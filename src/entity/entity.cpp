@@ -911,6 +911,7 @@ void Entity::advanceMotion(double time, float dt) {
         request.desiredFacing = heading;
     }
     request.desiredTurnRate = state_.turnRate;
+    request.bodyFacing = state_.facing();
     request.mode = state_.airborne ? MovementMode::Airborne : MovementMode::Ground;
     MotionMemory next;
     motionChainResult_ = motionChain_->advance(request, motionMemory_, time, dt, next);

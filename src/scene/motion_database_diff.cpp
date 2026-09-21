@@ -64,6 +64,10 @@ MotionDatabaseDiff diffMotionDatabases(const MotionDatabase& a, const MotionData
         out.configChanges.push_back(fmt::format("trajectoryTimes {} -> {}", joinFloats(ca.trajectoryTimes),
                                                 joinFloats(cb.trajectoryTimes)));
     }
+    if (ca.facingWindow != cb.facingWindow) {
+        out.configChanges.push_back(
+            fmt::format("facingWindow {} -> {}", ca.facingWindow, cb.facingWindow));
+    }
     const std::pair<const char*, std::pair<float, float>> weights[] = {
         {"jointPositionWeight", {ca.jointPositionWeight, cb.jointPositionWeight}},
         {"jointVelocityWeight", {ca.jointVelocityWeight, cb.jointVelocityWeight}},

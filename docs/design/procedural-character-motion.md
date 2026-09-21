@@ -2339,7 +2339,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 4 | Motion database | done | `9404a2d0` |
 | 5 | Motion sample | done | `9404a2d0` |
 | 6 | Database memory design | done | `392bf259` |
-| 7 | Feature representation | done | `9404a2d0`, `2489d6be` |
+| 7 | Feature representation | done (corrected) | `9404a2d0`, `2489d6be`. **A defect was found during the recount and fixed in the next commit:** features were position-relative but never facing-relative, and the matcher's query was world space. Invisible on Glowmere, which is authored facing +Z, and wrong on 100STYLE and for any character not facing +Z |
 | 8 | Feature configuration | done | `2489d6be` (ADR-608) |
 | 9 | Feature normalization | done | `9404a2d0` |
 | 10 | Cost function | done | `2489d6be` (ADR-608); `test_motion_cost.cpp` |

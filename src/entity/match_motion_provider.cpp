@@ -50,7 +50,12 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
     // what the body wants to be doing; the trajectory block is where it wants to be at each
     // horizon, which for a constant desired velocity is that velocity times the horizon.
     raw.assign(db_->dimension, 0.0f);
-    const glm::vec3 want = request.desiredVelocity + request.steering;
+    // **In the body's own frame, because that is the frame the database is in.** A request is
+    // world space. Before this rotation it was compared as-is with features extracted facing +Z,
+    // so a body facing east that asked to walk forward was scored against sideways motion. Every
+    // test built its body facing +Z, where the two frames coincide, so none of them could tell.
+    const glm::vec3 want =
+        scene::toFacingFrame(request.desiredVelocity + request.steering, request.bodyFacing);
     for (std::size_t t = 0; t < db_->config.trajectoryTimes.size(); ++t) {
         const float ahead = db_->config.trajectoryTimes[t];
         const std::size_t base = layout.trajectory + (t * 4u);

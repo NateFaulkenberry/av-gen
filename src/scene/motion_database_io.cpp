@@ -76,6 +76,7 @@ void digestSchema(Digest& d, const MotionFeatureConfig& config) {
         }
     }
     d.array(config.trajectoryTimes);
+    d.value(config.facingWindow);
     d.value(static_cast<std::uint8_t>(config.phaseWeight > 0.0f));
     d.value(config.dimension());
 }
@@ -97,6 +98,7 @@ json configToJson(const MotionFeatureConfig& c) {
     j["joints"] = c.joints;
     j["contactJoints"] = c.contactJoints;
     j["trajectoryTimes"] = c.trajectoryTimes;
+    j["facingWindow"] = c.facingWindow;
     j["jointPositionWeight"] = c.jointPositionWeight;
     j["jointVelocityWeight"] = c.jointVelocityWeight;
     j["trajectoryPositionWeight"] = c.trajectoryPositionWeight;
@@ -112,6 +114,9 @@ MotionFeatureConfig configFromJson(const json& j) {
     c.joints = j.at("joints").get<std::vector<std::string>>();
     c.contactJoints = j.at("contactJoints").get<std::vector<std::string>>();
     c.trajectoryTimes = j.at("trajectoryTimes").get<std::vector<float>>();
+    // Absent from a file written before extraction version 3. Such a file is refused by the
+    // schema check, which says why; reading it must not throw first and say something vaguer.
+    c.facingWindow = j.value("facingWindow", 0.0f);
     c.jointPositionWeight = j.at("jointPositionWeight").get<float>();
     c.jointVelocityWeight = j.at("jointVelocityWeight").get<float>();
     c.trajectoryPositionWeight = j.at("trajectoryPositionWeight").get<float>();

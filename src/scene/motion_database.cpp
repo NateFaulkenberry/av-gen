@@ -34,7 +34,59 @@ bool contains(const std::string& haystack, std::string_view needle) {
     return false;
 }
 
+
 } // namespace
+
+std::vector<glm::vec3> clipFacing(const Skeleton& skeleton, const AnimationClip& clip, int root,
+                                  std::uint32_t frames, float dt, bool loop, float window) {
+    const auto rotationOf = [](const glm::mat4& m) {
+        return glm::mat3(glm::normalize(glm::vec3(m[0])), glm::normalize(glm::vec3(m[1])),
+                         glm::normalize(glm::vec3(m[2])));
+    };
+    Pose pose;
+    std::vector<glm::mat4> model;
+    setRestPose(skeleton, pose);
+    poseToModel(skeleton, pose, model);
+    const glm::mat3 restInverse = glm::transpose(rotationOf(model[static_cast<std::size_t>(root)]));
+
+    std::vector<glm::vec3> raw(frames, glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::vec3 previous(0.0f, 0.0f, 1.0f);
+    for (std::uint32_t f = 0; f < frames; ++f) {
+        const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
+        setRestPose(skeleton, pose);
+        sampleClip(clip, t, pose);
+        poseToModel(skeleton, pose, model);
+        const glm::vec3 forward =
+            rotationOf(model[static_cast<std::size_t>(root)]) * (restInverse * glm::vec3(0.0f, 0.0f, 1.0f));
+        const float len = std::sqrt((forward.x * forward.x) + (forward.z * forward.z));
+        // A body pitched straight up or down has no planar facing; it keeps the last one it had.
+        previous = len > 1e-4f ? glm::vec3(forward.x / len, 0.0f, forward.z / len) : previous;
+        raw[f] = previous;
+    }
+    const auto half = static_cast<int>(std::lround((std::max(window, 0.0f) * 0.5f) / dt));
+    if (half == 0 || frames < 2) {
+        return raw;
+    }
+    // A looping clip's first and last samples are the same instant, so the period is one less.
+    const int period = loop ? static_cast<int>(frames) - 1 : static_cast<int>(frames);
+    std::vector<glm::vec3> out(frames);
+    for (int f = 0; f < static_cast<int>(frames); ++f) {
+        glm::vec3 sum(0.0f);
+        for (int o = -half; o <= half; ++o) {
+            int i = f + o;
+            if (loop) {
+                i = ((i % period) + period) % period;
+            } else {
+                i = std::clamp(i, 0, static_cast<int>(frames) - 1);
+            }
+            sum += raw[static_cast<std::size_t>(i)];
+        }
+        const float len = std::sqrt((sum.x * sum.x) + (sum.z * sum.z));
+        out[static_cast<std::size_t>(f)] = len > 1e-4f ? glm::vec3(sum.x / len, 0.0f, sum.z / len) : raw[static_cast<std::size_t>(f)];
+    }
+    return out;
+}
+
 
 std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis) {
     std::uint32_t tags = 0;
@@ -396,8 +448,18 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             return offset;
         };
 
+        // ---- the body's facing, per frame (§7) --------------------------------------------------
+        //
+        // §7 says the features are in the body's own frame. The builder removed the body's
+        // position and never its heading, so a walk facing east and the same walk facing north
+        // were different motions to the search. Every Glowmere clip is authored facing +Z, which
+        // is why nothing noticed. 100STYLE turns, and so does any character in a scene.
+        const std::vector<glm::vec3> facing =
+            clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop, options.config.facingWindow);
+
         for (std::uint32_t f = 0; f < frames; ++f) {
             const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
+            const glm::vec3 heading = facing[f];
             setRestPose(pack.skeleton, pose);
             sampleClip(clip, t, pose);
             poseToModel(pack.skeleton, pose, model);
@@ -422,8 +484,10 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             // would make two identical walks at different places look unlike each other.
             for (std::size_t jn = 0; jn < jointIndex.size(); ++jn) {
                 const auto ji = static_cast<std::size_t>(jointIndex[jn]);
-                const glm::vec3 p = glm::vec3(model[ji][3]) - body;
-                const glm::vec3 v = ((glm::vec3(modelAhead[ji][3]) - bodyAhead) - p) / dt;
+                const glm::vec3 pWorld = glm::vec3(model[ji][3]) - body;
+                const glm::vec3 p = toFacingFrame(pWorld, heading);
+                const glm::vec3 v = toFacingFrame(
+                    ((glm::vec3(modelAhead[ji][3]) - bodyAhead) - pWorld) / dt, heading);
                 out[k++] = p.x; out[k++] = p.y; out[k++] = p.z;
                 out[k++] = v.x; out[k++] = v.y; out[k++] = v.z;
                 const double radius = static_cast<double>(glm::length(p));
@@ -440,7 +504,7 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 const glm::vec3 offset = sampleAhead(t + ahead);
                 const glm::vec3 future =
                     glm::vec3(modelAhead[static_cast<std::size_t>(root)][3]) + offset;
-                const glm::vec3 delta = future - body;
+                const glm::vec3 delta = toFacingFrame(future - body, heading);
                 out[k++] = delta.x;
                 out[k++] = delta.z;
                 // Facing: the direction it is heading at that moment, or zero when it is not
@@ -450,9 +514,10 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 out[k++] = len > 1e-5f ? delta.z / len : 0.0f;
             }
 
-            out[k++] = rootVelocity.x;
-            out[k++] = rootVelocity.y;
-            out[k++] = rootVelocity.z;
+            const glm::vec3 bodyVelocity = toFacingFrame(rootVelocity, heading);
+            out[k++] = bodyVelocity.x;
+            out[k++] = bodyVelocity.y;
+            out[k++] = bodyVelocity.z;
 
             if (options.config.phaseWeight > 0.0f) {
                 const float phase = meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start);

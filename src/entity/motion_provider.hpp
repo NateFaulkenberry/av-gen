@@ -98,6 +98,11 @@ struct MotionRequest {
     // target while watching it has one of each and they disagree.
     glm::vec3 desiredFacing{0.0f, 0.0f, 1.0f};
     float desiredTurnRate = 0.0f; // rad/s, signed; for turning on the spot
+    // World space, unit: the way the body faces **now**. This is not an intent but the frame the
+    // intents above are read in. A motion database stores its features relative to the body's
+    // facing, so a world-space velocity means nothing to it until it is expressed relative to this.
+    // The default is +Z, the frame every clip is authored in.
+    glm::vec3 bodyFacing{0.0f, 0.0f, 1.0f};
     MovementMode mode = MovementMode::Ground;
 
     // §38. Where the body will want to be heading shortly, so a turn can begin before the corner

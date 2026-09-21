@@ -30,6 +30,9 @@
 #include "scene/motion_pack.hpp"
 #include "scene/skeleton.hpp"
 
+#include <glm/glm.hpp>
+
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -67,7 +70,37 @@ enum class MotionTag : std::uint32_t {
 //   2  looks past a clip's end continue it instead of clamping: a looping clip wraps into its own
 //      start, and anything else extrapolates at its final velocity. Before this, the last sample of
 //      every clip read zero root velocity.
-inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 2;
+//   3  every feature is expressed in the body's own facing frame (§7), not only relative to its
+//      position.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 3;
+
+// A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
+// forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one
+// definition of that frame: the database builder uses it on every feature, and the matcher uses it
+// on every request. A zero facing leaves the vector unrotated.
+// The body's planar facing at each of a clip's `frames` samples (sample f at
+// `clip.start + f*dt`), as unit vectors in model space (§7). `root` is the travel joint. Its
+// rotation is taken relative to its rest orientation, so a clip authored facing +Z reads +Z at rest
+// whatever the rig's own joint axes are.
+//
+// **Smoothed, because a pelvis is not a heading.** A walking pelvis yaws from side to side with
+// every step. Taken raw, that sway would rotate every feature in time with the gait, while the
+// character's facing in a scene (the frame a query is built in) does not sway. `window` is the
+// span, in seconds, of a centred average of the unit vectors. A looping clip's average wraps; any
+// other clip's is clamped at its ends. A window of 0 takes the raw facing.
+[[nodiscard]] std::vector<glm::vec3> clipFacing(const Skeleton& skeleton, const AnimationClip& clip,
+                                                int root, std::uint32_t frames, float dt, bool loop,
+                                                float window);
+
+[[nodiscard]] inline glm::vec3 toFacingFrame(const glm::vec3& world, const glm::vec3& facing) {
+    const float len = std::sqrt((facing.x * facing.x) + (facing.z * facing.z));
+    if (len < 1e-6f) {
+        return world;
+    }
+    const float s = facing.x / len; // sin(yaw)
+    const float c = facing.z / len; // cos(yaw)
+    return {(world.x * c) - (world.z * s), world.y, (world.x * s) + (world.z * c)};
+}
 
 // One feature dimension's contribution to a cost: the squared difference, weighted. **A function
 // rather than an expression written out at each site** so that every place a cost is summed
@@ -103,6 +136,17 @@ struct MotionFeatureConfig {
     // Seconds ahead to sample the future trajectory. Empty means no trajectory term, which is the
     // honest configuration for an in-place corpus.
     std::vector<float> trajectoryTimes;
+    // Seconds: the span over which the body's facing is averaged before every feature is expressed
+    // relative to it (`clipFacing`). It changes what every dimension means, so it is part of the
+    // schema.
+    //
+    // **One second, measured.** Across the scout's five walk and run cycles, all authored facing
+    // +Z, the raw pelvis facing sways 2.49° RMS on average, 4.51° RMS in the worst clip (`Walking`)
+    // and 9.87° at the worst peak. A 0.25 s window leaves 1.98° RMS, 0.5 s leaves 1.39°, and 1 s
+    // leaves 0.31° (worst peak 2.04°). One second is about one gait cycle, which is the sway's
+    // period, and that is why it cancels. The cost is lag on a real turn, about half the window.
+    // (test_motion_facing.cpp, "how much a Glowmere pelvis sways".)
+    float facingWindow = 1.0f;
 
     // ---- weights (§10) ---------------------------------------------------------------------
     // Every term is weighted and every weight is named. §10: avoid an opaque scoring function.
