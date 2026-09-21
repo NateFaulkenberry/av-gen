@@ -102,7 +102,31 @@ that returns confidently wrong heights.
 
 ## Consequences
 
-### The end-to-end number, and why it is not here
+### The end-to-end number
+
+**A scrub of the owner's film, before this pass and after it, measured as one interleaved session on
+a quiet machine.** Four rounds, both bypasses, minima (ADR-170):
+
+| arm | rounds (ms) | min | spread within the arm |
+|---|---|---:|---:|
+| before — no cutoff, no cache | 3045.3, 3048.8, 3106.8, 3050.2 | **3045.3** | 61.5 ms (2.0%) |
+| after — both | 1834.3, 1850.3, 1868.2, 1870.5 | **1834.3** | 36.2 ms (2.0%) |
+
+> **3045.3 ms -> 1834.3 ms, −39.8%.**
+
+Load average **5.63 at the start and 4.57 at the end** — stated at both ends because a run that gets
+quieter as it proceeds biases whichever arm ran later, and interleaving only cancels that if the
+drift is small. It was.
+
+**The control nobody designed, and the best evidence in this document.** The before arm's minimum is
+**3045.3 ms**. ADR-482 measured the same configuration at **3045.2 ms**, in a different session, on a
+different day's machine, before either bypass existed. Agreement to a tenth of a millisecond says
+three things at once that no single arm could: the bypasses genuinely restore the original code path
+rather than approximating it, the measurement is reproducible across sessions, and minima over
+repeats is doing exactly the job it is chosen for. A number that lands on an independently taken one
+is worth more than a number with a small error bar.
+
+### Why the first attempt is recorded and discarded
 
 Both halves of this pass are switchable in one process -- `AVGEN_PATH_CUTOFF=0` and
 `AVGEN_HEIGHT_CACHE=0` -- so "what did the pass buy" can be a single interleaved measurement rather
@@ -125,10 +149,9 @@ so the minimum is the least-disturbed one and is the most load-robust thing a sh
 give you. It is an argument for why minima are the right statistic. It is not a result about the
 cache, and it does not license quoting the delta.
 
-* A scrub is cheaper again, on top of ADR-482. The absolute figure is deliberately **not quoted
-  here**: every number in this document that could be quoted as an absolute was taken while three
-  other agents were on the machine, and the honest ones above are ratios measured inside a single
-  interleaved session. The end-to-end figure belongs in a quiet window.
+* **A scrub of the multicam film is 1.8 s where it was 3.0 s** -- 39.8% faster, exact, and still
+  far too slow to call interactive. The `input -> first visual` half was already 7.6 ms (ADR-482
+  Decision 3); what this moves is the settled frame.
 * `AVGEN_HEIGHT_CACHE=0` removes the cache without removing the build, so the comparison can always
   be re-run as an A/B rather than against a remembered number.
 * **Not done:** the load phase's 1.8 million height calls at a 3% repeat rate are untouched, and a
