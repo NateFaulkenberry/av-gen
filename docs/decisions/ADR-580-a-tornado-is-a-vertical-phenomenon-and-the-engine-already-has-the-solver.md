@@ -644,6 +644,171 @@ happening to be loud was luck. **Two were caught by a person parsing instead of 
 6 is the worst of them and is not a scan failure at all but a *schema* one: two subsystems sharing
 an English word in the same file, where the symptom was a flat wash that reads as a tuning problem.
 
+## 10. Phases 7 and 8: onto the foundation, into the hero shot, and what it cost
+
+### 10.1 The integration, and three defects it surfaced
+
+ADR-562's medium slots landed while this branch was on its provisional plumbing -- a parallel
+uniform block and a per-effect frame slot, described from the start as a move rather than a
+rewrite. The rebase took the foundation's side for every file it owned and the integration was done
+once, against the final shape: `EffectBucket::Medium`, a `packMedium` beside `fill`, and the
+Tornado's arm in `mediumShape`, `mediumEmissionAt` and `mediumInterval`. The ray interval is a
+vertical cylinder whose radius is the Bezier **convex hull** of the three artist radii -- a provable
+bound rather than an estimate -- and whose caps are the field's own compact support.
+
+Three defects came out of it, all one family:
+
+**`MediumSlot::kind` had zero readers.** Set on the CPU, compared by `frameDiffers`, and the
+renderer copied only lanes -- so the tag selecting a density function reached no shader.
+Built-but-unreachable *inside the foundation written to fix that family*, one day old. Found
+independently on two branches; the central fix (lane 15, written in `buildAtmosphericFrame` after
+each kind's `pack` returns, so no kind can forget) is `agent/fog`'s and this branch's own attempt
+was reverted in favour of one fix rather than two.
+
+**This branch's packer wrote a colour into lane 15 -- the tag's lane.** Thirteen field lanes plus
+three of appearance is sixteen; lane 15 is reserved; so a tornado has sixty floats and wanted
+sixty-one. `edgeWidth` was folded into a constant to free the last one. **One artist control
+removed deliberately beats a packer that silently overwrites the tag selecting its own density
+function** -- and the timing is the frightening part: had the tag landed *before* the packer, this
+would have presented as **a tornado intermittently rendering as a comet**, which names a symptom
+somebody would otherwise chase for a long time.
+
+**The §68 wind lean was vortex-specific.** `buildAtmosphericFrame` wrote `leaned.vortex.field.center`
+unconditionally -- correct for the two kinds that store in `e.vortex`, a silent no-op for a tornado.
+`effect_conformance`'s `flow-reaches` named it within a minute of the kind existing, which is that
+check paying out on a kind built after it. It is a per-kind hook beside `pack` now, because a disc
+leans by **moving** and a tornado's axis is already a curve so it leans by **bending**. Adding the
+hook then broke FOG, which had been relying on the unconditional arm; the agent who adds the branch
+owns every kind it breaks, so that was fixed in the same commit.
+
+### 10.2 The six renders, and the two moves that would have saved five of them
+
+With the tag not yet on `main`, the march read a tornado's lanes through `vortexShapeAt`: lane 0's
+`.w` is a **height** read as a radius, lane 1's `.w` is a **taper** read as extinction per metre. A
+1400 m disc at 1.5 per metre is a blown-out white wash.
+
+It was predicted, by name, in advance: *a tornado evaluated as a vortex will look like a tuning
+problem and you will have no reason to suspect the dispatch.* **It still cost six renders.** A step
+ladder at 32/96/160, an emission ladder, scattering to zero -- and reasoning through two documented
+failure modes (ADR-374's in-scattering wash, ADR-461's under-sampling) and tuning against both,
+before suspecting the dispatch at all.
+
+**Knowing a hazard by name does not make it recognisable in the moment.** That is the argument for
+structural fixes over checklists, and it was reached on two branches the same night from opposite
+directions -- here, and in `agent/fog`'s finding that the producer/consumer split is the default
+outcome of writing a producer and a consumer in separate commits rather than a lapse of care.
+
+What broke it is cheap and general, and is recorded here because it is worth more than the fix:
+
+> **When a knob does nothing, compare hashes across configurations that should differ wildly.
+> Identity across unrelated inputs says the input is not reaching the computation at all.**
+
+`e7ff2f282b5b08fa` came back from `emission 0.22 / scattering 0.15 / density 0.05` and again from
+`emission 0.03 / scattering 0.0 / density 0.012`. Two configurations sharing no value cannot
+produce one frame. That is a **category** signal rather than a magnitude one, and it is a cheaper
+first move than any ladder.
+
+Its companion, which is the same thought one step earlier:
+
+> **The first question about an unresponsive control is not "what value" but "is this code
+> running".**
+
+Disabling the effect entirely -- which is what finally settled it -- should have been the first
+move, not the seventh.
+
+And the confirmation, in the other direction: once the tag was live, an emission ladder returned
+**three different hashes**, which is the same test used to prove the input now *does* reach.
+
+### 10.3 The hero shot
+
+Both halves of the deliverable were replaced together so the shot has no gap. ADR-264 caught the
+first attempt: only the scene was edited and the frame did not move, because the project authors
+its own effect list.
+
+The census was taken by **parsing, not grepping**, and the count is the record: **two** deliverable
+files author an atmospheric Vortex; **six** others carry a `spatial::FieldKind::Vortex` driving
+particles and are untouched; **twelve** `_`-prefixed arms belong to other branches' ADR evidence
+(ADR-460/461, ADR-560) and are left alone, because deleting them destroys the evidence for three
+records. A `git grep` of `"kind": "vortex"` returns eight files and would have deleted particle
+motion from six scenes -- §9 row 1, and the reason this paragraph states its method.
+
+The Vortex **kind stays**: `volumetric_fog_effect.cpp` stores in `e.vortex` at 57 sites.
+
+The project's five routes are **retargeted rather than deleted** -- bass to thickness and debris,
+mid to wobble, treble to striation contrast, beat to glow. The musical intent survives the change
+of kind even though every leaf name does not.
+
+Two tests encoded "the hero has a vortex". `test_vortex_effect` now counts five routes naming the
+Tornado and still resolves every one. `test_tree_energy_reach` now finds whatever kind resolves
+into `EffectBucket::Medium` and asks the registry for its factory -- it follows the **role** rather
+than the kind, so it survives the next replacement as well as this one.
+
+### 10.4 What the hero frame actually looks like, and the seam it exposes
+
+Shape, placement and scale are right. A vertical luminous column on the right third of frame,
+clear of the island exactly where §2's geometry put it (2380 m out, 22 degrees off a view axis
+whose island occupies 15, 32.8 of a 36 degree frame vertically), with a visible waist, a flared
+base and readable striations at `emission` 0.004.
+
+**The values are not right, and this is recorded as unfinished rather than shipped.** It is too
+bright and reads as glowing gas rather than smoke; the wall cloud is cut off by the top of frame,
+which loses the thin-column-under-a-broad-cloud proportion §8.1 identified as the thing that sells
+the silhouette; and the base flare reads as a pool of light rather than a dust skirt.
+
+**That last one is not a brightness problem, and it is the seam §32 warned about.** The debris
+skirt is a visual statement that *this column is touching the ground and tearing it up*. The Tree
+of Life is an island in open space: **there is no ground**, so the term is asserting a relationship
+the scene does not contain, and no amount of dimming or brightening will make it read, because the
+problem is not its value.
+
+Three ways out, genuinely different, and this record does not choose between them because it is an
+art-direction decision rather than an engineering one:
+
+1. **Drop the skirt in this scene.** A cosmic column with no ground contact is a coherent object --
+   nearer a column of matter than a terrestrial tornado -- and §1 permits the effect to remain
+   stylised for Tree of Life.
+2. **Give it something to touch.** Land the base on the island or on something else. A composition
+   change rather than an effect change, and it makes the skirt mean what it is drawn to mean.
+3. **Keep it and accept the read** as unearthly rather than wrong.
+
+§32 asks for EmberGen's physical vocabulary inside a cosmic art direction. The skirt is the exact
+point where those two pull apart, and it is worth naming as a seam rather than tuning past.
+
+### 10.5 Phase 8: 4.7x cheaper, like for like
+
+The measurement §8.2 deferred, taken in a known state **before** any value moved -- because tuning
+and measuring together makes neither attributable. Same project, camera, 32 steps, 1920x1080 with
+the half-res volume target, **same tree**. Interleaved, `tools/gpu-lock.sh`, minima over repeats
+(ADR-170):
+
+| arm | `volume.march` |
+|---|---|
+| the shipped Cosmic Vortex, recovered from `fd71b736` | **6.16 ms** (6.16, 6.49, 6.16) |
+| the Cosmic Tornado that replaced it | **1.31 ms** (1.31, 1.44, 1.57, 1.97) |
+| no medium at all | **no `volume.march` pass exists** |
+
+**4.7x.** §5 predicted 1.5 to 3 ms from ADR-374's coverage model and §8.2 measured 1.25 ms in the
+lab while refusing to quote a ratio from it. The real ratio is **smaller than the lab's 6.5x would
+have implied**, which is exactly what refusing to quote it protected against: the lab's column
+covered about 15% of frame against a funnel filling two thirds, and a ratio between quantities
+measured under different distributions is the ADR-389 family's mistake in a new place.
+
+**The ray interval is separated rather than folded in.** ADR-460 measured this same vortex in this
+same shot at **8.13 ms** before the per-slot interval existed; on this tree it is 6.16, which is
+**-24%** and is consistent with the interval doing what it was built for. Other work landed between
+those trees, so that is an **association and not an attribution**. What is clean is the 4.7x: both
+arms on one tree, with the interval under both.
+
+Frame medians: vortex 14.61-15.60, tornado 10.75-12.06, no medium 10.94-11.99. **The tornado is
+roughly frame-neutral against having no placed medium at all.** ADR-374 called the thing it
+replaces "+5.5 ms of a 13.5 ms frame -- the most expensive term in the scene"; it is now the
+cheapest thing in it.
+
+No combined shot was measured. `agent/fog` has since found that per-slot cost is **not additive** --
+dense media in one frame subsidise each other through the transmittance early-out while thin
+separated ones do not -- so nothing above rests on an additive assumption, and nothing is claimed
+about combinations.
+
 ## Do NOT "fix" this later
 
 **Vorticity confinement is absent from the analytic tier on purpose, and the missing slider is not
@@ -676,7 +841,23 @@ the word is missing from a shader.**
   was never simulated. It does not violate ADR-360 and it does break `--range t:t`. If the tier is
   built, one of ADR-581 §4's four options has to be chosen first.
 
-### What is still open at the end of Phase 6
+### What is still open at the end of Phase 8
+
+- **The hero's art direction**, §10.4's list: too bright, the wall cloud cut off, and the debris
+  skirt asserting a ground contact the scene does not have. The third is a decision between three
+  named options rather than a tuning pass, and it belongs to the owner.
+- **Phase 5, cinematic rendering.** Blocked on the shared self-shadow light march, which does not
+  exist. Nothing is budgeted for it inside this slot.
+- **The wedge** is the weakest of §47's seven and the diagnosis looks intrinsic: its funnel is as
+  wide as its cloud, so the shoulder §8.1 names is gone by definition. It ships weak and stays in
+  the showcase, because an honest weak case beats one tuned to a camera chosen for it.
+- **Step redistribution.** The per-slot interval skips samples outside a medium but does not place
+  them inside it, so a thin column is still limited by the global step count. The rope table in
+  §8.3 and `agent/fog`'s 7% are the two arguments for doing it; it is a separate change.
+- **Four medium slots, not eight.** §47's showcase authors seven and draws four. Raising the cap is
+  a constant plus a measurement, and the per-slot cost curve is `agent/fog`'s to finish.
+
+### What was still open at the end of Phase 6
 
 - **Phase 5, cinematic rendering.** Blocked on the shared volumetric foundation's light march
   (§7 item 7), which the fog agent took. Nothing is budgeted for self-shadowing inside this slot.
