@@ -768,6 +768,34 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::NoTarget;
                 continue;
             }
+
+            // ---- §14/§15: hold the foot where it landed, and let it go gracefully ---------------
+            //
+            // In the body's own frame a planted foot slides **backwards at the body's speed**.
+            // Holding it in the world therefore means offsetting the plant target by
+            // `-velocity * elapsed`, which needs no memory: `elapsed` comes from the contact track
+            // the clip already carries, and the velocity from the seam. See `PoseLayer::footLock`
+            // for why an accumulated anchor could not survive a scrub.
+            if (layer.footLock > 0.0f && layer.inContact) {
+                // §15's approach and release. A lock that switched on at the span boundary is the
+                // "foot locked, then teleports" failure named outright in the spec, so both edges
+                // ease -- and the ease is over the *time to the edge*, not over the span's length,
+                // so a long stance and a short one release the same way.
+                const float blend = std::max(layer.lockBlendSeconds, 1e-4f);
+                const float rampIn = std::clamp(layer.contactElapsed / blend, 0.0f, 1.0f);
+                const float rampOut = std::clamp(layer.contactRemaining / blend, 0.0f, 1.0f);
+                const auto smooth = [](float t) { return t * t * (3.0f - (2.0f * t)); };
+                const float hold = std::clamp(layer.footLock, 0.0f, 1.0f) *
+                                   smooth(std::min(rampIn, rampOut));
+                if (hold > 1e-4f) {
+                    const glm::vec3 slid =
+                        target - (layer.bodyVelocity * layer.contactElapsed * hold);
+                    // Only the horizontal component is held. The vertical one is the ground's
+                    // answer and holding it would lift a foot off a slope it is walking down.
+                    target = glm::vec3(slid.x, target.y, slid.z);
+                }
+            }
+
             // The pole direction becomes a pole *position* here, out from the midpoint of the hip
             // and the target by one limb length. Only the component perpendicular to the
             // hip->target axis does anything, and building it this way makes that component exactly

@@ -437,3 +437,150 @@ TEST_CASE("a standing body does not lean, and weight fades it", "[lean][layers]"
     INFO("half weight " << half << ", full " << whole);
     CHECK(half == Approx(whole * 0.5f).margin(0.1f));
 }
+
+// ---- Foot planting and release (Phase B §14/§15) -----------------------------------------------
+
+namespace {
+
+// A leg whose three joints are an ordinary chain, so the solve is not the thing under test here.
+scene::Skeleton legRig() {
+    scene::Skeleton sk;
+    sk.name = "leg";
+    sk.joints.push_back(scene::Joint{"rig", -1, scene::Transform{}});
+    scene::Transform hip;
+    hip.position = glm::vec3(0.0f, 1.0f, 0.0f);
+    sk.joints.push_back(scene::Joint{"hip", 0, hip});
+    // **The knee is bent at rest, and that is load-bearing for the fixture.** A leg that is
+    // straight at rest has zero slack, so any horizontal lock offset is already out of reach and
+    // the solver clamps -- the first version of this rig measured the clamp and reported that the
+    // lock did nothing. Two 0.527 segments spanning 1.0 leave 0.055 of slack, which a 0.2 offset
+    // fits inside (1.02 < 1.055).
+    scene::Transform knee;
+    knee.position = glm::vec3(0.0f, -0.5f, 0.15f);
+    sk.joints.push_back(scene::Joint{"knee", 1, knee});
+    scene::Transform foot;
+    foot.position = glm::vec3(0.0f, -0.5f, -0.15f);
+    sk.joints.push_back(scene::Joint{"foot", 2, foot});
+    sk.palette = {0, 1, 2, 3};
+    sk.inverseBind.assign(4, glm::mat4(1.0f));
+    return sk;
+}
+
+scene::PoseLayer lockedFoot(float lock) {
+    scene::PoseLayer layer;
+    layer.name = "foot";
+    layer.kind = scene::PoseLayerKind::Foot;
+    layer.drive = scene::PoseLayerDrive::Manual;
+    layer.chainRoot = "hip";
+    layer.chainMid = "knee";
+    layer.chainTip = "foot";
+    layer.hasGround = true;
+    layer.groundPoint = glm::vec3(0.0f, 0.0f, 0.0f);
+    layer.groundNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+    layer.footLock = lock;
+    layer.lockBlendSeconds = 0.05f;
+    layer.weight = 1.0f;
+    return layer;
+}
+
+// Where the foot ends up, in the rig's own frame, for a given moment of a contact span.
+glm::vec3 footAfter(float lock, const glm::vec3& velocity, float elapsed, float remaining) {
+    const scene::Skeleton sk = legRig();
+    const std::vector<scene::AnimationClip> clips;
+    scene::PoseLayer layer = lockedFoot(lock);
+    layer.inContact = true;
+    layer.bodyVelocity = velocity;
+    layer.contactElapsed = elapsed;
+    layer.contactRemaining = remaining;
+    scene::PoseLayerStack stack;
+    const std::vector<std::string> problems = stack.bind({layer}, sk, clips);
+    INFO((problems.empty() ? std::string("none") : problems.front()));
+    REQUIRE(problems.empty());
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    stack.apply(sk, clips, 0.0, pose);
+    std::vector<glm::mat4> model;
+    scene::poseToModel(sk, pose, model);
+    return glm::vec3(model[3][3]);
+}
+
+} // namespace
+
+TEST_CASE("a planted foot slides backwards in the body's frame, which is standing still in the world",
+          "[footlock][layers]") {
+    // §14. The whole mechanism in one assertion. The body travels +Z at 1 m/s; in its own frame a
+    // foot that is standing still in the world must move -Z at 1 m/s. After 0.2 s of contact the
+    // held foot is 0.2 behind where the unheld one would be.
+    const glm::vec3 v(0.0f, 0.0f, 1.0f);
+    const glm::vec3 unheld = footAfter(0.0f, v, 0.2f, 0.2f);
+    const glm::vec3 held = footAfter(1.0f, v, 0.2f, 0.2f);
+    INFO("unheld z " << unheld.z << ", held z " << held.z);
+    CHECK(held.z == Approx(unheld.z - 0.2f).margin(0.01f));
+    // And the height is the ground's answer, untouched: holding it would lift a foot off a slope
+    // it is walking down.
+    CHECK(held.y == Approx(unheld.y).margin(1e-4));
+}
+
+TEST_CASE("the lock eases in and out rather than switching", "[footlock][layers]") {
+    // §15, named in the spec as the failure to avoid: "foot locked -> suddenly teleports". Both
+    // edges ease over `lockBlendSeconds`, and the ease is over the time to the edge rather than
+    // over the span's length, so a long stance and a short one release identically.
+    const glm::vec3 v(0.0f, 0.0f, 1.0f);
+    const float atEntry = footAfter(1.0f, v, 0.0f, 0.4f).z;      // the instant contact begins
+    const float midway = footAfter(1.0f, v, 0.2f, 0.2f).z;       // fully held
+    const float atRelease = footAfter(1.0f, v, 0.4f, 0.0f).z;    // the instant it ends
+    const float free = footAfter(0.0f, v, 0.2f, 0.2f).z;
+    INFO("entry " << atEntry << " mid " << midway << " release " << atRelease << " free " << free);
+    // At both edges the hold is zero, so the foot is exactly where the animation put it -- no step
+    // to teleport across.
+    CHECK(atEntry == Approx(free).margin(1e-3));
+    CHECK(atRelease == Approx(free).margin(1e-3));
+    // And in the middle it is fully held.
+    CHECK(midway < free - 0.15f);
+}
+
+TEST_CASE("the lock's drift under acceleration is 0.5*a*t^2, measured", "[footlock][layers]") {
+    // **The cost of deriving the anchor instead of remembering it, stated as a magnitude**
+    // (testing.md #20). The derivation assumes the body's speed over the stance is the speed it
+    // has now; under acceleration that is wrong by exactly `0.5*a*t^2`, and the question is not
+    // "does it drift" but "by how much, and does that read on screen".
+    //
+    // Integrated here rather than reasoned about: the body accelerates from rest at a m/s^2 and
+    // the test compares where the lock holds the foot against where a perfect world-fixed anchor
+    // would.
+    const float dt = 1.0f / 60.0f;
+    for (const float accel : {1.0f, 2.0f, 4.0f}) {
+        float bodyZ = 0.0f;
+        float speed = 0.0f;
+        float elapsed = 0.0f;
+        float worstDrift = 0.0f;
+        const float stance = 0.3f;
+        // Where the foot is in the world at the instant contact begins.
+        const float anchorWorld = bodyZ + footAfter(1.0f, glm::vec3(0.0f), 0.0f, stance).z;
+        while (elapsed < stance) {
+            speed += accel * dt;
+            bodyZ += speed * dt;
+            elapsed += dt;
+            const glm::vec3 v(0.0f, 0.0f, speed);
+            const float localZ = footAfter(1.0f, v, elapsed, stance - elapsed).z;
+            const float worldZ = bodyZ + localZ;
+            worstDrift = std::max(worstDrift, std::abs(worldZ - anchorWorld));
+        }
+        const float predicted = 0.5f * accel * stance * stance;
+        INFO("accel " << accel << " m/s^2: worst drift " << worstDrift << " m, 0.5*a*t^2 = "
+                      << predicted);
+        // The prediction is a magnitude and it is checked as one. The edge ease makes the measured
+        // value a little under the closed form, which is the ease doing its job.
+        CHECK(worstDrift < predicted * 1.15f);
+        CHECK(worstDrift > predicted * 0.35f);
+    }
+}
+
+TEST_CASE("an unlocked foot is the behaviour every scene had before", "[footlock][layers]") {
+    // ADR-182's control. `footLock` defaults to 0, and at 0 the layer does exactly what it did
+    // before this stage: plants on the ground under it and travels with the body.
+    const scene::PoseLayer plain = lockedFoot(0.0f);
+    CHECK(plain.footLock == 0.0f);
+    const glm::vec3 v(0.0f, 0.0f, 2.0f);
+    CHECK(footAfter(0.0f, v, 0.25f, 0.25f).z == Approx(footAfter(0.0f, glm::vec3(0.0f), 0.0f, 0.5f).z).margin(1e-4));
+}

@@ -226,6 +226,27 @@ struct PoseLayer {
     // pose's up needs no authoring and cannot be wrong about a rig it has read.
     glm::vec3 soleUp{0.0f};
 
+    // ---- Foot planting and release (Phase B §14/§15) ---------------------------------------------
+    // How strongly a foot is held in the WORLD while its contact span lasts. 0 is the behaviour
+    // every scene had before this: the foot lands on the ground under it and then travels with the
+    // body, which is the foot slide `Gait::footSlip` has been reporting across the whole cast.
+    //
+    // **The anchor is derived, never accumulated.** A lock that remembered where the foot landed
+    // would be state in a pose layer, and `EntityWorld::seek` poses the rigs once at the end of a
+    // replay -- so a scrubbed frame would hold an anchor from a timeline the scrub abolished. This
+    // one computes the same answer from values already on the seam: in the body's own frame a
+    // planted foot must slide **backwards at the body's speed**, so the offset is
+    // `-velocity * elapsed-in-contact` and needs no memory at all.
+    //
+    // The approximation is exact at constant velocity and drifts under acceleration by
+    // `0.5 * a * t^2` over a stance -- at 2 m/s^2 across a 0.3 s stance, 9 cm, which is why the
+    // lock is weighted rather than absolute and why `lockBlendSeconds` eases both edges.
+    float footLock = 0.0f;
+    // Seconds of ease at each end of a contact span: §15's approach and release. A lock that
+    // switched on and off at the span boundary is the "foot locked, then teleports" failure §15
+    // names outright.
+    float lockBlendSeconds = 0.08f;
+
     // ---- Stride (Phase B §7) --------------------------------------------------------------------
     // The joint whose horizontal excursion is scaled -- a foot, or a hand on a quadruped forelimb.
     std::string strideJoint;
@@ -290,6 +311,12 @@ struct PoseLayer {
     // frame from `MotionContext`, which took them from the seam.
     glm::vec3 bodyAcceleration{0.0f};
     float bodyTurnRate = 0.0f;
+    // Foot lock, written per frame: whether this foot's contact span is running, how long it has
+    // been running, how long is left, and how fast the body is travelling in its own frame.
+    bool inContact = false;
+    float contactElapsed = 0.0f;
+    float contactRemaining = 0.0f;
+    glm::vec3 bodyVelocity{0.0f};
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
     bool hasTarget = false;
 };

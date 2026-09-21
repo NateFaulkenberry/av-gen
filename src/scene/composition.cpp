@@ -2874,6 +2874,55 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 // across their own footprint, and not one foot clamped or compensated.
                 //
                 // So each foot layer that can be placed asks the terrain under its own tip.
+                // §14/§15. Which contact span this foot is in, and how far through it -- read
+                // from the contact track the clip already carries (Phase A) rather than from a
+                // detector run again here, because two answers to "is this foot down" is how
+                // ADR-260 started.
+                if (layer.kind == PoseLayerKind::Foot && layer.footLock > 0.0f) {
+                    layer.inContact = false;
+                    layer.bodyVelocity = motion_.velocity;
+                    const SkinnedRig& rig = owner_.scene_.rigs[id];
+                    const int stateIndex = rig.player.currentStateIndex();
+                    if (stateIndex >= 0 &&
+                        static_cast<std::size_t>(stateIndex) < rig.player.states().size()) {
+                        const std::uint32_t clipIndex =
+                            rig.player.states()[static_cast<std::size_t>(stateIndex)].clip;
+                        if (clipIndex < rig.clipContacts.size() && clipIndex < rig.clips.size()) {
+                            const std::vector<ContactTrack>& tracks = rig.clipContacts[clipIndex];
+                            // Matched by the tip joint's NAME, not by layer order: the contact
+                            // tracks are indexed by the node's `contacts` list and the layers by
+                            // the node's `layers` list, and nothing makes those parallel. An
+                            // off-by-one between two lists that merely look parallel is exactly
+                            // the bug ADR-551 records.
+                            for (const ContactTrack& track : tracks) {
+                                if (track.joint != layer.chainTip) {
+                                    continue;
+                                }
+                                const float local =
+                                    rig.player.stateTime(rig.clips, state.time);
+                                for (const ContactSpan& span : track.spans) {
+                                    const float length = span.clipLength;
+                                    const bool inside =
+                                        span.wraps() ? (local >= span.start || local <= span.end)
+                                                     : (local >= span.start && local <= span.end);
+                                    if (!inside) {
+                                        continue;
+                                    }
+                                    layer.inContact = true;
+                                    layer.contactElapsed =
+                                        span.wraps() && local <= span.end
+                                            ? (length - span.start) + local
+                                            : local - span.start;
+                                    const float duration = span.duration();
+                                    layer.contactRemaining =
+                                        std::max(duration - layer.contactElapsed, 0.0f);
+                                    break;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
                 if (haveGround && layer.kind == PoseLayerKind::Foot &&
                     thisLayer < owner_.scene_.rigs[id].layers.chains().size()) {
                     const glm::ivec3 chain = owner_.scene_.rigs[id].layers.chains()[thisLayer];
