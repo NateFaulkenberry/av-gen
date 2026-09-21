@@ -756,15 +756,26 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                 // `footLock > 0` (which defaults to 0).
                 //
                 // `layers.front()` is the lowest `poseLayerStage`, and the order is Stride 10,
-                // Lean 20, Secondary 30, Aim 40, Additive 50, Foot 60, Reach 70. So the
-                // acceleration arrow appears only on a rig with a Lean layer and no Stride layer,
-                // and the velocity arrow only on a rig whose lowest-stage layer is a foot-locking
-                // Foot layer -- no Stride, Lean, Secondary, Aim or Additive at all.
+                // Lean 20, Secondary 30, Aim 40, Additive 50, Foot 60, Reach 70.
+                //
+                // **On the content that exists, this is not a conditional failure -- it is total.**
+                // A corpus census of every scene in `examples/` found **zero `lean` layers**, so
+                // `bodyAcceleration` is never written by anything; and `bodyVelocity` is written
+                // only under `footLock > 0`, which **no scene can set** because it has no parser
+                // (see `PoseLayer::footLock`). So the acceleration arrow and the velocity arrow
+                // **never draw, in any scene in this repository.**
                 //
                 // **The failure reads as data rather than as a bug**: the facing arrow below is
-                // computed from the entity transform and always draws, so a viewer sees one arrow
-                // and concludes the body has no velocity. Whoever fixes this should read the
-                // fields off the layer that carries each one, by kind.
+                // computed from the entity transform and always draws, so a viewer ticks "Motion
+                // vectors", sees exactly one arrow, and concludes the body has no velocity right
+                // now. That is why nobody has reported it.
+                //
+                // The sharpest detail: `examples/labs/footik/alien-foot-lab.scene.json` authors
+                // layers that are *all* `kind: "foot"`, so after stage sorting `layers.front()` is
+                // a Foot layer -- the one scene in the repository where the velocity arrow could
+                // have worked. It still cannot, because `footLock` has no parser.
+                //
+                // Whoever fixes this should read each field off the layer kind that carries it.
                 const scene::PoseLayer& any = layers.front();
                 const glm::vec3 origin = glm::vec3(model[3]);
                 const auto dir = [&](const glm::vec3& local) {

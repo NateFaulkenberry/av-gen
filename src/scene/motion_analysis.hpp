@@ -33,12 +33,14 @@ struct AnimationClip;
 
 // ---- contacts ------------------------------------------------------------------------------------
 
-// **Stored, serialised, and never branched on (ADR-615).** Nothing in the engine reads
-// `ContactTrack::kind` or `ContactJoint::kind` to make a decision, so a `Hand` or `Body` track is
-// detected, gated, packed and matched exactly as a `Foot` one is. Every in-engine construction is
-// `Foot`; the others can only arrive from pack JSON, where an unrecognised kind name silently
-// becomes `Foot` rather than being reported -- harmless while nothing branches, and the wrong
-// default the moment something does.
+// **A dead taxonomy: `Hand`, `Body` and `Custom` are not merely un-branched-on, they are
+// unreachable** (ADR-615). Nothing in the engine reads `ContactTrack::kind` or `ContactJoint::kind`
+// to make a decision -- and nothing can produce a non-`Foot` one either. The scene route hardcodes
+// it (`composition.cpp` pushes `ContactJoint{joint, ContactKind::Foot}`; a scene's `"contacts"`
+// array is a list of joint names with no kind in it), and the only other route is pack JSON, of
+// which **there is none in the repository**. So the parse in `motion_pack.cpp`, where an
+// unrecognised kind name silently becomes `Foot` rather than being reported, has no content to
+// read -- harmless today, and the wrong default the moment either end is wired.
 enum class ContactKind : std::uint8_t { Foot, Hand, Body, Custom };
 [[nodiscard]] const char* contactKindName(ContactKind kind);
 [[nodiscard]] bool contactKindFromName(std::string_view name, ContactKind& out);

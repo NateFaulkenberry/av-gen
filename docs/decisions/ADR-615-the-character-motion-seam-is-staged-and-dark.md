@@ -113,6 +113,32 @@ fixed; the comment was left describing the state before the fix.
 Worth a specific watch: a comment saying a thing is broken is exactly the comment nobody re-reads
 after fixing it.
 
+## What the corpus said, and the two findings it demoted
+
+A fourth audit pass measured the content rather than the code, and it **downgraded two findings and
+strengthened one**. That asymmetry is the point of doing it: a defect on a path no scene reaches is
+a documentation problem, and only the corpus can say which those are.
+
+| finding | corpus verdict |
+|---|---|
+| foot-lock contact spans read from the clip player's state on frames it did not run | **latent** — the whole block is gated on `footLock > 0`, which no scene can set |
+| `bodyAcceleration` divided by node scale while its gain is authored in world m/s² | **latent** — `bodyAcceleration` is written only onto `Lean` layers and **no scene authors one** |
+| the Motion-vectors overlay reading body state off `layers.front()` | **strengthened to unconditional** — neither arrow can ever draw |
+
+Three corpus claims settled, two of them TRUE and correctly stated:
+
+- *"there is no scene with more than one rig per character node"* — **TRUE**, and now closed
+  directly rather than by inference: every one of the six alien `.glb` files reports exactly one
+  skin, and `node.rigs.size()` is the glTF's skin count. `AnimationSink::rootMotion`'s first-rig
+  shortcut is safe.
+- *"nothing in this project's content can jump"* — **TRUE by construction**: the field is
+  `WalkRules::jumpOver` and `navigation.hpp` says outright there is deliberately no scene key for
+  it. A correctly-stated blocked measurement, not a rotting comment.
+- *"505 interest points on `glowmere-valley-2`"* — **undetermined**: the list is built at runtime
+  from landmarks plus ecology scatter plus nav-grid shore and vista points, so it is not statically
+  countable. Structurally consistent with how the list is assembled, which is worth saying: that
+  file's failure mode was structural claims rotting, not figures being invented.
+
 ## Consequences
 
 - **The reachability fact is cited, not restated.** Anything that needs it points here.

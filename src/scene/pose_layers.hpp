@@ -291,6 +291,18 @@ struct PoseLayer {
     // The approximation is exact at constant velocity and drifts under acceleration by
     // `0.5 * a * t^2` over a stance -- at 2 m/s^2 across a 0.3 s stance, 9 cm, which is why the
     // lock is weighted rather than absolute and why `lockBlendSeconds` eases both edges.
+    // **No authoring surface: a scene cannot set this, so it is 0 everywhere and this whole
+    // subsystem is off in every scene that exists** (ADR-615). There are zero parse sites and zero
+    // serialisation sites, and it is absent from `kLayerKeys` -- the whitelist in `composition.cpp`
+    // that decides which layer keys a scene file may use -- so an author who writes `"footLock"`
+    // gets the "key is not one this build reads and was ignored" warning. Its immediate neighbours
+    // in this struct (`footAlign`, `poleDirection`, `groundOffset`, `extension`, `soleUp`) are all
+    // parsed and all serialised; this one was never wired.
+    //
+    // **What is off because of it:** the contact-span lookup in `driveLayers`, `inContact`,
+    // `contactElapsed`, `contactRemaining`, `bodyVelocity`, and the lock itself with
+    // `lockBlendSeconds`. ADR-557 derives an anchor for a feature no scene can turn on. The only
+    // writer in the repository is `tests/unit/test_stride_warp.cpp`, in C++.
     float footLock = 0.0f;
     // Seconds of ease at each end of a contact span: §15's approach and release. A lock that
     // switched on and off at the span boundary is the "foot locked, then teleports" failure §15

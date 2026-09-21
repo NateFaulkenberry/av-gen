@@ -19,19 +19,43 @@
 // §0. What already exists. Do not build a second one of any of these.
 // ------------------------------------------------------------------------------------------------
 //
-// | the brief's name  | the type that already is it        | where                       |
-// |-------------------|------------------------------------|-----------------------------|
-// | character state   | `entity::EntityState`              | entity/behavior.hpp:48      |
-// |                   | + `entity::Entity`                 | entity/entity.hpp:256       |
-// | navigation        | `entity::Navigator`                | entity/navigation.hpp:113   |
-// |                   | + `NavGrid`, `PathRequest/Result`  | entity/nav_grid.hpp         |
-// |                   | + `entity::IPathProvider`          | entity/action.hpp:83        |
-// | behaviour state   | `entity::IBehavior`                | entity/behavior.hpp:126     |
-// |                   | + `entity::ActionQueue`/`Authority`| entity/action.hpp:253,281   |
-// |                   | + `entity::Schedule`               | entity/action.hpp:393       |
-// | animation intent  | `entity::LocomotionState`          | entity/locomotion.hpp:52    |
-// |                   | + `IPoseSink`, `ISkeletonQuery`    | entity/locomotion.hpp:90,99 |
-// | directed staging  | `stage::Staging`                   | stage/staging.hpp:485       |
+// **Names, and the command that locates them. No line numbers, and that is deliberate** -- see
+// "why this section is written this way" at the end of §0.
+//
+// | the brief's name  | the type that already is it                                    |
+// |-------------------|----------------------------------------------------------------|
+// | character state   | `entity::EntityState`, `entity::Entity`                        |
+// | navigation        | `entity::Navigator`, `NavGrid`, `PathRequest`/`PathResult`,    |
+// |                   | `entity::IPathProvider`                                        |
+// | behaviour state   | `entity::IBehavior`, `entity::ActionQueue`, `entity::Authority`,|
+// |                   | `entity::Schedule`                                             |
+// | animation intent  | `entity::LocomotionState`, `IPoseSink`, `ISkeletonQuery`       |
+// | directed staging  | `stage::Staging`                                               |
+//
+// To find any of them, and to find every implementation of an interface:
+//
+//     grep -rn --include='*.hpp' -E "(struct|class) <Name>\b" src/
+//     grep -rn --include='*.cpp' --include='*.hpp' -E ": public <Interface>\b" src/
+//
+// **The second one searches `.cpp` as well, and that is not a detail.** Interfaces here are
+// commonly implemented in a translation unit rather than a header -- every `IBehavior` lives in
+// `entity/behaviors.cpp` -- so a header-only search for implementations reports **none** and reads
+// exactly like "nobody has built one yet". That is the failure this whole section exists to avoid,
+// reintroduced through the instruction meant to prevent it. A first draft of these two lines had
+// it. Run an instruction before you write it down.
+//
+// **Why this section is written this way, so that nobody restores the old form.** It used to carry
+// a `file:line` for every entry. When it was audited, **0 of 12 coordinates landed on the type they
+// named** -- one pointed at a blank line, one at a closing brace, one at an unrelated `scale`
+// member. Not one was wrong when written; all twelve rotted, because this file is structurally the
+// **last** thing anyone edits and a line number is invalidated by any insertion above it.
+//
+// So this section asserts as little as it can get away with. **A name survives a move and a line
+// number does not, and a command that finds the answer cannot be wrong about what the answer is.**
+// A document that tells you how to check is strictly harder to falsify than one that tells you what
+// is true. If you are tempted to add an inventory here -- a count, a coordinate, a list of what
+// does or does not exist yet -- add the grep that produces it instead. ADR-615 and ADR-617 record
+// what this cost.
 //
 // The four rules that go with them, each of which has cost this project a shipped defect:
 //
@@ -123,24 +147,57 @@
 namespace avgen::entity {
 
 // ------------------------------------------------------------------------------------------------
-// §2. Perception -- **BUILT. The heading below was true in Phase 0 and is false now (ADR-615).**
-//
-// `src/entity/perception.{hpp,cpp}` exist, with two implementations of `IPerception` --
-// `GridPerception` and `ScriptedPerception` -- and `GridPerception` has the distance limit, the
-// facing test and the occlusion check the paragraph below says are missing. `Explore` scores
-// `ctx.percepts`, not `interestPoints()`, with `Perceived` and `Omniscient` as selectable sources.
-//
-// **This is the tier that matters, because §2 is a build instruction and not a status note.** This
-// file declares itself normative and exists so that several parallel agents do not each invent a
-// perception layer; an agent reading the heading below and believing it writes a second
-// `GridPerception`. The document now causes the outcome it was written to prevent.
-//
-// Kept as history, because the argument is what produced the layer. Read it as the brief, not as a
-// description of the engine.
-//
-// §2. Perception -- the layer that genuinely does not exist [BUILT -- see above]
+// §2. Perception -- what it is for, and what must stay true of it
 // ------------------------------------------------------------------------------------------------
 //
+// **Before building anything here, run this. It answers "does it exist and how many are there"
+// better than any sentence in this file can:**
+//
+//     grep -rn --include='*.cpp' --include='*.hpp' -E ": public IPerception\b" src/
+//     ls src/entity/perception.*
+//
+// ---- purpose -----------------------------------------------------------------------------------
+//
+// **One perception layer, shared, so that "what a character knows" has a single answer.** The
+// failure this prevents is not a missing feature; it is several behaviours each deciding privately
+// what their character can see, after which no two agree and none can be tested. A percept is
+// something a body **knows**; an order is something it was **told**; the two arrive by different
+// routes and must not be merged into one list.
+//
+// ---- invariants, which survive any refactor of the implementation ------------------------------
+//
+// **P1. Perception is a query, not a store.** What a character knows is reconstructed by the
+// replay, never persisted -- the same rule as D4 below. A seek that inherited the last played
+// frame's percepts would be state surviving the one call whose job is to remove state.
+//
+// **P2. Cost scales with the number of characters, so the per-character budget is the design
+// constraint, not the per-query one.** The sightline figures below are why: a ray budget that is
+// fine for one hero is not fine for a crowd, and the interface is shaped by that rather than by
+// what a single character could afford.
+//
+// **P3. A perception source is selectable, and "omniscient" stays available.** A behaviour that
+// can only run against real percepts cannot be bisected against one that sees everything, and that
+// comparison is how a perception bug is found at all.
+//
+// **P4. Nothing downstream may read the global interest list directly** once it is scoring
+// percepts. Two sources for one question is how the two tiers drift apart.
+//
+// ---- history, and why this section no longer states what exists --------------------------------
+//
+// This section used to be headed *"Perception -- the layer that genuinely does not exist"*, and
+// said every character sees everything with no distance limit, no facing and no occlusion. It was
+// true in Phase 0. It was false for a long time before anyone noticed, and because this file
+// declares itself normative and exists **specifically** to stop parallel agents each inventing a
+// perception layer, the heading had become a build instruction to write a second one. A document
+// that causes the outcome it was written to prevent is the worst failure available to it.
+//
+// So the section now carries purpose, invariants and a command, and **asserts nothing about code
+// state**. Invariants are falsified by a design change, which is a thing someone does on purpose;
+// inventory is falsified by an ordinary edit somewhere else, which is a thing nobody notices.
+// See §0's note, ADR-615 and ADR-617. The Phase 0 text below is kept as the brief that produced
+// the layer -- **read it as history, not as a description of this engine.**
+//
+// ================================ PHASE 0 BRIEF -- HISTORY ======================================
 // Today every character sees everything. `EntityWorld::interestPoints()` is one global list --
 // **505 entries** on `glowmere-valley-2` -- and `Explore` scores all of them every time it picks a
 // goal, with no distance limit, no facing, no occlusion and no notion of having noticed something.
