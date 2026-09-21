@@ -196,11 +196,54 @@ night from two agents who never spoke to each other.
        print(b["exception"]); print(b.get("vmRegionInfo","")[:600])' <report>.ips
    ```
 
-   The tool that turns it into a deterministic failure at the overrun's own line is an ASan build
-   (`-fsanitize=address`), or `DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib` if a build is not
-   available. **Sampling more runs will not find it**; the samples below are what sampling gets
-   you, and they are included because the shape of the data is what a heap overrun looks like from
-   the outside:
+   **FOUND AND FIXED, same session, by an ASan build.** `-fsanitize=address` named it on the first
+   run, in one line of `tests/rendering/test_lighting_lab_gpu.cpp`:
+
+   ```cpp
+   CHECK(*std::max_element(falloffProfile(*control).begin(),
+                           falloffProfile(*control).end()) > 0.5f);
+   ```
+
+   `falloffProfile` returns a `std::vector<float>` **by value**, and it is called **twice**. So
+   `.begin()` is an iterator into one temporary and `.end()` an iterator into a *different* one,
+   and `max_element` walks from the first vector's start toward an unrelated address in the heap.
+   Where that walk crosses a reserved page, `KERN_PROTECTION_FAILURE`.
+
+   Every property follows from that and none of them needed a new theory:
+
+   - **intermittent** -- it depends on where two temporaries land. If the second is at a *lower*
+     address, `begin >= end`, the loop ends immediately, and nothing happens at all;
+   - **the crash site moves** -- the victim is whoever owns the pages the walk crosses;
+   - **seed- and load-independent** -- it is allocator layout, not scheduling;
+   - **replaying the crashing seed passes** -- same reason;
+   - **one byte past a MALLOC_SMALL region, in all twenty-five reports** -- because that is where a
+     forward walk through the heap first meets a page it may not touch.
+
+   **Sampling could not have found this.** Eight full runs, a seed replay, a concurrency arm and a
+   load check produced a precise description of the *symptom* and not one step toward the cause.
+   The crash report gave the mechanism (a heap overrun) in about a minute, and ASan gave the line
+   in about an hour of unattended build-and-run. Reach for both before the third sample.
+
+   ```sh
+   cmake -S . -B build/asan -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+         -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+         -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+   cmake --build build/asan -j 10 --target avgen_render_tests
+   ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 tools/gpu-lock.sh ./build/asan/tests/avgen_render_tests
+   ```
+
+   It reports `container-overflow` rather than `heap-buffer-overflow`, because ASan's container
+   annotations catch the read between `size()` and `capacity()` of the second vector before the
+   walk reaches unmapped memory. **A `container-overflow` on a range built from two calls is
+   almost always this**: look at whether the two ends came from the same object.
+
+   The general rule, which is not about this suite:
+
+   > **A range needs one object. Two calls that each return by value are two objects**, and a
+   > compiler will not stop you building an iterator pair out of them. Name the result.
+
+   The samples below are what sampling got, and they are kept because the shape of the data is
+   what a heap overrun looks like from the outside -- worth recognising the next time:
 
    | run | result |
    |---|---|
