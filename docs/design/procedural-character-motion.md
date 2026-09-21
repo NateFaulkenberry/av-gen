@@ -1747,3 +1747,68 @@ than offered.
 near-unique per sample the way phase is, so the effect should be far weaker — but **§24's numbers
 were taken with the same `d += 5` perturbation**, and its conclusion (more horizons buy no
 measurable gain) survives only if that holds under full perturbation. Flagged rather than assumed.
+
+
+## §24 — RE-TAKEN under full perturbation, and the conclusion moved
+
+The published table used the same `d += 5` perturbation §31 was retracted for, and here it was not
+merely partial but **confounded**. The arms have **21, 25, 33, 37 and 41** dimensions, so the stride
+left *a different subset of each arm's trajectory block* unperturbed — in the `{0.2}` arm the
+trajectory dimensions are 21–24 and the last perturbed index below them is 20, so **that arm's
+entire trajectory block carried exact values.** The flaw landed unevenly on exactly the variable
+under test.
+
+| horizons | dim | published | **corrected (full perturbation)** |
+|---|---|---|---|
+| none | 21 | 83.5% | **69.6% ±3.7** |
+| {0.2} | 25 | 88.0% | **77.2% ±3.3** |
+| **{0.2, 0.4, 0.6}** shipping | 33 | **93.0%** | **76.6% ±3.4** |
+| {0.1, 0.2, 0.4, 0.8} | 37 | 92.4% | **81.0% ±3.1** ← best |
+| {0.2, 0.4, 0.6, 0.8, 1.0} | 41 | 91.1% | **78.5% ±3.3** |
+
+**Both halves of the old conclusion are gone.** The shipping default is no longer the best arm, and
+"more horizons make it worse" is false — the 37-dimension arm leads. But the margins are inside the
+error bars: 81.0 ±3.1 against 76.6 ±3.4 is 4.4 points on a combined error of ~4.6, so **no horizon
+set is distinguishable from another at n=158.**
+
+What survives, weakened: **trajectory features probably help** — 69.6 against 81.0 is ~2.4σ, no
+longer the 3σ the partial perturbation showed, and only 1.4σ against the shipping default. §24's
+honest state is **unresolved at this sample size**, which is a §20 question.
+
+## §19 — checked, and it survives
+
+§19's 100.0%-on-clip was the seventh ceiling and used the same `d += 5`. Re-taken with every
+dimension perturbed: **still 100.0% of steps on the clip, and still a new sample on 1.00 of steps.**
+It is real. The difference from §31 is structural rather than lucky — §19 asks whether the matcher
+stays within the *right clip*, a question with ~66 acceptable answers per clip rather than one, so
+an unperturbed dimension cannot convert it into a lookup the way it can a single-target retrieval.
+
+## The rule that separates what survives from what does not
+
+> **A measurement artefact is harmless exactly when it is constant across the thing being varied.**
+
+- **§16's recall** compares two search plans over the same queries at the same dimensionality. The
+  flaw hit both arms identically — **survives**.
+- **§24's horizons** compares arms of *different* dimensionality, so the flaw landed differently in
+  each — **does not survive**, and re-running moved the answer.
+- **§31's retrieval** was an absolute quality claim with no comparison to shelter it — **did not
+  survive at all**.
+
+This is cheaper than re-running everything: it says in advance which numbers need re-taking. Ask
+what varies between arms, and whether the flaw varies with it.
+
+## On the conditions, not the standards
+
+Six perfect scores were fake tonight and I caught five unprompted. The sixth arrived flattering, at
+a ceiling, with a supervisor's prediction in front of it — and I banked it. Same standards, same
+evidence-handling, different outcome.
+
+**Rigour is not a property you have; it is a property of the conditions you are working under.** The
+five that were caught had nothing riding on them. That is the argument for controls being
+**mandatory rather than discretionary**: the moments you most need one are exactly the moments you
+will feel least need of one.
+
+And the shuffle control did something better than failing. **A control that merely fails says the
+feature is inert. This one beat the thing it controls for**, which says the *metric* is measuring
+the wrong quantity — and that invalidates every use of leave-one-out retrieval as a quality measure,
+not one result.
