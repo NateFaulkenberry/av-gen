@@ -51,20 +51,54 @@ thicker faster, because squaring the exponent makes the effective extinction gro
 distance** -- which is, exactly, a horizon-density control. §7 asks for one by name; the engine
 already has one, unlabelled, in a pass that was not thinking about it.
 
-## The population, corrected -- and an inference that was offered and does not hold
+## The population, reconciled -- and it took two people getting different answers to get it right
 
 The first version of this ADR counted "36 shipped files that set both", from a glob over
-`examples/**/*.json`. That glob includes probe arms. **Restricted to shipped scenes** --
-`*.scene.json`, excluding `_`-prefixed probes -- the picture is different and more useful:
+`examples/**/*.json` that included this branch's own probe arms. Correcting that produced a second
+census -- and a *third* person's census of the same question produced different numbers again:
+**120 scenes, 57 both, 57 surface-only, 0 march-only** against **90, 30, 23, 1**.
 
-| of 90 shipped scenes | count |
-|---|---|
-| **both laws active** (the crossover bites) | **30** |
-| only the exp-squared surface law | 23 |
-| only the Beer--Lambert march | 1 |
-| neither | 36 |
+**Neither was wrong. They were two different questions**, and the two axes they differed on were
+invisible in both commands:
 
-So the exp-squared law is live in **53** scenes and the march in **31**.
+| axis | one answer | the other |
+|---|---|---|
+| what counts as **shipped** | all 120 tracked `*.scene.json` | the 90 that are not `_`-prefixed probe scenes |
+| what counts as **using a law** | the key is present | the key's value is greater than 0 |
+
+`"fogDensity": 0.0` has the key and does not use the law, and `examples/` holds **30 `_`-prefixed
+probe scenes** from several agents' diagnostic tooling. Both axes reproduce exactly:
+`--all --present` gives 57/57/0/6 and the default gives 30/23/1/36.
+
+**Branch is not a factor and that was checked rather than assumed**: `main` and `agent/fog` carry
+the same 120 tracked `*.scene.json` files with zero differing.
+
+So the census lives in a file now, and this ADR cites the file rather than a shell line:
+
+```
+$ python3 tools/fog_law_census.py
+branch agent/fog, shipped scenes (no `_` probes), value > 0
+  total                      90
+  both laws active           30
+  surface law only           23
+  march law only             1
+  neither                    36
+  march-only scenes: volumetric-atmosphere-lab.scene.json
+  scenes whose surface law is live (option 2's migration): 53
+    -- of which 23 have no volumetric density to derive one from
+```
+
+**The decision-relevant reading is the non-zero one**, because this ADR is about two laws being
+*active* and disagreeing; a key at 0 is an inactive law. Presence matters only for the migration,
+where a scene already carrying the key at 0 is trivially converted.
+
+**The one march-only scene, named because it was worth naming:**
+`volumetric-atmosphere-lab.scene.json`. Not an artefact of scope -- the only scene in the
+repository that exercises the volumetric march without the surface law is the **lab built to
+exercise the volumetric march**. Which is its own small finding: outside that lab, the march is
+never seen except alongside a surface law it disagrees with.
+
+So the exp-squared law is live in **53** shipped scenes and the march in **31**.
 
 **An inference was put to me that both laws are not really in use -- that one of them ships
 everywhere and the other has never shipped at all -- and it does not survive the table above.**

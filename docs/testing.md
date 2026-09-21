@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-six ways a green suite has lied
+## Twenty-seven ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -666,6 +666,40 @@ night from two agents who never spoke to each other.
      re-deriving a test's expected number from `grep -c` rather than from the red output, and it
      catches a different failure: not "the test now agrees with the code" but "the code is not what
      I think it is".
+
+27. **A census of "what the project ships" is answered in part by the project's own instrumentation,
+   and two people running "the same census" will get different numbers.**
+
+   `examples/` holds **119 tracked `_`-prefixed JSON files**, 30 of them `*.scene.json`, written by
+   several agents' diagnostic tooling and committed. Any `grep -rl` over `examples/` finds them. A
+   question like *"how many shipped scenes use X"* therefore has its answer inflated by the arms
+   somebody generated while measuring X -- which is the measurer contaminating the measurement, in
+   the one place nobody looks for it because the files look exactly like data.
+
+   **It happened twice in one session, and the second time it happened to two people at once.**
+   First: a claim that no shipped scene contained a fog bank, published with a command that
+   returned 52 rather than 0, because the filter that made it true lived in the analyst's head.
+   Then: two people ran a corrected census of the same question and got **120 / 57 / 57 / 0**
+   against **90 / 30 / 23 / 1**. Neither was wrong. They differed on two axes that neither command
+   made visible:
+
+   - **what counts as shipped** -- all tracked scenes, or only the ones that are not probes;
+   - **what counts as using a feature** -- the key is present, or its value is non-zero. `"x": 0.0`
+     has the key and does not use the thing.
+
+   Three rules, and the third is the one that actually holds:
+
+   - **exclude probe files explicitly and say so in the command**, not in the sentence around it;
+   - **state the predicate.** Presence and non-zero are different censuses and both are true;
+   - **put the census in a file and cite the file.** `tools/fog_law_census.py` takes both axes as
+     flags and prints the branch, the scope and the predicate above its numbers. A figure in a
+     document that a reader cannot reproduce without the author's shell is a figure that will
+     eventually be disbelieved -- **and it will be disbelieved for a reason that has nothing to do
+     with its subject**, which is the expensive part.
+
+   The general form, which is not about scenes: **when your tooling writes artefacts into the same
+   namespace as the thing it measures, every later measurement of that namespace is contaminated
+   until somebody notices.** Name them so they can be excluded, and exclude them in the command.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
