@@ -43,3 +43,32 @@ patent pools are a separate, licence-independent question for a commercial produ
 
 Planned, not yet added: OpenImageDenoise (OIDN, path-tracer denoise, ADR-351 Phase 4 -- licence recorded as unverified until it is actually fetched); meshoptimizer, libktx, ozz-animation (0.3+);
 efsw (0.4 hot reload); libebur128, pffft (analysis extras); Tracy (profiling).
+
+## Third-party data
+
+Datasets are not libraries: they carry no build pin, they are not linked, and their terms bind
+what may be **published** rather than what may be compiled. They are recorded here anyway,
+because "every third-party thing, its licence and the reason" is the question this file answers.
+
+| Dataset | Licence | Used for | Obligation when publishing |
+|---|---|---|---|
+| The 100STYLE Dataset (Ian Mason) | CC0, per the project owner's determination, 2026-09-21 | Phase C §20, the motion-matching scale experiment: a corpus large and diverse enough to carry root motion, starts, stops and directional changes, which the in-place Glowmere corpus (ADR-540) structurally lacks | **Credit required for creative or commercial work.** The dataset asks that it be credited in an appropriate way for such use |
+
+**The credit line to use, verbatim:**
+
+> The 100STYLE Dataset - Ian Mason
+
+CC0 waives the *legal* requirement to attribute; the request to credit is the authors' own and we
+honour it. The distinction matters only in one direction -- it means nobody may treat a missing
+credit as merely a licence question, and it means the obligation does not lapse if the waiver is
+re-read. **Any render, video, still or written work published from output that used 100STYLE
+motion carries the line above.**
+
+Note the gap, rather than assuming it is covered: this file is the record, and **nothing in the
+application surfaces the credit at export time**. Someone exporting a video will not read
+`docs/dependencies.md`. Until an about-box or export-manifest credit exists, the obligation is
+carried by whoever publishes the work, which is a process control and not a technical one.
+
+The corpus itself is not in version control (`assets` is gitignored), so a measurement taken on it
+is only reproducible if its provenance is recorded alongside the result: where the subset came
+from and how it was subsetted.
