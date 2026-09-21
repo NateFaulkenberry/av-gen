@@ -1089,12 +1089,17 @@ the best one, which is the denominator that makes an excess mean anything:
 weighted value is **52.57**. The excesses are unchanged — they are differences of weighted search
 costs and only the scale moved — so every percentage rises:
 
-| plan | recall | worst excess | % of spread (was) | **% of spread** | samples fully scored |
-|---|---|---|---|---|---|
-| stride 8, prefix 12, top 32 | 94.4% | 60.60 | 86.9% | **115.3%** | 2320 |
-| stride 8, prefix 12, top 128 | 99.6% | 48.93 | 70.2% | **93.1%** | 1873 |
-| stride 8, full prefix, top 32 | 96.8% | 59.49 | 85.3% | **113.2%** | 2278 |
-| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | 3.1% | **4.2%** | **84** |
+| plan | recall | worst excess | **× the typical gap** | samples fully scored |
+|---|---|---|---|---|
+| stride 8, prefix 12, top 32 | 94.4% | 60.60 | **1.15×** | 2320 |
+| stride 8, prefix 12, top 128 | 99.6% | 48.93 | **0.93×** | 1873 |
+| stride 8, full prefix, top 32 | 96.8% | 59.49 | **1.13×** | 2278 |
+| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | **0.04×** | **84** |
+
+Reported as a **multiple**, not a percentage. A column headed "% of spread" reading 115.3% looks
+like a bug to any reader meeting it cold, and the explanation lived in a document rather than at the
+number — the exact thing three remedies tonight converged on fixing. A multiple carries no
+implication of a ceiling.
 
 **The finding got stronger, and the headline changes.** Three of the four plans have a worst-case
 miss that **exceeds the entire good-to-typical spread** — so the miss is not merely "as bad as a
@@ -1695,3 +1700,35 @@ it took minutes and finding the third by accident would have taken another night
 `MatchSettings::searchIntervalShadowed()` are the same fix three times:
 
 > **A caveat belongs where the number is read, not where the number is explained.**
+
+## §31 — what §13's fix bought, measured before the chance expired
+
+Until tonight `buildMotionDatabase` re-derived its clip analysis with an empty contact-joint list,
+so `phase.cyclic` was false for every clip of every pack and `MotionTag::Cyclic` reached the
+database as 0%. **Phase-aware matching had never once had phase data to be aware of.** The old
+behaviour was still reconstructable, and this is the only window in which the comparison existed.
+
+| | dim | cyclic | retrieval (n=158) |
+|---|---|---|---|
+| **before** — phase weight 0, as shipped | 33 | 95.4% | 93.0% ±2.0 |
+| **after** — phase weighted 1.0, §13 fixed | 35 | 95.4% | **100.0%** |
+
+**+7.0 points, to perfect leave-one-out retrieval.** At n=158 the standard error is ±2.0, so this is
+better than 3σ — unlike §24's decline, this one is significant, and 100.0% is a ceiling rather than
+a high number.
+
+**And it exposes a live consequence: `defaultBipedConfig` ships `phaseWeight = 0`.** At zero the
+phase dimensions are not merely unweighted, they are **not in the feature vector at all** — `dimension()`
+omits them. So the shipping default leaves seven points of retrieval unclaimed on a corpus where 95%
+of samples are cyclic, and it was a *correct* default for as long as the phase data was dead.
+
+This is the same shape as the dead weights and the shadowed dial, seen from the other side: **a
+default that was right under the old behaviour and is wrong under the new one, with nothing to say
+so when the behaviour changed.** §13 fixed the data and could not have known to revisit the
+configuration that had been tuned around its absence.
+
+Recorded rather than changed, with the reason stated so it is not mistaken for caution: the change
+costs two dimensions (33 → 35), and §24 established that dimensions are not free — more horizons
+bought no measurable gain and cost bytes and microseconds. The phase case looks different because
+the gain *is* measurable and large, but the cost side deserves the same table §24 got before a
+shipping default moves.

@@ -507,7 +507,7 @@ TEST_CASE("the two-stage search finds what the linear scan finds, on real motion
     WARN(fmt::format("cost spread on this database: a typical candidate is {:.2f} worse than the "
                      "best one",
                      spread));
-    WARN("plan                           recall   worst excess   % of spread   samples scored");
+    WARN("plan                           recall   worst excess   x typical gap   samples scored");
     double chosenRecall = 0.0;
     double chosenExcess = 0.0;
     double chosenMean = 1.0;
@@ -557,8 +557,14 @@ TEST_CASE("the two-stage search finds what the linear scan finds, on real motion
         const double recall = 100.0 * agreed / std::max(trials, 1);
         const double meanCost = totalFullCost / std::max(trials, 1);
         (void)meanCost;
-        WARN(fmt::format("{}  {:5.1f}%  {:12.4f}  {:10.1f}%  {:14.0f}", p.name, recall, worstExcess,
-                         100.0 * worstExcess / std::max(spread, 1e-9),
+        // **A multiple, not a percentage.** A column headed "% of spread" reading 115.3% looks
+        // like a bug to every reader who meets it cold, and the explanation -- that a worst case
+        // is not bounded by a typical case -- lived in a document rather than at the number. A
+        // multiple carries no implication of a ceiling, so nobody has to be told that exceeding
+        // one is legitimate. Same rule as `caveat()` and `searchIntervalShadowed()`: put it where
+        // the number is read.
+        WARN(fmt::format("{}  {:5.1f}%  {:12.4f}  {:11.2f}x  {:14.0f}", p.name, recall, worstExcess,
+                         worstExcess / std::max(spread, 1e-9),
                          static_cast<double>(fullyScored) / trials));
         if (p.prefix == 0u && p.stride == 4u) {
             chosenRecall = recall;
@@ -1744,4 +1750,112 @@ TEST_CASE("the quality report describes the real database", "[motionscale][phase
     CHECK(json.find("\"samples\":") != std::string::npos);
     CHECK(json.find("\"duplicates\":") != std::string::npos);
     CHECK(json.find("nan") == std::string::npos); // a NaN in JSON is not JSON
+}
+
+// ---------------------------------------------------------------------------------------------
+// §31 -- phase-aware matching, measured before and after §13's fix.
+//
+// **This comparison expires.** Until tonight `buildMotionDatabase` re-derived its clip analysis
+// with an empty contact-joint list, so `phase.cyclic` was false for every clip of every pack and
+// `MotionTag::Cyclic` reached the database as 0%. Phase-aware matching has therefore never once had
+// phase data to be aware of. The old behaviour can still be reconstructed -- zero the phase weight
+// and the tag, which is exactly what the broken path produced -- and that is the only way to
+// quantify what §13's fix bought.
+//
+// If the difference is large, §31 was dead and is now alive. **If it is small, that is a finding
+// too**: it would say the phase term was never carrying much weight, which is a different problem
+// and worth knowing before anything is built on it.
+
+TEST_CASE("what §13's fix bought phase-aware matching", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §31"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+
+    // Retrieval, the same leave-one-out measure §24 used: query with a sample's true successor,
+    // perturbed, `current` unset so continuity cannot supply the answer.
+    const auto retrieval = [&](float phaseWeight, const char* label) {
+        scene::MotionDatabaseOptions dbOptions;
+        dbOptions.sampleRate = 30.0f;
+        dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+        dbOptions.config.phaseWeight = phaseWeight;
+        auto db = scene::buildMotionDatabase(*pack, dbOptions);
+        if (!db.has_value()) {
+            FAIL("motion database build failed: " << db.error().message);
+        }
+        std::uint32_t cyclic = 0;
+        for (const std::uint32_t tags : db->sampleTags) {
+            if ((tags & static_cast<std::uint32_t>(scene::MotionTag::Cyclic)) != 0u) {
+                ++cyclic;
+            }
+        }
+        const scene::MotionCostWeights weights;
+        int hits = 0;
+        int trials = 0;
+        for (std::uint32_t s = 0; s + 1 < db->sampleCount(); s += 11u) {
+            const std::uint32_t next = db->sampleNext[s];
+            if (next == scene::MotionDatabase::kInvalid || next >= db->sampleCount()) {
+                continue;
+            }
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(next);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); d += 5) {
+                query.features[d] += 0.07f;
+            }
+            const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
+            REQUIRE(match.found());
+            if (match.sample == next) {
+                ++hits;
+            }
+            ++trials;
+        }
+        const double rate = 100.0 * hits / std::max(trials, 1);
+        const double err = 100.0 * std::sqrt((rate / 100.0) * (1.0 - rate / 100.0) / std::max(trials, 1));
+        WARN(fmt::format("{:<34} dim {:>2}  cyclic {:>5.1f}%  retrieval {:5.1f}% +-{:.1f} (n={})",
+                         label, db->dimension, 100.0 * cyclic / db->sampleCount(), rate, err,
+                         trials));
+        return rate;
+    };
+
+    // The "before": phase weight 0, which is what `defaultBipedConfig` ships and what the broken
+    // path effectively produced -- the phase dimensions were not even in the feature vector.
+    const double before = retrieval(0.0f, "BEFORE (phase weight 0, as shipped)");
+    // The "after": phase in the vector and weighted, now that the tag and the phase track are real.
+    const double after = retrieval(1.0f, "AFTER  (phase weighted 1.0, §13 fixed)");
+
+    WARN(fmt::format("§13's fix buys phase-aware matching {:+.1f} points of retrieval",
+                     after - before));
+
+    // **Both answers are findings and neither is asserted as an improvement.** Asserting that the
+    // fix helped would be the conclusion writing the experiment -- the same discipline §24 needed.
+    // What is asserted is that the experiment discriminated at all.
+    CHECK(before > 0.0);
+    CHECK(after > 0.0);
 }

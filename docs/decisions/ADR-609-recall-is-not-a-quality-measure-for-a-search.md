@@ -31,19 +31,31 @@ justified.
 
 **Judge a first stage by the severity of its mistakes, not by how often it makes them.**
 
+> **The stride-8 plan's worst miss is 1.15× the gap between a good match and a typical one. In its
+> failure mode it is not a degraded search — it is worse than not searching at all. And it earns
+> 94.4% recall while doing it.**
+
+That is the sharpest statement of this family the phase produced, and it is only visible once
+severity is measured against a scale that is a property of the data.
+
 Four plans, swept on **real** Glowmere motion (ADR-607: a scan's cost is distribution-independent,
 a first stage's recall is not), 249 queries drawn from inside the distribution and perturbed so the
 answer is not trivially the seed sample:
 
-| plan | recall | worst excess cost | as % of the cost spread | samples fully scored |
+| plan | recall | worst excess cost | **× the typical gap** | samples fully scored |
 |---|---|---|---|---|
-| stride 8, prefix 12, top 32 | 94.4% | 60.60 | **86.9%** | 2320 |
-| stride 8, prefix 12, top 128 | 99.6% | 48.93 | **70.2%** | 1873 |
-| stride 8, full prefix, top 32 | 96.8% | 59.49 | **85.3%** | 2278 |
-| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | **3.1%** | 84 |
+| stride 8, prefix 12, top 32 | 94.4% | 60.60 | **1.15×** | 2320 |
+| stride 8, prefix 12, top 128 | 99.6% | 48.93 | **0.93×** | 1873 |
+| stride 8, full prefix, top 32 | 96.8% | 59.49 | **1.13×** | 2278 |
+| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | **0.04×** | 84 |
 
-On this database a typical candidate scores 69.72 worse than the best one, and that spread is the
-denominator that makes an excess mean anything.
+(Reported as a multiple rather than a percentage: a worst case is not bounded by a typical case, so
+a value above one is legitimate, and a multiple says so without needing a footnote. These figures
+are against the **weighted** spread of 52.57; they were first published against an unweighted 69.72
+and every one of them was too low.)
+
+On this database a typical candidate scores **52.57** worse than the best one, and that spread is
+the denominator that makes an excess mean anything.
 
 **94.4% recall hides that the 5.6% of misses are near-worst-case picks** — 86.9% of the whole gap
 between a good match and a random one. A matcher wrong that way does not choose a slightly different
