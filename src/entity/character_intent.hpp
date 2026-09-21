@@ -23,6 +23,7 @@
 // decides what plays.
 
 #include <cstdint>
+#include <string_view>
 
 #include <glm/glm.hpp>
 
@@ -41,21 +42,27 @@ enum class IntentType : std::uint8_t {
     Flee,
     Avoid,
     Interact,
+    // Phase D §3/§24/§67. Added when the first producer needed them, not before.
+    Socialize,  // approach / greet / idle near another character
+    ReturnTo,   // go back to a designated region (a post, a home)
+    React,      // respond to a world event
     Custom,
 };
 [[nodiscard]] const char* intentTypeName(IntentType type);
+// The inverse, for a scene file that names an option's intent. False for an unknown name.
+[[nodiscard]] bool intentTypeFromName(std::string_view name, IntentType& out);
 
-// **If you are here because a character ignores the intent you set on it, this is the answer:
-// nothing in `src/` or `tools/` writes any field of this struct** (ADR-615).
+// **Who writes it (Phase D, superseding ADR-615's "no producer").** Two writers, one per half:
 //
-// `Entity::advanceMotion` reads it -- `if (state_.intent.valid)` at `entity.cpp` -- and `valid` is
-// never set true by anything, so that branch is dead and **every character takes the polar
-// `speed`/`yaw` reconstruction underneath it**. The seam is built and correct and has no producer;
-// a behaviour that wants vector intent has to write this itself, and none does.
+//   * the **HOW** -- `desiredVelocity`, `facing`, `valid` -- is written by the mover that knows
+//     it: `ActionKind::Move` and `ActionKind::Face` in `action.cpp`, every step they run;
+//   * the **WHAT** -- `type`, `targetPosition`, `urgency`, `stoppingDistance` -- is written by the
+//     `decide` behaviour from the option it has committed to.
 //
-// Deliberately kept rather than deleted: the spec asked for it and the spec is still being worked,
-// so this is an unfinished feature and not a cut one. ADR-615 has the ruling and the list of the
-// other five things dark for the same reason.
+// Cleared at the top of every entity step on both paths (`update` and `seek`), so a step nobody
+// published one in falls back to the polar pair. `Entity::advanceMotion` reads it when
+// `proceduralMotion` is on; with it off (every shipping scene), nothing downstream of the seam
+// reads the vector half, which is why producing it changed no rendered frame.
 struct CharacterIntent {
     IntentType type = IntentType::Idle;
 

@@ -97,6 +97,8 @@ public:
         std::size_t dwellRejections = 0;  // switches refused because the dwell had not expired
         std::size_t marginRejections = 0; // switches refused because the margin was not cleared
         std::size_t empty = 0;            // ticks at which nothing scored above zero
+        // Phase D §20: switches refused because a plan in progress was being held (see `hold`).
+        std::size_t holdRejections = 0;
     };
 
     static constexpr std::size_t kNone = static_cast<std::size_t>(-1);
@@ -117,6 +119,11 @@ public:
     [[nodiscard]] std::span<const Option> options() const { return options_; }
     [[nodiscard]] std::size_t chosen() const { return chosen_; }
     [[nodiscard]] std::string_view current() const { return current_; }
+    // What the committed option is about (Phase D §3). Part of its identity: two options with one
+    // name and different subjects are two courses of action, so a change of subject is a change of
+    // mind and hands the queue a new list. Every option written before Phase D has subject 0, which
+    // makes the name the whole identity exactly as it was.
+    [[nodiscard]] std::uint64_t currentSubject() const { return currentSubject_; }
     // The tick the current option was committed on, and the tick the last `select` ran at.
     [[nodiscard]] std::uint64_t committedTick() const { return committedTick_; }
     [[nodiscard]] std::uint64_t tick() const { return tick_; }
@@ -124,6 +131,27 @@ public:
     [[nodiscard]] Counts counts() const { return counts_; }
 
     void reset();
+
+    // **Commitment (Phase D §20): an errand in progress is not abandoned because the thing that
+    // proposed it stopped proposing it -- only because something better came along.**
+    //
+    // Measured on the autonomy demo before this: an explorer wandering to a shoreline point stood
+    // off it by `approach` (4 m) while the goal model drops a point inside `minRange` (10 m), so the
+    // incumbent vanished from the list six metres short of arriving, the selector committed to the
+    // next shore point along, and the body crept down the river bank re-deciding once a second
+    // ("interrupted" on every line of the trace) and never arrived anywhere. The same arithmetic cut
+    // short every walk toward a fading event.
+    //
+    // While held, an incumbent **missing from this tick's list** is treated as still scoring
+    // `score` -- the value it was committed at -- so a challenger must beat that by the margin. An
+    // incumbent that *is* in the list is compared on its live score exactly as before. The caller
+    // holds only while the plan is running and its subject is still known, so a target that is
+    // genuinely lost (a saucer out of sight) still ends the behaviour (§19).
+    void hold(float score) {
+        hold_ = true;
+        holdScore_ = score;
+    }
+    void release() { hold_ = false; }
 
     // Forget the commitment, keep the counts (ADR-351).
     //
@@ -141,6 +169,9 @@ private:
     // The committed option's name, copied rather than viewed: a considerer may rebuild its storage
     // on the next tick and the incumbent has to survive that to be compared against.
     std::string current_;
+    std::uint64_t currentSubject_ = 0;
+    bool hold_ = false;
+    float holdScore_ = 0.0f;
     std::size_t chosen_ = kNone;
     std::uint64_t committedTick_ = 0;
     std::uint64_t tick_ = 0;
@@ -336,10 +367,30 @@ public:
 private:
     [[nodiscard]] float scoreOf(const DecisionContext& ctx, const Percept& p) const;
 
+    // Phase D §25: the percept must carry at least one of these semantic tags ("glowing", "ufo").
+    // Empty -- the default, and every scene written before Phase D -- means no tag filter.
+    [[nodiscard]] std::uint64_t tagMask(const DecisionContext& ctx) const;
+
     GoalTaste taste_{};       // only `weight` and the ranges are read
     std::string activity_;    // what it plays once it arrives
     float approach_ = 3.0f;   // how close it goes before it stops
     double dwell_ = 4.0;      // seconds it attends to the thing once there
+    std::vector<std::string> tags_;
+    // Phase D §3: what winning this option means, for the intent seam and the trace.
+    IntentType intent_ = IntentType::Investigate;
+    // Phase D §22: how hard novelty bends the score, as an exponent on `ObjectMemory::novelty`.
+    // Read only when the decider runs the awareness layer; 0 turns novelty off.
+    float noveltyWeight_ = 1.0f;
+    // Phase D §16–§18: the verb to use on the thing when it offers it and this body can.
+    std::string affordance_;
+
+public:
+    // What the last `consider` made of the affordance, for a test and the overlay.
+    enum class Affordance : std::uint8_t { None, Used, NotOffered, NotCapable };
+    [[nodiscard]] Affordance lastAffordance() const { return affordanceState_; }
+
+private:
+    mutable Affordance affordanceState_ = Affordance::None;
     // Seconds after which a percept this old is worth nothing. A memory fades on the same curve it
     // is remembered on, which is why this and `PerceptMemory::Settings::seconds` are different
     // knobs: one is how long a body keeps the fact, the other is how much it trusts it.
@@ -528,6 +579,112 @@ private:
     mutable std::vector<Destination> places_;
     mutable std::vector<GoalCandidate> scratch_;
     mutable std::vector<Priced> priced_;
+};
+
+// Respond to a world event (Phase D §26–§28). **The first considerer that reads what a character
+// heard rather than what it sees.**
+//
+// Two options from one event, and the personality chooses between them -- which is the whole of
+// Success Demonstration step 14, "reacts differently because of its personality":
+//
+//   * **approach** -- go and see: walk to within `approach` metres, face it, attend for `dwell`.
+//     Scored up by curiosity and down by caution.
+//   * **flee** -- get away: walk `flee` metres directly away from it, then turn and watch it.
+//     Scored up by caution and down by curiosity.
+//
+// Same world, same event, same code; a curious alien walks toward the bloom and a cautious one
+// backs off from it. Neither is a branch on which alien it is (§77).
+//
+// Only events whose names are in `events` (empty = any). Scored on the event's perceived intensity,
+// how fresh it is, and its novelty -- so an event already dealt with, or one this body already fled,
+// does not win twice. R4: the activities are names, never clips.
+class ReactConsiderer final : public StockConsiderer {
+public:
+    explicit ReactConsiderer(const nlohmann::json* settings = nullptr);
+    [[nodiscard]] std::string_view kind() const override { return "react"; }
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override;
+    void collectParameterPaths(std::vector<std::string>& out) const override;
+    void consider(const DecisionContext& ctx, std::vector<Option>& out) const override;
+
+private:
+    std::vector<std::string> events_;
+    float approach_ = 4.0f;
+    float flee_ = 14.0f;
+    double dwell_ = 3.0;
+    std::string activity_;      // while attending, after an approach
+    std::string fleeActivity_;  // while watching, after fleeing
+    float fadeSeconds_ = 8.0f;
+    // How strongly each trait bends each response. Exponents on `(0.5 + trait)`.
+    float curiosityPull_ = 2.0f;
+    float cautionPull_ = 2.0f;
+    mutable std::string approachName_;
+    mutable std::string fleeName_;
+    mutable std::vector<ActionDesc> approachActions_;
+    mutable std::vector<ActionDesc> fleeActions_;
+};
+
+// Another character (Phase D §24): notice, approach or keep away. A minimal framework, not a
+// social simulation -- two options, both about the most salient other body carrying one of `tags`:
+//
+//   * **greet** -- walk to within a comfortable distance, face it, attend for `dwell`. Scored by
+//     salience, the other body's novelty to this one, and sociability.
+//   * **avoid** -- when it is inside `personalSpace`, step back out to `keepAway`. Scored by how far
+//     inside it is, and by caution against sociability.
+//
+// The comfortable distance is `distance` scaled by `(0.5 + preferredDistance)`. `relationship` is a
+// data label carried into the trace and nothing more, as §24 asks for.
+class SocialConsiderer final : public StockConsiderer {
+public:
+    explicit SocialConsiderer(const nlohmann::json* settings = nullptr);
+    [[nodiscard]] std::string_view kind() const override { return "social"; }
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override;
+    void collectParameterPaths(std::vector<std::string>& out) const override;
+    void consider(const DecisionContext& ctx, std::vector<Option>& out) const override;
+
+private:
+    std::vector<std::string> tags_;
+    std::string relationship_ = "neutral";
+    float distance_ = 3.0f;
+    float personalSpace_ = 2.5f;
+    float keepAway_ = 6.0f;
+    double dwell_ = 3.0;
+    std::string activity_;
+    float sociabilityPull_ = 2.0f;
+    float cautionPull_ = 2.0f;
+    mutable std::string greetName_;
+    mutable std::string avoidName_;
+    mutable std::vector<ActionDesc> greetActions_;
+    mutable std::vector<ActionDesc> avoidActions_;
+};
+
+// A goal injected from outside the character (Phase D §34 "hybrid", §35, §50's future goal
+// providers): "investigate mushroom-1 between 32 s and 90 s". The author -- or a timeline track, a
+// director, one day an optional LLM goal provider -- names *what*; the character does the *how*:
+// finds a path, approaches, faces, uses the thing's affordance if it can, observes otherwise.
+//
+// Active while `from <= time < until` (until 0 = open-ended) and the subject is still novel to this
+// body, so once it has done the errand it stops wanting to -- and a registered `weight` means a
+// timeline track can switch the goal on and off by keyframing it, which is the whole of "authored
+// mode" without a second mechanism. Needs the awareness layer only for the "done it" test; without
+// one it runs every time it wins.
+class GoalConsiderer final : public StockConsiderer {
+public:
+    explicit GoalConsiderer(const nlohmann::json* settings = nullptr);
+    [[nodiscard]] std::string_view kind() const override { return "goal"; }
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override;
+    void collectParameterPaths(std::vector<std::string>& out) const override;
+    void consider(const DecisionContext& ctx, std::vector<Option>& out) const override;
+
+private:
+    std::string subject_;       // an entity or a landmark
+    std::string affordance_;    // the verb to use when offered and capable
+    IntentType intent_ = IntentType::Investigate;
+    double from_ = 0.0;
+    double until_ = 0.0;
+    float approach_ = 2.0f;
+    double dwell_ = 3.0;
+    std::string activity_;
+    mutable std::vector<ActionDesc> actions_;
 };
 
 [[nodiscard]] std::vector<std::string_view> considererKinds();

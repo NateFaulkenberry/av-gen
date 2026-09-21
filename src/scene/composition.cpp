@@ -42,7 +42,8 @@ constexpr std::string_view kSceneKeys[] = {
     "lightRig",   "lights",         "navBodyRadius",  "navCellSize",   "navWadeDepth",
     "wind",       "post",           "environment",    "composition",   "heroes",
     "worldEffects", "atmosphericEffects", "entityProfiles", "entities", "fields",
-    "staging",    "graph",          "grids",          "materialPrograms", "nodes"};
+    "staging",    "graph",          "grids",          "materialPrograms", "nodes",
+    "worldEvents"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -2257,6 +2258,8 @@ void Composition::installEntities() {
     // on, and never needs a second description of it kept in step by hand.
     entityWorld_.setNavigator(buildNavigator());
     entityWorld_.setExtraInterestPoints(glowInterestPoints());
+    // Phase D §26: how far each named world event carries, as the scene authored it.
+    entityWorld_.setEventProfiles(eventProfiles_);
 
     // Fields go in here rather than in a pass of their own, because they bind against the same node
     // table, the same landmarks and the same entity set -- a field that resolved its source against
@@ -9090,6 +9093,23 @@ nlohmann::json Composition::toJson() const {
     if (!entityDescs_.empty()) {
         j["entities"] = entity::entitiesToJson(entityDescs_);
     }
+    // Phase D §26. Written when authored and never otherwise (the diff-noise rule, ADR-225).
+    if (!eventProfiles_.empty()) {
+        json events = json::array();
+        for (const entity::EntityWorld::EventProfile& e : eventProfiles_) {
+            json ej{{"name", e.name}, {"radius", e.radius}, {"magnitude", e.magnitude}};
+            if (!e.signal.empty()) {
+                ej["signal"] = e.signal;
+                ej["threshold"] = e.threshold;
+                ej["minInterval"] = e.minInterval;
+            }
+            if (!e.at.empty()) {
+                ej["at"] = e.at;
+            }
+            events.push_back(std::move(ej));
+        }
+        j["worldEvents"] = std::move(events);
+    }
     if (!fieldDescs_.empty()) {
         j["fields"] = entity::fieldsToJson(fieldDescs_);
     }
@@ -9843,6 +9863,44 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         if (auto ok = comp->setEntities(std::move(*entities)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
+    }
+    // Phase D §26: `"worldEvents": [{"name": "bloom", "radius": 45, "magnitude": 0.8}]` -- how far
+    // a named event carries and how loud it is. Before the entities are bound, so the first
+    // `rebuild` hands them to the world.
+    if (j.contains("worldEvents")) {
+        const json& events = j.at("worldEvents");
+        if (!events.is_array()) {
+            return fail("scene file '{}': 'worldEvents' must be an array", scenePath.string());
+        }
+        std::vector<entity::EntityWorld::EventProfile> profiles;
+        for (const json& e : events) {
+            if (!e.is_object() || !e.contains("name") || !e.at("name").is_string()) {
+                return fail("scene file '{}': every world event needs a string 'name'",
+                            scenePath.string());
+            }
+            entity::EntityWorld::EventProfile profile;
+            profile.name = e.at("name").get<std::string>();
+            if (e.contains("radius") && e.at("radius").is_number()) {
+                profile.radius = std::max(0.0f, e.at("radius").get<float>());
+            }
+            if (e.contains("magnitude") && e.at("magnitude").is_number()) {
+                profile.magnitude = std::clamp(e.at("magnitude").get<float>(), 0.0f, 1.0f);
+            }
+            if (e.contains("signal") && e.at("signal").is_string()) {
+                profile.signal = e.at("signal").get<std::string>();
+            }
+            if (e.contains("threshold") && e.at("threshold").is_number()) {
+                profile.threshold = e.at("threshold").get<float>();
+            }
+            if (e.contains("at") && e.at("at").is_string()) {
+                profile.at = e.at("at").get<std::string>();
+            }
+            if (e.contains("minInterval") && e.at("minInterval").is_number()) {
+                profile.minInterval = std::max(0.0f, e.at("minInterval").get<float>());
+            }
+            profiles.push_back(std::move(profile));
+        }
+        comp->setEventProfiles(std::move(profiles));
     }
     if (j.contains("fields")) {
         auto fields = entity::fieldsFromJson(j.at("fields"));

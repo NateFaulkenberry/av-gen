@@ -1044,6 +1044,14 @@ public:
     // Setting entities does not mark the composition dirty: an entity moves a node by writing its
     // transform parameters, and nothing it can do requires geometry to be rebuilt.
     [[nodiscard]] const std::vector<entity::EntityDesc>& entities() const { return entityDescs_; }
+    // Phase D §26: how far each named world event carries. Takes effect at the next rebuild.
+    void setEventProfiles(std::vector<entity::EntityWorld::EventProfile> profiles) {
+        eventProfiles_ = std::move(profiles);
+        entityWorld_.setEventProfiles(eventProfiles_);
+    }
+    [[nodiscard]] const std::vector<entity::EntityWorld::EventProfile>& eventProfiles() const {
+        return eventProfiles_;
+    }
     [[nodiscard]] const entity::EntityWorld& entityWorld() const { return entityWorld_; }
     [[nodiscard]] entity::EntityWorld& entityWorld() { return entityWorld_; }
     // Rejects the whole set and names the offender rather than dropping one, for the same reason
@@ -1770,6 +1778,7 @@ private:
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    std::vector<entity::EntityWorld::EventProfile> eventProfiles_; // Phase D §26: "worldEvents"
     stage::StagingDesc stagingDesc_;              // ADR-209: authored, round-tripped as "staging"
     stage::Staging staging_;
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"
