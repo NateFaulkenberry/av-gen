@@ -38,6 +38,7 @@
 #include "scene/skeleton.hpp"
 #include "signals/signal_bus.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <nlohmann/json.hpp>
@@ -794,4 +795,101 @@ TEST_CASE("a reaction plays on the upper body while the legs keep the gait",
     // stopped the legs.
     CHECK(foot < 1e-5f);
     CHECK(toe < 1e-5f);
+}
+
+TEST_CASE("an authored layer WEIGHT survives the scene file", "[labs][character][layers]") {
+    // **A setting the application does not keep is not a setting** -- the sentence the round-trip
+    // test above is built on. `weight` was the field it did not cover, and it did not survive.
+    //
+    // The parser draws the line correctly: `layer.weight = drive == Manual ? *weight : 0.0f`,
+    // because a driven layer's weight is written every frame from the seam and an authored one
+    // would be overwritten before it was read. The serialiser never wrote the key at all. So a
+    // manual layer's authored weight was read once and lost on the next save, and the file still
+    // loaded cleanly -- the layer just resolved `Inactive`, which no live consumer distinguishes
+    // from any other reason a layer did nothing (ADR-618).
+    //
+    // This runs on the **shipping** scene rather than a fixture, because that is where it bites:
+    // `glowmere-valley-2-multicam` authors fifteen manual layers at weight 1.0 -- both stride
+    // warpers and the secondary-motion layer on each of five aliens -- and one editor save turned
+    // all fifteen off.
+    //
+    // **Teeth-checked**: with the `l["weight"]` write removed from the serialiser, 30 of this
+    // test's 55 assertions fail.
+    const fs::path scene =
+        fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.scene.json";
+    if (!fs::exists(scene) || !assetsPresent()) {
+        SKIP("the Glowmere multicam scene or its assets are not present");
+    }
+    assets::AssetRegistry registry(scene.parent_path());
+    auto loaded = scene::Composition::loadFile(scene, registry);
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+
+    const auto manualWeights = [](const scene::Composition& comp) {
+        std::vector<std::pair<std::string, float>> out;
+        for (const auto& node : comp.nodes()) {
+            for (const scene::PoseLayer& layer : node->animation.layers) {
+                if (layer.drive == scene::PoseLayerDrive::Manual) {
+                    out.emplace_back(node->name + "/" + layer.name, layer.weight);
+                }
+            }
+        }
+        return out;
+    };
+
+    const auto before = manualWeights(**loaded);
+    // The fixture must actually contain the thing, or this test asserts nothing.
+    REQUIRE(before.size() >= 15);
+    int authored = 0;
+    for (const auto& [name, w] : before) {
+        if (w > 0.0f) {
+            ++authored;
+        }
+    }
+    INFO(fmt::format("{} manual layers, {} with a non-zero authored weight", before.size(),
+                     authored));
+    REQUIRE(authored >= 15);
+
+    // **Asserted on the emitted document rather than on a reload, and the reason is itself a
+    // finding.** `fromJson` on a `toJson` document cannot reload this scene at all -- the document
+    // carries no path, so a relative reference like `'../entities/craft-lights.profile.json'`
+    // resolves against nothing and the load fails with `scene file ''`. That is a separate defect
+    // from this one and it is why the round trip is taken at the JSON layer: the key going missing
+    // is the whole of the bug, and a reload would only re-establish what the parser already does
+    // correctly. See ADR-618's consequences.
+    const nlohmann::json doc = (*loaded)->toJson();
+    int persisted = 0;
+    for (const auto& node : doc.at("nodes")) {
+        if (!node.contains("animation") || !node.at("animation").contains("layers")) {
+            continue;
+        }
+        for (const auto& layer : node.at("animation").at("layers")) {
+            if (layer.contains("drive")) {
+                continue; // driven; the control below covers these
+            }
+            INFO(layer.value("name", std::string{}));
+            CHECK(layer.contains("weight"));
+            CHECK(layer.value("weight", 0.0f) == Catch::Approx(1.0f));
+            ++persisted;
+        }
+    }
+    CHECK(persisted == authored);
+
+    // **The control, and it is the half that stops this becoming a bad fix.** A *driven* layer's
+    // weight is per-frame state, so saving it would persist a transient -- the key must NOT appear
+    // for anything but a manual layer, or the round trip would start freezing whatever weight the
+    // seam happened to have written on the frame the file was saved.
+    int driven = 0;
+    for (const auto& node : doc.at("nodes")) {
+        if (!node.contains("animation") || !node.at("animation").contains("layers")) {
+            continue;
+        }
+        for (const auto& layer : node.at("animation").at("layers")) {
+            if (layer.contains("drive")) { // present only when the drive is NOT manual
+                CHECK_FALSE(layer.contains("weight"));
+                ++driven;
+            }
+        }
+    }
+    CHECK(driven > 0); // and the control had something to check
 }

@@ -8796,6 +8796,22 @@ nlohmann::json Composition::toJson() const {
                     if (layer.drive != PoseLayerDrive::Manual) {
                         l["drive"] = poseLayerDriveName(layer.drive);
                     }
+                    // **`weight` is authored state for a Manual layer and per-frame state for every
+                    // other drive, and only the first kind may be saved.** The parser already draws
+                    // exactly this line -- `layer.weight = drive == Manual ? *weight : 0.0f` -- and
+                    // this side did not, so a manual layer's authored weight was read and never
+                    // written back. Loading and saving `glowmere-valley-2-multicam` turned fifteen
+                    // layers off: both stride warpers and the secondary-motion layer on all five
+                    // aliens, silently, in a file that still loaded cleanly (ADR-618).
+                    //
+                    // Written **here, before the Foot/Reach early-out below**, deliberately. There
+                    // are two `push_back` sites in this loop and a key added to one of them is a
+                    // key the other drops -- which is the same defect one level down, and the
+                    // reason this comment is at the top of the function rather than beside a
+                    // `l["weight"]` in each branch.
+                    if (layer.drive == PoseLayerDrive::Manual && layer.weight != 0.0f) {
+                        l["weight"] = layer.weight;
+                    }
                     // ADR-359: a foot layer is a different set of keys, not the same set with some
                     // of them empty. Written through the shared path it came out with `"joints":
                     // []` and `"clip": ""`, and the file it produced would not load -- a save that
