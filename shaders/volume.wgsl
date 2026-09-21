@@ -31,6 +31,10 @@
 // ADR-388. After fields.wgsl, which is what brings in noise.wgsl's fbm3; the include directive
 // does not de-duplicate, so this file must not include noise.wgsl itself.
 #include "vortex.wgsl"
+// ADR-563: the fog bank's own analytic field. Included after vortex.wgsl for the same reason
+// vortex.wgsl is included after fields.wgsl -- the include directive does not de-duplicate, and
+// this file must not pull noise.wgsl in twice.
+#include "fog.wgsl"
 
 struct VolumeUniforms {
     params0: vec4<f32>,   // density, fogHeight, fogHeightFalloff, scattering
@@ -163,7 +167,27 @@ fn vortexFilterWidth() -> f32 {
     return vol.params1.w / max(vol.info.x, 1.0);
 }
 
+// ADR-562's kind tag, in the slot's last lane. ADR-563 is the first reader: until a second kind
+// needed a different density function the tag was packed, compared and never uploaded, which is
+// this branch's own defect family inside the foundation written to fix it.
+const kMediumKindFog: u32 = 4u; // AtmosphereKind::VolumetricFog
+
+fn mediumKind(s: u32) -> u32 {
+    return u32(mediaLane(s, 15u).x + 0.5);
+}
+
+// The fog bank reads the SAME lanes the vortex does for the parameters they share -- centre,
+// radius, thickness -- and its own shape controls from the lanes the vortex leaves empty. One lane
+// map, two readings of it, which is what keeps a fog bank a different authoring surface onto one
+// primitive rather than a second primitive (ADR-500's argument, still standing).
+fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
+    return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u));
+}
+
 fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
+    if (mediumKind(s) == kMediumKindFog) {
+        return fogShapeAt(mediumFogUniforms(s), p, t);
+    }
     return vortexShapeAt(mediumVortexUniforms(s), p, t, vortexFilterWidth());
 }
 

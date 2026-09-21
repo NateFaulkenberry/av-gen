@@ -41,6 +41,8 @@
 #include "core/vortex.hpp"
 #include "world/world_effects/effect_registry.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <array>
 #include <string>
 #include <string_view>
@@ -49,6 +51,12 @@ namespace avgen::world {
 namespace {
 
 using E = AtmosphericEffect;
+
+float storedOf(const AtmosphericEffect& e, const char* leaf, float fallback) {
+    std::string key = "fog/";
+    key.append(leaf);
+    return e.values.getFloat(key, fallback);
+}
 
 #define GET(expr) +[](const E& e) { return (expr); }
 #define SETF(lhs) +[](E& e, float v) { (lhs) = v; }
@@ -100,6 +108,16 @@ constexpr EffectField kFields[] = {
     // Named for what it does to the picture rather than for the fBM it weights: ADR-560 measured
     // that at 0 this bank is a grey card, which is a defect in the FIELD and not in this control.
     // Turning it down is how an artist sees that, which is what a diagnostic is for.
+    // ADR-563, the brief's §10: a bank has a SHAPE. These are what make the field structured with
+    // the detail at zero, and they live in `EffectValueStore` rather than on `world::Vortex`
+    // because that struct is shared with the tornado and these are a fog bank's alone (ADR-500's
+    // rule for a kind declared after the registry).
+    storedFloat("bankLength", "Bank length", 1.0f, 0.2f, 6.0f, 0.5f, 3.0f).main(),
+    storedFloat("bankRotation", "Bank rotation", 0.0f, -180.0f, 180.0f, -180.0f, 180.0f).main(),
+    storedFloat("edgeSoftness", "Edge softness", 0.35f, 0.02f, 1.0f, 0.05f, 0.9f).main(),
+    storedFloat("groundHug", "Ground hug", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f).main(),
+    storedFloat("heightFalloff", "Height falloff", 1.4f, 0.05f, 8.0f, 0.3f, 4.0f).sec("Structure"),
+    storedFloat("domeShape", "Dome", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f),
     floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
                SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").main()
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
@@ -377,6 +395,16 @@ void packMedium(const E& e, float envelope, MediumSlot& out) {
     out.lane[10] = glm::vec4(v.colorMid, 0.0f);
     out.lane[11] = glm::vec4(v.colorAccent, 0.0f);
     out.lane[12] = glm::vec4(std::max(v.spill, 0.0f), 0.0f, 0.0f, 0.0f);
+    // ADR-563: the bank's own shape, in the lanes the vortex leaves empty. `shaders/fog.wgsl`
+    // reads 0, 13 and 14; lane 15 is the kind tag `buildAtmosphericFrame` writes.
+    const float rot = glm::radians(storedOf(e, "bankRotation", 0.0f));
+    out.lane[13] = glm::vec4(std::max(v.field.thickness, 1e-3f),
+                             std::max(storedOf(e, "bankLength", 1.0f), 0.05f),
+                             std::cos(rot), std::sin(rot));
+    out.lane[14] = glm::vec4(std::clamp(storedOf(e, "edgeSoftness", 0.35f), 0.02f, 1.0f),
+                             std::clamp(storedOf(e, "groundHug", 0.0f), 0.0f, 1.0f),
+                             std::max(storedOf(e, "heightFalloff", 1.4f), 0.01f),
+                             std::clamp(storedOf(e, "domeShape", 0.0f), 0.0f, 1.0f));
 }
 
 EffectSchema buildSchema() {
