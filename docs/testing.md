@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Eleven ways a green suite has lied
+## Twelve ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into two families: **the run did not happen as you think**,
@@ -158,12 +158,27 @@ and **the run happened and you read it wrong.**
    exit code the only dissenting signal. Absence of a verdict is not a pass. If neither
    `test cases:` nor `All tests passed` appears, the run did not finish, whatever else the log says.
 
+12. **A task reported dead whose process is still alive, still holding the GPU lock.** This one
+   belongs to the first family — *the run did not happen as you think* — and it is the nastiest
+   here because **it is invisible from both ends at once**. A task harness killed the wrapper it
+   had launched; `tools/gpu-lock.sh` and the test binary underneath it survived the signal and
+   kept running for about five minutes. To the agent that killed it, the task had finished and
+   failed, exit 144. To the agent waiting on the lock, the holder was active and healthy:
+   `kill -0` succeeded, so the stale-lock reclaim in `gpu-lock.sh` **correctly declined to steal
+   it**. Both agents were right about everything they could see, and the GPU sat idle inside a
+   held lock.
+
+   The trap is that `trap ... EXIT INT TERM` only fires for the process that installed it, so
+   signalling the wrapper does not clean up the child. **The tell is a task reported dead whose
+   PID still answers `ps`.** After any killed or failed GPU task, before assuming you released
+   anything: `pgrep -fl avgen_render_tests` and read the lock's own `pid` file.
+
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
 only as a pointer to what to go and look at** — not the other way round.
 
-**The exit code is the only check that catches all eleven.** Every other signal here — the summary,
+**The exit code is the only check that catches all twelve.** Every other signal here — the summary,
 the `FAILED:` blocks, the assertion counts — is a convenience that some entry above defeats. Capture
 `$?` from the binary itself: a pipeline's exit code is the last command's, which is usually `grep`,
 and `grep` is delighted to find nothing.
