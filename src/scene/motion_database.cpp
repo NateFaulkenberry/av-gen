@@ -280,8 +280,30 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         if (root < 0) {
             root = 0;
         }
-        const ClipAnalysis analysis =
-            analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{});
+        // **The pack already knows this, and re-deriving it here was silently wrong.** This line
+        // used to call `analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{})` -- with an
+        // empty contact-joint list -- so the phase analysis had no foot plants to work from and
+        // `cyclic` came back false for every clip in every pack. 25 of the alien's 26 clips are
+        // cyclic in the pack, and **zero samples carried `MotionTag::Cyclic` in the database.**
+        //
+        // Found by §14 printing the tag distribution before using it, which is the only reason
+        // anyone looked: a filter on `Cyclic` would not have been inert, it would have emptied the
+        // candidate set and returned a confident answer computed over nothing.
+        //
+        // `buildMotionPack` computed this correctly, with the real contact joints, and stored it.
+        // Reading what the pack stored is both correct and cheaper -- one statement of a fact,
+        // several readers, the same rule `motionFeatureLayout` follows.
+        ClipAnalysis analysis;
+        analysis.phase = meta.phase;
+        // `travels` is NOT recoverable from what `PackClip` stores: ADR-552 defines travel as the
+        // root's extent against the body's rest height, and the pack keeps `rootTravel`, which is
+        // net displacement -- the very measure ADR-552 rejected, because a 131-second walk that
+        // returns to its start has a net displacement of 0.508 m against a path length of 93 m.
+        // So it is re-derived here, and it is re-derived with the same empty contacts as before,
+        // which means `MotionTag::Travelling` remains unreachable. Recorded rather than papered
+        // over: the fix is for the pack to store the verdict, not for this to guess it.
+        const ClipAnalysis derived = analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{});
+        analysis.travels = derived.travels;
         const std::uint32_t tags = motionTagsFor(meta, analysis);
 
         const auto frames =

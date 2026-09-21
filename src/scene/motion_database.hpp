@@ -128,6 +128,21 @@ struct MotionCostBreakdown {
         return sum;
     }
     [[nodiscard]] std::string report() const;
+
+    // **Any UI that shows this must show this sentence beside it.** A breakdown answers "what did
+    // this cost", not "what changed the decision", and the two differ whenever a term did its work
+    // on a candidate that lost. §12's transition penalty is the worked example: with the penalty
+    // off the idle wins, with it on the walk wins -- and the winner's `transition` reads **zero**,
+    // because the winner never left the motion family and so never paid it. A term can be decisive
+    // and read as zero.
+    //
+    // Provided as a function rather than left in this comment because the person reading a cost
+    // breakdown at two in the morning has not read ADR-611, and the place the warning has to be is
+    // next to the number.
+    [[nodiscard]] static const char* caveat() {
+        return "A cost breakdown says what the CHOSEN sample paid, not what decided the match: a "
+               "term that reads zero may have been decisive by making another candidate expensive.";
+    }
 };
 
 // The default for a biped: the two feet and the head, which is what the literature converges on

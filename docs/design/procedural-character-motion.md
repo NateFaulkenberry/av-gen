@@ -1159,3 +1159,39 @@ breakdown answers "what did this cost", not "what changed the decision" — **a 
 and read as zero** — so the penalty is confirmed separately on a query whose surviving choice does
 have to cross. Recorded in ADR-611 as a corollary, because anyone debugging a choice through §50's
 read-out will hit it.
+
+## §13 — the tags, and a seam that dropped one
+
+§14's tag distribution raised the right question, and it is not whether the vocabulary is
+well-formed: **for each tag, is there a writer, a reader, or only one end of the contract?**
+
+| tag | writer | in the database | verdict |
+|---|---|---|---|
+| Locomotion, Walk, Run, Idle, Turn | clip names / authored tags | 18% / 15% / 3% / 14% / 7% | connected |
+| **Cyclic** | `analysis.phase.cyclic` | **0% → 95%** | **was a broken seam** |
+| Travelling | `analysis.travels` | 0% | unreachable, correct verdict for the wrong reason |
+| OneShot | `!clip.loop` | 0% | **no writer on this path** |
+
+**`Cyclic` was the real finding, and it was better than "no writer".** `buildMotionDatabase` called
+`analyseClip(skeleton, clip, {}, 0, {})` — with an **empty contact-joint list** — so the phase
+analysis had no foot plants and `cyclic` came back false for every clip of every pack. Meanwhile
+`buildMotionPack` had already computed it correctly, with the real contact joints, and stored it:
+**25 of the alien's 26 clips are cyclic in the pack, and zero samples carried the tag.** The
+database threw away a correct answer and recomputed it with the inputs missing.
+
+It now reads what the pack stored — one statement of a fact, several readers, the rule
+`motionFeatureLayout` already follows — and the tag goes **0% → 95%**. A filter on `Cyclic` would
+not have sat inert; it would have emptied the candidate set and returned a confident answer computed
+over nothing.
+
+**`OneShot` genuinely has no writer here.** `PackClip::loop` defaults to `true` and is assigned in
+exactly one place — deserialising a pack from JSON — so a pack built from a rig has every clip
+looping, `Dying_forward` included. Recorded rather than fixed: deciding whether a take loops is a
+judgement about content and belongs with the clip analysis, not bolted onto the tagger.
+
+**`Travelling` stays 0, which is the right answer for the wrong reason.** ADR-540 says every
+locomotion clip here is authored in place, so 0 is correct — but the database still cannot compute
+it, because ADR-552 defines travel as the root's extent against rest height and the pack stores
+`rootTravel`, which is *net displacement*: the very measure ADR-552 rejected. Five clips move their
+root more than 5 cm and all five are deaths, which fall rather than travel. The fix is for the pack
+to store the verdict, not for the database to guess it.

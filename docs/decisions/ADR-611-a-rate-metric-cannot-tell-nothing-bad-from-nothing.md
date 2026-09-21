@@ -65,6 +65,28 @@ result away; this says **read the rest of the row before you do**, because the n
 the headline may be the one that matters. The three dead-probe findings in this programme all had a
 non-headline column that was already wrong.
 
+## It applies to the harness, not only to the tests
+
+The command this branch waited two hours on was:
+
+```sh
+tools/gpu-lock.sh ./build/release/tests/avgen_render_tests 2>&1 | tail -4; echo "render exit: $?"
+```
+
+**Both of its signals are incapable of carrying a failure.** `$?` after a pipeline is the status of
+the *last* command in it, and with no `pipefail` that is `tail`'s — which exits 0 essentially
+always. So `render exit: 0` prints whether the suite passed, failed or crashed. And `tail -4`
+removes the rest of the row: a clean Catch2 run prints `All tests passed` and no `^test cases:`
+line, a crash prints no verdict line at all, and the last four lines of a crashed run are whatever
+the crash happened to emit.
+
+This is contamination guard #3 — *take the exit code from the binary, never from a pipeline* —
+violated by the author of this ADR while writing it. It is also the ADR's own subject: a probe that
+cannot fail, with the one mitigation (read the rest of the row) removed by the `tail`.
+
+**The rule is therefore about the harness as much as the assertions.** A suite full of careful
+controls, run through a pipeline that discards the status, is a suite with no verdict.
+
 ## Consequences
 
 - The §11 test asserts `stalledFraction` alongside the jump rate. The §16 sweep reports severity

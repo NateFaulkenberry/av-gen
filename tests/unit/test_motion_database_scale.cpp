@@ -990,3 +990,99 @@ TEST_CASE("the transition penalty is a control that does something", "[motionsca
         WARN(fmt::format("crossing out of the idle clip pays {}", crossing.breakdown.report()));
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// §13 -- motion tags and metadata, audited for **which end of each tag is connected**.
+//
+// §14's tag distribution turned up three tags carried by zero samples, and the right question that
+// raises is not whether the vocabulary is well-formed. It is: for each tag, is there a **writer**,
+// is there a **reader**, or is it a contract with one end connected?
+//
+// That failure has now appeared in both directions in this programme. ADR-608 is the declaration
+// with no consumer -- five cost weights read by nothing. This is its mirror: a vocabulary with no
+// producer. **The mirror is worse for a filter than for a weight**, because a dead weight sits
+// inert while a filter that matches nothing does not: it silently empties the candidate set and
+// hands the caller a confident answer computed over zero samples. That would be found later as
+// "the matcher returns garbage when I filter by cyclic", and the search is where nobody would look.
+
+TEST_CASE("every motion tag has a writer as well as a reader", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §13"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+
+    // Per clip, the three facts the tag writer reads, so a zero tag can be traced to the input that
+    // produced it rather than blamed on the tagger.
+    int looping = 0;
+    int cyclic = 0;
+    int travelling = 0;
+    int withTags = 0;
+    WARN("clip                       loop  cyclic  travels  authored tags");
+    for (const scene::PackClip& clip : pack->clips) {
+        looping += clip.loop ? 1 : 0;
+        cyclic += clip.phase.cyclic ? 1 : 0;
+        travelling += glm::length(clip.rootTravel) > 0.05f ? 1 : 0;
+        withTags += clip.tags.empty() ? 0 : 1;
+        if (clip.name.find("Walk") != std::string::npos ||
+            clip.name.find("Dying") != std::string::npos ||
+            clip.name.find("Idle") != std::string::npos) {
+            WARN(fmt::format("  {:<24} {:>4}  {:>6}  {:>7}  {}", clip.name, clip.loop ? "yes" : "no",
+                             clip.phase.cyclic ? "yes" : "no",
+                             glm::length(clip.rootTravel) > 0.05f ? "yes" : "no",
+                             clip.tags.empty() ? "(none)" : clip.tags.front()));
+        }
+    }
+    WARN(fmt::format("{} of {} clips loop, {} are cyclic, {} travel, {} carry authored tags",
+                     looping, pack->clips.size(), cyclic, travelling, withTags));
+
+    // **`OneShot` has no writer on this path, and this is the assertion that says so.**
+    // `PackClip::loop` defaults to `true` and is assigned in exactly one place -- deserialising a
+    // pack from JSON (`c.value("loop", true)`). Nothing in `buildMotionPack` ever decides it from
+    // the clip, so a pack built from a rig has every clip looping, including `Dying_forward`, and
+    // `MotionTag::OneShot` is unreachable.
+    //
+    // Recorded as a measurement rather than fixed here: deciding whether a take loops is a
+    // judgement about content (does the last pose meet the first?) and belongs with the clip
+    // analysis that already answers questions of that kind, not bolted onto the tagger.
+    CHECK(looping == static_cast<int>(pack->clips.size()));
+
+    // **And the contrast that turned this from "no writer" into something better.** 25 of 26 clips
+    // are `cyclic` *in the pack*, computed correctly by `buildMotionPack` from the real contact
+    // joints -- and zero samples carried `MotionTag::Cyclic` in the database. The writer was not
+    // missing; the database **re-derived** the analysis with empty contact joints and silently got
+    // false. A broken seam, not an absent producer, and a worse defect because everything looked
+    // populated at the point it was computed.
+    CHECK(cyclic > 20);
+
+    // Five clips move their root more than 5 cm -- all of them deaths, which fall rather than
+    // travel. `MotionTag::Travelling` correctly stays unset (ADR-540: every locomotion clip here is
+    // authored in place), but it stays unset for the wrong reason, because the database still
+    // cannot compute it. Recorded so the two causes are not confused later.
+    CHECK(travelling == 5);
+    CHECK(withTags == 0); // the alien pack authors no tags; everything comes from clip names
+}

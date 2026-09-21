@@ -171,3 +171,14 @@ TEST_CASE("the cost says what it was made of", "[motioncost][phaseC]") {
     // which is what a separately-computed diagnostic does the first time someone edits one of them.
     CHECK(match.breakdown.total() == Approx(match.cost).margin(1e-5f));
 }
+
+TEST_CASE("the breakdown carries its own caveat", "[motioncost][phaseC]") {
+    // §50's rule applied to §10's artefact: the warning has to live next to the number, because
+    // the person reading a cost breakdown has not read the ADR. This asserts the text exists and
+    // says the thing it must say -- so deleting it to tidy the header fails here rather than
+    // silently removing a warning from every future inspector.
+    const std::string caveat = scene::MotionCostBreakdown::caveat();
+    CHECK(caveat.find("decisive") != std::string::npos);
+    CHECK(caveat.find("zero") != std::string::npos);
+    CHECK(caveat.size() > 60);
+}
