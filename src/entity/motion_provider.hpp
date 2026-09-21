@@ -134,17 +134,21 @@ struct MotionMemory {
     // 0..1 through the locomotion cycle, when the content has a phase (Phase A's `PhaseTrack`).
     float phase = 0.0f;
     bool hasPhase = false;
-    // The timeline second the provider last made a decision. A *time*, never an elapsed count,
-    // for the reason ADR-086 gives.
+    // The timeline second this provider last decided what to play. A *time*, never an elapsed
+    // count, for the reason ADR-086 gives.
     //
-    // **It is not the instant the current transition began, and an inertializer must not read it
-    // as one** (ADR-613). `ClipMotionProvider` writes it when the clip actually changes;
-    // `MatchMotionProvider` writes it on **every search**, including the searches whose winner was
-    // the continuation and which therefore changed nothing. Under the matcher's convention it is
-    // "when the last search ran", which is what the search interval and the continuation lock read
-    // it for and what they need. One name, two conventions, and the name carries the wrong one --
-    // which is why the blend below has its own clock instead of deriving one from here.
-    double transitionStart = 0.0;
+    // **It was called `transitionStart`, and that name was true for one of its two writers.**
+    // `ClipMotionProvider` writes it when the clip actually changes, which is a transition;
+    // `MatchMotionProvider` writes it on **every search**, including the ones whose winner was the
+    // continuation and which therefore changed nothing at all. The search interval and the
+    // continuation lock read it under the second convention and need exactly that. So the field
+    // was never wrong -- the *name* was, for the reader most likely to be hunting for it, since
+    // "when did the current transition begin" is the first thing an inertializer asks and this
+    // would have answered it with the time of the last search.
+    //
+    // Renamed to what both writers actually mean. **A deciding is not a changing**, and the blend
+    // slots above keep their own clock rather than deriving one from here (ADR-613).
+    double decisionTime = 0.0;
 
     // ---- the inertialized transition (ADR-613, Phase C §32) ------------------------------------
     //
@@ -183,7 +187,7 @@ struct MotionMemory {
         // a time cannot reconstruct them from the index alone.
         float fromTime = 0.0f;
         float toTime = 0.0f;
-        // Seconds since that instant. **Its own clock**, for the reason `transitionStart` gives
+        // Seconds since that instant. **Its own clock**, for the reason `decisionTime` gives
         // above.
         float elapsed = 0.0f;
         [[nodiscard]] bool live() const { return from != kNoBlend && to != kNoBlend; }

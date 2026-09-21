@@ -99,7 +99,7 @@ MotionResult ClipMotionProvider::advance(const MotionRequest& request, const Mot
     next.generation = changed ? in.generation + 1 : in.generation;
     next.phase = clip.length() > 0.0f ? local / clip.length() : 0.0f;
     next.hasPhase = true;
-    next.transitionStart = changed ? time : in.transitionStart;
+    next.decisionTime = changed ? time : in.decisionTime;
 
     // §32/ADR-613. **The clip change is a transition, and it is inertialized here** rather than
     // left to `AnimationPlayer`, which is not running when a provider poses the body. The blend's

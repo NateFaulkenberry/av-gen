@@ -228,5 +228,8 @@ matcher's.
   need a blend to rescue it. Recorded as a residual rather than opened as a section.
 - The default halflife is on. No shipping body is affected, because `proceduralMotion` is off on
   every one of them; the cost above is what it will cost when they are switched on.
-- **`transitionStart` is misnamed for one of its two writers.** Renaming it touches two providers
-  and three tests and was not done inside a measurement change. It is documented at the field.
+- **`transitionStart` was misnamed for one of its two writers and is now `decisionTime`.** The
+  matcher writes it on every search, the clip provider on a genuine change; "when did the current
+  transition begin" is the first question an inertializer asks, and the old name would have
+  answered it with the time of the last search. Renamed in its own commit, deliberately outside
+  the measurement change, so that a rename could not be mistaken for a result.

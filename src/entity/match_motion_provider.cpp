@@ -53,7 +53,7 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
     //
     // Following `sampleNext` is an array read. That is the whole reason motion matching is
     // affordable: the scan happens ten times a second, not sixty.
-    const double sinceSearch = time - in.transitionStart;
+    const double sinceSearch = time - in.decisionTime;
     const bool due = !haveCurrent || sinceSearch >= static_cast<double>(settings_.searchInterval);
     const bool locked = haveCurrent && sinceSearch < static_cast<double>(settings_.minimumContinuation);
 
@@ -187,7 +187,7 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
     next.phase = db_->samplePhase[chosen];
     next.hasPhase = true;
     next.generation = in.generation + 1;
-    next.transitionStart = time;
+    next.decisionTime = time;
     result.status = MotionStatus::Produced;
     result.content = db_->clipNames[db_->sampleClip[chosen]];
     return result;
