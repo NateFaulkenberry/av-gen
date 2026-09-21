@@ -76,4 +76,41 @@ private:
     glm::vec3 normal_{0.0f, 1.0f, 0.0f};
 };
 
+// ---- Environment-aware motion (Phase B §40) ---------------------------------------------------
+//
+// **What a body knows about the ground it is on, as opposed to what a foot knows about the ground
+// under it.** §16/§17 already answer the second question: each foot asks `IGroundQuery` beneath its
+// own tip and plants there (ADR-551). §40 is the first question -- slope, footing and clearance as
+// things that change *how the body moves*, not just where its feet land.
+//
+// **This asks `IGroundQuery` and adds no new source.** There were three things asking the terrain
+// already -- `GroundFollower` for the body plane, the foot layers per tip, and the nav grid -- and
+// a fourth with its own sampling rule is how a family of divergent copies starts. So this is a
+// function over the interface that exists, not an interface beside it.
+struct EnvironmentSample {
+    // Radians from vertical. Zero on the flat, positive on any incline.
+    float slope = 0.0f;
+    // Unit, in the frame the caller sampled in, pointing **downhill**. Zero when there is no
+    // meaningful slope, which is not the same as "downhill is north".
+    glm::vec3 downhill{0.0f};
+    // How much of the footprint got a valid answer, 0..1. **Reported rather than folded in**: a
+    // body half off the edge of a height field and a body on a perfectly flat plain both produce
+    // slope 0, and only this tells them apart.
+    float coverage = 0.0f;
+    // The worst step between any two samples, in model units -- broken ground rather than a
+    // uniform incline. A body crossing scree shortens its stride for a reason a mean slope cannot
+    // see.
+    float relief = 0.0f;
+    GroundCategory category = GroundCategory::Unknown;
+    [[nodiscard]] bool valid() const { return coverage > 0.5f; }
+};
+
+// Sample the ground across a body's own footprint.
+//
+// `centre` and `radius` are world space. Four samples on the axes plus the centre: enough to fit a
+// plane, cheap enough to run per character per frame, and the same shape `GroundFollower` already
+// uses so the two cannot disagree about what a footprint is.
+[[nodiscard]] EnvironmentSample sampleEnvironment(const IGroundQuery& ground, const glm::vec3& centre,
+                                                  float radius);
+
 } // namespace avgen::scene

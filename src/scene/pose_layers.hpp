@@ -282,6 +282,13 @@ struct PoseLayer {
     // and shortening the reach while leaving the lift alone is what makes a shortened walk read as
     // a march. 0 keeps the authored height; 1 scales it with the stride.
     float strideLift = 0.7f;
+    // §40. How much a slope shortens the step, as a fraction removed per radian of incline.
+    // **Bounded by `strideSlopeFloor`, and the bound is the point**: a stride that shortens
+    // indefinitely is a character mincing up a hill, and the cost of shortening it is that the
+    // feet slide by whatever the body still travels -- which is the opposing quantity the tests
+    // measure (ADR-559).
+    float strideSlopeGain = 0.45f;
+    float strideSlopeFloor = 0.55f;
 
     // ---- Secondary (Phase B §26-§28) ------------------------------------------------------------
     // The axis the oscillation turns about, in each masked joint's own local frame. Defaults to
@@ -315,6 +322,10 @@ struct PoseLayer {
     // replays, so the lean is a pure function of it and a scrubbed frame reproduces a played one.
     // The field exists to say that, and to be the place an argument happens if anyone wants lag.
     float leanSmoothing = 0.0f;
+    // §40. Degrees of forward lean per radian of uphill slope -- a body leans into a hill. Capped
+    // by `leanMaxDegrees` along with everything else, because a lean that grows without bound is a
+    // character falling over, and the balance margin is what measures that (ADR-559).
+    float leanSlopeDegrees = 14.0f;
 
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
@@ -329,6 +340,10 @@ struct PoseLayer {
     // frame from `MotionContext`, which took them from the seam.
     glm::vec3 bodyAcceleration{0.0f};
     float bodyTurnRate = 0.0f;
+    // §40, written per frame: the incline the body is on, and which way is downhill in the rig's
+    // own frame. A stride shortens on any slope; a lean only tips into an *uphill* one.
+    float bodySlope = 0.0f;
+    glm::vec3 bodyDownhill{0.0f};
     // Foot lock, written per frame: whether this foot's contact span is running, how long it has
     // been running, how long is left, and how fast the body is travelling in its own frame.
     bool inContact = false;

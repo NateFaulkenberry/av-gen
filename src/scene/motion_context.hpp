@@ -129,6 +129,12 @@ struct MotionContext {
     glm::vec3 groundNormal{0.0f, 1.0f, 0.0f};
     bool hasGroundPlane = false;
 
+    // §40. What the body knows about the ground it is on, as opposed to what a foot knows about
+    // the ground under it. Sampled once per frame across the footprint through the same
+    // `IGroundQuery` everything else asks, because a fourth thing with its own sampling rule is
+    // how a family of divergent copies starts.
+    EnvironmentSample environment;
+
     // ---- targets -------------------------------------------------------------------------------
     glm::vec3 lookTarget{0.0f};            // entity-local
     bool hasLookTarget = false;

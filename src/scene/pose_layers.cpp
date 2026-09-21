@@ -592,7 +592,18 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // Pitch from the forward component, roll from the lateral one plus the turn rate. A
             // body cornering leans into the inside of the turn, and that is a different input
             // from its lateral acceleration even though the two usually agree.
-            const float pitchDegrees = -layer.bodyAcceleration.z * layer.leanDegreesPerAccel;
+            // §40. A body leans into a hill, and only into an *uphill* one: the sign comes from
+            // how much of the downhill direction points behind the body. On the flat
+            // `bodyDownhill` is zero and this term vanishes, which is why it needs no branch.
+            // **The sign follows the acceleration term's convention, and the first version had
+            // it backwards.** Negative `pitchDegrees` is a forward lean (see the accel term just
+            // below, where accelerating forward gives a negative). Ascending means downhill is
+            // *behind* the body -- `bodyDownhill.z` negative -- and ascending should lean
+            // forward, so the term is `+downhill.z` and not `-`. Descending then leans back,
+            // which is what a body going downhill actually does.
+            const float uphill = layer.bodyDownhill.z * layer.bodySlope * layer.leanSlopeDegrees;
+            const float pitchDegrees =
+                (-layer.bodyAcceleration.z * layer.leanDegreesPerAccel) + uphill;
             const float rollDegrees = (layer.bodyAcceleration.x * layer.leanDegreesPerAccel) +
                                       (layer.bodyTurnRate * layer.leanDegreesPerTurn);
             const float magnitude =
@@ -695,7 +706,14 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::NoTarget; // nobody told it how far the body is going
                 continue;
             }
-            const float scale = std::clamp(wanted, layer.strideMin, layer.strideMax);
+            // §40. A slope shortens the step whichever way it runs -- climbing and descending
+            // both cost stride -- so the magnitude of the incline is what counts and the floor is
+            // what stops it becoming a mince.
+            const float slopeScale =
+                std::max(1.0f - (std::abs(layer.bodySlope) * layer.strideSlopeGain),
+                         layer.strideSlopeFloor);
+            const float scale =
+                std::clamp(wanted * slopeScale, layer.strideMin, layer.strideMax);
             const bool clamped = std::abs(scale - wanted) > 1e-4f;
             // A ratio of 1 is the authored stride, and doing the arithmetic anyway would be a
             // float round-trip on every joint of every character for no change.

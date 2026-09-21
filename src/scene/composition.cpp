@@ -2784,6 +2784,18 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     motion_.strideRatio =
         entity::Gait::footSlip(entity_.desc().gait, state.activity, state.speed);
     motion_.ground = &ground;
+    // §40. Once per frame, across the body's own footprint, and converted into the rig's frame
+    // like everything else here. `restHeight * 0.55` is a body's stance width rather than a
+    // number: a footprint measured in metres would be wrong the moment a scene scales a character.
+    {
+        const glm::vec3 centre = glm::vec3(world[3]);
+        const EnvironmentSample env =
+            sampleEnvironment(ground, centre, std::max(motion_.restHeight * 0.55f, 0.1f));
+        motion_.environment = env;
+        motion_.environment.downhill =
+            glm::length(env.downhill) > 1e-5f ? glm::normalize(glm::mat3(inverse) * env.downhill)
+                                              : glm::vec3(0.0f);
+    }
     motion_.worldFromLocal = world;
     motion_.localFromWorld = inverse;
     motion_.groundPoint = localGround;
@@ -2837,6 +2849,7 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 // (`phaseStride`, §8's ramp in and §9's brake out). A start at a quarter speed
                 // wants both, and picking one would make the other invisible.
                 layer.strideRatio = motion_.strideRatio * motion_.phaseStride;
+                layer.bodySlope = motion_.environment.slope;
             }
             if (layer.kind == PoseLayerKind::Secondary) {
                 layer.bodySpeed = motion_.groundSpeed;
@@ -2844,6 +2857,8 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             if (layer.kind == PoseLayerKind::Lean) {
                 layer.bodyAcceleration = motion_.acceleration;
                 layer.bodyTurnRate = motion_.turnRate;
+                layer.bodySlope = motion_.environment.slope;
+                layer.bodyDownhill = motion_.environment.downhill;
             }
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
