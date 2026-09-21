@@ -1,0 +1,142 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Grid catch-up lab",
+ "_note": "ADR-581. The FIRST scene in this repository to author a simulated grid (ADR-032). The solver -- semi-Lagrangian advection, injection, Jacobi diffusion and dissipation, on the GPU in shaders/simulate.wgsl -- has shipped since ADR-032 with NO authored user anywhere under examples/, which is why the catch-up behaviour this scene measures has never been found. Density is injected in a sphere at the base and carried up and around by a spiral field, so how far the smoke has travelled is a direct readout of how many sub-steps the grid has taken. The fields are `kind: \"field\"` NODES: the scene-level `\"fields\"` key is entity::FieldDesc (ADR-097), an entirely different subsystem that happens to share the word.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0,
+   6,
+   26
+  ],
+  "target": [
+   0,
+   6,
+   0
+  ],
+  "fov": 40,
+  "orbitSpeed": 0
+ },
+ "environment": {
+  "background": [
+   0.02,
+   0.025,
+   0.04
+  ],
+  "intensity": 0.5,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.25,
+  "volumeSteps": 96,
+  "volumeJitter": 0.0,
+  "volumeMaxDistance": 60.0,
+  "volumeAbsorption": 1.0,
+  "volumeScattering": 1.0,
+  "volumeEmission": 1.2,
+  "fogColor": [
+   0.55,
+   0.78,
+   1.0
+  ],
+  "volumeDensityField": "smokeGrid",
+  "sky": {
+   "enabled": false,
+   "background": false
+  }
+ },
+ "grids": [
+  {
+   "name": "smoke",
+   "enabled": true,
+   "mode": "scalar",
+   "wrap": "clamp",
+   "resolution": [
+    48,
+    48,
+    48
+   ],
+   "boundsMin": [
+    -8,
+    -1,
+    -8
+   ],
+   "boundsMax": [
+    8,
+    15,
+    8
+   ],
+   "injectField": "source",
+   "velocityField": "lift",
+   "injectRate": 2.5,
+   "advect": 1.0,
+   "diffusion": 0.0,
+   "diffuseIterations": 2,
+   "dissipation": 0.12,
+   "simRate": 60.0,
+   "maxSubSteps": 4,
+   "seed": 11,
+   "seedAmount": 0.0
+  }
+ ],
+ "nodes": [
+  {
+   "name": "source",
+   "kind": "field",
+   "position": [
+    0,
+    1.0,
+    0
+   ],
+   "field": {
+    "kind": "sphere",
+    "radius": 2.0,
+    "softness": 1.0,
+    "strength": 1.0,
+    "falloff": {
+     "kind": "smoothstep",
+     "inner": 0.0,
+     "outer": 3.0
+    }
+   }
+  },
+  {
+   "name": "lift",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "spiral",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "spiralBias": 0.35,
+    "strength": 4.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  },
+  {
+   "name": "smokeGrid",
+   "kind": "field",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "field": {
+    "kind": "grid",
+    "reference": "smoke",
+    "strength": 1.0,
+    "falloff": {
+     "kind": "none"
+    }
+   }
+  }
+ ]
+}

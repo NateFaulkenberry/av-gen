@@ -22,6 +22,7 @@
 #include "scene/composition.hpp"
 #include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
+#include "world/world_effects/effect_registry.hpp"
 #include "world/atmospherics.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -139,17 +140,31 @@ TEST_CASE("the shipped project's vortex routes name parameters that exist",
     REQUIRE(in.good());
     const json doc = json::parse(in);
 
-    // The vortex the project declares, and the prefix its parameters therefore live under.
-    std::string vortexName;
+    // The PLACED MEDIUM the project declares, and the prefix its parameters therefore live under.
+    //
+    // This looked for `"kind" == "vortex"` and was right for as long as the hero's medium was one.
+    // ADR-580 replaced it with a tornado, and the check has to follow the *role* rather than the
+    // kind or it asserts a fact about which effect the deliverable happened to use. Reading it from
+    // the registry -- whatever kind is there, is it routed correctly -- is what makes it survive
+    // the next replacement as well as this one.
+    std::string mediumName;
+    world::AtmosphereKind mediumKind = world::AtmosphereKind::Vortex;
     for (const auto& e : doc.value("atmosphericEffects", json::array())) {
-        if (e.value("kind", std::string{}) == "vortex") {
-            vortexName = e.value("name", std::string{});
+        const std::string key = e.value("kind", std::string{});
+        const world::EffectSchema* s = world::effectSchema(key);
+        if (s != nullptr && s->resolve.bucket == world::EffectBucket::Medium) {
+            mediumName = e.value("name", std::string{});
+            mediumKind = s->kind;
         }
     }
-    REQUIRE_FALSE(vortexName.empty());
+    REQUIRE_FALSE(mediumName.empty());
+    const std::string vortexName = mediumName;
 
+    const world::EffectSchema* schema = world::effectSchema(mediumKind);
+    REQUIRE(schema != nullptr);
+    REQUIRE(schema->factory != nullptr);
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex(vortexName)};
+    std::vector<world::AtmosphericEffect> effects{schema->factory(mediumName)};
     world::registerAtmosphericParameters(params, effects);
     const std::string prefix = world::atmosphericParameterPrefix(vortexName);
 

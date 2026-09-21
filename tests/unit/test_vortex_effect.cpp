@@ -298,18 +298,29 @@ TEST_CASE("the shipped project drives the vortex through a path that exists",
         if (target.rfind("scene/vortex/", 0) == 0) {
             sawLegacy = true;
         }
-        if (target.rfind("atmos/", 0) == 0 && target.find("Vortex") != std::string::npos) {
+        // ADR-580 replaced the hero's Cosmic Vortex with a Cosmic Tornado and RETARGETED these
+        // five rather than deleting them -- the musical intent survives the change of kind even
+        // though every leaf name does not. So the name this looks for moved, deliberately, and the
+        // check is updated rather than removed: it is still the control proving the project really
+        // does route to its placed medium, which is what makes the `sawLegacy` line above a fact
+        // about the migration rather than about a project that never mentioned one.
+        if (target.rfind("atmos/", 0) == 0 && target.find("Tornado") != std::string::npos) {
             vortexTargets.push_back(target);
         }
     }
     CHECK_FALSE(sawLegacy);
-    // THE CONTROL: the project really does route to the vortex, so the line above is a fact about
-    // the migration rather than about a project that never mentioned it.
+    // THE CONTROL: the project really does route to its placed medium, so the line above is a fact
+    // about the migration rather than about a project that never mentioned one.
     CHECK(vortexTargets.size() == 5);
 
-    // And every one of them resolves against a registered vortex of that name.
+    // And every one of them resolves against a registered TORNADO of that name -- which is the half
+    // that matters, because a retarget that names a leaf the new kind does not declare is a dead
+    // route, and a dead route is a setting the picture does not keep.
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex("Cosmic Vortex")};
+    const world::EffectSchema* tornado = world::effectSchema(world::AtmosphereKind::Tornado);
+    REQUIRE(tornado != nullptr);
+    REQUIRE(tornado->factory != nullptr);
+    std::vector<world::AtmosphericEffect> effects{tornado->factory("Cosmic Tornado")};
     world::registerAtmosphericParameters(params, effects);
     for (const std::string& target : vortexTargets) {
         INFO(target);

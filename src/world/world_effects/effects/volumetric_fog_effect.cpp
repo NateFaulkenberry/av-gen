@@ -542,10 +542,23 @@ AtmosphericEffect make(std::string name) {
     e.name = std::move(name);
     e.kind = AtmosphereKind::VolumetricFog;
     applyStyle(e, kStyleNames[0]);
-    // Weather, not an event: it is there, and the music moves it. The fade-in is long because a
-    // bank that appears is a cut and a bank that gathers is weather.
+    // Weather, not an event: it is there, and the music moves it.
     e.activation = Activation::Always;
-    e.timing.fadeIn = 3.0;
+    // The fade-in WAS 3 s, on the argument that "a bank that appears is a cut and a bank that
+    // gathers is weather". The argument is right about a shot and wrong about a button.
+    //
+    // `buildAtmosphericFrame` drops an effect whose envelope is at or below 1e-4 rather than
+    // seating it dim (`atmospherics.cpp:736`), which is correct -- an invisible medium should not
+    // cost a march. The consequence is that a 3 s fade-in does not make a new bank faint at t=0,
+    // it makes it ABSENT: no slot, `mediumCount == 0`, and `VolumeRenderer::enabled(scene)` false
+    // with it. An artist who presses Add and looks at frame 0 -- which is where a scene opens --
+    // sees nothing at all and reports the effect as broken. That is exactly how this was found.
+    //
+    // So the gather is a SHOT decision and belongs to whoever authors the shot, not to the button.
+    // Nothing in the repository is changed by this: eleven example scenes author a vortex and not
+    // one authors a fog bank, which is the other half of why a 3 s hole at the origin survived a
+    // green suite -- there was no artifact anybody opened.
+    e.timing.fadeIn = 0.0;
     e.timing.fadeOut = 0.0;
     // No ground pool. A bank lights what stands IN it, through `spill` and `scattering`; ADR-230's
     // ground glow is a coloured patch on terrain from something in the sky, which this is not.
@@ -609,9 +622,27 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 // CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
 // what happens when they can). The appearance lanes are assembled here because they are what the
 // picture does with the field rather than part of it.
+// ADR-572 (§17) and ADR-580 §68, in one place rather than two.
+//
+// §68: a bank leans downwind by MOVING, exactly as a cosmic vortex does -- it is the same placed
+// medium with a different authoring surface, so it answers the wind the same way. That is separate
+// from `driftWind` below, which steers the bank's INTERNAL structure: one moves the volume, the
+// other moves what is inside it, and an artist can want either without the other.
+//
+// It is written here rather than inherited from a shared stage because the frame builder used to
+// write `leaned.vortex.field.center` unconditionally, which was right for the two kinds that store
+// in `e.vortex` and did nothing at all for a tornado, whose axis is a curve and which leans by
+// bending. `agent/tornado` fixed that with a `lean` hook in the registry; `agent/fog` had already
+// given this packer the flow. The merge kept ONE channel (ADR-441), the flow argument, so a kind's
+// wind response is now the body of its own packer -- and a kind that forgets is still named by
+// `effect_conformance`'s `flow-reaches` check, which compares packed frames and never knew which
+// hook produced them.
 void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumSlot& out) {
     const Vortex& v = e.vortex;
-    const vortex::VortexUniforms f = vortex::packVortex(v.field);
+    constexpr float kLeanFraction = 0.10f; // of the radius, per unit influence
+    vortex::VortexField field = v.field;
+    field.center += flowLean(flow.sample, flow.influence) * (kLeanFraction * std::max(field.radius, 0.0f));
+    const vortex::VortexUniforms f = vortex::packVortex(field);
     out.lane[0] = f.v0;
     // The envelope scales the two PER-METRE coefficients and nothing else (ADR-387): fading a
     // medium means less of it in the air. Fading its colours would leave a full-strength grey
@@ -628,9 +659,9 @@ void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumS
     // march, `mediumVortexUniforms`, and that is the arm a fog bank never takes. ADR-562 §9's
     // rule applied before writing rather than after something broke.
     //
-    // The flow field a scene subscribes to cannot reach here -- `EffectResolve::pack` is handed
-    // the effect and an envelope and not the resolved flow -- so §17's wind coupling is not in
-    // this lane yet. ADR-571's revisit note says what it would take.
+    // ADR-571 wrote here that the flow could not reach this function, because `EffectResolve::pack`
+    // was handed the effect and an envelope and nothing else. ADR-572 is that revisit note carried
+    // out: it does reach here, as `flow`, and the paragraph below is what this lane does with it.
     const float driftRot = glm::radians(storedOf(e, "bankRotation", 0.0f));
     const float driftSpeed = storedOf(e, "driftSpeed", 0.0f);
     glm::vec3 driftDir(std::cos(driftRot), 0.0f, std::sin(driftRot));

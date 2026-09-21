@@ -20,6 +20,8 @@
 #include <array>
 #include <cstring>
 #include <set>
+#include <utility>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -556,6 +558,54 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
 // This is therefore a deliberate hard-coded list: a name here is a promise that an effect keeps a
 // control an artist can already find in the panel. Removing a control is allowed -- editing this
 // list is how you say so out loud.
+TEST_CASE("no row is drawn under a section header the panel never emitted",
+          "[world][atmospherics][registry]") {
+    // **The panel emits a section header only on the row that declares one, and it filters by page
+    // FIRST.** `drawSchemaRows` is `if (field.page != page) continue;` then
+    // `if (field.section[0]) SeparatorText(...)`. So if a section is declared by a row on one page
+    // and some LATER row of that same section sits on the other page, that row is drawn with no
+    // header of its own -- appended under whatever separator happened to precede it on that page,
+    // which is a different section's, or none.
+    //
+    // It is invisible in the source, where the rows read as one tidy list, and invisible in a
+    // screenshot unless you already know which section a row was meant to be under. It is one
+    // `.main()` away at all times: moving a row between pages is the most ordinary edit there is
+    // and it silently re-parents every row of its section that stayed behind.
+    //
+    // **The first version of this check asserted that the first row on each page declares a
+    // section, and it was wrong** -- it went red on five of six shipped kinds. That is not a
+    // defect, it is the family's deliberate convention: a few ungrouped rows first (a comet's
+    // colours, a vortex's density and radius) and named sections after them. A guard that fires on
+    // working code is not a guard, which is the lesson the kind-name check twenty lines up was
+    // bought with. The property below is the narrow one that is actually true and actually
+    // load-bearing: a row may have no section, but it may not have one the panel did not draw.
+    for (const world::EffectSchema* schema : world::effectSchemas()) {
+        // Each row's owning section is the last one declared at or before it in list order, which
+        // is exactly how the panel accumulates them.
+        std::string owner;
+        std::vector<std::pair<const world::EffectField*, std::string>> owned;
+        std::map<std::string, std::set<world::FieldPage>> declaredOn;
+        for (const world::EffectField& f : schema->fields) {
+            if (f.section[0] != '\0') {
+                owner = f.section;
+                declaredOn[owner].insert(f.page);
+            }
+            owned.emplace_back(&f, owner);
+        }
+        for (const auto& [field, section] : owned) {
+            if (section.empty()) {
+                continue; // an ungrouped row is drawn ungrouped, which is the convention
+            }
+            const auto it = declaredOn.find(section);
+            const bool drawnHere = it != declaredOn.end() && it->second.count(field->page) == 1;
+            INFO(std::string(schema->key) + ": row '" + field->leaf + "' belongs to section '" +
+                 section + "', which no row on its own page declares -- the panel will draw it "
+                 "under a different section's header, or under none");
+            CHECK(drawnHere);
+        }
+    }
+}
+
 TEST_CASE("a kind keeps the leaves its authored scenes and panels already name",
           "[world][atmospherics][registry]") {
     struct Expect {

@@ -67,7 +67,9 @@ struct VolumeStats {
     double volumeMs = -1.0;             // GPU time of the march + composite passes (-1 = none)
 };
 
-// Group 1 binding 1 of both passes (112 bytes). Mirrors `VolumeUniforms` in shaders/volume.wgsl.
+// Group 1 binding 1 of both passes. Mirrors `VolumeUniforms` in shaders/volume.wgsl. The size is
+// asserted below rather than stated here, because the literal that used to be stated here (112
+// bytes) stopped being true three lanes ago and nothing noticed.
 struct VolumeUniforms {
     glm::vec4 params0;     // density, fogHeight, fogHeightFalloff, scattering
     glm::vec4 params1;     // absorption, anisotropy, emission, maxDistance
@@ -96,6 +98,16 @@ struct VolumeUniforms {
     glm::vec4 mediaInfo;
     glm::vec4 media[world::kMaxMedia * world::kMediumLanes];
 };
+// **Counted against the merged struct, not inherited from either branch.** Ten shared `vec4`s --
+// the original eight, plus `heightFog` (ADR-568) and `selfShadow` (ADR-570) from `agent/fog` --
+// then `mediaInfo`, then the lanes. `agent/fog` asserted `10 + 1` and `agent/tornado` asserted
+// `8 + 1`; each was true of its own struct and the merged one is neither branch's, so the number
+// below was recounted from the members above rather than chosen between them.
+//
+// `agent/tornado`'s comment beside its assertion named a `mediaKind` member that no longer
+// exists: the kind tag moved into each slot's own last lane (`MediumSlot::lane[15].x`, ADR-562),
+// which is why it costs nothing here. That stale comment is exactly why this one counts members
+// instead of describing them.
 static_assert(sizeof(VolumeUniforms) == 16 * (10 + 1 + world::kMaxMedia * world::kMediumLanes));
 
 class VolumeRenderer {
