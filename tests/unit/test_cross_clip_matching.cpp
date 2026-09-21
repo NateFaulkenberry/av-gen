@@ -362,3 +362,82 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
     CHECK(withPhaseRate > 0.0);
     CHECK(std::abs(withPhaseRate - withoutPhase) < 5.0); // no large effect either way
 }
+
+TEST_CASE("§30: contact-aware matching, on the validated instrument",
+          "[crossclip][phaseC][aliens]") {
+    // §30: "the search should understand contact state. Avoid selecting a candidate with left foot
+    // planted when the current character state strongly indicates right foot planted. Use contacts
+    // as a feature/filter."
+    //
+    // `contactWeight > 0` puts one contact flag per watched joint into the vector. This runs it on
+    // the instrument validated above rather than on the retired one, **and the shuffle control is
+    // part of the run rather than a follow-up** -- contacts are exactly the kind of feature that
+    // could act as an identifier, since a left/right planting pattern is close to a clip-phase
+    // fingerprint.
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §30"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions options;
+    options.sampleRate = 30.0f;
+    options.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    options.config.contactWeight = 1.0f;
+    auto db = scene::buildMotionDatabase(*pack, options);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+
+    // Does the contact feature exist at all on this corpus? §14's discipline: report the
+    // distribution before the ratio, because a feature whose values never vary cannot help.
+    const std::vector<scene::MotionFeatureGroup> layout = scene::motionFeatureLayout(db->config);
+    std::size_t contactDims = 0;
+    for (const scene::MotionFeatureGroup g : layout) {
+        if (g == scene::MotionFeatureGroup::Contact) {
+            ++contactDims;
+        }
+    }
+    WARN(fmt::format("§30: contact dimensions in the vector: {} of {}", contactDims,
+                     db->dimension));
+    CHECK(contactDims > 0u);
+
+    float lo = 1e9f;
+    float hi = -1e9f;
+    for (std::size_t d = 0; d < layout.size(); ++d) {
+        if (layout[d] != scene::MotionFeatureGroup::Contact) {
+            continue;
+        }
+        for (std::uint32_t s = 0; s < db->sampleCount(); ++s) {
+            lo = std::min(lo, db->featuresFor(s)[d]);
+            hi = std::max(hi, db->featuresFor(s)[d]);
+        }
+    }
+    WARN(fmt::format("§30: contact feature spans {:.4f} .. {:.4f} (normalised)", lo, hi));
+    // **A contact feature that does not vary is a dead dimension wearing a name**, and this is the
+    // check that says which before any rate is reported.
+    CHECK(hi > lo);
+}

@@ -1958,3 +1958,32 @@ noise cost a little.
 Nothing in a shuffle can tell you the ground truth was drawn from the wrong place — a phase-defined
 target would have made shuffled phase collapse *correctly* while the whole result stayed worthless.
 Two independent things have to be right, and only one of them has an automated check.
+
+
+### Amendment: the third face resolved to "no change needed", and that is the better version
+
+I recorded `phaseWeight = 0` as the third face of the night's category — *a default that was right
+under the old behaviour and is wrong under the new one*. **The measurement has come back and the
+default is not wrong.** With the phase data live and the weight on, there is no detectable benefit on
+this corpus, so **`phaseWeight = 0` remains the correct value.** It stopped being correct for its
+original reason and is now correct for a measured one.
+
+**The category keeps its place and the hazard is unchanged:** *fixing a dead input does not fix the
+configuration that was tuned around it being dead, and the fix has no way to find its own
+dependents.* What changes is the instance: it resolved to **no change needed**, and the only way to
+learn that was to measure rather than to assume the config had gone stale.
+
+That is the stronger form of the lesson. **The hazard is that nobody checks — not that the value is
+necessarily wrong.** And my first instinct, not to move the default until the cost side had been
+measured, turned out right for a reason I did not have at the time.
+
+A category whose every instance happens to be a bug is a category that has been curated. This one
+has an instance that resolved to no-change, which is why both the finding and its resolution stay in
+the record.
+
+### Why the negative is strong rather than merely null
+
+At a 34.7% baseline the matcher picks something notably worse than the best available **roughly two
+thirds of the time** — so there was **ample headroom for phase to help, and it did not.** This is
+not "no room to improve"; it is "plenty of room, and this feature took none of it". A ceiling effect
+would have been the available get-out and there isn't one.
