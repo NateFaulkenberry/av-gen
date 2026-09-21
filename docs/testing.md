@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-eight ways a green suite has lied
+## Twenty-nine ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -725,6 +725,41 @@ night from two agents who never spoke to each other.
    the new region, a round-trip test whose field list is written out by hand, a conformance table
    with a row per property. **The harness's shape is a claim about what the thing has, and the
    thing grew.**
+
+29. **Running the CPU suite and the GPU suite at the same time breaks both, and one of the ways it
+   breaks them is a DETERMINISM failure.**
+
+   Measured 2026-09-21. Run concurrently on an idle machine:
+
+   - `avgen_tests` died with `EXC_BREAKPOINT` / `SIGTRAP` inside
+     `CVPixelBufferPoolCreatePixelBuffer`, in the video-writer case -- **exit 133, no verdict
+     line**. CoreVideo's pixel-buffer pool is a system resource and the GPU suite was competing
+     for it;
+   - `avgen_render_tests` failed `CHECK(a == b)` in
+     `test_procedural_examples_gpu.cpp` on `examples/worlds/worlds.json`: **the same project
+     rendered twice, through two fresh engines, produced two different sequence hashes.**
+
+   Run one after the other, the same binaries on the same tree: **2841 cases exit 0, and 401 cases
+   exit 0.**
+
+   **The second failure is the one that matters, because it falsifies a claim this repository was
+   working from.** `render_arms.sh` carried the header *"no gpu-lock (ADR-170 binds TIMING, and
+   pixels are deterministic under contention -- ADR-360)"*, and the practice of rendering image
+   arms without the lock rested on it. Pixels were not deterministic under that contention. Whether
+   the mechanism is contention itself or an intermittent that contention made likely is **not
+   established from one trial each way** -- and that ambiguity is the point: *running them together
+   removed the ability to tell.*
+
+   So the rule is not "it is slower", it is:
+
+   > **ADR-170's lock is about the GPU, and the CPU suite uses the GPU.** It encodes video, and it
+   > goes through the same system frameworks the render suite does. Serialise them. A run taken
+   > while the other suite is up is not evidence, whichever way it came out.
+
+   And the uncomfortable corollary, which is why this is an entry rather than a note: **the green
+   runs taken that way were green, and they were also unsound.** A pass under a method that can
+   produce a false failure can equally produce a false pass, and nothing in the output distinguishes
+   them. Re-take anything that mattered.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
