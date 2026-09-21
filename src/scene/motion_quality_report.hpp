@@ -39,6 +39,8 @@ struct MotionQualitySummary {
     // scan time spent on an outcome that cannot happen.
     std::uint32_t duplicates = 0;
     float duplicateFraction = 0.0f;
+    float duplicateRadius = 0.0f;   // the radius actually used
+    bool radiusDerived = false;     // whether it was derived from this matcher or pinned
 
     // Feature density: how much of the normalised feature space the corpus actually occupies,
     // reported as the mean nearest-neighbour distance. Small means the corpus is tightly clustered
@@ -63,10 +65,21 @@ struct MotionQualitySummary {
 };
 
 struct MotionQualitySummaryOptions {
-    // In normalised feature units. Two samples closer than this are treated as duplicates; the
-    // default is chosen against the **measured** nearest-neighbour distribution rather than picked,
-    // and `analyseMotionQuality` reports the distribution so the choice can be checked.
-    float duplicateEpsilon = 0.05f;
+    // **0 means "derive it from the matcher in hand", and that is the default.**
+    //
+    // A duplicate count at a fixed radius is extremely sensitive to that radius -- more so than a
+    // coverage bin count, because it is a threshold on a continuous distance rather than a
+    // partition. At 0.01 the count is near zero and at 0.2 it could be most of the corpus, so a
+    // bare percentage at a chosen radius is a property of the choice. And the claim it supports is
+    // a strong one -- "these samples can never be chosen" is an argument for deleting them -- so an
+    // arbitrary radius makes an arbitrary deletion.
+    //
+    // The radius that means something is the one **inside which the search cannot tell two samples
+    // apart**: two samples are duplicates *to the matcher* exactly when swapping one for the other
+    // changes no selection. That is the same probe §22 uses to derive its bin width, pointed at
+    // feature distance instead of requested speed, and it carries the same ADR-389 property -- it
+    // moves when the weights move, so it cannot go stale.
+    float duplicateEpsilon = 0.0f;
     // Nearest-neighbour search is O(n^2); on a million samples that is not a report, it is a job.
     // Above this many samples the density figures are computed on a stride and said to be.
     std::uint32_t exactBelow = 20000;

@@ -1694,7 +1694,35 @@ TEST_CASE("the quality report describes the real database", "[motionscale][phase
     // percentage rise when the sampler got finer. This asserts the exclusion is doing something --
     // without it every sample would have a near-zero nearest neighbour.
     CHECK(summary.meanNearestNeighbour > 0.0f);
-    CHECK(summary.duplicateFraction < 0.5f);
+
+    // **The radius is derived, and deriving it changed the answer from 7.42% to 57.02%.**
+    // The first version used a chosen 0.05 normalised units. The matcher's actual discrimination
+    // radius -- the distance a query must move before the search returns a different sample -- is
+    // **1.3945**, twenty-eight times larger, and below the corpus's own mean nearest-neighbour
+    // distance of 1.8493. So more than half the samples have a neighbour the search cannot tell
+    // them apart from.
+    //
+    // That inverts what the number is evidence *for*. At 7.42% it read as "delete 129 redundant
+    // samples". At 57% it is not a deletion argument at all -- deleting half a corpus because the
+    // current weight vector cannot resolve it would be destroying content to flatter an instrument.
+    // It is evidence that **the corpus is far denser than this matcher can use**, which points at
+    // the feature weighting (§22 already found root velocity is 3 of 33 dimensions and swamped) or
+    // at the sample rate, and is a question for §20's larger corpus.
+    CHECK(summary.radiusDerived);
+    CHECK(summary.duplicateRadius > 0.0f);
+    CHECK(summary.duplicateFraction > 0.0f);
+    CHECK(summary.duplicateFraction <= 1.0f);
+
+    // The sweep, printed so nobody mistakes one point on a steep curve for a property of the
+    // corpus -- the curve is the finding, and at a chosen radius the headline is a property of the
+    // choice.
+    WARN("duplicate percentage against radius (the curve, not a point):");
+    for (const float radius : {0.01f, 0.05f, 0.5f, 1.3945f, 2.0f}) {
+        scene::MotionQualitySummaryOptions pinned;
+        pinned.duplicateEpsilon = radius;
+        const scene::MotionQualitySummary at = scene::analyseMotionQuality(*db, pinned);
+        WARN(fmt::format("  radius {:.4f}: {:>5.2f}%", radius, 100.0f * at.duplicateFraction));
+    }
 
     // The report cites the coverage analyzer rather than recomputing, so the two cannot disagree
     // about one corpus -- §13's lesson, one section later.

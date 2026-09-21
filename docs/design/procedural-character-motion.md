@@ -1439,9 +1439,34 @@ motion database quality: 1738 samples x 33 dimensions
   pack build time on the clip and the skeleton.
 ```
 
-**7.42% of the corpus is indistinguishable to the search** — 129 samples that can never be chosen,
-because a sample within 0.05 normalised units of each of them exists. That is memory, scan time and
-cache spent on outcomes that cannot happen, and it is §23's first named metric for a reason.
+**That 7.42% was a property of 0.05, and 0.05 was a number I chose.** Corrected: the radius is now
+derived the way §22's bin width is — the distance a query must move before the search returns a
+different sample, which is the only definition of "duplicate" that licences deleting one. It is
+**1.3945** normalised units, twenty-eight times larger, and *below* the corpus's own mean
+nearest-neighbour distance of 1.8493.
+
+| radius | duplicates |
+|---|---|
+| 0.0100 | 6.44% |
+| 0.0500 | **7.42%** ← the number I first reported |
+| 0.5000 | 26.52% |
+| **1.3945** ← derived from this matcher | **57.02%** |
+| 2.0000 | 66.11% |
+
+The curve is printed beside the figure so nobody mistakes one point on it for a property of the
+corpus.
+
+**And the correction inverts what the number is evidence for.** At 7.42% it read as *"delete 129
+redundant samples"*. At 57% it is not a deletion argument at all — deleting half a corpus because
+the current weight vector cannot resolve it would be **destroying content to flatter an
+instrument**. It is evidence that the corpus is far denser than this matcher can *use*, which points
+at the feature weighting (§22 already found root velocity is 3 of 33 dimensions and swamped by the
+pose terms) or at the sample rate. The radius carries the same ADR-389 property as the bin width: it
+moves when the weights move, so it cannot go stale.
+
+Worth noting the low end is flat — 6.44% at 0.01 against 7.42% at 0.05 — so there really is a small
+core of near-exact duplicates across clips, independent of any radius. That part of the original
+finding survives; the headline did not.
 
 **The duplicate measure excludes consecutive frames of the same clip**, which is the difference
 between measuring the corpus and measuring the sample rate. At 30 Hz adjacent frames are nearly
