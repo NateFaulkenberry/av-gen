@@ -420,3 +420,65 @@ one second at 60 Hz: **8–13 searches, 45+ frames continued** by following `sam
 - **§21 motion augmentation** (mirroring, time-warping to synthesise coverage): not built.
 - **§23 database quality analyzer**: partly — the per-joint articulation statistic above is the
   part that earned its place; coverage analysis (§22) is not built.
+
+
+---
+
+# D2 — the Glowmere integration
+
+## What changed in the scene
+
+All five aliens (`rook`, `tide`, `sage`, `ember`, `vane`) in
+`glowmere-valley-2-multicam.scene.json`. They already carried a `look` aim layer and a `startle`
+additive layer; they now carry **seven**:
+
+| layer | what it does |
+|---|---|
+| `foot.l` / `foot.r` | plant on the terrain under each foot (ADR-551), on ADR-543's detached chains |
+| `stride.l` / `stride.r` | shorten the step to match how fast the body is actually travelling |
+| `life` | secondary motion — breathing and weight shift, faded out while walking |
+| `look`, `startle` | unchanged |
+
+Plus `contacts`, `matchPhase`, `inertialize: 0.12` and body compensation. Each alien gets slightly
+different numbers — stride floor 0.35–0.45, lift 0.70–0.80, breath 1.1–1.7° over a 3.8–5.1 s
+period, and five different phases — so they read as individuals rather than as one animation
+played five times.
+
+**The edit is surgical**: 400 insertions, 5 deletions, and the only removals are the five array
+brackets that now have content after them. Re-serialising the file would have produced a
+9,600-line diff against a file the owner may be editing.
+
+## What is visible
+
+Rendered through the project (ADR-264), `--range 4.2:7.8`, which is `rook`'s own camera shot.
+Artifacts in `build/review/` (gitignored): `rook-before-after-frame210.png` is the side-by-side.
+
+**Before** (left): the alien is in a wide mid-stride — legs well apart, torso pitched forward, the
+leading foot hanging above the plants rather than resting on them. That is the 0.033× stride
+mismatch B.A measured, drawn: the body is travelling at 0.10 m/s while playing a walk authored for
+3.07 m/s, so it takes a full stride it has no distance to spend.
+
+**After** (right): the stance is narrower, the torso is upright, and both feet are down on the
+ground surface. The head is lifted and turned, so the character's emissive eyes and mouth are
+toward camera.
+
+**A caveat I am stating rather than glossing.** At frame 210 — 3.5 seconds in — some of that
+difference is *simulation divergence*, not a direct layer effect: posing feeds back into the
+entity through sockets (ADR-274), so two runs drift apart over seconds. The cleanest read of the
+layers alone is the earliest frames, where the difference is 0.13% of pixels confined to a band at
+the aliens' feet. The pose change is real in both; the attribution is cleaner early.
+
+## The honest gap: `proceduralMotion` is OFF in Glowmere
+
+The provider chain is opted **in** on the foot lab's `alien-provider` and **out** on all five
+Glowmere aliens, and that is a deliberate quality decision rather than an oversight.
+
+`ClipMotionProvider` has parity with `AnimationPlayer` for steady-state playback (asserted joint by
+joint over 90 frames) and **does not implement transitions or inertialization** — ADR-547's
+machinery belongs to the player and the provider does not yet use it. Glowmere's aliens change gait
+constantly, so switching them to the provider tonight would have replaced a blending player with a
+non-blending one: an architecture win that reads on screen as a regression.
+
+So the seam is proven reachable where it can be proven (the lab, with two probes each shown failing
+against a deliberate break) and left off where it would look worse. **Named as the first thing to
+fix before the provider drives production characters.**
