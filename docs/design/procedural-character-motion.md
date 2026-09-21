@@ -1812,3 +1812,55 @@ And the shuffle control did something better than failing. **A control that mere
 feature is inert. This one beat the thing it controls for**, which says the *metric* is measuring
 the wrong quantity — and that invalidates every use of leave-one-out retrieval as a quality measure,
 not one result.
+
+
+## §24 — VOID, and removed from the §20 queue
+
+The shuffle control was carried forward to the next use of the metric, as it should have been at
+once. It returns §31's verdict and more strongly:
+
+| arm | real | **shuffled** |
+|---|---|---|
+| no trajectory (baseline) | 69.6% | — |
+| shipping `{0.2, 0.4, 0.6}` | 76.6% | **99.4%** |
+| `{0.1, 0.2, 0.4, 0.8}` | 81.0% | **100.0%** |
+
+Permuting the trajectory values destroys their meaning and keeps their distribution, so a feature
+carrying meaning would collapse toward the 69.6% baseline. **It rises to a ceiling instead**, beating
+the real features by 23 and 19 points — random values are more uniquely identifying than real ones,
+exactly as phase was.
+
+**So §24's corrected table measures nothing either, and the correct filing is not "unresolved at
+this sample size".** A larger corpus would give tighter error bars around a meaningless number.
+**§24 is not a §20 question**, and putting it on that queue would have implied a licensing decision
+buys something it cannot.
+
+**The scope is wider than either feature.** This is the second family the metric has failed on,
+which is evidence it fails on any of them: leave-one-out retrieval admits **exactly one correct
+answer per query**, so it rewards whatever identifies that answer, and every added dimension helps.
+The metric is retired as a quality measure, not adjusted.
+
+### The n question, answered — and why it is moot
+
+n = 158 was a **choice**, not a limit: the loop strides `s += 11u` over 1,738 samples, and
+leave-one-out can run on every one. n = 1738 would cut the standard error ~3.3×, turning ±3.4 into
+about ±1.0 and the 4.4-point gap into ~3σ.
+
+**And it would have been the more expensive mistake.** Tightening the bars first would have produced
+a confidently wrong answer — 3σ of precision around a quantity the instrument does not measure.
+**Validity first, then precision**, and validity failed, so the precision work is not worth doing on
+this instrument at all.
+
+### Which metrics are exposed, stated in advance
+
+> **A metric is vulnerable to identifiability in proportion to how few correct answers it admits.**
+
+- **Leave-one-out retrieval** — exactly one correct answer → maximally exposed → **retired**.
+- **§19's stay-on-clip** — ~66 acceptable answers per clip → not exposed → **survives** (and it did,
+  under full perturbation).
+- **§16's recall** — one correct answer, but compared between plans at equal dimensionality, so the
+  exposure is constant across arms → the *comparison* survives even though the absolute rate would
+  not.
+
+That ordering was available before any of these were run, and it is the cheap test for the rest of
+the phase: count the acceptable answers before trusting the number.

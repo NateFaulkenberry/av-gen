@@ -1411,11 +1411,20 @@ TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][ph
         {"{0.2, 0.4, 0.6, 0.8, 1.0}", {0.2f, 0.4f, 0.6f, 0.8f, 1.0f}},
     };
 
+    // **Validity before precision.** §31 established that leave-one-out retrieval rewards
+    // identifiability rather than match quality, and this is the next use of that same metric --
+    // so the control has to be carried forward rather than left with the result that produced it.
+    // `shuffle` permutes the trajectory dimensions across samples, keeping their distribution and
+    // destroying their meaning. Three outcomes point in completely different directions: collapse
+    // toward the no-trajectory baseline means the features carry meaning and the metric is valid
+    // here; matching the real arms means they contribute identifiability; beating them is §31's
+    // verdict and the instrument is wrong for this family too.
     WARN("horizons                                  dim  bytes/sample  retrieval  query us");
     double defaultRetrieval = 0.0;
     double bestRetrieval = 0.0;
+    double noneRetrieval = 0.0;
     std::string bestName;
-    for (const Horizons& set : sets) {
+    const auto measureArm = [&](const Horizons& set, bool shuffleTrajectory) {
         scene::MotionDatabaseOptions dbOptions;
         dbOptions.sampleRate = 30.0f;
         dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
@@ -1423,6 +1432,37 @@ TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][ph
         auto db = scene::buildMotionDatabase(*pack, dbOptions);
         if (!db.has_value()) {
             FAIL("motion database build failed: " << db.error().message);
+        }
+        if (shuffleTrajectory) {
+            const std::vector<scene::MotionFeatureGroup> layout =
+                scene::motionFeatureLayout(db->config);
+            std::vector<std::size_t> dims;
+            for (std::size_t d = 0; d < layout.size(); ++d) {
+                if (layout[d] == scene::MotionFeatureGroup::TrajectoryPosition ||
+                    layout[d] == scene::MotionFeatureGroup::TrajectoryFacing) {
+                    dims.push_back(d);
+                }
+            }
+            if (!dims.empty()) {
+                std::vector<std::uint32_t> order(db->sampleCount());
+                for (std::uint32_t i = 0; i < db->sampleCount(); ++i) {
+                    order[i] = i;
+                }
+                std::mt19937 rng(9876u);
+                std::shuffle(order.begin(), order.end(), rng);
+                std::vector<float> saved(db->sampleCount() * dims.size());
+                for (std::uint32_t i = 0; i < db->sampleCount(); ++i) {
+                    for (std::size_t k = 0; k < dims.size(); ++k) {
+                        saved[i * dims.size() + k] = db->featuresFor(i)[dims[k]];
+                    }
+                }
+                for (std::uint32_t i = 0; i < db->sampleCount(); ++i) {
+                    for (std::size_t k = 0; k < dims.size(); ++k) {
+                        db->features[static_cast<std::size_t>(i) * db->dimension + dims[k]] =
+                            saved[order[i] * dims.size() + k];
+                    }
+                }
+            }
         }
         const scene::MotionCostWeights weights;
 
@@ -1484,6 +1524,14 @@ TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][ph
         WARN(fmt::format("{}  {:>3}  {:>12.0f}  {:6.1f}% +-{:.1f} (n={})  {:8.2f}", set.name,
                          db->dimension, db->dimension * 4.0 + 20.0, retrieval, stderrPoints,
                          trials, best));
+        return retrieval;
+    };
+
+    for (const Horizons& set : sets) {
+        const double retrieval = measureArm(set, false);
+        if (set.times.empty()) {
+            noneRetrieval = retrieval;
+        }
         if (set.times.size() == 3) {
             defaultRetrieval = retrieval;
         }
@@ -1493,6 +1541,25 @@ TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][ph
         }
     }
 
+    // The control, on the two arms that matter: the shipping default and the current leader.
+    WARN("-- shuffle control: trajectory values permuted across samples --");
+    double shuffledDefault = 0.0;
+    double shuffledBest = 0.0;
+    for (const Horizons& set : sets) {
+        if (set.times.size() != 3 && set.times.size() != 4) {
+            continue;
+        }
+        const double r = measureArm(set, true);
+        if (set.times.size() == 3) {
+            shuffledDefault = r;
+        } else {
+            shuffledBest = r;
+        }
+    }
+    WARN(fmt::format("shipping default: real {:.1f}% vs shuffled {:.1f}%; 4-horizon arm: real "
+                     "{:.1f}% vs shuffled {:.1f}%; no-trajectory baseline {:.1f}%",
+                     defaultRetrieval, shuffledDefault, bestRetrieval, shuffledBest, noneRetrieval));
+
     WARN(fmt::format("best retrieval: {} at {:.1f}%; the shipping default gives {:.1f}%", bestName,
                      bestRetrieval, defaultRetrieval));
 
@@ -1501,8 +1568,29 @@ TEST_CASE("the trajectory horizons, experimentally validated", "[motionscale][ph
     // than a citation. Whether the shipping default wins is the interesting part and is reported,
     // not asserted -- an assertion that the current value is best would be the conclusion writing
     // the experiment.
+    // **The control returns §31's verdict, and more strongly.** Shuffled trajectory beats real
+    // trajectory by 23 and 19 points:
+    //
+    //   shipping default   real 76.6%   shuffled  99.4%
+    //   4-horizon arm      real 81.0%   shuffled 100.0%
+    //   no-trajectory baseline          69.6%
+    //
+    // Permuting the values destroys their meaning and keeps their distribution, so a feature that
+    // carried meaning would collapse toward the 69.6% baseline. It rises to a ceiling instead --
+    // random values are more uniquely identifying than real ones, exactly as phase was.
+    //
+    // **So leave-one-out retrieval measures nothing here, and §24's whole table is void.** Not
+    // "unresolved at this sample size": a larger corpus would give tighter error bars around a
+    // meaningless number. **§24 is therefore NOT a §20 question**, and filing it as one would have
+    // implied a licensing decision buys something it does not.
+    //
+    // And the scope is wider than either feature: this is now the second family the metric has
+    // failed on, which is evidence that it fails on *any* of them. A metric with exactly one
+    // correct answer per query rewards whatever identifies that answer, and every added dimension
+    // helps it do so.
     CHECK(defaultRetrieval > 0.0);
-    CHECK(bestRetrieval >= defaultRetrieval);
+    CHECK(shuffledDefault > defaultRetrieval); // the control beats the real thing -- see above
+    CHECK(shuffledBest > bestRetrieval);
     // **Re-taken under full perturbation, and the conclusion moved.** The first run stepped
     // `d += 5`, which left a *different subset of each arm's trajectory block* unperturbed -- the
     // arms have 21/25/33/37/41 dimensions, so the flaw landed unevenly on exactly the variable
