@@ -10,7 +10,7 @@
 | stage (§61) | state | note |
 |---|---|---|
 | A. Phase A audit | **done** | the implementation map below; found the stride problem is 97% one-sided |
-| B. MotionContext | **done** | ADR-561; found three seam publication defects on the way (ADR-560) |
+| B. MotionContext | **done** | ADR-555; found three seam publication defects on the way (ADR-554) |
 | C. MotionController — provider seam | **done** | ADR-541 built as written; chain + clip provider held to parity |
 | D. acceleration / deceleration | **done** | the vector layer `Gait::approach` does not have |
 | E. locomotion adaptation | **done** | `PoseLayerKind::Stride`; accepted reordering, see below |
@@ -54,7 +54,7 @@ Phase B must add. Read off the code rather than off Phase A's own report.
 | primitive | file | Phase B use |
 |---|---|---|
 | `PoseLayer` (name, kind, drive, mask, weight) | `scene/pose_layers.hpp` | the layer system. **Reuse, extend.** |
-| `PoseLayerKind::{Aim, Additive, Foot}` | same | Phase B adds kinds here, not a parallel hierarchy — see ADR-560 |
+| `PoseLayerKind::{Aim, Additive, Foot}` | same | Phase B adds kinds here, not a parallel hierarchy — see ADR-554 |
 | `PoseLayerDrive::{Manual, Look, Reaction, Ground}` | same | how a layer is fed from the entity seam |
 | `JointMaskSpec`, `LayerResolution`, `PoseLayerStats` | same | §30 masking and §64 diagnostics already exist |
 | `solveTwoBone`, `IkStatus` | `scene/ik.hpp` | §13 foot placement, §23 reach |
@@ -127,7 +127,7 @@ fixed here.)
 
 ## B.B — MotionContext
 
-`src/scene/motion_context.hpp`. ADR-561 records why it is scene-tier and entity-free, and why
+`src/scene/motion_context.hpp`. ADR-555 records why it is scene-tier and entity-free, and why
 `LocomotionMode` is a five-value projection of the nine-value `entity::Activity` rather than that
 enum. Built once per frame at `Composition::AnimationSink::driveLayers`, the one function that
 already depends on both tiers; readable through `Composition::motionContext(node)` for §50's debug
@@ -140,7 +140,7 @@ thresholds are ratios rather than metres (ADR-552's rule, on this side of the pi
 ### The three seam defects it found
 
 Needing to read `LocomotionState` meant asking, for each field, *which of the two publish paths
-writes it*. Two of three answers were wrong (ADR-560):
+writes it*. Two of three answers were wrong (ADR-554):
 
 | field | `update` | `seek` | symptom |
 |---|---|---|---|
@@ -256,7 +256,7 @@ player, which would read it as a clip index and draw a different animation entir
 ### Where each piece lives
 
 - **`Entity` owns the memory** (ADR-541) and `Entity::advanceMotion` steps it. Called from **both**
-  publish paths — ADR-560's rule, applied to the very struct that rule was discovered by.
+  publish paths — ADR-554's rule, applied to the very struct that rule was discovered by.
 - **`SkinnedRig::externalPose`** is a pose, not a provider. The scene tier deliberately does not
   learn what put it there; if it did, the layer module would have a route to the simulation, which
   ADR-300 exists to prevent. It is **consumed** rather than latched, so a driver that stops driving
@@ -401,7 +401,7 @@ of wall clock**, or about 1% of one core.
 `src/entity/match_motion_provider.{hpp,cpp}`, on ADR-541's chain ahead of the clip player.
 
 **The part that looks impossible.** A motion-matching query needs the character's current pose, and
-ADR-562 forbids `advance` from touching a skeleton. It resolves because the current pose **is a
+ADR-556 forbids `advance` from touching a skeleton. It resolves because the current pose **is a
 database sample** — the character is playing frame N of clip C, so the pose half of the query is
 that sample's own feature vector, already extracted and already normalised. Only intent is
 computed. That is not a trick to satisfy the interface; it is how motion matching is formulated.

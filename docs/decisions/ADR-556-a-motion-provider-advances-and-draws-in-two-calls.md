@@ -1,11 +1,11 @@
-# ADR-562: A motion provider advances and draws in two calls, because a seek replays 5,400 steps and poses once
+# ADR-556: A motion provider advances and draws in two calls, because a seek replays 5,400 steps and poses once
 
 **Status:** Accepted
 **Date:** 2026-09-20
 **Amends:** ADR-541 (a motion provider that remembers lives in the entity tier)
 **Related:** ADR-086 (a state stores when it was entered), ADR-182 (a probe that cannot fail proves
 nothing), ADR-273 (the seek budget), ADR-300 (a pose layer cannot reach the world), ADR-360 (the
-determinism contract), ADR-560, ADR-561
+determinism contract), ADR-554, ADR-555
 **Implemented by:** `src/entity/motion_provider.hpp`, `motion_chain.hpp`,
 `clip_motion_provider.{hpp,cpp}`, `Entity::advanceMotion`, `SkinnedRig::externalPose`
 **Tests:** `tests/unit/test_motion_provider.cpp`, `tests/unit/test_alien_foot_lab.cpp` — "the opt-in

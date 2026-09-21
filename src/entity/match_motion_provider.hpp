@@ -4,7 +4,7 @@
 // player.
 //
 // **Why this fits `advance`/`pose` without a skeleton, which is the part that looks impossible.**
-// ADR-562 says `advance` may not touch a skeleton, and a motion-matching query obviously needs the
+// ADR-556 says `advance` may not touch a skeleton, and a motion-matching query obviously needs the
 // character's current pose. The resolution is that the current pose **is a database sample**: the
 // character is playing frame N of clip C, so the pose half of the query is that sample's own
 // feature vector, already extracted, already normalised, already in the database. Only the half

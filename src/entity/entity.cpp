@@ -1210,7 +1210,7 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(dt);
         // Phase B: the provider memory, advanced on this path as on the other one. Both, for
-        // ADR-560's reason -- and this is the field that rule was discovered by, so getting it
+        // ADR-554's reason -- and this is the field that rule was discovered by, so getting it
         // wrong here would be the same bug in the same struct twice.
         entity.advanceMotion(entity.locomotion_.time, static_cast<float>(dt));
         entity.locomotion_.reaction = entity.state_.reaction;
@@ -1731,7 +1731,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(ctx.dt);
         // Phase B: the provider memory, advanced on this path as on the other one. Both, for
-        // ADR-560's reason -- and this is the field that rule was discovered by, so getting it
+        // ADR-554's reason -- and this is the field that rule was discovered by, so getting it
         // wrong here would be the same bug in the same struct twice.
         entity.advanceMotion(entity.locomotion_.time, static_cast<float>(ctx.dt));
         entity.locomotion_.reaction = entity.state_.reaction;

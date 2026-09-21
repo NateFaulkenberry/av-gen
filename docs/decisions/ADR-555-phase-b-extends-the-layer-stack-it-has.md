@@ -1,4 +1,4 @@
-# ADR-561: Phase B extends the layer stack it has, and puts the deciders somewhere else
+# ADR-555: Phase B extends the layer stack it has, and puts the deciders somewhere else
 
 **Status:** Accepted
 **Date:** 2026-09-20

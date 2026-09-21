@@ -1,4 +1,4 @@
-# ADR-560: A seam published from two places must be written by both, field by field
+# ADR-554: A seam published from two places must be written by both, field by field
 
 **Status:** Accepted
 **Date:** 2026-09-20

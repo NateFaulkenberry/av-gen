@@ -22,7 +22,7 @@
 //
 // **Its memory is a value the entity owns**, exactly as `MotionMemory` is, and for the same reason:
 // `EntityWorld::seek` reproduces a frame by replaying the simulation, so anything remembered here
-// must be reconstructible by that replay (ADR-541, ADR-560).
+// must be reconstructible by that replay (ADR-541, ADR-554).
 
 #include "entity/motion_provider.hpp"
 

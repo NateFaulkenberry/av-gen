@@ -165,7 +165,7 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
         return result;
     }
     // `selection` is a SAMPLE index in this provider's space. Validated rather than trusted: the
-    // clip provider reads the same field as a clip index, and ADR-562's `MotionMemory::provider`
+    // clip provider reads the same field as a clip index, and ADR-556's `MotionMemory::provider`
     // is what stops them being confused -- this is the second lock on that door.
     if (memory.selection >= db_->sampleCount()) {
         result.status = MotionStatus::NoContent;

@@ -304,7 +304,7 @@ public:
     // driven by its clips, which is every body until a scene opts one in.
     void setMotionChain(const MotionChain* chain) { motionChain_ = chain; }
     [[nodiscard]] const MotionChain* motionChain() const { return motionChain_; }
-    // Advance the provider memory one step. Called from BOTH publish paths -- ADR-560's rule,
+    // Advance the provider memory one step. Called from BOTH publish paths -- ADR-554's rule,
     // applied to the very thing that rule was discovered by.
     void advanceMotion(double time, float dt);
     // Where the body is **drawn**, as distinct from where the simulation says it is.
@@ -486,7 +486,7 @@ private:
     Schedule schedule_;
     Gait gait_;
     // Phase B. Reset with everything else on a seek, and advanced on both publish paths, which is
-    // ADR-560's rule applied to the thing ADR-560 was found by.
+    // ADR-554's rule applied to the thing ADR-554 was found by.
     MotionMemory motionMemory_;
     MotionState motionState_;
     MotionChainResult motionChainResult_;

@@ -249,7 +249,7 @@ TEST_CASE("an airborne request falls through rather than guessing", "[matching][
 }
 
 TEST_CASE("the matcher keeps nothing, so a replay reproduces a play", "[matching][provider][determinism]") {
-    // ADR-562's contract. Everything the matcher remembers is in `MotionMemory`; the counters are
+    // ADR-556's contract. Everything the matcher remembers is in `MotionMemory`; the counters are
     // diagnostics about the provider and not about any character.
     const scene::MotionDatabase db = buildProbe();
     const scene::MotionPack pack = twoGaitPack();
@@ -295,7 +295,7 @@ TEST_CASE("the matcher poses from the sample it chose", "[matching][provider]") 
     // answerable rather than being true of any pose.
     CHECK(std::abs(pose.local[1].position.z - pose.local[2].position.z) > 0.05f);
 
-    // A memory pointing past the end is refused rather than read -- the second lock on ADR-562's
+    // A memory pointing past the end is refused rather than read -- the second lock on ADR-556's
     // door, in case a clip provider's memory ever reaches this provider.
     memory.selection = 99999;
     CHECK_FALSE(provider.pose(memory, sk, pose).ok());
