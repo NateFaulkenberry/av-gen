@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-three ways a green suite has lied
+## Twenty-four ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -464,6 +464,39 @@ night from two agents who never spoke to each other.
    And all three presented the same way, which is why they are expensive: right shape, slightly
    wrong appearance. **A defect that survives because it is plausible is the costly kind** -- it
    gets tuned around rather than found. "Renders as a comet" is a bug someone fixes in a minute.
+
+24. **A constant that was derived from one function and is still right under another is a
+   coincidence, and the control that ends the coincidence is the one nobody moved.**
+
+   A ray march clipped each medium to a bound of `3 * thickness` vertically. That is where a
+   GAUSSIAN ends, and it was written when the field's vertical profile was one. The profile was
+   later replaced by an exponential at an artist-controlled rate -- and the bound was not
+   revisited, because at the control's DEFAULT the old constant still left only 0.37% of the
+   column outside. It was right, for a reason that had stopped existing.
+
+   At the control's low end it left **56%** of the medium outside its own bound. The same bound
+   was short horizontally by a factor of `bankLength`, which is 1 by default and 6 at the top of
+   its slider: **71%** of peak density outside, at a setting an artist reaches by dragging.
+
+   Two things make this family hard to catch and worth its own entry:
+
+   - **it is invisible at every default**, so it survives any amount of ordinary use, and the
+     arms and screenshots accumulated while it is invisible become evidence that it is fine;
+   - **the failure is a quieter version of the thing working.** Nothing errors. The medium is
+     still there, still soft-edged, still the right colour, and simply smaller than the number
+     that was typed. The artist concludes the control is weak and tunes around it.
+
+   **The check is to put the claim and the thing it claims about in front of each other.** A bound
+   is a claim about the support of a field, so sample the field and assert containment -- and add
+   the assertion that stops the first one being satisfied by giving up, because a bound of infinity
+   contains every field perfectly. Two halves: *nothing dense outside it*, and *it is not much
+   larger than what is inside it.*
+
+   Generalises past bounds. Any constant chosen against a distribution -- a threshold, a budget, an
+   epsilon, a cache size, a step count -- is invalidated by a change to that distribution
+   (ADR-389), **and it will keep passing until someone moves the control that makes the two
+   distributions differ.** When you replace a function, grep for the constants that were sized
+   against the old one. They do not announce themselves.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a

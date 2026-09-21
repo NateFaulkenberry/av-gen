@@ -107,3 +107,10 @@ __pycache__/
 # sweeps it into a commit. One did, on 8263d1d1. Never stage while a suite is in flight, and this
 # is the guard for the time you forget.
 /examples/world/.avgen_node_set_probe_*.json
+
+# Derived diagnostic arms. `tools/make_fog_arms.py` and `tools/make_fog_primitive_arms.py` write
+# these BESIDE the shipped project, because a project names its scene by relative path and a copy
+# in the system temp resolves none of its assets. The generator is the artefact worth keeping; the
+# arm it writes is reproducible from it in a second.
+/examples/treeisland/_fog-*.json
+/examples/treeisland/_fogshape-*.json
