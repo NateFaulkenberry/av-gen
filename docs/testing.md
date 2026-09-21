@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Nineteen ways a green suite has lied
+## Twenty ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -88,6 +88,9 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
   (entries 13-17, 19; 9 and 10 are its older members, from before it had a name).
+- **Family D — the question was the wrong shape** (entry 20). One member so far, and it is neither a
+  bad measurement nor a bad reading: the instrument worked and the answer was thrown away by the
+  form of the question.
 
 Families A and B are failures of *reporting*: the run lies about itself, and **the binary's exit
 code catches every one of them.** Family C is a failure of *aim*: the run is honest, the exit code
@@ -355,6 +358,33 @@ night from two agents who never spoke to each other.
    is the measurer who knows a five-arm ladder is not a paired A/B. The coordinator owes: *ask how
    long before granting a window, and say unprompted when the machine changes* — an agent going
    from idle to compiling is a fact the coordinator has and the measurer does not.
+
+### The question was the wrong shape
+
+20. **A yes/no prediction about an effect that has a size will be answered, and the answer will not
+   contain the size.**
+
+   A hypothesis — *the transmittance early-out is why four media cost less than one* — was tested
+   with a control whose prediction was stated in advance as a **binary**: "four media at matched
+   optical depth must cost MORE than one." The control came back cheaper, so by the letter of the
+   prediction the hypothesis was **refuted**, and it was reported that way.
+
+   The magnitudes said the opposite. Four media at full density were **−1.16 ms** against one; at
+   matched depth, **−0.24 ms**. **Diluting removed 79% of the effect.** The early-out was not
+   present-or-absent, it was *four fifths of the answer* — and a prediction shaped as a yes/no has
+   nowhere to put a proportion, so the result arrived with four fifths of its content discarded.
+
+   Nothing was wrong with the instrument, the arms or the hypothesis. **The question was wrong.**
+   That makes this its own family: entries 13-19 are measurements that were misleading, and this is
+   a measurement that was fine and a *question* that could not receive its answer.
+
+   **When the mechanism has a size, state the prediction as a magnitude.** "Matched depth removes
+   most of the saving" is falsifiable, and it can also come back "removes 79%", which is the result.
+   "Costs more" can only come back yes or no, and both are wrong here.
+
+   Corollary worth the line: a refutation you were *expecting to lose* is the one to re-read before
+   reporting. This one refuted a hypothesis its author believed, which is exactly when the letter of
+   a prediction is most likely to be taken at face value.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
