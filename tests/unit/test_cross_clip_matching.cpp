@@ -605,3 +605,136 @@ TEST_CASE("§30: contact-aware matching, on the validated instrument",
     CHECK(hi > lo);
 
 }
+
+TEST_CASE("are the detected contacts actually right?", "[crossclip][phaseC][aliens]") {
+    // **The rival hypothesis to redundancy: the contacts are wrong, not duplicated.**
+    //
+    // Both explain every row. A wrong feature costs its dimensions and buys nothing (phase); it
+    // actively misleads the distance (contacts below baseline); and shuffling **removes a
+    // misleading signal** while paying only the noise cost (shuffled beats real). That last row is
+    // the one called hard to explain otherwise, and "the signal was worse than nothing" explains it
+    // equally well.
+    //
+    // And there is specific reason to suspect it here: §13 found the database running this analysis
+    // **with an empty contact-joint list** until today. The detector has had its inputs wrong once
+    // already, and **its output quality has never been checked.**
+    //
+    // The two hypotheses demand opposite fixes -- remove the feature, or fix the detector -- so the
+    // check comes before either. A contact track that is right looks obviously right against the
+    // physical tells: a planted foot is at its height minimum and its velocity is near zero.
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+
+    const scene::AnimationClip* walk = nullptr;
+    for (const scene::AnimationClip& c : rig.clips) {
+        if (c.name == "Walking") {
+            walk = &c;
+            break;
+        }
+    }
+    REQUIRE(walk != nullptr);
+
+    const int footL = rig.skeleton.find("foot.l");
+    REQUIRE(footL >= 0);
+
+    // Sample the foot's height and speed across the clip, and find where the detector says it is
+    // planted. If the detector is right, the planted frames are the low-and-slow ones.
+    scene::ContactSettings settings;
+    const std::vector<scene::ContactJoint> contactJoints = {
+        scene::ContactJoint{"foot.l", scene::ContactKind::Foot}};
+    const std::vector<scene::ContactTrack> tracks =
+        scene::detectContacts(rig.skeleton, *walk, contactJoints, settings);
+    REQUIRE_FALSE(tracks.empty());
+    const scene::ContactTrack& track = tracks.front();
+
+    scene::Pose pose;
+    std::vector<glm::mat4> model;
+    std::vector<float> heights;
+    std::vector<float> speeds;
+    const int frames = static_cast<int>(walk->length() * 30.0f);
+    glm::vec3 previous{0.0f};
+    for (int f = 0; f <= frames; ++f) {
+        const float t = walk->start + static_cast<float>(f) / 30.0f;
+        scene::setRestPose(rig.skeleton, pose);
+        scene::sampleClip(*walk, t, pose);
+        scene::poseToModel(rig.skeleton, pose, model);
+        const glm::vec3 p = glm::vec3(model[static_cast<std::size_t>(footL)][3]);
+        heights.push_back(p.y);
+        speeds.push_back(f == 0 ? 0.0f : glm::length(p - previous) * 30.0f);
+        previous = p;
+    }
+
+    std::vector<float> sortedHeights = heights;
+    std::sort(sortedHeights.begin(), sortedHeights.end());
+    const float lowQuartile = sortedHeights[sortedHeights.size() / 4];
+    std::vector<float> sortedSpeeds = speeds;
+    std::sort(sortedSpeeds.begin(), sortedSpeeds.end());
+    const float slowQuartile = sortedSpeeds[sortedSpeeds.size() / 4];
+
+    int planted = 0;
+    int plantedAndLow = 0;
+    int plantedAndSlow = 0;
+    for (int f = 0; f <= frames && f < static_cast<int>(heights.size()); ++f) {
+        const float t = static_cast<float>(f) / 30.0f;
+        bool isPlanted = false;
+        for (const scene::ContactSpan& span : track.spans) {
+            const bool inside = span.wraps() ? (t >= span.start || t <= span.end)
+                                             : (t >= span.start && t <= span.end);
+            if (inside) {
+                isPlanted = true;
+                break;
+            }
+        }
+        if (!isPlanted) {
+            continue;
+        }
+        ++planted;
+        if (heights[static_cast<std::size_t>(f)] <= lowQuartile) {
+            ++plantedAndLow;
+        }
+        if (speeds[static_cast<std::size_t>(f)] <= slowQuartile) {
+            ++plantedAndSlow;
+        }
+    }
+
+    WARN(fmt::format("'Walking' foot.l: {} intervals over {} frames; {} frames planted "
+                     "({:.0f}% of the clip), duty cycle {:.2f}",
+                     track.spans.size(), frames + 1, planted,
+                     100.0 * planted / std::max(frames + 1, 1), track.dutyCycle));
+    WARN(fmt::format("  of the planted frames, {:.0f}% are in the lowest height quartile and "
+                     "{:.0f}% in the slowest speed quartile",
+                     100.0 * plantedAndLow / std::max(planted, 1),
+                     100.0 * plantedAndSlow / std::max(planted, 1)));
+    WARN(fmt::format("  foot height range {:.4f} .. {:.4f} m, speed range {:.3f} .. {:.3f} m/s",
+                     sortedHeights.front(), sortedHeights.back(), sortedSpeeds.front(),
+                     sortedSpeeds.back()));
+
+    REQUIRE(planted > 0); // it detects something, so the percentages mean something
+
+    // **Result: the height tell strongly supports the detector; the velocity tell does not apply.**
+    //
+    // 75% of planted frames are in the lowest height quartile, against 25% by chance -- that is a
+    // real signal and the detector is finding the stance phase. Duty cycle 38% over one span is a
+    // plausible walk.
+    //
+    // Only 17% are in the slowest speed quartile, *below* chance -- and that is **expected here
+    // rather than damning**, because of ADR-540: every locomotion clip in this repository is
+    // authored **in place**. The body does not translate, so during stance the planted foot must
+    // slide backwards in model space at the gait speed. **"A planted foot is not moving" is a tell
+    // about root-motion clips, and it is inverted for in-place ones** -- a planted foot is one of
+    // the few things that IS moving.
+    //
+    // So my second tell was measuring the wrong quantity for this corpus, which is the same
+    // question as "does this tell apply" that should precede any diagnostic. The contacts look
+    // broadly right, which **weakens the wrong-data hypothesis without killing it** and leaves the
+    // ablation as the decisive experiment.
+    CHECK(100.0 * plantedAndLow / planted > 50.0); // well above the 25% chance level
+    CHECK(track.dutyCycle > 0.1f);
+    CHECK(track.dutyCycle < 0.9f);
+}
