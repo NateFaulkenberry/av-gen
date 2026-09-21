@@ -14,7 +14,7 @@ counted against these files and nothing else.
 | `phase-a.md` | 6 (plus the STEP list) | Phase A is organised by STEP numbers, not sections |
 | `phase-b.md` | 67 | |
 | `phase-c.md` | 95 | the build board had counted 94 |
-| `phase-d.md` | 78, **incomplete** | the paste was cut at 50,000 characters, inside §78's architecture diagram. §1–§77 are complete. Anything after §78 was never received; only the owner has it. The board had counted D out of 44, which was wrong. |
+| `phase-d.md` | 78, plus the Success Demonstration | the first paste was cut at 50,000 characters inside §78; the owner re-sent §78 onward on 2026-09-21 and it is spliced in verbatim from the `# 78.` heading. Complete. The board had counted D out of 44, which was wrong. |
 | `phase-e.md` | 80 | |
 | `phase-f.md` | 104 | nine independently gated tracks; no single completion bar |
 

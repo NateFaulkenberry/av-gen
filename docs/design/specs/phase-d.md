@@ -3520,6 +3520,105 @@ The target architecture after Phase D should be approximately:
                           ↓
                   MOTION REQUEST
                           ↓
-             ┌───
+             ┌────────────┴────────────┐
+             │                         │
+           CLIP                  MOTION MATCH
+             │                         │
+             └────────────┬────────────┘
+                          ↓
+                    POSE GENERATION
+                          ↓
+                  BODY ADAPTATION
+                          ↓
+                    IK / CONTACTS
+                          ↓
+                     FINAL POSE
+                          ↓
+                       RENDER
+```
 
-[Message truncated - exceeded 50,000 character limit]
+And the offline side:
+
+```text
+MOTION DATA
+    ↓
+RETARGET
+    ↓
+CLEAN
+    ↓
+CONTACT / PHASE
+    ↓
+TRAJECTORY
+    ↓
+AUGMENTATION
+    ↓
+MOTION DATABASE
+    ↓
+RUNTIME MOTION PROVIDERS
+```
+
+The key architectural boundary is:
+
+```text
+                    WHAT?
+                     │
+            Behavior / Goals
+                     │
+                  Intent
+                     │
+                     ▼
+                    HOW?
+             Navigation / Motion
+                     │
+                     ▼
+                   BODY
+              Motion / IK / Pose
+```
+
+That separation is what allows AV Gen to eventually have characters that **actually appear to live inside the worlds you create**, rather than characters that merely execute increasingly sophisticated animation sequences.
+
+---
+
+# Phase D Success Demonstration
+
+The final demonstration should be something you can watch for several minutes without manually controlling the alien.
+
+Start playback.
+
+The alien:
+
+1. wanders
+2. notices a glowing mushroom
+3. decides it is interesting
+4. navigates toward it
+5. avoids a rock
+6. approaches naturally
+7. slows down
+8. turns toward the mushroom
+9. looks down
+10. observes it
+11. loses interest
+12. leaves
+13. notices another event
+14. reacts differently because of its personality
+15. encounters another alien
+16. avoids or approaches it
+17. notices the UFO
+18. looks upward
+19. responds to the event
+20. returns to autonomous exploration
+
+And none of that should require the author to specify:
+
+```text
+Walk clip at 12.3 seconds
+Turn animation at 14.1
+Look animation at 15.0
+Idle animation at 18.0
+```
+
+The author specifies the **world, character, capabilities, goals, behaviors and artistic constraints**.
+
+AV Gen determines the physical execution.
+
+That is the point of Phase D.
