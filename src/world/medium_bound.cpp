@@ -43,10 +43,40 @@ MediumBound mediumBound(const MediumSlot& m) {
     const float thickness = std::max(m.lane[1].x, 1e-3f);
     const float depth = std::max(m.lane[4].x, 0.0f);
     const glm::vec3 centre(m.lane[0]);
-    const bool isFog = static_cast<AtmosphereKind>(static_cast<int>(m.lane[15].x + 0.5f)) ==
-                       AtmosphereKind::VolumetricFog;
+    const auto kind = static_cast<AtmosphereKind>(static_cast<int>(m.lane[15].x + 0.5f));
 
-    if (!isFog) {
+    // ---- the tornado (ADR-580) ---------------------------------------------------------------
+    //
+    // The transliteration of `mediumBoundOf`'s tornado arm, and it is the case the cylinder was
+    // chosen for: a column 80 m across and 800 m tall is 1% of its own bounding sphere.
+    //
+    // **`lane[0]` means something different for this kind and that is deliberate.** `lane[0].w` is
+    // the HEIGHT, not a radius, and `lane[0].xyz` is the GROUND CONTACT, not a centre. This
+    // function and the shader's are the only two places that read both conventions, so they are
+    // the only two places the two could be confused -- which is the argument for them being
+    // transliterations of each other rather than two derivations.
+    if (kind == AtmosphereKind::Tornado) {
+        const float height = radius; // named for what lane[0].w carries here
+        // The radius curve is a quadratic Bezier, so it never leaves the convex hull of its three
+        // control values -- the largest is a provable bound, not an estimate.
+        const float widest = std::max(m.lane[1].x, std::max(m.lane[1].y, m.lane[1].z));
+        const float funnel = widest * (1.0f + std::max(m.lane[2].x, 0.0f) + std::max(m.lane[3].x, 0.0f));
+        const float skirt = m.lane[1].x * std::max(m.lane[4].x, 1.0f) * (1.0f + std::max(m.lane[4].w, 0.0f));
+        const float cloud = m.lane[1].z * std::max(m.lane[8].w, 1.0f);
+        // The axis is a curve: the lean displaces the top and the wobble swings it, and both move
+        // the whole column sideways WITHIN the bound rather than deforming it. The lean is the
+        // tornado's answer to the wind it subscribes to (§68) and it is applied by the packer, so
+        // by the time a slot reaches here the bend is already in `lane[7]` and this covers it.
+        const float lateral = std::sqrt(m.lane[7].x * m.lane[7].x + m.lane[7].y * m.lane[7].y) +
+                              std::max(m.lane[7].z, 0.0f);
+        b.radiusXZ = std::max(funnel, std::max(skirt, cloud)) + lateral;
+        // Vertically the field is compactly supported: `h > 1.08` and `h < -0.02` are both zero.
+        b.yTop = centre.y + height * 1.08f;
+        b.yBot = centre.y - height * 0.02f;
+        return b;
+    }
+
+    if (kind != AtmosphereKind::VolumetricFog) {
         b.radiusXZ = radius * breath * 1.35f;
         b.yTop = centre.y + thickness * 3.0f;
         b.yBot = centre.y - depth - thickness * 3.0f;

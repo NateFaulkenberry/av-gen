@@ -110,6 +110,10 @@ writes a scene file. `--help` lists every flag.
   releasing a render, video or still
 - [docs/dependencies.md](docs/dependencies.md): every third-party library and dataset, its licence,
   version and reason
+- [docs/tornado-handoff.md](docs/tornado-handoff.md): the Tornado world effect -- what is built
+  and proven, what is built and unproven, and what is left, ranked. Reconstructed from the
+  committed record by an agent that did not build it, so every claim is tagged evidenced or
+  inferred. Detail lives in ADR-580 and ADR-581
 - [docs/quality-lab/](docs/quality-lab/): the Render Quality Lab -- objective, repeatable measurement
   of rendered output. [reconnaissance](docs/quality-lab/repository-reconnaissance.md),
   [research](docs/quality-lab/research.md) (what was adopted and what was rejected, with reasons),

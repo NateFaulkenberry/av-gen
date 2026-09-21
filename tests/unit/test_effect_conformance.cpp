@@ -60,8 +60,36 @@ std::vector<std::string> declaredKindNames() {
     const std::size_t decl = text.find("enum class AtmosphereKind");
     REQUIRE(decl != std::string::npos);
     const std::size_t open = text.find('{', decl);
-    const std::size_t close = text.find('}', open);
     REQUIRE(open != std::string::npos);
+    // The end of the enum is the first `}` **that is not inside a comment**, and the distinction
+    // was bought by a failure rather than anticipated.
+    //
+    // This was `text.find('}', open)`. ADR-580's `Tornado` carries a comment naming the files that
+    // implement it -- `core/tornado.{hpp,cpp}` -- and that brace ended the enum three lines early,
+    // so the header appeared to declare six kinds when it declares seven. The test then failed
+    // with "a schema claims AtmosphereKind::Tornado, which atmospherics.hpp does not declare",
+    // which is a true statement about what the parser saw and a badly misleading one about what
+    // was wrong: the enumerator was there, correct, and two lines below where the scan stopped.
+    //
+    // It is worth more than the fix. This guard exists so that a kind added and not finished
+    // wiring is NAMED, and its failure mode was to silently shorten the list it checks against --
+    // a guard that can be switched off by a punctuation mark in a comment. Rewording the comment
+    // would have made the symptom go away and left the next person to find it again.
+    std::size_t close = std::string::npos;
+    for (std::size_t i = open + 1; i + 1 < text.size(); ++i) {
+        if (text[i] == '/' && text[i + 1] == '/') {
+            const std::size_t eol = text.find('\n', i);
+            if (eol == std::string::npos) {
+                break;
+            }
+            i = eol;
+            continue;
+        }
+        if (text[i] == '}') {
+            close = i;
+            break;
+        }
+    }
     REQUIRE(close != std::string::npos);
 
     std::vector<std::string> names;
