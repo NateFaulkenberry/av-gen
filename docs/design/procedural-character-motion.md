@@ -2411,6 +2411,57 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 
 ---
 
+## Feature values corrected, 2026-09-21: what moved, and §20 re-taken
+
+Four defects in the *values* the database and matcher compute. Each has a test that fails with the
+change reverted:
+
+| commit | defect | found by |
+|---|---|---|
+| `d53afbb0` | a clip's last sample read zero velocity; the look ahead was clamped at the end, looping walks included | anim-cinfra §58 |
+| `fc33c4ef` | features were position-relative but not facing-relative, and the query was world space (§7) | recount |
+| `cdac0ebe` | in-place cycles read as standing still; the scout, asked to walk, chose a kick | anim-cinfra §68 |
+| `6f8bd107` | the continuation advanced one sample per call, so it played 2x at 60 Hz and 4x at 120 Hz (§73) | reading `explain` |
+
+`kMotionFeatureExtractionVersion` is 4 and is part of the schema digest, so any `.motiondb` written
+before these is refused on load.
+
+**§20 re-taken** with the ADR-614 commands (`avgen-motion pack` then `quality --joints
+LeftAnkle,RightAnkle,Head --seeds 250 --trajectory 0.2,0.4,0.6`), on FW (100 forward walks, 434,478
+samples), with the scout packed by the same CLI as the control. Provenance: 100STYLE CC BY 4.0,
+subset and digests in `assets/100STYLE-ATTRIBUTION.md`; nothing derived is committed.
+
+| | Glowmere before → now | FW before → now |
+|---|---|---|
+| duplicates | 61.68% → 63.52% | 91.66% → **87.02%** |
+| radius ÷ mean NN | 0.95 → 1.03 | 1.71 → **1.47** |
+| matcher speed resolution | 0.876 → 1.342 m/s | 1.168 → **0.718 m/s** |
+| cost spread, sweep | 49.50 → 49.94 | 49.88 → 52.35 |
+| cost spread, build time | 45.73 → **77.41** | 47.59 → 50.06 |
+| stride 4, full prefix: recall | 98.3% → 99.0% | 98.4% → **94.0%** |
+| … worst excess × typical gap | 0.38× → 0.21× | 0.02× → 0.07× |
+| cheap prefix vs full prefix (stride 8, top 32) | 94.8 vs 94.5 → 94.8 vs 95.2 | −23.1 pts → **−24.7 pts** |
+| cross-clip bound, median | 3.53× → 4.70× | 1.90× → 1.75× |
+
+What this changes in ADR-614:
+
+- **Stride-4 still survives, but by less.** On FW, recall falls 98.4% to 94.0%, and a miss now
+  costs 0.07× of the typical gap instead of 0.02×. That is still small, but "survives outright" no
+  longer describes it.
+- **FW is more resolvable than it was.** It has fewer duplicates, a lower radius-to-neighbour
+  ratio, and a finer speed resolution. The world-heading term must have been adding structure the
+  matcher could not use. This is recorded as a measurement; nothing here tests that mechanism.
+- **"The cost spread transferred" holds for the sweep definition only.** The sweep spread is 49.94
+  against 52.35. The build-time spread no longer transfers (77.41 against 50.06), because implied
+  travel changed what Glowmere's walks look like to the search. Severity figures are quoted against
+  the sweep spread.
+- **The cheap prefix still costs ~24 points at scale.** Unchanged in substance.
+- **The Glowmere column is a different system**, not a regression. Its walks now travel, so its
+  duplicate and cross-clip figures describe a corpus the matcher can finally tell apart by speed.
+
+Not re-taken: MIXED, and §30 on TR (the `[.scale]` test). Both are 100STYLE runs that the facing
+frame will move. They are queued rather than claimed.
+
 # Phase C infrastructure and tooling (`agent/anim-cinfra`)
 
 Sections §37–§43, §57, §58, §68, §69, §72, §74–§76, §81–§83. Built under the programme's faster

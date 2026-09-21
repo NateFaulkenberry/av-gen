@@ -262,7 +262,12 @@ TEST_CASE("an area light with no authored range reaches as far as one that has i
     // The control that says the comparison is about a lit frame rather than two dark ones: the
     // corridor really is lit, and the nearest floor is bright.
     CHECK(meanLevel > 20.0);
-    CHECK(*std::max_element(falloffProfile(*control).begin(), falloffProfile(*control).end()) > 0.5f);
+    // One profile, held. This took `begin()` of one temporary and `end()` of another, a range
+    // spanning two unrelated allocations, and scanning it read off the end of the heap: SIGBUS on
+    // 2026-09-21, and a pass only when the two allocations happened to fall in a benign order.
+    const std::vector<float> controlProfile = falloffProfile(*control);
+    REQUIRE_FALSE(controlProfile.empty());
+    CHECK(*std::max_element(controlProfile.begin(), controlProfile.end()) > 0.5f);
 
     // The invariant. A reach that stops a light while it is still contributing shows up here as
     // the whole of that contribution, over the whole of the far half of the corridor.

@@ -12,6 +12,8 @@ Phase C §16, §20, §22, §23
 **Corpus:** `assets/100STYLE-ATTRIBUTION.md` — terms, the exact file list, the digests and the
 commands. **Every number below is conditioned on the subset named beside it.**
 
+**Amended 2026-09-21:** re-taken after four corrections to the feature values (extraction version 4). Stride-4 still survives on FW, but by less: 94.0% recall, with a miss at 0.07× of the typical gap. FW is more resolvable: 87.0% duplicates, radius ÷ NN 1.47. Only the *sweep* cost spread still transfers. The figures are in `docs/design/procedural-character-motion.md`, "Feature values corrected". The body below is the original record.
+
 ---
 
 ## Retraction: "the mechanism is refuted" was wrong, and the dimensionality is why
