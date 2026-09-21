@@ -366,9 +366,16 @@ night from two agents who never spoke to each other.
    lookahead of exactly 1.0 s reached exactly *to* a corner and never past it, so a right angle
    read as zero degrees.
 
-   Five instances now, in five different clothes: a parameter at its boundary, a sample domain on a
+   **The sixth, and it is in the sample points rather than the fixture.** A coverage/cost knee was
+   measured at 4 and 16 variants when saturation is past 16, because the generator skips targets it
+   has already covered. The flat part of the curve was sampled and the conclusion drawn was that
+   there is no curve. **Measuring a knee means sampling where the knee is** — and the check is the
+   same as the others: what would have to be true for the phenomenon to appear in this window?
+
+   Six instances now, in six different clothes: a parameter at its boundary, a sample domain on a
    plateau, a duration spanning two mechanisms, a lookahead landing on the feature it was meant to
-   see past, and a mechanism with no authority at the default values. **The fix is the same one
+   see past, a mechanism with no authority at the default values, and sample points that miss the
+   phenomenon entirely. **The fix is the same one
    every time: ask what would have to be true for this mechanism to matter, and put the fixture
    there.** Not "does the code run" — *does the thing I am measuring have any authority at these
    values.*
