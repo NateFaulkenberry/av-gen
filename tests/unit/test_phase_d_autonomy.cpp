@@ -1271,6 +1271,11 @@ TEST_CASE("a glowing thing inside a rock is tried, fails, and is left alone rath
                 for (auto& b : e["behaviors"]) {
                     if (b["kind"] == "decide") {
                         b["mind"]["memory"]["capacity"] = capacity;
+                        if (capacity == 0.0f) {
+                            // And no failed-option exclusion: `Selector::exclude` is the same rule
+                            // for options with no subject, and it runs for `failSeconds`.
+                            b["mind"]["memory"]["failSeconds"] = 0.0;
+                        }
                     }
                 }
             }
@@ -1302,7 +1307,8 @@ TEST_CASE("a glowing thing inside a rock is tried, fails, and is left alone rath
     CHECK(attempts <= 5);
     CHECK(decisions > attempts + 4); // and it was never stuck on it
 
-    // Control: with no object memory (no failure suppression, no habituation) the same scout goes
+    // Control: with no object memory (no failure suppression, no habituation) and no failed-option
+    // exclusion, the same scout goes
     // back to the impossible target again and again -- §59's "unbounded path retries", which is
     // what the memory is there to stop.
     std::size_t retries = 0;

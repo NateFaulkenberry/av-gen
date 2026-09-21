@@ -3275,6 +3275,44 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         // entity arithmetic says it is. One frame old by construction -- see `visualPlacement`.
         stageCtx.visuals = this;
         staging_.update(stageCtx);
+        // Phase D §26/§38: a director beat is a world event -- "abduction/beam" -- raised at the
+        // scenario actor's body, so a character can hear the saucer start to beam and react to it
+        // the way it reacts to anything else, and no character code knows a scenario exists. The
+        // authored beats stay the director's; this only tells the world they happened.
+        //
+        // Not reproduced by a scrub: a seek resets the director (ADR-209) and restarts its run,
+        // so a beat heard on a play is not heard on a replay, exactly as the scenario itself is not.
+        for (const stage::StageEvent& event : staging_.events()) {
+            if (event.kind != stage::StageEventKind::Beat) {
+                continue;
+            }
+            entity::WorldEvent w;
+            w.type = entityWorld_.eventType(event.scenario + "/" + event.beat);
+            w.time = time.renderTime;
+            for (const stage::ScenarioDesc& scenario : stagingDesc_.scenarios) {
+                if (scenario.name != event.scenario) {
+                    continue;
+                }
+                for (const stage::ActorDesc& actor : stagingDesc_.actors) {
+                    if (actor.name == scenario.actor) {
+                        const auto& all = entityWorld_.entities();
+                        for (std::size_t e = 0; e < all.size(); ++e) {
+                            if (all[e]->name() == actor.driven()) {
+                                w.position = all[e]->state().position();
+                                w.source = e;
+                            }
+                        }
+                    }
+                }
+            }
+            for (const entity::EntityWorld::EventProfile& profile : entityWorld_.eventProfiles()) {
+                if (profile.name == entityWorld_.eventName(w.type)) {
+                    w.radius = profile.radius;
+                    w.magnitude = profile.magnitude;
+                }
+            }
+            entityWorld_.emitEvent(w);
+        }
     }
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.

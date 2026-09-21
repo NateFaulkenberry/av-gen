@@ -184,7 +184,21 @@ void Selector::forget() {
     started_ = false;
 }
 
+void Selector::exclude(std::string_view name, std::uint64_t subject, double until) {
+    for (Exclusion& e : excluded_) {
+        if (e.name == name && e.subject == subject) {
+            e.until = until;
+            return;
+        }
+    }
+    if (excluded_.size() >= 8) {
+        excluded_.erase(excluded_.begin());
+    }
+    excluded_.push_back(Exclusion{std::string(name), subject, until});
+}
+
 void Selector::reset() {
+    excluded_.clear();
     hold_ = false;
     holdScore_ = 0.0f;
     options_.clear();
@@ -213,6 +227,17 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
         }
     }
     counts_.scored += options_.size();
+    // Phase D §59: options whose plan failed recently are not on offer.
+    if (!excluded_.empty()) {
+        std::erase_if(excluded_, [&](const Exclusion& e) { return e.until <= ctx.time; });
+        for (Option& o : options_) {
+            for (const Exclusion& e : excluded_) {
+                if (o.name == e.name && o.subject == e.subject) {
+                    o.score = 0.0f;
+                }
+            }
+        }
+    }
 
     // The best applicable option. `<= 0` is "not applicable now" (character_ai.hpp §3), and a tie
     // is broken on the order the considerers appended -- which is the scene file's order, and so is
@@ -266,7 +291,7 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
             ++counts_.dwellRejections;
             return false;
         }
-        if (bestScore <= options_[incumbent].score + settings_.margin) {
+        if (bestScore <= options_[incumbent].score * (1.0f + commitment_) + settings_.margin) {
             ++counts_.marginRejections;
             return false;
         }
@@ -408,7 +433,7 @@ std::size_t scoreGoals(const DecisionContext& ctx, const GoalTaste& taste,
                 name = bodies[percept.source]->name();
             }
         }
-        out.push_back(GoalCandidate{percept.position, name, percept.kind, weight});
+        out.push_back(GoalCandidate{percept.position, name, percept.kind, weight, subjectOf(percept)});
     }
     return out.size() - before;
 }
@@ -882,6 +907,21 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
         o.hasTarget = true;
         o.stoppingDistance = approach_;
         o.kind = static_cast<std::uint8_t>(scratch_[i].kind);
+        // Phase D §19/§59, aware deciders only: an errand to a perceived *thing* has that thing
+        // as its subject, so a failed walk to it is remembered and left alone and a completed one
+        // makes it familiar. Measured on Glowmere before this: `vane` walked at `tide`, failed
+        // "stuck", and chose `tide` again at once -- twelve times in 150 s -- because a subjectless
+        // option has nothing for the failure memory to hold.
+        if (ctx.mind != nullptr && scratch_[i].subject != 0) {
+            o.subject = scratch_[i].subject;
+            if (ctx.mind->suppressed(o.subject, ctx.time)) {
+                o.score = 0.0f;
+            } else {
+                const float n = ctx.mind->novelty(o.subject, ctx.time);
+                o.score *= n;
+                o.addFactor("novelty", n);
+            }
+        }
         o.addFactor("goal", scratch_[i].weight);
         o.addFactor("weight", w);
         // Variety (§23), aware deciders only. Measured on the autonomy demo before this: a

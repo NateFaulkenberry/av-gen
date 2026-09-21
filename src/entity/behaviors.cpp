@@ -2388,6 +2388,10 @@ public:
                     objects_.investigated(committed_.subject, ctx.time);
                 }
             }
+            if (drained.failed) {
+                selector_.exclude(committed_.name, committed_.subject,
+                                  ctx.time + static_cast<double>(memorySettings_.failSeconds));
+            }
             planSerial_ = 0;
             planActive_ = false;
             selector_.forget();
@@ -2484,6 +2488,14 @@ public:
         // Phase D §20: hold a running plan while its subject is still known (see `Selector::hold`).
         if (aware_ && planActive_ && subjectKnown(dctx, committed_.subject)) {
             selector_.hold(committed_.score);
+            // Commitment is to an errand in progress, not to standing somewhere indefinitely: a
+            // pose with no duration (a post, an idle) is a body waiting for something better, and
+            // committing to it would pin it there -- measured on Glowmere's `sage`, which sat at its
+            // grove for 170 s once this applied to its holdPost.
+            const ActionDesc* running = ctx.actions->current(Authority::Routine);
+            const bool openEnded =
+                running == nullptr || (running->kind == ActionKind::Pose && running->duration <= 0.0);
+            selector_.commit(openEnded ? 0.0f : kCommitment);
         } else {
             selector_.release();
         }
@@ -2867,6 +2879,8 @@ private:
     SubjectId attentionNameFor_ = kNoSubject;
     static constexpr std::size_t kHistoryCapacity = 256;
     static constexpr std::size_t kRecentKinds = 4;
+    // A running plan's incumbent is compared at 1.25x its live score (see `Selector::commit`).
+    static constexpr float kCommitment = 0.25f;
     std::vector<std::uint8_t> recentKinds_;
     std::vector<DecisionTraceEntry> history_;
     std::size_t historyTotal_ = 0;

@@ -151,7 +151,24 @@ public:
         hold_ = true;
         holdScore_ = score;
     }
-    void release() { hold_ = false; }
+    void release() {
+        hold_ = false;
+        commitment_ = 0.0f;
+    }
+    // Phase D §5 "commitment", §20: while a plan is running, a *present* incumbent is compared at
+    // (1 + fraction) of its live score, so a challenger must beat the errand in progress by a share
+    // of its worth as well as by the margin. Measured on Glowmere before this: a sociable alien's
+    // greeting and its home range traded the slot every dwell (2.5 s), each 0.06 ahead in turn --
+    // a tug between two authored pulls that the flat margin could not settle.
+    void commit(float fraction) { commitment_ = std::max(0.0f, fraction); }
+
+    // Phase D §59: an option whose plan just failed is not on offer again until `until` (a
+    // timeline second). The failure memory already does this for an option about a *thing*; this
+    // is the same rule for an option about nothing in particular -- a post, a place -- which has no
+    // subject to remember. Measured on Glowmere before this: `rook`'s return to its range failed
+    // "blocked" on its first step, the lifecycle chose the same return at once, and it failed again
+    // -- 2,758 times in 50 s. Bounded: at most eight exclusions, the oldest dropped first.
+    void exclude(std::string_view name, std::uint64_t subject, double until);
 
     // Forget the commitment, keep the counts (ADR-351).
     //
@@ -172,6 +189,13 @@ private:
     std::uint64_t currentSubject_ = 0;
     bool hold_ = false;
     float holdScore_ = 0.0f;
+    float commitment_ = 0.0f;
+    struct Exclusion {
+        std::string name;
+        std::uint64_t subject = 0;
+        double until = 0.0;
+    };
+    std::vector<Exclusion> excluded_;
     std::size_t chosen_ = kNone;
     std::uint64_t committedTick_ = 0;
     std::uint64_t tick_ = 0;
@@ -203,6 +227,8 @@ struct GoalCandidate {
     std::string_view name;    // into the interest point; empty for a derived point
     InterestKind kind = InterestKind::Landmark;
     float weight = 0.0f;
+    // Phase D: what it is, as a `SubjectId` (mind.hpp), when it came from a percept; 0 otherwise.
+    std::uint64_t subject = 0;
 };
 
 // **The goal model, as one function.** This is the thing that was extracted (ADR-333 §3): taste

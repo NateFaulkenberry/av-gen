@@ -28,6 +28,7 @@
 #include "scene/tree_generated.hpp"
 #include "signals/signal_bus.hpp"
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <chrono>
@@ -64,6 +65,12 @@ struct Options {
     // structural counts. No trace printed.
     int crowd = 0;
     int repeats = 3;
+    // --scrub T: the application's scrub (EntityWorld::seek with the engine's budget, 90 s and
+    // 180,000 body-steps) timed as a minimum over --repeats, and each deciding character's position
+    // and choice after it compared with a play to the same second. Exit 0; it reports, it does not
+    // judge -- the director is reset by a real scrub, so a scene with staged bodies can differ for
+    // reasons that are not the decider's.
+    double scrub = -1.0;
 };
 
 // N deciding bodies from the scene's first one: a grid 6 m apart around it, each with its own seed
@@ -130,6 +137,8 @@ struct Run {
     std::size_t deciders = 0;
     std::size_t decisions = 0;
     std::size_t distinctChoices = 0;
+    std::vector<float> reach; // per entity: furthest it got from its anchor, on the ground
+    std::vector<std::string> reachLines;
 };
 
 std::string stateLine(const entity::Entity& e) {
@@ -153,7 +162,10 @@ Run simulate(const Options& o, bool withExplain) {
     if (o.crowd > 0) {
         doc = crowdScene(std::move(doc), o.crowd);
     }
-    auto loaded = scene::Composition::fromJson(doc, registry);
+    // A file load when nothing was changed, so relative profile references resolve against the
+    // file (a document built by `fromJson` carries no path -- the ADR-618 note).
+    auto loaded = o.crowd > 0 ? scene::Composition::fromJson(doc, registry)
+                              : scene::Composition::loadFile(o.scene, registry);
     if (!loaded) {
         std::fprintf(stderr, "could not load '%s': %s\n", o.scene.string().c_str(),
                      loaded.error().message.c_str());
@@ -186,6 +198,14 @@ Run simulate(const Options& o, bool withExplain) {
         comp.update(time);
         if (o.crowd == 0) {
             recorder.sample(comp.entityWorld());
+            const auto& all = comp.entityWorld().entities();
+            if (run.reach.size() != all.size()) {
+                run.reach.assign(all.size(), 0.0f);
+            }
+            for (std::size_t e = 0; e < all.size(); ++e) {
+                const glm::vec3 d = all[e]->state().position() - all[e]->state().anchor;
+                run.reach[e] = std::max(run.reach[e], std::sqrt(d.x * d.x + d.z * d.z));
+            }
         }
         if (withExplain && o.optionsFrom >= 0.0 && time.renderTime >= o.optionsFrom &&
             time.renderTime <= o.optionsTo) {
@@ -249,6 +269,12 @@ Run simulate(const Options& o, bool withExplain) {
         run.distinctChoices = subjects.size();
     }
     run.lines = recorder.lines();
+    for (std::size_t e = 0; e < run.reach.size(); ++e) {
+        const auto& ent = *comp.entityWorld().entities()[e];
+        if (!stateLine(ent).empty()) {
+            run.reachLines.push_back(fmt::format("{:<10} furthest from its anchor: {:.1f} m", ent.name(), run.reach[e]));
+        }
+    }
     for (const auto& e : comp.entityWorld().entities()) {
         const std::string line = stateLine(*e);
         if (!line.empty()) {
@@ -284,6 +310,84 @@ Run simulate(const Options& o, bool withExplain) {
     return run;
 }
 
+struct Loaded {
+    assets::AssetRegistry registry;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    signals::SignalBus bus;
+    std::unique_ptr<scene::Composition> comp;
+    explicit Loaded(const fs::path& scene) : registry(scene.parent_path()) {
+        auto loaded = scene::Composition::loadFile(scene, registry);
+        if (loaded) {
+            comp = std::move(*loaded);
+            comp->attach(params, modulator);
+            comp->setViewport(1280, 720);
+            comp->scene().detailLimits.entityDistanceCull = false;
+        }
+    }
+};
+
+int scrubReport(const Options& o) {
+    const double t = o.scrub;
+    // The play.
+    Loaded played(o.scene);
+    if (!played.comp) {
+        return 2;
+    }
+    const double step = 1.0 / 60.0;
+    FrameTime time;
+    const auto frames = static_cast<long long>(std::llround(t * 60.0));
+    for (long long i = 0; i <= frames; ++i) {
+        time.renderTime = static_cast<double>(i) * step;
+        time.deltaTime = i == 0 ? 0.0 : step;
+        time.frameIndex = static_cast<std::uint64_t>(i);
+        played.params.resetFinals();
+        played.comp->updateFields(time, played.bus, played.modulator);
+        played.modulator.applyRoutes(played.bus, played.params, time.deltaTime);
+        played.comp->updateBehaviour(time, played.bus);
+        played.comp->update(time);
+    }
+    // The scrub, timed, as the engine does it (minus the renderer).
+    double best = 1e30;
+    std::unique_ptr<Loaded> scrubbed;
+    for (int r = 0; r < o.repeats; ++r) {
+        auto s = std::make_unique<Loaded>(o.scene);
+        const auto begin = std::chrono::steady_clock::now();
+        s->comp->director().reset(&s->comp->entityWorld(), &s->params);
+        s->comp->entityWorld().seek(t, &s->params, nullptr, step,
+                                    entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 180000});
+        best = std::min(best, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count());
+        scrubbed = std::move(s);
+    }
+    std::printf("scrub to %.2f s: %.1f ms (min of %d); %llu body-steps replayed\n", t, best, o.repeats,
+                static_cast<unsigned long long>(scrubbed->comp->entityWorld().lastSeekWork().bodySteps));
+    float worst = 0.0f;
+    std::size_t differing = 0;
+    for (const auto& e : played.comp->entityWorld().entities()) {
+        entity::DecisionDebug pd;
+        bool decides = false;
+        for (const auto& b : e->behaviors()) {
+            decides = decides || b->decisionDebug(pd);
+        }
+        if (!decides) {
+            continue;
+        }
+        const entity::Entity* other = scrubbed->comp->entityWorld().find(e->name());
+        entity::DecisionDebug sd;
+        for (const auto& b : other->behaviors()) {
+            (void)b->decisionDebug(sd);
+        }
+        const float d = glm::length(e->state().position() - other->state().position());
+        worst = std::max(worst, d);
+        const bool same = pd.chosen == sd.chosen && pd.subject == sd.subject;
+        differing += same && d < 1e-3f ? 0 : 1;
+        std::printf("  %-10s play %-22s scrub %-22s  %.4f m apart\n", e->name().c_str(),
+                    std::string(pd.chosen).c_str(), std::string(sd.chosen).c_str(), d);
+    }
+    std::printf("deciders differing: %zu; worst %.4f m\n", differing, worst);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -301,6 +405,8 @@ int main(int argc, char** argv) {
             o.entity = next();
         } else if (a == "--repeat") {
             o.repeat = true;
+        } else if (a == "--scrub") {
+            o.scrub = std::atof(next());
         } else if (a == "--crowd") {
             o.crowd = std::atoi(next());
         } else if (a == "--repeats") {
@@ -323,6 +429,9 @@ int main(int argc, char** argv) {
     organism::registerMushroomGenerator();
     scene::registerTreeGenerator();
 
+    if (o.scrub >= 0.0) {
+        return scrubReport(o);
+    }
     if (o.crowd > 0) {
         double best = 1e30;
         Run kept;
@@ -355,6 +464,10 @@ int main(int argc, char** argv) {
         if (!o.entity.empty() && line.find(o.entity) == std::string::npos) {
             continue;
         }
+        std::printf("%s\n", line.c_str());
+    }
+    std::printf("\n");
+    for (const std::string& line : first.reachLines) {
         std::printf("%s\n", line.c_str());
     }
     for (const std::string& text : first.explained) {
