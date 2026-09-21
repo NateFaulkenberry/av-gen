@@ -2193,3 +2193,53 @@ behaviour. `defaultBipedConfig` names the two feet. Contact dimensions: **2 of 3
 The natural experiment that bug provided — neutralising the bogus flag — is recorded in the test
 file rather than deleted silently: it measured 0.0 points, **that null was underpowered, and the
 dose-response reversed it.**
+
+
+## §30 measured against its own purpose — the third candidate also fails
+
+Pose proximity asks what the body *looks like* at one instant. A contact flag describes **where in
+the gait cycle you are and what the next frames will do** — a temporal property. Two poses can be
+pose-space identical while one has a foot arriving and the other has it leaving, and a single-frame
+score calls those equally good. That would produce exactly what was measured — dimensional cost, no
+gain, shuffling harmless — with the feature neither duplicated nor wrong, but **orthogonal to the
+instrument.**
+
+It is also the shape of the retirement already performed: leave-one-out measured *identity* where
+*meaning* was wanted; pose proximity would be measuring *appearance* where contacts carry
+*continuity*. **Twice the instrument has been at fault rather than the feature**, against a habit of
+suspecting the feature first.
+
+So §30 was measured against the defect it exists to prevent: **foot-plant discontinuity across a
+transition**, which is visible across a switch and invisible within a frame.
+
+| | switches | mean foot jump | worst |
+|---|---|---|---|
+| contacts **off** | 32 | **0.3566 m** | 1.6437 m |
+| contacts **on** | 30 | **0.3792 m** | 1.6437 m |
+
+**Contacts do not reduce plant discontinuity either.** +6% is well inside the spread of a
+distribution whose worst case is 1.64 m, so the honest reading is **no detectable benefit**, not
+"slightly harmful".
+
+**The first version of this test produced 4 switches in 300 steps**, and a mean over 4 would have
+been the single-point-null mistake in a new place. It was rebuilt to drive the demanded motion
+across a different clip every 20 steps — which is what a behaviour tier changing its mind looks
+like, and the case §30 is written for.
+
+### Three candidates eliminated
+
+| candidate | verdict | how |
+|---|---|---|
+| redundancy — the pose block already carries it | **falsified** | ablation: −1.4 with the implicit copy, −1.4 without |
+| wrong data — the detector is broken | **weakened** | 75% of plants in the lowest height quartile vs 25% by chance |
+| orthogonal metric — contacts carry continuity, not appearance | **not supported** | no benefit on the transition metric either |
+
+**The contact feature appears genuinely inert on this corpus**, now measured against both what a
+body looks like and how it transitions. That is a narrow, dull, well-supported claim, and it is
+worth more than the elegant mechanism it replaced — which was mine, and wrong.
+
+**What it does not license** is removing contacts from the engine. §30 is in the spec for reasons
+that include content this corpus does not contain: starts, stops and directional changes, where a
+plant disagreement is most visible. The supported statement is about *this corpus*, and the reason
+it is not a §20 item is unchanged — **no mechanism means no prediction, and a queue item without a
+prediction is a wish rather than a question.**

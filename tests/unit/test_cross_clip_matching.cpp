@@ -811,3 +811,162 @@ TEST_CASE("are the detected contacts actually right?", "[crossclip][phaseC][alie
     CHECK(track.dutyCycle > 0.1f);
     CHECK(track.dutyCycle < 0.9f);
 }
+
+TEST_CASE("§30 measured against its own purpose: plant discontinuity across a transition",
+          "[crossclip][phaseC][aliens]") {
+    // **The third candidate, and the likeliest: the instrument was asking a question contact
+    // features were never meant to answer.**
+    //
+    // Pose proximity asks "is the chosen pose within a margin of the best achievable" -- a question
+    // about what the body *looks like* at one instant. A contact flag does not describe appearance.
+    // It describes **where in the gait cycle you are and what the next frames will do**. Two poses
+    // can be pose-space identical while one has a foot arriving and the other has it leaving, and a
+    // single-frame score calls those equally good, because in pose terms they are.
+    //
+    // That predicts exactly what was measured: the dimensional cost with no compensating gain, and
+    // shuffling doing no harm, because the real values were not being used for anything the metric
+    // rewards. Neither duplicated nor wrong -- **orthogonal**.
+    //
+    // And it is the same shape as the retirement already performed: leave-one-out measured identity
+    // where meaning was wanted; pose proximity measures appearance where contacts carry continuity.
+    // **Twice the instrument has been at fault rather than the feature**, against a habit of
+    // suspecting the feature first.
+    //
+    // §30 exists to stop feet skating and to stop a transition landing on a frame whose plant
+    // disagrees with the one before. **That is a defect across a transition, not within a frame.**
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §30 purpose"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+
+    const int footL = rig.skeleton.find("foot.l");
+    const int footR = rig.skeleton.find("foot.r");
+    REQUIRE(footL >= 0);
+    REQUIRE(footR >= 0);
+
+    const auto feetAt = [&](const scene::MotionDatabase& db, std::uint32_t s) {
+        const scene::AnimationClip& clip = rig.clips[db.sampleClip[s]];
+        scene::Pose pose;
+        std::vector<glm::mat4> model;
+        scene::setRestPose(rig.skeleton, pose);
+        scene::sampleClip(clip, clip.start + db.sampleTime[s], pose);
+        scene::poseToModel(rig.skeleton, pose, model);
+        return std::pair<glm::vec3, glm::vec3>{
+            glm::vec3(model[static_cast<std::size_t>(footL)][3]),
+            glm::vec3(model[static_cast<std::size_t>(footR)][3])};
+    };
+
+    // Drive the loop toward a different clip so transitions actually happen, and measure the feet's
+    // jump at each switch. **This is the quantity §30 exists to reduce.**
+    const auto measureTransitions = [&](float contactWeight, const char* label) {
+        scene::MotionDatabaseOptions options;
+        options.sampleRate = 30.0f;
+        options.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+        options.config.contactWeight = contactWeight;
+        auto db = scene::buildMotionDatabase(*pack, options);
+        if (!db.has_value()) {
+            FAIL("motion database build failed: " << db.error().message);
+        }
+        const scene::MotionCostWeights weights;
+        std::uint32_t current = 0;
+        std::uint32_t target = 0;
+        for (std::uint32_t s = 0; s < db->sampleCount(); ++s) {
+            if (db->sampleClip[s] != db->sampleClip[0]) {
+                target = s;
+                break;
+            }
+        }
+        REQUIRE(target != 0u);
+
+        double totalJump = 0.0;
+        double worstJump = 0.0;
+        int switches = 0;
+        // **Drive the target across several clips so transitions actually happen.** The first
+        // version followed one clip and produced 4 switches in 300 steps -- far too few to compare
+        // two arms, and reporting a mean over 4 would have been the single-point-null mistake in a
+        // new place. Here the demanded motion jumps to a different clip every 20 steps, which is
+        // what a behaviour tier changing its mind looks like and is the case §30 is written for.
+        std::vector<std::uint32_t> clipStarts;
+        for (std::uint32_t s = 1; s < db->sampleCount(); ++s) {
+            if (db->sampleClip[s] != db->sampleClip[s - 1u]) {
+                clipStarts.push_back(s);
+            }
+        }
+        REQUIRE(clipStarts.size() > 5u);
+        for (int i = 0; i < 600; ++i) {
+            const std::uint32_t leg = static_cast<std::uint32_t>(i / 20) % clipStarts.size();
+            const std::uint32_t base = clipStarts[leg];
+            const std::uint32_t want =
+                base + static_cast<std::uint32_t>(i % 20) < db->sampleCount()
+                    ? base + static_cast<std::uint32_t>(i % 20)
+                    : base;
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(want);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); ++d) {
+                query.features[d] += 0.05f;
+            }
+            query.current = current;
+            const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
+            REQUIRE(match.found());
+            // A switch is anything that is not the natural continuation -- that is where a plant
+            // can jump.
+            const bool continues = db->sampleNext[current] == match.sample;
+            if (!continues) {
+                const auto [beforeL, beforeR] = feetAt(*db, current);
+                const auto [afterL, afterR] = feetAt(*db, match.sample);
+                const double jump =
+                    std::max(glm::length(afterL - beforeL), glm::length(afterR - beforeR));
+                totalJump += jump;
+                worstJump = std::max(worstJump, jump);
+                ++switches;
+            }
+            current = match.sample;
+        }
+        const double mean = switches > 0 ? totalJump / switches : 0.0;
+        WARN(fmt::format("{:<26} {} switches, mean foot jump {:.4f} m, worst {:.4f} m", label,
+                         switches, mean, worstJump));
+        return std::pair<double, int>{mean, switches};
+    };
+
+    const auto [withoutContacts, switchesOff] = measureTransitions(0.0f, "contacts OFF");
+    const auto [withContacts, switchesOn] = measureTransitions(1.0f, "contacts ON");
+
+    WARN(fmt::format("§30 AGAINST ITS PURPOSE: mean foot jump {:.4f} m without contacts, {:.4f} m "
+                     "with ({:+.1f}%)",
+                     withoutContacts, withContacts,
+                     100.0 * (withContacts - withoutContacts) / std::max(withoutContacts, 1e-9)));
+
+    // The loop actually transitioned, so the means are over real switches rather than over nothing.
+    // Enough switches for the means to be comparable. At n=4 they were not, and that was the
+    // first version of this test.
+    CHECK(switchesOff > 20);
+    CHECK(switchesOn > 20);
+    CHECK(withoutContacts > 0.0);
+}
