@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <map>
 #include <random>
@@ -174,12 +175,32 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
 
     // The measurement: for each probe, what is the best achievable cross-clip pose match, and does
     // the matcher's own cross-clip answer land within `margin` of it?
+    // **The denominator, before any rate is read.** A cross-clip hit rate's value is a property of
+    // what was reachable, the same way a filter's value is a property of the corpus (§14).
+    //
+    // Two things have to be separated here, and the first is a correction to how this reads. The
+    // criterion is `chosenPose <= bestPose + margin` -- within the margin **of the best achievable
+    // cross-clip answer**, not within the margin absolutely. So **the oracle rate is 100% by
+    // construction**: the best achievable always satisfies it. The metric cannot be measuring
+    // corpus coverage, because it never asks for an answer better than the corpus contains.
+    //
+    // What does need reporting is **how good the best available answer is**, because "within
+    // 0.0565 m of the best" is a tight band around a poor answer if the best is itself distant.
+    // That is the number that says whether the task is compressed, and it is reported per arm --
+    // which is also a free control: the target is pose-space and independent of the feature vector,
+    // so **if `bestPose` moves between arms the ground truth is leaking from the features** and
+    // nothing else the instrument says can be trusted.
     const auto score = [&](const scene::MotionDatabase& db, const char* label) {
         int hits = 0;
         int trials = 0;
+        double bestPoseTotal = 0.0;
+        std::vector<float> bestPoses;
         std::map<std::uint32_t, int> answerClips;
         const scene::MotionCostWeights weights;
-        for (std::size_t i = 0; i < probes.size(); i += 3) {
+        // n raised now that validity is established -- the correct order, and the reason it was
+        // wrong to do this first: precision around an invalid instrument is a confidently wrong
+        // answer. Every probe rather than every third.
+        for (std::size_t i = 0; i < probes.size(); ++i) {
             const std::uint32_t s = probes[i];
             const std::uint32_t sourceClip = db.sampleClip[s];
 
@@ -237,6 +258,8 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
                 continue;
             }
             ++trials;
+            bestPoseTotal += static_cast<double>(bestPose);
+            bestPoses.push_back(bestPose);
             answerClips[db.sampleClip[chosen]] += 1;
             if (chosenPose <= bestPose + margin) {
                 ++hits;
@@ -250,16 +273,31 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
         for (const auto& [clip, n] : answerClips) {
             largest = std::max(largest, n);
         }
-        WARN(fmt::format("{:<34} {:5.1f}% within margin (n={}), answers spread over {} clips, "
-                         "largest share {:.0f}%",
+        std::sort(bestPoses.begin(), bestPoses.end());
+        const float medianBest = bestPoses.empty() ? 0.0f : bestPoses[bestPoses.size() / 2];
+        WARN(fmt::format("{:<34} {:5.1f}% within margin (n={}), answers over {} clips, largest "
+                         "share {:.0f}%; best achievable cross-clip pose: median {:.4f} m",
                          label, rate, trials, answerClips.size(),
-                         100.0 * largest / std::max(trials, 1)));
-        return rate;
+                         100.0 * largest / std::max(trials, 1), medianBest));
+        return std::pair<double, float>{rate, medianBest};
     };
 
-    const double withoutPhase = score(base, "phase weight 0");
+    const auto [withoutPhase, oracleA] = score(base, "phase weight 0");
     scene::MotionDatabase withPhase = buildDb(1.0f);
-    const double withPhaseRate = score(withPhase, "phase weighted 1.0");
+    const auto [withPhaseRate, oracleB] = score(withPhase, "phase weighted 1.0");
+
+    // **The free control.** The ground truth is pose-space and cannot depend on the feature vector,
+    // so the best achievable answer must be identical between arms. If it moves, the target is
+    // leaking from the features and every other number here is void.
+    WARN(fmt::format("ORACLE: best achievable cross-clip pose is {:.4f} m with phase off and "
+                     "{:.4f} m with it on -- identical, so the ground truth is independent; the "
+                     "acceptance margin is {:.4f} m",
+                     oracleA, oracleB, margin));
+    CHECK(oracleA == Approx(oracleB).margin(1e-6f));
+    // And the compression question: if the best available cross-clip pose is far compared with the
+    // margin, the metric asks the matcher to hit a narrow band around a mediocre answer. Reported
+    // rather than asserted -- it is a property of the corpus, and §20 would change it.
+    WARN(fmt::format("the margin is {:.2f}x the median best-achievable distance", margin / std::max(oracleA, 1e-6f)));
 
     // **The shuffle control, as a test rather than a follow-up.** Shuffled features must score near
     // the no-feature baseline; if they beat it, this instrument is measuring identification too and
@@ -293,7 +331,7 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
                     saved[order[i] * dims.size() + k];
             }
         }
-        const double shuffled = score(withPhase, "phase SHUFFLED (control)");
+        const double shuffled = score(withPhase, "phase SHUFFLED (control)").first;
         WARN(fmt::format("VALIDITY: baseline {:.1f}%, real phase {:.1f}%, shuffled {:.1f}%",
                          withoutPhase, withPhaseRate, shuffled));
         // The instrument is valid only if destroying the feature's meaning costs it. A shuffled
@@ -302,6 +340,25 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
         CHECK(shuffled <= withPhaseRate + 5.0);
     }
 
+    // **The answer, at adequate power: phase-aware matching shows no measurable benefit here.**
+    //
+    //   n=145   baseline 32.4%   phase 35.9%   shuffled 33.1%   (+3.5, +-4.0 -- noise)
+    //   n=435   baseline 34.7%   phase 34.9%   shuffled 32.0%   (+0.2, +-2.3 -- zero)
+    //
+    // Raising n did not tighten a real effect; it dissolved an apparent one. The +3.5 was inside
+    // its own error bar at n=145 and said so, and this is what that warning looked like when it
+    // was honoured rather than explained away.
+    //
+    // A +0.2 effect would need roughly n=100,000 to resolve, which this corpus cannot supply at
+    // any stride -- so the honest statement is **no effect detectable on this corpus**, not "not
+    // yet significant". §13's fix remains correct and necessary; what it does not do is buy
+    // measurable matching quality, which is what the retraction suspected and this now shows with
+    // an instrument that can tell meaning from identity.
+    //
+    // Shuffled scoring *below* baseline (32.0 vs 34.7) is the expected sign: adding dimensions that
+    // carry noise costs a little, which is also §24's warning about dimensions not being free,
+    // arriving from a valid instrument this time.
     CHECK(withoutPhase > 0.0);
     CHECK(withPhaseRate > 0.0);
+    CHECK(std::abs(withPhaseRate - withoutPhase) < 5.0); // no large effect either way
 }

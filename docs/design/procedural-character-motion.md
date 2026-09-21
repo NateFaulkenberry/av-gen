@@ -1913,3 +1913,48 @@ real by 23.
 buying** — and n is a choice here as it was in §24 (the probe loop strides twice). That is the
 correct order: it would have been wrong to tighten the bars first, and it is right to tighten them
 now.
+
+### The oracle, and then the answer
+
+**The oracle rate is 100% by construction**, which is a correction to how the rates read. The
+criterion is `chosenPose <= bestPose + margin` — within the margin **of the best achievable
+cross-clip answer**, not within the margin absolutely — so the best available always satisfies it
+and the metric never asks for an answer better than the corpus contains. It cannot be measuring
+coverage.
+
+What does need reporting is **how good the best available answer is**: median **0.1578 m**, against
+a margin of 0.0565 m. So the margin is **0.36×** the typical best-answer distance — a demanding but
+not absurd band, and the best cross-clip pose is typically **2.8× further away than two adjacent
+frames of one clip**. That last figure is a real statement about this corpus's cross-clip coverage,
+and it is a §20 quantity.
+
+**The free control passes**: best-achievable is **identical across arms** (0.1578 m with phase off
+and on), so the ground truth is not leaking from the feature vector.
+
+**Then n, in the right order — and raising it dissolved the effect rather than tightening it:**
+
+| | baseline | phase | shuffled | effect |
+|---|---|---|---|---|
+| n = 145 | 32.4% | 35.9% | 33.1% | +3.5 (±4.0 — noise) |
+| **n = 435** | **34.7%** | **34.9%** | **32.0%** | **+0.2 (±2.3 — zero)** |
+
+**Phase-aware matching shows no measurable benefit on this corpus.** The +3.5 was inside its own
+error bar and said so; this is what honouring that warning looks like instead of explaining it away.
+A +0.2 effect would need roughly n = 100,000 to resolve, which this corpus cannot supply at any
+stride, so the honest statement is **no effect detectable here** rather than "not yet significant".
+
+§13's fix remains correct and necessary — `Cyclic` really was 0% and really is 95.4%. What it does
+not do is buy measurable matching quality, which is what the retraction suspected and this now shows
+with an instrument that can tell meaning from identity.
+
+Shuffled scoring *below* baseline (32.0 against 34.7) is the expected sign: dimensions carrying
+noise cost a little.
+
+### A limit on the shuffle control itself
+
+> **A shuffle control validates a feature against a metric. It cannot validate the metric against
+> the question.**
+
+Nothing in a shuffle can tell you the ground truth was drawn from the wrong place — a phase-defined
+target would have made shuffled phase collapse *correctly* while the whole result stayed worthless.
+Two independent things have to be right, and only one of them has an automated check.
