@@ -42,6 +42,10 @@ struct MotionLimits {
     // body asked to walk east should not have to turn its velocity vector from a direction it does
     // not have. Expressed in m/s because it is about the body, not about the clip.
     float headingFloor = 0.05f;
+    // §38. How much of the turn aims at where the body will be heading rather than where it is
+    // heading. A dial rather than a constant because over-eager anticipation is a real failure
+    // and an onset count cannot see it -- see `test_trajectory.cpp`'s path-deviation arm.
+    float anticipation = 0.5f;
 };
 
 // Everything the controller remembers between steps. A plain value, entity-owned.
