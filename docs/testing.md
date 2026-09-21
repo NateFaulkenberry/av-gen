@@ -330,6 +330,17 @@ night from two agents who never spoke to each other.
    is the same as 13 and 17 — a confident, reproducible zero — and the instinct that catches all
    three is to suspect the fixture's domain before the feature.
 
+   **The same entry, in time rather than in parameters.** An attention tie-break test drove 300
+   frames — five seconds — against a selector whose attention hold is four. It crossed the hold,
+   caught a legitimate refractory release, and reported it as *reordering thrash*: a real mechanism
+   firing, attributed to the mechanism the test was named after. Shortened to three seconds, inside
+   the hold, it measured the thing it claimed to.
+
+   So the form generalises: **a fixture that spans more than the mechanism under test will measure
+   whichever mechanism fires first.** A boundary can be in a parameter (a straight leg), in a
+   sample domain (a plateau), or in a *duration* — and the third is the easiest to miss, because
+   running a test for longer feels like more evidence rather than less.
+
 19. **A minimum is robust to contention ARRIVING and defenceless against the machine getting
    quieter.** ADR-170 says "report minima over repeats, never means" and stops, which reads as
    though minima solve contention. They solve **one direction** of it.
