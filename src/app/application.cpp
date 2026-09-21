@@ -1496,11 +1496,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onAddGltfNode = addAssetNode(scene::NodeKind::Gltf, platform::Window::DialogKind::Scene);
         panel_->onAddSceneNode = addAssetNode(scene::NodeKind::Scene, platform::Window::DialogKind::Any);
         auto saveTo = [this](const std::filesystem::path& path) { saveProjectTo(path); };
-        panel_->onSaveProject = [this, saveTo] {
-            window_->saveFileDialog(platform::Window::SaveKind::Project, [saveTo](std::string path) {
-                if (!path.empty()) {
-                    saveTo(path);
+        // Save As takes its own copies. Cmd+S (`onSaveProjectHere`) still writes in place, because
+        // re-copying every asset on every save would be a different command wearing the same name.
+        panel_->onSaveProject = [this] {
+            window_->saveFileDialog(platform::Window::SaveKind::Project, [this](std::string path) {
+                if (path.empty()) {
+                    return;
                 }
+                saveProjectAsCopyTo(std::filesystem::path(path));
             });
         };
         panel_->onSaveProjectHere = [this, saveTo] {
@@ -2446,6 +2449,28 @@ void Application::startRenderFromUi() {
 // modal's Yes all come through here, so "what counts as a successful save" cannot have two answers
 // (ADR-440) -- and `Engine::saveProject` is what clears the dirty state, so the gate reading
 // `projectDirtyCached()` afterwards is reading the save's own verdict rather than a second one.
+// Save As, with copies. The bookkeeping below is `saveProjectTo`'s, because "what counts as a
+// successful save" must not grow a second answer (ADR-440) -- only the writing differs.
+void Application::saveProjectAsCopyTo(const std::filesystem::path& path) {
+    storeOutputsToProject();
+    if (auto r = engine_->saveProjectAsCopy(path); !r) {
+        log::error("save project as: {}", r.error().message);
+        if (panel_ != nullptr) {
+            panel_->setStatus(r.error().message);
+        }
+        return;
+    }
+    const auto written = engine_->projectPath();
+    if (panel_ != nullptr) {
+        panel_->setStatus("saved " + written.filename().string() + " with its own assets");
+    }
+    edits_.markSaved();
+    rememberProject(written);
+    touchedSinceDirtySample_ = false;
+    lastDirtySample_ = std::chrono::steady_clock::now();
+    refreshWindowTitle();
+}
+
 void Application::saveProjectTo(const std::filesystem::path& path) {
     storeOutputsToProject();
     if (auto r = engine_->saveProject(path); !r) {

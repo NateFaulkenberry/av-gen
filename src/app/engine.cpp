@@ -2360,8 +2360,19 @@ std::vector<std::filesystem::path> Engine::referencedFiles() const {
 }
 
 Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
+    return bundleInto(dir / "project.json", dir / "assets");
+}
+
+// The one copier. `exportBundle` writes a folder with a fixed layout; Save As writes a project file
+// the person named, with its copies beside it. They differ only in where the two outputs land, and
+// a second implementation of "copy every asset and rewrite every reference" is how one of them
+// quietly stops covering a reference the other handles -- which is exactly the defect this is being
+// written to fix, one level up.
+Result<void> Engine::bundleInto(const std::filesystem::path& projectFile,
+                                const std::filesystem::path& assetsDir) {
     std::error_code ec;
-    const auto assetsDir = dir / "assets";
+    const auto dir = projectFile.parent_path();
+    std::filesystem::create_directories(dir, ec);
     std::filesystem::create_directories(assetsDir, ec);
     if (ec) {
         return fail("cannot create '{}': {}", assetsDir.string(), ec.message());
@@ -2430,6 +2441,31 @@ Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
             }
             doc["environment"]["map"] = copied->filename().generic_string();
         }
+        // The light rig is an asset path in the environment block, and it was missed here exactly
+        // as it was missed in `saveComposition`: two copiers, the same omission, found twice. A
+        // scene bundled without it opens in the new location with no lighting.
+        if (doc.contains("environment") && doc["environment"].is_object() &&
+            doc["environment"].contains("lightRig") && doc["environment"]["lightRig"].is_string()) {
+            auto copied = copyFile(resolveFrom(doc["environment"]["lightRig"].get<std::string>(), srcDir));
+            if (!copied) {
+                return std::unexpected(copied.error());
+            }
+            doc["environment"]["lightRig"] = copied->filename().generic_string();
+        }
+        // Entity profiles. `visitor` in the Tree of Life scenes names one, and a bundle without it
+        // reports "cannot open entity profile" on open -- which is what caught this.
+        if (doc.contains("entities") && doc["entities"].is_array()) {
+            for (auto& entity : doc["entities"]) {
+                if (!entity.is_object() || !entity.contains("profile") || !entity["profile"].is_string()) {
+                    continue;
+                }
+                auto copied = copyFile(resolveFrom(entity["profile"].get<std::string>(), srcDir));
+                if (!copied) {
+                    return std::unexpected(copied.error());
+                }
+                entity["profile"] = copied->filename().generic_string();
+            }
+        }
         if (doc.contains("materialPrograms") && doc["materialPrograms"].is_array()) {
             for (auto& entry : doc["materialPrograms"]) {
                 if (!entry.is_string()) {
@@ -2442,18 +2478,50 @@ Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
                 entry = copied->filename().generic_string();
             }
         }
-        if (doc.contains("nodes") && doc["nodes"].is_array()) {
-            for (auto& node : doc["nodes"]) {
-                if (!node.is_object() || !node.contains("asset") || !node["asset"].is_string()) {
+        // EVERY `asset` in the document, wherever it sits. Enumerating the places a mesh can be
+        // named was wrong three times running: `node.asset` was handled, `procedural.source.asset`
+        // was not (the saucer), and `scatter[].asset` was not either -- eighteen references, every
+        // tree, rock and plant in the Tree of Life. Each gap was found only by fixing the one above
+        // it, which is the signature of a list that will go stale again the next time somebody adds
+        // a place to name a mesh. So this walks the document instead: any string under a key called
+        // `asset` is an asset, and a new home for one is covered the day it is invented.
+        std::function<Result<void>(nlohmann::json&)> copyEveryAsset;
+        copyEveryAsset = [&](nlohmann::json& value) -> Result<void> {
+            if (value.is_array()) {
+                for (auto& item : value) {
+                    if (auto r = copyEveryAsset(item); !r) {
+                        return r;
+                    }
+                }
+                return {};
+            }
+            if (!value.is_object()) {
+                return {};
+            }
+            for (auto& [key, child] : value.items()) {
+                if (key == "asset" && child.is_string()) {
+                    const auto source = resolveFrom(child.get<std::string>(), srcDir);
+                    // A nested scene is bundled as a scene, not copied as an opaque file.
+                    std::string ext = source.extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(),
+                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                    Result<std::filesystem::path> copied =
+                        ext == ".json" ? bundleScene(source, depth + 1) : copyFile(source);
+                    if (!copied) {
+                        return std::unexpected(copied.error());
+                    }
+                    child = copied->filename().generic_string();
                     continue;
                 }
-                const auto asset = resolveFrom(node["asset"].get<std::string>(), srcDir);
-                Result<std::filesystem::path> copied =
-                    node.value("kind", std::string()) == "scene" ? bundleScene(asset, depth + 1) : copyFile(asset);
-                if (!copied) {
-                    return std::unexpected(copied.error());
+                if (auto r = copyEveryAsset(child); !r) {
+                    return r;
                 }
-                node["asset"] = copied->filename().generic_string();
+            }
+            return {};
+        };
+        if (doc.contains("nodes")) {
+            if (auto r = copyEveryAsset(doc["nodes"]); !r) {
+                return std::unexpected(r.error());
             }
         }
         std::ofstream out(dest);
@@ -2465,7 +2533,6 @@ Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
     };
 
     // Save the project first (captures the current state), then rewrite its references.
-    const auto projectFile = dir / "project.json";
     if (auto r = saveProject(projectFile); !r) {
         return r;
     }
@@ -2538,8 +2605,31 @@ Result<void> Engine::exportBundle(const std::filesystem::path& dir) {
         return fail("cannot write '{}'", projectFile.string());
     }
     out << doc.dump(2) << '\n';
-    log::info("bundle exported to '{}': {} file(s)", dir.string(), placed.size());
+    log::info("bundle written to '{}': {} file(s) beside '{}'", assetsDir.string(), placed.size(),
+              projectFile.filename().string());
     return {};
+}
+
+// Save As. The project and its own copies of everything it names, so opening it later cannot reach
+// back into the folder it was saved from -- and, more to the point, so EDITING it later cannot write
+// back over a scene another project is still using. That was the reported defect: a project saved to
+// the Desktop kept pointing at `examples/world/...scene.json`, and saving the scene through it
+// overwrote the shared original.
+Result<void> Engine::saveProjectAsCopy(const std::filesystem::path& path) {
+    auto file = path;
+    if (file.extension().empty()) {
+        file.replace_extension(".json");
+    }
+    // Per project rather than a shared `assets/`: two projects saved into one folder would otherwise
+    // copy over each other's files by name, which is the same defect this exists to remove.
+    const auto assetsDir = file.parent_path() / (file.stem().string() + "_assets");
+    if (auto r = bundleInto(file, assetsDir); !r) {
+        return r;
+    }
+    // The session now belongs to the copy. Without this the editor would still be holding the paths
+    // it was opened with, and the next scene save would land on the original -- the copy would be a
+    // snapshot rather than a move, and the reported defect would survive its own fix.
+    return loadProject(file);
 }
 
 Result<void> Engine::loadScene(const std::filesystem::path& path) {
