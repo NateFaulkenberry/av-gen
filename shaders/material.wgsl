@@ -695,6 +695,24 @@ fn materialRunOps(pi: u32, first: u32, count: u32, ctx: MaterialContext, regsIn:
 
 // Evaluates the program in slot `programIndex` for `ctx`, starting from the material's own values
 // in `base`. A programIndex outside 0..count-1 returns `base` unchanged.
+// Whether program `programIndex` runs on this fragment at all (scene::MaterialGate). Header lanes:
+// opacityCountPad.w = the tested instanceRandom component + 1 (0 = no instance test);
+// emissionIntensityPad = (intensity, below, near, far), near/far 0 = no edge. A fragment the gate
+// refuses takes the program-less path, so the caller asks this BEFORE deciding which path it is
+// on -- see pbr_shade.wgsl.
+fn materialProgramAdmits(programIndex: i32, instanceRandom: vec4<f32>, cameraDistance: f32) -> bool {
+    if (programIndex < 0 || programIndex >= MAT_MAX_PROGRAMS || u32(programIndex) >= materialPrograms.count) {
+        return true; // not a gate's business: evaluateMaterialProgram answers an unknown index itself
+    }
+    let pi = u32(programIndex);
+    let lane = materialPrograms.programs[pi].opacityCountPad.w;
+    let g = materialPrograms.programs[pi].emissionIntensityPad;
+    if (lane > 0 && !(instanceRandom[u32(min(lane, 4)) - 1u] < g.y)) {
+        return false;
+    }
+    return cameraDistance >= g.z && (g.w <= 0.0 || cameraDistance < g.w);
+}
+
 fn evaluateMaterialProgram(programIndex: i32, ctx: MaterialContext, base: MaterialResult) -> MaterialResult {
     if (programIndex < 0 || programIndex >= MAT_MAX_PROGRAMS || u32(programIndex) >= materialPrograms.count) {
         return base;

@@ -260,12 +260,23 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let lod = textureLodFor(uv, vec2<f32>(textureDimensions(baseColorTex, 0)));
         alphaCutoff = alphaCutoff * exp2(-lod * kAlphaCoverageFade);
     }
+    // scene::MaterialGate: a gated program runs only on the instances and at the camera distances it
+    // admits, and a fragment it refuses takes the program-less path below exactly -- no interpreter,
+    // no early ambient-occlusion read, the material's own emission lane. That varies per fragment,
+    // so it is not uniform control flow; the geometry's derivatives stay behind the per-draw guard,
+    // where they were, and are simply unused on a refused fragment. For a program with no gate
+    // `programRuns` is `programIndex >= 0`, and nothing about it changes. The distance is the one
+    // the program's own `cameraDistance` input reads.
+    let programRuns = programIndex >= 0 &&
+                      materialProgramAdmits(programIndex, info.instanceRandom, distance(frame.cameraPos.xyz, worldPos));
     if (programIndex >= 0) {
         geometry = materialGeometry(worldPos, n);
+    }
+    if (programRuns) {
         occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
         sampledOcclusion = true;
     }
-    if (programIndex >= 0) {
+    if (programRuns) {
         var ctx = materialContextZero();
         ctx.worldPosition = worldPos;
         ctx.localPosition = info.localPosition;

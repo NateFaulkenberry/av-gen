@@ -729,6 +729,12 @@ int MaterialProgram::totalOpCount() const {
 }
 
 Result<void> MaterialProgram::validate() const {
+    if (gate.lane < -1 || gate.lane > 3) {
+        return fail("material '{}': gate lane {} is not an instanceRandom component (0..3)", name, gate.lane);
+    }
+    if (gate.near < 0.0f || gate.far < 0.0f || (gate.far > 0.0f && gate.far <= gate.near)) {
+        return fail("material '{}': gate distance band [{}, {}) m is empty", name, gate.near, gate.far);
+    }
     if (layers.size() > static_cast<std::size_t>(kMaxMaterialLayers)) {
         return fail("material '{}': at most {} layers (got {})", name, kMaxMaterialLayers, layers.size());
     }
@@ -829,6 +835,13 @@ std::uint64_t MaterialProgram::structuralHash() const {
     h.i32(normalRegister);
     h.i32(occlusionRegister);
     h.i32(heightRegister);
+    // Hashed only when set, so a program without a gate keeps the hash it always had.
+    if (gate.active()) {
+        h.i32(gate.lane);
+        h.f32(gate.below);
+        h.f32(gate.near);
+        h.f32(gate.far);
+    }
     h.u32(static_cast<std::uint32_t>(layers.size()));
     for (const MaterialLayer& layer : layers) {
         h.str(layer.name);
@@ -880,6 +893,20 @@ json MaterialProgram::toJson() const {
         }
         j["layers"] = std::move(layerArray);
     }
+    if (gate.active()) {
+        json g = json::object();
+        if (gate.lane >= 0) {
+            g["lane"] = gate.lane;
+            g["below"] = gate.below;
+        }
+        if (gate.near > 0.0f) {
+            g["near"] = gate.near;
+        }
+        if (gate.far > 0.0f) {
+            g["far"] = gate.far;
+        }
+        j["gate"] = std::move(g);
+    }
     return j;
 }
 
@@ -924,6 +951,26 @@ Result<MaterialProgram> MaterialProgram::fromJson(const json& j) {
     AVGEN_MAT_READ(p.normalRegister, "normal", readInt);
     AVGEN_MAT_READ(p.occlusionRegister, "occlusion", readInt);
     AVGEN_MAT_READ(p.heightRegister, "height", readInt);
+    if (j.contains("gate")) {
+        const json& g = j.at("gate");
+        if (!g.is_object()) {
+            return fail("'gate' must be an object: 'lane' (0..3) and 'below', and/or 'near' and 'far' metres");
+        }
+        auto lane = readInt(g, "lane", -1);
+        auto below = readFloat(g, "below", 1.0f);
+        auto nearM = readFloat(g, "near", 0.0f);
+        auto farM = readFloat(g, "far", 0.0f);
+        if (!lane || !below || !nearM || !farM) {
+            return fail("'gate' members must be numbers");
+        }
+        if (g.contains("lane") && (*lane < 0 || *lane > 3)) {
+            return fail("'gate' lane {} is not an instanceRandom component (0..3)", *lane);
+        }
+        p.gate.lane = *lane;
+        p.gate.below = *below;
+        p.gate.near = *nearM;
+        p.gate.far = *farM;
+    }
     if (auto ok = p.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -967,6 +1014,9 @@ MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const Mat
                                        const MaterialResult& base) {
     MaterialResult result = base;
     result.registers = {};
+    if (!program.gate.admits(ctx.instanceRandom, ctx.depth)) {
+        return result; // the program-less surface: nothing below runs
+    }
     MaterialContext local = ctx;
     int budget = kMaxMaterialOps;
     runOps(program.ops, local, result.registers, budget);
@@ -1102,7 +1152,14 @@ MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program,
         g.params = glm::vec4(layer.emissionIntensity, layer.blendRange, 0.0f, 0.0f);
         ++layerCount;
     }
-    gpu.opacityCountPad = glm::ivec4(program.opacityRegister, baseCount, layerCount, 0);
+    // The gate rides in the lanes the header had spare, all zero for a program without one -- which
+    // is what every program packed before it wrote there: opacityCountPad.w = lane + 1 (0 = no
+    // instance test), emissionIntensityPad = (intensity, below, near, far).
+    gpu.opacityCountPad = glm::ivec4(program.opacityRegister, baseCount, layerCount,
+                                     program.gate.lane >= 0 ? program.gate.lane + 1 : 0);
+    gpu.emissionIntensityPad.y = program.gate.lane >= 0 ? program.gate.below : 0.0f;
+    gpu.emissionIntensityPad.z = program.gate.near;
+    gpu.emissionIntensityPad.w = program.gate.far;
     gpu.aux = glm::ivec4(program.normalRegister, program.occlusionRegister, program.heightRegister, count);
     return gpu;
 }
