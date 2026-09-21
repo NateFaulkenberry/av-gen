@@ -65,12 +65,28 @@ has to be measured against the database's own cost spread.
 - Third and correct: the excess against **the measured gap between a good match and a typical one**,
   which is the only scale on which "how bad is this miss" has an answer.
 
+### The rule, stated generally, because §11 and §14 both have this trap in them
+
+> **A ratio whose denominator can approach zero measures the denominator.** An error metric needs a
+> scale that is a property of the data, not of how close this particular query happened to land.
+
+Every quantity of the form "how much worse is A than B" needs an explicit answer to *worse relative
+to what*, and the answer is almost never B itself. Here the scale is the measured gap between a good
+match and a typical one; in §41's foot slide it was the character's rest height; in §45's limb
+deviation it was the rest bone length. **Pick the scale before taking the measurement**, because
+once a number exists there is a strong pull to divide it by whatever is nearest to hand.
+
 ### And the cheap prefix did not work
 
 The textbook two-stage design ranks coarsely on a cheap prefix of the feature vector. Here the
 prefix bought nothing: at stride 8 the full-prefix plan (96.8%, 85.3%) was barely better than the
 12-dimension one (94.4%, 86.9%). **The entire win came from the stride**, and the only safe plan is
-stride 4 with the *full* prefix — which fully scores 84 samples per query against 1,738 exhaustive,
+stride 4 with the *full* prefix.
+
+**The standard design was tried, measured, and lost**, and that is recorded here so nobody re-adds
+the prefix stage later believing it was merely overlooked. The plan this data wants is the one the
+textbook treats as the degenerate case. This is the second time in this programme that a canonical
+design has lost to a simpler one on real data, which is the entire argument for §15's insistence — which fully scores 84 samples per query against 1,738 exhaustive,
 a 20x reduction in work at 99.6% recall and a 3.1% worst case.
 
 ## Consequences

@@ -1107,3 +1107,28 @@ an answer.
 full-prefix plan at stride 8 was barely better than the 12-dimension one. The entire win is the
 stride, and the safe plan is stride 4 at full prefix: **84 samples fully scored against 1,738, a 20x
 reduction at 99.6% recall and a 3.1% worst case.** Recorded as ADR-609.
+
+## §11 — graded continuity, measured and rejected
+
+§11 names its own metric: *"constantly jump between unrelated clips"* is a **rate**, so it is
+measured by running the matching loop, not by scoring a query.
+
+| continuity | clip jumps/s | mean index step | stalled | worst excess |
+|---|---|---|---|---|
+| binary | 0.50 | 2.47 | **0%** | 0.0612 |
+| graded 0.5–4.0/s | 0.50 | 1.81 | **13%** | 0.0612 |
+
+**Identical jump rate at every rate tried, and the loop stands still on 13% of steps.** The reason
+is structural: a penalty proportional to the distance from the current sample is *zero for the
+current sample*, so not moving is free and the matcher freezes rather than continuing. A freeze is
+the worst outcome wearing the appearance of the best, because a frozen matcher also reports zero
+jumps. Kept at its inert default with the measurement recorded (ADR-610), so a second attempt can
+see it was tried and why it failed — a working version must penalise *not advancing*, which needs
+§11's "previous sample" input as well.
+
+**The fixture was vacuous first.** It queried with `sampleNext[current]`, so the natural
+continuation was always the answer and continuity never decided anything; it reported **0.00 jumps
+per second for every configuration**. Caught by this repository's own rule that an exact zero is a
+reading to distrust. And the vacuous version **carried the evidence of the freeze all along** —
+index step 0.15 against 1.82 — in a test whose headline metric said everything was fine. A probe
+that cannot fail does not merely prove nothing; it can present a real fault as a success.

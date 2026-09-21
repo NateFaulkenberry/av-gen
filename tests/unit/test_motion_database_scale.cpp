@@ -625,3 +625,186 @@ TEST_CASE("the two-stage search is worth it only at a scale nothing here has",
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// §11 -- continuity, measured by the thing §11 actually asks for.
+//
+// §11's own words name the failure: "do not allow the system to **constantly jump between
+// unrelated clips** simply because they happen to have similar poses." So the quantity is a **jump
+// rate**, not a cost, and the way to measure it is to run the matching loop rather than to score
+// one query.
+//
+// The binary continuity in place before this stage penalises the one sample that follows the
+// current one at zero and *everything else in full* -- so a candidate two frames later in the same
+// clip pays exactly what a candidate from an unrelated clip pays. Once the loop is off by a single
+// frame it has no reason to prefer the clip it is already in.
+
+TEST_CASE("continuity is measured by how often the loop jumps, on real motion",
+          "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §11"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+
+    // **The first version of this loop reported 0.00 jumps per second for every configuration**,
+    // which by this repository's own rule (`docs/testing.md`, "this rig produces convincing
+    // zeros") is a reading to distrust before believing. It was vacuous: the loop queried with the
+    // features of `sampleNext[current]`, so the natural continuation was always the exact answer
+    // and the continuity term was never asked to decide anything. **A probe that cannot produce the
+    // behaviour it is measuring** -- ADR-182, in a fixture I had just written.
+    //
+    // It also hid something. The graded runs reported a mean index step of 0.15 against the
+    // binary's 1.82: the graded penalty was making the loop **stand still**, advancing less than
+    // one sample per query, which is a worse failure than jumping and which the vacuous jump count
+    // could not see.
+    //
+    // This loop instead drives the character somewhere its current clip cannot go -- the query
+    // follows a *different* clip's motion -- so continuity has a real decision to make on every
+    // step: follow the request and cut, or stay and be wrong. Both a thrashing matcher and a
+    // frozen one now show up, in different numbers.
+    struct Run {
+        double clipJumpsPerSecond = 0.0;
+        double meanIndexStep = 0.0;
+        double stalledFraction = 0.0;  // steps where the loop did not advance at all
+        double worstExcess = 0.0;      // §11 severity: how much worse than the best available
+    };
+    const auto run = [&](float perSecond) {
+        scene::MotionCostWeights weights;
+        weights.continuityPerSecond = perSecond;
+        // Start in one clip and ask for another, so the term is exercised rather than agreed with.
+        std::uint32_t current = 0;
+        std::uint32_t target = 0;
+        for (std::uint32_t s = 0; s < db->sampleCount(); ++s) {
+            if (db->sampleClip[s] != db->sampleClip[0]) {
+                target = s;
+                break;
+            }
+        }
+        REQUIRE(target != 0u);
+
+        int jumps = 0;
+        int stalls = 0;
+        int steps = 0;
+        double indexStep = 0.0;
+        double worstExcess = 0.0;
+        for (int i = 0; i < 300; ++i) {
+            const std::uint32_t want =
+                target + static_cast<std::uint32_t>(i) < db->sampleCount()
+                    ? target + static_cast<std::uint32_t>(i)
+                    : target;
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(want);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); d += 4) {
+                query.features[d] += 0.08f;
+            }
+            query.current = current;
+            const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
+            REQUIRE(match.found());
+
+            // §11 severity, which the coordinator is right that frequency alone cannot show: how
+            // much worse is what continuity made it choose than the best match ignoring
+            // continuity entirely? A term that is wrong rarely but catastrophically hides behind a
+            // good-looking rate.
+            scene::MotionQuery free = query;
+            free.current = scene::MotionDatabase::kInvalid;
+            const scene::MotionMatch unconstrained = scene::searchMotion(*db, free, weights);
+            if (unconstrained.found() && match.sample != unconstrained.sample) {
+                float chosen = 0.0f;
+                const float* a = db->featuresFor(match.sample);
+                const float* b = db->featuresFor(unconstrained.sample);
+                for (std::size_t d = 0; d < db->dimension; ++d) {
+                    const float da = query.features[d] - a[d];
+                    const float dbv = query.features[d] - b[d];
+                    chosen += (da * da) - (dbv * dbv);
+                }
+                worstExcess = std::max(worstExcess, static_cast<double>(chosen));
+            }
+
+            if (db->sampleClip[match.sample] != db->sampleClip[current]) {
+                ++jumps;
+            }
+            if (match.sample == current) {
+                ++stalls;
+            }
+            indexStep += std::abs(static_cast<double>(match.sample) - static_cast<double>(current));
+            ++steps;
+            current = match.sample;
+        }
+        Run out;
+        out.clipJumpsPerSecond = jumps / (steps / 30.0);
+        out.meanIndexStep = indexStep / steps;
+        out.stalledFraction = static_cast<double>(stalls) / steps;
+        out.worstExcess = worstExcess;
+        return out;
+    };
+
+    const Run binary = run(0.0f);
+    WARN(fmt::format("binary continuity: {:.2f} jumps/s, step {:.2f}, stalled {:.0f}%, worst "
+                     "excess {:.4f}",
+                     binary.clipJumpsPerSecond, binary.meanIndexStep,
+                     100.0 * binary.stalledFraction, binary.worstExcess));
+
+    // The graded rate is chosen against `continuity` itself rather than invented: at 0.35 for a
+    // clip change, a rate of 1.0 per second means a skip of a third of a second inside the clip
+    // costs what leaving it costs. Anything beyond that is not a skip, it is a cut.
+    double bestRate = 0.0;
+    Run bestRun = binary;
+    for (const float rate : {0.5f, 1.0f, 2.0f, 4.0f}) {
+        const Run graded = run(rate);
+        WARN(fmt::format("graded at {:.1f}/s:  {:.2f} jumps/s, step {:.2f}, stalled {:.0f}%, "
+                         "worst excess {:.4f}",
+                         rate, graded.clipJumpsPerSecond, graded.meanIndexStep,
+                         100.0 * graded.stalledFraction, graded.worstExcess));
+        if (graded.clipJumpsPerSecond < bestRun.clipJumpsPerSecond) {
+            bestRun = graded;
+            bestRate = rate;
+        }
+    }
+    WARN(fmt::format("best rate {:.1f}/s: {:.2f} jumps/s against the binary {:.2f}", bestRate,
+                     bestRun.clipJumpsPerSecond, binary.clipJumpsPerSecond));
+
+    // **The loop was actually made to choose.** Driving it toward another clip means the binary
+    // term has a real decision on every step, so a zero here would be a finding rather than a
+    // fixture artefact -- which is exactly what the first version of this test could not say.
+    CHECK(binary.meanIndexStep > 0.0);
+    CHECK(bestRun.meanIndexStep > 0.0);
+    // **A frozen matcher is worse than a jumpy one, and frequency alone cannot tell them apart.**
+    // The graded penalty's first configuration stalled the loop -- 0.15 samples per query against
+    // the binary's 1.82 -- while reporting zero jumps, which looked like a perfect score.
+    CHECK(bestRun.stalledFraction < 0.5);
+    CHECK(bestRun.clipJumpsPerSecond <= binary.clipJumpsPerSecond);
+}

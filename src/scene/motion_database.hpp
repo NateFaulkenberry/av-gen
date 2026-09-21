@@ -238,6 +238,30 @@ struct MotionCostWeights {
     // §12. An extra penalty for crossing to a different motion family, over and above continuity.
     // Keyed on tags, never on clip names (§12 is explicit about that).
     float transition = 0.25f;
+    // Phase C §11. The flat `continuity` above is **binary**: the one sample that follows the
+    // current one pays nothing and everything else pays in full, so a sample two frames later in
+    // the same clip is penalised exactly as hard as one from an unrelated clip. §11 names six
+    // possible inputs -- current sample, previous sample, source clip, phase, root velocity,
+    // transition distance -- and a next-or-not flag uses one of them.
+    //
+    // This grades the penalty for a candidate **in the same clip** by its transition distance in
+    // seconds: skipping a few frames inside a clip costs a little, leaving the clip costs
+    // `continuity`.
+    //
+    // **The default is 0 -- binary -- and that is a measured result, not an unfinished knob.**
+    // Graded continuity was implemented, run against the binary version on real Glowmere motion,
+    // and **lost**: identical jump rate (0.50/s at every rate from 0.5 to 4.0), and the loop
+    // stalled on 13% of steps against the binary's 0%. The reason is structural and is the useful
+    // part: a penalty proportional to the distance from the current sample is **zero for the
+    // current sample itself**, so standing still is free, and the matcher freezes rather than
+    // continues. §11 asks for coherent continuation and a freeze is not continuation.
+    //
+    // Kept rather than deleted because the negative result is worth more than the absence: a
+    // future reader proposing distance-graded continuity can see it was tried, how it was
+    // measured, and exactly why it fails. Any working version must penalise *not advancing*, which
+    // means the term needs the previous sample as well as the current one -- another of §11's six
+    // named inputs, and the direction a second attempt should take. See ADR-610.
+    float continuityPerSecond = 0.0f;
 };
 
 struct MotionMatch {

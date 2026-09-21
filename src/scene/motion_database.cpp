@@ -528,7 +528,16 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
             const bool continues =
                 query.current < db.sampleNext.size() && db.sampleNext[query.current] == s;
             if (!continues) {
-                cost += weights.continuity;
+                // §11: graded inside the clip, flat outside it. A candidate a few frames
+                // further on in the same clip is a small skip; a candidate in another clip is a
+                // cut, and only the second should cost what a cut costs.
+                if (weights.continuityPerSecond > 0.0f && query.current < db.sampleClip.size() &&
+                    db.sampleClip[s] == db.sampleClip[query.current]) {
+                    const float gap = std::abs(db.sampleTime[s] - db.sampleTime[query.current]);
+                    cost += std::min(gap * weights.continuityPerSecond, weights.continuity);
+                } else {
+                    cost += weights.continuity;
+                }
                 // §12 transition: an extra penalty for leaving the motion family, over and above
                 // leaving the clip. A walk finding another walk is cheaper than a walk finding a
                 // fall, even when the poses rhyme.
@@ -566,6 +575,13 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
                                    db.sampleNext[query.current] == best.sample;
             if (!continues) {
                 best.breakdown.continuity = weights.continuity;
+                if (weights.continuityPerSecond > 0.0f && query.current < db.sampleClip.size() &&
+                    db.sampleClip[best.sample] == db.sampleClip[query.current]) {
+                    const float gap =
+                        std::abs(db.sampleTime[best.sample] - db.sampleTime[query.current]);
+                    best.breakdown.continuity =
+                        std::min(gap * weights.continuityPerSecond, weights.continuity);
+                }
                 if (db.sampleClip[best.sample] != currentClip) {
                     const std::uint32_t shared = db.sampleTags[best.sample] & currentTags;
                     if (currentTags != 0 && shared != currentTags) {
@@ -670,7 +686,16 @@ MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& quer
             const bool continues =
                 query.current < db.sampleNext.size() && db.sampleNext[query.current] == s;
             if (!continues) {
-                cost += weights.continuity;
+                // §11: graded inside the clip, flat outside it. A candidate a few frames
+                // further on in the same clip is a small skip; a candidate in another clip is a
+                // cut, and only the second should cost what a cut costs.
+                if (weights.continuityPerSecond > 0.0f && query.current < db.sampleClip.size() &&
+                    db.sampleClip[s] == db.sampleClip[query.current]) {
+                    const float gap = std::abs(db.sampleTime[s] - db.sampleTime[query.current]);
+                    cost += std::min(gap * weights.continuityPerSecond, weights.continuity);
+                } else {
+                    cost += weights.continuity;
+                }
                 const std::uint32_t currentClip = query.current < db.sampleClip.size()
                                                       ? db.sampleClip[query.current]
                                                       : MotionDatabase::kInvalid;
