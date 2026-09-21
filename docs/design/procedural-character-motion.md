@@ -1864,3 +1864,52 @@ this instrument at all.
 
 That ordering was available before any of these were run, and it is the cheap test for the rest of
 the phase: count the acceptable answers before trusting the number.
+
+## A valid instrument: cross-clip matching judged in pose space
+
+Leave-one-out retrieval is retired. Its replacement had a trap in it that would have wasted the
+build, and it is worth recording because it would have **looked like success at every stage**:
+
+**Cross-clip retrieval needs a definition of "the right moment in another clip", and the obvious one
+is the phase-aligned moment — which is circular.** It would score the matcher on recovering a target
+*defined by the feature under test*; phase would win by construction, win harder the more weight it
+got, and **the shuffle control would not catch it** — a shuffled phase cannot recover a
+phase-defined target, so the control would pass and the result would still be worthless.
+
+So the ground truth is **pose-space agreement**: the correct answers are the samples whose
+model-space joint positions are closest. §23 had already established that the feature vector
+deliberately contains no pose, which is exactly what makes pose available as an independent arbiter
+— and it is what a matcher is ultimately for.
+
+**Three guards are built in rather than run afterwards:**
+
+1. **Many correct answers by construction.** Any sample within a margin of the best achievable
+   cross-clip pose counts, so the question is "did it find an equivalent moment", not "did it find
+   *the* moment". The margin is **derived**: the median pose distance between consecutive frames of
+   one clip — two frames 1/30 s apart are interchangeable for matching — which is **0.0565 m** of
+   mean joint offset. A property of the content, not of the matcher.
+2. **The shuffle control is a test**, asserted, so the next person to add a feature gets the
+   validity check without having to think of it.
+3. **A degeneracy guard** reporting which clips the answers come from, since a matcher always
+   picking the same clip-relative position would score well on similar-length clips without
+   matching anything.
+
+**And it validates:**
+
+| arm | within margin (n=145) |
+|---|---|
+| phase weight 0 (baseline) | 32.4% |
+| phase weighted 1.0 | **35.9%** |
+| **phase SHUFFLED (control)** | **33.1%** |
+
+**The control collapses back toward baseline**, which is the first of the three possible outcomes
+and the one that makes the instrument usable: destroying the feature's meaning costs it almost
+everything it gained. Real phase carries **+3.5** points; shuffled carries **+0.7**. Contrast the
+retired metric, where shuffled phase *beat* real phase by 7.6 points and shuffled trajectory beat
+real by 23.
+
+**It is not yet a result, and the ordering says why.** At n=145 the standard error on a 35% rate is
+~4.0 points, so +3.5 is inside the noise. **Validity is established, so precision is now worth
+buying** — and n is a choice here as it was in §24 (the probe loop strides twice). That is the
+correct order: it would have been wrong to tighten the bars first, and it is right to tighten them
+now.
