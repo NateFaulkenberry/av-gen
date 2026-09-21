@@ -328,3 +328,95 @@ entity 'sage': ...   'ember': ...   'vane': ...
 ```
 A chain that resolves **zero** entries warns rather than falling silently back, because a silent
 fallback is the failure this whole stage was closing.
+
+
+---
+
+# Phase C — motion library and motion matching
+
+## C.1 The database (§4-§9)
+
+`src/scene/motion_database.{hpp,cpp}`. Built offline from a `MotionPack`, searched at runtime, and
+deliberately a different shape from the pack: a pack stores clips so they can be *played*, a
+database stores features so they can be *compared*.
+
+**Memory (§6).** No `MotionSample` object — parallel arrays plus one contiguous feature block, so a
+query touches memory linearly. Measured at 33 dimensions:
+
+| corpus | clips | samples | features | metadata | total | per sample |
+|---|---|---|---|---|---|---|
+| Glowmere alien, own clips | 26 | 1,738 | 0.22 MB | 0.03 MB | **0.25 MB** | 152 B |
+| 100STYLE, retargeted | 24 | 85,610 | 10.78 MB | 1.63 MB | **12.41 MB** | 152 B |
+
+Build throughput **24,000–36,000 samples/s**. Extrapolated, 100STYLE's full 4.78 M frames is
+**~700 MB** and about 2¼ minutes — which is a fact worth knowing before anyone asks for it.
+
+**Normalization (§9)** is zero mean, unit standard deviation per dimension, applied once at build
+so a query is a plain squared distance. The convention is stated rather than tuned: a dimension's
+own spread *in this database* is what makes metres comparable to metres-per-second, and a
+hand-authored scale per unit would be a second set of weights fighting the first.
+
+## C.2 The finding: a zero-variance check is necessary and not sufficient
+
+I added a dead-dimension count expecting it to expose the in-place corpus. **It reported zero dead
+dimensions on both corpora**, including the one ADR-553 proved cannot move its own legs.
+
+The reason is worth stating exactly. A foot welded to a pelvis that *rotates* has feature
+coordinates that change on every frame — x and z sweep round — while the thing that would reveal
+the weld, the **length** of that offset, never changes at all. Variance in the raw dimensions is
+therefore the wrong test.
+
+The right one is rotation-invariant: the spread of each feature joint's **distance from the body**.
+
+| corpus | `foot.l` | `foot.r` | `head.x` |
+|---|---|---|---|
+| alien, own clips | **0.0869** | **0.0980** | 0.0142 |
+| 100STYLE, retargeted | **0.0000** | **0.0000** | 0.7067 |
+
+That is ADR-553 confirmed from an unrelated direction and **more precisely than the original
+finding**: the retarget drives the upper body correctly — the head moves 0.71 — and the legs not at
+all. The database reports this per joint on every build.
+
+## C.3 Search (§10-§17)
+
+Linear scan with an early out, continuity cost (§11) and transition cost (§12) keyed on **tags,
+never clip names** (§12 is explicit). Tag filtering (§14) runs before scoring: one AND per sample
+against 33 multiply-adds.
+
+Benchmarked on **queries drawn from the database and perturbed** — what a character actually asks —
+rather than white noise, for the reason ADR-540 paid to learn: a white-noise fixture made an early
+out look 2.23× *slower* when on real near queries it is a 0.80× win.
+
+| samples | ms/query | queries/s | ns per sample scored |
+|---|---|---|---|
+| 1,738 | **0.0172** | 58,050 | 9.9 |
+| 85,610 | **0.5074** | 1,971 | 5.9 |
+
+49× the samples for 29.5× the time: the early out and cache behaviour both improve with size.
+A 60-character scene searching ten times a second over the alien's own database costs **10.3 ms/s
+of wall clock**, or about 1% of one core.
+
+## C.4 The matcher as a provider
+
+`src/entity/match_motion_provider.{hpp,cpp}`, on ADR-541's chain ahead of the clip player.
+
+**The part that looks impossible.** A motion-matching query needs the character's current pose, and
+ADR-562 forbids `advance` from touching a skeleton. It resolves because the current pose **is a
+database sample** — the character is playing frame N of clip C, so the pose half of the query is
+that sample's own feature vector, already extracted and already normalised. Only intent is
+computed. That is not a trick to satisfy the interface; it is how motion matching is formulated.
+
+Search frequency (§27), minimum continuation (§29) and a switch margin (§28), because a matcher
+that searched every frame would pass every quality test and cost six times as much. Measured over
+one second at 60 Hz: **8–13 searches, 45+ frames continued** by following `sampleNext`.
+
+## Cut, and named
+
+- **§16 two-stage search** and **§15's KD-tree/PCA arms**: not built. The linear scan is 5.9 ns per
+  sample and the whole Glowmere database is 0.25 MB — it fits in L2. A tree would be measured
+  against a baseline that is already fast enough for the content that exists, which is how
+  ADR-540's synthetic-fixture mistake happens. The benchmark harness is in place for the day a
+  corpus makes it worth it.
+- **§21 motion augmentation** (mirroring, time-warping to synthesise coverage): not built.
+- **§23 database quality analyzer**: partly — the per-joint articulation statistic above is the
+  part that earned its place; coverage analysis (§22) is not built.
