@@ -2221,6 +2221,27 @@ transition**, which is visible across a switch and invisible within a frame.
 distribution whose worst case is 1.64 m, so the honest reading is **no detectable benefit**, not
 "slightly harmful".
 
+### The finding is in the baseline, not the difference
+
+**A foot teleports 0.3566 m on average when the matcher switches motion, with a worst case of
+1.6437 m — identical in both arms.** On a character whose rest height sets the scale that is a
+substantial fraction of a leg, every time the behaviour tier changes its mind, and the identical
+worst case says it comes from a specific reproducible pair of clips.
+
+This table exists to answer "do contacts help". It quietly contains a more important answer to a
+question nobody asked — the §14 lesson one more time: **print the distribution before the ratio, and
+read the quantity the arms share.**
+
+**And it is not a harness artefact.** `MatchMotionProvider::advance` records `transitionStart`, but
+it is read only for the search interval and the continuation lock: **nothing in the provider blends
+or inertialises between the outgoing and incoming samples.** The loop here jumps because the
+provider jumps. That is the same gap Phase B left open when `ClipMotionProvider` transitions were
+deferred, and it means **0.36 m is a property of the shipping path**.
+
+**It belongs to §32** — root-motion continuity — and the number goes there rather than being
+re-derived: any inertialization §32 adds has this as its before figure, measured over ~30 real
+switches on the real corpus.
+
 **The first version of this test produced 4 switches in 300 steps**, and a mean over 4 would have
 been the single-point-null mistake in a new place. It was rebuilt to drive the demanded motion
 across a different clip every 20 steps — which is what a behaviour tier changing its mind looks
