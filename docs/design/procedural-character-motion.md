@@ -2324,3 +2324,87 @@ that include content this corpus does not contain: starts, stops and directional
 plant disagreement is most visible. The supported statement is about *this corpus*, and the reason
 it is not a §20 item is unchanged — **no mechanism means no prediction, and a queue item without a
 prediction is a wish rather than a question.**
+
+## Phase C recount, 2026-09-21 — §1–§36 plus the sections assigned to `agent/anim-research`
+
+This is checked against `docs/design/specs/phase-c.md`, section by section. The coordinator reduced the scope: §37–§43, §57, §58, §68, §69, §72, §74–§76 and §81–§83 belong to `agent/anim-cinfra`. §56, §60, §62, §63, §80, §84–§88, §90 and §95 are principles, gates or framing, and are not counted. **Done** means built and tested, with a commit or ADR cited. **Partial** says what is missing.
+
+One caution. This log also holds Phase B entries with the same section numbers, for example "§46 — the first true vertical slice" and "§47 — performance baselines". Those are Phase B §46–§54 and **not** Phase C. The headings below this point that carry no "Phase B" label are Phase C.
+
+| § | Title | Status | Evidence / what is missing |
+|---|---|---|---|
+| 1 | Read the existing system first | framing | ADR-606, the audit-from-memory rule. Not counted |
+| 2 | Not "add a nearest-neighbour search" | framing | Met by the query design in §3/§7. Not counted |
+| 3 | Core architecture | done | `40ebee42`: the matcher is a provider on ADR-541's chain. `9404a2d0` |
+| 4 | Motion database | done | `9404a2d0` |
+| 5 | Motion sample | done | `9404a2d0` |
+| 6 | Database memory design | done | `392bf259` |
+| 7 | Feature representation | done | `9404a2d0`, `2489d6be` |
+| 8 | Feature configuration | done | `2489d6be` (ADR-608) |
+| 9 | Feature normalization | done | `9404a2d0` |
+| 10 | Cost function | done | `2489d6be` (ADR-608); `test_motion_cost.cpp` |
+| 11 | Continuity cost | done | `b5c3b858`. Graded continuity was measured and rejected; binary continuity stays |
+| 12 | Transition cost | done | `b2aab5ee` |
+| 13 | Tags / metadata | done | `09f5f7da` |
+| 14 | Candidate filtering | done | `b2aab5ee` |
+| 15 | Search strategy | done | `51ab0815` |
+| 16 | Two-stage search | done | `02da5d81`, `d535d534` |
+| 17 | Search benchmark | done | `392bf259`, `51ab0815` |
+| 18 | Real data first | done | `369b7027` |
+| 19 | First database from Glowmere | done | `369b7027`. Re-checked in `3b66b565` |
+| 20 | 100STYLE scale experiment | done | `d67fc36a` (ADR-612 amended; the licence is CC BY 4.0, `bc56f7f1`) |
+| 21 | Motion augmentation | **partial** | `03659866` audit: 4 of the 7 kinds exist. **Missing: directional warping, turn variation and start/stop variants.** `motion_variants` has no product consumer |
+| 22 | Coverage analysis | done | `03659866`, `8a90148a`, `38017f94` |
+| 23 | Database quality analyzer | done | `8c9165fa`, `4fdde514` |
+| 24 | Trajectory representation | done | `8a90148a`, re-taken in `3b66b565`. `49aeb2ea` voids only its §20 queue item |
+| 25 | Trajectory prediction | done | `8b286711` |
+| 26 | Matching loop | done | `b6be4544` |
+| 27 | Search frequency | done | `b6be4544`, `cbf01f64` |
+| 28 | Hysteresis | done | `cbf01f64` |
+| 29 | Minimum continuation | done | `b6be4544` |
+| 30 | Contact-aware matching | done | `19bce1c7` (the feature is live), `1e081a06`, `c78f6549`, `57594698`. It is built; on this corpus it measures inert |
+| 31 | Phase-aware matching | done (built) | The phase term is live (ADR-608, `09f5f7da`). **Its benefit is unmeasured**: the measurement was retracted in `e0a9cb49` because the metric cannot see it |
+| 32 | Root-motion continuity | done | `275a35d0` (ADR-612, ADR-613). A forced-transition residual was accepted by the owner |
+| 33 | Integrate with Phase B layers | done | `528e5dec`, the audit. One latent defect is recorded there |
+| 34 | Matching does not own behaviour | done | `528e5dec`, the audit |
+| 35 | Fallback system | **partial** (owner) | The mechanism is typed and tested but unreachable, because the chain has one entry (ADR-615, staged and dark). This is the owner's decision |
+| 36 | Database versioning | **partial** | Packs carry a version, a skeleton digest and a tool version, and a wrong one is refused (`test_motion_pack.cpp`). **Missing: a feature-schema version and a retarget-profile version.** The database is built in memory and never persisted, so it has no version of its own |
+| 44 | Motion style | **partial** | Style travels in the request and the clip provider reads it. **The matcher ignores style**: there is no style tag or cost term |
+| 45 | Search weights | **partial** | All 8 weights are configurable and live (ADR-608; `test_motion_cost.cpp:56`). **Missing: a versioned configuration** |
+| 46 | Automated search evaluation | **partial** | The pieces exist: pose-space retrieval (`test_cross_clip_matching.cpp`), jump rate (`test_motion_database_scale.cpp:658`), plant discontinuity. **Missing: one ground-truth harness that reports all seven measures** |
+| 47 | Adversarial tests | **partial** | Present: stationary / near-zero velocity, reverse, and a single-candidate case. **Missing: empty database, strafe, sharp turn, high-speed, start, stop, contact transition, incompatible candidate set, and an explicit no-op guard** |
+| 48 | Golden motion tests | not started | There is no scenario test of the "walk north, turn east, stop" kind that drives the matcher |
+| 49 | Search correctness | **partial** | Continuity, the tag filter, airborne fall-through, replay and pose-from-sample are tested (`test_motion_matching.cpp`), and better trajectory vs better pose is too (`test_motion_cost.cpp:56`). **Missing: wrong-contact, discontinuous-root and obvious-bad candidates as named cases** |
+| 50 | Performance targeting | **partial** | Build metrics and average/worst query time exist. **Missing: p95/p99, database load timings, and multi-character matching cost** |
+| 51 | Realistic scenarios | **partial** | Single-character scaling to 1M samples (`392bf259`), and 100 characters sharing one database, measured for memory only. **Missing: the characters × samples grid** |
+| 52 | CPU/GPU boundary | done | CPU-side, benchmarked (`392bf259`, `51ab0815`). No case for the GPU |
+| 53 | Cache behaviour | **partial** | Contiguous feature arrays, 4.6 ns/sample (`392bf259`). **Missing: an explicit locality or cache measurement** |
+| 54 | Approximate search | **partial** | The strided two-stage search is built and measured, and is not needed at current scale (`02da5d81`, `test_motion_database_scale.cpp:591`). **KD-tree, PCA, ANN and VQ were not investigated** |
+| 55 | Quality vs speed | **partial** | A recall/latency matrix across the plans exists. **Missing: memory, transition-quality and complexity columns** |
+| 59 | Procedural + motion matching | **partial** | The division exists for the clip provider (the §33 audit; `adaptRootMotion`). **No test drives a matcher-selected motion through the layers** |
+| 61 | Dataset strategy | **partial** | 100STYLE is verified (CC BY 4.0, `bc56f7f1`; `assets/100STYLE-ATTRIBUTION.md`; ADR-612 amendment), and a pack refuses to build without a licence (`test_motion_pack.cpp:107`). **ACCAD and CMU are not assessed. The derivative-data rule for a distributable pack is not recorded** |
+| 64 | First vertical slice | **partial** | Every stage exists in isolation, and 100STYLE is retargeted and searched in tests. **No playable alien runs on the matcher in a scene**, because the product installs the clip provider (ADR-615) |
+| 65 | Glowmere demonstration | not started | |
+| 66 | Phase B integration | **partial** | The order is a contract for the clip provider (`7e2e1543`, §33). Nothing is exercised through `MotionMatchingProvider` |
+| 67 | Multi-character demonstration | **partial** | 100 characters share one database, measured for memory (`test_motion_database_scale.cpp:179`). **CPU cost of matching at 10/50/100 is not measured** |
+| 70 | Failure-case analysis | not started | No classification document exists. The findings so far (§16, §23, §31) are unclassified |
+| 71 | Root-motion policy | **partial** | ADR-337 gives the ownership model for clip root motion. **Nothing states the matcher's position** (it reads velocity and does not move the root) |
+| 73 | Cinematic determinism | **partial** | "The matcher keeps nothing, so a replay reproduces a play" (`test_motion_matching.cpp:251`), and ADR-360. **Missing: bit-identity across runs and the pack/config/seed matrix** |
+| 77 | Testing matrix | **partial** | Pack serialisation, version mismatch and corrupt data are covered (`test_motion_pack.cpp`). Search preferences are partly covered (§49). **Missing: empty and one-sample database, missing joints, database swap, and multiple characters** |
+| 78 | Adversarial search test | **partial** | Pose vs trajectory under configured weights: done (`test_motion_cost.cpp:56`). **Pose vs contact is not constructed** |
+| 79 | Golden dataset | **partial** | Synthetic fixtures exist, one per test file (`twoGaitPack`, `tinyDatabase`). **Missing: one shared, intentionally distinguishable golden database** |
+| 89 | Final report | not started | `docs/design/motion-matching.md` does not exist |
+| 91 | First milestone | **partial** | Linear search, the database and the provider run on the Glowmere corpus in tests. **Not on the alien in a scene** |
+| 92 | Second milestone | **partial** | 100STYLE is retargeted, analysed, put in a database and matched in tests (`d67fc36a`). **Not driving Glowmere** |
+| 93 | Third milestone | **partial** | Linear vs strided is compared (§55). **Missing: the memory and complexity columns, and an optimised exact search** |
+| 94 | Final artistic demonstration | not started | |
+
+**Totals for the rows verified.** §3–§36 (34 rows): **31 done**, 3 partial (§21, §35, §36). Of the 36 assigned rows, 2 are done (§52 and the built half of §31, which is already counted above), 28 are partial and 6 are not started (§48, §65, §70, §89, §94, plus §65's sibling, the §64 slice, which is partial).
+
+**Against the coordinator's audit (C 34/83).** The full table is not in the tree, so only the totals and the flagged rows can be compared:
+
+- **§21 partial: confirmed.**
+- **§35 partial: confirmed**, and it is the owner's call.
+- **§61 partial: confirmed.** 100STYLE is verified; the others are not assessed.
+
+**One correction.** §36 is also partial, not done, if the audit counted it as done. The difference is small: 31 done in §3–§36, plus §52, gives 32 done among the rows I verified. That is consistent with 34 only if the anim-cinfra rows contribute about 2.
