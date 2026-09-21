@@ -542,10 +542,23 @@ AtmosphericEffect make(std::string name) {
     e.name = std::move(name);
     e.kind = AtmosphereKind::VolumetricFog;
     applyStyle(e, kStyleNames[0]);
-    // Weather, not an event: it is there, and the music moves it. The fade-in is long because a
-    // bank that appears is a cut and a bank that gathers is weather.
+    // Weather, not an event: it is there, and the music moves it.
     e.activation = Activation::Always;
-    e.timing.fadeIn = 3.0;
+    // The fade-in WAS 3 s, on the argument that "a bank that appears is a cut and a bank that
+    // gathers is weather". The argument is right about a shot and wrong about a button.
+    //
+    // `buildAtmosphericFrame` drops an effect whose envelope is at or below 1e-4 rather than
+    // seating it dim (`atmospherics.cpp:736`), which is correct -- an invisible medium should not
+    // cost a march. The consequence is that a 3 s fade-in does not make a new bank faint at t=0,
+    // it makes it ABSENT: no slot, `mediumCount == 0`, and `VolumeRenderer::enabled(scene)` false
+    // with it. An artist who presses Add and looks at frame 0 -- which is where a scene opens --
+    // sees nothing at all and reports the effect as broken. That is exactly how this was found.
+    //
+    // So the gather is a SHOT decision and belongs to whoever authors the shot, not to the button.
+    // Nothing in the repository is changed by this: eleven example scenes author a vortex and not
+    // one authors a fog bank, which is the other half of why a 3 s hole at the origin survived a
+    // green suite -- there was no artifact anybody opened.
+    e.timing.fadeIn = 0.0;
     e.timing.fadeOut = 0.0;
     // No ground pool. A bank lights what stands IN it, through `spill` and `scattering`; ADR-230's
     // ground glow is a coloured patch on terrain from something in the sky, which this is not.
