@@ -1084,12 +1084,30 @@ Swept on **real** Glowmere motion, 249 queries drawn from inside the distributio
 the answer is not trivially the seed. A typical candidate on this database scores 69.72 worse than
 the best one, which is the denominator that makes an excess mean anything:
 
-| plan | recall | worst excess | % of spread | samples fully scored |
-|---|---|---|---|---|
-| stride 8, prefix 12, top 32 | 94.4% | 60.60 | 86.9% | 2320 |
-| stride 8, prefix 12, top 128 | 99.6% | 48.93 | 70.2% | 1873 |
-| stride 8, full prefix, top 32 | 96.8% | 59.49 | 85.3% | 2278 |
-| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | **3.1%** | **84** |
+**Corrected.** The percentages below were first published against an *unweighted* cost spread of
+69.72; the feature-distance sweep found that denominator was in the wrong space and the correct,
+weighted value is **52.57**. The excesses are unchanged — they are differences of weighted search
+costs and only the scale moved — so every percentage rises:
+
+| plan | recall | worst excess | % of spread (was) | **% of spread** | samples fully scored |
+|---|---|---|---|---|---|
+| stride 8, prefix 12, top 32 | 94.4% | 60.60 | 86.9% | **115.3%** | 2320 |
+| stride 8, prefix 12, top 128 | 99.6% | 48.93 | 70.2% | **93.1%** | 1873 |
+| stride 8, full prefix, top 32 | 96.8% | 59.49 | 85.3% | **113.2%** | 2278 |
+| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | 3.1% | **4.2%** | **84** |
+
+**The finding got stronger, and the headline changes.** Three of the four plans have a worst-case
+miss that **exceeds the entire good-to-typical spread** — so the miss is not merely "as bad as a
+random candidate", it is **worse than a typical candidate**.
+
+**A percentage over 100 is legitimate here and not a bug**, which has to be said or a reader will
+assume arithmetic error. `costSpread` is a *typical-minus-best* gap: the mean, over probes, of how
+much worse an arbitrary distant sample scores than the best available. **A worst case is not bounded
+by a typical case.** A search that misses badly can land on something worse than the arbitrary
+sample the scale was built from, and three of these plans do.
+
+**The recommendation is unchanged**, which matters so nobody reads a correction as a reversal:
+stride 4 at full prefix survives at 4.2%, and it was and remains the plan to pick.
 
 **94.4% recall hides that the misses land 86.9% of the way to a random sample.** That matcher does
 not pick a slightly different frame of comparable motion; it picks different motion. And the
@@ -1640,6 +1658,24 @@ Some of these could defensibly have been unweighted — a nearest-neighbour stat
 corpus is arguably a property of the data. The rule is that **each must be unweighted on purpose and
 say so**, not by having been written before the weights existed. Every one here is now weighted
 because every one is compared against something weighted, and the comments say which.
+
+### Why the category is dangerous rather than merely annoying
+
+`costSpread` was written unweighted **by the person who had just finished diagnosing the identical
+asymmetry in the hysteresis**, an hour earlier. That is not carelessness; it is evidence of how
+strong the pull is:
+
+> **A quantity's name does not carry the convention it was computed under, so the mismatch is
+> invisible at the point of use and only visible at the point of definition.**
+
+`costSpread` reads as obviously correct at every site that consumes it. Nothing about the identifier
+says which space it lives in, and the weighted/unweighted distinction lives in the *call*, not in
+the *name*.
+
+**The structural fix is a type, and the comments are an interim measure.** A `WeightedCost` that
+will not compare against a raw sum would have made all four of these bugs *unrepresentable* rather
+than merely documented, and this codebase can express that. It is a larger change than the phase has
+room for and is recorded here as the intended one, so the comments are understood as what they are.
 
 ### The general form
 
