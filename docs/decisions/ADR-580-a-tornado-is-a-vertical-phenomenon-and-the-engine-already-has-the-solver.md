@@ -809,6 +809,192 @@ dense media in one frame subsidise each other through the transmittance early-ou
 separated ones do not -- so nothing above rests on an additive assumption, and nothing is claimed
 about combinations.
 
+## 11. Phase 9: the skirt ruling, and what dropping it does not fix
+
+**Written by a different agent from every section above it.** Phases 1-8 were one agent's; this
+section is a second agent's, handed the branch to bring to a stopping point with no access to the
+first. Everything below is either a measurement taken today in this worktree or a decision taken
+today, and it says which. Nothing in it reconstructs what the previous agent thought.
+
+### 11.1 The skirt is dropped in the Tree of Life, by ruling rather than by discovery
+
+§10.4 left three options and declined to choose. **The choice is option 1: drop it**, and the
+choice was made by the agent coordinating the handoff -- not by the owner, and not by the agent
+who built the effect. It is recorded here so nobody reopens it as an open question.
+
+The reasoning given for it, in one line: option 2, "give the column something to touch", adds a
+cloud deck and so changes what the scene *is*, which is a set-dressing decision and does not
+belong inside a rendering task.
+
+The edit is two values and one route:
+
+| file | change |
+|---|---|
+| `tree-of-life-floating-island.json` | `skirtDensity` 0.9 -> **0.0** |
+| `tree-of-life-floating-island.scene.json` | `skirtDensity` 0.9 -> **0.0** |
+| `tree-of-life-floating-island.json` | route `audio.bass` -> `atmos/Cosmic Tornado/skirtDensity` retargeted to **`coreDensity`** |
+
+**Both halves, because both are live and they are live for different shots** -- see §11.4. And the
+route, because `skirtDensity = 0` with a bass route still pointing at it is not a dropped skirt: it
+is a skirt that reappears on every beat, `op: add`, up to `amount` 0.5. §10.3 retargeted five
+routes when the kind changed and `test_vortex_effect` counts exactly five; retargeting keeps the
+count and the resolve check without touching the test. `coreDensity` was chosen as the nearest
+surviving reading of the same musical intent (the bass swells the column's body); it is a **guess
+at intent, not a recovered one**, and the owner may want it elsewhere.
+
+Rendered, `--range 6:6` at 960x540, sequence hash `c57c8bcee871b688`: the pool of light at the base
+is gone. Compared against the review frame the owner has, that is the only difference at the foot.
+
+### 11.2 And it does not fix the read, which is the half worth carrying forward
+
+The claim that survives the skirt -- "the funnel's own flat bottom is also a disc at this angle" --
+**is not in this ADR.** It is in `~/Desktop/avgen-tornado-review/README.txt`, the sheet the owner
+was given, under option 1. §10.4 does not make it. That distinction is worth the sentence because
+the obvious next move is to read §10.4, drop the skirt, look at the frame and conclude the seam is
+closed.
+
+Checked against the field rather than against either document. `core/tornado.cpp::evaluate`
+terminates the funnel at `h = 0` in two ways and neither is a shape:
+
+```
+if (h > 1.08f || h < -0.02f) { return s; }                       // a hard horizontal plane
+const float foot = smoothstepf(reach - footSoft, reach + footSoft, h);   // footSoft = 0.04
+```
+
+At `touchdown = 1`, `reach` is 0 and the foot ramp is a smoothstep from `-footSoft` to
+`+footSoft` -- 0.08 of the height, 112 m of a 1400 m column -- with a hard plane below it. So the
+column ends in a horizontal cut, which at the hero's 8.8 degree depression is an ellipse.
+**Structurally the claim is correct.**
+
+Visually, at 960x540, it is **milder than the sheet's wording suggests**: with the skirt gone the
+base reads as a blunt stub rather than as a pool on an invisible floor, because what made it read
+as a floor was mostly the skirt's own brightness. It is still wrong, and it is still the same
+problem, but "a disc of light" is now "a column that stops".
+
+**The fix is a ground interaction and it is the highest-value work left on this effect** -- a
+debris cloud where the funnel meets something, which is the term that hides the cut by putting
+structure in front of it. That is Phase 5 work in kind (it wants the self-shadow march to read as
+dust rather than as more of the same glow) but it does not depend on it.
+
+### 11.3 The Tall Column defect is NOT in that preset's values, and it is not sampling
+
+§8.9 / the review sheet record it as "a real defect in that preset's values rather than a
+rendering artefact. Not yet diagnosed." Reproduced today, and **that attribution is wrong**.
+
+Reproduction, one command, from this worktree:
+
+```
+tools/gpu-lock.sh ./build/release/src/avgen --headless \
+  --composition examples/labs/_tc-4-tall-column.scene.json \
+  --render <out> --format png --range 6:6 --fps 30 --size 1280x720
+```
+sequence hash `eadf0dd2a8549880`, exit 0, 0 GPU errors. The frame matches the sheet's panel 4
+exactly: a cluster of blocks at the top, one small block at the very foot, and **nothing between**.
+
+Mapping the frame back through the camera (position `y = 144`, target `y = 1320`, fov 40, distance
+4080), the two surviving pieces are `h > ~0.74` -- the wall cloud -- and `h < ~0.07` -- the foot.
+**The funnel term contributes nothing over the whole middle.**
+
+Four arms, each one render, each `--range 6:6` at the size given:
+
+| arm | hash | result |
+|---|---|---|
+| as authored, 1280x720 | `eadf0dd2a8549880` | broken, matches the sheet |
+| as authored, **2560x1440** | `da0ca5bdfe7774c4` | **identical composition at twice the pixels** |
+| `cloudAmount` (Detail) **0** | `cfb373ac30f97c02` | **still broken, essentially unchanged** |
+| `lean` **[0,0]** + `wobbleAmount` **0** | `6270952a9ecae4bb` | **the whole column appears**, cloud to ground |
+| `lean` **[0,0]** only, wobble kept | `bdce04eb7412fe68` | column reaches ~`h = 0.55`; the bottom half is still gone |
+
+What that rules out, in order:
+
+- **Not screen-space.** Doubling the resolution reproduces the same blocks at the same world
+  positions. Whatever quantises it is fixed in the world, not in the framebuffer.
+- **Not noise.** With detail off the frame is the same. This matters beyond the defect: §39's
+  structure-before-noise gate says the analytic field must read on its own, and here **the analytic
+  field is what is broken**.
+- **Not under-sampling.** The previous agent's 512-step arm plus the resolution arm above.
+- **It is the axis displacement.** `lean` is 120 m and `wobbleAmount` is 70 m on a 2400 m column;
+  zeroing both restores the column and zeroing only `lean` restores about half of it. `_tc-4` is
+  **the only one of the seven with a non-zero `lean`**, which is the differential that was sitting
+  in the preset table the whole time.
+
+**Not diagnosed further, deliberately.** A mechanism that fits the five arms and is *untested*: the
+displaced funnel presents a shorter chord to each ray, the column at these values is already close
+to the visibility floor (see the `lean 0 / wobble 0` arm, where the mid column is present but very
+faint), and spreading the same mass over more screen area drops it under. If that is right, the
+defect is a contrast floor rather than a hole, nothing is being skipped, and no step count or bound
+can fix it. **The one measurement that would settle it is a CPU probe of `tornado::evaluate` down
+the displaced axis**: if the CPU field has a hole at `h = 0.4`, it is the field; if it does not, it
+is the march. `test_tornado_parity_gpu.cpp` already has the harness for exactly this.
+
+### 11.4 Both halves of the Tree of Life are live, and for different deliverables
+
+Counted by parsing, because §9 row 1 is what grepping this question costs:
+
+- `tree-of-life-floating-island.json` authors `atmosphericEffects` and, per ADR-264/387 §19,
+  **replaces** the scene's list. So the day project draws its own `[comet, tornado]`.
+- `tree-of-life-floating-island-night.json` authors **no** `atmosphericEffects` at all and names
+  `tree-of-life-floating-island.scene.json` as its composition. So the night project draws the
+  **scene's** list.
+
+**Neither copy is redundant and removing either one breaks a shipped shot.** Verified by rendering
+both: day `c57c8bcee871b688`, night `4ca76bbcc98637fa`, both with the column present and the skirt
+gone.
+
+The merge hazard as it was passed to this agent -- "effect lists merge, so two declarations become
+two effects" -- **does not hold on this tree**, and the reason is worth writing down rather than
+leaving as a disagreement. `engine.cpp`'s project reader replaces the list outright; the only
+carry-over is a *migration* arm that copies one effect from the scene when the project declares no
+`AtmosphereKind::Vortex`. With no vortex anywhere in either file, that arm finds nothing to carry
+and the project's list stands alone. One tornado, not two. `kMaxMedia` is 4 since ADR-562, so even
+two would not have been dropped -- but nothing counted `dropped` either way, which is still true
+and still §8.8's open item.
+
+A census of `examples/**` confirms the Vortex is gone from every deliverable and survives only in
+the twelve `_`-prefixed evidence arms §10.3 protected.
+
+### 11.5 The 4.7x reproduces, at 5.2x, on this tree
+
+§10.5's claim re-measured today rather than restated. Same binary, same shaders, **interleaved**
+three rounds under `tools/gpu-lock.sh`, 1920x1080, `scene/volumeSteps` 32 in both arms, 60 frames
+each, `--bench-json`. The baseline arm is the hero project recovered whole from `fd71b736` -- the
+Vortex *kind* was never deleted from the code, so nothing had to be un-deleted:
+
+```
+git show fd71b736:examples/treeisland/tree-of-life-floating-island.json > examples/treeisland/<arm>.json
+tools/gpu-lock.sh ./build/release/src/avgen --headless --project <arm> \
+  --frames 60 --fps 30 --size 1920x1080 --bench-json <out>.json
+```
+
+| arm | `volume.march` median, three rounds | min | GPU frame p50 |
+|---|---|---|---|
+| the Cosmic Vortex from `fd71b736` | 5.833, 6.095, 5.898 | **5.83 ms** | 14.55, 14.68, 14.61 |
+| the Cosmic Tornado that replaced it | 1.114, 1.114, 1.114 | **1.11 ms** | 9.57, 9.70, 9.63 |
+
+**5.2x, against §10.5's 4.7x.** The frame medians land inside §10.5's ranges (vortex 14.61-15.60,
+tornado 10.75-12.06), which is the control that says this is the same measurement and not a
+different one.
+
+Two reasons the ratio moved, both making it a **larger** number rather than a suspicious one:
+§10.5 quoted a minimum over repeats and this quotes a median of medians, and **the tornado arm
+measured here is the skirtless one** (§11.1) -- less non-zero density near the base is less
+coverage, and ADR-374's model says coverage is the cost. The tornado's three rounds are identical
+to the digit because 1.114112 ms is exactly 17 ticks of the GPU timer's 0.065536 ms quantum; that
+is a resolution floor, not a suspiciously stable measurement.
+
+**What this does not settle**: this branch is 15 commits behind `main`, and `agent/fog` has changed
+`shaders/volume.wgsl` since. Both arms here ran on *this* tree, which is what makes them
+comparable to each other; neither is a prediction about the merged tree.
+
+### 11.6 Review pixels do not live in the repository
+
+`examples/treeisland/renders/tornado-hero/hero/frame_000000.png`, 1.8 MB, was committed in
+`392c7e62`. `.gitignore`'s own paragraph on render evidence says the queue is committed and the
+pixels are not; the rule implementing it, `/renders/`, is anchored at the repository root and so
+never covered `examples/treeisland/renders/`. The frame is removed and the rule is now also
+written unanchored. The owner's copies are in `~/Desktop/avgen-tornado-review/`, which is where
+review frames belong.
+
 ## Do NOT "fix" this later
 
 **Vorticity confinement is absent from the analytic tier on purpose, and the missing slider is not
@@ -846,6 +1032,9 @@ the word is missing from a shader.**
 - **The hero's art direction**, §10.4's list: too bright, the wall cloud cut off, and the debris
   skirt asserting a ground contact the scene does not have. The third is a decision between three
   named options rather than a tuning pass, and it belongs to the owner.
+  **Superseded in part by §11.1**: the skirt is dropped, by ruling. Too bright and the cut-off wall
+  cloud are untouched, and §11.2 records that dropping the skirt leaves the funnel's own flat
+  bottom behind -- which is the thing a ground interaction fixes and nothing else does.
 - **Phase 5, cinematic rendering.** Blocked on the shared self-shadow light march, which does not
   exist. Nothing is budgeted for it inside this slot.
 - **The wedge** is the weakest of §47's seven and the diagnosis looks intrinsic: its funnel is as

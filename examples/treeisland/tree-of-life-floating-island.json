@@ -204,7 +204,7 @@
     "footSoft": 0.04,
     "skirtWidth": 2.6,
     "skirtHeight": 0.09,
-    "skirtDensity": 0.9,
+    "skirtDensity": 0.0,
     "skirtFlare": 0.8,
     "stripeCount": 5.0,
     "stripePitch": 5.5,
@@ -1998,7 +1998,7 @@
    "op": "add",
    "polarity": "unipolar",
    "source": "audio.bass",
-   "target": "atmos/Cosmic Tornado/skirtDensity"
+   "target": "atmos/Cosmic Tornado/coreDensity"
   },
   {
    "amount": 0.06,
