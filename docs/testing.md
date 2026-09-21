@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Thirty-two ways a green suite has lied
+## Thirty-three ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -825,6 +825,51 @@ a wound.
 
    Distinct from 22 and 23, which are about two code paths that *do* the same thing diverging.
    This is about two paths that do *opposite* things failing to be inverses.
+
+33. **A test can go green because its subject stopped existing. Absence and compliance are
+   indistinguishable to most assertions.**
+
+   `test_abduction_poc` asserts that wandering animals do not walk into things. It loads
+   `glowmere-valley-2.scene.json`, which carries **forty `"generator": "mushroom"` sources**, and
+   its own comments call the obstacle field load-bearing: *"without the obstacle field the 'not
+   inside a tree' assertion below would be asking a question..."*
+
+   `scene::generatorRegistry()` is a process-global `static` map. **Exactly one thing fills it** --
+   `Engine`'s constructor, via `registerMushroomGenerator()` and `registerTreeGenerator()` -- and
+   `scene::clearGenerators()` empties it. Two tests call that, **one of them from a destructor**,
+   so it hands the rest of the process an empty registry by design. The test constructs no
+   `Engine`, so it inherited whatever the process happened to hold.
+
+   Run alone, the registry was empty, **forty sources produced no geometry at all**, and the
+   obstacle field was missing forty obstacles. **The test passed.** Run after anything that built
+   an `Engine`, the mushrooms existed, the routes had to bend around them, and it failed.
+
+   > **A green run meant there were fewer obstacles, not that the animals avoided them.**
+
+   That is the whole entry. Every other failure in this document announces itself as a wrong
+   number; **this one announces itself as success**, and nothing about a pass invites anyone to
+   look. It is strictly worse than a flaky test: a flaky test is annoying and visible, and this was
+   quiet and reassuring.
+
+   **The general form.** An assertion of the shape *"X never does the bad thing"* is satisfied
+   both by X behaving and by **there being no opportunity** -- no obstacles, no neighbours, no
+   candidates, no content. Any global that a *different* test empties can remove the opportunity.
+   So:
+
+   - **A test that depends on a process-global must populate it or assert it, never inherit it.**
+     The fix here was not to make the test build an `Engine` so the registry happened to be full;
+     it was to register what the scene needs and `REQUIRE(hasGenerator("mushroom"))`. A test that
+     relies on someone else having filled a global will lie again the next time the order changes.
+   - **Assert the size of the haystack, not only the absence of the needle.** "No animal was inside
+     a tree" is worth little without "there were N trees". Any test whose subject is *avoidance*,
+     *collision*, *selection* or *filtering* should assert the population it was choosing from.
+   - **A global cleared by a destructor is a global with a hostile owner.** Clearing on the way
+     *out* of a fixture is correct isolation for that fixture and a landmine for everything after.
+
+   The tell, when it happens: **the test passes alone and fails in company, and the failing run is
+   the honest one.** The instinct is to trust the isolated run; here isolation was the broken
+   configuration. Found by an order bisect after the obvious explanation -- RNG seeding -- was
+   checked and *failed to explain anything*, which is what made it worth bisecting at all.
 
 ## The scratchpad is shared by every agent in a session
 

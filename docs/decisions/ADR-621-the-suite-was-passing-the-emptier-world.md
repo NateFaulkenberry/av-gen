@@ -79,15 +79,57 @@ That is the same definitional gap as the farm pack's `frozenWhileMoving`, in a s
 it is left open on purpose: the detectors ask the right question and the answers they now give are
 true. Redefining them to accept the ramp is a decision about what those words mean, not a fix.
 
+## Two method notes, both of which changed the outcome
+
+**A hypothesis that makes a failure STABLE has been confirmed, not refuted.**
+
+The registry hypothesis was tested as a disproof: register the generators, re-run, see whether the
+test passes. **It did not pass** — and for a moment that read as a refutation. It was the opposite.
+Before the change the test passed alone and failed in company; after it, it failed **identically in
+every order**. The hypothesis did not predict a pass, it predicted *order-independence*, and
+order-independence is what arrived.
+
+> Read what a hypothesis actually predicts. "It still fails" refutes nothing if the prediction was
+> about **variance** rather than about the sign of the result. A fix that converts an intermittent
+> failure into a deterministic one has removed a cause, and the remaining failure is a different
+> and more tractable problem.
+
+**Checking the obvious explanation is worth doing precisely when it fails to explain anything.**
+
+The first hypothesis was RNG sensitivity — Catch2 reseeds per run, and the two runs had different
+seeds. Running the isolated test under the full suite's own seed took one command and it **still
+passed**, which eliminated the explanation that would have allowed the investigation to stop. The
+order bisect was only worth starting because the cheap explanation had been tried and had failed.
+An explanation that is never tested is not an explanation; it is a reason to stop looking.
+
 ## Consequences
 
 - **A registry cleared by a destructor is a global with a hostile owner.** `clearGenerators()` on
   the way *out* of a fixture is deliberate isolation for that fixture and a landmine for everything
   after it.
-- **Unexamined siblings.** The audit that supplied this mechanism also found that
-  `generatedMeshForBounds` caches **refusals** for the life of the process, keyed without builder
-  identity and cleared by nothing — so a source asked for while the registry was empty is
-  permanently empty afterwards, and two builders registered under one name serve each other's
-  geometry. Not chased here.
+- **Two sibling defects, recorded with their mechanisms so nobody has to rediscover them.** Both
+  are in `generatedMeshForBounds` (`src/scene/procedural.cpp`), whose cache is a function-local
+  `static` keyed on `generator/generatorVersion/generatedPart/values` and cleared by nothing —
+  `clearGenerators()` does not touch it and no other function does.
+
+  **(a) A refusal is cached for the life of the process.** A source asked for while the registry
+  was empty writes an empty slot, and every later lookup returns `nullptr` **even after a
+  re-registration makes the generator available again**. So the registry is recoverable and the
+  cache is not: a single early lookup in the wrong order permanently removes that geometry from the
+  process. **The failure mode is missing geometry, and missing geometry reads as success** — the
+  same category this ADR closes, one layer down.
+
+  **(b) Two builders registered under one name serve each other's geometry.** The key omits builder
+  identity, so a second `registerGenerator("fixture", ...)` with different geometry, at the same
+  name and version, returns the first builder's mesh. That is a correctness bug independent of
+  ordering, and two tests already register under fixed names (`"slab"`, `"fixture"`).
+
+  Neither is fixed here.
+- **Credit.** The mechanism came from the audit subagent's seventh pass. It named
+  `generatorRegistry()` and `clearGenerators()`, traced the path from the registry to the stall
+  metric, **called the direction correctly against the obvious assumption** — warning that the
+  culprit might be a test that *constructs* an `Engine` rather than one that clears — supplied the
+  disproof to run, and cleared `WorldMap`'s height memo as *not* the culprit, which saved the time
+  that would have gone there.
 - **The order bisect is cheap and should be the first move next time**: Catch2 `--order decl` plus a
   spec file narrowed 2,959 tests to a category in six runs.

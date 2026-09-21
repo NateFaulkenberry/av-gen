@@ -43,6 +43,8 @@
 #include <glm/gtx/euler_angles.hpp>
 
 #include <catch2/catch_approx.hpp>
+#include "support/ramp.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <fmt/format.h>
@@ -619,6 +621,7 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
         int slipOut = 0;
         float worstSlip = 1.0f;
         int frozenWhileMoving = 0;
+        float previousSpeed = 0.0f; // for the authored-ramp test below
         double travelled = 0.0;
         float worstYawGap = 0.0f;
         int coarse = 0;
@@ -703,9 +706,18 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
             // A clip frozen while the body covers ground.  `idleRate` is 0 on this pack -- these
             // animals have no idle clip, so a standing one freezes its walk cycle mid-stride
             // (ADR-213) -- and a *moving* body doing that is a statue gliding over the terrain.
-            if (loco.playbackRate < 0.02f && len > 0.01f) {
+            // **A body inside its own authored acceleration budget is ramping, not frozen**
+            // (`support/ramp.hpp`, and the same definition `test_abduction_poc` uses for the same
+            // reason). This detector was written when a body was either at speed or stopped, so a
+            // slow clip and a moving body could never coexist honestly. With an authored ramp they
+            // do, for as long as the ramp lasts. Not a tolerance: the budget is authored and the
+            // question is exact.
+            const bool ramping =
+                testsupport::withinAuthoredRamp(r.who->desc().gait, r.previousSpeed, loco.speed, ft.deltaTime);
+            if (!ramping && loco.playbackRate < entity::kVisibleClipRate && len > 0.01f) {
                 ++r.frozenWhileMoving;
             }
+            r.previousSpeed = loco.speed;
 
             if (len < 1e-4f) {
                 continue;

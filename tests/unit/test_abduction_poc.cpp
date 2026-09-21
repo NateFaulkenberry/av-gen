@@ -28,6 +28,7 @@
 #include "scene/tree_generated.hpp"
 #include "signals/signal_bus.hpp"
 #include "stage/staging.hpp"
+#include "support/ramp.hpp"
 #include "world/terrain_query.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -140,6 +141,8 @@ struct Run {
         const world::TerrainQuery terrain = comp->terrainQuery();
 
         std::map<std::string, glm::vec3> was;
+        // The speed each body published last step, so the ramp test above has its other half.
+        std::map<std::string, float> previousSpeed;
         std::map<std::string, glm::vec3> home;
         std::map<std::string, double> stall;
         std::map<std::string, double> still;
@@ -230,6 +233,21 @@ struct Run {
                 const float speed = e.state().speed;
                 if (speed > 0.05f) {
                     ++commandedFrames;
+                    // **A body inside its own authored acceleration budget is accelerating, and
+                    // accelerating is not stalled** (`support/ramp.hpp`). This detector was written
+                    // when `state.speed` was assigned outright, so a body was either at speed or
+                    // stopped; with an authored ramp it spends real frames climbing, during which
+                    // the distance it covers legitimately lags the speed it is publishing. Not a
+                    // tolerance: the ramp is authored and bounded, so "inside my own budget" is an
+                    // exact question. A body that is genuinely stuck is not changing speed at its
+                    // authored rate and still counts below.
+                    if (testsupport::withinAuthoredRamp(e.desc().gait, previousSpeed[e.name()],
+                                                        speed, step)) {
+                        stall[e.name()] = 0.0;
+                        previousSpeed[e.name()] = speed;
+                        was[e.name()] = now;
+                        continue;
+                    }
                     const glm::vec2 moved(now.x - was[e.name()].x, now.z - was[e.name()].z);
                     // "Did not move" means it covered less than a quarter of what its own commanded
                     // speed says it should have. A quarter rather than nothing because a body
@@ -248,6 +266,7 @@ struct Run {
                 } else {
                     stall[e.name()] = 0.0;
                 }
+                previousSpeed[e.name()] = speed;
                 was[e.name()] = now;
             }
 
