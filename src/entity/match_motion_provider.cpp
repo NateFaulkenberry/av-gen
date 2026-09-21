@@ -30,6 +30,70 @@ FeatureLayout layoutOf(const scene::MotionFeatureConfig& config) {
     return out;
 }
 
+// Where carrying on for `dt` seconds lands, from `sample` at clip time `time`.
+//
+// **By time, not by one sample per call.** The continuation used to follow `sampleNext` once per
+// `advance`, whatever `dt` was. The database is sampled at 30 Hz and the entity steps at 60 Hz, and
+// seeking replays at a fixed 1/60 step, so every continuation played at twice its authored speed,
+// and at a speed that changed with the frame rate. That broke ADR-086: the pose must be a function
+// of time, not of how many frames it took to get there.
+//
+// The walk follows `sampleNext`, so it goes wherever the database says the clip goes: a looping
+// clip wraps into its own start (whose first and last samples are the same instant, so the wrap
+// costs no time), and a clip that ends reports `ended` so a search can be forced.
+// The clip time a memory is showing: its own `localTime` when that lies within the stretch of clip
+// its sample stands for, and the sample's time otherwise. A memory built by hand, or by an older
+// provider, may carry a time that does not belong to its sample, and posing that time would show
+// some other part of the clip.
+float shownTime(const scene::MotionDatabase& db, std::uint32_t sample, float localTime) {
+    const float from = db.sampleTime[sample];
+    const std::uint32_t after = db.sampleNext[sample];
+    const float to = (after != scene::MotionDatabase::kInvalid && after > sample)
+                         ? db.sampleTime[after]
+                         : from; // a clip's last sample stands for its own instant only
+    return (localTime >= from - 1e-6f && localTime <= to + 1e-6f) ? localTime : from;
+}
+
+struct Carried {
+    std::uint32_t sample = scene::MotionDatabase::kInvalid;
+    float time = 0.0f;
+    bool ended = false;
+};
+
+Carried carryOn(const scene::MotionDatabase& db, std::uint32_t sample, float time, float dt) {
+    Carried out;
+    out.sample = sample;
+    float target = shownTime(db, sample, time) + std::max(dt, 0.0f);
+    // The samples of one clip are in order, so the walk visits each at most once per wrap. The
+    // bound stops a malformed chain looping forever.
+    for (std::uint32_t guard = 0; guard <= db.sampleCount(); ++guard) {
+        const std::uint32_t next = db.sampleNext[out.sample];
+        if (next == scene::MotionDatabase::kInvalid) {
+            // The clip ends here. Hold its last frame, and say so.
+            out.ended = target > db.sampleTime[out.sample] + 1e-6f;
+            out.time = db.sampleTime[out.sample];
+            return out;
+        }
+        if (next <= out.sample) {
+            // The loop's wrap: the last sample and the first are the same instant, one period
+            // apart on the clock.
+            const float period = db.sampleTime[out.sample] - db.sampleTime[next];
+            if (period <= 0.0f) {
+                break;
+            }
+            target -= period;
+            out.sample = next;
+            continue;
+        }
+        if (db.sampleTime[next] > target + 1e-6f) {
+            break;
+        }
+        out.sample = next;
+    }
+    out.time = std::max(target, db.sampleTime[out.sample]);
+    return out;
+}
+
 } // namespace
 
 void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t current,
@@ -132,23 +196,25 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
     const bool due = !haveCurrent || sinceSearch >= static_cast<double>(settings_.searchInterval);
     const bool locked = haveCurrent && sinceSearch < static_cast<double>(settings_.minimumContinuation);
 
-    if (haveCurrent && (!due || locked)) {
-        const std::uint32_t follow = db_->sampleNext[in.selection];
-        if (follow != scene::MotionDatabase::kInvalid) {
-            next.selection = follow;
-            next.localTime = db_->sampleTime[follow];
-            next.phase = db_->samplePhase[follow];
-            next.hasPhase = true;
-            // §32: the blends' own clocks run on every step, including the ones that do not
-            // search.
-            next.tickBlends(dt);
-            ++counters_.continued;
-            result.status = MotionStatus::Produced;
-            result.content = db_->clipNames[db_->sampleClip[follow]];
-            return result;
-        }
-        // The clip ended and does not loop, so a search is due whatever the clock says.
+    // Where carrying on would put the body now. Both branches below need it: the continuation
+    // itself, and the §28 comparison of a search's winner against it.
+    const Carried carried = haveCurrent ? carryOn(*db_, in.selection, in.localTime, dt) : Carried{};
+
+    if (haveCurrent && (!due || locked) && !carried.ended) {
+        next.selection = carried.sample;
+        next.localTime = carried.time;
+        next.phase = db_->samplePhase[carried.sample];
+        next.hasPhase = true;
+        // §32: the blends' own clocks run on every step, including the ones that do not
+        // search.
+        next.tickBlends(dt);
+        ++counters_.continued;
+        result.status = MotionStatus::Produced;
+        result.content = db_->clipNames[db_->sampleClip[carried.sample]];
+        return result;
     }
+    // A clip that has ended and does not loop falls through: a search is due whatever the clock
+    // says.
 
     // ---- build the query -----------------------------------------------------------------------
     //
@@ -173,8 +239,9 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
     // §28: a candidate must beat carrying on by a margin, or the motion is held. Without this a
     // body sitting between two samples re-selects on every search and commits to neither.
     std::uint32_t chosen = match.sample;
+    const std::uint32_t follow = haveCurrent && !carried.ended ? carried.sample
+                                                                : scene::MotionDatabase::kInvalid;
     if (haveCurrent) {
-        const std::uint32_t follow = db_->sampleNext[in.selection];
         if (follow != scene::MotionDatabase::kInvalid && follow != match.sample) {
             // The continuation's own cost, under the same query, so the comparison is like for
             // like rather than the winner against a remembered number.
@@ -192,7 +259,7 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
             float continueCost = 0.0f;
             for (std::size_t d = 0; d < db_->dimension; ++d) {
                 const float delta = query.features[d] - f[d];
-                continueCost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+                continueCost += scene::motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
             }
             // §28: the margin is a fraction of the measured spread, so it is in the cost
             // function's own scale rather than in raw units that mean nothing without it.
@@ -204,7 +271,7 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
         }
     }
 
-    const bool switched = !haveCurrent || chosen != db_->sampleNext[in.selection];
+    const bool switched = !haveCurrent || chosen != follow;
     if (switched) {
         ++counters_.switches;
     }
@@ -215,7 +282,9 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
     // already draws, reused rather than re-derived so the two cannot disagree.
     if (switched && haveCurrent) {
         next.tickBlends(dt);
-        next.pushBlend(in.selection, db_->sampleTime[in.selection], chosen,
+        // From where the outgoing motion was actually showing, which while carrying on lies
+        // between samples.
+        next.pushBlend(in.selection, shownTime(*db_, in.selection, in.localTime), chosen,
                        db_->sampleTime[chosen], settings_.blendSlots);
     } else if (switched) {
         // The first selection of a character's life is not a transition: there is nothing to
@@ -225,7 +294,8 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
         next.tickBlends(dt);
     }
     next.selection = chosen;
-    next.localTime = db_->sampleTime[chosen];
+    // Carrying on keeps its time between samples. A switch starts at the chosen sample's own time.
+    next.localTime = (!switched && haveCurrent) ? carried.time : db_->sampleTime[chosen];
     next.phase = db_->samplePhase[chosen];
     next.hasPhase = true;
     // **This counts SEARCHES, not selection changes, and `MotionMemory::generation` is documented
@@ -272,7 +342,8 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
     }
     const scene::AnimationClip& clip = (*clips_)[clipIndex];
     scene::setRestPose(skeleton, out);
-    scene::sampleClip(clip, db_->sampleTime[memory.selection], out);
+    // At the memory's own time, which lies between samples while carrying on (`shownTime`).
+    scene::sampleClip(clip, shownTime(*db_, memory.selection, memory.localTime), out);
     result.status = MotionStatus::Produced;
     result.content = clip.name;
 
