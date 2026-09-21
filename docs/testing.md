@@ -372,10 +372,21 @@ night from two agents who never spoke to each other.
    there is no curve. **Measuring a knee means sampling where the knee is** — and the check is the
    same as the others: what would have to be true for the phenomenon to appear in this window?
 
-   Six instances now, in six different clothes: a parameter at its boundary, a sample domain on a
+   **The seventh is specific to this engine and worth the extra line.** On a **detached** IK chain
+   (ADR-543) the three joints are posed independently, so `solveTwoBone` reads its bone lengths
+   from the *current pose*. A fixture that posed the tip without moving the mid therefore shortened
+   the limb it was about to ask the solver to extend — the second bone read 0.430 against its rest
+   0.626, total reach fell below the target distance, and the solve clamped. **The fixture was
+   asking for a leg the fixture had just shortened.**
+
+   That one has a product-side corollary worth knowing: any layer that moves a tip without moving
+   its mid changes what a later IK solve believes the limb is. On an ancestor chain this cannot
+   happen, because rotations preserve bone length; on a detached one it is routine.
+
+   Seven instances now, in seven different clothes: a parameter at its boundary, a sample domain on a
    plateau, a duration spanning two mechanisms, a lookahead landing on the feature it was meant to
-   see past, a mechanism with no authority at the default values, and sample points that miss the
-   phenomenon entirely. **The fix is the same one
+   see past, a mechanism with no authority at the default values, sample points that miss the
+   phenomenon entirely, and a fixture that changed the very quantity it was about to measure. **The fix is the same one
    every time: ask what would have to be true for this mechanism to matter, and put the fixture
    there.** Not "does the code run" — *does the thing I am measuring have any authority at these
    values.*

@@ -118,6 +118,26 @@ enum class PoseLayerKind : std::uint8_t {
     Reach,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
+
+// ---- the pipeline order (Phase B §5) -----------------------------------------------------------
+//
+// §5's chain is `base locomotion -> speed/direction adaptation -> stride adjustment -> turn
+// adaptation -> foot placement -> body adaptation`, and until this existed the order layers ran in
+// was **the order a scene file happened to list them**.
+//
+// That is a convention an author can break silently, and the way it breaks is specific: **a foot
+// planted and then displaced by a stride warp is planted nowhere.** The IK solves the foot onto the
+// ground, the stride layer then scales the foot's excursion about the body, and the carefully
+// solved contact slides off the surface. Nothing reports it; the character just has bad feet.
+//
+// So the order is a property of the *kind*, not of the file. `poseLayerStage` is the contract, and
+// `PoseLayerStack` sorts by it -- a scene may list layers in any order and get the right one. The
+// same move as the `-Wswitch` tripwire: the thing that cannot be got wrong beats the thing that is
+// currently right (ADR-600).
+//
+// Ties inside a stage keep their authored order, which is what makes two foot layers stay left
+// then right.
+[[nodiscard]] int poseLayerStage(PoseLayerKind kind);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
 
 // Which field of the animation-intent seam moves this layer.
@@ -432,6 +452,9 @@ public:
     // reason `chains()` is -- "which joint did this layer actually bind to" is the first question
     // of any report about it, and re-deriving the rule in a debug view would be a second copy.
     [[nodiscard]] const std::vector<glm::ivec2>& strides() const { return stride_; }
+    // The order `apply` runs the layers in: indices into `layers()`, sorted by pipeline stage.
+    // Exposed so a test can assert the contract rather than infer it from an outcome.
+    [[nodiscard]] const std::vector<std::uint32_t>& order() const { return order_; }
     [[nodiscard]] const std::vector<LayerResolution>& results() const { return results_; }
     // Per layer, what the two-bone solver said the last time a `Foot` layer ran. `Solved` on every
     // layer that is not one, which is a lie a caller has to read alongside `results()` -- the point
@@ -485,6 +508,7 @@ private:
     // Stride (Phase B §7): the joint whose excursion is scaled, and the joint it is measured from.
     // Parallel to `layers_`, like every other resolved index here.
     std::vector<glm::ivec2> stride_;
+    std::vector<std::uint32_t> order_;
     std::vector<LayerResolution> results_;
     std::vector<int> clipIndex_;  // per layer, resolved once by bind
     std::vector<int> pivotIndex_; // per layer, resolved once by bind

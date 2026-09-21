@@ -62,6 +62,24 @@ const char* poseLayerKindName(PoseLayerKind kind) {
     return "aim";
 }
 
+int poseLayerStage(PoseLayerKind kind) {
+    // §5's chain, as numbers. The gaps are deliberate: a kind added between two of these needs a
+    // number, and a dense sequence would force renumbering the ones around it.
+    switch (kind) {
+    case PoseLayerKind::Stride:    return 10;  // stride adjustment, on the base pose
+    case PoseLayerKind::Lean:      return 20;  // turn and acceleration adaptation of the body
+    case PoseLayerKind::Secondary: return 30;  // breathing and idle life, on the adapted body
+    case PoseLayerKind::Aim:       return 40;  // look, which is upper body and independent
+    case PoseLayerKind::Additive:  return 50;  // a reaction played on top of all of it
+    // **The two IK solves run last, and that is the whole point of this function.** They put an
+    // end effector at a place in the world; anything that moved the body afterwards would move the
+    // effector off it. A foot planted and then displaced by a stride warp is planted nowhere.
+    case PoseLayerKind::Foot:      return 60;
+    case PoseLayerKind::Reach:     return 70;
+    }
+    return 100;
+}
+
 bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
     if (name == "aim") {
         out = PoseLayerKind::Aim;
@@ -236,6 +254,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
     chainLinked_.assign(layers_.size(), glm::ivec2(0));
     soleUp_.assign(layers_.size(), glm::vec3(0.0f, 1.0f, 0.0f));
     stride_.assign(layers_.size(), glm::ivec2(-1));
+    order_.clear();
     restTipHeight_.assign(layers_.size(), 0.0f);
     ikStatus_.assign(layers_.size(), IkStatus::Solved);
     bodyResult_ = BodyCompensation{};
@@ -254,6 +273,16 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
         }
     }
     results_.assign(layers_.size(), LayerResolution::Inactive);
+    // §5. The order `apply` will run these in, by pipeline stage rather than by the order the
+    // scene file happened to list them. Stable within a stage, so two foot layers stay left then
+    // right.
+    order_.resize(layers_.size());
+    for (std::size_t i = 0; i < layers_.size(); ++i) {
+        order_[i] = static_cast<std::uint32_t>(i);
+    }
+    std::stable_sort(order_.begin(), order_.end(), [this](std::uint32_t a, std::uint32_t b) {
+        return poseLayerStage(layers_[a].kind) < poseLayerStage(layers_[b].kind);
+    });
     masks_.reserve(layers_.size());
     for (std::size_t i = 0; i < layers_.size(); ++i) {
         const PoseLayer& layer = layers_[i];
@@ -476,7 +505,8 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         chain_.size() != layers_.size() || chainLinked_.size() != layers_.size() ||
         ikStatus_.size() != layers_.size() ||
         soleUp_.size() != layers_.size() || restTipHeight_.size() != layers_.size() ||
-        stride_.size() != layers_.size() || pose.size() != skeleton.jointCount()) {
+        stride_.size() != layers_.size() || order_.size() != layers_.size() ||
+        pose.size() != skeleton.jointCount()) {
         return stats;
     }
     const std::size_t count = skeleton.joints.size();
@@ -540,7 +570,9 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         }
     }
 
-    for (std::size_t i = 0; i < layers_.size(); ++i) {
+    // §5: pipeline order, not file order. `order_` is sorted by `poseLayerStage`.
+    for (const std::uint32_t slot : order_) {
+        const auto i = static_cast<std::size_t>(slot);
         PoseLayer& layer = layers_[i];
         const JointMask& mask = masks_[i];
         LayerResolution& result = results_[i];
