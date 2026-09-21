@@ -22,6 +22,7 @@
 
 #include "entity/match_motion_provider.hpp"
 #include "scene/motion_coverage.hpp"
+#include "scene/motion_quality_report.hpp"
 #include "scene/motion_database.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -1637,4 +1638,76 @@ TEST_CASE("the coverage bin width is derived from what the matcher can tell apar
     CHECK(resolution < 3.0);
     CHECK(justifiedBins >= 1u);
     CHECK(justifiedBins < 512u);
+}
+
+// ---------------------------------------------------------------------------------------------
+// §23 -- the database quality report, on the real corpus.
+
+TEST_CASE("the quality report describes the real database", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §23"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+
+    const scene::MotionQualitySummary summary = scene::analyseMotionQuality(*db);
+    WARN(summary.humanReadable());
+    WARN(summary.json());
+
+    CHECK(summary.samples == db->sampleCount());
+    CHECK(summary.dimension == db->dimension);
+
+    // **The duplicate measure excludes consecutive frames of the same clip**, which is the
+    // difference between measuring the corpus and measuring the sample rate: at 30 Hz adjacent
+    // frames are nearly identical by construction, and counting them would make the duplicate
+    // percentage rise when the sampler got finer. This asserts the exclusion is doing something --
+    // without it every sample would have a near-zero nearest neighbour.
+    CHECK(summary.meanNearestNeighbour > 0.0f);
+    CHECK(summary.duplicateFraction < 0.5f);
+
+    // The report cites the coverage analyzer rather than recomputing, so the two cannot disagree
+    // about one corpus -- §13's lesson, one section later.
+    const scene::MotionCoverageReport coverage = scene::measureMotionCoverage(*db);
+    CHECK(summary.speedResolution == coverage.speedResolution);
+    CHECK(summary.jointOccupancy == coverage.jointOccupancy);
+
+    // §23 asks for machine-readable output as well as human-readable, so both exist and the
+    // machine-readable one is checked for being parseable rather than merely present.
+    const std::string json = summary.json();
+    CHECK(json.front() == '{');
+    CHECK(json.back() == '}');
+    CHECK(json.find("\"samples\":") != std::string::npos);
+    CHECK(json.find("\"duplicates\":") != std::string::npos);
+    CHECK(json.find("nan") == std::string::npos); // a NaN in JSON is not JSON
 }

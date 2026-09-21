@@ -1419,3 +1419,41 @@ Measured:
 
 Two horizons falling inside one tick both get a point, because dropping one would leave a zero where
 a position belongs in the feature vector — a silent hole in the thing the matcher searches on.
+
+## §23 — the database quality report
+
+§23 lists eleven candidate metrics, and the audit question is **which of them this repository can
+answer from the database** rather than by re-deriving from the source clips — because §13 has just
+shown what re-deriving costs when the inputs are not the ones the pack used. So the report is
+deliberately narrow, and **says what it does not cover and where that is covered instead**:
+
+```
+motion database quality: 1738 samples x 33 dimensions
+  duplicates            129 (7.42%)
+  nearest neighbour     mean 1.8493, max 11.4375 (normalised units)
+  dead dimensions       0 of 33
+  matcher resolution    0.876 m/s of speed changes its answer
+  speed x turn cells    9 of 9 occupied
+  NOT covered here: foot sliding, contact quality and joint limits need a pose, which
+  a feature vector does not contain. Those are Phase B's measureMotionQuality, run at
+  pack build time on the clip and the skeleton.
+```
+
+**7.42% of the corpus is indistinguishable to the search** — 129 samples that can never be chosen,
+because a sample within 0.05 normalised units of each of them exists. That is memory, scan time and
+cache spent on outcomes that cannot happen, and it is §23's first named metric for a reason.
+
+**The duplicate measure excludes consecutive frames of the same clip**, which is the difference
+between measuring the corpus and measuring the sample rate. At 30 Hz adjacent frames are nearly
+identical by construction, so counting them would make the duplicate percentage *rise when the
+sampler got finer* — a number that describes the sampler, not the content. Same denominator
+discipline as §14 and §22.
+
+**Zero dead dimensions**, which independently confirms the §22 finding: the matcher's coarseness on
+speed is weighting, not a feature that fails to vary.
+
+The coverage figures are **cited from `measureMotionCoverage`, not recomputed**, so the report and
+the analyzer cannot disagree about one corpus — §13's lesson applied one section later, and
+asserted. Both human-readable and machine-readable output exist, as §23 asks, and the JSON is
+checked for being parseable rather than merely present (including that it contains no `nan`, which
+is not JSON).
