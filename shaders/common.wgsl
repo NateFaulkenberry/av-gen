@@ -464,16 +464,11 @@ fn treeEnergyAt(worldPos: vec3<f32>) -> vec3<f32> {
 }
 
 
-// How much air sits below height `y`, measured relative to the mist layer's top and in metres of
-// the layer's full density: the antiderivative of exp(-b * max(0, y)), zeroed at y = 0. It is
-// linear inside the layer and saturates at 1/b above it, and it is C1 across the join, so a ray
-// crossing the fog bank's surface has no seam where the two halves meet.
-fn fogHeightIntegral(y: f32, b: f32) -> f32 {
-    if (y <= 0.0) {
-        return y;
-    }
-    return (1.0 - exp(-b * y)) / b;
-}
+// ADR-567: the layer's profile and its antiderivative moved to `height_fog.wgsl`, unchanged, so
+// that the march and this pass call the same two functions and a test can compile them with no
+// uniform buffers. Included HERE and nowhere else -- `volume.wgsl` reaches them through its own
+// include of this file, and a second include would compile two copies into one module.
+#include "height_fog.wgsl"
 
 // Exponential-squared distance fog towards frame.fogParams.rgb; density 0 leaves the colour
 // untouched (the branch keeps the no-fog output bit-identical to the pre-fog shader).

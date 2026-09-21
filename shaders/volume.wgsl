@@ -182,7 +182,7 @@ fn mediumKind(s: u32) -> u32 {
 // primitive rather than a second primitive (ADR-500's argument, still standing).
 fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
     return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u),
-                           mediaLane(s, 7u));
+                           mediaLane(s, 7u), mediaLane(s, 12u));
 }
 
 fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
@@ -208,6 +208,68 @@ fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
     return c * (shape * l3.z);
 }
 
+// ADR-566: the bound the interval below is built from -- (radiusXZ, yBot, yTop).
+//
+// `world::mediumBound` in `src/world/medium_bound.cpp` is the transliteration of this function,
+// and that file carries the full argument. The short version: a bound is a CLAIM that every
+// non-zero sample of this slot's field lies inside it, a generous bound costs only field
+// evaluations (the march's step positions do not depend on it), and a tight one deletes part of
+// the medium in the way that is hardest to see. So when it is uncertain, be generous.
+//
+// It was tight in two places, both invisible at the defaults and both severe at the ends of the
+// controls that caused them:
+//   - horizontally, `fogEllipticalRadius` normalises the long axis by `radius * bankLength`, so a
+//     bank reaches `bankLength` times as far along it. At `bankLength` 6 the old bound cut five
+//     sixths of the length off;
+//   - vertically, three thicknesses is where a GAUSSIAN ends. A fog bank's upper profile is an
+//     EXPONENTIAL whose rate is `heightFalloff`, and at the control's low end 82% of the column's
+//     optical depth lay above the old ceiling.
+fn mediumBoundOf(s: u32) -> vec3<f32> {
+    let l0 = mediaLane(s, 0u);
+    let radius = l0.w;
+    let breath = 1.0 + max(mediaLane(s, 3u).x, 0.0);
+    let thickness = max(mediaLane(s, 1u).x, 1e-3);
+    let depth = max(mediaLane(s, 4u).x, 0.0);
+    let centre = l0.xyz;
+
+    if (mediumKind(s) != kMediumKindFog) {
+        return vec3<f32>(radius * breath * 1.35,
+                         centre.y - depth - thickness * 3.0,
+                         centre.y + thickness * 3.0);
+    }
+
+    let f = mediumFogUniforms(s);
+    let shape = fogShapeKind(f);
+    let along = max(mediaLane(s, 13u).y, 0.05);
+    // The sphere is the one primitive that ignores `bankLength`, so it is the one whose bound
+    // must not carry it.
+    var reach = max(along, 1.0);
+    if (shape == kFogShapeSphere) {
+        reach = 1.0;
+    }
+    let rr = radius * breath * reach * 1.35;
+
+    if (shape == kFogShapeBank) {
+        // Solve `exp(-h * falloff) = 0.01`: 1% of the column left outside, which is below what a
+        // frame can show. The floor keeps a steep bank at the old three thicknesses; the ceiling
+        // is where a bound this generous stops being worth the samples.
+        let falloff = max(mediaLane(s, 14u).z, 0.01);
+        let bias = clamp(mediaLane(s, 14u).y, 0.0, 1.0);
+        let base = -thickness + 2.0 * thickness * bias;
+        let hTop = clamp(4.6 / falloff, 3.0, 40.0);
+        return vec3<f32>(rr,
+                         centre.y + base - depth - thickness * 1.5,
+                         centre.y + base + thickness * hTop);
+    }
+    // A closed primitive ends where its own surface ends, and the height influence can only make
+    // it thinner.
+    var half = thickness;
+    if (shape == kFogShapeSphere) {
+        half = radius;
+    }
+    return vec3<f32>(rr, centre.y - depth - half * 1.35, centre.y + half * 1.35);
+}
+
 // ADR-562 §4: the per-slot ray interval, as a VERTICAL CYLINDER.
 //
 // This is the highest-value affordance in the foundation and it is why the slot array had to come
@@ -229,18 +291,11 @@ fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -
     if (radius <= 0.0) {
         return vec2<f32>(1.0, -1.0);
     }
-    // The field is zero past `rr > 1.35` (vortex.wgsl's compact early-out), and `breathAmount`
-    // widens the radius by at most its own amount, so this is the smallest bound that provably
-    // contains every non-zero sample.
-    let breath = 1.0 + max(mediaLane(s, 3u).x, 0.0);
-    let rr = radius * breath * 1.35;
-    // Vertically: the Gaussian wall falls to ~1e-6 by three thicknesses, and the throat descends
-    // `funnelDepth` below the mouth.
-    let thickness = max(mediaLane(s, 1u).x, 1e-3);
-    let depth = max(mediaLane(s, 4u).x, 0.0);
+    let bound = mediumBoundOf(s);
+    let rr = bound.x;
+    let yBot = bound.y;
+    let yTop = bound.z;
     let centre = l0.xyz;
-    let yTop = centre.y + thickness * 3.0;
-    let yBot = centre.y - depth - thickness * 3.0;
 
     // Infinite cylinder about +Y, then clipped by the two caps.
     let d = vec2<f32>(dir.x, dir.z);
@@ -279,7 +334,11 @@ fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -
 }
 
 fn volumeDensityAt(p: vec3<f32>) -> f32 {
-    let heightTerm = exp(-max(0.0, p.y - vol.params0.y) * vol.params0.z);
+    // ADR-567: the SAME function the surface fog integrates (`height_fog.wgsl`, reached through
+    // this file's include of common.wgsl). It used to be this expression written out here and the
+    // antiderivative written out in common.wgsl -- two statements of one model, in two files, with
+    // nothing asserting they were a function and its integral.
+    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z);
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);
     if (densitySlot >= 0) {

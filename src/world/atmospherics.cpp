@@ -407,6 +407,7 @@ void writeSharedField(const EffectField& field, const AtmosphericEffect& e, json
     case FieldType::Float: out[group][key] = fieldFloat(field, any, e); break;
     case FieldType::Color: out[group][key] = vec3ToJson(fieldColor(field, any, e)); break;
     case FieldType::Bool: out[group][key] = fieldBool(field, any, e); break;
+    case FieldType::Choice: out[group][key] = std::string(field.choiceName(fieldFloat(field, any, e))); break;
     }
 }
 
@@ -427,6 +428,13 @@ void readSharedField(const EffectField& field, const json& in, AtmosphericEffect
     case FieldType::Color: setFieldColor(field, any, e, vec3FromJson(v, fieldColor(field, any, e))); break;
     case FieldType::Bool:
         if (v.is_boolean()) { setFieldBool(field, any, e, v.get<bool>()); }
+        break;
+    case FieldType::Choice:
+        if (v.is_string()) {
+            if (const int i = field.choiceIndex(v.get<std::string>()); i >= 0) {
+                setFieldFloat(field, any, e, static_cast<float>(i));
+            }
+        }
         break;
     }
 }
@@ -912,6 +920,55 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
     g.band3 = glm::vec4(bands[12], bands[13], bands[14], bands[15]);
     return g;
 }
+// ADR-566: pack + tag, in ONE place, because they are one operation and two callers need it.
+//
+// `buildAtmosphericFrame` is the shipping caller; a test that wants the exact bytes the march
+// reads is the other, and before this function existed the only way to get them was to call
+// `pack` and then write the tag by hand -- a second copy of the ordering rule that ADR-565's
+// sentinel exists to enforce. ADR-554's rule: a seam published from two places must be written by
+// both, so this one is published from one.
+void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot) {
+    const EffectSchema* schema = effectSchema(e.kind);
+    if (schema == nullptr || schema->resolve.pack == nullptr) {
+        return;
+    }
+    // ADR-565: the tag's lane is RESERVED, and this makes that a constraint a packer cannot
+    // violate silently rather than a sentence in a comment.
+    //
+    // `agent/tornado` found the hazard by walking into it: its block is sixteen lanes, it had
+    // sixty floats and wanted sixty-one, and the overflow landed exactly on lane 15. Because
+    // the tag is written AFTER `pack` below, the tag itself always wins -- so the dispatch
+    // keeps working and the PACKER's value disappears. Silent, and it presents as a wrong
+    // appearance rather than as a wrong shape, which is the harder thing to trace.
+    //
+    // A sentinel written before the call and checked after costs two stores per medium per
+    // frame and turns a silent loss into a named one.
+    constexpr float kReserved = -987654.0f;
+    slot.lane[kMediumLanes - 1] = glm::vec4(kReserved);
+    schema->resolve.pack(e, envelope, slot);
+    if (slot.lane[kMediumLanes - 1] != glm::vec4(kReserved)) {
+        static std::set<AtmosphereKind> warned;
+        if (warned.insert(e.kind).second) {
+            log::warn("medium kind '{}' writes lane {} in its packer, which is reserved for the "
+                      "kind tag: that value is discarded and the effect will look wrong",
+                      atmosphereKindName(e.kind), kMediumLanes - 1);
+        }
+    }
+    slot.kind = static_cast<std::uint32_t>(e.kind);
+    // ADR-562: and the kind reaches the SHADER, in the last lane.
+    //
+    // It did not, for a day. `MediumSlot::kind` was set here, compared by `frameDiffers` and
+    // then dropped on the floor by the renderer, which uploaded only the lanes -- so the march
+    // had no way to tell a fog bank from a tornado and every kind got `vortexShapeAt`. The slot
+    // contract said "kind tag" and the tag was unreachable: this branch's own defect family,
+    // one day old, in the foundation written to fix it.
+    //
+    // Set HERE rather than in each kind's `packMedium`, so a new kind cannot forget to. The
+    // lane is the last one precisely because it is the one no kind's parameters will reach
+    // first -- the vortex fills 0-12 and the tornado 0-13.
+    slot.lane[kMediumLanes - 1].x = static_cast<float>(slot.kind);
+}
+
 
 void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const AtmosphericContext& ctx,
                            AtmosphericFrame& out) {
@@ -970,42 +1027,7 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
                 leaned.vortex.field.center += (lean / len) * metres;
             }
         }
-        MediumSlot& slot = out.media[out.mediumCount];
-        // ADR-565: the tag's lane is RESERVED, and this makes that a constraint a packer cannot
-        // violate silently rather than a sentence in a comment.
-        //
-        // `agent/tornado` found the hazard by walking into it: its block is sixteen lanes, it had
-        // sixty floats and wanted sixty-one, and the overflow landed exactly on lane 15. Because
-        // the tag is written AFTER `pack` below, the tag itself always wins -- so the dispatch
-        // keeps working and the PACKER's value disappears. Silent, and it presents as a wrong
-        // appearance rather than as a wrong shape, which is the harder thing to trace.
-        //
-        // A sentinel written before the call and checked after costs two stores per medium per
-        // frame and turns a silent loss into a named one.
-        constexpr float kReserved = -987654.0f;
-        slot.lane[kMediumLanes - 1] = glm::vec4(kReserved);
-        schema->resolve.pack(leaned, rv.envelope, slot);
-        if (slot.lane[kMediumLanes - 1] != glm::vec4(kReserved)) {
-            static std::set<AtmosphereKind> warned;
-            if (warned.insert(rv.effect->kind).second) {
-                log::warn("medium kind '{}' writes lane {} in its packer, which is reserved for the "
-                          "kind tag: that value is discarded and the effect will look wrong",
-                          atmosphereKindName(rv.effect->kind), kMediumLanes - 1);
-            }
-        }
-        slot.kind = static_cast<std::uint32_t>(rv.effect->kind);
-        // ADR-562: and the kind reaches the SHADER, in the last lane.
-        //
-        // It did not, for a day. `MediumSlot::kind` was set here, compared by `frameDiffers` and
-        // then dropped on the floor by the renderer, which uploaded only the lanes -- so the march
-        // had no way to tell a fog bank from a tornado and every kind got `vortexShapeAt`. The slot
-        // contract said "kind tag" and the tag was unreachable: this branch's own defect family,
-        // one day old, in the foundation written to fix it.
-        //
-        // Set HERE rather than in each kind's `packMedium`, so a new kind cannot forget to. The
-        // lane is the last one precisely because it is the one no kind's parameters will reach
-        // first -- the vortex fills 0-12 and the tornado 0-13.
-        slot.lane[kMediumLanes - 1].x = static_cast<float>(slot.kind);
+        packMediumSlot(leaned, rv.envelope, out.media[out.mediumCount]);
         ++out.mediumCount;
     }
     // Everything the resolve could not seat. ADR-560: this number had one reader in the whole tree

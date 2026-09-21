@@ -78,16 +78,16 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-six ways a green suite has lied
+## Twenty-eight ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
 you are short of time, because it is the only one the exit code cannot save you from.
 
-- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 25).
+- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 27).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19, 24; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 26; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -117,7 +117,7 @@ night from two agents who never spoke to each other.
    The tell is that the failure text does not match source you can read. `git clean` the test object
    directory after a merge is cheaper than the check.
 3. **A log written by somebody else's process.** See the next section; this is the severe one.
-25. **An edit script that asserts and writes at the end leaves a partial change that looks
+27. **An edit script that asserts and writes at the end leaves a partial change that looks
    complete.** The shape is: make N replacements in memory, assert each match count so a silent
    wrong edit is impossible, write the file once at the end. When the *fourth* assertion fires,
    the first three are discarded with it — and the file on disk is neither the before nor the
@@ -330,7 +330,7 @@ night from two agents who never spoke to each other.
    aimed at the wrong region or the wrong mechanism passes every check you would think to run.**
    When a reachability probe reports zero, suspect the sample domain before the knob.
 
-24. **A fixture at a boundary of its own valid range measures the boundary, not the feature.**
+26. **A fixture at a boundary of its own valid range measures the boundary, not the feature.**
 
    A foot-lock probe reported the lock doing nothing: the held foot and the free foot came out at
    the same place, on every arm, reproducibly. The lock was correct. The **test rig's leg was
@@ -550,6 +550,85 @@ night from two agents who never spoke to each other.
    wrong appearance. **A defect that survives because it is plausible is the costly kind** -- it
    gets tuned around rather than found. "Renders as a comet" is a bug someone fixes in a minute.
 
+24. **A constant that was derived from one function and is still right under another is a
+   coincidence, and the control that ends the coincidence is the one nobody moved.**
+
+   A ray march clipped each medium to a bound of `3 * thickness` vertically. That is where a
+   GAUSSIAN ends, and it was written when the field's vertical profile was one. The profile was
+   later replaced by an exponential at an artist-controlled rate -- and the bound was not
+   revisited, because at the control's DEFAULT the old constant still left only 0.37% of the
+   column outside. It was right, for a reason that had stopped existing.
+
+   At the control's low end it left **56%** of the medium outside its own bound. The same bound
+   was short horizontally by a factor of `bankLength`, which is 1 by default and 6 at the top of
+   its slider: **71%** of peak density outside, at a setting an artist reaches by dragging.
+
+   Two things make this family hard to catch and worth its own entry:
+
+   - **it is invisible at every default**, so it survives any amount of ordinary use, and the
+     arms and screenshots accumulated while it is invisible become evidence that it is fine;
+   - **the failure is a quieter version of the thing working.** Nothing errors. The medium is
+     still there, still soft-edged, still the right colour, and simply smaller than the number
+     that was typed. The artist concludes the control is weak and tunes around it.
+
+   **The check is to put the claim and the thing it claims about in front of each other.** A bound
+   is a claim about the support of a field, so sample the field and assert containment -- and add
+   the assertion that stops the first one being satisfied by giving up, because a bound of infinity
+   contains every field perfectly. Two halves: *nothing dense outside it*, and *it is not much
+   larger than what is inside it.*
+
+   Generalises past bounds. Any constant chosen against a distribution -- a threshold, a budget, an
+   epsilon, a cache size, a step count -- is invalidated by a change to that distribution
+   (ADR-389), **and it will keep passing until someone moves the control that makes the two
+   distributions differ.** When you replace a function, grep for the constants that were sized
+   against the old one. They do not announce themselves.
+
+25. **A GPU suite reads its shaders from the source tree at RUN time, so editing a `.wgsl` while
+   one is running makes the whole run say nothing.**
+
+   Done on 2026-09-21, by me, an hour after re-reading the entry about editing `tools/gpu-lock.sh`
+   while instances held it. The suite was started, then `shaders/particles.wgsl` was edited while
+   it ran. `ShaderLibrary` loads from `AVGEN_SHADER_SOURCE_DIR` when a case asks for a module, so
+   cases that ran before the write compiled one version and cases after it compiled another.
+
+   **The run came back green, 397 cases, exit 0.** That is what makes it worth an entry rather
+   than a note: there was no symptom. A mixed run is not "probably fine" -- it is a run in which
+   no case can be attributed to a version of the tree, including the green ones, and a pass under
+   those conditions is exactly as uninformative as a failure.
+
+   The rule is narrower than "do not edit while tests run", because a C++ edit is harmless -- the
+   binary is already linked:
+
+   > **A running binary's inputs are frozen only if they were compiled into it.** Shaders, scenes,
+   > assets and config files are read when a case asks for them. Anything the suite loads from
+   > disk is live for the whole run.
+
+   Discard the run and start it again. It costs one suite; arguing about which half of a mixed run
+   to believe costs more, and believing it costs more still.
+
+   **And the same hour, the same mistake one layer up.** While the replacement run was going, this
+   very entry's companion note was written into `tools/gpu-lock.sh` -- the script that run was
+   executing. Bash reads a script incrementally by byte offset, so inserting five lines above the
+   offset it was holding shifted everything after it, and the wrapper died with
+
+       tools/gpu-lock.sh: line 89: syntax error near unexpected token `('
+
+   *after* the binary had finished and printed `397 cases | 396 passed | 1 skipped`. The file was
+   restored from `git` within about thirty seconds, so the lock was not wedged this time -- but the
+   run's captured exit code was **2, from the wrapper**, against a summary that said everything
+   passed. Which is the header's own rule arriving as a live example: **an exit code that disagrees
+   with the summary is a tooling fault, and neither of them is a pass.** The run was re-taken.
+
+   Two corollaries worth more than the incident:
+
+   - **`pgrep -f` matched only the orphaned waiters.** The "is anything running?" check came back
+     with four processes and all four were `until ! pgrep -qf "avgen_render_tests"` loops from a
+     session two days ago, matching their own command lines and therefore immortal. The idle
+     machine looked busy. Match the binary's PATH and exclude the shell wrappers:
+     `ps -Ao pid,command | grep 'build/release/tests/avgen_render_tests' | grep -v 'zsh -c'`.
+   - **After editing a shell script, `bash -n` it.** It costs nothing and it is the difference
+     between finding a syntax error now and finding it in the exit code of somebody's suite.
+
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
@@ -598,7 +677,7 @@ added. **A check that refuses to proceed on an input it cannot resolve is worth 
 resolves it optimistically**, and it is the only entry in this family that is a defence rather than
 a wound.
 
-26. **A position probe cannot see a rotation on a rig that is not a hierarchy.** Phase B §51 asked
+28. **A position probe cannot see a rotation on a rig that is not a hierarchy.** Phase B §51 asked
     whether secondary motion is bounded, so it measured how far `head.x` moved over six minutes of
     timeline and read **exactly 0.00000 m**. The layer was working: measured as a *rotation* it runs
     at 1.4993 degrees against its authored 1.5. `alien-scout.glb` is flat (ADR-553) -- every joint

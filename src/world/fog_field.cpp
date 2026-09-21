@@ -72,12 +72,54 @@ float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t) {
     return 1.0f + amount * (n * 2.0f - 1.0f);
 }
 
+// ADR-566: the six primitives, transliterated from `fogPrimitiveDistance` in `shaders/fog.wgsl`.
+// Same expressions, same order, same normalisation -- 1 at the surface, zero past 1.35.
+FogShape fogShapeKindOf(const MediumSlot& m) {
+    const int i = static_cast<int>(std::clamp(m.lane[12].y, 0.0f, 5.0f) + 0.5f);
+    return static_cast<FogShape>(i);
+}
+
+float fogPrimitiveDistance(const MediumSlot& m, const glm::vec3& rel) {
+    const float radius = std::max(m.lane[0].w, 1e-3f);
+    const float along = std::max(m.lane[13].y, 0.05f);
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
+    const float x = rel.x * c + rel.z * s;
+    const float z = -rel.x * s + rel.z * c;
+    const float y = rel.y;
+    const float ax = radius * along;
+    const float az = radius;
+    const float ay = std::max(m.lane[13].x, 1e-3f);
+
+    switch (fogShapeKindOf(m)) {
+    case FogShape::Sphere:
+        return glm::length(glm::vec3(x, y, z)) / radius;
+    case FogShape::Ellipsoid:
+        return glm::length(glm::vec3(x / ax, y / ay, z / az));
+    case FogShape::Box:
+        return std::max(std::max(std::abs(x) / ax, std::abs(y) / ay), std::abs(z) / az);
+    case FogShape::Capsule: {
+        const float half = std::max(ax - az, 0.0f);
+        const float qx = x - std::clamp(x, -half, half);
+        return glm::length(glm::vec3(qx, y * (az / ay), z)) / az;
+    }
+    case FogShape::Cylinder: {
+        const float u = x / ax;
+        const float v = z / az;
+        return std::max(std::sqrt(u * u + v * v), std::abs(y) / ay);
+    }
+    case FogShape::Bank:
+        break;
+    }
+    return fogEllipticalRadius(m, rel);
+}
+
 float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;
     }
     const glm::vec3 rel = p - glm::vec3(m.lane[0]);
-    const float rr = fogEllipticalRadius(m, rel);
+    const float rr = fogPrimitiveDistance(m, rel);
     if (rr > 1.35f) {
         return 0.0f;
     }
@@ -86,7 +128,12 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
     if (rim <= 0.0f) {
         return 0.0f;
     }
-    return std::max(rim * fogVerticalProfile(m, rel.y) * fogMacroDetail(m, p, t), 0.0f);
+    float profile = fogVerticalProfile(m, rel.y);
+    if (fogShapeKindOf(m) != FogShape::Bank) {
+        const float influence = std::clamp(m.lane[12].z, 0.0f, 1.0f);
+        profile = 1.0f + (profile - 1.0f) * influence;
+    }
+    return std::max(rim * profile * fogMacroDetail(m, p, t), 0.0f);
 }
 
 } // namespace avgen::world

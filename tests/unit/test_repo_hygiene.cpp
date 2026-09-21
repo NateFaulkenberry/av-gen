@@ -181,3 +181,37 @@ TEST_CASE("every writer of a parameter final is a kind the Inspector can name", 
     // above would pass by finding nothing at all.
     CHECK(writers.size() >= 4);
 }
+
+// A credit obligation that lives only in a document is one edit away from vanishing, and nothing
+// about the resulting tree looks wrong. 100STYLE is CC0 AND asks to be credited for creative or
+// commercial work -- two separate facts, the second not implied by the first, which is exactly the
+// shape of obligation someone drops while tidying. The assertion is on the exact line, because a
+// paraphrase satisfies a reader and not the request.
+TEST_CASE("the credits a published work must carry are still there", "[hygiene]") {
+    const std::filesystem::path root(AVGEN_SOURCE_DIR);
+
+    const std::filesystem::path credits = root / "CREDITS.md";
+    REQUIRE(std::filesystem::exists(credits));
+
+    std::ifstream in(credits);
+    REQUIRE(in.good());
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+
+    // The line as the dataset asks for it, not as someone remembered it.
+    REQUIRE(text.find("The 100STYLE Dataset - Ian Mason") != std::string::npos);
+
+    // 100STYLE is CC BY 4.0: attribution is a licence CONDITION, not a courtesy, and the licence
+    // terminates automatically on breach. This assertion previously required the string "CC0",
+    // which was the wrong licence -- a guard can enforce an error as faithfully as a fact, and the
+    // only thing that catches that is checking the claim rather than the guard.
+    REQUIRE(text.find("CC BY 4.0") != std::string::npos);
+    REQUIRE(text.find("https://creativecommons.org/licenses/by/4.0/") != std::string::npos);
+
+    // The engineering record must keep pointing at the same obligation.
+    const std::filesystem::path deps = root / "docs" / "dependencies.md";
+    REQUIRE(std::filesystem::exists(deps));
+    std::ifstream depsIn(deps);
+    const std::string depsText((std::istreambuf_iterator<char>(depsIn)),
+                               std::istreambuf_iterator<char>());
+    REQUIRE(depsText.find("The 100STYLE Dataset - Ian Mason") != std::string::npos);
+}
