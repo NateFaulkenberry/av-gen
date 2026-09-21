@@ -344,3 +344,54 @@ TEST_CASE("the density response curve is identity at its defaults and a curve aw
         CHECK(withDense < withThin);
     }
 }
+
+
+TEST_CASE("the bank's glow can follow its height", "[fog][emission]") {
+    // ADR-575, the brief's §26: "Optional emission: intensity, color, height influence, density
+    // influence." The march had three of the four. This is the fourth, and it is a SEPARATE number
+    // from the density's height influence on purpose -- a bank can be densest at its floor and
+    // glow evenly, or be uniform and glow only where it is low.
+    auto e = primitive(world::FogShape::Bank, 1.0f);
+    setRow(e, "groundHug", 0.0f);     // densest layer at the floor
+    setRow(e, "heightFalloff", 3.0f); // thinning quickly above it
+
+    SECTION("at zero it is exactly uniform, which is what it has always been") {
+        setRow(e, "emissionHeight", 0.0f);
+        const world::MediumSlot m = slotOf(e);
+        for (const float y : {-60.0f, -10.0f, 0.0f, 25.0f, 90.0f}) {
+            INFO("y = " << y);
+            REQUIRE(world::fogEmissionHeight(m, y) == 1.0f);
+        }
+    }
+
+    SECTION("at one it follows the density's own vertical profile") {
+        // Reusing `fogVerticalProfile` rather than introducing a second vertical shape is the
+        // decision under test: one vertical model for the medium. A version with its own curve
+        // would pass "the glow fades upward" and fail this.
+        setRow(e, "emissionHeight", 1.0f);
+        const world::MediumSlot m = slotOf(e);
+        for (const float y : {-60.0f, -10.0f, 0.0f, 25.0f, 90.0f}) {
+            INFO("y = " << y);
+            // `.margin` rather than a relative tolerance: the profile is 5.8e-5 at the top of
+            // this range, and `1 + (p - 1)` differs from `p` by float rounding that is nothing in
+            // absolute terms and enormous relative to 5.8e-5. A relative tolerance on a quantity
+            // that legitimately approaches zero is a test that fails where the value stops
+            // mattering.
+            CHECK(world::fogEmissionHeight(m, y) ==
+                  Approx(world::fogVerticalProfile(m, y)).margin(1e-6));
+        }
+    }
+
+    SECTION("it is independent of the DENSITY's height influence") {
+        // The two are different rows and must stay different numbers. Setting one must not move
+        // the other, which is the check that they did not end up sharing a lane slot.
+        setRow(e, "emissionHeight", 1.0f);
+        setRow(e, "heightInfluence", 0.0f);
+        const float a = world::fogEmissionHeight(slotOf(e), 30.0f);
+        setRow(e, "heightInfluence", 1.0f);
+        const float b = world::fogEmissionHeight(slotOf(e), 30.0f);
+        INFO("glow at y=30 with density influence 0 and 1: " << a << ", " << b);
+        CHECK(a == b);
+        CHECK(a < 1.0f); // ...and the control is doing something, or the equality is free
+    }
+}

@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-seven ways a green suite has lied
+## Twenty-eight ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -700,6 +700,31 @@ night from two agents who never spoke to each other.
    The general form, which is not about scenes: **when your tooling writes artefacts into the same
    namespace as the thing it measures, every later measurement of that namespace is contaminated
    until somebody notices.** Name them so they can be excluded, and exclude them in the command.
+
+28. **A parity test covers the terms it reads. Add a term to the pair and it silently stops being
+   a pair.**
+
+   `test_fog_parity_gpu.cpp` compares a shader against its CPU twin over the same packed bytes, and
+   it existed because the two once drifted for ten minutes (entry in ADR-565). A new term was added
+   to both sides, and the shader's half was then deliberately broken to demonstrate the failure --
+   **and the test passed.** It compared four quantities and the new one was not among them.
+
+   Nothing about the test had changed; it was simply answering the question it had always answered,
+   about a pair that had grown a fifth member. **The gap opens at the moment the feature lands, and
+   it opens silently, because a parity harness has no way to know what it is not reading.**
+
+   Two habits:
+
+   - **when you add a term to a transliterated pair, add an assertion for it in the same edit.**
+     Not the same day -- the same edit, the way a new `case` goes in with its `enum` value;
+   - **break the new term and watch the parity test fail before you believe it covers it.** That is
+     ADR-182 applied to the test you did not write, and it is the only step that would have caught
+     this. The break was being run for a different reason and the pass was the surprise.
+
+   Generalises to any harness with a fixed output shape: a golden-image test whose mask excludes
+   the new region, a round-trip test whose field list is written out by hand, a conformance table
+   with a row per property. **The harness's shape is a claim about what the thing has, and the
+   thing grew.**
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a

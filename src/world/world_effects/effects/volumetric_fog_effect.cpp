@@ -206,6 +206,15 @@ constexpr EffectField kFields[] = {
     storedFloat("densitySoftness", "Density softness", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f)
         .tooltip("Bends the threshold's knee from a straight line into a smooth one. Section 23 of\n"
                  "the brief: softness matters more than detail."),
+    // ADR-575, the brief's §26: emission wants intensity, colour, density influence AND height
+    // influence, and the march had the first three. It reuses the density's vertical profile
+    // rather than introducing a second vertical shape, so a bank whose glow follows its height
+    // follows the same curve its density does.
+    storedFloat("emissionHeight", "Glow follows height", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f)
+        .sec("Glow")
+        .tooltip("How much the bank's glow follows its height profile instead of being even.\n"
+                 "At 1 a ground-hugging bank glows at its floor and fades upward with its\n"
+                 "density; at 0 it glows evenly through its whole height."),
     floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
                SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").sec("Detail").main()
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
@@ -545,7 +554,11 @@ void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumS
     out.lane[12] = glm::vec4(std::max(v.spill, 0.0f),
                              std::clamp(storedOf(e, "shape", 0.0f), 0.0f,
                                         static_cast<float>(kFogShapeCount - 1)),
-                             std::clamp(storedOf(e, "heightInfluence", 0.0f), 0.0f, 1.0f), 0.0f);
+                             std::clamp(storedOf(e, "heightInfluence", 0.0f), 0.0f, 1.0f),
+                             // ADR-575 (§26): the GLOW's own height influence, separate from the
+                             // density's on purpose -- a bank can be densest at its floor and glow
+                             // evenly, or be uniform and glow only where it is low.
+                             std::clamp(storedOf(e, "emissionHeight", 0.0f), 0.0f, 1.0f));
     // ADR-563: the bank's own shape, in the lanes the vortex leaves empty. `shaders/fog.wgsl`
     // reads 0, 13 and 14; lane 15 is the kind tag `buildAtmosphericFrame` writes.
     const float rot = glm::radians(storedOf(e, "bankRotation", 0.0f));

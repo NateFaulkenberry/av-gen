@@ -132,6 +132,16 @@ float fogDensityRemap(const MediumSlot& m, float shape) {
     return std::clamp(s, 0.0f, 1.0f);
 }
 
+// §26's height influence on emission -- the transliteration of `fogEmissionHeight` in
+// `shaders/fog.wgsl`. Reuses the density's vertical profile, so one vertical model serves both.
+float fogEmissionHeight(const MediumSlot& m, float relY) {
+    const float amount = std::clamp(m.lane[12].w, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return 1.0f;
+    }
+    return 1.0f + (fogVerticalProfile(m, relY) - 1.0f) * amount;
+}
+
 float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;

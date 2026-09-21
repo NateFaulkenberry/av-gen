@@ -563,6 +563,25 @@ struct Environment {
     // glowing flora had nothing darker to glow against, and distance fog lighter than the ground
     // could not separate a far ridge from a near one. The defaults below are exactly the constants
     // the shader used to carry, so a styled scene that names none of them renders as it did.
+    // ADR-574, recorded HERE rather than only in a fog ADR because these three are lighting and
+    // their owner will read this struct before they read anything about fog. **None of ADR-058's
+    // four controls is drawn on any panel.** `fogHeightAmount` above now has a parameter and a
+    // row; these three do not have a row, and two of them do have parameters:
+    //
+    //   styledSkyAmbient      registered parameter, NO panel row
+    //   styledGroundAmbient   registered parameter, NO panel row
+    //   styledAmbientFloor    no parameter at all, NO panel row
+    //
+    // The middle state is the strange one and is worth naming: **a quantity a machine can drive
+    // and a person cannot find.** A modulation route or an automation curve can move the styled
+    // ambient; an artist looking for it in the Environment panel will conclude the engine does not
+    // have the control. ADR-574's rule: a capability with no control teaches an artist that the
+    // system cannot do it, and nobody files a bug about a feature they do not know exists.
+    //
+    // The comment that used to justify all four -- "nothing about them is animated, so they are
+    // copied, not picked" -- was false about two of them and circular about the rest; see
+    // ADR-574. This is a measurement, not a request: whoever owns the styled hemisphere decides
+    // whether it wants rows.
     glm::vec3 styledSkyAmbient{0.38f, 0.56f, 0.65f};   // reaches an up-facing normal
     glm::vec3 styledGroundAmbient{0.12f, 0.10f, 0.22f}; // reaches a down-facing one (bounce)
     float styledAmbientFloor = 0.68f;                   // ambient left where occlusion is total

@@ -35,7 +35,9 @@
 //        the audit, and it is the one ADR-562 §9 prescribes: grep the lane index, not the feature.
 //   f4  = LANE 12. x is `spill`, which the SURFACE GLOW reads (ADR-562) and this file must not
 //        touch. y and z are the vortex's two zeroes and ADR-566's two new numbers:
-//        y = shape index (the primitive), z = height influence.
+//        y = shape index (the primitive), z = height influence, w = §26's EMISSION height
+//        influence, which is a separate number from z on purpose: a bank can be densest at its
+//        floor and glow evenly, or be uniform and glow only where it is low.
 //
 //        Both of them in ONE lane on purpose. ADR-562 §9's finding is that a per-kind lane map is
 //        only safe where every reader knows which kind it is holding, and the cheapest way to keep
@@ -256,6 +258,22 @@ fn fogDensityRemap(f: FogUniformsWgsl, shape: f32) -> f32 {
         s = pow(max(s, 0.0), contrast);
     }
     return clamp(s, 0.0, 1.0);
+}
+
+// §26's "height influence" on EMISSION, which the brief lists beside intensity, colour and density
+// influence and which the march had only three of.
+//
+// It reuses `fogVerticalProfile` rather than introducing a second vertical shape, so a bank whose
+// glow follows its height is following the same curve its density does -- one vertical model for
+// the medium, which is the argument ADR-567 makes one level up for the whole atmosphere. At 0 the
+// emission is uniform through the bank's height, which is what it has always been and is the
+// default.
+fn fogEmissionHeight(f: FogUniformsWgsl, relY: f32) -> f32 {
+    let amount = clamp(f.f4.w, 0.0, 1.0);
+    if (amount <= 0.0) {
+        return 1.0;
+    }
+    return mix(1.0, fogVerticalProfile(f, relY), amount);
 }
 
 // The bank, analytic and complete. Zero outside, and compactly so, which is the property ADR-374

@@ -208,7 +208,17 @@ fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
     var c = mix(mediaLane(s, 9u).rgb, mediaLane(s, 10u).rgb, smoothstep(0.0, 0.45, shape));
     let filament = smoothstep(0.62, 0.95, shape) * clamp(l3.w, 0.0, 4.0);
     c = c + mediaLane(s, 11u).rgb * filament;
-    return c * (shape * l3.z);
+    // ADR-575 (§26): the emission's own height influence, as a per-kind ARM rather than a lane
+    // read. `mediumEmissionAt` is a shared accessor and lane 12's meaning is per-kind, which is
+    // precisely the shape ADR-562 §9 recorded three defects of -- so the fog's number is reached
+    // through the same dispatch `mediumShape` uses and a kind that has no such control is
+    // untouched, by construction rather than by a zero.
+    var height = 1.0;
+    if (mediumKind(s) == kMediumKindFog) {
+        let f = mediumFogUniforms(s);
+        height = fogEmissionHeight(f, p.y - f.f0.y);
+    }
+    return c * (shape * l3.z * height);
 }
 
 // ADR-566: the bound the interval below is built from -- (radiusXZ, yBot, yTop).
