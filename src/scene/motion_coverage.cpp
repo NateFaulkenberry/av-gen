@@ -224,3 +224,261 @@ MotionCoverageReport measureMotionCoverage(const MotionDatabase& db,
 }
 
 } // namespace avgen::scene
+
+// ---- §58 ------------------------------------------------------------------------------------------
+
+namespace avgen::scene {
+
+const char* motionCategoryName(MotionCategory category) {
+    switch (category) {
+    case MotionCategory::Idle: return "idle";
+    case MotionCategory::Walk: return "walk";
+    case MotionCategory::Run: return "run";
+    case MotionCategory::Strafe: return "strafe";
+    case MotionCategory::Reverse: return "reverse locomotion";
+    case MotionCategory::LeftTurn: return "left turn";
+    case MotionCategory::RightTurn: return "right turn";
+    case MotionCategory::FastLeftTurn: return "high-speed left turn";
+    case MotionCategory::FastRightTurn: return "high-speed right turn";
+    case MotionCategory::Start: return "start transitions";
+    case MotionCategory::Stop: return "stop transitions";
+    case MotionCategory::Count: break;
+    }
+    return "?";
+}
+
+const char* coverageGradeName(CoverageGrade grade) {
+    switch (grade) {
+    case CoverageGrade::Poor: return "poor";
+    case CoverageGrade::Limited: return "limited";
+    case CoverageGrade::Moderate: return "moderate";
+    case CoverageGrade::Good: return "good";
+    }
+    return "?";
+}
+
+namespace {
+
+CoverageGrade gradeOf(std::uint32_t count, std::uint32_t clips, std::uint32_t moderateAt,
+                      std::uint32_t goodAt, std::uint32_t goodClips) {
+    if (count == 0) {
+        return CoverageGrade::Poor;
+    }
+    if (count >= goodAt && clips >= goodClips) {
+        return CoverageGrade::Good;
+    }
+    // A category from one clip is capped at moderate however long it is: every search into it
+    // lands in the same take.
+    if (count >= moderateAt) {
+        return CoverageGrade::Moderate;
+    }
+    return CoverageGrade::Limited;
+}
+
+} // namespace
+
+std::string MotionCategoryReport::report() const {
+    std::string out = fmt::format(
+        "motion coverage by category, {} samples at {:.1f} Hz (measured from root velocity, not from "
+        "clip names)\n",
+        samples, sampleRate);
+    out += fmt::format(
+        "  thresholds: idle < {:.2f} m/s <= walk < {:.2f} m/s <= run; turn > {:.2f} rad/s; one "
+        "window = {:.2f} s (one matcher commitment)\n",
+        options.idleSpeed, options.runSpeed, options.turnRate, options.commitmentSeconds);
+    out += fmt::format(
+        "  grades: poor = none; limited = at least 1; moderate = {}+ windows ({}+ events); good = "
+        "{}+ windows ({}+ events) from {}+ clips\n",
+        options.moderateWindows, options.moderateEvents, options.goodWindows, options.goodEvents,
+        options.goodClips);
+    out += fmt::format("  {} clip-final samples excluded: the builder's forward difference reads zero "
+                       "velocity at every clip's last frame\n",
+                       excludedClipFinal);
+    for (const MotionCategoryCoverage& c : categories) {
+        if (c.event) {
+            out += fmt::format("  {:<22} {:<8} {:>4} events from {} clip(s)", motionCategoryName(c.category),
+                               coverageGradeName(c.grade), c.windows, c.clips);
+        } else {
+            out += fmt::format("  {:<22} {:<8} {:>4} windows ({:6.2f} s) from {} clip(s)",
+                               motionCategoryName(c.category), coverageGradeName(c.grade), c.windows,
+                               c.seconds, c.clips);
+        }
+        if (c.taggedSeconds >= 0.0f) {
+            out += fmt::format("   [tagged {:.2f} s, of which {:.2f} s measured {}]", c.taggedSeconds,
+                               c.taggedAgreeing, motionCategoryName(c.category));
+            // The disagreement is the finding: content named for this category that the matcher
+            // cannot reach by the quantity it searches on.
+            if (c.taggedSeconds >= options.commitmentSeconds && c.taggedAgreeing < 0.5f * c.taggedSeconds) {
+                out += "  <-- most tagged content is not this by root velocity (in place?)";
+            }
+        }
+        out += "\n";
+    }
+    return out;
+}
+
+MotionCategoryReport measureMotionCategories(const MotionDatabase& db,
+                                             const MotionCategoryOptions& options) {
+    MotionCategoryReport out;
+    out.options = options;
+    out.samples = db.sampleCount();
+    const auto count = static_cast<std::size_t>(MotionCategory::Count);
+    out.categories.resize(count);
+    for (std::size_t c = 0; c < count; ++c) {
+        out.categories[c].category = static_cast<MotionCategory>(c);
+        out.categories[c].event =
+            c == static_cast<std::size_t>(MotionCategory::Start) ||
+            c == static_cast<std::size_t>(MotionCategory::Stop);
+    }
+    if (db.sampleCount() == 0 || db.dimension == 0) {
+        return out;
+    }
+
+    // The sample rate the database was built at; for a database that never recorded one, the
+    // spacing of its first two same-clip samples.
+    float rate = db.build.sampleRate;
+    if (rate <= 0.0f) {
+        for (std::uint32_t s = 1; s < db.sampleCount(); ++s) {
+            if (db.sampleClip[s] == db.sampleClip[s - 1u] && db.sampleTime[s] > db.sampleTime[s - 1u]) {
+                rate = 1.0f / (db.sampleTime[s] - db.sampleTime[s - 1u]);
+                break;
+            }
+        }
+    }
+    rate = rate > 0.0f ? rate : 30.0f;
+    out.sampleRate = rate;
+    const float secondsPerSample = 1.0f / rate;
+
+    std::vector<MotionFeatureGroup> layout;
+    motionFeatureLayoutInto(db.config, layout);
+    std::size_t rv = layout.size();
+    for (std::size_t d = 0; d < layout.size(); ++d) {
+        if (layout[d] == MotionFeatureGroup::RootVelocity) {
+            rv = d;
+            break;
+        }
+    }
+    if (rv + 2u >= db.dimension) {
+        return out;
+    }
+    const auto raw = [&](const float* f, std::size_t d) {
+        return db.scale[d] != 0.0f ? (f[d] / db.scale[d]) + db.mean[d] : f[d];
+    };
+
+    std::vector<float> speed(db.sampleCount());
+    std::vector<float> heading(db.sampleCount());
+    for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
+        const float* f = db.featuresFor(s);
+        const float x = raw(f, rv);
+        const float z = raw(f, rv + 2u);
+        speed[s] = std::sqrt((x * x) + (z * z));
+        heading[s] = std::atan2(x, z);
+    }
+
+    std::vector<std::vector<bool>> clipsIn(count, std::vector<bool>(db.clipNames.size() + 1u, false));
+    const auto add = [&](MotionCategory c, std::uint32_t s) {
+        MotionCategoryCoverage& cov = out.categories[static_cast<std::size_t>(c)];
+        ++cov.samples;
+        const std::uint32_t clip = std::min<std::uint32_t>(db.sampleClip[s],
+                                                           static_cast<std::uint32_t>(db.clipNames.size()));
+        clipsIn[static_cast<std::size_t>(c)][clip] = true;
+    };
+
+    // **A clip's last sample is excluded, because its velocity is an artefact.** The builder takes
+    // a forward difference clamped to the clip's end, so the final sample of every clip -- looping
+    // walks included -- reads a root velocity of exactly zero. Counted, it would put one idle
+    // sample and one fictitious STOP at the end of every moving clip in the corpus.
+    const auto clipFinal = [&](std::uint32_t s) {
+        const std::uint32_t next = db.sampleNext[s];
+        return next == MotionDatabase::kInvalid || next <= s || db.sampleClip[next] != db.sampleClip[s];
+    };
+    constexpr float kQuarter = 0.785398163f;
+    // Each sample's speed-and-direction category, for the per-sample tag agreement below.
+    std::vector<MotionCategory> primary(db.sampleCount(), MotionCategory::Count);
+    for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
+        if (clipFinal(s)) {
+            ++out.excludedClipFinal;
+            continue;
+        }
+        const bool sameClip = s > 0 && db.sampleClip[s] == db.sampleClip[s - 1u];
+        if (speed[s] < options.idleSpeed) {
+            primary[s] = MotionCategory::Idle;
+        } else {
+            const float off = std::abs(heading[s]);
+            if (off <= kQuarter) {
+                primary[s] = speed[s] >= options.runSpeed ? MotionCategory::Run : MotionCategory::Walk;
+            } else if (off <= 3.0f * kQuarter) {
+                primary[s] = MotionCategory::Strafe;
+            } else {
+                primary[s] = MotionCategory::Reverse;
+            }
+        }
+        add(primary[s], s);
+        if (speed[s] >= options.idleSpeed) {
+            // A turn needs a direction at both ends, so both samples must be moving.
+            if (sameClip && speed[s - 1u] >= options.idleSpeed) {
+                const float dt = std::max(db.sampleTime[s] - db.sampleTime[s - 1u], 1e-4f);
+                float dTheta = heading[s] - heading[s - 1u];
+                while (dTheta > 3.14159265f) { dTheta -= 6.28318531f; }
+                while (dTheta < -3.14159265f) { dTheta += 6.28318531f; }
+                const float turn = dTheta / dt;
+                const bool fast = speed[s] >= options.runSpeed;
+                if (turn > options.turnRate) {
+                    add(fast ? MotionCategory::FastLeftTurn : MotionCategory::LeftTurn, s);
+                    if (fast) { add(MotionCategory::LeftTurn, s); }
+                } else if (turn < -options.turnRate) {
+                    add(fast ? MotionCategory::FastRightTurn : MotionCategory::RightTurn, s);
+                    if (fast) { add(MotionCategory::RightTurn, s); }
+                }
+            }
+        }
+        if (sameClip) {
+            const bool was = speed[s - 1u] >= options.idleSpeed;
+            const bool is = speed[s] >= options.idleSpeed;
+            if (!was && is) {
+                add(MotionCategory::Start, s);
+            } else if (was && !is) {
+                add(MotionCategory::Stop, s);
+            }
+        }
+    }
+
+    const auto crossCheck = [&](MotionCategory category, MotionTag tag) {
+        std::uint32_t tagged = 0;
+        std::uint32_t agreeing = 0;
+        for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
+            if ((db.sampleTags[s] & static_cast<std::uint32_t>(tag)) == 0u) {
+                continue;
+            }
+            ++tagged;
+            agreeing += primary[s] == category ? 1u : 0u;
+        }
+        MotionCategoryCoverage& cov = out.categories[static_cast<std::size_t>(category)];
+        cov.taggedSeconds = static_cast<float>(tagged) * secondsPerSample;
+        cov.taggedAgreeing = static_cast<float>(agreeing) * secondsPerSample;
+    };
+
+    for (std::size_t c = 0; c < count; ++c) {
+        MotionCategoryCoverage& cov = out.categories[c];
+        cov.clips = static_cast<std::uint32_t>(
+            std::count(clipsIn[c].begin(), clipsIn[c].end(), true));
+        if (cov.event) {
+            cov.seconds = 0.0f;
+            cov.windows = cov.samples;
+            cov.grade = gradeOf(cov.windows, cov.clips, options.moderateEvents, options.goodEvents,
+                                options.goodClips);
+        } else {
+            cov.seconds = static_cast<float>(cov.samples) * secondsPerSample;
+            cov.windows = static_cast<std::uint32_t>(
+                std::floor(cov.seconds / std::max(options.commitmentSeconds, 1e-3f) + 1e-4f));
+            cov.grade = gradeOf(cov.windows, cov.clips, options.moderateWindows, options.goodWindows,
+                                options.goodClips);
+        }
+    }
+    crossCheck(MotionCategory::Idle, MotionTag::Idle);
+    crossCheck(MotionCategory::Walk, MotionTag::Walk);
+    crossCheck(MotionCategory::Run, MotionTag::Run);
+    return out;
+}
+
+} // namespace avgen::scene

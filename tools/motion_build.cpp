@@ -13,6 +13,7 @@
 //   avgen-motion retarget  <src> <dst> --profile p    move motion between skeletons
 //   avgen-motion pack      <file...> --out dir        build a MotionPack
 //   avgen-motion validate  <pack>                     the report, and a non-zero exit on FAIL
+//   avgen-motion build-db  <pack> --joints a,b,c      a stored motion database (Phase C §38)
 //   avgen-motion benchmark <file> [--repeat n]        what each stage costs on this machine
 //
 // Exit codes: 0 success, 1 usage or I/O, 2 a validation that FAILED. A validation that passes with
@@ -23,6 +24,13 @@
 #include "assets/gltf_loader.hpp"
 #include "scene/motion_analysis.hpp"
 #include "scene/motion_database.hpp"
+#include "scene/motion_database_io.hpp"
+#include "scene/motion_database_inspect.hpp"
+#include "scene/motion_database_diff.hpp"
+#include "scene/motion_library.hpp"
+#include "scene/motion_match_explain.hpp"
+#include "entity/match_motion_provider.hpp"
+#include "entity/motion_bake.hpp"
 #include "scene/motion_pack.hpp"
 #include "scene/motion_quality_report.hpp"
 #include "scene/retarget.hpp"
@@ -37,6 +45,7 @@
 #include <fstream>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <map>
 #include <string>
 #include <vector>
@@ -199,6 +208,18 @@ int usage() {
                "  validate  <pack>                        the report; exit 2 on FAIL\n"
                "  reach     <pack> [--chain h:k:a,...]    how close each pose is to a straight leg\n"
                "  database  <pack> --joints a,b,c [--bench]  build a motion database and search it\n"
+               "  build-db  <pack> --joints a,b,c [--name n] [--force]\n"
+               "                                          Phase C 38: write <pack>/databases/<n>.motiondb,\n"
+               "                                          reused when its inputs are unchanged (82)\n"
+               "  inspect-db <file.motiondb> [--pack dir] [--categories]\n"
+               "                                          Phase C 57/58: contents, memory, coverage,\n"
+               "                                          provenance\n"
+               "  diff-db   <a.motiondb> <b.motiondb>     Phase C 83: samples added/removed/changed\n"
+               "  explain   <pack> --db <name> [--speed v] [--speed2 v --switch t] [--turn r]\n"
+               "            [--seconds s] [--at t] [--stride n]\n"
+               "                                          Phase C 68/69: why each search chose what it did\n"
+               "  bake      <pack> --db <name> --out <dir> [--seconds s] [session flags as explain]\n"
+               "                                          Phase C 72: a matching session as a clip\n"
                "  benchmark <file> [--repeat n]           what each stage costs here\n"
                "  quality   <pack> --joints a,b,c [--trajectory 0.2,0.4,0.6]\n"
                "                                          Phase C 20: density, duplicates, search\n"
@@ -960,22 +981,15 @@ int cmdQuality(const Args& args) {
     return 0;
 }
 
-int cmdDatabase(const Args& args) {
-    if (args.positional.empty()) {
-        return usage();
-    }
-    const auto pack = scene::readMotionPack(args.positional.front());
-    if (!pack) {
-        fmt::print(stderr, "{}\n", pack.error().message);
-        return 1;
-    }
-    scene::MotionDatabaseOptions options;
+// The feature config from the command line, shared by `database` and `build-db` so the two cannot
+// build different databases from the same flags.
+bool databaseOptionsFromArgs(const Args& args, scene::MotionDatabaseOptions& options) {
     options.sampleRate = std::stof(args.option("rate", "30"));
     const std::vector<std::string> joints = splitCommas(args.option("joints"));
     if (joints.empty()) {
         fmt::print(stderr, "--joints is required: the feature joints are a property of the "
                            "character, not of the search (Phase C §8)\n");
-        return 1;
+        return false;
     }
     options.config.joints = joints;
     if (args.has("trajectory")) {
@@ -990,6 +1004,254 @@ int cmdDatabase(const Args& args) {
     }
     if (args.has("contacts-feature")) {
         options.config.contactWeight = std::stof(args.option("contacts-feature", "1"));
+    }
+    if (args.has("contact-joints")) {
+        options.config.contactJoints = splitCommas(args.option("contact-joints"));
+    }
+    return true;
+}
+
+// Phase C §37/§38/§82: build a database into the pack, once. The offline half of the boundary §37
+// draws: the runtime reads `<pack>/databases/<name>.motiondb` and never extracts a feature, and a
+// second run with identical inputs reuses the file instead of rebuilding it.
+int cmdBuildDb(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const fs::path packDir = args.positional.front();
+    const auto pack = scene::readMotionPack(packDir);
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    scene::MotionDatabaseOptions options;
+    if (!databaseOptionsFromArgs(args, options)) {
+        return 1;
+    }
+    const std::string name = args.option("name", "default");
+    const fs::path file = args.has("out") ? fs::path(args.option("out"))
+                                          : scene::motionDatabasePath(packDir, name);
+    if (args.has("force")) {
+        std::error_code ec;
+        fs::remove(file, ec);
+    }
+    const auto t0 = Clock::now();
+    auto result = scene::buildMotionDatabaseCached(*pack, options, file);
+    const double ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    if (!result) {
+        fmt::print(stderr, "{}\n", result.error().message);
+        return 1;
+    }
+    const scene::MotionDatabase& db = result->db;
+    fmt::print("{} {}  ({:.1f} ms)\n", result->reused ? "reused" : "built", file.string(), ms);
+    fmt::print("  {} samples x {} dimensions, {} clips, {:.2f} MB\n", db.sampleCount(), db.dimension,
+               db.clipNames.size(), static_cast<double>(db.stats.totalBytes()) / (1024.0 * 1024.0));
+    fmt::print("  build key {}  schema {}  source {}\n", db.build.buildKey, db.build.featureSchema,
+               db.build.sourcePackDigest);
+    return 0;
+}
+
+// Phase C §57: what is in a stored database. The pack beside it -- `<pack>/databases/x.motiondb` --
+// is read too when it is there, for the contact distribution and the licences.
+int cmdInspectDb(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const fs::path file = args.positional.front();
+    const auto db = scene::readMotionDatabase(file);
+    if (!db) {
+        fmt::print(stderr, "{}\n", db.error().message);
+        return 1;
+    }
+    fs::path packDir = args.has("pack") ? fs::path(args.option("pack")) : fs::path{};
+    if (packDir.empty() && file.parent_path().filename() == "databases") {
+        packDir = file.parent_path().parent_path();
+    }
+    std::optional<scene::MotionPack> pack;
+    if (!packDir.empty()) {
+        auto read = scene::readMotionPack(packDir);
+        if (read) {
+            pack = std::move(*read);
+        } else {
+            fmt::print(stderr, "(pack not read: {})\n", read.error().message);
+        }
+    }
+    const scene::MotionDatabaseInspection in =
+        scene::inspectMotionDatabase(*db, pack ? &*pack : nullptr);
+    fmt::print("{}", in.report());
+    std::error_code ec;
+    fmt::print("  file {} bytes\n", fs::file_size(file, ec));
+    if (args.has("categories")) {
+        fmt::print("\n{}", in.categories.report());
+    }
+    return 0;
+}
+
+// Phase C §83: what changed between two stored databases.
+int cmdDiffDb(const Args& args) {
+    if (args.positional.size() < 2) {
+        return usage();
+    }
+    const auto a = scene::readMotionDatabase(args.positional[0]);
+    const auto b = scene::readMotionDatabase(args.positional[1]);
+    if (!a || !b) {
+        fmt::print(stderr, "{}\n", !a ? a.error().message : b.error().message);
+        return 1;
+    }
+    const scene::MotionDatabaseDiff diff = scene::diffMotionDatabases(*a, *b);
+    fmt::print("{}", diff.report(args.positional[0], args.positional[1]));
+    return 0;
+}
+
+// The pack and database a session command runs on: `<pack> --db <name or file>`, loaded exactly as
+// the runtime loads them (`loadMotionAsset`), so the tool sees what a character would.
+std::shared_ptr<const scene::MotionAsset> sessionAsset(const Args& args) {
+    if (args.positional.empty()) {
+        return nullptr;
+    }
+    const fs::path packDir = args.positional.front();
+    const std::string db = args.option("db", "default");
+    const fs::path file = db.find(scene::kMotionDatabaseExtension) != std::string::npos
+                              ? fs::path(db)
+                              : scene::motionDatabasePath(packDir, db);
+    auto asset = scene::loadMotionAsset(packDir, file);
+    if (!asset) {
+        fmt::print(stderr, "{}\n", asset.error().message);
+        return nullptr;
+    }
+    return *asset;
+}
+
+// A scripted request: `--speed` m/s along a heading that turns at `--turn` rad/s, optionally
+// switching to `--speed2` at `--switch` seconds. Deterministic, so a session can be re-run.
+entity::MotionRequest scriptedRequest(const Args& args, double time) {
+    const float speed = std::stof(args.option("speed", "1.2"));
+    const float speed2 = std::stof(args.option("speed2", args.option("speed", "1.2")));
+    const float at = std::stof(args.option("switch", "1e9"));
+    const float turn = std::stof(args.option("turn", "0"));
+    const float v = static_cast<float>(time) < at ? speed : speed2;
+    const float heading = turn * static_cast<float>(time);
+    entity::MotionRequest r;
+    r.desiredVelocity = glm::vec3(std::sin(heading) * v, 0.0f, std::cos(heading) * v);
+    if (v > 1e-4f) {
+        r.desiredFacing = glm::normalize(r.desiredVelocity);
+    }
+    return r;
+}
+
+// Phase C §68/§69: run a session and explain its searches -- every one, or the first at or after
+// `--at` seconds. The query explained is the provider's own (`queryFor`), so the explanation is of
+// the decision the provider made.
+int cmdExplain(const Args& args) {
+    const auto asset = sessionAsset(args);
+    if (!asset) {
+        return args.positional.empty() ? usage() : 1;
+    }
+    const scene::MotionDatabase& db = asset->db;
+    entity::MatchMotionProvider provider(&db, &asset->pack.animation, "match");
+    const entity::MatchSettings settings = provider.settings();
+    scene::MotionExplainOptions options;
+    options.switchMargin = settings.switchMargin;
+    if (args.has("stride")) {
+        scene::MotionSearchPlan plan;
+        plan.stride = static_cast<std::uint32_t>(std::stoi(args.option("stride")));
+        plan.shortlist = static_cast<std::uint32_t>(std::stoi(args.option("shortlist", "32")));
+        plan.neighbourhood = static_cast<std::uint32_t>(std::stoi(args.option("neighbourhood", "0")));
+        options.plan = plan;
+    }
+    const double seconds = std::stod(args.option("seconds", "3"));
+    const double at = args.has("at") ? std::stod(args.option("at")) : -1.0;
+    const float dt = 1.0f / 60.0f;
+    entity::MotionMemory memory;
+    int explained = 0;
+    for (double t = 0.0; t <= seconds; t += dt) {
+        const entity::MotionRequest request = scriptedRequest(args, t);
+        const auto query = provider.queryFor(request, memory);
+        const std::uint64_t searches = provider.counters().searches;
+        entity::MotionMemory next;
+        (void)provider.advance(request, memory, t, dt, next);
+        const bool searched = provider.counters().searches > searches;
+        if (searched && query && (at < 0.0 || t >= at)) {
+            const scene::MotionMatchExplanation e =
+                scene::explainMotionMatch(db, *query, settings.weights, options);
+            fmt::print("---- t = {:.3f}s  search {}  -> playing {}\n{}\n", t, provider.counters().searches,
+                       scene::motionSampleLabel(db, next.selection), e.report(db, *query));
+            ++explained;
+            if (at >= 0.0) {
+                break;
+            }
+        }
+        memory = next;
+    }
+    const auto c = provider.counters();
+    fmt::print("session: {:.2f}s, {} searches, {} switches, {} held by margin, {} frames continued\n",
+               seconds, c.searches, c.switches, c.heldByMargin, c.continued);
+    return explained > 0 ? 0 : 1;
+}
+
+// Phase C §72: bake a scripted matching session into a MotionPack holding one clip.
+int cmdBake(const Args& args) {
+    const auto asset = sessionAsset(args);
+    if (!asset || !args.has("out")) {
+        if (asset && !args.has("out")) {
+            fmt::print(stderr, "--out <dir> is required\n");
+        }
+        return 1;
+    }
+    entity::MatchMotionProvider provider(&asset->db, &asset->pack.animation, "match");
+    entity::MotionBakeOptions options;
+    options.name = args.option("name", "baked");
+    options.seconds = std::stof(args.option("seconds", "5"));
+    options.sampleRate = std::stof(args.option("rate", "30"));
+    const auto baked = entity::bakeMotionSession(
+        provider, asset->pack.skeleton,
+        [&](std::uint32_t, double time) { return scriptedRequest(args, time); }, options);
+    if (!baked) {
+        fmt::print(stderr, "{}\n", baked.error().message);
+        return 1;
+    }
+    // The baked clip inherits the corpus's licence -- it is derived from it -- with the bake recorded
+    // in its processing chain, so its ancestry can be printed (Phase A's provenance rule).
+    scene::Provenance provenance =
+        asset->pack.provenance.empty() ? scene::Provenance{} : asset->pack.provenance.front();
+    provenance.processing.push_back(fmt::format(
+        "bake: motion matching session over database {:016x}, {:.2f}s at {:.0f} Hz", asset->db.identity,
+        options.seconds, options.sampleRate));
+    provenance.toolVersion = kToolVersion;
+    scene::PackBuildOptions packOptions;
+    packOptions.sampleRate = options.sampleRate;
+    packOptions.toolVersion = kToolVersion;
+    auto pack = scene::buildMotionPack(options.name, asset->pack.skeleton, {baked->clip}, provenance,
+                                       packOptions);
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    if (auto ok = scene::writeMotionPack(*pack, args.option("out")); !ok) {
+        fmt::print(stderr, "{}\n", ok.error().message);
+        return 1;
+    }
+    std::uint32_t switches = 0;
+    for (std::size_t i = 1; i < baked->memories.size(); ++i) {
+        switches += baked->memories[i].selection != asset->db.sampleNext[baked->memories[i - 1].selection] ? 1u : 0u;
+    }
+    fmt::print("baked {} steps ({} declined, {} switches) into {}\n", baked->steps, baked->declined,
+               switches, args.option("out"));
+    return baked->declined == 0 ? 0 : 2;
+}
+
+int cmdDatabase(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const auto pack = scene::readMotionPack(args.positional.front());
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    scene::MotionDatabaseOptions options;
+    if (!databaseOptionsFromArgs(args, options)) {
+        return 1;
     }
 
     const auto t0 = Clock::now();
@@ -1330,6 +1592,21 @@ int main(int argc, char** argv) {
     }
     if (args.command == "database") {
         return cmdDatabase(args);
+    }
+    if (args.command == "build-db") {
+        return cmdBuildDb(args);
+    }
+    if (args.command == "inspect-db") {
+        return cmdInspectDb(args);
+    }
+    if (args.command == "diff-db") {
+        return cmdDiffDb(args);
+    }
+    if (args.command == "explain") {
+        return cmdExplain(args);
+    }
+    if (args.command == "bake") {
+        return cmdBake(args);
     }
     if (args.command == "reach") {
         return cmdReach(args);
