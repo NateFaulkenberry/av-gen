@@ -58,6 +58,7 @@
 // wrapper and this shader has no frame group, so it takes the arithmetic and passes its own
 // copy of the sixteen floats. There used to be a hand-maintained transliteration here
 // instead, and it had already dropped `WindSample::phase`.
+#include "height_fog.wgsl"
 #include "wind_field.wgsl"
 #include "fields.wgsl"
 #include "spline.wgsl"
@@ -1014,7 +1015,11 @@ fn fogTransmittance(origin: vec3<f32>, dir: vec3<f32>, dist: f32) -> f32 {
     for (var i = 0; i < 4; i = i + 1) {
         let t = (f32(i) + 0.5) * 0.25 * dist;
         let y = origin.y + dir.y * t;
-        sum += exp(-max(0.0, y - params.fog.y) * params.fog.z);
+        // ADR-567: the SAME profile the march evaluates and the surface pass integrates. This was
+        // a third statement of the model, written out here -- the shape ADR-562 §9 names: every
+        // reader of a shared model is a call site to audit, and a reader that restates it is one
+        // edit away from being a different atmosphere in the same frame.
+        sum += fogHeightProfile(y - params.fog.y, params.fog.z);
     }
     return exp(-density * params.fog.w * (sum * 0.25) * dist);
 }

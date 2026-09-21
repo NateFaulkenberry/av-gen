@@ -334,7 +334,11 @@ fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -
 }
 
 fn volumeDensityAt(p: vec3<f32>) -> f32 {
-    let heightTerm = exp(-max(0.0, p.y - vol.params0.y) * vol.params0.z);
+    // ADR-567: the SAME function the surface fog integrates (`height_fog.wgsl`, reached through
+    // this file's include of common.wgsl). It used to be this expression written out here and the
+    // antiderivative written out in common.wgsl -- two statements of one model, in two files, with
+    // nothing asserting they were a function and its integral.
+    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z);
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);
     if (densitySlot >= 0) {

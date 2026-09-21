@@ -27,6 +27,11 @@
 # summary: an exit code with no summary is a crash, a summary that disagrees with the exit
 # code is a tooling fault, and neither is a pass.
 #
+# AND THE INPUTS ARE LIVE. `ShaderLibrary` loads `.wgsl` from the SOURCE TREE when a case asks
+# for a module, so editing a shader while a suite is running mixes two versions into one run --
+# which comes back green and means nothing. Same for scenes and assets. A C++ edit is harmless
+# (the binary is linked); anything read from disk is not. docs/testing.md entry 25.
+#
 # Doing that is load-bearing wherever it already happens, and is written down almost
 # nowhere -- a later cleanup that wraps an invocation "for consistency" removes the only
 # reason the result can be trusted, silently. That is why this paragraph is here and not

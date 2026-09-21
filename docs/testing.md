@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-four ways a green suite has lied
+## Twenty-five ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -497,6 +497,52 @@ night from two agents who never spoke to each other.
    (ADR-389), **and it will keep passing until someone moves the control that makes the two
    distributions differ.** When you replace a function, grep for the constants that were sized
    against the old one. They do not announce themselves.
+
+25. **A GPU suite reads its shaders from the source tree at RUN time, so editing a `.wgsl` while
+   one is running makes the whole run say nothing.**
+
+   Done on 2026-09-21, by me, an hour after re-reading the entry about editing `tools/gpu-lock.sh`
+   while instances held it. The suite was started, then `shaders/particles.wgsl` was edited while
+   it ran. `ShaderLibrary` loads from `AVGEN_SHADER_SOURCE_DIR` when a case asks for a module, so
+   cases that ran before the write compiled one version and cases after it compiled another.
+
+   **The run came back green, 397 cases, exit 0.** That is what makes it worth an entry rather
+   than a note: there was no symptom. A mixed run is not "probably fine" -- it is a run in which
+   no case can be attributed to a version of the tree, including the green ones, and a pass under
+   those conditions is exactly as uninformative as a failure.
+
+   The rule is narrower than "do not edit while tests run", because a C++ edit is harmless -- the
+   binary is already linked:
+
+   > **A running binary's inputs are frozen only if they were compiled into it.** Shaders, scenes,
+   > assets and config files are read when a case asks for them. Anything the suite loads from
+   > disk is live for the whole run.
+
+   Discard the run and start it again. It costs one suite; arguing about which half of a mixed run
+   to believe costs more, and believing it costs more still.
+
+   **And the same hour, the same mistake one layer up.** While the replacement run was going, this
+   very entry's companion note was written into `tools/gpu-lock.sh` -- the script that run was
+   executing. Bash reads a script incrementally by byte offset, so inserting five lines above the
+   offset it was holding shifted everything after it, and the wrapper died with
+
+       tools/gpu-lock.sh: line 89: syntax error near unexpected token `('
+
+   *after* the binary had finished and printed `397 cases | 396 passed | 1 skipped`. The file was
+   restored from `git` within about thirty seconds, so the lock was not wedged this time -- but the
+   run's captured exit code was **2, from the wrapper**, against a summary that said everything
+   passed. Which is the header's own rule arriving as a live example: **an exit code that disagrees
+   with the summary is a tooling fault, and neither of them is a pass.** The run was re-taken.
+
+   Two corollaries worth more than the incident:
+
+   - **`pgrep -f` matched only the orphaned waiters.** The "is anything running?" check came back
+     with four processes and all four were `until ! pgrep -qf "avgen_render_tests"` loops from a
+     session two days ago, matching their own command lines and therefore immortal. The idle
+     machine looked busy. Match the binary's PATH and exclude the shell wrappers:
+     `ps -Ao pid,command | grep 'build/release/tests/avgen_render_tests' | grep -v 'zsh -c'`.
+   - **After editing a shell script, `bash -n` it.** It costs nothing and it is the difference
+     between finding a syntax error now and finding it in the exit code of somebody's suite.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
