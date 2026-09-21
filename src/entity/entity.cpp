@@ -1562,10 +1562,15 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // ---- the senses, before the behaviours (ADR-270) ----
         // Above the behaviours and below the action tier, because a percept is something a body
         // *knows* and an order is something it was *told*: a character under orders still notices
-        // what is around it, and P3's decider is what will be allowed to act on that. Nothing reads
-        // `Entity::percepts()` yet -- the decider is the next unit -- so this stage currently
-        // changes no character's route by a millimetre, which is a claim
-        // `tests/unit/test_entity_perception.cpp` holds rather than an assurance.
+        // what is around it, and P3's decider is what will be allowed to act on that.
+        //
+        // **This used to say "Nothing reads `Entity::percepts()` yet… so this stage currently
+        // changes no character's route by a millimetre". That is no longer true** (ADR-615):
+        // `Explore` merges `self->percepts()` into its memory and `decision.cpp` scores them, so
+        // the sense stage does change routes through the `Perceived` goal source. The accessor is
+        // grep-complete at three lines -- declaration, this comment, one consumer -- so there is no
+        // second path the old claim could have been narrowly true about. Someone profiling this
+        // stage, or tracking down an odd goal, would have been told to stop looking here.
         if (perceiving_) {
             perceiveOne(entityIndex, ctx.time);
         }

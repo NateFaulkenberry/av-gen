@@ -123,7 +123,22 @@
 namespace avgen::entity {
 
 // ------------------------------------------------------------------------------------------------
-// §2. Perception -- the layer that genuinely does not exist
+// §2. Perception -- **BUILT. The heading below was true in Phase 0 and is false now (ADR-615).**
+//
+// `src/entity/perception.{hpp,cpp}` exist, with two implementations of `IPerception` --
+// `GridPerception` and `ScriptedPerception` -- and `GridPerception` has the distance limit, the
+// facing test and the occlusion check the paragraph below says are missing. `Explore` scores
+// `ctx.percepts`, not `interestPoints()`, with `Perceived` and `Omniscient` as selectable sources.
+//
+// **This is the tier that matters, because §2 is a build instruction and not a status note.** This
+// file declares itself normative and exists so that several parallel agents do not each invent a
+// perception layer; an agent reading the heading below and believing it writes a second
+// `GridPerception`. The document now causes the outcome it was written to prevent.
+//
+// Kept as history, because the argument is what produced the layer. Read it as the brief, not as a
+// description of the engine.
+//
+// §2. Perception -- the layer that genuinely does not exist [BUILT -- see above]
 // ------------------------------------------------------------------------------------------------
 //
 // Today every character sees everything. `EntityWorld::interestPoints()` is one global list --

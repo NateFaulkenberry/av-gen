@@ -77,7 +77,33 @@ float deriveDuplicateRadius(const MotionDatabase& db) {
             }
         }
     }
-    return measured > 0 ? static_cast<float>(total / measured) : 0.0f;
+    if (measured == 0) {
+        return 0.0f;
+    }
+    // **Converted into the weighted space, because that is the only space it is ever compared in.**
+    //
+    // The probe above displaces the query by `radius / sqrt(D)` in every dimension and calls the
+    // result `radius` -- which is the **unweighted** L2 length of that displacement. But the only
+    // consumers of this number are `meanNearestNeighbour`, a *weighted* distance, and the
+    // duplicate count, which tests `weightedDistance < radius`. Comparing a weighted distance
+    // against an unweighted threshold is the weighted/unweighted mismatch this phase has now paid
+    // for in four places, and it was hiding behind a comment asserting the opposite.
+    //
+    // For a displacement of `per` in every dimension the weighted length is
+    // `sqrt(sum_k per^2 w_k)` = `radius * sqrt(mean(w))`, so one factor converts it. At the default
+    // weights that factor is 0.863, and it is **constant across corpora at fixed weights** -- which
+    // is exactly why the corpus-to-corpus comparisons taken before this fix survive it, and why a
+    // comparison across *weightings* would not have. See ADR-616.
+    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    float meanWeight = 1.0f;
+    if (dimWeight.size() == db.dimension && db.dimension > 0u) {
+        float sum = 0.0f;
+        for (const float w : dimWeight) {
+            sum += w;
+        }
+        meanWeight = sum / static_cast<float>(db.dimension);
+    }
+    return static_cast<float>(total / measured) * std::sqrt(std::max(meanWeight, 1e-6f));
 }
 
 } // namespace
@@ -100,9 +126,13 @@ MotionQualitySummary analyseMotionQuality(const MotionDatabase& db,
 
     // **Weighted, and that is a decision rather than a default.** A nearest-neighbour statistic
     // could defensibly describe the corpus in raw feature space -- but this one is compared against
-    // `duplicateRadius`, which is derived from the *search's* discrimination and is therefore
-    // weighted. Two quantities compared to each other must be in one space, whichever space that
-    // is, and the radius has no meaning outside the weighted one.
+    // `duplicateRadius`, so the two must be in one space, whichever space that is.
+    //
+    // **This comment used to assert that they already were, and they were not**: the radius was an
+    // unweighted displacement length and this is a weighted distance. `deriveDuplicateRadius` now
+    // converts, and the assertion is true rather than merely written down. The lesson is the
+    // general one -- a quantity's name does not carry the convention it was computed under, and a
+    // comment claiming two things share a space is not evidence that they do.
     const std::vector<float> dimWeight = motionFeatureWeights(db.config);
     const bool weighted = dimWeight.size() == db.dimension;
 

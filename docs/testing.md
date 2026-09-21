@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Thirty ways a green suite has lied
+## Thirty-one ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -763,6 +763,36 @@ a wound.
    runs, still asserts, still prints a number with four decimals. Ask what the metric can see
    before asking what the feature carries -- the same instinct as 13, 17 and 26, arriving through
    the corpus rather than through the fixture.
+
+31. **Finding a fact in one place tells you nothing about how many places it is in. Grep for the
+   second copy of anything found once.**
+
+   `LocomotionState::grounded` carried a comment saying it was "written by neither and read by
+   nobody". The write half had been fixed; the comment had not. That was found, and fixed, and the
+   class was believed closed — **and it was still there, because `EntityWorld::seek` and
+   `EntityWorld::update` publish the locomotion seam in two separate blocks and both carry the
+   identical sentence.** Fixing one left the other, and the grep that would have said so takes five
+   seconds:
+
+   ```
+   grep -n "written by neither" src/entity/entity.cpp   # two hits, not one
+   ```
+
+   **A duplicated block duplicates its comments, its constants and its bugs.** Any fact that lives
+   inside a copied region lives in N copies, and the first one you find is evidence of N ≥ 1 and
+   nothing more. This is the reason a fix can be correct, tested, and still leave the defect in the
+   tree.
+
+   The habit: **after finding something by reading, search for its own text before believing you
+   have all of it.** Quote a distinctive fragment of the thing itself — the comment sentence, the
+   magic number, the expression — rather than the symbol name, because the symbol is what differs
+   between copies and the body is what does not.
+
+   It generalises past comments. Two `switch` statements over the same enum, two publication paths
+   for one seam, two arms of a test fixture, `seek` and `update`, a JSON reader and a JSON writer:
+   each is a place where a fact was copied and can rot independently. Entry 22's dispatch and
+   entry 23's two kinds are the same family seen from the code side; this is the same family seen
+   from the *fix* side, and it is the one that bites after you think you are done.
 
 ## The scratchpad is shared by every agent in a session
 

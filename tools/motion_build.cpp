@@ -760,6 +760,20 @@ int cmdQuality(const Args& args) {
             options.config.trajectoryTimes.push_back(std::stof(t));
         }
     }
+    // §20's follow-up: the mechanism predicted that a corpus **the matcher can resolve** would
+    // break the stride plan, and no corpus tested it, because more data moves a corpus the wrong
+    // way. Resolution is a property of the weighting, so these are how the experiment is run.
+    //
+    // **Set BEFORE the database is built, which is not where they were first written.** The first
+    // version assigned them after `buildMotionDatabase` had already copied `options.config`, so a
+    // 64x sweep of `rootVelocityWeight` printed the weight it had been given and produced four
+    // byte-identical arms. A control that reports itself as set and changes nothing is ADR-558's
+    // shape, and it was caught only because the arms were printed side by side.
+    options.config.jointPositionWeight = std::stof(args.option("joint-pos", "1.0"));
+    options.config.jointVelocityWeight = std::stof(args.option("joint-vel", "0.4"));
+    options.config.trajectoryPositionWeight = std::stof(args.option("traj-pos", "1.0"));
+    options.config.trajectoryFacingWeight = std::stof(args.option("traj-facing", "0.5"));
+    options.config.rootVelocityWeight = std::stof(args.option("root-vel", "1.0"));
     const auto db = scene::buildMotionDatabase(*pack, options);
     if (!db) {
         fmt::print(stderr, "{}\n", db.error().message);
@@ -781,6 +795,11 @@ int cmdQuality(const Args& args) {
 
     fmt::print("corpus: {} clip(s), {} sample(s), {} dimension(s)\n", db->stats.clips,
                db->sampleCount(), db->dimension);
+    fmt::print("  weights: jointPos {:.2f}  jointVel {:.2f}  trajPos {:.2f}  trajFacing {:.2f}  "
+               "rootVel {:.2f}\n",
+               options.config.jointPositionWeight, options.config.jointVelocityWeight,
+               options.config.trajectoryPositionWeight, options.config.trajectoryFacingWeight,
+               options.config.rootVelocityWeight);
     fmt::print("  cost spread (build-time): {:.2f}   dead dimensions: {}\n", db->stats.costSpread,
                db->stats.deadDimensions);
 
@@ -821,7 +840,23 @@ int cmdQuality(const Args& args) {
         {"stride 8, FULL prefix, top 32", 8u, 32u, 0u, 8u},
         {"stride 4, FULL prefix, top 32", 4u, 32u, 0u, 4u},
     };
-    fmt::print("plan                           recall   worst excess   x typical gap   scored\n");
+    // **The same degeneracy §30's contact experiment hit, checked for here before any recall
+    // number is read.** A query built from a sample's own features and nudged by a fixed amount
+    // identifies its own source uniquely once the corpus is large enough, and then every plan
+    // agrees with the exhaustive search trivially: recall reads 100% and measures identifiability
+    // rather than search quality. The perturbation is therefore expressed in the matcher's own
+    // units -- the derived duplicate radius -- so the query is ambiguous by construction at any
+    // corpus size and under any weighting, and the seed-return count is printed beside the recall
+    // so a degenerate run cannot be read as a good one.
+    const float planPerturbation =
+        quality.duplicateRadius > 0.0f
+            ? quality.duplicateRadius / std::sqrt(static_cast<float>(db->dimension))
+            : 0.05f;
+    fmt::print("plan perturbation {:.4f} per dimension (derived radius {:.4f} over {} dims; the "
+               "fixed 0.05 would be {:.1f}x smaller)\n",
+               planPerturbation, quality.duplicateRadius, db->dimension, planPerturbation / 0.05f);
+    fmt::print("plan                           recall   worst excess   x typical gap   scored  "
+               "seed-returns\n");
     for (const Plan& p : plans) {
         scene::MotionSearchPlan plan;
         plan.stride = p.stride;
@@ -832,13 +867,14 @@ int cmdQuality(const Args& args) {
         int trials = 0;
         double worstExcess = 0.0;
         std::uint64_t fullyScored = 0;
+        int returnedSeed = 0;
         for (std::uint32_t s = 0; s < db->sampleCount(); s += step) {
             scene::MotionQuery query;
             query.features.assign(db->dimension, 0.0f);
             const float* f = db->featuresFor(s);
             std::copy(f, f + db->dimension, query.features.begin());
             for (std::size_t d = 0; d < query.features.size(); d += 3) {
-                query.features[d] += 0.05f;
+                query.features[d] += planPerturbation;
             }
             query.current = s > 0 ? s - 1u : scene::MotionDatabase::kInvalid;
             const scene::MotionMatch full = scene::searchMotion(*db, query, weights);
@@ -847,6 +883,9 @@ int cmdQuality(const Args& args) {
                 continue;
             }
             ++trials;
+            if (full.sample == s) {
+                ++returnedSeed;
+            }
             fullyScored += staged.fullyScored;
             if (staged.sample == full.sample) {
                 ++agreed;
@@ -855,10 +894,11 @@ int cmdQuality(const Args& args) {
                                                         static_cast<double>(full.cost));
             }
         }
-        fmt::print("{}  {:5.1f}%  {:12.4f}  {:11.2f}x  {:12.0f}   (n={})\n", p.name,
+        fmt::print("{}  {:5.1f}%  {:12.4f}  {:11.2f}x  {:12.0f}  {:5.1f}%  (n={})\n", p.name,
                    100.0 * agreed / std::max(trials, 1), worstExcess,
                    worstExcess / std::max(spread, 1e-9),
-                   static_cast<double>(fullyScored) / std::max(trials, 1), trials);
+                   static_cast<double>(fullyScored) / std::max(trials, 1),
+                   100.0 * returnedSeed / std::max(trials, 1), trials);
     }
 
     // ---- the cross-clip coverage bound --------------------------------------------------------

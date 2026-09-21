@@ -182,9 +182,12 @@ public:
     virtual void setLocomotion(const LocomotionState& state) = 0;
 };
 
-// Implemented by the animation layer so sockets can follow joints. Until one exists, a socket
-// resolves against the entity's own transform, which is correct for a craft and approximate for a
-// character -- approximate being the right failure for a prop that has to be somewhere.
+// Implemented by the animation layer so sockets can follow joints. **One exists** --
+// `Composition::AnimationSink`, installed through `Entity::setSkeleton` -- so the fallback below is
+// the path taken by a body with no rig rather than by every body (ADR-615). Where there is no
+// implementation a socket resolves against the entity's own transform, which is correct for a
+// craft and approximate for a character; approximate is the right failure for a prop that has to
+// be somewhere.
 //
 // **The frame this answers in is the rig's model space, which is the entity's own frame, and not
 // the world** (ADR-274). The method used to be called `jointWorldTransform` and its only consumer,

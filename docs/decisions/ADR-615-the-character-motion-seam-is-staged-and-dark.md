@@ -58,6 +58,47 @@ symptom, not where the phase log records it — the ADR-612 treatment. Someone a
 character ignore the velocity I set on its intent" should find the answer at the intent field, not
 by reading a motion-matching phase log.
 
+## The worst instance in this programme, and why it is worse than the rest
+
+Every other one-ended contract in this codebase is **a declaration nothing consumes** — the code
+does less than it claims, and a reader loses time. `src/entity/character_ai.hpp` is the inverse and
+it is in a different class.
+
+It is the file that **declares itself normative**, that every agent and engineer reads first before
+touching character work, and that exists specifically so parallel workers do not each invent a
+second character-state type. Its status block told those readers that six shipped subsystems **do
+not exist**: joint masks, the pose layer stack, IK of any kind, root-motion extraction,
+`ISkeletonQuery` implementations, and `Entity::setSkeleton` call sites. Its four outstanding work
+items, A1–A4, are all done. It also states "nothing in this file compiles into the engine" while
+three live headers include it — which is the detail that shows how long it had been since anyone
+re-read it.
+
+**It hands you a falsification procedure that falsifies the document.** The text says to confirm
+the absence of masks by grepping for `jointMask` in `src/scene/skeleton.*`. That grep now returns
+hits. The document supplied the evidence against itself and nobody ran it.
+
+### The consequence that makes it more than embarrassing
+
+`src/entity/behaviors.cpp` cites the dead fact as a **rationale**:
+
+> *"And 'head movement' is not here, because nothing can address a head: `ISkeletonQuery` is
+> declared, stored, and never implemented… A whole-body nod is what is honestly available, and that
+> is what `nod` is."*
+
+A head can be addressed two ways now — `PoseLayerKind::Aim` with a pivot, and
+`PoseLayerDrive::Look`. So someone asked to add head movement reads this, believes the engine
+cannot do it, and **builds a second whole-body approximation: a worse feature, shipped, because the
+documentation was stale.**
+
+> **That is the tier that matters. A stale assertion used as a rationale does not merely waste a
+> reader's time or cause a misdiagnosis — it causes new bad code.** Rank stale text by what a
+> reader *does* because of it: causes new bad code, causes a misdiagnosis, wastes time. Only the
+> first actively makes the codebase worse, and it is the one that looks most like helpful context.
+
+Both are corrected in place. The Phase 0 text is kept and labelled as history rather than deleted,
+because the argument that produced the layer stack is worth finding — but it is no longer presented
+as a description of this engine.
+
 ## The shape this added to the catalogue
 
 `LocomotionState::grounded` is written on both paths and read by nobody — ordinary enough. What is
