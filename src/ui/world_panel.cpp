@@ -1231,6 +1231,43 @@ void WorldPanel::drawDebugOptions(app::Engine& engine, WorldEditor* editor) {
     if (ImGui::IsItemHovered()) {
         tooltip("Every skinned entity's joints and bones, in world space.");
     }
+    // Phase B §50. Beside the other debug toggles rather than in a panel of their own: these are
+    // diagnostics for a reusable engine system, which is where ADR-387 says first-class UI goes,
+    // and a person looking for "why is this leg doing that" looks where Skeletons already is.
+    ImGui::SameLine();
+    ImGui::Checkbox("IK chains", &debug.motionChains);
+    if (ImGui::IsItemHovered()) {
+        tooltip("Every IK chain the layer stack solved this frame, coloured by what the solver\n"
+                "said: green solved, amber clamped at the limb's reach, red degenerate. The\n"
+                "colour is the diagnostic -- a chain drawn the same whatever the solve returned\n"
+                "is a picture of a leg.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("IK targets", &debug.motionTargets);
+    if (ImGui::IsItemHovered()) {
+        tooltip("What each aim and IK layer was asked to reach, with a line from the thing that\n"
+                "was asked to reach it -- so 'the hand is off the target' and 'the target is not\n"
+                "where you think' are different pictures.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Contacts", &debug.motionContacts);
+    if (ImGui::IsItemHovered()) {
+        tooltip("The ground plane under each foot layer and the gap between it and the foot.\n"
+                "Absent, not flat, when there is no ground: no answer is not no ground.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Motion vectors", &debug.motionVectors);
+    if (ImGui::IsItemHovered()) {
+        tooltip("Body velocity, acceleration and facing, from the state the layers actually ran\n"
+                "with this frame.");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Body comp.", &debug.motionCompensation);
+    if (ImGui::IsItemHovered()) {
+        tooltip("The pelvis correction: where the body joint was and where the solve moved it.\n"
+                "Red when a limb still cannot reach afterwards -- 'it ran' and 'it worked' are\n"
+                "different answers.");
+    }
     ImGui::SameLine();
     ImGui::Checkbox("Beam axes", &debug.beams);
     if (ImGui::IsItemHovered()) {

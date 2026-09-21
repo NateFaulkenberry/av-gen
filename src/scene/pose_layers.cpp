@@ -62,6 +62,34 @@ const char* poseLayerKindName(PoseLayerKind kind) {
     return "aim";
 }
 
+std::uint32_t seedFromName(std::string_view name) {
+    std::uint32_t h = 2166136261u;
+    for (const char c : name) {
+        h ^= static_cast<std::uint32_t>(static_cast<unsigned char>(c));
+        h *= 16777619u;
+    }
+    return h;
+}
+
+float seedPhase(std::uint32_t characterSeed, std::uint32_t layerSeed) {
+    // Zero and zero means "unseeded", and it has to come out as exactly zero rather than as some
+    // arbitrary hash of two zeroes -- otherwise adding this field would have silently shifted
+    // every existing secondary layer in the repository, and the first anyone would know is that a
+    // render no longer matched.
+    if (characterSeed == 0u && layerSeed == 0u) {
+        return 0.0f;
+    }
+    // A bit-mixer, not a random number generator: no state, no sequence, no order dependence.
+    std::uint32_t h = characterSeed * 2654435761u;
+    h ^= layerSeed + 2654435769u + (h << 6) + (h >> 2);
+    h ^= h >> 16;
+    h *= 2246822507u;
+    h ^= h >> 13;
+    h *= 3266489909u;
+    h ^= h >> 16;
+    return static_cast<float>(h) / 4294967296.0f;
+}
+
 int poseLayerStage(PoseLayerKind kind) {
     // §5's chain, as numbers. The gaps are deliberate: a kind added between two of these needs a
     // number, and a dense sequence would force renumbering the ones around it.
@@ -756,7 +784,11 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 }
                 // Each successive masked joint lags the one before, so the motion travels up the
                 // body instead of moving it as one rigid block.
+                // §49: authored phase, plus the seeded offset, plus the per-joint spread. Three
+                // terms that are each a pure function of their inputs, summed -- so the whole
+                // thing is reconstructable at frame N without having run frame N-1.
                 const float phase = layer.secondaryPhase +
+                                    seedPhase(layer.characterSeed, layer.layerSeed) +
                                     (static_cast<float>(ordinal) * layer.secondarySpread);
                 ++ordinal;
                 const auto cycles = static_cast<float>(now / static_cast<double>(period));

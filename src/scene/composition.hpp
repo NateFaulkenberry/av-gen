@@ -1672,6 +1672,36 @@ public:
         // How many frames the RIG actually consumed an external pose on. Counted by the consumer,
         // which is the only party whose answer cannot be a claim -- see `externalPoseFrames`.
         std::uint64_t externalPoseFrames = 0;
+
+        // **Phase B §50.** Everything above answers "did the provider seam work". These answer
+        // "what is the animation actually doing", which is the question §50 exists for and which
+        // nothing could ask before: the layer state lived inside `PoseLayerStack` and the body
+        // state inside `MotionContext`, and neither was reachable from outside the sink.
+        //
+        // Gathered here rather than read out of ImGui so it can be **tested without a GPU and
+        // without a panel** -- the numbers are the part that can be wrong, and a panel that
+        // renders wrong numbers correctly is not debuggable, it is convincing.
+        struct LayerRow {
+            std::string name;
+            PoseLayerKind kind = PoseLayerKind::Aim;
+            float requestedWeight = 0.0f; // what the driver asked for this frame
+            float realizedWeight = 0.0f;  // what the blend actually applied (§46)
+            LayerResolution resolution = LayerResolution::Inactive;
+            IkStatus ik = IkStatus::Solved;
+            bool hasTarget = false;
+            bool hasGround = false;
+        };
+        std::vector<LayerRow> layers;
+        LocomotionMode mode = LocomotionMode::Idle;
+        MotionPhase motionPhase = MotionPhase::Idle;
+        float groundSpeed = 0.0f;
+        float turnRate = 0.0f;
+        bool hasGroundPlane = false;
+        bool hasLookTarget = false;
+        // The pelvis correction and whether it was enough -- "it ran" and "it worked" are
+        // different answers and a panel that conflates them hides the interesting case.
+        glm::vec3 bodyCompensation{0.0f};
+        std::uint32_t unreachableAfterCompensation = 0;
     };
     [[nodiscard]] MotionDebug motionDebug(std::string_view node) const;
 

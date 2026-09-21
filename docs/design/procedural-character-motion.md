@@ -860,3 +860,87 @@ is invalidated rather than carried (§53).
 and pose once. `MotionChain` already orders Neural → Matching → Clip with fallback. `MotionDatabase`
 and `searchMotion` exist with feature vectors and continuity cost. Phase C replaces what produces
 the base pose and changes nothing below `MotionContext`.
+
+## §49 — deterministic randomness
+
+My own audit marked this done, and it was wrong. §49's second sentence — "do not use uncontrolled
+global randomness" — was satisfied: the secondary layer is a pure function of the timeline second
+(ADR-360). Its **first** sentence names two fields, `characterSeed` and `layerSeed`, and neither
+existed. Variation was hand-authored, one `phase` per layer per character typed into the scene file.
+**Hand-authored spread is not a seed; it is the absence of one, done by hand.** Five aliens can be
+spread that way and a hundred cannot.
+
+`seedPhase(characterSeed, layerSeed)` is a bit-mixer — no state, no sequence, no order dependence —
+hashed into a phase offset rather than into a generator, with `seedPhase(0, 0)` exactly `0.0f` so an
+unseeded layer is byte-for-byte unchanged. `seedFromName` is FNV-1a rather than `std::hash`, whose
+value is explicitly allowed to differ between runs of the same program, which would make a
+"deterministic" seed reproducible only by accident. Because a knob nobody sets refuses nothing
+(ADR-600), `driveLayers` seeds every layer it drives, from **names** rather than indices: an index
+changes when someone reorders a scene file, and a render that changes because two characters swapped
+places in a JSON array is what §49 exists to prevent. The authored `secondaryPhase` survives as an
+offset on top, rather than being replaced when it happens to be zero.
+
+Measured: a hundred seeded characters, closest pair 0.00002 apart, largest empty gap 0.0583 against
+a 0.25 bound a corner-piling hash would fail. Recorded as ADR-606.
+
+## §50 — editor / debug visualization
+
+What makes this stage load-bearing rather than cosmetic: every defect this phase found was invisible
+until something measured it, and **a probe can only be written once somebody suspects the thing it
+measures**. An overlay works the other way round.
+
+Five toggles beside the existing `Skeletons` one in the World panel, drawn in
+`buildDebugGeometry` — which is testable without a GPU, so the geometry is read back and asserted
+rather than eyeballed:
+
+- **IK chains**, coloured by what the solver said: green solved, amber clamped, red degenerate. The
+  colour is the diagnostic; a chain drawn the same whatever the solve returned is a picture of a leg.
+- **IK targets**, with a line from the thing asked to reach them, so "the hand is off the target"
+  and "the target is not where you think" are different pictures.
+- **Contacts**: the plane under each foot and the gap to the foot — absent, not flat, when there is
+  no ground, because no answer is not no ground (ADR-551).
+- **Motion vectors**: velocity, acceleration and facing, from the state the layers actually ran with.
+- **Body compensation**: where the body joint was and where the solve moved it, red when a limb
+  still cannot reach — "it ran" and "it worked" are different answers.
+
+Everything reads the **realized** weight, not the requested one: a layer at requested 1.0 and
+realized 0.02 is two frames into a blend, and an overlay showing the request would draw §46's defect
+as though it were not happening.
+
+`Composition::MotionDebug` gained the numeric half — per-layer name, kind, requested and realized
+weight, resolution, IK status — plus mode, phase, ground speed, turn rate and the body correction.
+Gathered in the seam rather than in ImGui so it is testable without a GPU and without a panel: the
+numbers are the part that can be wrong, and **a panel that renders wrong numbers correctly is not
+debuggable, it is convincing.** I cannot see ImGui, so what is claimed here is that the data is
+right and the panel is a thin reader of it.
+
+Arms that can fail: each toggle draws nothing when off; moving a reach target out of range recolours
+12 of 36 chain vertices and **not** the other 24, so the diagnostic distinguishes the limb that
+clamped from the two that did not; and `hasGround` false draws nothing at all rather than a plane
+at zero.
+
+## §51 — the audit against the matrix
+
+Twenty-four rows in §51's own list. Eighteen were already covered and are cited by file and test
+name in `tests/unit/test_phase_b_matrix.cpp`'s header. Six were gaps, and two of the six were
+findings rather than formalities:
+
+- **Contact release.** Before §46 a released contact dropped the foot **0.200 m in one frame** — the
+  same defect §46 found on the reach layer, on a different layer, missed by the six-cause list
+  because the slice's script never released a contact. §46's blend fixes it structurally, which is
+  the argument for having put it on `PoseLayer` rather than in the reach code: measured now at
+  0.0231 m worst frame over a 0.25 s release.
+- **Lowered ground.** My row asserted symmetry and failed. Raising the ground 0.20 m moves the foot
+  0.1999 m; lowering it 0.20 m moves the foot 0.0119 m. The engine is right: the alien binds with
+  its leg nearly straight, so there is no slack to extend downward and the solve clamps. **A foot
+  layer alone cannot follow ground that falls** — that is what body compensation is for. The
+  expectation was wrong, not the code.
+
+The other four: elevated ground, a moving reach target (worst tracking error 0.00000 m, worst hand
+step 0.0022 m over 121 frames), and secondary motion **bounded** (1.4993° against an authored 1.5°
+over six minutes) and **stable** (bit-identical one period later, and different half a period later,
+so the check is about the period rather than about the layer doing nothing).
+
+The bounded/stable probes first read **exactly 0.00000 m** because they measured the head's
+*position* on a flat rig, where rotating a sibling moves nothing. That is `docs/testing.md` #26, and
+the second confident zero this rig has produced in one phase.

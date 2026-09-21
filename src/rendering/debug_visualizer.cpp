@@ -663,6 +663,131 @@ void buildDebugGeometry(DebugDraw& draw, const scene::Scene& scene, const DebugV
                 }
             }
         }
+        // Phase B §50. One block, because every one of these reads the same two things: the rig's
+        // model-space joints and the per-layer state `driveLayers` wrote this frame. `model` takes
+        // entity-local to world, which is the conversion a layer target needs -- a layer's target
+        // is in the rig's own frame (ADR-274), and drawing it in world space without this is the
+        // classic diagnostic that is confidently wrong by a whole transform.
+        const bool wantMotion = options.motionChains || options.motionTargets ||
+                                options.motionContacts || options.motionVectors ||
+                                options.motionCompensation;
+        if (wantMotion && entity.rig < scene.rigs.size()) {
+            const scene::SkinnedRig& rig = scene.rigs[entity.rig];
+            const scene::PoseLayerStack& stack = rig.layers;
+            const std::vector<glm::mat4>& jointModel = rig.scratchModel;
+            const std::vector<scene::PoseLayer>& layers = stack.layers();
+            const std::vector<glm::ivec3>& chains = stack.chains();
+            const std::vector<scene::IkStatus>& statuses = stack.ikStatuses();
+            const std::vector<scene::LayerResolution>& results = stack.results();
+
+            const auto worldOf = [&](int joint) {
+                return glm::vec3(model * jointModel[static_cast<std::size_t>(joint)][3]);
+            };
+            const auto inRange = [&](int joint) {
+                return joint >= 0 && static_cast<std::size_t>(joint) < jointModel.size();
+            };
+
+            for (std::size_t i = 0; i < layers.size(); ++i) {
+                const scene::PoseLayer& layer = layers[i];
+                // The **realized** weight, not the requested one. A layer at requested 1.0 and
+                // realized 0.02 is two frames into a blend, and an overlay that showed the request
+                // would say it is fully on -- which is exactly the defect §46 found, drawn as
+                // though it were not happening.
+                const float weight = layer.effectiveWeight();
+                const bool live = weight > 0.0f && i < results.size() &&
+                                  results[i] != scene::LayerResolution::Inactive;
+
+                if (options.motionChains && i < chains.size() && live) {
+                    const glm::ivec3 ids = chains[i];
+                    if (inRange(ids.x) && inRange(ids.y) && inRange(ids.z)) {
+                        // The colour IS the diagnostic. A chain drawn the same whatever the solver
+                        // said is a picture of a leg, and this phase already has one of those.
+                        const scene::IkStatus status =
+                            i < statuses.size() ? statuses[i] : scene::IkStatus::Solved;
+                        glm::vec4 colour{0.2f, 1.0f, 0.4f, 0.95f}; // Solved
+                        if (status == scene::IkStatus::Clamped) {
+                            colour = glm::vec4(1.0f, 0.75f, 0.1f, 0.95f);
+                        } else if (status != scene::IkStatus::Solved) {
+                            colour = glm::vec4(1.0f, 0.2f, 0.2f, 0.95f); // degenerate, of any kind
+                        }
+                        colour.a *= std::clamp(weight, 0.15f, 1.0f);
+                        draw.line(worldOf(ids.x), worldOf(ids.y), colour);
+                        draw.line(worldOf(ids.y), worldOf(ids.z), colour);
+                        draw.point(worldOf(ids.z), options.pointSize * 0.9f, colour);
+                    }
+                }
+
+                if (options.motionTargets && layer.hasTarget && live) {
+                    const glm::vec3 target = glm::vec3(model * glm::vec4(layer.target, 1.0f));
+                    const glm::vec4 colour = layer.kind == scene::PoseLayerKind::Aim
+                                                 ? glm::vec4(0.4f, 0.8f, 1.0f, 0.9f)
+                                                 : glm::vec4(1.0f, 0.4f, 0.9f, 0.9f);
+                    draw.point(target, options.pointSize * 1.2f, colour);
+                    // A line from the thing that was asked to reach it, so "the hand is not on the
+                    // target" and "the target is not where you think" are distinguishable.
+                    if (i < chains.size() && inRange(chains[i].z)) {
+                        draw.line(worldOf(chains[i].z), target, colour);
+                    } else if (inRange(stack.bodyJoint())) {
+                        draw.line(worldOf(stack.bodyJoint()), target, colour);
+                    }
+                }
+
+                if (options.motionContacts && layer.hasGround && live) {
+                    const glm::vec3 point = glm::vec3(model * glm::vec4(layer.groundPoint, 1.0f));
+                    const glm::vec3 normal =
+                        glm::normalize(glm::vec3(model * glm::vec4(layer.groundNormal, 0.0f)));
+                    const glm::vec4 colour{0.6f, 1.0f, 0.6f, 0.85f};
+                    draw.circle(point, normal, 0.12f, colour);
+                    draw.arrow(point, normal, 0.25f, colour);
+                    // The gap between the plane and the foot on it: this is contact error, and it
+                    // is the quantity a viewer reads as "the feet are floating".
+                    if (i < chains.size() && inRange(chains[i].z)) {
+                        draw.line(point, worldOf(chains[i].z), glm::vec4(1.0f, 1.0f, 0.4f, 0.9f));
+                    }
+                }
+            }
+
+            if (options.motionVectors && !layers.empty()) {
+                // Read off any live layer: `driveLayers` writes the same body state onto all of
+                // them, so this is the frame's own numbers rather than a second derivation.
+                const scene::PoseLayer& any = layers.front();
+                const glm::vec3 origin = glm::vec3(model[3]);
+                const auto dir = [&](const glm::vec3& local) {
+                    return glm::vec3(model * glm::vec4(local, 0.0f));
+                };
+                if (glm::length(any.bodyVelocity) > 1e-4f) {
+                    draw.arrow(origin, glm::normalize(dir(any.bodyVelocity)),
+                               glm::length(any.bodyVelocity) * 0.5f,
+                               glm::vec4(0.3f, 1.0f, 0.9f, 0.95f));
+                }
+                if (glm::length(any.bodyAcceleration) > 1e-4f) {
+                    draw.arrow(origin, glm::normalize(dir(any.bodyAcceleration)),
+                               glm::length(any.bodyAcceleration) * 0.12f,
+                               glm::vec4(1.0f, 0.6f, 0.2f, 0.95f));
+                }
+                // Facing is the entity's own +Z through its world transform, which is the one
+                // direction here that does NOT come off a layer.
+                draw.arrow(origin, glm::normalize(dir(glm::vec3(0.0f, 0.0f, 1.0f))), 0.8f,
+                           glm::vec4(1.0f, 1.0f, 1.0f, 0.8f));
+            }
+
+            if (options.motionCompensation && inRange(stack.bodyJoint())) {
+                const scene::BodyCompensation& body = stack.bodyCompensation();
+                if (glm::length(body.translation) > 1e-5f) {
+                    const glm::vec3 to = worldOf(stack.bodyJoint());
+                    const glm::vec3 from =
+                        to - glm::vec3(model * glm::vec4(body.translation, 0.0f));
+                    // Red when limbs still cannot reach after the correction: the correction ran
+                    // and was not enough, which is a different thing from it not running.
+                    const glm::vec4 colour = body.unreachableAfter > 0u
+                                                 ? glm::vec4(1.0f, 0.3f, 0.3f, 0.95f)
+                                                 : glm::vec4(0.9f, 0.5f, 1.0f, 0.95f);
+                    draw.line(from, to, colour);
+                    draw.point(to, options.pointSize * 1.1f, colour);
+                }
+            }
+        }
+
         if (options.entityOrigins && budget > 0) {
             draw.point(glm::vec3(model[3]), options.pointSize * 0.08f,
                        entity.cameraCulled ? culledColour : glm::vec4(1.0f, 0.9f, 0.2f, 0.9f));

@@ -2630,8 +2630,37 @@ Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
         out.posedByProvider = sink->posedByProvider();
         if (const CompositionNode* n = findNode(std::string(node));
             n != nullptr && !n->rigs.empty() && n->rigs.front() < scene_.rigs.size()) {
-            out.externalPoseFrames = scene_.rigs[n->rigs.front()].externalPoseFrames;
+            const SkinnedRig& rig = scene_.rigs[n->rigs.front()];
+            out.externalPoseFrames = rig.externalPoseFrames;
+            // §50. Read from the stack as the frame left it, never re-derived: a diagnostic that
+            // recomputes what it is diagnosing agrees with itself (ADR-182).
+            const PoseLayerStack& stack = rig.layers;
+            const std::vector<LayerResolution>& results = stack.results();
+            const std::vector<IkStatus>& statuses = stack.ikStatuses();
+            out.layers.reserve(stack.layers().size());
+            for (std::size_t i = 0; i < stack.layers().size(); ++i) {
+                const PoseLayer& layer = stack.layers()[i];
+                MotionDebug::LayerRow row;
+                row.name = layer.name;
+                row.kind = layer.kind;
+                row.requestedWeight = layer.weight;
+                row.realizedWeight = layer.effectiveWeight();
+                row.resolution = i < results.size() ? results[i] : LayerResolution::Inactive;
+                row.ik = i < statuses.size() ? statuses[i] : IkStatus::Solved;
+                row.hasTarget = layer.hasTarget;
+                row.hasGround = layer.hasGround;
+                out.layers.push_back(std::move(row));
+            }
+            out.bodyCompensation = stack.bodyCompensation().translation;
+            out.unreachableAfterCompensation = stack.bodyCompensation().unreachableAfter;
         }
+        const MotionContext& ctx = sink->motion();
+        out.mode = ctx.mode;
+        out.motionPhase = ctx.motionPhase;
+        out.groundSpeed = ctx.groundSpeed;
+        out.turnRate = ctx.turnRate;
+        out.hasGroundPlane = ctx.hasGroundPlane;
+        out.hasLookTarget = ctx.hasLookTarget;
         out.status = sink->chainResult().result.status;
         if (live != nullptr) {
             out.optedIn = live->desc().proceduralMotion;
@@ -2865,6 +2894,18 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 layer.bodySlope = motion_.environment.slope;
                 layer.bodyDownhill = motion_.environment.downhill;
             }
+            // §49. Every layer on this node gets the node's seed and its own, whatever its drive
+            // and whatever the scene authored -- a seed is an identity, not a setting. The
+            // secondary layer is the only reader today; giving it to all of them is what makes
+            // the next procedural layer deterministic without anyone remembering to wire it.
+            //
+            // Derived from names rather than from an index, because an index changes when someone
+            // reorders the nodes in a scene file, and a render that changes because two characters
+            // swapped places in a JSON array is exactly the kind of irreproducibility §49 exists
+            // to prevent.
+            layer.characterSeed = seedFromName(node_);
+            layer.layerSeed = seedFromName(layer.name);
+
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
                 break;

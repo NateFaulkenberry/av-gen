@@ -138,6 +138,18 @@ enum class PoseLayerKind : std::uint8_t {
 // Ties inside a stage keep their authored order, which is what makes two foot layers stay left
 // then right.
 [[nodiscard]] int poseLayerStage(PoseLayerKind kind);
+
+// Phase B §49. A phase in [0,1) derived from two seeds, with **no generator and no state**: the
+// same pair gives the same number for the life of the repository, which is what makes a render
+// reproducible, a test repeatable and an offline bake deterministic.
+//
+// `seedPhase(0, 0)` is exactly 0.0f, so an unseeded layer is byte-for-byte unchanged.
+[[nodiscard]] float seedPhase(std::uint32_t characterSeed, std::uint32_t layerSeed);
+
+// The seed a name deterministically produces. FNV-1a, so it is the same on every platform and
+// does not depend on `std::hash`, whose value is explicitly allowed to differ between runs of the
+// same program -- which would make a "deterministic" seed reproducible only by accident.
+[[nodiscard]] std::uint32_t seedFromName(std::string_view name);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
 
 // Which field of the animation-intent seam moves this layer.
@@ -317,6 +329,29 @@ struct PoseLayer {
     float secondaryDegrees = 1.2f;   // peak amplitude; a breath is small and a shiver is not
     float secondaryPeriod = 4.0f;    // seconds for one full cycle
     float secondaryPhase = 0.0f;     // 0..1, so two layers on one body are not in lockstep
+
+    // **Phase B §49: deterministic randomness.** §49 asks for `characterSeed` and `layerSeed` by
+    // name, and for a reason: "reproducible renders, reproducible tests, deterministic offline
+    // baking, debugging. Do not use uncontrolled global randomness."
+    //
+    // The secondary layer was already free of global randomness -- it is a pure function of the
+    // timeline second (ADR-360) -- so an audit could call §49 met, and mine did. It was generous.
+    // What was missing is the other half: a body's variation was *hand-authored*, one `phase`
+    // number per layer per character in the scene file. That works for five aliens and does not
+    // work for a hundred, and hand-authored spread is not a seed.
+    //
+    // These two are **hashed into a phase offset, never into a generator**. `seedPhase` is a pure
+    // function of the pair: same seeds, same render, on any machine, in any order, under a scrub.
+    // Zero and zero hash to exactly zero, so a layer that sets neither is byte-for-byte what it
+    // was -- and because a knob nobody sets refuses nothing (ADR-600), `driveLayers` sets
+    // `characterSeed` from the node's name and `layerSeed` from the layer's.
+    //
+    // The authored `secondaryPhase` survives as an **offset on top**, rather than being replaced
+    // when it happens to be zero. A rule of the form "the seed applies unless you authored
+    // something" makes the two mechanisms fight over the same field, and which one won would
+    // depend on a number an artist typed.
+    std::uint32_t characterSeed = 0;
+    std::uint32_t layerSeed = 0;
     // How much each successive masked joint lags the one before, in cycles. Zero makes a chest and
     // a head move as one rigid block, which reads as a mechanism rather than a body; a small
     // value is what makes the motion travel up the spine.

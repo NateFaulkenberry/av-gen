@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-five ways a green suite has lied
+## Twenty-six ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -598,6 +598,20 @@ added. **A check that refuses to proceed on an input it cannot resolve is worth 
 resolves it optimistically**, and it is the only entry in this family that is a defence rather than
 a wound.
 
+26. **A position probe cannot see a rotation on a rig that is not a hierarchy.** Phase B §51 asked
+    whether secondary motion is bounded, so it measured how far `head.x` moved over six minutes of
+    timeline and read **exactly 0.00000 m**. The layer was working: measured as a *rotation* it runs
+    at 1.4993 degrees against its authored 1.5. `alien-scout.glb` is flat (ADR-553) -- every joint
+    is a sibling under `rig` -- so rotating `spine_02.x` does not move `head.x`, and rotating
+    `head.x` about its own origin does not move `head.x` either. There was no path from the effect
+    to the probe.
+
+    Family C, and the **second** confident zero this flat rig produced in one phase: §45 read three
+    of four limb segments as 0.0% deviation, which was true and meant something quite different
+    from what it looked like. The general form is that **a probe encodes an assumption about how
+    the effect propagates**, and on an ancestor chain "rotation moves descendants" is so reliably
+    true that nobody states it. State it, or measure the quantity the mechanism actually writes --
+    this layer writes rotations, so the probe should have read rotations from the start.
 - **When a filter, census or probe returns the number you expected, that is when to check it. A
   surprising number gets checked for free.**
 - **An aggregate cannot separate the two things it sums.** Two instances of the same failure were
