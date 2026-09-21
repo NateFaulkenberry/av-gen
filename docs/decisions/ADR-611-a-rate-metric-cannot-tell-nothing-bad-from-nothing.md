@@ -111,6 +111,28 @@ cannot fail, with the one mitigation (read the rest of the row) removed by the `
 **The rule is therefore about the harness as much as the assertions.** A suite full of careful
 controls, run through a pipeline that discards the status, is a suite with no verdict.
 
+### And about how progress is judged
+
+The same run was then reported as "still running, 964 bytes" and "still running, 1005 bytes", with
+the growth offered as evidence of progress. Every one of those bytes was this:
+
+```
+gpu-lock: waiting for the GPU (1440s)...
+gpu-lock: waiting for the GPU (1500s)...
+```
+
+26 lines of lock heartbeat and **zero lines of test output**. The job was not running; it was queued,
+and had been queued the whole time.
+
+> **A growing log is not progress. It is a heartbeat from something — and not necessarily from the
+> thing you are waiting on.** File size counts bytes, not events, so it cannot distinguish "the work
+> is proceeding" from "the waiting is proceeding".
+
+This is the same rule as the rest of this ADR in its purest form: `wc -c` is a monotone metric with
+no term for what is in the file. The cure is the same — **read the row**. One `grep -c` for the
+lock's own message against one for anything else answers it in a second, and the status a report
+should carry is `BLOCKED on the GPU lock`, not `still running`.
+
 ## Consequences
 
 - The §11 test asserts `stalledFraction` alongside the jump rate. The §16 sweep reports severity
