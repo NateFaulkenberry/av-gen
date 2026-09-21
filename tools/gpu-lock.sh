@@ -9,14 +9,30 @@
 #   tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[water]"
 #   tools/gpu-lock.sh ./build/release/src/avgen --headless --frames 120 ...
 #
-# BEFORE YOU READ THE RESULT: docs/testing.md, "Seventeen ways a green suite has lied".
+# BEFORE YOU READ THE RESULT: docs/testing.md, "Eighteen ways a green suite has lied".
 #
 # It is here because it is not findable from anywhere else. Two agents in one night each
 # walked into a hazard that section already described accurately -- one of them by name,
 # naming the exact test file -- and neither knew the document existed. This is the one file
 # every agent doing GPU work reads the top of, so the pointer lives here.
 #
-# The short version: **read the exit code of the BINARY**, for families A and B. Not
+# THE ONE SENTENCE, and it is narrower than "read the exit code":
+#
+#     Read the exit code the BINARY returned, not the one the tooling reports about it.
+#
+# This file is a wrapper. Its exit status is a report ABOUT your run and has been wrong in
+# both directions in one session -- failure reported for a process that was still alive and
+# holding this lock, success reported for a run whose own summary said `1 failed`. Capture
+# `$?` immediately after the binary, in the same shell, and read it TOGETHER with the
+# summary: an exit code with no summary is a crash, a summary that disagrees with the exit
+# code is a tooling fault, and neither is a pass.
+#
+# Doing that is load-bearing wherever it already happens, and is written down almost
+# nowhere -- a later cleanup that wraps an invocation "for consistency" removes the only
+# reason the result can be trusted, silently. That is why this paragraph is here and not
+# only one link away.
+#
+# The rest, for families A and B. Not
 # the summary, not a `grep -c FAILED`, and never a pipeline's `$?` -- that is the last
 # command's, usually `grep`, and grep is delighted to find nothing. A crashed run prints no
 # verdict line at all, so a failure grep reports success on it.
@@ -25,6 +41,14 @@
 # thing you measured is not the thing you meant -- a filter that excluded nothing, a
 # census that matched the wrong noun, a probe aimed where the knob does nothing. Check
 # what your scan MATCHED, not just how many. An expected number is the one to verify.
+#
+# NEVER EDIT THIS FILE WHILE ANY INSTANCE OF IT IS RUNNING. bash reads a script
+# incrementally from a byte offset, so inserting even a COMMENT shifts every byte below
+# it and a running instance resumes mid-token. That wedged this lock for twenty minutes
+# on 2026-09-20: a corrupted instance won the `mkdir` and died before writing `pid`,
+# leaving an ownerless directory that the stale-reclaim below cannot see, because its
+# own test is `[ -f "$LOCK/pid" ]`. Land changes here only when the lock is free and
+# `ps -Ao pid,args | grep gpu-lock` is empty.
 #
 # And if you kill a run: `trap` only fires for the process that installed it. Signalling
 # this wrapper leaves the test binary alive and this lock held, which is invisible from

@@ -78,13 +78,13 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Seventeen ways a green suite has lied
+## Eighteen ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
 you are short of time, because it is the only one the exit code cannot save you from.
 
-- **Family A — the run did not happen as you think** (entries 1-3, 12).
+- **Family A — the run did not happen as you think** (entries 1-3, 12, 18).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
   (entries 13-17; 9 and 10 are its older members, from before it had a name).
@@ -184,6 +184,37 @@ night from two agents who never spoke to each other.
    PID still answers `ps`.** After any killed or failed GPU task, before assuming you released
    anything: `pgrep -fl avgen_render_tests` and read the lock's own `pid` file.
 
+18. **The exit code you read was the tooling's opinion, not the binary's.**
+
+   Twice in one session a harness running a test binary reported an exit code that disagreed with
+   what the binary did. Once it reported **failure (144)** for a run whose process was still alive
+   and still holding the GPU lock — the wrapper had been killed and the child kept going (entry 12
+   is that incident from the lock's side). Once it reported **success (0)** for a run whose own
+   summary said `1 failed`.
+
+   Both directions are dangerous and **the second is worse, because it is the one that gets a defect
+   committed.**
+
+   So the guard is narrower than "read the exit code":
+
+   > **Read the exit code the binary itself returned, not the one the tooling reports about the
+   > binary.**
+
+   In practice: capture `$?` immediately after the binary, in the same shell, and write it somewhere
+   you will read — `./build/release/tests/avgen_tests …; echo "EXIT=$?" >> log`. A wrapper's status,
+   a task runner's summary and a CI widget are all reports *about* the run and can each be wrong
+   about it. And because a crashed Catch2 run prints **no verdict line at all** (11), `EXIT=` and the
+   presence of a summary have to be read **together**: an exit code with no summary is a crash, and
+   a summary with a disagreeing exit code is a tooling fault — **neither is a pass.**
+
+   This is not about any one harness; it is structural to anything that wraps a process.
+
+   **And capturing `$?` straight from the binary is load-bearing wherever it already happens.** It
+   is usually not written down as a requirement, so a later cleanup that wraps an invocation "for
+   consistency" silently removes the only reason the result can be trusted, and nothing announces
+   it. Same shape as three divergent copies of one conversion: a property everything depends on,
+   recorded nowhere, preserved by luck.
+
 ### The scan, the filter or the control was looking where the effect could not reach
 
 13. **Command-line matching counts the watchers as workers.** `pgrep -f "avgen_render_tests"`
@@ -251,23 +282,28 @@ put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *no
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
 only as a pointer to what to go and look at** — not the other way round.
 
-**The exit code is the only check that catches every entry in families A and B.** Every other
-signal there — the summary, the `FAILED:` blocks, the assertion counts — is a convenience that some
-entry above defeats. Capture `$?` from the binary itself: a pipeline's exit code is the last
-command's, which is usually `grep`, and `grep` is delighted to find nothing.
+**The exit code is the only check that catches every entry in families A and B** — but it has to be
+**the binary's own**, not a wrapper's report of it (18). Every other signal there — the summary, the
+`FAILED:` blocks, the assertion counts — is a convenience that some entry above defeats. Capture
+`$?` immediately after the binary, in the same shell: a pipeline's exit code is the last command's,
+which is usually `grep`, and `grep` is delighted to find nothing. Then read it **with** the summary,
+because an exit code and no summary is a crash and a summary disagreeing with an exit code is a
+tooling fault, and neither is a pass.
 
 **And it catches nothing in family C, which is why that family is the dangerous one.** 13 through 17
 all exit 0, print a truthful summary, and report a number that is not about what you think it is
 about. There is no signal to read, because the run was honest; the aim was wrong. The only defences
 are structural, and they are cheap:
 
+- **When a filter, census or probe returns the number you expected, that is when to check it. A
+  surprising number gets checked for free.** That is the whole family in one sentence, and it would
+  have caught all three of the scans below.
 - **Check what your scan matched, not just how many.** 13, 14 and 15 were each caught by looking at
   the matched items — eight files that were the wrong eight, 392 cases where 391 was wanted, eight
   `pgrep` hits that were all shells. Every one announced itself in output somebody nearly skipped.
 - **Name every mechanism that could mask the fault before you trust a teeth-check** (16), and
   **suspect the sample domain before the knob when a reachability probe reports zero** (17).
-- When a filter, a census or a probe returns a number you expected, that is when to check it. A
-  surprising number gets checked for free.
+
 
 ## The scratchpad is shared by every agent in a session
 
