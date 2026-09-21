@@ -93,6 +93,26 @@ struct AttachmentDesc {
     std::string socket;
 };
 
+// ADR-623: this body's base pose chosen by the Phase C motion matcher, with the clip provider as
+// its fallback. **Opt-in per character, default off.** Present in a scene as
+//
+//     "motionMatching": { "joints": ["foot.l", "foot.r", "head.x"],
+//                         "contacts": ["foot.l", "foot.r"],
+//                         "trajectory": [0.2, 0.4, 0.6] }
+//
+// `joints` are the feature joints and are required: which joints carry a character's identity is
+// a property of the character (§8). `contacts` are the joints analysed for foot plants, which is
+// where an in-place clip's implied travel comes from. They default to `joints`. `trajectory` is
+// the horizons in seconds, and defaults to the three §24 validated. The key implies
+// `proceduralMotion`, because the matcher is a provider and providers only run on that path.
+struct MotionMatchingDesc {
+    bool enabled = false;
+    std::vector<std::string> joints;
+    std::vector<std::string> contacts;
+    std::vector<float> trajectory{0.2f, 0.4f, 0.6f};
+    friend bool operator==(const MotionMatchingDesc&, const MotionMatchingDesc&) = default;
+};
+
 struct EntityDesc {
     std::string name;
     std::string node;             // the composition node this entity drives; defaults to `name`
@@ -136,6 +156,8 @@ struct EntityDesc {
     // inert" is a claim that can be measured rather than asserted -- see the rendered-hash
     // comparison in `docs/design/procedural-character-motion.md`.
     bool proceduralMotion = false;
+    // ADR-623. The matcher in front of the clip provider; see `MotionMatchingDesc`.
+    MotionMatchingDesc motionMatching;
     // Phase B §8-§11. Start, stop, turn-in-place and strafe, on top of the gait's clip family.
     LocomotionPlanSettings locomotion;
 

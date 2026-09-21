@@ -23,6 +23,8 @@
 #include "scene/field_params.hpp"
 #include "scene/ground_query.hpp"
 #include "entity/clip_motion_provider.hpp"
+#include "entity/match_motion_provider.hpp"
+#include "scene/motion_library.hpp"
 #include "entity/motion_chain.hpp"
 #include "scene/motion_context.hpp"
 #include "scene/camera_rig.hpp"
@@ -1629,10 +1631,25 @@ private:
         // Built lazily on the first frame the rig exists: a rig is not loaded when the sink is
         // constructed, so building it at bind time would build it against nothing.
         entity::ClipMotionProvider clipProvider_;
+        // ADR-623. In front of the clip provider when the body opted in, and only then. The asset
+        // is shared with every body on the same skeleton and config (ADR-650); holding it here
+        // keeps it alive for as long as this provider points into it.
+        entity::MatchMotionProvider matchProvider_;
+        std::shared_ptr<const MotionAsset> matchAsset_;
         entity::MotionChain chain_;
         bool chainBuilt_ = false;
         RigId chainRig_ = kInvalidRig;
         void buildChain(const SkinnedRig& rig);
+
+    public:
+        // Build this body's chain now if its rig exists and it has not been built. Called before
+        // the entities advance, so the first frame a body is simulated already has its providers:
+        // a chain built lazily at the first *pose* left frame 0 unsimulated, and a seek, which
+        // replays with the chain present, then disagreed with a play (ADR-360).
+        void prepareChain();
+        [[nodiscard]] const entity::MatchMotionProvider* matcher() const {
+            return matchAsset_ != nullptr ? &matchProvider_ : nullptr;
+        }
 
     public:
         // Whether this body's base pose came from the chain on the last frame, and what the chain
@@ -1647,6 +1664,12 @@ private:
         entity::MotionChainResult chainResult_;
     };
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
+    // ADR-623/ADR-650: one motion database per (skeleton, feature config), shared by every body
+    // that matches on it. Built on first use from the rig's own clips.
+    std::map<std::string, std::shared_ptr<const MotionAsset>> matchAssets_;
+    [[nodiscard]] std::shared_ptr<const MotionAsset> matchAssetFor(const SkinnedRig& rig,
+                                                                   const entity::MotionMatchingDesc& m,
+                                                                   const std::string& who);
 
 public:
     // The motion context most recently built for `node`, or null when that node drives no entity

@@ -1,6 +1,6 @@
 # ADR-615: The character-motion seam is staged and dark — one lab scene enables it, and that is one fact rather than six findings
 
-**Status:** Accepted
+**Status:** Accepted. **Superseded in part by ADR-623 (2026-09-21):** the matcher row. `MatchMotionProvider` is now installed on a body's chain when the body opts in with `motionMatching`, in front of the clip provider. Every other row stands.
 **Date:** 2026-09-21
 **Related:** ADR-541 (the provider seam), ADR-545 (vector intent), ADR-556 (advance and pose),
 ADR-612 (amended — the beneficiary it named could not have benefited), ADR-613, ADR-441 (cut

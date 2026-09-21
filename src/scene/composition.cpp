@@ -2281,6 +2281,7 @@ void Composition::installEntities() {
     // none gets one too and it does nothing -- which is the point: a craft, a rock and a character
     // are the same kind of thing here, and only the data says which.
     animationSinks_.clear();
+    matchAssets_.clear();
     for (const entity::EntityDesc& desc : entityDescs_) {
         entity::Entity* live = entityWorld_.find(desc.name);
         if (live == nullptr) {
@@ -2600,6 +2601,29 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
     entryFor(entity::Activity::Walk, entity_.desc().gait.walkSpeed);
     entryFor(entity::Activity::Run, entity_.desc().gait.runSpeed);
 
+    // ADR-623: the matcher goes in front when this body opted in and its database could be built.
+    // When the database could not be built, the chain is the clip provider alone and the log says
+    // so: falling back is the designed behaviour, and doing it silently is not.
+    matchAsset_.reset();
+    matchProvider_.setDatabase(nullptr);
+    matchProvider_.setClips(nullptr);
+    if (entity_.desc().motionMatching.enabled) {
+        matchAsset_ = owner_.matchAssetFor(rig, entity_.desc().motionMatching, entity_.desc().name);
+        if (matchAsset_ != nullptr) {
+            matchProvider_.setDatabase(&matchAsset_->db);
+            matchProvider_.setClips(&matchAsset_->pack.animation);
+            matchProvider_.setExpectedSkeleton(skeletonDigest(rig.skeleton));
+            // The node's own scale, taken from its world transform's first basis column. Uniform
+            // scale is assumed, as it is everywhere a Glowmere body is drawn.
+            float scale = 1.0f;
+            if (const CompositionNode* node = owner_.findNode(node_); node != nullptr) {
+                scale = glm::length(glm::vec3(owner_.nodeWorldTransform(*node).matrix()[0]));
+            }
+            matchProvider_.setWorldScale(scale);
+            chain_.add(&matchProvider_);
+        }
+    }
+
     // **The fallback chain, with its one implementation.** Phase C's matcher and Phase E's neural
     // provider are added in front of this; the clip provider stays at the back, because ADR-541
     // corollary 1 says every character can run in Clip mode and Clip mode is the fallback for
@@ -2617,6 +2641,87 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
         log::info("entity '{}': procedural motion on, {} clip entry(s), chain of {}",
                   entity_.desc().name, clipProvider_.entries().size(), chain_.size());
     }
+}
+
+void Composition::AnimationSink::prepareChain() {
+    if (!entity_.desc().proceduralMotion) {
+        return;
+    }
+    const CompositionNode* node = owner_.findNode(node_);
+    if (node == nullptr || node->rigs.empty()) {
+        return;
+    }
+    const RigId id = node->rigs.front();
+    if (id >= owner_.scene_.rigs.size() || !owner_.scene_.rigs[id].skeleton.valid()) {
+        return;
+    }
+    if (!chainBuilt_ || chainRig_ != id) {
+        buildChain(owner_.scene_.rigs[id]);
+        chainRig_ = id;
+    }
+}
+
+std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& rig,
+                                                              const entity::MotionMatchingDesc& m,
+                                                              const std::string& who) {
+    // The key is everything the database is a function of: the skeleton, and the config.
+    std::string key = skeletonDigest(rig.skeleton) + "|j";
+    for (const std::string& j : m.joints) {
+        key += ":" + j;
+    }
+    key += "|c";
+    for (const std::string& c : m.contacts) {
+        key += ":" + c;
+    }
+    key += "|t";
+    for (const float t : m.trajectory) {
+        key += fmt::format(":{:.6f}", t);
+    }
+    if (auto it = matchAssets_.find(key); it != matchAssets_.end()) {
+        return it->second;
+    }
+    // Built at load from the rig this scene already has. **In memory, for this process only**: it
+    // is never written or shipped, so its provenance says what it is rather than claiming a
+    // licence for the asset it was derived from.
+    Provenance provenance;
+    provenance.source = "scene rig (runtime matching)";
+    provenance.license = "LicenseRef-scene-asset";
+    provenance.notes = "built at load from the scene's own rig for ADR-623 motion matching; "
+                       "held in memory and never written";
+    provenance.processing = {"ADR-623 runtime build"};
+    PackBuildOptions packOptions;
+    for (const std::string& c : m.contacts.empty() ? m.joints : m.contacts) {
+        packOptions.contactJoints.push_back(ContactJoint{c, ContactKind::Foot});
+    }
+    packOptions.toolVersion = "avgen-runtime-match";
+    auto pack = buildMotionPack(who, rig.skeleton, rig.clips, provenance, packOptions);
+    std::shared_ptr<const MotionAsset> out;
+    if (!pack) {
+        log::warn("entity '{}': motion matching is on but its pack did not build ({}); the body "
+                  "falls back to its clip provider",
+                  who, pack.error().message);
+    } else {
+        MotionDatabaseOptions dbOptions;
+        dbOptions.config.joints = m.joints;
+        dbOptions.config.contactJoints = m.contacts;
+        dbOptions.config.trajectoryTimes = m.trajectory;
+        auto db = buildMotionDatabase(*pack, dbOptions);
+        if (!db) {
+            log::warn("entity '{}': motion matching is on but its database did not build ({}); the "
+                      "body falls back to its clip provider",
+                      who, db.error().message);
+        } else {
+            auto asset = std::make_shared<MotionAsset>();
+            asset->pack = std::move(*pack);
+            asset->db = std::move(*db);
+            log::info("entity '{}': motion matching on, {} samples x {} dimensions over {} clips",
+                      who, asset->db.sampleCount(), asset->db.dimension, asset->db.clipNames.size());
+            out = std::move(asset);
+        }
+    }
+    // A failure is cached too, so a body that cannot match does not rebuild every frame.
+    matchAssets_[key] = out;
+    return out;
 }
 
 Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
@@ -3278,6 +3383,9 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
+    for (const auto& sink : animationSinks_) {
+        sink->prepareChain();
+    }
     entityWorld_.update(update, *params_);
 }
 

@@ -1033,6 +1033,12 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     for (std::size_t i = 0; i < entities_.size(); ++i) {
         const Entity& entity = *entities_[i];
         bool deep = !entity.desc_.actions.empty() || !entity.schedule_.desc().entries.empty();
+        // ADR-623: **a provider's memory is an accumulation too.** Its clip time has advanced on
+        // every step since the body began, and a matcher's selection depends on every search before
+        // it, so neither has a bounded history. A body on the provider chain is replayed in full;
+        // replayed shallow, its scrubbed pose landed on a different sample from the played one.
+        deep = deep || (entity.desc_.proceduralMotion && entity.motionChain_ != nullptr &&
+                         entity.motionChain_->size() > 0);
         std::uint64_t need = 1; // every body integrates the step it lands on
         if (!deep) {
             for (const auto& behavior : entity.behaviors_) {
@@ -1130,6 +1136,17 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     // makes the replayed sequence the same sequence of instants a play from zero produces, and the
     // residual goes to zero; tests/unit/test_entity_seek.cpp holds it there with a 30 Hz arm beside
     // it that must disagree.
+    // ADR-623. A play's first frame advances every provider memory at time 0 with no elapsed time
+    // (its first search). A replay that starts from the very beginning has no step at 0, so it is
+    // given that one here; without it the matcher's first search lands a frame late and every
+    // search after it is shifted by one step.
+    if (steps > 0 && target - static_cast<double>(steps) * dt < 0.5 * dt) {
+        for (std::size_t e = 0; e < entities_.size(); ++e) {
+            if (seekFirstStep_[e] == 0) {
+                entities_[e]->advanceMotion(0.0, 0.0f);
+            }
+        }
+    }
     for (std::uint64_t i = 0; i < steps; ++i) {
         const double now = target - static_cast<double>(steps - 1 - i) * dt;
 
@@ -1280,6 +1297,13 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             entity.locomotion_.activity =
                 entity.gait_.select(entity.desc_.gait, entity.state_.activity, entity.state_.speed,
                                     entity.state_.turnRate, dt);
+            // ADR-623: **the provider memory, on every replayed step, at that step's own time.**
+            // This used to run once, after the replay, at the target time. A clip provider's time
+            // and a matcher's selection therefore came out of a seek as the answer to one step from
+            // a reset memory, and every scrubbed provider pose disagreed with the played one. The
+            // matcher's scrub test found it; the clip provider had the same defect with nothing
+            // looking.
+            entity.advanceMotion(now, static_cast<float>(dt));
         }
     }
     // Publish the state the next frame will build on, without touching the parameter set.
@@ -1323,10 +1347,12 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         }
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(dt);
-        // Phase B: the provider memory, advanced on this path as on the other one. Both, for
-        // ADR-554's reason -- and this is the field that rule was discovered by, so getting it
-        // wrong here would be the same bug in the same struct twice.
-        entity.advanceMotion(entity.locomotion_.time, static_cast<float>(dt));
+        // Phase B: the provider memory. Advanced inside the replay above, once per step (ADR-623).
+        // Only a seek with nothing to replay advances it here, once, at the target, as the played
+        // frame at that instant did.
+        if (steps == 0) {
+            entity.advanceMotion(entity.locomotion_.time, 0.0f);
+        }
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.publishLookSchedule();
@@ -2546,6 +2572,59 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
     if (j.contains("proceduralMotion") && j["proceduralMotion"].is_boolean()) {
         desc.proceduralMotion = j["proceduralMotion"].get<bool>();
     }
+    // ADR-623. A malformed block is a load error, not a silent no-op: an author who wrote it meant
+    // the matcher to run, and a character quietly left on its clips is the failure this project
+    // keeps shipping.
+    if (j.contains("motionMatching")) {
+        const auto& m = j["motionMatching"];
+        if (!m.is_object()) {
+            return fail("entity '{}': 'motionMatching' must be an object", desc.name);
+        }
+        const auto names = [&](const char* key, std::vector<std::string>& out) -> Result<void> {
+            if (!m.contains(key)) {
+                return {};
+            }
+            if (!m[key].is_array()) {
+                return fail("entity '{}': 'motionMatching.{}' must be an array of joint names",
+                            desc.name, key);
+            }
+            for (const auto& n : m[key]) {
+                if (!n.is_string()) {
+                    return fail("entity '{}': 'motionMatching.{}' must be an array of joint names",
+                                desc.name, key);
+                }
+                out.push_back(n.get<std::string>());
+            }
+            return {};
+        };
+        if (auto ok = names("joints", desc.motionMatching.joints); !ok) {
+            return std::unexpected(ok.error());
+        }
+        if (desc.motionMatching.joints.empty()) {
+            return fail("entity '{}': 'motionMatching.joints' is required and names the feature "
+                        "joints (the feet and the head, for a biped)",
+                        desc.name);
+        }
+        if (auto ok = names("contacts", desc.motionMatching.contacts); !ok) {
+            return std::unexpected(ok.error());
+        }
+        if (m.contains("trajectory")) {
+            if (!m["trajectory"].is_array()) {
+                return fail("entity '{}': 'motionMatching.trajectory' must be an array of seconds",
+                            desc.name);
+            }
+            desc.motionMatching.trajectory.clear();
+            for (const auto& s : m["trajectory"]) {
+                if (!s.is_number() || s.get<float>() <= 0.0f) {
+                    return fail("entity '{}': 'motionMatching.trajectory' must be positive seconds",
+                                desc.name);
+                }
+                desc.motionMatching.trajectory.push_back(s.get<float>());
+            }
+        }
+        desc.motionMatching.enabled = true;
+        desc.proceduralMotion = true;
+    }
     if (j.contains("tags")) {
         if (!j["tags"].is_array()) {
             return fail("entity '{}': 'tags' must be an array of strings", desc.name);
@@ -2883,6 +2962,18 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     // the first time anyone saved -- the diff-noise failure ADR-225 already had to fix once.
     if (entity.proceduralMotion) {
         j["proceduralMotion"] = true;
+    }
+    // ADR-623. Written only when on, for the reason above; and every field, including the ones at
+    // their defaults, because a reader that fills a default the writer dropped is how a save
+    // changes what a scene means (ADR-618).
+    if (entity.motionMatching.enabled) {
+        nlohmann::json m;
+        m["joints"] = entity.motionMatching.joints;
+        if (!entity.motionMatching.contacts.empty()) {
+            m["contacts"] = entity.motionMatching.contacts;
+        }
+        m["trajectory"] = entity.motionMatching.trajectory;
+        j["motionMatching"] = std::move(m);
     }
     if (entity.behaviors.size() > entity.profileBehaviors) {
         nlohmann::json behaviors = nlohmann::json::array();

@@ -2367,7 +2367,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 32 | Root-motion continuity | done | `275a35d0` (ADR-612, ADR-613). A forced-transition residual was accepted by the owner |
 | 33 | Integrate with Phase B layers | done | `528e5dec`, the audit. One latent defect is recorded there |
 | 34 | Matching does not own behaviour | done | `528e5dec`, the audit |
-| 35 | Fallback system | **partial** (owner) | The mechanism is typed and tested but unreachable, because the chain has one entry (ADR-615, staged and dark). This is the owner's decision |
+| 35 | Fallback system | done | ADR-623 (owner-delegated): the matcher is wired opt-in per character, with the clip provider behind it. Every §35 failure is tested falling through, with a control arm that does not |
 | 36 | Database versioning | done (via merge) | `9ebbb173` (`agent/anim-cinfra`, merged in `54f30cc3`): the database is a file with a format version, a feature schema digest, the skeleton digest, a pack content digest that includes the provenance chain (where the retarget profile is recorded), and a tool version. Incompatible files are refused on load. **Added here:** `kMotionFeatureExtractionVersion`, folded into the schema digest, so a change in how a feature is *computed*, not only which features exist, also invalidates stored data |
 | 44 | Motion style | **partial** | Style travels in the request and the clip provider reads it. **The matcher ignores style**: there is no style tag or cost term |
 | 45 | Search weights | **partial** | All 8 weights are configurable and live (ADR-608; `test_motion_cost.cpp:56`). **Missing: a versioned configuration** |

@@ -118,8 +118,10 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
     // world space. Before this rotation it was compared as-is with features extracted facing +Z,
     // so a body facing east that asked to walk forward was scored against sideways motion. Every
     // test built its body facing +Z, where the two frames coincide, so none of them could tell.
+    // And in the asset's own units, because that is the scale the database was extracted in.
     const glm::vec3 want =
-        scene::toFacingFrame(request.desiredVelocity + request.steering, request.bodyFacing);
+        scene::toFacingFrame(request.desiredVelocity + request.steering, request.bodyFacing) /
+        worldScale_;
     for (std::size_t t = 0; t < db_->config.trajectoryTimes.size(); ++t) {
         const float ahead = db_->config.trajectoryTimes[t];
         const std::size_t base = layout.trajectory + (t * 4u);
@@ -168,6 +170,19 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
     next = in;
     if (db_ == nullptr || clips_ == nullptr || db_->sampleCount() == 0) {
         result.status = MotionStatus::NotReady;
+        return result;
+    }
+    if (!expectedSkeleton_.empty() && db_->skeletonDigest != expectedSkeleton_) {
+        // §35 "skeleton mismatch". Not a pose to adapt: every sample indexes another rig's joints.
+        result.status = MotionStatus::NotReady;
+        return result;
+    }
+    // §35 "invalid query". A non-finite intent would standardise to NaN in every intent dimension
+    // and every candidate would score NaN, so the search would return whatever it compared first.
+    const glm::vec3 intent = request.desiredVelocity + request.steering;
+    if (!std::isfinite(intent.x) || !std::isfinite(intent.y) || !std::isfinite(intent.z) ||
+        !std::isfinite(request.bodyFacing.x) || !std::isfinite(request.bodyFacing.z)) {
+        result.status = MotionStatus::Unsupported;
         return result;
     }
     if (request.mode != MovementMode::Ground) {

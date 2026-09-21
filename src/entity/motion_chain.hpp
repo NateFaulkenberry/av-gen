@@ -75,8 +75,16 @@ public:
                                             double time, float dt, MotionMemory& next) const {
         MotionChainResult chain;
         for (std::size_t i = 0; i < count_; ++i) {
-            MotionMemory scratch = in;
-            const MotionResult r = providers_[i]->advance(request, in, time, dt, scratch);
+            // **A memory another provider settled means nothing to this one** (ADR-623). Its
+            // `selection` is an index into the other provider's space: a database sample to the
+            // matcher and a clip to the clip player. Handed over as-is, a fallback read a sample
+            // index as a clip index, and a matcher coming back read a clip index as a sample. So
+            // a provider sees its own memory or a fresh one, never a foreign one.
+            const bool foreign = in.provider >= 0 && in.provider != static_cast<int>(i);
+            MotionMemory fresh;
+            const MotionMemory& mine = foreign ? fresh : in;
+            MotionMemory scratch = mine;
+            const MotionResult r = providers_[i]->advance(request, mine, time, dt, scratch);
             if (r.ok()) {
                 next = scratch;
                 // **A handover is not a transition, and nobody can blend it.** ADR-613's blend

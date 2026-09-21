@@ -119,6 +119,16 @@ public:
     // the same mistake one tier up, where 78% of a scene's rig memory is a second copy.
     [[nodiscard]] const scene::MotionDatabase* database() const { return db_; }
     void setClips(const std::vector<scene::AnimationClip>* clips) { clips_ = clips; }
+    // ADR-623/ADR-650. The digest of the skeleton this provider will pose. When set and the
+    // database was built for another skeleton, `advance` declines with `NotReady`, so the chain
+    // falls through to the clip provider instead of posing one character with another's motion.
+    // Empty (the default) skips the check, for callers that pose no rig.
+    void setExpectedSkeleton(std::string digest) { expectedSkeleton_ = std::move(digest); }
+    // World units per model unit for the body this provider drives: the node's scale. A request is
+    // in world metres per second and the database is in the asset's own units, so a Glowmere alien
+    // drawn at 1.94x asking for 3 m/s is asking its clips for 1.55. Without this the matcher would
+    // look for motion 1.94x faster than the body is moving.
+    void setWorldScale(float scale) { worldScale_ = scale > 1e-6f ? scale : 1.0f; }
     void setSettings(MatchSettings settings) { settings_ = settings; }
     [[nodiscard]] const MatchSettings& settings() const { return settings_; }
 
@@ -165,6 +175,8 @@ private:
     const std::vector<scene::AnimationClip>* clips_ = nullptr;
     MatchSettings settings_;
     std::string name_ = "match";
+    std::string expectedSkeleton_;
+    float worldScale_ = 1.0f;
     // Mutable because `IMotionProvider` is const by contract -- a provider holds no per-character
     // state, and these are diagnostics about the provider rather than about any one character.
     //
