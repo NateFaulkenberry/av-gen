@@ -437,6 +437,10 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                     // scratch pose the additive path also uses; nothing here runs per frame.
                     setRestPose(skeleton, reference_);
                     poseToModel(skeleton, reference_, model_);
+                    // `model_` now holds the REST pose, not whatever `modelPose_` last recorded.
+                    // Clearing the snapshot forces the next `ensureModel` to rebuild in full;
+                    // without it a rig re-bound mid-run would solve against rest positions.
+                    modelPose_.local.clear();
                     const glm::mat3 bind(model_[static_cast<std::size_t>(tip)]);
                     const glm::vec3 authored = glm::dot(layer.soleUp, layer.soleUp) > 1e-8f
                                                    ? glm::normalize(layer.soleUp)
@@ -493,6 +497,45 @@ bool descendsFrom(const Skeleton& skeleton, int joint, int ancestor) {
     return false;
 }
 
+void PoseLayerStack::ensureModel(const Skeleton& skeleton, const Pose& pose) {
+    const std::size_t count = skeleton.joints.size();
+    if (modelPose_.local.size() != pose.local.size() || model_.size() != count ||
+        pose.local.size() != count) {
+        poseToModel(skeleton, pose, model_);
+        modelPose_ = pose;
+        return;
+    }
+    modelDirty_.assign(count, 0u);
+    bool any = false;
+    for (std::size_t j = 0; j < count; ++j) {
+        const Transform& was = modelPose_.local[j];
+        const Transform& now = pose.local[j];
+        if (was.position != now.position || was.rotation != now.rotation || was.scale != now.scale) {
+            modelDirty_[j] = 1u;
+            any = true;
+        }
+    }
+    if (!any) {
+        return;
+    }
+    for (std::size_t j = 0; j < count; ++j) {
+        const int parent = skeleton.joints[j].parent;
+        const bool parentDirty =
+            parent >= 0 && static_cast<std::size_t>(parent) < j && modelDirty_[static_cast<std::size_t>(parent)] != 0u;
+        if (parentDirty) {
+            modelDirty_[j] = 1u;
+        }
+        if (modelDirty_[j] == 0u) {
+            continue;
+        }
+        const glm::mat4 local = pose.local[j].matrix();
+        model_[j] = parent >= 0 && static_cast<std::size_t>(parent) < j
+                        ? model_[static_cast<std::size_t>(parent)] * local
+                        : local;
+        modelPose_.local[j] = pose.local[j];
+    }
+}
+
 PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector<AnimationClip>& clips,
                                      double now, Pose& pose) {
     PoseLayerStats stats;
@@ -523,7 +566,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
     bodyResult_ = BodyCompensation{};
     if (bodyJoint_ >= 0 && static_cast<std::size_t>(bodyJoint_) < count) {
         demands_.clear();
-        poseToModel(skeleton, pose, model_);
+        ensureModel(skeleton, pose);
         for (std::size_t i = 0; i < layers_.size(); ++i) {
             const PoseLayer& layer = layers_[i];
             // The same realized weight the apply loop will use. Reading `layer.weight` here
@@ -761,7 +804,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 stats.applied += 1u;
                 continue;
             }
-            poseToModel(skeleton, pose, model_);
+            ensureModel(skeleton, pose);
             const auto jointIndex = static_cast<std::size_t>(ids.x);
             const auto originIndex = static_cast<std::size_t>(ids.y);
             const glm::vec3 jointModel(model_[jointIndex][3]);
@@ -802,7 +845,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // whole of this layer. When the mask spreads the turn over a chain the pivot therefore
             // moves under the joints that already turned; the residual that leaves is measured in
             // tests/unit/test_character_lab_layers.cpp rather than asserted away.
-            poseToModel(skeleton, pose, model_);
+            ensureModel(skeleton, pose);
             const glm::vec3 pivot = glm::vec3(model_[static_cast<std::size_t>(pivotIndex_[i])][3]);
             const glm::vec3 toTarget = layer.target - pivot;
             if (glm::dot(toTarget, toTarget) < 1e-8f) {
@@ -858,7 +901,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             const auto r = static_cast<std::size_t>(ids.x);
             const auto m = static_cast<std::size_t>(ids.y);
             const auto t = static_cast<std::size_t>(ids.z);
-            poseToModel(skeleton, pose, model_);
+            ensureModel(skeleton, pose);
             const TwoBoneChain chain{glm::vec3(model_[r][3]), glm::vec3(model_[m][3]),
                                      glm::vec3(model_[t][3])};
             // An explicit target beats the plane, so a test or a timeline can drive one foot by

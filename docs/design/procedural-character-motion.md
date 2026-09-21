@@ -705,3 +705,45 @@ from what would become shared input.
 The other half of §48 is in good shape and is now asserted: per-instance state really is
 per-instance — two rigs from the same file have separate storage and posing one leaves the other
 untouched.
+
+## §52 — visual regression, numerically
+
+`tests/data/motion-baseline.txt`: 335 named quantities in metres, recorded for the alien under the
+full seven-layer stack at sixteen samples of one walk loop — joint positions for six tracked joints,
+foot contact heights, and per-sample pose continuity. Compared at 0.1 mm, which is loose enough that
+a fused multiply-add does not fail it and five hundred times tighter than the smallest effect
+measured in this phase (the 0.052 m foot slide).
+
+Named quantities rather than a checksum, deliberately. A screenshot diff and a hash both answer "is
+this different" with a number nobody can act on; this one says *which joint, at which sample, by how
+many millimetres*. Falsified by nudging the reach target 1 cm: it named `hand.l.x` at every sample
+and printed the delta.
+
+The regeneration escape hatch (`AVGEN_WRITE_MOTION_BASELINE=1`) is necessary and is also how this
+kind of test dies — a regression appears, someone regenerates, the diff is a wall nobody reads. The
+mitigation is that the file is small, human-readable and in metres, so regenerating puts the change
+in front of a reviewer instead of hiding it in a hash.
+
+## §53 — profile before optimizing
+
+The profile was §47's. `PoseLayerStack::ensureModel` now keeps `model_` valid across the layer loop
+and recomputes only the joints a previous layer wrote, plus their descendants — found by **diffing
+the pose**, not by consulting each layer's mask, because the mask is a claim and a layer that wrote
+outside it (which is `docs/testing.md` #25, and has already happened once in this phase) would hand
+the next layer a stale model space with nothing to fail.
+
+| | before | after |
+|---|---|---|
+| full stack, per character per frame | 21.91 µs | **14.1–14.3 µs** |
+| 100 characters | 2.16 ms | **1.41 ms** |
+| adding one more model-space layer | 2.64 µs | **1.05 µs** (a full walk is 2.10 µs) |
+
+**ADR-603 predicted the stack would approach 4.9 µs, and it did not — it is three times that.** The
+first `ensureModel` of each frame follows the clip sample, which changes every joint, so one full
+walk per frame is a floor rather than something the optimization removes. Seven walks became one
+walk plus six dirty-set passes, and a dirty-set pass is not free. Recorded as ADR-605: the win
+reported alone is a success, and the win against a stated expectation is a success plus a corrected
+model of where the time goes.
+
+§52 is what makes it safe: the incremental rebuild changed **none** of the 335 baseline quantities,
+to 0.1 mm. An optimization to a solver that cannot show its output unchanged is a rewrite.

@@ -236,6 +236,7 @@ TEST_CASE("the per-character cost of the motion stack, measured", "[perf][phaseB
     WARN("microseconds per character per frame, fastest of 5 repeats:");
 
     std::vector<double> fullAt;
+    double lastMarginal = 0.0; // the cost of adding the final model-space layer
     const int counts[] = {1, 10, 50, 100};
     for (const int count : counts) {
         std::vector<Instance> instances(static_cast<std::size_t>(count));
@@ -294,12 +295,15 @@ TEST_CASE("the per-character cost of the motion stack, measured", "[perf][phaseB
                      atHundred, 100.0 * (atHundred - atOne) / atOne));
     CHECK(atHundred < atOne * 1.5);
 
-    // **Where the time goes, measured rather than reasoned about (ADR-385).** Six of the layers in
-    // this stack read model space, and each one calls `poseToModel` over all 90 joints to read one
-    // to three of them -- plus the body compensation pre-pass, plus the caller's own. That is not
-    // gratuitous: a layer writes the pose, so the next layer needs model space *as the previous
-    // layers left it*, and a hoisted single rebuild would be wrong rather than fast. But it does
-    // mean the stack's cost is dominated by a hierarchy walk rather than by any solve.
+    // **Where the time goes, measured rather than reasoned about (ADR-385).** Before §53 this
+    // stack called `poseToModel` over all 90 joints once per model-space layer -- seven full walks
+    // per character per frame, 14.3 of 21.6 us, 66%. §53 made the walk incremental: `model_` is
+    // kept valid across the layer loop and only the joints a previous layer actually wrote, plus
+    // their descendants, are recomputed.
+    //
+    // The floor is one full walk per frame, because the clip sample that starts the frame changes
+    // every joint. So the useful comparison is no longer "seven walks" -- it is one walk plus six
+    // dirty-set passes, and the number below is what one full walk still costs.
     {
         scene::Pose pose;
         std::vector<glm::mat4> model;
@@ -318,15 +322,45 @@ TEST_CASE("the per-character cost of the motion stack, measured", "[perf][phaseB
                         .count() /
                     20000.0);
         }
-        const double layerCost = atHundred - fullAt[0] * 0.0; // the full stack, per character
-        WARN(fmt::format("one poseToModel over {} joints: {:.3f} us; the stack does 7 of them per "
-                         "character per frame = {:.2f} us of {:.2f} ({:.0f}%)",
-                         rig.skeleton.jointCount(), bestWalk, bestWalk * 7.0, layerCost,
-                         100.0 * bestWalk * 7.0 / layerCost));
-        // Asserted as a shape, not a share: whatever the machine, a hierarchy walk repeated once
-        // per model-space layer has to be a large part of a stack whose solves are two-bone.
+        WARN(fmt::format("one full poseToModel over {} joints: {:.3f} us. Seven of those would be "
+                         "{:.2f} us; the whole stack now costs {:.2f} us per character per frame, "
+                         "so it is no longer doing seven.",
+                         rig.skeleton.jointCount(), bestWalk, bestWalk * 7.0, atHundred));
+        // **The guard on §53, chosen for separation rather than for being the obvious comparison.**
+        //
+        // The obvious one -- "the stack costs less than seven walks" -- is true (14.2 against 14.7)
+        // and would have been a bad test: a 3% margin in a suite four agents run on a shared
+        // machine is a coin flip, and a flaky assertion is worse than no assertion because someone
+        // eventually deletes it.
+        //
+        // This one compares the cost of *adding one more model-space layer* against a full walk.
+        // Before §53 adding one cost a full walk, because that is literally what it did. A marginal
+        // is a difference of two minima and is therefore much noisier than either -- the first three
+        // times this ran it reported 0.64, 1.59 and 2.64 us -- so it is measured as the **minimum
+        // of three paired measurements** rather than one, which is the same minima-not-means rule
+        // applied one level up. Stated honestly: the separation here is roughly a factor of two,
+        // not the factor of three a single lucky reading suggested.
+        {
+            std::vector<Instance> one(1);
+            CHECK(one[0].layers.bind(perfLayers(), rig.skeleton, rig.clips).empty());
+            const LayerSet without = sets[4]; // everything but the reach
+            const LayerSet with = sets[5];    // and with it
+            for (int pair = 0; pair < 3; ++pair) {
+                const double a =
+                    measure(rig.skeleton, rig.clips, *walk, one, without, 600, 5)
+                        .microsPerCharacterFrame;
+                const double b =
+                    measure(rig.skeleton, rig.clips, *walk, one, with, 600, 5)
+                        .microsPerCharacterFrame;
+                lastMarginal = pair == 0 ? b - a : std::min(lastMarginal, b - a);
+            }
+        }
+        WARN(fmt::format("adding one more model-space layer costs {:.2f} us against a {:.2f} us "
+                         "full walk",
+                         lastMarginal, bestWalk));
         CHECK(bestWalk > 0.0);
-        CHECK(bestWalk * 7.0 > 0.2 * layerCost);
+        CHECK(lastMarginal > 0.0);      // it was measured at all
+        CHECK(lastMarginal < bestWalk); // and a layer no longer costs a walk
     }
 
     // And the corresponding baseline, stated as a measurement and not as a promise: what a hundred

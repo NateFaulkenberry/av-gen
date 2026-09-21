@@ -544,6 +544,11 @@ public:
                          Pose& pose);
 
 private:
+    // Brings `model_` up to date with `pose`, recomputing only what changed since it was last
+    // brought up to date. Bit-for-bit identical to `poseToModel` for the joints it recomputes,
+    // because it composes the same `parent * local` in the same order.
+    void ensureModel(const Skeleton& skeleton, const Pose& pose);
+
     std::vector<PoseLayer> layers_;
     std::vector<JointMask> masks_;
     // Stride (Phase B §7): the joint whose excursion is scaled, and the joint it is measured from.
@@ -578,6 +583,18 @@ private:
     std::vector<ReachDemand> demands_;
     // Scratch, kept so a per-frame apply allocates nothing after the first.
     std::vector<glm::mat4> model_;
+    // Phase B §53. `model_` is kept valid **across** the layer loop instead of being rebuilt from
+    // scratch by every layer that needs it. `modelPose_` is the pose `model_` was last built from;
+    // the difference between it and the incoming pose is exactly the set of joints a previous
+    // layer wrote, and only those joints and their descendants need recomputing.
+    //
+    // The dirty set is found by **diffing the pose**, not by consulting each layer's mask. The mask
+    // would be faster and it would be a claim: a layer that wrote outside its mask -- which is the
+    // defect `docs/testing.md` #25 describes -- would silently get a stale model space and a wrong
+    // solve. A diff cannot be wrong about what changed, and 90 transform comparisons are an order
+    // of magnitude cheaper than 90 matrix multiplies.
+    Pose modelPose_;
+    std::vector<std::uint8_t> modelDirty_;
     std::vector<glm::mat4> updated_;
     Pose reference_;
     Pose sampled_;
