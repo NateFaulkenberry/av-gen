@@ -133,10 +133,18 @@ PathHit closestOnPath(const std::vector<glm::vec3>& path, glm::vec2 p,
     // them was the larger half of what this pass cost. 64 blocks is 512 segments; past that the
     // buffer is declined and the function behaves exactly as it did before this paragraph existed,
     // which is also the fallback that keeps this correct rather than merely bounded.
+    // `AVGEN_PATH_CUTOFF=0` removes the cutoff without removing the build, the twin of
+    // `AVGEN_HEIGHT_CACHE=0`. Both exist so that "what did this pass buy end to end" can be one
+    // interleaved measurement in one session rather than a product of two ratios taken hours apart
+    // on a machine four agents share -- which is arithmetic, not a measurement.
+    static const bool cutoffEnabled = [] {
+        const char* v = std::getenv("AVGEN_PATH_CUTOFF");
+        return v == nullptr || (v[0] != '0' || v[1] != '\0');
+    }();
     constexpr std::size_t kMaxCachedBlocks = 64;
     std::array<float, kMaxCachedBlocks> boxDist{};
     float cutoff = std::numeric_limits<float>::max();
-    const bool cached = blocked && blocks.size() > 1 && blocks.size() <= kMaxCachedBlocks;
+    const bool cached = cutoffEnabled && blocked && blocks.size() > 1 && blocks.size() <= kMaxCachedBlocks;
     if (cached) {
         std::size_t nearest = 0;
         float nearestBox = std::numeric_limits<float>::max();
