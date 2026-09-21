@@ -58,6 +58,34 @@ enum class PoseLayerKind : std::uint8_t {
     // gives: a two-bone solve is not maskable per joint, because half a knee does not reach half a
     // target. `weight` still blends the whole correction towards the animated pose.
     Foot,
+    // **Stride warping (Phase B §7).** Scale how far a foot swings horizontally away from the
+    // body, so a character travelling slower than its walk clip was authored for takes shorter
+    // steps instead of sliding long ones.
+    //
+    // This is the load-bearing half of speed adaptation on this repository's content, and that is
+    // a measurement rather than a preference: `Gait::footSlip` reports **97 of 100** mismatches
+    // across the shipping cast as the body moving *slower* than its own stride, median ratio
+    // **0.250**, with the Glowmere aliens at **0.016-0.042x** and their playback-rate clamp
+    // already pushed 7.5x below default and still saturated. There is no second clip to blend
+    // toward down there and no rate left to give, so the stride has to get shorter in space.
+    //
+    // Deliberately *not* a two-bone solve. It moves the named joint and lets the `Foot` layer --
+    // which runs after it -- put the foot back on the ground. Stride is how far the step reaches;
+    // ground contact is where it lands, and they are different questions.
+    Stride,
+    // **Secondary motion (Phase B §26-§28).** A small, continuous oscillation added on top of
+    // whatever is already posed: breathing, weight shifts, the micro-motion that separates a
+    // character from a statue.
+    //
+    // **A pure function of the timeline second**, with no state and no random number generator.
+    // That is not a simplification, it is the requirement: ADR-360 says a render must reproduce,
+    // and anything that accumulated per frame would differ between a scrub and a play. A per-layer
+    // `secondaryPhase` and a per-joint spread are what stop every joint moving in lockstep, which
+    // is what noise would otherwise have been for.
+    //
+    // Fades out as the body travels (`secondaryStillness`), because idle life is what a standing
+    // body does and a walking one has a gait instead.
+    Secondary,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
@@ -121,9 +149,13 @@ struct PoseLayer {
     // that turns one into the others. Any joints *between* the named three ride along unchanged,
     // which is what makes the goat's ankle a non-problem.
     //
-    // `chainMid` must be a descendant of `chainRoot` and `chainTip` a descendant of `chainMid`;
-    // `bind` checks it and says so when it is not, because "these three names are a leg" is an
-    // assumption the alien pack disproves (its foot, thigh and leg are three separate branches).
+    // The three need NOT be an ancestor chain (ADR-543). They were required to be, and the
+    // requirement was measured wrong: `tools/motion_probe.cpp` solved the alien's three detached
+    // leg joints and wrote them back faithful to 1.2e-7 with bone lengths preserved to 0.000000,
+    // while the ancestor-only write-back missed by 0.206 and moved the foot not at all. What
+    // ancestry decides is which model-space transform each written joint's *parent* has undergone,
+    // and `apply` works that out per joint instead of assuming it. `bind` records the linkage and
+    // `PoseLayerStats::detachedChains` reports it; the only refusal left is naming one joint twice.
     std::string chainRoot;
     std::string chainMid;
     std::string chainTip;
@@ -182,8 +214,48 @@ struct PoseLayer {
     // pose's up needs no authoring and cannot be wrong about a rig it has read.
     glm::vec3 soleUp{0.0f};
 
+    // ---- Stride (Phase B §7) --------------------------------------------------------------------
+    // The joint whose horizontal excursion is scaled -- a foot, or a hand on a quadruped forelimb.
+    std::string strideJoint;
+    // The joint the excursion is measured FROM: the body, not the world. Empty means the rig's
+    // first translated joint, which is ADR-337's rule and the one `motion_analysis` already uses;
+    // naming it matters on a rig whose armature wrapper is joint 0 and whose body is a child of it.
+    std::string strideOrigin;
+    // How far the scaling may go. A clip played at a twentieth of its authored speed does not want
+    // a twentieth of a stride -- that is a character mincing, not walking. Below the floor the
+    // honest answer is a different clip, and §12's locomotion modes are where that belongs; this
+    // clamps, and `LayerResolution::Clamped` says that it did.
+    float strideMin = 0.35f;
+    float strideMax = 1.6f;
+    // Scale the vertical lift with the stride too. A short step does not lift the foot as high,
+    // and shortening the reach while leaving the lift alone is what makes a shortened walk read as
+    // a march. 0 keeps the authored height; 1 scales it with the stride.
+    float strideLift = 0.7f;
+
+    // ---- Secondary (Phase B §26-§28) ------------------------------------------------------------
+    // The axis the oscillation turns about, in each masked joint's own local frame. Defaults to
+    // the rig's forward roll, which is what a breath looks like on a chest.
+    glm::vec3 secondaryAxis{1.0f, 0.0f, 0.0f};
+    float secondaryDegrees = 1.2f;   // peak amplitude; a breath is small and a shiver is not
+    float secondaryPeriod = 4.0f;    // seconds for one full cycle
+    float secondaryPhase = 0.0f;     // 0..1, so two layers on one body are not in lockstep
+    // How much each successive masked joint lags the one before, in cycles. Zero makes a chest and
+    // a head move as one rigid block, which reads as a mechanism rather than a body; a small
+    // value is what makes the motion travel up the spine.
+    float secondarySpread = 0.08f;
+    // Above this ground speed the layer has faded out entirely, in metres per second. Idle life is
+    // what a standing body does; a walking one has a gait. Zero disables the fade.
+    float secondaryStillness = 0.6f;
+
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
+    // Stride: how far the body travels against the stride its clip was authored for. 1 means they
+    // agree and this layer is a no-op. Written per frame from `MotionContext::strideRatio`, which
+    // is `Gait::footSlip` -- one answer to that question rather than a second (ADR-260).
+    float strideRatio = 1.0f;
+    // Secondary: the body's horizontal speed, so the oscillation can fade as it walks. Written per
+    // frame from `MotionContext::groundSpeed` -- the measurement (ADR-545), not the intent.
+    float bodySpeed = 0.0f;
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
     bool hasTarget = false;
 };
@@ -219,6 +291,36 @@ struct PoseLayerStats {
     std::uint32_t layers = 0;  // layers in the stack
     std::uint32_t applied = 0; // layers that wrote a joint
     std::uint32_t joints = 0;  // joint writes, summed over the layers that applied
+    // ADR-543: foot layers that solved this frame on a chain with at least one DETACHED link --
+    // a knee that is not beneath its hip, or a foot not beneath its knee. Zero on every properly
+    // nested rig in this repository and non-zero on every Glowmere alien, which is the point: a
+    // reader can tell which write-back rule a character is exercising without reading the rig.
+    std::uint32_t detachedChains = 0;
+    // ADR-544: 1 when reachable-contact solving moved the body this frame, 0 otherwise. The
+    // translation itself and why it was that size are in `PoseLayerStack::bodyCompensation()`;
+    // this is the count a stats line can carry beside the others.
+    std::uint32_t bodyCompensations = 0;
+};
+
+// Reachable contact solving, as a property of the whole stack rather than of one layer (ADR-544).
+//
+// It is not a layer because it is not about one limb. Every `Foot` layer on this rig is asking the
+// same body to be somewhere, and the body has one answer; a per-layer version would have four feet
+// each translating the pelvis by their own amount. So the stack gathers the demands, solves once,
+// and moves the body before any limb runs.
+//
+// **Off by default**, because it moves a joint that no layer moved before it and a scene that did
+// not ask for that must not get it.
+struct BodyCompensationSpec {
+    bool enabled = false;
+    // The joint that carries the body. Empty means the skeleton's own root -- joint 0, whose parent
+    // is -1 -- which is the right default for the same reason `root_motion.hpp` compensates there:
+    // translating a parentless joint's local IS a rigid model-space translation of everything
+    // beneath it, and on a nearly flat rig like the alien's that is the only joint every limb and
+    // the spine share. Naming one is for a rig with a real pelvis.
+    std::string joint;
+    BodyCompensationLimits limits;
+    friend bool operator==(const BodyCompensationSpec&, const BodyCompensationSpec&) = default;
 };
 
 // An ordered stack of layers over one skeleton. Lives on `SkinnedRig`; copied with it, because
@@ -232,11 +334,34 @@ public:
     [[nodiscard]] std::vector<PoseLayer>& layers() { return layers_; }
     [[nodiscard]] const std::vector<PoseLayer>& layers() const { return layers_; }
     [[nodiscard]] const std::vector<JointMask>& masks() const { return masks_; }
+    // Parallel to `layers()`: {strideJoint, strideOrigin} resolved, or -1. Exposed for the same
+    // reason `chains()` is -- "which joint did this layer actually bind to" is the first question
+    // of any report about it, and re-deriving the rule in a debug view would be a second copy.
+    [[nodiscard]] const std::vector<glm::ivec2>& strides() const { return stride_; }
     [[nodiscard]] const std::vector<LayerResolution>& results() const { return results_; }
     // Per layer, what the two-bone solver said the last time a `Foot` layer ran. `Solved` on every
     // layer that is not one, which is a lie a caller has to read alongside `results()` -- the point
     // is to say *which* degeneracy, and `LayerResolution::Degenerate` only says that there was one.
     [[nodiscard]] const std::vector<IkStatus>& ikStatuses() const { return ikStatus_; }
+    // Per layer, the chain's three joint indices, or -1 (ADR-543).
+    [[nodiscard]] const std::vector<glm::ivec3>& chains() const { return chain_; }
+    // Per layer, whether each link is an ancestor link: x = mid beneath root, y = tip beneath mid.
+    [[nodiscard]] const std::vector<glm::ivec2>& chainLinkage() const { return chainLinked_; }
+
+    // ---- reachable contact solving (ADR-544) ---------------------------------------------------
+    // Installed with the layers and resolved against the same skeleton. **It takes effect at the
+    // next `bind`/`rebind`**, which is where the body joint is looked up and where a name this rig
+    // does not carry is reported -- the same rule the masks follow, and for the same reason: a
+    // setter that resolved names would need a skeleton it has not been given. Set it first, then
+    // bind.
+    [[nodiscard]] const BodyCompensationSpec& bodyCompensationSpec() const { return bodySpec_; }
+    void setBodyCompensation(BodyCompensationSpec spec) { bodySpec_ = std::move(spec); }
+    // What the last `apply()` decided. `NotNeeded` with a zero translation on a stack that is not
+    // using it, which is the same answer as "every foot could reach" and is deliberately not
+    // distinguished: neither moved the body.
+    [[nodiscard]] const BodyCompensation& bodyCompensation() const { return bodyResult_; }
+    // The joint the body translation is applied to, or -1 when the stack is not compensating.
+    [[nodiscard]] int bodyJoint() const { return bodyJoint_; }
     // The layer with this role, or nullptr. Roles are how the animation-intent seam reaches a
     // layer; a name is how a person does.
     [[nodiscard]] PoseLayer* find(PoseLayerDrive drive);
@@ -263,12 +388,20 @@ public:
 private:
     std::vector<PoseLayer> layers_;
     std::vector<JointMask> masks_;
+    // Stride (Phase B §7): the joint whose excursion is scaled, and the joint it is measured from.
+    // Parallel to `layers_`, like every other resolved index here.
+    std::vector<glm::ivec2> stride_;
     std::vector<LayerResolution> results_;
     std::vector<int> clipIndex_;  // per layer, resolved once by bind
     std::vector<int> pivotIndex_; // per layer, resolved once by bind
     // Per layer, the three joint indices of a `Foot` chain, or -1. Resolved once by bind, including
     // the check that they are an ancestor chain rather than three names that happen to exist.
     std::vector<glm::ivec3> chain_;
+    // Per layer, whether each link of the chain is an ancestor link: x = mid is beneath root,
+    // y = tip is beneath mid. Recorded by `bind` (ADR-543) rather than required by it. It changes
+    // nothing about the solve and everything about what the intermediate joints do: on a linked
+    // chain they ride along, on a detached one they stay where the clip put them.
+    std::vector<glm::ivec2> chainLinked_;
     // Per layer, `PoseLayer::soleUp` resolved against this rig's rest pose. Held here rather than
     // recomputed per frame because it is a fact about the asset, and read out of the *rest* pose
     // rather than the current one because "up" has to mean the same thing on every frame of a walk.
@@ -278,12 +411,24 @@ private:
     // `soleUp_` is.
     std::vector<float> restTipHeight_;
     std::vector<IkStatus> ikStatus_;
+    BodyCompensationSpec bodySpec_;
+    int bodyJoint_ = -1;
+    BodyCompensation bodyResult_;
+    // Scratch for the demands gathered from the foot layers, kept so the pre-pass allocates nothing
+    // after the first frame.
+    std::vector<ReachDemand> demands_;
     // Scratch, kept so a per-frame apply allocates nothing after the first.
     std::vector<glm::mat4> model_;
     std::vector<glm::mat4> updated_;
     Pose reference_;
     Pose sampled_;
 };
+
+// Is `joint` beneath `ancestor` in this skeleton? False for either index negative, and false for a
+// joint compared with itself -- "beneath" is strict. Exposed because ADR-543 made chain ancestry a
+// recorded property rather than a precondition, and `bind` and `apply` must not each own a copy of
+// the test: two ancestry predicates is two chances to disagree about a rig.
+[[nodiscard]] bool descendsFrom(const Skeleton& skeleton, int joint, int ancestor);
 
 // The rotation that takes `from` to `to`, limited to `maxYaw` radians of azimuth and `maxPitch`
 // radians of elevation away from `from`, about model-space up (+Y). Exposed because it is the whole

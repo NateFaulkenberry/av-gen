@@ -17,6 +17,7 @@
 // `play(state, now)`; everything below that is arithmetic.
 
 #include "core/time.hpp"
+#include "scene/motion_analysis.hpp"
 #include "scene/pose_layers.hpp"
 #include "scene/root_motion.hpp"
 #include "scene/skeleton.hpp"
@@ -99,6 +100,14 @@ struct AnimationState {
     float speed = 1.0f;     // clip seconds per timeline second
     bool loop = true;
     float blendIn = 0.2f;   // default cross-fade, in seconds, when something enters this state
+    // ---- phase matching (ADR-547) ---------------------------------------------------------------
+    // Enter this state at the phase the outgoing state was at, rather than at its clip's frame
+    // zero. `play()` has always set the new clip's clock to `now`, so a walk at 73% of its cycle
+    // cross-faded into a run at 0% and whether the feet agreed was luck.
+    //
+    // Off by default: it changes which frame a state starts on, and every scene that authored a
+    // transition around the old behaviour must keep getting it.
+    bool matchPhase = false;
 };
 
 struct AnimationTransition {
@@ -112,6 +121,13 @@ public:
     // ---- authoring ----
     void addState(AnimationState state);
     void addTransition(AnimationTransition transition);
+    // Turn phase matching on or off for every state at once. Per-state is the authored granularity
+    // (`AnimationState::matchPhase`); this is what a node-level scene key reaches.
+    void setMatchPhase(bool on) {
+        for (AnimationState& state : states_) {
+            state.matchPhase = on;
+        }
+    }
     void clear();
     [[nodiscard]] const std::vector<AnimationState>& states() const { return states_; }
     [[nodiscard]] const std::vector<AnimationTransition>& transitions() const { return transitions_; }
@@ -121,6 +137,27 @@ public:
     // `from`, then a wildcard one), else the target state's own blendIn.
     [[nodiscard]] float blendTimeFor(std::string_view from, std::string_view to) const;
 
+    // ---- phase matching and inertialization (ADR-547) --------------------------------------
+    //
+    // What `play` needs in order to align phases: the clips, and a phase track per clip. Passed in
+    // rather than held, because the player is copied with its rig (ADR-086) and a pointer held
+    // across that copy is a pointer into whichever rig was copied from.
+    struct PhaseMatch {
+        const std::vector<AnimationClip>* clips = nullptr;
+        const std::vector<PhaseTrack>* phases = nullptr; // parallel to `clips`; empty entries are fine
+        [[nodiscard]] bool usable() const { return clips != nullptr && phases != nullptr; }
+    };
+
+    // Seconds for the inertialized transition's offset to halve. **Zero means cross-fade**, which
+    // is what every existing scene gets and what keeps them bit-identical.
+    //
+    // Inertialization evaluates only the INCOMING clip and decays the pose difference captured at
+    // the transition, instead of evaluating both clips and blending. The cost is therefore fixed
+    // rather than doubling for the length of a transition, and -- the part that matters here --
+    // the offset is **recomputed from the clips** rather than stored, so it is a pure function of
+    // (states, entry times, now) exactly as the rest of this class is.
+    float inertializeHalflife = 0.0f;
+
     // ---- driving: the four calls a behaviour makes ----
     // Enters `name` at timeline second `now`, cross-fading from whatever is playing over the
     // transition's blend time. Asking for the state already current is a no-op -- the clip is *not*
@@ -129,6 +166,10 @@ public:
     bool play(std::string_view name, double now);
     // As above with an explicit cross-fade; 0 snaps.
     bool play(std::string_view name, double now, float blendSeconds);
+    // As above, aligning the incoming clip's phase to the outgoing one's when the target state asks
+    // for it and both clips have a phase track. Falls back to the plain `play` -- frame zero --
+    // when either is missing, which is the honest answer for a clip nobody analysed.
+    bool play(std::string_view name, double now, float blendSeconds, const PhaseMatch& match);
     // Restarts the current state's clock at `now` (a one-shot played again).
     void restart(double now);
     // Changes the current state's rate without a jump: the clock is rebased so the local clip time
@@ -172,6 +213,11 @@ private:
     };
     [[nodiscard]] float localTime(const Playing& playing, const std::vector<AnimationClip>& clips,
                                   double now) const;
+    // The pose offset an inertialized transition decays away: what the outgoing state was doing at
+    // the transition instant, minus what the incoming state was doing at the same instant.
+    // Recomputed rather than remembered -- see `inertializeHalflife`.
+    void transitionOffset(const std::vector<AnimationClip>& clips, const Skeleton& skeleton, Pose& outgoing,
+                          Pose& incoming) const;
     void sampleInto(const Playing& playing, const std::vector<AnimationClip>& clips, const Skeleton& skeleton,
                     double now, Pose& pose) const;
 
@@ -179,6 +225,9 @@ private:
     std::vector<AnimationTransition> transitions_;
     Playing current_;
     Playing previous_;
+    // Scratch for the inertialized path's second sample. `mutable` because `evaluate` is const and
+    // this is a buffer rather than a decision -- the same reason `SkinnedRig::rootMotionScratch` is.
+    mutable Pose inertScratch_;
     double blendStart_ = 0.0;
     float blendDuration_ = 0.0f;
 };
@@ -221,6 +270,23 @@ struct SkinnedRig {
     // (ADR-170): a layer that reported 0 joints is a layer whose mask missed.
     PoseLayerStats layerStats;
 
+    // ---- contacts and phase (ADR-546, ADR-547) ---------------------------------------------
+    // The joints whose ground contact this character's clips are analysed for, and the result.
+    // `clipPhases` is parallel to `clips`; an entry is empty for a clip that was never analysed,
+    // and a transition into one falls back to frame zero rather than pretending.
+    //
+    // Filled by `analyse()`, which is an OFFLINE call -- it samples every clip on a 30 Hz grid and
+    // costs milliseconds per clip. Nothing calls it per frame and nothing should.
+    std::vector<ContactJoint> contactJoints;
+    std::vector<PhaseTrack> clipPhases;
+    std::vector<std::vector<ContactTrack>> clipContacts; // parallel to `clips`
+    // Runs `analyseClip` over every clip with `contactJoints`, filling the two above. Returns how
+    // many clips came back cyclic, which is the one number worth logging: a rig where none did has
+    // thresholds that do not suit it, and phase matching will silently do nothing.
+    std::uint32_t analyse(const ContactSettings& settings = {});
+    // What `AnimationPlayer::play` needs to align phases on this rig.
+    [[nodiscard]] AnimationPlayer::PhaseMatch phaseMatch() const { return {&clips, &clipPhases}; }
+
     // ---- root motion (ADR-337) -------------------------------------------------------------
     // Which of this rig's clips hand their root displacement to the simulation instead of drawing
     // it. Empty on every rig that does not author one, and an empty set is checked with one
@@ -257,6 +323,34 @@ struct SkinnedRig {
     // would copy it forward and reintroduce exactly the jump. The next evaluate has to take its
     // "previous" from the pose it lands on rather than the one it left.
     bool reseedPrevious = false;
+
+    // ---- an externally supplied base pose (Phase B) ---------------------------------------------
+    //
+    // When `hasExternalPose` is set, `evaluate` uses `externalPose` as the base instead of asking
+    // `player`. **Everything after that is unchanged**: root motion compensation, the layer stack
+    // and the palette all run exactly as they do over a clip, which is the point -- a procedurally
+    // driven character is still a character, and foot IK does not care where its base pose came
+    // from.
+    //
+    // **The scene tier deliberately does not know what put it there.** It is a pose, not a
+    // provider: `entity::MotionChain` and its providers live one tier up, own their own memory,
+    // and are replayed by `EntityWorld::seek` (ADR-541). If this field knew about them, the layer
+    // module would have a way to reach the simulation, which ADR-300 exists to prevent.
+    //
+    // Set every frame by whoever is driving, and **consumed** by `evaluate`, which clears the flag.
+    // One frame's silence therefore falls back to the clip player rather than freezing on a stale
+    // pose -- a driver that stops driving should hand the body back, not abandon it.
+    Pose externalPose;
+    bool hasExternalPose = false;
+    // **Evidence from the consumer, not a claim from the producer.** Incremented by `evaluate`
+    // each time it actually uses an external pose.
+    //
+    // This exists because the first probe for this seam was vacuous and a deliberate break caught
+    // it: the sink's own "I posed it" flag was true while the pose was computed and dropped, and
+    // the drawn result was indistinguishable, because a clip provider and the clip player agree by
+    // design (ADR-541 corollary 1). A flag set by whoever *claims* to have done the work cannot
+    // tell that apart. A counter incremented by whoever *consumed* it can.
+    std::uint64_t externalPoseFrames = 0;
 
     // Scratch, kept so a per-frame evaluation allocates nothing.
     Pose scratchPose;

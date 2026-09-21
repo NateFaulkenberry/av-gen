@@ -6,6 +6,7 @@
 #include "core/log.hpp"
 #include "assets/asset_library.hpp"
 #include "assets/mesh_lod.hpp"
+#include "entity/gait.hpp"
 #include "entity/obstacles.hpp"
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
@@ -2292,6 +2293,11 @@ void Composition::installEntities() {
         // own frame. One line, and it is the line between the engine and every socket, attachment,
         // carried prop and aim.
         live->setSkeleton(animationSinks_.back().get());
+        // Phase B. The chain the entity advances, and the sink draws from. Installed
+        // unconditionally for the same reason `setSkeleton` is: whether a body opted in is a
+        // question `Entity::advanceMotion` answers per frame, and a pointer installed only for
+        // opted-in bodies would have to be reinstalled every time a scene was edited.
+        live->setMotionChain(&animationSinks_.back()->chain());
         // ADR-337: the third. Installed unconditionally, like the other two, because whether a
         // clip was opted in is a question about the *rig* -- which may not be built yet when this
         // runs -- and the source answers "nothing" for a body playing a clip nobody named. A
@@ -2467,6 +2473,36 @@ entity::Navigator Composition::buildNavigator() const {
     return {};
 }
 
+GroundSample Composition::TerrainGroundQuery::sampleAt(const glm::vec3& worldPoint) const {
+    GroundSample out;
+    const world::TerrainQuery terrain = owner_.terrainQuery();
+    if (!terrain.valid()) {
+        return out; // no terrain in this scene: no answer, which is not the same as flat ground
+    }
+    const world::TerrainPoint point = terrain.at(glm::vec2(worldPoint.x, worldPoint.z));
+    // **`TerrainReject` answers a different question from this one.** Its values -- `TooSteep`,
+    // `Submerged`, `NoHeadroom`, `InsideHero`, `Obstructed` -- are about whether a character may
+    // WALK here. Every one of those places still has a surface with a height, and a foot standing
+    // on a steep bank, in shallow water or under a canopy is standing on something.
+    //
+    // Treating a reject as "no ground" was measured doing exactly the wrong thing: an alien's right
+    // foot fell back to the body's plane precisely where the terrain was steep enough to be worth
+    // sampling. Only `OutOfBounds` is genuinely no answer.
+    if (point.reject == world::TerrainReject::OutOfBounds) {
+        return out;
+    }
+    out.point = glm::vec3(worldPoint.x, point.height, worldPoint.z);
+    out.normal = point.normal;
+    out.distance = worldPoint.y - point.height;
+    out.category = point.water ? GroundCategory::Water : GroundCategory::Terrain;
+    out.valid = true;
+    return out;
+}
+
+const IGroundQuery& Composition::groundQuery() const {
+    return groundQuery_ != nullptr ? *groundQuery_ : terrainGround_;
+}
+
 world::TerrainQuery Composition::terrainQuery() const {
     for (const auto& nodePtr : nodes_) {
         if (nodePtr->kind != NodeKind::Terrain) {
@@ -2533,11 +2569,129 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
 // **Which position (ADR-260).** It reads the *drawn* transform: the node parameters' finals, which
 // `applyOffsets` wrote earlier in this same `EntityWorld::update` -- so there is no frame of lag
 // here, unlike attachments. It writes `SkinnedRig::layers`, which is pose intent and nothing else.
+// Phase B. Build this body's provider chain against the rig it actually has.
+//
+// The entries come from the entity's own `clips` map and `GaitSettings` -- the two places a scene
+// already authors "which clip is this body's walk" and "how fast was it authored for". Deriving
+// them anywhere else would be a third answer to a question with two (ADR-260), and inventing an
+// authored speed would be inventing the number ADR-540 measured as underivable.
+void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
+    clipProvider_.clearEntries();
+    clipProvider_.setClips(&rig.clips);
+    chain_.clear();
+
+    const auto entryFor = [&](entity::Activity activity, float authored) {
+        const std::string& want = entity_.clipFor(activity);
+        if (want.empty()) {
+            return;
+        }
+        const int index = findClip(rig.clips, want);
+        if (index < 0) {
+            return;
+        }
+        entity::ClipEntry entry;
+        entry.clip = static_cast<std::uint32_t>(index);
+        entry.mode = entity::MovementMode::Ground;
+        entry.authoredSpeed = authored;
+        entry.loop = true;
+        clipProvider_.addEntry(std::move(entry));
+    };
+    entryFor(entity::Activity::Idle, 0.0f);
+    entryFor(entity::Activity::Walk, entity_.desc().gait.walkSpeed);
+    entryFor(entity::Activity::Run, entity_.desc().gait.runSpeed);
+
+    // **The fallback chain, with its one implementation.** Phase C's matcher and Phase E's neural
+    // provider are added in front of this; the clip provider stays at the back, because ADR-541
+    // corollary 1 says every character can run in Clip mode and Clip mode is the fallback for
+    // every failure.
+    chain_.add(&clipProvider_);
+    chainBuilt_ = true;
+    // §50/§64: a body whose base pose stops coming from its clips is a large enough change that
+    // it says so once, with the entries it resolved. A chain built with zero entries is the
+    // silent-no-op this whole stage exists to prevent, so that case is a warning.
+    if (clipProvider_.entries().empty()) {
+        log::warn("entity '{}': procedural motion is on but no clip entry resolved; the body will "
+                  "fall back to its clip player",
+                  entity_.desc().name);
+    } else {
+        log::info("entity '{}': procedural motion on, {} clip entry(s), chain of {}",
+                  entity_.desc().name, clipProvider_.entries().size(), chain_.size());
+    }
+}
+
+Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
+    MotionDebug out;
+    for (const auto& sink : animationSinks_) {
+        if (sink->nodeName() != node) {
+            continue;
+        }
+        const entity::Entity* live = entityWorld_.find(sink->entityName());
+        out.found = true;
+        out.posedByProvider = sink->posedByProvider();
+        if (const CompositionNode* n = findNode(std::string(node));
+            n != nullptr && !n->rigs.empty() && n->rigs.front() < scene_.rigs.size()) {
+            out.externalPoseFrames = scene_.rigs[n->rigs.front()].externalPoseFrames;
+        }
+        out.status = sink->chainResult().result.status;
+        if (live != nullptr) {
+            out.optedIn = live->desc().proceduralMotion;
+            out.provider = live->motionMemory().provider;
+            out.fellThrough = live->motionChainResult().fellThrough;
+            out.generation = live->motionMemory().generation;
+            out.localTime = live->motionMemory().localTime;
+        }
+        return out;
+    }
+    return out;
+}
+
+const MotionContext* Composition::motionContext(std::string_view node) const {
+    for (const auto& sink : animationSinks_) {
+        if (sink->nodeName() == node) {
+            return &sink->motion();
+        }
+    }
+    return nullptr;
+}
+
 void Composition::AnimationSink::driveLayers(const entity::LocomotionState& state) {
     CompositionNode* node = owner_.findNode(node_);
     if (node == nullptr || node->rigs.empty()) {
         return;
     }
+
+    // ---- Phase B: the base pose, when this body opted in ----------------------------------------
+    //
+    // **The split that makes this legal.** `Entity::advanceMotion` has already moved the provider
+    // memory this frame, on whichever path published the seam -- so on a scrub it was advanced once
+    // per replay step and holds the value a play would have reached. All that is left here is to
+    // *draw* it, which is a pure function of that memory and the skeleton, and cheap enough to do
+    // once per frame rather than 5,400 times per seek.
+    //
+    // A pose that fails to arrive leaves `hasExternalPose` false, and `SkinnedRig::evaluate` falls
+    // back to the clip player. Not hidden: `posedByProvider()` and `chainResult()` report it, and
+    // the lab test asserts on them.
+    posedByProvider_ = false;
+    if (entity_.desc().proceduralMotion) {
+        const RigId id = node->rigs.front();
+        if (id < owner_.scene_.rigs.size()) {
+            SkinnedRig& rig = owner_.scene_.rigs[id];
+            if (rig.skeleton.valid()) {
+                if (!chainBuilt_ || chainRig_ != id) {
+                    buildChain(rig);
+                    chainRig_ = id;
+                }
+                chainResult_.result =
+                    chain_.pose(entity_.motionMemory(), rig.skeleton, rig.externalPose);
+                if (chainResult_.result.ok() &&
+                    rig.externalPose.size() == rig.skeleton.joints.size()) {
+                    rig.hasExternalPose = true;
+                    posedByProvider_ = true;
+                }
+            }
+        }
+    }
+
     bool wanted = false;
     for (const RigId id : node->rigs) {
         if (id < owner_.scene_.rigs.size() && !owner_.scene_.rigs[id].layers.empty()) {
@@ -2548,14 +2702,18 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     if (!wanted) {
         return; // no node authored a layer: the conversion below is not worth a matrix inverse
     }
+    // ADR-551. Hoisted: the per-foot ground sampling below needs the node's world transform and
+    // its inverse whether or not there is a look target, which the original condition did not
+    // guarantee.
+    const glm::mat4 world = owner_.nodeWorldTransform(*node).matrix();
+    const glm::mat4 inverse = glm::inverse(world);
+    const IGroundQuery& ground = owner_.groundQuery();
     glm::vec3 localTarget(0.0f);
     bool haveTarget = false;
     glm::vec3 localGround(0.0f);
     glm::vec3 localNormal(0.0f, 1.0f, 0.0f);
     bool haveGround = false;
     if (state.hasLookTarget || state.hasGroundPlane) {
-        const glm::mat4 world = owner_.nodeWorldTransform(*node).matrix();
-        const glm::mat4 inverse = glm::inverse(world);
         if (state.hasLookTarget) {
             localTarget = glm::vec3(inverse * glm::vec4(state.lookTarget, 1.0f));
             haveTarget = true;
@@ -2576,11 +2734,97 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
         }
     }
     const float reaction = std::clamp(state.reaction, 0.0f, 1.0f);
+
+    // Phase B §4. Built here because this is the one function that already depends on both tiers,
+    // and built ONCE per frame rather than per layer: the inverse above is a matrix inverse and the
+    // conversions below are the same two lines every layer would otherwise repeat.
+    //
+    // Everything spatial goes to the entity's own frame, for the reason ADR-274 gives -- a posed
+    // rig has no world position -- and the normal goes through the transpose rather than the
+    // inverse, for the reason ADR-359 gives.
+    motion_ = MotionContext{};
+    motion_.dt = state.dt;
+    motion_.time = state.time;
+    motion_.velocity = glm::mat3(inverse) * state.velocity;
+    motion_.facing = glm::normalize(glm::mat3(inverse) * state.facing);
+    motion_.groundSpeed =
+        std::sqrt((state.velocity.x * state.velocity.x) + (state.velocity.z * state.velocity.z));
+    motion_.turnRate = state.turnRate;
+    // The intent, as the polar pair the mover authored it in: a scalar along a heading. Converted
+    // to a vector here so a layer never has to know which of the two forms the seam used.
+    motion_.desiredFacing =
+        glm::normalize(glm::mat3(inverse) * glm::vec3(std::sin(state.yaw), 0.0f, std::cos(state.yaw)));
+    motion_.desiredVelocity = motion_.desiredFacing * state.speed;
+    switch (state.activity) {
+    case entity::Activity::Idle: motion_.mode = LocomotionMode::Idle; break;
+    case entity::Activity::Walk: motion_.mode = LocomotionMode::Walk; break;
+    case entity::Activity::Run: motion_.mode = LocomotionMode::Run; break;
+    case entity::Activity::Turn: motion_.mode = LocomotionMode::Turn; break;
+    default: motion_.mode = LocomotionMode::Other; break;
+    }
+    motion_.playbackRate = state.playbackRate;
+    // What the playing clip was authored for, and how badly the body disagrees with it. Measured
+    // across the shipping Glowmere scene, 97 of 100 mismatches are the stride out-running the body
+    // and the median is 0.250 -- so this is the number a stride warper exists to drive to 1.
+    motion_.authoredSpeed = state.activity == entity::Activity::Run ? entity_.desc().gait.runSpeed
+                            : state.activity == entity::Activity::Walk
+                                ? entity_.desc().gait.walkSpeed
+                                : 0.0f;
+    motion_.strideRatio =
+        entity::Gait::footSlip(entity_.desc().gait, state.activity, state.speed);
+    motion_.ground = &ground;
+    motion_.worldFromLocal = world;
+    motion_.localFromWorld = inverse;
+    motion_.groundPoint = localGround;
+    motion_.groundNormal = localNormal;
+    motion_.hasGroundPlane = haveGround;
+    motion_.lookTarget = localTarget;
+    motion_.hasLookTarget = haveTarget;
+    motion_.reaction = reaction;
+    for (const RigId id : node->rigs) {
+        if (id < owner_.scene_.rigs.size()) {
+            // The body's own scale, so a layer's thresholds can be ratios (ADR-552).
+            const Skeleton& sk = owner_.scene_.rigs[id].skeleton;
+            if (!sk.joints.empty()) {
+                Pose rest;
+                std::vector<glm::mat4> restModel;
+                setRestPose(sk, rest);
+                poseToModel(sk, rest, restModel);
+                float lo = restModel.front()[3].y;
+                float hi = lo;
+                for (const glm::mat4& m : restModel) {
+                    lo = std::min(lo, m[3].y);
+                    hi = std::max(hi, m[3].y);
+                }
+                motion_.restHeight = std::max(hi - lo, 1e-4f);
+            }
+            break;
+        }
+    }
+
     for (const RigId id : node->rigs) {
         if (id >= owner_.scene_.rigs.size()) {
             continue;
         }
+        std::size_t layerIndex = 0;
         for (PoseLayer& layer : owner_.scene_.rigs[id].layers.layers()) {
+            // This layer's index, taken BEFORE the increment. Reading `layerIndex` here instead
+            // indexes the NEXT layer -- which silently gave the left foot the right foot's chain
+            // and read one past the end for the right foot. The bounds check above is belt as well
+            // as braces: `chains()` is parallel to `layers()` by construction, and a loop that
+            // trusted that without checking is how this went unnoticed.
+            const std::size_t thisLayer = layerIndex++;
+            // Phase B §7. Every stride layer gets this frame's ratio whatever drives it,
+            // including `Manual` -- the ratio is a measurement of the body, not an intent a
+            // timeline authors, and a manual stride layer with no ratio would be a layer that
+            // silently does nothing. One source for it: `MotionContext::strideRatio`, which is
+            // `Gait::footSlip` (ADR-260).
+            if (layer.kind == PoseLayerKind::Stride) {
+                layer.strideRatio = motion_.strideRatio;
+            }
+            if (layer.kind == PoseLayerKind::Secondary) {
+                layer.bodySpeed = motion_.groundSpeed;
+            }
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
                 break;
@@ -2592,7 +2836,7 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             case PoseLayerDrive::Reaction:
                 layer.weight = reaction;
                 break;
-            case PoseLayerDrive::Ground:
+            case PoseLayerDrive::Ground: {
                 // The weight is the *grounded* bit and not a blend: a body standing on something
                 // gets its feet planted, and a body in a tractor beam does not. A scene that wants
                 // the correction eased in says so with a fade on the layer it authors, which is a
@@ -2601,7 +2845,46 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 layer.groundPoint = localGround;
                 layer.groundNormal = localNormal;
                 layer.hasGround = haveGround;
+                // ADR-551: the ground under THIS foot, where the terrain can say.
+                //
+                // The body's plane above is one plane for the whole character, and a foot dropped
+                // onto the plane its own body is standing on is reachable by construction -- so
+                // foot IK on a single plane can never need the body to move, and never plants on
+                // anything but an idealised surface. Measured: three aliens on 0.3499 m of relief
+                // across their own footprint, and not one foot clamped or compensated.
+                //
+                // So each foot layer that can be placed asks the terrain under its own tip.
+                if (haveGround && layer.kind == PoseLayerKind::Foot &&
+                    thisLayer < owner_.scene_.rigs[id].layers.chains().size()) {
+                    const glm::ivec3 chain = owner_.scene_.rigs[id].layers.chains()[thisLayer];
+                    if (chain.z >= 0) {
+                        // The tip's LAST posed position. `EntityWorld::update` runs a whole stage
+                        // before the rigs are posed (ADR-274 §5), so this is one frame old -- the
+                        // same frame of lag an attachment carries, and for the same reason. A foot
+                        // moves a centimetre or two in 16.7 ms and the ground under it does not
+                        // move at all, so the staleness costs a centimetre of horizontal sampling
+                        // position rather than a centimetre of foot height.
+                        const SkinnedRig& rig = owner_.scene_.rigs[id];
+                        if (static_cast<std::size_t>(chain.z) < rig.pose.size()) {
+                            std::vector<glm::mat4> model;
+                            poseToModel(rig.skeleton, rig.pose, model);
+                            const glm::vec3 tipLocal(model[static_cast<std::size_t>(chain.z)][3]);
+                            const glm::vec3 tipWorld = glm::vec3(world * glm::vec4(tipLocal, 1.0f));
+                            const GroundSample under = ground.sampleAt(tipWorld);
+                            // An invalid sample is "no answer", not "no ground" -- off the edge of
+                            // a height field, or a scene with no terrain at all. The body's plane
+                            // remains, which is the behaviour every scene had before this.
+                            if (under.valid) {
+                                layer.groundPoint = glm::vec3(inverse * glm::vec4(under.point, 1.0f));
+                                const glm::vec3 n = glm::transpose(glm::mat3(world)) * under.normal;
+                                const float len = glm::length(n);
+                                layer.groundNormal = len > 1e-6f ? n / len : localNormal;
+                            }
+                        }
+                    }
+                }
                 break;
+            }
             }
         }
     }
@@ -5000,7 +5283,36 @@ void Composition::rebuild() {
                 // joint the rig does not have used to be indistinguishable from a mask that did
                 // nothing because nothing asked it to, which is the same failure as a socket
                 // returning `true` on its fallback (ADR-274).
-                if (!node.animation.layers.empty()) {
+                // ADR-546/547, bound here for the same reason the layers are: the authored names
+                // and the asset that has to carry them are only both in scope at this point.
+                if (!node.animation.contacts.empty()) {
+                    rig.contactJoints.clear();
+                    for (const std::string& joint : node.animation.contacts) {
+                        if (rig.skeleton.find(joint) < 0) {
+                            log::warn("node '{}' rig '{}': contact joint '{}' is not in this rig, so no "
+                                      "clip will be analysed for it",
+                                      node.name, src.name, joint);
+                            continue;
+                        }
+                        rig.contactJoints.push_back(ContactJoint{joint, ContactKind::Foot});
+                    }
+                    if (!rig.contactJoints.empty()) {
+                        const std::uint32_t cyclic = rig.analyse();
+                        if (cyclic == 0) {
+                            log::warn("node '{}' rig '{}': none of its {} clip(s) came back cyclic, so "
+                                      "phase matching has nothing to align to",
+                                      node.name, src.name, rig.clips.size());
+                        }
+                    }
+                }
+                if (node.animation.matchPhase) {
+                    rig.player.setMatchPhase(true);
+                }
+                rig.player.inertializeHalflife = node.animation.inertialize;
+                if (!node.animation.layers.empty() || node.animation.bodyCompensation.enabled) {
+                    // ADR-544. Set BEFORE `bind`, because `bind` is what resolves the body joint
+                    // against this rig and reports a name it does not carry.
+                    rig.layers.setBodyCompensation(node.animation.bodyCompensation);
                     for (const std::string& problem :
                          rig.layers.bind(node.animation.layers, rig.skeleton, rig.clips)) {
                         log::warn("node '{}' rig '{}': {}", node.name, src.name, problem);
@@ -6166,7 +6478,10 @@ void Composition::updateCharacters(const FrameTime& time) {
             const float blend = node.animation.blend >= 0.0f
                                     ? node.animation.blend
                                     : rig.player.blendTimeFor(rig.player.currentState(), node.animation.state);
-            if (rig.player.play(node.animation.state, node.animationAppliedAt, blend)) {
+            // ADR-547: phase-matched when the target state asks for it and this rig has been
+            // analysed. The overload falls back to frame zero on its own when either is missing,
+            // so this is the only call site and there is no second code path to keep in step.
+            if (rig.player.play(node.animation.state, node.animationAppliedAt, blend, rig.phaseMatch())) {
                 if (node.animationRebase) {
                     // play() returns true without restarting a state it is already in, which is
                     // exactly right for a behaviour and exactly wrong for a timeline cue (ADR-089).
@@ -8336,6 +8651,24 @@ nlohmann::json Composition::toJson() const {
                     // of them empty. Written through the shared path it came out with `"joints":
                     // []` and `"clip": ""`, and the file it produced would not load -- a save that
                     // breaks the scene it saved is worse than one that refuses.
+                    if (layer.kind == PoseLayerKind::Secondary) {
+                        l["degrees"] = layer.secondaryDegrees;
+                        l["period"] = layer.secondaryPeriod;
+                        l["phase"] = layer.secondaryPhase;
+                        l["spread"] = layer.secondarySpread;
+                        l["stillness"] = layer.secondaryStillness;
+                        l["axis"] = json::array({layer.secondaryAxis.x, layer.secondaryAxis.y,
+                                                 layer.secondaryAxis.z});
+                    }
+                    if (layer.kind == PoseLayerKind::Stride) {
+                        l["joint"] = layer.strideJoint;
+                        if (!layer.strideOrigin.empty()) {
+                            l["origin"] = layer.strideOrigin;
+                        }
+                        l["strideMin"] = layer.strideMin;
+                        l["strideMax"] = layer.strideMax;
+                        l["strideLift"] = layer.strideLift;
+                    }
                     if (layer.kind == PoseLayerKind::Foot) {
                         l["chain"] = json::array({layer.chainRoot, layer.chainMid, layer.chainTip});
                         if (glm::dot(layer.poleDirection, layer.poleDirection) > 0.0f) {
@@ -8381,6 +8714,40 @@ nlohmann::json Composition::toJson() const {
                     layers.push_back(std::move(l));
                 }
                 anim["layers"] = std::move(layers);
+            }
+            if (!node.animation.contacts.empty()) { // ADR-546
+                anim["contacts"] = node.animation.contacts;
+            }
+            if (node.animation.matchPhase) { // ADR-547
+                anim["matchPhase"] = true;
+            }
+            if (node.animation.inertialize != 0.0f) {
+                anim["inertialize"] = node.animation.inertialize;
+            }
+            if (node.animation.bodyCompensation.enabled) { // ADR-544
+                const BodyCompensationSpec& bc = node.animation.bodyCompensation;
+                const BodyCompensationLimits defaults;
+                json bcJson;
+                bcJson["enabled"] = true;
+                if (!bc.joint.empty()) {
+                    bcJson["joint"] = bc.joint;
+                }
+                if (bc.limits.maxDown != defaults.maxDown) {
+                    bcJson["maxDown"] = bc.limits.maxDown;
+                }
+                if (bc.limits.maxUp != defaults.maxUp) {
+                    bcJson["maxUp"] = bc.limits.maxUp;
+                }
+                if (bc.limits.maxLateral != defaults.maxLateral) {
+                    bcJson["maxLateral"] = bc.limits.maxLateral;
+                }
+                if (bc.limits.compliance != defaults.compliance) {
+                    bcJson["compliance"] = vecToJson(bc.limits.compliance);
+                }
+                if (bc.limits.iterations != defaults.iterations) {
+                    bcJson["iterations"] = bc.limits.iterations;
+                }
+                anim["bodyCompensation"] = std::move(bcJson);
             }
             if (!node.animation.rootMotion.empty()) { // ADR-337
                 json rm = json::array();
@@ -9583,7 +9950,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // ADR-278 generalised this loop out of here; what is left is the key list.
                 static constexpr std::string_view kAnimationKeys[] = {
                     "state", "blend",        "speed",  "updateHz",  "nearDistance",
-                    "farHz", "cullDistance", "layers", "rootMotion"};
+                    "farHz",   "cullDistance", "layers",    "rootMotion",
+                    "bodyCompensation", "contacts", "matchPhase", "inertialize"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
                                            where + ": node '" + node.name + "': animation");
                 node.animation.state = *state;
@@ -9597,6 +9965,84 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // every rig names its joints differently -- `head.x` on the alien pack, `Head01` on
                 // the bull, `Head` on the chicken. A name this rig does not carry is warned about
                 // when the rig is built, never silently dropped.
+                // ADR-546/547: which joints to analyse, and what to do with the result.
+                if (anim.contains("contacts")) {
+                    const json& contacts = anim.at("contacts");
+                    if (!contacts.is_array() ||
+                        !std::all_of(contacts.begin(), contacts.end(),
+                                     [](const json& j) { return j.is_string(); })) {
+                        return fail("node '{}': animation 'contacts' must be an array of joint names",
+                                    node.name);
+                    }
+                    node.animation.contacts.clear();
+                    for (const json& entry : contacts) {
+                        node.animation.contacts.push_back(entry.get<std::string>());
+                    }
+                }
+                node.animation.matchPhase = anim.value("matchPhase", false);
+                {
+                    auto inert = readFloat(anim, "inertialize", 0.0f);
+                    if (!inert) {
+                        return fail("node '{}': animation 'inertialize': {}", node.name,
+                                    inert.error().message);
+                    }
+                    if (*inert < 0.0f) {
+                        return fail("node '{}': animation 'inertialize' is a half-life in seconds and "
+                                    "cannot be negative (got {})",
+                                    node.name, *inert);
+                    }
+                    node.animation.inertialize = *inert;
+                }
+                // ADR-544: reachable contact solving. Parsed before the layers so a scene that
+                // enables it and authors no foot layer still gets its body joint resolved and
+                // still hears about a joint name this rig does not carry.
+                if (anim.contains("bodyCompensation")) {
+                    const json& bc = anim.at("bodyCompensation");
+                    if (!bc.is_object()) {
+                        return fail("node '{}': animation 'bodyCompensation' must be an object", node.name);
+                    }
+                    static constexpr std::string_view kBodyKeys[] = {
+                        "enabled", "joint", "maxDown", "maxUp", "maxLateral", "compliance", "iterations"};
+                    json_keys::warnUnknownKeys(bc, kBodyKeys,
+                                               where + ": node '" + node.name + "': bodyCompensation");
+                    BodyCompensationSpec spec;
+                    spec.enabled = bc.value("enabled", true);
+                    spec.joint = bc.value("joint", std::string());
+                    auto down = readFloat(bc, "maxDown", spec.limits.maxDown);
+                    auto up = readFloat(bc, "maxUp", spec.limits.maxUp);
+                    auto lateral = readFloat(bc, "maxLateral", spec.limits.maxLateral);
+                    if (!down || !up || !lateral) {
+                        return fail("node '{}': animation bodyCompensation: {}", node.name,
+                                    (!down ? down : (!up ? up : lateral)).error().message);
+                    }
+                    if (*down < 0.0f || *up < 0.0f || *lateral < 0.0f) {
+                        return fail("node '{}': animation bodyCompensation: a limit is a distance and "
+                                    "cannot be negative (down {}, up {}, lateral {})",
+                                    node.name, *down, *up, *lateral);
+                    }
+                    spec.limits.maxDown = *down;
+                    spec.limits.maxUp = *up;
+                    spec.limits.maxLateral = *lateral;
+                    if (bc.contains("compliance")) {
+                        auto compliance = readVec<3>(bc, "compliance", spec.limits.compliance);
+                        if (!compliance) {
+                            return fail("node '{}': animation bodyCompensation: 'compliance' must be three "
+                                        "numbers, one per axis ({})",
+                                        node.name, compliance.error().message);
+                        }
+                        spec.limits.compliance = *compliance;
+                    }
+                    if (bc.contains("iterations")) {
+                        if (!bc.at("iterations").is_number_unsigned()) {
+                            return fail("node '{}': animation bodyCompensation: 'iterations' must be a "
+                                        "positive whole number of solver sweeps",
+                                        node.name);
+                        }
+                        spec.limits.iterations =
+                            std::max(1u, bc.at("iterations").get<std::uint32_t>());
+                    }
+                    node.animation.bodyCompensation = std::move(spec);
+                }
                 if (anim.contains("layers")) {
                     const json& layers = anim.at("layers");
                     if (!layers.is_array()) {
@@ -9627,8 +10073,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         if (!weight) return std::unexpected(weight.error());
                         layer.name = *lname;
                         if (!poseLayerKindFromName(*kind, layer.kind)) {
-                            return fail("node '{}': animation layer '{}': unknown kind '{}' (aim, additive)",
-                                        node.name, layer.name, *kind);
+                            // The list is generated rather than written out. It said
+                            // "(aim, additive)" while the engine had supported `foot` for a whole
+                            // phase -- a hand-maintained enumeration in an error message is a
+                            // claim about every value that will ever be added, and it was already
+                            // wrong before anyone read it.
+                            std::string known;
+                            for (const PoseLayerKind k :
+                                 {PoseLayerKind::Aim, PoseLayerKind::Additive, PoseLayerKind::Foot,
+                                  PoseLayerKind::Stride, PoseLayerKind::Secondary}) {
+                                if (!known.empty()) {
+                                    known += ", ";
+                                }
+                                known += poseLayerKindName(k);
+                            }
+                            return fail("node '{}': animation layer '{}': unknown kind '{}' ({})",
+                                        node.name, layer.name, *kind, known);
                         }
                         if (!poseLayerDriveFromName(*drive, layer.drive)) {
                             return fail("node '{}': animation layer '{}': unknown drive '{}' (manual, look, "
@@ -9690,6 +10150,63 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         // ADR-359: a foot layer is addressed by a chain and never by a mask, so it
                         // reads a different set of keys and refuses a mask outright here rather
                         // than letting `bind` report a no-op after the scene has loaded.
+                        if (layer.kind == PoseLayerKind::Secondary) {
+                            // Phase B §26-§28. Masked like an aim layer, because the oscillation
+                            // is applied per joint and a chest and a head are different amounts of
+                            // it -- the opposite of a foot layer, where half a knee is meaningless.
+                            auto degrees = readFloat(entry, "degrees", layer.secondaryDegrees);
+                            auto period = readFloat(entry, "period", layer.secondaryPeriod);
+                            auto phase = readFloat(entry, "phase", layer.secondaryPhase);
+                            auto spread = readFloat(entry, "spread", layer.secondarySpread);
+                            auto still = readFloat(entry, "stillness", layer.secondaryStillness);
+                            if (!degrees) return std::unexpected(degrees.error());
+                            if (!period) return std::unexpected(period.error());
+                            if (!phase) return std::unexpected(phase.error());
+                            if (!spread) return std::unexpected(spread.error());
+                            if (!still) return std::unexpected(still.error());
+                            layer.secondaryDegrees = *degrees;
+                            layer.secondaryPeriod = *period;
+                            layer.secondaryPhase = *phase;
+                            layer.secondarySpread = *spread;
+                            layer.secondaryStillness = *still;
+                            if (layer.secondaryPeriod <= 0.0f) {
+                                return fail("node '{}': animation layer '{}': 'period' must be above "
+                                            "zero seconds",
+                                            node.name, layer.name);
+                            }
+                            if (entry.contains("axis")) {
+                                auto axis = readVec<3>(entry, "axis", layer.secondaryAxis);
+                                if (!axis) return std::unexpected(axis.error());
+                                layer.secondaryAxis = *axis;
+                            }
+                        }
+                        if (layer.kind == PoseLayerKind::Stride) {
+                            // Phase B §7. Addressed by one joint and a body to measure it from,
+                            // not by a mask: what it scales is an excursion, which needs two ends.
+                            if (!entry.contains("joint") || !entry.at("joint").is_string()) {
+                                return fail("node '{}': animation layer '{}': a stride layer needs a "
+                                            "'joint' -- the foot whose step is shortened",
+                                            node.name, layer.name);
+                            }
+                            layer.strideJoint = entry.at("joint").get<std::string>();
+                            if (entry.contains("origin") && entry.at("origin").is_string()) {
+                                layer.strideOrigin = entry.at("origin").get<std::string>();
+                            }
+                            auto lo = readFloat(entry, "strideMin", layer.strideMin);
+                            auto hi = readFloat(entry, "strideMax", layer.strideMax);
+                            auto lift = readFloat(entry, "strideLift", layer.strideLift);
+                            if (!lo) return std::unexpected(lo.error());
+                            if (!hi) return std::unexpected(hi.error());
+                            if (!lift) return std::unexpected(lift.error());
+                            layer.strideMin = *lo;
+                            layer.strideMax = *hi;
+                            layer.strideLift = *lift;
+                            if (layer.strideMin > layer.strideMax) {
+                                return fail("node '{}': animation layer '{}': strideMin {} is above "
+                                            "strideMax {}, so every ratio clamps to the wrong end",
+                                            node.name, layer.name, layer.strideMin, layer.strideMax);
+                            }
+                        }
                         if (layer.kind == PoseLayerKind::Foot) {
                             if (!entry.contains("chain")) {
                                 return fail("node '{}': animation layer '{}': a foot layer needs a 'chain' "
@@ -9732,18 +10249,42 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 if (!sole) return std::unexpected(sole.error());
                                 layer.soleUp = *sole;
                             }
-                        } else if (layer.mask.joints.empty()) {
+                        } else if (layer.kind != PoseLayerKind::Stride && layer.mask.joints.empty()) {
+                            // **A stride layer is addressed by `joint`, not by a mask** -- the same
+                            // way a foot layer is addressed by `chain`. Without this exemption the
+                            // check refused every stride layer with "masks no joints", which is the
+                            // third catch-all over this enum to fire tonight: `rebind`'s clip
+                            // lookup, the error message's hand-written kind list, and this.
+                            //
+                            // The pattern is worth naming. A branch that says "anything that is
+                            // not X" is a claim about every value that will ever be added to the
+                            // enum, and it is the author of the *next* value who pays for it.
                             return fail("node '{}': animation layer '{}' masks no joints, so it could only "
                                         "ever do nothing",
                                         node.name, layer.name);
                         }
                         for (const auto& key : entry.items()) {
-                            static constexpr std::array<std::string_view, 19> kLayerKeys{
-                                "name",         "kind",     "drive",         "joints",
-                                "weights",      "descendants", "pivot",      "forward",
-                                "maxYaw",       "maxPitch", "clip",          "clipRate",
-                                "weight",       "chain",    "poleDirection", "footAlign",
-                                "groundOffset", "extension", "soleUp"};
+                            // The size is deduced rather than written, because a hand-kept count
+                            // beside a hand-kept list is two things that can disagree.
+                            static constexpr std::array kLayerKeys{
+                                std::string_view{"name"},      std::string_view{"kind"},
+                                std::string_view{"drive"},     std::string_view{"joints"},
+                                std::string_view{"weights"},   std::string_view{"descendants"},
+                                std::string_view{"pivot"},     std::string_view{"forward"},
+                                std::string_view{"maxYaw"},    std::string_view{"maxPitch"},
+                                std::string_view{"clip"},      std::string_view{"clipRate"},
+                                std::string_view{"weight"},    std::string_view{"chain"},
+                                std::string_view{"poleDirection"}, std::string_view{"footAlign"},
+                                std::string_view{"groundOffset"},  std::string_view{"extension"},
+                                std::string_view{"soleUp"},
+                                // Stride (Phase B §7)
+                                std::string_view{"joint"},     std::string_view{"origin"},
+                                std::string_view{"strideMin"}, std::string_view{"strideMax"},
+                                std::string_view{"strideLift"},
+                                // Secondary motion (Phase B §26-§28)
+                                std::string_view{"degrees"},   std::string_view{"period"},
+                                std::string_view{"phase"},     std::string_view{"spread"},
+                                std::string_view{"stillness"}, std::string_view{"axis"}};
                             if (std::find(kLayerKeys.begin(), kLayerKeys.end(), key.key()) ==
                                 kLayerKeys.end()) {
                                 log::warn("scene file '{}': node '{}': animation layer key '{}' is not one "

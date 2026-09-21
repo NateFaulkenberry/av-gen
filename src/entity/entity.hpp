@@ -27,6 +27,8 @@
 //     "reactions": [ { "signal": "audio.bass", "target": "parts/Lamp/emissiveGain", "depth": 3 } ]
 
 #include "core/rng.hpp"
+#include "entity/motion_chain.hpp"
+#include "entity/motion_controller.hpp"
 #include "entity/action.hpp"
 #include "entity/behavior.hpp"
 #include "entity/gait.hpp"
@@ -124,6 +126,15 @@ struct EntityDesc {
     // How this body's speed becomes a gait. Per entity because a deer, a robot and a person cross
     // from walking to running at different speeds.
     GaitSettings gait;
+
+    // ---- procedural motion (Phase B) -------------------------------------------------------
+    //
+    // **Opt-in, and default off.** When set, this body's base pose comes from its
+    // `entity::MotionChain` instead of from `scene::AnimationPlayer`. Off by default because the
+    // change touches the path every shipping scene renders through, and "default off is provably
+    // inert" is a claim that can be measured rather than asserted -- see the rendered-hash
+    // comparison in `docs/design/procedural-character-motion.md`.
+    bool proceduralMotion = false;
 
     // ---- the senses (ADR-270, ADR-290) ----
     //
@@ -283,6 +294,19 @@ public:
     [[nodiscard]] const std::string& name() const { return desc_.name; }
     [[nodiscard]] const EntityState& state() const { return state_; }
     [[nodiscard]] const LocomotionState& locomotion() const { return locomotion_; }
+    // ADR-541: the provider's memory is a value the ENTITY owns, because `EntityWorld::seek`
+    // reconstructs it by replay and a provider that owned it would be the one object in the
+    // character pipeline a scrub could not rewind.
+    [[nodiscard]] const MotionMemory& motionMemory() const { return motionMemory_; }
+    [[nodiscard]] const MotionState& motionState() const { return motionState_; }
+    [[nodiscard]] const MotionChainResult& motionChainResult() const { return motionChainResult_; }
+    // Borrowed, owned by whoever built the providers (the composition). Null means this body is
+    // driven by its clips, which is every body until a scene opts one in.
+    void setMotionChain(const MotionChain* chain) { motionChain_ = chain; }
+    [[nodiscard]] const MotionChain* motionChain() const { return motionChain_; }
+    // Advance the provider memory one step. Called from BOTH publish paths -- ADR-554's rule,
+    // applied to the very thing that rule was discovered by.
+    void advanceMotion(double time, float dt);
     // Where the body is **drawn**, as distinct from where the simulation says it is.
     //
     // `state().position()` is the anchor plus `travel` -- what navigation and a director wrote. The
@@ -425,6 +449,12 @@ private:
     std::uint32_t seed_ = 0;
     Rng rng_;
     EntityState state_{};
+    // ADR-545: where this body was at the end of the previous step, and whether there was one.
+    // The measured velocity is a backward difference and this is the thing it differences against;
+    // `EntityWorld::reset` clears both, so a seek rebuilds them by replay rather than carrying a
+    // difference across a discontinuity.
+    glm::vec3 lastPosition_{0.0f};
+    bool hasLastPosition_ = false;
     MotionOffset motion_{};
     DirectorMotion director_{};
     LocomotionState locomotion_{};
@@ -455,6 +485,12 @@ private:
     ActionQueue actions_;
     Schedule schedule_;
     Gait gait_;
+    // Phase B. Reset with everything else on a seek, and advanced on both publish paths, which is
+    // ADR-554's rule applied to the thing ADR-554 was found by.
+    MotionMemory motionMemory_;
+    MotionState motionState_;
+    MotionChainResult motionChainResult_;
+    const MotionChain* motionChain_ = nullptr;
     // Authoritative here rather than in the parameter set: an entity may be ticked before anything
     // registers a parameter, and a state that only existed as a parameter would vanish on a scene
     // swap. The parameter mirrors this, not the other way round.

@@ -6924,8 +6924,87 @@
               "head.x"
             ],
             "descendants": true
+          },
+          {
+            "name": "foot.l",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.l",
+              "leg_stretch.l",
+              "foot.l"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "foot.r",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.r",
+              "leg_stretch.r",
+              "foot.r"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "stride.l",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.l",
+            "origin": "root.x",
+            "strideMin": 0.4,
+            "strideMax": 1.6,
+            "strideLift": 0.75,
+            "weight": 1.0
+          },
+          {
+            "name": "stride.r",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.r",
+            "origin": "root.x",
+            "strideMin": 0.4,
+            "strideMax": 1.6,
+            "strideLift": 0.75,
+            "weight": 1.0
+          },
+          {
+            "name": "life",
+            "kind": "secondary",
+            "drive": "manual",
+            "joints": [
+              "spine_02.x",
+              "spine_03.x",
+              "spine_04.x",
+              "neck.x",
+              "head.x"
+            ],
+            "degrees": 1.5,
+            "period": 4.2,
+            "phase": 0.0,
+            "spread": 0.09,
+            "stillness": 0.55,
+            "weight": 1.0,
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ]
           }
-        ]
+        ],
+        "contacts": [
+          "foot.l",
+          "foot.r"
+        ],
+        "matchPhase": true,
+        "inertialize": 0.12,
+        "bodyCompensation": {
+          "enabled": true,
+          "maxDown": 0.3,
+          "maxUp": 0.05,
+          "maxLateral": 0.04
+        }
       },
       "visible": true
     },
@@ -6981,8 +7060,87 @@
               "head.x"
             ],
             "descendants": true
+          },
+          {
+            "name": "foot.l",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.l",
+              "leg_stretch.l",
+              "foot.l"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "foot.r",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.r",
+              "leg_stretch.r",
+              "foot.r"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "stride.l",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.l",
+            "origin": "root.x",
+            "strideMin": 0.35,
+            "strideMax": 1.6,
+            "strideLift": 0.7,
+            "weight": 1.0
+          },
+          {
+            "name": "stride.r",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.r",
+            "origin": "root.x",
+            "strideMin": 0.35,
+            "strideMax": 1.6,
+            "strideLift": 0.7,
+            "weight": 1.0
+          },
+          {
+            "name": "life",
+            "kind": "secondary",
+            "drive": "manual",
+            "joints": [
+              "spine_02.x",
+              "spine_03.x",
+              "spine_04.x",
+              "neck.x",
+              "head.x"
+            ],
+            "degrees": 1.1,
+            "period": 4.8,
+            "phase": 0.3,
+            "spread": 0.09,
+            "stillness": 0.55,
+            "weight": 1.0,
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ]
           }
-        ]
+        ],
+        "contacts": [
+          "foot.l",
+          "foot.r"
+        ],
+        "matchPhase": true,
+        "inertialize": 0.12,
+        "bodyCompensation": {
+          "enabled": true,
+          "maxDown": 0.3,
+          "maxUp": 0.05,
+          "maxLateral": 0.04
+        }
       },
       "visible": true
     },
@@ -7038,8 +7196,87 @@
               "head.x"
             ],
             "descendants": true
+          },
+          {
+            "name": "foot.l",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.l",
+              "leg_stretch.l",
+              "foot.l"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "foot.r",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.r",
+              "leg_stretch.r",
+              "foot.r"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "stride.l",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.l",
+            "origin": "root.x",
+            "strideMin": 0.45,
+            "strideMax": 1.6,
+            "strideLift": 0.8,
+            "weight": 1.0
+          },
+          {
+            "name": "stride.r",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.r",
+            "origin": "root.x",
+            "strideMin": 0.45,
+            "strideMax": 1.6,
+            "strideLift": 0.8,
+            "weight": 1.0
+          },
+          {
+            "name": "life",
+            "kind": "secondary",
+            "drive": "manual",
+            "joints": [
+              "spine_02.x",
+              "spine_03.x",
+              "spine_04.x",
+              "neck.x",
+              "head.x"
+            ],
+            "degrees": 1.3,
+            "period": 5.1,
+            "phase": 0.55,
+            "spread": 0.09,
+            "stillness": 0.55,
+            "weight": 1.0,
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ]
           }
-        ]
+        ],
+        "contacts": [
+          "foot.l",
+          "foot.r"
+        ],
+        "matchPhase": true,
+        "inertialize": 0.12,
+        "bodyCompensation": {
+          "enabled": true,
+          "maxDown": 0.3,
+          "maxUp": 0.05,
+          "maxLateral": 0.04
+        }
       },
       "visible": true
     },
@@ -7095,8 +7332,87 @@
               "head.x"
             ],
             "descendants": true
+          },
+          {
+            "name": "foot.l",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.l",
+              "leg_stretch.l",
+              "foot.l"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "foot.r",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.r",
+              "leg_stretch.r",
+              "foot.r"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "stride.l",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.l",
+            "origin": "root.x",
+            "strideMin": 0.38,
+            "strideMax": 1.6,
+            "strideLift": 0.72,
+            "weight": 1.0
+          },
+          {
+            "name": "stride.r",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.r",
+            "origin": "root.x",
+            "strideMin": 0.38,
+            "strideMax": 1.6,
+            "strideLift": 0.72,
+            "weight": 1.0
+          },
+          {
+            "name": "life",
+            "kind": "secondary",
+            "drive": "manual",
+            "joints": [
+              "spine_02.x",
+              "spine_03.x",
+              "spine_04.x",
+              "neck.x",
+              "head.x"
+            ],
+            "degrees": 1.7,
+            "period": 3.8,
+            "phase": 0.75,
+            "spread": 0.09,
+            "stillness": 0.55,
+            "weight": 1.0,
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ]
           }
-        ]
+        ],
+        "contacts": [
+          "foot.l",
+          "foot.r"
+        ],
+        "matchPhase": true,
+        "inertialize": 0.12,
+        "bodyCompensation": {
+          "enabled": true,
+          "maxDown": 0.3,
+          "maxUp": 0.05,
+          "maxLateral": 0.04
+        }
       },
       "visible": true
     },
@@ -7152,8 +7468,87 @@
               "head.x"
             ],
             "descendants": true
+          },
+          {
+            "name": "foot.l",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.l",
+              "leg_stretch.l",
+              "foot.l"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "foot.r",
+            "kind": "foot",
+            "drive": "ground",
+            "chain": [
+              "thigh_twist.r",
+              "leg_stretch.r",
+              "foot.r"
+            ],
+            "footAlign": 1.0
+          },
+          {
+            "name": "stride.l",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.l",
+            "origin": "root.x",
+            "strideMin": 0.42,
+            "strideMax": 1.6,
+            "strideLift": 0.78,
+            "weight": 1.0
+          },
+          {
+            "name": "stride.r",
+            "kind": "stride",
+            "drive": "manual",
+            "joint": "foot.r",
+            "origin": "root.x",
+            "strideMin": 0.42,
+            "strideMax": 1.6,
+            "strideLift": 0.78,
+            "weight": 1.0
+          },
+          {
+            "name": "life",
+            "kind": "secondary",
+            "drive": "manual",
+            "joints": [
+              "spine_02.x",
+              "spine_03.x",
+              "spine_04.x",
+              "neck.x",
+              "head.x"
+            ],
+            "degrees": 1.2,
+            "period": 4.5,
+            "phase": 0.15,
+            "spread": 0.09,
+            "stillness": 0.55,
+            "weight": 1.0,
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ]
           }
-        ]
+        ],
+        "contacts": [
+          "foot.l",
+          "foot.r"
+        ],
+        "matchPhase": true,
+        "inertialize": 0.12,
+        "bodyCompensation": {
+          "enabled": true,
+          "maxDown": 0.3,
+          "maxUp": 0.05,
+          "maxLateral": 0.04
+        }
       },
       "visible": true,
       "rotation": [

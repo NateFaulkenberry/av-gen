@@ -184,4 +184,118 @@ TwoBoneSolution solveTwoBone(const TwoBoneChain& chain, const glm::vec3& target,
     return out;
 }
 
+
+// ---- reachable contact solving (ADR-544) --------------------------------------------------------
+
+const char* bodyCompensationStatusName(BodyCompensationStatus status) {
+    switch (status) {
+    case BodyCompensationStatus::NotNeeded: return "not-needed";
+    case BodyCompensationStatus::Solved: return "solved";
+    case BodyCompensationStatus::Limited: return "limited";
+    case BodyCompensationStatus::Impossible: return "impossible";
+    }
+    return "?";
+}
+
+namespace {
+
+// The worst amount by which a demand exceeds its limb, given a body translation, and how many
+// demands exceed it at all.
+struct Shortfall {
+    float worst = 0.0f;
+    std::uint32_t count = 0;
+};
+
+Shortfall shortfallFor(std::span<const ReachDemand> demands, const glm::vec3& translation) {
+    Shortfall out;
+    for (const ReachDemand& d : demands) {
+        const float need = glm::length(d.target - (d.root + translation));
+        const float over = need - d.reach;
+        if (over > 1e-6f) {
+            out.worst = std::max(out.worst, over);
+            ++out.count;
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+BodyCompensation solveBodyCompensation(std::span<const ReachDemand> demands,
+                                       const BodyCompensationLimits& limits) {
+    BodyCompensation out;
+    const Shortfall before = shortfallFor(demands, glm::vec3(0.0f));
+    out.shortfallBefore = before.worst;
+    out.unreachableBefore = before.count;
+    out.shortfallAfter = before.worst;
+    out.unreachableAfter = before.count;
+    if (demands.empty() || before.count == 0) {
+        return out; // NotNeeded, translation exactly zero
+    }
+
+    const glm::vec3 compliance = glm::clamp(limits.compliance, glm::vec3(0.0f), glm::vec3(1.0f));
+    const glm::vec3 lo(-std::max(limits.maxLateral, 0.0f), -std::max(limits.maxDown, 0.0f),
+                       -std::max(limits.maxLateral, 0.0f));
+    const glm::vec3 hi(std::max(limits.maxLateral, 0.0f), std::max(limits.maxUp, 0.0f),
+                       std::max(limits.maxLateral, 0.0f));
+
+    glm::vec3 t(0.0f);
+    Shortfall best = before;
+    glm::vec3 bestT(0.0f);
+    for (std::uint32_t sweep = 0; sweep < limits.iterations; ++sweep) {
+        // The correction each violated demand is asking for: move the body along the line from its
+        // limb root towards its target, by exactly the amount the limb is short. Averaged, because
+        // several limbs asking at once should not each get their whole wish.
+        glm::vec3 sum(0.0f);
+        std::uint32_t asking = 0;
+        for (const ReachDemand& d : demands) {
+            const glm::vec3 v = d.target - (d.root + t);
+            const float need = glm::length(v);
+            const float over = need - d.reach;
+            if (over <= 1e-6f || need <= 1e-9f) {
+                continue;
+            }
+            sum += v * (over / need);
+            ++asking;
+        }
+        if (asking == 0) {
+            break;
+        }
+        out.sweeps = sweep + 1;
+        t = glm::clamp(t + (sum / static_cast<float>(asking)) * compliance, lo, hi);
+        const Shortfall now = shortfallFor(demands, t);
+        // Keep the best sweep rather than the last. Under a per-axis clamp the sequence is not
+        // guaranteed monotone, and returning a translation that is worse than one already visited
+        // would be a body that lurched for nothing.
+        if (now.worst < best.worst) {
+            best = now;
+            bestT = t;
+        }
+        if (now.count == 0) {
+            best = now;
+            bestT = t;
+            break;
+        }
+    }
+
+    out.translation = bestT;
+    out.shortfallAfter = best.worst;
+    out.unreachableAfter = best.count;
+    if (best.count == 0) {
+        out.status = BodyCompensationStatus::Solved;
+        return out;
+    }
+    // Which kind of failure. If the body is sitting on a limit it was allowed to reach, more room
+    // would have helped and this is `Limited`. If it is *inside* its limits and still short, no
+    // translation satisfies these demands at once and more room would not help.
+    const float eps = 1e-5f;
+    const bool onLimit = std::fabs(bestT.x - lo.x) < eps || std::fabs(bestT.x - hi.x) < eps ||
+                         std::fabs(bestT.y - lo.y) < eps || std::fabs(bestT.y - hi.y) < eps ||
+                         std::fabs(bestT.z - lo.z) < eps || std::fabs(bestT.z - hi.z) < eps;
+    const bool frozen = compliance.x <= 0.0f || compliance.y <= 0.0f || compliance.z <= 0.0f;
+    out.status = (onLimit || frozen) ? BodyCompensationStatus::Limited
+                                     : BodyCompensationStatus::Impossible;
+    return out;
+}
+
 } // namespace avgen::scene

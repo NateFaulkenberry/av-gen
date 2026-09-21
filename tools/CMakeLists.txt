@@ -80,6 +80,18 @@ add_subdirectory(quality-lab)
 add_executable(avgen_charai_probe charai_probe.cpp)
 target_link_libraries(avgen_charai_probe PRIVATE avgen_core)
 
+# The offline motion pipeline (Phase A step 12). A build target rather than a script because it
+# uses exactly the importer, analyser, retargeter and pack writer the engine uses: a
+# reimplementation would eventually disagree with them, and the disagreement would be silent.
+add_executable(avgen_motion motion_build.cpp)
+target_link_libraries(avgen_motion PRIVATE avgen_core)
+
+# TEMPORARY (docs/design/autonomous-character-animation.md, Phase A). The alien-leg IK probe:
+# can the analytic solver reach and hold a target on a chain whose joints are not each other's
+# ancestors? Delete it with the architecture it informs.
+add_executable(avgen_motion_probe motion_probe.cpp)
+target_link_libraries(avgen_motion_probe PRIVATE avgen_core)
+
 # TEMPORARY (ADR-273). Delete with the phase it priced.
 add_executable(avgen_seek_probe seek_probe.cpp)
 target_link_libraries(avgen_seek_probe PRIVATE avgen_core)
@@ -125,3 +137,7 @@ if(APPLE)
     target_link_libraries(avgen_metal_rt_probe PRIVATE avgen_core
         "-framework Metal" "-framework Foundation")
 endif()
+
+add_executable(avgen_slope_probe _slope_probe.cpp)
+target_link_libraries(avgen_slope_probe PRIVATE avgen_core)
+

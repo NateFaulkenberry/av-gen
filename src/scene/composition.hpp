@@ -21,6 +21,10 @@
 #include "graph/graph.hpp"
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
+#include "scene/ground_query.hpp"
+#include "entity/clip_motion_provider.hpp"
+#include "entity/motion_chain.hpp"
+#include "scene/motion_context.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/material_params.hpp"
@@ -171,6 +175,21 @@ struct NodeAnimation {
     // fields reach a pose; without one authored on the node they go on reaching nothing, which is
     // the honest behaviour -- there is no joint name this engine may assume.
     std::vector<PoseLayer> layers;
+    // ---- reachable contact solving (ADR-544) ---------------------------------------------------
+    // Whether, and how far, this character's body may move when a foot layer is asked for ground
+    // its leg cannot reach. Authored per node for the same reason the layers are: how much a body
+    // may drop its hips is a fact about the character and the staging, not about the engine.
+    // Disabled by default -- it moves a joint nothing else moves.
+    BodyCompensationSpec bodyCompensation;
+    // ---- contacts, phase and inertialization (ADR-546, ADR-547) ---------------------------------
+    // The joints this character's clips are analysed for ground contact on, in the order that makes
+    // the first one the phase reference. Empty means no analysis, and phase matching then falls
+    // back to frame zero -- the behaviour every scene had before this existed.
+    std::vector<std::string> contacts;
+    // Enter every state at the outgoing state's phase rather than at its clip's frame zero.
+    bool matchPhase = false;
+    // Seconds for an inertialized transition's offset to halve. 0 keeps the cross-fade.
+    float inertialize = 0.0f;
     // ---- root motion (ADR-337) -----------------------------------------------------------------
     // Which of this character's clips hand their root displacement to the simulation instead of
     // drawing it. Per clip and per node, because it is an art decision twice over: whether a clip
@@ -1009,6 +1028,13 @@ public:
     // obstacle field says so through `hasObstacles()` rather than pretending the world is empty.
     [[nodiscard]] world::TerrainQuery terrainQuery() const;
 
+    // ---- environmental contact queries (ADR-551, Phase B §17) -----------------------------------
+    // What a procedural layer asks about the world, behind an abstraction that hides where the
+    // answer came from. Defaults to this composition's own terrain; a caller may install another
+    // source -- a collision system, a baked field, a test's plane -- without the layers knowing.
+    [[nodiscard]] const IGroundQuery& groundQuery() const;
+    void setGroundQuery(const IGroundQuery* query) { groundQuery_ = query; }
+
     // ---- entities (ADR-088) ------------------------------------------------------------------
     //
     // The `entities` array of a scene file: what in this scene moves on its own and how it answers
@@ -1523,6 +1549,18 @@ private:
     double currentTime_ = 0.0;
     void updateCharacters(const FrameTime& time); // ADR-086
     RigStats rigStats_;   // ADR-086: what the last update() spent posing skinned characters
+    // ADR-551. `terrainGround_` adapts this composition's own terrain to `IGroundQuery`;
+    // `groundQuery_` is what the layers actually ask, and is null until something installs one.
+    class TerrainGroundQuery final : public IGroundQuery {
+    public:
+        explicit TerrainGroundQuery(const Composition& owner) : owner_(owner) {}
+        [[nodiscard]] GroundSample sampleAt(const glm::vec3& worldPoint) const override;
+
+    private:
+        const Composition& owner_;
+    };
+    TerrainGroundQuery terrainGround_{*this};
+    const IGroundQuery* groundQuery_ = nullptr;
     // Scene-level material programs (ADR-030): "materialPrograms" in the file, parameters
     // "material/<name>/…", referenced by Material::program.
     CompositionData compositionData_;
@@ -1555,6 +1593,12 @@ private:
         // Separate because it does a different thing -- it does not push an animation *state*, it
         // writes this frame's intent onto the node's layer stack, in the entity's own frame.
         void driveLayers(const entity::LocomotionState& state);
+        // Phase B §4. The context the procedural layers read, rebuilt from the seam each frame and
+        // kept so a layer, a test or a debug view can ask for it without re-deriving the node's
+        // world transform. Valid only after `driveLayers` has run for this frame.
+        [[nodiscard]] const MotionContext& motion() const { return motion_; }
+        [[nodiscard]] const std::string& nodeName() const { return node_; }
+        [[nodiscard]] const std::string& entityName() const { return entity_.desc().name; }
         // The joint's transform in the entity's own frame -- the rig's model space. False when
         // this node carries no rig, no rig of its carries the joint, or the rig has not been posed.
         [[nodiscard]] bool jointTransform(std::string_view joint, scene::Transform& out) const override;
@@ -1576,8 +1620,62 @@ private:
         mutable RigId modelRig_ = kInvalidRig;
         mutable std::uint64_t modelVersion_ = 0;
         mutable bool modelValid_ = false;
+        MotionContext motion_;
+
+        // Phase B. The provider chain for THIS body, and the clip provider at the bottom of it.
+        // Owned here because the entries index this rig's clips; the memory that distinguishes one
+        // frame from the next is owned by the `Entity` (ADR-541) and replayed by a seek.
+        //
+        // Built lazily on the first frame the rig exists: a rig is not loaded when the sink is
+        // constructed, so building it at bind time would build it against nothing.
+        entity::ClipMotionProvider clipProvider_;
+        entity::MotionChain chain_;
+        bool chainBuilt_ = false;
+        RigId chainRig_ = kInvalidRig;
+        void buildChain(const SkinnedRig& rig);
+
+    public:
+        // Whether this body's base pose came from the chain on the last frame, and what the chain
+        // said. Reported so that "is the opt-in actually doing anything" is answerable from
+        // outside -- which is the question a seam called by nothing cannot answer.
+        [[nodiscard]] const entity::MotionChain& chain() const { return chain_; }
+        [[nodiscard]] bool posedByProvider() const { return posedByProvider_; }
+        [[nodiscard]] const entity::MotionChainResult& chainResult() const { return chainResult_; }
+
+    private:
+        bool posedByProvider_ = false;
+        entity::MotionChainResult chainResult_;
     };
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
+
+public:
+    // The motion context most recently built for `node`, or null when that node drives no entity
+    // or has not been updated yet. Phase B §50 wants this for a debug view; a test wants it to
+    // check that the seam arrived, which is the only way to catch a field published into a
+    // context nobody reads.
+    [[nodiscard]] const MotionContext* motionContext(std::string_view node) const;
+
+    // Phase B §50/§64. What the motion seam did for `node` on the frame just drawn.
+    //
+    // Exists because "did the provider actually drive this body" has to be answerable from
+    // outside the sink. A seam whose only evidence is its own internal state is a seam that can
+    // stop working silently, which is the failure this whole stage was closing.
+    struct MotionDebug {
+        bool found = false;            // this node drives an entity at all
+        bool optedIn = false;          // the scene asked for procedural motion
+        bool posedByProvider = false;  // ...and it actually happened, this frame
+        entity::MotionStatus status = entity::MotionStatus::NoContent;
+        int provider = -1;             // which one answered, as a chain index
+        std::uint32_t fellThrough = 0; // how many declined before it
+        std::uint32_t generation = 0;  // the memory's, so "it never ran" is visible
+        float localTime = 0.0f;
+        // How many frames the RIG actually consumed an external pose on. Counted by the consumer,
+        // which is the only party whose answer cannot be a claim -- see `externalPoseFrames`.
+        std::uint64_t externalPoseFrames = 0;
+    };
+    [[nodiscard]] MotionDebug motionDebug(std::string_view node) const;
+
+private:
 
     std::vector<world::WorldEffect> worldEffects_; // ADR-207: authored, round-tripped as "worldEffects"
     // ADR-230: authored, round-tripped as "atmosphericEffects"

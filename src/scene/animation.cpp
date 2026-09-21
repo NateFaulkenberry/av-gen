@@ -255,6 +255,49 @@ bool AnimationPlayer::play(std::string_view name, double now, float blendSeconds
     return true;
 }
 
+bool AnimationPlayer::play(std::string_view name, double now, float blendSeconds, const PhaseMatch& match) {
+    const int index = stateIndex(name);
+    if (index < 0 || current_.state == index) {
+        return play(name, now, blendSeconds); // no change, or no such state: the plain path answers
+    }
+    const AnimationState& target = states_[static_cast<std::size_t>(index)];
+    // The outgoing state, captured before `play` overwrites it.
+    const Playing outgoing = current_;
+    if (!play(name, now, blendSeconds)) {
+        return false;
+    }
+    if (!target.matchPhase || !match.usable() || outgoing.state < 0) {
+        return true;
+    }
+    const std::vector<AnimationClip>& clips = *match.clips;
+    const std::vector<PhaseTrack>& phases = *match.phases;
+    const auto phaseFor = [&](int state) -> const PhaseTrack* {
+        if (state < 0) {
+            return nullptr;
+        }
+        const std::size_t clip = states_[static_cast<std::size_t>(state)].clip;
+        if (clip >= phases.size() || phases[clip].empty()) {
+            return nullptr;
+        }
+        return &phases[clip];
+    };
+    const PhaseTrack* from = phaseFor(outgoing.state);
+    const PhaseTrack* to = phaseFor(index);
+    if (from == nullptr || to == nullptr) {
+        return true; // one of them was never analysed; frame zero is the honest fallback
+    }
+    // Where the outgoing clip is in its own cycle right now, and the instant in the incoming clip
+    // that sits at the same place in its cycle.
+    const float want = from->at(localTime(outgoing, clips, now));
+    const float land = to->timeAt(want);
+    // Rebase the incoming clock so that `now` lands on `land` rather than on the clip's start.
+    // Speed divides because `localTime` multiplies by it: the clock is in timeline seconds and the
+    // landing point is in clip seconds.
+    const float speed = current_.speed != 0.0f ? current_.speed : 1.0f;
+    current_.start = now - static_cast<double>(land) / static_cast<double>(speed);
+    return true;
+}
+
 void AnimationPlayer::restart(double now) {
     current_.start = now;
 }
@@ -344,6 +387,16 @@ void AnimationPlayer::sampleInto(const Playing& playing, const std::vector<Anima
     sampleClip(clips[state.clip], localTime(playing, clips, now), pose);
 }
 
+void AnimationPlayer::transitionOffset(const std::vector<AnimationClip>& clips, const Skeleton& skeleton,
+                                       Pose& outgoing, Pose& incoming) const {
+    // Both states, sampled at the instant the transition began. Recomputed rather than remembered:
+    // it is a pure function of (previous, previous start, current, current start, clips), all of
+    // which the player already holds, so a scrub that lands mid-transition reconstructs the same
+    // offset instead of inheriting one from wherever the playhead came from.
+    sampleInto(previous_, clips, skeleton, blendStart_, outgoing);
+    sampleInto(current_, clips, skeleton, blendStart_, incoming);
+}
+
 void AnimationPlayer::evaluate(const std::vector<AnimationClip>& clips, const Skeleton& skeleton, double now,
                                Pose& pose, Pose& scratch) const {
     sampleInto(current_, clips, skeleton, now, pose);
@@ -351,9 +404,45 @@ void AnimationPlayer::evaluate(const std::vector<AnimationClip>& clips, const Sk
     if (weight >= 1.0f || previous_.state < 0) {
         return;
     }
-    sampleInto(previous_, clips, skeleton, now, scratch);
-    // The outgoing pose is `a`, the incoming one `b`, and `weight` walks from one to the other.
-    blendPose(scratch, pose, weight, pose);
+    if (inertializeHalflife <= 0.0f) {
+        sampleInto(previous_, clips, skeleton, now, scratch);
+        // The outgoing pose is `a`, the incoming one `b`, and `weight` walks from one to the other.
+        blendPose(scratch, pose, weight, pose);
+        return;
+    }
+    // ADR-547. Inertialization: the incoming clip is the pose, and what is added to it is the
+    // *difference the transition introduced*, decaying to nothing. Only one clip is evaluated for
+    // the body of the transition, so the cost does not double while one is running.
+    //
+    // A critically damped decay rather than Bollo's quintic, for the reason ADR-541 gives about
+    // where state may live: the spring's closed form is a pure function of (offset, elapsed,
+    // halflife) with no seed and no accumulator, and this class's whole contract is that a pose is
+    // a function of when a state was entered rather than of how long it has been running.
+    Pose& outgoingAtStart = scratch;
+    transitionOffset(clips, skeleton, outgoingAtStart, inertScratch_);
+    const auto elapsed = static_cast<float>(now - blendStart_);
+    // y = 2 * ln(2) / halflife is the decay of a critically damped spring released from rest;
+    // `(1 + y t) e^{-y t}` is its exact solution, and it starts at exactly 1 with zero slope, so
+    // the pose at the transition instant is exactly the outgoing pose and there is no kink.
+    const float y = (2.0f * 0.6931472f) / std::max(inertializeHalflife, 1e-4f);
+    const float decay = (1.0f + y * elapsed) * std::exp(-y * elapsed);
+    if (decay <= 1e-4f) {
+        return; // the offset has gone; the incoming clip is the answer
+    }
+    const std::size_t joints = std::min(pose.size(), std::min(outgoingAtStart.size(), inertScratch_.size()));
+    for (std::size_t j = 0; j < joints; ++j) {
+        const Transform& was = outgoingAtStart.local[j];
+        const Transform& became = inertScratch_.local[j];
+        Transform& out = pose.local[j];
+        out.position += (was.position - became.position) * decay;
+        out.scale += (was.scale - became.scale) * decay;
+        // The rotational offset is a rotation, composed rather than added, and slerped from
+        // identity by the decay so a half-decayed offset is half the angle rather than half the
+        // quaternion.
+        const glm::quat offset = was.rotation * glm::conjugate(became.rotation);
+        static const glm::quat kIdentity(1.0f, 0.0f, 0.0f, 0.0f);
+        out.rotation = glm::normalize(glm::slerp(kIdentity, offset, decay) * out.rotation);
+    }
 }
 
 // ---- SkinnedRig --------------------------------------------------------------------------------
@@ -373,6 +462,25 @@ int findClip(const std::vector<AnimationClip>& clips, std::string_view name) {
 }
 
 int SkinnedRig::findClip(std::string_view clipName) const { return scene::findClip(clips, clipName); }
+
+std::uint32_t SkinnedRig::analyse(const ContactSettings& settings) {
+    clipPhases.assign(clips.size(), PhaseTrack{});
+    clipContacts.assign(clips.size(), {});
+    if (contactJoints.empty()) {
+        return 0;
+    }
+    std::uint32_t cyclic = 0;
+    for (std::size_t i = 0; i < clips.size(); ++i) {
+        // The reference joint is the first one named. A caller ordering its feet left-then-right
+        // gets phase anchored on the left, which is the convention every locomotion pipeline uses
+        // and which this code does not itself assume -- it just takes the first.
+        ClipAnalysis analysis = analyseClip(skeleton, clips[i], contactJoints, 0, settings);
+        clipContacts[i] = std::move(analysis.contacts);
+        clipPhases[i] = std::move(analysis.phase);
+        cyclic += clipPhases[i].cyclic ? 1u : 0u;
+    }
+    return cyclic;
+}
 
 void SkinnedRig::addDefaultStates(float blendSeconds) {
     for (std::size_t i = 0; i < clips.size(); ++i) {
@@ -456,7 +564,17 @@ bool SkinnedRig::evaluate(double now, float hz) {
     if (!reseed) {
         previousPalette = palette;
     }
-    player.evaluate(clips, skeleton, t, pose, scratchPose);
+    // Phase B: an externally supplied base pose replaces the clip player's, and nothing else
+    // changes. Consumed rather than latched -- see `hasExternalPose` -- so a driver that stops
+    // driving hands the body back to its clips on the next frame instead of freezing it.
+    if (hasExternalPose && externalPose.size() == skeleton.joints.size()) {
+        pose = externalPose;
+        hasExternalPose = false;
+        ++externalPoseFrames;
+    } else {
+        hasExternalPose = false;
+        player.evaluate(clips, skeleton, t, pose, scratchPose);
+    }
     // ADR-300, and the order is the whole of it: the player first, the layers on top of what it
     // produced, and only then the palette. `t` rather than `now`, so a rate-limited rig's layers
     // move on the same fixed grid its clips do -- a look that updated every frame on a rig posed at

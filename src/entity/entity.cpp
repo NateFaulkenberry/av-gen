@@ -839,6 +839,45 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
     bindFields();
 }
 
+// Phase B. One step of the provider memory, from the state the body is already in.
+//
+// **Deliberately reads `state_` rather than taking arguments.** The request is a view of what the
+// body is doing and wants, and both halves already live on the entity (ADR-545); building it from
+// parameters would give a caller a way to advance the memory with something other than the truth,
+// and a seek would then replay a different request from the one a play used.
+void Entity::advanceMotion(double time, float dt) {
+    if (motionChain_ == nullptr || !desc_.proceduralMotion) {
+        return;
+    }
+    // Phase D §2.5/§15. The request is built from the character's INTENT, and intent comes in two
+    // forms because the engine grew the second one late:
+    //
+    //   * the **vector** form, `EntityState::intent`, which can express a strafe -- a body moving
+    //     one way while facing another;
+    //   * the **polar** form, `speed` along `yaw`, which every behaviour that exists writes and
+    //     which cannot.
+    //
+    // The vector form wins when a behaviour published one. When none did, the polar pair is
+    // reconstructed into a vector here -- which is exactly what the whole cast gets today, and is
+    // why adding this seam changed no existing character's motion.
+    const glm::vec3 heading(std::sin(state_.yaw), 0.0f, std::cos(state_.yaw));
+    MotionRequest request;
+    if (state_.intent.valid) {
+        request.desiredVelocity = state_.intent.desiredVelocity;
+        request.desiredFacing =
+            state_.intent.hasFacing ? state_.intent.facing : heading;
+        request.steering = state_.intent.steering;
+    } else {
+        request.desiredVelocity = heading * state_.speed;
+        request.desiredFacing = heading;
+    }
+    request.desiredTurnRate = state_.turnRate;
+    request.mode = state_.airborne ? MovementMode::Airborne : MovementMode::Ground;
+    MotionMemory next;
+    motionChainResult_ = motionChain_->advance(request, motionMemory_, time, dt, next);
+    motionMemory_ = next;
+}
+
 void EntityWorld::reset() {
     actionEvents_.clear();
     pendingEvents_.clear();
@@ -855,6 +894,12 @@ void EntityWorld::reset() {
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
         // difference between two unrelated clips -- the whole of `Landing` backwards, in one
         // step, as a teleport, which is exactly the class of thing `reset` exists to remove.
+        // ADR-545: the measured velocity is a backward difference, so a reset must forget where
+        // the body was. Keeping it would make the first step of a seek a difference between two
+        // unrelated places -- the same class of mistake the root-motion sample below it makes, and
+        // for the same reason.
+        entity->lastPosition_ = glm::vec3(0.0f);
+        entity->hasLastPosition_ = false;
         entity->rootMotionLast_ = glm::vec3(0.0f);
         entity->rootMotionGeneration_ = 0;
         entity->rootMotionHeld_ = false;
@@ -901,6 +946,11 @@ void EntityWorld::reset() {
         entity->actions_.reset();
         entity->schedule_.reset();
         entity->gait_.reset();
+        // ADR-541: the provider memory is reset with everything else, and rebuilt by the replay.
+        // A seek that kept it would carry a clip clock from a timeline the scrub has abolished.
+        entity->motionMemory_.reset();
+        entity->motionState_.reset();
+        entity->motionChainResult_ = MotionChainResult{};
         entity->attachments_ = entity->desc_.attachments;
         entity->claims_.clear();
         for (std::size_t i = 0; i < entity->desc_.properties.size() && i < entity->propertyValues_.size(); ++i) {
@@ -1080,6 +1130,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // could not reproduce (ADR-267 defect 3). The events it raises are collected and thrown
             // away -- they belong to the moment they happened, and the moment is eighty seconds ago.
             entity.schedule_.update(now, entity.actions_);
+            // The activity this action wants played, kept across the loop so the publish below can
+            // carry it. It has to survive the iteration rather than be read at the end, because on
+            // the final step the queue may have nothing pending and the answer is still whatever
+            // the last step decided.
+            entity.locomotion_.action.clear();
             if (entity.actions_.pending() > 0) {
                 seekEvents_.clear();
                 ActionContext ac;
@@ -1091,7 +1146,16 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 ac.path = &pathProvider();
                 ac.gait = &entity.desc_.gait;
                 ac.events = &seekEvents_;
-                (void)entity.actions_.update(ac, entity.state_);
+                // **The result was discarded here, with a literal `(void)`.** `update` captures it
+                // and publishes `locomotion_.action`, which is what picks the clip -- an action's
+                // activity first, the gait's second. Throwing it away meant a body that sits while
+                // the timeline runs stood up and walked the moment anyone scrubbed to the same
+                // frame: an ADR-360 violation in the one tier ADR-267 defect 3 had already had to
+                // teach this function to replay.
+                const ActionOutput out = entity.actions_.update(ac, entity.state_);
+                if (entity.locomotion_.action != out.activity) {
+                    entity.locomotion_.action.assign(out.activity);
+                }
             }
 
             if (perceiving_) {
@@ -1148,6 +1212,21 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         entity.locomotion_.yaw = entity.state_.yaw;
         entity.locomotion_.speed = entity.state_.speed;
         entity.locomotion_.turnRate = entity.state_.turnRate;
+        // ADR-545. Both halves cross the seam: `speed`/`yaw` are what the mover intended, and these
+        // two are what the body did. An animation layer that has to tell a strafe from a walk needs
+        // the pair, and until now the seam could only carry one of them.
+        entity.locomotion_.velocity = entity.state_.velocity;
+        entity.locomotion_.facing = entity.state_.facing();
+        // Published on BOTH paths, deliberately. The sweep that added these asked, for every
+        // field of the seam, which of `seek` and `update` writes it -- and two of the answers
+        // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
+        // `update`. `grounded` was written by neither and read by nobody.
+        entity.locomotion_.grounded = !entity.state_.airborne;
+        entity.locomotion_.dt = static_cast<float>(dt);
+        // Phase B: the provider memory, advanced on this path as on the other one. Both, for
+        // ADR-554's reason -- and this is the field that rule was discovered by, so getting it
+        // wrong here would be the same bug in the same struct twice.
+        entity.advanceMotion(entity.locomotion_.time, static_cast<float>(dt));
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
@@ -1579,6 +1658,29 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             }
         }
 
+        // ---- the measured velocity (ADR-545) ----------------------------------------------
+        //
+        // Taken HERE, after `applyOffsets`, because this is the first instant at which the body's
+        // place for this step is settled: every behaviour has run, the action tier and the director
+        // have had their say, root motion has been added and crowd separation has pushed. One
+        // backward difference at one site is correct for all of them, and it is the only thing in
+        // this file that measures rather than decides.
+        //
+        // `dt <= 0` leaves the previous velocity alone rather than dividing by it. That is not
+        // hypothetical: ADR-521 records that `FixedStepClock::tick()` hands out `deltaTime = 0` on
+        // the first tick of every render, so a naive division would publish an infinity into the
+        // pose layer on frame one of every offline job.
+        {
+            const glm::vec3 settled = entity.state_.position();
+            if (entity.hasLastPosition_ && ctx.dt > 0.0) {
+                entity.state_.velocity = (settled - entity.lastPosition_) / static_cast<float>(ctx.dt);
+            } else {
+                entity.state_.velocity = glm::vec3(0.0f);
+            }
+            entity.lastPosition_ = settled;
+            entity.hasLastPosition_ = true;
+        }
+
         // A character doing nothing else, with a reaction still ringing, is reacting. Resolved
         // here rather than in the behaviour that raised it, because whether there was anything
         // else to do is only known once every behaviour has had its turn.
@@ -1626,6 +1728,26 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.locomotion_.yaw = entity.state_.yaw;
         entity.locomotion_.speed = entity.state_.speed;
         entity.locomotion_.turnRate = entity.state_.turnRate;
+        // ADR-545's measurement, across the seam -- **and this line was missing**. `seek` published
+        // it and `update` did not, so a pose layer got the right velocity while scrubbing and a
+        // zero one while playing: an ADR-360 violation in a field the animation layer reads, and
+        // backwards from every other kind of staleness bug.
+        //
+        // It survived because every velocity test asserted on `Entity::state()`, which is the
+        // measurement, and none asserted on `Entity::locomotion()`, which is what anything
+        // downstream actually receives. Same shape as ADR-553.
+        entity.locomotion_.velocity = entity.state_.velocity;
+        entity.locomotion_.facing = entity.state_.facing();
+        // Published on BOTH paths, deliberately. The sweep that added these asked, for every
+        // field of the seam, which of `seek` and `update` writes it -- and two of the answers
+        // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
+        // `update`. `grounded` was written by neither and read by nobody.
+        entity.locomotion_.grounded = !entity.state_.airborne;
+        entity.locomotion_.dt = static_cast<float>(ctx.dt);
+        // Phase B: the provider memory, advanced on this path as on the other one. Both, for
+        // ADR-554's reason -- and this is the field that rule was discovered by, so getting it
+        // wrong here would be the same bug in the same struct twice.
+        entity.advanceMotion(entity.locomotion_.time, static_cast<float>(ctx.dt));
         entity.locomotion_.reaction = entity.state_.reaction;
         entity.locomotion_.lookTarget = entity.state_.lookTarget;
         entity.locomotion_.hasLookTarget = entity.state_.hasLookTarget;
@@ -2268,6 +2390,13 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
     if (j.contains("cullDistance") && j["cullDistance"].is_number()) {
         desc.cullDistance = j["cullDistance"].get<float>();
     }
+    // Phase B's opt-in. Absent means false, which is every scene that exists today: the change
+    // this key turns on touches the path every shipping scene renders through, and "default off
+    // is inert" is measured by rendering the Glowmere project with and without this branch and
+    // comparing sequence hashes, not asserted.
+    if (j.contains("proceduralMotion") && j["proceduralMotion"].is_boolean()) {
+        desc.proceduralMotion = j["proceduralMotion"].get<bool>();
+    }
     if (j.contains("tags")) {
         if (!j["tags"].is_array()) {
             return fail("entity '{}': 'tags' must be an array of strings", desc.name);
@@ -2599,6 +2728,12 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     }
     if (entity.cullDistance > 0.0f) {
         j["cullDistance"] = entity.cullDistance;
+    }
+    // Written only when true, so saving a scene that never opted in produces the same bytes it
+    // had. A writer that emitted `false` everywhere would rewrite every entity in every project
+    // the first time anyone saved -- the diff-noise failure ADR-225 already had to fix once.
+    if (entity.proceduralMotion) {
+        j["proceduralMotion"] = true;
     }
     if (entity.behaviors.size() > entity.profileBehaviors) {
         nlohmann::json behaviors = nlohmann::json::array();

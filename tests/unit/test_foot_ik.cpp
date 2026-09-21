@@ -555,7 +555,7 @@ TEST_CASE("a foot layer is a pure function of the pose and the target", "[ik][la
 #endif
 }
 
-TEST_CASE("every farm rig carries a solvable two-bone leg and the alien rig does not",
+TEST_CASE("every farm rig carries a solvable two-bone leg and the alien's detached one solves too",
           "[ik][layers][farm][aliens]") {
 #ifndef AVGEN_SOURCE_DIR
     SKIP("AVGEN_SOURCE_DIR not defined");
@@ -565,10 +565,19 @@ TEST_CASE("every farm rig carries a solvable two-bone leg and the alien rig does
     }
     // The finding that decided the shape of this unit, as an assertion rather than a paragraph.
     //
-    // The farm pack spells the same anatomy three ways and every one of them is a chain. The alien
-    // pack's leg is not a chain at all: `foot.l` is a direct child of `root.x`, the thigh is a
-    // separate branch under the same parent, and `leg_stretch.l` is a sibling of `root.x` entirely.
-    // Three names that all exist, under two different parents, describing nothing that bends.
+    // The farm pack spells the same anatomy three ways and every one of them is an ancestor chain.
+    // The alien pack's leg is not: `foot.l` is a direct child of `root.x`, the thigh is a separate
+    // branch under the same parent, and `leg_stretch.l` is a sibling of `root.x` entirely. Three
+    // names that all exist, under two different parents.
+    //
+    // **This test used to assert that the alien's leg could not be solved, and that assertion was
+    // wrong** (ADR-543). It was not wrong about the topology -- the joints really are detached, and
+    // the section below still asserts it -- it was wrong about the consequence. `tools/motion_probe.cpp`
+    // solved exactly those joints against the real rig and wrote them back faithful to 1.2e-7 with
+    // bone lengths preserved to 0.000000. What ancestry decides is which transform each written
+    // joint's *parent* has undergone, not whether a solve is possible. The old expectation is kept
+    // in the git history and in ADR-359; it is not kept here, because a test that asserts a
+    // limitation the engine no longer has is a test that stops the engine being fixed.
     struct Leg {
         const char* file;
         const char* root;
@@ -618,38 +627,103 @@ TEST_CASE("every farm rig carries a solvable two-bone leg and the alien rig does
         CHECK(dist(jointAt(sk, animal.rig->pose, leg.tip), layer.target) < 1e-4f);
     }
 
-    SECTION("the alien's three leg-ish names bind to a complaint and write nothing") {
+    SECTION("no farm chain is detached, which is what makes the alien arm below a contrast") {
+        Rig animal(farmDir() / "bull.glb");
+        scene::Skeleton& sk = animal.rig->skeleton;
+        CHECK(scene::descendsFrom(sk, sk.find("LowerLegB.L"), sk.find("UpperLegB.L")));
+        CHECK(scene::descendsFrom(sk, sk.find("HoofB.L"), sk.find("LowerLegB.L")));
+        CHECK_FALSE(scene::descendsFrom(sk, sk.find("UpperLegB.L"), sk.find("UpperLegB.L")));
+    }
+
+    SECTION("the alien's detached leg binds, and the foot MOVES to where it was asked to go") {
         Rig alien(alienDir() / "alien-scout.glb");
         scene::Skeleton& sk = alien.rig->skeleton;
-        // Every one of these joints exists. That is the trap.
-        REQUIRE(sk.find("thigh_stretch.l") >= 0);
+        // `thigh_twist.l` is the anatomical hip -- the joint the thigh hangs from -- and is what
+        // `tools/motion_probe.cpp` measured. Every one of these joints exists and no two of them
+        // are related. That is the trap this rig sets, and the topology is asserted rather than
+        // described so that a re-export would fail this test loudly.
+        REQUIRE(sk.find("thigh_twist.l") >= 0);
         REQUIRE(sk.find("leg_stretch.l") >= 0);
         REQUIRE(sk.find("foot.l") >= 0);
+        REQUIRE_FALSE(scene::descendsFrom(sk, sk.find("leg_stretch.l"), sk.find("thigh_twist.l")));
+        REQUIRE_FALSE(scene::descendsFrom(sk, sk.find("foot.l"), sk.find("leg_stretch.l")));
 
         scene::PoseLayer layer;
         layer.name = "alien-left";
         layer.kind = scene::PoseLayerKind::Foot;
-        layer.chainRoot = "thigh_stretch.l";
+        layer.chainRoot = "thigh_twist.l";
         layer.chainMid = "leg_stretch.l";
         layer.chainTip = "foot.l";
         layer.weight = 1.0f;
-        layer.target = jointAt(sk, alien.rig->pose, "foot.l") - glm::vec3(0.0f, 0.2f, 0.0f);
-        layer.hasTarget = true;
+        layer.footAlign = 0.0f; // the plant's sole alignment is a different test; this is the solve
+
+        const scene::Pose rest = alien.rig->pose;
+        const glm::vec3 hip = jointAt(sk, rest, "thigh_twist.l");
+        const glm::vec3 knee = jointAt(sk, rest, "leg_stretch.l");
+        const glm::vec3 foot = jointAt(sk, rest, "foot.l");
+        const float reach = dist(hip, knee) + dist(knee, foot);
 
         const auto problems = alien.rig->layers.bind({layer}, sk, alien.rig->clips);
-        REQUIRE_FALSE(problems.empty());
-        INFO(problems.front());
-        CHECK(problems.front().find("is not below") != std::string::npos);
+        INFO((problems.empty() ? std::string() : problems.front()));
+        CHECK(problems.empty()); // it used to be refused here, by name, before ADR-543
+        CHECK(alien.rig->layers.chainLinkage().front() == glm::ivec2(0, 0));
 
-        const scene::Pose before = alien.rig->pose;
-        const auto stats = alien.rig->layers.apply(sk, alien.rig->clips, 0.0, alien.rig->pose);
-        CHECK(stats.applied == 0);
-        CHECK(alien.rig->layers.results().front() == scene::LayerResolution::NoChain);
-        for (std::size_t j = 0; j < before.size(); ++j) {
-            CHECK(alien.rig->pose.local[j].position == before.local[j].position);
-            CHECK(alien.rig->pose.local[j].rotation == before.local[j].rotation);
+        // THE POSITIVE ARM. ADR-543's own lesson, as an assertion: the shipped ancestor-only
+        // write-back scores PERFECTLY on a null request -- it moves nothing, so a target the foot
+        // is already at is hit exactly -- while missing a real one by the full requested distance.
+        // So the arm that matters asks for a foot somewhere it is NOT, and requires it to arrive.
+        // A raise, because this leg binds at 98.5% extension and has 0.0098 of slack (ADR-543):
+        // down is out of reach and is the arm below.
+        SECTION("a reachable target is reached") {
+            alien.rig->layers.layers().front().target = foot + glm::vec3(0.0f, reach * 0.10f, 0.0f);
+            alien.rig->layers.layers().front().hasTarget = true;
+            alien.rig->pose = rest;
+            const auto stats = alien.rig->layers.apply(sk, alien.rig->clips, 0.0, alien.rig->pose);
+            CHECK(stats.applied == 1);
+            CHECK(stats.detachedChains == 1); // zero on every farm rig; this is the discriminator
+            CHECK(alien.rig->layers.results().front() == scene::LayerResolution::Applied);
+            CHECK(alien.rig->layers.ikStatuses().front() == scene::IkStatus::Solved);
+
+            const glm::vec3 landed = jointAt(sk, alien.rig->pose, "foot.l");
+            const glm::vec3 wanted = alien.rig->layers.layers().front().target;
+            // It arrived...
+            CHECK(dist(landed, wanted) < 1e-4f);
+            // ...and it arrived by MOVING, which is the half a null request cannot ask for. The
+            // shipped rule left the foot exactly at `foot` and would fail this line by the whole
+            // 0.0655 it was asked to travel.
+            CHECK(dist(landed, foot) > reach * 0.09f);
+            // The limb did not stretch to get there.
+            const glm::vec3 k2 = jointAt(sk, alien.rig->pose, "leg_stretch.l");
+            const glm::vec3 h2 = jointAt(sk, alien.rig->pose, "thigh_twist.l");
+            CHECK(dist(h2, k2) == Approx(dist(hip, knee)).margin(1e-4));
+            CHECK(dist(k2, landed) == Approx(dist(knee, foot)).margin(1e-4));
+            // And the intermediate joints on the *linked* sub-branches came with it: `toes_01.l`
+            // hangs off `foot.l` and must have travelled the same way the foot did.
+            const glm::vec3 toeBefore = jointAt(sk, rest, "toes_01.l");
+            const glm::vec3 toeAfter = jointAt(sk, alien.rig->pose, "toes_01.l");
+            CHECK(dist(toeAfter, toeBefore) > reach * 0.02f);
+            CHECK(dist(toeAfter, landed) == Approx(dist(toeBefore, foot)).margin(1e-4));
+        }
+
+        // The other half of the ADR-543 measurement: this leg cannot go DOWN. The solve must say
+        // so rather than approximate, and must still leave the foot on the ray to the target.
+        SECTION("an unreachable downward target clamps and says so") {
+            alien.rig->layers.layers().front().target = foot - glm::vec3(0.0f, 0.10f, 0.0f);
+            alien.rig->layers.layers().front().hasTarget = true;
+            alien.rig->pose = rest;
+            const auto stats = alien.rig->layers.apply(sk, alien.rig->clips, 0.0, alien.rig->pose);
+            CHECK(stats.applied == 1);
+            CHECK(alien.rig->layers.results().front() == scene::LayerResolution::Clamped);
+            CHECK(alien.rig->layers.ikStatuses().front() == scene::IkStatus::Clamped);
+            const glm::vec3 landed = jointAt(sk, alien.rig->pose, "foot.l");
+            // It went DOWN -- a clamp is not a refusal -- and it stopped short of the target.
+            CHECK(landed.y < foot.y);
+            CHECK(dist(landed, alien.rig->layers.layers().front().target) > 0.05f);
+            // ...at exactly the limb's own extension from the hip, which is what "clamped" means.
+            CHECK(dist(jointAt(sk, alien.rig->pose, "thigh_twist.l"), landed) == Approx(reach).margin(1e-4));
         }
     }
+
 #endif
 }
 
