@@ -358,54 +358,21 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
     // Shuffled scoring *below* baseline (32.0 vs 34.7) is the expected sign: adding dimensions that
     // carry noise costs a little, which is also §24's warning about dimensions not being free,
     // arriving from a valid instrument this time.
-    // **What a noise dimension costs -- the first valid measurement of it in this phase.**
+    // **The neutralise experiment that used to live here has been removed, and why matters.**
     //
-    // `dimension()` adds one contact flag per *feature* joint rather than per *contact* joint, so
-    // with contacts enabled `head.x` carries one. A head does not plant: that dimension is
-    // **meaningless by construction**, for a reason statable in advance, and it varies -- so it
-    // passes the liveness check. Which is the limit of that check, and the third member of a set:
+    // `dimension()` added one contact flag per *feature* joint rather than per *contact* joint, so
+    // `head.x` carried one -- a dimension meaningless by construction that nonetheless varied, and
+    // so passed every liveness check. That made it a natural experiment: neutralising it (setting
+    // it constant, so it adds the same amount to every distance and cannot affect a ranking)
+    // measured what a noise dimension costs with dimensionality held fixed. It read **33.3% with
+    // and 33.3% without -- 0.0 points**.
     //
-    //   liveness distinguishes present from absent.
-    //   the shuffle distinguishes meaning from identity.
-    //   **neither distinguishes meaning from noise.**
-    //
-    // Neutralising it -- setting it constant across samples, so it adds the same amount to every
-    // distance and cannot affect any ranking -- isolates the noise from the dimension count, which
-    // is cleaner than deleting it. §24 asserted "dimensions are not free" and its instrument has
-    // since been retired for measuring identifiability; this measures the claim validly.
-    {
-        scene::MotionDatabaseOptions withContacts;
-        withContacts.sampleRate = 30.0f;
-        withContacts.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
-        withContacts.config.contactWeight = 1.0f;
-        auto noisy = scene::buildMotionDatabase(*pack, withContacts);
-        if (!noisy.has_value()) {
-            FAIL("motion database build failed: " << noisy.error().message);
-        }
-        const std::vector<scene::MotionFeatureGroup> lay =
-            scene::motionFeatureLayout(noisy->config);
-        std::vector<std::size_t> contactDims;
-        for (std::size_t d = 0; d < lay.size(); ++d) {
-            if (lay[d] == scene::MotionFeatureGroup::Contact) {
-                contactDims.push_back(d);
-            }
-        }
-        REQUIRE(contactDims.size() == 3u); // foot.l, foot.r, head.x -- the third is the bogus one
-
-        scene::MotionDatabase clean = *noisy;
-        for (std::uint32_t s = 0; s < clean.sampleCount(); ++s) {
-            clean.features[static_cast<std::size_t>(s) * clean.dimension + contactDims[2]] = 0.0f;
-        }
-
-        const auto [withNoise, oracleNoisy] = score(*noisy, "contacts, bogus head flag LIVE");
-        const auto [withoutNoise, oracleClean] = score(clean, "contacts, bogus head flag NEUTRAL");
-        WARN(fmt::format("NOISE DIMENSION: {:.1f}% with it, {:.1f}% without -- one meaningless "
-                         "dimension of {} costs {:+.1f} points",
-                         withNoise, withoutNoise, noisy->dimension, withNoise - withoutNoise));
-        // The oracle must not move: neutralising a feature dimension cannot change what pose-space
-        // answers exist. If it does, the arms differ in something other than the dimension.
-        CHECK(oracleNoisy == Approx(oracleClean).margin(1e-6f));
-    }
+    // **That null was underpowered and the dose-response below reversed it** (-0.30 points per
+    // dimension, from K=4 and K=16 agreeing to 0.01). The experiment is gone because **the bug it
+    // depended on is fixed** -- contacts now follow their own joint list and there is no bogus
+    // flag to neutralise. Recorded here rather than deleted silently: it was a real measurement, it
+    // was wrong in the direction of convenience, and the correction came from measuring a slope
+    // instead of a point.
 
     // **Dose-response: the marginal cost of a useless dimension.**
     //
@@ -487,6 +454,73 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
         CHECK(atZero > 0.0);
     }
 
+    // **§30: contacts, judged on NET value.** The dose-response gives a hurdle: two contact
+    // dimensions cost about 2 x 0.30 = **0.6 points** at unit weight, so contacts must buy more
+    // than that to be worth carrying at all. Reporting the effect against zero would answer "does
+    // it help"; reporting it against the hurdle answers "is it worth its dimensions", which is the
+    // question §24 was groping at.
+    {
+        scene::MotionDatabaseOptions withContacts;
+        withContacts.sampleRate = 30.0f;
+        withContacts.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+        withContacts.config.contactWeight = 1.0f;
+        auto contactsDb = scene::buildMotionDatabase(*pack, withContacts);
+        if (!contactsDb.has_value()) {
+            FAIL("motion database build failed: " << contactsDb.error().message);
+        }
+        const auto [withContactsRate, oracleC] = score(*contactsDb, "§30 contacts ON");
+
+        // The shuffle, built in: contacts are the feature most likely to act as an identifier,
+        // since a left/right planting pattern is close to a clip-phase fingerprint.
+        const std::vector<scene::MotionFeatureGroup> lay =
+            scene::motionFeatureLayout(contactsDb->config);
+        std::vector<std::size_t> dims;
+        for (std::size_t d = 0; d < lay.size(); ++d) {
+            if (lay[d] == scene::MotionFeatureGroup::Contact) {
+                dims.push_back(d);
+            }
+        }
+        REQUIRE(dims.size() == 2u);
+        scene::MotionDatabase shuffledContacts = *contactsDb;
+        {
+            std::vector<std::uint32_t> order(shuffledContacts.sampleCount());
+            for (std::uint32_t i = 0; i < shuffledContacts.sampleCount(); ++i) {
+                order[i] = i;
+            }
+            std::mt19937 rng(777u);
+            std::shuffle(order.begin(), order.end(), rng);
+            std::vector<float> saved(shuffledContacts.sampleCount() * dims.size());
+            for (std::uint32_t i = 0; i < shuffledContacts.sampleCount(); ++i) {
+                for (std::size_t k = 0; k < dims.size(); ++k) {
+                    saved[i * dims.size() + k] = shuffledContacts.featuresFor(i)[dims[k]];
+                }
+            }
+            for (std::uint32_t i = 0; i < shuffledContacts.sampleCount(); ++i) {
+                for (std::size_t k = 0; k < dims.size(); ++k) {
+                    shuffledContacts
+                        .features[static_cast<std::size_t>(i) * shuffledContacts.dimension +
+                                  dims[k]] = saved[order[i] * dims.size() + k];
+                }
+            }
+        }
+        const auto [shuffledContactsRate, oracleS] = score(shuffledContacts, "§30 contacts SHUFFLED");
+
+        const double hurdle = 2.0 * 0.30;
+        WARN(fmt::format("§30 NET: baseline {:.1f}%, contacts {:.1f}% ({:+.1f}), shuffled {:.1f}%; "
+                         "dimensional hurdle {:.1f} points, so net {:+.1f}",
+                         withoutPhase, withContactsRate, withContactsRate - withoutPhase,
+                         shuffledContactsRate, hurdle,
+                         (withContactsRate - withoutPhase) - hurdle));
+        CHECK(oracleC == Approx(oracleS).margin(1e-6f));
+        // **The third-instance watch.** If shuffled contacts beat real contacts, that is not "a
+        // third feature failed" -- three independent features behaving as identifiers under one
+        // encoding is a statement about the ENCODING, and it gets written up separately rather
+        // than folded in here.
+        if (shuffledContactsRate > withContactsRate) {
+            WARN("*** shuffled contacts BEAT real contacts -- third instance, see the design log");
+        }
+    }
+
     CHECK(withoutPhase > 0.0);
     CHECK(withPhaseRate > 0.0);
     CHECK(std::abs(withPhaseRate - withoutPhase) < 5.0); // no large effect either way
@@ -552,7 +586,7 @@ TEST_CASE("§30: contact-aware matching, on the validated instrument",
     }
     WARN(fmt::format("§30: contact dimensions in the vector: {} of {}", contactDims,
                      db->dimension));
-    CHECK(contactDims > 0u);
+    CHECK(contactDims == 2u); // feet only: the head-flag bug is fixed
 
     float lo = 1e9f;
     float hi = -1e9f;

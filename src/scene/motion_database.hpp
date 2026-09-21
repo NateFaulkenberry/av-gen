@@ -65,6 +65,16 @@ struct MotionFeatureConfig {
     // **Not every joint** (§7): a 90-joint alien would give a 540-dimension vector in which the
     // fingers outvote the feet.
     std::vector<std::string> joints;
+    // **Which joints carry a contact flag, when `contactWeight > 0`.** Separate from `joints`
+    // because they are different questions: `joints` are the ones whose position and velocity
+    // describe the pose, and a head is a good pose feature and a meaningless contact. Before this
+    // existed `dimension()` added one flag per *feature* joint, so `head.x` carried a contact flag
+    // -- a dimension meaningless by construction, which nonetheless varied and so passed every
+    // liveness check. Empty falls back to `joints`, which is what the old behaviour was.
+    std::vector<std::string> contactJoints;
+    [[nodiscard]] const std::vector<std::string>& contactJointNames() const {
+        return contactJoints.empty() ? joints : contactJoints;
+    }
     // Seconds ahead to sample the future trajectory. Empty means no trajectory term, which is the
     // honest configuration for an in-place corpus.
     std::vector<float> trajectoryTimes;

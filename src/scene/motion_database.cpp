@@ -102,7 +102,8 @@ std::uint32_t MotionFeatureConfig::dimension() const {
         d += 2u; // phase as (cos, sin), so 0.99 and 0.01 are adjacent rather than a unit apart
     }
     if (contactWeight > 0.0f) {
-        d += static_cast<std::uint32_t>(joints.size()); // one contact flag per watched joint
+        // One flag per CONTACT joint, not per feature joint: a head does not plant.
+        d += static_cast<std::uint32_t>(contactJointNames().size());
     }
     return d;
 }
@@ -139,7 +140,7 @@ std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& c
         out.insert(out.end(), 2u, MotionFeatureGroup::Phase);
     }
     if (config.contactWeight > 0.0f) {
-        out.insert(out.end(), config.joints.size(), MotionFeatureGroup::Contact);
+        out.insert(out.end(), config.contactJointNames().size(), MotionFeatureGroup::Contact);
     }
     return out;
 }
@@ -188,6 +189,9 @@ std::string MotionCostBreakdown::report() const {
 
 MotionFeatureConfig defaultBipedConfig(std::string leftFoot, std::string rightFoot, std::string head) {
     MotionFeatureConfig config;
+    // The feet carry contacts; the head does not. Named explicitly rather than inherited from the
+    // feature joints, which is what put a contact flag on a head.
+    config.contactJoints = {leftFoot, rightFoot};
     config.joints = {std::move(leftFoot), std::move(rightFoot), std::move(head)};
     // 0.2 / 0.4 / 0.6 s, the spacing the literature converges on: far enough apart to describe a
     // turn, near enough that the last one is still a prediction rather than a guess.

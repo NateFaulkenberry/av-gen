@@ -2048,10 +2048,24 @@ It does not contradict the shuffle result. Neutralising removes a dimension's co
 shuffling **replaces it with active noise**, which cost 2.7 points for two dimensions. Removing a
 weak signal and injecting a strong one are different operations and the asymmetry is expected.
 
-**What it changes:** the cost side of every dimension decision now has a real number attached
-instead of a slogan. At −0.30 points per useless dimension, §24's five-horizon arm carries 8 more
-dimensions than the three-horizon one, which predicts about **−2.4 points** from dimensionality
-alone — a real cost, and one that was being asserted without measurement for the whole phase.
+**−0.30 is a unit-weight figure and must be cited with that condition attached.** What was measured
+is *the cost of one extra unit-weight dimension in a vector where every dimension carries unit
+weight* — because the dose-response had to run at uniform weights to keep the arms comparable.
+
+**So the obvious use of it is wrong, and I had proposed it.** I suggested subtracting ~2.4 points
+from §24's five-horizon arm for its 8 extra dimensions. That subtraction assumes the extra
+*trajectory* dimensions contribute to the distance the way the synthetic unit-weight ones did, and
+under the production weight vector they do not — a dimension's cost scales with how much it
+contributes. **Importing the constant into a weighted run is the `costSpread` asymmetry again: a
+quantity whose name does not carry the convention it was computed under.**
+
+The clean fix is the one that keeps recurring: **make the conditions constant across the
+comparison.** Re-run §24 at uniform weights too, so the correction is measured and applied under one
+regime. A weighted slope is obtainable but needs the padding trap solved first — by extending the
+weight vector explicitly rather than letting it fall back to unweighted.
+
+**What it changes:** the cost side of every dimension decision now has a real number instead of a
+slogan, for unit-weight vectors.
 
 **But the reasoning published for three decisions was borrowed from an untested claim, and that is
 worth marking even where the conclusion survives**, in the same way the `Travelling` comment was
@@ -2078,3 +2092,71 @@ number turning out to be an artefact. The large, significant-looking +7.0 was re
 to act on it still stands. **A rule that protects you when your evidence is wrong is doing more work
 than one that protects you when it is right**, which is the argument for this being standing practice
 rather than a remark about that instance.
+
+
+### Two pre-tests now, both available before the result
+
+> **1. Count the acceptable answers before trusting the number.** A metric is vulnerable to
+> identifiability in proportion to how few correct answers it admits.
+>
+> **2. A single-point null is underpowered, not evidence of absence.** One point near the origin
+> cannot distinguish a slope from a flat line, and the tell is available *before* the result.
+
+Both were available in advance of the failures they would have caught, which is what makes them
+pre-tests rather than post-mortems.
+
+# THE THIRD INSTANCE: a statement about the encoding, not about a third feature
+
+Three features intended to describe periodic gait have now been measured on the validated
+cross-clip instrument, each with its own shuffle control:
+
+| feature | baseline | real | shuffled | verdict |
+|---|---|---|---|---|
+| **phase** (2 dims) | 34.7% | 34.9% | 32.0% | no detectable benefit |
+| **trajectory** (on the retired metric) | 69.6% | 76.6% | **99.4%** | shuffled beat real |
+| **contacts** (2 dims) | 34.7% | **33.3%** | **34.9%** | **worse than baseline, and shuffled beat real** |
+
+**Contacts are net −2.0 points**: −1.4 against baseline, plus a **0.6-point dimensional hurdle** (two
+dimensions at the measured −0.30 each, unit weight). This is the first feature in the phase judged
+on *net value* rather than on whether it helps, and the answer is that it is worth less than the
+dimensions it occupies.
+
+**Three independent features behaving this way under one encoding is a statement about the encoding
+rather than three separate feature failures.** Folding it into §30 would lose that.
+
+## The mechanism, stated as a hypothesis with its test
+
+The candidate explanation is **redundancy, not absence of signal.** The pose block already contains
+foot and head positions *and velocities*. A foot's position and velocity jointly encode where in the
+gait cycle the body is and whether that foot is planted — so phase and contact state are **already
+present implicitly**, and the explicit features re-state them.
+
+That predicts exactly what is observed, including the part that looks paradoxical:
+
+- Adding a redundant feature costs its dimensions and buys nothing → phase, at +0.2.
+- A redundant feature **double-counts a signal already present**, over-weighting gait phase relative
+  to everything else in the distance → contacts, at −1.4, *below* baseline.
+- **Shuffling a redundant feature removes the double-counting** while paying only the noise cost →
+  shuffled beats real, which is otherwise hard to explain.
+
+**This is a hypothesis and it is falsifiable now, on the corpus in hand:** measure the correlation
+between the explicit gait dimensions (phase, contact) and the pose dimensions. High correlation
+supports redundancy; low correlation kills it and sends the search elsewhere. That measurement is
+the next thing to do and it does not need §20.
+
+**What it would mean if it holds:** the feature vector is over-specified for this corpus, and the
+right response is not to tune the weights of the explicit gait features but to **remove them** — the
+opposite of what §30 and §31 were written to add. That would change what the feature vector should
+be rather than what its weights should be, which is why it is recorded above the section level.
+
+## And the flag is fixed
+
+`MotionFeatureConfig` now carries `contactJoints` separately from `joints`, because they answer
+different questions: `joints` are the ones whose position and velocity describe the pose, and a head
+is a good pose feature and a meaningless contact. Empty falls back to `joints`, which is the old
+behaviour. `defaultBipedConfig` names the two feet. Contact dimensions: **2 of 35**, down from 3 of
+36.
+
+The natural experiment that bug provided — neutralising the bogus flag — is recorded in the test
+file rather than deleted silently: it measured 0.0 points, **that null was underpowered, and the
+dose-response reversed it.**
