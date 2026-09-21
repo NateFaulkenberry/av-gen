@@ -1207,6 +1207,17 @@ public:
     // what the scene will remember it as, and may be empty for a rig that has no file.
     Result<void> installLightRig(LightRig rig, const std::filesystem::path& sourcePath = {});
     [[nodiscard]] const std::filesystem::path& lightRigPath() const { return lightRigPath_; }
+    // Changes only how the rig's path is WRITTEN, not which rig is loaded. `setLightRig`
+    // reloads the file and re-registers the rig's parameters, so using it to move a path --
+    // which is what saving into another folder needs -- would tear down and rebuild every
+    // `lightrig/...` parameter and lose whatever the author had tuned them to. This exists
+    // because the light rig was the one asset in the environment block that `saveComposition`
+    // did not rebase: a scene saved to another folder kept a path relative to the folder it
+    // came from, and the rig was missing the next time it opened.
+    void rebaseLightRigPath(const std::filesystem::path& path) {
+        lightRigPath_ = path;
+        dirty_ = true;
+    }
     [[nodiscard]] const LightRig* lightRig() const { return lightRig_ ? &*lightRig_ : nullptr; }
     [[nodiscard]] const std::filesystem::path& sourcePath() const { return sourcePath_; }
 

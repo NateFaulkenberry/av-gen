@@ -2645,11 +2645,22 @@ Result<void> Engine::saveComposition(const std::filesystem::path& path) {
     }
     comp->setEnvironmentMap(environmentPath_.empty() ? std::filesystem::path()
                                                      : registry_.relativise(registry_.resolve(environmentPath_)));
+    // The light rig is an asset path in the same environment block and was the one thing here that
+    // did not move with the file. Saving `glowmere-valley-2-multicam` to the Desktop wrote
+    // `../lightrigs/glowmere-valley.rig.json` unchanged -- still relative to `examples/world` --
+    // so it resolved to `~/lightrigs/...` and the scene opened without its lighting.
+    const auto rigPath = comp->lightRigPath();
+    if (!rigPath.empty()) {
+        comp->rebaseLightRigPath(registry_.relativise(registry_.resolve(rigPath)));
+    }
     if (auto r = comp->saveFile(path); !r) {
         return r;
     }
     if (!environmentPath_.empty()) {
         comp->setEnvironmentMap(environmentPath_);
+    }
+    if (!rigPath.empty()) {
+        comp->rebaseLightRigPath(rigPath); // the live session keeps the path it was loaded with
     }
     compositionPath_ = path;
     return {};

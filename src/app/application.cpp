@@ -1470,7 +1470,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->shaderErrorFor = [this](std::uint32_t id) { return renderer_->shaderStack().errorFor(id); };
         panel_->onSaveScene = [this] {
-            window_->saveFileDialog(platform::Window::SaveKind::Project, [this](std::string path) {
+            window_->saveFileDialog(platform::Window::SaveKind::Scene, [this](std::string path) {
                 if (path.empty()) return;
                 if (auto r = engine_->saveComposition(path); !r) {
                     panel_->setStatus(r.error().message);
