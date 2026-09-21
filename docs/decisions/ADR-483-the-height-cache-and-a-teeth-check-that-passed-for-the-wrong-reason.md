@@ -102,6 +102,29 @@ that returns confidently wrong heights.
 
 ## Consequences
 
+### The end-to-end number, and why it is not here
+
+Both halves of this pass are switchable in one process -- `AVGEN_PATH_CUTOFF=0` and
+`AVGEN_HEIGHT_CACHE=0` -- so "what did the pass buy" can be a single interleaved measurement rather
+than the product of two ratios taken hours apart. That product would be arithmetic, not a
+measurement, and it is the same error that produced this pass's "the cache is 2x slower" reading.
+
+The first attempt was taken at load average 93.6 and **discarded**:
+
+    before (no cutoff, no cache)   9138.2   3099.5   5738.1
+    after  (both)                  1971.7   1842.7   3315.9
+
+The before arm spreads by a **factor of three within one arm**. ADR-170 asks for minima over repeats
+*and* a statement of the contention, and this contention disqualifies the run rather than annotating
+it. Min-to-min would have read −40.5% and that number is not in this document.
+
+One observation from it is worth keeping, as **reasoning and not as evidence**: the before arm's
+minimum of 3099.5 ms sits close to ADR-482's 3045.2 ms taken in a quiet window. That is minima
+behaving exactly as the statistic is chosen to behave — contention can only push a sample *slower*,
+so the minimum is the least-disturbed one and is the most load-robust thing a shared machine will
+give you. It is an argument for why minima are the right statistic. It is not a result about the
+cache, and it does not license quoting the delta.
+
 * A scrub is cheaper again, on top of ADR-482. The absolute figure is deliberately **not quoted
   here**: every number in this document that could be quoted as an absolute was taken while three
   other agents were on the machine, and the honest ones above are ratios measured inside a single
