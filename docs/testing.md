@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-two ways a green suite has lied
+## Twenty-three ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -437,6 +437,33 @@ night from two agents who never spoke to each other.
    And note which half each party got right: the prediction that only one *kind* was affected held;
    the guess that only one *case* was affected came from the instance that was tripped over rather
    than from a search, and was wrong. **A boundary is measured, not estimated.**
+
+23. **Two kinds that agree on a lane are not a dispatch, and production code has no suite to go
+   green.**
+
+   Entry 22 is that hazard in *tests*. The same session found it in shipping code, and it is worse
+   there because there is no summary line to misread -- the program simply does the wrong thing.
+
+   `MediumSlot` was made per-kind: each kind gets its own packer, its own density function, its own
+   lane meanings. What was not done was audit the **readers**. Within an hour of a third kind
+   existing, three shared accessors turned out to be still assuming the first kind's layout: a wind
+   hook writing a field the third kind does not store, three coefficient helpers reading `lane(1).w`
+   as an extinction when on the third kind it is a radius control (tens, not hundredths), and a
+   reserved lane that a sixty-one-float block landed on.
+
+   **The reason none of it surfaced in the preceding day is that the first two kinds happened to
+   agree on every lane those sites read.** Two implementations of an interface that agree are one
+   implementation with two names; the disagreement is the control, and **the third case is the
+   first one that can fail.** If you are generalising a layout, a protocol or a schema, the second
+   instance does not validate the generalisation -- it is usually built by copying the first.
+
+   The general form: **when you make a layout per-kind, every reader of that layout is a call site
+   to audit, not just the probes.** Grep for the lane index, not for the feature name -- the
+   feature name is what the mis-aimed reader does *not* mention.
+
+   And all three presented the same way, which is why they are expensive: right shape, slightly
+   wrong appearance. **A defect that survives because it is plausible is the costly kind** -- it
+   gets tuned around rather than found. "Renders as a comet" is a bug someone fixes in a minute.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a

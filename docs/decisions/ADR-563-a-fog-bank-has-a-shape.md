@@ -101,11 +101,45 @@ not working. It samples 0.9 now, and the limit is stated in the case.
 
 ## Consequences
 
-- **A fog bank is no longer a pure alias of the vortex's block.** It has six stored rows, so every
-  effect of every kind now writes six more numbers in its `fog` block (`toJson` writes every kind's
+- **A fog bank is no longer a pure alias of the vortex's block.** It has eight stored rows, so every
+  effect of every kind now writes eight more numbers in its `fog` block (`toJson` writes every kind's
   block). Defaults, so nothing loads differently -- which `test_effect_registry` checks and still
-  checks, with the assertion updated from `empty()` to `size() == 6`.
-- **Lane budget**: the vortex fills 0-12, fog adds 13-14, **15 is reserved for the kind tag**.
+  checks, with the assertion updated from `empty()` to `size() == 8`.
+
+  That number was taken from `grep -c storedFloat` on the effect file, **not** from what made the
+  test pass. The distinction is the whole value of the case: a probe updated to match the code
+  asserts whatever the code now does, and a probe updated against an independently counted quantity
+  is still a probe. This case has reported a true consequence three times; both of the times it
+  caught me it was because a row was added and the count was not re-derived.
+- **Lane budget**: the vortex fills 0-12, fog adds 13-14, **15 is reserved for the kind tag** --
+  and that reservation is a **checked constraint** now, not a convention.
+
+  `agent/tornado`'s block is **sixteen** lanes (thirteen field, three appearance), not the fourteen
+  recorded here at first. The tornado had sixty floats and wanted sixty-one, and the overflow landed
+  exactly on lane 15. It resolved it by folding `edgeWidth` into a constant -- one artist control
+  traded against a packer that silently overwrites the tag selecting its own density function.
+
+  **The wrong figure had two authors and the record should say so.** I published a count for a block
+  I had never opened -- that is the origin. The coordinator held the correct number from the
+  tornado's own Phase 4 report and relayed mine without reconciling the two -- that is the
+  propagation, and the propagation is the half that reached the agent building against it. Neither
+  of us needed the other to make the mistake and it took both of us to deliver it.
+
+  **The failure mode is not the one either of us expected.** The tag is written *after* `pack`, so
+  the tag always wins and the dispatch keeps working; what disappears is the **packer's** number. It
+  presents as a wrong appearance rather than a wrong shape, which is harder to trace than "the
+  tornado renders as a comet" would have been.
+
+  So `buildAtmosphericFrame` writes a sentinel into lane 15 before calling `pack` and names the kind
+  in a warning if it comes back changed -- two stores per medium per frame to turn a silent loss
+  into a reported one. **A reserved lane that nothing enforces is a comment, and sixty-one floats
+  will find it.**
+
+  The reason that price is worth paying is the failure mode above, and it is the line the
+  enforcement cites: *"renders as a comet" is a bug someone finds in a minute; "the thick colour is
+  subtly wrong" is one that gets tuned around.* **A defect that survives because it is plausible is
+  the expensive kind**, and this lane layout has now produced three of them -- the eye hole, the
+  extinction read at tens instead of hundredths, and this.
 - **The hero shot still cannot show a placed medium.** The first acceptance arm was built on it
   anyway and came back a featureless wash, for the reason ADR-560 had already recorded: the bank
   encloses the camera. The camera has to be outside.
