@@ -747,3 +747,116 @@ model of where the time goes.
 
 §52 is what makes it safe: the incremental rebuild changed **none** of the 335 baseline quantities,
 to 0.1 mm. An optimization to a solver that cannot show its output unchanged is a rewrite.
+
+## §54 — the final pipeline, and who owns what
+
+§54 requires this before Phase B can be declared complete. The pipeline, in the order it runs, with
+the owner of each decision named — because most of the defects found in this phase were two owners
+answering the same question, or none answering it.
+
+```
+CHARACTER INTENT (entity tier — re-simulated on a seek, so it may remember)
+  CharacterIntent -> planLocomotion -> MotionRequest
+    |
+    v
+  stepMotion(MotionRequest, MotionState, MotionLimits, dt) -> MotionSolution
+    velocity, facing, acceleration, speed, turnRate            [§35, ADR-545]
+    |
+    v
+  LocomotionState  <- THE SEAM. Published by BOTH EntityWorld::update and
+                      EntityWorld::seek, field by field           [ADR-554]
+    |
+================ tier boundary: below here nothing may remember ================
+    |
+    v
+  MotionContext    <- built per frame by driveLayers from the seam, converted
+                      into the rig's frame through the node's world transform,
+                      because a posed rig has no world position   [ADR-274]
+    |
+    v
+  BASE POSE        <- AnimationPlayer samples the clip (or a MotionProvider
+                      produces it) into a rest-seeded Pose
+    |
+    v
+  POSE LAYER STACK, in `poseLayerStage` order, not file order     [§5]
+      10 Stride     scales foot excursion to the travelled distance
+      20 Lean       leans the spine into acceleration and turn
+      30 Secondary  breathing and settle; a pure function of the timeline second
+      40 Aim        head/eyes toward the look target
+      50 Additive   a reaction played over the base
+      60 Foot       plants the feet on the ground plane
+      70 Reach      a hand to a target
+    each layer:  ensureModel -> read -> write joints -> mark the model dirty [§53]
+    |
+    v
+  BODY COMPENSATION   pelvis moves so the feet can reach          [pre-pass + stage]
+    |
+    v
+  FINAL POSE -> skinning palette
+```
+
+**Who owns translation.** The entity tier, exclusively, and there is exactly one authoritative
+movement result (ADR-337). Layers rotate; the two that translate — Stride scaling an excursion and
+Body Compensation moving the pelvis — do so in the rig's own frame and never in the world's. Root
+motion is applied by `applyRootMotionCompensation` *before* the layers, and the two writes are equal
+and opposite so the drawn body does not move.
+
+**Who owns rotation.** The layers. `solveTwoBone` returns two model-space pre-rotations rather than
+composed local transforms, because the caller is the only thing that knows what a local transform is
+on a given rig — and reporting them separately is what lets a partial-weight caller slerp each
+towards identity without the knee's share depending on the hip's.
+
+**Who owns contacts.** The Foot layer owns the *solve*; `IGroundQuery` owns the *answer*, and "no
+answer" is not "no ground" (ADR-551). The entity owns the smoothing of the ground plane, and the
+layer owns the solve against it: everything above `groundPoint` in `LocomotionState` is stateful and
+re-simulated on a seek, and everything below it is a pure function of the pose and that plane
+(ADR-359).
+
+**Who owns IK.** `scene::ik` owns the mathematics and nothing else. It is a pure function of the
+chain it is handed, which is why full extension is a safe default — the next frame does not start
+from this frame's answer, it starts from the animated pose. A limb is three *named joints* and a
+write-back rule, not an ancestor chain (ADR-543), and the price of that is ADR-601: on a rig that is
+not a hierarchy the bone lengths are a property of the frame.
+
+**Layer ordering** is a contract, not a convention (§5). `poseLayerStage` returns the stage;
+`rebind` sorts by it with `std::stable_sort`, so two foot layers stay left-then-right. The order is
+asserted twice — as an order and as an outcome — with a foot-layer-alone control.
+
+**Data ownership.** Shared: `Skeleton`, `AnimationClip`s, resolved masks, chain definitions,
+retarget profiles. Per-instance: `Pose`, `PoseLayerStack` state, `MotionState`, velocity, phase,
+targets, seeds. §47 measured that the *time* does not grow with the count (+0.9% from 1 to 100);
+§48 measured that the *data* does — 78% of the shipping scene's rig memory is a byte-identical second
+copy, and ADR-604 says where the fix belongs.
+
+**Offline / runtime boundary.** Offline: clip analysis (`analyse`, contact tracks, phase tracks),
+motion database construction, variant generation and its quality gate (§41–§44), travel
+classification (ADR-552). Runtime: everything in the diagram above. The rule that keeps the boundary
+honest is that **the offline side may measure the runtime side, and the runtime side may not depend
+on having been measured** — an unmeasured metric never fails a gate, which is correct, and the
+caller configures the gate, which is what makes it able to refuse (ADR-600).
+
+**The one rule that decides the tier boundary**: the entity tier is re-simulated by
+`EntityWorld::seek`, so anything it accumulates is reconstructable at frame N by construction. The
+pose tier poses the rig *once* on a scrub, so it may never accumulate — a foot lock anchor is
+derived (ADR-557), a layer blend is derived from an elapsed time (ADR-602), and a model-space cache
+is invalidated rather than carried (§53).
+
+### Known limitations, stated rather than discovered later
+
+- **ADR-601**: on this rig the solver's reach depends on the frame. Real, sub-pixel at Glowmere's
+  framing, 20 px at a character-scale one, deliberately unfixed.
+- **ADR-604**: five aliens carry five byte-identical copies of the same 26-clip pack; a hundred
+  characters would be 301 MB of which 298 MB is the same bytes.
+- **`Gait::footSlip` still has the threshold** ADR-602 describes. The correct driver shape is
+  demonstrated in the slice; changing the function itself lands on `assets/farm`.
+- The §44 quality limits are a **locomotion** gate, not a clip gate: 13 of the alien's 26 clips fail
+  them, which is the expected shape for `Dying_forward` and `Crazy` and a trap for any generator fed
+  non-locomotion source.
+- The remaining per-frame cost is one full hierarchy walk plus six dirty-set passes (ADR-605).
+
+### Phase C integration points
+
+`IMotionProvider` already splits `advance` from `pose` (ADR-556) so a seek can replay 5,400 steps
+and pose once. `MotionChain` already orders Neural → Matching → Clip with fallback. `MotionDatabase`
+and `searchMotion` exist with feature vectors and continuity cost. Phase C replaces what produces
+the base pose and changes nothing below `MotionContext`.
