@@ -52,17 +52,23 @@ because "every third-party thing, its licence and the reason" is the question th
 
 | Dataset | Licence | Used for | Obligation when publishing |
 |---|---|---|---|
-| The 100STYLE Dataset (Ian Mason) | CC0, per the project owner's determination, 2026-09-21 | Phase C §20, the motion-matching scale experiment: a corpus large and diverse enough to carry root motion, starts, stops and directional changes, which the in-place Glowmere corpus (ADR-540) structurally lacks | **Credit required for creative or commercial work.** The dataset asks that it be credited in an appropriate way for such use |
+| The 100STYLE Dataset (Ian Mason, Sebastian Starke, Taku Komura) | **CC BY 4.0** -- verified 2026-09-21 against the authors' page (`ianxmason.com/100style/`) and the Zenodo record's own rights field (DOI 8127870, `"id": "cc-by-4.0"`). **Recorded as CC0 earlier the same day; that was wrong** | Phase C 20, the motion-matching scale experiment: a corpus large and diverse enough to carry root motion, starts, stops and directional changes, which the in-place Glowmere corpus (ADR-540) structurally lacks | **Attribution is a licence condition, not a courtesy.** Credit, a licence notice and link, and an indication that changes were made -- motion is subsetted and retargeted. See `CREDITS.md` |
 
 **The credit line to use, verbatim:**
 
 > The 100STYLE Dataset - Ian Mason
 
-CC0 waives the *legal* requirement to attribute; the request to credit is the authors' own and we
-honour it. The distinction matters only in one direction -- it means nobody may treat a missing
-credit as merely a licence question, and it means the obligation does not lapse if the waiver is
-re-read. **Any render, video, still or written work published from output that used 100STYLE
-motion carries the line above.**
+**This was recorded as CC0 on 2026-09-21 and corrected the same day.** The credit line was right;
+the licence line was not. The correction is kept visible rather than erased because the two
+licences put opposite defaults on a hurried reader: under CC0 a missing credit is a discourtesy,
+**under CC BY it is a licence breach, and CC BY terminates automatically on breach.** Anyone who
+finds the old claim in a branch or a stale checkout should be able to see it was superseded.
+
+Attribution under CC BY 4.0 is four things, not one: the credit, a licence notice and a link to
+`https://creativecommons.org/licenses/by/4.0/`, an indication that changes were made -- which
+applies here, since motion is subsetted and retargeted onto non-human rigs -- and no additional
+restrictions imposed on recipients. `CREDITS.md` carries the form to paste. **Any render, video,
+still or written work shared publicly from output that used 100STYLE motion carries it.**
 
 Note the gap, rather than assuming it is covered: this file is the record, and **nothing in the
 application surfaces the credit at export time**. Someone exporting a video will not read

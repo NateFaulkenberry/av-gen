@@ -13,7 +13,7 @@ is canonical; where they could disagree about the wording of a credit, this file
 
 | What | When | The line, verbatim |
 |---|---|---|
-| The 100STYLE Dataset (Ian Mason) | Any creative or commercial work whose output used 100STYLE motion | `The 100STYLE Dataset - Ian Mason` |
+| The 100STYLE Dataset (Ian Mason, Sebastian Starke, Taku Komura) | Any public sharing of work whose output used 100STYLE motion | `The 100STYLE Dataset - Ian Mason` |
 
 Ready to paste:
 
@@ -21,14 +21,38 @@ Ready to paste:
 The 100STYLE Dataset - Ian Mason
 ```
 
-**100STYLE is CC0, and it asks to be credited anyway.** Those are two separate facts and the
-second does not follow from the first. CC0 waives the *legal* requirement to attribute; the
-request to credit is the authors' own, and we honour it. The distinction only ever matters in one
-direction: **nobody may re-read the waiver and conclude the obligation lapsed.**
+**100STYLE is licensed CC BY 4.0. Attribution is a licence condition, not a courtesy.**
 
-"An appropriate way" is the dataset's own phrasing, and it means the credit should be somewhere a
-person would actually look for one -- end credits, a description, a liner note, an about page --
-not buried where it satisfies a checklist and reaches nobody.
+This was recorded as CC0 on 2026-09-21 and that was wrong; the correction is in the git history
+rather than erased, because the two licences place opposite defaults on a reader who is in a
+hurry. Under CC0 a missing credit is a discourtesy. **Under CC BY a missing credit is a licence
+breach**, and the licence terminates automatically for anyone who breaches it.
+
+CC BY 4.0 asks for four things when you share the work publicly, and the credit line is only the
+first:
+
+- **credit** the creators -- the line above is the authors' own preferred wording,
+- a **notice of the licence** and a **link to it** (`https://creativecommons.org/licenses/by/4.0/`),
+- an **indication that changes were made**, which applies to us: motion is subsetted and
+  retargeted onto non-human rigs before it reaches a frame,
+- and **no additional restrictions** placed on what a recipient may do with the licensed material.
+
+A workable form for end credits or a description:
+
+```
+The 100STYLE Dataset - Ian Mason. Licensed CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/). Motion was subsetted and retargeted.
+```
+
+"An appropriate way" is the dataset's own phrasing for the credit, and it means somewhere a person
+would actually look -- end credits, a description, a liner note, an about page -- not buried where
+it satisfies a checklist and reaches nobody.
+
+One limit worth stating rather than assuming: CC BY binds the sharing of the licensed material and
+of **adaptations** of it. Whether a rendered frame of an alien driven by retargeted motion is an
+adaptation of the dataset is a question with no settled answer, and this file does not pretend to
+resolve it. **The cheap course is to credit, and that is the course taken** -- the cost is one
+line, and the alternative is relying on an argument nobody has tested.
 
 ## Nothing currently surfaces this at export time
 

@@ -200,8 +200,12 @@ TEST_CASE("the credits a published work must carry are still there", "[hygiene]"
     // The line as the dataset asks for it, not as someone remembered it.
     REQUIRE(text.find("The 100STYLE Dataset - Ian Mason") != std::string::npos);
 
-    // And the reason it survives a CC0 waiver, so a future reader cannot conclude it lapsed.
-    REQUIRE(text.find("CC0") != std::string::npos);
+    // 100STYLE is CC BY 4.0: attribution is a licence CONDITION, not a courtesy, and the licence
+    // terminates automatically on breach. This assertion previously required the string "CC0",
+    // which was the wrong licence -- a guard can enforce an error as faithfully as a fact, and the
+    // only thing that catches that is checking the claim rather than the guard.
+    REQUIRE(text.find("CC BY 4.0") != std::string::npos);
+    REQUIRE(text.find("https://creativecommons.org/licenses/by/4.0/") != std::string::npos);
 
     // The engineering record must keep pointing at the same obligation.
     const std::filesystem::path deps = root / "docs" / "dependencies.md";
