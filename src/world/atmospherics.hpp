@@ -56,6 +56,7 @@
 // than smuggled in as a second analyzer.
 
 #include "core/error.hpp"
+#include "core/tornado.hpp"
 #include "core/vortex.hpp"
 #include "world/effects.hpp"
 #include "world/world_effects/field_bus.hpp"
@@ -106,6 +107,14 @@ enum class AtmosphereKind : std::uint8_t {
     // and cannot move into a single C++ file.
     MeteorShower,
     VolumetricFog,
+    // ADR-580. A tornado: a rotating column of dust and condensate standing IN the world, read
+    // from the side. Deliberately NOT a variant of `Vortex`, which is a cyclone -- a thing you look
+    // DOWN at, whose whole macro structure (eye, eye wall, spiral rainbands) is a function of the
+    // horizontal plane at a height. There is no parameter of one that is a parameter of the other.
+    //
+    // It is the FIRST kind to reach the march through a different density function, which is what
+    // `MediumSlot::kind` exists to select and what ADR-562 built the lanes to carry.
+    Tornado,
 };
 // ADR-500: derived from the registry's schemas rather than written out here, so a kind whose name
 // does not round-trip is a named failure of `checkRegistry` instead of an if-chain that fell behind.
@@ -346,6 +355,51 @@ struct Vortex {
 };
 
 
+// ADR-580. A tornado, as authored.
+//
+// **The field is held by value rather than copied member for member**, which is the one place this
+// departs from `Vortex` above, on purpose. `world::Vortex` restates all twenty-odd members of
+// `vortex::VortexField` and `volume_renderer.cpp` rebuilds one from the other at the packing site;
+// ADR-388 records the consequence -- `packVortex` had exactly one caller, the parity test, and the
+// bytes the renderer actually uploaded had been assembled somewhere else. Two lists that must agree
+// by hand is the defect ADR-392 counted nine instances of. One list cannot disagree with itself.
+//
+// So `field` is the geometry and the motion, and everything beside it is APPEARANCE: what the
+// picture does with the field, which a particle asking which way the air is moving must not have
+// to carry a colour ramp to find out (core/tornado.hpp says why at length).
+struct Tornado {
+    tornado::TornadoField field;
+
+    // ADR-374's units, and they are not negotiable: `density` is an extinction coefficient PER
+    // METRE and `emission` is an emissive density PER METRE. They are two knobs because they are
+    // two physical quantities, and labelling them "opacity" and "glow" is how they got confused.
+    float density = 0.06f;
+    float emission = 0.0f;
+
+    // How much of the SCENE's light this medium scatters -- and the default is 1, which is the
+    // reverse of `Vortex::scattering` and is the reversal that makes this a tornado.
+    //
+    // ADR-371/374 denied the vortex the scene's lights after measuring what letting it in does: a
+    // nebula four hundred metres below an island lit by that island's key came back a flat wash at
+    // mean luminance 131 of 255 with its own emission at zero. That reasoning is about a
+    // self-luminous object at a scale nothing in the scene could light. A tornado is the opposite
+    // case -- a body of dust standing in the world at the world's scale -- and a storm column the
+    // sun does not touch is the one thing that cannot read as one.
+    //
+    // It stays a coefficient rather than becoming a constant because the cosmic direction wants
+    // the other end: a self-luminous storm on a black sky takes no key light at all.
+    float scattering = 1.0f;
+
+    // Thin medium takes the first colour, thick medium the second. Two rather than three because
+    // the third -- the vortex's luminous `colorAccent` -- is a filament highlight on a nebula, and
+    // a tornado's equivalent is the striations, which are geometry here rather than colour.
+    glm::vec3 colorThin{0.62f, 0.60f, 0.58f};
+    glm::vec3 colorThick{0.16f, 0.15f, 0.16f};
+
+    [[nodiscard]] bool active() const { return field.active() && density > 0.0f; }
+    [[nodiscard]] Result<void> validate() const;
+};
+
 // ---- values a kind declared in its own file keeps (ADR-500) ---------------------------------------
 
 // ADR-500. The three kinds that predate the registry keep their typed structs above -- `Comet`,
@@ -382,6 +436,7 @@ struct AtmosphericEffect {
     Comet comet;
     Aurora aurora;
     Vortex vortex;
+    Tornado tornado; // ADR-580
 
     GroundIllumination ground;
     Activation activation = Activation::Always; // ADR-207's, unchanged

@@ -12,6 +12,7 @@
 #include "core/vortex.hpp"
 #include "world/world_effects/effect_registry.hpp"
 
+#include <algorithm>
 #include <array>
 #include <string>
 #include <string_view>
@@ -154,8 +155,15 @@ constexpr EffectField kFields[] = {
         .tooltip("The clear centre of the storm, as a fraction of the mouth radius. This is the same\n"
                  "number the Advanced section used to call Inner void; it is here because with a wall\n"
                  "around it it is no longer a detail, it is the shape of the thing."),
+    // ADR-580's panel guard found this, and the rebase onto the medium foundation silently lost
+    // the first fix, which is the guard earning its place twice: `contrast` inherits "Cyclone
+    // structure" from `innerVoid` in list order, `innerVoid` is `.main()` and this row is Advanced,
+    // and the panel emits a section header only on the declaring row AFTER filtering by page. So no
+    // "Cyclone structure" separator is drawn on the Advanced page and Contrast lands under
+    // **"Shape"**, three rows below Wall thickness: a noise transfer-function exponent filed as
+    // geometry.
     floatField("contrast", "Contrast", 0.05f, 12.0f, 0.5f, 5.0f, GET(e.vortex.field.contrast),
-               SETF(e.vortex.field.contrast)),
+               SETF(e.vortex.field.contrast)).sec("Cyclone structure"),
     floatField("turbulence", "Turbulence", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.turbulence),
                SETF(e.vortex.field.turbulence)).sec("Motion"),
     floatField("turbulenceScale", "Turbulence scale", 0.001f, 40.0f, 0.1f, 8.0f,
@@ -365,6 +373,15 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 // CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
 // what happens when they can). The appearance lanes are assembled here because they are what the
 // picture does with the field rather than part of it.
+// §68: a disc leans by MOVING. Its shape is what the march's per-metre coefficients were tuned
+// against (ADR-389), so moving where it is costs the march nothing while changing what it is costs
+// everything. Capped at a tenth of the radius per unit of influence, so an effect subscribed at the
+// soft maximum leans by a fifth of its width rather than wandering off the island it was placed on.
+void leanWithFlow(E& e, const glm::vec3& downwind, float influence) {
+    constexpr float kLeanFraction = 0.10f;
+    e.vortex.field.center += downwind * (influence * kLeanFraction * std::max(e.vortex.field.radius, 0.0f));
+}
+
 void packMedium(const E& e, float envelope, MediumSlot& out) {
     const Vortex& v = e.vortex;
     const vortex::VortexUniforms f = vortex::packVortex(v.field);
@@ -410,6 +427,7 @@ EffectSchema buildSchema() {
     s.factory = make;
     s.resolve.bucket = EffectBucket::Medium;
     s.resolve.pack = packMedium;
+    s.resolve.lean = leanWithFlow;
     s.resolve.fill = fill;
     s.validate = validate;
     return s;

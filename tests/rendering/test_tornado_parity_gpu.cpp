@@ -255,7 +255,6 @@ tornado::TornadoField cone() {
     f.detailScale = 2.4f;
     f.climbRate = 0.07f;
     f.erosion = 1.2f;
-    f.edgeWidth = 0.6f;
     f.suctionCount = 4.0f;
     f.suctionStrength = 0.5f;
     f.suctionRadius = 0.95f;
@@ -512,7 +511,6 @@ TEST_CASE("every number the tornado uniform carries reaches the shader", "[gpu][
         {"detailScale", &tornado::TornadoField::detailScale, 6.3f},
         {"climbRate", &tornado::TornadoField::climbRate, 0.9f},
         {"erosion", &tornado::TornadoField::erosion, 4.0f},
-        {"edgeWidth", &tornado::TornadoField::edgeWidth, 1.8f},
         {"suctionCount", &tornado::TornadoField::suctionCount, 5.0f},
         {"suctionStrength", &tornado::TornadoField::suctionStrength, 0.7f},
         {"suctionRadius", &tornado::TornadoField::suctionRadius, 0.4f},

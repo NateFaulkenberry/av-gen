@@ -332,6 +332,20 @@ struct EffectResolve {
     // COLOURS would leave a full-strength grey ghost and fading its RADIUS would shrink it rather
     // than dim it (ADR-387).
     void (*pack)(const AtmosphericEffect&, float envelope, MediumSlot& out) = nullptr;
+    // ADR-580, `EffectBucket::Medium` only: how this kind answers the wind it subscribes to (§68).
+    //
+    // It is a hook rather than a line in `buildAtmosphericFrame` because the answer is per kind and
+    // is not a translation for every kind. A cosmic vortex is a disc and leans by MOVING -- its
+    // shape is what the march's coefficients were tuned against, so changing the shape is the
+    // expensive direction. A tornado already has a lean control, because its axis is a curve rather
+    // than a line, so it answers by BENDING: both what a storm column visibly does and free, since
+    // the lean term is evaluated per sample whatever its value.
+    //
+    // `downwind` is a unit vector in the XZ plane and `influence` is the subscription's strength.
+    // Null means this kind does not answer the wind, which is a legitimate answer and not an
+    // oversight -- but `effect_conformance`'s `flow-reaches` check will say so out loud, which is
+    // how the Tornado's missing one was found rather than shipped.
+    void (*lean)(AtmosphericEffect&, const glm::vec3& downwind, float influence) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.
@@ -400,12 +414,13 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
+inline constexpr std::array<AtmosphereKind, 6> kAtmosphereKinds{
     AtmosphereKind::Comet,         //
     AtmosphereKind::Aurora,        //
     AtmosphereKind::Vortex,        //
     AtmosphereKind::MeteorShower,  //
     AtmosphereKind::VolumetricFog, //
+    AtmosphereKind::Tornado,       // ADR-580
 };
 
 // The kind's position in `kAtmosphereKinds`, or `size()` for an enumerator that is not in it --
@@ -430,6 +445,7 @@ inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
 
 static_assert(atmosphereKindIndex(AtmosphereKind::Comet) == 0);
 static_assert(atmosphereKindIndex(AtmosphereKind::VolumetricFog) == 4);
+static_assert(atmosphereKindIndex(AtmosphereKind::Tornado) == 5);
 
 [[nodiscard]] inline std::span<const AtmosphereKind> declaredAtmosphereKinds() { return kAtmosphereKinds; }
 

@@ -271,6 +271,34 @@ Result<void> Vortex::validate() const {
     return {};
 }
 
+Result<void> Tornado::validate() const {
+    const tornado::TornadoField& f = field;
+    if (!finite(f.base.x) || !finite(f.base.y) || !finite(f.base.z)) {
+        return fail("the tornado base is not finite");
+    }
+    for (const float v : {f.height, f.radiusBottom, f.radiusMid, f.radiusTop, f.taper,
+                          f.shellWidth, f.shellGain, f.coreRadius, f.coreDensity, f.edgeSoft,
+                          f.wallCloudGain, f.cloudWidth, f.cloudHeight, f.cloudDensity, f.suctionCount, f.suctionStrength,
+                          f.suctionRadius, f.suctionWidth, f.suctionSpeed,
+                          f.cloudAmount, f.macroAmp, f.mesoAmp, f.microAmp, f.detailContrast,
+                          f.detailScale, f.climbRate, f.erosion, f.touchdown, f.footSoft, f.skirtWidth, f.skirtHeight,
+                          f.skirtDensity, f.skirtFlare, f.stripeCount, f.stripePitch,
+                          f.stripeDepth, f.stripeHarmonic, f.circulation, f.coreRadiusMetres,
+                          f.inflow, f.lift, f.rotationBottom, f.rotationTop, f.rotationCurve,
+                          f.lean.x, f.lean.y, f.wobbleAmount, f.wobbleSpeed,
+                          density, emission, scattering}) {
+        if (!finite(v)) { return fail("a tornado control is not finite"); }
+    }
+    if (f.height < 0.0f) { return fail("the tornado height may not be negative (0 is off)"); }
+    if (f.radiusBottom < 0.0f || f.radiusMid < 0.0f || f.radiusTop < 0.0f) {
+        return fail("a tornado radius may not be negative");
+    }
+    if (f.touchdown < 0.0f || f.touchdown > 1.0f) { return fail("the tornado touchdown is 0..1"); }
+    if (f.coreRadius < 0.0f || f.coreRadius > 1.0f) { return fail("the tornado core radius is 0..1"); }
+    if (density < 0.0f) { return fail("the tornado density may not be negative"); }
+    return {};
+}
+
 
 Result<void> AtmosphericEffect::validate() const {
     if (name.empty()) { return fail("an atmospheric effect needs a name"); }
@@ -948,23 +976,24 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
         }
         AtmosphericEffect leaned = *rv.effect;
 
-        // §68. A placed medium leans downwind. A translation, deliberately, rather than a change to
-        // the turbulence or the breath: those two are inputs to the filament noise whose
-        // distribution ADR-389 measured the march's cost against, and moving where a shape is costs
-        // the march nothing while changing what it is costs it everything.
+        // §68. A placed medium answers the wind it subscribes to -- and HOW it answers is the
+        // kind's business, not this loop's.
         //
-        // Scaled by the medium's own radius so the lean means the same thing for a 200 m funnel and
-        // a 2 km one, and capped at a tenth of the radius per unit of influence so that an effect
-        // subscribed at the soft maximum leans by a fifth of its width rather than wandering off
-        // the island it was placed on (ADR-387's warning about a preset that moves a `center`).
-        if (rv.flowInfluence != 0.0f) {
-            const glm::vec3 lean(rv.flow.flow.x, 0.0f, rv.flow.flow.z);
-            const float len = glm::length(lean);
+        // This used to write `leaned.vortex.field.center` unconditionally. That is right for a
+        // vortex and does nothing at all for any other kind, which ADR-580's Tornado found the
+        // moment it arrived: `effect_conformance`'s `flow-reaches` check reported that subscribing
+        // one to a gale changed not a byte of the frame it builds. A registered, saved, modulatable
+        // row that the picture does not keep is this family's signature defect and the check exists
+        // for it.
+        //
+        // So the answer is a per-kind hook beside `pack`, for the same reason `pack` is one: a
+        // vortex is a disc and leans by MOVING, while a tornado's axis is already a curve and it
+        // leans by BENDING. A switch here would have to know both.
+        if (rv.flowInfluence != 0.0f && schema->resolve.lean != nullptr) {
+            const glm::vec3 flat(rv.flow.flow.x, 0.0f, rv.flow.flow.z);
+            const float len = glm::length(flat);
             if (len > 1e-6f) {
-                constexpr float kLeanFraction = 0.10f; // of the radius, per unit influence
-                const float metres = std::min(len, 1.0f) * rv.flowInfluence * kLeanFraction *
-                                     std::max(leaned.vortex.field.radius, 0.0f);
-                leaned.vortex.field.center += (lean / len) * metres;
+                schema->resolve.lean(leaned, flat / len, std::min(len, 1.0f) * rv.flowInfluence);
             }
         }
         MediumSlot& slot = out.media[out.mediumCount];

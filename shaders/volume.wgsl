@@ -35,6 +35,10 @@
 // vortex.wgsl is included after fields.wgsl -- the include directive does not de-duplicate, and
 // this file must not pull noise.wgsl in twice.
 #include "fog.wgsl"
+// ADR-580, the Tornado: the second density function a medium slot can select. It needs
+// `fbm3` and deliberately does not include `noise.wgsl` -- the include directive does not
+// de-duplicate and `fields.wgsl` above has already brought it in.
+#include "tornado.wgsl"
 
 struct VolumeUniforms {
     params0: vec4<f32>,   // density, fogHeight, fogHeightFalloff, scattering
@@ -63,6 +67,32 @@ struct VolumeUniforms {
 // Slot `s`'s lane `l`. The one place the flattening is expressed.
 fn mediaLane(s: u32, l: u32) -> vec4<f32> {
     return vol.media[s * 16u + l];
+}
+
+// Which density function slot `s` wants. Matches `AtmosphereKind`; only the kinds that resolve
+// into `EffectBucket::Medium` can appear here.
+// These mirror `AtmosphereKind`'s enumerator ORDER, which is what `slot.kind` is cast from. Named
+// constants rather than literals so the two sides are legible against each other; only the kinds
+// that resolve into `EffectBucket::Medium` can appear here.
+const kMediumKindVortex: u32 = 2u;
+const kMediumKindFog: u32 = 4u;
+const kMediumKindTornado: u32 = 5u;
+
+// The tag lives in the LAST lane, written centrally in `buildAtmosphericFrame` right after each
+// kind's `pack` returns -- central so that a new medium kind cannot forget to set it, which is
+// exactly how it came to be written and read by nobody for a day. The `+ 0.5` is a float-to-int
+// round and not superstition: the tag arrives as a float and truncating 3.9999997 gives 3.
+fn mediumKind(s: u32) -> u32 {
+    return u32(mediaLane(s, 15u).x + 0.5);
+}
+
+// The packed tornado uniforms for slot `s`, in the order `shaders/tornado.wgsl` names them.
+fn mediumTornadoUniforms(s: u32) -> TornadoUniformsWgsl {
+    return TornadoUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 1u), mediaLane(s, 2u),
+                               mediaLane(s, 3u), mediaLane(s, 4u), mediaLane(s, 5u),
+                               mediaLane(s, 6u), mediaLane(s, 7u), mediaLane(s, 8u),
+                               mediaLane(s, 9u), mediaLane(s, 10u), mediaLane(s, 11u),
+                               mediaLane(s, 12u));
 }
 
 // The packed vortex uniforms for slot `s`, in the order `shaders/vortex.wgsl` names them.
@@ -184,9 +214,59 @@ fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
     return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u));
 }
 
+// ADR-580's tornado: the first kind whose field is a DIFFERENT function rather than a different
+// reading of the same lanes. A fog bank and a cosmic vortex are one primitive with two authoring
+// surfaces and share `vortexShapeAt`; a tornado is a different phenomenon.
+const kMediumKindTornado: u32 = 5u; // AtmosphereKind::Tornado
+
+// The packed tornado uniforms for slot `s`, in the order `shaders/tornado.wgsl` names them. Its
+// thirteen field lanes are 0..12 and its appearance is 13..14 -- the same two lanes a fog bank
+// uses for its shape, read differently, because a slot is one kind and never both.
+fn mediumTornadoUniforms(s: u32) -> TornadoUniformsWgsl {
+    return TornadoUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 1u), mediaLane(s, 2u),
+                               mediaLane(s, 3u), mediaLane(s, 4u), mediaLane(s, 5u),
+                               mediaLane(s, 6u), mediaLane(s, 7u), mediaLane(s, 8u),
+                               mediaLane(s, 9u), mediaLane(s, 10u), mediaLane(s, 11u),
+                               mediaLane(s, 12u));
+}
+
+// The per-metre EXTINCTION for slot `s`. Kind-aware for the same reason `mediumShape` is: a
+// vortex and a fog bank share a lane layout because they share a field, and a tornado does not.
+// Reading `lane(1).w` unconditionally -- which both call sites used to do -- gives a tornado its
+// own `radiusMidControl` as a density, which is a number in the tens rather than the hundredths.
+fn mediumDensityCoeff(s: u32) -> f32 {
+    if (mediumKind(s) == kMediumKindTornado) {
+        return mediaLane(s, 13u).w;
+    }
+    return mediaLane(s, 1u).w;
+}
+
+// How much of the SCENE's light this medium scatters (ADR-388). A tornado defaults to LIT and a
+// cosmic vortex to unlit, which is the reversal that makes one smoke and the other a nebula.
+fn mediumScatterWeight(s: u32) -> f32 {
+    if (mediumKind(s) == kMediumKindTornado) {
+        return mediaLane(s, 12u).w;
+    }
+    return mediaLane(s, 5u).z;
+}
+
+// How much of a COMET's light this medium takes. A tornado has no such control -- it is a cosmic
+// vortex's, for the one shot that needed it -- so it answers zero rather than reading a lane that
+// means something else entirely.
+fn mediumCometResponse(s: u32) -> f32 {
+    if (mediumKind(s) == kMediumKindTornado) {
+        return 0.0;
+    }
+    return mediaLane(s, 5u).x;
+}
+
+// The dispatch the kind tag exists for.
 fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
     if (mediumKind(s) == kMediumKindFog) {
         return fogShapeAt(mediumFogUniforms(s), p, t);
+    }
+    if (mediumKind(s) == kMediumKindTornado) {
+        return tornadoDensityAt(mediumTornadoUniforms(s), p, t, vortexFilterWidth());
     }
     return vortexShapeAt(mediumVortexUniforms(s), p, t, vortexFilterWidth());
 }
@@ -194,6 +274,21 @@ fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
 // The medium's own light. Emissive rather than lit: nothing in this scene could illuminate
 // something that size, and the brief's reference is a nebula, which glows.
 fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
+    if (mediumKind(s) == kMediumKindTornado) {
+        // A tornado is SMOKE and is mostly LIT rather than glowing, so its emission may be zero and
+        // it still reads -- the opposite default from a nebula. Two colours rather than three: the
+        // vortex's luminous accent is a filament highlight, and a tornado's equivalent is the
+        // helical striations, which are geometry here rather than colour.
+        // Lanes 13 and 14 carry a colour and its own per-metre coefficient each; lane 15 is the
+        // kind tag and is not appearance.
+        let thin = mediaLane(s, 13u);
+        let thick = mediaLane(s, 14u);
+        if (shape <= 0.0 || thick.w <= 0.0) {
+            return vec3<f32>(0.0);
+        }
+        let c = mix(thin.rgb, thick.rgb, smoothstep(0.0, 0.85, shape));
+        return c * (shape * thick.w);
+    }
     let l3 = mediaLane(s, 3u);
     if (shape <= 0.0 || l3.z <= 0.0) {
         return vec3<f32>(0.0);
@@ -228,18 +323,47 @@ fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -
     if (radius <= 0.0) {
         return vec2<f32>(1.0, -1.0);
     }
-    // The field is zero past `rr > 1.35` (vortex.wgsl's compact early-out), and `breathAmount`
-    // widens the radius by at most its own amount, so this is the smallest bound that provably
-    // contains every non-zero sample.
-    let breath = 1.0 + max(mediaLane(s, 3u).x, 0.0);
-    let rr = radius * breath * 1.35;
-    // Vertically: the Gaussian wall falls to ~1e-6 by three thicknesses, and the throat descends
-    // `funnelDepth` below the mouth.
-    let thickness = max(mediaLane(s, 1u).x, 1e-3);
-    let depth = max(mediaLane(s, 4u).x, 0.0);
+    var rr = 0.0;
+    var yTop = 0.0;
+    var yBot = 0.0;
     let centre = l0.xyz;
-    let yTop = centre.y + thickness * 3.0;
-    let yBot = centre.y - depth - thickness * 3.0;
+    if (mediumKind(s) == kMediumKindTornado) {
+        // ADR-580. A tornado's bound is the same cylinder with different numbers, and it is the
+        // case the cylinder was chosen for: a column 80 m across and 800 m tall is 1% of its own
+        // bounding sphere. `l0.w` is the HEIGHT here rather than a radius, and `l0.xyz` is the
+        // GROUND CONTACT rather than a centre -- the two conventions differ on purpose and this is
+        // the one place both are read, so it is the one place they could be confused.
+        let l1 = mediaLane(s, 1u);
+        let l2 = mediaLane(s, 2u);
+        let l4 = mediaLane(s, 4u);
+        let l7 = mediaLane(s, 7u);
+        let l8 = mediaLane(s, 8u);
+        // The radius curve is a quadratic Bezier, so it never leaves the convex hull of its three
+        // control values -- taking the largest is a provable bound and not an estimate.
+        let widest = max(l1.x, max(l1.y, l1.z));
+        let funnel = widest * (1.0 + max(l2.x, 0.0) + max(mediaLane(s, 3u).x, 0.0));
+        let skirt = l1.x * max(l4.x, 1.0) * (1.0 + max(l4.w, 0.0));
+        let cloud = l1.z * max(l8.w, 1.0);
+        // The axis is a curve: the lean displaces the top and the wobble swings it, and both move
+        // the whole column sideways within the bound rather than deforming it.
+        let lateral = length(vec2<f32>(l7.x, l7.y)) + max(l7.z, 0.0);
+        rr = max(funnel, max(skirt, cloud)) + lateral;
+        // Vertically the field is compactly supported: `h > 1.08` and `h < -0.02` both return zero.
+        yTop = centre.y + radius * 1.08;
+        yBot = centre.y - radius * 0.02;
+    } else {
+        // The field is zero past `rr > 1.35` (vortex.wgsl's compact early-out), and `breathAmount`
+        // widens the radius by at most its own amount, so this is the smallest bound that provably
+        // contains every non-zero sample.
+        let breath = 1.0 + max(mediaLane(s, 3u).x, 0.0);
+        rr = radius * breath * 1.35;
+        // Vertically: the Gaussian wall falls to ~1e-6 by three thicknesses, and the throat
+        // descends `funnelDepth` below the mouth.
+        let thickness = max(mediaLane(s, 1u).x, 1e-3);
+        let depth = max(mediaLane(s, 4u).x, 0.0);
+        yTop = centre.y + thickness * 3.0;
+        yBot = centre.y - depth - thickness * 3.0;
+    }
 
     // Infinite cylinder about +Y, then clipped by the two caps.
     let d = vec2<f32>(dir.x, dir.z);
@@ -300,7 +424,7 @@ fn volumeTotalDensityAt(p: vec3<f32>, t: f32) -> f32 {
     var total = volumeDensityAt(p);
     let count = u32(vol.mediaInfo.x);
     for (var s = 0u; s < count; s = s + 1u) {
-        total = total + mediumShape(s, p, t) * mediaLane(s, 1u).w;
+        total = total + mediumShape(s, p, t) * mediumDensityCoeff(s);
     }
     return total;
 }
@@ -552,15 +676,14 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
             if (shape <= 0.0) {
                 continue;
             }
-            let l1 = mediaLane(s, 1u);
             let l5 = mediaLane(s, 5u);
-            let d = shape * l1.w;
+            let d = shape * mediumDensityCoeff(s);
             mediumDensity = mediumDensity + d;
             // Per-slot scene-light scattering weight (ADR-388), so a dark forward-scattering
             // tornado and a self-luminous nebula can stand in one frame without sharing a knob.
-            mediumScatter = mediumScatter + d * l5.z;
+            mediumScatter = mediumScatter + d * mediumScatterWeight(s);
             mediumEmission = mediumEmission + mediumEmissionAt(s, p, shape, vol.noiseParams.w);
-            cometLit = cometLit + shape * l5.x;
+            cometLit = cometLit + shape * mediumCometResponse(s);
         }
         let density = fogDensity + mediumDensity;
         if (density <= 0.0) {

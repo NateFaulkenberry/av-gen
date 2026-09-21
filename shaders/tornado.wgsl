@@ -43,7 +43,7 @@
 //   t9  cloudHeight, cloudDensity, suctionCount, suctionStrength
 //   t10 suctionRadius, suctionWidth, suctionSpeed, cloudAmount
 //   t11 macroAmp, mesoAmp, microAmp, contrast
-//   t12 macroScale, climbRate, erosion, edgeWidth
+//   t12 detailScale, climbRate, erosion, (scattering -- appearance, not read here)
 
 struct TornadoUniformsWgsl {
     t0: vec4<f32>,
@@ -278,7 +278,9 @@ fn tornadoDetail(v: TornadoUniformsWgsl, rr: f32, h: f32, angle: f32, envelope: 
     // §26 and the brief's edge erosion: detail bites HARDER where the structure is already thin.
     // That is what makes wisps break away from the column instead of the whole thing fading evenly,
     // and it is one line because the envelope is right here and already says where the edges are.
-    let edge = 1.0 - smoothstep(0.0, max(v.t12.w, 1e-3), envelope);
+    // A constant since lane 15 became the kind tag (ADR-562) and this field's 61st float had to
+    // go. It is the default the control it replaced had settled on.
+    let edge = 1.0 - smoothstep(0.0, 0.6, envelope);
     let bite = clamp(amount * (1.0 + max(v.t12.z, 0.0) * edge), 0.0, 1.0);
     return mix(1.0, unit, bite);
 }

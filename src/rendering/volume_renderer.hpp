@@ -78,6 +78,8 @@ struct VolumeUniforms {
     glm::vec4 mediaInfo;
     glm::vec4 media[world::kMaxMedia * world::kMediumLanes];
 };
+// 8 shared vec4s, then `mediaInfo` and `mediaKind`, then the lanes. The `+ 2` was `+ 1`
+// before ADR-580 added the kind tag, and this assertion is what said so.
 static_assert(sizeof(VolumeUniforms) == 16 * (8 + 1 + world::kMaxMedia * world::kMediumLanes));
 
 class VolumeRenderer {

@@ -8,6 +8,10 @@
 namespace avgen::tornado {
 namespace {
 
+// What counts as "thin" for the edge erosion below, in envelope units. A constant since the
+// sixteenth lane became the kind tag; it is the value the control it replaced had settled on.
+constexpr float kEdgeWidth = 0.6f;
+
 float smoothstepf(float edge0, float edge1, float x) {
     const float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
@@ -117,7 +121,7 @@ float detail(const TornadoUniforms& v, float rr, float h, float angle, float env
     const float half = 0.5f / contrast;
     const float shaped = smoothstepf(0.5f - half, 0.5f + half, std::clamp(n, 0.0f, 1.0f));
     const float unit = shaped * 2.0f;
-    const float edge = 1.0f - smoothstepf(0.0f, std::max(v.t12.w, 1e-3f), envelope);
+    const float edge = 1.0f - smoothstepf(0.0f, kEdgeWidth, envelope);
     const float bite = std::clamp(amount * (1.0f + std::max(v.t12.z, 0.0f) * edge), 0.0f, 1.0f);
     return std::lerp(1.0f, unit, bite);
 }
@@ -240,8 +244,9 @@ TornadoUniforms packTornado(const TornadoField& f) {
                       f.suctionSpeed, std::clamp(f.cloudAmount, 0.0f, 1.0f));
     v.t11 = glm::vec4(std::max(f.macroAmp, 0.0f), std::max(f.mesoAmp, 0.0f),
                       std::max(f.microAmp, 0.0f), std::max(f.detailContrast, 0.05f));
-    v.t12 = glm::vec4(std::max(f.detailScale, 1e-3f), f.climbRate, std::max(f.erosion, 0.0f),
-                      std::max(f.edgeWidth, 1e-3f));
+    // `.w` is the SCATTERING coefficient, not a field value: the appearance had to borrow the
+    // slot `edgeWidth` used to hold, because lane 15 belongs to the kind tag (ADR-562).
+    v.t12 = glm::vec4(std::max(f.detailScale, 1e-3f), f.climbRate, std::max(f.erosion, 0.0f), 0.0f);
     return v;
 }
 

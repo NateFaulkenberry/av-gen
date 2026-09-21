@@ -163,8 +163,16 @@ struct TornadoField {
     // change of coordinates rather than an advection: the noise is sampled in the column's
     // co-moving frame, so a feature sits still in a frame that is itself rising and turning.
     float climbRate = 0.06f;
-    float erosion = 1.2f;   // how much harder detail bites where the structure is already thin
-    float edgeWidth = 0.6f; // what counts as thin, in envelope units
+    // How much harder detail bites where the structure is already thin -- what makes wisps break
+    // AWAY from the column instead of the whole thing fading evenly.
+    //
+    // There was a second control beside this, `edgeWidth`, deciding what counted as thin. It is
+    // gone, and the reason is a hard constraint rather than taste: ADR-562's medium slot is 16
+    // lanes and lane 15 carries the kind tag, so a tornado has 60 floats and wanted 61. One
+    // artist control removed deliberately beats a control that silently overwrites the tag that
+    // selects this kind's own density function -- which is what the sixteenth lane was doing.
+    // `kEdgeWidth` in the shader is this control's old default, which is where it had settled.
+    float erosion = 1.2f;
 
     // ---- motion (§13, §17-§19) ---------------------------------------------------------------------
     //

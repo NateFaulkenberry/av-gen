@@ -49,6 +49,7 @@
 
 #include "world/world_effects/effect_registry.hpp"
 
+#include <algorithm>
 #include <array>
 #include <string>
 #include <string_view>
@@ -262,10 +263,6 @@ constexpr EffectField kFields[] = {
                SETF(e.tornado.field.erosion)).main()
         .tooltip("How much harder the detail bites where the storm is already thin. This is what\n"
                  "makes wisps break AWAY from the column instead of the whole thing fading evenly."),
-    floatField("edgeWidth", "Edge width", 0.01f, 4.0f, 0.05f, 2.0f, GET(e.tornado.field.edgeWidth),
-               SETF(e.tornado.field.edgeWidth)).main()
-        .tooltip("How much of the storm counts as 'the edge' for Edge breakup above. Small erodes\n"
-                 "only the outermost skin; large lets the breakup eat into the body."),
 
     // ---- Appearance.
     colorField("colorThin", "Thin colour", GET(e.tornado.colorThin), SETC(e.tornado.colorThin))
@@ -658,6 +655,65 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
     return true;
 }
 
+// ADR-562: this kind's authored numbers as the 16 packed lanes the march reads. Thirteen from the
+// field and three of appearance -- exactly the 16 the slot carries, which is the size this branch
+// and `agent/fog` arrived at independently.
+//
+// The lanes are copied from `packTornado` and NOT re-derived here, which is the whole lesson of
+// ADR-562 part one: the `world::Vortex` -> `vortex::VortexField` conversion existed in THREE
+// hand-written copies and the one in `engine.cpp` had fallen seven members behind, silently
+// defaulting every one of Vortex 2.0's macro-structure controls. One conversion, one caller.
+// §68, and the tornado's answer is different from the vortex's on purpose.
+//
+// A cosmic vortex is a disc and leans by MOVING. A tornado's axis is already a CURVE rather than a
+// line -- that is what stops it being a mathematical cone -- so it leans by BENDING, which is both
+// what a storm column visibly does in a wind and free, since the lean term is evaluated per sample
+// whatever its value. Moving the base instead would slide the whole column, skirt and all, which
+// reads as the storm teleporting rather than as the storm being pushed.
+//
+// Scaled by the TOP radius so the bend means the same thing for a 40 m dust devil and a 300 m
+// wedge, and capped so an effect subscribed at the soft maximum bends by about a radius rather
+// than folding flat.
+void leanWithFlow(E& e, const glm::vec3& downwind, float influence) {
+    constexpr float kLeanFraction = 1.0f; // of the top radius, per unit influence
+    const float metres = influence * kLeanFraction * std::max(e.tornado.field.radiusTop, 0.0f);
+    e.tornado.field.lean += glm::vec2(downwind.x, downwind.z) * metres;
+}
+
+void packMedium(const E& e, float envelope, MediumSlot& out) {
+    const Tornado& tn = e.tornado;
+    const tornado::TornadoUniforms f = tornado::packTornado(tn.field);
+    out.lane[0] = f.t0;
+    out.lane[1] = f.t1;
+    out.lane[2] = f.t2;
+    out.lane[3] = f.t3;
+    out.lane[4] = f.t4;
+    out.lane[5] = f.t5;
+    out.lane[6] = f.t6;
+    out.lane[7] = f.t7;
+    out.lane[8] = f.t8;
+    out.lane[9] = f.t9;
+    out.lane[10] = f.t10;
+    out.lane[11] = f.t11;
+    // Appearance, and the layout is a constraint rather than a preference. ADR-562's slot is 16
+    // lanes and **lane 15 carries the kind tag**, set centrally after this function returns -- so a
+    // tornado has lanes 0..14, sixty floats, and this field wanted sixty-one. `edgeWidth` was
+    // folded into a constant to free the last one (see core/tornado.hpp). The first version of this
+    // packer wrote `colorThick` into lane 15, which would have overwritten the tag that selects
+    // this kind's own density function: a tornado silently evaluated as a vortex, which reads as a
+    // tuning problem and is not one.
+    //
+    // Each colour lane carries its own per-metre coefficient, which is what makes the layout
+    // legible rather than merely packed.
+    //
+    // The envelope scales the two PER-METRE coefficients and nothing else (ADR-374): fading a storm
+    // means less of it in the air. Fading its colours would leave a full-strength grey ghost.
+    out.lane[12] = glm::vec4(glm::vec3(f.t12), std::max(tn.scattering, 0.0f));
+    out.lane[13] = glm::vec4(tn.colorThin, std::max(tn.density, 0.0f) * envelope);
+    out.lane[14] = glm::vec4(tn.colorThick, std::max(tn.emission, 0.0f) * envelope);
+    // lane 15 is NOT written here. It is the kind tag and `buildAtmosphericFrame` owns it.
+}
+
 Result<void> validate(const AtmosphericEffect& e) { return e.tornado.validate(); }
 
 EffectSchema buildSchema() {
@@ -670,16 +726,18 @@ EffectSchema buildSchema() {
     s.addTip = "A rotating column of dust and condensate standing in the world: a funnel with a\n"
                "debris skirt at its foot and a wall cloud at its head, read from the side.\n"
                "Drawn by the volumetric march, so terrain and objects sit INSIDE it rather\n"
-               "than in front of it. It has a medium slot of its own, so a fog bank does not\n"
-               "displace it.";
+               "than in front of it. It shares the march's medium slots with fog banks and\n"
+               "cosmic vortices; four are live at once and the rest are reported.";
     s.fields = kFields;
     s.styles = kStyles;
     s.routes = kRoutes;
     s.beatLeaf = "emission";
     s.groundGlow = false;
     s.factory = make;
-    s.resolve.bucket = EffectBucket::Tornado;
+    s.resolve.bucket = EffectBucket::Medium;
     s.resolve.fill = fill;
+    s.resolve.pack = packMedium;
+    s.resolve.lean = leanWithFlow;
     s.validate = validate;
     return s;
 }

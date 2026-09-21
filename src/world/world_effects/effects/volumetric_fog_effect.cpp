@@ -374,6 +374,21 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 // CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
 // what happens when they can). The appearance lanes are assembled here because they are what the
 // picture does with the field rather than part of it.
+// §68: a bank leans downwind by MOVING, exactly as a cosmic vortex does -- it is the same placed
+// medium with a different authoring surface, so it answers the wind the same way.
+//
+// It is declared here rather than inherited because ADR-580 made the lean a per-kind hook: the
+// frame builder used to write `leaned.vortex.field.center` unconditionally, which was right for the
+// two kinds that store in `e.vortex` and did nothing at all for a tornado, whose axis is a curve
+// and which leans by bending. A kind that wants the old behaviour now says so, and a kind that
+// forgets is named by `effect_conformance`'s `flow-reaches` check rather than silently ignoring
+// its own subscription -- which is how this one was caught within a minute of the hook landing.
+void leanWithFlow(E& e, const glm::vec3& downwind, float influence) {
+    constexpr float kLeanFraction = 0.10f; // of the radius, per unit influence
+    e.vortex.field.center +=
+        downwind * (influence * kLeanFraction * std::max(e.vortex.field.radius, 0.0f));
+}
+
 void packMedium(const E& e, float envelope, MediumSlot& out) {
     const Vortex& v = e.vortex;
     const vortex::VortexUniforms f = vortex::packVortex(v.field);
@@ -426,6 +441,7 @@ EffectSchema buildSchema() {
     s.factory = make;
     s.resolve.bucket = EffectBucket::Medium;
     s.resolve.pack = packMedium;
+    s.resolve.lean = leanWithFlow;
     s.resolve.fill = fill;
     s.validate = validate;
     return s;
