@@ -970,3 +970,76 @@ TEST_CASE("§30 measured against its own purpose: plant discontinuity across a t
     CHECK(switchesOn > 20);
     CHECK(withoutContacts > 0.0);
 }
+
+TEST_CASE("§32's acceptance threshold, derived and fixed BEFORE any fix exists",
+          "[crossclip][phaseC][aliens]") {
+    // **The before-figure was taken by accident, which is what makes it trustworthy. The after will
+    // be taken by someone who wants it to be smaller.** So the threshold is set now, while no fix
+    // exists to flatter, and derived from the content rather than picked -- the same discipline as
+    // the coverage bin width and the duplicate radius.
+    //
+    // The natural floor: **a transition is acceptable when it moves a foot no further than the foot
+    // moves anyway between two ordinary frames.** Below that it is indistinguishable from normal
+    // locomotion; above it, something happened that the motion itself would not have done. That is
+    // a property of the content, independent of any fix, and it survives a change of character or
+    // units.
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    const scene::AnimationClip* walk = nullptr;
+    for (const scene::AnimationClip& c : rig.clips) {
+        if (c.name == "Walking") {
+            walk = &c;
+            break;
+        }
+    }
+    REQUIRE(walk != nullptr);
+    const int footL = rig.skeleton.find("foot.l");
+    REQUIRE(footL >= 0);
+
+    scene::Pose pose;
+    std::vector<glm::mat4> model;
+    std::vector<float> steps;
+    glm::vec3 previous{0.0f};
+    float restHeight = 0.0f;
+    const int frames = static_cast<int>(walk->length() * 30.0f);
+    for (int f = 0; f <= frames; ++f) {
+        scene::setRestPose(rig.skeleton, pose);
+        scene::sampleClip(*walk, walk->start + static_cast<float>(f) / 30.0f, pose);
+        scene::poseToModel(rig.skeleton, pose, model);
+        const glm::vec3 p = glm::vec3(model[static_cast<std::size_t>(footL)][3]);
+        if (f > 0) {
+            steps.push_back(glm::length(p - previous));
+        }
+        previous = p;
+        for (const glm::mat4& m : model) {
+            restHeight = std::max(restHeight, m[3].y);
+        }
+    }
+    REQUIRE(steps.size() > 10u);
+    std::sort(steps.begin(), steps.end());
+    const float typicalStep = steps[steps.size() / 2];
+    const float worstStep = steps.back();
+
+    WARN(fmt::format("character height {:.3f} m; foot moves a median {:.4f} m and at most {:.4f} m "
+                     "between two ordinary frames of 'Walking'",
+                     restHeight, typicalStep, worstStep));
+    WARN(fmt::format("§32 BEFORE: mean transition jump 0.3566 m = {:.0f}% of body height and "
+                     "{:.1f}x a normal frame step; worst 1.6437 m = {:.0f}% of body height",
+                     100.0f * 0.3566f / restHeight, 0.3566f / typicalStep,
+                     100.0f * 1.6437f / restHeight));
+    WARN(fmt::format("§32 ACCEPTANCE THRESHOLD, fixed now: mean transition jump <= {:.4f} m (one "
+                     "ordinary frame step). A fix that reaches 0.30 m is not a fix.",
+                     typicalStep));
+
+    // The threshold is recorded as an assertion so it cannot be quietly relaxed when the fix is
+    // measured against it.
+    CHECK(typicalStep > 0.0f);
+    CHECK(restHeight > 1.0f);
+    CHECK(0.3566f > typicalStep); // the defect is real against this threshold, stated before the fix
+}

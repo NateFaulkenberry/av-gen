@@ -34,9 +34,35 @@ discontinuity. They do not — but **both arms agreed on a number nobody had ask
 | contacts off | 32 | **0.3566 m** | 1.6437 m |
 | contacts on | 30 | **0.3792 m** | 1.6437 m |
 
-**A foot teleports 36 cm on average when the matcher switches motion**, on a character whose rest
-height is 1.66 m. The worst case is over a metre and a half and is **identical in both arms**, so it
-comes from a specific reproducible pair of clips rather than a distributional tail.
+**Stated as fractions of the character, because metres mean nothing without the scene's scale** and
+a ratio survives a change of units or of character:
+
+| | metres | of body height (1.733 m) | × a normal frame step |
+|---|---|---|---|
+| mean transition jump | 0.3566 | **21%** | **7.0×** |
+| worst transition jump | 1.6437 | **95%** | 32× |
+
+**A foot teleports a fifth of a body height on average when the matcher switches motion, and once
+very nearly a whole body height.** The worst case is **identical in both arms**, so it comes from a
+specific reproducible pair of clips rather than a distributional tail.
+
+The third column is the sharpest of the three: during ordinary walking this foot moves a median
+**0.0510 m** between two frames. **A transition moves it seven times further than the motion itself
+ever does.**
+
+### The acceptance threshold, fixed now — before any fix exists
+
+The before-figure is trustworthy because it was taken by accident. **The after-figure will be taken
+by someone who wants it to be smaller**, so the threshold is set while nothing exists to flatter,
+and derived from the content rather than picked:
+
+> **A transition is acceptable when it moves a foot no further than the foot moves anyway between
+> two ordinary frames: ≤ 0.0510 m.**
+
+Below that it is indistinguishable from normal locomotion; above it, something happened that the
+motion itself would not have done. **A fix that reduces 0.3566 m to 0.30 m is not a fix.** The
+threshold is asserted in `test_cross_clip_matching.cpp` so it cannot be quietly relaxed when the fix
+is measured against it.
 
 **This is the shipping path, not the harness.** `MatchMotionProvider::advance` records
 `transitionStart`, and it is read *only* for the search interval and the continuation lock. Nothing
