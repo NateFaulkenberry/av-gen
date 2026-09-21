@@ -120,6 +120,17 @@ void drawEnvironmentPanel(app::Engine& engine) {
         // cannot be reached is a control that does not exist (ADR-421) -- and at 0 the first one
         // is the whole feature's off switch, which an artist should be able to find.
         intSlider(engine, "scene/volumeShadowSteps", "Fog shadow steps");
+        // ADR-579: the COST, where the decision is made rather than only in an ADR. ADR-570
+        // measured that this scales with the number of lights whose `volumetricStrength` is above
+        // zero -- +10.6 ms of march for one light against +31 for three -- and an artist turning
+        // it up has no other way to learn that. Drawn only when it is on, so the row does not
+        // lecture anybody who has left it at its default.
+        if (params::IParameter* p = engine.params().find("scene/volumeShadowSteps");
+            p != nullptr && p->baseComponent(0) >= 0.5f) {
+            ImGui::TextColored(kMuted,
+                               "  cost scales with how many lights light the fog:\n"
+                               "  about +10 ms of march per light at 4 steps (ADR-570)");
+        }
         slider(engine, "scene/volumeShadowStrength", "Fog shadow strength", "%.2f");
         // ADR-573 (§27). "Local lights in fog" is the artist's name for it; `volumeLocalLights` is
         // the engine's. The capability has existed since ADR-053 and twelve shipped scenes use it,

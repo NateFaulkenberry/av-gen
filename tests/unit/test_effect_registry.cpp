@@ -588,3 +588,40 @@ TEST_CASE("a kind keeps the leaves its authored scenes and panels already name",
         CHECK(have.count("notAField") == 0);
     }
 }
+
+TEST_CASE("no panel page draws the same section heading twice", "[world][registry][panels]") {
+    // ADR-579, the brief's §36. `EffectField::sec` marks a row as the START of a section, and
+    // `drawSchemaRows` emits an `ImGui::SeparatorText` whenever it meets one -- **on the page it
+    // is drawing**. So two rows carrying the same section name, with other rows of the same page
+    // between them, draw that heading twice with unrelated controls under each.
+    //
+    // It is a panel defect with no visual test and no compile error, and it has now happened
+    // twice: `agent/tornado`'s section guard found one instance in the fog kind (ADR-566 fixed
+    // it), and enumerating the rows again for §36 found another that the first fix did not cover.
+    // **A defect that recurs in the same file after being fixed once is a defect that needs a
+    // check rather than a fix.**
+    //
+    // The check is per KIND and per PAGE, because a name reused across pages is correct -- each
+    // page draws its own copy and an artist sees one of them.
+    for (const world::AtmosphereKind kind : world::kAtmosphereKinds) {
+        const world::EffectSchema* s = world::effectSchema(kind);
+        if (s == nullptr) {
+            continue;
+        }
+        for (const world::FieldPage page :
+             {world::FieldPage::Main, world::FieldPage::Advanced, world::FieldPage::Hidden}) {
+            std::vector<std::string> seen;
+            for (const world::EffectField& f : s->fields) {
+                if (f.page != page || f.section[0] == '\0') {
+                    continue;
+                }
+                const std::string name = f.section;
+                INFO("kind " << world::atmosphereKindName(kind) << ", page "
+                     << static_cast<int>(page) << ", section '" << name << "' at row '" << f.leaf
+                     << "'");
+                CHECK(std::find(seen.begin(), seen.end(), name) == seen.end());
+                seen.push_back(name);
+            }
+        }
+    }
+}

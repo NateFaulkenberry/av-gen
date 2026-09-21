@@ -83,10 +83,44 @@ medium and a nebula", and §39 asked for it in so many words.
 - **A record is a claim like any other.** The generators' comments were the stated reason; the
   count was the evidence; they disagreed. ADR-385, on tooling this time.
 
+## Why it happened: a legacy migration that cannot tell absence from intent
+
+The obvious reading -- *"a project's effect list merges with the scene's"* -- is **wrong, and the
+rule is the one anybody would assume.** ADR-264 and ADR-387 §19: a project's `atmosphericEffects`
+block is a **copy of the scene's list and REPLACES it.**
+
+What put a vortex in every arm is a **migration carry-over**, in `engine.cpp` under ADR-387 §19:
+
+> a project saved before the vortex was an effect carries a list that cannot contain one -- and the
+> vortex the scene's own migration just produced would be thrown away by a project that is exactly
+> as legacy as the scene it names. Measured: the intermediate state where only the scene had been
+> migrated rendered **97.96% of pixels different**, with the funnel gone.
+
+So when the project's list contains **no vortex**, the engine adds the scene's back. The ADR states
+its control -- *"a project that authors its own vortex is not legacy and is left alone"* -- and
+that control is exactly the thing that does not hold here.
+
+**My generators replaced the project's vortex with a fog bank. The project then had no vortex. The
+migration helpfully put the scene's back.**
+
+The finding, stated generally: **a migration that restores what a file does not contain cannot
+distinguish "this file is too old to express it" from "this file deliberately does not have it".**
+Both look like absence. The migration was correct for the case it was written for -- a 97.96%
+regression is not a small thing -- and it has no expiry, so it now also fires for every project
+that removes a vortex on purpose. Anyone writing a diagnostic arm by editing a project's effect
+list will hit it, and nothing will say so except a count of what was marched.
+
+Two ways out, and the generators take the first because it is the one a project can express:
+disable the carried effect by parameter (`atmos/Cosmic Vortex/enabled`), or keep a vortex in the
+project's list so the carry-over sees one and stands down. The second suppresses it entirely and is
+the better answer if the migration ever gains an expiry.
+
 ## Revisit when
 
 - **Memory reaches the record.** §39 lists it and nothing reports it. It is the one item on the
   list still missing, and it is a different kind of work -- Dawn does not hand out an allocation
   total, so it means counting the renderer's own buffers and textures.
-- **A second project merges effects with a scene.** The merge is the behaviour that made this
-  possible, and it is not documented anywhere a project author would meet it.
+- **ADR-387 §19's vortex carry-over gains an expiry.** It exists for projects saved before the
+  vortex was an effect, it has run on every project load since, and it cannot tell a legacy file
+  from a deliberate removal. A format version on the project would settle it; until then the
+  behaviour is correct for its case and surprising for every other.

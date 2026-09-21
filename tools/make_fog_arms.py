@@ -145,7 +145,7 @@ def as_fog_bank(project: dict) -> None:
         if effect.get("kind") == "vortex":
             effect["kind"] = "fog"
             effect["name"] = "Fog Bank"
-            effect["style"] = "Valley Mist"
+            effect["style"] = "Valley Fog"
             effect["vortex"] = dict(BANK)
             return
     raise SystemExit("no vortex effect in the project to replace")

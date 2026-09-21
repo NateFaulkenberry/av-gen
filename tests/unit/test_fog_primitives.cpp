@@ -395,3 +395,46 @@ TEST_CASE("the bank's glow can follow its height", "[fog][emission]") {
         CHECK(a < 1.0f); // ...and the control is doing something, or the equality is free
     }
 }
+
+TEST_CASE("a preset is a starting point, not a continuation", "[fog][presets]") {
+    // ADR-579, the brief's §37: "Presets are starting points, not hard-coded special effects."
+    //
+    // `applyStyle` opens with `v = Vortex{}` and a comment explaining exactly why: "a fog preset
+    // applied to an effect that was a vortex a moment ago must not leave a spiral and a throat
+    // behind, and a preset that only set what it wanted would." **That argument is right and it
+    // covers half the parameters.** Since ADR-566 a fog bank's shape, its drift, its density curve
+    // and its glow height live in `AtmosphericEffect::values`, and nothing resets those -- so a
+    // preset applied after an artist set Shape to Box gets a box, and after another preset gets
+    // that preset's leftovers.
+    //
+    // The property, stated so it cannot be satisfied by accident: **applying B must give the same
+    // effect whether or not A was applied first.** Delete the stored-row reset from `applyStyle`
+    // and this fails on the first pair.
+    const world::EffectSchema& s = fogSchema();
+    REQUIRE(!s.styles.empty());
+
+    for (const world::EffectStyle& a : s.styles) {
+        for (const world::EffectStyle& b : s.styles) {
+            world::AtmosphericEffect viaA = s.factory("p");
+            a.apply(viaA);
+            // ...and an artist's own edits in between, which is the case a preset must survive
+            // being applied after.
+            setRow(viaA, "shape", static_cast<float>(static_cast<int>(world::FogShape::Box)));
+            setRow(viaA, "driftSpeed", 17.0f);
+            setRow(viaA, "densityThreshold", 0.7f);
+            b.apply(viaA);
+
+            world::AtmosphericEffect fresh = s.factory("p");
+            b.apply(fresh);
+
+            INFO("'" << b.name << "' applied after '" << a.name << "' and an edit");
+            for (const world::EffectField& f : s.fields) {
+                if (!f.stored || f.type != world::FieldType::Float) {
+                    continue;
+                }
+                INFO("row " << f.leaf);
+                CHECK(world::fieldFloat(f, s, viaA) == world::fieldFloat(f, s, fresh));
+            }
+        }
+    }
+}

@@ -199,6 +199,20 @@ struct QualitySettings {
     // `volumeStepScale` buys depth banding back and almost no time. Everybody reaches for the step
     // count first, so it is written here rather than in an ADR nobody will open.
     //
+    // ADR-577: **"almost no time" does not generalise to a scene with a PLACED MEDIUM.** The
+    // sentence above was measured against the environment fog, whose cost is dominated by how many
+    // pixels have non-zero density rather than by the step count -- which is ADR-374's finding and
+    // is why it is quoted here. A fog bank is the other regime: measured with the engine's own
+    // interleaved A/B on a bank scene, three pairs of 120 frames, halving the steps took
+    // `volume.march` from **15.14 ms to 10.81 ms -- 28%**, with every pair positive and the
+    // machine holding still.
+    //
+    // And what it costs is the brief's §29, which calls the artefact mandatory to avoid: at 16
+    // steps and an optical depth of 12 the march's animated grain reaches **1% of the medium's
+    // brightness**, about 2.6 levels of 255 and visible as crawl. At 32 it is 1e-4. So Preview's
+    // 0.5 is a real trade and not a free saving -- 28% against visible grain on thick media -- and
+    // it is left at 0.5 deliberately: an interactive tier's quality is the artist's call to feel.
+    //
     // ONLY PREVIEW REDUCES THIS. Realtime is the reference live picture, and a tier that silently
     // removed 40% of every existing scene's particles would be changing what the engine looks like
     // by default rather than offering a cheaper view of it -- `tests/rendering/test_particles_gpu`
