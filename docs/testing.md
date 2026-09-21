@@ -612,6 +612,16 @@ a wound.
     the effect propagates**, and on an ancestor chain "rotation moves descendants" is so reliably
     true that nobody states it. State it, or measure the quantity the mechanism actually writes --
     this layer writes rotations, so the probe should have read rotations from the start.
+- **A panel that renders wrong numbers correctly is not debuggable, it is convincing.** Phase B §50
+  gathers every quantity its overlays and read-outs display in `Composition::motionDebug`, where it
+  is asserted without a GPU and without a panel, and the UI is a thin reader of it. The numbers are
+  the part that can be wrong; a diagnostic that is pleasant to look at and wrong is worse than no
+  diagnostic, because it ends the investigation. The corollary for anyone reading a debug overlay:
+  ask which of the displayed quantities has a test, and treat the rest as a rumour.
+- **This rig produces convincing zeros.** `alien-scout.glb` returned `0.0%` for three of four limb
+  segments in §45 and `0.00000 m` for secondary motion in §51, and both were true readings of the
+  wrong quantity (see 26). **Treat any exact zero from a flat rig as suspect until you know which
+  mechanism produced it.**
 - **When a filter, census or probe returns the number you expected, that is when to check it. A
   surprising number gets checked for free.**
 - **An aggregate cannot separate the two things it sums.** Two instances of the same failure were

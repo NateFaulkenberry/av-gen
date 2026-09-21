@@ -944,3 +944,54 @@ so the check is about the period rather than about the layer doing nothing).
 The bounded/stable probes first read **exactly 0.00000 m** because they measured the head's
 *position* on a flat rig, where rotating a sibling moves nothing. That is `docs/testing.md` #26, and
 the second confident zero this rig has produced in one phase.
+
+# Phase C
+
+## §6 and §17 — the database's memory and the scan's cost, measured before anything is built on them
+
+ADR-606 is the standing rule for a phase that arrives with sixteen sections already marked done,
+and it paid on the first pass. `MotionDatabase` genuinely satisfies §4, §5, §7, §8, §9 and §13 —
+struct-of-arrays with indices rather than poses, versioned, `mean`/`scale` normalization,
+data-driven `MotionFeatureConfig`, a tag bitset. It even carries `featureBytes` and `metadataBytes`,
+which is what made §6 look done. **Nothing had ever exercised them at scale.** The alien's 26 clips
+come to a few thousand samples; §6 names a million, and the three scales it names are the
+deliverable. *A field that reports a number is not a measurement of that number.*
+
+Feature dimension 33 floats = 132 bytes, plus five 4-byte per-sample fields = **152 bytes/sample
+exactly**, asserted as arithmetic rather than as "roughly linear" — which is what would catch
+somebody adding a `std::string` or a `Pose` to the per-sample data, the failure §5 and §6 exist to
+prevent.
+
+| samples | features | metadata | total | per sample |
+|---|---|---|---|---|
+| 10,000 | 1.26 MB | 0.19 MB | 1.45 MB | 152.0 |
+| 100,000 | 12.59 MB | 1.91 MB | 14.50 MB | 152.0 |
+| 1,000,000 | 125.89 MB | 19.07 MB | **144.96 MB** | 152.0 |
+
+§17's benchmark, taken **before** §16's two-stage search rather than after, for ADR-603's reason —
+a number written down beforehand can be wrong, and an optimisation whose starting point was never
+recorded cannot be shown to have helped:
+
+| samples | µs per query | queries per 60 Hz frame |
+|---|---|---|
+| 10,000 | 360.8 | 46 |
+| 100,000 | 3,627 | 5 |
+| 1,000,000 | **36,492** | **0** |
+
+**One query at a million samples takes 36.5 ms — more than two whole frames, for one character.**
+Scaling is 101x for 100x the samples, so the scan is honestly linear and the linear scan is the
+right first implementation and the wrong last one. That is §16's justification, measured rather than
+asserted.
+
+The benchmark asserts it actually scanned: every sample carries the required tag, so `considered`
+equals the sample count and `rejected` is zero. A filter that had quietly emptied the candidate set
+would otherwise have produced a very fast and completely meaningless number.
+
+**And the cross-phase catch.** §4 says the database "should be … shared between character
+instances", which is the kind of clause that reads as tidiness. At 144.96 MB it is not: a hundred
+characters each holding one is 14.5 GB. Phase B §48 found exactly this failure one tier up —
+`SkinnedRig` holds its `Skeleton` and every `AnimationClip` by value, and 78% of the Glowmere
+scene's rig memory is a byte-identical second copy (ADR-604) — and it would be invisible to §47's
+timing here for the same reason it was there. `MatchMotionProvider` holds a `const MotionDatabase*`,
+so it is correct today; a hundred providers are now asserted to point at the same `features.data()`,
+because *"it is a pointer today" is not a property anything checks.*

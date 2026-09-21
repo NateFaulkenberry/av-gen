@@ -57,6 +57,12 @@ public:
         : db_(db), clips_(clips), name_(std::move(name)) {}
 
     void setDatabase(const scene::MotionDatabase* db) { db_ = db; }
+    // Phase C §4 requires the database be "shared between character instances", and §6's
+    // measurement is why that clause is load-bearing rather than tidy: at a million samples the
+    // database is 144.96 MB, so a hundred characters each holding one is 14.5 GB. Exposed so a
+    // test can assert the sharing rather than trust that a pointer stays a pointer -- ADR-604 is
+    // the same mistake one tier up, where 78% of a scene's rig memory is a second copy.
+    [[nodiscard]] const scene::MotionDatabase* database() const { return db_; }
     void setClips(const std::vector<scene::AnimationClip>* clips) { clips_ = clips; }
     void setSettings(MatchSettings settings) { settings_ = settings; }
     [[nodiscard]] const MatchSettings& settings() const { return settings_; }

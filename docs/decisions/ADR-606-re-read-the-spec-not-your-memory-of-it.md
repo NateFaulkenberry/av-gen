@@ -46,6 +46,25 @@ seeds **every** layer it drives, from the node's name and the layer's name rathe
 index, since an index changes when someone reorders a scene file and a render that changes because
 two characters swapped places in a JSON array is exactly what §49 exists to prevent.
 
+### Key on identity, not on position
+
+`driveLayers` seeds from the node's **name** and the layer's **name**, never from their indices,
+and this generalises well past §49:
+
+> **Anything seeded, keyed, cached or ordered keys on identity, not on position.**
+
+An index changes when somebody reorders a scene file. An index-seeded render therefore moves
+because two characters swapped places in a JSON array — **a determinism break disguised as a
+tidy-up**, discovered by whoever diffs a render after a cleanup and has no idea why it differs.
+There is no error, no warning, and nothing in the diff that points at the cause.
+
+It is the same rule this branch already reached from a different direction, when attention ties
+had to break on identity rather than on list order (ADR-558's neighbourhood): a tie broken by
+position makes a character's choice depend on how the scene file was typed. Two arrivals at one
+rule from unrelated problems is the sign it is the rule rather than a special case, and it carries
+into Phase C — where a motion database's sample ordering, its clip indices and any cache keyed on
+them are all positions — and into Phase D.
+
 The authored `secondaryPhase` survives as an offset on top rather than being replaced when it
 happens to be zero: a rule of the form "the seed applies unless you authored something" makes two
 mechanisms fight over one field, and which one wins depends on a number an artist typed.
