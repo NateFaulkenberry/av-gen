@@ -110,14 +110,33 @@ float distinctValue(const params::IParameter& p, std::size_t component, std::siz
     if (!(shi > slo)) {
         return def; // a pinned parameter; nothing to vary, and nothing to get wrong
     }
+    // ADR-566: an Int parameter's representable states are the integers, so a fraction of its
+    // range is a value it cannot hold -- and the check below would then compare the fraction that
+    // was requested against the integer that was stored and call a working round trip lost. Worse
+    // in the other direction: for a two-state Int, a fraction that rounds back to the default
+    // makes this probe VACUOUS, because it would then be asserting that the default survives.
+    // So quantise here and search the integers for one that differs.
+    const bool integral = p.kind() == params::ParamKind::Int;
     // Seven fractions, so consecutive fields differ and the cycle does not align with any
     // plausible field ordering.
     static constexpr float kFractions[] = {0.31f, 0.67f, 0.44f, 0.82f, 0.23f, 0.58f, 0.71f};
     for (std::size_t attempt = 0; attempt < std::size(kFractions); ++attempt) {
         const float t = kFractions[(salt + attempt) % std::size(kFractions)];
-        const float v = std::clamp(slo + t * (shi - slo), lo, hi);
+        float v = std::clamp(slo + t * (shi - slo), lo, hi);
+        if (integral) {
+            v = std::round(v);
+        }
         if (std::abs(v - def) > 1e-4f * std::max(1.0f, std::abs(def))) {
             return v;
+        }
+    }
+    if (integral) {
+        // Every fraction rounded back to the default: walk the integers instead. A two-choice row
+        // reaches here every time.
+        for (float v = std::round(lo); v <= std::round(hi); v += 1.0f) {
+            if (std::abs(v - def) > 1e-4f * std::max(1.0f, std::abs(def))) {
+                return v;
+            }
         }
     }
     return def;

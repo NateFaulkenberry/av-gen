@@ -169,6 +169,15 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
             case world::FieldType::Bool:
                 world::setFieldBool(f, s, e, (salt % 2) == 0);
                 break;
+            // ADR-566: an INTEGER index, deliberately not the lerp the float rows get. A Choice
+            // serialises as a name, so a fractional index would come back rounded and the
+            // mismatch would be the test's rather than the code's -- and it would look exactly
+            // like a real round-trip failure.
+            case world::FieldType::Choice:
+                REQUIRE(f.choiceCount > 0);
+                world::setFieldFloat(f, s, e,
+                                     static_cast<float>(static_cast<int>(salt) % f.choiceCount));
+                break;
             }
             ++salt;
         }
@@ -190,6 +199,13 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
                 break;
             case world::FieldType::Bool:
                 CHECK(world::fieldBool(f, s, *back) == world::fieldBool(f, s, e));
+                break;
+            case world::FieldType::Choice:
+                CHECK(world::fieldFloat(f, s, *back) == world::fieldFloat(f, s, e));
+                // The file has to carry the NAME. Checking only the value back would pass just as
+                // well if the index were written, and the whole reason the name is there is the
+                // day a primitive is appended to the list.
+                CHECK(doc[s.key][f.leaf].is_string());
                 break;
             }
         }
@@ -427,7 +443,20 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // nothing loads differently -- which is the property this case exists to check and still
         // checks, one line down.
         REQUIRE(doc.contains("fog"));
-        CHECK(doc["fog"].size() == 6);
+        // Fifteen since ADR-575 added §26's `emissionHeight`. Counted with
+        // `grep -c '    storedFloat("'` (14) plus `grep -c 'storedChoice("'` (1), not read off
+        // the failure -- which is the third time that distinction has caught something. This number
+        // moving is the case doing its job rather than breaking: it is the only thing in the suite
+        // that notices a kind's stored rows changing what EVERY effect of every kind serialises,
+        // because `toJson` writes every kind's block.
+        //
+        // **Take the number from the code, not from the failure.** `grep -c '    storedFloat('`
+        // plus `grep -c 'storedChoice('` on `volumetric_fog_effect.cpp` is 9 + 1; a count derived
+        // that way is still an assertion, and a count copied out of the red output is a test that
+        // now agrees with whatever the code does. Third time this case has reported a true
+        // consequence, and both times it caught me it was because a row was added and the count
+        // was not re-derived.
+        CHECK(doc["fog"].size() == 15);
         // The shower block holds only its six own numbers.
         REQUIRE(doc.contains("meteors"));
         CHECK(doc["meteors"].size() == 6);
@@ -607,5 +636,42 @@ TEST_CASE("a kind keeps the leaves its authored scenes and panels already name",
         // than passing because the loop found nothing to check.
         CHECK(have.count("eyeRadius") == 0);
         CHECK(have.count("notAField") == 0);
+    }
+}
+
+TEST_CASE("no panel page draws the same section heading twice", "[world][registry][panels]") {
+    // ADR-579, the brief's §36. `EffectField::sec` marks a row as the START of a section, and
+    // `drawSchemaRows` emits an `ImGui::SeparatorText` whenever it meets one -- **on the page it
+    // is drawing**. So two rows carrying the same section name, with other rows of the same page
+    // between them, draw that heading twice with unrelated controls under each.
+    //
+    // It is a panel defect with no visual test and no compile error, and it has now happened
+    // twice: `agent/tornado`'s section guard found one instance in the fog kind (ADR-566 fixed
+    // it), and enumerating the rows again for §36 found another that the first fix did not cover.
+    // **A defect that recurs in the same file after being fixed once is a defect that needs a
+    // check rather than a fix.**
+    //
+    // The check is per KIND and per PAGE, because a name reused across pages is correct -- each
+    // page draws its own copy and an artist sees one of them.
+    for (const world::AtmosphereKind kind : world::kAtmosphereKinds) {
+        const world::EffectSchema* s = world::effectSchema(kind);
+        if (s == nullptr) {
+            continue;
+        }
+        for (const world::FieldPage page :
+             {world::FieldPage::Main, world::FieldPage::Advanced, world::FieldPage::Hidden}) {
+            std::vector<std::string> seen;
+            for (const world::EffectField& f : s->fields) {
+                if (f.page != page || f.section[0] == '\0') {
+                    continue;
+                }
+                const std::string name = f.section;
+                INFO("kind " << world::atmosphereKindName(kind) << ", page "
+                     << static_cast<int>(page) << ", section '" << name << "' at row '" << f.leaf
+                     << "'");
+                CHECK(std::find(seen.begin(), seen.end(), name) == seen.end());
+                seen.push_back(name);
+            }
+        }
     }
 }

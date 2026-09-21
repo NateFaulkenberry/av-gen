@@ -447,6 +447,10 @@ void effectPayloadToJson(const EffectSchema& schema, const AtmosphericEffect& ef
         case FieldType::Float: writeAt(out, path, json(fieldFloat(field, schema, effect))); break;
         case FieldType::Color: writeAt(out, path, vec3ToJson(fieldColor(field, schema, effect))); break;
         case FieldType::Bool: writeAt(out, path, json(fieldBool(field, schema, effect))); break;
+        // ADR-566: the NAME, not the index. A scene file outlives an enum's order.
+        case FieldType::Choice:
+            writeAt(out, path, json(std::string(field.choiceName(fieldFloat(field, schema, effect)))));
+            break;
         }
     }
     if (schema.writeExtra != nullptr) {
@@ -495,6 +499,17 @@ Result<void> effectPayloadFromJson(const EffectSchema& schema, const json& docum
         case FieldType::Bool:
             if (v->is_boolean()) {
                 setFieldBool(field, schema, effect, v->get<bool>());
+            }
+            break;
+        case FieldType::Choice:
+            // An unknown name leaves the default. A file written by a build with one more
+            // primitive than this one must not quietly become primitive 0.
+            if (v->is_string()) {
+                if (const int i = field.choiceIndex(v->get<std::string>()); i >= 0) {
+                    setFieldFloat(field, schema, effect, static_cast<float>(i));
+                }
+            } else if (v->is_number()) {
+                setFieldFloat(field, schema, effect, v->get<float>()); // pre-ADR-566 files
             }
             break;
         }

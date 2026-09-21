@@ -262,7 +262,20 @@ TEST_CASE("an area light with no authored range reaches as far as one that has i
     // The control that says the comparison is about a lit frame rather than two dark ones: the
     // corridor really is lit, and the nearest floor is bright.
     CHECK(meanLevel > 20.0);
-    CHECK(*std::max_element(falloffProfile(*control).begin(), falloffProfile(*control).end()) > 0.5f);
+    //
+    // ONE profile, held in a named local, and that is the whole of a four-day intermittent SIGBUS
+    // (docs/testing.md 10). This line used to call `falloffProfile(*control)` TWICE -- the
+    // function returns a `std::vector<float>` by value, so `.begin()` came from one temporary and
+    // `.end()` from a different one. `max_element` then walked from the first vector's start
+    // toward an unrelated address in the heap, and where that walk crossed a reserved page it took
+    // `KERN_PROTECTION_FAILURE`. Twenty-five crash reports, four days, several agents, and the
+    // fault address in every one of them was one byte past the end of a MALLOC_SMALL region.
+    //
+    // It was intermittent because it depends on where two temporaries land: if the second is at a
+    // LOWER address the loop ends immediately and nothing happens at all.
+    const std::vector<float> controlProfile = falloffProfile(*control);
+    REQUIRE_FALSE(controlProfile.empty());
+    CHECK(*std::max_element(controlProfile.begin(), controlProfile.end()) > 0.5f);
 
     // The invariant. A reach that stops a light while it is still contributing shows up here as
     // the whole of that contribution, over the whole of the far half of the corridor.

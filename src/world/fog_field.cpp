@@ -11,6 +11,7 @@
 // interpretation step to get wrong. ADR-401, ADR-561 and ADR-562 each found a hand-written copy of
 // one conversion that had drifted; this one has nothing to copy.
 
+#include "core/noise.hpp"
 #include "world/atmospherics.hpp"
 
 #include <algorithm>
@@ -58,12 +59,95 @@ float fogVerticalProfile(const MediumSlot& m, float relY) {
     return thin + (lid - thin) * blend;
 }
 
-float fogShapeAt(const MediumSlot& m, const glm::vec3& p) {
+// §13/§14's macro detail. Identity at zero and mean-preserving by construction -- the
+// transliteration of `fogMacroDetail` in `shaders/fog.wgsl`, same expressions, same order.
+float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t) {
+    const float amount = std::clamp(m.lane[7].z, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return 1.0f;
+    }
+    const float scale = std::max(m.lane[7].x, 0.05f) / std::max(m.lane[0].w, 1.0f);
+    // ADR-571 (§15/§16): an ADVECTION. `detail(p + v*dt, t + dt) == detail(p, t)` exactly, which
+    // is what makes the structure move through the world rather than regenerate in place.
+    const glm::vec3 velocity(m.lane[2]);
+    const float n = noise::fbm3((p - velocity * t) * scale, 41u);
+    return 1.0f + amount * (n * 2.0f - 1.0f);
+}
+
+// ADR-566: the six primitives, transliterated from `fogPrimitiveDistance` in `shaders/fog.wgsl`.
+// Same expressions, same order, same normalisation -- 1 at the surface, zero past 1.35.
+FogShape fogShapeKindOf(const MediumSlot& m) {
+    const int i = static_cast<int>(std::clamp(m.lane[12].y, 0.0f, 5.0f) + 0.5f);
+    return static_cast<FogShape>(i);
+}
+
+float fogPrimitiveDistance(const MediumSlot& m, const glm::vec3& rel) {
+    const float radius = std::max(m.lane[0].w, 1e-3f);
+    const float along = std::max(m.lane[13].y, 0.05f);
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
+    const float x = rel.x * c + rel.z * s;
+    const float z = -rel.x * s + rel.z * c;
+    const float y = rel.y;
+    const float ax = radius * along;
+    const float az = radius;
+    const float ay = std::max(m.lane[13].x, 1e-3f);
+
+    switch (fogShapeKindOf(m)) {
+    case FogShape::Sphere:
+        return glm::length(glm::vec3(x, y, z)) / radius;
+    case FogShape::Ellipsoid:
+        return glm::length(glm::vec3(x / ax, y / ay, z / az));
+    case FogShape::Box:
+        return std::max(std::max(std::abs(x) / ax, std::abs(y) / ay), std::abs(z) / az);
+    case FogShape::Capsule: {
+        const float half = std::max(ax - az, 0.0f);
+        const float qx = x - std::clamp(x, -half, half);
+        return glm::length(glm::vec3(qx, y * (az / ay), z)) / az;
+    }
+    case FogShape::Cylinder: {
+        const float u = x / ax;
+        const float v = z / az;
+        return std::max(std::sqrt(u * u + v * v), std::abs(y) / ay);
+    }
+    case FogShape::Bank:
+        break;
+    }
+    return fogEllipticalRadius(m, rel);
+}
+
+// §24's density response curve -- the transliteration of `fogDensityRemap` in `shaders/fog.wgsl`.
+// Identity at (threshold 0, softness 0, contrast 1), which is what makes it opt-in.
+float fogDensityRemap(const MediumSlot& m, float shape) {
+    const float threshold = std::clamp(m.lane[6].y, 0.0f, 0.99f);
+    float s = std::max(shape - threshold, 0.0f) / std::max(1.0f - threshold, 1e-4f);
+    const float softness = std::clamp(m.lane[6].z, 0.0f, 1.0f);
+    if (softness > 0.0f) {
+        s = s + (smoothstepf(0.0f, 1.0f, s) - s) * softness;
+    }
+    const float contrast = std::max(m.lane[6].x, 0.05f);
+    if (contrast != 1.0f) {
+        s = std::pow(std::max(s, 0.0f), contrast);
+    }
+    return std::clamp(s, 0.0f, 1.0f);
+}
+
+// §26's height influence on emission -- the transliteration of `fogEmissionHeight` in
+// `shaders/fog.wgsl`. Reuses the density's vertical profile, so one vertical model serves both.
+float fogEmissionHeight(const MediumSlot& m, float relY) {
+    const float amount = std::clamp(m.lane[12].w, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return 1.0f;
+    }
+    return 1.0f + (fogVerticalProfile(m, relY) - 1.0f) * amount;
+}
+
+float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;
     }
     const glm::vec3 rel = p - glm::vec3(m.lane[0]);
-    const float rr = fogEllipticalRadius(m, rel);
+    const float rr = fogPrimitiveDistance(m, rel);
     if (rr > 1.35f) {
         return 0.0f;
     }
@@ -72,7 +156,12 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p) {
     if (rim <= 0.0f) {
         return 0.0f;
     }
-    return rim * fogVerticalProfile(m, rel.y);
+    float profile = fogVerticalProfile(m, rel.y);
+    if (fogShapeKindOf(m) != FogShape::Bank) {
+        const float influence = std::clamp(m.lane[12].z, 0.0f, 1.0f);
+        profile = 1.0f + (profile - 1.0f) * influence;
+    }
+    return fogDensityRemap(m, std::max(rim * profile * fogMacroDetail(m, p, t), 0.0f));
 }
 
 } // namespace avgen::world

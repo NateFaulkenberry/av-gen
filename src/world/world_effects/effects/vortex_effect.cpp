@@ -116,8 +116,12 @@ constexpr EffectField kFields[] = {
         .tooltip("Weight of the finest noise octave. Detail below what the volume march can sample is\n"
                  "faded out automatically, so raising this past the point where it stops changing the\n"
                  "picture means the march is the limit, not this."),
+    // ADR-579: these two are LIGHTING and were sitting inside "Cyclone structure", which is why
+    // `innerVoid` below had to re-open that heading to get out from under them -- and re-opening a
+    // heading on the same page draws it twice. Giving the lighting pair its own section is what
+    // makes the duplicate unnecessary rather than renamed.
     floatField("spill", "Light spill", 0.0f, 20.0f, 0.0f, 6.0f, GET(e.vortex.spill),
-               SETF(e.vortex.spill)).main()
+               SETF(e.vortex.spill)).main().sec("Light")
         .tooltip("How much of the funnel's own light lands on the surfaces above it. Separate from\n"
                  "Brightness so it can be tuned against the island without changing the funnel."),
     // ADR-388, and the range is a measurement rather than a guess. Laddered on the shipped Tree of
@@ -151,7 +155,7 @@ constexpr EffectField kFields[] = {
     floatField("throatDensity", "Throat thickness", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.throatDensity),
                SETF(e.vortex.field.throatDensity)),
     floatField("innerVoid", "Eye radius", 0.0f, 0.95f, 0.0f, 0.6f, GET(e.vortex.field.innerVoid),
-               SETF(e.vortex.field.innerVoid)).main().sec("Cyclone structure")
+               SETF(e.vortex.field.innerVoid)).main().sec("Eye")
         .tooltip("The clear centre of the storm, as a fraction of the mouth radius. This is the same\n"
                  "number the Advanced section used to call Inner void; it is here because with a wall\n"
                  "around it it is no longer a detail, it is the shape of the thing."),
@@ -373,18 +377,28 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 // CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
 // what happens when they can). The appearance lanes are assembled here because they are what the
 // picture does with the field rather than part of it.
+// ADR-572 (§17) and ADR-580 §68, now one thing rather than two.
+//
 // §68: a disc leans by MOVING. Its shape is what the march's per-metre coefficients were tuned
 // against (ADR-389), so moving where it is costs the march nothing while changing what it is costs
 // everything. Capped at a tenth of the radius per unit of influence, so an effect subscribed at the
 // soft maximum leans by a fifth of its width rather than wandering off the island it was placed on.
-void leanWithFlow(E& e, const glm::vec3& downwind, float influence) {
-    constexpr float kLeanFraction = 0.10f;
-    e.vortex.field.center += downwind * (influence * kLeanFraction * std::max(e.vortex.field.radius, 0.0f));
-}
-
-void packMedium(const E& e, float envelope, MediumSlot& out) {
+//
+// This used to happen one layer up: `buildAtmosphericFrame` wrote `leaned.vortex.field.center`
+// before calling the packer, which was right for this kind and silently nothing for a tornado.
+// `agent/tornado` replaced that with a per-kind `lean` hook in the registry at the same time as
+// `agent/fog` gave the packer the resolved flow, and the merge had both. One channel won (ADR-441):
+// the flow argument below, which this kind now reads for itself.
+void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumSlot& out) {
     const Vortex& v = e.vortex;
-    const vortex::VortexUniforms f = vortex::packVortex(v.field);
+    // The leaned centre is LOCAL. Nothing outside this function sees a moved vortex -- the field
+    // bus publishes the AUTHORED funnel on purpose (see `Engine::publishFields`), so a subscriber
+    // reads where the artist put it and not where this frame's wind pushed it, which is the only
+    // version of that with no fixed point in it.
+    constexpr float kLeanFraction = 0.10f; // of the radius, per unit influence
+    vortex::VortexField field = v.field;
+    field.center += flowLean(flow.sample, flow.influence) * (kLeanFraction * std::max(field.radius, 0.0f));
+    const vortex::VortexUniforms f = vortex::packVortex(field);
     out.lane[0] = f.v0;
     // The envelope scales the two PER-METRE coefficients and nothing else (ADR-387): fading a
     // medium means less of it in the air. Fading its colours would leave a full-strength grey
@@ -427,7 +441,6 @@ EffectSchema buildSchema() {
     s.factory = make;
     s.resolve.bucket = EffectBucket::Medium;
     s.resolve.pack = packMedium;
-    s.resolve.lean = leanWithFlow;
     s.resolve.fill = fill;
     s.validate = validate;
     return s;

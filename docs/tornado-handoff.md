@@ -15,6 +15,11 @@ Two consequences you should act on:
   single claim inside an evidenced section is a guess, it is marked inline. Treat anything marked
   inferred as a hypothesis you still have to test, even where it sounds confident.
 
+**And one thing this document did not know when it was written.** While it was being written,
+`agent/fog` rebuilt the shared volumetric foundation *underneath* this branch and landed it on
+`main`. **Read §10 before you act on §5**, because it removes one of §5's blockers outright and
+changes where two of its files live.
+
 Point of entry for detail: **ADR-580** — the whole design and nine phases of findings; §1 to §10
 are the original agent's, **§11 is this agent's** and says so at its head — and **ADR-581**, the
 simulated-grid census. This document is meant to be actionable without opening either; it is not
@@ -227,13 +232,18 @@ hole means the march. `tests/rendering/test_tornado_parity_gpu.cpp` already has 
 Note the consequence if the field turns out to be at fault: this is a failure of the **analytic
 structure**, which is exactly what §1's constraint is about.
 
-### 3. Self-shadowing — blocked, and it is why the column reads as gas
+### 3. Self-shadowing — ~~blocked~~ **unblocked; read §10 before planning this**
 
-*(evidenced: ADR-580 §7, Phase 5, and the review sheet's "WHAT IS NOT DONE")*
+*(evidenced: ADR-580 §7, Phase 5, and the review sheet's "WHAT IS NOT DONE" — then superseded)*
 
 The tornado is lit but casts no shadow into itself. It needs a **shared light march in
 `shaders/volume.wgsl`** that does not exist; the fog agent owns that file. Nothing is budgeted for
 it inside this effect. This is a large part of why the hero column reads as glowing gas.
+
+**That paragraph was true when it was written and is not true now.** ADR-570 built the shared
+march, kind-dispatched so this effect is carried by construction, and it is off by default. See
+§10. This is no longer the third-ranked project it is ranked as here; try turning
+`volumeShadowSteps` up and re-rank it against what you see.
 
 ### 4. The hero's remaining art direction
 
@@ -322,7 +332,8 @@ rather than chased. If you need those, they are gone.
 | `src/core/tornado.hpp` | the artist-facing field, one commented struct; the best single read |
 | `src/core/tornado.cpp` | the CPU evaluation — `evaluate()` is the whole density field in 100 lines |
 | `shaders/tornado.wgsl` | the GPU transliteration; the parity test keeps the two in step |
-| `shaders/volume.wgsl` | the shared march, `mediumShape` / `mediumInterval` / `mediumEmissionAt`. **Owned by the fog agent** — coordinate before restructuring |
+| `shaders/volume.wgsl` | the shared march, `mediumShape` / `mediumInterval` / `mediumBoundOf` / `mediumEmissionAt` / `mediumSelfShadow`. **Was owned by the fog agent; that branch has landed** (§10) |
+| `src/world/medium_bound.cpp` | ADR-566's CPU twin of `mediumBoundOf`. Change the tornado's extent here **and** in the shader; `tests/unit/test_medium_bound.cpp` fails when only one moves |
 | `src/world/world_effects/effects/tornado_effect.cpp` | the registration: 57 panel rows, JSON, modulation targets, presets |
 | `examples/labs/tornado-modes-{a,b,c,d}-*.scene.json` | the structure-before-noise ladder; **this is the gate in §1** |
 | `examples/labs/tornado-showcase.scene.json` + `_tc-1`..`_tc-7` | the seven variants; regenerate the arms with `tools/make_tornado_showcase.py` after editing the showcase |
@@ -341,3 +352,133 @@ Full rules in `docs/testing.md`. The three that catch the most:
   identical to a clean one in every other field. The unit suite carries one
   **failed-as-expected** case by design — reconcile against the summary header, not against the
   word FAILED.
+
+---
+
+## 10. The `agent/fog` merge: the foundation moved under this branch
+
+*(evidenced: this section was written by the agent that performed the merge, from the conflicts it
+resolved. Commit and files cited inline.)*
+
+**Read this before you read anything above it.** Sections 1-9 were written against
+`agent/tornado` standing alone. While that document was being written, `agent/fog` rebuilt the
+shared volumetric foundation **underneath** this branch and landed it on `main` — 33 commits,
+ADR-563 to ADR-579. `agent/tornado` was then 33 commits behind and did not merge. This section
+records what changed and, in particular, **one design collision that both branches answered
+independently and that had to be settled at the merge.**
+
+### What `agent/fog` moved
+
+- `shaders/volume.wgsl` is no longer only the march. The per-slot bound was factored out of
+  `mediumInterval` into **`mediumBoundOf`**, and it now has a **CPU twin**, `world::mediumBound`
+  in `src/world/medium_bound.cpp`, with `tests/unit/test_medium_bound.cpp` asserting the bound
+  actually contains the field's support (ADR-566). The tornado's bound arm was inlined in
+  `mediumInterval` on this branch; **the merge moved it into `mediumBoundOf` and transliterated it
+  into the C++ twin.** If you change the tornado's extent, you now change it in two places and a
+  test will tell you when you have changed only one.
+- `VolumeUniforms` gained `heightFog` (ADR-568) and `selfShadow` (ADR-570). The `sizeof`
+  assertion in `src/rendering/volume_renderer.hpp` was `8 + 1` here and `10 + 1` there; the
+  merged struct was recounted from its members rather than picked between.
+- **§5.3's blocker is gone, and this is the single most actionable thing in this section.**
+  "Self-shadowing — blocked; it needs a shared light march in `shaders/volume.wgsl` that does not
+  exist; the fog agent owns that file" was true when §5.3 was written. **ADR-570 built exactly
+  that**, `mediumSelfShadow` in `shaders/volume.wgsl`, and its own comment says it was written with
+  this branch in mind: *"`agent/tornado` needs the same term and must not write a second one. This
+  marches whatever each slot's kind says its density is."* It dispatches through `mediumShape` and
+  clips to the same `mediumInterval` the primary march does, so the Tornado kind is carried by
+  construction. `volumeShadowSteps` defaults to 0, which returns 1.0 from the first branch and
+  leaves every existing frame bit-identical — so **nothing about the tornado's look has changed
+  until someone turns it on.** §5.3 ranked this third and called it "a large part of why the hero
+  column reads as glowing gas". It is now a slider, not a project. Turn it on and look — the
+  slider is `scene/volumeShadowSteps`, capped at 16, and the panel still labels it **"Fog
+  shadow steps"**, which is the only thing about it that is fog-specific.
+
+  **One defect the merge itself created here, found and fixed while resolving it.** ADR-570 wrote
+  `let extinctionPerShape = mediaLane(s, 1u).w;` — correct on `agent/fog`, where the only two kinds
+  shared a lane layout. A tornado does not: lane 1 is its radius curve. That read would have handed
+  the shadow march `radiusMidControl`, a number in the tens, as an extinction in the hundredths, and
+  a tornado would have swallowed every light crossing it. This branch had already built the
+  kind-aware accessor for precisely this (`mediumDensityCoeff`, whose comment names the same
+  hazard); the merge routes ADR-570's new call site through it. **Neither branch could have caught
+  this alone** — it needs the new shared reader and the new kind in one tree, which is what a merge
+  is. It is also why the first thing to do with a shared reader after a merge is grep for
+  `mediaLane(s, <n>u)` and ask which kinds it is true of.
+
+### The collision: `lean` versus `pack(flow)`
+
+Both branches independently answered **"how does a medium respond to the wind it subscribes to?"**,
+and neither knew about the other:
+
+| | what it built | where |
+|---|---|---|
+| `agent/fog` | changed the signature **every** kind implements: `pack(effect, envelope, const MediumFlowInput& flow, slot)` | ADR-572 §17 |
+| `agent/tornado` | added a **separate per-kind hook beside** `pack`: `lean(effect&, downwind, influence)`, called by `buildAtmosphericFrame` on a copy of the effect | ADR-580 §68 |
+
+Keeping both would have left **two channels for one question** with nothing downstream able to
+disagree about which was authoritative — the defect family this repository has shipped repeatedly
+(§7's own lesson, and ADR-576). ADR-441 forbids half-converted hooks while the engine is in heavy
+development.
+
+**How it was settled.** `pack(..., flow, ...)` is the single channel. **The `lean` function
+pointer was deleted from `EffectResolve`**, and so was the lean stage in `buildAtmosphericFrame`.
+Each kind's wind response is now **the body of its own packer**, which was being handed the flow
+anyway.
+
+**ADR-580 §68's insight is not lost — it is the thing that survived.** The argument that a kind's
+answer to the wind is *per kind and the frame builder must not know it* was correct, and it won:
+the frame builder no longer knows. What it did not need was a registry slot of its own.
+
+- a cosmic vortex is a disc whose shape the march's coefficients were tuned against, so it answers
+  by **moving** — `vortex_effect.cpp`'s packer, a tenth of the radius per unit influence;
+- a fog bank is the same placed medium with a different authoring surface, so it answers the same
+  way — `volumetric_fog_effect.cpp`'s packer. (That is separate from `driftWind`, which steers the
+  structure *inside* the bank.)
+- a tornado's axis is already a **curve** rather than a line, so it answers by **bending**, which
+  is what a storm column visibly does and is free because the lean term is evaluated per sample
+  whatever its value. That paragraph is now the comment on `packMedium` in `tornado_effect.cpp`.
+
+The shared derivation — unit downwind direction, speed clamped to 1, times influence — is
+**`world::flowLean`** in `atmospherics.hpp`, beside `flowAmplitude` and `flowOffset`, so "how much"
+is answered once and only "in what units, for this shape" is per kind.
+
+**What made the hook removable rather than merely redundant, and the condition that would reopen
+this:** `buildAtmosphericFrame` called `lean` on a *local copy* of the effect whose only reader was
+`packMediumSlot`, so nothing between the mutation and the pack could observe it. **A kind that
+needs the effect mutated before some *other* stage reads it cannot be expressed as a packer** — and
+that kind does not get a second hook here without an ADR saying why first.
+
+Two consequences you can rely on:
+
+- `effect_conformance`'s **`flow-reaches`** check is unchanged and still fires. It compares
+  **packed frames**, not hooks, so it never knew which mechanism produced them — it was what
+  caught the Tornado ignoring its own subscription in the first place, and it will catch it again.
+- The bent column is still inside its own bound: `world::mediumBound`'s tornado arm adds
+  `length(lane[7].xy)` to the cylinder radius, and the bend reaches `lane[7]` through the packer.
+
+### Two smaller resolutions worth knowing
+
+- `docs/testing.md` is now **"Thirty-two ways a green suite has lied"**. This branch's two new
+  entries were renumbered to **31** and **32** rather than renumbering `main`'s 3-30, because other
+  files cite those numbers (`tools/gpu-lock.sh` cites entry 25).
+- The panel-guard row this branch added for `detailAmount` was dropped, as its own comment invited
+  ("drop it if it conflicts"): `main`'s ADR-579 §36 fixed the same defect by declaring
+  `.sec("Detail")` on the row explicitly.
+
+### What the merge was proven against
+
+All from the `av-gen-tornado` worktree, after `cmake --preset release` (**reconfigure, always** —
+the test glob is configure-time and this merge brought seven new test files in; `docs/testing.md`
+entry 1), and with the build's own exit code read separately from the suite's:
+
+| | result |
+|---|---|
+| build | exit 0, **0 errors** |
+| CPU suite `./build/release/tests/avgen_tests` | **exit 0** — 2848 cases, 2843 passed, **4 skipped**, 1 failed as expected |
+| the one `FAILED` | `test_character_lab_slopes.cpp:187`, tagged `[!shouldfail]`, `with expansion: 7.168504715f < 1.0f`. Pre-existing and by design (ADR-260); it reconciles against the header's "1 failed as expected" and is not this merge's |
+| the 4 skips | 2 × `AVGEN_SAMPLE_ASSETS is not set`, 2 × `ffmpeg is installed; the search falls back to it`. Environment, not GPU — **no case skipped for a context that would not create** |
+| `[tornado]` under `tools/gpu-lock.sh` | **binary exit 0**, `All tests passed (2868 assertions in 5 test cases)`. All five **ran**; none skipped. This is the run that matters: a wind mechanism that silently lost would still render a perfectly plausible tornado |
+| `[fog],[vortex],[volume]` under the lock | **binary exit 0**, 125374 assertions in 37 cases, 0 skipped — the other side of the shared foundation, unbroken |
+
+The CPU suite was run **twice**: once after the build, and again after the `volume.wgsl` edit above,
+because `ShaderLibrary` reads `.wgsl` from the source tree at run time and several CPU cases read
+those files (`docs/testing.md` entry 25).

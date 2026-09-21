@@ -100,7 +100,16 @@ namespace avgen::world {
 
 // ---- one row ------------------------------------------------------------------------------------
 
-enum class FieldType : std::uint8_t { Float, Color, Bool };
+// ADR-566: `Choice` is a row whose value is one of a short named list -- the fog bank's five
+// volume primitives are the first, and every future "which of these" control is the reason it is a
+// registry type rather than a float slider labelled 0..5.
+//
+// It is carried as a FLOAT INDEX everywhere a number is what the machinery wants -- `values`, a
+// project parameter (ADR-264), a modulation route's clamp -- because making it a second scalar
+// representation would double every conversion in this file. It is written to JSON as its NAME,
+// because a scene file outlives the order of an enum: appending a primitive must not silently
+// change what every saved bank is, and an index in a file makes that exact mistake available.
+enum class FieldType : std::uint8_t { Float, Color, Bool, Choice };
 
 // Which disclosure level the panel draws this row at. `Hidden` is a real parameter that the panel
 // does not offer -- there are none today, and the value exists so that "registered but not drawn"
@@ -160,8 +169,36 @@ struct EffectField {
     // effect that changes kind keeps what the kind it left was holding -- the property the comment
     // above `struct AtmosphericEffect` states and the reason it is not a variant.
     bool stored = false;
-    float storedDefault = 0.0f;         // Float and Bool (0 or 1)
+    float storedDefault = 0.0f;         // Float, Bool (0 or 1) and Choice (the index)
     glm::vec3 storedColor{0.0f};        // Color
+
+    // Choice only. Points at a static array the declaring file owns; `choiceCount` is its length.
+    // The hard range is 0 .. count-1, so a modulation route or a project parameter cannot select a
+    // primitive that does not exist.
+    const char* const* choices = nullptr;
+    int choiceCount = 0;
+
+    [[nodiscard]] constexpr const char* choiceName(float v) const {
+        if (choices == nullptr || choiceCount <= 0) {
+            return "";
+        }
+        int i = static_cast<int>(v + 0.5f);
+        if (i < 0) { i = 0; }
+        if (i >= choiceCount) { i = choiceCount - 1; }
+        return choices[i];
+    }
+    // -1 when the name is not one of this row's choices, which the readers treat as "leave the
+    // value alone" rather than as "index 0": a scene written by a newer build names a primitive
+    // this one does not have, and silently becoming a Bank is worse than staying whatever the
+    // default is and saying nothing.
+    [[nodiscard]] constexpr int choiceIndex(std::string_view name) const {
+        for (int i = 0; i < choiceCount; ++i) {
+            if (name == std::string_view(choices[i])) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     [[nodiscard]] constexpr bool hasAccessors() const {
         if (stored) {
@@ -171,6 +208,7 @@ struct EffectField {
         case FieldType::Float: return getFloat != nullptr && setFloat != nullptr;
         case FieldType::Color: return getColor != nullptr && setColor != nullptr;
         case FieldType::Bool: return getBool != nullptr && setBool != nullptr;
+        case FieldType::Choice: return false; // a Choice is always `stored`; see `storedChoice`
         }
         return false;
     }
@@ -257,6 +295,26 @@ struct EffectField {
     return f;
 }
 
+// A named list, backed by `values` like every other stored row. `N` comes from the array, so the
+// count cannot disagree with the list -- the class of defect ADR-563's lane budget was.
+template <std::size_t N>
+[[nodiscard]] consteval EffectField storedChoice(const char* leaf, const char* label, int def,
+                                                 const char* const (&names)[N]) {
+    EffectField f;
+    f.type = FieldType::Choice;
+    f.leaf = leaf;
+    f.label = label;
+    f.hardMin = 0.0f;
+    f.hardMax = static_cast<float>(N - 1);
+    f.softMin = 0.0f;
+    f.softMax = static_cast<float>(N - 1);
+    f.stored = true;
+    f.storedDefault = static_cast<float>(def);
+    f.choices = names;
+    f.choiceCount = static_cast<int>(N);
+    return f;
+}
+
 [[nodiscard]] consteval EffectField storedColor(const char* leaf, const char* label, glm::vec3 def) {
     EffectField f;
     f.type = FieldType::Color;
@@ -331,21 +389,42 @@ struct EffectResolve {
     // in the air, which is what scaling an extinction and an emissive density does, while fading its
     // COLOURS would leave a full-strength grey ghost and fading its RADIUS would shrink it rather
     // than dim it (ADR-387).
-    void (*pack)(const AtmosphericEffect&, float envelope, MediumSlot& out) = nullptr;
-    // ADR-580, `EffectBucket::Medium` only: how this kind answers the wind it subscribes to (§68).
     //
-    // It is a hook rather than a line in `buildAtmosphericFrame` because the answer is per kind and
-    // is not a translation for every kind. A cosmic vortex is a disc and leans by MOVING -- its
-    // shape is what the march's coefficients were tuned against, so changing the shape is the
-    // expensive direction. A tornado already has a lean control, because its axis is a curve rather
-    // than a line, so it answers by BENDING: both what a storm column visibly does and free, since
-    // the lean term is evaluated per sample whatever its value.
+    // ADR-572 (§17): `flow` is what the air is doing where this medium is -- the subscription the
+    // effect already declares, resolved. It is handed to the packer because the packer is where a
+    // medium's MOTION is computed, and §17 asks a medium to respond to a flow field.
     //
-    // `downwind` is a unit vector in the XZ plane and `influence` is the subscription's strength.
-    // Null means this kind does not answer the wind, which is a legitimate answer and not an
-    // oversight -- but `effect_conformance`'s `flow-reaches` check will say so out loud, which is
-    // how the Tornado's missing one was found rather than shipped.
-    void (*lean)(AtmosphericEffect&, const glm::vec3& downwind, float influence) = nullptr;
+    // Every kind's packer changed in one commit rather than an overload being added beside the old
+    // one: ADR-441 is explicit that this engine takes no compatibility shims while it is in heavy
+    // development, and a half-converted hook is the state in which the two versions disagree about
+    // which is authoritative.
+    //
+    // **This is the ONLY channel by which a medium answers the wind, and it is one on purpose.**
+    // `agent/fog` and `agent/tornado` each built an answer to the same question and they collided
+    // at the merge. ADR-580 §68 had added a SECOND function pointer beside this one,
+    // `lean(AtmosphericEffect&, downwind, influence)`, called by `buildAtmosphericFrame` on a copy
+    // of the effect just before packing it. Two hooks, one question, and nothing downstream able
+    // to disagree about which was authoritative -- this repository's signature defect (ADR-576,
+    // and the three subsystems with no users found in one night). It was removed at the merge.
+    //
+    // **ADR-580 §68's insight is kept and it lives in the packers now.** A kind's answer to the
+    // wind IS per kind and the frame builder must not know it: a cosmic vortex is a disc whose
+    // shape the march's coefficients were tuned against, so it answers by MOVING; a fog bank is the
+    // same placed medium and answers the same way; a tornado's axis is already a CURVE rather than
+    // a line, so it answers by BENDING, which is both what a storm column visibly does and free,
+    // since the lean term is evaluated per sample whatever its value. All three of those are now
+    // the body of a packer that was handed `flow` anyway, and a kind with no wind response simply
+    // ignores its `flow` argument -- which is a legitimate answer, and one that
+    // `effect_conformance`'s `flow-reaches` check still says out loud, because that check compares
+    // PACKED FRAMES and never knew which hook produced them.
+    //
+    // What made the hook removable rather than merely redundant: `buildAtmosphericFrame` called it
+    // on a local copy of the effect whose only reader was `packMediumSlot`, so nothing between the
+    // mutation and the pack could observe it. A future kind that needs the world changed BEFORE
+    // some other stage reads it does not get a second hook here; it gets a reason recorded in an
+    // ADR first.
+    void (*pack)(const AtmosphericEffect&, float envelope, const MediumFlowInput& flow,
+                 MediumSlot& out) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.

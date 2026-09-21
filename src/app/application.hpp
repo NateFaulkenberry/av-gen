@@ -330,6 +330,9 @@ private:
     // Writes the project, reporting whether anything reached the disk. Shared by Cmd-S and by the
     // modal's Yes, so the two cannot disagree about what a successful save is.
     void saveProjectTo(const std::filesystem::path& path);
+    // Save As: the project plus its own copies of every asset, and the session re-opened on
+    // the copy so later edits cannot reach back into where it was saved from.
+    void saveProjectAsCopyTo(const std::filesystem::path& path);
     // Save As on behalf of the modal: the native dialog is asynchronous, so the gate stays in
     // `AwaitingSave` until its callback arrives and a cancel there cancels the whole close.
     void saveProjectAsForGate();

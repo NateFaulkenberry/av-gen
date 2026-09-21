@@ -597,8 +597,8 @@ struct EffectFlow {
 [[nodiscard]] EffectFlow resolveEffectFlow(const AtmosphericEffect& effect, const glm::vec3& anchor,
                                            const AtmosphericContext& ctx);
 
-// The two numbers every kind derives from a flow. They are here, shared, rather than open-coded in
-// three packers, because "each effect has its own isolated wind handling" is the thing §68 is
+// The three numbers every kind derives from a flow. They are here, shared, rather than open-coded
+// in three packers, because "each effect has its own isolated wind handling" is the thing §68 is
 // against and three private derivations of one field would be that again one layer down.
 //
 // `flowAmplitude` is a multiplier on whatever lateral motion the kind already has: 1 in still air,
@@ -611,6 +611,22 @@ struct EffectFlow {
 // this a field rather than a shared clock -- a shared clock would move them in lockstep, and moving
 // in lockstep is the tell ADR-055 was written to remove from the meadow.
 [[nodiscard]] float flowOffset(const fields::FlowSample& sample, float influence);
+
+// `flowLean` is the DISPLACEMENT DIRECTION and strength a placed medium is pushed in: a vector in
+// the XZ plane whose length is the dimensionless amount to lean by, and exactly zero in still air
+// or when nothing is subscribed. Multiply it by however many metres a lean of 1 means for your
+// kind -- a fraction of a radius for a disc, a fraction of the top radius for a column.
+//
+// It exists because §68's lean used to be a stage in `buildAtmosphericFrame` and then, briefly, a
+// second function pointer in the registry beside `pack` (ADR-580 §68). Neither survived the
+// `agent/fog` merge: the flow now reaches the packer (ADR-572 §17) and a kind's wind response is
+// the body of its own packer. This is the one derivation those packers share, so that "how much"
+// is answered once and only "in what units, for this shape" is per kind.
+//
+// The speed is clamped to 1 before scaling, so a field that publishes metres per second cannot
+// throw a medium across the world -- the cap is what makes this safe against both `FlowUnits`
+// without branching on which one it got.
+[[nodiscard]] glm::vec3 flowLean(const fields::FlowSample& sample, float influence);
 
 // Mirrors `Comet` in shaders/atmosphere_fx.wgsl. 144 bytes, the same size ADR-207 chose, for the
 // same reason: it is what nine vec4s cost and nine is what the lanes need.
@@ -696,9 +712,61 @@ struct MediumSlot {
 // ADR-563: the fog bank's field, evaluated on the CPU from the same packed lanes the march reads.
 // The transliteration of `shaders/fog.wgsl` -- see `world/fog_field.cpp` for why it takes a slot
 // rather than a struct of its own.
-[[nodiscard]] float fogShapeAt(const MediumSlot& m, const glm::vec3& p);
+[[nodiscard]] float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t = 0.0f);
+[[nodiscard]] float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t);
 [[nodiscard]] float fogEllipticalRadius(const MediumSlot& m, const glm::vec3& rel);
 [[nodiscard]] float fogVerticalProfile(const MediumSlot& m, float relY);
+// ADR-571 (§24): the density response curve. Identity at threshold 0, softness 0, contrast 1.
+[[nodiscard]] float fogDensityRemap(const MediumSlot& m, float shape);
+// ADR-575 (§26): how much the bank's GLOW follows its height profile. 1 at amount 0.
+[[nodiscard]] float fogEmissionHeight(const MediumSlot& m, float relY);
+
+// ADR-566, the brief's §9: which local volume primitive a bank is. The order is the order of the
+// names `volumetric_fog_effect.cpp` offers and of the constants in `shaders/fog.wgsl`, and the
+// three lists agreeing is what `test_fog_primitives.cpp` checks rather than assumes.
+//
+// APPEND ONLY. The index is what `values` and a project parameter carry; the NAME is what a scene
+// file carries (ADR-566's reason for `FieldType::Choice` serialising as a string), so inserting
+// in the middle would change what every saved bank is.
+enum class FogShape : int { Bank = 0, Sphere, Ellipsoid, Box, Capsule, Cylinder };
+inline constexpr int kFogShapeCount = 6;
+
+[[nodiscard]] FogShape fogShapeKindOf(const MediumSlot& m);
+// 1 at the primitive's surface, less inside, and the field is zero past 1.35 for every shape.
+[[nodiscard]] float fogPrimitiveDistance(const MediumSlot& m, const glm::vec3& rel);
+
+// ADR-566: the claim `shaders/volume.wgsl` clips a ray to -- a vertical cylinder that must contain
+// every non-zero sample of this slot's field. `radiusXZ < 0` means the slot is off. See
+// `world/medium_bound.cpp` for why a bound is allowed to be generous and never allowed to be
+// tight, and `test_medium_bound.cpp` for the containment property itself.
+struct MediumBound {
+    float radiusXZ = -1.0f; // about the slot's centre, in metres
+    float yBot = 1.0f;
+    float yTop = -1.0f;
+};
+[[nodiscard]] MediumBound mediumBound(const MediumSlot& m);
+
+// ADR-572 (the fog brief's §17): what the air is doing where this medium is, as a packer needs it.
+//
+// The flow reaches `pack` at all because §17 asks a medium to respond to a flow field and the
+// packer is where a medium's motion is computed. It is a STRUCT rather than two parameters so a
+// second thing the air knows can be added without touching every kind again -- which is the cost
+// this ADR paid once and would rather not pay twice.
+//
+// `influence` is 0 whenever the effect is unsubscribed, names a dead field, or set its own
+// subscription to 0, so a packer that multiplies by it needs no branch. The default-constructed
+// value is exactly that state, which is what lets a test pack a medium without inventing a flow.
+struct MediumFlowInput {
+    fields::FlowSample sample{};
+    float influence = 0.0f;
+};
+
+// ADR-566: pack one effect into the bytes the march reads -- its kind's packer, the reserved-lane
+// check and the kind tag, in the one order that is correct. `buildAtmosphericFrame` calls it for
+// every seated medium; a test calls it to get exactly those bytes rather than a second copy of
+// the sequence (ADR-554).
+void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot,
+                    const MediumFlowInput& flow = {});
 
 // What one frame hands the renderer. A plain aggregate so nothing allocates and `scene::Scene` can
 // hold it by value beside `worldEffects`.

@@ -142,6 +142,41 @@ boundaries, as set with it:
 - Soft particles are authored, serialised, uploaded into `u.turb.z` and never read by any shader
   (`shaders/particles.wgsl`). Leaves near the island will intersect it hard until that is finished.
 
+## Addendum, 2026-09-21: the contract holds UNDER THE LOCK, and that condition was never stated
+
+This ADR's determinism contract -- a render is reproducible, and the same second is the same frame
+however it was reached -- is checked by 44 GPU cases. **Those cases were found to fail when another
+suite is running**, and the condition under which the contract holds had never been written down.
+
+Measured. `avgen_tests` and `avgen_render_tests` run **concurrently** on an idle machine:
+
+- `test_procedural_examples_gpu` failed `CHECK(a == b)` on `examples/worlds/worlds.json` -- **one
+  project, two fresh engines, two different sequence hashes**;
+- `avgen_tests` died with `SIGTRAP` inside `CVPixelBufferPoolCreatePixelBuffer`, exit 133, no
+  verdict line.
+
+Run one after the other, same binaries, same tree: **2841 cases exit 0 and 401 cases exit 0**, and
+the 44 determinism cases pass three times in a row with identical assertion counts (23060 each).
+
+**The gap in the project's model, which is the part worth keeping:** ADR-170's GPU lock was
+understood as protecting *GPU work* from *GPU work*, with `avgen_tests` on the other side of the
+line as "the CPU suite". It is not on the other side of the line. **The CPU suite encodes video
+through the same system frameworks the renderer draws through** -- `CVPixelBufferPool` is a system
+resource, not a per-process one -- so "CPU" and "GPU" were never disjoint and the lock has been
+protecting less than everyone assumed.
+
+So the contract, stated with its condition:
+
+> **A render is reproducible when nothing else on the machine is using the GPU.** That includes the
+> CPU test suite. It is not a caveat about precision; it is the difference between a frame hash
+> matching and not.
+
+Whether the mechanism is contention itself or an intermittent that contention makes likely is **not
+established from one trial each way**, and the distinction does not change what to do: a
+determinism result taken while another suite is up is not evidence, whichever way it came out.
+`docs/testing.md` 29 has the operational form; `tools/gpu-lock.sh`'s header now says the CPU suite
+counts as GPU work.
+
 ## Revisit when
 
 - An imported tree arrives with per-vertex branch/tier attributes or a skeleton, at which point the

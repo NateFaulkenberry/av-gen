@@ -106,7 +106,10 @@ writes a scene file. `--help` lists every flag.
   [docs/procedural-graph.md](docs/procedural-graph.md),
   [docs/gpu-culling-lod.md](docs/gpu-culling-lod.md),
   [docs/scene-states-and-macros.md](docs/scene-states-and-macros.md)
-- [docs/dependencies.md](docs/dependencies.md): every third-party library, licence and reason
+- [CREDITS.md](CREDITS.md): the credits that published work must carry. Read this before
+  releasing a render, video or still
+- [docs/dependencies.md](docs/dependencies.md): every third-party library and dataset, its licence,
+  version and reason
 - [docs/tornado-handoff.md](docs/tornado-handoff.md): the Tornado world effect -- what is built
   and proven, what is built and unproven, and what is left, ranked. Reconstructed from the
   committed record by an agent that did not build it, so every claim is tagged evidenced or

@@ -43,3 +43,38 @@ patent pools are a separate, licence-independent question for a commercial produ
 
 Planned, not yet added: OpenImageDenoise (OIDN, path-tracer denoise, ADR-351 Phase 4 -- licence recorded as unverified until it is actually fetched); meshoptimizer, libktx, ozz-animation (0.3+);
 efsw (0.4 hot reload); libebur128, pffft (analysis extras); Tracy (profiling).
+
+## Third-party data
+
+Datasets are not libraries: they carry no build pin, they are not linked, and their terms bind
+what may be **published** rather than what may be compiled. They are recorded here anyway,
+because "every third-party thing, its licence and the reason" is the question this file answers.
+
+| Dataset | Licence | Used for | Obligation when publishing |
+|---|---|---|---|
+| The 100STYLE Dataset (Ian Mason, Sebastian Starke, Taku Komura) | **CC BY 4.0** -- verified 2026-09-21 against the authors' page (`ianxmason.com/100style/`) and the Zenodo record's own rights field (DOI 8127870, `"id": "cc-by-4.0"`). **Recorded as CC0 earlier the same day; that was wrong** | Phase C 20, the motion-matching scale experiment: a corpus large and diverse enough to carry root motion, starts, stops and directional changes, which the in-place Glowmere corpus (ADR-540) structurally lacks | **Attribution is a licence condition, not a courtesy.** Credit, a licence notice and link, and an indication that changes were made -- motion is subsetted and retargeted. See `CREDITS.md` |
+
+**The credit line to use, verbatim:**
+
+> The 100STYLE Dataset - Ian Mason
+
+**This was recorded as CC0 on 2026-09-21 and corrected the same day.** The credit line was right;
+the licence line was not. The correction is kept visible rather than erased because the two
+licences put opposite defaults on a hurried reader: under CC0 a missing credit is a discourtesy,
+**under CC BY it is a licence breach, and CC BY terminates automatically on breach.** Anyone who
+finds the old claim in a branch or a stale checkout should be able to see it was superseded.
+
+Attribution under CC BY 4.0 is four things, not one: the credit, a licence notice and a link to
+`https://creativecommons.org/licenses/by/4.0/`, an indication that changes were made -- which
+applies here, since motion is subsetted and retargeted onto non-human rigs -- and no additional
+restrictions imposed on recipients. `CREDITS.md` carries the form to paste. **Any render, video,
+still or written work shared publicly from output that used 100STYLE motion carries it.**
+
+Note the gap, rather than assuming it is covered: this file is the record, and **nothing in the
+application surfaces the credit at export time**. Someone exporting a video will not read
+`docs/dependencies.md`. Until an about-box or export-manifest credit exists, the obligation is
+carried by whoever publishes the work, which is a process control and not a technical one.
+
+The corpus itself is not in version control (`assets` is gitignored), so a measurement taken on it
+is only reproducible if its provenance is recorded alongside the result: where the subset came
+from and how it was subsetted.

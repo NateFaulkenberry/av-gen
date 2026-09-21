@@ -20708,7 +20708,7 @@
         "state": "Idle",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen/assets/aliens/alien-scout.glb",
+      "asset": "../../assets/aliens/alien-scout.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "rook",
@@ -20738,7 +20738,7 @@
         "state": "Idle",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen/assets/aliens/alien-diver.glb",
+      "asset": "../../assets/aliens/alien-diver.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "tide",
@@ -20768,7 +20768,7 @@
         "state": "Idle",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen/assets/aliens/alien-elder.glb",
+      "asset": "../../assets/aliens/alien-elder.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "sage",
@@ -20798,7 +20798,7 @@
         "state": "Idle",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen/assets/aliens/alien-ranger.glb",
+      "asset": "../../assets/aliens/alien-ranger.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "ember",
@@ -20828,7 +20828,7 @@
         "state": "Idle",
         "updateHz": 30.0
       },
-      "asset": "/Users/natefaulkenberry/Documents/GitHub/av-gen/assets/aliens/alien-pilot.glb",
+      "asset": "../../assets/aliens/alien-pilot.glb",
       "emissiveBoost": 1.0,
       "kind": "gltf",
       "name": "vane",
@@ -21881,6 +21881,10 @@
               {
                 "role": "actor.beam",
                 "steps": [
+                  {
+                    "kind": "hide",
+                    "name": "beamOut"
+                  },
                   {
                     "kind": "set",
                     "name": "beamFall",

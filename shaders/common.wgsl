@@ -139,6 +139,7 @@ struct FrameUniforms {
     // FrameUniforms; the sum in scene_renderer.hpp's static_assert catches these drifting apart.
     vortexGlow: vec4<f32>,          // xyz = mouth centre, w = mouth radius
     vortexGlowColor: vec4<f32>,     // rgb = radiance, w = intensity (0 = no vortex)
+    fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
 };
 
 struct ObjectUniforms {
@@ -464,16 +465,11 @@ fn treeEnergyAt(worldPos: vec3<f32>) -> vec3<f32> {
 }
 
 
-// How much air sits below height `y`, measured relative to the mist layer's top and in metres of
-// the layer's full density: the antiderivative of exp(-b * max(0, y)), zeroed at y = 0. It is
-// linear inside the layer and saturates at 1/b above it, and it is C1 across the join, so a ray
-// crossing the fog bank's surface has no seam where the two halves meet.
-fn fogHeightIntegral(y: f32, b: f32) -> f32 {
-    if (y <= 0.0) {
-        return y;
-    }
-    return (1.0 - exp(-b * y)) / b;
-}
+// ADR-567: the layer's profile and its antiderivative moved to `height_fog.wgsl`, unchanged, so
+// that the march and this pass call the same two functions and a test can compile them with no
+// uniform buffers. Included HERE and nowhere else -- `volume.wgsl` reaches them through its own
+// include of this file, and a second include would compile two copies into one module.
+#include "height_fog.wgsl"
 
 // Exponential-squared distance fog towards frame.fogParams.rgb; density 0 leaves the colour
 // untouched (the branch keeps the no-fog output bit-identical to the pre-fog shader).
@@ -499,6 +495,8 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         // The mean of the layer's density along the ray. The difference quotient is the whole
         // integral because the ray climbs at a constant rate: metres of mist per metre travelled.
         var mean = 1.0;
+        let upper = frame.fogShape.x;
+        let curve = frame.fogShape.y;
         if (max(y0, y1) > 0.0) {
             // Both endpoints below the layer's top puts the whole segment below it, so the mean is
             // exactly one and this branch is skipped -- which is what keeps a scene that sits
@@ -506,9 +504,10 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
             // it to the quotient would give 1.0 only to within rounding, because the numerator and
             // the denominator are the same subtraction written twice and the compiler is free to
             // fuse one of them and not the other.
-            mean = exp(-falloff * max(y0, 0.0)); // a level ray never leaves its own altitude
+            mean = fogHeightProfile(y0, falloff, upper, curve); // a level ray never leaves its altitude
             if (abs(rise) > 1e-3) {
-                mean = (fogHeightIntegral(y1, falloff) - fogHeightIntegral(y0, falloff)) / rise;
+                mean = (fogHeightIntegral(y1, falloff, upper, curve) -
+                        fogHeightIntegral(y0, falloff, upper, curve)) / rise;
             }
         }
         travel = travel * mix(1.0, mean, amount);

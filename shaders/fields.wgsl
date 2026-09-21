@@ -402,6 +402,9 @@ fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
     if (kind == FIELD_GRID) {
         return gridScalarAt(fi, q);
     }
+    // ADR-576: SdfDistance is unbound here AND on the CPU, and a spec naming it is now
+    // refused at load, so this arm is unreachable from any scene. Kept defined rather
+    // than removed, because an unknown kind must also land somewhere.
     return 0.0; // SdfDistance (unbound on the GPU) and anything unknown
 }
 

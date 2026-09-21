@@ -78,19 +78,19 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-two ways a green suite has lied
+## Thirty-two ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
 you are short of time, because it is the only one the exit code cannot save you from.
 
-- **Family A — the run did not happen as you think** (entries 1-3, 12, 18).
+- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 31, 32).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
   (entries 13-17, 19; 9 and 10 are its older members, from before it had a name).
-- **Family D — the question was the wrong shape** (entry 20). One member so far, and it is neither a
-  bad measurement nor a bad reading: the instrument worked and the answer was thrown away by the
-  form of the question.
+- **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
+  the instrument worked, the probe looked in the right place, and the answer was spoiled by the
+  *form of the question* (20) or by the *size of the window* (21).
 
 Families A and B are failures of *reporting*: the run lies about itself, and **the binary's exit
 code catches every one of them.** Family C is a failure of *aim*: the run is honest, the exit code
@@ -116,7 +116,7 @@ night from two agents who never spoke to each other.
    pointing at a line that is a closing brace, for a test name that no longer exists in the file.
    The tell is that the failure text does not match source you can read. `git clean` the test object
    directory after a merge is cheaper than the check.
-3. **A build that compiled nothing you changed, and said exit 0.** `cmake --build && ./tests`
+31. **A build that compiled nothing you changed, and said exit 0.** `cmake --build && ./tests`
    chained with `&&` looks safe and is not: if the build fails, the shell short-circuits and you
    never run the suite — but if you *piped* the build (`cmake --build ... | tail`) the exit code is
    the pipe's, the build's failure is invisible, and the suite then runs **the previous binary**.
@@ -128,7 +128,7 @@ night from two agents who never spoke to each other.
    assertion text does not match what is on that line now, you are reading a report about a binary
    that no longer corresponds to the tree. Read the build's exit code off the build, separately,
    before believing anything the suite says.
-4. **The shader compiles at LOAD, so a green build proves nothing about WGSL.** C++ errors stop the
+32. **The shader compiles at LOAD, so a green build proves nothing about WGSL.** C++ errors stop the
    build; a duplicate function in a `.wgsl` file does not exist until `ShaderLibrary` concatenates
    the includes and hands the result to Dawn — at which point the *render* fails with
    `redeclaration of ...` and the build is still green. Merging two branches that each added a
@@ -137,7 +137,7 @@ night from two agents who never spoke to each other.
 
    So a change to a shader is unverified until something has **rendered a frame** with it. A suite
    that never loads that shader will not tell you, and neither will the compiler.
-5. **A log written by somebody else's process.** See the next section; this is the severe one.
+3. **A log written by somebody else's process.** See the next section; this is the severe one.
 
 ### The run happened and you read it wrong
 
@@ -187,6 +187,101 @@ night from two agents who never spoke to each other.
    test passes alone, passes with the suspect beside it, and only dies in the full set; the method
    is to bisect the *filter*, not to read the named test. Cumulative GPU memory makes the victim and
    the culprit different tests, and ctest names the victim.
+
+   **DIAGNOSED, 2026-09-21, and it is NOT the mechanism above.** `avgen_render_tests` takes an
+   intermittent SIGBUS, and the cause is in the crash reports, which nobody had opened.
+   `~/Library/Logs/DiagnosticReports/avgen_render_tests-*.ips` held **25 of them**, spanning
+   2026-09-18 to 2026-09-21, and **every single one has the same signature**:
+
+   - `EXC_BAD_ACCESS`, `SIGBUS`, `KERN_PROTECTION_FAILURE`;
+   - the faulting address is **exactly the first byte past the end of a `MALLOC_SMALL` region** --
+     `vmRegionInfo` reports `bytes after start: 0` of the reserved space that follows it, in all
+     twenty-five;
+   - the faulting frame is a Catch2 test body on the main thread, not Metal and not Dawn.
+
+   That is **a heap buffer overrun on the CPU**, not GPU memory exhaustion, and it explains every
+   property that made it look mysterious: a small overrun normally lands in malloc's own slack
+   inside the same region and does nothing at all. It faults only when the allocation happens to
+   sit at the very end of that region's page run. So the crash **moves between runs, is
+   independent of the RNG seed, is independent of machine load, and disappears when you replay the
+   seed that produced it** -- all of which was measured before the reports were read, and none of
+   which pointed at the cause.
+
+   **Read the crash report first.** Four separate sessions treated this as a scheduling or memory
+   mystery and took samples; the answer was sitting in a file the OS had already written, and the
+   one fact that settles it -- *fault address is one past a malloc block* -- takes a minute to get:
+
+   ```sh
+   ls -t ~/Library/Logs/DiagnosticReports/ | grep avgen
+   python3 -c 'import json,sys; b=json.loads(open(sys.argv[1]).read().split("\n",1)[1]); \
+       print(b["exception"]); print(b.get("vmRegionInfo","")[:600])' <report>.ips
+   ```
+
+   **FOUND AND FIXED, same session, by an ASan build.** `-fsanitize=address` named it on the first
+   run, in one line of `tests/rendering/test_lighting_lab_gpu.cpp`:
+
+   ```cpp
+   CHECK(*std::max_element(falloffProfile(*control).begin(),
+                           falloffProfile(*control).end()) > 0.5f);
+   ```
+
+   `falloffProfile` returns a `std::vector<float>` **by value**, and it is called **twice**. So
+   `.begin()` is an iterator into one temporary and `.end()` an iterator into a *different* one,
+   and `max_element` walks from the first vector's start toward an unrelated address in the heap.
+   Where that walk crosses a reserved page, `KERN_PROTECTION_FAILURE`.
+
+   Every property follows from that and none of them needed a new theory:
+
+   - **intermittent** -- it depends on where two temporaries land. If the second is at a *lower*
+     address, `begin >= end`, the loop ends immediately, and nothing happens at all;
+   - **the crash site moves** -- the victim is whoever owns the pages the walk crosses;
+   - **seed- and load-independent** -- it is allocator layout, not scheduling;
+   - **replaying the crashing seed passes** -- same reason;
+   - **one byte past a MALLOC_SMALL region, in all twenty-five reports** -- because that is where a
+     forward walk through the heap first meets a page it may not touch.
+
+   **Sampling could not have found this.** Eight full runs, a seed replay, a concurrency arm and a
+   load check produced a precise description of the *symptom* and not one step toward the cause.
+   The crash report gave the mechanism (a heap overrun) in about a minute, and ASan gave the line
+   in about an hour of unattended build-and-run. Reach for both before the third sample.
+
+   ```sh
+   cmake -S . -B build/asan -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+         -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+         -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+   cmake --build build/asan -j 10 --target avgen_render_tests
+   ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 tools/gpu-lock.sh ./build/asan/tests/avgen_render_tests
+   ```
+
+   It reports `container-overflow` rather than `heap-buffer-overflow`, because ASan's container
+   annotations catch the read between `size()` and `capacity()` of the second vector before the
+   walk reaches unmapped memory. **A `container-overflow` on a range built from two calls is
+   almost always this**: look at whether the two ends came from the same object.
+
+   The general rule, which is not about this suite:
+
+   > **A range needs one object. Two calls that each return by value are two objects**, and a
+   > compiler will not stop you building an iterator pair out of them. Name the result.
+
+   The samples below are what sampling got, and they are kept because the shape of the data is
+   what a heap overrun looks like from the outside -- worth recognising the next time:
+
+   | run | result |
+   |---|---|
+   | 1 | 397 cases, 396 passed, 1 skipped |
+   | 2 | **SIGBUS** (exit 138), ~300 lines in, after *"A generated tree renders, and renders the same way twice"* |
+   | 3 | **SIGBUS** (exit 138), at a **different** point -- a skinning/culling table |
+   | 4 | run 2's own seed replayed: **397 cases, exit 0** |
+
+   So: **not seed-determined, not order-determined in any fixed way, and not a function of machine
+   load.** Replaying a crashing run's seed passes. A quiet-machine explanation was proposed and
+   withdrawn on this data. By the end of the session it was 4 crashes in 8 full runs, one of them
+   with a CPU suite running alongside and one with the machine otherwise idle.
+
+   **It predates the fog branch by three days**: fourteen of the twenty-five reports are from
+   2026-09-18, before any of this work existed. The victim test varies because the victim is
+   whoever owns the allocation that happens to be at the end of a region -- which is also why
+   naming the test it died in has never been informative.
 
 11. **A crash prints NO verdict line at all, so a failure grep reports success.** Distinct from 5,
    and the distinction is the whole point: there the summary printed and was honest. Here the
@@ -407,6 +502,352 @@ night from two agents who never spoke to each other.
    reporting. This one refuted a hypothesis its author believed, which is exactly when the letter of
    a prediction is most likely to be taken at face value.
 
+21. **A window too small for the quantity to exist in it returns a phase dressed as a statistic.**
+
+   A macro-detail term was built to be mean-preserving -- `1 + amount * (n * 2 - 1)`, whose mean is
+   exactly 1 when `E[n]` is 0.5 -- and the test that checked it **failed at +7.1%**. The code was
+   right. The test averaged the field over a fog bank's interior, **a region comparable to the
+   noise's own period**, so there were only a few periods in it to average and what came back was
+   *where the bank happens to sit in the noise*. Measured properly across many periods, `E[fbm3]`
+   is 0.50044 and the term's mean is **1.00089** -- a 0.09% shift, not 7.1%.
+
+   **A mean is a property of a form over many periods; asking for it over one period returns a
+   phase.** The same applies to any low-frequency or periodic quantity: variance, RMS, a duty cycle,
+   a grain figure over a window narrower than the structure it is measuring.
+
+   **And it reproduces, which is what makes it convincing and wrong.** The phase is deterministic,
+   so the bad number is stable across reruns and survives every check that looks for flakiness. It
+   is not noise. It is the right calculation over a window in which the answer does not exist.
+
+   Count the periods in your window before you trust a statistic taken over it.
+
+22. **Adding a dispatch silently invalidates every probe written against the pre-dispatch path.**
+
+   A reachability probe names a field. When a kind is given its **own** density function, every test
+   that sampled the shared one goes on passing *while asserting about a field nothing calls for that
+   kind*. **The probe does not break — that is the whole problem.**
+
+   Measured on 2026-09-20, after `shaders/fog.wgsl` gave the fog bank its own field: **three** probes
+   in one file were mis-aimed, not the one that was noticed. The worst was the one guarding a
+   *shipped fix* -- a defect that had survived in three places and been fixed with a break
+   demonstration -- whose fog assertion was against the vortex's envelope. **From that commit
+   onward the fix's claim was untested and passing.** A fix for an invisible defect, made invisible
+   again by an architecture change, with a green suite throughout.
+
+   **The audit is two greps and the intersection is the suspect set:**
+
+   ```sh
+   grep -rln 'sampleVortex\|vortexShapeAt\|packVortex' tests/   # calls the old field
+   grep -rln 'VolumetricFog' tests/                              # constructs the dispatched kind
+   ```
+
+   | file | old-field calls | builds the kind | verdict |
+   |---|---|---|---|
+   | `test_fog_bank.cpp` | 9 | yes | **three cases mis-aimed** |
+   | `test_field_bus.cpp` | yes | no | clean |
+   | `test_vortex_parity_gpu.cpp` | yes | no | clean |
+   | `test_effect_conformance.cpp` | 0 | yes | clean |
+   | `test_effect_registry.cpp` | 0 | yes | clean |
+
+   Run it **when you add the dispatch**, not when something looks wrong -- nothing will look wrong.
+   And note which half each party got right: the prediction that only one *kind* was affected held;
+   the guess that only one *case* was affected came from the instance that was tripped over rather
+   than from a search, and was wrong. **A boundary is measured, not estimated.**
+
+23. **Two kinds that agree on a lane are not a dispatch, and production code has no suite to go
+   green.**
+
+   Entry 22 is that hazard in *tests*. The same session found it in shipping code, and it is worse
+   there because there is no summary line to misread -- the program simply does the wrong thing.
+
+   `MediumSlot` was made per-kind: each kind gets its own packer, its own density function, its own
+   lane meanings. What was not done was audit the **readers**. Within an hour of a third kind
+   existing, three shared accessors turned out to be still assuming the first kind's layout: a wind
+   hook writing a field the third kind does not store, three coefficient helpers reading `lane(1).w`
+   as an extinction when on the third kind it is a radius control (tens, not hundredths), and a
+   reserved lane that a sixty-one-float block landed on.
+
+   **The reason none of it surfaced in the preceding day is that the first two kinds happened to
+   agree on every lane those sites read.** Two implementations of an interface that agree are one
+   implementation with two names; the disagreement is the control, and **the third case is the
+   first one that can fail.** If you are generalising a layout, a protocol or a schema, the second
+   instance does not validate the generalisation -- it is usually built by copying the first.
+
+   The general form: **when you make a layout per-kind, every reader of that layout is a call site
+   to audit, not just the probes.** Grep for the lane index, not for the feature name -- the
+   feature name is what the mis-aimed reader does *not* mention.
+
+   And all three presented the same way, which is why they are expensive: right shape, slightly
+   wrong appearance. **A defect that survives because it is plausible is the costly kind** -- it
+   gets tuned around rather than found. "Renders as a comet" is a bug someone fixes in a minute.
+
+24. **A constant that was derived from one function and is still right under another is a
+   coincidence, and the control that ends the coincidence is the one nobody moved.**
+
+   A ray march clipped each medium to a bound of `3 * thickness` vertically. That is where a
+   GAUSSIAN ends, and it was written when the field's vertical profile was one. The profile was
+   later replaced by an exponential at an artist-controlled rate -- and the bound was not
+   revisited, because at the control's DEFAULT the old constant still left only 0.37% of the
+   column outside. It was right, for a reason that had stopped existing.
+
+   At the control's low end it left **56%** of the medium outside its own bound. The same bound
+   was short horizontally by a factor of `bankLength`, which is 1 by default and 6 at the top of
+   its slider: **71%** of peak density outside, at a setting an artist reaches by dragging.
+
+   Two things make this family hard to catch and worth its own entry:
+
+   - **it is invisible at every default**, so it survives any amount of ordinary use, and the
+     arms and screenshots accumulated while it is invisible become evidence that it is fine;
+   - **the failure is a quieter version of the thing working.** Nothing errors. The medium is
+     still there, still soft-edged, still the right colour, and simply smaller than the number
+     that was typed. The artist concludes the control is weak and tunes around it.
+
+   **The check is to put the claim and the thing it claims about in front of each other.** A bound
+   is a claim about the support of a field, so sample the field and assert containment -- and add
+   the assertion that stops the first one being satisfied by giving up, because a bound of infinity
+   contains every field perfectly. Two halves: *nothing dense outside it*, and *it is not much
+   larger than what is inside it.*
+
+   Generalises past bounds. Any constant chosen against a distribution -- a threshold, a budget, an
+   epsilon, a cache size, a step count -- is invalidated by a change to that distribution
+   (ADR-389), **and it will keep passing until someone moves the control that makes the two
+   distributions differ.** When you replace a function, grep for the constants that were sized
+   against the old one. They do not announce themselves.
+
+25. **A GPU suite reads its shaders from the source tree at RUN time, so editing a `.wgsl` while
+   one is running makes the whole run say nothing.**
+
+   Done on 2026-09-21, by me, an hour after re-reading the entry about editing `tools/gpu-lock.sh`
+   while instances held it. The suite was started, then `shaders/particles.wgsl` was edited while
+   it ran. `ShaderLibrary` loads from `AVGEN_SHADER_SOURCE_DIR` when a case asks for a module, so
+   cases that ran before the write compiled one version and cases after it compiled another.
+
+   **The run came back green, 397 cases, exit 0.** That is what makes it worth an entry rather
+   than a note: there was no symptom. A mixed run is not "probably fine" -- it is a run in which
+   no case can be attributed to a version of the tree, including the green ones, and a pass under
+   those conditions is exactly as uninformative as a failure.
+
+   The rule is narrower than "do not edit while tests run", because a C++ edit is harmless -- the
+   binary is already linked:
+
+   > **A running binary's inputs are frozen only if they were compiled into it.** Shaders, scenes,
+   > assets and config files are read when a case asks for them. Anything the suite loads from
+   > disk is live for the whole run.
+
+   Discard the run and start it again. It costs one suite; arguing about which half of a mixed run
+   to believe costs more, and believing it costs more still.
+
+   **And the same hour, the same mistake one layer up.** While the replacement run was going, this
+   very entry's companion note was written into `tools/gpu-lock.sh` -- the script that run was
+   executing. Bash reads a script incrementally by byte offset, so inserting five lines above the
+   offset it was holding shifted everything after it, and the wrapper died with
+
+       tools/gpu-lock.sh: line 89: syntax error near unexpected token `('
+
+   *after* the binary had finished and printed `397 cases | 396 passed | 1 skipped`. The file was
+   restored from `git` within about thirty seconds, so the lock was not wedged this time -- but the
+   run's captured exit code was **2, from the wrapper**, against a summary that said everything
+   passed. Which is the header's own rule arriving as a live example: **an exit code that disagrees
+   with the summary is a tooling fault, and neither of them is a pass.** The run was re-taken.
+
+   Two corollaries worth more than the incident:
+
+   - **`pgrep -f` matched only the orphaned waiters.** The "is anything running?" check came back
+     with four processes and all four were `until ! pgrep -qf "avgen_render_tests"` loops from a
+     session two days ago, matching their own command lines and therefore immortal. The idle
+     machine looked busy. Match the binary's PATH and exclude the shell wrappers:
+     `ps -Ao pid,command | grep 'build/release/tests/avgen_render_tests' | grep -v 'zsh -c'`.
+   - **After editing a shell script, `bash -n` it.** It costs nothing and it is the difference
+     between finding a syntax error now and finding it in the exit code of somebody's suite.
+
+26. **`git checkout -- <file>` to undo a break demonstration silently deletes the uncommitted work
+   in that file, and everything still builds.**
+
+   A break demonstration edits a file, runs the suite, and restores it. Restoring from a scratch
+   copy is correct. Restoring with `git checkout --` restores it to **HEAD** -- which is not where
+   it was, if the file also carried an hour of uncommitted work.
+
+   Done on 2026-09-21. Four artist rows and a packed lane went back to HEAD, the build succeeded,
+   the tests that did not cover the reverted lines passed, and the next edit -- which anchored on
+   one of the deleted lines -- **silently did nothing**, because `str.replace` with no match is a
+   no-op. Two layers of silence: the revert and then the failed patch.
+
+   **What caught it was a count taken from the code**: `grep -c 'storedFloat("'` came back 9 where
+   the change should have made it 12. The registry's block-size assertion would have caught it at
+   the next suite too, but the grep caught it one minute after it happened instead of forty.
+
+   Three habits, in the order they pay:
+
+   - **restore from a scratch copy, never from `git`**, when a file has uncommitted work:
+     `cp file $SCRATCH/file.bak` before the break, `cp $SCRATCH/file.bak file` after;
+   - **assert on every scripted edit.** `assert old in t` before `t.replace(old, new)` turns a
+     silent no-op into an immediate failure, and the one replacement in that batch written without
+     an assert is the one that vanished;
+   - **count the thing you changed, from the code, after changing it.** It is the same move as
+     re-deriving a test's expected number from `grep -c` rather than from the red output, and it
+     catches a different failure: not "the test now agrees with the code" but "the code is not what
+     I think it is".
+
+27. **A census of "what the project ships" is answered in part by the project's own instrumentation,
+   and two people running "the same census" will get different numbers.**
+
+   `examples/` holds **119 tracked `_`-prefixed JSON files**, 30 of them `*.scene.json`, written by
+   several agents' diagnostic tooling and committed. Any `grep -rl` over `examples/` finds them. A
+   question like *"how many shipped scenes use X"* therefore has its answer inflated by the arms
+   somebody generated while measuring X -- which is the measurer contaminating the measurement, in
+   the one place nobody looks for it because the files look exactly like data.
+
+   **It happened twice in one session, and the second time it happened to two people at once.**
+   First: a claim that no shipped scene contained a fog bank, published with a command that
+   returned 52 rather than 0, because the filter that made it true lived in the analyst's head.
+   Then: two people ran a corrected census of the same question and got **120 / 57 / 57 / 0**
+   against **90 / 30 / 23 / 1**. Neither was wrong. They differed on two axes that neither command
+   made visible:
+
+   - **what counts as shipped** -- all tracked scenes, or only the ones that are not probes;
+   - **what counts as using a feature** -- the key is present, or its value is non-zero. `"x": 0.0`
+     has the key and does not use the thing.
+
+   Three rules, and the third is the one that actually holds:
+
+   - **exclude probe files explicitly and say so in the command**, not in the sentence around it;
+   - **state the predicate.** Presence and non-zero are different censuses and both are true;
+   - **put the census in a file and cite the file.** `tools/fog_law_census.py` takes both axes as
+     flags and prints the branch, the scope and the predicate above its numbers. A figure in a
+     document that a reader cannot reproduce without the author's shell is a figure that will
+     eventually be disbelieved -- **and it will be disbelieved for a reason that has nothing to do
+     with its subject**, which is the expensive part.
+
+   The general form, which is not about scenes: **when your tooling writes artefacts into the same
+   namespace as the thing it measures, every later measurement of that namespace is contaminated
+   until somebody notices.** Name them so they can be excluded, and exclude them in the command.
+
+28. **A parity test covers the terms it reads. Add a term to the pair and it silently stops being
+   a pair.**
+
+   `test_fog_parity_gpu.cpp` compares a shader against its CPU twin over the same packed bytes, and
+   it existed because the two once drifted for ten minutes (entry in ADR-565). A new term was added
+   to both sides, and the shader's half was then deliberately broken to demonstrate the failure --
+   **and the test passed.** It compared four quantities and the new one was not among them.
+
+   Nothing about the test had changed; it was simply answering the question it had always answered,
+   about a pair that had grown a fifth member. **The gap opens at the moment the feature lands, and
+   it opens silently, because a parity harness has no way to know what it is not reading.**
+
+   Two habits:
+
+   - **when you add a term to a transliterated pair, add an assertion for it in the same edit.**
+     Not the same day -- the same edit, the way a new `case` goes in with its `enum` value;
+   - **break the new term and watch the parity test fail before you believe it covers it.** That is
+     ADR-182 applied to the test you did not write, and it is the only step that would have caught
+     this. The break was being run for a different reason and the pass was the surprise.
+
+   Generalises to any harness with a fixed output shape: a golden-image test whose mask excludes
+   the new region, a round-trip test whose field list is written out by hand, a conformance table
+   with a row per property. **The harness's shape is a claim about what the thing has, and the
+   thing grew.**
+
+29. **Running the CPU suite and the GPU suite at the same time breaks both, and one of the ways it
+   breaks them is a DETERMINISM failure.**
+
+   Measured 2026-09-21. Run concurrently on an idle machine:
+
+   - `avgen_tests` died with `EXC_BREAKPOINT` / `SIGTRAP` inside
+     `CVPixelBufferPoolCreatePixelBuffer`, in the video-writer case -- **exit 133, no verdict
+     line**. CoreVideo's pixel-buffer pool is a system resource and the GPU suite was competing
+     for it;
+   - `avgen_render_tests` failed `CHECK(a == b)` in
+     `test_procedural_examples_gpu.cpp` on `examples/worlds/worlds.json`: **the same project
+     rendered twice, through two fresh engines, produced two different sequence hashes.**
+
+   Run one after the other, the same binaries on the same tree: **2841 cases exit 0, and 401 cases
+   exit 0.**
+
+   **The second failure is the one that matters, because it falsifies a claim this repository was
+   working from.** `render_arms.sh` carried the header *"no gpu-lock (ADR-170 binds TIMING, and
+   pixels are deterministic under contention -- ADR-360)"*, and the practice of rendering image
+   arms without the lock rested on it. Pixels were not deterministic under that contention. Whether
+   the mechanism is contention itself or an intermittent that contention made likely is **not
+   established from one trial each way** -- and that ambiguity is the point: *running them together
+   removed the ability to tell.*
+
+   So the rule is not "it is slower", it is:
+
+   > **ADR-170's lock is about the GPU, and the CPU suite uses the GPU.** It encodes video, and it
+   > goes through the same system frameworks the render suite does. Serialise them. A run taken
+   > while the other suite is up is not evidence, whichever way it came out.
+
+   And the uncomfortable corollary, which is why this is an entry rather than a note: **the green
+   runs taken that way were green, and they were also unsound.** A pass under a method that can
+   produce a false failure can equally produce a false pass, and nothing in the output distinguishes
+   them.
+
+   **But do not re-take everything -- re-take the class where a false PASS has a mechanism.**
+   Contention perturbs timing and resources: it causes crashes, allocator pressure and
+   nondeterminism, and all three push a run toward *failing*. For an ordinary value assertion --
+   a bit-identity check at defaults, a luminance ratio, a parity comparison -- a competing suite
+   has no way to make a false assertion come out true. Those greens are **unproven but not
+   suspect**.
+
+   The exception is **determinism**, because that is precisely the property contention perturbs: a
+   quiet perturbation could have gone the other way and let a real nondeterminism pass as a match.
+   So the re-take list is *every GPU assertion whose subject is reproducibility or bit-identity*,
+   and nothing else. Here that was 44 cases, taken three times sequentially: 23060 assertions each
+   time, exit 0 each time.
+
+   One more thing to watch in the verdict line: **the SKIP count.** A GPU context that fails to
+   create under contention makes a case skip rather than fail, and a skipped case is not a passed
+   one. Ours held at 4 across every run, which is what says nothing was silently dropped.
+
+   Two traps met while assembling that re-take list, both worth the line:
+
+   - **the filter is comma-separated and a test name contained a comma.** `A generated tree
+     renders, and renders the same way twice` split into two specs, neither matching, and the
+     filter quietly selected 42 cases instead of 43 -- family C, in the tool used to investigate
+     family C. Use a trailing `*` for any name with punctuation, and **count the selected cases
+     before running them**;
+   - **`^test cases:` is not printed when everything passes.** Catch2 prints `All tests passed
+     (N assertions in M test cases)` instead, so a guard that greps only for `^test cases:` reads
+     0 verdict lines on a perfect run. Grep for both.
+
+30. **A tolerance is a proxy for a property. When a feature lands that the proxy forbids, the
+   feature working looks exactly like the defect.**
+
+   A case called *"a fog bank is filled to its own axis"* guarded a real defect -- a 200 m hole in
+   the middle of a 900 m bank, inherited from a cyclone's eye. It guarded it by sampling outward
+   from the centre and requiring every sample **within 2% of the axis value**, which was a fair
+   proxy while the field was `rim * profile`.
+
+   Then a density response curve landed, and a bank *should* fall away faster than 2% by half a
+   radius. **The new feature working was indistinguishable from the old defect returning**, and the
+   case failed against correct code.
+
+   The repair is not a wider tolerance. **A hole means the centre reads LOWER than a point further
+   out**, so the case asserts that -- the axis is the maximum -- plus a control that the bank is
+   not simply empty. That form cannot be broken by any legitimate change to how fast the density
+   falls, because it is the property rather than a symptom of it.
+
+   The same case was wrong two more ways for the same underlying reason, and both are worth
+   recognising:
+
+   - **it sampled where the thing was not.** The probe ran at `y = 0`, and a control that slides
+     the densest layer between a bank's floor and its top put that layer a thickness *below* the
+     centre for three of ten presets. It computes the layer from the control now;
+   - **it measured along an axis whose length a preset owns.** Two neighbouring assertions sampled
+     a fixed multiple of the radius along the *long* axis to prove the field ended -- which stops
+     being outside the shape the moment somebody tunes the length. They use the short axis, whose
+     extent no control moves.
+
+   The generalisation, which is the whole of this document in one line: **a test encodes a claim,
+   and a proxy encodes a claim about a claim.** When the thing under test grows a feature, the
+   proxy is the part that silently stops meaning what it meant -- and it fails *loudly against
+   working code*, which is the good case. The bad case is the same drift in a proxy that stays
+   green (entries 22, 28): the harness that quietly narrowed, and the parity test that stopped
+   covering a term.
+
+   **Ask of every tolerance: what property is this standing in for, and can I assert that instead?**
+   Usually you can, and it is usually shorter.
+
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
@@ -435,6 +876,15 @@ probe's own control, a blown-out render, a person parsing instead of matching. *
 prospectively, by distrusting an expected number**, which is the only defence available when nothing
 downstream is positioned to disagree.
 
+**And one positive check is worth naming, because it is the inverse of everything above.** Most of
+these entries are numbers that looked right and were not. The opposite move is to find a number that
+must be **identical** and use identity as the signal: after a change that should have added
+assertions to existing cases rather than adding cases, the suite's case count matching the
+previously verified total *exactly* confirms the change was what its author thought. **A count that
+had moved would have meant something unaccounted for.** Pick a quantity your change must not move,
+and check it did not — it is cheaper than checking the quantities it should move, and it fails
+loudly when your model of your own edit is wrong.
+
 **One defence in this tree already works, and it is worth copying.** `test_renderer_layout_guards.cpp`
 resolves a struct's array extents against constants scraped from named headers, and when it meets a
 symbolic name it has not been shown it **fails hard rather than guessing** — its own comment says
@@ -447,7 +897,14 @@ resolves it optimistically**, and it is the only entry in this family that is a 
 a wound.
 
 - **When a filter, census or probe returns the number you expected, that is when to check it. A
-  surprising number gets checked for free.** That is the whole family in one sentence, and it would
+  surprising number gets checked for free.**
+- **An aggregate cannot separate the two things it sums.** Two instances of the same failure were
+  found in one night, in two different aggregations: a grain figure that fell 15% across a ladder
+  that added nothing but density, because the tone curve compresses near white; and a whole-frame
+  mean luminance that read 49 against 84 for two fog banks of identical optical depth, because the
+  larger one **covered more of the frame**. Neither number was wrong; both answered a question about
+  the frame when the question was about the medium. **Window the measurement onto the thing that
+  changed, or look at the picture.** That is the whole family in one sentence, and it would
   have caught all three of the scans below.
 - **Check what your scan matched, not just how many.** 13, 14 and 15 were each caught by looking at
   the matched items — eight files that were the wrong eight, 392 cases where 391 was wanted, eight

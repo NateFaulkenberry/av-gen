@@ -489,3 +489,52 @@ TEST_CASE("a disc emitter faces its direction and has two radii", "[gpu][particl
         CHECK(wide.first > wide.second * 2);
     }
 }
+
+// A disabled pool is skipped, not stepped, so its particles do not age while the system is off.
+// Before the reset-on-disable, re-enabling the system somewhere else thawed the whole pool at the
+// new position: Glowmere's tractor beam resumed a five-second pool as stray particles in unrelated
+// shots, up to 210 m from where it had been hidden. Waiting could not drain it, because ageing only
+// happens on the stepped path a disabled system never reaches.
+//
+// The `alive > 0` arm is not decoration (ADR-182): without it a pool that had never emitted would
+// satisfy the emptiness check and the test would pass on a renderer that does nothing at all.
+TEST_CASE("a particle pool is emptied when its system is disabled", "[gpu][particles]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    scene::Scene s = sceneWith(recyclingSystem());
+    FixedStepClock clock(64.0);
+
+    auto frame = [&]() {
+        const FrameTime time = clock.tick();
+        auto img = renderer.renderToImage(s, time, 32, 32);
+        REQUIRE(img.has_value());
+        auto counts = renderer.particles().readCounts(0);
+        REQUIRE(counts.has_value());
+        return counts->alive;
+    };
+
+    for (int i = 0; i < 8; ++i) {
+        frame();
+    }
+    const std::uint32_t whileEmitting = frame();
+    INFO("alive while emitting: " << whileEmitting);
+    REQUIRE(whileEmitting > 0); // or the emptiness below is about nothing
+
+    // Off. One frame is enough: the pool is emptied on the frame the system goes down, not on the
+    // frame it comes back, so nothing survives to be thawed however long it stays off or however
+    // far the emitter travels meanwhile.
+    s.particles[0].enabled = false;
+    const std::uint32_t afterDisable = frame();
+    INFO("alive one frame after disable: " << afterDisable);
+    CHECK(afterDisable == 0);
+
+    // Still empty after a long absence during which the emitter moved.
+    s.particles[0].position = {250.0f, 0.0f, 0.0f};
+    for (int i = 0; i < 30; ++i) {
+        CHECK(frame() == 0);
+    }
+    CHECK(ctx->errorCount() == 0);
+}

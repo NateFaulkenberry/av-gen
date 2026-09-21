@@ -31,7 +31,10 @@
 // * A disabled field samples as 0 (vector 0, colour (0, 0, 0, 0)); disabled compound children are
 //   skipped (they do not count towards Average).
 // * Compound recursion: a field at depth > 4 samples as 0, which is also how cycles terminate.
-// * SdfDistance is 0 on the CPU (unbound; ADR-027 binds it later).
+// * SdfDistance is 0 on the CPU and 0 on the GPU (unbound; ADR-027 reserved the seam and
+//   never bound it). Since ADR-576 a spec that names it is REFUSED by `validate`, so this
+//   arm is reachable only by a field constructed in code that never validated -- the zero
+//   is kept so that path stays defined rather than undefined.
 
 #include "spatial/field.hpp"
 
@@ -830,8 +833,25 @@ Result<void> FieldSpec::validate() const {
             }
         }
     }
-    if (kind == FieldKind::SdfDistance && reference.empty()) {
-        return fail("field '{}': sdfDistance needs a 'reference'", name);
+    // ADR-576: `sdfDistance` REFUSES rather than returning zero.
+    //
+    // It is a declared kind that evaluates to 0 on the CPU (`sampleScalar` below) and 0 on the GPU
+    // (`fields.wgsl` returns 0 for it), so a density field using it produced a density of zero --
+    // which for the volumetric march means NO FOG AT ALL. A scene author selected it from a
+    // documented list, got an empty sky, and had no way to learn why. The system answered a
+    // question with silence.
+    //
+    // The kind is not vestigial and is deliberately not removed: `Scene::sdfs` exists and
+    // `SdfRenderer` draws it, so the binding target is real and ADR-027 reserved this seam on
+    // purpose. What is missing is the binding, and that is a feature decision. Refusing costs one
+    // branch and turns an hour of debugging somebody's fog density into a message.
+    if (kind == FieldKind::SdfDistance) {
+        return fail("field '{}': kind 'sdfDistance' is declared but not implemented -- it "
+                    "evaluates to 0 everywhere, on the CPU and on the GPU, so a density field "
+                    "using it produces nothing at all. ADR-027 reserved the kind and never bound "
+                    "it. Use 'distance' for a point, 'sphere' or 'box' for a volume, or ask for "
+                    "the SDF binding to be built",
+                    name);
     }
     if (kind == FieldKind::Grid && reference.empty()) {
         return fail("field '{}': grid needs a 'reference' (the grid's name)", name);

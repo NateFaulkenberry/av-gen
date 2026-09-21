@@ -663,7 +663,10 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
 // ADR-562 part one: the `world::Vortex` -> `vortex::VortexField` conversion existed in THREE
 // hand-written copies and the one in `engine.cpp` had fallen seven members behind, silently
 // defaulting every one of Vortex 2.0's macro-structure controls. One conversion, one caller.
-// §68, and the tornado's answer is different from the vortex's on purpose.
+// §68, and the tornado's answer to the wind is different from the vortex's ON PURPOSE. This is the
+// insight ADR-580 §68 was written for, and it survived the `agent/fog` merge as the body of this
+// function rather than as a registry slot of its own -- see `EffectResolve::pack` for why there is
+// one channel and not two.
 //
 // A cosmic vortex is a disc and leans by MOVING. A tornado's axis is already a CURVE rather than a
 // line -- that is what stops it being a mathematical cone -- so it leans by BENDING, which is both
@@ -672,17 +675,20 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
 // reads as the storm teleporting rather than as the storm being pushed.
 //
 // Scaled by the TOP radius so the bend means the same thing for a 40 m dust devil and a 300 m
-// wedge, and capped so an effect subscribed at the soft maximum bends by about a radius rather
-// than folding flat.
-void leanWithFlow(E& e, const glm::vec3& downwind, float influence) {
-    constexpr float kLeanFraction = 1.0f; // of the top radius, per unit influence
-    const float metres = influence * kLeanFraction * std::max(e.tornado.field.radiusTop, 0.0f);
-    e.tornado.field.lean += glm::vec2(downwind.x, downwind.z) * metres;
-}
-
-void packMedium(const E& e, float envelope, MediumSlot& out) {
+// wedge, and capped -- by `flowLean`, which clamps the speed before scaling -- so an effect
+// subscribed at the soft maximum bends by about a radius rather than folding flat.
+//
+// The bend is LOCAL to this pack, like the vortex's moved centre: `lane[7]` carries it to the
+// march, and `world::mediumBound`'s tornado arm adds `length(lane[7].xy)` to the cylinder radius,
+// so a bent column is still inside its own bound. Nothing outside this function sees a tornado
+// whose authored `lean` changed.
+void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumSlot& out) {
     const Tornado& tn = e.tornado;
-    const tornado::TornadoUniforms f = tornado::packTornado(tn.field);
+    constexpr float kLeanFraction = 1.0f; // of the top radius, per unit influence
+    tornado::TornadoField bent = tn.field;
+    const glm::vec3 push = flowLean(flow.sample, flow.influence);
+    bent.lean += glm::vec2(push.x, push.z) * (kLeanFraction * std::max(bent.radiusTop, 0.0f));
+    const tornado::TornadoUniforms f = tornado::packTornado(bent);
     out.lane[0] = f.t0;
     out.lane[1] = f.t1;
     out.lane[2] = f.t2;
@@ -737,7 +743,6 @@ EffectSchema buildSchema() {
     s.resolve.bucket = EffectBucket::Medium;
     s.resolve.fill = fill;
     s.resolve.pack = packMedium;
-    s.resolve.lean = leanWithFlow;
     s.validate = validate;
     return s;
 }
