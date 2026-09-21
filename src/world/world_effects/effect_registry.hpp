@@ -100,7 +100,16 @@ namespace avgen::world {
 
 // ---- one row ------------------------------------------------------------------------------------
 
-enum class FieldType : std::uint8_t { Float, Color, Bool };
+// ADR-566: `Choice` is a row whose value is one of a short named list -- the fog bank's five
+// volume primitives are the first, and every future "which of these" control is the reason it is a
+// registry type rather than a float slider labelled 0..5.
+//
+// It is carried as a FLOAT INDEX everywhere a number is what the machinery wants -- `values`, a
+// project parameter (ADR-264), a modulation route's clamp -- because making it a second scalar
+// representation would double every conversion in this file. It is written to JSON as its NAME,
+// because a scene file outlives the order of an enum: appending a primitive must not silently
+// change what every saved bank is, and an index in a file makes that exact mistake available.
+enum class FieldType : std::uint8_t { Float, Color, Bool, Choice };
 
 // Which disclosure level the panel draws this row at. `Hidden` is a real parameter that the panel
 // does not offer -- there are none today, and the value exists so that "registered but not drawn"
@@ -160,8 +169,36 @@ struct EffectField {
     // effect that changes kind keeps what the kind it left was holding -- the property the comment
     // above `struct AtmosphericEffect` states and the reason it is not a variant.
     bool stored = false;
-    float storedDefault = 0.0f;         // Float and Bool (0 or 1)
+    float storedDefault = 0.0f;         // Float, Bool (0 or 1) and Choice (the index)
     glm::vec3 storedColor{0.0f};        // Color
+
+    // Choice only. Points at a static array the declaring file owns; `choiceCount` is its length.
+    // The hard range is 0 .. count-1, so a modulation route or a project parameter cannot select a
+    // primitive that does not exist.
+    const char* const* choices = nullptr;
+    int choiceCount = 0;
+
+    [[nodiscard]] constexpr const char* choiceName(float v) const {
+        if (choices == nullptr || choiceCount <= 0) {
+            return "";
+        }
+        int i = static_cast<int>(v + 0.5f);
+        if (i < 0) { i = 0; }
+        if (i >= choiceCount) { i = choiceCount - 1; }
+        return choices[i];
+    }
+    // -1 when the name is not one of this row's choices, which the readers treat as "leave the
+    // value alone" rather than as "index 0": a scene written by a newer build names a primitive
+    // this one does not have, and silently becoming a Bank is worse than staying whatever the
+    // default is and saying nothing.
+    [[nodiscard]] constexpr int choiceIndex(std::string_view name) const {
+        for (int i = 0; i < choiceCount; ++i) {
+            if (name == std::string_view(choices[i])) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     [[nodiscard]] constexpr bool hasAccessors() const {
         if (stored) {
@@ -171,6 +208,7 @@ struct EffectField {
         case FieldType::Float: return getFloat != nullptr && setFloat != nullptr;
         case FieldType::Color: return getColor != nullptr && setColor != nullptr;
         case FieldType::Bool: return getBool != nullptr && setBool != nullptr;
+        case FieldType::Choice: return false; // a Choice is always `stored`; see `storedChoice`
         }
         return false;
     }
@@ -254,6 +292,26 @@ struct EffectField {
     f.softMax = shi;
     f.stored = true;
     f.storedDefault = def;
+    return f;
+}
+
+// A named list, backed by `values` like every other stored row. `N` comes from the array, so the
+// count cannot disagree with the list -- the class of defect ADR-563's lane budget was.
+template <std::size_t N>
+[[nodiscard]] consteval EffectField storedChoice(const char* leaf, const char* label, int def,
+                                                 const char* const (&names)[N]) {
+    EffectField f;
+    f.type = FieldType::Choice;
+    f.leaf = leaf;
+    f.label = label;
+    f.hardMin = 0.0f;
+    f.hardMax = static_cast<float>(N - 1);
+    f.softMin = 0.0f;
+    f.softMax = static_cast<float>(N - 1);
+    f.stored = true;
+    f.storedDefault = static_cast<float>(def);
+    f.choices = names;
+    f.choiceCount = static_cast<int>(N);
     return f;
 }
 

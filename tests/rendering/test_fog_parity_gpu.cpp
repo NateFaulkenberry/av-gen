@@ -63,6 +63,7 @@ struct Args {
     f1: vec4<f32>,
     f2: vec4<f32>,
     f3: vec4<f32>,
+    f4: vec4<f32>,
     time: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> args: Args;
@@ -73,18 +74,21 @@ struct Args {
 fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= arrayLength(&samples)) { return; }
-    let f = FogUniformsWgsl(args.f0, args.f1, args.f2, args.f3);
+    let f = FogUniformsWgsl(args.f0, args.f1, args.f2, args.f3, args.f4);
     let p = samples[i].xyz;
     let t = args.time.x;
     let rel = p - f.f0.xyz;
-    results[i] = vec4<f32>(fogShapeAt(f, p, t), fogEllipticalRadius(f, rel),
+    // ADR-566: the PRIMITIVE distance, which is what the march calls -- not the bank's ellipse,
+    // which is one arm of it. A parity test aimed at the arm the dispatch no longer takes is
+    // ADR-565's entry 22 written a second time, and this pair is where it would be least visible.
+    results[i] = vec4<f32>(fogShapeAt(f, p, t), fogPrimitiveDistance(f, rel),
                            fogVerticalProfile(f, rel.y), fogMacroDetail(f, p, t));
 }
 )";
 
 struct Gpu {
     float shape = 0.0f;
-    float radius = 0.0f;
+    float distance = 0.0f;
     float vertical = 0.0f;
     float detail = 0.0f;
 };
@@ -133,8 +137,8 @@ public:
         // The four lanes the march hands the field, by value, so this harness has no list to fall
         // behind — the same property the vortex harness gets from passing its uniform block whole.
         struct Args {
-            glm::vec4 f0, f1, f2, f3, time;
-        } args{m.lane[0], m.lane[13], m.lane[14], m.lane[7],
+            glm::vec4 f0, f1, f2, f3, f4, time;
+        } args{m.lane[0],  m.lane[13], m.lane[14], m.lane[7], m.lane[12],
                glm::vec4(time, 0.0f, 0.0f, 0.0f)};
         wgpu::BufferDescriptor adesc{};
         adesc.size = sizeof(Args);
@@ -202,7 +206,7 @@ private:
 
 // An authored bank with every control off its default, so a lane the shader reads from the wrong
 // place cannot pass by both sides seeing the same number.
-world::MediumSlot shippedBank(float detail) {
+world::MediumSlot shippedBank(float detail, int shape = 0, float heightInfluence = 0.0f) {
     const world::EffectSchema* s = world::effectSchema(world::AtmosphereKind::VolumetricFog);
     REQUIRE(s != nullptr);
     REQUIRE(s->resolve.pack != nullptr);
@@ -220,8 +224,12 @@ world::MediumSlot shippedBank(float detail) {
     e.values.setFloat("fog/domeShape", 0.28f);
     e.values.setFloat("fog/detailScale", 7.5f);
     e.values.setFloat("fog/detailDrift", 0.04f);
+    e.values.setFloat("fog/shape", static_cast<float>(shape));
+    e.values.setFloat("fog/heightInfluence", heightInfluence);
     world::MediumSlot slot{};
-    s->resolve.pack(e, 1.0f, slot);
+    // ADR-566: the one writer, so the bytes here are the bytes the frame marches -- including the
+    // kind tag, which `pack` alone does not write.
+    world::packMediumSlot(e, 1.0f, slot);
     return slot;
 }
 
@@ -265,7 +273,7 @@ TEST_CASE("the fog shader agrees with world/fog_field.cpp", "[gpu][fog][parity][
             // 1e-3 for the shape, as the vortex's parity uses for its noise kinds: one octave of
             // value noise accumulates more rounding than a closed form does.
             CHECK(gpu[i].shape == Approx(world::fogShapeAt(slot, pts[i], t)).margin(1e-3));
-            CHECK(gpu[i].radius == Approx(world::fogEllipticalRadius(slot, rel)).margin(1e-4));
+            CHECK(gpu[i].distance == Approx(world::fogPrimitiveDistance(slot, rel)).margin(1e-4));
             CHECK(gpu[i].vertical == Approx(world::fogVerticalProfile(slot, rel.y)).margin(1e-4));
             CHECK(gpu[i].detail == Approx(world::fogMacroDetail(slot, pts[i], t)).margin(1e-3));
             if (world::fogShapeAt(slot, pts[i], t) > 1e-4f) {
@@ -295,5 +303,46 @@ TEST_CASE("the fog field is a pure function of position and time", "[gpu][fog][d
         if (t == 12.0f) {
             CHECK(s == forward);
         }
+    }
+}
+
+
+TEST_CASE("the fog shader agrees about all six primitives", "[gpu][fog][parity][primitive]") {
+    // ADR-566 put a dispatch in front of the field, and a dispatch is exactly where a
+    // transliteration stops being one: five of these six arms did not exist an hour ago and the
+    // case above samples only the arm that did. docs/testing.md 22 is the general form -- a probe
+    // written before a dispatch goes on passing about a path nothing takes.
+    //
+    // The detail term is left ON so that the shapes are compared through the whole field rather
+    // than through a closed form, which is the half that drifts silently.
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    const std::vector<glm::vec3> pts = positions();
+    for (int shape = 0; shape < world::kFogShapeCount; ++shape) {
+        INFO("shape index " << shape);
+        // Height influence at 0.65: neither end of its range, so a side that ignored the control
+        // entirely and a side that applied it whole are both visible.
+        const world::MediumSlot slot = shippedBank(0.6f, shape, 0.65f);
+        REQUIRE(static_cast<int>(world::fogShapeKindOf(slot)) == shape);
+        int inside = 0;
+        for (const float t : {0.0f, 19.25f}) {
+            const std::vector<Gpu> gpu = harness.run(slot, t, pts);
+            REQUIRE(gpu.size() == pts.size());
+            for (std::size_t i = 0; i < pts.size(); ++i) {
+                const glm::vec3 rel = pts[i] - glm::vec3(slot.lane[0]);
+                INFO("t=" << t << " p=(" << pts[i].x << ", " << pts[i].y << ", " << pts[i].z << ")");
+                CHECK(gpu[i].shape == Approx(world::fogShapeAt(slot, pts[i], t)).margin(1e-3));
+                CHECK(gpu[i].distance ==
+                      Approx(world::fogPrimitiveDistance(slot, rel)).margin(1e-4));
+                if (world::fogShapeAt(slot, pts[i], t) > 1e-4f) {
+                    ++inside;
+                }
+            }
+        }
+        // The control. A shape whose samples all land outside it agrees with the GPU perfectly and
+        // says nothing -- and with six shapes over one set of sample points that is a live risk,
+        // not a formality.
+        INFO("samples inside this primitive: " << inside);
+        CHECK(inside > 20);
     }
 }

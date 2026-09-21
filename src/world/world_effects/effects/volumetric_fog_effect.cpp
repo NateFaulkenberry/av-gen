@@ -1,37 +1,42 @@
 // The volumetric fog bank (ADR-500's second proof that an effect is one file).
 //
-// **What it is.** A placed bank of luminous medium sitting in the world -- a drift of mist filling a
-// valley, a glowing haze around an island -- with a soft rim, a Gaussian vertical profile and
-// billowing internal structure. Authored in fog vocabulary: a density per metre, a radius, a height,
-// a churn and a billow, and three colours through its depth.
+// **What it is.** A placed volume of luminous medium sitting in the world -- a drift of mist
+// filling a valley, a glowing haze around an island, a ball of fog hanging off a cliff -- with a
+// soft rim, an asymmetric height profile and optional low-frequency structure. Authored in fog
+// vocabulary: an optical depth, a radius, a height, a shape, and three colours through its depth.
 //
-// **How it reaches the GPU without a line of new shader, and why that is honest rather than a
-// dodge.** `shaders/volume.wgsl` already marches exactly this: `vortexShapeAt` with `innerVoid` at
-// 0 is a filled disc rather than a ring, with `rim` fading smoothly out past the radius and `wall`
-// a Gaussian in Y; with `swirl` and `funnelDepth` at 0 it has no spiral and no throat, which leaves
-// a soft-edged bank of billowing medium that drifts. So a fog bank IS the placed volumetric medium
-// the engine has, marched with a different set of numbers.
+// **THIS HEADER WAS WRONG FOR THREE ADRs AND IS BEING FIXED WITH THE FOURTH.** What it said, and
+// what is actually true now:
 //
-// That makes this kind a different **authoring surface** onto one primitive rather than a second
-// primitive, and the distinction is the point ADR-500 is making. What an artist gets that a vortex
-// with the swirl turned down would not give them is the whole of what a first-class effect is: its
-// own Add button, its own vocabulary, its own presets, its own default audio routes, its own
-// conformance entry, and a panel with no Throat, Funnel depth or Swirl on it to be confused by.
-// A control that does nothing teaches an artist that the system is broken (ADR-421), and nine of a
-// vortex's controls do nothing to a fog bank.
+//   - *"a density per metre"* -- no. ADR-564: the authored number is an OPTICAL DEPTH through the
+//     bank's own crossing path, converted to an extinction in `packMedium`. Per-metre meant a
+//     preset could not ship a correct density, because the depth scaled with the radius slider.
+//   - *"a Gaussian vertical profile"* -- no. ADR-563 replaced it with a base and an exponential
+//     falloff, because `exp(-y^2/t^2)` is a cloud floating in nothing and fog sits ON something.
+//     (That stale sentence is not harmless: the march's vertical bound was sized as a Gaussian's
+//     three sigma and stayed that way until ADR-566 measured what it was cutting off.)
+//   - *"it reaches the GPU without a line of new shader ... a different authoring surface onto one
+//     primitive rather than a second primitive"* -- no, and this was the load-bearing one. ADR-563
+//     gave the fog its OWN field in `shaders/fog.wgsl`, because the vortex's field with the funnel
+//     switched off is monotone in radius and completely uniform in angle: a circular grey disc.
+//     Every feature anybody had ever seen in a fog bank came out of the fBM underneath, which is
+//     the "procedural texture rendered as a volume" the brief opens by rejecting.
+//   - *"the volumetric march has ONE medium slot ... this is the owner's live bug"* -- fixed.
+//     ADR-562 gave the march four slots with a per-kind dispatch, and what it cannot seat reaches
+//     the panel and the headless log as `mediaDropped` instead of vanishing.
 //
-// **The limit, and the sentence that used to be here was false.** The volumetric march has ONE
-// medium slot (`AtmosphericFrame::hasVortex`), for the reason ADR-374 measured: the single vortex
-// costs +5.5 ms of a 13.5 ms frame. This comment used to say the second medium in a scene "is
-// counted in `AtmosphericCounts::dropped` and reported -- a stated limit, not a silent no-op."
+// **The rule that comes out of that list**, and it is ADR-385 aimed at a comment rather than at a
+// claim in conversation: *a header that describes the architecture is a claim with no test on it.*
+// Four sentences here survived the changes that falsified them, and one of them -- the Gaussian --
+// was still being relied on by a bound in another file the day after it stopped being true. When
+// an ADR changes what a file IS, the file's own first paragraph is part of the change.
 //
-// ADR-560 measured it. A fog bank and the Cosmic Vortex authored together render **byte-identical**
-// to whichever of the two appears FIRST in the array; the other contributes not one pixel, and
-// which one survives is the order of a list in a project file. `dropped` has exactly one reader in
-// the tree and it is a CPU conformance finding, not a panel and not a log, so nothing reports
-// anything. It was a silent no-op, and the stated reason is what stopped anyone checking (ADR-385).
-//
-// The slot count is being lifted rather than documented; until it is, this is the owner's live bug.
+// **What an artist gets** that a vortex with the swirl turned down would not give them is the
+// whole of what a first-class effect is: its own Add button, its own vocabulary, its own presets,
+// its own default audio routes, its own conformance entry, six volume primitives (ADR-566), and a
+// panel with no Throat, Funnel depth or Swirl on it to be confused by. A control that does nothing
+// teaches an artist that the system is broken (ADR-421), and nine of a vortex's controls do
+// nothing to a fog bank.
 //
 // **Where its numbers live.** `e.vortex`, aliased on purpose: it is the same medium, so it is the
 // same struct and the same block in the saved file (the rows say so with an absolute `/vortex/...`
@@ -44,6 +49,7 @@
 #include <algorithm>
 #include <cmath>
 #include <array>
+#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -61,6 +67,14 @@ float storedOf(const AtmosphericEffect& e, const char* leaf, float fallback) {
 #define GET(expr) +[](const E& e) { return (expr); }
 #define SETF(lhs) +[](E& e, float v) { (lhs) = v; }
 #define SETC(lhs) +[](E& e, glm::vec3 v) { (lhs) = v; }
+
+// ADR-566: the names an artist picks from, in `world::FogShape` order. A scene file carries the
+// NAME rather than the index (`FieldType::Choice`), so this list is APPEND ONLY -- inserting in
+// the middle would change what every saved bank is, silently and in every scene at once.
+constexpr const char* const kFogShapeNames[] = {"Bank",    "Sphere",  "Ellipsoid",
+                                                "Box",     "Capsule", "Cylinder"};
+static_assert(std::size(kFogShapeNames) == static_cast<std::size_t>(kFogShapeCount),
+              "the panel's list and world::FogShape must have the same length");
 
 constexpr EffectField kFields[] = {
     // ADR-374: this is EXTINCTION per metre. It is the quantity the march integrates, and the
@@ -123,19 +137,42 @@ constexpr EffectField kFields[] = {
     // the detail at zero, and they live in `EffectValueStore` rather than on `world::Vortex`
     // because that struct is shared with the tornado and these are a fog bank's alone (ADR-500's
     // rule for a kind declared after the registry).
+    // ADR-566, the brief's §9: which local volume primitive this bank is. First row of the panel,
+    // because it is the one control that changes what every control under it means -- `Bank length`
+    // is a long axis on a capsule and a semi-axis on a box, and an artist has to see which they
+    // are holding before they reach for it.
+    //
+    // The list is the order of `world::FogShape` and of the constants in `shaders/fog.wgsl`, and
+    // `test_fog_primitives.cpp` checks the three agree rather than trusting that they do -- which
+    // is ADR-562 §9's rule applied to a list instead of to a lane.
+    storedChoice("shape", "Shape", 0, kFogShapeNames).sec("Shape").main()
+        .tooltip("Bank: fog lying in the world, ending upward by its height profile rather than\n"
+                 "at a lid -- the shape a valley or a lakeside fills with.\n"
+                 "The other five are closed volumes you place: a ball of mist, a stretched\n"
+                 "ellipsoid, a box, a capsule lying along its long axis, a standing cylinder."),
     storedFloat("bankLength", "Bank length", 1.0f, 0.2f, 6.0f, 0.5f, 3.0f).main(),
     storedFloat("bankRotation", "Bank rotation", 0.0f, -180.0f, 180.0f, -180.0f, 180.0f).main(),
     storedFloat("edgeSoftness", "Edge softness", 0.35f, 0.02f, 1.0f, 0.05f, 0.9f).main(),
     storedFloat("groundHug", "Ground hug", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f).main(),
     storedFloat("heightFalloff", "Height falloff", 1.4f, 0.05f, 8.0f, 0.3f, 4.0f).sec("Structure"),
     storedFloat("domeShape", "Dome", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f),
+    // ADR-566, §9's "height influence". A Bank has no vertical geometry of its own -- the profile
+    // IS its top -- so it takes the profile whole and this row does nothing to it. The five closed
+    // primitives already have a top and a bottom, so for them the profile is an optional
+    // modulation inside the volume: 0 is a uniform ball of mist, 1 is one that pools at its floor.
+    // Stated here and in the tooltip rather than left for an artist to discover, which is what
+    // ADR-421 asks of a control that is inert in one of its own modes.
+    storedFloat("heightInfluence", "Height influence", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f)
+        .tooltip("How much the height profile above shapes the density INSIDE a closed volume.\n"
+                 "0 fills it evenly; 1 makes it pool at its floor the way a bank does.\n"
+                 "A Bank always takes the profile whole, so this does nothing to one."),
     // ADR-565 (§13/§14): the macro detail's own two controls. Frequency is expressed against the
     // bank's radius, so the detail is the same SHAPE at any size -- ADR-564's size independence
     // applied to structure rather than to density.
-    storedFloat("detailScale", "Detail scale", 6.0f, 0.5f, 40.0f, 1.0f, 16.0f).sec("Structure"),
+    storedFloat("detailScale", "Detail scale", 6.0f, 0.5f, 40.0f, 1.0f, 16.0f).sec("Detail"),
     storedFloat("detailDrift", "Detail drift", 0.01f, -0.5f, 0.5f, -0.1f, 0.1f),
     floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
-               SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").main()
+               SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").sec("Detail").main()
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
                  "its shape. At 0 the bank is its analytic volume alone -- which is the check\n"
                  "that the fog is fog and not a noise field: it should still read as fog."),
@@ -418,7 +455,14 @@ void packMedium(const E& e, float envelope, MediumSlot& out) {
     out.lane[9] = glm::vec4(v.colorDeep, 0.0f);
     out.lane[10] = glm::vec4(v.colorMid, 0.0f);
     out.lane[11] = glm::vec4(v.colorAccent, 0.0f);
-    out.lane[12] = glm::vec4(std::max(v.spill, 0.0f), 0.0f, 0.0f, 0.0f);
+    // ADR-566: lane 12's first slot is `spill`, which the surface glow reads and this kind must
+    // leave alone. The two zeroes beside it are where the primitive selector and its height
+    // influence live -- one lane, read by `shaders/fog.wgsl` and `world::fogShapeAt` and by
+    // nothing else, which is ADR-562 §9's rule for adding a number to a per-kind lane map.
+    out.lane[12] = glm::vec4(std::max(v.spill, 0.0f),
+                             std::clamp(storedOf(e, "shape", 0.0f), 0.0f,
+                                        static_cast<float>(kFogShapeCount - 1)),
+                             std::clamp(storedOf(e, "heightInfluence", 0.0f), 0.0f, 1.0f), 0.0f);
     // ADR-563: the bank's own shape, in the lanes the vortex leaves empty. `shaders/fog.wgsl`
     // reads 0, 13 and 14; lane 15 is the kind tag `buildAtmosphericFrame` writes.
     const float rot = glm::radians(storedOf(e, "bankRotation", 0.0f));

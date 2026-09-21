@@ -167,6 +167,15 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
             case world::FieldType::Bool:
                 world::setFieldBool(f, s, e, (salt % 2) == 0);
                 break;
+            // ADR-566: an INTEGER index, deliberately not the lerp the float rows get. A Choice
+            // serialises as a name, so a fractional index would come back rounded and the
+            // mismatch would be the test's rather than the code's -- and it would look exactly
+            // like a real round-trip failure.
+            case world::FieldType::Choice:
+                REQUIRE(f.choiceCount > 0);
+                world::setFieldFloat(f, s, e,
+                                     static_cast<float>(static_cast<int>(salt) % f.choiceCount));
+                break;
             }
             ++salt;
         }
@@ -188,6 +197,13 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
                 break;
             case world::FieldType::Bool:
                 CHECK(world::fieldBool(f, s, *back) == world::fieldBool(f, s, e));
+                break;
+            case world::FieldType::Choice:
+                CHECK(world::fieldFloat(f, s, *back) == world::fieldFloat(f, s, e));
+                // The file has to carry the NAME. Checking only the value back would pass just as
+                // well if the index were written, and the whole reason the name is there is the
+                // day a primitive is appended to the list.
+                CHECK(doc[s.key][f.leaf].is_string());
                 break;
             }
         }
@@ -425,12 +441,18 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // nothing loads differently -- which is the property this case exists to check and still
         // checks, one line down.
         REQUIRE(doc.contains("fog"));
-        // Eight since ADR-565 added `detailScale` and `detailDrift` to §46 B's six. This number
+        // Ten since ADR-566 added `shape` and `heightInfluence` to ADR-565's eight. This number
         // moving is the case doing its job rather than breaking: it is the only thing in the suite
         // that notices a kind's stored rows changing what EVERY effect of every kind serialises,
-        // because `toJson` writes every kind's block. Update it deliberately, and check the count
-        // is the number of rows you meant to add.
-        CHECK(doc["fog"].size() == 8);
+        // because `toJson` writes every kind's block.
+        //
+        // **Take the number from the code, not from the failure.** `grep -c '    storedFloat('`
+        // plus `grep -c 'storedChoice('` on `volumetric_fog_effect.cpp` is 9 + 1; a count derived
+        // that way is still an assertion, and a count copied out of the red output is a test that
+        // now agrees with whatever the code does. Third time this case has reported a true
+        // consequence, and both times it caught me it was because a row was added and the count
+        // was not re-derived.
+        CHECK(doc["fog"].size() == 10);
         // The shower block holds only its six own numbers.
         REQUIRE(doc.contains("meteors"));
         CHECK(doc["meteors"].size() == 6);

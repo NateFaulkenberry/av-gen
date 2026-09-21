@@ -24,14 +24,36 @@
 //   f3  = LANE 7, which the vortex packs as (eyeWallWidth, eyeWallGain, cloudNoise, 0) and a fog
 //        bank has no eye to want the first two for. So the fog packer reuses them:
 //        x = detail scale, y = drift speed, z = detail amount (cloudNoise), w = 0.
-//        NOT lane 12 -- that is `spill`, read by the surface glow (ADR-562), and a fog bank uses it.
+//   f4  = LANE 12. x is `spill`, which the SURFACE GLOW reads (ADR-562) and this file must not
+//        touch. y and z are the vortex's two zeroes and ADR-566's two new numbers:
+//        y = shape index (the primitive), z = height influence.
+//
+//        Both of them in ONE lane on purpose. ADR-562 §9's finding is that a per-kind lane map is
+//        only safe where every reader knows which kind it is holding, and the cheapest way to keep
+//        that true is to add nothing to a lane a shared accessor already reads. Lane 12.y and 12.z
+//        are read by this file and by `world::fogShapeAt`, and by nothing else in the engine.
 
 struct FogUniformsWgsl {
     f0: vec4<f32>,
     f1: vec4<f32>,
     f2: vec4<f32>,
     f3: vec4<f32>,
+    f4: vec4<f32>,
 };
+
+// ADR-566, the brief's §9: the five local volume primitives, plus the bank that was here first.
+// The index is lane 12.y; `volumetric_fog_effect.cpp` owns the names an artist picks from and the
+// two lists must agree, which `test_fog_primitives.cpp` is the check on.
+const kFogShapeBank: u32 = 0u;
+const kFogShapeSphere: u32 = 1u;
+const kFogShapeEllipsoid: u32 = 2u;
+const kFogShapeBox: u32 = 3u;
+const kFogShapeCapsule: u32 = 4u;
+const kFogShapeCylinder: u32 = 5u;
+
+fn fogShapeKind(f: FogUniformsWgsl) -> u32 {
+    return u32(clamp(f.f4.y, 0.0, 5.0) + 0.5);
+}
 
 // The bank's horizontal footprint: an ELLIPSE, rotated.
 //
@@ -114,6 +136,69 @@ fn fogMacroDetail(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     return 1.0 + amount * (n * 2.0 - 1.0);
 }
 
+// ADR-566, the brief's §9: the NORMALISED DISTANCE to the primitive's surface.
+//
+// One number for all six shapes, and the contract on it is what makes the rest of the file
+// shape-blind: **1 at the surface, less inside, and the field is zero past 1.35 whatever the
+// shape is.** Everything downstream -- the rim smoothstep, the early-out, the ray interval in
+// `volume.wgsl`, the CPU twin -- was written against that threshold for the bank alone, and it
+// keeps working for five more shapes because they are normalised the same way rather than because
+// each was given its own cutoff. A per-shape cutoff would be five more numbers for a bound to get
+// wrong, and ADR-566 exists because the bound got ONE number wrong.
+//
+// Semi-axes, in the bank's own yawed frame: `ax` along the long axis, `az` across it, `ay` up.
+// `bankLength` is what makes them differ, so the five primitives inherit the bank's one shape
+// control rather than declaring five of their own (ADR-500's economy, and §9's "scale").
+//
+// The forms are deliberately the cheap ones -- a max for the box rather than a rounded SDF, a
+// clamp for the capsule -- because every one of these is evaluated per sample per slot. The C0
+// creases a `max` leaves on a box's edges are then smoothed by the rim's smoothstep, which is
+// already there and already wide.
+fn fogPrimitiveDistance(f: FogUniformsWgsl, rel: vec3<f32>) -> f32 {
+    let radius = max(f.f0.w, 1e-3);
+    let along = max(f.f1.y, 0.05);
+    let c = f.f1.z;
+    let s = f.f1.w;
+    // Into the bank's own frame (a yaw; §9's "rotation where applicable", and for a volume that
+    // sits on the ground the applicable rotation is the one about up).
+    let x = rel.x * c + rel.z * s;
+    let z = -rel.x * s + rel.z * c;
+    let y = rel.y;
+    let ax = radius * along;
+    let az = radius;
+    let ay = max(f.f1.x, 1e-3); // thickness is the vertical semi-axis for every closed primitive
+
+    let kind = fogShapeKind(f);
+    if (kind == kFogShapeSphere) {
+        // Deliberately isotropic: it ignores `bankLength` and `thickness`. A sphere an artist has
+        // to set two other controls to 1 to get back is not a sphere, it is a trap.
+        return length(vec3<f32>(x, y, z)) / radius;
+    }
+    if (kind == kFogShapeEllipsoid) {
+        return length(vec3<f32>(x / ax, y / ay, z / az));
+    }
+    if (kind == kFogShapeBox) {
+        return max(max(abs(x) / ax, abs(y) / ay), abs(z) / az);
+    }
+    if (kind == kFogShapeCapsule) {
+        // A segment along the long axis with a hemispherical (elliptical in Y) cap at each end.
+        // The half-length is what is LEFT of the long axis after the caps, so a capsule at
+        // `bankLength` 1 degenerates to the sphere/ellipsoid it should and never inverts.
+        let half = max(ax - az, 0.0);
+        let qx = x - clamp(x, -half, half);
+        return length(vec3<f32>(qx, y * (az / ay), z)) / az;
+    }
+    if (kind == kFogShapeCylinder) {
+        let u = x / ax;
+        let v = z / az;
+        return max(sqrt(u * u + v * v), abs(y) / ay);
+    }
+    // kFogShapeBank: horizontal only. Its vertical extent is the PROFILE rather than a semi-axis,
+    // which is the whole difference between a bank and the five closed volumes above -- fog lying
+    // in a valley has a top that thins, not a lid at a height.
+    return fogEllipticalRadius(f, rel);
+}
+
 // The bank, analytic and complete. Zero outside, and compactly so, which is the property ADR-374
 // measured the march's cost against and ADR-562's ray interval depends on.
 fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
@@ -121,7 +206,7 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
         return 0.0;
     }
     let rel = p - f.f0.xyz;
-    let rr = fogEllipticalRadius(f, rel);
+    let rr = fogPrimitiveDistance(f, rel);
     if (rr > 1.35) {
         return 0.0;
     }
@@ -133,5 +218,18 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     if (rim <= 0.0) {
         return 0.0;
     }
-    return max(rim * fogVerticalProfile(f, rel.y) * fogMacroDetail(f, p, t), 0.0);
+    // §9's "height influence". The bank IS the vertical profile and takes it whole; a closed
+    // primitive already has a top and a bottom of its own, so the profile is an optional
+    // modulation inside it -- 0 for a uniform ball of mist, 1 for one that pools at its floor.
+    //
+    // The bank cannot be given the choice and the reason is the bound, not the picture: `rim` is
+    // horizontal for a bank, so the profile is the ONLY term that makes it end in Y. Blend that
+    // toward 1 and the bank becomes an infinite vertical column with a finite bound around it --
+    // ADR-566's own defect, reintroduced by a control. So it is read for the five and ignored for
+    // the one, and `mediumBoundOf` in `volume.wgsl` is written against exactly that rule.
+    var profile = fogVerticalProfile(f, rel.y);
+    if (fogShapeKind(f) != kFogShapeBank) {
+        profile = mix(1.0, profile, clamp(f.f4.z, 0.0, 1.0));
+    }
+    return max(rim * profile * fogMacroDetail(f, p, t), 0.0);
 }

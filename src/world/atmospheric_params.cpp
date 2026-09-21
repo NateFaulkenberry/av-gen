@@ -30,6 +30,28 @@ params::ParamDesc<float> f(std::string path, float def, float lo, float hi, floa
     return d;
 }
 
+// ADR-566: a Choice row registers as an INT.
+//
+// It is carried as a float index everywhere else, and for a while it registered as a float too --
+// which the conformance round trip caught within one suite. `distinctValue` sets a parameter to a
+// fraction of its range, the serialiser writes the NAME of the index that fraction rounds to, and
+// what comes back is an integer that does not equal 1.55. **The value did not survive the file,
+// and it was right to say so**: a control whose parameter can hold 1.55 has states the file cannot
+// represent, and a route or a keyframe could put it in one.
+//
+// `params::Components<int>::set` rounds on the way in, so the whole chain -- slider, route,
+// project parameter, save -- is integral and the representable states are exactly the choices.
+params::ParamDesc<int> i(std::string path, int def, int lo, int hi) {
+    params::ParamDesc<int> d;
+    d.path = std::move(path);
+    d.defaultValue = std::clamp(def, lo, hi);
+    d.hardMin = lo;
+    d.hardMax = hi;
+    d.softMin = lo;
+    d.softMax = hi;
+    return d;
+}
+
 params::ParamDesc<bool> b(std::string path, bool def) {
     params::ParamDesc<bool> d;
     d.path = std::move(path);
@@ -110,8 +132,17 @@ AtmosphericParameters registerAtmosphericParameters(params::ParameterSet& params
             case FieldType::Color:
                 p.values.push_back(&params.add(col(path(field.leaf), fieldColor(field, *schema, e))));
                 break;
+            // ADR-566: a Choice is a float index in the parameter table. That is what lets a
+            // project parameter (ADR-264) and a modulation route reach it at all -- both speak
+            // floats -- and the hard range the factory set is 0..count-1, so neither can select a
+            // primitive that does not exist.
             case FieldType::Bool:
                 p.values.push_back(&params.add(b(path(field.leaf), fieldBool(field, *schema, e))));
+                break;
+            case FieldType::Choice:
+                p.values.push_back(&params.add(
+                    i(path(field.leaf), static_cast<int>(fieldFloat(field, *schema, e) + 0.5f), 0,
+                      std::max(field.choiceCount - 1, 0))));
                 break;
             }
         };
@@ -171,6 +202,7 @@ void copyParameters(const AtmosphericParameters& registered, std::vector<Atmosph
                 setFieldColor(field, *schema, e, glm::vec3(value(q, 0), value(q, 1), value(q, 2)));
                 break;
             case FieldType::Bool: setFieldBool(field, *schema, e, value(q, 0) >= 0.5f); break;
+            case FieldType::Choice: setFieldFloat(field, *schema, e, value(q, 0)); break;
             }
             ++i;
         };

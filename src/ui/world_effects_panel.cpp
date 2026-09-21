@@ -122,6 +122,28 @@ bool paramCheckbox(app::Engine& engine, const std::string& prefix, const char* l
     return changed;
 }
 
+// ADR-566: a Choice row. The value is a float index in the parameter table like every other row
+// -- what changes here is only that the artist picks a NAME instead of dragging a number. A
+// primitive selector drawn as a 0..5 slider is a control an artist has to decode, which is the
+// thing ADR-230 and ADR-421 are both about.
+bool paramCombo(app::Engine& engine, const std::string& prefix, const char* leaf, const char* label,
+                const char* const* choices, int count) {
+    params::IParameter* p = find(engine, prefix, leaf);
+    if (p == nullptr || choices == nullptr || count <= 0) {
+        return false;
+    }
+    int index = static_cast<int>(p->baseComponent(0) + 0.5f);
+    index = std::clamp(index, 0, count - 1);
+    rowLabel(label);
+    ImGui::PushID(leaf);
+    const bool changed = ImGui::Combo("##v", &index, choices, count);
+    ImGui::PopID();
+    if (changed) {
+        p->setBaseComponent(0, static_cast<float>(index));
+    }
+    return changed;
+}
+
 bool paramColor(app::Engine& engine, const std::string& prefix, const char* leaf, const char* label) {
     params::IParameter* p = find(engine, prefix, leaf);
     if (p == nullptr) {
@@ -557,6 +579,9 @@ void drawSchemaRows(app::Engine& engine, const std::string& prefix, const world:
             paramSlider(engine, prefix, field.leaf, field.label,
                         field.format[0] != '\0' ? field.format : "%.2f", field.logarithmic);
             break;
+        case world::FieldType::Choice:
+            paramCombo(engine, prefix, field.leaf, field.label, field.choices, field.choiceCount);
+            break;
         }
         if (field.tip[0] != '\0' && ImGui::IsItemHovered()) {
             tooltipUnformatted(field.tip);
@@ -577,6 +602,9 @@ void drawSharedRow(app::Engine& engine, const std::string& prefix, const char* l
         case world::FieldType::Float:
             paramSlider(engine, prefix, field.leaf, field.label,
                         field.format[0] != '\0' ? field.format : "%.2f", field.logarithmic);
+            break;
+        case world::FieldType::Choice:
+            paramCombo(engine, prefix, field.leaf, field.label, field.choices, field.choiceCount);
             break;
         }
         if (field.tip[0] != '\0' && ImGui::IsItemHovered()) {

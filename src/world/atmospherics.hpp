@@ -646,6 +646,37 @@ struct MediumSlot {
 [[nodiscard]] float fogEllipticalRadius(const MediumSlot& m, const glm::vec3& rel);
 [[nodiscard]] float fogVerticalProfile(const MediumSlot& m, float relY);
 
+// ADR-566, the brief's §9: which local volume primitive a bank is. The order is the order of the
+// names `volumetric_fog_effect.cpp` offers and of the constants in `shaders/fog.wgsl`, and the
+// three lists agreeing is what `test_fog_primitives.cpp` checks rather than assumes.
+//
+// APPEND ONLY. The index is what `values` and a project parameter carry; the NAME is what a scene
+// file carries (ADR-566's reason for `FieldType::Choice` serialising as a string), so inserting
+// in the middle would change what every saved bank is.
+enum class FogShape : int { Bank = 0, Sphere, Ellipsoid, Box, Capsule, Cylinder };
+inline constexpr int kFogShapeCount = 6;
+
+[[nodiscard]] FogShape fogShapeKindOf(const MediumSlot& m);
+// 1 at the primitive's surface, less inside, and the field is zero past 1.35 for every shape.
+[[nodiscard]] float fogPrimitiveDistance(const MediumSlot& m, const glm::vec3& rel);
+
+// ADR-566: the claim `shaders/volume.wgsl` clips a ray to -- a vertical cylinder that must contain
+// every non-zero sample of this slot's field. `radiusXZ < 0` means the slot is off. See
+// `world/medium_bound.cpp` for why a bound is allowed to be generous and never allowed to be
+// tight, and `test_medium_bound.cpp` for the containment property itself.
+struct MediumBound {
+    float radiusXZ = -1.0f; // about the slot's centre, in metres
+    float yBot = 1.0f;
+    float yTop = -1.0f;
+};
+[[nodiscard]] MediumBound mediumBound(const MediumSlot& m);
+
+// ADR-566: pack one effect into the bytes the march reads -- its kind's packer, the reserved-lane
+// check and the kind tag, in the one order that is correct. `buildAtmosphericFrame` calls it for
+// every seated medium; a test calls it to get exactly those bytes rather than a second copy of
+// the sequence (ADR-554).
+void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot);
+
 // What one frame hands the renderer. A plain aggregate so nothing allocates and `scene::Scene` can
 // hold it by value beside `worldEffects`.
 struct AtmosphericFrame {
