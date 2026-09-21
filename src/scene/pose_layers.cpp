@@ -56,6 +56,7 @@ const char* poseLayerKindName(PoseLayerKind kind) {
     case PoseLayerKind::Foot: return "foot";
     case PoseLayerKind::Stride: return "stride";
     case PoseLayerKind::Secondary: return "secondary";
+    case PoseLayerKind::Lean: return "lean";
     }
     return "aim";
 }
@@ -79,6 +80,10 @@ bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
     }
     if (name == "secondary") {
         out = PoseLayerKind::Secondary;
+        return true;
+    }
+    if (name == "lean") {
+        out = PoseLayerKind::Lean;
         return true;
     }
     return false;
@@ -524,6 +529,58 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // limb this rig does not have.
             result = layer.kind == PoseLayerKind::Foot ? LayerResolution::NoChain
                                                        : LayerResolution::NoJoints;
+            continue;
+        }
+        if (layer.kind == PoseLayerKind::Lean) {
+            // **Into the force, in the body's own frame.**
+            //
+            // The acceleration arrives already converted to the rig's model space, so +Z is the
+            // body's forward and +X its right whichever way it is facing in the world. That is
+            // what makes one set of gains work for a character walking north and the same one
+            // walking south -- and getting it wrong is invisible on a body that only ever walks
+            // one way, which is why the test drives it round a circle.
+            //
+            // Pitch from the forward component, roll from the lateral one plus the turn rate. A
+            // body cornering leans into the inside of the turn, and that is a different input
+            // from its lateral acceleration even though the two usually agree.
+            const float pitchDegrees = -layer.bodyAcceleration.z * layer.leanDegreesPerAccel;
+            const float rollDegrees = (layer.bodyAcceleration.x * layer.leanDegreesPerAccel) +
+                                      (layer.bodyTurnRate * layer.leanDegreesPerTurn);
+            const float magnitude =
+                std::sqrt((pitchDegrees * pitchDegrees) + (rollDegrees * rollDegrees));
+            const float limit = std::max(layer.leanMaxDegrees, 0.0f);
+            const bool clamped = magnitude > limit + 1e-4f;
+            // Scaled as a pair rather than clamped per axis, so a body accelerating diagonally
+            // leans diagonally instead of squaring off against the limit.
+            const float scale = clamped && magnitude > 1e-6f ? limit / magnitude : 1.0f;
+            const float w = std::clamp(layer.weight, 0.0f, 1.0f);
+            const float pitch = glm::radians(pitchDegrees * scale) * w;
+            const float roll = glm::radians(rollDegrees * scale) * w;
+            if (std::abs(pitch) < 1e-6f && std::abs(roll) < 1e-6f) {
+                // Standing still, or braking exactly as hard as it is turning. Applied, not
+                // inactive: the layer did what it was asked and the answer was nothing.
+                result = clamped ? LayerResolution::Clamped : LayerResolution::Applied;
+                stats.applied += 1u;
+                continue;
+            }
+            std::uint32_t moved = 0;
+            for (std::size_t j = 0; j < mask.weight.size(); ++j) {
+                const float jw = mask.weight[j];
+                if (jw <= 0.0f) {
+                    continue;
+                }
+                // Spread across the masked joints by their weights, so a spine leans along its
+                // length instead of hinging at one vertebra.
+                const glm::quat tilt =
+                    glm::angleAxis(pitch * jw, glm::vec3(1.0f, 0.0f, 0.0f)) *
+                    glm::angleAxis(roll * jw, glm::vec3(0.0f, 0.0f, 1.0f));
+                pose.local[j].rotation = glm::normalize(pose.local[j].rotation * tilt);
+                ++moved;
+            }
+            result = moved == 0   ? LayerResolution::NoJoints
+                     : clamped    ? LayerResolution::Clamped
+                                  : LayerResolution::Applied;
+            stats.applied += moved > 0 ? 1u : 0u;
             continue;
         }
         if (layer.kind == PoseLayerKind::Secondary) {

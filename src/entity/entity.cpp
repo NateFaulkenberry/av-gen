@@ -899,6 +899,7 @@ void EntityWorld::reset() {
         // unrelated places -- the same class of mistake the root-motion sample below it makes, and
         // for the same reason.
         entity->lastPosition_ = glm::vec3(0.0f);
+        entity->hasLastVelocity_ = false;
         entity->hasLastPosition_ = false;
         entity->rootMotionLast_ = glm::vec3(0.0f);
         entity->rootMotionGeneration_ = 0;
@@ -1221,6 +1222,7 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         // field of the seam, which of `seek` and `update` writes it -- and two of the answers
         // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
         // `update`. `grounded` was written by neither and read by nobody.
+        entity.locomotion_.acceleration = entity.state_.acceleration;
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(dt);
         // Phase B: the provider memory, advanced on this path as on the other one. Both, for
@@ -1672,10 +1674,26 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // pose layer on frame one of every offline job.
         {
             const glm::vec3 settled = entity.state_.position();
+            const glm::vec3 previousVelocity = entity.state_.velocity;
             if (entity.hasLastPosition_ && ctx.dt > 0.0) {
                 entity.state_.velocity = (settled - entity.lastPosition_) / static_cast<float>(ctx.dt);
+                // Phase B §19/§35. **Measured once, here, beside the velocity it differences** --
+                // ADR-545's rule applied one derivative out. Lean, stride and balance all want it
+                // and three subsystems differencing the same vector independently is how the
+                // engine ended up with two answers to "where is this body" (ADR-260).
+                //
+                // The second frame of a body's life has a previous velocity of zero, so its
+                // acceleration reads as the whole of its speed over one step. That is honest --
+                // it did accelerate from rest -- and the lean layer's own limit is what stops it
+                // being a visible snap.
+                entity.state_.acceleration =
+                    entity.hasLastVelocity_
+                        ? (entity.state_.velocity - previousVelocity) / static_cast<float>(ctx.dt)
+                        : glm::vec3(0.0f);
+                entity.hasLastVelocity_ = true;
             } else {
                 entity.state_.velocity = glm::vec3(0.0f);
+                entity.state_.acceleration = glm::vec3(0.0f);
             }
             entity.lastPosition_ = settled;
             entity.hasLastPosition_ = true;
@@ -1742,6 +1760,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // field of the seam, which of `seek` and `update` writes it -- and two of the answers
         // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
         // `update`. `grounded` was written by neither and read by nobody.
+        entity.locomotion_.acceleration = entity.state_.acceleration;
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(ctx.dt);
         // Phase B: the provider memory, advanced on this path as on the other one. Both, for

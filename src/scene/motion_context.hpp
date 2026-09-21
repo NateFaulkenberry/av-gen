@@ -62,6 +62,9 @@ struct MotionContext {
     glm::vec3 facing{0.0f, 0.0f, 1.0f};    // entity-local, unit
     float groundSpeed = 0.0f;              // horizontal magnitude of `velocity`, m/s
     float turnRate = 0.0f;                 // rad/s, signed
+    // Entity-local, m/s^2. Measured once at the entity beside the velocity it differences
+    // (ADR-545 one derivative out), so lean, stride and balance do not each derive their own.
+    glm::vec3 acceleration{0.0f};
 
     // ---- what it MEANT to do -------------------------------------------------------------------
     // The difference between these and the pair above is the whole of strafing, backing up and

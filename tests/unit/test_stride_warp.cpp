@@ -291,3 +291,149 @@ TEST_CASE("secondary motion oscillates rather than drifting", "[secondary][layer
     const scene::Pose t1 = secondaryAt(1.0, 0.0f);
     CHECK(angleOf(t1.local[1].rotation) > glm::radians(3.0f));
 }
+
+// ---- Movement lean (Phase B §19, the pose half of B.F) ----------------------------------------
+
+namespace {
+
+scene::PoseLayer leanLayer() {
+    scene::PoseLayer layer;
+    layer.name = "lean";
+    layer.kind = scene::PoseLayerKind::Lean;
+    layer.drive = scene::PoseLayerDrive::Manual;
+    layer.mask.joints = {"body"};
+    layer.leanDegreesPerAccel = 3.0f;
+    layer.leanDegreesPerTurn = 6.0f;
+    layer.leanMaxDegrees = 9.0f;
+    layer.weight = 1.0f;
+    return layer;
+}
+
+scene::Pose leanAt(const glm::vec3& accel, float turnRate, float maxDeg = 9.0f,
+                   scene::LayerResolution* outRes = nullptr) {
+    const scene::Skeleton sk = walkerRig();
+    const std::vector<scene::AnimationClip> clips = travellingClip();
+    scene::PoseLayer layer = leanLayer();
+    layer.bodyAcceleration = accel;
+    layer.bodyTurnRate = turnRate;
+    layer.leanMaxDegrees = maxDeg;
+    scene::PoseLayerStack stack;
+    const std::vector<std::string> problems = stack.bind({layer}, sk, clips);
+    INFO((problems.empty() ? std::string("none") : problems.front()));
+    REQUIRE(problems.empty());
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    stack.apply(sk, clips, 0.0, pose);
+    if (outRes != nullptr) {
+        *outRes = stack.results().front();
+    }
+    return pose;
+}
+
+// The tilt about an axis, signed, in degrees.
+float tiltAbout(const glm::quat& q, const glm::vec3& axis) {
+    const glm::vec3 v = glm::vec3(q.x, q.y, q.z);
+    const float s = glm::dot(v, axis);
+    return glm::degrees(2.0f * std::atan2(s, q.w));
+}
+
+} // namespace
+
+TEST_CASE("a body accelerating leans forward and a braking one leans back", "[lean][layers]") {
+    // §19. The sign is the assertion: a lean that went the wrong way would still be "a lean", and
+    // would read as a character being shoved from in front.
+    const scene::Pose forward = leanAt(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);   // accelerating +Z
+    const scene::Pose braking = leanAt(glm::vec3(0.0f, 0.0f, -2.0f), 0.0f);  // braking
+
+    const float f = tiltAbout(forward.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f));
+    const float b = tiltAbout(braking.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f));
+    INFO("accelerating pitch " << f << " deg, braking pitch " << b << " deg");
+    CHECK(f < -1.0f);          // nose down, into the direction of travel
+    CHECK(b > 1.0f);           // and the other way when braking
+    CHECK(f == Approx(-b).margin(1e-3));
+}
+
+TEST_CASE("the lean is in the body's frame, not the world's", "[lean][layers]") {
+    // **The assertion that catches the mistake this layer is most likely to have.** The context
+    // converts the acceleration to the rig's model space, so +Z is the body's own forward whichever
+    // way it faces in the world. A layer fed world-space acceleration would lean correctly for a
+    // character walking north and lean *sideways* for one walking east, and both look plausible in
+    // isolation.
+    //
+    // Here that is asserted at the layer's own boundary: the same body-frame acceleration must
+    // produce the same tilt, and a lateral one must produce roll rather than pitch.
+    const scene::Pose ahead = leanAt(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
+    const scene::Pose sideways = leanAt(glm::vec3(2.0f, 0.0f, 0.0f), 0.0f);
+
+    const float aheadPitch = tiltAbout(ahead.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f));
+    const float aheadRoll = tiltAbout(ahead.local[1].rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+    const float sidePitch = tiltAbout(sideways.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f));
+    const float sideRoll = tiltAbout(sideways.local[1].rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+    INFO("ahead pitch " << aheadPitch << " roll " << aheadRoll << "; sideways pitch " << sidePitch
+                        << " roll " << sideRoll);
+    CHECK(std::abs(aheadPitch) > 4.0f);
+    CHECK(std::abs(aheadRoll) < 0.5f);
+    CHECK(std::abs(sidePitch) < 0.5f);
+    CHECK(std::abs(sideRoll) > 4.0f);
+}
+
+TEST_CASE("a turn leans the body into the inside of it", "[lean][layers]") {
+    // Turn rate is a separate input from lateral acceleration, even though the two usually agree:
+    // a body turning on the spot has a turn rate and no acceleration at all.
+    scene::LayerResolution res{};
+    const scene::Pose turning = leanAt(glm::vec3(0.0f), 1.0f, 9.0f, &res);
+    const float roll = tiltAbout(turning.local[1].rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+    INFO("turning roll " << roll << " deg");
+    CHECK(std::abs(roll) > 4.0f);
+    CHECK(res == scene::LayerResolution::Applied);
+
+    // And the other way round.
+    const scene::Pose other = leanAt(glm::vec3(0.0f), -1.0f);
+    CHECK(tiltAbout(other.local[1].rotation, glm::vec3(0.0f, 0.0f, 1.0f)) == Approx(-roll).margin(1e-3));
+}
+
+TEST_CASE("the lean limit is a magnitude, and it is reported", "[lean][layers]") {
+    // **Stated as a magnitude, not as a yes/no** (testing.md #20). The question is not "does it
+    // clamp" but "what does it clamp to, and does a diagonal stay diagonal".
+    scene::LayerResolution res{};
+    // 10 m/s^2 diagonally: 30 degrees of pitch and 30 of roll before the limit, 42.4 combined.
+    const scene::Pose hard = leanAt(glm::vec3(10.0f, 0.0f, 10.0f), 0.0f, 9.0f, &res);
+    const float pitch = tiltAbout(hard.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f));
+    const float roll = tiltAbout(hard.local[1].rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+    const float magnitude = std::sqrt((pitch * pitch) + (roll * roll));
+    INFO("pitch " << pitch << " roll " << roll << " magnitude " << magnitude);
+    CHECK(res == scene::LayerResolution::Clamped);
+    // Clamped to the limit as a pair, so it is still on the diagonal rather than squared off.
+    CHECK(magnitude == Approx(9.0f).margin(0.4f));
+    CHECK(std::abs(std::abs(pitch) - std::abs(roll)) < 0.5f);
+
+    // The unclamped control, so "Clamped" above is a measurement and not the only answer this
+    // layer can give (ADR-182).
+    scene::LayerResolution small{};
+    (void)leanAt(glm::vec3(0.0f, 0.0f, 1.0f), 0.0f, 9.0f, &small);
+    CHECK(small == scene::LayerResolution::Applied);
+}
+
+TEST_CASE("a standing body does not lean, and weight fades it", "[lean][layers]") {
+    scene::LayerResolution res{};
+    const scene::Pose still = leanAt(glm::vec3(0.0f), 0.0f, 9.0f, &res);
+    CHECK(tiltAbout(still.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f)) == Approx(0.0f).margin(1e-3));
+    CHECK(res == scene::LayerResolution::Applied); // it did its job; the answer was nothing
+
+    // §63: disableable by weight, like every other layer.
+    const scene::Skeleton sk = walkerRig();
+    const std::vector<scene::AnimationClip> clips = travellingClip();
+    scene::PoseLayer layer = leanLayer();
+    layer.bodyAcceleration = glm::vec3(0.0f, 0.0f, 2.0f);
+    layer.weight = 0.5f;
+    scene::PoseLayerStack stack;
+    REQUIRE(stack.bind({layer}, sk, clips).empty());
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    stack.apply(sk, clips, 0.0, pose);
+    const float half = tiltAbout(pose.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f));
+    const scene::Pose full = leanAt(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
+    const float whole = tiltAbout(full.local[1].rotation, glm::vec3(1.0f, 0.0f, 0.0f));
+    INFO("half weight " << half << ", full " << whole);
+    CHECK(half == Approx(whole * 0.5f).margin(0.1f));
+}

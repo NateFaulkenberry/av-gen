@@ -2750,6 +2750,7 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     motion_.groundSpeed =
         std::sqrt((state.velocity.x * state.velocity.x) + (state.velocity.z * state.velocity.z));
     motion_.turnRate = state.turnRate;
+    motion_.acceleration = glm::mat3(inverse) * state.acceleration;
     // The intent, as the polar pair the mover authored it in: a scalar along a heading. Converted
     // to a vector here so a layer never has to know which of the two forms the seam used.
     motion_.desiredFacing =
@@ -2824,6 +2825,10 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             }
             if (layer.kind == PoseLayerKind::Secondary) {
                 layer.bodySpeed = motion_.groundSpeed;
+            }
+            if (layer.kind == PoseLayerKind::Lean) {
+                layer.bodyAcceleration = motion_.acceleration;
+                layer.bodyTurnRate = motion_.turnRate;
             }
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
@@ -8651,6 +8656,11 @@ nlohmann::json Composition::toJson() const {
                     // of them empty. Written through the shared path it came out with `"joints":
                     // []` and `"clip": ""`, and the file it produced would not load -- a save that
                     // breaks the scene it saved is worse than one that refuses.
+                    if (layer.kind == PoseLayerKind::Lean) {
+                        l["degreesPerAccel"] = layer.leanDegreesPerAccel;
+                        l["degreesPerTurn"] = layer.leanDegreesPerTurn;
+                        l["maxDegrees"] = layer.leanMaxDegrees;
+                    }
                     if (layer.kind == PoseLayerKind::Secondary) {
                         l["degrees"] = layer.secondaryDegrees;
                         l["period"] = layer.secondaryPeriod;
@@ -10081,7 +10091,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             std::string known;
                             for (const PoseLayerKind k :
                                  {PoseLayerKind::Aim, PoseLayerKind::Additive, PoseLayerKind::Foot,
-                                  PoseLayerKind::Stride, PoseLayerKind::Secondary}) {
+                                  PoseLayerKind::Stride, PoseLayerKind::Secondary,
+                                  PoseLayerKind::Lean}) {
                                 if (!known.empty()) {
                                     known += ", ";
                                 }
@@ -10150,6 +10161,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         // ADR-359: a foot layer is addressed by a chain and never by a mask, so it
                         // reads a different set of keys and refuses a mask outright here rather
                         // than letting `bind` report a no-op after the scene has loaded.
+                        if (layer.kind == PoseLayerKind::Lean) {
+                            auto accel = readFloat(entry, "degreesPerAccel", layer.leanDegreesPerAccel);
+                            auto turn = readFloat(entry, "degreesPerTurn", layer.leanDegreesPerTurn);
+                            auto cap = readFloat(entry, "maxDegrees", layer.leanMaxDegrees);
+                            if (!accel) return std::unexpected(accel.error());
+                            if (!turn) return std::unexpected(turn.error());
+                            if (!cap) return std::unexpected(cap.error());
+                            layer.leanDegreesPerAccel = *accel;
+                            layer.leanDegreesPerTurn = *turn;
+                            layer.leanMaxDegrees = *cap;
+                            if (layer.leanMaxDegrees < 0.0f) {
+                                return fail("node '{}': animation layer '{}': 'maxDegrees' cannot be "
+                                            "negative",
+                                            node.name, layer.name);
+                            }
+                        }
                         if (layer.kind == PoseLayerKind::Secondary) {
                             // Phase B §26-§28. Masked like an aim layer, because the oscillation
                             // is applied per joint and a chest and a head are different amounts of
@@ -10284,7 +10311,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 // Secondary motion (Phase B §26-§28)
                                 std::string_view{"degrees"},   std::string_view{"period"},
                                 std::string_view{"phase"},     std::string_view{"spread"},
-                                std::string_view{"stillness"}, std::string_view{"axis"}};
+                                std::string_view{"stillness"}, std::string_view{"axis"},
+                                // Lean (Phase B §19)
+                                std::string_view{"degreesPerAccel"},
+                                std::string_view{"degreesPerTurn"},
+                                std::string_view{"maxDegrees"}};
                             if (std::find(kLayerKeys.begin(), kLayerKeys.end(), key.key()) ==
                                 kLayerKeys.end()) {
                                 log::warn("scene file '{}': node '{}': animation layer key '{}' is not one "

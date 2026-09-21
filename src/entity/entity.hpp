@@ -455,6 +455,7 @@ private:
     // difference across a discontinuity.
     glm::vec3 lastPosition_{0.0f};
     bool hasLastPosition_ = false;
+    bool hasLastVelocity_ = false;
     MotionOffset motion_{};
     DirectorMotion director_{};
     LocomotionState locomotion_{};

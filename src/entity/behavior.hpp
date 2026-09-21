@@ -123,6 +123,10 @@ struct EntityState {
     // form every existing behaviour writes; this is the form that can express a strafe, and it is
     // invalid by default so that a behaviour which writes neither still works exactly as it did.
     CharacterIntent intent;
+
+    // Phase B §19/§35. Measured beside `velocity`, from the same difference, one derivative out.
+    // Zero on a body's first two steps and across a seek, for the same reason `velocity` is.
+    glm::vec3 acceleration{0.0f};
     // How far the body's travel is from its facing, in radians, 0 when standing still. Zero for a
     // body walking where it looks, pi for one backing up, pi/2 for a pure strafe.
     [[nodiscard]] float strafeAngle() const {

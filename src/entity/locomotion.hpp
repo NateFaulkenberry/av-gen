@@ -70,6 +70,9 @@ struct LocomotionState {
     // difference against there.
     glm::vec3 velocity{0.0f}; // world
     glm::vec3 facing{0.0f, 0.0f, 1.0f};
+    // What the body's velocity is doing, for a lean layer to tilt into. Published on both paths
+    // (ADR-554), like everything else here.
+    glm::vec3 acceleration{0.0f};
     // **Written by nobody and read by nobody** until Phase B looked for the same publication gap
     // that hid `velocity` and `action`. Its source is `EntityState::airborne`, which the jump/fall
     // machinery maintains; a foot placement layer must not plant a foot on a body in mid-air, so it

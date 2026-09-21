@@ -86,6 +86,18 @@ enum class PoseLayerKind : std::uint8_t {
     // Fades out as the body travels (`secondaryStillness`), because idle life is what a standing
     // body does and a walking one has a gait instead.
     Secondary,
+    // **Movement lean (Phase B §19, the pose half of B.F).** Tilt the body into what it is doing:
+    // forward when accelerating, back when braking, and into the inside of a turn.
+    //
+    // This is the half of "turn and directional movement" that `stepMotion` cannot supply. B.D
+    // built the *rate limits* -- how fast a velocity may change direction, and how fast a body may
+    // come round to face somewhere -- and those decide where the character goes. A lean is what
+    // the body does about it, and it lives in the pose.
+    //
+    // Driven by the **measured** acceleration (ADR-545's rule, one derivative out), not by the
+    // desired one: a body leans into the force it is actually under, and a character leaning into
+    // an acceleration its legs were never given is a character falling over on purpose.
+    Lean,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
@@ -247,6 +259,24 @@ struct PoseLayer {
     // what a standing body does; a walking one has a gait. Zero disables the fade.
     float secondaryStillness = 0.6f;
 
+    // ---- Lean (Phase B §19) ---------------------------------------------------------------------
+    // Degrees of tilt per metre-per-second-squared of acceleration. Small: 1 m/s^2 is a brisk
+    // start, and a body does not lean ten degrees into one.
+    float leanDegreesPerAccel = 2.2f;
+    // Degrees of roll per radian-per-second of turn. A body cornering leans into the inside of the
+    // turn, which is a different input from acceleration and needs its own gain.
+    float leanDegreesPerTurn = 6.0f;
+    // The most it may ever tilt, in degrees, after both terms. A clamp rather than a soft knee,
+    // and `LayerResolution::Clamped` reports it -- the engine has been bitten once by a limiter
+    // that saturated silently for the whole shipping cast (`Gait::playbackRate`).
+    float leanMaxDegrees = 9.0f;
+    // Seconds for the lean to follow a change in acceleration. **Zero, and deliberately so.**
+    // Smoothing here would be memory in a pose layer, which ADR-359 §4 puts in the entity tier
+    // instead: the acceleration this reads has already been measured from a simulation a seek
+    // replays, so the lean is a pure function of it and a scrubbed frame reproduces a played one.
+    // The field exists to say that, and to be the place an argument happens if anyone wants lag.
+    float leanSmoothing = 0.0f;
+
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
     // Stride: how far the body travels against the stride its clip was authored for. 1 means they
@@ -256,6 +286,10 @@ struct PoseLayer {
     // Secondary: the body's horizontal speed, so the oscillation can fade as it walks. Written per
     // frame from `MotionContext::groundSpeed` -- the measurement (ADR-545), not the intent.
     float bodySpeed = 0.0f;
+    // Lean: the body's MEASURED acceleration and turn rate, in the rig's own frame. Written per
+    // frame from `MotionContext`, which took them from the seam.
+    glm::vec3 bodyAcceleration{0.0f};
+    float bodyTurnRate = 0.0f;
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
     bool hasTarget = false;
 };
