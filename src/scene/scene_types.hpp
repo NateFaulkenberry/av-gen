@@ -586,6 +586,18 @@ struct Environment {
     // the air is does not read as one place.
     float fogUpperDensity = 0.0f;          // fraction of the layer's density left at any height
     float fogHeightCurve = 0.0f;           // 0 = exponential tail, 1 = a layer with a definite top
+    // ADR-570 (the fog brief's §20 and §22): the self-shadow march. At each march sample a short
+    // secondary ray goes toward each light that lights the air, through the PLACED MEDIA's own
+    // density, and that light's in-scatter is attenuated by the transmittance. It is what makes a
+    // bank brighter on the side facing the light than the side away from it, and it is where a
+    // light shaft comes from -- the same density, not a screen-space effect (§22 asks for exactly
+    // that and warns against the cheap version).
+    //
+    // 0 steps is OFF and is the default, because this multiplies the field evaluations per march
+    // step and ADR-562 §8 measured that those are the cost of this pass. 2 is enough for a soft
+    // directional darkening; 4-6 reads as a shaft. See ADR-570 for the measured numbers.
+    int volumeShadowSteps = 0;             // 0 = off
+    float volumeShadowStrength = 1.0f;     // 1 = physical; less lets light further in
     float volumeScattering = 1.0f;         // in-scatter strength
     float volumeAbsorption = 0.5f;         // extinction multiplier
     float volumeAnisotropy = 0.3f;         // HG g in (-1, 1)

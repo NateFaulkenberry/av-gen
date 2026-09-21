@@ -52,6 +52,26 @@ bool slider(app::Engine& engine, const char* path, const char* label, const char
     return changed;
 }
 
+// An integer row. ADR-570 needed one for `scene/volumeShadowSteps`, and a step COUNT drawn as a
+// float slider reading "3.47" is a control an artist has to interpret -- the same argument
+// `FieldType::Choice` makes in ADR-566, one type down.
+bool intSlider(app::Engine& engine, const char* path, const char* label) {
+    params::IParameter* p = engine.params().find(path);
+    if (p == nullptr) {
+        return false;
+    }
+    int v = static_cast<int>(p->baseComponent(0) + 0.5f);
+    rowLabel(label);
+    ImGui::PushID(path);
+    const bool changed = ImGui::SliderInt("##v", &v, static_cast<int>(p->softMin(0)),
+                                          static_cast<int>(p->softMax(0)));
+    ImGui::PopID();
+    if (changed) {
+        p->setBaseComponent(0, static_cast<float>(v));
+    }
+    return changed;
+}
+
 bool checkbox(app::Engine& engine, const char* path, const char* label) {
     params::IParameter* p = engine.params().find(path);
     if (p == nullptr) {
@@ -94,6 +114,13 @@ void drawEnvironmentPanel(app::Engine& engine) {
         // top, or a thin global haze that never quite clears.
         slider(engine, "scene/fogUpperDensity", "Upper density", "%.2f");
         slider(engine, "scene/fogHeightCurve", "Height curve", "%.2f");
+        // ADR-570 (§20/§22). Named for what an artist is buying rather than for the algorithm:
+        // what these do is make a bank light from a direction and cast a shaft, and "shadow steps"
+        // is the number that costs frame time. Both are drawn because a control that exists and
+        // cannot be reached is a control that does not exist (ADR-421) -- and at 0 the first one
+        // is the whole feature's off switch, which an artist should be able to find.
+        intSlider(engine, "scene/volumeShadowSteps", "Fog shadow steps");
+        slider(engine, "scene/volumeShadowStrength", "Fog shadow strength", "%.2f");
         slider(engine, "env/intensity", "Ambient", "%.2f");
         slider(engine, "env/sky/intensity", "Sky intensity", "%.2f");
         ImGui::PopID();

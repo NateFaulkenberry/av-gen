@@ -54,6 +54,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex"};
 constexpr std::string_view kSkyKeys[] = {
@@ -3933,6 +3934,20 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                                       .softMin = 8,
                                                       .softMax = 96,
                                                       .label = "scene/volumeSteps"});
+    // ADR-570 (§20/§22). The hard maximum is 16 rather than the march's 256: this runs INSIDE the
+    // march, once per light that lights the air, so its cost is multiplicative and a slider that
+    // can reach 256 is a slider that can stall a frame by a factor of a hundred. The soft range
+    // stops at 8, which ADR-570's measurement says is past the point where more steps change the
+    // picture.
+    volumeShadowSteps_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "scene/volumeShadowSteps",
+                                                            .defaultValue = volumeSetting_.volumeShadowSteps,
+                                                            .hardMin = 0,
+                                                            .hardMax = 16,
+                                                            .softMin = 0,
+                                                            .softMax = 8,
+                                                            .label = "scene/volumeShadowSteps"});
+    volumeShadowStrength_ = &params.add(floatDesc(prefix_ + "scene/volumeShadowStrength",
+                                                  volumeSetting_.volumeShadowStrength, 0.0f, 8.0f, 0.0f, 2.0f));
     // ADR-461. The soft range is the whole of 0..1 because the whole of it is usable and the
     // interesting end is the low one -- a slider whose useful region is in its first hair is the
     // `scene/windSpeed` defect this project has already fixed once.
@@ -4853,6 +4868,8 @@ void Composition::detach() {
     volumeNoiseSpeed_ = nullptr;
     volumeEmission_ = nullptr;
     volumeSteps_ = nullptr;
+    volumeShadowSteps_ = nullptr;
+    volumeShadowStrength_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     gridIntensity_ = nullptr;
@@ -7445,6 +7462,9 @@ void Composition::applyParameters() {
         env.volumeNoiseSpeed = pick(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
         env.volumeEmission = pick(volumeEmission_, volumeSetting_.volumeEmission);
         env.volumeSteps = volumeSteps_ != nullptr ? volumeSteps_->value() : volumeSetting_.volumeSteps;
+        env.volumeShadowSteps = volumeShadowSteps_ != nullptr ? volumeShadowSteps_->value()
+                                                             : volumeSetting_.volumeShadowSteps;
+        env.volumeShadowStrength = pick(volumeShadowStrength_, volumeSetting_.volumeShadowStrength);
         env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
@@ -8455,6 +8475,10 @@ nlohmann::json Composition::toJson() const {
             environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
             environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
             environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
+            environment["volumeShadowSteps"] =
+                volumeShadowSteps_ != nullptr ? volumeShadowSteps_->base() : volumeSetting_.volumeShadowSteps;
+            environment["volumeShadowStrength"] =
+                base(volumeShadowStrength_, volumeSetting_.volumeShadowStrength);
             environment["volumeJitter"] = base(volumeJitter_, volumeSetting_.volumeJitter);
             environment["shadowCascades"] = volumeSetting_.shadowCascades;
             environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
@@ -9403,6 +9427,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"fogHeightFalloff", &v.fogHeightFalloff},
                                       FloatKey{"fogUpperDensity", &v.fogUpperDensity},
                                       FloatKey{"fogHeightCurve", &v.fogHeightCurve},
+                                      FloatKey{"volumeShadowStrength", &v.volumeShadowStrength},
                                       FloatKey{"volumeScattering", &v.volumeScattering},
                                       FloatKey{"volumeAbsorption", &v.volumeAbsorption},
                                       FloatKey{"volumeAnisotropy", &v.volumeAnisotropy},
@@ -9473,6 +9498,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("'volumeSteps' must be an integer");
                 }
                 v.volumeSteps = std::clamp(e["volumeSteps"].get<int>(), 4, 256);
+            }
+            // ADR-570: clamped to the same 0..16 the parameter is, so a hand-written scene cannot
+            // ask for a cost the slider refuses to offer.
+            if (e.contains("volumeShadowSteps")) {
+                if (!e["volumeShadowSteps"].is_number_integer()) {
+                    return fail("'volumeShadowSteps' must be an integer");
+                }
+                v.volumeShadowSteps = std::clamp(e["volumeShadowSteps"].get<int>(), 0, 16);
             }
             if (e.contains("volumeJitter")) {
                 if (!e["volumeJitter"].is_number()) {

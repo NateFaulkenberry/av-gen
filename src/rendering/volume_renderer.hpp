@@ -75,6 +75,10 @@ struct VolumeUniforms {
     // is a uniform with a sizeof assertion, so a named lane is free and a reused one is not.
     // x = fogUpperDensity, y = fogHeightCurve, zw = 0.
     glm::vec4 heightFog;
+    // ADR-570 (§20/§22): the shared self-shadow march. x = steps along the ray toward each light
+    // (0 = off and the shader returns 1.0 from its first branch, so every existing frame is
+    // bit-identical), y = strength, zw = 0.
+    glm::vec4 selfShadow;
     // ADR-562: the placed media, as lanes. Was twelve named `vortexN` members carrying exactly one
     // medium; a slot is `world::kMediumLanes` `vec4` and there are `world::kMaxMedia` of them, so a
     // second medium is a slot rather than a rewrite. `mediaInfo.x` is how many are live and the
@@ -84,7 +88,7 @@ struct VolumeUniforms {
     glm::vec4 mediaInfo;
     glm::vec4 media[world::kMaxMedia * world::kMediumLanes];
 };
-static_assert(sizeof(VolumeUniforms) == 16 * (9 + 1 + world::kMaxMedia * world::kMediumLanes));
+static_assert(sizeof(VolumeUniforms) == 16 * (10 + 1 + world::kMaxMedia * world::kMediumLanes));
 
 class VolumeRenderer {
 public:
