@@ -1081,9 +1081,12 @@ TEST_CASE("every motion tag has a writer as well as a reader", "[motionscale][ph
     CHECK(cyclic > 20);
 
     // Five clips move their root more than 5 cm -- all of them deaths, which fall rather than
-    // travel. `MotionTag::Travelling` correctly stays unset (ADR-540: every locomotion clip here is
-    // authored in place), but it stays unset for the wrong reason, because the database still
-    // cannot compute it. Recorded so the two causes are not confused later.
+    // travel, and all far short of a rest height. `MotionTag::Travelling` correctly stays unset
+    // (ADR-540: every locomotion clip here is authored in place) and it stays unset **for the
+    // right reason**: `travels` is `extent > restHeight` from `measureRoot`, which takes no
+    // contacts, so the empty contact list the database passes does not degrade it. An earlier
+    // version of this test claimed the tag was unreachable; it is reachable and working, and the
+    // claim was a documented assertion nothing could disagree with (ADR-385).
     CHECK(travelling == 5);
     CHECK(withTags == 0); // the alien pack authors no tags; everything comes from clip names
 }

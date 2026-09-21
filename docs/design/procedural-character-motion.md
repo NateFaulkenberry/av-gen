@@ -1189,12 +1189,23 @@ exactly one place — deserialising a pack from JSON — so a pack built from a 
 looping, `Dying_forward` included. Recorded rather than fixed: deciding whether a take loops is a
 judgement about content and belongs with the clip analysis, not bolted onto the tagger.
 
-**`Travelling` stays 0, which is the right answer for the wrong reason.** ADR-540 says every
-locomotion clip here is authored in place, so 0 is correct — but the database still cannot compute
-it, because ADR-552 defines travel as the root's extent against rest height and the pack stores
-`rootTravel`, which is *net displacement*: the very measure ADR-552 rejected. Five clips move their
-root more than 5 cm and all five are deaths, which fall rather than travel. The fix is for the pack
-to store the verdict, not for the database to guess it.
+**`Travelling` stays 0, and it is the right answer for the right reason — my first write-up of this
+said otherwise and was wrong.** I claimed the tag was unreachable because the database passes an
+empty contact list. It is not: `analyseClip` computes `travels` from `measureRoot`, whose inputs are
+the travel joint's translation track and the rest height, and whose verdict is
+`extent > restHeight`. Contacts are not an argument to it; the only thing `ContactSettings{}`
+contributes is a 30 Hz sample rate, which is the alien pack's authored rate. **The tag is reachable
+and working**, and reads 0% because ADR-540 holds: every locomotion clip here is authored in place,
+and the five clips whose root moves more than 5 cm are deaths that fall far short of a rest height.
+
+That correction matters more than the fact. *"Travelling remains unreachable"* was a claim in the
+codebase that no test could disagree with — ADR-385, and the same shape as the dead weights and the
+one-ended tags. The next reader concludes the tag is vestigial and deletes it, or works around a
+mechanism that already works.
+
+What *is* wrong there is the cost: the call runs `detectContacts` and `extractPhase` over every
+clip, discards both, and keeps one boolean. The clean fix is the one `phase` just received — have
+the pack store the verdict it already computed — and it is noted for §37's offline/runtime boundary.
 
 ## §18 and §19 — the database reproduces its own content
 

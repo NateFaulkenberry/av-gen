@@ -299,9 +299,25 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         // root's extent against the body's rest height, and the pack keeps `rootTravel`, which is
         // net displacement -- the very measure ADR-552 rejected, because a 131-second walk that
         // returns to its start has a net displacement of 0.508 m against a path length of 93 m.
-        // So it is re-derived here, and it is re-derived with the same empty contacts as before,
-        // which means `MotionTag::Travelling` remains unreachable. Recorded rather than papered
-        // over: the fix is for the pack to store the verdict, not for this to guess it.
+        // So it is re-derived here.
+        //
+        // **The empty contact list does not affect it, and an earlier version of this comment said
+        // it did.** `analyseClip` computes `travels` from `measureRoot(skeleton, clip, root,
+        // rate)`, whose only inputs are the travel joint's translation track and the rest height:
+        // `travels = extent > restHeight`. Contacts are not an argument to it. The sole thing
+        // `ContactSettings{}` contributes here is `sampleRate`, whose default of 30 Hz is the
+        // alien pack's authored rate, so this verdict is computed correctly.
+        //
+        // `MotionTag::Travelling` therefore reads 0% on this corpus for the **right reason**:
+        // ADR-540, every locomotion clip in this repository is authored in place. The five clips
+        // whose root moves more than 5 cm are all deaths, which fall a long way short of a rest
+        // height. The tag is reachable and working.
+        //
+        // What is genuinely wrong here is the cost: this call runs `detectContacts` and
+        // `extractPhase` over the whole clip, discards both, and keeps one boolean. `measureRoot`
+        // alone would answer it, and is not currently exported. The clean fix is for the pack to
+        // store the verdict it already computed -- the same fix `phase` just received above -- and
+        // that is a note for §37's offline/runtime boundary rather than a change made here.
         const ClipAnalysis derived = analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{});
         analysis.travels = derived.travels;
         const std::uint32_t tags = motionTagsFor(meta, analysis);
