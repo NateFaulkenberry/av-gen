@@ -184,7 +184,8 @@ fn mediumKind(s: u32) -> u32 {
 // primitive rather than a second primitive (ADR-500's argument, still standing).
 fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
     return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u),
-                           mediaLane(s, 7u), mediaLane(s, 12u));
+                           mediaLane(s, 7u), mediaLane(s, 12u), mediaLane(s, 2u),
+                           mediaLane(s, 6u));
 }
 
 fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {

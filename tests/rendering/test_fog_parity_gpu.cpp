@@ -64,6 +64,8 @@ struct Args {
     f2: vec4<f32>,
     f3: vec4<f32>,
     f4: vec4<f32>,
+    f5: vec4<f32>,
+    f6: vec4<f32>,
     time: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> args: Args;
@@ -74,7 +76,7 @@ struct Args {
 fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= arrayLength(&samples)) { return; }
-    let f = FogUniformsWgsl(args.f0, args.f1, args.f2, args.f3, args.f4);
+    let f = FogUniformsWgsl(args.f0, args.f1, args.f2, args.f3, args.f4, args.f5, args.f6);
     let p = samples[i].xyz;
     let t = args.time.x;
     let rel = p - f.f0.xyz;
@@ -137,8 +139,8 @@ public:
         // The four lanes the march hands the field, by value, so this harness has no list to fall
         // behind — the same property the vortex harness gets from passing its uniform block whole.
         struct Args {
-            glm::vec4 f0, f1, f2, f3, f4, time;
-        } args{m.lane[0],  m.lane[13], m.lane[14], m.lane[7], m.lane[12],
+            glm::vec4 f0, f1, f2, f3, f4, f5, f6, time;
+        } args{m.lane[0],  m.lane[13], m.lane[14], m.lane[7], m.lane[12], m.lane[2], m.lane[6],
                glm::vec4(time, 0.0f, 0.0f, 0.0f)};
         wgpu::BufferDescriptor adesc{};
         adesc.size = sizeof(Args);
@@ -223,7 +225,13 @@ world::MediumSlot shippedBank(float detail, int shape = 0, float heightInfluence
     e.values.setFloat("fog/heightFalloff", 1.9f);
     e.values.setFloat("fog/domeShape", 0.28f);
     e.values.setFloat("fog/detailScale", 7.5f);
-    e.values.setFloat("fog/detailDrift", 0.04f);
+    // ADR-571: a drift with a real velocity, so the parity harness exercises the advection.
+    e.values.setFloat("fog/driftSpeed", 3.5f);
+    e.values.setFloat("fog/driftVertical", -0.8f);
+    // ADR-571 §24: every term of the density curve off its identity, so a shader that dropped one
+    // of the three cannot pass.
+    e.values.setFloat("fog/densityThreshold", 0.12f);
+    e.values.setFloat("fog/densitySoftness", 0.6f);
     e.values.setFloat("fog/shape", static_cast<float>(shape));
     e.values.setFloat("fog/heightInfluence", heightInfluence);
     world::MediumSlot slot{};

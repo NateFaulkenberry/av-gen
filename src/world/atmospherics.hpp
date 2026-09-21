@@ -645,6 +645,8 @@ struct MediumSlot {
 [[nodiscard]] float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t);
 [[nodiscard]] float fogEllipticalRadius(const MediumSlot& m, const glm::vec3& rel);
 [[nodiscard]] float fogVerticalProfile(const MediumSlot& m, float relY);
+// ADR-571 (§24): the density response curve. Identity at threshold 0, softness 0, contrast 1.
+[[nodiscard]] float fogDensityRemap(const MediumSlot& m, float shape);
 
 // ADR-566, the brief's §9: which local volume primitive a bank is. The order is the order of the
 // names `volumetric_fog_effect.cpp` offers and of the constants in `shaders/fog.wgsl`, and the

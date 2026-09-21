@@ -24,6 +24,15 @@
 //   f3  = LANE 7, which the vortex packs as (eyeWallWidth, eyeWallGain, cloudNoise, 0) and a fog
 //        bank has no eye to want the first two for. So the fog packer reuses them:
 //        x = detail scale, y = drift speed, z = detail amount (cloudNoise), w = 0.
+//   f6  = LANE 6, free for a fog bank by the same audit as lane 2. ADR-571 gives it §24's DENSITY
+//        RESPONSE CURVE: x = contrast, y = threshold, z = softness, w = 0.
+//   f5  = LANE 2, which the vortex packs as part of its field and which NOTHING reads for a fog
+//        bank: `mediaLane(s, 2u)` has exactly one reader in the whole march, `mediumVortexUniforms`,
+//        and that is the arm a fog bank never takes. So ADR-571 gives it to the bank's MOTION:
+//        xyz = a world-space drift velocity in metres per second, w = 0.
+//
+//        Checked rather than assumed -- `grep -o 'mediaLane(s, [0-9]*u)' shaders/volume.wgsl` is
+//        the audit, and it is the one ADR-562 §9 prescribes: grep the lane index, not the feature.
 //   f4  = LANE 12. x is `spill`, which the SURFACE GLOW reads (ADR-562) and this file must not
 //        touch. y and z are the vortex's two zeroes and ADR-566's two new numbers:
 //        y = shape index (the primitive), z = height influence.
@@ -39,6 +48,8 @@ struct FogUniformsWgsl {
     f2: vec4<f32>,
     f3: vec4<f32>,
     f4: vec4<f32>,
+    f5: vec4<f32>,
+    f6: vec4<f32>,
 };
 
 // ADR-566, the brief's §9: the five local volume primitives, plus the bank that was here first.
@@ -131,8 +142,22 @@ fn fogMacroDetail(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     // Tied to the bank's radius, so the detail is the same SHAPE at any size -- the size
     // independence ADR-564 gave the density, applied to the structure.
     let scale = max(f.f3.x, 0.05) / max(f.f0.w, 1.0);
-    let drift = f.f3.y * t;
-    let n = fbm3(p * scale + vec3<f32>(drift, drift * 0.3, -drift * 0.7), 41u);
+    // ADR-571, the brief's §15 and §16. **This is an ADVECTION, not an animation**, and §16 gives
+    // the form in one line: "sample the density field at `position - velocity x time`". Written
+    // that way it has a property no amount of tuning gives an offset added in noise space:
+    //
+    //     detail(p + v*dt, t + dt) == detail(p, t), EXACTLY.
+    //
+    // The structure is carried through the world rather than regenerated in place, which is what
+    // §15 means by "the fog should move through space, not shimmer internally because the texture
+    // changed" -- and `test_fog_flow.cpp` asserts that identity rather than describing it.
+    //
+    // What it replaced: `p * scale + vec3(drift, drift*0.3, -drift*0.7)`, a hard-coded direction
+    // in NOISE space. Its speed therefore depended on `detailScale` and on the bank's radius, so
+    // one number meant a different speed in every bank -- and its direction was not a control at
+    // all. The artist had a drift knob with no drift direction, which is the first line of §16's
+    // list.
+    let n = fbm3((p - f.f5.xyz * t) * scale, 41u);
     return 1.0 + amount * (n * 2.0 - 1.0);
 }
 
@@ -199,6 +224,40 @@ fn fogPrimitiveDistance(f: FogUniformsWgsl, rel: vec3<f32>) -> f32 {
     return fogEllipticalRadius(f, rel);
 }
 
+// §24's density response curve: raw density -> remap -> final density.
+//
+// **It is here because `contrast` was a dead knob.** A fog bank has declared a `Contrast` row
+// since it existed, and all three of its shipped styles set it -- Valley Mist 1.5, Glowmere Haze
+// 2.6, Dense Bank 3.4. ADR-563 gave the fog its own field and `fogShapeAt` never read the number,
+// so from that commit onward an artist loading "Dense Bank" got a contrast of 3.4 that did
+// nothing at all. Same family as ADR-561's eye hole and ADR-565's `detailAmount`: a control that
+// is declared, set by a preset, and unreachable. **Turning it on changes no shipped frame, because
+// `grep -rl '"kind": "fog"' examples/` returns ZERO scenes** -- which is also why so many of this
+// kind's controls were able to die unnoticed.
+//
+// All three terms are the IDENTITY at their defaults (threshold 0, softness 0, contrast 1), so the
+// curve is something an artist opts into rather than something they have to undo.
+//
+//   threshold  clears density below it and renormalises what is left, which is how thin haze
+//              becomes clear air and how a bank gets a definite boundary instead of a long tail.
+//   softness   bends the knee from a straight line into a smoothstep. §23: softness matters more
+//              than detail, so this is a first-class control rather than a hidden constant.
+//   contrast   the response curve itself. Above 1 the bank is thin at its edge and dense in its
+//              core -- cinematic cloud; below 1 it fills out toward a uniform slab.
+fn fogDensityRemap(f: FogUniformsWgsl, shape: f32) -> f32 {
+    let threshold = clamp(f.f6.y, 0.0, 0.99);
+    var s = max(shape - threshold, 0.0) / max(1.0 - threshold, 1e-4);
+    let softness = clamp(f.f6.z, 0.0, 1.0);
+    if (softness > 0.0) {
+        s = mix(s, smoothstep(0.0, 1.0, s), softness);
+    }
+    let contrast = max(f.f6.x, 0.05);
+    if (contrast != 1.0) {
+        s = pow(max(s, 0.0), contrast);
+    }
+    return clamp(s, 0.0, 1.0);
+}
+
 // The bank, analytic and complete. Zero outside, and compactly so, which is the property ADR-374
 // measured the march's cost against and ADR-562's ray interval depends on.
 fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
@@ -231,5 +290,5 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     if (fogShapeKind(f) != kFogShapeBank) {
         profile = mix(1.0, profile, clamp(f.f4.z, 0.0, 1.0));
     }
-    return max(rim * profile * fogMacroDetail(f, p, t), 0.0);
+    return fogDensityRemap(f, max(rim * profile * fogMacroDetail(f, p, t), 0.0));
 }

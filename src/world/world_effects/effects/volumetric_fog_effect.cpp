@@ -170,7 +170,34 @@ constexpr EffectField kFields[] = {
     // bank's radius, so the detail is the same SHAPE at any size -- ADR-564's size independence
     // applied to structure rather than to density.
     storedFloat("detailScale", "Detail scale", 6.0f, 0.5f, 40.0f, 1.0f, 16.0f).sec("Detail"),
-    storedFloat("detailDrift", "Detail drift", 0.01f, -0.5f, 0.5f, -0.1f, 0.1f),
+    // ADR-571 (§15/§16): the bank's MOTION, in metres per second, along its own long axis.
+    //
+    // `detailDrift` was a rate in NOISE space, divided by `detailScale` and by the radius on the
+    // way in, so one number meant a different speed in every bank -- and its direction was not a
+    // control at all, which is the first line of §16's list. It is metres a second now, the same
+    // move ADR-564 made for density, and it is GONE rather than aliased (ADR-441).
+    //
+    // The direction is the bank's own long axis (`bankRotation`), which costs no control and is
+    // the answer an artist expects: a bank lying along a valley drifts along the valley.
+    storedFloat("driftSpeed", "Drift speed", 0.0f, -40.0f, 40.0f, -4.0f, 4.0f)
+        .sec("Motion")
+        .fmt("%.2f m/s")
+        .tooltip("How fast the bank's internal structure is carried through the world, along the\n"
+                 "bank's long axis. This is an ADVECTION: the detail moves rather than changing in\n"
+                 "place, so at any speed the fog still reads as fog rather than boiling."),
+    storedFloat("driftVertical", "Drift vertical", 0.0f, -20.0f, 20.0f, -2.0f, 2.0f)
+        .fmt("%.2f m/s")
+        .tooltip("Upward or downward drift, in metres a second. Mist lifting off water is a small\n"
+                 "positive number; a bank settling into a valley is a small negative one."),
+    // ADR-571 (§24): the density response curve's threshold and softness. `Contrast` is its third
+    // term and is declared below, as the absolute row on `e.vortex.field.contrast` it always was.
+    storedFloat("densityThreshold", "Density threshold", 0.0f, 0.0f, 0.99f, 0.0f, 0.8f)
+        .sec("Density curve")
+        .tooltip("Clears density below this and renormalises what is left. Turn it up to make thin\n"
+                 "haze into clear air and give the bank a definite boundary instead of a long tail."),
+    storedFloat("densitySoftness", "Density softness", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f)
+        .tooltip("Bends the threshold's knee from a straight line into a smooth one. Section 23 of\n"
+                 "the brief: softness matters more than detail."),
     floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
                SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").sec("Detail").main()
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
@@ -404,7 +431,11 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 //
 //   0  centre.xyz, radius (0 is off, and it is the gate)
 //   1  thickness, swirl, rotationSpeed, DENSITY (extinction per metre)
-//   2  innerVoid, contrast, turbulence, turbulenceScale
+//   2  ADR-571: the fog bank's DRIFT VELOCITY (m/s, world space). The vortex packs
+//      (innerVoid, contrast, turbulence, turbulenceScale) here and no reader of a fog bank's slot
+//      looks at it -- audited with `grep -o 'mediaLane(s, [0-9]*u)' shaders/volume.wgsl`.
+//   6  ADR-571: the DENSITY RESPONSE CURVE (contrast, threshold, softness). Free for the same
+//      reason and audited the same way.
 //   3  breathAmount, breathSpeed, EMISSION (per metre), filaments
 //   4  funnelDepth, throat, throatDensity, 0
 //   5  cometResponse, cometReach, sceneScattering, 0
@@ -439,13 +470,33 @@ void packMedium(const E& e, float envelope, MediumSlot& out) {
     // bank is usually looked through, so `density` means the same thing at any size.
     const float crossing = std::max(2.0f * v.field.radius * std::max(storedOf(e, "bankLength", 1.0f), 0.05f), 1.0f);
     out.lane[1] = glm::vec4(glm::vec3(f.v1), (std::max(v.density, 0.0f) / crossing) * envelope);
-    out.lane[2] = f.v2;
+    // ADR-571 (§15/§16): lane 2 is the bank's DRIFT VELOCITY in metres per second, world space.
+    //
+    // It is the vortex's lane 2 reinterpreted, and the audit that says that is safe is
+    // `grep -o 'mediaLane(s, [0-9]*u)' shaders/volume.wgsl`: lane 2 has exactly one reader in the
+    // march, `mediumVortexUniforms`, and that is the arm a fog bank never takes. ADR-562 §9's
+    // rule applied before writing rather than after something broke.
+    //
+    // The flow field a scene subscribes to cannot reach here -- `EffectResolve::pack` is handed
+    // the effect and an envelope and not the resolved flow -- so §17's wind coupling is not in
+    // this lane yet. ADR-571's revisit note says what it would take.
+    const float driftRot = glm::radians(storedOf(e, "bankRotation", 0.0f));
+    const float driftSpeed = storedOf(e, "driftSpeed", 0.0f);
+    out.lane[2] = glm::vec4(std::cos(driftRot) * driftSpeed,
+                            storedOf(e, "driftVertical", 0.0f),
+                            std::sin(driftRot) * driftSpeed, 0.0f);
     out.lane[3] = glm::vec4(f.v3.x, f.v3.y, std::max(v.emission, 0.0f) * envelope,
                             std::max(v.filaments, 0.0f));
     out.lane[4] = f.v4;
     out.lane[5] = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f),
                             std::max(v.scattering, 0.0f), 0.0f);
-    out.lane[6] = f.v6;
+    // ADR-571 (§24): lane 6 is the bank's DENSITY RESPONSE CURVE. Free for a fog bank by the same
+    // audit as lane 2 -- `mediumVortexUniforms` is its only reader in the march and a bank never
+    // takes that arm. `contrast` finally reaches the field through it: the row has existed since
+    // this kind did and all three styles set it, and nothing has read it since ADR-563.
+    out.lane[6] = glm::vec4(std::max(v.field.contrast, 0.05f),
+                            std::clamp(storedOf(e, "densityThreshold", 0.0f), 0.0f, 0.99f),
+                            std::clamp(storedOf(e, "densitySoftness", 0.0f), 0.0f, 1.0f), 0.0f);
     // ADR-565: a fog bank has no eye, so lane 7's first two slots carry its macro-detail terms
     // instead. `.z` stays `cloudNoise` exactly where `packVortex` put it, so the control an artist
     // moves is the one the field reads.

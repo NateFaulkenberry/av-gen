@@ -441,7 +441,10 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // nothing loads differently -- which is the property this case exists to check and still
         // checks, one line down.
         REQUIRE(doc.contains("fog"));
-        // Ten since ADR-566 added `shape` and `heightInfluence` to ADR-565's eight. This number
+        // Thirteen since ADR-571 traded `detailDrift` for `driftSpeed` and `driftVertical` and
+        // added §24's `densityThreshold` and `densitySoftness`. Counted with
+        // `grep -c '    storedFloat("'` (12) plus `grep -c 'storedChoice("'` (1), not read off
+        // the failure. This number
         // moving is the case doing its job rather than breaking: it is the only thing in the suite
         // that notices a kind's stored rows changing what EVERY effect of every kind serialises,
         // because `toJson` writes every kind's block.
@@ -452,7 +455,7 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // now agrees with whatever the code does. Third time this case has reported a true
         // consequence, and both times it caught me it was because a row was added and the count
         // was not re-derived.
-        CHECK(doc["fog"].size() == 10);
+        CHECK(doc["fog"].size() == 13);
         // The shower block holds only its six own numbers.
         REQUIRE(doc.contains("meteors"));
         CHECK(doc["meteors"].size() == 6);

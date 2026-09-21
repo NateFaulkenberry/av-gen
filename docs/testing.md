@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty-five ways a green suite has lied
+## Twenty-six ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -638,6 +638,34 @@ night from two agents who never spoke to each other.
      `ps -Ao pid,command | grep 'build/release/tests/avgen_render_tests' | grep -v 'zsh -c'`.
    - **After editing a shell script, `bash -n` it.** It costs nothing and it is the difference
      between finding a syntax error now and finding it in the exit code of somebody's suite.
+
+26. **`git checkout -- <file>` to undo a break demonstration silently deletes the uncommitted work
+   in that file, and everything still builds.**
+
+   A break demonstration edits a file, runs the suite, and restores it. Restoring from a scratch
+   copy is correct. Restoring with `git checkout --` restores it to **HEAD** -- which is not where
+   it was, if the file also carried an hour of uncommitted work.
+
+   Done on 2026-09-21. Four artist rows and a packed lane went back to HEAD, the build succeeded,
+   the tests that did not cover the reverted lines passed, and the next edit -- which anchored on
+   one of the deleted lines -- **silently did nothing**, because `str.replace` with no match is a
+   no-op. Two layers of silence: the revert and then the failed patch.
+
+   **What caught it was a count taken from the code**: `grep -c 'storedFloat("'` came back 9 where
+   the change should have made it 12. The registry's block-size assertion would have caught it at
+   the next suite too, but the grep caught it one minute after it happened instead of forty.
+
+   Three habits, in the order they pay:
+
+   - **restore from a scratch copy, never from `git`**, when a file has uncommitted work:
+     `cp file $SCRATCH/file.bak` before the break, `cp $SCRATCH/file.bak file` after;
+   - **assert on every scripted edit.** `assert old in t` before `t.replace(old, new)` turns a
+     silent no-op into an immediate failure, and the one replacement in that batch written without
+     an assert is the one that vanished;
+   - **count the thing you changed, from the code, after changing it.** It is the same move as
+     re-deriving a test's expected number from `grep -c` rather than from the red output, and it
+     catches a different failure: not "the test now agrees with the code" but "the code is not what
+     I think it is".
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a

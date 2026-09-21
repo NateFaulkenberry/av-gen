@@ -272,3 +272,75 @@ TEST_CASE("the bank is what ADR-563 left it", "[fog][primitive]") {
     CHECK(world::fogPrimitiveDistance(sa, glm::vec3(0.0f, 999.0f, 70.0f)) ==
           Approx(world::fogEllipticalRadius(sa, glm::vec3(0.0f, 999.0f, 70.0f))));
 }
+
+
+TEST_CASE("the density response curve is identity at its defaults and a curve away from them",
+          "[fog][density]") {
+    // ADR-571, the brief's §24: raw density -> remap -> final density, with Density, Contrast,
+    // Threshold and Softness exposed. Two properties, and the first is the one that makes the
+    // second safe to ship.
+    //
+    // **`Contrast` was a dead knob before this.** The row has existed since this kind did and all
+    // three styles set it -- Valley Mist 1.5, Glowmere Haze 2.6, Dense Bank 3.4 -- and since
+    // ADR-563 gave the fog its own field nothing read the number. Delete the `pow` in
+    // `fogDensityRemap` and the third section fails; before ADR-571 every assertion in it would
+    // have passed against a field that ignored the control entirely.
+    auto plain = primitive(world::FogShape::Sphere, 1.0f);
+    setRow(plain, "densityThreshold", 0.0f);
+    setRow(plain, "densitySoftness", 0.0f);
+    plain.vortex.field.contrast = 1.0f;
+
+    SECTION("at threshold 0, softness 0 and contrast 1 the curve does nothing") {
+        // The default a bank is made with, so this is the promise that §24 is opt-in. `1e-4` is
+        // float rounding through a divide and a clamp, not a tolerance on the behaviour.
+        const world::MediumSlot m = slotOf(plain);
+        for (const float s : {0.0f, 0.05f, 0.31f, 0.5f, 0.87f, 1.0f}) {
+            INFO("raw density " << s);
+            CHECK(world::fogDensityRemap(m, s) == Approx(s).margin(1e-4));
+        }
+    }
+
+    SECTION("a threshold clears thin density and renormalises what is left") {
+        auto e = plain;
+        setRow(e, "densityThreshold", 0.4f);
+        const world::MediumSlot m = slotOf(e);
+        CHECK(world::fogDensityRemap(m, 0.2f) == 0.0f);   // below it: clear air
+        CHECK(world::fogDensityRemap(m, 0.4f) == 0.0f);   // exactly at it
+        CHECK(world::fogDensityRemap(m, 0.7f) == Approx(0.5f));  // halfway up what remains
+        CHECK(world::fogDensityRemap(m, 1.0f) == Approx(1.0f));  // and the core is untouched
+    }
+
+    SECTION("contrast is a response curve and it REACHES the field") {
+        auto dense = plain;
+        dense.vortex.field.contrast = 3.0f;
+        auto thin = plain;
+        thin.vortex.field.contrast = 0.4f;
+        const world::MediumSlot md = slotOf(dense);
+        const world::MediumSlot mt = slotOf(thin);
+        // Above 1 the mid-range thins and the core stays; below 1 the mid-range fills out. The
+        // ends are fixed points of x^k, which is what makes this a CURVE rather than a scale.
+        CHECK(world::fogDensityRemap(md, 0.5f) < 0.5f);
+        CHECK(world::fogDensityRemap(mt, 0.5f) > 0.5f);
+        CHECK(world::fogDensityRemap(md, 1.0f) == Approx(1.0f));
+        CHECK(world::fogDensityRemap(md, 0.0f) == Approx(0.0f));
+
+        // ...and the same numbers reach `fogShapeAt`, which is the half that was missing: the
+        // control was declared and packed and the field never read it.
+        //
+        // Sampled ON THE RIM and not in the core, because 0 and 1 are fixed points of `x^k`: the
+        // first version of this assertion read the centre of the sphere, got 1.0 from both arms
+        // and failed -- correctly. A curve has to be measured where the curve is.
+        auto rimDense = dense;
+        auto rimThin = thin;
+        setRow(rimDense, "edgeSoftness", 0.6f);
+        setRow(rimThin, "edgeSoftness", 0.6f);
+        const world::MediumSlot rd = slotOf(rimDense);
+        const world::MediumSlot rt = slotOf(rimThin);
+        const glm::vec3 p(100.0f, 0.0f, 0.0f); // the sphere's surface: rim is mid-range here
+        const float withDense = world::fogShapeAt(rd, p);
+        const float withThin = world::fogShapeAt(rt, p);
+        INFO("fogShapeAt with contrast 3.0 = " << withDense << ", with 0.4 = " << withThin);
+        REQUIRE(withThin > 0.0f);
+        CHECK(withDense < withThin);
+    }
+}

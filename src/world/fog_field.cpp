@@ -67,8 +67,10 @@ float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t) {
         return 1.0f;
     }
     const float scale = std::max(m.lane[7].x, 0.05f) / std::max(m.lane[0].w, 1.0f);
-    const float drift = m.lane[7].y * t;
-    const float n = noise::fbm3(p * scale + glm::vec3(drift, drift * 0.3f, -drift * 0.7f), 41u);
+    // ADR-571 (§15/§16): an ADVECTION. `detail(p + v*dt, t + dt) == detail(p, t)` exactly, which
+    // is what makes the structure move through the world rather than regenerate in place.
+    const glm::vec3 velocity(m.lane[2]);
+    const float n = noise::fbm3((p - velocity * t) * scale, 41u);
     return 1.0f + amount * (n * 2.0f - 1.0f);
 }
 
@@ -114,6 +116,22 @@ float fogPrimitiveDistance(const MediumSlot& m, const glm::vec3& rel) {
     return fogEllipticalRadius(m, rel);
 }
 
+// §24's density response curve -- the transliteration of `fogDensityRemap` in `shaders/fog.wgsl`.
+// Identity at (threshold 0, softness 0, contrast 1), which is what makes it opt-in.
+float fogDensityRemap(const MediumSlot& m, float shape) {
+    const float threshold = std::clamp(m.lane[6].y, 0.0f, 0.99f);
+    float s = std::max(shape - threshold, 0.0f) / std::max(1.0f - threshold, 1e-4f);
+    const float softness = std::clamp(m.lane[6].z, 0.0f, 1.0f);
+    if (softness > 0.0f) {
+        s = s + (smoothstepf(0.0f, 1.0f, s) - s) * softness;
+    }
+    const float contrast = std::max(m.lane[6].x, 0.05f);
+    if (contrast != 1.0f) {
+        s = std::pow(std::max(s, 0.0f), contrast);
+    }
+    return std::clamp(s, 0.0f, 1.0f);
+}
+
 float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;
@@ -133,7 +151,7 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
         const float influence = std::clamp(m.lane[12].z, 0.0f, 1.0f);
         profile = 1.0f + (profile - 1.0f) * influence;
     }
-    return std::max(rim * profile * fogMacroDetail(m, p, t), 0.0f);
+    return fogDensityRemap(m, std::max(rim * profile * fogMacroDetail(m, p, t), 0.0f));
 }
 
 } // namespace avgen::world
