@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include <fmt/format.h>
+#include <utility>
 
 namespace avgen::scene {
 namespace {
@@ -574,6 +575,124 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
             }
         }
     }
+    return best;
+}
+
+
+MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& query,
+                               const MotionCostWeights& weights, const MotionSearchPlan& plan) {
+    // An exhaustive plan is the linear scan, by delegation rather than by a parallel
+    // implementation that has to be kept in step. §16 says "do not prematurely overengineer it",
+    // and two copies of a cost function is the first way that goes wrong.
+    if (plan.exhaustive()) {
+        MotionMatch out = searchMotion(db, query, weights);
+        out.coarseConsidered = out.considered;
+        out.fullyScored = out.considered;
+        return out;
+    }
+
+    MotionMatch best;
+    const std::size_t dim = db.dimension;
+    if (dim == 0 || query.features.size() != dim || db.sampleCount() == 0) {
+        return best;
+    }
+    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    const bool weighted = dimWeight.size() == dim;
+    const std::size_t prefix =
+        plan.prefixDimensions == 0 ? dim : std::min<std::size_t>(plan.prefixDimensions, dim);
+    const float* q = query.features.data();
+
+    const auto passesTags = [&](std::uint32_t s) {
+        const std::uint32_t tags = db.sampleTags[s];
+        return !((query.requireTags != 0 && (tags & query.requireTags) != query.requireTags) ||
+                 (query.rejectTags != 0 && (tags & query.rejectTags) != 0));
+    };
+
+    // Stage one: a strided pass over a prefix of the feature vector. No early-out here -- it needs
+    // a running best to be worth anything, and the point of this pass is that every candidate is
+    // cheap rather than that some are skipped.
+    std::vector<std::pair<float, std::uint32_t>> shortlist;
+    shortlist.reserve(plan.shortlist + 1u);
+    const std::uint32_t stride = std::max(plan.stride, 1u);
+    for (std::uint32_t s = 0; s < db.sampleCount(); s += stride) {
+        if (!passesTags(s)) {
+            ++best.rejected;
+            continue;
+        }
+        ++best.coarseConsidered;
+        const float* f = db.featuresFor(s);
+        float cost = 0.0f;
+        for (std::size_t d = 0; d < prefix; ++d) {
+            const float delta = q[d] - f[d];
+            cost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+        }
+        if (shortlist.size() < plan.shortlist) {
+            shortlist.emplace_back(cost, s);
+            std::push_heap(shortlist.begin(), shortlist.end());
+        } else if (!shortlist.empty() && cost < shortlist.front().first) {
+            std::pop_heap(shortlist.begin(), shortlist.end());
+            shortlist.back() = {cost, s};
+            std::push_heap(shortlist.begin(), shortlist.end());
+        }
+    }
+
+    // Stage two: the full weighted cost, including continuity and transition, on the shortlist and
+    // on the neighbours the coarse pass stepped over. **The neighbourhood is what stops striding
+    // from permanently hiding an answer**: with stride 8 and neighbourhood 8 every sample in the
+    // database is reachable from some shortlisted one, so the plan trades work for a chance of
+    // missing rather than for a guarantee of it.
+    std::vector<std::uint32_t> candidates;
+    candidates.reserve(shortlist.size() * (2u * plan.neighbourhood + 1u));
+    for (const auto& [cost, s] : shortlist) {
+        const std::uint32_t lo = s > plan.neighbourhood ? s - plan.neighbourhood : 0u;
+        const std::uint32_t hi = std::min(s + plan.neighbourhood, db.sampleCount() - 1u);
+        for (std::uint32_t n = lo; n <= hi; ++n) {
+            candidates.push_back(n);
+        }
+    }
+    std::sort(candidates.begin(), candidates.end());
+    candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+
+    MotionQuery narrowed = query;
+    float bestCost = 0.0f;
+    for (const std::uint32_t s : candidates) {
+        if (!passesTags(s)) {
+            continue;
+        }
+        ++best.fullyScored;
+        const float* f = db.featuresFor(s);
+        float cost = 0.0f;
+        for (std::size_t d = 0; d < dim; ++d) {
+            const float delta = q[d] - f[d];
+            cost += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+        }
+        if (query.current != MotionDatabase::kInvalid) {
+            const bool continues =
+                query.current < db.sampleNext.size() && db.sampleNext[query.current] == s;
+            if (!continues) {
+                cost += weights.continuity;
+                const std::uint32_t currentClip = query.current < db.sampleClip.size()
+                                                      ? db.sampleClip[query.current]
+                                                      : MotionDatabase::kInvalid;
+                if (db.sampleClip[s] != currentClip) {
+                    const std::uint32_t currentTags = query.current < db.sampleTags.size()
+                                                          ? db.sampleTags[query.current]
+                                                          : 0u;
+                    const std::uint32_t shared = db.sampleTags[s] & currentTags;
+                    if (currentTags != 0 && shared != currentTags) {
+                        cost += weights.transition;
+                    }
+                }
+            }
+        }
+        if (!best.found() || cost < bestCost) {
+            best.sample = s;
+            bestCost = cost;
+        }
+    }
+    best.considered = best.fullyScored;
+    best.cost = bestCost;
+    (void)narrowed;
     return best;
 }
 

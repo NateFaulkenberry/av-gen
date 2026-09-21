@@ -1072,3 +1072,38 @@ unrelated clip. §11 lists "current sample, previous sample, source clip, phase,
 transition distance" as inputs, and a next-or-not flag is the crudest possible reading of that.
 §12 is met in the respect it cares about — it uses tag metadata, never clip names, which is its one
 explicit prohibition — but is likewise binary. Both are next.
+
+## §16 — the two-stage search, and what recall hid
+
+**The disclaimer first**, because it belongs with the justification: on this repository's content a
+linear scan is comfortably correct — 1,738 samples, 17.46 µs worst case, **955 characters per frame
+at 60 Hz**. §16 exists for the scale §6 and §17 ask about, where one query is **36.5 ms**. A future
+reader finding a two-stage search here should not conclude the linear scan was inadequate.
+
+Swept on **real** Glowmere motion, 249 queries drawn from inside the distribution and perturbed so
+the answer is not trivially the seed. A typical candidate on this database scores 69.72 worse than
+the best one, which is the denominator that makes an excess mean anything:
+
+| plan | recall | worst excess | % of spread | samples fully scored |
+|---|---|---|---|---|
+| stride 8, prefix 12, top 32 | 94.4% | 60.60 | 86.9% | 2320 |
+| stride 8, prefix 12, top 128 | 99.6% | 48.93 | 70.2% | 1873 |
+| stride 8, full prefix, top 32 | 96.8% | 59.49 | 85.3% | 2278 |
+| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | **3.1%** | **84** |
+
+**94.4% recall hides that the misses land 86.9% of the way to a random sample.** That matcher does
+not pick a slightly different frame of comparable motion; it picks different motion. And the
+99.6%-recall plan at stride 8 is *still* 70.2% when wrong — **raising recall did not make the
+failures benign.** ADR-559's family in a new place, and the opposing quantity is severity.
+
+Getting the denominator right took three attempts, and the wrong two are recorded because they are
+the instructive part: `staged/full` reported **2957x**, because a query drawn from the database sits
+near a sample so the best cost is near zero — *a ratio whose denominator can approach zero measures
+the denominator*. Excess against the mean best cost was the same defect one step removed. Only the
+measured gap between a good match and a typical one is a scale on which "how bad is this miss" has
+an answer.
+
+**And the cheap prefix bought nothing.** The textbook design ranks coarsely on a prefix; here the
+full-prefix plan at stride 8 was barely better than the 12-dimension one. The entire win is the
+stride, and the safe plan is stride 4 at full prefix: **84 samples fully scored against 1,738, a 20x
+reduction at 99.6% recall and a 3.1% worst case.** Recorded as ADR-609.

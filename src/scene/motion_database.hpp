@@ -246,11 +246,51 @@ struct MotionMatch {
     MotionCostBreakdown breakdown; // §10: what the cost was made of, for the winner
     std::uint32_t considered = 0; // how many survived filtering and were scored
     std::uint32_t rejected = 0;   // how many the tag filter removed before scoring
+    // §16: how many the cheap stage looked at, and how many reached the full cost. Equal to
+    // `considered` and to each other for an exhaustive plan.
+    std::uint32_t coarseConsidered = 0;
+    std::uint32_t fullyScored = 0;
     [[nodiscard]] bool found() const { return sample != MotionDatabase::kInvalid; }
 };
 
 // Standardise a raw feature vector in place, using this database's own mean and scale.
 void normaliseQuery(const MotionDatabase& db, std::vector<float>& features);
+
+// Phase C §16: candidate filtering -> cheap feature search -> top N -> full cost -> best.
+//
+// **Read the disclaimer before the implementation.** On this repository's actual content a linear
+// scan is comfortably correct: the real Glowmere database is 1,738 samples and a full search costs
+// 8.88 us at best, 9.25 us on average and 17.46 us at worst -- **955 characters per frame at
+// 60 Hz on the worst case.** Nothing here needs a two-stage search.
+//
+// What needs it is the scale §6 and §17 ask about. At a million samples one query is **36.5 ms**,
+// more than two whole frames, for one character, and the scan is honestly linear (101x for 100x
+// the samples). So this exists for a database two orders of magnitude larger than any in the tree,
+// and a future reader finding it here should NOT conclude the linear scan was inadequate. It was
+// not. The numbers above are the whole of the justification and the whole of the disclaimer, and
+// they are stated together on purpose: an optimisation defended by a benchmark that never needed
+// it becomes permanent without ever having been justified.
+//
+// `stride` is the cheap stage. It scores every `stride`-th sample on a **prefix** of the feature
+// vector, keeps the best `shortlist`, then evaluates the full weighted cost -- including
+// continuity and transition -- on those and on each shortlisted sample's neighbours, so a sample
+// the coarse pass stepped over can still win.
+struct MotionSearchPlan {
+    std::uint32_t stride = 1;      // 1 = exhaustive, which is the linear scan exactly
+    std::uint32_t shortlist = 32;  // how many survive the cheap stage
+    std::uint32_t prefixDimensions = 0; // 0 = all of them
+    // The neighbourhood re-expanded around each shortlisted sample, so striding cannot permanently
+    // hide the true best: with `stride` 8 and `neighbourhood` 8 every sample is reachable.
+    std::uint32_t neighbourhood = 0;
+    [[nodiscard]] bool exhaustive() const { return stride <= 1u; }
+};
+
+// The two-stage search. With a default-constructed plan this is `searchMotion` exactly -- same
+// samples considered, same answer -- which is what makes the plan a tuning surface rather than a
+// second code path that has to be kept in step.
+[[nodiscard]] MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& query,
+                                             const MotionCostWeights& weights,
+                                             const MotionSearchPlan& plan);
 
 // Linear scan (§15's baseline). Benchmarked against real motion distributions rather than a
 // synthetic fixture, for the reason ADR-540 paid to learn: a white-noise fixture made an early-out

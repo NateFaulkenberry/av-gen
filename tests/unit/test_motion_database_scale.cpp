@@ -392,3 +392,236 @@ TEST_CASE("the real Glowmere database, built and benchmarked", "[motionscale][ph
                      match.sample, match.cost));
     CHECK(match.sample == seedSample); // it is its own nearest neighbour
 }
+
+// ---------------------------------------------------------------------------------------------
+// §16 -- the two-stage search, judged on real data and timed on synthetic, which is the boundary
+// ADR-607 draws: a scan's cost is distribution-independent, a first stage's *recall* is not.
+
+TEST_CASE("the two-stage search finds what the linear scan finds, on real motion",
+          "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §16"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+
+    const scene::MotionCostWeights weights;
+
+    // **An exhaustive plan must be the linear scan exactly**, or the plan is a second code path
+    // rather than a tuning surface. Asserted before anything about recall, because if these two
+    // disagree the recall numbers below mean nothing.
+    scene::MotionQuery probe;
+    probe.features.assign(db->dimension, 0.0f);
+    const float* seed = db->featuresFor(db->sampleCount() / 2u);
+    std::copy(seed, seed + db->dimension, probe.features.begin());
+    const scene::MotionMatch exhaustiveScan = scene::searchMotion(*db, probe, weights);
+    const scene::MotionMatch exhaustivePlan =
+        scene::searchMotionStaged(*db, probe, weights, scene::MotionSearchPlan{});
+    CHECK(exhaustivePlan.sample == exhaustiveScan.sample);
+    CHECK(exhaustivePlan.cost == exhaustiveScan.cost);
+    CHECK(exhaustivePlan.considered == exhaustiveScan.considered);
+
+    // The sweep, on real motion, because a first stage's recall is not distribution-independent.
+    struct Plan {
+        const char* name;
+        std::uint32_t stride;
+        std::uint32_t shortlist;
+        std::uint32_t prefix;
+        std::uint32_t neighbourhood;
+    };
+    const Plan plans[] = {
+        {"stride 8, prefix 12, top 32 ", 8u, 32u, 12u, 8u},
+        {"stride 8, prefix 12, top 128", 8u, 128u, 12u, 8u},
+        {"stride 8, FULL prefix, top 32", 8u, 32u, 0u, 8u},
+        {"stride 4, FULL prefix, top 32", 4u, 32u, 0u, 4u},
+    };
+
+    // **The denominator, measured rather than assumed.** "Excess against the mean best cost" is
+    // still the wrong scale: a query drawn from the database sits almost on a sample, so the best
+    // cost is near zero and everything is a large multiple of it. The quantity that gives an
+    // excess meaning is **how far apart the costs in this database actually are** -- the gap
+    // between the best match and a typical one. An excess small against that gap is a different
+    // frame of comparably good motion; an excess comparable to it is a different motion.
+    double spread = 0.0;
+    {
+        int n = 0;
+        for (std::uint32_t s = 0; s < db->sampleCount(); s += 97u) {
+            scene::MotionQuery q;
+            q.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(s);
+            std::copy(f, f + db->dimension, q.features.begin());
+            const scene::MotionMatch best = scene::searchMotion(*db, q, weights);
+            // A typical candidate: the same query scored against a sample far away in the database.
+            const float* other = db->featuresFor((s + db->sampleCount() / 2u) % db->sampleCount());
+            float typical = 0.0f;
+            for (std::size_t d = 0; d < db->dimension; ++d) {
+                const float delta = q.features[d] - other[d];
+                typical += delta * delta;
+            }
+            spread += static_cast<double>(typical) - static_cast<double>(best.cost);
+            ++n;
+        }
+        spread /= std::max(n, 1);
+    }
+    WARN(fmt::format("cost spread on this database: a typical candidate is {:.2f} worse than the "
+                     "best one",
+                     spread));
+    WARN("plan                           recall   worst excess   % of spread   samples scored");
+    double chosenRecall = 0.0;
+    double chosenExcess = 0.0;
+    double chosenMean = 1.0;
+    int trials = 0;
+    for (const Plan& p : plans) {
+        scene::MotionSearchPlan plan;
+        plan.stride = p.stride;
+        plan.shortlist = p.shortlist;
+        plan.prefixDimensions = p.prefix;
+        plan.neighbourhood = p.neighbourhood;
+
+        int agreed = 0;
+        trials = 0;
+        double worstExcess = 0.0;
+        double totalFullCost = 0.0;
+        std::uint64_t fullyScored = 0;
+        for (std::uint32_t s = 0; s < db->sampleCount(); s += 7u) {
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(s);
+            std::copy(f, f + db->dimension, query.features.begin());
+            // Perturbed, so the answer is not trivially the seed sample: a query sitting exactly on
+            // a database entry makes any search look perfect.
+            for (std::size_t d = 0; d < query.features.size(); d += 3) {
+                query.features[d] += 0.05f;
+            }
+            query.current = s > 0 ? s - 1u : scene::MotionDatabase::kInvalid;
+            const scene::MotionMatch full = scene::searchMotion(*db, query, weights);
+            const scene::MotionMatch staged = scene::searchMotionStaged(*db, query, weights, plan);
+            REQUIRE(full.found());
+            REQUIRE(staged.found());
+            ++trials;
+            fullyScored += staged.fullyScored;
+            totalFullCost += static_cast<double>(full.cost);
+            if (staged.sample == full.sample) {
+                ++agreed;
+            } else {
+                // **Not a ratio.** The first version measured `staged.cost / full.cost` and
+                // reported **2957x**, which says nothing about the search: a query drawn from the
+                // database sits almost on a sample, so `full.cost` is near zero and any absolute
+                // difference over near zero is enormous. The quantity that means something is the
+                // absolute excess, read against the scale of the cost distribution itself.
+                worstExcess = std::max(worstExcess, static_cast<double>(staged.cost) -
+                                                        static_cast<double>(full.cost));
+            }
+        }
+        const double recall = 100.0 * agreed / std::max(trials, 1);
+        const double meanCost = totalFullCost / std::max(trials, 1);
+        (void)meanCost;
+        WARN(fmt::format("{}  {:5.1f}%  {:12.4f}  {:10.1f}%  {:14.0f}", p.name, recall, worstExcess,
+                         100.0 * worstExcess / std::max(spread, 1e-9),
+                         static_cast<double>(fullyScored) / trials));
+        if (p.prefix == 0u && p.stride == 4u) {
+            chosenRecall = recall;
+            chosenExcess = worstExcess;
+            chosenMean = std::max(spread, 1e-9);
+        }
+    }
+
+    CHECK(trials > 100);
+    // **Recall is the thing that can fail**, and it is asserted rather than reported. A first stage
+    // that agreed 30% of the time would still be fast, and fast is not the property being bought.
+    CHECK(chosenRecall > 80.0);
+    // And when it disagrees it must disagree **cheaply**: a different sample at nearly the same
+    // cost is a different frame of equally good motion, which is what a motion matcher is allowed
+    // to do. The bound is the excess against the typical cost of a match, so it scales with the
+    // database rather than being a number picked to pass.
+    // The bound is a fraction of the database's own cost spread, so it scales with the content
+    // rather than being a number chosen to pass: when the two-stage search differs from the linear
+    // scan, it must land within a tenth of the gap between a good match and a typical one.
+    CHECK(chosenExcess < 0.10 * chosenMean);
+}
+
+TEST_CASE("the two-stage search is worth it only at a scale nothing here has",
+          "[motionscale][phaseC]") {
+    // Timing may be synthetic (ADR-607: a scan's cost is distribution-independent). What this
+    // measures is the *shape* of the saving, and the point of the test is as much the disclaimer
+    // as the number.
+    const scene::MotionFeatureConfig config =
+        scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    scene::MotionQuery query;
+    query.features.assign(config.dimension(), 0.35f);
+    const scene::MotionCostWeights weights;
+    scene::MotionSearchPlan plan;
+    plan.stride = 8;
+    plan.shortlist = 32;
+    plan.prefixDimensions = 12;
+    plan.neighbourhood = 8;
+
+    WARN("samples        linear      two-stage      speedup");
+    for (const std::uint32_t count : {1738u, 1000000u}) {
+        const scene::MotionDatabase db = synthesise(count, config);
+        query.current = count / 2u;
+        const auto time = [&](bool staged) {
+            double best = std::numeric_limits<double>::max();
+            const int repeats = count >= 1000000u ? 3 : 50;
+            for (int r = 0; r < 5; ++r) {
+                const auto t0 = std::chrono::steady_clock::now();
+                for (int i = 0; i < repeats; ++i) {
+                    if (staged) {
+                        (void)scene::searchMotionStaged(db, query, weights, plan);
+                    } else {
+                        (void)scene::searchMotion(db, query, weights);
+                    }
+                }
+                const auto t1 = std::chrono::steady_clock::now();
+                best = std::min(best,
+                                std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(
+                                    t1 - t0)
+                                        .count() /
+                                    repeats);
+            }
+            return best;
+        };
+        const double linear = time(false);
+        const double staged = time(true);
+        WARN(fmt::format("{:>9}  {:>9.1f} us  {:>9.1f} us  {:>9.1f}x", count, linear, staged,
+                         linear / staged));
+        if (count >= 1000000u) {
+            // The justification, asserted: at a million samples the two-stage search has to bring
+            // a query inside a 60 Hz frame, which the 36.5 ms linear scan does not.
+            CHECK(staged < 16666.0);
+            CHECK(linear / staged > 5.0);
+        }
+    }
+}
