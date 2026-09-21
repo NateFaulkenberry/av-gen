@@ -2399,7 +2399,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 93 | Third milestone | **partial** | Linear vs strided is compared (§55). **Missing: the memory and complexity columns, and an optimised exact search** |
 | 94 | Final artistic demonstration | not started | |
 
-**Totals for the rows verified.** §3–§36 (34 rows): **31 done**, 3 partial (§21, §35, §36). Of the 36 assigned rows, 2 are done (§52 and the built half of §31, which is already counted above), 28 are partial and 6 are not started (§48, §65, §70, §89, §94, plus §65's sibling, the §64 slice, which is partial).
+**Totals for the rows verified.** §3–§36 (34 rows): **31 done**, 3 partial (§21, §35, §36). The 29 assigned rows outside §1–§36: **1 done** (§52), 23 partial, and 5 not started (§48, §65, §70, §89, §94). That makes 32 done among the rows verified here.
 
 **Against the coordinator's audit (C 34/83).** The full table is not in the tree, so only the totals and the flagged rows can be compared:
 
@@ -2407,4 +2407,4 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 - **§35 partial: confirmed**, and it is the owner's call.
 - **§61 partial: confirmed.** 100STYLE is verified; the others are not assessed.
 
-**One correction.** §36 is also partial, not done, if the audit counted it as done. The difference is small: 31 done in §3–§36, plus §52, gives 32 done among the rows I verified. That is consistent with 34 only if the anim-cinfra rows contribute about 2.
+§36 is partial. If the audit counted it as done, that is the one correction. The 34 in the audit can be reconciled with the 32 here only if the anim-cinfra rows contribute about 2 done, and without the audit's own table that cannot be checked.
