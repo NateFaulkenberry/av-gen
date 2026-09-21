@@ -8743,7 +8743,8 @@ nlohmann::json Composition::toJson() const {
                         l["strideMax"] = layer.strideMax;
                         l["strideLift"] = layer.strideLift;
                     }
-                    if (layer.kind == PoseLayerKind::Foot) {
+                    if (layer.kind == PoseLayerKind::Foot ||
+                        layer.kind == PoseLayerKind::Reach) {
                         l["chain"] = json::array({layer.chainRoot, layer.chainMid, layer.chainTip});
                         if (glm::dot(layer.poleDirection, layer.poleDirection) > 0.0f) {
                             l["poleDirection"] = vecToJson(layer.poleDirection);
@@ -10156,7 +10157,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             for (const PoseLayerKind k :
                                  {PoseLayerKind::Aim, PoseLayerKind::Additive, PoseLayerKind::Foot,
                                   PoseLayerKind::Stride, PoseLayerKind::Secondary,
-                                  PoseLayerKind::Lean}) {
+                                  PoseLayerKind::Lean, PoseLayerKind::Reach}) {
                                 if (!known.empty()) {
                                     known += ", ";
                                 }
@@ -10298,11 +10299,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                             node.name, layer.name, layer.strideMin, layer.strideMax);
                             }
                         }
-                        if (layer.kind == PoseLayerKind::Foot) {
+                        if (layer.kind == PoseLayerKind::Foot ||
+                            layer.kind == PoseLayerKind::Reach) {
                             if (!entry.contains("chain")) {
-                                return fail("node '{}': animation layer '{}': a foot layer needs a 'chain' "
-                                            "of exactly three joint names -- the hip, the knee and the foot",
-                                            node.name, layer.name);
+                                return fail("node '{}': animation layer '{}': a {} layer needs a "
+                                            "'chain' of exactly three joint names -- root, mid and tip",
+                                            node.name, layer.name, poseLayerKindName(layer.kind));
                             }
                             const json& chain = entry.at("chain");
                             if (!chain.is_array() || chain.size() != 3 ||

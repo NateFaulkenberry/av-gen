@@ -57,6 +57,7 @@ const char* poseLayerKindName(PoseLayerKind kind) {
     case PoseLayerKind::Stride: return "stride";
     case PoseLayerKind::Secondary: return "secondary";
     case PoseLayerKind::Lean: return "lean";
+    case PoseLayerKind::Reach: return "reach";
     }
     return "aim";
 }
@@ -84,6 +85,10 @@ bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
     }
     if (name == "lean") {
         out = PoseLayerKind::Lean;
+        return true;
+    }
+    if (name == "reach") {
+        out = PoseLayerKind::Reach;
         return true;
     }
     return false;
@@ -263,7 +268,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
             // with itself.
             spec.joints = {layer.strideJoint};
         }
-        if (layer.kind == PoseLayerKind::Foot) {
+        if (layer.kind == PoseLayerKind::Foot || layer.kind == PoseLayerKind::Reach) {
             if (!spec.joints.empty()) {
                 problems.push_back(fmt::format(
                     "layer '{}': a foot layer is driven by its chain and ignores the {} joint(s) its mask "
@@ -346,7 +351,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                 origin = -1;
             }
             stride_[i] = glm::ivec2(joint, origin);
-        } else if (layer.kind == PoseLayerKind::Foot) {
+        } else if (layer.kind == PoseLayerKind::Foot || layer.kind == PoseLayerKind::Reach) {
             const int root = skeleton.find(layer.chainRoot);
             const int mid = skeleton.find(layer.chainMid);
             const int tip = skeleton.find(layer.chainTip);
@@ -742,7 +747,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             stats.joints += wrote;
             continue;
         }
-        if (layer.kind == PoseLayerKind::Foot) {
+        if (layer.kind == PoseLayerKind::Foot || layer.kind == PoseLayerKind::Reach) {
             ikStatus_[i] = IkStatus::Solved;
             const glm::ivec3 ids = chain_[i];
             if (ids.x < 0 || ids.y < 0 || ids.z < 0) {
@@ -761,6 +766,13 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             glm::vec3 target(0.0f);
             if (layer.hasTarget) {
                 target = layer.target;
+            } else if (layer.kind == PoseLayerKind::Reach) {
+                // §23/§24. A reach with nowhere to reach is not a failure and not an invention:
+                // it is a hand that has been given no work. `NoTarget` says exactly that, and the
+                // arm keeps whatever the animation had it doing. A reach never falls back to the
+                // ground plane -- a hand planted on the floor under the shoulder is not a reach.
+                result = LayerResolution::NoTarget;
+                continue;
             } else if (layer.hasGround) {
                 target = plantOnPlane(chain.tip, layer.groundPoint, layer.groundNormal,
                                       layer.groundOffset + restTipHeight_[i]);

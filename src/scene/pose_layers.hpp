@@ -98,6 +98,24 @@ enum class PoseLayerKind : std::uint8_t {
     // desired one: a body leans into the force it is actually under, and a character leaning into
     // an acceleration its legs were never given is a character falling over on purpose.
     Lean,
+    // **Reach / hand IK (Phase B §23).** Put a hand on a target: touch a mushroom, gesture toward
+    // something, hold a prop.
+    //
+    // **The same solve as `Foot`, deliberately and without a second implementation.** ADR-543's
+    // arbitrary-chain write-back was built for the alien's legs, whose three joints sit on three
+    // separate branches. Its arms are the same shape and worse: `shoulder.l` hangs off
+    // `spine_05.x` while `forearm_stretch.l` and `hand.l` both hang off `rig` -- **three different
+    // parents for one limb**. So this is the second consumer of that decision on the same rig, and
+    // it needed no change to it. A generality that survives its second consumer unchanged is worth
+    // recording as such rather than as a lucky guess.
+    //
+    // What differs from `Foot` is only the intent: a reach is addressed by a target and never by a
+    // ground plane, and §24's reachability is the honest answer when the target is out of range --
+    // `IkStatus::Clamped` and a limb stopped at its own limit, rather than a broken arm.
+    //
+    // §23 is explicit that this is **not** a grasping system. Target -> reach pose -> IK, and
+    // nothing about what the hand then does with the thing.
+    Reach,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
