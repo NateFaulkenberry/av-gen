@@ -12,6 +12,7 @@
 // hand, or by a spatial query, and still have it hover -- and what lets a modulation route and a
 // behaviour drive the same property without fighting over who owns it.
 
+#include "entity/character_intent.hpp"
 #include "core/rng.hpp"
 #include "entity/locomotion.hpp"
 #include "entity/nav_grid.hpp"
@@ -117,6 +118,11 @@ struct EntityState {
     // mover intended this step and this is what the body did. They differ whenever something
     // downstream had an opinion -- a crowd push, a penetration resolve, a director, an obstacle.
     [[nodiscard]] float groundSpeed() const { return std::sqrt(velocity.x * velocity.x + velocity.z * velocity.z); }
+
+    // Phase D §15. What this character WANTS, as a vector. `speed` and `yaw` above are the polar
+    // form every existing behaviour writes; this is the form that can express a strafe, and it is
+    // invalid by default so that a behaviour which writes neither still works exactly as it did.
+    CharacterIntent intent;
     // How far the body's travel is from its facing, in radians, 0 when standing still. Zero for a
     // body walking where it looks, pi for one backing up, pi/2 for a pure strafe.
     [[nodiscard]] float strafeAngle() const {

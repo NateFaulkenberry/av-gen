@@ -7,7 +7,9 @@
 // that was pure decoration, which is the thing Phase A declined to build.
 
 #include "entity/clip_motion_provider.hpp"
+#include "entity/character_intent.hpp"
 #include "entity/motion_chain.hpp"
+#include "entity/motion_controller.hpp"
 #include "scene/animation.hpp"
 #include "scene/skeleton.hpp"
 
@@ -343,4 +345,104 @@ TEST_CASE("the clip provider agrees with AnimationPlayer joint by joint", "[moti
     // pose against itself.
     CHECK(m.localTime > 0.0f);
     CHECK(m.generation == 1); // one selection, never re-selected
+}
+
+// ---- Phase D: the intent seam ------------------------------------------------------------------
+
+TEST_CASE("vector intent carries a strafe that the polar form cannot", "[motion][intent][phaseD]") {
+    // **Phase D §15, as a measurement.** `EntityState::speed` along `EntityState::yaw` is a scalar
+    // on a heading: it can describe a body walking where it looks, and nothing else. ADR-545
+    // already had to add a measured velocity vector because the seam could not tell a strafe from
+    // a walk; this is the same correction on the intent side.
+    //
+    // The arm that matters: a body travelling +X while facing +Z. The polar pair has one direction
+    // to put in two places, so whichever it keeps, the other is wrong.
+    entity::CharacterIntent intent;
+    intent.type = entity::IntentType::Observe;
+    intent.desiredVelocity = glm::vec3(2.0f, 0.0f, 0.0f); // travelling +X
+    intent.facing = glm::vec3(0.0f, 0.0f, 1.0f);          // watching +Z
+    intent.hasFacing = true;
+    intent.valid = true;
+
+    // What the motion tier receives, built the way `Entity::advanceMotion` builds it.
+    entity::MotionRequest request;
+    request.desiredVelocity = intent.desiredVelocity;
+    request.desiredFacing = intent.facing;
+
+    entity::MotionLimits limits;
+    entity::MotionState state;
+    state.velocity = glm::vec3(2.0f, 0.0f, 0.0f);
+    state.facing = glm::vec3(0.0f, 0.0f, 1.0f);
+    state.started = true;
+    entity::MotionState next;
+    const entity::MotionSolution s = entity::stepMotion(request, state, limits, 1.0f / 60.0f, next);
+
+    INFO("velocity " << s.velocity.x << "," << s.velocity.z << "  facing " << s.facing.x << ","
+                     << s.facing.z);
+    CHECK(s.velocity.x == Approx(2.0f).margin(1e-3));
+    CHECK(std::abs(s.velocity.z) < 1e-3f);
+    CHECK(s.facing.z == Approx(1.0f).margin(1e-3));
+    CHECK(std::abs(s.facing.x) < 1e-3f);
+
+    // **The polar reconstruction, for comparison.** Given only `speed` and `yaw`, the best the old
+    // seam could do is put the body's motion along its facing -- which is a different animation.
+    const float yaw = std::atan2(intent.facing.x, intent.facing.z);
+    const glm::vec3 polar(std::sin(yaw), 0.0f, std::cos(yaw));
+    const glm::vec3 polarVelocity = polar * 2.0f;
+    INFO("polar reconstruction would travel " << polarVelocity.x << "," << polarVelocity.z);
+    CHECK(glm::length(polarVelocity - intent.desiredVelocity) > 2.0f); // a right angle apart
+}
+
+TEST_CASE("an invalid intent leaves the polar path exactly as it was", "[motion][intent][phaseD]") {
+    // The compatibility arm, and it is the one that matters for a shipping cast: every behaviour
+    // in this engine writes `speed` and `yaw` and nothing else, so an intent that defaults to
+    // "valid, zero" would stop all of them dead. It defaults to invalid, and invalid means
+    // "reconstruct from the polar pair" rather than "stand still".
+    const entity::CharacterIntent intent;
+    CHECK_FALSE(intent.valid);
+    CHECK(intent.type == entity::IntentType::Idle);
+
+    const float yaw = 0.9f;
+    const float speed = 1.7f;
+    const glm::vec3 heading(std::sin(yaw), 0.0f, std::cos(yaw));
+    entity::MotionRequest request;
+    request.desiredVelocity = heading * speed;  // what advanceMotion does when intent is invalid
+    request.desiredFacing = heading;
+
+    entity::MotionLimits limits;
+    entity::MotionState state;
+    state.velocity = heading * speed;
+    state.facing = heading;
+    state.started = true;
+    entity::MotionState next;
+    const entity::MotionSolution s = entity::stepMotion(request, state, limits, 1.0f / 60.0f, next);
+    CHECK(s.speed == Approx(speed).margin(1e-3));
+    // Travelling exactly where it faces, which is the whole of what the polar form can say.
+    CHECK(std::abs(std::atan2(s.velocity.x, s.velocity.z) - yaw) < 1e-3f);
+}
+
+TEST_CASE("intent names a goal and never a clip", "[motion][intent][phaseD]") {
+    // R4 (ADR-096), asserted structurally: there is no animation name anywhere in this struct, and
+    // the day somebody adds one this test is where the argument happens.
+    CHECK(std::string(entity::intentTypeName(entity::IntentType::Investigate)) == "investigate");
+    CHECK(std::string(entity::intentTypeName(entity::IntentType::Flee)) == "flee");
+    // Steering is added to the desired velocity, not blended (§14/§39).
+    entity::CharacterIntent intent;
+    intent.desiredVelocity = glm::vec3(0.0f, 0.0f, 3.0f);
+    intent.steering = glm::vec3(3.0f, 0.0f, 0.0f);
+    intent.valid = true;
+    entity::MotionRequest request;
+    request.desiredVelocity = intent.desiredVelocity;
+    request.steering = intent.steering;
+    entity::MotionLimits limits;
+    limits.maxAcceleration = 1000.0f; // so one step reaches the target and this measures the sum
+    limits.maxTurnRate = 1000.0f;
+    entity::MotionState state;
+    state.velocity = glm::vec3(0.0f, 0.0f, 3.0f);
+    state.started = true;
+    entity::MotionState next;
+    const entity::MotionSolution s = entity::stepMotion(request, state, limits, 1.0f / 60.0f, next);
+    // 3 forward plus 3 sideways is a diagonal at 4.24 m/s, not a blend back to 3.
+    INFO("summed speed " << s.speed);
+    CHECK(s.speed == Approx(std::sqrt(18.0f)).margin(0.05f));
 }

@@ -847,9 +847,28 @@ void Entity::advanceMotion(double time, float dt) {
     if (motionChain_ == nullptr || !desc_.proceduralMotion) {
         return;
     }
+    // Phase D §2.5/§15. The request is built from the character's INTENT, and intent comes in two
+    // forms because the engine grew the second one late:
+    //
+    //   * the **vector** form, `EntityState::intent`, which can express a strafe -- a body moving
+    //     one way while facing another;
+    //   * the **polar** form, `speed` along `yaw`, which every behaviour that exists writes and
+    //     which cannot.
+    //
+    // The vector form wins when a behaviour published one. When none did, the polar pair is
+    // reconstructed into a vector here -- which is exactly what the whole cast gets today, and is
+    // why adding this seam changed no existing character's motion.
+    const glm::vec3 heading(std::sin(state_.yaw), 0.0f, std::cos(state_.yaw));
     MotionRequest request;
-    request.desiredVelocity = glm::vec3(std::sin(state_.yaw), 0.0f, std::cos(state_.yaw)) * state_.speed;
-    request.desiredFacing = glm::vec3(std::sin(state_.yaw), 0.0f, std::cos(state_.yaw));
+    if (state_.intent.valid) {
+        request.desiredVelocity = state_.intent.desiredVelocity;
+        request.desiredFacing =
+            state_.intent.hasFacing ? state_.intent.facing : heading;
+        request.steering = state_.intent.steering;
+    } else {
+        request.desiredVelocity = heading * state_.speed;
+        request.desiredFacing = heading;
+    }
     request.desiredTurnRate = state_.turnRate;
     request.mode = state_.airborne ? MovementMode::Airborne : MovementMode::Ground;
     MotionMemory next;
