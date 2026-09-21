@@ -21,9 +21,15 @@
 // Band-limited by construction, so it survives the march's ~125 metre sample spacing intact, and
 // cheap enough that it does not move the cost measurement the architecture decision turns on.
 //
-// Needs nothing else included. Deliberately: `vortex.wgsl` documents that the include directive
-// does not de-duplicate (ADR-360 learned it the expensive way), and this file has no fBM in it to
-// need `noise.wgsl` for.
+// **Needs `noise.wgsl` for `fbm3`, and deliberately does NOT include it.** The include directive
+// does not de-duplicate (ADR-360 learned that the expensive way), and `volume.wgsl` already brings
+// noise in through `fields.wgsl` before it includes this file. Any other consumer -- the parity
+// harness is the only one today -- must prepend it.
+//
+// Until Phase 4 this file included nothing at all, because it contained no noise whatever. That
+// was the architecture rather than an omission and it still is: everything above the detail stage
+// below is analytic, and §38's Mode 1 is this file with `cloudAmount` at 0, which is a render and
+// not a rebuild.
 //
 //   t0  xyz = the GROUND CONTACT point, w = height in metres (0 is off, and it is the gate)
 //   t1  radiusBottom, radiusMidControl, radiusTop, taper
@@ -35,7 +41,9 @@
 //   t7  leanX, leanZ, wobbleAmount, wobbleSpeed
 //   t8  rotationBottom, rotationTop, rotationCurve, cloudWidth
 //   t9  cloudHeight, cloudDensity, suctionCount, suctionStrength
-//   t10 suctionRadius, suctionWidth, suctionSpeed, 0
+//   t10 suctionRadius, suctionWidth, suctionSpeed, cloudAmount
+//   t11 macroAmp, mesoAmp, microAmp, contrast
+//   t12 macroScale, climbRate, erosion, edgeWidth
 
 struct TornadoUniformsWgsl {
     t0: vec4<f32>,
@@ -49,6 +57,8 @@ struct TornadoUniformsWgsl {
     t8: vec4<f32>,
     t9: vec4<f32>,
     t10: vec4<f32>,
+    t11: vec4<f32>,
+    t12: vec4<f32>,
 };
 
 // ---- shape ------------------------------------------------------------------------------------
@@ -178,6 +188,99 @@ fn tornadoSuction(v: TornadoUniformsWgsl, rr: f32, h: f32, angle: f32, t: f32) -
     let spin = t * (v.t10.z + tornadoRotationAt(v, h)) + h * 2.0;
     // Clamped so the density cannot go negative, exactly as the striations are.
     return 1.0 + clamp(v.t9.w, 0.0, 0.9) * window * cos(count * (angle - spin));
+}
+
+// ---- detail (§21, §26, §29) ---------------------------------------------------------------------
+//
+// **The hierarchy, and it is the brief's §45 written as one multiply.** Everything above this point
+// is the tornado. This returns a number whose mean is 1, and the density is `envelope * detail`. So
+// noise makes the tornado look natural; it does not make the tornado exist. At `cloudAmount` 0 this
+// returns exactly 1.0 and the field is byte-for-byte the analytic one -- which is why §38's Mode 1
+// is a slider and not a build.
+//
+// **Mean exactly 1 is not tidiness, it is ADR-389's family rule.** `density` is a per-metre
+// extinction coefficient calibrated against this field's mean. A detail term with mean 0.6 silently
+// multiplies the medium's optical depth by 0.6 and every look tuned before it is wrong. So the
+// shaped noise is divided by its own mean rather than used raw, and the blend toward 1 is a `mix`
+// rather than a scale.
+//
+// **Temporal coherence (§29) is free here, and that is the whole payoff of an analytic flow.** The
+// noise is not sampled at `p`. It is sampled in the column's own co-moving frame: the angle is
+// advanced by `rotationAt(h) * t` and the height is dropped by `climbRate * t`, so a feature sits
+// still in a frame that is itself rotating and rising. Detail RIDES the flow instead of scrolling
+// through it. There is no advected texture, no history and no state -- it is a change of
+// coordinates, correct at any `t`, evaluated not integrated, and therefore reproducible (ADR-360).
+//
+// **The band limit is not a knob** (ADR-389). An octave whose world period falls below twice the
+// march's sample spacing cannot be resolved, and what it contributes is not detail but aliasing --
+// salt-and-pepper grain that crawls when the camera moves. `filterWidth` is the caller's sample
+// spacing and 0 means "point sample, nothing to alias". The right answer changes with `volumeSteps`
+// and `volumeMaxDistance`, which change between quality tiers, so nobody should have to find a
+// slider called "stop aliasing".
+fn tornadoOctaveWeight(periodMetres: f32, filterWidth: f32) -> f32 {
+    if (filterWidth <= 0.0) {
+        return 1.0;
+    }
+    return smoothstep(0.0, 1.0, periodMetres / (2.0 * filterWidth));
+}
+
+fn tornadoDetail(v: TornadoUniformsWgsl, rr: f32, h: f32, angle: f32, envelope: f32, radius: f32,
+                 t: f32, filterWidth: f32) -> f32 {
+    let amount = clamp(v.t10.w, 0.0, 1.0);
+    if (amount <= 0.0) {
+        return 1.0; // §38 Mode 1, and it is an early-out so it costs nothing to leave off
+    }
+    // The co-moving frame. `spin` winds the sample with the structure so detail follows the
+    // striations rather than cutting across them; `climb` carries it upward, which is what reads as
+    // material being lifted through the funnel rather than a texture scrolling on it.
+    let spin = tornadoRotationAt(v, h) * t;
+    let climb = v.t12.y * t;
+    let q = vec3<f32>(cos(angle - spin) * rr, h * 3.0 - climb, sin(angle - spin) * rr);
+
+    // Three scales, §21's macro / meso / micro, at fixed octave ratios rather than three authored
+    // scales. The ratios are a structural decision and not a preference: an artist given three
+    // independent scale sliders sets them to the same number and gets one octave at triple
+    // amplitude, which is the failure §21 exists to prevent.
+    let s0 = max(v.t12.x, 1e-3);
+    let s1 = s0 * 3.1;
+    let s2 = s0 * 9.7;
+    // What this march can carry, per octave. The world period of an octave at scale S is
+    // `radius / S`, since `q` is expressed in units of the funnel radius.
+    let w0 = tornadoOctaveWeight(radius / s0, filterWidth);
+    let w1 = tornadoOctaveWeight(radius / s1, filterWidth);
+    let w2 = tornadoOctaveWeight(radius / s2, filterWidth);
+    let a0 = max(v.t11.x, 0.0) * w0;
+    let a1 = max(v.t11.y, 0.0) * w1;
+    let a2 = max(v.t11.z, 0.0) * w2;
+    let sum = a0 + a1 + a2;
+    if (sum <= 1e-4) {
+        return 1.0; // every octave faded out by the band limit: smooth is the correct answer
+    }
+    // Three rates, slowest for the biggest masses. A macro cloud that churns as fast as a wisp is
+    // the single most recognisable tell of noise pretending to be smoke.
+    let n0 = fbm3(q * s0 + vec3<f32>(t * 0.011, 0.0, t * 0.008), 71u);
+    let n1 = fbm3(q * s1 + vec3<f32>(0.0, t * 0.043, 0.0), 131u);
+    let n2 = fbm3(q * s2 + vec3<f32>(t * 0.15, 0.0, -t * 0.11), 197u);
+    // Normalised by the weights actually used, so an octave fading out smooths the result rather
+    // than darkening it -- the mean must not move when the step length changes.
+    let n = (n0 * a0 + n1 * a1 + n2 * a2) / sum;
+
+    // A smoothstep remap rather than `pow`, and ADR-389 records why: an exponent above 1 on a noise
+    // sum crushes everything toward black and leaves sparse isolated peaks, so every surviving
+    // aliased sample becomes a bright dot in a dark field. It also throws away the midtones, which
+    // are what make a volume read as THICK rather than as sparks.
+    let contrast = max(v.t11.w, 0.05);
+    let half = 0.5 / contrast;
+    let shaped = smoothstep(0.5 - half, 0.5 + half, clamp(n, 0.0, 1.0));
+    // A smoothstep centred on 0.5 has mean 0.5 whatever its width, so this has mean 1.
+    let unit = shaped * 2.0;
+
+    // §26 and the brief's edge erosion: detail bites HARDER where the structure is already thin.
+    // That is what makes wisps break away from the column instead of the whole thing fading evenly,
+    // and it is one line because the envelope is right here and already says where the edges are.
+    let edge = 1.0 - smoothstep(0.0, max(v.t12.w, 1e-3), envelope);
+    let bite = clamp(amount * (1.0 + max(v.t12.z, 0.0) * edge), 0.0, 1.0);
+    return mix(1.0, unit, bite);
 }
 
 struct TornadoShape {
@@ -336,10 +439,11 @@ fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f3
     }
     s.envelope = envelope;
     s.inside = true;
-    // Phase 2 is Mode 1 BY CONSTRUCTION: there is no noise term to switch off, because none has
-    // been added. The detail stages multiply this; they do not create it. If this render does not
-    // already read as a tornado, no later stage can repair it, and that is the whole test.
-    s.density = envelope;
+    // §45 as one multiply. The envelope above IS the tornado; this makes it look natural. At
+    // `cloudAmount` 0 the detail term is exactly 1 and the density is the analytic field, which is
+    // §38's Mode 1 -- a slider rather than a rebuild, and the render the brief asks to be shown
+    // before any detail is added.
+    s.density = envelope * tornadoDetail(v, rr, hc, angle, envelope, radius, t, filterWidth);
     return s;
 }
 

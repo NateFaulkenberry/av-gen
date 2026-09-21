@@ -202,6 +202,44 @@ constexpr EffectField kFields[] = {
                GET(e.tornado.field.rotationTop), SETF(e.tornado.field.rotationTop)).main()
         .tooltip("The same multiplier where the funnel enters the wall cloud."),
 
+    // ---- Detail (§21). Everything above is the tornado; this is what makes it look natural.
+    floatField("cloudAmount", "Detail", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.tornado.field.cloudAmount),
+               SETF(e.tornado.field.cloudAmount)).main().sec("Detail")
+        .tooltip("The weight of the whole noise stack against the smooth analytic storm. At 0 you\n"
+                 "see the tornado's STRUCTURE alone -- funnel, shell, skirt, wall cloud,\n"
+                 "striations -- with no noise on it anywhere. That render is the test: if it is\n"
+                 "not already unmistakably a tornado at 0, no amount of detail will save it."),
+    floatField("macroAmp", "Macro", 0.0f, 4.0f, 0.0f, 2.0f, GET(e.tornado.field.macroAmp),
+               SETF(e.tornado.field.macroAmp)).main()
+        .tooltip("The largest cloud masses -- whole sides of the column lightening and darkening."),
+    floatField("mesoAmp", "Meso", 0.0f, 4.0f, 0.0f, 2.0f, GET(e.tornado.field.mesoAmp),
+               SETF(e.tornado.field.mesoAmp)).main()
+        .tooltip("Rolling, billowing masses at about a third the size of the macro ones."),
+    floatField("microAmp", "Micro", 0.0f, 4.0f, 0.0f, 2.0f, GET(e.tornado.field.microAmp),
+               SETF(e.tornado.field.microAmp)).main()
+        .tooltip("Wisps and breakup. Detail finer than the volume march can sample is faded out\n"
+                 "automatically, so raising this past the point where it stops changing the\n"
+                 "picture means the march is the limit, not this."),
+    floatField("detailScale", "Detail scale", 0.01f, 40.0f, 0.3f, 8.0f,
+               GET(e.tornado.field.detailScale), SETF(e.tornado.field.detailScale)).main()
+        .tooltip("How fine the whole stack is. ONE control, not three: the meso and micro octaves\n"
+                 "sit at fixed ratios above it, because three independent scale sliders get set to\n"
+                 "the same number and give one octave at triple amplitude."),
+    floatField("detailContrast", "Detail contrast", 0.05f, 12.0f, 0.5f, 5.0f,
+               GET(e.tornado.field.detailContrast), SETF(e.tornado.field.detailContrast)).main(),
+    floatField("climbRate", "Detail climb", -4.0f, 4.0f, 0.0f, 0.6f, GET(e.tornado.field.climbRate),
+               SETF(e.tornado.field.climbRate)).main()
+        .tooltip("How fast detail is carried UP the column. This is what reads as material being\n"
+                 "lifted through the funnel rather than a texture scrolling on it -- the noise is\n"
+                 "sampled in the storm's own rising, turning frame, so a wisp sits still in the\n"
+                 "flow instead of swimming through it."),
+    floatField("erosion", "Edge breakup", 0.0f, 6.0f, 0.0f, 3.0f, GET(e.tornado.field.erosion),
+               SETF(e.tornado.field.erosion)).main()
+        .tooltip("How much harder the detail bites where the storm is already thin. This is what\n"
+                 "makes wisps break AWAY from the column instead of the whole thing fading evenly."),
+    floatField("edgeWidth", "Edge width", 0.01f, 4.0f, 0.05f, 2.0f, GET(e.tornado.field.edgeWidth),
+               SETF(e.tornado.field.edgeWidth)).main(),
+
     // ---- Appearance.
     colorField("colorThin", "Thin colour", GET(e.tornado.colorThin), SETC(e.tornado.colorThin))
         .main().sec("Appearance")
@@ -336,6 +374,9 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         // structure actually shows up -- and where this preset most needs the help.
         tn.field.suctionCount = 0.0f;
         tn.field.suctionStrength = 0.0f;
+        tn.field.cloudAmount = 0.65f;
+        tn.field.detailScale = 2.40f;
+        tn.field.climbRate = 0.07f;
         tn.density = 0.06f;
         tn.emission = 0.0f;
         tn.scattering = 1.0f;
@@ -374,6 +415,9 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         // lengthening as the winds inside it weaken by conservation of angular momentum.
         tn.field.wobbleAmount = 95.0f;
         tn.field.wobbleSpeed = 0.42f;
+        tn.field.cloudAmount = 0.55f;
+        tn.field.detailScale = 3.20f;
+        tn.field.climbRate = 0.10f;
         tn.density = 0.09f;
         tn.emission = 0.0f;
         tn.scattering = 1.0f;
@@ -418,6 +462,9 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         tn.field.suctionSpeed = 0.7f;
         tn.field.wobbleAmount = 30.0f;
         tn.field.wobbleSpeed = 0.1f;
+        tn.field.cloudAmount = 0.75f;
+        tn.field.detailScale = 1.50f;
+        tn.field.climbRate = 0.05f;
         tn.density = 0.05f;
         tn.emission = 0.0f;
         tn.scattering = 1.0f;
@@ -455,6 +502,9 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         tn.field.rotationTop = 1.2f;
         tn.field.wobbleAmount = 6.0f;
         tn.field.wobbleSpeed = 1.1f;
+        tn.field.cloudAmount = 0.85f;
+        tn.field.detailScale = 4.50f;
+        tn.field.climbRate = 0.25f;
         tn.density = 0.35f;
         tn.emission = 0.0f;
         tn.scattering = 1.2f;
@@ -491,6 +541,9 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
         tn.field.rotationTop = 0.5f;
         tn.field.wobbleAmount = 60.0f;
         tn.field.wobbleSpeed = 0.22f;
+        tn.field.cloudAmount = 0.60f;
+        tn.field.detailScale = 1.90f;
+        tn.field.climbRate = 0.05f;
         tn.density = 0.05f;
         // The one preset that makes its own light, and it takes none of the scene's: the whole
         // point of the cosmic direction is a storm on a black sky.

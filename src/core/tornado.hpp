@@ -144,6 +144,28 @@ struct TornadoField {
     float suctionWidth = 0.35f;   // the radial window's width
     float suctionSpeed = 0.9f;    // their own turn rate, ON TOP of the parent's
 
+    // ---- detail (§21, §26, §29) ----------------------------------------------------------------
+    //
+    // Everything above is the tornado. This is what makes it look natural, and the distinction is
+    // the whole architecture: `cloudAmount` at 0 gives the analytic field exactly, which is §38's
+    // Mode 1 and is a slider rather than a rebuild. The detail term's mean is exactly 1, because
+    // `density` is a per-metre coefficient calibrated against this field's mean (ADR-389).
+    float cloudAmount = 0.0f; // 0 is off and is the default; 1 is the full stack
+    float macroAmp = 1.0f;    // §21's huge cloud structures
+    float mesoAmp = 0.5f;     // rolling smoke masses
+    float microAmp = 0.25f;   // wisps and breakup
+    float detailContrast = 1.6f;
+    // Scale is ONE control, not three: the meso and micro octaves sit at fixed 3.1x and 9.7x
+    // ratios above it. Three independent scale sliders get set to the same number and produce one
+    // octave at triple amplitude, which is the failure §21 exists to prevent.
+    float detailScale = 2.2f;
+    // §29. How fast detail is carried UP the column, in normalised heights per second. This is a
+    // change of coordinates rather than an advection: the noise is sampled in the column's
+    // co-moving frame, so a feature sits still in a frame that is itself rising and turning.
+    float climbRate = 0.06f;
+    float erosion = 1.2f;   // how much harder detail bites where the structure is already thin
+    float edgeWidth = 0.6f; // what counts as thin, in envelope units
+
     // ---- motion (§13, §17-§19) ---------------------------------------------------------------------
     //
     // A Burgers-Rott vortex: `u_r = -a r / 2`, `u_z = +a z`, `u_theta = (G / 2 pi r)(1 - e^{-r^2/Rc^2})`.
@@ -180,9 +202,11 @@ struct TornadoUniforms {
     glm::vec4 t7{0.0f}; // leanX, leanZ, wobbleAmount, wobbleSpeed
     glm::vec4 t8{0.0f}; // rotationBottom, rotationTop, rotationCurve, cloudWidth
     glm::vec4 t9{0.0f};  // cloudHeight, cloudDensity, suctionCount, suctionStrength
-    glm::vec4 t10{0.0f}; // suctionRadius, suctionWidth, suctionSpeed, 0
+    glm::vec4 t10{0.0f}; // suctionRadius, suctionWidth, suctionSpeed, cloudAmount
+    glm::vec4 t11{0.0f}; // macroAmp, mesoAmp, microAmp, detailContrast
+    glm::vec4 t12{0.0f}; // detailScale, climbRate, erosion, edgeWidth
 };
-static_assert(sizeof(TornadoUniforms) == 176);
+static_assert(sizeof(TornadoUniforms) == 208);
 
 [[nodiscard]] TornadoUniforms packTornado(const TornadoField& field);
 
@@ -214,9 +238,9 @@ struct TornadoSample {
 // The shape alone, which is what the volumetric march wants and all it wants.
 //
 // `filterWidth` is the world-space distance between the caller's samples, and 0 means "a point
-// sample, not an integral". It is accepted now and unused now: every term in this field is analytic
-// and band-limited by construction, so there is nothing to alias. It is in the signature because
-// the detail stages will need it and ADR-389's rule is that the band limit is not a knob -- the
+// sample, not an integral". The analytic terms are band-limited by construction and ignore it; the
+// detail stack uses it to fade out any octave whose world period falls below twice that spacing,
+// because what such an octave contributes is not detail but aliasing. ADR-389: not a knob -- the
 // right answer changes with `volumeSteps` and `volumeMaxDistance`, which change between tiers.
 [[nodiscard]] float tornadoDensity(const TornadoUniforms& v, const glm::vec3& p, float t,
                                    float filterWidth = 0.0f);

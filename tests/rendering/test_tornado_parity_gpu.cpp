@@ -96,9 +96,14 @@ public:
         // `tornado.wgsl` includes nothing and needs nothing -- there is no fBM in it, which is the
         // architecture rather than an omission (ADR-580 §5). So unlike the vortex harness there is
         // no `noise.wgsl` to prepend, and no include-order hazard to get wrong.
+        // Phase 4: `tornado.wgsl` needs `fbm3` and deliberately does not include it, because the
+        // include directive does not de-duplicate and `volume.wgsl` already brings noise in through
+        // `fields.wgsl`. So this harness prepends it, exactly as the vortex harness does.
+        auto noise = shaders_.loadSource("noise.wgsl");
+        REQUIRE(noise.has_value());
         auto tornado = shaders_.loadSource("tornado.wgsl");
         REQUIRE(tornado.has_value());
-        auto module = shaders_.compile(*tornado + kKernel, "tornado-parity");
+        auto module = shaders_.compile(*noise + *tornado + kKernel, "tornado-parity");
         REQUIRE(module.has_value());
         const auto& device = ctx_.device();
         std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
@@ -240,6 +245,17 @@ tornado::TornadoField cone() {
     f.rotationBottom = 1.0f;
     f.rotationTop = 0.55f;
     f.rotationCurve = 1.0f;
+    // The detail stack ON, or nine of the knobs below are gated off and the reachability probe
+    // passes while proving nothing about them -- ADR-401's defect in its other form.
+    f.cloudAmount = 0.65f;
+    f.macroAmp = 1.0f;
+    f.mesoAmp = 0.5f;
+    f.microAmp = 0.25f;
+    f.detailContrast = 1.6f;
+    f.detailScale = 2.4f;
+    f.climbRate = 0.07f;
+    f.erosion = 1.2f;
+    f.edgeWidth = 0.6f;
     f.suctionCount = 4.0f;
     f.suctionStrength = 0.5f;
     f.suctionRadius = 0.95f;
@@ -339,11 +355,16 @@ TEST_CASE("the tornado shader agrees with core/tornado.cpp", "[gpu][tornado][par
         for (std::size_t i = 0; i < pts.size(); ++i) {
             const tornado::TornadoSample cpu = tornado::sampleTornado(u, pts[i], t);
             INFO("t=" << t << " p=(" << pts[i].x << ", " << pts[i].y << ", " << pts[i].z << ")");
-            // 1e-4 rather than the vortex's 1e-3, and the tighter bound is a property of the
-            // architecture rather than of the test. This field is trigonometry, smoothsteps and one
-            // exponential -- closed form throughout, with no fBM anywhere -- so it does not
-            // accumulate the rounding that three octaves of value noise at three scales do.
-            CHECK(gpu[i].density == Approx(cpu.density).margin(1e-4));
+            // The ENVELOPE keeps the 1e-4 bound, because it is closed form throughout -- and
+            // holding it to the tighter number is the point: Phase 4 added noise on top, and if the
+            // structure underneath had drifted this is where it would show.
+            //
+            // The DENSITY relaxes to 1e-3 now that three octaves of value noise multiply it, for
+            // the reason the vortex's parity test gives for the same bound: fBM at three scales
+            // accumulates more rounding than a closed form does, and the Metal compiler contracts
+            // the arithmetic differently on each side (ADR-388 measured 62 of 518400 pixels moving
+            // for that reason alone).
+            CHECK(gpu[i].density == Approx(cpu.density).margin(1e-3));
             CHECK(gpu[i].envelope == Approx(cpu.envelope).margin(1e-4));
             CHECK(gpu[i].radialT == Approx(cpu.radialT).margin(1e-4));
             CHECK(gpu[i].heightT == Approx(cpu.heightT).margin(1e-4));
@@ -483,6 +504,15 @@ TEST_CASE("every number the tornado uniform carries reaches the shader", "[gpu][
         {"stripePitch", &tornado::TornadoField::stripePitch, 14.0f},
         {"stripeDepth", &tornado::TornadoField::stripeDepth, 0.62f},
         {"stripeHarmonic", &tornado::TornadoField::stripeHarmonic, 0.95f},
+        {"cloudAmount", &tornado::TornadoField::cloudAmount, 0.2f},
+        {"macroAmp", &tornado::TornadoField::macroAmp, 2.6f},
+        {"mesoAmp", &tornado::TornadoField::mesoAmp, 1.9f},
+        {"microAmp", &tornado::TornadoField::microAmp, 1.4f},
+        {"detailContrast", &tornado::TornadoField::detailContrast, 4.1f},
+        {"detailScale", &tornado::TornadoField::detailScale, 6.3f},
+        {"climbRate", &tornado::TornadoField::climbRate, 0.9f},
+        {"erosion", &tornado::TornadoField::erosion, 4.0f},
+        {"edgeWidth", &tornado::TornadoField::edgeWidth, 1.8f},
         {"suctionCount", &tornado::TornadoField::suctionCount, 5.0f},
         {"suctionStrength", &tornado::TornadoField::suctionStrength, 0.7f},
         {"suctionRadius", &tornado::TornadoField::suctionRadius, 0.4f},

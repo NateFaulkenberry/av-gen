@@ -1,5 +1,7 @@
 #include "core/tornado.hpp"
 
+#include "core/noise.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -78,7 +80,49 @@ float suction(const TornadoUniforms& v, float rr, float h, float angle, float t)
     return 1.0f + std::clamp(v.t9.w, 0.0f, 0.9f) * window * std::cos(count * (angle - spin));
 }
 
-Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float /*filterWidth*/) {
+float octaveWeight(float periodMetres, float filterWidth) {
+    if (filterWidth <= 0.0f) {
+        return 1.0f;
+    }
+    return smoothstepf(0.0f, 1.0f, periodMetres / (2.0f * filterWidth));
+}
+
+// The transliteration of `tornadoDetail`. See `shaders/tornado.wgsl` for the reasoning at length:
+// mean exactly 1 so ADR-389's per-metre calibration survives, a co-moving sample frame so detail
+// rides the flow with no state, and a band limit that is not a knob.
+float detail(const TornadoUniforms& v, float rr, float h, float angle, float envelope, float radius,
+             float t, float filterWidth) {
+    const float amount = std::clamp(v.t10.w, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return 1.0f;
+    }
+    const float spin = rotationAt(v, h) * t;
+    const float climb = v.t12.y * t;
+    const glm::vec3 q(std::cos(angle - spin) * rr, h * 3.0f - climb, std::sin(angle - spin) * rr);
+    const float s0 = std::max(v.t12.x, 1e-3f);
+    const float s1 = s0 * 3.1f;
+    const float s2 = s0 * 9.7f;
+    const float a0 = std::max(v.t11.x, 0.0f) * octaveWeight(radius / s0, filterWidth);
+    const float a1 = std::max(v.t11.y, 0.0f) * octaveWeight(radius / s1, filterWidth);
+    const float a2 = std::max(v.t11.z, 0.0f) * octaveWeight(radius / s2, filterWidth);
+    const float sum = a0 + a1 + a2;
+    if (sum <= 1e-4f) {
+        return 1.0f;
+    }
+    const float n0 = noise::fbm3(q * s0 + glm::vec3(t * 0.011f, 0.0f, t * 0.008f), 71u);
+    const float n1 = noise::fbm3(q * s1 + glm::vec3(0.0f, t * 0.043f, 0.0f), 131u);
+    const float n2 = noise::fbm3(q * s2 + glm::vec3(t * 0.15f, 0.0f, -t * 0.11f), 197u);
+    const float n = (n0 * a0 + n1 * a1 + n2 * a2) / sum;
+    const float contrast = std::max(v.t11.w, 0.05f);
+    const float half = 0.5f / contrast;
+    const float shaped = smoothstepf(0.5f - half, 0.5f + half, std::clamp(n, 0.0f, 1.0f));
+    const float unit = shaped * 2.0f;
+    const float edge = 1.0f - smoothstepf(0.0f, std::max(v.t12.w, 1e-3f), envelope);
+    const float bite = std::clamp(amount * (1.0f + std::max(v.t12.z, 0.0f) * edge), 0.0f, 1.0f);
+    return std::lerp(1.0f, unit, bite);
+}
+
+Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float filterWidth) {
     Shape s;
     const float height = v.t0.w;
     if (height <= 0.0f) {
@@ -154,7 +198,7 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float /*fi
     }
     s.envelope = envelope;
     s.inside = true;
-    s.density = envelope;
+    s.density = envelope * detail(v, rr, hc, angle, envelope, radius, t, filterWidth);
     return s;
 }
 
@@ -193,7 +237,11 @@ TornadoUniforms packTornado(const TornadoField& f) {
     v.t9 = glm::vec4(std::clamp(f.cloudHeight, 1e-3f, 1.0f), std::max(f.cloudDensity, 0.0f),
                      std::max(f.suctionCount, 0.0f), std::clamp(f.suctionStrength, 0.0f, 0.9f));
     v.t10 = glm::vec4(std::clamp(f.suctionRadius, 0.0f, 2.0f), std::max(f.suctionWidth, 1e-3f),
-                      f.suctionSpeed, 0.0f);
+                      f.suctionSpeed, std::clamp(f.cloudAmount, 0.0f, 1.0f));
+    v.t11 = glm::vec4(std::max(f.macroAmp, 0.0f), std::max(f.mesoAmp, 0.0f),
+                      std::max(f.microAmp, 0.0f), std::max(f.detailContrast, 0.05f));
+    v.t12 = glm::vec4(std::max(f.detailScale, 1e-3f), f.climbRate, std::max(f.erosion, 0.0f),
+                      std::max(f.edgeWidth, 1e-3f));
     return v;
 }
 
