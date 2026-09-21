@@ -106,6 +106,7 @@ struct Params {
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
     fog: vec4<f32>,         // volume density, fog height, height falloff, absorption
     fog2: vec4<f32>,        // volume max distance, fog coupling 0..1, glow strength, linear depth 1/0
+    fog3: vec4<f32>,        // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
     // ADR-370: leaf cards. x = shape (0 round, 1 leaf), y = tumble rate (rad/s), z = leaf aspect
     // (length over width), w = two-sided shading depth. All zero is the round dot this always was.
     leaf: vec4<f32>,
@@ -1019,7 +1020,7 @@ fn fogTransmittance(origin: vec3<f32>, dir: vec3<f32>, dist: f32) -> f32 {
         // a third statement of the model, written out here -- the shape ADR-562 §9 names: every
         // reader of a shared model is a call site to audit, and a reader that restates it is one
         // edit away from being a different atmosphere in the same frame.
-        sum += fogHeightProfile(y - params.fog.y, params.fog.z);
+        sum += fogHeightProfile(y - params.fog.y, params.fog.z, params.fog3.x, params.fog3.y);
     }
     return exp(-density * params.fog.w * (sum * 0.25) * dist);
 }

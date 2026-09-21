@@ -389,7 +389,17 @@ struct EffectResolve {
     // in the air, which is what scaling an extinction and an emissive density does, while fading its
     // COLOURS would leave a full-strength grey ghost and fading its RADIUS would shrink it rather
     // than dim it (ADR-387).
-    void (*pack)(const AtmosphericEffect&, float envelope, MediumSlot& out) = nullptr;
+    //
+    // ADR-572 (§17): `flow` is what the air is doing where this medium is -- the subscription the
+    // effect already declares, resolved. It is handed to the packer because the packer is where a
+    // medium's MOTION is computed, and §17 asks a medium to respond to a flow field.
+    //
+    // Every kind's packer changed in one commit rather than an overload being added beside the old
+    // one: ADR-441 is explicit that this engine takes no compatibility shims while it is in heavy
+    // development, and a half-converted hook is the state in which the two versions disagree about
+    // which is authoritative.
+    void (*pack)(const AtmosphericEffect&, float envelope, const MediumFlowInput& flow,
+                 MediumSlot& out) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.

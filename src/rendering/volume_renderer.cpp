@@ -366,6 +366,18 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     u.depthParams = glm::vec4(scene.camera.nearPlane, scene.camera.farPlane,
                               std::clamp(scene.environment.volumeJitter, 0.0f, 1.0f), 0.0f);
     u.fogColor = glm::vec4(env.fogColor, 0.0f);
+    // ADR-568 (§7): the height layer's shape. Clamped here, for the reason the surface path is --
+    // both ends of both controls are meaningful and outside them the profile stops being one.
+    u.heightFog = glm::vec4(std::clamp(env.fogUpperDensity, 0.0f, 1.0f),
+                            std::clamp(env.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
+    // ADR-570 (§20/§22). The step count is NOT scaled by the quality tier's `volumeStepScale`, and
+    // that is deliberate: ADR-035's rule lets a tier scale "sample counts, resolutions and history
+    // lengths", and this is a sample count -- but it is also the difference between a fog bank
+    // that is lit from a direction and one that is not, which is a property of the LOOK. A tier
+    // that silently flattened the lighting would be changing the picture rather than its fidelity.
+    // If the cost needs a tier, it should be a tier that turns it off and says so.
+    u.selfShadow = glm::vec4(static_cast<float>(std::clamp(env.volumeShadowSteps, 0, 16)),
+                             std::max(env.volumeShadowStrength, 0.0f), 0.0f, 0.0f);
     // ADR-040: the march reads this many entries from the particle glow table.
     const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);
     u.glow = glm::vec4(static_cast<float>(glowSystems),
@@ -394,6 +406,10 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     im.activeThisFrame = true;
     stats_.steps = static_cast<std::uint32_t>(steps);
     stats_.glowSystems = glowSystems;
+    // ADR-578 (§39): the two numbers that decide this pass's cost and were not in any record.
+    stats_.media = static_cast<std::uint32_t>(scene.atmospherics.mediumCount);
+    stats_.mediaDropped = scene.atmospherics.mediaDropped;
+    stats_.shadowSteps = static_cast<std::uint32_t>(std::clamp(env.volumeShadowSteps, 0, 16));
     stats_.halfResolution = im.half.width() < width || im.half.height() < height;
     stats_.resolutionScale = resolutionScale;
     stats_.marchWidth = im.half.width();

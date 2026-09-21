@@ -28,6 +28,23 @@ import json
 import sys
 from pathlib import Path
 
+# ADR-578: THE SCENE CARRIES A MEDIUM OF ITS OWN AND THESE ARMS DID NOT KNOW.
+#
+# `tree-of-life-floating-island.scene.json` declares a `Cosmic Vortex`, and a project's
+# `atmosphericEffects` list MERGES with the scene's rather than replacing it -- so every arm this
+# file has ever written rendered the vortex as well as whatever it placed. The generator's own
+# comments said otherwise.
+#
+# It was invisible until §39's "active volume count" reached the headless log (ADR-578): the first
+# arm run after that printed `media=2` where one had been placed, and the second number was the
+# scene's. Nothing else in the record would have said so.
+#
+# What it did and did not invalidate: the vortex was CONSTANT across every arm in a set, so a
+# difference between two arms is still the parameter that differs -- the comparisons stand. What
+# does not stand is any sentence claiming an arm contained one medium, or none. Those are corrected
+# in place, and the vortex is switched off by parameter below.
+DISABLE_SCENE_MEDIUM = {"atmos/Cosmic Vortex/enabled": False}
+
 HERE = Path(__file__).resolve().parent.parent
 EX = HERE / "examples" / "treeisland"
 PROJECT = EX / "tree-of-life-floating-island.json"
@@ -119,9 +136,19 @@ def main() -> int:
         p = load_project()
         as_primitive(p, shape)
         p["parameters"]["post/bloom/enabled"] = False
+        p["parameters"].update(DISABLE_SCENE_MEDIUM)  # ADR-578
         # 256 steps, deliberately. These are SHAPE arms, not cost arms: at the shipped 32 the
-        # march's own sampling grain is louder than the silhouette and every primitive reads as
-        # the same speckled blob, which is section 48's point made against my own diagnostic --
+        # medium is UNDERSAMPLED along the ray and every primitive reads as the same speckled blob,
+        # which is section 48's point made against my own diagnostic --
+        #
+        # ADR-577 corrects what that speckle IS. It was written here as "the march's own sampling
+        # grain", which reads as the per-pixel start jitter, and it is not: measured, the jitter's
+        # contribution to a frame's high-frequency content at 32 steps and above is a ratio of
+        # **1.000** against the jitter switched off. The speckle is the medium itself sampled too
+        # coarsely along the ray -- a different artefact with a different fix (more steps, or §31's
+        # adaptive sampling), and the jitter is what BREAKS UP its banding rather than what causes
+        # it. A misattributed cause is worse than an unexplained one: it sends the next person to
+        # tune the wrong knob.
         # a badly sampled shape is not a shape you can judge. The cost question is phase I's and
         # has its own arms under the lock.
         p["parameters"]["scene/volumeSteps"] = 256

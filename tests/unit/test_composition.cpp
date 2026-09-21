@@ -1033,6 +1033,8 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
       "format": "avgen-scene", "version": 1, "name": "volumes",
       "environment": {
         "volumeDensity": 0.05, "fogHeight": 2.0, "fogHeightFalloff": 0.25,
+        "fogUpperDensity": 0.18, "fogHeightCurve": 0.65,
+        "volumeLocalLights": 1.7, "fogHeightAmount": 0.6,
         "volumeScattering": 1.2, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.4,
         "volumeNoise": 0.6, "volumeNoiseScale": 0.09, "volumeNoiseSpeed": 0.2,
         "volumeEmission": 0.3, "volumeSteps": 48, "volumeMaxDistance": 120.0,
@@ -1074,6 +1076,48 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     CHECK(s.environment.volumeSteps == 48);
     CHECK(s.environment.volumeDensityField == "smokeField");
     CHECK(s.environment.volumeColorField == "heat");
+    // ADR-568 (§7). Values chosen so neither is a default and neither is the other: a read wired
+    // to the wrong member, or a key written and never read, is the failure this asks about, and
+    // two numbers that happened to match would answer it the wrong way.
+    CHECK(s.environment.fogUpperDensity == 0.18f);
+    CHECK(s.environment.fogHeightCurve == 0.65f);
+    REQUIRE(params.find("scene/fogUpperDensity") != nullptr);
+    REQUIRE(params.find("scene/fogHeightCurve") != nullptr);
+    // ADR-573 (§27): both of these shipped for months with no parameter at all, so they could be
+    // authored and never reached from the editor, an automation curve or a modulation route.
+    CHECK(s.environment.volumeLocalLights == 1.7f);
+    CHECK(s.environment.volumeMaxDistance == 120.0f);
+    REQUIRE(params.find("scene/volumeLocalLights") != nullptr);
+    REQUIRE(params.find("scene/volumeMaxDistance") != nullptr);
+    // ADR-574: and ADR-058's coupling, whose omission was justified by a reason that was false
+    // about its own four lines.
+    CHECK(s.environment.fogHeightAmount == 0.6f);
+    REQUIRE(params.find("scene/fogHeightAmount") != nullptr);
+
+    // THE HALF THAT WAS MISSING, and the half a registration test alone does not ask: does moving
+    // the parameter reach the ENVIRONMENT the renderer is handed? A parameter that exists, draws a
+    // row, accepts a keyframe and is then dropped on the floor is this repository's most common
+    // defect shape -- four of the fog kind's controls died that way (ADR-561, ADR-565, ADR-571) and
+    // the medium kind tag was packed, compared and never uploaded for a day (ADR-562).
+    //
+    // The base is what a panel writes; the FINAL is what `Composition::applyParameters` reads,
+    // and the modulator is what turns one into the other each frame. A test that moves only the
+    // base and expects the environment to follow is testing the modulator's absence -- which is
+    // what the first version of these four lines did, and it failed, correctly, against working
+    // code. Driving the seam the way the engine drives it is the difference between a reachability
+    // test and a test of the harness.
+    // `ParameterSet::resetFinals()` is "final = base for every parameter", the start of the
+    // engine's modulation pass; `applyRoutes` then modifies only the finals a route targets. A
+    // test that calls the second without the first leaves every unrouted final at whatever
+    // registration set it -- which is what the first two versions of these lines did.
+    params.find("scene/volumeLocalLights")->setBaseComponent(0, 0.25f);
+    params.find("scene/volumeMaxDistance")->setBaseComponent(0, 1234.0f);
+    params.find("scene/fogHeightAmount")->setBaseComponent(0, 0.35f);
+    params.resetFinals();
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->scene().environment.volumeLocalLights == 0.25f);
+    CHECK((*comp)->scene().environment.volumeMaxDistance == 1234.0f);
+    CHECK((*comp)->scene().environment.fogHeightAmount == 0.35f);
     REQUIRE(params.find("scene/volumeDensity") != nullptr);
     REQUIRE(params.find("scene/volumeSteps") != nullptr);
 
@@ -1082,6 +1126,13 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     REQUIRE(j.contains("grids"));
     CHECK_FALSE(j["grids"][0].contains("data"));
     CHECK(j["environment"]["volumeSteps"] == 48);
+    CHECK(j["environment"]["fogUpperDensity"] == 0.18f);
+    CHECK(j["environment"]["fogHeightCurve"] == 0.65f);
+    // ...and what the parameter was moved to is what a save writes, which is the other half of
+    // "reachable": a control you can move and cannot keep is not a control.
+    CHECK(j["environment"]["volumeLocalLights"] == 0.25f);
+    CHECK(j["environment"]["volumeMaxDistance"] == 1234.0f);
+    CHECK(j["environment"]["fogHeightAmount"] == 0.35f);
     auto again = scene::Composition::fromJson(j, fx.registry);
     REQUIRE(again.has_value());
     REQUIRE((*again)->grids().size() == 1);

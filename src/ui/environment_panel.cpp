@@ -52,6 +52,26 @@ bool slider(app::Engine& engine, const char* path, const char* label, const char
     return changed;
 }
 
+// An integer row. ADR-570 needed one for `scene/volumeShadowSteps`, and a step COUNT drawn as a
+// float slider reading "3.47" is a control an artist has to interpret -- the same argument
+// `FieldType::Choice` makes in ADR-566, one type down.
+bool intSlider(app::Engine& engine, const char* path, const char* label) {
+    params::IParameter* p = engine.params().find(path);
+    if (p == nullptr) {
+        return false;
+    }
+    int v = static_cast<int>(p->baseComponent(0) + 0.5f);
+    rowLabel(label);
+    ImGui::PushID(path);
+    const bool changed = ImGui::SliderInt("##v", &v, static_cast<int>(p->softMin(0)),
+                                          static_cast<int>(p->softMax(0)));
+    ImGui::PopID();
+    if (changed) {
+        p->setBaseComponent(0, static_cast<float>(v));
+    }
+    return changed;
+}
+
 bool checkbox(app::Engine& engine, const char* path, const char* label) {
     params::IParameter* p = engine.params().find(path);
     if (p == nullptr) {
@@ -87,6 +107,40 @@ void drawEnvironmentPanel(app::Engine& engine) {
         slider(engine, "scene/volumeDensity", "Fog density", "%.3f");
         slider(engine, "scene/fogHeight", "Fog height", "%.1f m");
         slider(engine, "scene/fogHeightFalloff", "Horizon falloff", "%.2f");
+        // ADR-568 (the fog brief's §7). Drawn beside the falloff they shape rather than in an
+        // advanced section: a parameter an artist cannot reach is a parameter that does not exist
+        // as far as the work is concerned (ADR-421), and these two are what turn one exponential
+        // haze into the range §7 asks for -- clear air above the mist, a definite layer with a
+        // top, or a thin global haze that never quite clears.
+        slider(engine, "scene/fogUpperDensity", "Upper density", "%.2f");
+        slider(engine, "scene/fogHeightCurve", "Height curve", "%.2f");
+        // ADR-570 (§20/§22). Named for what an artist is buying rather than for the algorithm:
+        // what these do is make a bank light from a direction and cast a shaft, and "shadow steps"
+        // is the number that costs frame time. Both are drawn because a control that exists and
+        // cannot be reached is a control that does not exist (ADR-421) -- and at 0 the first one
+        // is the whole feature's off switch, which an artist should be able to find.
+        intSlider(engine, "scene/volumeShadowSteps", "Fog shadow steps");
+        // ADR-579: the COST, where the decision is made rather than only in an ADR. ADR-570
+        // measured that this scales with the number of lights whose `volumetricStrength` is above
+        // zero -- +10.6 ms of march for one light against +31 for three -- and an artist turning
+        // it up has no other way to learn that. Drawn only when it is on, so the row does not
+        // lecture anybody who has left it at its default.
+        if (params::IParameter* p = engine.params().find("scene/volumeShadowSteps");
+            p != nullptr && p->baseComponent(0) >= 0.5f) {
+            ImGui::TextColored(kMuted,
+                               "  cost scales with how many lights light the fog:\n"
+                               "  about +10 ms of march per light at 4 steps (ADR-570)");
+        }
+        slider(engine, "scene/volumeShadowStrength", "Fog shadow strength", "%.2f");
+        // ADR-573 (§27). "Local lights in fog" is the artist's name for it; `volumeLocalLights` is
+        // the engine's. The capability has existed since ADR-053 and twelve shipped scenes use it,
+        // every one of them hand-edited, because until now there was no row to move.
+        slider(engine, "scene/volumeLocalLights", "Local lights in fog", "%.2f");
+        slider(engine, "scene/volumeMaxDistance", "Fog march distance", "%.0f m", true);
+        // ADR-574 (ADR-058's coupling). Named for what an artist buys: at 0 the distance fog is a
+        // uniform slab, at 1 a ridge standing clear of the mist is seen through the air that is
+        // actually between it and the eye. Nine shipped scenes set it, every one by hand.
+        slider(engine, "scene/fogHeightAmount", "Surface fog follows layer", "%.2f");
         slider(engine, "env/intensity", "Ambient", "%.2f");
         slider(engine, "env/sky/intensity", "Sky intensity", "%.2f");
         ImGui::PopID();

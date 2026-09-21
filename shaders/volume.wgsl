@@ -42,9 +42,11 @@ struct VolumeUniforms {
     noiseParams: vec4<f32>, // noiseAmount, noiseScale, noiseSpeed, time (seconds)
     info: vec4<f32>,      // steps, density field slot (-1 none), colour field slot (-1 none), frame index
     sizes: vec4<f32>,     // march width, march height, full width, full height (ADR-139)
-    depthParams: vec4<f32>, // camera near, camera far, 0, 0
+    depthParams: vec4<f32>, // camera near, camera far, march start jitter (ADR-461), 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
-    glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), yzw = 0
+    glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), y = local-light strength
+    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    selfShadow: vec4<f32>, // ADR-570: x = shadow march steps (0 = off), y = strength, zw = 0
     // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
     //
     // Was twelve named `vortexN` members carrying exactly ONE medium, so the second placed medium
@@ -182,7 +184,8 @@ fn mediumKind(s: u32) -> u32 {
 // primitive rather than a second primitive (ADR-500's argument, still standing).
 fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
     return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u),
-                           mediaLane(s, 7u), mediaLane(s, 12u));
+                           mediaLane(s, 7u), mediaLane(s, 12u), mediaLane(s, 2u),
+                           mediaLane(s, 6u));
 }
 
 fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
@@ -205,7 +208,17 @@ fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
     var c = mix(mediaLane(s, 9u).rgb, mediaLane(s, 10u).rgb, smoothstep(0.0, 0.45, shape));
     let filament = smoothstep(0.62, 0.95, shape) * clamp(l3.w, 0.0, 4.0);
     c = c + mediaLane(s, 11u).rgb * filament;
-    return c * (shape * l3.z);
+    // ADR-575 (§26): the emission's own height influence, as a per-kind ARM rather than a lane
+    // read. `mediumEmissionAt` is a shared accessor and lane 12's meaning is per-kind, which is
+    // precisely the shape ADR-562 §9 recorded three defects of -- so the fog's number is reached
+    // through the same dispatch `mediumShape` uses and a kind that has no such control is
+    // untouched, by construction rather than by a zero.
+    var height = 1.0;
+    if (mediumKind(s) == kMediumKindFog) {
+        let f = mediumFogUniforms(s);
+        height = fogEmissionHeight(f, p.y - f.f0.y);
+    }
+    return c * (shape * l3.z * height);
 }
 
 // ADR-566: the bound the interval below is built from -- (radiusXZ, yBot, yTop).
@@ -338,7 +351,8 @@ fn volumeDensityAt(p: vec3<f32>) -> f32 {
     // this file's include of common.wgsl). It used to be this expression written out here and the
     // antiderivative written out in common.wgsl -- two statements of one model, in two files, with
     // nothing asserting they were a function and its integral.
-    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z);
+    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z,
+                                      vol.heightFog.x, vol.heightFog.y);
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);
     if (densitySlot >= 0) {
@@ -410,6 +424,78 @@ fn lightTowards(index: i32, p: vec3<f32>) -> vec3<f32> {
     return toLight * inverseSqrt(max(dot(toLight, toLight), 1e-4));
 }
 
+// ADR-570 (the brief's §20 and §22): the SHARED self-shadow march.
+//
+// **What it is.** At a sample `p`, march a short secondary ray toward a light through the placed
+// media's own density and attenuate that light's in-scatter by the transmittance. That is the one
+// missing term between "fog that is lit" and "fog that is lit FROM A DIRECTION": without it a bank
+// is equally bright on the side facing the sun and the side away from it, which is why ADR-358
+// refused to build a volumetric beam without shadow sampling and why §20's "backlit fog" and
+// "dark moody fog" were not reachable by any setting of the existing controls.
+//
+// **And it is §22's answer without a second system.** A shaft is what you see when the air behind
+// an occluder is dark and the air beside it is not. The occluder here is the medium itself, so a
+// spotlight aimed through a fog bank produces a beam out of the same density the march already
+// integrates -- "light -> fog -> scattering -> visible beam" from one field, which is what §22 asks
+// for and what it warns against faking with a 2D radial blur.
+//
+// **Why it lives HERE and dispatches through `mediumShape`.** `agent/tornado` needs the same term
+// and must not write a second one. This marches whatever each slot's kind says its density is, so
+// a kind added tomorrow self-shadows correctly without touching this function -- the same property
+// ADR-562 gave the primary march, and ADR-562 §9 is the record of what happens when a shared
+// reader is left assuming one kind's layout.
+//
+// **The cost, stated because it is the reason this is off by default.** ADR-562 §8 measured that
+// the field evaluation IS the cost of this pass. This multiplies the field evaluations per march
+// step by (lights that light the air) x (slots the shadow ray crosses) x `steps`. What keeps it
+// from being catastrophic is that the per-slot interval (ADR-562 §4) culls the shadow ray the same
+// way it culls the primary one: a ray toward the sun from a point nowhere near a medium costs four
+// analytic interval tests and evaluates no field at all. So the cost concentrates where the media
+// actually are, which is where it should be. It is still a multiple, and `volumeShadowSteps`
+// defaults to 0, which returns 1.0 from the first branch and leaves every existing frame
+// bit-identical.
+fn mediumSelfShadow(p: vec3<f32>, towards: vec3<f32>, t: f32) -> f32 {
+    let steps = i32(vol.selfShadow.x);
+    let strength = vol.selfShadow.y;
+    if (steps <= 0 || strength <= 0.0) {
+        return 1.0;
+    }
+    let mediumCount = u32(vol.mediaInfo.x);
+    var tau = 0.0;
+    for (var s = 0u; s < mediumCount; s = s + 1u) {
+        // The SAME bound the primary march clips to (ADR-566), so the shadow ray cannot miss part
+        // of a medium the camera ray can see -- and so an ADR-566-style defect could not be
+        // introduced here separately: there is one bound and this is a second reader of it.
+        let iv = mediumInterval(s, p, towards, 1.0e7);
+        if (iv.y <= iv.x) {
+            continue;
+        }
+        let dt = (iv.y - iv.x) / f32(steps);
+        let extinctionPerShape = mediaLane(s, 1u).w;
+        for (var k = 0; k < steps; k = k + 1) {
+            let x = p + towards * (iv.x + (f32(k) + 0.5) * dt);
+            let shape = mediumShape(s, x, t);
+            if (shape > 0.0) {
+                tau = tau + shape * extinctionPerShape * dt;
+            }
+            // NO EARLY-OUT HERE, and that is a measurement rather than an oversight. The primary
+            // march breaks at `transmittance < 0.002` and the same test was written into this
+            // loop, expecting the same win. Measured interleaved at 4 steps with one volumetric
+            // light, three repeats: +1.57, +0.85, -0.78 ms. **Mixed sign, so no effect is
+            // established** (docs/testing.md 19's discard rule: discard on sign disagreement,
+            // never on spread), and it was removed rather than kept on the argument that it must
+            // help. At four steps the loop can save at most three evaluations and only deep
+            // inside a thick medium, which is probably why. If `volumeShadowSteps`' cap of 16 is
+            // ever raised, measure it again before assuming the answer is the same.
+        }
+    }
+    // `params1.x` is the absorption the primary march turns density into extinction with, so the
+    // shadow ray and the camera ray agree about how opaque the medium is. `strength` is the
+    // artist's dial on top: 1 is physical, less is a softer bank that light reaches further into,
+    // and more is a bank that swallows light -- which is a look, not an error.
+    return exp(-tau * vol.params1.x * strength);
+}
+
 fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32) -> vec3<f32> {
     var total = vec3<f32>(0.0);
     let count = min(i32(frame.envParams.z), 8);
@@ -420,7 +506,11 @@ fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32) -> vec3<f32>
         }
         let towards = lightTowards(i, p);
         let phase = henyeyGreenstein(dot(direction, towards), anisotropy);
-        total = total + strength * phase * lightRadiance(i, p).rgb;
+        // ADR-570: and how much of this light actually reaches `p` through the media. One shadow
+        // march per light that lights the air; a light with `volumetricStrength` 0 skipped above
+        // costs nothing here either, which is what makes a rig with one volumetric key affordable.
+        let shadow = mediumSelfShadow(p, towards, vol.noiseParams.w);
+        total = total + strength * phase * shadow * lightRadiance(i, p).rgb;
     }
     return total;
 }
@@ -493,6 +583,11 @@ fn localInScatterAt(p: vec3<f32>, screenUv: vec2<f32>, viewDepth: f32, direction
             attenuation = attenuation * t * t;
         }
         let phase = henyeyGreenstein(dot(direction, towards), anisotropy);
+        // ADR-570 deliberately does NOT self-shadow the clustered local lights, and the reason is
+        // arithmetic rather than principle: this loop runs over a froxel's whole light list, so a
+        // shadow march here is one per light per sample with no `volumetricStrength` gate to thin
+        // it. The eight frame lights are gated and few; a froxel's list is neither. If a scene
+        // wants a shadowed practical it should be one of the eight. Revisit with a measurement.
         sum = sum + light.colorIntensity.rgb * (attenuation * phase);
     }
     return sum * gain;

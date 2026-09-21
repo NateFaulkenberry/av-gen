@@ -64,6 +64,8 @@ struct Args {
     f2: vec4<f32>,
     f3: vec4<f32>,
     f4: vec4<f32>,
+    f5: vec4<f32>,
+    f6: vec4<f32>,
     time: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> args: Args;
@@ -74,15 +76,19 @@ struct Args {
 fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= arrayLength(&samples)) { return; }
-    let f = FogUniformsWgsl(args.f0, args.f1, args.f2, args.f3, args.f4);
+    let f = FogUniformsWgsl(args.f0, args.f1, args.f2, args.f3, args.f4, args.f5, args.f6);
     let p = samples[i].xyz;
     let t = args.time.x;
     let rel = p - f.f0.xyz;
     // ADR-566: the PRIMITIVE distance, which is what the march calls -- not the bank's ellipse,
     // which is one arm of it. A parity test aimed at the arm the dispatch no longer takes is
     // ADR-565's entry 22 written a second time, and this pair is where it would be least visible.
-    results[i] = vec4<f32>(fogShapeAt(f, p, t), fogPrimitiveDistance(f, rel),
-                           fogVerticalProfile(f, rel.y), fogMacroDetail(f, p, t));
+    // ADR-575: TWO vec4s per sample now. The emission's height influence is a term the march
+    // evaluates on the GPU, and a parity harness that does not read it is a pair with a gap --
+    // which was found by breaking the shader and watching this test pass.
+    results[i * 2u] = vec4<f32>(fogShapeAt(f, p, t), fogPrimitiveDistance(f, rel),
+                                fogVerticalProfile(f, rel.y), fogMacroDetail(f, p, t));
+    results[i * 2u + 1u] = vec4<f32>(fogEmissionHeight(f, rel.y), 0.0, 0.0, 0.0);
 }
 )";
 
@@ -91,6 +97,7 @@ struct Gpu {
     float distance = 0.0f;
     float vertical = 0.0f;
     float detail = 0.0f;
+    float emissionHeight = 0.0f; // ADR-575 (§26)
 };
 
 class Harness {
@@ -137,8 +144,8 @@ public:
         // The four lanes the march hands the field, by value, so this harness has no list to fall
         // behind — the same property the vortex harness gets from passing its uniform block whole.
         struct Args {
-            glm::vec4 f0, f1, f2, f3, f4, time;
-        } args{m.lane[0],  m.lane[13], m.lane[14], m.lane[7], m.lane[12],
+            glm::vec4 f0, f1, f2, f3, f4, f5, f6, time;
+        } args{m.lane[0],  m.lane[13], m.lane[14], m.lane[7], m.lane[12], m.lane[2], m.lane[6],
                glm::vec4(time, 0.0f, 0.0f, 0.0f)};
         wgpu::BufferDescriptor adesc{};
         adesc.size = sizeof(Args);
@@ -158,7 +165,7 @@ public:
         ctx_.queue().WriteBuffer(samples, 0, padded.data(), sdesc.size);
 
         wgpu::BufferDescriptor rdesc{};
-        rdesc.size = padded.size() * sizeof(glm::vec4);
+        rdesc.size = padded.size() * sizeof(glm::vec4) * 2; // ADR-575: two vec4s per sample
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer results = device.CreateBuffer(&rdesc);
 
@@ -188,11 +195,12 @@ public:
         ctx_.queue().Submit(1, &commands);
         auto bytes = gpu::readBuffer(ctx_, results, 0, rdesc.size);
         REQUIRE(bytes.has_value());
-        std::vector<glm::vec4> raw(padded.size());
+        std::vector<glm::vec4> raw(padded.size() * 2);
         std::memcpy(raw.data(), bytes->data(), rdesc.size);
         std::vector<Gpu> out(padded.size());
         for (std::size_t i = 0; i < padded.size(); ++i) {
-            out[i] = Gpu{raw[i].x, raw[i].y, raw[i].z, raw[i].w};
+            out[i] = Gpu{raw[i * 2].x, raw[i * 2].y, raw[i * 2].z, raw[i * 2].w,
+                         raw[i * 2 + 1].x};
         }
         return out;
     }
@@ -223,7 +231,14 @@ world::MediumSlot shippedBank(float detail, int shape = 0, float heightInfluence
     e.values.setFloat("fog/heightFalloff", 1.9f);
     e.values.setFloat("fog/domeShape", 0.28f);
     e.values.setFloat("fog/detailScale", 7.5f);
-    e.values.setFloat("fog/detailDrift", 0.04f);
+    // ADR-571: a drift with a real velocity, so the parity harness exercises the advection.
+    e.values.setFloat("fog/driftSpeed", 3.5f);
+    e.values.setFloat("fog/driftVertical", -0.8f);
+    // ADR-571 §24: every term of the density curve off its identity, so a shader that dropped one
+    // of the three cannot pass.
+    e.values.setFloat("fog/densityThreshold", 0.12f);
+    e.values.setFloat("fog/densitySoftness", 0.6f);
+    e.values.setFloat("fog/emissionHeight", 0.7f); // ADR-575 §26, off both ends of its range
     e.values.setFloat("fog/shape", static_cast<float>(shape));
     e.values.setFloat("fog/heightInfluence", heightInfluence);
     world::MediumSlot slot{};
@@ -276,6 +291,8 @@ TEST_CASE("the fog shader agrees with world/fog_field.cpp", "[gpu][fog][parity][
             CHECK(gpu[i].distance == Approx(world::fogPrimitiveDistance(slot, rel)).margin(1e-4));
             CHECK(gpu[i].vertical == Approx(world::fogVerticalProfile(slot, rel.y)).margin(1e-4));
             CHECK(gpu[i].detail == Approx(world::fogMacroDetail(slot, pts[i], t)).margin(1e-3));
+            CHECK(gpu[i].emissionHeight ==
+                  Approx(world::fogEmissionHeight(slot, rel.y)).margin(1e-4));
             if (world::fogShapeAt(slot, pts[i], t) > 1e-4f) {
                 ++inside;
             }

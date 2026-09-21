@@ -55,6 +55,10 @@ struct ParticleUniforms {
     glm::vec4 trail2;     // tail alpha fraction, tail tint rgb
     glm::vec4 fog;        // volume density, fog height, height falloff, absorption
     glm::vec4 fog2;       // volume max distance, fog coupling, glow strength, 0
+    // ADR-568 (§7): the height layer's shape. Here because this pass estimates its own
+    // transmittance through the SAME layer the march integrates (ADR-567), and a reader
+    // left on the old model is a third atmosphere in the same frame.
+    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, 0, 0
     glm::vec4 leaf;       // ADR-370: shape (0 round, 1 leaf), tumble rate, aspect, two-sided depth
     // ADR-370: ADR-055's packed wind field, so `cs_simulate` can sample the same air the tree bends
     // in without the particle pipelines growing a frame bind group they have never had.
@@ -80,7 +84,7 @@ struct ParticleUniforms {
     glm::vec4 opacityKeys[scene::kMaxCurveKeys]; // (t, value, 0, 0)
     glm::vec4 colorKeys[scene::kMaxCurveKeys];   // (t, r, g, b)
 };
-static_assert(sizeof(ParticleUniforms) == 128 + 16 * 37 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
+static_assert(sizeof(ParticleUniforms) == 128 + 16 * 38 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
@@ -106,6 +110,8 @@ struct ParticleFrameContext {
     float fogDensity = 0.0f;
     float fogHeight = 0.0f;
     float fogHeightFalloff = 0.0f;
+    float fogUpperDensity = 0.0f;   // ADR-568
+    float fogHeightCurve = 0.0f;    // ADR-568
     float fogAbsorption = 1.0f;
     float fogMaxDistance = 200.0f;
     // The ADR-035 R32F linear-depth target, resolved by the depth prepass. Null disables the fog

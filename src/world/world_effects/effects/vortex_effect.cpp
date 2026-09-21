@@ -115,8 +115,12 @@ constexpr EffectField kFields[] = {
         .tooltip("Weight of the finest noise octave. Detail below what the volume march can sample is\n"
                  "faded out automatically, so raising this past the point where it stops changing the\n"
                  "picture means the march is the limit, not this."),
+    // ADR-579: these two are LIGHTING and were sitting inside "Cyclone structure", which is why
+    // `innerVoid` below had to re-open that heading to get out from under them -- and re-opening a
+    // heading on the same page draws it twice. Giving the lighting pair its own section is what
+    // makes the duplicate unnecessary rather than renamed.
     floatField("spill", "Light spill", 0.0f, 20.0f, 0.0f, 6.0f, GET(e.vortex.spill),
-               SETF(e.vortex.spill)).main()
+               SETF(e.vortex.spill)).main().sec("Light")
         .tooltip("How much of the funnel's own light lands on the surfaces above it. Separate from\n"
                  "Brightness so it can be tuned against the island without changing the funnel."),
     // ADR-388, and the range is a measurement rather than a guess. Laddered on the shipped Tree of
@@ -150,7 +154,7 @@ constexpr EffectField kFields[] = {
     floatField("throatDensity", "Throat thickness", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.throatDensity),
                SETF(e.vortex.field.throatDensity)),
     floatField("innerVoid", "Eye radius", 0.0f, 0.95f, 0.0f, 0.6f, GET(e.vortex.field.innerVoid),
-               SETF(e.vortex.field.innerVoid)).main().sec("Cyclone structure")
+               SETF(e.vortex.field.innerVoid)).main().sec("Eye")
         .tooltip("The clear centre of the storm, as a fraction of the mouth radius. This is the same\n"
                  "number the Advanced section used to call Inner void; it is here because with a wall\n"
                  "around it it is no longer a detail, it is the shape of the thing."),
@@ -365,7 +369,11 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 // CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
 // what happens when they can). The appearance lanes are assembled here because they are what the
 // picture does with the field rather than part of it.
-void packMedium(const E& e, float envelope, MediumSlot& out) {
+// ADR-572 (§17): the resolved flow is handed to every packer. A vortex does not use it -- it is a
+// static field the march samples, and ADR-387 already gives it the only flow response it wants, the
+// §68 lean that moves its centre. Named and unused rather than removed from the signature, because
+// the hook is shared and the next kind will want it.
+void packMedium(const E& e, float envelope, const MediumFlowInput& /*flow*/, MediumSlot& out) {
     const Vortex& v = e.vortex;
     const vortex::VortexUniforms f = vortex::packVortex(v.field);
     out.lane[0] = f.v0;

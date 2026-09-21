@@ -49,6 +49,9 @@ const world::EffectSchema& fogSchema() {
 }
 
 // A fog bank as the Add button makes one, then as a named style leaves it.
+// ADR-579 renamed the three styles to §37's vocabulary -- "Valley Mist" is "Valley Fog"
+// now. The `REQUIRE(it != s.styles.end())` below is what caught every call site, which is
+// why the helper looks the style up by name rather than taking an index.
 world::AtmosphericEffect fogBank(std::string_view style) {
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.factory != nullptr);
@@ -61,6 +64,16 @@ world::AtmosphericEffect fogBank(std::string_view style) {
     return e;
 }
 
+float storedOf(const world::AtmosphericEffect& e, std::string_view leaf) {
+    for (const world::EffectField& f : fogSchema().fields) {
+        if (std::string_view(f.leaf) == leaf) {
+            return world::fieldFloat(f, fogSchema(), e);
+        }
+    }
+    FAIL("no such row: " << leaf);
+    return 0.0f;
+}
+
 // ADR-565: the field the march evaluates FOR THIS KIND, which since ADR-563 is `fogShapeAt` and
 // not the vortex's. A probe that samples the pre-dispatch path goes on passing while asserting
 // about a field nothing calls for a fog bank -- it does not break, which is what makes it
@@ -70,7 +83,7 @@ float fogSampleAt(const world::AtmosphericEffect& e, glm::vec3 offset) {
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.resolve.pack != nullptr);
     world::AtmosphericEffect copy = e;
-    s.resolve.pack(copy, 1.0f, slot);
+    world::packMediumSlot(copy, 1.0f, slot);
     return world::fogShapeAt(slot, e.vortex.field.center + offset);
 }
 
@@ -90,23 +103,46 @@ TEST_CASE("a fog bank is filled to its own axis", "[fog]") {
         const float radius = e.vortex.field.radius;
         REQUIRE(radius > 0.0f);
 
-        const float axis = fogSampleAt(e, glm::vec3(0.0f));
+        // Sampled at the height where the bank is DENSEST, not at its centre point, and ADR-579
+        // is why. `groundHug` slides the densest layer between the bank's floor and its top, and
+        // for every ground-hugging preset that layer is one thickness BELOW the centre -- so a
+        // radial probe at y = 0 was asking about a hole at a height where three of the ten presets
+        // legitimately have almost nothing. The eye hole ADR-561 fixed is a hole on the axis at the
+        // height the bank is at; this samples there.
+        const float hug = std::clamp(storedOf(e, "groundHug"), 0.0f, 1.0f);
+        const float dense = -e.vortex.field.thickness + 2.0f * e.vortex.field.thickness * hug;
+        INFO("densest layer at y = " << dense);
+        const float axis = fogSampleAt(e, glm::vec3(0.0f, dense, 0.0f));
         CHECK(axis > 0.0f);
-        // ...and nothing dips on the way out. 0.22 is where the vortex's crest sat, so the samples
-        // deliberately still straddle it.
+        // ...and the AXIS IS THE MAXIMUM, which is the eye hole stated as a property rather than
+        // as a tolerance. 0.22 is where the vortex's crest sat, so the samples deliberately still
+        // straddle it: a hole means the centre reads LOWER than a point further out, and that is
+        // what this asks.
+        //
+        // ADR-579 changed this from "within 2% of the axis". That form was written when the field
+        // was `rim * profile`, and ADR-571's density curve legitimately makes a bank fall away
+        // faster than 2% by half a radius -- `Dense Cinematic` sets a threshold of 0.15 and
+        // `Horror Fog` 0.3, and the curve working looked exactly like the defect. **A tolerance is
+        // a proxy for a property; when a feature lands that the proxy forbids, assert the
+        // property.**
         for (const float rr : {0.05f, 0.10f, 0.22f, 0.35f, 0.50f}) {
             INFO("rr = " << rr);
-            CHECK(fogSampleAt(e, glm::vec3(radius * rr, 0.0f, 0.0f)) >= axis * 0.98f);
+            CHECK(fogSampleAt(e, glm::vec3(radius * rr, dense, 0.0f)) <= axis + 1e-6f);
         }
+        // ...and it is not flat-to-zero either, or the line above passes on an empty bank.
+        CHECK(fogSampleAt(e, glm::vec3(radius * 0.10f, dense, 0.0f)) > axis * 0.5f);
         // The rim still falls away, or the above would pass on a field that is 1 everywhere and
-        // this case would prove nothing (ADR-182).
-        CHECK(fogSampleAt(e, glm::vec3(radius * 1.6f, 0.0f, 0.0f)) == Approx(0.0f).margin(1e-6f));
+        // this case would prove nothing (ADR-182). Sampled on the SHORT axis (+Z) for the reason
+        // the sweep below is: the long axis moves with `bankLength` and a preset may set it, so a
+        // fixed multiple of the radius along +X is a distance that stops being outside the bank
+        // when somebody tunes a preset. The short half-extent is `radius` whatever the length is.
+        CHECK(fogSampleAt(e, glm::vec3(0.0f, 0.0f, radius * 1.6f)) == Approx(0.0f).margin(1e-6f));
     }
 }
 
 TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]") {
     const world::EffectSchema& s = fogSchema();
-    world::AtmosphericEffect e = fogBank("Valley Mist");
+    world::AtmosphericEffect e = fogBank("Valley Fog");
 
     // The panel, registration and the route table all walk `s.fields`. A control that is not a row
     // here is a control that does not exist for this kind, whatever the struct carries (ADR-421).
@@ -134,14 +170,14 @@ TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]"
     // could not reach, and the tell was that nothing downstream disagreed.
     const world::EffectSchema& fs = fogSchema();
     REQUIRE(fs.resolve.pack != nullptr);
-    world::AtmosphericEffect probe = fogBank("Valley Mist");
+    world::AtmosphericEffect probe = fogBank("Valley Fog");
     const float radius = probe.vortex.field.radius;
     world::MediumSlot slotOff{};
     world::MediumSlot slotOn{};
     probe.vortex.field.cloudNoise = 0.0f;
-    fs.resolve.pack(probe, 1.0f, slotOff);
+    world::packMediumSlot(probe, 1.0f, slotOff);
     probe.vortex.field.cloudNoise = 1.0f;
-    fs.resolve.pack(probe, 1.0f, slotOn);
+    world::packMediumSlot(probe, 1.0f, slotOn);
     bool moved = false;
     for (int i = 1; i < 24 && !moved; ++i) {
         const float rr = 0.04f * static_cast<float>(i);
@@ -153,7 +189,7 @@ TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]"
 }
 
 TEST_CASE("a fog bank with its detail at zero still has a field with shape in it", "[fog]") {
-    world::AtmosphericEffect e = fogBank("Valley Mist");
+    world::AtmosphericEffect e = fogBank("Valley Fog");
     e.vortex.field.cloudNoise = 0.0f;
     const float radius = e.vortex.field.radius;
     const float thickness = e.vortex.field.thickness;
@@ -161,10 +197,16 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     // ADR-565: sampled through `fogShapeAt`, the field the march evaluates for this kind. This
     // case sampled the VORTEX's field until the audit -- passing the whole time, about a field
     // nothing calls for a fog bank.
+    // ADR-579: swept along +Z, the bank's SHORT axis, and that is the point. The sweep used to go
+    // along +X and assert the field reached zero by 1.6 radii -- which is true only while
+    // `bankLength` is small, and it stopped being true the moment a preset set a longer one. The
+    // short axis is `radius` whatever the length is, so this samples the same property without
+    // depending on a preset's numbers. **A test coupled to a preset's values fails when the
+    // preset is tuned, which is not what it is for.**
     std::vector<float> radial;
     for (int i = 0; i <= 16; ++i) {
         const float rr = 0.1f * static_cast<float>(i);
-        radial.push_back(fogSampleAt(e, glm::vec3(radius * rr, 0.0f, 0.0f)));
+        radial.push_back(fogSampleAt(e, glm::vec3(0.0f, 0.0f, radius * rr)));
     }
     CHECK(*std::max_element(radial.begin(), radial.end()) > 0.0f);
     CHECK(*std::min_element(radial.begin(), radial.end()) == Approx(0.0f).margin(1e-6f));
@@ -181,13 +223,13 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     // point of the phase.
     //
     // Measured through the packed lanes and the same `fogShapeAt` the march runs, not a copy.
-    world::AtmosphericEffect shaped = fogBank("Valley Mist");
+    world::AtmosphericEffect shaped = fogBank("Valley Fog");
     shaped.vortex.field.cloudNoise = 0.0f;
     shaped.values.setFloat("fog/bankLength", 2.5f); // a bank with a long axis
     world::MediumSlot slot{};
     const world::EffectSchema& fs = fogSchema();
     REQUIRE(fs.resolve.pack != nullptr);
-    fs.resolve.pack(shaped, 1.0f, slot);
+    world::packMediumSlot(shaped, 1.0f, slot);
 
     // Sampled at 0.9 of the radius, NOT at 0.45, and the difference is a finding rather than a
     // fitting of the test to the code: with `edgeSoftness` at its default the bank is a flat
@@ -209,14 +251,20 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
         lo = std::min(lo, d);
         hi = std::max(hi, d);
     }
-    INFO("angular spread at rr=0.9, detail 0, bankLength 2.5: " << (hi - lo));
-    CHECK(hi - lo > 0.05f); // ADR-563: it varies with angle. Was asserted == 0 before §46 B.
+    // ADR-579: a RELATIVE spread. The absolute threshold was tied to whatever vertical profile the
+    // preset happened to have -- raising `heightFalloff` from 1.4 to 1.8 scales every sample here
+    // by exp(-0.4) and the spread went from 0.055 to 0.046, failing a test about angle because of
+    // a change to height. A fraction of the peak asks the question the case is actually about.
+    INFO("angular spread at rr=0.9, detail 0, bankLength 2.5: " << (hi - lo) << " of a peak "
+         << hi << " (" << (hi > 0.0f ? 100.0f * (hi - lo) / hi : 0.0f) << "%)");
+    REQUIRE(hi > 0.0f);
+    CHECK((hi - lo) / hi > 0.15f); // ADR-563: it varies with angle. Was asserted == 0 before §46 B.
 
     // ...and the control, or the assertion above would pass on a field that is simply noisy: a
     // CIRCULAR bank must still be uniform in angle, because that is the shape it is.
     shaped.values.setFloat("fog/bankLength", 1.0f);
     world::MediumSlot round{};
-    fs.resolve.pack(shaped, 1.0f, round);
+    world::packMediumSlot(shaped, 1.0f, round);
     float rlo = 1e30f;
     float rhi = -1e30f;
     for (int i = 0; i < 16; ++i) {
@@ -246,11 +294,11 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
     REQUIRE(s.resolve.pack != nullptr);
 
     const auto opticalDepth = [&](float radius) {
-        world::AtmosphericEffect e = fogBank("Valley Mist");
+        world::AtmosphericEffect e = fogBank("Valley Fog");
         e.vortex.field.radius = radius;
         e.values.setFloat("fog/bankLength", 2.0f);
         world::MediumSlot slot{};
-        s.resolve.pack(e, 1.0f, slot);
+        world::packMediumSlot(e, 1.0f, slot);
         const float perMetre = slot.lane[1].w;
         const float crossing = 2.0f * radius * 2.0f;
         return perMetre * crossing;
@@ -268,14 +316,14 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
 
     // The control: the authored number still CHANGES the depth, or the test above would pass on a
     // packer that ignored it entirely (ADR-182, and the shape ADR-460's reachability probe uses).
-    world::AtmosphericEffect a = fogBank("Valley Mist");
+    world::AtmosphericEffect a = fogBank("Valley Fog");
     a.vortex.field.radius = 400.0f;
     world::MediumSlot lo{};
     world::MediumSlot hi{};
     a.vortex.density = 1.0f;
-    s.resolve.pack(a, 1.0f, lo);
+    world::packMediumSlot(a, 1.0f, lo);
     a.vortex.density = 4.0f;
-    s.resolve.pack(a, 1.0f, hi);
+    world::packMediumSlot(a, 1.0f, hi);
     CHECK(hi.lane[1].w > lo.lane[1].w * 3.5f);
 }
 
@@ -296,11 +344,11 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
 TEST_CASE("the fog macro detail does not move the medium's mean", "[fog]") {
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.resolve.pack != nullptr);
-    world::AtmosphericEffect e = fogBank("Valley Mist");
+    world::AtmosphericEffect e = fogBank("Valley Fog");
     e.vortex.field.cloudNoise = 1.0f;
     e.values.setFloat("fog/detailScale", 7.0f);
     world::MediumSlot slot{};
-    s.resolve.pack(e, 1.0f, slot);
+    world::packMediumSlot(e, 1.0f, slot);
 
     // The claim is about the MULTIPLIER, over many periods -- and the distinction is a finding
     // rather than a convenience. The first version averaged the whole field over the bank's
@@ -341,4 +389,27 @@ TEST_CASE("the fog macro detail does not move the medium's mean", "[fog]") {
     }
     INFO("detail multiplier range: " << lo << " .. " << hi);
     CHECK(hi - lo > 0.2);
+}
+
+
+// A hidden instrument, not a check (`[.]`), and it is how §37's ten were tuned rather than
+// guessed. It prints each preset's density at its centre, at its floor and half way out, which is
+// what tells a "low fog" from a fog that is empty where an artist will point at it:
+//
+//     ./build/release/tests/avgen_tests "the presets, sampled" -s
+//
+// It found two badly-tuned presets on its first run -- Horror Fog reading EXACTLY ZERO at its own
+// centre, and Dense Cinematic 0.035 -- because ADR-571's density threshold subtracts from the
+// shape AFTER the vertical profile, so a steep `heightFalloff` and a high threshold clear
+// everything but the base. That interaction is not visible in either control on its own.
+TEST_CASE("the presets, sampled", "[.][fog][presets]") {
+    for (const world::EffectStyle& style : fogSchema().styles) {
+        world::AtmosphericEffect e = fogBank(style.name);
+        e.vortex.field.cloudNoise = 0.0f;
+        const float r = e.vortex.field.radius;
+        const float th = e.vortex.field.thickness;
+        WARN(style.name << " centre=" << fogSampleAt(e, glm::vec3(0.0f))
+             << " floor=" << fogSampleAt(e, glm::vec3(0.0f, -th, 0.0f))
+             << " mid=" << fogSampleAt(e, glm::vec3(r * 0.4f, -th * 0.5f, 0.0f)));
+    }
 }
