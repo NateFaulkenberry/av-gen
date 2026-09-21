@@ -105,4 +105,95 @@ struct MotionCoverageOptions {
 [[nodiscard]] MotionCoverageReport measureMotionCoverage(const MotionDatabase& db,
                                                          const MotionCoverageOptions& options = {});
 
+
+// ---- §58: the coverage report in words, with the thresholds that produce the words -------------
+//
+// §58 asks for statements like "Walk: good coverage / Reverse locomotion: poor coverage", measured
+// from the data, and forbids subjective labels without defined thresholds. So every category below
+// is a **predicate over quantities the database already carries** -- the root velocity in its
+// feature vectors, that velocity's change along a clip, the clip's tags -- and every grade is a
+// **count compared with a stated number**, printed beside the verdict.
+//
+// **What a grade counts.** Not seconds, and not samples, because neither is what the matcher can
+// use. The matcher commits to a choice for `minimumContinuation` (0.2 s by default, §29), so the
+// unit of usable content is one commitment's worth: a category with 0.1 s of motion cannot be
+// played even once without running out of it. `windows` is the category's seconds divided by that
+// commitment; transitions (starts, stops) are counted as **events** instead, because one start is
+// one entry point however many frames it spans. And a category that lives in one clip is graded
+// no better than moderate however long it is: every search into it lands in the same take.
+//
+// **Categories are measured by what the body does, and cross-checked by what the clip is called.**
+// A walk is a sample whose root moves forward at walking speed; the Walk *tag* is reported beside
+// it. When the two disagree -- an in-place corpus (ADR-540) tags walks the matcher can never find
+// by speed -- the report says so, because that disagreement is the finding.
+enum class MotionCategory : std::uint8_t {
+    Idle,          // planar speed below `idleSpeed`
+    Walk,          // forward, idleSpeed .. runSpeed
+    Run,           // forward, at least runSpeed
+    Strafe,        // moving, direction 45..135 degrees off forward
+    Reverse,       // moving, direction more than 135 degrees off forward
+    LeftTurn,      // moving, turning left faster than `turnRate`
+    RightTurn,     // moving, turning right faster than `turnRate`
+    FastLeftTurn,  // at least runSpeed, turning left faster than `turnRate`
+    FastRightTurn, // at least runSpeed, turning right faster than `turnRate`
+    Start,         // an event: speed rising through idleSpeed within a clip
+    Stop,          // an event: speed falling through idleSpeed within a clip
+    Count,
+};
+[[nodiscard]] const char* motionCategoryName(MotionCategory category);
+
+enum class CoverageGrade : std::uint8_t { Poor, Limited, Moderate, Good };
+[[nodiscard]] const char* coverageGradeName(CoverageGrade grade);
+
+struct MotionCategoryOptions {
+    // Speed bands, metres per second of planar root velocity.
+    float idleSpeed = 0.2f;
+    float runSpeed = 2.0f;
+    // rad/s of change in the direction of travel. Positive is a LEFT turn: forward is +z, left is
+    // +x, and a heading swinging from +z toward +x increases atan2(x, z).
+    float turnRate = 1.0f;
+    // One matcher commitment (`MatchSettings::minimumContinuation`), the unit of usable content.
+    float commitmentSeconds = 0.2f;
+    // Grade thresholds, in commitments for continuous categories and in events for transitions.
+    // Limited = at least one, moderate = at least `moderateAt`, good = at least `goodAt` AND from
+    // at least `goodClips` distinct clips.
+    std::uint32_t moderateWindows = 5;
+    std::uint32_t goodWindows = 15;
+    std::uint32_t moderateEvents = 2;
+    std::uint32_t goodEvents = 4;
+    std::uint32_t goodClips = 2;
+};
+
+struct MotionCategoryCoverage {
+    MotionCategory category = MotionCategory::Idle;
+    bool event = false;           // counted in events, not seconds
+    std::uint32_t samples = 0;    // samples in the category (for an event, samples AT the event)
+    float seconds = 0.0f;
+    std::uint32_t windows = 0;    // seconds / commitmentSeconds, or the event count
+    std::uint32_t clips = 0;      // distinct clips contributing
+    CoverageGrade grade = CoverageGrade::Poor;
+    // The same category read from tags, in seconds, where a tag exists for it (-1 where none does).
+    float taggedSeconds = -1.0f;
+    // Of those tagged seconds, how many the root velocity ALSO puts in this category. Totals can
+    // agree by coincidence -- root sway on an in-place idle can add up to as many "walking" seconds
+    // as the walk clips hold -- so agreement is measured sample by sample.
+    float taggedAgreeing = 0.0f;
+};
+
+struct MotionCategoryReport {
+    std::vector<MotionCategoryCoverage> categories;
+    MotionCategoryOptions options;
+    float sampleRate = 0.0f;
+    std::uint32_t samples = 0;
+    // Samples left out because their root velocity is a build artefact (see the .cpp).
+    std::uint32_t excludedClipFinal = 0;
+    [[nodiscard]] const MotionCategoryCoverage& at(MotionCategory c) const {
+        return categories[static_cast<std::size_t>(c)];
+    }
+    [[nodiscard]] std::string report() const;
+};
+
+[[nodiscard]] MotionCategoryReport measureMotionCategories(const MotionDatabase& db,
+                                                           const MotionCategoryOptions& options = {});
+
 } // namespace avgen::scene

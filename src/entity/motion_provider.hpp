@@ -232,6 +232,14 @@ struct MotionMemory {
     // frame to the clip player, which would read it as a clip index and pose a different animation
     // entirely. It is part of the memory, so a replay reconstructs it like everything else.
     int provider = -1;
+    // **Which database `selection` and the blends index**, as that database's `identity`, or 0 for
+    // content that is not a database. Phase C §40/§76: a database can be replaced while characters
+    // are mid-motion, and a sample index from the old one is a valid-looking index into the new one
+    // that names a different frame. A provider that finds a stamp other than its database's treats
+    // the memory as a first selection -- search afresh, nothing to blend from -- rather than posing
+    // whatever frame the stale index now happens to hit. An identity, not a load counter, so a
+    // replay against the same database reproduces the same memory (ADR-360).
+    std::uint64_t database = 0;
 
     void reset() { *this = MotionMemory{}; }
 };

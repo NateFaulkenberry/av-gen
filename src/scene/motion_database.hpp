@@ -123,6 +123,10 @@ enum class MotionFeatureGroup : std::uint8_t {
 // config, which is what makes a weight **tunable without rebuilding the database**: the features
 // are unchanged, only what they are multiplied by.
 [[nodiscard]] std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config);
+// The same two, written into a caller's vector so a hot path reuses its capacity (§75: no
+// allocation during normal matching).
+void motionFeatureLayoutInto(const MotionFeatureConfig& config, std::vector<MotionFeatureGroup>& out);
+void motionFeatureWeightsInto(const MotionFeatureConfig& config, std::vector<float>& out);
 
 // §10's explicit breakdown, for the sample a search chose. This is the half that makes the scoring
 // function not opaque: "why that sample" has an answer with numbers in it.
@@ -194,6 +198,27 @@ struct MotionDatabaseStats {
     std::string report() const;
 };
 
+// Phase C §38/§82: where a database came from, so a stored one can be checked against its inputs
+// and a rebuild with identical inputs can be skipped. Filled by `buildMotionDatabase`, persisted by
+// `writeMotionDatabase` (motion_database_io.hpp), and checked by `readMotionDatabase`.
+struct MotionDatabaseBuildInfo {
+    // `motionPackContentDigest` of the pack it was built from: skeleton, clips, analysis and the
+    // provenance chain (which is where a retarget profile is recorded). Empty for a database that
+    // was synthesised rather than built.
+    std::string sourcePackDigest;
+    // `motionFeatureSchemaDigest` of the config: which dimensions exist and what they mean. Two
+    // databases with the same schema are comparable dimension for dimension; weights are not part
+    // of it, because a weight does not change what a dimension means.
+    std::string featureSchema;
+    float sampleRate = 0.0f;
+    std::string toolVersion;
+    // §82: the content address of this build -- source, full config (weights included, because
+    // `stats.costSpread` is weighted), sample rate and tool version. Equal keys mean an identical
+    // build.
+    std::string buildKey;
+    friend bool operator==(const MotionDatabaseBuildInfo&, const MotionDatabaseBuildInfo&) = default;
+};
+
 struct MotionDatabase {
     static constexpr std::uint32_t kVersion = 1;
 
@@ -226,6 +251,12 @@ struct MotionDatabase {
 
     std::vector<std::string> clipNames;
     MotionDatabaseStats stats;
+    MotionDatabaseBuildInfo build;
+    // §40/§76: a digest of the searchable content (every per-sample array, the normalization and
+    // the config). **What `MotionMemory::database` is stamped with**, so a character whose memory
+    // indexes one database is never posed from another after a hot swap. Also the integrity check
+    // a stored database is verified against on load. 0 only for a database nobody stamped.
+    std::uint64_t identity = 0;
 
     [[nodiscard]] std::uint32_t sampleCount() const {
         return static_cast<std::uint32_t>(sampleClip.size());
@@ -239,6 +270,9 @@ struct MotionDatabase {
 struct MotionDatabaseOptions {
     float sampleRate = 30.0f;   // samples per second of clip
     MotionFeatureConfig config;
+    // Recorded in `MotionDatabase::build` and folded into its build key (§82): a builder whose
+    // feature extraction changed must not reuse a cached result from the old one.
+    std::string toolVersion = "avgen-motion-db/1";
 };
 
 // Build from a pack. Offline: this walks every frame of every clip and poses the skeleton.

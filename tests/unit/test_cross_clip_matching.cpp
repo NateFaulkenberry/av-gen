@@ -1119,6 +1119,8 @@ TEST_CASE("§32 against ADR-612's own population: the forced cross-clip transiti
         entity::MotionMemory memory;
         memory.selection = 0;
         memory.generation = 1;
+        // Hand-driven, so it states which database it indexes, as `advance` would (§40).
+        memory.database = db->identity;
         const scene::MotionCostWeights weights;
         scene::Pose out;
         std::vector<glm::mat4> matrices;

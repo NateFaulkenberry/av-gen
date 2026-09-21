@@ -2408,3 +2408,186 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 - **§61 partial: confirmed.** 100STYLE is verified; the others are not assessed.
 
 §36 is partial. If the audit counted it as done, that is the one correction. The 34 in the audit can be reconciled with the 32 here only if the anim-cinfra rows contribute about 2 done, and without the audit's own table that cannot be checked.
+
+---
+
+# Phase C infrastructure and tooling (`agent/anim-cinfra`)
+
+Sections §37–§43, §57, §58, §68, §69, §72, §74–§76, §81–§83. Built under the programme's faster
+rules: working code plus tests that fail with the change reverted (ADR-182). Every probe below was
+reverted and seen to fail before it was trusted.
+
+## §37/§38/§82 — the database became a file
+
+**Before this a motion database existed only in memory.** Nothing wrote `buildMotionDatabase`'s
+result anywhere, so anything that wanted to search one had to pose every frame of every clip in
+its own process: exactly the offline work §37 says the runtime must not do.
+
+`scene/motion_database_io.{hpp,cpp}`: `<pack>/databases/<name>.motiondb`, one file per feature
+config beside the Phase A pack, whose format is unchanged. One file, not one per array, so
+publishing a rebuild is one rename (§40 on disk). A JSON header (config, stats, build record) and a
+raw little-endian payload. `MotionDatabase` gained a `build` record (source pack content digest,
+feature schema digest, sample rate, tool version, build key) and an `identity` content digest.
+
+A load refuses, with a message, a flipped payload byte, a different rig, a database left behind by
+an older pack ("stale, rebuild"), a config whose recomputed schema disagrees with the recorded one,
+and an unknown file version. A write refuses a database that was changed after it was stamped. The
+schema digest follows meaning and ignores weights, since a weight is tunable without a rebuild.
+
+| real Glowmere scout, 1,738 samples | |
+|---|---|
+| build (poses every frame) | 98.8 ms |
+| `build-db` second run: header key check + verified load | 0.9 ms |
+| round trip | bit-identical; save → load → save byte-identical |
+
+§82 is the build key, which covers source content, full config and weights (because `costSpread`
+is weighted), sample rate and tool version. A matching key is still fully verified by the load, and
+a corrupt cache entry with a matching key is rebuilt rather than trusted. The pack content digest
+includes the provenance processing chain, which is where a retarget profile is recorded, so the
+same source retargeted differently gets a different key.
+
+**Checked against the pack as READ, not as built.** Writing a pack and reading it back reproduces
+the content digest exactly on the real scout. If it had not, every stored database would have
+been stale on arrival.
+
+CLI: `avgen-motion build-db <pack> --joints a,b,c [--name n] [--force]`.
+
+## §39/§40/§76/§81 — load in the background, publish atomically, migrate what was mid-motion
+
+`scene/motion_library.{hpp,cpp}`: `MotionDatabaseSlot`. `requestLoad` returns immediately, and a
+worker thread reads, verifies and cross-checks the pack against the database (skeleton, content
+digest, clip count). Only then does it swap a `shared_ptr<const MotionAsset>` under a lock that is
+held for one pointer copy. The last request wins: an earlier load that finishes later is dropped,
+not published. A failed load leaves the previous asset published. Nothing on the runtime path
+builds a database, so a scrub can never trigger one (§81).
+
+**The migration hazard, and its fix.** After a swap, a character's `MotionMemory::selection` is a
+sample index into the old database. It is usually still in range in the new one, where it names an
+unrelated frame. `MotionMemory` now carries `database` (the identity it indexes).
+`MatchMotionProvider::advance` treats a memory from another database as a first selection with no
+blend, and `pose` declines it rather than posing the stale index. Using an identity rather than a
+load counter keeps a replay against the same database reproducing the same memory (ADR-360).
+
+Three existing tests hand-built a `MotionMemory` and so went dark under the new check. One of them,
+§32's pose-cost benchmark, **failed**, because every arm was timing the refusal path (0.0037 µs
+against 0.0037 µs). Those three tests now stamp their memories. A timing assertion caught a no-op
+it was never written to catch.
+
+## §41/§74/§75 — one immutable database, one provider, many threads, no allocation
+
+- **A data race, found by audit.** `MatchMotionProvider::counters_` were plain integers incremented
+  from a `const` provider that the design shares between every character. That was the only
+  mutable state in an otherwise shareable object. They are now relaxed atomics. Test: 64
+  characters over 8 threads against one provider give memories identical to a serial run, and
+  counters equal to it exactly.
+- **Allocation.** Each search allocated three vectors in `advance` plus two in `searchMotion` (the
+  layout and the weights). They now use per-thread scratch (`motionFeatureLayoutInto` /
+  `motionFeatureWeightsInto`). Test: **0 allocations over 600 warm frames** containing more than 20
+  real searches, using an interposed `operator new` in the test TU (the engine's counters are
+  compiled only with `AVGEN_ALLOC_COUNTERS`). The probe is itself asserted live.
+- `MotionMemory` is tripwired at ≤128 bytes and trivially copyable. A hundred providers bound from
+  one slot share one `features.data()`.
+
+## §42/§43 — the strategy, measured on the cast — DECISION (ADR number requested; see below)
+
+Measured on the six Glowmere aliens (`[motionstrategy]`):
+
+| | A: source + runtime retarget | B: retargeted offline per rig |
+|---|---|---|
+| per posed frame | **197 µs** | **2.33 µs** (84.5× less) |
+| 60 characters @ 60 Hz | **710 ms CPU per second** | 8.4 ms CPU per second |
+| per rig offline | — | retarget 348 ms + pack/db 91 ms |
+| memory, 60 characters | 3.41 MB (shared + 2.8 KB binding each) | 4.05 MB per distinct rig |
+
+**The decisive fact: all six aliens share one skeleton digest.** For this cast, B needs no
+retarget at all: the scout's database is every alien's database, and B's memory is one copy.
+
+**Decision: B, keyed by skeleton digest, which is §43's "support both".** Characters with the same
+skeleton share one database. A new, distinct skeleton gets a character-specific pack, retargeted
+offline, and its own database. A is rejected because its runtime cost is 84× B's and makes 60
+characters cost most of a core. Its one advantage, a small memory saving per extra rig (3.8 vs
+4.05 MB), only exists when rigs differ, and this repository's rigs do not. Revisit if a cast of
+many *distinct* skeletons arrives and memory binds before CPU does. The test asserts
+`perPoseA > 5 × perPoseB`, so a faster retargeter re-opens the decision by failing.
+
+This needs an ADR, and the numbering table gives 600–649 to `agent/anim-research` and says 650+
+"ask before taking". **The number is requested from the supervisor rather than taken.**
+
+## §57 — the inspector
+
+`scene/motion_database_inspect.{hpp,cpp}`, `avgen-motion inspect-db <file> [--pack] [--categories]`.
+It reports clips, samples, dimensions per cost term, trajectory horizons, memory by part, contact
+distribution (from the pack's spans), the phase histogram, tag counts, coverage, search structure
+and provenance, all read from the arrays and never re-derived. On the scout: foot.l planted 45.0%,
+foot.r 43.8%, and 1,658 of 1,738 samples phased, spread flat across the ten tenths (160–180
+each). It says "search structure: none — linear scan" in plain words.
+
+## §58 — coverage in words, with the thresholds printed
+
+`measureMotionCategories` extends `motion_coverage` with eleven categories: idle, walk, run,
+strafe, reverse, left/right turn, fast left/right turn, starts, stops. Each is a predicate over the
+database's own root velocity. The grade counts **matcher commitments** (seconds ÷ the 0.2 s minimum
+continuation, §29), because a category with 0.1 s of content cannot be played even once. Starts
+and stops count events. A category drawn from one clip is capped at moderate. Every threshold is
+printed in the report.
+
+**Two findings from building it:**
+
+1. **Every clip's last sample reads zero root velocity**, looping walks included. The builder's
+   forward difference is clamped at the clip end. Counted naively, that is one fictitious idle
+   sample and one fictitious STOP per moving clip. The report excludes clip-final samples and says
+   so. *For the core agent:* the feature itself carries the artefact, so a query landing on a
+   clip's last frame sees a body at rest.
+2. **On the scout, tags and root velocity disagree sample by sample.** Walk is tagged 8.47 s, but
+   **only 0.57 s of it moves like a walk**. Run is tagged 1.77 s and moves like a run for 0 s. The
+   measured "walking" (7.57 s over 18 clips), the reverse locomotion (7.03 s) and the 64 starts and
+   stops are root sway in in-place clips. This is ADR-540 again, now per sample, and the report
+   flags it on the line where it happens.
+
+## §68/§69 — why did it choose this motion
+
+`scene/motion_match_explain.{hpp,cpp}`. An explanation is **a comparison, not a breakdown**. It
+sets the winner beside the continuation, the best candidate from another clip, the best candidate
+the tag filter removed, and (for a staged plan) the exhaustive answer, all with per-term costs.
+From the differences it attributes the decision to one of §69's eight causes. The weights cause is
+counterfactual: re-evaluate the decisive term at weight 1 and report a flip. The cost it computes
+equals `MotionMatch::cost` **to the bit**, so it cannot drift from the search. Each cause has a test
+case built to be decided by that cause alone.
+
+`MatchMotionProvider::queryFor` rebuilds the provider's own query through the same `fillQuery` that
+`advance` uses, so the explanation covers the decision the provider actually made.
+`avgen-motion explain <pack> --db <n> [--speed --speed2 --switch --turn --at --stride]` prints the
+§68 panel.
+
+**What it found on its first run on the scout.** Asked to stand for a second and then walk at 1.6
+m/s, the matcher plays `Fight_head_hit` and then selects `Fight_leg_kick_1`. Why, in its own words:
+57% of the winner's misfit is trajectory (the query wants to be 0.96 m ahead at +0.6 s, and the
+winner gets 0.36 m), and even the best match costs 174% of the typical gap: "the database may not
+contain this motion". This is the in-place corpus seen from the matcher's side. It belongs to the
+core agent's Glowmere demonstration (§65), and it is now a one-line command to reproduce.
+
+## §72 — baking
+
+`entity/motion_bake.{hpp,cpp}`, `avgen-motion bake <pack> --db <n> --out <dir>`. It runs the
+provider exactly as the entity does and keys `pose`'s output, inertialized blends included. At
+every key the baked clip reproduces the session's pose (< 1e-5), two bakes are bit-identical, and a
+declined step is keyed from rest and counted rather than closed up. The output is a MotionPack whose
+provenance inherits the corpus licence and records the bake. It does not bake world root motion
+(§71 owns that) and says so.
+
+## §83 — diffing
+
+`scene/motion_database_diff.{hpp,cpp}`, `avgen-motion diff-db a b`. Samples are matched by
+(clip name, time), not index, and compared in **raw** units, because each database is normalised
+by its own spread. A clip inserted first is therefore 31 additions and zero changes, not every
+later sample "changed". Schema changes are reported and values across them are not compared. Weight
+and config changes are listed.
+
+## Handover notes for the supervisor
+
+- **Owner-level (batched):** none of this is reachable from a shipping scene, because the product
+  installs the clip provider and the matcher is dark (ADR-615, §35 is the owner's). The slot, the
+  migration and the explainer are ready for the day it is wired. Wiring it changes shipping scene
+  behaviour, so it is not done here.
+- **ADR number** for the §42 decision: requested (650+ is "ask before taking").
+- **For the core agent (§65):** the explain output above, and the clip-final zero-velocity artefact.
