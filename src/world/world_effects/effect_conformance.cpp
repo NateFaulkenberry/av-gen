@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <type_traits>
 #include <utility>
@@ -42,6 +43,15 @@ constexpr std::string_view kProbeName = "conformance probe";
     // Checked, which is what this assertion is for: the `memcmp` at the bottom covers the WHOLE of
     // `Vortex`, so the new members are read with no edit here -- the assertion fired, the question
     // was asked, and the answer was yes.
+    //
+    // 1640 -> 2400 when ADR-390's Cosmic Ocean arrived, and that time the answer was **no**: the
+    // frame had gained `hasCosmicOcean`, `cosmicOcean` and `cosmicOceanEnvelope` and this function
+    // read none of the three. The assertion earned its keep twice in one day.
+    //
+    // 2400 -> 1640 when the Cosmic Ocean was removed (ADR-441), which is the same question asked
+    // in the other direction and is the easy direction: a member this function read is gone, and
+    // what is left is what it read before. A SHRINKING frame is the case an assertion on `sizeof`
+    // catches and a checklist does not.
     static_assert(sizeof(AtmosphericFrame) == 1640,
                   "AtmosphericFrame changed size: check that frameDiffers still reads all of it");
     if (a.cometCount != b.cometCount || a.auroraCount != b.auroraCount || a.hasVortex != b.hasVortex ||

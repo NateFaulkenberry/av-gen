@@ -275,7 +275,6 @@ Result<void> AtmosphericEffect::validate() const {
     if (auto ok = comet.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = aurora.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = vortex.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
-    if (auto ok = cosmicOcean.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = ground.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     if (auto ok = timing.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
     // ADR-500: and the rows of whatever kind this is. For the three kinds ported to the registry
@@ -506,23 +505,6 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
         }
     }
 
-    // ADR-390, read back through the same tables that wrote it -- see the note in `toJson`. Every
-    // leaf falls back to the value already in `e.cosmicOcean`, which is the struct's own default, so
-    // an older file missing a key loads with that default rather than with a zero.
-    if (j.contains("cosmicOcean") && j.at("cosmicOcean").is_object()) {
-        const json& cj = j.at("cosmicOcean");
-        CosmicOcean& co = e.cosmicOcean;
-        for (const CosmicFloatField& f : cosmicFloatFields()) {
-            f.set(co, readFloat(cj, f.leaf, f.get(co)));
-        }
-        for (const CosmicColorField& f : cosmicColorFields()) {
-            f.set(co, readVec3(cj, f.leaf, f.get(co)));
-        }
-        for (const CosmicBoolField& f : cosmicBoolFields()) {
-            f.set(co, readBool(cj, f.leaf, f.get(co)));
-        }
-    }
-
     if (auto ok = e.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -618,37 +600,6 @@ AtmosphericEffect glowmereAurora(std::string name) {
 }
 AtmosphericEffect cosmicVortex(std::string name) {
     return makeAtmosphericEffect(AtmosphereKind::Vortex, std::move(name));
-}
-
-// ADR-390. The styles themselves live in `cosmic_ocean.cpp` over `CosmicOcean`, because that is
-// where the struct is; this is the one-line bridge the family's `applyXStyle(AtmosphericEffect&)`
-// shape needs, and nothing else.
-bool applyCosmicOceanStyle(AtmosphericEffect& effect, std::string_view style) {
-    return applyCosmicOceanStyle(effect.cosmicOcean, style);
-}
-
-AtmosphericEffect cosmicOceanEffect(std::string name) {
-    AtmosphericEffect e;
-    e.name = std::move(name);
-    e.kind = AtmosphereKind::CosmicOcean;
-    // `defaultCosmicOcean()` and not the struct's member defaults: the members have to be *neutral*
-    // so a field round-trips to itself, and the default *look* has to be worth rendering, and those
-    // are not the same numbers. `cosmic_ocean.hpp` says the same thing at the declaration.
-    e.cosmicOcean = defaultCosmicOcean();
-    const auto styles = cosmicOceanStyleNames();
-    if (!styles.empty()) {
-        e.style = std::string(styles[0]);
-        applyCosmicOceanStyle(e.cosmicOcean, styles[0]);
-    }
-    // Scenery, not an event, and exactly for the vortex's reasons: it is the background, it is
-    // there for the whole shot, and a fade on it is a fade on the sky.
-    e.activation = Activation::Always;
-    e.timing.fadeIn = 0.0;
-    e.timing.fadeOut = 0.0;
-    // No ground glow. A cosmic background does not light the island -- ADR-390 §10 -- and a
-    // `GroundIllumination` that did nothing would be a control that lies.
-    e.ground.mode = GroundGlow::Off;
-    return e;
 }
 
 // ---- resolution --------------------------------------------------------------------------------
@@ -833,26 +784,6 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
                     vortices[counts.vortices] = r;
                 }
                 ++counts.vortices;
-                break;
-            }
-            case EffectBucket::CosmicOcean: {
-                // ADR-390. One, not an array: a second cosmos is not a composition, and the extras
-                // are counted so the UI can say so rather than silently doing nothing with them --
-                // the same statement the vortex arm above makes for the same reason.
-                //
-                // It does not write into `comets`, `auroras` or `vortices`: it is drawn by
-                // `rendering::CosmicOceanRenderer` and a pass of its own, so what resolution has to
-                // produce is the one live record with its envelope, which `counts.cosmicOcean`
-                // carries to `buildAtmosphericFrame`.
-                if (counts.cosmicOceans >= 1) {
-                    ++counts.dropped;
-                    continue;
-                }
-                if (!schema->resolve.fill(e, index, ctx, base, r)) {
-                    continue;
-                }
-                counts.cosmicOcean = r;
-                ++counts.cosmicOceans;
                 break;
             }
             }

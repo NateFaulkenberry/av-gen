@@ -7,7 +7,6 @@
 #include "scene/composition.hpp"
 #include "scene/temporal_settings.hpp"
 #include "ui/help_panel.hpp"
-#include "ui/cosmic_ocean_rows.hpp"
 #include "ui/ui_logic.hpp"
 #include "world/atmospheric_params.hpp"
 #include "world/atmospherics.hpp"
@@ -26,6 +25,44 @@
 
 namespace avgen::ui {
 namespace {
+
+// A button row that WRAPS instead of running off the edge of the panel.
+//
+// ADR-500's promise is that adding an effect means no edit in this file at all, and it kept
+// that promise -- which is exactly how this broke. The registry loop below is `SameLine()`
+// unconditionally, so every kind added since made the row wider with nobody editing it, and at
+// six kinds it runs past the edge of a docked panel and the last button cannot be clicked. The
+// cost of adding an effect was not zero; it was being paid somewhere nobody was looking.
+//
+// `GetContentRegionAvail` is read ONCE, in the constructor, before the first button. After a
+// `SameLine` it reports what is left of the current line rather than the width of the region,
+// so reading it per-iteration wraps after every button on a narrow panel -- which looks like a
+// fix on a wide one and is the same defect on the panel that needed fixing.
+class WrapRow {
+public:
+    WrapRow()
+        : avail_(ImGui::GetContentRegionAvail().x),
+          spacing_(ImGui::GetStyle().ItemSpacing.x) {}
+
+    // Called immediately BEFORE the button, with the label that button will carry.
+    void next(const char* label) {
+        const float width =
+            ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        if (!first_ && used_ + spacing_ + width <= avail_) {
+            ImGui::SameLine();
+            used_ += spacing_ + width;
+        } else {
+            used_ = width; // a new line: this button is all that is on it so far
+        }
+        first_ = false;
+    }
+
+private:
+    float avail_ = 0.0f;
+    float spacing_ = 0.0f;
+    float used_ = 0.0f;
+    bool first_ = true;
+};
 
 constexpr ImVec4 kMuted(0.6f, 0.62f, 0.66f, 1.0f);
 constexpr ImVec4 kWarning(1.0f, 0.6f, 0.35f, 1.0f);
@@ -159,6 +196,8 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
     // *that* here would show sliders jittering to the music.
     const std::vector<world::WorldEffect>& authored = comp->worldEffects();
 
+    WrapRow propagationRow;
+    propagationRow.next("Add camera beam");
     if (ImGui::Button("Add camera beam")) {
         std::vector<world::WorldEffect> next = authored;
         std::string name = "Camera Travel Beam";
@@ -172,7 +211,7 @@ void WorldEffectsPanel::draw(app::Engine& engine) {
             status_ = ok.error().message;
         }
     }
-    ImGui::SameLine();
+    propagationRow.next("Add hero pulse");
     if (ImGui::Button("Add hero pulse")) {
         std::vector<world::WorldEffect> next = authored;
         std::string name = "Hero Pulse";
@@ -667,16 +706,23 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
     // ADR-500: one button per declared kind, from the registry. Adding a kind used to mean adding
     // a button, a tooltip and a factory call here; it now means nothing here at all, which is the
     // difference between "seventy effects" being a list of edits and being a list of files.
+    //
+    // There was a SECOND "Add cosmic ocean" button below this loop, hand-written with its own
+    // factory call and its own copy of the tooltip. It predates the registry: when ADR-390 shipped
+    // the Cosmic Ocean it had to add its own button here, and when the kind was ported onto the
+    // ADR-500 registry the loop above started drawing it from `schema->addLabel` -- so the panel
+    // offered the same kind twice, and the two buttons did not even take the same route to the
+    // scene. Both are gone now with the kind itself, but the shape of the defect is worth
+    // keeping: a hand-written button for a kind the registry already draws is invisible until
+    // somebody counts the buttons. A kind with a factory in the registry is drawn by the loop,
+    // and that is the whole rule.
     {
-        bool first = true;
+        WrapRow row;
         for (const world::EffectSchema* schema : world::effectSchemas()) {
             if (schema->factory == nullptr) {
                 continue;
             }
-            if (!first) {
-                ImGui::SameLine();
-            }
-            first = false;
+            row.next(schema->addLabel);
             if (ImGui::Button(schema->addLabel)) {
                 append(world::makeAtmosphericEffect(schema->kind, unique(schema->displayName)));
             }
@@ -684,15 +730,6 @@ void WorldEffectsPanel::drawAtmosphericSection(app::Engine& engine) {
                 tooltipUnformatted(schema->addTip);
             }
         }
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Add cosmic ocean")) {
-        append(world::cosmicOceanEffect(unique("Cosmic Ocean")));
-    }
-    if (ImGui::IsItemHovered()) {
-        tooltip("A procedural deep-space background: nebulae, star strata, planets, dust\n"
-                          "and galaxies, each on its own shell with its own parallax, so the sky\n"
-                          "separates by depth as the camera travels. One per scene.");
     }
 
     if (authored.empty()) {
@@ -742,6 +779,48 @@ void WorldEffectsPanel::drawAtmospheric(app::Engine& engine, const world::Atmosp
                                      "changed here and nothing renders it.");
         ImGui::Unindent();
         return;
+    }
+
+    // ---- the medium slot, said where the artist is looking -------------------------------------
+    //
+    // The volumetric march has ONE medium slot, for the cost ADR-374 measured: a single vortex is
+    // +5.5 ms of a 13.5 ms frame, the most expensive term in the scene. So a cosmic vortex and a
+    // fog bank compete for it, and the second one in the list does not draw.
+    //
+    // That limit was already deliberate and already counted -- `AtmosphericCounts::dropped` --
+    // and `volumetric_fog_effect.cpp` says in as many words that it is "counted ... and reported,
+    // a stated limit, not a silent no-op". **Nothing read that counter.** Not the panel, not a log,
+    // not the overlay: the owner turned fog on, the vortex vanished, and the engine's only comment
+    // on it was a number nobody printed. A limit nobody is told about is indistinguishable from a
+    // bug, which is the whole of ADR-421's "a control that does nothing teaches an artist that the
+    // system is broken".
+    //
+    // Computed here from the authored list rather than plumbed from the frame, because the panel
+    // already has everything the question needs and `AtmosphericFrame` is memcmp'd against a
+    // `static_assert`ed size -- a string on it would be the wrong shape for the wrong reason.
+    if (schema->resolve.bucket == world::EffectBucket::Vortex && authored.enabled) {
+        std::size_t ahead = 0;
+        for (const world::AtmosphericEffect& other : engine.atmosphericEffects()) {
+            if (&other == &authored) {
+                break;
+            }
+            const world::EffectSchema* s2 = world::effectSchema(other.kind);
+            if (other.enabled && s2 != nullptr && s2->resolve.bucket == world::EffectBucket::Vortex) {
+                ++ahead;
+            }
+        }
+        if (ahead > 0) {
+            ImGui::TextColored(kWarning, "Not drawn: the volumetric march has one medium slot and "
+                                         "an effect above this one is using it.");
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted(
+                    "A cosmic vortex and a fog bank are the same placed medium, marched by the\n"
+                    "same pass, and there is room for one of them. The first enabled one in this\n"
+                    "list wins; disable it, or disable this one, to see the other.\n\n"
+                    "The limit is the cost: one medium is +5.5 ms of a 13.5 ms frame (ADR-374),\n"
+                    "which is the most expensive term in the scene.");
+            }
+        }
     }
 
     // ---- preset ----

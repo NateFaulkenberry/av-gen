@@ -56,7 +56,6 @@
 // than smuggled in as a second analyzer.
 
 #include "core/error.hpp"
-#include "world/cosmic_ocean.hpp"
 #include "world/effects.hpp"
 #include "world/world_effects/field_bus.hpp"
 
@@ -106,15 +105,6 @@ enum class AtmosphereKind : std::uint8_t {
     // and cannot move into a single C++ file.
     MeteorShower,
     VolumetricFog,
-    // ADR-390. A procedural deep-space background: nebulae, star strata, planets, dust and
-    // galaxies, every one of them a hash evaluated against the view ray, with per-layer depth and
-    // parallax. It is in this family for the reason the vortex is -- a scene AUTHORS it, so it
-    // wants instances with names, a table of parameters under `atmos/<name>/`, serialisation,
-    // modulation and a panel row -- and, like the vortex, it is rasterised by a draw of its own
-    // rather than by `atmosphere_fx.wgsl`. Which pass draws a kind is a rendering detail; this
-    // family is about authoring. See `AtmosphericFrame::any()` for the one place that distinction
-    // is load-bearing.
-    CosmicOcean,
 };
 // ADR-500: derived from the registry's schemas rather than written out here, so a kind whose name
 // does not round-trip is a named failure of `checkRegistry` instead of an if-chain that fell behind.
@@ -412,10 +402,6 @@ struct AtmosphericEffect {
     Comet comet;
     Aurora aurora;
     Vortex vortex;
-    // ADR-390. A member beside the other three rather than a variant, for the reason the comment in
-    // `validate()` gives: an effect keeps the settings of the kind it is not currently using, so
-    // switching kind in the panel and switching back does not lose what was authored.
-    CosmicOcean cosmicOcean;
 
     GroundIllumination ground;
     Activation activation = Activation::Always; // ADR-207's, unchanged
@@ -472,16 +458,12 @@ bool applyAuroraStyle(AtmosphericEffect& effect, std::string_view style);
 // ADR-387. A vortex style leaves `center` alone: where the funnel is in the world is a placement
 // decision the scene made, and a preset that moved it would silently unanchor it from the island.
 bool applyVortexStyle(AtmosphericEffect& effect, std::string_view style);
-// ADR-390. Likewise leaves `center` alone -- the cosmic origin the strata are concentric about is a
-// placement decision, and the styles are palettes.
-bool applyCosmicOceanStyle(AtmosphericEffect& effect, std::string_view style);
 
 // Ready-made effects, so "add a comet" is one call from the UI and one line in a test rather than a
 // page of field assignments that can drift from the shipped scene's.
 [[nodiscard]] AtmosphericEffect bioluminescentComet(std::string name = "Bioluminescent Comet");
 [[nodiscard]] AtmosphericEffect glowmereAurora(std::string name = "Glowmere Aurora");
 [[nodiscard]] AtmosphericEffect cosmicVortex(std::string name = "Cosmic Vortex");
-[[nodiscard]] AtmosphericEffect cosmicOceanEffect(std::string name = "Cosmic Ocean");
 
 // ---- resolution --------------------------------------------------------------------------------
 
@@ -660,17 +642,6 @@ struct AtmosphericFrame {
     // so instead of silently ignoring it.
     bool hasVortex = false;
     Vortex vortex{};
-    // ADR-390: the live Cosmic Ocean, likewise ONE. A second cosmos is not a composition, it is a
-    // mistake, and the resolve counts the extras in `dropped` so the UI can say so.
-    //
-    // The AUTHORED struct travels, not `CosmicOceanGpu`, which is where this departs from ADR-390's
-    // §8 sketch. `packCosmicOcean` takes a `CosmicQualityScale`, and the quality tier is the
-    // renderer's to know, not the world's -- packing here would either bake Realtime into every
-    // frame or push the tier into `AtmosphericContext` to be carried past everything that does not
-    // want it. So the world resolves and the renderer packs, which is also what the vortex does.
-    bool hasCosmicOcean = false;
-    CosmicOcean cosmicOcean{};
-    float cosmicOceanEnvelope = 0.0f; // the lifecycle fade, for `packCosmicOcean`'s `envelope`
     // Samples the shader marches down each comet's tail. A quality control (§12): lowering it
     // costs smoothness and not brightness, because the accumulation is normalised by the count and
     // the sample width has a floor of the sample spacing.
@@ -683,27 +654,21 @@ struct AtmosphericFrame {
     // `atmosphere_fx.wgsl` -- is live. The renderer skips that whole fullscreen draw on false, so a
     // scene with no comet and no aurora pays for none of it, not even a uniform branch.
     //
-    // TWO kinds of this family are deliberately absent, and the asymmetry is the point rather than
-    // an oversight. The vortex is rasterised by the volumetric march; the Cosmic Ocean has its own
-    // pipeline and its own `Draw(3)` in the same render pass (`CosmicOceanRenderer`, ADR-390).
-    // Neither contributes a single term to `atmosphereSkyAt`, so switching this predicate on for
-    // either would run a fullscreen draw that evaluates two empty loops and adds exactly zero to
-    // every sky pixel. That is a cost, not a fix.
+    // ONE kind of this family is deliberately absent, and the asymmetry is the point rather than
+    // an oversight: the vortex is rasterised by the volumetric march and contributes not a single
+    // term to `atmosphereSkyAt`, so switching this predicate on for it would run a fullscreen draw
+    // that evaluates two empty loops and adds exactly zero to every sky pixel. That is a cost, not
+    // a fix.
     //
-    // ADR-390 §8 says to add `|| hasCosmicOcean` here, and that instruction was written against the
-    // §3 design in which the ocean was one more term inside `atmosphereSkyAt`. The implementation
-    // on `agent/ocean` took the separate-pipeline route instead, with its reasons stated at the top
-    // of `rendering/cosmic_ocean_renderer.hpp`; under THAT design the ADR's own argument against
-    // `|| hasVortex` applies word for word to the ocean as well. What makes the ocean reachable is
-    // `hasCosmicOcean` reaching `CosmicOceanRenderer::update`, which is a different line in
-    // `scene_renderer.cpp` and is the one to check if the sky comes up empty.
+    // There were TWO such kinds until the Cosmic Ocean was removed (ADR-441). It had gone further
+    // still -- its own pipeline and its own `Draw(3)` -- and it is worth recording why that mattered
+    // here: ADR-390 §8 instructed `|| hasCosmicOcean` on this line, written against a design in
+    // which the ocean was one more term inside `atmosphereSkyAt`, and the implementation that
+    // shipped took a separate pipeline instead. An instruction inherited from a superseded design
+    // would have cost a fullscreen draw for nothing.
     //
     // Add a kind here only if it is drawn by shaders/atmosphere.wgsl.
     [[nodiscard]] bool any() const { return cometCount > 0 || auroraCount > 0; }
-
-    // True when a Cosmic Ocean is live. Separate from `any()` because it gates a separate draw --
-    // see the note above, which is the whole reason there are two predicates.
-    [[nodiscard]] bool anyCosmicOcean() const { return hasCosmicOcean && cosmicOcean.active(); }
 };
 
 // Resolves every enabled effect. Returns how many of each were written; effects past the caps are
@@ -713,11 +678,10 @@ struct AtmosphericCounts {
     std::size_t comets = 0;
     std::size_t auroras = 0;
     std::size_t vortices = 0; // ADR-387; at most one is used, the rest count as dropped
-    std::size_t cosmicOceans = 0; // ADR-390; likewise at most one
     std::size_t dropped = 0;
 
-    // The one live vortex and the one live Cosmic Ocean, as the arms that claimed them saw them --
-    // effect pointer and lifecycle envelope.
+    // The one live vortex, as the arm that claimed it saw it -- effect pointer and lifecycle
+    // envelope.
     //
     // These exist because `buildAtmosphericFrame` used to find the vortex again with a second loop
     // of its own, over `effects`, testing only `enabled && vortex.active()`. That loop ignored the
@@ -725,7 +689,6 @@ struct AtmosphericCounts {
     // "were already applied by the resolve above" -- ADR-385's shape exactly, a stated reason that
     // stopped anyone checking. One resolve, one answer.
     ResolvedAtmospheric vortex{};
-    ResolvedAtmospheric cosmicOcean{};
 };
 // §68 added `vortices`. A vortex has no trajectory, so before this it resolved into a count and
 // nothing else, and `buildAtmosphericFrame` found its payload by walking `effects` a second time.
