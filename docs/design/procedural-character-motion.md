@@ -639,3 +639,38 @@ Recorded as ADR-602, whose two rules are:
 Three of the six causes were in the driver rather than the stack, and one was in the test's own
 script. That last distinction is kept rather than smoothed over: a continuity bound is only
 meaningful over inputs a world could actually present, so the fix was the script, not the bound.
+
+## §47 — performance baselines
+
+Measured on the Glowmere alien (90 joints, 26 clips), minima over five repeats, never means.
+Microseconds per character per frame, layers switched on cumulatively so each column's difference
+from the last is that kind's marginal cost:
+
+| | clip only | +stride (2) | +lean (1) | +feet (2 IK) | +look (1 aim) | +reach (1 IK) |
+|---|---|---|---|---|---|---|
+| n=1 | 4.74 | 8.87 | 8.94 | 14.37 | 18.88 | 21.43 |
+| n=10 | 4.89 | 9.06 | 9.12 | 14.55 | 19.01 | 21.59 |
+| n=50 | 4.91 | 9.08 | 9.14 | 14.55 | 19.04 | 21.59 |
+| n=100 | 4.92 | 9.07 | 9.26 | 15.03 | 19.20 | 21.91 |
+
+- **Shared cost stays shared**: +0.9% per character from n=1 to n=100. Nothing in the stack
+  duplicates the skeleton, the clips or the resolved masks per instance, and the assertion is
+  written so that it would if it did.
+- **The steady state allocates nothing**: net live heap blocks over a whole repeat is zero at every
+  count, read from the default malloc zone rather than by overriding global `operator new` — which
+  would have been a change to a binary four agents run.
+- **Baseline: 2.16 ms per frame for a hundred characters, full stack.** A measurement on this
+  machine today, not a promise.
+
+The number that does not fit the intuition is the aim layer: a look costs 4.68 µs, more than a
+two-bone IK solve at 2.75 µs. The reason is that every model-space layer calls `poseToModel` over
+all 90 joints to read one to three of them, seven times per character per frame counting the body
+compensation pre-pass. One walk measures 2.048 µs, so **the walks are 14.3 µs of the 21.6 µs total —
+66% of the stack, against solves that are the small part.**
+
+ADR-603 records that, and records that it **cannot be hoisted**: a layer writes the pose and the
+next needs model space as the previous layers left it, which is the entire content of §5's ordering
+contract. One shared rebuild at the top would be fast and silently wrong. The correct optimization
+is incremental — rebuild only beneath what the previous layer wrote — and the stack already knows
+what each layer touches, because `masks_`, `chain_` and `stride_` are resolved at bind time. That is
+§53's work, and the expected win is stated in the ADR *before* the work so that it can be wrong.
