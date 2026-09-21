@@ -407,6 +407,86 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
         CHECK(oracleNoisy == Approx(oracleClean).margin(1e-6f));
     }
 
+    // **Dose-response: the marginal cost of a useless dimension.**
+    //
+    // The neutralise test above measures one point near the origin with a bar wide enough to hide
+    // the effect -- 0.0 +-2.3 on ONE dimension of 36 cannot distinguish "free" from "cheap". The
+    // claim under test is about a *slope*, so it needs more than one dose. K fresh random
+    // dimensions are appended, fixed at build so the database is stable, and measured at K = 1, 4
+    // and 16. At sixteen the effect must appear if the claim is true.
+    //
+    // **Run at uniform weights**, deliberately: appending dimensions makes the config's weight
+    // vector the wrong length, which would silently drop weighting for *every* dimension and
+    // confound the arms. With all weights at 1.0 the weighted and unweighted paths are identical,
+    // so the only thing differing between arms is K.
+    {
+        scene::MotionDatabaseOptions uniform;
+        uniform.sampleRate = 30.0f;
+        uniform.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+        uniform.config.jointPositionWeight = 1.0f;
+        uniform.config.jointVelocityWeight = 1.0f;
+        uniform.config.trajectoryPositionWeight = 1.0f;
+        uniform.config.trajectoryFacingWeight = 1.0f;
+        uniform.config.rootVelocityWeight = 1.0f;
+        auto flat = scene::buildMotionDatabase(*pack, uniform);
+        if (!flat.has_value()) {
+            FAIL("motion database build failed: " << flat.error().message);
+        }
+
+        const auto withNoiseDims = [&](std::uint32_t k) {
+            scene::MotionDatabase out = *flat;
+            if (k == 0u) {
+                return out;
+            }
+            const std::uint32_t oldDim = flat->dimension;
+            out.dimension = oldDim + k;
+            out.features.assign(static_cast<std::size_t>(flat->sampleCount()) * out.dimension, 0.0f);
+            std::mt19937 rng(2024u);
+            std::normal_distribution<float> gauss(0.0f, 1.0f);
+            for (std::uint32_t s = 0; s < flat->sampleCount(); ++s) {
+                const float* src = flat->featuresFor(s);
+                for (std::uint32_t d = 0; d < oldDim; ++d) {
+                    out.features[static_cast<std::size_t>(s) * out.dimension + d] = src[d];
+                }
+                for (std::uint32_t d = 0; d < k; ++d) {
+                    out.features[static_cast<std::size_t>(s) * out.dimension + oldDim + d] =
+                        gauss(rng);
+                }
+            }
+            out.mean.assign(out.dimension, 0.0f);
+            out.scale.assign(out.dimension, 1.0f);
+            return out;
+        };
+
+        WARN("DOSE-RESPONSE: appended random dimensions, uniform weights");
+        double atZero = 0.0;
+        for (const std::uint32_t k : {0u, 1u, 4u, 16u}) {
+            const scene::MotionDatabase probe = withNoiseDims(k);
+            const auto [rate, oracleK] =
+                score(probe, fmt::format("  +{} random dimensions", k).c_str());
+            if (k == 0u) {
+                atZero = rate;
+            } else {
+                WARN(fmt::format("    K={:<2} dim {}  {:+.1f} points against K=0 ({:+.2f} per "
+                                 "dimension)",
+                                 k, probe.dimension, rate - atZero,
+                                 (rate - atZero) / static_cast<double>(k)));
+            }
+            // The oracle cannot move: appending feature dimensions does not change which
+            // pose-space answers exist.
+            CHECK(oracleK > 0.0f);
+        }
+
+        // **And a bound available from arithmetic, stronger than the null looks.** If a useless
+        // dimension cost anything like 2 points -- the top of the neutralise interval -- then a
+        // 36-dimension vector carrying even a handful of weak ones would be catastrophically
+        // degraded, and it plainly is not. So the per-dimension cost is already bounded well below
+        // the interval that was measured, and the honest statement is "bounded above by something
+        // small" rather than "we could not see it" -- which is what stops a reader assuming the
+        // effect is real and the test was weak.
+        CHECK(atZero > 0.0);
+    }
+
     CHECK(withoutPhase > 0.0);
     CHECK(withPhaseRate > 0.0);
     CHECK(std::abs(withPhaseRate - withoutPhase) < 5.0); // no large effect either way

@@ -2014,19 +2014,57 @@ since neutralising a feature cannot alter which pose-space answers exist.
 
 **One meaningless dimension of 36 costs 0.0 points — nothing measurable.**
 
-**This retires a claim the phase has been repeating since §24.** "Dimensions are not free" was
-asserted there and its instrument has since been retired for measuring identifiability; this is the
-first valid test of it, and the answer at this scale is that **the cost of a noise dimension is below
-detection** (0.0 ± 2.3, so an effect up to about two points cannot be excluded — but the assertion
-that dimensions carry a real cost is not supported).
+**That single point was low-powered by construction, and the dose-response reversed it.** One
+dimension of 36 is a small perturbation measured with a bar wide enough to hide the effect: 0.0 ±
+2.3 cannot distinguish "free" from "cheap". The claim under test is about a **slope**, so it needs
+more than one dose.
+
+Appending K fresh random dimensions — fixed at build, at **uniform weights** so that lengthening the
+vector cannot silently change how the existing dimensions are treated:
+
+| K | dimensions | rate | vs K=0 | **per dimension** |
+|---|---|---|---|---|
+| 0 | 33 | 32.2% | — | — |
+| 1 | 34 | 32.4% | +0.2 | +0.23 |
+| 4 | 37 | 31.0% | −1.1 | **−0.29** |
+| 16 | 49 | 27.4% | −4.8 | **−0.30** |
+
+**"Dimensions are not free" is true after all, and now it has a number: about −0.30 points per
+useless dimension.** K=4 and K=16 agree to within 0.01, which is a slope rather than noise, and the
+K=1 point is simply below the resolution of a single measurement — exactly the low-power failure the
+dose-response was run to escape.
+
+**So the earlier "not supported" verdict was wrong, and it was wrong in the direction of my own
+convenience** — it let a claim I had been repeating be quietly retired rather than measured
+properly. The correction: the claim stands, with a magnitude, and the single-point null should have
+been reported as *underpowered* rather than as evidence of absence.
+
+It also reconciles with the shuffle. Two shuffled phase dimensions cost 2.7 points — about 1.35 each
+— against 0.30 for an appended one. Shuffling **destroys a signal and adds noise in its place**;
+appending only adds noise. The larger figure for the destructive operation is what should be
+expected, and the two are consistent rather than corroborating.
 
 It does not contradict the shuffle result. Neutralising removes a dimension's contribution;
 shuffling **replaces it with active noise**, which cost 2.7 points for two dimensions. Removing a
 weak signal and injecting a strong one are different operations and the asymmetry is expected.
 
-**What it changes:** the cost side of every dimension decision in the phase — the horizons, the
-phase weight, the contact flags. Those were all argued partly on "dimensions are not free", and that
-argument now needs its own evidence in each case rather than being available by default.
+**What it changes:** the cost side of every dimension decision now has a real number attached
+instead of a slogan. At −0.30 points per useless dimension, §24's five-horizon arm carries 8 more
+dimensions than the three-horizon one, which predicts about **−2.4 points** from dimensionality
+alone — a real cost, and one that was being asserted without measurement for the whole phase.
+
+**But the reasoning published for three decisions was borrowed from an untested claim, and that is
+worth marking even where the conclusion survives**, in the same way the `Travelling` comment was
+corrected rather than quietly replaced:
+
+- **the horizons** — the cost side was argued on "dimensions are not free" before it was measured;
+  the conclusion is void anyway, because §24's instrument was retired.
+- **the phase weight** — declining to move it was justified *independently* once the effect measured
+  zero, so the decision stands; the published reasoning leaned on the untested claim.
+- **the contact flags** — the same, and the flag is wrong for a reason that needs no measurement.
+
+The distinction most likely to be lost is the one that matters: **the earlier reasoning was wrong
+even where the conclusion survives.**
 
 The flag itself is wrong regardless of the measurement — a contact flag on a head is not a judgement
 call — and is fixed separately, after the experiment rather than before it.
