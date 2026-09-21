@@ -58,6 +58,21 @@ enum class PoseLayerKind : std::uint8_t {
     // gives: a two-bone solve is not maskable per joint, because half a knee does not reach half a
     // target. `weight` still blends the whole correction towards the animated pose.
     Foot,
+    // **Stride warping (Phase B §7).** Scale how far a foot swings horizontally away from the
+    // body, so a character travelling slower than its walk clip was authored for takes shorter
+    // steps instead of sliding long ones.
+    //
+    // This is the load-bearing half of speed adaptation on this repository's content, and that is
+    // a measurement rather than a preference: `Gait::footSlip` reports **97 of 100** mismatches
+    // across the shipping cast as the body moving *slower* than its own stride, median ratio
+    // **0.250**, with the Glowmere aliens at **0.016-0.042x** and their playback-rate clamp
+    // already pushed 7.5x below default and still saturated. There is no second clip to blend
+    // toward down there and no rate left to give, so the stride has to get shorter in space.
+    //
+    // Deliberately *not* a two-bone solve. It moves the named joint and lets the `Foot` layer --
+    // which runs after it -- put the foot back on the ground. Stride is how far the step reaches;
+    // ground contact is where it lands, and they are different questions.
+    Stride,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
@@ -186,8 +201,30 @@ struct PoseLayer {
     // pose's up needs no authoring and cannot be wrong about a rig it has read.
     glm::vec3 soleUp{0.0f};
 
+    // ---- Stride (Phase B §7) --------------------------------------------------------------------
+    // The joint whose horizontal excursion is scaled -- a foot, or a hand on a quadruped forelimb.
+    std::string strideJoint;
+    // The joint the excursion is measured FROM: the body, not the world. Empty means the rig's
+    // first translated joint, which is ADR-337's rule and the one `motion_analysis` already uses;
+    // naming it matters on a rig whose armature wrapper is joint 0 and whose body is a child of it.
+    std::string strideOrigin;
+    // How far the scaling may go. A clip played at a twentieth of its authored speed does not want
+    // a twentieth of a stride -- that is a character mincing, not walking. Below the floor the
+    // honest answer is a different clip, and §12's locomotion modes are where that belongs; this
+    // clamps, and `LayerResolution::Clamped` says that it did.
+    float strideMin = 0.35f;
+    float strideMax = 1.6f;
+    // Scale the vertical lift with the stride too. A short step does not lift the foot as high,
+    // and shortening the reach while leaving the lift alone is what makes a shortened walk read as
+    // a march. 0 keeps the authored height; 1 scales it with the stride.
+    float strideLift = 0.7f;
+
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
+    // Stride: how far the body travels against the stride its clip was authored for. 1 means they
+    // agree and this layer is a no-op. Written per frame from `MotionContext::strideRatio`, which
+    // is `Gait::footSlip` -- one answer to that question rather than a second (ADR-260).
+    float strideRatio = 1.0f;
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
     bool hasTarget = false;
 };
@@ -266,6 +303,10 @@ public:
     [[nodiscard]] std::vector<PoseLayer>& layers() { return layers_; }
     [[nodiscard]] const std::vector<PoseLayer>& layers() const { return layers_; }
     [[nodiscard]] const std::vector<JointMask>& masks() const { return masks_; }
+    // Parallel to `layers()`: {strideJoint, strideOrigin} resolved, or -1. Exposed for the same
+    // reason `chains()` is -- "which joint did this layer actually bind to" is the first question
+    // of any report about it, and re-deriving the rule in a debug view would be a second copy.
+    [[nodiscard]] const std::vector<glm::ivec2>& strides() const { return stride_; }
     [[nodiscard]] const std::vector<LayerResolution>& results() const { return results_; }
     // Per layer, what the two-bone solver said the last time a `Foot` layer ran. `Solved` on every
     // layer that is not one, which is a lie a caller has to read alongside `results()` -- the point
@@ -316,6 +357,9 @@ public:
 private:
     std::vector<PoseLayer> layers_;
     std::vector<JointMask> masks_;
+    // Stride (Phase B §7): the joint whose excursion is scaled, and the joint it is measured from.
+    // Parallel to `layers_`, like every other resolved index here.
+    std::vector<glm::ivec2> stride_;
     std::vector<LayerResolution> results_;
     std::vector<int> clipIndex_;  // per layer, resolved once by bind
     std::vector<int> pivotIndex_; // per layer, resolved once by bind

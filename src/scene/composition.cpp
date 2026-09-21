@@ -2814,6 +2814,14 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             // as braces: `chains()` is parallel to `layers()` by construction, and a loop that
             // trusted that without checking is how this went unnoticed.
             const std::size_t thisLayer = layerIndex++;
+            // Phase B §7. Every stride layer gets this frame's ratio whatever drives it,
+            // including `Manual` -- the ratio is a measurement of the body, not an intent a
+            // timeline authors, and a manual stride layer with no ratio would be a layer that
+            // silently does nothing. One source for it: `MotionContext::strideRatio`, which is
+            // `Gait::footSlip` (ADR-260).
+            if (layer.kind == PoseLayerKind::Stride) {
+                layer.strideRatio = motion_.strideRatio;
+            }
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
                 break;
@@ -8640,6 +8648,15 @@ nlohmann::json Composition::toJson() const {
                     // of them empty. Written through the shared path it came out with `"joints":
                     // []` and `"clip": ""`, and the file it produced would not load -- a save that
                     // breaks the scene it saved is worse than one that refuses.
+                    if (layer.kind == PoseLayerKind::Stride) {
+                        l["joint"] = layer.strideJoint;
+                        if (!layer.strideOrigin.empty()) {
+                            l["origin"] = layer.strideOrigin;
+                        }
+                        l["strideMin"] = layer.strideMin;
+                        l["strideMax"] = layer.strideMax;
+                        l["strideLift"] = layer.strideLift;
+                    }
                     if (layer.kind == PoseLayerKind::Foot) {
                         l["chain"] = json::array({layer.chainRoot, layer.chainMid, layer.chainTip});
                         if (glm::dot(layer.poleDirection, layer.poleDirection) > 0.0f) {
@@ -10107,6 +10124,33 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         // ADR-359: a foot layer is addressed by a chain and never by a mask, so it
                         // reads a different set of keys and refuses a mask outright here rather
                         // than letting `bind` report a no-op after the scene has loaded.
+                        if (layer.kind == PoseLayerKind::Stride) {
+                            // Phase B §7. Addressed by one joint and a body to measure it from,
+                            // not by a mask: what it scales is an excursion, which needs two ends.
+                            if (!entry.contains("joint") || !entry.at("joint").is_string()) {
+                                return fail("node '{}': animation layer '{}': a stride layer needs a "
+                                            "'joint' -- the foot whose step is shortened",
+                                            node.name, layer.name);
+                            }
+                            layer.strideJoint = entry.at("joint").get<std::string>();
+                            if (entry.contains("origin") && entry.at("origin").is_string()) {
+                                layer.strideOrigin = entry.at("origin").get<std::string>();
+                            }
+                            auto lo = readFloat(entry, "strideMin", layer.strideMin);
+                            auto hi = readFloat(entry, "strideMax", layer.strideMax);
+                            auto lift = readFloat(entry, "strideLift", layer.strideLift);
+                            if (!lo) return std::unexpected(lo.error());
+                            if (!hi) return std::unexpected(hi.error());
+                            if (!lift) return std::unexpected(lift.error());
+                            layer.strideMin = *lo;
+                            layer.strideMax = *hi;
+                            layer.strideLift = *lift;
+                            if (layer.strideMin > layer.strideMax) {
+                                return fail("node '{}': animation layer '{}': strideMin {} is above "
+                                            "strideMax {}, so every ratio clamps to the wrong end",
+                                            node.name, layer.name, layer.strideMin, layer.strideMax);
+                            }
+                        }
                         if (layer.kind == PoseLayerKind::Foot) {
                             if (!entry.contains("chain")) {
                                 return fail("node '{}': animation layer '{}': a foot layer needs a 'chain' "

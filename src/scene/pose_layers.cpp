@@ -54,6 +54,7 @@ const char* poseLayerKindName(PoseLayerKind kind) {
     case PoseLayerKind::Aim: return "aim";
     case PoseLayerKind::Additive: return "additive";
     case PoseLayerKind::Foot: return "foot";
+    case PoseLayerKind::Stride: return "stride";
     }
     return "aim";
 }
@@ -69,6 +70,10 @@ bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
     }
     if (name == "foot") {
         out = PoseLayerKind::Foot;
+        return true;
+    }
+    if (name == "stride") {
+        out = PoseLayerKind::Stride;
         return true;
     }
     return false;
@@ -215,6 +220,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
     chain_.assign(layers_.size(), glm::ivec3(-1));
     chainLinked_.assign(layers_.size(), glm::ivec2(0));
     soleUp_.assign(layers_.size(), glm::vec3(0.0f, 1.0f, 0.0f));
+    stride_.assign(layers_.size(), glm::ivec2(-1));
     restTipHeight_.assign(layers_.size(), 0.0f);
     ikStatus_.assign(layers_.size(), IkStatus::Solved);
     bodyResult_ = BodyCompensation{};
@@ -241,6 +247,12 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
         // reach half a target -- so an authored mask on one could only be a silent no-op, which is
         // the failure this whole unit exists to stop repeating. It is reported instead.
         JointMaskSpec spec = layer.mask;
+        if (layer.kind == PoseLayerKind::Stride && spec.joints.empty() && !layer.strideJoint.empty()) {
+            // A stride layer's joint set IS its named joint, the same way a foot layer's is its
+            // chain. Derived rather than authored so that naming the joint twice cannot disagree
+            // with itself.
+            spec.joints = {layer.strideJoint};
+        }
         if (layer.kind == PoseLayerKind::Foot) {
             if (!spec.joints.empty()) {
                 problems.push_back(fmt::format(
@@ -284,6 +296,46 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                     }
                 }
             }
+        } else if (layer.kind == PoseLayerKind::Stride) {
+            const int joint = skeleton.find(layer.strideJoint);
+            if (joint < 0) {
+                problems.push_back(fmt::format(
+                    "layer '{}': stride joint '{}' is not in this rig, so no step can be shortened",
+                    layer.name, layer.strideJoint));
+            }
+            // The body the excursion is measured from. Empty means ADR-337's rule -- the joint the
+            // clips actually translate -- and NOT joint 0, because on `alien-scout.glb` joint 0 is
+            // `rig`, an armature wrapper no clip animates. Measuring from it would make the whole
+            // body's travel look like stride and scale the character into the ground.
+            int origin = -1;
+            if (!layer.strideOrigin.empty()) {
+                origin = skeleton.find(layer.strideOrigin);
+                if (origin < 0) {
+                    problems.push_back(fmt::format(
+                        "layer '{}': stride origin '{}' is not in this rig", layer.name,
+                        layer.strideOrigin));
+                }
+            } else {
+                for (const AnimationClip& clip : clips) {
+                    for (const AnimationChannel& channel : clip.channels) {
+                        if (channel.path == AnimationPath::Translation &&
+                            (origin < 0 || static_cast<int>(channel.joint) < origin)) {
+                            origin = static_cast<int>(channel.joint);
+                        }
+                    }
+                }
+                if (origin < 0) {
+                    origin = skeleton.jointCount() > 0 ? 0 : -1;
+                }
+            }
+            if (joint >= 0 && origin >= 0 && joint == origin) {
+                problems.push_back(fmt::format(
+                    "layer '{}': its stride joint and its origin are both '{}', so the excursion it "
+                    "scales is always zero",
+                    layer.name, layer.strideJoint));
+                origin = -1;
+            }
+            stride_[i] = glm::ivec2(joint, origin);
         } else if (layer.kind == PoseLayerKind::Foot) {
             const int root = skeleton.find(layer.chainRoot);
             const int mid = skeleton.find(layer.chainMid);
@@ -383,7 +435,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         chain_.size() != layers_.size() || chainLinked_.size() != layers_.size() ||
         ikStatus_.size() != layers_.size() ||
         soleUp_.size() != layers_.size() || restTipHeight_.size() != layers_.size() ||
-        pose.size() != skeleton.jointCount()) {
+        stride_.size() != layers_.size() || pose.size() != skeleton.jointCount()) {
         return stats;
     }
     const std::size_t count = skeleton.joints.size();
@@ -462,6 +514,61 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // limb this rig does not have.
             result = layer.kind == PoseLayerKind::Foot ? LayerResolution::NoChain
                                                        : LayerResolution::NoJoints;
+            continue;
+        }
+        if (layer.kind == PoseLayerKind::Stride) {
+            // **Scale how far the foot reaches from the body, not where the body is.**
+            //
+            // The excursion is measured in MODEL space from the origin joint, because that is the
+            // frame a step actually happens in: the foot swings forward of the hips and back
+            // behind them, and the hips are what travel. Scaling the joint's LOCAL translation
+            // instead would scale its offset from whatever its parent happens to be, which on this
+            // alien is a sibling relationship and means nothing (ADR-543).
+            const glm::ivec2 ids = stride_[i];
+            if (ids.x < 0 || ids.y < 0) {
+                result = LayerResolution::NoJoints;
+                continue;
+            }
+            const float wanted = layer.strideRatio;
+            if (!(wanted > 0.0f) || !std::isfinite(wanted)) {
+                result = LayerResolution::NoTarget; // nobody told it how far the body is going
+                continue;
+            }
+            const float scale = std::clamp(wanted, layer.strideMin, layer.strideMax);
+            const bool clamped = std::abs(scale - wanted) > 1e-4f;
+            // A ratio of 1 is the authored stride, and doing the arithmetic anyway would be a
+            // float round-trip on every joint of every character for no change.
+            if (std::abs(scale - 1.0f) < 1e-4f) {
+                result = clamped ? LayerResolution::Clamped : LayerResolution::Applied;
+                stats.applied += 1u;
+                continue;
+            }
+            poseToModel(skeleton, pose, model_);
+            const auto jointIndex = static_cast<std::size_t>(ids.x);
+            const auto originIndex = static_cast<std::size_t>(ids.y);
+            const glm::vec3 jointModel(model_[jointIndex][3]);
+            const glm::vec3 originModel(model_[originIndex][3]);
+            glm::vec3 excursion = jointModel - originModel;
+            // Horizontal by `scale`, vertical by `strideLift` of it: a shorter step does not lift
+            // the foot as high, and shortening the reach while leaving the lift alone is what
+            // makes a shortened walk read as a march.
+            const float lift = 1.0f + ((scale - 1.0f) * std::clamp(layer.strideLift, 0.0f, 1.0f));
+            const glm::vec3 wantedModel =
+                originModel + glm::vec3(excursion.x * scale, excursion.y * lift, excursion.z * scale);
+            // Blended by the layer's weight, like every other correction here, so a scene can fade
+            // it in rather than snap it (§63).
+            const glm::vec3 finalModel = glm::mix(jointModel, wantedModel, std::clamp(layer.weight, 0.0f, 1.0f));
+
+            // Back to the joint's own parent frame. A model position is in the rig's space and a
+            // local translation is in the parent's, so the parent's model transform has to come
+            // out -- the full inverse and not just the basis, because this is a point.
+            const int parent = skeleton.joints[jointIndex].parent;
+            const glm::mat4 parentModel =
+                parent >= 0 ? model_[static_cast<std::size_t>(parent)] : glm::mat4(1.0f);
+            pose.local[jointIndex].position =
+                glm::vec3(glm::inverse(parentModel) * glm::vec4(finalModel, 1.0f));
+            result = clamped ? LayerResolution::Clamped : LayerResolution::Applied;
+            stats.applied += 1u;
             continue;
         }
         if (layer.kind == PoseLayerKind::Aim) {
