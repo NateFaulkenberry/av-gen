@@ -641,7 +641,8 @@ struct MediumSlot {
 // ADR-563: the fog bank's field, evaluated on the CPU from the same packed lanes the march reads.
 // The transliteration of `shaders/fog.wgsl` -- see `world/fog_field.cpp` for why it takes a slot
 // rather than a struct of its own.
-[[nodiscard]] float fogShapeAt(const MediumSlot& m, const glm::vec3& p);
+[[nodiscard]] float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t = 0.0f);
+[[nodiscard]] float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t);
 [[nodiscard]] float fogEllipticalRadius(const MediumSlot& m, const glm::vec3& rel);
 [[nodiscard]] float fogVerticalProfile(const MediumSlot& m, float relY);
 

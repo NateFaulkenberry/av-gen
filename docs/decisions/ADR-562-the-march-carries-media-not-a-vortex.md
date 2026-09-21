@@ -296,6 +296,49 @@ returns the number you expected, that is when to check it; a surprising number g
 free.* The fit looked right, which is the only reason it was checked. And the instrument was the one
 ADR-560 already prescribes — **look at the picture before trusting the statistic derived from it.**
 
+## 9. The hazard this architecture introduced, recorded beside it
+
+Per-kind dispatch has a cost nobody priced when this was approved, and it surfaced within a day.
+
+**A reachability probe names a field. Giving a kind its own density function silently invalidates
+every probe written against the shared one** -- the probe does not break, it goes on passing while
+asserting about a field the march no longer calls for that kind.
+
+Measured when `shaders/fog.wgsl` landed (ADR-563): **three** probes in `test_fog_bank.cpp` were
+mis-aimed, and the worst was the one guarding ADR-561's hole fix -- a defect that had survived in
+three places and been closed with a break demonstration -- whose *fog* assertion was against the
+**vortex's** envelope. From that commit onward the fix's claim for the kind it was named after was
+untested and green.
+
+**The audit is two greps and the intersection is the suspect set**: tests that call the old field,
+crossed against tests that construct the dispatched kind. Run it **when the dispatch is added**,
+because nothing will look wrong afterwards. `docs/testing.md` entry 22 carries the method and the
+table.
+
+So the rule this architecture comes with: **adding an arm to `mediumShape` is not complete until
+the probes for that kind have been re-aimed at the arm.** The next one is the tornado's.
+
+### And the same hazard in production code, which is the half this ADR first missed
+
+The probe entry covers *tests*. The identical failure lives in ordinary call sites, and
+`agent/tornado`'s integration found three of them in one sitting:
+
+- the §68 wind lean wrote `leaned.vortex.field.center` unconditionally -- correct for kinds that
+  store in `e.vortex`, a silent no-op for one that does not. It is a per-kind hook beside `pack`
+  now;
+- `mediumDensityCoeff`, `mediumScatterWeight` and `mediumCometResponse` read `lane(1).w` as the
+  extinction, which on a tornado's lanes is `radiusMidControl` -- tens rather than hundredths;
+- lane 15's reservation was a convention, and a block with sixty-one floats landed on it.
+
+**Every one is a shared accessor reading a lane whose meaning is per-kind.** This ADR gave each kind
+its own packer and its own density function and then left a handful of sites still assuming the
+vortex's layout -- and the omission was invisible because **the vortex and the fog bank happen to
+agree on the lanes those sites read.** Two kinds that agree are not a dispatch; they are one layout
+with two names, and the third kind is what tells you.
+
+The general form: **when you make a layout per-kind, every reader of that layout is a call site to
+audit, not just the probes.** Grep for the lane index, not for the feature.
+
 ## Consequences
 
 - **`EffectBucket::Vortex` is `EffectBucket::Medium`.** The name was a lie about what the bucket

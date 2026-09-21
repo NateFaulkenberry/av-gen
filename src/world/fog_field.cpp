@@ -11,6 +11,7 @@
 // interpretation step to get wrong. ADR-401, ADR-561 and ADR-562 each found a hand-written copy of
 // one conversion that had drifted; this one has nothing to copy.
 
+#include "core/noise.hpp"
 #include "world/atmospherics.hpp"
 
 #include <algorithm>
@@ -58,7 +59,20 @@ float fogVerticalProfile(const MediumSlot& m, float relY) {
     return thin + (lid - thin) * blend;
 }
 
-float fogShapeAt(const MediumSlot& m, const glm::vec3& p) {
+// §13/§14's macro detail. Identity at zero and mean-preserving by construction -- the
+// transliteration of `fogMacroDetail` in `shaders/fog.wgsl`, same expressions, same order.
+float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t) {
+    const float amount = std::clamp(m.lane[7].z, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return 1.0f;
+    }
+    const float scale = std::max(m.lane[7].x, 0.05f) / std::max(m.lane[0].w, 1.0f);
+    const float drift = m.lane[7].y * t;
+    const float n = noise::fbm3(p * scale + glm::vec3(drift, drift * 0.3f, -drift * 0.7f), 41u);
+    return 1.0f + amount * (n * 2.0f - 1.0f);
+}
+
+float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;
     }
@@ -72,7 +86,7 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p) {
     if (rim <= 0.0f) {
         return 0.0f;
     }
-    return rim * fogVerticalProfile(m, rel.y);
+    return std::max(rim * fogVerticalProfile(m, rel.y) * fogMacroDetail(m, p, t), 0.0f);
 }
 
 } // namespace avgen::world

@@ -425,7 +425,12 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // nothing loads differently -- which is the property this case exists to check and still
         // checks, one line down.
         REQUIRE(doc.contains("fog"));
-        CHECK(doc["fog"].size() == 6);
+        // Eight since ADR-565 added `detailScale` and `detailDrift` to §46 B's six. This number
+        // moving is the case doing its job rather than breaking: it is the only thing in the suite
+        // that notices a kind's stored rows changing what EVERY effect of every kind serialises,
+        // because `toJson` writes every kind's block. Update it deliberately, and check the count
+        // is the number of rows you meant to add.
+        CHECK(doc["fog"].size() == 8);
         // The shower block holds only its six own numbers.
         REQUIRE(doc.contains("meteors"));
         CHECK(doc["meteors"].size() == 6);

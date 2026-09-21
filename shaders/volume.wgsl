@@ -181,7 +181,8 @@ fn mediumKind(s: u32) -> u32 {
 // map, two readings of it, which is what keeps a fog bank a different authoring surface onto one
 // primitive rather than a second primitive (ADR-500's argument, still standing).
 fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
-    return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u));
+    return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u),
+                           mediaLane(s, 7u));
 }
 
 fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {

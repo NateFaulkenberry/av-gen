@@ -6,7 +6,10 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include "core/log.hpp"
+
 #include <array>
+#include <set>
 #include <cmath>
 #include <limits>
 #include <string_view>
@@ -968,7 +971,28 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
             }
         }
         MediumSlot& slot = out.media[out.mediumCount];
+        // ADR-565: the tag's lane is RESERVED, and this makes that a constraint a packer cannot
+        // violate silently rather than a sentence in a comment.
+        //
+        // `agent/tornado` found the hazard by walking into it: its block is sixteen lanes, it had
+        // sixty floats and wanted sixty-one, and the overflow landed exactly on lane 15. Because
+        // the tag is written AFTER `pack` below, the tag itself always wins -- so the dispatch
+        // keeps working and the PACKER's value disappears. Silent, and it presents as a wrong
+        // appearance rather than as a wrong shape, which is the harder thing to trace.
+        //
+        // A sentinel written before the call and checked after costs two stores per medium per
+        // frame and turns a silent loss into a named one.
+        constexpr float kReserved = -987654.0f;
+        slot.lane[kMediumLanes - 1] = glm::vec4(kReserved);
         schema->resolve.pack(leaned, rv.envelope, slot);
+        if (slot.lane[kMediumLanes - 1] != glm::vec4(kReserved)) {
+            static std::set<AtmosphereKind> warned;
+            if (warned.insert(rv.effect->kind).second) {
+                log::warn("medium kind '{}' writes lane {} in its packer, which is reserved for the "
+                          "kind tag: that value is discarded and the effect will look wrong",
+                          atmosphereKindName(rv.effect->kind), kMediumLanes - 1);
+            }
+        }
         slot.kind = static_cast<std::uint32_t>(rv.effect->kind);
         // ADR-562: and the kind reaches the SHADER, in the last lane.
         //

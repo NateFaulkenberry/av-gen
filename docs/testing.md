@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Twenty ways a green suite has lied
+## Twenty-three ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -88,9 +88,9 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
   (entries 13-17, 19; 9 and 10 are its older members, from before it had a name).
-- **Family D — the question was the wrong shape** (entry 20). One member so far, and it is neither a
-  bad measurement nor a bad reading: the instrument worked and the answer was thrown away by the
-  form of the question.
+- **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
+  the instrument worked, the probe looked in the right place, and the answer was spoiled by the
+  *form of the question* (20) or by the *size of the window* (21).
 
 Families A and B are failures of *reporting*: the run lies about itself, and **the binary's exit
 code catches every one of them.** Family C is a failure of *aim*: the run is honest, the exit code
@@ -386,6 +386,85 @@ night from two agents who never spoke to each other.
    reporting. This one refuted a hypothesis its author believed, which is exactly when the letter of
    a prediction is most likely to be taken at face value.
 
+21. **A window too small for the quantity to exist in it returns a phase dressed as a statistic.**
+
+   A macro-detail term was built to be mean-preserving -- `1 + amount * (n * 2 - 1)`, whose mean is
+   exactly 1 when `E[n]` is 0.5 -- and the test that checked it **failed at +7.1%**. The code was
+   right. The test averaged the field over a fog bank's interior, **a region comparable to the
+   noise's own period**, so there were only a few periods in it to average and what came back was
+   *where the bank happens to sit in the noise*. Measured properly across many periods, `E[fbm3]`
+   is 0.50044 and the term's mean is **1.00089** -- a 0.09% shift, not 7.1%.
+
+   **A mean is a property of a form over many periods; asking for it over one period returns a
+   phase.** The same applies to any low-frequency or periodic quantity: variance, RMS, a duty cycle,
+   a grain figure over a window narrower than the structure it is measuring.
+
+   **And it reproduces, which is what makes it convincing and wrong.** The phase is deterministic,
+   so the bad number is stable across reruns and survives every check that looks for flakiness. It
+   is not noise. It is the right calculation over a window in which the answer does not exist.
+
+   Count the periods in your window before you trust a statistic taken over it.
+
+22. **Adding a dispatch silently invalidates every probe written against the pre-dispatch path.**
+
+   A reachability probe names a field. When a kind is given its **own** density function, every test
+   that sampled the shared one goes on passing *while asserting about a field nothing calls for that
+   kind*. **The probe does not break — that is the whole problem.**
+
+   Measured on 2026-09-20, after `shaders/fog.wgsl` gave the fog bank its own field: **three** probes
+   in one file were mis-aimed, not the one that was noticed. The worst was the one guarding a
+   *shipped fix* -- a defect that had survived in three places and been fixed with a break
+   demonstration -- whose fog assertion was against the vortex's envelope. **From that commit
+   onward the fix's claim was untested and passing.** A fix for an invisible defect, made invisible
+   again by an architecture change, with a green suite throughout.
+
+   **The audit is two greps and the intersection is the suspect set:**
+
+   ```sh
+   grep -rln 'sampleVortex\|vortexShapeAt\|packVortex' tests/   # calls the old field
+   grep -rln 'VolumetricFog' tests/                              # constructs the dispatched kind
+   ```
+
+   | file | old-field calls | builds the kind | verdict |
+   |---|---|---|---|
+   | `test_fog_bank.cpp` | 9 | yes | **three cases mis-aimed** |
+   | `test_field_bus.cpp` | yes | no | clean |
+   | `test_vortex_parity_gpu.cpp` | yes | no | clean |
+   | `test_effect_conformance.cpp` | 0 | yes | clean |
+   | `test_effect_registry.cpp` | 0 | yes | clean |
+
+   Run it **when you add the dispatch**, not when something looks wrong -- nothing will look wrong.
+   And note which half each party got right: the prediction that only one *kind* was affected held;
+   the guess that only one *case* was affected came from the instance that was tripped over rather
+   than from a search, and was wrong. **A boundary is measured, not estimated.**
+
+23. **Two kinds that agree on a lane are not a dispatch, and production code has no suite to go
+   green.**
+
+   Entry 22 is that hazard in *tests*. The same session found it in shipping code, and it is worse
+   there because there is no summary line to misread -- the program simply does the wrong thing.
+
+   `MediumSlot` was made per-kind: each kind gets its own packer, its own density function, its own
+   lane meanings. What was not done was audit the **readers**. Within an hour of a third kind
+   existing, three shared accessors turned out to be still assuming the first kind's layout: a wind
+   hook writing a field the third kind does not store, three coefficient helpers reading `lane(1).w`
+   as an extinction when on the third kind it is a radius control (tens, not hundredths), and a
+   reserved lane that a sixty-one-float block landed on.
+
+   **The reason none of it surfaced in the preceding day is that the first two kinds happened to
+   agree on every lane those sites read.** Two implementations of an interface that agree are one
+   implementation with two names; the disagreement is the control, and **the third case is the
+   first one that can fail.** If you are generalising a layout, a protocol or a schema, the second
+   instance does not validate the generalisation -- it is usually built by copying the first.
+
+   The general form: **when you make a layout per-kind, every reader of that layout is a call site
+   to audit, not just the probes.** Grep for the lane index, not for the feature name -- the
+   feature name is what the mis-aimed reader does *not* mention.
+
+   And all three presented the same way, which is why they are expensive: right shape, slightly
+   wrong appearance. **A defect that survives because it is plausible is the costly kind** -- it
+   gets tuned around rather than found. "Renders as a comet" is a bug someone fixes in a minute.
+
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
@@ -414,6 +493,15 @@ probe's own control, a blown-out render, a person parsing instead of matching. *
 prospectively, by distrusting an expected number**, which is the only defence available when nothing
 downstream is positioned to disagree.
 
+**And one positive check is worth naming, because it is the inverse of everything above.** Most of
+these entries are numbers that looked right and were not. The opposite move is to find a number that
+must be **identical** and use identity as the signal: after a change that should have added
+assertions to existing cases rather than adding cases, the suite's case count matching the
+previously verified total *exactly* confirms the change was what its author thought. **A count that
+had moved would have meant something unaccounted for.** Pick a quantity your change must not move,
+and check it did not — it is cheaper than checking the quantities it should move, and it fails
+loudly when your model of your own edit is wrong.
+
 **One defence in this tree already works, and it is worth copying.** `test_renderer_layout_guards.cpp`
 resolves a struct's array extents against constants scraped from named headers, and when it meets a
 symbolic name it has not been shown it **fails hard rather than guessing** — its own comment says
@@ -426,7 +514,14 @@ resolves it optimistically**, and it is the only entry in this family that is a 
 a wound.
 
 - **When a filter, census or probe returns the number you expected, that is when to check it. A
-  surprising number gets checked for free.** That is the whole family in one sentence, and it would
+  surprising number gets checked for free.**
+- **An aggregate cannot separate the two things it sums.** Two instances of the same failure were
+  found in one night, in two different aggregations: a grain figure that fell 15% across a ladder
+  that added nothing but density, because the tone curve compresses near white; and a whole-frame
+  mean luminance that read 49 against 84 for two fog banks of identical optical depth, because the
+  larger one **covered more of the frame**. Neither number was wrong; both answered a question about
+  the frame when the question was about the medium. **Window the measurement onto the thing that
+  changed, or look at the picture.** That is the whole family in one sentence, and it would
   have caught all three of the scans below.
 - **Check what your scan matched, not just how many.** 13, 14 and 15 were each caught by looking at
   the matched items — eight files that were the wrong eight, 392 cases where 391 was wanted, eight

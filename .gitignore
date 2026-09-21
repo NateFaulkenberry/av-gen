@@ -100,3 +100,10 @@ __pycache__/
 # the system temp resolves none of them; they are removed by whatever wrote them, and this is the
 # guard for a run that was interrupted between the two.
 /examples/world/_v3*
+
+# Transient probe a running integration case writes beside the project it saves (the same reason
+# as the line above: a save rebases assets relative to its folder). Its owner removes it in a
+# destructor, so it only exists *while the suite runs* -- which is exactly when a `git add -A`
+# sweeps it into a commit. One did, on 8263d1d1. Never stage while a suite is in flight, and this
+# is the guard for the time you forget.
+/examples/world/.avgen_node_set_probe_*.json

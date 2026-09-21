@@ -22,6 +22,14 @@ more than a luminance level or so are not comparable by this number, and an arm 
 medium's brightness must be re-shot at matched exposure before its grain is quoted. Both figures are
 printed for that reason.
 
+**And `mean luma` conflates COVERAGE with OPACITY, which is the same failure one aggregation over.**
+Two fog banks of the same authored optical depth at radii 250 m and 900 m read 49.0 and 83.8 by
+whole-frame mean luminance -- a difference that looks like one being twice as thick, and is entirely
+the larger one *covering more of the frame*. A metric that aggregates over the frame cannot separate
+"how much of the picture" from "how much of the light". When the change is about opacity, window it
+onto the medium, or look at the image: stars visible through both settled that one in seconds where
+the number said the opposite.
+
 **The window is not a detail.** ADR-389: "a metric that measures the whole frame would have missed
 it -- the tree's foliage dominates the high-frequency energy of this shot, and the whole-frame
 number moves by 3% across arms that move the medium's own grain by 54%." So `lower` (the default,
