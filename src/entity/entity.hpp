@@ -27,6 +27,7 @@
 //     "reactions": [ { "signal": "audio.bass", "target": "parts/Lamp/emissiveGain", "depth": 3 } ]
 
 #include "core/rng.hpp"
+#include "entity/locomotion_plan.hpp"
 #include "entity/motion_chain.hpp"
 #include "entity/motion_controller.hpp"
 #include "entity/action.hpp"
@@ -135,6 +136,8 @@ struct EntityDesc {
     // inert" is a claim that can be measured rather than asserted -- see the rendered-hash
     // comparison in `docs/design/procedural-character-motion.md`.
     bool proceduralMotion = false;
+    // Phase B §8-§11. Start, stop, turn-in-place and strafe, on top of the gait's clip family.
+    LocomotionPlanSettings locomotion;
 
     // ---- the senses (ADR-270, ADR-290) ----
     //
@@ -300,6 +303,7 @@ public:
     [[nodiscard]] const MotionMemory& motionMemory() const { return motionMemory_; }
     [[nodiscard]] const MotionState& motionState() const { return motionState_; }
     [[nodiscard]] const MotionChainResult& motionChainResult() const { return motionChainResult_; }
+    [[nodiscard]] const LocomotionPlanState& locomotionPlan() const { return locomotionPlan_; }
     // Borrowed, owned by whoever built the providers (the composition). Null means this body is
     // driven by its clips, which is every body until a scene opts one in.
     void setMotionChain(const MotionChain* chain) { motionChain_ = chain; }
@@ -491,6 +495,7 @@ private:
     MotionMemory motionMemory_;
     MotionState motionState_;
     MotionChainResult motionChainResult_;
+    LocomotionPlanState locomotionPlan_;
     const MotionChain* motionChain_ = nullptr;
     // Authoritative here rather than in the parameter set: an entity may be ticked before anything
     // registers a parameter, and a state that only existed as a parameter would vanish on a scene

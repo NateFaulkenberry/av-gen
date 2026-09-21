@@ -48,6 +48,18 @@ enum class LocomotionMode : std::uint8_t {
 };
 [[nodiscard]] const char* locomotionModeName(LocomotionMode mode);
 
+// Where the body is in the arc of a movement (Phase B §8-§11). Orthogonal to `LocomotionMode`: a
+// body can be walking AND starting, and those are two different facts about it.
+enum class MotionPhase : std::uint8_t {
+    Idle,
+    Starting,
+    Moving,
+    Stopping,
+    Turning,
+    Strafing,
+};
+[[nodiscard]] const char* motionPhaseName(MotionPhase phase);
+
 struct MotionContext {
     // ---- time ----------------------------------------------------------------------------------
     // Seconds since the previous update. Zero on the first frame after a seek and on a paused
@@ -75,6 +87,19 @@ struct MotionContext {
 
     // ---- what it is playing --------------------------------------------------------------------
     LocomotionMode mode = LocomotionMode::Idle;
+    // Phase B §8-§11. Where the body is in the arc of a movement, how much of the authored stride
+    // that phase wants, and how far the heading is from the facing.
+    //
+    // **Projected from `entity::LocomotionPhase`, not that enum**, for exactly the reason
+    // `LocomotionMode` is (ADR-555): naming the entity type here would drag `entity/locomotion.hpp`
+    // into every pose layer and end the rule that makes a layer a pure function a scrub can replay.
+    // One field's convenience is not worth that, and the projection is five lines at the seam.
+    // Named `motionPhase` rather than `phase`, because `phase` below is the clip's 0..1 position
+    // in its own cycle and that name was here first. Two different meanings of one word in one
+    // struct is how a reader ends up reading the wrong one.
+    MotionPhase motionPhase = MotionPhase::Idle;
+    float phaseStride = 1.0f;
+    float strafeAngle = 0.0f;
     // Clip seconds per timeline second, as the gait resolved it. **Carried so a layer can see that
     // it saturated**: `Gait::playbackRate` clamps, and a clamped rate is the engine saying it could
     // not do the job with the one tool it had. Measured on the shipping Glowmere scene, the aliens

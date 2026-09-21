@@ -482,3 +482,69 @@ non-blending one: an architecture win that reads on screen as a regression.
 So the seam is proven reachable where it can be proven (the lab, with two probes each shown failing
 against a deliberate break) and left off where it would look worse. **Named as the first thing to
 fix before the provider drives production characters.**
+
+---
+
+# Phase B, second pass — the stages the scope cut had removed
+
+Scope-cut authority was revoked for A–D. This section is the running note of each outstanding
+stage as it lands.
+
+## B §19 — movement lean (the pose half of B.F)
+
+`PoseLayerKind::Lean`. Tilts the body into what it is doing: pitch from forward acceleration, roll
+from lateral acceleration plus turn rate.
+
+**Acceleration is measured once**, at the entity, beside the velocity it differences — ADR-545's
+rule one derivative out — and published on **both** seam paths (ADR-554). Lean, stride and balance
+all want it, and three subsystems differencing the same vector is how the engine got two answers to
+"where is this body" (ADR-260).
+
+Driven by the **measured** acceleration, not the desired one: a body leans into the force it is
+actually under, and one leaning into an acceleration its legs were never given is falling over on
+purpose.
+
+The clamp is a **magnitude on the pair**, so a diagonal acceleration stays diagonal rather than
+squaring off against a per-axis limit. Tested by stating the prediction as a magnitude
+(`magnitude == 9.0 ± 0.4`, `|pitch| - |roll| < 0.5`) rather than as "does it clamp" — testing.md
+#20.
+
+Measured: 3 m/s² forward gives −6.6° pitch and 0.0° roll; 3 m/s² lateral gives 0.0° pitch and
+−6.6° roll. Half weight gives half the angle.
+
+## B §8, §9, §10, §11 — start, stop, turn-in-place, strafe
+
+`entity::planLocomotion`, a pure function with its memory owned by the entity and replayed by
+`EntityWorld::seek`.
+
+**Not a second gait machine.** `Gait::select` owns the clip *family* (ADR-096) and has no notion of
+the transitional states. This reads the gait's answer and adds a phase to it — a body does not go
+from standing to walking, it goes from standing to **starting** to walking — so there is one answer
+to "which clip family" and a second, orthogonal one to "where in the arc".
+
+| stage | what it does |
+|---|---|
+| §8 start | `Starting`, with **two** exits: reaching the asked-for pace, or running out of start. The second is not optional — a body asked for 4 m/s that can only manage 0.3 would otherwise ramp its stride forever |
+| §9 stop | `Stopping`, easing the stride out to a **final step, never to zero**. A stride scale of zero is both feet in one place, which is the fade §9 forbids |
+| §10 turn | `Turning` for a body turning on the spot, distinct from `Starting` so a stride is not ramped for a body going nowhere |
+| §11 strafe | `Strafing` above 35° between heading and facing, back to `Moving` below 22° |
+
+**The braking test is the one that matters for this cast.** A stop triggers when the body is asked
+to *shed* speed (`desired < speed × 0.35`), not when it is slow. B.A measured 97 of 100 of the
+shipping cast travelling below a quarter of their authored stride — a "is it slow" test would have
+put every one of them into a permanent `Stopping`. Both arms are tested: a body that always creeps
+stays `Moving`; one that was travelling and is asked to stop goes to `Stopping`.
+
+**Flicker, measured rather than argued.** Three seconds sitting exactly on the strafe threshold,
+wobbling ±1° every frame — 180 opportunities to change phase. A single-threshold machine changes
+180 times; this one changes **at most 2**. Both mechanisms are needed and both are present: an
+enter/exit band and a minimum dwell, which is the pair `GaitSettings` already paid for.
+
+**Wired, not shelved.** The plan runs on both publish paths, the phase and its stride ramp cross
+the seam, and the stride layer **multiplies** the phase ramp into the travel ratio — two
+independent reasons a step should be shorter, rather than one overwriting the other.
+
+`MotionContext` projects it as `scene::MotionPhase` rather than importing `entity::LocomotionPhase`,
+for the reason ADR-555 gives about `LocomotionMode`: naming the entity type in a scene header would
+drag `entity/locomotion.hpp` into every pose layer and end the rule that makes a layer a pure
+function a scrub can replay.

@@ -950,6 +950,7 @@ void EntityWorld::reset() {
         // ADR-541: the provider memory is reset with everything else, and rebuilt by the replay.
         // A seek that kept it would carry a clip clock from a timeline the scrub has abolished.
         entity->motionMemory_.reset();
+        entity->locomotionPlan_.reset();
         entity->motionState_.reset();
         entity->motionChainResult_ = MotionChainResult{};
         entity->attachments_ = entity->desc_.attachments;
@@ -1223,6 +1224,20 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
         // `update`. `grounded` was written by neither and read by nobody.
         entity.locomotion_.acceleration = entity.state_.acceleration;
+        // Phase B §8-§11, on both paths (ADR-554). The plan reads the gait's answer and adds
+        // the transitional phase to it -- a body does not go from standing to walking, it
+        // goes from standing to STARTING to walking, and `Gait` has no notion of that.
+        {
+            LocomotionPlanState nextPlan;
+            const LocomotionPlan plan = planLocomotion(
+                entity.desc_.locomotion, entity.locomotionPlan_, entity.locomotion_.activity,
+                entity.state_.groundSpeed(), entity.state_.speed, entity.state_.turnRate,
+                entity.state_.strafeAngle(), entity.locomotion_.time, nextPlan);
+            entity.locomotionPlan_ = nextPlan;
+            entity.locomotion_.phase = plan.phase;
+            entity.locomotion_.phaseStride = plan.strideScale;
+            entity.locomotion_.strafeAngle = plan.strafeAngle;
+        }
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(dt);
         // Phase B: the provider memory, advanced on this path as on the other one. Both, for
@@ -1761,6 +1776,20 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // were wrong: `velocity`/`facing` were written only by `seek`, and `action` only by
         // `update`. `grounded` was written by neither and read by nobody.
         entity.locomotion_.acceleration = entity.state_.acceleration;
+        // Phase B §8-§11, on both paths (ADR-554). The plan reads the gait's answer and adds
+        // the transitional phase to it -- a body does not go from standing to walking, it
+        // goes from standing to STARTING to walking, and `Gait` has no notion of that.
+        {
+            LocomotionPlanState nextPlan;
+            const LocomotionPlan plan = planLocomotion(
+                entity.desc_.locomotion, entity.locomotionPlan_, entity.locomotion_.activity,
+                entity.state_.groundSpeed(), entity.state_.speed, entity.state_.turnRate,
+                entity.state_.strafeAngle(), entity.locomotion_.time, nextPlan);
+            entity.locomotionPlan_ = nextPlan;
+            entity.locomotion_.phase = plan.phase;
+            entity.locomotion_.phaseStride = plan.strideScale;
+            entity.locomotion_.strafeAngle = plan.strafeAngle;
+        }
         entity.locomotion_.grounded = !entity.state_.airborne;
         entity.locomotion_.dt = static_cast<float>(ctx.dt);
         // Phase B: the provider memory, advanced on this path as on the other one. Both, for

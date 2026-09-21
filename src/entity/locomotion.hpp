@@ -49,6 +49,19 @@ enum class Activity : std::uint8_t {
 [[nodiscard]] bool activityFromName(std::string_view name, Activity& out);
 
 // Everything an animation layer needs from a behaviour layer, and nothing else.
+// Where the body is in the arc of a movement. Deliberately orthogonal to `Activity`: a body can be
+// `Activity::Walk` and `LocomotionPhase::Starting` at the same time, and those are two different
+// facts about it.
+enum class LocomotionPhase : std::uint8_t {
+    Idle,      // standing, and not about to stop being
+    Starting,  // §8: accelerating out of a stand, before the stride has settled
+    Moving,    // travelling at a settled pace
+    Stopping,  // §9: braking toward a stand, with a final step still to place
+    Turning,   // §10: turning on the spot, not travelling
+    Strafing,  // §11: travelling, with the heading and the facing meaningfully apart
+};
+[[nodiscard]] const char* locomotionPhaseName(LocomotionPhase phase);
+
 struct LocomotionState {
     Activity activity = Activity::Idle;
     // The timeline second this decision was made at, never a wall clock. The animation layer
@@ -73,6 +86,12 @@ struct LocomotionState {
     // What the body's velocity is doing, for a lean layer to tilt into. Published on both paths
     // (ADR-554), like everything else here.
     glm::vec3 acceleration{0.0f};
+    // Phase B §8-§11. Where the body is in the arc of a movement, and how much of the authored
+    // stride that phase wants -- a start eases it in, a stop eases it out. Published on both
+    // paths (ADR-554).
+    LocomotionPhase phase = LocomotionPhase::Idle;
+    float phaseStride = 1.0f;
+    float strafeAngle = 0.0f;
     // **Written by nobody and read by nobody** until Phase B looked for the same publication gap
     // that hid `velocity` and `action`. Its source is `EntityState::airborne`, which the jump/fall
     // machinery maintains; a foot placement layer must not plant a foot on a body in mid-air, so it

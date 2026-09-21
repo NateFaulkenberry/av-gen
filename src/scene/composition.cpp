@@ -2751,6 +2751,16 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
         std::sqrt((state.velocity.x * state.velocity.x) + (state.velocity.z * state.velocity.z));
     motion_.turnRate = state.turnRate;
     motion_.acceleration = glm::mat3(inverse) * state.acceleration;
+    switch (state.phase) {
+    case entity::LocomotionPhase::Idle: motion_.motionPhase = MotionPhase::Idle; break;
+    case entity::LocomotionPhase::Starting: motion_.motionPhase = MotionPhase::Starting; break;
+    case entity::LocomotionPhase::Moving: motion_.motionPhase = MotionPhase::Moving; break;
+    case entity::LocomotionPhase::Stopping: motion_.motionPhase = MotionPhase::Stopping; break;
+    case entity::LocomotionPhase::Turning: motion_.motionPhase = MotionPhase::Turning; break;
+    case entity::LocomotionPhase::Strafing: motion_.motionPhase = MotionPhase::Strafing; break;
+    }
+    motion_.phaseStride = state.phaseStride;
+    motion_.strafeAngle = state.strafeAngle;
     // The intent, as the polar pair the mover authored it in: a scalar along a heading. Converted
     // to a vector here so a layer never has to know which of the two forms the seam used.
     motion_.desiredFacing =
@@ -2821,7 +2831,12 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             // silently does nothing. One source for it: `MotionContext::strideRatio`, which is
             // `Gait::footSlip` (ADR-260).
             if (layer.kind == PoseLayerKind::Stride) {
-                layer.strideRatio = motion_.strideRatio;
+                // Two independent reasons a step should be shorter, multiplied rather than
+                // fought over: **how fast the body is travelling against its authored stride**
+                // (`strideRatio`, `Gait::footSlip`), and **where it is in the arc of a movement**
+                // (`phaseStride`, §8's ramp in and §9's brake out). A start at a quarter speed
+                // wants both, and picking one would make the other invisible.
+                layer.strideRatio = motion_.strideRatio * motion_.phaseStride;
             }
             if (layer.kind == PoseLayerKind::Secondary) {
                 layer.bodySpeed = motion_.groundSpeed;
