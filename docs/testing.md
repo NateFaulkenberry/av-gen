@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Ten ways a green suite has lied
+## Eleven ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into two families: **the run did not happen as you think**,
@@ -147,9 +147,26 @@ and **the run happened and you read it wrong.**
    is to bisect the *filter*, not to read the named test. Cumulative GPU memory makes the victim and
    the culprit different tests, and ctest names the victim.
 
-**So `grep -c FAILED` is not a failure count.** Two of the eight cases above put a well-formed
-`FAILED:` block into a perfectly healthy log. Read the **exit code first, the summary second, and
-`FAILED:` blocks only as a pointer to what to go and look at** — not the other way round.
+11. **A crash prints NO verdict line at all, so a failure grep reports success.** Distinct from 5,
+   and the distinction is the whole point: there the summary printed and was honest. Here the
+   process dies before Catch2 writes anything, so the log contains **no `test cases:` line, no
+   `All tests passed`, and no `FAILED:`** — only `tools/gpu-lock.sh: line 39: 88724 Bus error: 10`
+   from the shell. A guard script that counts `FAILED:` blocks and reads the summary therefore
+   reports a clean run twice over: both counters are legitimately zero *because nothing ran to
+   completion*. That is what happened on 2026-09-20 to the full `avgen_render_tests` run — an
+   `=== FAILED ===` section that printed nothing, two zeroed counters, and **exit 138**, with the
+   exit code the only dissenting signal. Absence of a verdict is not a pass. If neither
+   `test cases:` nor `All tests passed` appears, the run did not finish, whatever else the log says.
+
+**So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
+put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
+log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
+only as a pointer to what to go and look at** — not the other way round.
+
+**The exit code is the only check that catches all eleven.** Every other signal here — the summary,
+the `FAILED:` blocks, the assertion counts — is a convenience that some entry above defeats. Capture
+`$?` from the binary itself: a pipeline's exit code is the last command's, which is usually `grep`,
+and `grep` is delighted to find nothing.
 
 ## The scratchpad is shared by every agent in a session
 
