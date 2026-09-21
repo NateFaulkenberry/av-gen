@@ -114,3 +114,6 @@ __pycache__/
 # arm it writes is reproducible from it in a second.
 /examples/treeisland/_fog-*.json
 /examples/treeisland/_fogshape-*.json
+
+# ADR-568 height-layer arms (tools/make_height_fog_arms.py), same rule as the two above.
+/examples/treeisland/_fogheight-*.json

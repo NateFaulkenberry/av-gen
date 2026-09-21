@@ -42,9 +42,10 @@ struct VolumeUniforms {
     noiseParams: vec4<f32>, // noiseAmount, noiseScale, noiseSpeed, time (seconds)
     info: vec4<f32>,      // steps, density field slot (-1 none), colour field slot (-1 none), frame index
     sizes: vec4<f32>,     // march width, march height, full width, full height (ADR-139)
-    depthParams: vec4<f32>, // camera near, camera far, 0, 0
+    depthParams: vec4<f32>, // camera near, camera far, march start jitter (ADR-461), 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
-    glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), yzw = 0
+    glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), y = local-light strength
+    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
     // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
     //
     // Was twelve named `vortexN` members carrying exactly ONE medium, so the second placed medium
@@ -338,7 +339,8 @@ fn volumeDensityAt(p: vec3<f32>) -> f32 {
     // this file's include of common.wgsl). It used to be this expression written out here and the
     // antiderivative written out in common.wgsl -- two statements of one model, in two files, with
     // nothing asserting they were a function and its integral.
-    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z);
+    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z,
+                                      vol.heightFog.x, vol.heightFog.y);
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);
     if (densitySlot >= 0) {

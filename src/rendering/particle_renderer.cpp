@@ -595,6 +595,8 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.fog = glm::vec4(frame_.fogDensity, frame_.fogHeight, frame_.fogHeightFalloff, frame_.fogAbsorption);
         u.fog2 = glm::vec4(frame_.fogMaxDistance, std::clamp(sys.fogCoupling, 0.0f, 1.0f),
                            std::max(0.0f, sys.volumeGlow), frame_.linearDepth ? 1.0f : 0.0f);
+        u.fog3 = glm::vec4(std::clamp(frame_.fogUpperDensity, 0.0f, 1.0f),
+                           std::clamp(frame_.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
         // Lifetime curves (ADR-040): at most kMaxCurveKeys keys each; fewer than two disables the
         // curve in the shader and the linear ramp above is used instead.
         const auto keyCount = [](std::size_t n) {

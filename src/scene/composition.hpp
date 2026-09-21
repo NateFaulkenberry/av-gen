@@ -1413,6 +1413,9 @@ private:
     nlohmann::json postJson_;
     params::Parameter<float>* fogHeight_ = nullptr;
     params::Parameter<float>* fogHeightFalloff_ = nullptr;
+    // ADR-568 (§7): the layer's shape, beside the height and the falloff it shapes.
+    params::Parameter<float>* fogUpperDensity_ = nullptr;
+    params::Parameter<float>* fogHeightCurve_ = nullptr;
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two

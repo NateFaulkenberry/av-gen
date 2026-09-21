@@ -72,6 +72,8 @@ std::unique_ptr<gpu::Context> makeContext() {
 // so midpoint converges as h^2 and 4096 slices over at most 400 m leaves an error far below the
 // 1e-3 the comparison allows -- which is checked by the self-consistency case below rather than
 // asserted here.
+// A case is TWO vec4s: (y0, y1, falloff, 0) then (upper, curve, 0, 0). Five numbers do not fit in
+// one, and splitting them across two arrays would let the two get out of step.
 constexpr const char* kKernel = R"(
 struct Args { count: vec4<f32> };
 @group(0) @binding(0) var<uniform> args: Args;
@@ -81,21 +83,31 @@ struct Args { count: vec4<f32> };
 @compute @workgroup_size(64)
 fn cs_check(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
-    if (i >= arrayLength(&cases)) { return; }
-    let y0 = cases[i].x;
-    let y1 = cases[i].y;
-    let b  = cases[i].z;
+    if (i * 2u + 1u >= arrayLength(&cases)) { return; }
+    let y0 = cases[i * 2u].x;
+    let y1 = cases[i * 2u].y;
+    let b  = cases[i * 2u].z;
+    let upper = cases[i * 2u + 1u].x;
+    let curve = cases[i * 2u + 1u].y;
 
-    let closed = fogHeightIntegral(y1, b) - fogHeightIntegral(y0, b);
+    let closed = fogHeightIntegral(y1, b, upper, curve) - fogHeightIntegral(y0, b, upper, curve);
 
     let slices = 4096;
     let h = (y1 - y0) / f32(slices);
     var sum = 0.0;
     for (var k = 0; k < slices; k = k + 1) {
         let y = y0 + (f32(k) + 0.5) * h;
-        sum = sum + fogHeightProfile(y, b) * h;
+        sum = sum + fogHeightProfile(y, b, upper, curve) * h;
     }
-    results[i] = vec4<f32>(closed, sum, fogHeightProfile(y0, b), fogHeightProfile(y1, b));
+    results[i * 2u] = vec4<f32>(closed, sum,
+                                fogHeightProfile(y0, b, upper, curve),
+                                fogHeightProfile(y1, b, upper, curve));
+    // ADR-568's bit-identity claim, answered by the shader rather than argued about: at upper 0
+    // and curve 0 the two functions must be EXACTLY the expressions they replaced.
+    results[i * 2u + 1u] = vec4<f32>(fogHeightProfile(y1, b, 0.0, 0.0) - exp(-b * max(0.0, y1)),
+                                     fogHeightIntegral(y1, b, 0.0, 0.0) -
+                                         select((1.0 - exp(-b * y1)) / b, y1, y1 <= 0.0),
+                                     0.0, 0.0);
 }
 )";
 
@@ -104,9 +116,25 @@ struct Row {
     float numeric = 0.0f;
     float profile0 = 0.0f;
     float profile1 = 0.0f;
+    float defaultProfileDelta = 0.0f;  // must be exactly 0 (ADR-568's bit-identity claim)
+    float defaultIntegralDelta = 0.0f; // must be exactly 0
 };
 
-std::vector<Row> run(gpu::Context& ctx, const std::vector<glm::vec4>& cases) {
+struct Case {
+    float y0 = 0.0f;
+    float y1 = 0.0f;
+    float falloff = 0.17f;
+    float upper = 0.0f;
+    float curve = 0.0f;
+};
+
+std::vector<Row> run(gpu::Context& ctx, const std::vector<Case>& list) {
+    std::vector<glm::vec4> cases;
+    cases.reserve(list.size() * 2);
+    for (const Case& c : list) {
+        cases.emplace_back(c.y0, c.y1, c.falloff, 0.0f);
+        cases.emplace_back(c.upper, c.curve, 0.0f, 0.0f);
+    }
     gpu::ShaderLibrary shaders(ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
     // The file the renderer loads, not a copy of it. `height_fog.wgsl` declares no bindings
     // precisely so this line needs nothing else (ADR-567).
@@ -178,7 +206,7 @@ std::vector<Row> run(gpu::Context& ctx, const std::vector<glm::vec4>& cases) {
     wgpu::ComputePassEncoder pass = encoder.BeginComputePass();
     pass.SetPipeline(pipeline);
     pass.SetBindGroup(0, group);
-    pass.DispatchWorkgroups(static_cast<std::uint32_t>((cases.size() + 63) / 64));
+    pass.DispatchWorkgroups(static_cast<std::uint32_t>((list.size() + 63) / 64));
     pass.End();
     wgpu::CommandBuffer commands = encoder.Finish();
     ctx.queue().Submit(1, &commands);
@@ -186,9 +214,10 @@ std::vector<Row> run(gpu::Context& ctx, const std::vector<glm::vec4>& cases) {
     REQUIRE(bytes.has_value());
     std::vector<glm::vec4> raw(cases.size());
     std::memcpy(raw.data(), bytes->data(), rdesc.size);
-    std::vector<Row> rows(cases.size());
-    for (std::size_t i = 0; i < cases.size(); ++i) {
-        rows[i] = Row{raw[i].x, raw[i].y, raw[i].z, raw[i].w};
+    std::vector<Row> rows(list.size());
+    for (std::size_t i = 0; i < list.size(); ++i) {
+        rows[i] = Row{raw[i * 2].x, raw[i * 2].y, raw[i * 2].z, raw[i * 2].w,
+                      raw[i * 2 + 1].x, raw[i * 2 + 1].y};
     }
     return rows;
 }
@@ -202,16 +231,27 @@ TEST_CASE("the surface fog integrates the layer the march marches", "[gpu][fog][
     // because the profile is piecewise and the seam at y = 0 is where an integral goes wrong.
     // Falloffs across the shipped range: `fogHeightFalloff` defaults to 0.17 in `tree_scene.hpp`
     // and the scenes in the repository use 0.004 to 0.6.
-    std::vector<glm::vec4> cases;
+    std::vector<Case> cases;
     for (const float b : {0.004f, 0.05f, 0.17f, 0.25f, 0.6f, 2.0f}) {
-        for (const auto [y0, y1] : std::initializer_list<std::pair<float, float>>{
-                 {-120.0f, -10.0f},  // wholly inside the layer
-                 {-80.0f, 40.0f},    // climbing out through the top
-                 {60.0f, 180.0f},    // wholly above it
-                 {-5.0f, 5.0f},      // straddling the seam closely
-                 {200.0f, -200.0f},  // descending, so the sign of the span is exercised
-                 {0.0f, 260.0f}}) {  // starting exactly on the join
-            cases.emplace_back(y0, y1, b, 0.0f);
+        // ADR-568: and across the two SHAPE controls, including both ends of each. The compact
+        // quadratic reaches exactly zero at 2/b, so `curve` 1 is the setting where the integral
+        // has a case split the exponential does not -- which is the arm a closed form gets wrong.
+        for (const auto [upper, curve] : std::initializer_list<std::pair<float, float>>{
+                 {0.0f, 0.0f},   // what the model was before ADR-568
+                 {0.35f, 0.0f},  // a haze floor under the exponential
+                 {0.0f, 1.0f},   // a layer with a definite top
+                 {0.0f, 0.5f},   // mid-blend, where neither family's formula alone is right
+                 {0.2f, 0.75f},  // both at once
+                 {1.0f, 1.0f}}) {// degenerate: a uniform atmosphere, no layer at all
+            for (const auto [y0, y1] : std::initializer_list<std::pair<float, float>>{
+                     {-120.0f, -10.0f},  // wholly inside the layer
+                     {-80.0f, 40.0f},    // climbing out through the top
+                     {60.0f, 180.0f},    // wholly above it
+                     {-5.0f, 5.0f},      // straddling the seam closely
+                     {200.0f, -200.0f},  // descending, so the sign of the span is exercised
+                     {0.0f, 260.0f}}) {  // starting exactly on the join
+                cases.push_back(Case{y0, y1, b, upper, curve});
+            }
         }
     }
 
@@ -221,14 +261,15 @@ TEST_CASE("the surface fog integrates the layer the march marches", "[gpu][fog][
     int crossedTheSeam = 0;
     int sawFullDensity = 0;
     for (std::size_t i = 0; i < rows.size(); ++i) {
-        const glm::vec4& c = cases[i];
-        INFO("y0=" << c.x << " y1=" << c.y << " falloff=" << c.z
-             << " closed=" << rows[i].closed << " numeric=" << rows[i].numeric);
+        const Case& c = cases[i];
+        INFO("y0=" << c.y0 << " y1=" << c.y1 << " falloff=" << c.falloff << " upper=" << c.upper
+             << " curve=" << c.curve << " closed=" << rows[i].closed
+             << " numeric=" << rows[i].numeric);
         // The absolute tolerance is in METRES of full-density air. A span of 400 m integrated with
         // 4096 midpoint slices carries far less error than this; what it is really guarding
         // against is a shader that computes a different function, which misses by tens of metres.
         CHECK(rows[i].closed == Approx(rows[i].numeric).margin(0.02));
-        if ((c.x < 0.0f) != (c.y < 0.0f)) {
+        if ((c.y0 < 0.0f) != (c.y1 < 0.0f)) {
             ++crossedTheSeam;
         }
         if (rows[i].profile0 > 0.99f || rows[i].profile1 > 0.99f) {
@@ -242,6 +283,32 @@ TEST_CASE("the surface fog integrates the layer the march marches", "[gpu][fog][
     CHECK(sawFullDensity >= 12);
 }
 
+TEST_CASE("the ADR-568 controls at zero leave the layer bit-identical", "[gpu][fog][height]") {
+    // The promise every existing scene depends on, answered by the shader rather than by the
+    // algebra: at `upper` 0 and `curve` 0 the profile and its integral must be EXACTLY the
+    // expressions they replaced, not approximately. `mix(x, y, 0)` is `x*1 + y*0` and
+    // `0 + 1*shape` is `shape`, both exact in IEEE for finite inputs -- but that is an argument,
+    // and the difference is computed on the GPU here and required to be zero.
+    //
+    // It is the control on the whole of ADR-568: a height model that changed every scene by a
+    // fraction of a level would be found by nothing else in the suite, because the volumetric
+    // checkpoints are hashes of frames nobody would think to re-baseline for a "no-op" default.
+    auto ctx = makeContext();
+    std::vector<Case> cases;
+    for (const float b : {0.004f, 0.05f, 0.17f, 0.6f, 2.0f}) {
+        for (const float y : {-200.0f, -1.0f, 0.0f, 1.0f, 40.0f, 400.0f}) {
+            cases.push_back(Case{0.0f, y, b, 0.0f, 0.0f});
+        }
+    }
+    const std::vector<Row> rows = run(*ctx, cases);
+    REQUIRE(rows.size() == cases.size());
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        INFO("y=" << cases[i].y1 << " falloff=" << cases[i].falloff);
+        CHECK(rows[i].defaultProfileDelta == 0.0f);
+        CHECK(rows[i].defaultIntegralDelta == 0.0f);
+    }
+}
+
 TEST_CASE("the numerical integral in the case above is fine enough to be evidence",
           "[gpu][fog][height]") {
     // The control on the instrument rather than on the thing measured. If 4096 midpoint slices
@@ -250,9 +317,9 @@ TEST_CASE("the numerical integral in the case above is fine enough to be evidenc
     // step, so the midpoint rule's error should fall by about four -- and here it should already
     // be so far below the tolerance that both halves agree with the closed form to well inside it.
     auto ctx = makeContext();
-    const std::vector<glm::vec4> cases{{-200.0f, 200.0f, 0.17f, 0.0f},
-                                       {-200.0f, 0.0f, 0.17f, 0.0f},
-                                       {0.0f, 200.0f, 0.17f, 0.0f}};
+    const std::vector<Case> cases{Case{-200.0f, 200.0f, 0.17f, 0.2f, 0.5f},
+                                  Case{-200.0f, 0.0f, 0.17f, 0.2f, 0.5f},
+                                  Case{0.0f, 200.0f, 0.17f, 0.2f, 0.5f}};
     const std::vector<Row> rows = run(*ctx, cases);
     REQUIRE(rows.size() == 3);
     // The whole span is the sum of its two halves, for the closed form and for the numeric one.

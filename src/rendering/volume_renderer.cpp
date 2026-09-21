@@ -366,6 +366,10 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     u.depthParams = glm::vec4(scene.camera.nearPlane, scene.camera.farPlane,
                               std::clamp(scene.environment.volumeJitter, 0.0f, 1.0f), 0.0f);
     u.fogColor = glm::vec4(env.fogColor, 0.0f);
+    // ADR-568 (§7): the height layer's shape. Clamped here, for the reason the surface path is --
+    // both ends of both controls are meaningful and outside them the profile stops being one.
+    u.heightFog = glm::vec4(std::clamp(env.fogUpperDensity, 0.0f, 1.0f),
+                            std::clamp(env.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
     // ADR-040: the march reads this many entries from the particle glow table.
     const std::uint32_t glowSystems = std::min(particleGlowSystems, kMaxParticleGlowSystems);
     u.glow = glm::vec4(static_cast<float>(glowSystems),

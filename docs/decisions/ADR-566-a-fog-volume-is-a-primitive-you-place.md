@@ -106,6 +106,21 @@ falloff of 1.4 the old constant left 0.37% of the column outside, so it was stil
 constant that was derived from one function and is still correct under another is a coincidence,
 and the control that ends the coincidence is the one nobody moved.**
 
+**This is ADR-389's family, and it is the clearest instance of it in the tree.** ADR-389: *a
+coefficient tuned against a quantity is invalidated by a change to that quantity's distribution.*
+The three-sigma rule was not a guess -- it was **correct**, for the distribution it was written
+against. What invalidated it was ADR-563 changing the shape the constant described, in a different
+file, one ADR earlier, **by me**. Nothing connected the two: no test failed, no comment pointed
+from the profile to the bound, and the bound's own comment went on describing a Gaussian tail that
+no longer existed.
+
+So the rule this ADR is asking for is narrower and more actionable than "audit your constants":
+**when you change the SHAPE of a quantity, grep for the constants that were sized against the old
+shape.** They are not near the change -- that is the point of them being constants -- and they do
+not announce themselves. In this case the search term was `thickness * 3`, and the thing that
+would have found it is asking, at the moment of writing the new profile, *what else knows how far
+this reaches?*
+
 The fix: carry `bankLength` horizontally, and solve `exp(-h * falloff) = 0.01` vertically, floored
 at the old three thicknesses and capped at forty. 1% of the column left outside, which is below
 what a frame can show.

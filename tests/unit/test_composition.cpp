@@ -1033,6 +1033,7 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
       "format": "avgen-scene", "version": 1, "name": "volumes",
       "environment": {
         "volumeDensity": 0.05, "fogHeight": 2.0, "fogHeightFalloff": 0.25,
+        "fogUpperDensity": 0.18, "fogHeightCurve": 0.65,
         "volumeScattering": 1.2, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.4,
         "volumeNoise": 0.6, "volumeNoiseScale": 0.09, "volumeNoiseSpeed": 0.2,
         "volumeEmission": 0.3, "volumeSteps": 48, "volumeMaxDistance": 120.0,
@@ -1074,6 +1075,13 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     CHECK(s.environment.volumeSteps == 48);
     CHECK(s.environment.volumeDensityField == "smokeField");
     CHECK(s.environment.volumeColorField == "heat");
+    // ADR-568 (§7). Values chosen so neither is a default and neither is the other: a read wired
+    // to the wrong member, or a key written and never read, is the failure this asks about, and
+    // two numbers that happened to match would answer it the wrong way.
+    CHECK(s.environment.fogUpperDensity == 0.18f);
+    CHECK(s.environment.fogHeightCurve == 0.65f);
+    REQUIRE(params.find("scene/fogUpperDensity") != nullptr);
+    REQUIRE(params.find("scene/fogHeightCurve") != nullptr);
     REQUIRE(params.find("scene/volumeDensity") != nullptr);
     REQUIRE(params.find("scene/volumeSteps") != nullptr);
 
@@ -1082,6 +1090,8 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     REQUIRE(j.contains("grids"));
     CHECK_FALSE(j["grids"][0].contains("data"));
     CHECK(j["environment"]["volumeSteps"] == 48);
+    CHECK(j["environment"]["fogUpperDensity"] == 0.18f);
+    CHECK(j["environment"]["fogHeightCurve"] == 0.65f);
     auto again = scene::Composition::fromJson(j, fx.registry);
     REQUIRE(again.has_value());
     REQUIRE((*again)->grids().size() == 1);

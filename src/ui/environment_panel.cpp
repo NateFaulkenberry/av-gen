@@ -87,6 +87,13 @@ void drawEnvironmentPanel(app::Engine& engine) {
         slider(engine, "scene/volumeDensity", "Fog density", "%.3f");
         slider(engine, "scene/fogHeight", "Fog height", "%.1f m");
         slider(engine, "scene/fogHeightFalloff", "Horizon falloff", "%.2f");
+        // ADR-568 (the fog brief's §7). Drawn beside the falloff they shape rather than in an
+        // advanced section: a parameter an artist cannot reach is a parameter that does not exist
+        // as far as the work is concerned (ADR-421), and these two are what turn one exponential
+        // haze into the range §7 asks for -- clear air above the mist, a definite layer with a
+        // top, or a thin global haze that never quite clears.
+        slider(engine, "scene/fogUpperDensity", "Upper density", "%.2f");
+        slider(engine, "scene/fogHeightCurve", "Height curve", "%.2f");
         slider(engine, "env/intensity", "Ambient", "%.2f");
         slider(engine, "env/sky/intensity", "Sky intensity", "%.2f");
         ImGui::PopID();

@@ -50,6 +50,8 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     comp.attach(params, modulator);
 
     for (const char* path : {"scene/volumeDensity", "scene/fogHeight", "scene/fogHeightFalloff",
+                             // ADR-568 (§7): drawn beside the falloff, so they are asked for here.
+                             "scene/fogUpperDensity", "scene/fogHeightCurve",
                              "env/intensity", "env/sky/intensity"}) {
         INFO(path);
         CHECK(registered(params, path));

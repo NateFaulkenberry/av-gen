@@ -167,6 +167,58 @@ night from two agents who never spoke to each other.
    is to bisect the *filter*, not to read the named test. Cumulative GPU memory makes the victim and
    the culprit different tests, and ctest names the victim.
 
+   **DIAGNOSED, 2026-09-21, and it is NOT the mechanism above.** `avgen_render_tests` takes an
+   intermittent SIGBUS, and the cause is in the crash reports, which nobody had opened.
+   `~/Library/Logs/DiagnosticReports/avgen_render_tests-*.ips` held **25 of them**, spanning
+   2026-09-18 to 2026-09-21, and **every single one has the same signature**:
+
+   - `EXC_BAD_ACCESS`, `SIGBUS`, `KERN_PROTECTION_FAILURE`;
+   - the faulting address is **exactly the first byte past the end of a `MALLOC_SMALL` region** --
+     `vmRegionInfo` reports `bytes after start: 0` of the reserved space that follows it, in all
+     twenty-five;
+   - the faulting frame is a Catch2 test body on the main thread, not Metal and not Dawn.
+
+   That is **a heap buffer overrun on the CPU**, not GPU memory exhaustion, and it explains every
+   property that made it look mysterious: a small overrun normally lands in malloc's own slack
+   inside the same region and does nothing at all. It faults only when the allocation happens to
+   sit at the very end of that region's page run. So the crash **moves between runs, is
+   independent of the RNG seed, is independent of machine load, and disappears when you replay the
+   seed that produced it** -- all of which was measured before the reports were read, and none of
+   which pointed at the cause.
+
+   **Read the crash report first.** Four separate sessions treated this as a scheduling or memory
+   mystery and took samples; the answer was sitting in a file the OS had already written, and the
+   one fact that settles it -- *fault address is one past a malloc block* -- takes a minute to get:
+
+   ```sh
+   ls -t ~/Library/Logs/DiagnosticReports/ | grep avgen
+   python3 -c 'import json,sys; b=json.loads(open(sys.argv[1]).read().split("\n",1)[1]); \
+       print(b["exception"]); print(b.get("vmRegionInfo","")[:600])' <report>.ips
+   ```
+
+   The tool that turns it into a deterministic failure at the overrun's own line is an ASan build
+   (`-fsanitize=address`), or `DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib` if a build is not
+   available. **Sampling more runs will not find it**; the samples below are what sampling gets
+   you, and they are included because the shape of the data is what a heap overrun looks like from
+   the outside:
+
+   | run | result |
+   |---|---|
+   | 1 | 397 cases, 396 passed, 1 skipped |
+   | 2 | **SIGBUS** (exit 138), ~300 lines in, after *"A generated tree renders, and renders the same way twice"* |
+   | 3 | **SIGBUS** (exit 138), at a **different** point -- a skinning/culling table |
+   | 4 | run 2's own seed replayed: **397 cases, exit 0** |
+
+   So: **not seed-determined, not order-determined in any fixed way, and not a function of machine
+   load.** Replaying a crashing run's seed passes. A quiet-machine explanation was proposed and
+   withdrawn on this data. By the end of the session it was 4 crashes in 8 full runs, one of them
+   with a CPU suite running alongside and one with the machine otherwise idle.
+
+   **It predates the fog branch by three days**: fourteen of the twenty-five reports are from
+   2026-09-18, before any of this work existed. The victim test varies because the victim is
+   whoever owns the allocation that happens to be at the end of a region -- which is also why
+   naming the test it died in has never been informative.
+
 11. **A crash prints NO verdict line at all, so a failure grep reports success.** Distinct from 5,
    and the distinction is the whole point: there the summary printed and was honest. Here the
    process dies before Catch2 writes anything, so the log contains **no `test cases:` line, no

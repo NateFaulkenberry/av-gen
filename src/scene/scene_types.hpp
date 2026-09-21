@@ -573,9 +573,19 @@ struct Environment {
     // field term is the named scalar field's sample (1 when unset). Lit by the key light with a
     // Henyey–Greenstein phase (volumeAnisotropy) and self-emitting with volumeEmission × the
     // named colour field (or fogColor).
-    float volumeDensity = 0.0f;            // 0 = off
+    float volumeDensity = 0.0f;            // 0 = off; also §7's "ground density" -- the layer's full value
     float fogHeight = 0.0f;                // height above which density falls off
     float fogHeightFalloff = 0.0f;         // 0 = uniform
+    // ADR-568 (the fog brief's §7). Both default to the model this had before, exactly: at
+    // `fogUpperDensity` 0 and `fogHeightCurve` 0 the profile is `exp(-falloff * max(0, y - height))`
+    // to the last bit, which `test_height_fog_gpu.cpp` asserts rather than assumes.
+    //
+    // They live here rather than on the fog-bank effect because they describe the WHOLE
+    // atmosphere: the volumetric march, the surface distance fog and the particle transmittance
+    // estimate all read the same layer (ADR-567), and a scene whose passes disagree about where
+    // the air is does not read as one place.
+    float fogUpperDensity = 0.0f;          // fraction of the layer's density left at any height
+    float fogHeightCurve = 0.0f;           // 0 = exponential tail, 1 = a layer with a definite top
     float volumeScattering = 1.0f;         // in-scatter strength
     float volumeAbsorption = 0.5f;         // extinction multiplier
     float volumeAnisotropy = 0.3f;         // HG g in (-1, 1)

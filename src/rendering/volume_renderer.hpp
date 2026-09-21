@@ -66,9 +66,15 @@ struct VolumeUniforms {
     glm::vec4 noiseParams; // noiseAmount, noiseScale, noiseSpeed, time
     glm::vec4 info;        // steps, density field slot, colour field slot, frame index
     glm::vec4 sizes;       // half width, half height, full width, full height
-    glm::vec4 depthParams; // camera near, camera far, 0, 0
+    glm::vec4 depthParams; // camera near, camera far, march start jitter (ADR-461), 0
     glm::vec4 fogColor;    // rgb, w = 0
-    glm::vec4 glow;        // x = particle glow systems (ADR-040), yzw = 0
+    glm::vec4 glow;        // x = particle glow systems (ADR-040), y = local-light strength, zw = 0
+    // ADR-568 (§7): the height layer's SHAPE, in a lane of its own rather than in the zeroes of a
+    // lane that means something else. ADR-562 §9's finding is what that costs when it goes wrong,
+    // and `VolumeUniforms` has no lane budget to defend -- it is not a packed per-kind block, it
+    // is a uniform with a sizeof assertion, so a named lane is free and a reused one is not.
+    // x = fogUpperDensity, y = fogHeightCurve, zw = 0.
+    glm::vec4 heightFog;
     // ADR-562: the placed media, as lanes. Was twelve named `vortexN` members carrying exactly one
     // medium; a slot is `world::kMediumLanes` `vec4` and there are `world::kMaxMedia` of them, so a
     // second medium is a slot rather than a rewrite. `mediaInfo.x` is how many are live and the
@@ -78,7 +84,7 @@ struct VolumeUniforms {
     glm::vec4 mediaInfo;
     glm::vec4 media[world::kMaxMedia * world::kMediumLanes];
 };
-static_assert(sizeof(VolumeUniforms) == 16 * (8 + 1 + world::kMaxMedia * world::kMediumLanes));
+static_assert(sizeof(VolumeUniforms) == 16 * (9 + 1 + world::kMaxMedia * world::kMediumLanes));
 
 class VolumeRenderer {
 public:

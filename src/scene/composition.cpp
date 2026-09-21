@@ -50,6 +50,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
+    "fogUpperDensity", "fogHeightCurve",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -3903,6 +3904,14 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                        -20.0f, 40.0f));
     fogHeightFalloff_ = &params.add(floatDesc(prefix_ + "scene/fogHeightFalloff", volumeSetting_.fogHeightFalloff,
                                               0.0f, 10.0f, 0.0f, 1.0f));
+    // ADR-568 (§7). Both hard-clamped to 0..1: `upper` is a fraction of the layer's density and
+    // `curve` a blend weight, and a modulation route driving either outside that range would be
+    // asking for a profile that is not a profile -- negative density, or an extrapolation past the
+    // compact family into one whose integral this does not compute.
+    fogUpperDensity_ = &params.add(floatDesc(prefix_ + "scene/fogUpperDensity", volumeSetting_.fogUpperDensity,
+                                             0.0f, 1.0f, 0.0f, 1.0f));
+    fogHeightCurve_ = &params.add(floatDesc(prefix_ + "scene/fogHeightCurve", volumeSetting_.fogHeightCurve,
+                                            0.0f, 1.0f, 0.0f, 1.0f));
     volumeScattering_ = &params.add(floatDesc(prefix_ + "scene/volumeScattering", volumeSetting_.volumeScattering,
                                               0.0f, 20.0f, 0.0f, 4.0f));
     volumeAbsorption_ = &params.add(floatDesc(prefix_ + "scene/volumeAbsorption", volumeSetting_.volumeAbsorption,
@@ -4820,6 +4829,8 @@ void Composition::detach() {
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
+    fogUpperDensity_ = nullptr;
+    fogHeightCurve_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -7424,6 +7435,8 @@ void Composition::applyParameters() {
         env.volumeDensity = pick(volumeDensity_, volumeSetting_.volumeDensity);
         env.fogHeight = pick(fogHeight_, volumeSetting_.fogHeight);
         env.fogHeightFalloff = pick(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
+        env.fogUpperDensity = pick(fogUpperDensity_, volumeSetting_.fogUpperDensity);
+        env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
         env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
         env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
         env.volumeAnisotropy = pick(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -8431,6 +8444,8 @@ nlohmann::json Composition::toJson() const {
             environment["volumeDensity"] = density;
             environment["fogHeight"] = base(fogHeight_, volumeSetting_.fogHeight);
             environment["fogHeightFalloff"] = base(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
+            environment["fogUpperDensity"] = base(fogUpperDensity_, volumeSetting_.fogUpperDensity);
+            environment["fogHeightCurve"] = base(fogHeightCurve_, volumeSetting_.fogHeightCurve);
             environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
             environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
             environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -9386,6 +9401,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             for (const FloatKey fk : {FloatKey{"volumeDensity", &v.volumeDensity},
                                       FloatKey{"fogHeight", &v.fogHeight},
                                       FloatKey{"fogHeightFalloff", &v.fogHeightFalloff},
+                                      FloatKey{"fogUpperDensity", &v.fogUpperDensity},
+                                      FloatKey{"fogHeightCurve", &v.fogHeightCurve},
                                       FloatKey{"volumeScattering", &v.volumeScattering},
                                       FloatKey{"volumeAbsorption", &v.volumeAbsorption},
                                       FloatKey{"volumeAnisotropy", &v.volumeAnisotropy},
