@@ -1473,6 +1473,9 @@ private:
     // automatable and modulatable like every other control on this pass.
     params::Parameter<float>* volumeLocalLights_ = nullptr;
     params::Parameter<float>* volumeMaxDistance_ = nullptr;
+    // ADR-574: ADR-058's surface/volume coupling. Unreachable until the reason recorded
+    // for its omission was tested and turned out to be false about its own code.
+    params::Parameter<float>* fogHeightAmount_ = nullptr;
     params::Parameter<float>* volumeJitter_ = nullptr; // ADR-461
     // How far the directional shadow cascades reach; 0 = ADR-112's automatic range. See
     // `Environment::shadowRange` for why a scene is allowed an opinion about this one.

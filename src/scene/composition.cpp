@@ -3963,6 +3963,13 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     volumeMaxDistance_ = &params.add(floatDesc(prefix_ + "scene/volumeMaxDistance",
                                                volumeSetting_.volumeMaxDistance, 0.01f, 20000.0f,
                                                10.0f, 4000.0f));
+    // ADR-574: ADR-058's coupling -- how much of the volumetric's mist layer the SURFACE fog
+    // integrates. It had no parameter, on a recorded reason that turned out to be false about the
+    // four lines it sits on (see the comment at the assignment below). The feature is live: the
+    // shader reads it, the renderer uploads it, two GPU cases exercise it at 0 and 1, and nine
+    // shipped scenes set it -- all of them by hand, because there was no row to move.
+    fogHeightAmount_ = &params.add(floatDesc(prefix_ + "scene/fogHeightAmount",
+                                             volumeSetting_.fogHeightAmount, 0.0f, 1.0f, 0.0f, 1.0f));
     // ADR-461. The soft range is the whole of 0..1 because the whole of it is usable and the
     // interesting end is the low one -- a slider whose useful region is in its first hair is the
     // `scene/windSpeed` defect this project has already fixed once.
@@ -4887,6 +4894,7 @@ void Composition::detach() {
     volumeShadowStrength_ = nullptr;
     volumeLocalLights_ = nullptr;
     volumeMaxDistance_ = nullptr;
+    fogHeightAmount_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     gridIntensity_ = nullptr;
@@ -7495,9 +7503,22 @@ void Composition::applyParameters() {
             volumeColorFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeColorFieldSetting_;
         // ADR-055. A live `scene/windSpeed` parameter so the whole field can be turned up, down or
         // off without editing the file -- which is also how the A/B measurement is taken.
-        // ADR-058: the distance fog's share of the mist layer and the styled hemisphere travel with
-        // the rest of the atmosphere; nothing about them is animated, so they are copied, not picked.
-        env.fogHeightAmount = volumeSetting_.fogHeightAmount;
+        // ADR-574. The comment that used to stand here said the distance fog's share of the mist
+        // layer and the styled hemisphere "are copied, not picked" because "nothing about them is
+        // animated". **It was false about the four lines it covered**: `styledSkyAmbient` and
+        // `styledGroundAmbient` are registered parameters and ARE picked, two lines down. Someone
+        // gave them parameters and left the reason saying they had not.
+        //
+        // And the surviving half of the reason was circular. Nothing animated `fogHeightAmount`
+        // because nothing COULD: with no parameter there is no keyframe, no route and no row. A
+        // reason that is true only because of the thing it justifies is not a reason (ADR-385).
+        //
+        // So it is picked. Still unreachable and worth saying where a reader will meet it:
+        // `styledAmbientFloor` below has no parameter either, and `styledSkyAmbient` and
+        // `styledGroundAmbient` have parameters that no panel draws -- ADR-058 shipped four
+        // controls and not one of them is on a panel. Those three are lighting rather than fog;
+        // ADR-574 records the measurement and leaves them to their owner.
+        env.fogHeightAmount = pick(fogHeightAmount_, volumeSetting_.fogHeightAmount);
         env.styledSkyAmbient =
             styledSkyAmbient_ != nullptr ? styledSkyAmbient_->value() : volumeSetting_.styledSkyAmbient;
         env.styledGroundAmbient = styledGroundAmbient_ != nullptr ? styledGroundAmbient_->value()
@@ -8458,8 +8479,14 @@ nlohmann::json Composition::toJson() const {
         const scene::Environment envDefaults;
         const auto& v = volumeSetting_;
         const auto colourEq3 = [](const glm::vec3& a, const glm::vec3& b) { return a == b; };
-        if (v.fogHeightAmount != envDefaults.fogHeightAmount) {
-            environment["fogHeightAmount"] = v.fogHeightAmount;
+        // ADR-574: the PARAMETER's base where there is one, not the authored setting. A control an
+        // artist can move and cannot keep is not a control -- the same half of "reachable" ADR-573's
+        // case asks about, and writing `v.fogHeightAmount` here would have lost every change made
+        // through the row this ADR just added.
+        const float heightAmount =
+            fogHeightAmount_ != nullptr ? fogHeightAmount_->base() : v.fogHeightAmount;
+        if (heightAmount != envDefaults.fogHeightAmount) {
+            environment["fogHeightAmount"] = heightAmount;
         }
         if (!colourEq3(v.styledSkyAmbient, envDefaults.styledSkyAmbient)) {
             environment["styledSkyAmbient"] = {v.styledSkyAmbient.r, v.styledSkyAmbient.g, v.styledSkyAmbient.b};

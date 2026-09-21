@@ -56,6 +56,8 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
                              "scene/volumeShadowSteps", "scene/volumeShadowStrength",
                              // ADR-573 (§27): two controls that shipped without a way to reach them.
                              "scene/volumeLocalLights", "scene/volumeMaxDistance",
+                             // ADR-574: ADR-058's coupling, reachable at last.
+                             "scene/fogHeightAmount",
                              "env/intensity", "env/sky/intensity"}) {
         INFO(path);
         CHECK(registered(params, path));

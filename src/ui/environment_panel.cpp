@@ -126,6 +126,10 @@ void drawEnvironmentPanel(app::Engine& engine) {
         // every one of them hand-edited, because until now there was no row to move.
         slider(engine, "scene/volumeLocalLights", "Local lights in fog", "%.2f");
         slider(engine, "scene/volumeMaxDistance", "Fog march distance", "%.0f m", true);
+        // ADR-574 (ADR-058's coupling). Named for what an artist buys: at 0 the distance fog is a
+        // uniform slab, at 1 a ridge standing clear of the mist is seen through the air that is
+        // actually between it and the eye. Nine shipped scenes set it, every one by hand.
+        slider(engine, "scene/fogHeightAmount", "Surface fog follows layer", "%.2f");
         slider(engine, "env/intensity", "Ambient", "%.2f");
         slider(engine, "env/sky/intensity", "Sky intensity", "%.2f");
         ImGui::PopID();
