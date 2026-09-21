@@ -1,0 +1,468 @@
+#include "scene/motion_database.hpp"
+
+#include "scene/animation.hpp"
+
+#include <algorithm>
+#include <cmath>
+
+#include <fmt/format.h>
+
+namespace avgen::scene {
+namespace {
+
+// Lowercase, for tag inference from a clip's own name. Inference only fills in what the pack did
+// not say; an authored tag always wins.
+bool contains(const std::string& haystack, std::string_view needle) {
+    if (needle.size() > haystack.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i + needle.size() <= haystack.size(); ++i) {
+        bool ok = true;
+        for (std::size_t j = 0; j < needle.size(); ++j) {
+            const char a = static_cast<char>(std::tolower(static_cast<unsigned char>(haystack[i + j])));
+            if (a != needle[j]) {
+                ok = false;
+                break;
+            }
+        }
+        if (ok) {
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis) {
+    std::uint32_t tags = 0;
+    const auto set = [&](MotionTag t) { tags |= static_cast<std::uint32_t>(t); };
+
+    // Measured facts first, because they cannot be wrong about the clip they came from.
+    if (analysis.phase.cyclic) {
+        set(MotionTag::Cyclic);
+    }
+    if (analysis.travels) {
+        set(MotionTag::Travelling);
+    }
+    if (!clip.loop) {
+        set(MotionTag::OneShot);
+    }
+
+    // Then the clip's own tags, which a pack author wrote.
+    for (const std::string& tag : clip.tags) {
+        if (contains(tag, "walk")) { set(MotionTag::Walk); set(MotionTag::Locomotion); }
+        if (contains(tag, "run")) { set(MotionTag::Run); set(MotionTag::Locomotion); }
+        if (contains(tag, "idle")) { set(MotionTag::Idle); }
+        if (contains(tag, "turn")) { set(MotionTag::Turn); }
+        if (contains(tag, "jump") || contains(tag, "fall")) { set(MotionTag::Airborne); }
+    }
+    // And finally the name, which is the weakest source and is only consulted for what nothing
+    // above supplied. A clip called "Walking" with no tags is still a walk, and refusing to read
+    // that would make every existing asset untagged.
+    const std::string& n = clip.name;
+    if ((tags & static_cast<std::uint32_t>(MotionTag::Locomotion)) == 0) {
+        if (contains(n, "walk")) { set(MotionTag::Walk); set(MotionTag::Locomotion); }
+        else if (contains(n, "run")) { set(MotionTag::Run); set(MotionTag::Locomotion); }
+    }
+    if (contains(n, "idle")) { set(MotionTag::Idle); }
+    if (contains(n, "turn")) { set(MotionTag::Turn); }
+    if (contains(n, "jump") || contains(n, "fall") || contains(n, "land")) { set(MotionTag::Airborne); }
+    return tags;
+}
+
+std::string motionTagNames(std::uint32_t tags) {
+    static constexpr std::pair<MotionTag, const char*> kNames[] = {
+        {MotionTag::Locomotion, "locomotion"}, {MotionTag::Idle, "idle"},
+        {MotionTag::Walk, "walk"},             {MotionTag::Run, "run"},
+        {MotionTag::Turn, "turn"},             {MotionTag::Airborne, "airborne"},
+        {MotionTag::Cyclic, "cyclic"},         {MotionTag::Travelling, "travelling"},
+        {MotionTag::OneShot, "oneshot"},
+    };
+    std::string out;
+    for (const auto& [tag, name] : kNames) {
+        if ((tags & static_cast<std::uint32_t>(tag)) != 0) {
+            if (!out.empty()) {
+                out += '+';
+            }
+            out += name;
+        }
+    }
+    return out.empty() ? std::string("-") : out;
+}
+
+std::uint32_t MotionFeatureConfig::dimension() const {
+    // Per joint: position (3) and velocity (3), in the body's own frame.
+    std::uint32_t d = static_cast<std::uint32_t>(joints.size()) * 6u;
+    // Per trajectory sample: a planar position (2) and a planar facing (2).
+    d += static_cast<std::uint32_t>(trajectoryTimes.size()) * 4u;
+    d += 3u; // root velocity
+    if (phaseWeight > 0.0f) {
+        d += 2u; // phase as (cos, sin), so 0.99 and 0.01 are adjacent rather than a unit apart
+    }
+    if (contactWeight > 0.0f) {
+        d += static_cast<std::uint32_t>(joints.size()); // one contact flag per watched joint
+    }
+    return d;
+}
+
+MotionFeatureConfig defaultBipedConfig(std::string leftFoot, std::string rightFoot, std::string head) {
+    MotionFeatureConfig config;
+    config.joints = {std::move(leftFoot), std::move(rightFoot), std::move(head)};
+    // 0.2 / 0.4 / 0.6 s, the spacing the literature converges on: far enough apart to describe a
+    // turn, near enough that the last one is still a prediction rather than a guess.
+    config.trajectoryTimes = {0.2f, 0.4f, 0.6f};
+    return config;
+}
+
+std::string MotionDatabaseStats::report() const {
+    std::string out = fmt::format(
+        "{} clip(s), {} sample(s), {} dimension(s)\n"
+        "  features {:.2f} MB   metadata {:.2f} MB   total {:.2f} MB   ({:.1f} B/sample)\n"
+        "  dead dimensions: {}{}\n",
+        clips, samples, dimension, static_cast<double>(featureBytes) / 1048576.0,
+        static_cast<double>(metadataBytes) / 1048576.0,
+        static_cast<double>(totalBytes()) / 1048576.0,
+        samples > 0 ? static_cast<double>(totalBytes()) / samples : 0.0, deadDimensions,
+        deadDimensions > 0 ? "  <-- these contribute nothing to any comparison" : "");
+    // The statistic a dead-dimension count cannot supply. Near zero means the limb does not
+    // articulate in this corpus, whatever its raw coordinates do (ADR-553).
+    for (std::size_t j = 0; j < jointNames.size() && j < jointRadiusSpread.size(); ++j) {
+        out += fmt::format("  {:<16} distance-from-body spread {:.4f}{}\n", jointNames[j],
+                           jointRadiusSpread[j],
+                           jointRadiusSpread[j] < 0.005f
+                               ? "  <-- this limb does not articulate; only the body moves it"
+                               : "");
+    }
+    return out;
+}
+
+Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
+                                           const MotionDatabaseOptions& options) {
+    if (pack.skeleton.joints.empty()) {
+        return fail("motion database: the pack has no skeleton");
+    }
+    if (options.config.joints.empty()) {
+        return fail("motion database: the feature config names no joints, so every sample would "
+                    "have the same feature vector and the search would return the first one");
+    }
+    MotionDatabase db;
+    db.name = pack.name;
+    db.skeletonDigest = pack.skeletonDigest;
+    db.config = options.config;
+    db.dimension = options.config.dimension();
+
+    // Resolve the feature joints once. A joint the rig lacks is fatal rather than skipped: a
+    // database silently built on two of three joints would score against a different vector from
+    // the one the query builds, and every match would be wrong in a way nothing reports.
+    std::vector<int> jointIndex;
+    jointIndex.reserve(options.config.joints.size());
+    for (const std::string& name : options.config.joints) {
+        const int index = pack.skeleton.find(name);
+        if (index < 0) {
+            return fail("motion database: the feature config names joint '{}', which this pack's "
+                        "skeleton does not have",
+                        name);
+        }
+        jointIndex.push_back(index);
+    }
+
+    const float rate = std::max(options.sampleRate, 1.0f);
+    const float dt = 1.0f / rate;
+    const auto dim = static_cast<std::size_t>(db.dimension);
+
+    // Gathered during the build: the spread of each feature joint's distance from the body.
+    std::vector<double> radiusSum(jointIndex.size(), 0.0);
+    std::vector<double> radiusSumSq(jointIndex.size(), 0.0);
+    std::uint64_t radiusCount = 0;
+
+    Pose pose;
+    Pose poseAhead;
+    std::vector<glm::mat4> model;
+    std::vector<glm::mat4> modelAhead;
+
+    for (std::size_t c = 0; c < pack.animation.size() && c < pack.clips.size(); ++c) {
+        const AnimationClip& clip = pack.animation[c];
+        const PackClip& meta = pack.clips[c];
+        db.clipNames.push_back(meta.name);
+        const float length = clip.length();
+        if (length <= 0.0f) {
+            continue;
+        }
+        // ADR-337's travel joint: which joint carries the body. Not joint 0.
+        int root = -1;
+        for (const AnimationChannel& channel : clip.channels) {
+            if (channel.path == AnimationPath::Translation &&
+                (root < 0 || static_cast<int>(channel.joint) < root)) {
+                root = static_cast<int>(channel.joint);
+            }
+        }
+        if (root < 0) {
+            root = 0;
+        }
+        const ClipAnalysis analysis =
+            analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{});
+        const std::uint32_t tags = motionTagsFor(meta, analysis);
+
+        const auto frames =
+            static_cast<std::uint32_t>(std::max(2.0f, std::floor(length * rate + 0.5f) + 1.0f));
+        const std::uint32_t firstSample = db.sampleCount();
+
+        for (std::uint32_t f = 0; f < frames; ++f) {
+            const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
+            setRestPose(pack.skeleton, pose);
+            sampleClip(clip, t, pose);
+            poseToModel(pack.skeleton, pose, model);
+            // One step ahead, for velocities. A forward difference rather than a central one so
+            // that the first sample of a clip is not a special case; the error is one frame of
+            // acceleration, which is below the noise in the source.
+            const float tAhead = std::min(t + dt, clip.duration);
+            setRestPose(pack.skeleton, poseAhead);
+            sampleClip(clip, tAhead, poseAhead);
+            poseToModel(pack.skeleton, poseAhead, modelAhead);
+
+            const glm::vec3 body(model[static_cast<std::size_t>(root)][3]);
+            const glm::vec3 bodyAhead(modelAhead[static_cast<std::size_t>(root)][3]);
+            const glm::vec3 rootVelocity = (bodyAhead - body) / dt;
+
+            const std::size_t base = db.features.size();
+            db.features.resize(base + dim);
+            float* out = db.features.data() + base;
+            std::size_t k = 0;
+
+            // ---- joints, in the body's own frame ----
+            // Body-relative, because motion matching compares *shapes* and an absolute position
+            // would make two identical walks at different places look unlike each other.
+            for (std::size_t jn = 0; jn < jointIndex.size(); ++jn) {
+                const auto ji = static_cast<std::size_t>(jointIndex[jn]);
+                const glm::vec3 p = glm::vec3(model[ji][3]) - body;
+                const glm::vec3 v = ((glm::vec3(modelAhead[ji][3]) - bodyAhead) - p) / dt;
+                out[k++] = p.x; out[k++] = p.y; out[k++] = p.z;
+                out[k++] = v.x; out[k++] = v.y; out[k++] = v.z;
+                const double radius = static_cast<double>(glm::length(p));
+                radiusSum[jn] += radius;
+                radiusSumSq[jn] += radius * radius;
+            }
+            ++radiusCount;
+
+            // ---- future trajectory ----
+            // **Identically zero on in-place content** (ADR-540), which is every clip in this
+            // repository. Built anyway because it is correct and because 100STYLE exercises it;
+            // `deadDimensions` below reports when it contributed nothing.
+            for (const float ahead : options.config.trajectoryTimes) {
+                const float ft = std::min(t + ahead, clip.duration);
+                setRestPose(pack.skeleton, poseAhead);
+                sampleClip(clip, ft, poseAhead);
+                poseToModel(pack.skeleton, poseAhead, modelAhead);
+                const glm::vec3 future(modelAhead[static_cast<std::size_t>(root)][3]);
+                const glm::vec3 delta = future - body;
+                out[k++] = delta.x;
+                out[k++] = delta.z;
+                // Facing: the direction it is heading at that moment, or zero when it is not
+                // moving -- which is honest rather than a default of "forward".
+                const float len = std::sqrt((delta.x * delta.x) + (delta.z * delta.z));
+                out[k++] = len > 1e-5f ? delta.x / len : 0.0f;
+                out[k++] = len > 1e-5f ? delta.z / len : 0.0f;
+            }
+
+            out[k++] = rootVelocity.x;
+            out[k++] = rootVelocity.y;
+            out[k++] = rootVelocity.z;
+
+            if (options.config.phaseWeight > 0.0f) {
+                const float phase = meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start);
+                // As a point on a circle, so phase 0.99 and phase 0.01 are neighbours. A raw 0..1
+                // scalar makes the loop point the most distant pair in the database.
+                out[k++] = std::cos(6.283185307179586f * phase);
+                out[k++] = std::sin(6.283185307179586f * phase);
+            }
+            if (options.config.contactWeight > 0.0f) {
+                for (std::size_t ji = 0; ji < jointIndex.size(); ++ji) {
+                    bool planted = false;
+                    if (ji < meta.contacts.size()) {
+                        for (const ContactSpan& span : meta.contacts[ji].spans) {
+                            const float local = t - clip.start;
+                            if (span.wraps() ? (local >= span.start || local <= span.end)
+                                             : (local >= span.start && local <= span.end)) {
+                                planted = true;
+                                break;
+                            }
+                        }
+                    }
+                    out[k++] = planted ? 1.0f : 0.0f;
+                }
+            }
+
+            db.sampleClip.push_back(static_cast<std::uint32_t>(c));
+            db.sampleTime.push_back(t);
+            db.samplePhase.push_back(meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start));
+            db.sampleTags.push_back(tags);
+            // Filled below, once the clip's extent is known.
+            db.sampleNext.push_back(MotionDatabase::kInvalid);
+        }
+
+        // The continuation index. A looping clip's last sample continues at its first, which is
+        // what lets a cyclic walk play forever without ever searching.
+        const std::uint32_t lastSample = db.sampleCount();
+        for (std::uint32_t i = firstSample; i + 1 < lastSample; ++i) {
+            db.sampleNext[i] = i + 1;
+        }
+        if (lastSample > firstSample) {
+            db.sampleNext[lastSample - 1] = meta.loop ? firstSample : MotionDatabase::kInvalid;
+        }
+    }
+
+    if (db.sampleCount() == 0) {
+        return fail("motion database: the pack yielded no samples");
+    }
+
+    // ---- normalization (§9): zero mean, unit standard deviation, per dimension ----
+    db.mean.assign(dim, 0.0f);
+    db.scale.assign(dim, 1.0f);
+    const auto count = static_cast<double>(db.sampleCount());
+    std::vector<double> sum(dim, 0.0);
+    std::vector<double> sumSq(dim, 0.0);
+    for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
+        const float* f = db.featuresFor(s);
+        for (std::size_t d = 0; d < dim; ++d) {
+            sum[d] += f[d];
+            sumSq[d] += static_cast<double>(f[d]) * f[d];
+        }
+    }
+    db.stats.deadDimensions = 0;
+    for (std::size_t d = 0; d < dim; ++d) {
+        const double mean = sum[d] / count;
+        const double variance = std::max(0.0, (sumSq[d] / count) - (mean * mean));
+        const double stddev = std::sqrt(variance);
+        db.mean[d] = static_cast<float>(mean);
+        // A dimension that never varies cannot discriminate. Its scale is left at 1 and its
+        // contribution is therefore always zero after centring -- correct, and counted, because a
+        // block of dead dimensions is a fact about the corpus that the report should carry.
+        if (stddev < 1e-6) {
+            db.scale[d] = 1.0f;
+            ++db.stats.deadDimensions;
+        } else {
+            db.scale[d] = static_cast<float>(1.0 / stddev);
+        }
+    }
+    // Standardise the stored features once, so a query is a plain distance and the inner loop has
+    // no per-dimension arithmetic beyond a subtract and a multiply-add.
+    for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
+        float* f = db.features.data() + (static_cast<std::size_t>(s) * dim);
+        for (std::size_t d = 0; d < dim; ++d) {
+            f[d] = (f[d] - db.mean[d]) * db.scale[d];
+        }
+    }
+
+    // The rotation-invariant statistic: how much each feature joint's DISTANCE from the body
+    // moved. Computed from the raw features before they were standardised, which is why it is
+    // gathered in the loop above rather than here -- see `radiusSum`.
+    db.stats.jointNames = options.config.joints;
+    db.stats.jointRadiusSpread.assign(jointIndex.size(), 0.0f);
+    for (std::size_t j = 0; j < jointIndex.size(); ++j) {
+        const double n = static_cast<double>(radiusCount);
+        if (n <= 1.0) {
+            continue;
+        }
+        const double m = radiusSum[j] / n;
+        const double var = std::max(0.0, (radiusSumSq[j] / n) - (m * m));
+        db.stats.jointRadiusSpread[j] = static_cast<float>(std::sqrt(var));
+    }
+
+    db.stats.clips = static_cast<std::uint32_t>(db.clipNames.size());
+    db.stats.samples = db.sampleCount();
+    db.stats.dimension = db.dimension;
+    db.stats.featureBytes = db.features.size() * sizeof(float);
+    db.stats.metadataBytes =
+        (db.sampleClip.size() * sizeof(std::uint32_t)) + (db.sampleTime.size() * sizeof(float)) +
+        (db.samplePhase.size() * sizeof(float)) + (db.sampleTags.size() * sizeof(std::uint32_t)) +
+        (db.sampleNext.size() * sizeof(std::uint32_t));
+    return db;
+}
+
+void normaliseQuery(const MotionDatabase& db, std::vector<float>& features) {
+    const std::size_t dim = db.dimension;
+    features.resize(dim, 0.0f);
+    for (std::size_t d = 0; d < dim; ++d) {
+        features[d] = (features[d] - db.mean[d]) * db.scale[d];
+    }
+}
+
+MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
+                         const MotionCostWeights& weights) {
+    MotionMatch best;
+    const std::size_t dim = db.dimension;
+    if (dim == 0 || query.features.size() != dim || db.sampleCount() == 0) {
+        return best;
+    }
+    const float* q = query.features.data();
+
+    // The family of whatever is playing, for the transition cost (§12). Read from tags and never
+    // from a clip name, which §12 is explicit about.
+    const std::uint32_t currentTags =
+        query.current != MotionDatabase::kInvalid && query.current < db.sampleCount()
+            ? db.sampleTags[query.current]
+            : 0u;
+    const std::uint32_t currentClip =
+        query.current != MotionDatabase::kInvalid && query.current < db.sampleCount()
+            ? db.sampleClip[query.current]
+            : MotionDatabase::kInvalid;
+
+    float bestCost = 0.0f;
+    for (std::uint32_t s = 0; s < db.sampleCount(); ++s) {
+        // §14: filtering before scoring. One AND per sample, and it removes whole clips at a time.
+        const std::uint32_t tags = db.sampleTags[s];
+        if ((query.requireTags != 0 && (tags & query.requireTags) != query.requireTags) ||
+            (query.rejectTags != 0 && (tags & query.rejectTags) != 0)) {
+            ++best.rejected;
+            continue;
+        }
+        const float* f = db.featuresFor(s);
+        // Squared distance, with an early out. **Benchmarked on real motion rather than a
+        // synthetic fixture**, for the reason ADR-540 paid to learn: white noise made the early
+        // out look 2.23x slower, and on real near queries it is a 0.80x win, because a real query
+        // is close to its answer and far from everything else.
+        float cost = 0.0f;
+        for (std::size_t d = 0; d < dim; ++d) {
+            const float delta = q[d] - f[d];
+            cost += delta * delta;
+            if (best.found() && cost >= bestCost) {
+                break;
+            }
+        }
+        if (best.found() && cost >= bestCost) {
+            ++best.considered;
+            continue;
+        }
+
+        // §11 continuity: prefer carrying on. The penalty is on *not* being the continuation,
+        // which is the term that stops the search hopping between unrelated clips whenever two
+        // frames happen to rhyme.
+        if (query.current != MotionDatabase::kInvalid) {
+            const bool continues =
+                query.current < db.sampleNext.size() && db.sampleNext[query.current] == s;
+            if (!continues) {
+                cost += weights.continuity;
+                // §12 transition: an extra penalty for leaving the motion family, over and above
+                // leaving the clip. A walk finding another walk is cheaper than a walk finding a
+                // fall, even when the poses rhyme.
+                if (db.sampleClip[s] != currentClip) {
+                    const std::uint32_t shared = tags & currentTags;
+                    const std::uint32_t wanted = currentTags;
+                    if (wanted != 0 && shared != wanted) {
+                        cost += weights.transition;
+                    }
+                }
+            }
+        }
+        ++best.considered;
+        if (!best.found() || cost < bestCost) {
+            best.sample = s;
+            bestCost = cost;
+        }
+    }
+    best.cost = bestCost;
+    return best;
+}
+
+} // namespace avgen::scene

@@ -22,10 +22,12 @@
 #include "assets/bvh_loader.hpp"
 #include "assets/gltf_loader.hpp"
 #include "scene/motion_analysis.hpp"
+#include "scene/motion_database.hpp"
 #include "scene/motion_pack.hpp"
 #include "scene/retarget.hpp"
 #include "scene/scene.hpp"
 
+#include <random>
 #include <fmt/format.h>
 
 #include <algorithm>
@@ -193,6 +195,7 @@ int usage() {
                "  pack      <file...> --out <dir>         build a MotionPack\n"
                "  validate  <pack>                        the report; exit 2 on FAIL\n"
                "  reach     <pack> [--chain h:k:a,...]    how close each pose is to a straight leg\n"
+               "  database  <pack> --joints a,b,c [--bench]  build a motion database and search it\n"
                "  benchmark <file> [--repeat n]           what each stage costs here\n"
                "  survey    <dir>                         per-FILE rotation orders, up axis,\n"
                "                                          skeleton consistency across a corpus\n\n"
@@ -707,6 +710,141 @@ int cmdReach(const Args& args) {
     return 0;
 }
 
+// Phase C §6/§17: build a motion database from a pack, report its memory, and benchmark the
+// search on **real motion distributions** rather than a synthetic fixture.
+//
+// The fixture question is not academic here. ADR-540 measured an early-out as 2.23x SLOWER using
+// white-noise queries and 0.80x FASTER using near queries on real data, because a real query is
+// close to its answer and far from everything else. So the benchmark below draws its queries from
+// the database itself and perturbs them, which is what a character actually asks.
+int cmdDatabase(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const auto pack = scene::readMotionPack(args.positional.front());
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    scene::MotionDatabaseOptions options;
+    options.sampleRate = std::stof(args.option("rate", "30"));
+    const std::vector<std::string> joints = splitCommas(args.option("joints"));
+    if (joints.empty()) {
+        fmt::print(stderr, "--joints is required: the feature joints are a property of the "
+                           "character, not of the search (Phase C §8)\n");
+        return 1;
+    }
+    options.config.joints = joints;
+    if (args.has("trajectory")) {
+        for (const std::string& t : splitCommas(args.option("trajectory"))) {
+            options.config.trajectoryTimes.push_back(std::stof(t));
+        }
+    } else {
+        options.config.trajectoryTimes = {0.2f, 0.4f, 0.6f};
+    }
+    if (args.has("phase")) {
+        options.config.phaseWeight = std::stof(args.option("phase", "1"));
+    }
+    if (args.has("contacts-feature")) {
+        options.config.contactWeight = std::stof(args.option("contacts-feature", "1"));
+    }
+
+    const auto t0 = Clock::now();
+    auto db = scene::buildMotionDatabase(*pack, options);
+    const double buildMs = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    if (!db) {
+        fmt::print(stderr, "{}\n", db.error().message);
+        return 1;
+    }
+    fmt::print("{}", db->stats.report());
+    fmt::print("  build {:.1f} ms  ({:.0f} samples/s)\n", buildMs,
+               buildMs > 0.0 ? db->stats.samples / (buildMs / 1000.0) : 0.0);
+
+    // Which dimensions died, named rather than counted, because "the trajectory block is dead"
+    // and "the phase block is dead" are completely different facts about a corpus.
+    if (db->stats.deadDimensions > 0) {
+        const auto perJoint = static_cast<std::uint32_t>(options.config.joints.size()) * 6u;
+        const auto trajectory = static_cast<std::uint32_t>(options.config.trajectoryTimes.size()) * 4u;
+        std::uint32_t deadJoint = 0;
+        std::uint32_t deadTrajectory = 0;
+        std::uint32_t deadOther = 0;
+        for (std::uint32_t d = 0; d < db->dimension; ++d) {
+            if (db->scale[d] != 1.0f) {
+                continue;
+            }
+            // scale==1 is how a dead dimension is stored; a live one whose stddev is exactly 1 is
+            // possible in principle and vanishingly unlikely on standardised motion.
+            if (d < perJoint) { ++deadJoint; }
+            else if (d < perJoint + trajectory) { ++deadTrajectory; }
+            else { ++deadOther; }
+        }
+        fmt::print("  dead: {} joint, {} trajectory, {} other\n", deadJoint, deadTrajectory, deadOther);
+        if (deadTrajectory == trajectory && trajectory > 0) {
+            fmt::print("  ** every trajectory dimension is dead: this corpus does not travel "
+                       "(ADR-540), so motion matching here cannot match on where the body is going\n");
+        }
+    }
+
+    if (!args.has("bench")) {
+        return 0;
+    }
+
+    // ---- the benchmark (§17) ------------------------------------------------------------------
+    const int repeat = std::stoi(args.option("repeat", "5"));
+    const int queries = std::stoi(args.option("queries", "200"));
+    scene::MotionCostWeights weights;
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<std::uint32_t> pick(0, db->sampleCount() - 1);
+    std::normal_distribution<float> jitter(0.0f, 0.15f);
+
+    // Queries drawn from the database and perturbed: what a character asks, which is "something
+    // near where I am", not "a random point in feature space".
+    std::vector<std::vector<float>> qs;
+    std::vector<std::uint32_t> currents;
+    qs.reserve(static_cast<std::size_t>(queries));
+    for (int i = 0; i < queries; ++i) {
+        const std::uint32_t s = pick(rng);
+        std::vector<float> f(db->featuresFor(s), db->featuresFor(s) + db->dimension);
+        for (float& v : f) {
+            v += jitter(rng);
+        }
+        qs.push_back(std::move(f));
+        currents.push_back(s);
+    }
+
+    double best = 1e30;
+    std::uint64_t considered = 0;
+    std::uint64_t rejected = 0;
+    double worstSingle = 0.0;
+    for (int r = 0; r < repeat; ++r) {
+        const auto begin = Clock::now();
+        for (int i = 0; i < queries; ++i) {
+            scene::MotionQuery query;
+            query.features = qs[static_cast<std::size_t>(i)];
+            query.current = currents[static_cast<std::size_t>(i)];
+            const auto one = Clock::now();
+            const scene::MotionMatch m = scene::searchMotion(*db, query, weights);
+            const double ms = std::chrono::duration<double, std::milli>(Clock::now() - one).count();
+            worstSingle = std::max(worstSingle, ms);
+            considered += m.considered;
+            rejected += m.rejected;
+        }
+        // ADR-170: minima over repeats, never means.
+        best = std::min(best,
+                        std::chrono::duration<double, std::milli>(Clock::now() - begin).count());
+    }
+    const double perQuery = best / queries;
+    fmt::print("\n  search, minimum of {} run(s) over {} real queries:\n", repeat, queries);
+    fmt::print("    {:.4f} ms/query   worst single {:.4f} ms   {:.0f} queries/s\n", perQuery,
+               worstSingle, perQuery > 0.0 ? 1000.0 / perQuery : 0.0);
+    fmt::print("    {:.0f} samples scored per query, {:.0f} rejected by tag filter\n",
+               static_cast<double>(considered) / (repeat * queries),
+               static_cast<double>(rejected) / (repeat * queries));
+    fmt::print("    {:.1f} ns per sample scored\n",
+               considered > 0 ? (best * 1e6 * repeat) / static_cast<double>(considered) : 0.0);
+    return 0;
+}
+
 int cmdSurvey(const Args& args) {
     if (args.positional.empty()) {
         return usage();
@@ -946,6 +1084,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "validate") {
         return cmdValidate(args);
+    }
+    if (args.command == "database") {
+        return cmdDatabase(args);
     }
     if (args.command == "reach") {
         return cmdReach(args);
