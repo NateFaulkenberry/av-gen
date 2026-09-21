@@ -1,0 +1,120 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Tornado modes: c-meso",
+ "_note": "ADR-580, the brief's \u00a739 critical visual test -- one of four panels that differ ONLY in which octaves of detail are on. C -- plus MESO. Rolling masses at about a third the size.\n\nRENDER THIS AT 1920x1080. The four panels were first compared at 640x360 and the conclusion recorded was that B, C and D are barely distinguishable -- which was a fact about the render and not about the effect. `QualitySettings::volumeResolutionScale` is 0.5, so the volumetric march runs at 320x180 for a 640x360 output against 960x540 for 1920x1080: **nine times the samples.** The detail is generated identically at both sizes and sampled nine times more coarsely at the small one. At full resolution the progression is clear and each stage adds visible structure.\n\nIt is specifically NOT the band limit, which is the plausible wrong answer: `filterWidth` is `volumeMaxDistance / volumeSteps` and is resolution-INDEPENDENT, so the fine octaves are faded by exactly the same amount at both sizes. The lever is render resolution, not step count.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   1400,
+   60,
+   0
+  ],
+  "target": [
+   0,
+   420,
+   0
+  ],
+  "fov": 36,
+  "orbitSpeed": 0
+ },
+ "environment": {
+  "background": [
+   0.3,
+   0.36,
+   0.44
+  ],
+  "intensity": 1.0,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0,
+  "volumeSteps": 128,
+  "volumeJitter": 0.0,
+  "volumeMaxDistance": 4000.0,
+  "volumeAbsorption": 1.0,
+  "volumeScattering": 1.0,
+  "volumeAnisotropy": 0.25,
+  "sky": {
+   "enabled": false,
+   "background": false
+  }
+ },
+ "lights": [
+  {
+   "name": "key",
+   "type": "directional",
+   "direction": [
+    -0.45,
+    -0.55,
+    -0.7
+   ],
+   "color": [
+    1.0,
+    0.96,
+    0.9
+   ],
+   "intensity": 4.0
+  }
+ ],
+ "atmosphericEffects": [
+  {
+   "name": "Tornado",
+   "enabled": true,
+   "kind": "tornado",
+   "activation": "always",
+   "style": "Classic Cone",
+   "tornado": {
+    "base": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "height": 800.0,
+    "radiusBottom": 40.0,
+    "radiusMid": 52.0,
+    "radiusTop": 70.0,
+    "taper": 1.4,
+    "shellWidth": 0.22,
+    "shellGain": 1.0,
+    "coreRadius": 0.55,
+    "coreDensity": 0.35,
+    "edgeSoft": 0.35,
+    "wallCloudGain": 0.6,
+    "cloudWidth": 4.6,
+    "cloudHeight": 0.16,
+    "cloudDensity": 0.9,
+    "touchdown": 1.0,
+    "skirtWidth": 2.2,
+    "skirtHeight": 0.1,
+    "skirtDensity": 0.8,
+    "skirtFlare": 0.6,
+    "stripeCount": 4.0,
+    "stripePitch": 3.4,
+    "stripeDepth": 0.35,
+    "stripeHarmonic": 0.4,
+    "density": 0.06,
+    "emission": 0.0,
+    "scattering": 1.0,
+    "colorThin": [
+     0.62,
+     0.6,
+     0.58
+    ],
+    "colorThick": [
+     0.16,
+     0.15,
+     0.16
+    ],
+    "cloudAmount": 0.65,
+    "macroAmp": 1.0,
+    "mesoAmp": 0.5,
+    "microAmp": 0.0,
+    "detailScale": 2.4,
+    "detailContrast": 1.6,
+    "climbRate": 0.07,
+    "erosion": 1.2,
+    "edgeWidth": 0.6
+   }
+  }
+ ],
+ "nodes": []
+}
