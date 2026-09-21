@@ -24,6 +24,15 @@ screen as a regression.
 
 That caveat was recorded without a magnitude. It now has one.
 
+## The defect in one sentence
+
+> **When the matcher switches motion, a foot moves seven times further in that single step than it
+> ever moves between two frames of the walk it is interrupting.**
+
+That comparison needs no character height, no scene scale and no unit. It compares the defect to the
+thing it interrupts, which is the only comparison a viewer actually makes. The metres and the
+body-height fractions are below; this is the line to quote.
+
 ## The measurement, taken by accident
 
 Phase C §30 built a transition loop to test whether contact features reduce foot-plant
@@ -56,8 +65,10 @@ The before-figure is trustworthy because it was taken by accident. **The after-f
 by someone who wants it to be smaller**, so the threshold is set while nothing exists to flatter,
 and derived from the content rather than picked:
 
-> **A transition is acceptable when it moves a foot no further than the foot moves anyway between
-> two ordinary frames: ≤ 0.0510 m.**
+> **A transition may not move a foot further than walking does: ≤ 0.0510 m.**
+
+Derived from the same quantity the defect is stated against, which closes the loop — the criterion
+is self-evidently the right bar rather than a number someone negotiated.
 
 Below that it is indistinguishable from normal locomotion; above it, something happened that the
 motion itself would not have done. **A fix that reduces 0.3566 m to 0.30 m is not a fix.** The
