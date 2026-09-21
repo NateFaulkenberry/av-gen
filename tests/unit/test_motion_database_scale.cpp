@@ -245,6 +245,7 @@ TEST_CASE("a hundred characters share one database rather than carrying one each
 
 #include <filesystem>
 #include <numeric>
+#include <random>
 #include <set>
 
 namespace {
@@ -1799,7 +1800,14 @@ TEST_CASE("what §13's fix bought phase-aware matching", "[motionscale][phaseC][
 
     // Retrieval, the same leave-one-out measure §24 used: query with a sample's true successor,
     // perturbed, `current` unset so continuity cannot supply the answer.
-    const auto retrieval = [&](float phaseWeight, const char* label) {
+    // `shuffle` is the control the whole measurement rests on. It randomises the phase values
+    // across samples while keeping their distribution, so the phase dimensions carry the same
+    // statistics and none of the meaning. **If retrieval stays high under it, phase was acting as
+    // an index rather than a feature** -- within a clip it is monotone and nearly unique per
+    // sample, so `(pose, phase)` is very close to a primary key, and a matcher scoring 100% may be
+    // doing a lookup rather than a match. ADR-182's positive form: a probe that must fail under a
+    // null.
+    const auto retrieval = [&](float phaseWeight, bool shuffle, const char* label) {
         scene::MotionDatabaseOptions dbOptions;
         dbOptions.sampleRate = 30.0f;
         dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
@@ -1807,6 +1815,37 @@ TEST_CASE("what §13's fix bought phase-aware matching", "[motionscale][phaseC][
         auto db = scene::buildMotionDatabase(*pack, dbOptions);
         if (!db.has_value()) {
             FAIL("motion database build failed: " << db.error().message);
+        }
+        if (shuffle && db.has_value()) {
+            // Permute the phase dimensions across samples with a fixed, reproducible shuffle.
+            // The values and their distribution are untouched; only which sample holds which is.
+            const std::vector<scene::MotionFeatureGroup> layout =
+                scene::motionFeatureLayout(db->config);
+            std::vector<std::size_t> phaseDims;
+            for (std::size_t d = 0; d < layout.size(); ++d) {
+                if (layout[d] == scene::MotionFeatureGroup::Phase) {
+                    phaseDims.push_back(d);
+                }
+            }
+            REQUIRE_FALSE(phaseDims.empty());
+            std::vector<std::uint32_t> order(db->sampleCount());
+            for (std::uint32_t i = 0; i < db->sampleCount(); ++i) {
+                order[i] = i;
+            }
+            std::mt19937 rng(12345u); // fixed: a control that differs per run proves nothing
+            std::shuffle(order.begin(), order.end(), rng);
+            std::vector<float> saved(db->sampleCount() * phaseDims.size());
+            for (std::uint32_t i = 0; i < db->sampleCount(); ++i) {
+                for (std::size_t k = 0; k < phaseDims.size(); ++k) {
+                    saved[i * phaseDims.size() + k] = db->featuresFor(i)[phaseDims[k]];
+                }
+            }
+            for (std::uint32_t i = 0; i < db->sampleCount(); ++i) {
+                for (std::size_t k = 0; k < phaseDims.size(); ++k) {
+                    db->features[static_cast<std::size_t>(i) * db->dimension + phaseDims[k]] =
+                        saved[order[i] * phaseDims.size() + k];
+                }
+            }
         }
         std::uint32_t cyclic = 0;
         for (const std::uint32_t tags : db->sampleTags) {
@@ -1826,7 +1865,11 @@ TEST_CASE("what §13's fix bought phase-aware matching", "[motionscale][phaseC][
             query.features.assign(db->dimension, 0.0f);
             const float* f = db->featuresFor(next);
             std::copy(f, f + db->dimension, query.features.begin());
-            for (std::size_t d = 0; d < query.features.size(); d += 5) {
+            // **Every dimension, not every fifth.** The first version stepped `d += 5`, and the
+            // phase dimensions sit at 33 and 34 of 35 -- neither is a multiple of five, so the
+            // query carried the held-out sample's **exact phase**. An unperturbed key is precisely
+            // the index effect this measurement has to rule out.
+            for (std::size_t d = 0; d < query.features.size(); ++d) {
                 query.features[d] += 0.07f;
             }
             const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
@@ -1846,12 +1889,41 @@ TEST_CASE("what §13's fix bought phase-aware matching", "[motionscale][phaseC][
 
     // The "before": phase weight 0, which is what `defaultBipedConfig` ships and what the broken
     // path effectively produced -- the phase dimensions were not even in the feature vector.
-    const double before = retrieval(0.0f, "BEFORE (phase weight 0, as shipped)");
+    const double before = retrieval(0.0f, false, "BEFORE (phase weight 0, as shipped)");
     // The "after": phase in the vector and weighted, now that the tag and the phase track are real.
-    const double after = retrieval(1.0f, "AFTER  (phase weighted 1.0, §13 fixed)");
+    const double after = retrieval(1.0f, false, "AFTER  (phase weighted 1.0, §13 fixed)");
+    // The control. If this stays near `after`, the phase dimensions were carrying position rather
+    // than meaning and the gain is an artefact.
+    const double shuffled = retrieval(1.0f, true, "CONTROL (phase values shuffled)");
 
-    WARN(fmt::format("§13's fix buys phase-aware matching {:+.1f} points of retrieval",
-                     after - before));
+    WARN(fmt::format("§13's fix buys {:+.1f} points; the shuffle control gives {:+.1f} points over "
+                     "the baseline",
+                     after - before, shuffled - before));
+
+    // **The control did not merely fail -- it beat the thing it controls for, and that is the
+    // finding.**
+    //
+    //   BEFORE  (phase weight 0)      76.6%
+    //   AFTER   (phase weighted 1.0)  89.9%   <- the "+13.3 point gain"
+    //   CONTROL (phase SHUFFLED)      97.5%   <- random phase does BETTER
+    //
+    // Shuffled phase carries the same distribution and none of the meaning, so if it were a
+    // feature the control should collapse toward the baseline. It rises instead, above the real
+    // thing, because **random values are more uniquely identifying than real ones**: real phase is
+    // monotone within a clip and similar across clips at the same point in a cycle, while a
+    // shuffle gives every sample its own nonce.
+    //
+    // So leave-one-out retrieval is **not a valid measure of phase-aware matching**. It rewards
+    // identifiability, and identifiability is the opposite of what matching needs -- a matcher
+    // exists to find a *different* sample that is equivalent, not to find the one it was given.
+    // The "+7.0 points to 100.0%" reported before this control was an artefact twice over: the
+    // query was not perturbed on the phase dimensions, so it carried an exact key, and the metric
+    // could not have distinguished a feature from an index even if it had been.
+    //
+    // Asserted in the direction the evidence actually points, so this cannot be quietly re-read as
+    // a success later.
+    CHECK(shuffled > after);
+    CHECK(after > before); // phase does something -- but the control says what it does is identify
 
     // **Both answers are findings and neither is asserted as an improvement.** Asserting that the
     // fix helped would be the conclusion writing the experiment -- the same discipline §24 needed.

@@ -1701,34 +1701,49 @@ it took minutes and finding the third by accident would have taken another night
 
 > **A caveat belongs where the number is read, not where the number is explained.**
 
-## §31 — what §13's fix bought, measured before the chance expired
+## §31 — RETRACTED: the +7.0 was an artefact, and the metric cannot measure this
 
-Until tonight `buildMotionDatabase` re-derived its clip analysis with an empty contact-joint list,
-so `phase.cyclic` was false for every clip of every pack and `MotionTag::Cyclic` reached the
-database as 0%. **Phase-aware matching had never once had phase data to be aware of.** The old
-behaviour was still reconstructable, and this is the only window in which the comparison existed.
+**The first version of this section reported "+7.0 points, to perfect 100.0% leave-one-out
+retrieval" as the largest before/after in Phase C. A control destroyed it.**
 
-| | dim | cyclic | retrieval (n=158) |
-|---|---|---|---|
-| **before** — phase weight 0, as shipped | 33 | 95.4% | 93.0% ±2.0 |
-| **after** — phase weighted 1.0, §13 fixed | 35 | 95.4% | **100.0%** |
+| | retrieval (n=158) |
+|---|---|
+| **before** — phase weight 0, as shipped | 76.6% |
+| **after** — phase weighted 1.0, §13 fixed | 89.9% |
+| **control** — phase values *shuffled* across samples | **97.5%** |
 
-**+7.0 points, to perfect leave-one-out retrieval.** At n=158 the standard error is ±2.0, so this is
-better than 3σ — unlike §24's decline, this one is significant, and 100.0% is a ceiling rather than
-a high number.
+**The shuffle control did not merely fail to collapse — it beat the thing it controls for.** Random
+phase retrieves *better* than real phase, and the reason is decisive: **random values are more
+uniquely identifying than real ones.** Real phase is monotone within a clip and similar across
+clips at the same point in a cycle; a shuffle gives every sample its own nonce.
 
-**And it exposes a live consequence: `defaultBipedConfig` ships `phaseWeight = 0`.** At zero the
-phase dimensions are not merely unweighted, they are **not in the feature vector at all** — `dimension()`
-omits them. So the shipping default leaves seven points of retrieval unclaimed on a corpus where 95%
-of samples are cyclic, and it was a *correct* default for as long as the phase data was dead.
+**So leave-one-out retrieval is not a valid measure of phase-aware matching.** It rewards
+*identifiability*, and identifiability is the opposite of what a matcher needs — a matcher exists to
+find a **different** sample that is equivalent, not to find the one it was handed. Phase is very
+close to a primary key within a clip, so adding it to the vector turns a match into a lookup.
 
-This is the same shape as the dead weights and the shadowed dial, seen from the other side: **a
-default that was right under the old behaviour and is wrong under the new one, with nothing to say
-so when the behaviour changed.** §13 fixed the data and could not have known to revisit the
-configuration that had been tuned around its absence.
+**The original figure was an artefact twice over.** The perturbation stepped `d += 5` and the phase
+dimensions sit at 33 and 34 of 35 — neither a multiple of five — so **the query carried the
+held-out sample's exact phase**. And even perturbed, the metric could not have distinguished a
+feature from an index. Perturbing every dimension also drops the *baseline* from 93.0% to 76.6%,
+so the earlier absolute numbers were inflated as well.
 
-Recorded rather than changed, with the reason stated so it is not mistaken for caution: the change
-costs two dimensions (33 → 35), and §24 established that dimensions are not free — more horizons
-bought no measurable gain and cost bytes and microseconds. The phase case looks different because
-the gain *is* measurable and large, but the cost side deserves the same table §24 got before a
-shipping default moves.
+**What this does and does not overturn.** §13's fix is still correct and still necessary — `Cyclic`
+really was reaching the database as 0% and really is 95.4% now. What is retracted is the claim that
+the fix buys measurable matching quality, because **nothing here has yet measured matching
+quality.** The honest state of §31 is that phase-aware matching remains unevaluated, and the
+instrument to evaluate it has to be **cross-clip**: does a query from clip A find the right *moment*
+in a different clip of the same gait? Retrieval within a clip is the easy case and the one phase
+trivially solves.
+
+**This was the sixth perfect score to be fake tonight**, and the only one I had a motive to believe
+— it was flattering, and a supervisor's prediction agreed with it in advance. That combination is
+the condition under which a number goes unchecked, and it is why the control was demanded rather
+than offered.
+
+### And a caution that now extends backwards
+
+§24's horizon experiment uses the same leave-one-out retrieval metric. Trajectory horizons are not
+near-unique per sample the way phase is, so the effect should be far weaker — but **§24's numbers
+were taken with the same `d += 5` perturbation**, and its conclusion (more horizons buy no
+measurable gain) survives only if that holds under full perturbation. Flagged rather than assumed.
