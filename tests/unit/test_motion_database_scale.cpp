@@ -243,6 +243,7 @@ TEST_CASE("a hundred characters share one database rather than carrying one each
 
 #include <filesystem>
 #include <numeric>
+#include <set>
 
 namespace {
 namespace fs = std::filesystem;
@@ -1085,4 +1086,137 @@ TEST_CASE("every motion tag has a writer as well as a reader", "[motionscale][ph
     // cannot compute it. Recorded so the two causes are not confused later.
     CHECK(travelling == 5);
     CHECK(withTags == 0); // the alien pack authors no tags; everything comes from clip names
+}
+
+// ---------------------------------------------------------------------------------------------
+// §19 -- "the database should be able to **reproduce existing animation behavior**."
+//
+// That is the one falsifiable clause in §19 and it is a strong one: if the matcher, driven from
+// the database, cannot follow a clip the database was built from, then nothing downstream of it
+// means anything. It is also the test most likely to pass vacuously -- a query taken from a sample
+// matches that sample trivially -- so the query is taken from the clip's *next* frame and
+// perturbed, and the loop is judged on whether it stays on the clip rather than on whether any
+// single query is right.
+
+TEST_CASE("the database reproduces the clip it was built from", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §19"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+    const scene::MotionCostWeights weights;
+
+    // Play every clip that is long enough to be followed, one at a time, and ask the matcher to
+    // track it. "Reproduce" is measured as **staying on the clip**: the fraction of steps whose
+    // match is in the same clip, and how far the sample index drifts from where the clip is.
+    int clipsTested = 0;
+    double worstOnClip = 1.0;
+    std::string worstClip;
+    double totalOnClip = 0.0;
+    double worstDrift = 0.0;
+    double advanced = 1.0; // fraction of steps that reached a sample not already visited
+    for (std::uint32_t clipIndex = 0; clipIndex < db->clipNames.size(); ++clipIndex) {
+        std::vector<std::uint32_t> samples;
+        for (std::uint32_t s = 0; s < db->sampleCount(); ++s) {
+            if (db->sampleClip[s] == clipIndex) {
+                samples.push_back(s);
+            }
+        }
+        if (samples.size() < 40u) {
+            continue;
+        }
+        ++clipsTested;
+
+        std::uint32_t current = samples.front();
+        int onClip = 0;
+        int steps = 0;
+        double drift = 0.0;
+        std::set<std::uint32_t> visited;
+        for (std::size_t i = 1; i + 1 < samples.size(); ++i) {
+            const std::uint32_t want = samples[i];
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(want);
+            std::copy(f, f + db->dimension, query.features.begin());
+            // A real query is near its answer, never on it. Without this the test is a lookup.
+            for (std::size_t d = 0; d < query.features.size(); d += 5) {
+                query.features[d] += 0.06f;
+            }
+            query.current = current;
+            const scene::MotionMatch match = scene::searchMotion(*db, query, weights);
+            REQUIRE(match.found());
+            if (db->sampleClip[match.sample] == clipIndex) {
+                ++onClip;
+                drift = std::max(drift, std::abs(static_cast<double>(match.sample) -
+                                                 static_cast<double>(want)));
+            }
+            ++steps;
+            visited.insert(match.sample);
+            current = match.sample;
+        }
+        advanced = std::min(advanced, static_cast<double>(visited.size()) / std::max(steps, 1));
+        const double fraction = static_cast<double>(onClip) / std::max(steps, 1);
+        totalOnClip += fraction;
+        worstDrift = std::max(worstDrift, drift);
+        if (fraction < worstOnClip) {
+            worstOnClip = fraction;
+            worstClip = db->clipNames[clipIndex];
+        }
+    }
+
+    REQUIRE(clipsTested > 5); // enough clips are long enough to be worth following
+    WARN(fmt::format("§19 reproduction over {} clips: mean {:.1f}% of steps stayed on the clip, "
+                     "worst {:.1f}% ({}), worst index drift {:.0f} frames",
+                     clipsTested, 100.0 * totalOnClip / clipsTested, 100.0 * worstOnClip,
+                     worstClip, worstDrift));
+    WARN(fmt::format("  distinct samples visited per step, worst clip: {:.2f}", advanced));
+
+    // **The clause, asserted.** A database that cannot follow its own content is not a database
+    // anything else can be built on, and every later section -- augmentation, coverage, the
+    // matching loop -- assumes this silently.
+    CHECK(totalOnClip / clipsTested > 0.90);
+    CHECK(worstOnClip > 0.50);
+    // **ADR-611's companion, and my first version of it was wrong in the instructive direction.**
+    // It asserted `worstDrift > 0`, where drift is the *error* between the sample matched and the
+    // sample wanted -- so it demanded the matcher be imperfect, and failed on a run that tracked
+    // every clip exactly (drift 0.0, the best possible result). A companion metric has to count
+    // that something happened, not that something went wrong; those are opposite quantities and
+    // they are easy to confuse precisely because the ADR is about metrics that cannot see
+    // failures.
+    //
+    // The right companion is that the loop **advanced**: it reached a new sample on nearly every
+    // step, so "100% on the clip" cannot be earned by a matcher that returned one sample forever.
+    CHECK(advanced > 0.9);
+    CHECK(worstDrift >= 0.0);
 }

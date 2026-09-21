@@ -1195,3 +1195,31 @@ it, because ADR-552 defines travel as the root's extent against rest height and 
 `rootTravel`, which is *net displacement*: the very measure ADR-552 rejected. Five clips move their
 root more than 5 cm and all five are deaths, which fall rather than travel. The fix is for the pack
 to store the verdict, not for the database to guess it.
+
+## §18 and §19 — the database reproduces its own content
+
+§18 puts a number on the corpus — "only ~1,712 frames … useful for correctness, **not** sufficient
+to prove motion matching quality" — which is the measured 1,738 again, and the third time C's text
+has quoted this repository's own content back at it.
+
+§19's one falsifiable clause is that **the database should be able to reproduce existing animation
+behaviour**, and it is the clause everything downstream assumes silently. Measured by driving the
+matcher along each clip the database was built from, querying with the *next* frame's features
+perturbed so no query lands on a sample, and judging the loop on whether it stays on the clip:
+
+- **19 clips long enough to follow, mean 100.0% of steps stayed on the clip**, worst-case drift 0
+  frames — the matcher reached the exact sample asked for, every step, on every clip.
+
+**The companion assertion was wrong in the instructive direction.** I first asserted
+`worstDrift > 0`, where drift is the *error* between the sample matched and the sample wanted — so
+it demanded the matcher be imperfect, and failed on a run that tracked every clip exactly. A
+companion metric must count that **something happened**, not that something went wrong; those are
+opposite quantities, and they are easy to confuse precisely because ADR-611 is about metrics that
+cannot see failures. The correct companion is that the loop *advanced* — a new sample on 1.00 of
+steps — so 100% on-clip cannot be earned by a matcher returning one sample forever.
+
+**§20 is blocked on data this repository does not have.** It requires a 100STYLE subset, and §18 is
+explicit that third-party licensing must be verified rather than assumed and that dataset terms are
+not interchangeable with code terms. Downloading and repackaging an external corpus is not something
+to do on an assumption, so §20 is recorded as blocked on a licensing check and an import rather than
+attempted with substitute data — which would measure the substitute.
