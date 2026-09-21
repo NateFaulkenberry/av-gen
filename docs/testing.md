@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Eighteen ways a green suite has lied
+## Nineteen ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -87,7 +87,7 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family A — the run did not happen as you think** (entries 1-3, 12, 18).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19; 9 and 10 are its older members, from before it had a name).
 
 Families A and B are failures of *reporting*: the run lies about itself, and **the binary's exit
 code catches every one of them.** Family C is a failure of *aim*: the run is honest, the exit code
@@ -309,6 +309,53 @@ night from two agents who never spoke to each other.
    aimed at the wrong region or the wrong mechanism passes every check you would think to run.**
    When a reachability probe reports zero, suspect the sample domain before the knob.
 
+19. **A minimum is robust to contention ARRIVING and defenceless against the machine getting
+   quieter.** ADR-170 says "report minima over repeats, never means" and stops, which reads as
+   though minima solve contention. They solve **one direction** of it.
+
+   A minimum survives load *arriving*, because interference only ever adds time and the floor is
+   untouched. It has no defence at all against the load *falling*: then the floor itself moves down,
+   and an arm measured later wins for nothing. **Sequential arms plus a load that decreases is the
+   exact shape that produces a clean, monotone, entirely wrong ladder** — and it announces nothing,
+   because every individual number is a real minimum honestly measured.
+
+   Measured on 2026-09-20: a five-rung per-slot cost ladder, run as sequential blocks minutes apart,
+   came back `5.05, 5.51, 6.03, 4.52` — three rungs of believable per-slot cost and then a fourth
+   slot apparently *cheaper than none*. A separate arm design with a third of the samples had shown
+   the same anomaly at the same rung. The explanation was that a second agent had gone from blocked
+   to working partway through, so the last two arms were measured on a quieter machine than the
+   first three.
+
+   **The repository already encodes the fix and refuses to let you skip it.** `--ab` interleaves
+   baseline and arm inside ONE process and reports drift — it voided a run that same evening with
+   *"baseline 13.83 ms in the first half against 21.17 ms in the second; this run measured two
+   machines rather than two arms."* ADR-460's method is "minima of 3-4 **interleaved** repeats". The
+   word doing the work in that sentence is *interleaved*, not *minima*.
+
+   **Interleave, or pair each arm with a baseline taken in the same conditions.** A number measured
+   against a baseline in the same run is worth more than four numbers measured in sequence, and on a
+   machine several agents share it is the only kind worth quoting.
+
+   **A paired delta's SIGN is the robust quantity; its magnitude is not.** In the run above, the rep
+   that went out under load 49 came back at less than half the other two reps' magnitude — and the
+   same sign. So a contaminated rep should be read for **agreement in direction first**, and only
+   then for size: a spread of 0.99 across three reps is one noisy rep among three, not evidence
+   against the effect. This also gives a discard rule that can be stated in advance, which is what
+   makes a discard honest rather than convenient: **discard on sign disagreement, never on spread.**
+
+   **And it invalidates controls, not just ladders.** The same session produced a clean-looking
+   refutation of a hypothesis — an arm at 4.65 ms against a 5.05 ms baseline — which was itself
+   measured sequentially. Under interleaving that baseline reads 5.11 to 6.16, so the comparison
+   never meant anything and the "refutation" had to be withdrawn. **When you find that a
+   measurement was sequential, re-examine every conclusion drawn against it**, including the ones
+   that argued against your own hypothesis. Those are the ones you are least likely to re-check.
+
+   **Both halves of this are shared-machine rules and one is useless without the other.** The
+   measurer owes: *a window is a promise about a duration, so say how long the measurement is* — it
+   is the measurer who knows a five-arm ladder is not a paired A/B. The coordinator owes: *ask how
+   long before granting a window, and say unprompted when the machine changes* — an agent going
+   from idle to compiling is a fact the coordinator has and the measurer does not.
+
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
@@ -326,6 +373,16 @@ tooling fault, and neither is a pass.
 all exit 0, print a truthful summary, and report a number that is not about what you think it is
 about. There is no signal to read, because the run was honest; the aim was wrong. The only defences
 are structural, and they are cheap:
+
+**The headline's first confirmed save was on the measurement of the agent who wrote it.** A per-slot
+cost ladder returned `7.21 ms fixed + 2.00 ms per slot` — clean, quotable and decision-shaped — and
+was checked only because it looked right. It was confounded: a fourth slot reading *cheaper* than a
+third, because the four media had been placed close enough together to merge into one volume, so
+"another medium" and "another medium in a region already being marched" were the same arm. Four of
+the five family-C instances here were caught because something downstream objected — a compiler, a
+probe's own control, a blown-out render, a person parsing instead of matching. **That one was caught
+prospectively, by distrusting an expected number**, which is the only defence available when nothing
+downstream is positioned to disagree.
 
 **One defence in this tree already works, and it is worth copying.** `test_renderer_layout_guards.cpp`
 resolves a struct's array extents against constants scraped from named headers, and when it meets a
