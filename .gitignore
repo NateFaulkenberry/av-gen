@@ -114,3 +114,11 @@ __pycache__/
 # arm it writes is reproducible from it in a second.
 /examples/treeisland/_fog-*.json
 /examples/treeisland/_fogshape-*.json
+
+# 100STYLE (CC BY 4.0, Ian Mason / Sebastian Starke / Taku Komura). A gigabyte of ASCII BVH, and
+# redistributing it from here is a publishing act with attribution attached -- so it stays out,
+# explicitly rather than by relying on anyone's local exclude. assets/100STYLE-ATTRIBUTION.md is
+# the part the repository keeps: the terms, the exact file list and the commands to rebuild the
+# measurement. docs/dependencies.md and CREDITS.md carry the obligation.
+/assets/100style/
+/assets/100style-mixed/

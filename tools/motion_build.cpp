@@ -24,6 +24,7 @@
 #include "scene/motion_analysis.hpp"
 #include "scene/motion_database.hpp"
 #include "scene/motion_pack.hpp"
+#include "scene/motion_quality_report.hpp"
 #include "scene/retarget.hpp"
 #include "scene/scene.hpp"
 
@@ -34,6 +35,8 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <numeric>
 #include <map>
 #include <string>
 #include <vector>
@@ -197,6 +200,8 @@ int usage() {
                "  reach     <pack> [--chain h:k:a,...]    how close each pose is to a straight leg\n"
                "  database  <pack> --joints a,b,c [--bench]  build a motion database and search it\n"
                "  benchmark <file> [--repeat n]           what each stage costs here\n"
+               "  quality   <pack> --joints a,b,c         Phase C 20: density, duplicates, search\n"
+               "                                          plan recall, cross-clip coverage bound\n"
                "  survey    <dir>                         per-FILE rotation orders, up axis,\n"
                "                                          skeleton consistency across a corpus\n\n"
                "  --scale <f>       BVH units to metres (0.01 for centimetres)\n"
@@ -717,6 +722,194 @@ int cmdReach(const Args& args) {
 // white-noise queries and 0.80x FASTER using near queries on real data, because a real query is
 // close to its answer and far from everything else. So the benchmark below draws its queries from
 // the database itself and perturbs them, which is what a character actually asks.
+// ---- §20: the scale experiment -----------------------------------------------------------------
+//
+// **Why this is a command and not a test.** Every number it produces is a property of a corpus that
+// is gitignored and 612 MB, so a test would skip everywhere it ran and assert nothing where it did
+// not. What makes the figures checkable instead is that the command line is printed beside them and
+// the instruments are the *library* functions the Glowmere tests already use -- `analyseMotionQuality`
+// and `searchMotionStaged` -- rather than second copies that could drift.
+//
+// The trial counts are subsampled and **said to be**: the Glowmere sweep steps the whole database
+// (`s += 7`), which at 434,478 samples and 2 ms a query is nine hours. A fixed number of seeds
+// spread evenly over the corpus measures the same quantity at a stated n.
+int cmdQuality(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const auto pack = scene::readMotionPack(args.positional.front());
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    scene::MotionDatabaseOptions options;
+    options.sampleRate = std::stof(args.option("rate", "30"));
+    const std::vector<std::string> joints = splitCommas(args.option("joints"));
+    if (joints.empty()) {
+        fmt::print(stderr, "--joints is required (Phase C §8)\n");
+        return 1;
+    }
+    options.config.joints = joints;
+    const auto db = scene::buildMotionDatabase(*pack, options);
+    if (!db) {
+        fmt::print(stderr, "{}\n", db.error().message);
+        return 1;
+    }
+    const int seeds = std::stoi(args.option("seeds", "300"));
+    const scene::MotionCostWeights weights;
+    const std::vector<float> dimWeight = scene::motionFeatureWeights(db->config);
+    const bool weighted = dimWeight.size() == db->dimension;
+    const auto weightedDistance = [&](const float* a, const float* b) {
+        float sum = 0.0f;
+        for (std::size_t d = 0; d < db->dimension; ++d) {
+            const float delta = a[d] - b[d];
+            sum += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+        }
+        return sum;
+    };
+    const std::uint32_t step = std::max(1u, db->sampleCount() / static_cast<std::uint32_t>(seeds));
+
+    fmt::print("corpus: {} clip(s), {} sample(s), {} dimension(s)\n", db->stats.clips,
+               db->sampleCount(), db->dimension);
+    fmt::print("  cost spread (build-time): {:.2f}   dead dimensions: {}\n", db->stats.costSpread,
+               db->stats.deadDimensions);
+
+    // ---- density and duplicates (§23's instrument, unchanged) ---------------------------------
+    const scene::MotionQualitySummary quality = scene::analyseMotionQuality(*db);
+    fmt::print("\n{}\n", quality.humanReadable());
+
+    // ---- the cost spread, by the sweep's own definition ---------------------------------------
+    double spread = 0.0;
+    int spreadN = 0;
+    for (std::uint32_t s = 0; s < db->sampleCount(); s += step) {
+        scene::MotionQuery q;
+        q.features.assign(db->dimension, 0.0f);
+        const float* f = db->featuresFor(s);
+        std::copy(f, f + db->dimension, q.features.begin());
+        const scene::MotionMatch best = scene::searchMotion(*db, q, weights);
+        const float* other = db->featuresFor((s + db->sampleCount() / 2u) % db->sampleCount());
+        spread += static_cast<double>(weightedDistance(q.features.data(), other)) -
+                  static_cast<double>(best.cost);
+        ++spreadN;
+    }
+    spread /= std::max(spreadN, 1);
+    fmt::print("cost spread, sweep definition, n={}: a typical candidate is {:.2f} worse than the "
+               "best\n\n",
+               spreadN, spread);
+
+    // ---- §16's search plans, on this corpus ---------------------------------------------------
+    struct Plan {
+        const char* name;
+        std::uint32_t stride;
+        std::uint32_t shortlist;
+        std::uint32_t prefix;
+        std::uint32_t neighbourhood;
+    };
+    const Plan plans[] = {
+        {"stride 8, prefix 12, top 32 ", 8u, 32u, 12u, 8u},
+        {"stride 8, prefix 12, top 128", 8u, 128u, 12u, 8u},
+        {"stride 8, FULL prefix, top 32", 8u, 32u, 0u, 8u},
+        {"stride 4, FULL prefix, top 32", 4u, 32u, 0u, 4u},
+    };
+    fmt::print("plan                           recall   worst excess   x typical gap   scored\n");
+    for (const Plan& p : plans) {
+        scene::MotionSearchPlan plan;
+        plan.stride = p.stride;
+        plan.shortlist = p.shortlist;
+        plan.prefixDimensions = p.prefix;
+        plan.neighbourhood = p.neighbourhood;
+        int agreed = 0;
+        int trials = 0;
+        double worstExcess = 0.0;
+        std::uint64_t fullyScored = 0;
+        for (std::uint32_t s = 0; s < db->sampleCount(); s += step) {
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(s);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); d += 3) {
+                query.features[d] += 0.05f;
+            }
+            query.current = s > 0 ? s - 1u : scene::MotionDatabase::kInvalid;
+            const scene::MotionMatch full = scene::searchMotion(*db, query, weights);
+            const scene::MotionMatch staged = scene::searchMotionStaged(*db, query, weights, plan);
+            if (!full.found() || !staged.found()) {
+                continue;
+            }
+            ++trials;
+            fullyScored += staged.fullyScored;
+            if (staged.sample == full.sample) {
+                ++agreed;
+            } else {
+                worstExcess = std::max(worstExcess, static_cast<double>(staged.cost) -
+                                                        static_cast<double>(full.cost));
+            }
+        }
+        fmt::print("{}  {:5.1f}%  {:12.4f}  {:11.2f}x  {:12.0f}   (n={})\n", p.name,
+                   100.0 * agreed / std::max(trials, 1), worstExcess,
+                   worstExcess / std::max(spread, 1e-9),
+                   static_cast<double>(fullyScored) / std::max(trials, 1), trials);
+    }
+
+    // ---- the cross-clip coverage bound --------------------------------------------------------
+    //
+    // **What any matcher on this corpus is up against, before any feature or weight is chosen.**
+    // For each seed: the distance to the next frame of its own clip -- the smallest step the
+    // content itself can take -- against the nearest sample in a DIFFERENT clip. The ratio bounds
+    // what leaving a clip can cost, and it is a property of the corpus rather than of the search.
+    //
+    // **The mean of the per-seed ratios is the wrong statistic and this is where that was found.**
+    // A seed whose next frame is nearly identical -- a near-static frame, of which stylized idle
+    // and slow locomotion have many -- has an adjacent distance near zero, so its ratio explodes.
+    // On the Glowmere control the mean of ratios reads **2145x** and the worst **294,646x**, both
+    // of them descriptions of the smallest denominator in the set rather than of the corpus. The
+    // median and the ratio of means are reported instead, and they agree with each other.
+    std::vector<double> ratios;
+    double adjacentSum = 0.0;
+    double crossSum = 0.0;
+    int n = 0;
+    for (std::uint32_t s = 0; s < db->sampleCount(); s += step) {
+        const std::uint32_t next = db->sampleNext[s];
+        if (next == scene::MotionDatabase::kInvalid) {
+            continue;
+        }
+        const float* f = db->featuresFor(s);
+        const double adjacent = std::sqrt(static_cast<double>(weightedDistance(f, db->featuresFor(next))));
+        double bestCross = std::numeric_limits<double>::max();
+        const std::uint32_t clip = db->sampleClip[s];
+        for (std::uint32_t o = 0; o < db->sampleCount(); ++o) {
+            if (db->sampleClip[o] == clip) {
+                continue;
+            }
+            bestCross = std::min(bestCross, static_cast<double>(weightedDistance(f, db->featuresFor(o))));
+        }
+        bestCross = std::sqrt(bestCross);
+        if (adjacent <= 1e-9) {
+            continue;
+        }
+        adjacentSum += adjacent;
+        crossSum += bestCross;
+        ratios.push_back(bestCross / adjacent);
+        ++n;
+    }
+    std::sort(ratios.begin(), ratios.end());
+    const double median = ratios.empty() ? 0.0 : ratios[ratios.size() / 2];
+    const double p90 = ratios.empty() ? 0.0 : ratios[(ratios.size() * 9) / 10];
+    fmt::print("\ncross-clip coverage bound, n={}: the best available cross-clip pose is "
+               "**{:.2f}x** further than the next frame of the same clip (median ratio; p90 "
+               "{:.2f}x)\n",
+               n, median, p90);
+    fmt::print("  mean adjacent-frame distance {:.4f}, mean best cross-clip distance {:.4f}, "
+               "ratio of means {:.2f}x\n",
+               adjacentSum / std::max(n, 1), crossSum / std::max(n, 1),
+               (crossSum / std::max(n, 1)) / std::max(adjacentSum / std::max(n, 1), 1e-9));
+    fmt::print("  (the MEAN of the per-seed ratios is {:.2f}x and its worst is {:.2f}x -- both are "
+               "descriptions of the smallest denominator in the set, not of the corpus)\n",
+               std::accumulate(ratios.begin(), ratios.end(), 0.0) / std::max<std::size_t>(ratios.size(), 1),
+               ratios.empty() ? 0.0 : ratios.back());
+    return 0;
+}
+
 int cmdDatabase(const Args& args) {
     if (args.positional.empty()) {
         return usage();
@@ -1096,6 +1289,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "benchmark") {
         return cmdBenchmark(args);
+    }
+    if (args.command == "quality") {
+        return cmdQuality(args);
     }
     return usage();
 }

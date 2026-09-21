@@ -1268,7 +1268,30 @@ requirement will be tuning to a number nobody measured. The useful reading is th
 a spec's example matches the repository's actual content, the example is evidence about intent —
 here, that real-data-first was meant literally.
 
-## §20 — blocked, and what that blocks knowing
+## §20 — RUN. The corpus arrived, and one of the three answers went against the hypothesis
+
+**Superseded by ADR-614; the section below is kept as the record of what was unknown and why.**
+
+100STYLE is **CC BY 4.0** (not CC0 — the first determination said CC0 and was corrected; see
+`docs/dependencies.md`), and `assets/100STYLE-ATTRIBUTION.md` records the exact subsets, their
+digests and the commands. Two subsets, 434,478 and 279,735 database samples, against Glowmere's
+1,738.
+
+Against the four local results this section listed as needing §20:
+
+- the **stride-4, full-prefix** plan: **survives**, but the finding that *the cheap prefix bought
+  nothing* does **not** — it is free on Glowmere and costs 16.7 recall points at scale;
+- the **69.72 cost spread**: the spread is the one figure that transferred, moving only 32.76 →
+  31.82 across a 250× corpus under this instrument, so severity numbers expressed against it carry
+  better than expected;
+- the **82% rejection rate** and the **95% `Cyclic` share**: not re-measured — both are properties
+  of the tag distribution, and the 100STYLE pack tags every clip alike.
+
+And the prediction that motivated the section — that a corpus the matcher can resolve would break
+the stride plan — is **refuted**: 100STYLE is further under the matcher's resolution limit than
+Glowmere is, not less. ADR-614 has the tables.
+
+## §20 — the original entry: blocked, and what that blocks knowing
 
 §20 needs a 100STYLE subset. §18 is explicit that third-party dataset licensing must be **verified**
 rather than assumed and that dataset terms are not interchangeable with code terms, so downloading
