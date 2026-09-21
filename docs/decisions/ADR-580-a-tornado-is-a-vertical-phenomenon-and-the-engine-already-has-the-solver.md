@@ -333,12 +333,24 @@ Mapped onto the existing `QualityTier {Preview, Realtime, High, Offline}` plus a
 
 - `main` at `4d2a224e` **does not compile.** `sizeof(AtmosphericFrame)` is 2400 against the
   `static_assert` of 1640 in `effect_conformance.cpp:45`, because the Cosmic Ocean merge grew the
-  frame and `frameDiffers` does not read any of it. The guard worked. A minimal local fix is on
-  this branch, in its own commit, reading the two padding-free scalars and **stating in a comment
-  that the `CosmicOcean` payload itself is still unread** -- it cannot be `memcmp`ed the way
-  `Vortex` can, because it opens `bool; float;` and has three indeterminate bytes at offsets 1..3,
-  which is precisely the defect that function's own header records costing an hour. That gap is
-  real and belongs to whoever lands the ocean's conformance entry.
+  frame. The guard worked. A minimal local fix rode on this branch for one commit so that Phase 1
+  could build, and it is **dropped** in favour of the coordinator's, which was already in flight.
+
+  **The reading attached to that stopgap was wrong, and the correction is worth more than the
+  stopgap was.** This ADR first claimed that "a conformance check that varies only the ocean's
+  interior still reports no difference". That is true of the committed tree and **false of the
+  fix**, which handles the padding hazard exactly where this branch located it: `enabled` is
+  compared on its own, and the `memcmp` runs from `offsetof(CosmicOcean, intensity)` to the end of
+  the struct, pinned by `static_assert(offsetof(CosmicOcean, intensity) == 4)` and a `% 4 == 0` on
+  the remaining span. Interior variation **is** caught.
+
+  The evidence is the kind this repository asks for rather than an assurance: the suite reports
+  `cosmicOcean [flow-reaches]` -- a check that requires a *difference* and correctly found none.
+  It could not report that at all if the comparison were blind to the payload. So the finding is
+  the ocean not reading the flow, not the comparison not seeing the ocean. Recorded because the
+  wrong version of this paragraph would have made a later agent re-fix a function that was already
+  correct, and because "I found a gap" is a claim that needs the same evidence as any other
+  (ADR-385).
 - `scene/composition.hpp` carries six dead `vortex*_` parameter pointers (`-Wunused-private-field`
   at lines 1408-1414). §42 removal work will collect them.
 
@@ -382,10 +394,32 @@ its own density function. It needs a slot, its own uniform bytes, and a call.
 10. **Publish the WGSL include order.** `shaders/vortex.wgsl` records that the include directive
     does not de-duplicate and that ADR-360 learned it the expensive way.
 
+## Do NOT "fix" this later
+
+**Vorticity confinement is absent from the analytic tier on purpose, and the missing slider is not
+an oversight.** Written here, at the end, because this is where somebody looking for a shortcut
+will read. Fedkiw/Stam/Jensen's `f = epsilon * h * (N x omega)` exists to put back energy that
+**numerical diffusion** removed from a grid. An analytic field is not integrated and has no
+numerical diffusion, so there is no energy missing and nothing to confine: wiring the term up over
+`tornado.wgsl` would compute a force that is then added to a velocity field nothing integrates.
+That is a control that does nothing, which ADR-421 records as worse than a control that is absent.
+
+`Vorticity`, `Vorticity Scale` and `Vorticity Falloff` exist and do something -- they drive the
+curl-noise amplitude masked by the analytic `|omega_z|`, and the suction vortices. If the grid tier
+lands, the same three additionally drive a real confinement kernel over the grid, where the premise
+holds. **The trigger for implementing confinement is the grid tier existing, not a reviewer noticing
+the word is missing from a shader.**
+
 ## Revisit when
 
 - §38 Mode 1 is rendered. If the analytic structure alone does not read as a crude but unmistakable
   tornado, §5's density model is wrong and no later phase can repair it.
+- **Mode 1 must pass a value-separation test, not only a silhouette test.** The shipped backdrop is
+  a flat teal-to-green wash filling the lower two thirds of frame (§1). A dark smoke column against
+  a dark wash has no silhouette however tall it is, and no amount of vertical extent repairs it.
+  So Mode 1's pass condition is two-part: the shape reads as a tornado, **and** it separates in
+  value from the backdrop behind it. This is a Phase 2 gate, deliberately not a Phase 5 lighting
+  discovery.
 - The coverage cost prediction in §5 is measured. If a tornado is not cheaper than the funnel, the
   ADR-374 coverage model needs re-deriving, not the tornado.
 - The grid tier is attempted. If `kCatchUpSteps` makes a still frame unreproducible in practice as

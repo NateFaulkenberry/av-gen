@@ -1,0 +1,64 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "Tornado lab",
+ "_note": "ADR-580, the brief's §39 critical visual test. A tornado against a PLAIN background with nothing else in the frame, so that every feature in the picture is attributable to the field and to nothing else. The camera stands on the ground at 1400 m and looks slightly up, which is how a tornado is photographed and is the view a cyclone cannot be read from (ADR-461). One directional key so the column is LIT -- a tornado is smoke, and §39's panel A has to pass a value-separation test as well as a silhouette test, which an unlit dark column against a dark sky fails however tall it is.",
+ "camera": {"mode": 1, "position": [1400, 60, 0], "target": [0, 420, 0], "fov": 36, "orbitSpeed": 0},
+ "environment": {
+  "background": [0.30, 0.36, 0.44],
+  "intensity": 1.0,
+  "fogDensity": 0.0,
+  "volumeDensity": 0.0,
+  "volumeSteps": 64,
+  "volumeJitter": 0.0,
+  "volumeMaxDistance": 4000.0,
+  "volumeAbsorption": 1.0,
+  "volumeScattering": 1.0,
+  "volumeAnisotropy": 0.25,
+  "sky": {"enabled": false, "background": false}
+ },
+ "lights": [
+  {"name": "key", "kind": "directional", "direction": [-0.45, -0.55, -0.70], "color": [1.0, 0.96, 0.90], "intensity": 4.0}
+ ],
+ "atmosphericEffects": [
+  {
+   "name": "Tornado",
+   "enabled": true,
+   "kind": "tornado",
+   "activation": "always",
+   "style": "Classic Cone",
+   "tornado": {
+    "base": [0.0, 0.0, 0.0],
+    "height": 800.0,
+    "radiusBottom": 40.0,
+    "radiusMid": 52.0,
+    "radiusTop": 70.0,
+    "taper": 1.4,
+    "shellWidth": 0.22,
+    "shellGain": 1.0,
+    "coreRadius": 0.55,
+    "coreDensity": 0.35,
+    "edgeSoft": 0.35,
+    "wallCloudGain": 0.6,
+    "cloudWidth": 4.6,
+    "cloudHeight": 0.16,
+    "cloudDensity": 0.9,
+    "touchdown": 1.0,
+    "skirtWidth": 2.2,
+    "skirtHeight": 0.10,
+    "skirtDensity": 0.8,
+    "skirtFlare": 0.6,
+    "stripeCount": 4.0,
+    "stripePitch": 3.4,
+    "stripeDepth": 0.35,
+    "stripeHarmonic": 0.4,
+    "density": 0.06,
+    "emission": 0.0,
+    "scattering": 1.0,
+    "colorThin": [0.62, 0.60, 0.58],
+    "colorThick": [0.16, 0.15, 0.16]
+   }
+  }
+ ],
+ "nodes": []
+}
