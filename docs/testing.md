@@ -759,7 +759,35 @@ night from two agents who never spoke to each other.
    And the uncomfortable corollary, which is why this is an entry rather than a note: **the green
    runs taken that way were green, and they were also unsound.** A pass under a method that can
    produce a false failure can equally produce a false pass, and nothing in the output distinguishes
-   them. Re-take anything that mattered.
+   them.
+
+   **But do not re-take everything -- re-take the class where a false PASS has a mechanism.**
+   Contention perturbs timing and resources: it causes crashes, allocator pressure and
+   nondeterminism, and all three push a run toward *failing*. For an ordinary value assertion --
+   a bit-identity check at defaults, a luminance ratio, a parity comparison -- a competing suite
+   has no way to make a false assertion come out true. Those greens are **unproven but not
+   suspect**.
+
+   The exception is **determinism**, because that is precisely the property contention perturbs: a
+   quiet perturbation could have gone the other way and let a real nondeterminism pass as a match.
+   So the re-take list is *every GPU assertion whose subject is reproducibility or bit-identity*,
+   and nothing else. Here that was 44 cases, taken three times sequentially: 23060 assertions each
+   time, exit 0 each time.
+
+   One more thing to watch in the verdict line: **the SKIP count.** A GPU context that fails to
+   create under contention makes a case skip rather than fail, and a skipped case is not a passed
+   one. Ours held at 4 across every run, which is what says nothing was silently dropped.
+
+   Two traps met while assembling that re-take list, both worth the line:
+
+   - **the filter is comma-separated and a test name contained a comma.** `A generated tree
+     renders, and renders the same way twice` split into two specs, neither matching, and the
+     filter quietly selected 42 cases instead of 43 -- family C, in the tool used to investigate
+     family C. Use a trailing `*` for any name with punctuation, and **count the selected cases
+     before running them**;
+   - **`^test cases:` is not printed when everything passes.** Catch2 prints `All tests passed
+     (N assertions in M test cases)` instead, so a guard that greps only for `^test cases:` reads
+     0 verdict lines on a perfect run. Grep for both.
 
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a

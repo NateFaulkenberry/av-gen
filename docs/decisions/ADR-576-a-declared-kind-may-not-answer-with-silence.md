@@ -56,9 +56,13 @@ scene can reach them.
   `sampleScalar(sdf, p, 0.0) == 0.0f` -- the defect, written down as correct behaviour, by
   somebody who was documenting what the code did rather than what it should do. It still asserts
   the arm's value (that path is real) and now also asserts that `validate` refuses it.
-- **The refusal's message is asserted, not just its existence.** The case checks the error names
-  both the kind and the field, because *a refusal nobody can act on is a quieter silence*. A test
-  that only checked `has_value() == false` would pass against `fail("bad field")`.
+- **The refusal's message is asserted, not just its existence, and that is the detail that
+  matters.** The case checks the error names both the kind and the field. **A refusal nobody can
+  act on is a quieter silence**: an author who reads "field error" in a log and cannot tell which
+  of their fields or why is back where they started, one indirection further along. A test that
+  only checked `has_value() == false` would pass against `fail("bad field")`, and that is exactly
+  the refusal somebody writes when they are fixing a defect rather than fixing a person's
+  afternoon.
 - **An existing assertion was passing for the wrong reason and is fixed.** `m.kind = SdfDistance;
   m.reference.clear(); CHECK_FALSE(validate())` passed because the *reference* was empty. It now
   also checks the refusal **with** a reference -- otherwise removing ADR-576's branch and leaving
