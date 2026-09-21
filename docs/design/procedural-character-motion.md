@@ -1987,3 +1987,56 @@ At a 34.7% baseline the matcher picks something notably worse than the best avai
 thirds of the time** — so there was **ample headroom for phase to help, and it did not.** This is
 not "no room to improve"; it is "plenty of room, and this feature took none of it". A ceiling effect
 would have been the available get-out and there isn't one.
+
+## §30 — and the first valid measurement of what a dimension costs
+
+`dimension()` adds one contact flag per **feature** joint rather than per **contact** joint, so with
+contacts enabled `head.x` carries one. A head does not plant: that dimension is **meaningless by
+construction**, for a reason statable in advance — and **it varies, so it passes the liveness
+check.**
+
+That is the limit of that check, and it completes a set:
+
+> **Liveness distinguishes present from absent. The shuffle distinguishes meaning from identity.
+> Neither distinguishes meaning from noise.**
+
+Each needs its own experiment, and the third one was sitting in the live system for free.
+
+**The measurement.** Neutralising the bogus flag — setting it constant across samples, so it adds
+the same amount to every distance and cannot affect any ranking — isolates the noise from the
+dimension count, which is cleaner than deleting it. The oracle is asserted unchanged between arms,
+since neutralising a feature cannot alter which pose-space answers exist.
+
+| | within margin (n=435) |
+|---|---|
+| contacts, bogus head flag **live** | 33.3% |
+| contacts, bogus head flag **neutral** | 33.3% |
+
+**One meaningless dimension of 36 costs 0.0 points — nothing measurable.**
+
+**This retires a claim the phase has been repeating since §24.** "Dimensions are not free" was
+asserted there and its instrument has since been retired for measuring identifiability; this is the
+first valid test of it, and the answer at this scale is that **the cost of a noise dimension is below
+detection** (0.0 ± 2.3, so an effect up to about two points cannot be excluded — but the assertion
+that dimensions carry a real cost is not supported).
+
+It does not contradict the shuffle result. Neutralising removes a dimension's contribution;
+shuffling **replaces it with active noise**, which cost 2.7 points for two dimensions. Removing a
+weak signal and injecting a strong one are different operations and the asymmetry is expected.
+
+**What it changes:** the cost side of every dimension decision in the phase — the horizons, the
+phase weight, the contact flags. Those were all argued partly on "dimensions are not free", and that
+argument now needs its own evidence in each case rather than being available by default.
+
+The flag itself is wrong regardless of the measurement — a contact flag on a head is not a judgement
+call — and is fixed separately, after the experiment rather than before it.
+
+## A standing practice, not a note about one case
+
+> **Measure the cost before moving a shipping default.**
+
+Declining to move `phaseWeight` until the cost side had been measured was the rule that survived the
+number turning out to be an artefact. The large, significant-looking +7.0 was retracted; the refusal
+to act on it still stands. **A rule that protects you when your evidence is wrong is doing more work
+than one that protects you when it is right**, which is the argument for this being standing practice
+rather than a remark about that instance.

@@ -358,6 +358,55 @@ TEST_CASE("cross-clip matching, judged in pose space", "[crossclip][phaseC][alie
     // Shuffled scoring *below* baseline (32.0 vs 34.7) is the expected sign: adding dimensions that
     // carry noise costs a little, which is also §24's warning about dimensions not being free,
     // arriving from a valid instrument this time.
+    // **What a noise dimension costs -- the first valid measurement of it in this phase.**
+    //
+    // `dimension()` adds one contact flag per *feature* joint rather than per *contact* joint, so
+    // with contacts enabled `head.x` carries one. A head does not plant: that dimension is
+    // **meaningless by construction**, for a reason statable in advance, and it varies -- so it
+    // passes the liveness check. Which is the limit of that check, and the third member of a set:
+    //
+    //   liveness distinguishes present from absent.
+    //   the shuffle distinguishes meaning from identity.
+    //   **neither distinguishes meaning from noise.**
+    //
+    // Neutralising it -- setting it constant across samples, so it adds the same amount to every
+    // distance and cannot affect any ranking -- isolates the noise from the dimension count, which
+    // is cleaner than deleting it. §24 asserted "dimensions are not free" and its instrument has
+    // since been retired for measuring identifiability; this measures the claim validly.
+    {
+        scene::MotionDatabaseOptions withContacts;
+        withContacts.sampleRate = 30.0f;
+        withContacts.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+        withContacts.config.contactWeight = 1.0f;
+        auto noisy = scene::buildMotionDatabase(*pack, withContacts);
+        if (!noisy.has_value()) {
+            FAIL("motion database build failed: " << noisy.error().message);
+        }
+        const std::vector<scene::MotionFeatureGroup> lay =
+            scene::motionFeatureLayout(noisy->config);
+        std::vector<std::size_t> contactDims;
+        for (std::size_t d = 0; d < lay.size(); ++d) {
+            if (lay[d] == scene::MotionFeatureGroup::Contact) {
+                contactDims.push_back(d);
+            }
+        }
+        REQUIRE(contactDims.size() == 3u); // foot.l, foot.r, head.x -- the third is the bogus one
+
+        scene::MotionDatabase clean = *noisy;
+        for (std::uint32_t s = 0; s < clean.sampleCount(); ++s) {
+            clean.features[static_cast<std::size_t>(s) * clean.dimension + contactDims[2]] = 0.0f;
+        }
+
+        const auto [withNoise, oracleNoisy] = score(*noisy, "contacts, bogus head flag LIVE");
+        const auto [withoutNoise, oracleClean] = score(clean, "contacts, bogus head flag NEUTRAL");
+        WARN(fmt::format("NOISE DIMENSION: {:.1f}% with it, {:.1f}% without -- one meaningless "
+                         "dimension of {} costs {:+.1f} points",
+                         withNoise, withoutNoise, noisy->dimension, withNoise - withoutNoise));
+        // The oracle must not move: neutralising a feature dimension cannot change what pose-space
+        // answers exist. If it does, the arms differ in something other than the dimension.
+        CHECK(oracleNoisy == Approx(oracleClean).margin(1e-6f));
+    }
+
     CHECK(withoutPhase > 0.0);
     CHECK(withPhaseRate > 0.0);
     CHECK(std::abs(withPhaseRate - withoutPhase) < 5.0); // no large effect either way
@@ -440,4 +489,5 @@ TEST_CASE("§30: contact-aware matching, on the validated instrument",
     // **A contact feature that does not vary is a dead dimension wearing a name**, and this is the
     // check that says which before any rate is reported.
     CHECK(hi > lo);
+
 }
