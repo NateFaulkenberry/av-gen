@@ -1388,3 +1388,34 @@ assume every dimension improves quality") demonstrated without needing a noise a
 
 The result is *reported* and only weakly asserted: asserting that the current value is best would be
 the conclusion writing the experiment, and the same scepticism has to apply to the decline.
+
+## §25 — a trajectory predicted from a MotionRequest alone
+
+**The audit finding first, because it is why the file exists.** `entity::sampleTrajectory` already
+existed and looked like §25. It takes a span of **waypoints**, which is a navigation product, and
+§25 explicitly forbids requiring one — the matcher needs a trajectory every frame for every
+character and most of them are not following a route. *"A trajectory predictor exists"* was true and
+answered a neighbouring question.
+
+`entity::predictTrajectory` takes a `MotionRequest`, a `MotionState` and `MotionLimits`, and
+integrates forward with **`stepMotion` itself**. That is the load-bearing choice: the prediction
+agrees with what the body will actually do rather than being a second opinion about it. A prediction
+that disagrees trains the matcher on motion the character cannot produce, and the symptom would be a
+character that consistently selects clips it then fails to follow — which is the kind of fault that
+gets diagnosed as "the clips are wrong".
+
+Measured:
+
+- **Agreement**: predicting 0.6 s ahead gives `(0.3883, 0.7243)`; stepping the controller 0.6 s for
+  real gives `(0.3883, 0.7243)`. Compared against a loop written independently in the test, so this
+  is not a function agreeing with itself, and the 1e-5 margin catches any divergence — including
+  someone later "optimising" the prediction into a closed form.
+- **Limits respected**: asked for 4 m/s from rest, the prediction puts the body at **0.14 m** after
+  0.2 s where a straight line at the desired velocity would say **0.80 m** — 5.7x. The obvious cheap
+  prediction is wrong, not merely approximate.
+- **Lightweight, with a number**: **0.955 µs per call**, ~17,450 characters per 60 Hz frame, so a
+  hundred characters spend under 0.1 ms of their budget on it. §25 says "should be lightweight",
+  which is a claim with a number behind it or it is nothing.
+
+Two horizons falling inside one tick both get a point, because dropping one would leave a zero where
+a position belongs in the feature vector — a silent hole in the thing the matcher searches on.
