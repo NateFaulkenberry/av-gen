@@ -69,32 +69,6 @@ fn mediaLane(s: u32, l: u32) -> vec4<f32> {
     return vol.media[s * 16u + l];
 }
 
-// Which density function slot `s` wants. Matches `AtmosphereKind`; only the kinds that resolve
-// into `EffectBucket::Medium` can appear here.
-// These mirror `AtmosphereKind`'s enumerator ORDER, which is what `slot.kind` is cast from. Named
-// constants rather than literals so the two sides are legible against each other; only the kinds
-// that resolve into `EffectBucket::Medium` can appear here.
-const kMediumKindVortex: u32 = 2u;
-const kMediumKindFog: u32 = 4u;
-const kMediumKindTornado: u32 = 5u;
-
-// The tag lives in the LAST lane, written centrally in `buildAtmosphericFrame` right after each
-// kind's `pack` returns -- central so that a new medium kind cannot forget to set it, which is
-// exactly how it came to be written and read by nobody for a day. The `+ 0.5` is a float-to-int
-// round and not superstition: the tag arrives as a float and truncating 3.9999997 gives 3.
-fn mediumKind(s: u32) -> u32 {
-    return u32(mediaLane(s, 15u).x + 0.5);
-}
-
-// The packed tornado uniforms for slot `s`, in the order `shaders/tornado.wgsl` names them.
-fn mediumTornadoUniforms(s: u32) -> TornadoUniformsWgsl {
-    return TornadoUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 1u), mediaLane(s, 2u),
-                               mediaLane(s, 3u), mediaLane(s, 4u), mediaLane(s, 5u),
-                               mediaLane(s, 6u), mediaLane(s, 7u), mediaLane(s, 8u),
-                               mediaLane(s, 9u), mediaLane(s, 10u), mediaLane(s, 11u),
-                               mediaLane(s, 12u));
-}
-
 // The packed vortex uniforms for slot `s`, in the order `shaders/vortex.wgsl` names them.
 fn mediumVortexUniforms(s: u32) -> VortexUniformsWgsl {
     return VortexUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 1u), mediaLane(s, 2u),

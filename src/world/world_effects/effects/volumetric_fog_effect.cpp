@@ -118,8 +118,13 @@ constexpr EffectField kFields[] = {
     storedFloat("groundHug", "Ground hug", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f).main(),
     storedFloat("heightFalloff", "Height falloff", 1.4f, 0.05f, 8.0f, 0.3f, 4.0f).sec("Structure"),
     storedFloat("domeShape", "Dome", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f),
+    // ADR-580's panel guard: this row inherits "Structure" from `heightFalloff` in list order, and
+    // `heightFalloff` is ADVANCED while this one is Main. The panel emits a section header only on
+    // the declaring row, AFTER filtering by page -- so no "Structure" separator is ever drawn on
+    // the Main page and this row lands under whatever section precedes it there. Declaring it here
+    // is the whole fix. (One line in another agent's file; drop it if it conflicts.)
     floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
-               SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").main()
+               SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").main().sec("Structure")
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
                  "its shape. At 0 the bank is its analytic volume alone -- which is the check\n"
                  "that the fog is fog and not a noise field: it should still read as fog."),

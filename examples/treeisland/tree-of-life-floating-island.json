@@ -234,7 +234,7 @@
      0.0
     ],
     "density": 0.05,
-    "emission": 0.22,
+    "emission": 0.004,
     "scattering": 0.15,
     "colorThin": [
      0.28,
