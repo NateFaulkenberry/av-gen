@@ -674,3 +674,34 @@ contract. One shared rebuild at the top would be fast and silently wrong. The co
 is incremental — rebuild only beneath what the previous layer wrote — and the stack already knows
 what each layer touches, because `masks_`, `chain_` and `stride_` are resolved at bind time. That is
 §53's work, and the expected win is stated in the ADR *before* the work so that it can be wrong.
+
+## §48 — multi-character architecture
+
+§47 proved the per-character *time* does not grow with the count. §48 asks the question timing
+cannot answer, and the answer came from reading a header rather than running anything:
+`scene::SkinnedRig` holds `Skeleton skeleton` **and `std::vector<AnimationClip> clips` by value.**
+
+On the shipping Glowmere scene, after ticking the composition so its rigs are installed — counting
+straight after `loadFile` reports a confident 0.00 MB, which is `docs/testing.md` family C:
+
+- 14 rigs, **15.45 MB** of skeleton and clip data.
+- Five 90-joint aliens at **3.01 MB each**, clips **byte-identical** across all five by FNV-1a over
+  the key times and values. (The first version of the test compared clip *names and sizes*, which
+  two rigs could satisfy while animating differently in every key.)
+- **12.12 MB — 78% of the total — is a byte-identical second copy.**
+
+The five aliens are five different GLB files with different meshes shipping the same 26-clip pack,
+so the duplication is in the assets as well as in the instancing: one of each character already
+carries five copies.
+
+12 MB is not alarming, which is why ADR-604 records the extrapolation instead: **a hundred
+characters of this rig is 301 MB of animation data of which 298 MB is the same bytes.** The fix
+belongs at load — `AssetRegistry` already keys by source path, every consumer already takes
+`const std::vector<AnimationClip>&`, and ADR-550's digest already answers the identity question. The
+part that makes it more than a five-line change is that `analyse` writes `clipPhases` and
+`clipContacts` *parallel to* `clips` and `rootMotion` binds by clip index: per-rig results derived
+from what would become shared input.
+
+The other half of §48 is in good shape and is now asserted: per-instance state really is
+per-instance — two rigs from the same file have separate storage and posing one leaves the other
+untouched.

@@ -57,9 +57,14 @@ Three things about its shape are load-bearing:
 - **Elapsed seconds, not an absolute time.** The stack is applied on the rig's sample clock
   (ADR-086's fixed grid) while a driver knows the entity's. An absolute second from one clock
   compared against `now` from the other is a bug that shows only on a rate-limited rig. An elapsed
-  duration is computed where both its terms live, so there is no clock to get wrong. The first
-  implementation had the absolute form and it was wrong; nothing failed, because nothing in the
-  repository rate-limits a rig with a look layer yet.
+  duration is computed where both its terms live, so there is no clock to get wrong.
+
+  The first implementation had the absolute form. **Nothing failed, and that is the part worth
+  recording**: no rig in this repository currently rate-limits *and* carries a look layer, so the
+  two clocks happen to be the same clock everywhere the code runs today. A correctness argument
+  that holds only because the case does not exist yet is not a correctness argument — it is a
+  coincidence with a deadline, and the deadline is the first scene that sets `updateHz` on a
+  character. Passing tests said nothing about it either way.
 - **Smoothstep, not lerp.** A lerp arrives at full rate and stops dead. No position jumps and the
   derivative does, which reads as a tick.
 
@@ -76,6 +81,14 @@ replays every step and anything accumulated there is reconstructable at frame N 
 The pose tier may not, and so it is handed a time instead of a ramp.**
 
 ### 2. A parameter that snaps at a threshold should have been a weight
+
+**Stated generally, because it is not about this stack:** *a parameter that snaps at a threshold
+should have been a weight, because a neutral value is not neutral when the thing reading it scales
+by it.* Anywhere a function returns an identity value to mean "I do not apply here" — 1.0 for a
+multiplier, 0.0 for an offset, a rest pose for a pose — and a consumer applies that value rather
+than skipping, the boundary is a discontinuity in the output that no one wrote and no one can see
+in the source. The two questions being conflated are always the same pair: *what is the value* and
+*does this apply at all*. The second one is a weight.
 
 The second-largest discontinuity was `strideRatio`, and its shape is `Gait::footSlip`'s:
 

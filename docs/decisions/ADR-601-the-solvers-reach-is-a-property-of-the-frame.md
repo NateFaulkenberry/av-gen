@@ -46,8 +46,18 @@ length-preserving. Measured across all 26 clips:
 
 All 26 clips carry translation channels on all eight joints, so the three zeros are not "no channel"
 — they are channels whose values never leave the rest translation. Blender exports TRS for
-everything; the animator moved one of them. **The legs are safe by accident, not by structure**, and
-a re-export in which someone keyframes a hip slide moves them into the arm's column silently.
+everything; the animator moved one of them.
+
+**The accident is the finding underneath the finding, and it is worth more than the 21.4%.** The
+number is a measurement: it describes one character on one day, and a measurement can be re-taken.
+The zeros are a *hazard*: the legs are safe for no chosen reason, nothing in the asset, the loader,
+the retarget or the solver requires them to stay that way, and the thing that would change them is
+an animator keyframing a hip slide in a re-export — an ordinary act, by someone with no way to know
+it matters. A property that holds today, that nothing enforces, and whose violation is silent, is a
+worse position to be in than a known 21.4%, because the 21.4% is at least visible.
+
+This is also why the legs' zeros are asserted below rather than noted. An assertion is the only
+thing that converts "true by accident" into "true, or the suite says so".
 
 The consequence is a band of hand targets whose reachability depends on which frame of the walk they
 are asked on. Over `Walking`, the arm's `maxReach` runs 0.5091 m to 0.5398 m: a **0.0307 m band,
