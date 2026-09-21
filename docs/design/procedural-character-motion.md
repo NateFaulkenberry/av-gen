@@ -2462,6 +2462,12 @@ What this changes in ADR-614:
 Not re-taken: MIXED, and §30 on TR (the `[.scale]` test). Both are 100STYLE runs that the facing
 frame will move. They are queued rather than claimed.
 
+### Observed under load, not chased: `test_lighting_perf`
+
+Run explicitly by file on 2026-09-21, `test_lighting_perf.cpp:236` read 7.9 ms against its 4.0 ms
+limit (shadow + AO). Three agents' suites were running on the machine at the time. It is not part
+of the default run and not motion work. Recorded here as observed under load, per the coordinator.
+
 # Phase C infrastructure and tooling (`agent/anim-cinfra`)
 
 Sections §37–§43, §57, §58, §68, §69, §72, §74–§76, §81–§83. Built under the programme's faster

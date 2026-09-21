@@ -1076,16 +1076,22 @@ TEST_CASE("every motion tag has a writer as well as a reader", "[motionscale][ph
     WARN(fmt::format("{} of {} clips loop, {} are cyclic, {} travel, {} carry authored tags",
                      looping, pack->clips.size(), cyclic, travelling, withTags));
 
-    // **`OneShot` has no writer on this path, and this is the assertion that says so.**
-    // `PackClip::loop` defaults to `true` and is assigned in exactly one place -- deserialising a
-    // pack from JSON (`c.value("loop", true)`). Nothing in `buildMotionPack` ever decides it from
-    // the clip, so a pack built from a rig has every clip looping, including `Dying_forward`, and
-    // `MotionTag::OneShot` is unreachable.
-    //
-    // Recorded as a measurement rather than fixed here: deciding whether a take loops is a
-    // judgement about content (does the last pose meet the first?) and belongs with the clip
-    // analysis that already answers questions of that kind, not bolted onto the tagger.
-    CHECK(looping == static_cast<int>(pack->clips.size()));
+    // **`OneShot` now has a writer, and this assertion used to pin its absence.** `PackClip::loop`
+    // defaulted to `true` and nothing in `buildMotionPack` decided it, so every clip looped,
+    // `Dying_forward` included. The note here said the decision "belongs with the clip analysis",
+    // and that is where it went: `measureLoopClosure` asks whether the last pose meets the first.
+    // On the scout, 21 of 26 clips loop. The five that do not are the three deaths, `Landing`
+    // and `Crazy` (a 0.46 m jump at its seam).
+    CHECK(looping < static_cast<int>(pack->clips.size()));
+    CHECK(looping > 0);
+    for (const scene::PackClip& clip : pack->clips) {
+        if (clip.name.rfind("Dying", 0) == 0) {
+            CHECK_FALSE(clip.loop);
+        }
+        if (clip.name == "Walking" || clip.name == "Running" || clip.name == "Idle") {
+            CHECK(clip.loop);
+        }
+    }
 
     // **And the contrast that turned this from "no writer" into something better.** 25 of 26 clips
     // are `cyclic` *in the pack*, computed correctly by `buildMotionPack` from the real contact

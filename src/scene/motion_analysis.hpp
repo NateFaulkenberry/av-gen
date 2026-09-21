@@ -248,4 +248,27 @@ struct ClipAnalysis {
                                        std::span<const ContactJoint> joints, int referenceJoint = 0,
                                        const ContactSettings& settings = {});
 
+
+// Does this clip's end join its start? Read from the clip rather than assumed, because a pack built
+// from a file has nothing else to go on: glTF has no loop flag, and a BVH take is a take.
+//
+// The measure is the largest distance any joint moves between the last frame and the first, with
+// the body's horizontal travel removed so a walk that has moved on still matches its start. The
+// scale is the clip's own median frame-to-frame change of the same measure. A loop closes within a
+// few of its own steps: a duplicated end frame gives zero, and a cycle without one gives one step.
+// A death, a fall or a mocap take ends somewhere else entirely.
+struct LoopClosure {
+    float gap = 0.0f;          // model units: the worst joint's distance, last frame to first
+    float typicalStep = 0.0f;  // model units: the median frame-to-frame change
+    bool loops = false;
+};
+// How many of its own median steps a closing gap may be. **One step**, from the scout's 26 clips
+// (test_motion_pack.cpp, "how far each scout clip's end is from its start"): every cycle closes
+// within 0.43 of a step (`Walking_low_grav`, the worst; most are under 0.01), and the next clip up
+// is `Crazy` at 2.88 steps, a 0.46 m jump that would teleport a body if it were looped. After that
+// come `Landing` at 14.7 and the deaths at 31 to 119.
+inline constexpr float kLoopClosureSteps = 1.0f;
+[[nodiscard]] LoopClosure measureLoopClosure(const Skeleton& skeleton, const AnimationClip& clip,
+                                             float rate);
+
 } // namespace avgen::scene
