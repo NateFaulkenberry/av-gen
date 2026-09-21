@@ -130,8 +130,12 @@ TEST_CASE("the Glowmere alien stands on terrain with its feet on the ground",
         }
     }
     INFO("bound " << boundFootLayers << " detached " << detachedChains);
-    CHECK(boundFootLayers == 6);   // three aliens, two legs each
-    CHECK(detachedChains == 6);    // and not one of them is an ancestor chain
+    // Four aliens, two legs each. `alien-provider` was added when the motion seam was closed --
+    // it is the body that opts into procedural motion, and it carries the same authored foot
+    // layers as the other three so that the opt-in changes the *source of the base pose* and
+    // nothing else.
+    CHECK(boundFootLayers == 8);
+    CHECK(detachedChains == 8);    // and not one of them is an ancestor chain
 
     // ...and the analysis the scene asked for ran: `contacts` made the rigs analyse their clips.
     std::uint32_t cyclicClips = 0;
