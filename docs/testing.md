@@ -359,6 +359,20 @@ night from two agents who never spoke to each other.
    sample domain (a plateau), or in a *duration* — and the third is the easiest to miss, because
    running a test for longer feels like more evidence rather than less.
 
+   **The fifth instance, and the mechanism was not even running.** A balance-margin arm removed a
+   lean layer's 20° cap and asserted the lean grew. At the default gain that lean is **6.1°** — so
+   the cap never engaged, removing it changed nothing, and the assertion measured a limiter that
+   was not participating. Turning the *gain* up is what makes the margin fall. The same week, a
+   lookahead of exactly 1.0 s reached exactly *to* a corner and never past it, so a right angle
+   read as zero degrees.
+
+   Five instances now, in five different clothes: a parameter at its boundary, a sample domain on a
+   plateau, a duration spanning two mechanisms, a lookahead landing on the feature it was meant to
+   see past, and a mechanism with no authority at the default values. **The fix is the same one
+   every time: ask what would have to be true for this mechanism to matter, and put the fixture
+   there.** Not "does the code run" — *does the thing I am measuring have any authority at these
+   values.*
+
 19. **A minimum is robust to contention ARRIVING and defenceless against the machine getting
    quieter.** ADR-170 says "report minima over repeats, never means" and stops, which reads as
    though minima solve contention. They solve **one direction** of it.
