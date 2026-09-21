@@ -1132,3 +1132,30 @@ per second for every configuration**. Caught by this repository's own rule that 
 reading to distrust. And the vacuous version **carried the evidence of the freeze all along** —
 index step 0.15 against 1.82 — in a test whose headline metric said everything was fine. A probe
 that cannot fail does not merely prove nothing; it can present a real fault as a success.
+
+## §12 and §14 — the transition term does something, and filtering removes 82%
+
+**§14, whose deliverable is "measure how much it helps", measured on the real database:**
+
+| | scored | rejected | time |
+|---|---|---|---|
+| unfiltered | 1738 | 0 | 9.50 µs |
+| require `Locomotion` | 307 | **1431 (82%)** | **4.08 µs (2.33x)** |
+
+The tag distribution is reported first, because **a filter's value is a property of the corpus, not
+of the filter** — on a pack where every sample carried the same tag it would be exactly zero however
+well written it was. Locomotion 18%, idle 14%, walk 15%, run 3%, turn 7% — **and cyclic, travelling
+and oneshot are carried by zero samples.** Three tags with no writer, which is ADR-608's family seen
+from the other side, and worth knowing before anything is built that filters on them.
+
+**§12** is correct in its one explicit prohibition — it keys on tag metadata, never on clip names —
+and it is now checked the way ADR-608 says every configured term must be: make it large and see the
+answer change. With the transition weight at zero the idle wins on features alone; at 0.5 the walk
+wins. Continuity is pinned to zero in both arms so only the transition term differs.
+
+**And the winner's breakdown reports a transition cost of zero, correctly.** The penalty did its
+work on the candidate that *lost*; the chosen sample stayed in the family and paid nothing. A
+breakdown answers "what did this cost", not "what changed the decision" — **a term can be decisive
+and read as zero** — so the penalty is confirmed separately on a query whose surviving choice does
+have to cross. Recorded in ADR-611 as a corollary, because anyone debugging a choice through §50's
+read-out will hit it.

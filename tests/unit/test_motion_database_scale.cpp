@@ -808,3 +808,185 @@ TEST_CASE("continuity is measured by how often the loop jumps, on real motion",
     CHECK(bestRun.stalledFraction < 0.5);
     CHECK(bestRun.clipJumpsPerSecond <= binary.clipJumpsPerSecond);
 }
+
+// ---------------------------------------------------------------------------------------------
+// §14 -- candidate filtering: "**measure how much it helps**", which is the whole deliverable.
+// §12 -- the transition penalty, checked for being a control that does anything (ADR-608).
+
+TEST_CASE("candidate filtering, measured on the real database", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §14"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+
+    // What the tags actually say about this content, before asking what filtering on them saves.
+    // **A filter's value is a property of the corpus, not of the filter**, and on a pack where
+    // every sample carried the same tag it would be exactly zero however well written it was.
+    const scene::MotionTag interesting[] = {scene::MotionTag::Locomotion, scene::MotionTag::Idle,
+                                            scene::MotionTag::Walk,       scene::MotionTag::Run,
+                                            scene::MotionTag::Turn,       scene::MotionTag::Cyclic,
+                                            scene::MotionTag::Travelling, scene::MotionTag::OneShot};
+    WARN("tag distribution over the real database:");
+    for (const scene::MotionTag tag : interesting) {
+        std::uint32_t count = 0;
+        for (const std::uint32_t tags : db->sampleTags) {
+            if ((tags & static_cast<std::uint32_t>(tag)) != 0u) {
+                ++count;
+            }
+        }
+        WARN(fmt::format("  {:<12} {:>5} of {} samples ({:.0f}%)", scene::motionTagNames(static_cast<std::uint32_t>(tag)),
+                         count, db->sampleCount(), 100.0 * count / db->sampleCount()));
+    }
+
+    scene::MotionQuery base;
+    base.features.assign(db->dimension, 0.0f);
+    const float* seed = db->featuresFor(db->sampleCount() / 3u);
+    std::copy(seed, seed + db->dimension, base.features.begin());
+    const scene::MotionCostWeights weights;
+
+    const auto timeQuery = [&](const scene::MotionQuery& q) {
+        double best = std::numeric_limits<double>::max();
+        scene::MotionMatch match;
+        for (int r = 0; r < 5; ++r) {
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int i = 0; i < 200; ++i) {
+                match = scene::searchMotion(*db, q, weights);
+            }
+            const auto t1 = std::chrono::steady_clock::now();
+            best = std::min(best,
+                            std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(
+                                t1 - t0)
+                                    .count() /
+                                200.0);
+        }
+        return std::pair<double, scene::MotionMatch>{best, match};
+    };
+
+    const auto [unfilteredUs, unfiltered] = timeQuery(base);
+    scene::MotionQuery filtered = base;
+    filtered.requireTags = static_cast<std::uint32_t>(scene::MotionTag::Locomotion);
+    const auto [filteredUs, filteredMatch] = timeQuery(filtered);
+
+    WARN(fmt::format("unfiltered: {} scored, {} rejected, {:.2f} us", unfiltered.considered,
+                     unfiltered.rejected, unfilteredUs));
+    WARN(fmt::format("require Locomotion: {} scored, {} rejected ({:.0f}% removed), {:.2f} us "
+                     "({:.2f}x)",
+                     filteredMatch.considered, filteredMatch.rejected,
+                     100.0 * filteredMatch.rejected / db->sampleCount(), filteredUs,
+                     unfilteredUs / std::max(filteredUs, 1e-9)));
+
+    CHECK(unfiltered.rejected == 0u);
+    // **The measurement §14 asks for, asserted so it stays a measurement.** If a future pack tags
+    // everything identically this fails and says the filter stopped being worth anything -- which
+    // is a fact about the content that nobody would otherwise notice.
+    CHECK(filteredMatch.rejected > 0u);
+    CHECK(filteredMatch.considered < unfiltered.considered);
+    // A filter that removes candidates must not change which of the survivors wins, when the
+    // winner survives: otherwise it is not a filter, it is a second opinion about the cost.
+    if (filteredMatch.found() && unfiltered.found() &&
+        (db->sampleTags[unfiltered.sample] &
+         static_cast<std::uint32_t>(scene::MotionTag::Locomotion)) != 0u) {
+        CHECK(filteredMatch.sample == unfiltered.sample);
+    }
+}
+
+TEST_CASE("the transition penalty is a control that does something", "[motionscale][phaseC]") {
+    // §12, checked the way ADR-608 says every configured term should be: by making it large and
+    // seeing the answer change. Five of seven weights in this very struct were inert, so "it is
+    // in the cost function" is not evidence that it does anything.
+    const scene::MotionFeatureConfig config =
+        scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    scene::MotionDatabase db;
+    db.config = config;
+    db.dimension = config.dimension();
+    const std::uint32_t n = 3;
+    db.features.assign(static_cast<std::size_t>(n) * db.dimension, 0.0f);
+    db.sampleClip = {0u, 1u, 0u};
+    db.sampleTime = {0.0f, 0.0f, 1.0f};
+    db.samplePhase.assign(n, 0.0f);
+    // Sample 0 is a walk; sample 1 is an idle in another clip; sample 2 is a walk in clip 0.
+    db.sampleTags = {static_cast<std::uint32_t>(scene::MotionTag::Walk),
+                     static_cast<std::uint32_t>(scene::MotionTag::Idle),
+                     static_cast<std::uint32_t>(scene::MotionTag::Walk)};
+    db.sampleNext = {scene::MotionDatabase::kInvalid, scene::MotionDatabase::kInvalid,
+                     scene::MotionDatabase::kInvalid};
+    db.mean.assign(db.dimension, 0.0f);
+    db.scale.assign(db.dimension, 1.0f);
+    db.clipNames = {"walk", "idle"};
+
+    // The idle is a *slightly better* feature match, so only the transition penalty can stop it
+    // winning. Without that construction the test would pass whatever the penalty did.
+    db.features[0 * db.dimension + 0] = 0.20f; // walk, clip 0
+    db.features[1 * db.dimension + 0] = 0.10f; // idle, clip 1 -- closer
+    db.features[2 * db.dimension + 0] = 0.20f;
+
+    scene::MotionQuery query;
+    query.features.assign(db.dimension, 0.0f);
+    query.current = 2u; // currently walking, in clip 0
+
+    scene::MotionCostWeights off;
+    off.continuity = 0.0f;
+    off.transition = 0.0f;
+    const scene::MotionMatch without = scene::searchMotion(db, query, off);
+    REQUIRE(without.found());
+    CHECK(without.sample == 1u); // the idle wins on features alone
+
+    scene::MotionCostWeights on;
+    on.continuity = 0.0f; // isolated: only the transition term differs between the two runs
+    on.transition = 0.5f;
+    const scene::MotionMatch with = scene::searchMotion(db, query, on);
+    REQUIRE(with.found());
+    WARN(fmt::format("transition off -> sample {}, on -> sample {} ({})", without.sample,
+                     with.sample, with.breakdown.report()));
+    CHECK(with.sample == 0u); // the walk wins once crossing families costs something
+
+    // **And the winner's breakdown reports a transition cost of zero, which is correct and is a
+    // real limitation worth knowing.** The penalty did its work on the candidate that *lost*: the
+    // chosen sample stayed in the family, so it paid nothing. A breakdown answers "what did this
+    // cost", not "what changed the decision", and those are different questions. Anyone debugging
+    // a choice with §50's read-out needs to know that a term can be decisive and invisible.
+    CHECK(with.breakdown.transition == 0.0f);
+
+    // So the penalty is confirmed on a candidate that does pay it: ask from inside the idle clip,
+    // where the surviving choice has to cross.
+    scene::MotionQuery fromIdle = query;
+    fromIdle.current = 1u; // currently idling, in clip 1
+    const scene::MotionMatch crossing = scene::searchMotion(db, fromIdle, on);
+    REQUIRE(crossing.found());
+    if (db.sampleClip[crossing.sample] != db.sampleClip[1u]) {
+        CHECK(crossing.breakdown.transition > 0.0f);
+        WARN(fmt::format("crossing out of the idle clip pays {}", crossing.breakdown.report()));
+    }
+}
