@@ -19,6 +19,37 @@
 #include <span>
 
 namespace avgen::entity {
+
+namespace {
+
+// ADR-620. The authored acceleration limit, applied where the entity's own gait governs the entity.
+//
+// `GaitSettings::accel`/`decel` were authored, parsed and serialised, and read by nobody for a
+// behaviour-driven body: `Gait::approach`'s only caller was the action tier's `Move` verb, and
+// every behaviour assigns `state.speed` outright. So a character went from standing to full walking
+// speed in one frame and back to zero in one frame -- the sprite behaviour `gait.hpp` says the
+// class exists to prevent, with the two numbers that would prevent it sitting dead in the scene.
+//
+// Applied centrally rather than in each behaviour, because there are twenty-odd `state.speed`
+// writes across `behaviors.cpp` and a limit honoured by some of them is a limit an author cannot
+// reason about. **It is a no-op for an action-driven body**, whose speed the action tier has
+// already limited with the same numbers: the delta it sees is within budget and `approach` returns
+// it unchanged.
+//
+// `dt <= 0` is the first frame and a seek's zero-length step; there is no rate to limit over one.
+void limitSpeedToGait(const GaitSettings& gait, float previous, double dt, float& speed) {
+    // **Only where the scene authored a ramp.** The defaults exist for the action tier, which has
+    // always applied them; switching the behaviour tier on for every body would cost every shallow
+    // body a forty-step replay and change three behaviours that no author asked to change. See
+    // `GaitSettings::accelAuthored`.
+    if (!gait.accelAuthored || dt <= 0.0 || (gait.accel <= 0.0f && gait.decel <= 0.0f)) {
+        return;
+    }
+    speed = Gait::approach(previous, speed, gait.accel, gait.decel, dt);
+}
+
+} // namespace
+
 namespace {
 
 constexpr float kDegrees = 180.0f / 3.14159265358979323846f;
@@ -1012,6 +1043,30 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 need = std::max(need, static_cast<std::uint64_t>(steps));
             }
         }
+        // **ADR-620: a rate-limited speed is an integrator, so the ENTITY has a history
+        // requirement of its own** -- one that belongs to no behaviour and is therefore invisible
+        // to the loop above.
+        //
+        // Before the limiter, `state.speed` was assigned outright, so the step a body landed on
+        // determined it and a shallow body needed one or two steps. With `accel`/`decel` applied
+        // the speed ramps, and a replay too short to finish ramping lands on a different speed
+        // than the played frame did -- which is ADR-360's contract broken, and it is how the
+        // `drift` seek test found this change: seek read 0.10 m/s where play read 0.27.
+        //
+        // **Bounded, and that is the point.** The ramp converges in `maxSpeed / rate` seconds, so
+        // the requirement is a few tens of steps rather than the whole window: for the shipping
+        // `rook` (walk 3.07 m/s, accel 4.82) it is 39 steps against a 3,600-step window. A body
+        // with no authored acceleration is unchanged.
+        if (!deep && entity.desc_.gait.accelAuthored) {
+            const GaitSettings& gait = entity.desc_.gait;
+            const float rate = std::min(gait.accel > 0.0f ? gait.accel : 1e30f,
+                                        gait.decel > 0.0f ? gait.decel : 1e30f);
+            const float top = std::max(gait.runSpeed, gait.walkSpeed);
+            if (rate > 0.0f && rate < 1e30f && top > 0.0f) {
+                const double rampSteps = std::ceil((static_cast<double>(top) / rate) / dt) + 1.0;
+                need = std::max(need, static_cast<std::uint64_t>(rampSteps));
+            }
+        }
         needSteps[i] = deep ? 0 : need; // 0 means "the whole window"
         deepBodies += deep ? 1u : 0u;
     }
@@ -1202,9 +1257,14 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // one layer up. A decision taken during a replay pushes onto the queue the replay is
             // already integrating, so the replayed second contains the errand the played one did.
             bc.actions = &entity.actions_;
+            // ADR-620, and it is applied on BOTH paths for the reason testing.md #31 gives: a
+            // limit honoured by `update` and not by `seek` is a body that accelerates differently
+            // when scrubbed than when played, which is exactly the class ADR-360 exists to stop.
+            const float speedBefore = entity.state_.speed;
             for (auto& behavior : entity.behaviors_) {
                 behavior->update(bc, entity.state_, entity.motion_);
             }
+            limitSpeedToGait(entity.desc_.gait, speedBefore, step, entity.state_.speed);
             // The facing, canonicalised once after everything that steers has had its turn --
             // exactly where `update` does it. Without it a replayed yaw is the total a body has
             // turned rather than the direction it faces, and `angleDelta` against it is a different
@@ -1521,6 +1581,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.everUpdated_ = true;
 
         const glm::vec3 travelBefore = entity.state_.travel;
+        // ADR-620: the speed this body had last step, so the authored accel/decel can be applied
+        // to whatever the behaviours ask for this one.
+        const float speedBefore = entity.state_.speed;
         entity.motion_ = MotionOffset{};
         entity.state_.hasLookTarget = false;
         entity.state_.reaction = 0.0f;
@@ -1676,6 +1739,11 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                 entity.state_.speed = entity.director_.speed;
             }
         }
+        // ADR-620. After every writer of intent -- behaviours, the action tier, the director -- and
+        // before the arc, the velocity measurement and the gait, all three of which read the speed
+        // and would otherwise read one that teleported. The arc's `arcHoldStill_` stop below stays
+        // a hard stop on purpose: a body held by a beam is not decelerating, it is being held.
+        limitSpeedToGait(entity.desc_.gait, speedBefore, ctx.dt, entity.state_.speed);
         // The body's facing, not the total it has turned. Canonicalised here, once, after everything
         // that steers has had its turn and before anything reads it -- the node's rotation, the
         // sockets, and the LocomotionState the animation layer is handed all see the same angle.

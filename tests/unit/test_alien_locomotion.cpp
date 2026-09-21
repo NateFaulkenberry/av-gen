@@ -1747,3 +1747,85 @@ TEST_CASE("a character that has stopped turning is not still turning", "[locomot
     CHECK(worstStaleRate == Catch::Approx(0.0f).margin(1e-4));
     CHECK(settledButTurning == 0);
 }
+
+TEST_CASE("an authored acceleration limits how fast a body may reach its speed",
+          "[locomotion][behaviour][gait]") {
+    // **`GaitSettings::accel` and `decel` are authored, parsed, serialised, and read by nobody for
+    // a behaviour-driven body.**
+    //
+    // `gait.hpp` states what they are for: *"A body that reaches full speed in one frame and stops
+    // in one frame reads as a sprite, not a character. `approach()` is the whole model."* The only
+    // caller of `Gait::approach` in the engine is the **action** tier's `Move` verb, limiting its
+    // own `layer.progress.speed`. Behaviours assign `state.speed` outright -- `Wander`, `Explore`
+    // and the rest -- so a character goes from standing to full walking speed in a single frame,
+    // with the two numbers that would prevent it sitting authored in the scene file.
+    //
+    // `glowmere-valley-2`'s `rook` authors `accel: 4.8151, decel: 6.6207`. Reproduced here as a
+    // fixture with those numbers, because the measurement is of the mechanism.
+    params::ParameterSet params;
+    entity::EntityWorld world;
+    registerNode(params, "rover");
+
+    entity::EntityDesc rover;
+    rover.name = "rover";
+    rover.node = "rover";
+    rover.seed = 3;
+    rover.gait.walkSpeed = 3.0685f;
+    rover.gait.accel = 4.8151f;  // rook's own numbers
+    rover.gait.decel = 6.6207f;
+    // The flag a scene file sets by naming either key. Without it the behaviour tier leaves the
+    // speed alone, which is what every body that inherits the defaults still does (ADR-620).
+    rover.gait.accelAuthored = true;
+    rover.behaviors.push_back(behaviorDesc("wander", {{"speed", 3.0685}, {"radius", 40.0}}));
+
+    world.setEntities({rover}, 11u);
+    world.setBindings({binding("rover", glm::vec3(0.0f))});
+    world.registerParameters(params);
+    world.bind(params);
+
+    const entity::Entity* who = nullptr;
+    for (const auto& e : world.entities()) {
+        if (e->name() == "rover") {
+            who = e.get();
+        }
+    }
+    REQUIRE(who != nullptr);
+
+    signals::SignalBus bus;
+    const float dt = 1.0f / 60.0f;
+    float worstRise = 0.0f;
+    float worstFall = 0.0f;
+    float peakSpeed = 0.0f;
+    float previousSpeed = 0.0f;
+    for (int i = 0; i <= 900; ++i) {
+        params.resetFinals();
+        entity::EntityUpdate u;
+        u.time = static_cast<double>(i) / 60.0;
+        u.dt = i == 0 ? 0.0 : static_cast<double>(dt);
+        u.frameIndex = static_cast<std::uint64_t>(i);
+        u.bus = &bus;
+        world.update(u, params);
+
+        const float speed = who->locomotion().speed;
+        if (i > 1) {
+            const float delta = speed - previousSpeed;
+            worstRise = std::max(worstRise, delta);
+            worstFall = std::max(worstFall, -delta);
+        }
+        peakSpeed = std::max(peakSpeed, speed);
+        previousSpeed = speed;
+    }
+
+    // What the authored numbers permit in one frame.
+    const float riseBudget = rover.gait.accel * dt;
+    const float fallBudget = rover.gait.decel * dt;
+    WARN(fmt::format("rover peak speed {:.3f} m/s; worst rise {:.4f} m/s per frame (budget "
+                     "{:.4f}), worst fall {:.4f} (budget {:.4f})",
+                     peakSpeed, worstRise, riseBudget, worstFall, fallBudget));
+    // The body must actually move, or this measures nothing.
+    REQUIRE(peakSpeed > 1.0f);
+    // **The assertion: an authored acceleration is a limit, or it is decoration.** A small epsilon
+    // for float accumulation only -- not a tolerance that would let a whole frame's jump through.
+    CHECK(worstRise <= riseBudget + 1e-3f);
+    CHECK(worstFall <= fallBudget + 1e-3f);
+}

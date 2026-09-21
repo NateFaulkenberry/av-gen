@@ -1337,6 +1337,8 @@ Result<GaitSettings> gaitFromJson(const nlohmann::json& j) {
     gait.minDwell = readFloat(j, "minDwell", gait.minDwell);
     gait.accel = readFloat(j, "accel", gait.accel);
     gait.decel = readFloat(j, "decel", gait.decel);
+    // ADR-620. Either key means the author asked for a ramp; neither means they inherited one.
+    gait.accelAuthored = j.contains("accel") || j.contains("decel");
     gait.blend = readFloat(j, "blend", gait.blend);
     gait.matchRate = readBool(j, "matchRate", gait.matchRate);
     gait.rateMin = readFloat(j, "rateMin", gait.rateMin);
@@ -1364,8 +1366,14 @@ nlohmann::json gaitToJson(const GaitSettings& gait) {
     j["runExit"] = gait.runExit;
     j["turnEnter"] = gait.turnEnter;
     j["minDwell"] = gait.minDwell;
-    j["accel"] = gait.accel;
-    j["decel"] = gait.decel;
+    // **Written only when authored, or a save would promote every body to authored** (ADR-620,
+    // and it is ADR-618's shape inverted): writing the inherited default back out makes the next
+    // load see an explicit key, and a scene would silently start ramping the first time anyone
+    // saved it. The values are the defaults in that case, so dropping them round-trips identically.
+    if (gait.accelAuthored) {
+        j["accel"] = gait.accel;
+        j["decel"] = gait.decel;
+    }
     j["blend"] = gait.blend;
     if (gait.matchRate) {
         j["matchRate"] = true;

@@ -48,6 +48,22 @@ struct GaitSettings {
     float minDwell = 0.25f;
     float accel = 6.0f;      // m/s^2 the body may gain speed at
     float decel = 8.0f;      // m/s^2 it may lose it at
+    // **Whether a scene actually asked for these, as distinct from inheriting them** (ADR-620).
+    //
+    // The action tier has always applied `approach` with these numbers, so their defaults are
+    // load-bearing there and may not be zeroed -- `approach` with a rate of 0 returns the speed
+    // unchanged, which would freeze every action-driven body rather than merely unlimit it.
+    //
+    // The *behaviour* tier never applied them at all, and switching it on for every body costs
+    // a scrub: a rate-limited speed is an integrator, so a shallow body's replay grows from one
+    // or two steps to about forty. So the behaviour tier honours them **only where they were
+    // authored**, which puts the cost on the bodies whose author asked for the ramp and leaves
+    // every other body exactly as it was.
+    //
+    // Set by the parser when either key is present, and settable directly by a caller building a
+    // `GaitSettings` in code -- a test that sets `accel` and not this is asking for the old
+    // behaviour, which is a legitimate thing to ask for.
+    bool accelAuthored = false;
     float blend = 0.2f;      // cross-fade seconds between gaits; < 0 = leave it to the clip
     // Playback-rate matching: a walk clip authored at 1.6 m/s played at 2.0 m/s slides its feet
     // unless the clip runs 1.25x. Clamped, because a clip at 3x is a cartoon.
