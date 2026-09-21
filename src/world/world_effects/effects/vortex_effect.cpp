@@ -365,7 +365,11 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 // CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
 // what happens when they can). The appearance lanes are assembled here because they are what the
 // picture does with the field rather than part of it.
-void packMedium(const E& e, float envelope, MediumSlot& out) {
+// ADR-572 (§17): the resolved flow is handed to every packer. A vortex does not use it -- it is a
+// static field the march samples, and ADR-387 already gives it the only flow response it wants, the
+// §68 lean that moves its centre. Named and unused rather than removed from the signature, because
+// the hook is shared and the next kind will want it.
+void packMedium(const E& e, float envelope, const MediumFlowInput& /*flow*/, MediumSlot& out) {
     const Vortex& v = e.vortex;
     const vortex::VortexUniforms f = vortex::packVortex(v.field);
     out.lane[0] = f.v0;

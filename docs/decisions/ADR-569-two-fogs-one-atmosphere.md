@@ -35,7 +35,8 @@ thirty-six shipped files that set both:
 | 88--156 m | `snow`, `grove`, `machine`, `world`, `tide` |
 | 275 m -- 4.1 km | ten others |
 
-Median 79.3 m. What that means in the flagship scene, `glowmere-valley-2.scene.json`
+Median 79.3 m, over the original file glob; see the corrected population below for how many of
+these are shipped scenes rather than probe arms. What that means in the flagship scene, `glowmere-valley-2.scene.json`
 (`fogDensity` 0.0055, `volumeDensity` 0.006, `volumeAbsorption` 0.5):
 
 | distance | surface transmittance | march transmittance | ratio |
@@ -49,6 +50,36 @@ behind it. Beyond the crossover the surface fog is always the thicker of the two
 thicker faster, because squaring the exponent makes the effective extinction grow **linearly with
 distance** -- which is, exactly, a horizon-density control. §7 asks for one by name; the engine
 already has one, unlabelled, in a pass that was not thinking about it.
+
+## The population, corrected -- and an inference that was offered and does not hold
+
+The first version of this ADR counted "36 shipped files that set both", from a glob over
+`examples/**/*.json`. That glob includes probe arms. **Restricted to shipped scenes** --
+`*.scene.json`, excluding `_`-prefixed probes -- the picture is different and more useful:
+
+| of 90 shipped scenes | count |
+|---|---|
+| **both laws active** (the crossover bites) | **30** |
+| only the exp-squared surface law | 23 |
+| only the Beer--Lambert march | 1 |
+| neither | 36 |
+
+So the exp-squared law is live in **53** scenes and the march in **31**.
+
+**An inference was put to me that both laws are not really in use -- that one of them ships
+everywhere and the other has never shipped at all -- and it does not survive the table above.**
+Both laws are in use, in 53 and 31 scenes respectively. What has never appeared in a shipped scene
+is a **fog bank effect**, and that is a different object from the Beer--Lambert march: the march is
+`Environment::volumeDensity`, which 31 scenes set, while the fog bank is an `AtmosphericEffect` of
+kind `fog`, which none do. The example offered as evidence, `tree-of-life-ocean-world.scene.json`,
+carries `fogDensity` 0.000135 and **no** `volumeDensity`, so it is one of the 23 surface-only
+scenes and demonstrates the surface law being used rather than the march being unused.
+
+**The correction cuts the other way from the inference, and that is the part that matters for the
+decision.** Option 2 below -- make the surface pass Beer--Lambert -- was costed at 36 files. It is
+**53**, because the 23 surface-only scenes have no volumetric density to derive a new one from and
+would each need a number chosen by eye. That makes option 2 more expensive than stated, not less,
+and option 3 correspondingly better.
 
 ## Why this is a question and not a defect report
 

@@ -673,11 +673,27 @@ struct MediumBound {
 };
 [[nodiscard]] MediumBound mediumBound(const MediumSlot& m);
 
+// ADR-572 (the fog brief's §17): what the air is doing where this medium is, as a packer needs it.
+//
+// The flow reaches `pack` at all because §17 asks a medium to respond to a flow field and the
+// packer is where a medium's motion is computed. It is a STRUCT rather than two parameters so a
+// second thing the air knows can be added without touching every kind again -- which is the cost
+// this ADR paid once and would rather not pay twice.
+//
+// `influence` is 0 whenever the effect is unsubscribed, names a dead field, or set its own
+// subscription to 0, so a packer that multiplies by it needs no branch. The default-constructed
+// value is exactly that state, which is what lets a test pack a medium without inventing a flow.
+struct MediumFlowInput {
+    fields::FlowSample sample{};
+    float influence = 0.0f;
+};
+
 // ADR-566: pack one effect into the bytes the march reads -- its kind's packer, the reserved-lane
 // check and the kind tag, in the one order that is correct. `buildAtmosphericFrame` calls it for
 // every seated medium; a test calls it to get exactly those bytes rather than a second copy of
 // the sequence (ADR-554).
-void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot);
+void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot,
+                    const MediumFlowInput& flow = {});
 
 // What one frame hands the renderer. A plain aggregate so nothing allocates and `scene::Scene` can
 // hold it by value beside `worldEffects`.

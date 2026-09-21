@@ -927,7 +927,8 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
 // `pack` and then write the tag by hand -- a second copy of the ordering rule that ADR-565's
 // sentinel exists to enforce. ADR-554's rule: a seam published from two places must be written by
 // both, so this one is published from one.
-void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot) {
+void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot,
+                    const MediumFlowInput& flow) {
     const EffectSchema* schema = effectSchema(e.kind);
     if (schema == nullptr || schema->resolve.pack == nullptr) {
         return;
@@ -945,7 +946,7 @@ void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot
     // frame and turns a silent loss into a named one.
     constexpr float kReserved = -987654.0f;
     slot.lane[kMediumLanes - 1] = glm::vec4(kReserved);
-    schema->resolve.pack(e, envelope, slot);
+    schema->resolve.pack(e, envelope, flow, slot);
     if (slot.lane[kMediumLanes - 1] != glm::vec4(kReserved)) {
         static std::set<AtmosphereKind> warned;
         if (warned.insert(e.kind).second) {
@@ -1027,7 +1028,12 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
                 leaned.vortex.field.center += (lean / len) * metres;
             }
         }
-        packMediumSlot(leaned, rv.envelope, out.media[out.mediumCount]);
+        // ADR-572 (§17): the subscription this effect already declares, resolved, handed to
+        // the packer. The §68 lean above uses the same two numbers to move WHERE the medium
+        // is; the packer uses them to set which way its structure travels. One answer to
+        // "what is the air doing here", two consumers -- which is ADR-387's whole argument.
+        packMediumSlot(leaned, rv.envelope, out.media[out.mediumCount],
+                       MediumFlowInput{rv.flow, rv.flowInfluence});
         ++out.mediumCount;
     }
     // Everything the resolve could not seat. ADR-560: this number had one reader in the whole tree

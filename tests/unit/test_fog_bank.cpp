@@ -70,7 +70,7 @@ float fogSampleAt(const world::AtmosphericEffect& e, glm::vec3 offset) {
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.resolve.pack != nullptr);
     world::AtmosphericEffect copy = e;
-    s.resolve.pack(copy, 1.0f, slot);
+    world::packMediumSlot(copy, 1.0f, slot);
     return world::fogShapeAt(slot, e.vortex.field.center + offset);
 }
 
@@ -139,9 +139,9 @@ TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]"
     world::MediumSlot slotOff{};
     world::MediumSlot slotOn{};
     probe.vortex.field.cloudNoise = 0.0f;
-    fs.resolve.pack(probe, 1.0f, slotOff);
+    world::packMediumSlot(probe, 1.0f, slotOff);
     probe.vortex.field.cloudNoise = 1.0f;
-    fs.resolve.pack(probe, 1.0f, slotOn);
+    world::packMediumSlot(probe, 1.0f, slotOn);
     bool moved = false;
     for (int i = 1; i < 24 && !moved; ++i) {
         const float rr = 0.04f * static_cast<float>(i);
@@ -187,7 +187,7 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     world::MediumSlot slot{};
     const world::EffectSchema& fs = fogSchema();
     REQUIRE(fs.resolve.pack != nullptr);
-    fs.resolve.pack(shaped, 1.0f, slot);
+    world::packMediumSlot(shaped, 1.0f, slot);
 
     // Sampled at 0.9 of the radius, NOT at 0.45, and the difference is a finding rather than a
     // fitting of the test to the code: with `edgeSoftness` at its default the bank is a flat
@@ -216,7 +216,7 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     // CIRCULAR bank must still be uniform in angle, because that is the shape it is.
     shaped.values.setFloat("fog/bankLength", 1.0f);
     world::MediumSlot round{};
-    fs.resolve.pack(shaped, 1.0f, round);
+    world::packMediumSlot(shaped, 1.0f, round);
     float rlo = 1e30f;
     float rhi = -1e30f;
     for (int i = 0; i < 16; ++i) {
@@ -250,7 +250,7 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
         e.vortex.field.radius = radius;
         e.values.setFloat("fog/bankLength", 2.0f);
         world::MediumSlot slot{};
-        s.resolve.pack(e, 1.0f, slot);
+        world::packMediumSlot(e, 1.0f, slot);
         const float perMetre = slot.lane[1].w;
         const float crossing = 2.0f * radius * 2.0f;
         return perMetre * crossing;
@@ -273,9 +273,9 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
     world::MediumSlot lo{};
     world::MediumSlot hi{};
     a.vortex.density = 1.0f;
-    s.resolve.pack(a, 1.0f, lo);
+    world::packMediumSlot(a, 1.0f, lo);
     a.vortex.density = 4.0f;
-    s.resolve.pack(a, 1.0f, hi);
+    world::packMediumSlot(a, 1.0f, hi);
     CHECK(hi.lane[1].w > lo.lane[1].w * 3.5f);
 }
 
@@ -300,7 +300,7 @@ TEST_CASE("the fog macro detail does not move the medium's mean", "[fog]") {
     e.vortex.field.cloudNoise = 1.0f;
     e.values.setFloat("fog/detailScale", 7.0f);
     world::MediumSlot slot{};
-    s.resolve.pack(e, 1.0f, slot);
+    world::packMediumSlot(e, 1.0f, slot);
 
     // The claim is about the MULTIPLIER, over many periods -- and the distinction is a finding
     // rather than a convenience. The first version averaged the whole field over the bank's

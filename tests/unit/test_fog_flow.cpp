@@ -61,6 +61,28 @@ void setRow(world::AtmosphericEffect& e, std::string_view leaf, float v) {
     FAIL("no such row on the fog schema: " << leaf);
 }
 
+// ADR-572 (§17): the same bank, packed with a resolved flow. `influence` 0 is an unsubscribed
+// effect, which is what a default-constructed `MediumFlowInput` already is.
+world::MediumSlot bankInFlow(float speed, float rotationDeg, float windAmount,
+                             glm::vec3 flow, float influence,
+                             world::fields::FlowUnits units = world::fields::FlowUnits::Normalised) {
+    world::AtmosphericEffect e = fogSchema().factory("drift");
+    e.vortex.field.center = glm::vec3(0.0f);
+    e.vortex.field.radius = 200.0f;
+    e.vortex.field.thickness = 80.0f;
+    setRow(e, "bankRotation", rotationDeg);
+    setRow(e, "driftSpeed", speed);
+    setRow(e, "driftVertical", 0.0f);
+    setRow(e, "driftWind", windAmount);
+    world::MediumFlowInput in;
+    in.sample.flow = flow;
+    in.sample.units = units;
+    in.influence = influence;
+    world::MediumSlot slot{};
+    world::packMediumSlot(e, 1.0f, slot, in);
+    return slot;
+}
+
 world::MediumSlot bank(float speed, float vertical, float rotationDeg, float detail = 0.8f) {
     world::AtmosphericEffect e = fogSchema().factory("drift");
     e.vortex.field.center = glm::vec3(0.0f);
@@ -153,4 +175,75 @@ TEST_CASE("no drift is exactly static", "[fog][flow][determinism]") {
         sawStructure = sawStructure || std::abs(base - 1.0f) > 1e-3f;
     }
     CHECK(sawStructure); // a field that is the constant 1 is static for free
+}
+
+
+TEST_CASE("the flow steers the drift and never sets its speed", "[fog][flow][wind]") {
+    // ADR-572, the brief's §17: "flow affects movement, not basic existence." Setting which way the
+    // structure travels is movement; it cannot make the bank exist anywhere it did not.
+    //
+    // The design decision under test is that the flow contributes a DIRECTION and nothing else,
+    // and it is a unit decision rather than a simplification. `fields::FlowSample::units` exists
+    // because the wind publishes a dimensionless strength and a vortex publishes metres a second,
+    // and this codebase has produced the same unit bug four separate times by assuming. A
+    // direction is unit-free, so the two publishers cannot make one control mean two things.
+    const glm::vec3 acrossZ(0.0f, 0.0f, 1.0f);
+
+    SECTION("at zero coupling the flow does nothing at all") {
+        // The default, so this is the promise to every bank that has never heard of a flow field.
+        const glm::vec3 free = glm::vec3(bankInFlow(7.0f, 0.0f, 0.0f, acrossZ, 1.0f).lane[2]);
+        CHECK(free.x == Approx(7.0f));
+        CHECK(free.z == Approx(0.0f).margin(1e-5));
+    }
+
+    SECTION("an unsubscribed effect is unaffected however high the coupling") {
+        // `influence` is 0 when the effect is unsubscribed, names a dead field, or set its own
+        // subscription to 0 -- so the control is inert until a scene asks for a field, which is
+        // what stops it being a trap for a bank that has no flow to follow.
+        const glm::vec3 v = glm::vec3(bankInFlow(7.0f, 0.0f, 1.0f, acrossZ, 0.0f).lane[2]);
+        CHECK(v.x == Approx(7.0f));
+        CHECK(v.z == Approx(0.0f).margin(1e-5));
+    }
+
+    SECTION("at full coupling the drift follows the flow instead of the bank's axis") {
+        const glm::vec3 v = glm::vec3(bankInFlow(7.0f, 0.0f, 1.0f, acrossZ, 1.0f).lane[2]);
+        INFO("drift (" << v.x << ", " << v.y << ", " << v.z << ")");
+        CHECK(v.z == Approx(7.0f));
+        CHECK(v.x == Approx(0.0f).margin(1e-5));
+        // ...and it overrides the bank's rotation rather than adding to it.
+        const glm::vec3 turned = glm::vec3(bankInFlow(7.0f, 90.0f, 1.0f, acrossZ, 1.0f).lane[2]);
+        CHECK(turned.z == Approx(7.0f));
+    }
+
+    SECTION("THE SPEED IS THE ARTIST'S, whatever the flow is doing") {
+        // The property the whole design rests on. A flow of magnitude 40 and a flow of magnitude
+        // 0.01 in the same direction must produce the same drift, because only the direction is
+        // read -- and the magnitude of the drift must be exactly `driftSpeed` in every case.
+        for (const float mag : {0.01f, 1.0f, 40.0f}) {
+            for (const float coupling : {0.0f, 0.25f, 0.5f, 1.0f}) {
+                const glm::vec3 v =
+                    glm::vec3(bankInFlow(6.0f, 33.0f, coupling, acrossZ * mag, 1.0f).lane[2]);
+                INFO("flow magnitude " << mag << " coupling " << coupling);
+                CHECK(glm::length(v) == Approx(6.0f).margin(1e-4));
+            }
+        }
+    }
+
+    SECTION("the units a publisher answers in do not change the answer") {
+        // The claim that makes the direction-only design correct against BOTH publishers, tested
+        // rather than argued: the wind's normalised strength and a vortex's metres a second give
+        // the same drift for the same direction. A version that read the magnitude would differ
+        // here by a factor of the magnitude, and would do it silently.
+        const glm::vec3 normalised =
+            glm::vec3(bankInFlow(5.0f, 0.0f, 1.0f, acrossZ * 0.3f, 1.0f,
+                                 world::fields::FlowUnits::Normalised).lane[2]);
+        const glm::vec3 metres =
+            glm::vec3(bankInFlow(5.0f, 0.0f, 1.0f, acrossZ * 22.0f, 1.0f,
+                                 world::fields::FlowUnits::MetresPerSecond).lane[2]);
+        INFO("normalised (" << normalised.x << ", " << normalised.z << "), metres ("
+             << metres.x << ", " << metres.z << ")");
+        CHECK(metres.x == Approx(normalised.x).margin(1e-5));
+        CHECK(metres.z == Approx(normalised.z).margin(1e-5));
+        CHECK(glm::length(metres) == Approx(5.0f).margin(1e-4));
+    }
 }

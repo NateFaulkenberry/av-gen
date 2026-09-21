@@ -23,9 +23,41 @@ Since ADR-563 gave the fog its own field, **`fogShapeAt` has never read the numb
 loading "Dense Bank" got a contrast of 3.4 that did nothing at all. Same family as ADR-561's eye
 hole and ADR-565's `detailAmount`: declared, set by a preset, unreachable.
 
-**And a fact that explains the pattern.** `grep -rl '"kind": "fog"' examples/` returns **zero**.
-No shipped scene has ever contained a fog bank, which is exactly why four of this kind's controls
-have been able to die unnoticed, and why fixing the third one changes no shipped frame.
+**And the census below is the mechanism, not a coincidence beside it.** A dead control in an effect
+that **no shipped scene instantiates** cannot be noticed by anybody, because nothing renders the
+code path it is dead in. Four of this kind's controls died; the reason all four survived is the
+same one, and it is structural rather than a run of bad luck. The cheapest guard against the fifth
+is a shipped scene that uses the kind -- which is now the last line of this ADR's revisit list and
+is worth more than any test written against the field in isolation.
+
+**And a fact that explains the pattern -- stated with the command that actually produces it,
+because the first version of this paragraph did not.**
+
+```sh
+grep -rl --include='*.scene.json' '"kind": *"fog"' examples/ | grep -v '/_'   # -> 0
+```
+
+**No shipped scene has ever contained a fog bank.** That is why four of this kind's controls have
+been able to die unnoticed, and why making the third one live changes no shipped frame.
+
+The published version of this claim quoted `grep -rl '"kind": "fog"' examples/`, which is **not the
+command that was run** -- the real one also filtered `/_`, and without that filter it returns 52,
+because `examples/treeisland/` is full of this branch's own `_fog-*.json` probe arms. So the record
+said "run this, get zero" and running it gets 52. **The finding was right and the evidence
+published for it was not**, which is worse than a wrong finding: it is a wrong finding waiting to
+be discovered by someone who trusted the paragraph.
+
+Two consequences, and the second is the durable one:
+
+- the 41 tracked `_fog-*.json` probe arms are **untracked** as of this ADR. They are derived,
+  `tools/make_fog_arms.py` regenerates them in a second, and `.gitignore` already covered them --
+  the patterns simply do not apply to files already in the index. They were findable by anyone's
+  census of shipped content and would have kept producing this error;
+- **a census of shipped content must say what "shipped" means in the command.** The repository has
+  119 tracked `_`-prefixed JSON files and 30 `_`-prefixed `.scene.json` files across several
+  agents' probe sets, so `--include='*.scene.json'` and `grep -v '/_'` are both load-bearing. A
+  census whose filter lives in the analyst's head and not in the published command is a
+  measurement contaminated by the measurer.
 
 ## Decision
 

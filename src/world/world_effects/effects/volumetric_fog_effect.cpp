@@ -189,6 +189,14 @@ constexpr EffectField kFields[] = {
         .fmt("%.2f m/s")
         .tooltip("Upward or downward drift, in metres a second. Mist lifting off water is a small\n"
                  "positive number; a bank settling into a valley is a small negative one."),
+    // ADR-572 (§17): the flow the effect subscribes to steers the drift. It takes the DIRECTION
+    // only -- the speed above stays the artist's -- because a direction is unit-free and the two
+    // publishers of a flow disagree about units by design.
+    storedFloat("driftWind", "Drift follows flow", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f)
+        .tooltip("How much the field this effect subscribes to steers the drift, instead of the\n"
+                 "bank's own long axis. It sets the DIRECTION only: the speed stays Drift speed,\n"
+                 "so turning this up cannot make the bank move faster than you asked.\n"
+                 "Does nothing until the effect subscribes to a flow field."),
     // ADR-571 (§24): the density response curve's threshold and softness. `Contrast` is its third
     // term and is declared below, as the absolute row on `e.vortex.field.contrast` it always was.
     storedFloat("densityThreshold", "Density threshold", 0.0f, 0.0f, 0.99f, 0.0f, 0.8f)
@@ -458,7 +466,7 @@ Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); 
 // CPU sampler, the shader and this site cannot disagree about the field (ADR-388, and ADR-401 for
 // what happens when they can). The appearance lanes are assembled here because they are what the
 // picture does with the field rather than part of it.
-void packMedium(const E& e, float envelope, MediumSlot& out) {
+void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumSlot& out) {
     const Vortex& v = e.vortex;
     const vortex::VortexUniforms f = vortex::packVortex(v.field);
     out.lane[0] = f.v0;
@@ -482,9 +490,33 @@ void packMedium(const E& e, float envelope, MediumSlot& out) {
     // this lane yet. ADR-571's revisit note says what it would take.
     const float driftRot = glm::radians(storedOf(e, "bankRotation", 0.0f));
     const float driftSpeed = storedOf(e, "driftSpeed", 0.0f);
-    out.lane[2] = glm::vec4(std::cos(driftRot) * driftSpeed,
-                            storedOf(e, "driftVertical", 0.0f),
-                            std::sin(driftRot) * driftSpeed, 0.0f);
+    glm::vec3 driftDir(std::cos(driftRot), 0.0f, std::sin(driftRot));
+
+    // ADR-572, the brief's §17: the flow sets the DIRECTION and never the speed.
+    //
+    // That is a unit decision, not a simplification. `FlowSample::units` exists because the two
+    // publishers genuinely differ -- the wind's `speed` is a dimensionless strength and a vortex's
+    // is metres per second of real medium -- and this codebase has produced the same unit bug four
+    // times by assuming (ADR-374's density, ADR-379's spill, ADR-381's comet-on-fog, ADR-389's
+    // coefficient). A DIRECTION is unit-free, so taking only the direction is correct against both
+    // publishers with no branch on `units` and no chance of a control meaning two things. The
+    // metres a second stay the artist's, in `driftSpeed`, where they are legible.
+    //
+    // §17: "flow affects movement, not basic existence." Setting which way the structure travels is
+    // movement; it cannot make the bank exist anywhere it did not.
+    const float windAmount = std::clamp(storedOf(e, "driftWind", 0.0f), 0.0f, 1.0f) * flow.influence;
+    if (windAmount > 0.0f) {
+        const float len = glm::length(flow.sample.flow);
+        if (len > 1e-6f) {
+            const glm::vec3 blended = glm::mix(driftDir, flow.sample.flow / len, std::min(windAmount, 1.0f));
+            const float blendedLen = glm::length(blended);
+            if (blendedLen > 1e-6f) {
+                driftDir = blended / blendedLen; // renormalised: a blend of two units is not one
+            }
+        }
+    }
+    out.lane[2] = glm::vec4(driftDir * driftSpeed, 0.0f);
+    out.lane[2].y = storedOf(e, "driftVertical", 0.0f) + driftDir.y * driftSpeed;
     out.lane[3] = glm::vec4(f.v3.x, f.v3.y, std::max(v.emission, 0.0f) * envelope,
                             std::max(v.filaments, 0.0f));
     out.lane[4] = f.v4;
