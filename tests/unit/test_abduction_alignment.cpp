@@ -425,9 +425,21 @@ TEST_CASE("The beam never resumes particles emitted somewhere else", "[stage][be
         if (!run.hadEmittedBeforeShow[i]) {
             continue; // a pool that has never emitted is empty whatever it did while hidden
         }
-        // A particle only ages while its system is enabled. So this, and nothing about the
-        // renderer's internals, is the question "was the pool empty when the beam came back on".
-        CHECK(run.drainedForAtShow[i] >= static_cast<double>(run.beamLifetimeMax));
+        // A particle only ages while its system is enabled, so a pool cannot be drained by
+        // waiting while it is off -- it is frozen, not emptied. This test used to require the
+        // opposite of what it requires now: that the beam stay ENABLED and non-emitting for a
+        // full particle lifetime before being hidden, so the pool aged itself empty. That worked,
+        // and it is why the beam went on rendering a thinning cloud for five seconds after the
+        // animal it was lifting had faded out -- the shutdown the scene authored could only stop
+        // NEW particles.
+        //
+        // `ParticleRenderer` now empties a pool on the frame its system is disabled, so being off
+        // is sufficient and the wait is not needed. The requirement that replaces it is the one
+        // the film actually has: the beam goes off PROMPTLY after its last emission rather than
+        // lingering enabled. That is what `drainedForAtShow` measures, and asserting it small
+        // fails if anyone removes the `hide` from the `depart` beat and restores the lingering
+        // shutdown.
+        CHECK(run.drainedForAtShow[i] <= 0.5);
         anyMoved = anyMoved || run.emitterMovedWhileOff[i] > 10.0f;
     }
     // If the emitter had never moved while the beam was off, a frozen pool would have resumed in

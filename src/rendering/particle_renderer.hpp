@@ -216,6 +216,12 @@ private:
         wgpu::BindGroup renderGroup;
         wgpu::TextureView renderDepthView; // the linear-depth view renderGroup was built against
         bool needsReset = true;
+        // A disabled pool is SKIPPED, not stepped, so its particles do not age while it is
+        // off -- they are frozen, not drained. Re-enabling the system somewhere else thaws
+        // them at the new position: Glowmere's tractor beam resumed a five-second pool 210 m
+        // from where it was hidden, as stray particles in unrelated shots. This remembers the
+        // previous frame's state so the transition into disabled can empty the pool once.
+        bool wasEnabled = false;
         bool trailWarned = false; // the memory budget refusal is logged once per pool
     };
 

@@ -9950,6 +9950,10 @@
                 "role": "actor.beam",
                 "steps": [
                   {
+                    "kind": "hide",
+                    "name": "beamOut"
+                  },
+                  {
                     "kind": "set",
                     "name": "beamFall",
                     "target": "spawnRate",

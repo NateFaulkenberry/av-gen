@@ -525,8 +525,23 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
             resetPool(pool);
         }
         if (!sys.enabled) {
+            // Emptied on the frame it goes off, not on the frame it comes back. A pool that is
+            // merely skipped keeps its particles at the age and the position they had when the
+            // system was disabled, and the next enabled frame resumes them wherever the emitter
+            // has since travelled to. Draining by waiting is not available: ageing only happens
+            // on the stepped path below, which a disabled system never reaches.
+            if (pool.wasEnabled) {
+                // Emptied here rather than by setting `needsReset`: the reset check above has
+                // already run for this frame, so deferring it would leave the pool full for one
+                // more frame than this comment claims. Invisible today, because a disabled system
+                // is not drawn either -- but a claim the code does not keep is the kind that gets
+                // relied on later, and the GPU test asserts the frame this says it does.
+                resetPool(pool);
+                pool.wasEnabled = false;
+            }
             continue;
         }
+        pool.wasEnabled = true;
         const double dt = std::clamp(time.deltaTime, 0.0, 0.1);
         // ADR-360. How many spawns this frame owes, as a function of WHERE ON THE TIMELINE it is
         // rather than of a carry accumulated since the render started. The total emitted by time t
