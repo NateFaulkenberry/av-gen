@@ -5907,11 +5907,14 @@ int Application::runHeadless() {
                               st.entityLod.rungs[1], st.entityLod.rungs[2], st.entityLod.rungs[3],
                               st.entityLod.rungs[4], st.entityLod.changed, st.entityLod.held);
                 }
-                log::info("             workload: volumeSteps={} volumeTarget={}x{} cascades={} shadowRes={} aoTarget={}x{} "
+                log::info("             workload: volumeSteps={} volumeTarget={}x{} "
+                          "media={}+{}dropped fogShadow={}steps cascades={} shadowRes={} aoTarget={}x{} "
                           "aoSlices={}x{} shadowMask={}x{}/{}L postPasses={} bloomLevels={} "
                           "sdf={}ray/{}mesh simGrids={} "
                           "transient={} wind={}obj plants={}/{}awake ({} examined, {} slot writes)",
-                          st.volume.steps, st.volume.marchWidth, st.volume.marchHeight, st.shadows.cascades, st.shadows.resolution, st.ao.width,
+                          st.volume.steps, st.volume.marchWidth, st.volume.marchHeight,
+                          st.volume.media, st.volume.mediaDropped, st.volume.shadowSteps,
+                          st.shadows.cascades, st.shadows.resolution, st.ao.width,
                           st.ao.height, st.ao.slices, st.ao.steps, st.shadowMask.width, st.shadowMask.height,
                           st.shadowMask.lights, st.post.passes, st.post.bloomLevels,
                           st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,

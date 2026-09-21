@@ -45,6 +45,14 @@ class FieldUniforms;
 struct VolumeStats {
     std::uint32_t steps = 0;            // raymarch samples per pixel this frame (0 = fog off)
     std::uint32_t glowSystems = 0;      // emissive particle systems lighting the fog (ADR-040)
+    // ADR-578, the brief's §39: "capture GPU ms, CPU ms, memory, resolution, step count, ACTIVE
+    // VOLUME COUNT". Every item on that list was reported except this one, and it is the item
+    // ADR-560's headline defect was about -- a second medium in a scene rendered as nothing and
+    // no record said so. The count and the shadow steps are the two numbers that decide what this
+    // pass costs, and neither reached the workload line.
+    std::uint32_t media = 0;            // placed media the march marched this frame
+    std::uint32_t mediaDropped = 0;     // ...and the ones that did not fit (ADR-560)
+    std::uint32_t shadowSteps = 0;      // ADR-570's self-shadow march, 0 = off
     bool halfResolution = true;         // true when the march runs below the scene's resolution
     // ADR-139: what the tier actually asked for and what it produced, so a reader of a record
     // can tell a scale that was applied from one that was clamped away by a small viewport.

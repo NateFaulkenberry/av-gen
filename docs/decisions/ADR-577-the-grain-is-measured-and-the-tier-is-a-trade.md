@@ -59,6 +59,13 @@ Three readings, and the second is the one I did not expect:
 3. **At 16 steps with a thick medium the grain reaches 1% of the medium** -- about 2.6 levels of
    255, and visible as crawl.
 
+**Reading 2 is a correction to this branch's own record and it has been made where the original
+claim lives**, not only here: `tools/make_fog_primitive_arms.py` and ADR-566 both said the dense
+arms' speckle was "the march's own sampling grain", which reads as the jitter. **A misattributed
+cause is worse than an unexplained one -- it sends the next person to tune the wrong knob**, and in
+this case the wrong knob is the one that is *helping*: the jitter breaks up the banding of an
+undersampled medium rather than causing its speckle.
+
 ## The tier, which is a trade and not an oversight
 
 `QualityTier::Preview` sets `volumeStepScale = 0.5`, so a scene authored at 32 steps marches at
@@ -83,6 +90,18 @@ may well hold for the scenes it was written against and I measured one scene.
 So Preview's halving is a **real trade**: 28% of the march against the one artefact §29 calls
 mandatory, on thick media. Not free, not an oversight, and not mine to resolve -- the tier table
 belongs to the renderer.
+
+## The brief's section status, stated as *which record closes it*
+
+Under a no-cuts rule "already done" is a claim, and a reader should not have to take it on trust.
+So each of these names the record a reader can check rather than asserting the outcome:
+
+| section | status | closed by |
+|---|---|---|
+| **§29** temporal stability | **satisfied by measurement**, not skipped | this ADR's table: 1e-4 of the medium at the shipped 32 steps, `spatialRatio` 1.000. Nothing was added, and the number is why |
+| **§30** ray-march quality | **exists, under different names** | `rendering/render_quality.hpp`'s `QualityTier` and its per-tier `volumeStepScale` / `volumeResolutionScale` |
+| **§31** adaptive sampling | **not built**, deliberately, by an earlier ADR | ADR-562 §4's own comment: *"redistributing the steps into the union of the intervals is the bigger win and is NOT done here"* |
+| **§32** empty-space optimisation | **done** | ADR-562 §4 (the per-slot ray interval) and ADR-566 (the bound it depends on, which was wrong in two axes until measured) |
 
 ## §30 -- §32, assessed
 

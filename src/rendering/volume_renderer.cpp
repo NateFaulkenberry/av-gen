@@ -406,6 +406,10 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     im.activeThisFrame = true;
     stats_.steps = static_cast<std::uint32_t>(steps);
     stats_.glowSystems = glowSystems;
+    // ADR-578 (§39): the two numbers that decide this pass's cost and were not in any record.
+    stats_.media = static_cast<std::uint32_t>(scene.atmospherics.mediumCount);
+    stats_.mediaDropped = scene.atmospherics.mediaDropped;
+    stats_.shadowSteps = static_cast<std::uint32_t>(std::clamp(env.volumeShadowSteps, 0, 16));
     stats_.halfResolution = im.half.width() < width || im.half.height() < height;
     stats_.resolutionScale = resolutionScale;
     stats_.marchWidth = im.half.width();

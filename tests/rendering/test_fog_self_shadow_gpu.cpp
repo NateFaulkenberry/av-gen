@@ -228,3 +228,48 @@ TEST_CASE("zero shadow steps is exactly off", "[gpu][fog][shadow][determinism]")
     }
     CHECK(sawLight); // two black frames are identical for free
 }
+
+
+TEST_CASE("the record says how many media were marched", "[gpu][fog][instrumentation]") {
+    // ADR-578, the brief's §39: "capture GPU ms, CPU ms, memory, resolution, step count, ACTIVE
+    // VOLUME COUNT. Do not guess where the cost is." Every item on that list reached the headless
+    // workload line except the last -- which is the one ADR-560's headline defect was about, a
+    // second medium rendering as nothing with no record saying so.
+    //
+    // **This case exists because adding instrumentation without a guard is the same family as
+    // every dead knob in this branch.** A counter that is written and never read, or read and
+    // never written, looks exactly like a working one from the outside.
+    //
+    // And the number earned its keep within minutes of existing: the first arm rendered after it
+    // reached the log printed `media=2` where one had been placed, because
+    // `tree-of-life-floating-island.scene.json` declares a Cosmic Vortex and a project's effect
+    // list MERGES with the scene's rather than replacing it. Every fog arm this branch has ever
+    // rendered had that vortex in it, and three generators' comments said otherwise.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    // One medium.
+    scene::Scene one = bankScene(0, 1.0f);
+    shot(renderer, one);
+    CHECK(renderer.volumes().stats().media == 1u);
+    CHECK(renderer.volumes().stats().mediaDropped == 0u);
+    CHECK(renderer.volumes().stats().shadowSteps == 0u);
+
+    // Two, and the count follows -- which is what distinguishes a real counter from a constant.
+    scene::Scene two = bankScene(6, 1.0f);
+    two.atmospherics.media[1] = two.atmospherics.media[0];
+    two.atmospherics.media[1].lane[0].x += 400.0f; // somewhere else, so it is a second medium
+    two.atmospherics.mediumCount = 2;
+    shot(renderer, two);
+    CHECK(renderer.volumes().stats().media == 2u);
+    CHECK(renderer.volumes().stats().shadowSteps == 6u); // ADR-570's cost knob, also in the record
+
+    // ...and what did not fit. ADR-560's number, which had exactly one reader in the tree and it
+    // was a CPU conformance finding -- so in a running editor it did not exist.
+    scene::Scene dropped = bankScene(0, 1.0f);
+    dropped.atmospherics.mediaDropped = 3;
+    shot(renderer, dropped);
+    CHECK(renderer.volumes().stats().mediaDropped == 3u);
+}

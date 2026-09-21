@@ -182,6 +182,13 @@ be written by both. So it is published from one.
     rendered.
   - The arms run at 256 steps. They are shape arms, not cost arms: at the shipped 32 the march's
     own sampling grain is louder than the silhouette and all six read as the same speckled blob --
+    **and ADR-577 corrects what that speckle is.** "The march's own sampling grain" reads as the
+    per-pixel start jitter and it is not: measured, the jitter's contribution to a frame's
+    high-frequency content at 32 steps and above is a ratio of **1.000** against the jitter off.
+    The speckle is the medium sampled too coarsely along the ray; the jitter is what breaks up its
+    banding rather than what causes it. The arms are still right to run at 256 steps and the
+    sentence below is still true; only the cause named here was wrong, and a misattributed cause
+    sends the next person to the wrong knob --
     §48's point made against my own diagnostic. Cost is Phase I's, with its own arms under the lock.
 
 ## Revisit when
