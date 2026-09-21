@@ -1234,3 +1234,72 @@ explicit that third-party licensing must be verified rather than assumed and tha
 not interchangeable with code terms. Downloading and repackaging an external corpus is not something
 to do on an assumption, so §20 is recorded as blocked on a licensing check and an import rather than
 attempted with substitute data — which would measure the substitute.
+
+### A note on Phase C's illustrative figures
+
+Three of C's sections quote numbers that turn out to be this repository's own content, each slightly
+stale: §17's "1,700 frames" and §18's "~1,712 frames" against the measured **1,738**, and §6's round
+ladder against a real per-sample size of 152 bytes. **The specification was written with this corpus
+in view, so its figures are stale measurements rather than targets.** Anyone treating one as a
+requirement will be tuning to a number nobody measured. The useful reading is the opposite one: when
+a spec's example matches the repository's actual content, the example is evidence about intent —
+here, that real-data-first was meant literally.
+
+## §20 — blocked, and what that blocks knowing
+
+§20 needs a 100STYLE subset. §18 is explicit that third-party dataset licensing must be **verified**
+rather than assumed and that dataset terms are not interchangeable with code terms, so downloading
+and repackaging an external corpus on an assumption is precisely what that instruction exists to
+prevent — and substitute data would measure the substitute (§15). It needs a licensing check and an
+import decision from the owner.
+
+**Recorded as a known gap in what has been proven, not as a section skipped.** §20 is a *scale*
+experiment, and its value is entirely that a large, diverse corpus breaks assumptions a
+1,738-sample one cannot. Several results already on the record are properties of *this* corpus and
+§20 is the section that would say which of them survive:
+
+- the **stride-4, full-prefix** search plan, and the finding that the cheap prefix bought nothing;
+- the **82%** rejection rate of a `Locomotion` filter, which is a property of the tag distribution;
+- the **69.72** cost spread that every severity number in §16 is measured against;
+- the **95%** `Cyclic` share, on a corpus where 25 of 26 clips are cycles.
+
+None of those is wrong. All of them are *local*, and until §20 runs that is what the record should
+say.
+
+## §21 and §22 — the audit, and a gap-finder that could not find a gap
+
+**§21's audit**: C names seven augmentation kinds — mirroring, speed, stride, directional warping,
+turn variation, start/stop variants, root-motion adaptation. Phase B's `VariantKind` has **four**:
+`Source`, `SpeedWarp`, `StrideWarp`, `Mirror`. Directional warping, turn variation and start/stop
+variants are absent; root-motion adaptation exists separately as `adaptRootMotion`. Recorded here
+because "B already has variants" is precisely the audit-from-memory ADR-606 is about.
+
+**§22's audit**: C names six coverage axes. B's `measureCoverage` takes a list of target **speeds** —
+one axis. So `scene::motion_coverage.{hpp,cpp}` is new.
+
+**The denominator was chosen before measuring**, and it is the design decision. The obvious reading
+of "coverage over six axes" is a six-dimensional grid, and it is wrong: at eight bins per axis that
+is 262,144 cells, which 1,738 samples can occupy at most 1,738 of — **under 0.7% for any corpus of
+this size, however complete**. It would measure the dimensionality, not the content. So coverage is
+reported **per axis, marginally**, plus the one pairing where a gap means something concrete.
+
+**Then the instrument failed its own calibration, which is the finding.**
+
+| bins | empty bins across six axes | speed axis |
+|---|---|---|
+| 8 | **0** | 100.0% |
+| 32 | 7 | 78.1% |
+| 128 | 88 | 48.4% |
+| 512 | 788 | 33.0% |
+
+At the default eight bins **every axis is 100% covered with no gaps** — and that is a fact about the
+bin count, not the corpus. It takes only as many distinct values as there are bins to fill an axis,
+which 1,738 samples of varied motion supply trivially. **A gap-finder that cannot report a gap for
+any plausible corpus is ADR-182 in the instrument built to find absences**, and it was caught by the
+standing habit of distrusting a perfect score.
+
+**And the joint occupancy was carrying the information all along: 38 of 64 (speed × turn) cells —
+a 26-cell gap that the marginal report called 100% covered.** That inverts the framing the analyzer
+was written with. The *pairing* is the informative measure; the marginals are the near-vacuous one,
+useful only as a check that every axis is populated at all. The pairing is reported as a **count**
+rather than as a sixth percentage, so it cannot be averaged into the others and lost.

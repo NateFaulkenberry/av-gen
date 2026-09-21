@@ -21,6 +21,7 @@
 // bytes are the bytes the real builder would produce.
 
 #include "entity/match_motion_provider.hpp"
+#include "scene/motion_coverage.hpp"
 #include "scene/motion_database.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -1222,4 +1223,103 @@ TEST_CASE("the database reproduces the clip it was built from", "[motionscale][p
     // step, so "100% on the clip" cannot be earned by a matcher that returned one sample forever.
     CHECK(advanced > 0.9);
     CHECK(worstDrift >= 0.0);
+}
+
+// ---------------------------------------------------------------------------------------------
+// §22 -- motion coverage analysis on the real corpus.
+
+TEST_CASE("coverage across the six axes C names, with its gaps", "[motionscale][phaseC][aliens]") {
+    if (!fs::exists(alienGlb())) {
+        SKIP("the Glowmere alien is not present");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions loadOptions;
+    loadOptions.loadImages = false;
+    REQUIRE(assets::loadGltf(alienGlb(), sc, loadOptions).has_value());
+    const scene::SkinnedRig& rig = sc.rigs.front();
+    scene::Provenance provenance;
+    provenance.source = "Glowmere alien pack";
+    provenance.sourceFile = "alien-scout.glb";
+    provenance.creator = "AV Gen";
+    provenance.license = "CC0-1.0";
+    provenance.licenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+    provenance.redistribution = scene::Redistribution::Allowed;
+    provenance.derivedDataAllowed = true;
+    provenance.trainingAllowed = true;
+    provenance.processing = {"Phase C §22"};
+    provenance.toolVersion = "avgen-phase-c";
+    scene::PackBuildOptions packOptions;
+    packOptions.contactJoints = {scene::ContactJoint{"foot.l", scene::ContactKind::Foot},
+                                 scene::ContactJoint{"foot.r", scene::ContactKind::Foot}};
+    packOptions.contacts.looping = true;
+    packOptions.toolVersion = "avgen-phase-c";
+    auto pack = scene::buildMotionPack("glowmere-scout", rig.skeleton, rig.clips, provenance,
+                                       packOptions);
+    if (!pack.has_value()) {
+        FAIL("motion pack build failed: " << pack.error().message);
+    }
+    scene::MotionDatabaseOptions dbOptions;
+    dbOptions.sampleRate = 30.0f;
+    dbOptions.config = scene::defaultBipedConfig("foot.l", "foot.r", "head.x");
+    auto db = scene::buildMotionDatabase(*pack, dbOptions);
+    if (!db.has_value()) {
+        FAIL("motion database build failed: " << db.error().message);
+    }
+
+    // **Calibrate the instrument before trusting it.** A marginal per-axis coverage is a count of
+    // occupied bins, and it takes only as many distinct values as there are bins to fill an axis.
+    // On 1,738 samples of varied motion that is nearly guaranteed, so at a coarse bin count the
+    // measure cannot report a gap for *any* plausible corpus -- which would make it a gap-finder
+    // incapable of finding a gap. ADR-182, in the instrument built to find absences.
+    WARN("marginal coverage against bin count -- where does the instrument start to see absence?");
+    for (const std::uint32_t bins : {8u, 32u, 128u, 512u}) {
+        scene::MotionCoverageOptions options;
+        options.bins = bins;
+        const scene::MotionCoverageReport r = scene::measureMotionCoverage(*db, options);
+        std::uint32_t gaps = 0;
+        for (const scene::AxisCoverage& axis : r.axes) {
+            gaps += static_cast<std::uint32_t>(axis.gaps.size());
+        }
+        float speedFraction = 0.0f;
+        for (const scene::AxisCoverage& axis : r.axes) {
+            if (axis.axis == scene::CoverageAxis::Speed) {
+                speedFraction = axis.fraction();
+            }
+        }
+        WARN(fmt::format("  {:>4} bins: {:>5} empty bins across six axes, speed axis {:5.1f}%",
+                         bins, gaps, 100.0f * speedFraction));
+    }
+
+    const scene::MotionCoverageReport report = scene::measureMotionCoverage(*db);
+    WARN(report.report());
+
+    REQUIRE(report.axes.size() == 6u);
+    CHECK(report.samples == db->sampleCount());
+    for (const scene::AxisCoverage& axis : report.axes) {
+        CHECK(axis.bins > 0u);
+        CHECK(axis.occupied <= axis.bins);
+    }
+
+    // **At 8 bins every axis is 100% covered with no gaps, and that is a fact about the bin count
+    // rather than about the corpus.** So the coarse marginal report is kept for what it is -- a
+    // sanity check that every axis is populated at all -- and the assertion that the analyzer can
+    // see absence is made where absence is actually visible.
+    scene::MotionCoverageOptions fine;
+    fine.bins = 128u;
+    const scene::MotionCoverageReport detailed = scene::measureMotionCoverage(*db, fine);
+    std::uint32_t fineGaps = 0;
+    for (const scene::AxisCoverage& axis : detailed.axes) {
+        fineGaps += static_cast<std::uint32_t>(axis.gaps.size());
+    }
+    WARN(fmt::format("at 128 bins the six axes have {} empty bins between them", fineGaps));
+    CHECK(fineGaps > 0u);
+
+    // **And the joint occupancy is the number that carried information all along**: 38 of 64
+    // (speed x turn) cells, which is a gap of 26 cells that a marginal report called 100% covered.
+    // That inverts the framing this analyzer was written with -- the pairing is the informative
+    // measure and the marginals are the near-vacuous one -- and it is why the pairing is reported
+    // as a count rather than as a percentage buried among five other percentages.
+    CHECK(report.jointCells == 64u);
+    CHECK(report.jointOccupancy > 0u);
+    CHECK(report.jointOccupancy < report.jointCells);
 }

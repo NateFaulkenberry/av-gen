@@ -65,6 +65,30 @@ result away; this says **read the rest of the row before you do**, because the n
 the headline may be the one that matters. The three dead-probe findings in this programme all had a
 non-headline column that was already wrong.
 
+## The mirror image, which is as easy to build by accident
+
+§19 needed a companion for "100% of steps stayed on the clip". I wrote `worstDrift > 0`, where
+drift is the **error** between the sample matched and the sample wanted — so the companion
+*demanded the matcher be imperfect*. It failed on a run that tracked every clip exactly, which is
+the best possible result.
+
+> **A companion metric must assert that something happened, not that something went wrong.** "Did
+> the system do work" and "did the system make mistakes" are opposite quantities. A companion built
+> from the second fails on a perfect run and passes on a broken one that fails noisily.
+
+The confusion is structural rather than careless, which is why it is worth its own paragraph. The
+rule above teaches that a headline of zero bad events is suspicious, so the reflex is to assert some
+bad-event count is non-zero. But what makes zero suspicious is **its ambiguity with inaction**, and
+the cure is to measure the action. The correct companion was that the loop *advanced* — it reached a
+new sample on 1.00 of steps — which makes "100% on the clip" unearnable by a matcher returning one
+sample forever, and does not punish a matcher that is simply correct.
+
+| headline | wrong companion | right companion |
+|---|---|---|
+| clip jumps per second | "drift > 0" | fraction of steps that advanced |
+| % of steps on the clip | "some step was wrong" | distinct samples visited per step |
+| candidates rejected | "some candidate survived scoring by luck" | candidates *scored* |
+
 ## It applies to the harness, not only to the tests
 
 The command this branch waited two hours on was:
