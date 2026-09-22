@@ -40,6 +40,15 @@ function(avgen_set_warnings target)
             target_compile_options(${target} PRIVATE -Werror)
         endif()
     endif()
+    avgen_set_sanitizers(${target})
+endfunction()
+
+# The sanitizer flags, separable from the warning flags because a target can need these without
+# those. Every executable in `tools/` links `avgen_core`, which IS instrumented under
+# `--preset asan`; a tool that does not also link the sanitizer runtime fails with undefined
+# `___asan_*` symbols. Splitting this out lets those targets opt into the runtime without also
+# taking on the engine's warning set, which is a separate decision with its own risk.
+function(avgen_set_sanitizers target)
     if(AVGEN_ENABLE_ASAN AND NOT MSVC)
         target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
         target_link_options(${target} PRIVATE -fsanitize=address,undefined)
