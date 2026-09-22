@@ -4867,6 +4867,7 @@ void Composition::detach() {
         node->waterFoamParam = nullptr;
         node->waterGlowColorParam = nullptr;
         node->particleParams = {};
+        node->materialPartParams.clear(); // see the note at the end of this function
         if (node->child) {
             node->child->detach();
         }
@@ -4945,6 +4946,27 @@ void Composition::detach() {
     rootScale_ = nullptr;
     rootRotationSpeed_ = nullptr;
     rootImpulse_ = nullptr;
+
+    // QA pass 2026-09-22: the five below, the whole `dayNightParams_` group, the authored-light
+    // params and each node's material-part params were **missing from this list**, so they went on
+    // pointing into a `ParameterSet` that `detach` had just released. `applyParameters` reads
+    // `dayNightParams_.enabled` unconditionally, so `detach(); params.clear(); update();` -- the
+    // exact sequence `test_composition.cpp`'s "detach leaves no dangling use" section performs --
+    // was a heap-use-after-free. It never failed a run: freed memory reads as whatever is there,
+    // so the suite was green in release for as long as this existed. AddressSanitizer found it the
+    // first time the ASan build was repaired enough to link the test binary.
+    //
+    // `attach` re-registers every one of these, so clearing them here costs nothing: the five
+    // scalars and the day/night group at its `env/*` block, `registerAuthoredLightParameters` and
+    // `registerNodeParameters` for the other two.
+    showSkybox_ = nullptr;
+    proceduralSkyBackground_ = nullptr;
+    lightFromEnvironment_ = nullptr;
+    skyBloom_ = nullptr;
+    shadowRange_ = nullptr;
+    dayNightParams_ = {};
+    authoredLightParams_.clear();
+
     params_ = nullptr;
     modulator_ = nullptr;
 }
