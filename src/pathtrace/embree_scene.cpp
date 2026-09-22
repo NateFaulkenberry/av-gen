@@ -288,7 +288,7 @@ struct MemberView {
     child.scene = rtcNewScene(device);
     if (child.scene == nullptr) return fail("pathtrace: rtcNewScene failed for a child scene");
     // Meshes were built at HIGH when they lived in the top-level scene, and keep it; procedural
-    // sources took Embree's default and keep that. The build quality is not what ADR-582 changes.
+    // sources took Embree's default and keep that. The build quality is not what ADR-583 changes.
     if (highQuality) rtcSetSceneBuildQuality(child.scene, RTC_BUILD_QUALITY_HIGH);
 
     for (std::size_t k = 0; k < members.size(); ++k) {
@@ -441,7 +441,7 @@ Result<void> EmbreeScene::updateInner(const Snapshot& snapshot, unsigned buildTh
     for (const InstancedObject& obj : snapshot.instanced) {
         Need n;
         n.members.push_back(MemberView{proceduralKey(obj), &obj.source.positions, &obj.source.indices});
-        // Procedural sources took Embree's default quality before ADR-582 and keep it.
+        // Procedural sources took Embree's default quality before ADR-583 and keep it.
         n.highQuality = false;
         needs.push_back(std::move(n));
     }

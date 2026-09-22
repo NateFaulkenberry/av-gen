@@ -1,4 +1,4 @@
-// BVH reuse across frames (ADR-582).
+// BVH reuse across frames (ADR-583).
 //
 // Reuse is only worth having if it can never be wrong: a stale acceleration structure puts rays on
 // geometry where it USED to be, and the picture still looks like a picture. So every arm here moves

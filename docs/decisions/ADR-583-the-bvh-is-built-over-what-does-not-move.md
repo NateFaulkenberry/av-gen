@@ -1,4 +1,4 @@
-# ADR-582: The BVH is built over what does not move, and kept while it has not
+# ADR-583: The BVH is built over what does not move, and kept while it has not
 
 - Status: Accepted (2026-09-21)
 - Extends ADR-351 (the Embree tracer), ADR-383 (path-traced sequences). Owed by
@@ -164,13 +164,34 @@ Life 12.53 GB on `main`, 12.74 GB reusing -- the object-space copy in the snapsh
 vertex. The difference is that the BVH now lives between frames rather than being freed and
 reallocated each one; its size does not change.
 
+### Found on the way and fixed: a sequence kept every frame's AOVs and wrote none
+
+`TraceFrameSource` pushed every frame's full framebuffer -- radiance, albedo, normal, emission,
+motion, depth, id -- onto `aovFrames_` whenever `writeAovs` was on, which is the default, "so the
+writer can emit the multi-layer EXR beside the beauty frame". No writer ever read it. So a range
+kept seven buffers per frame until the job ended and put no AOV on disk. Measured on Glowmere at
+960x540, 1 spp, with `--pt-aovs`: `main` peaks at 4.59 GB RSS over 6 frames and **6.09 GB over 48**,
+about 36 MB per frame (about 140 MB at 1080p), with **0 AOV files written**. This branch peaks at
+4.55 GB and 4.58 GB and writes 6 and 48 files.
+
+The intent was plain from the comment, so the AOVs are now written the way it described: each
+frame's multi-layer EXR is written in `submit` as soon as the frame is traced, then released with
+the frame. For an EXR sequence it goes beside the beauty frame (`frame_000012.aovs.exr`); for a
+video it goes in a sibling `<movie>_aovs/` folder (`app::traceSequenceAovFile`). With denoising on,
+the feature buffers are folded to one sample along with the radiance, because otherwise the
+`sampleCount = 1` that denoising sets would make every feature resolve to N times its value.
+`TraceSequence::heldFrameBytes()` reports the finished-frame pixels the sequence is holding.
+`test_trace_sequence.cpp` checks that it stays flat over six frames and that all six AOV files
+exist. Against the old code it failed 11 assertions: the held bytes grew 72 KB -> 513 KB, and all
+six files were missing.
+
 ### Found on the way, not fixed here
 
-- `TraceFrameSource::aovFrames_` keeps every frame's full framebuffer (radiance, albedo, normal,
-  emission, motion, depth, id) for the whole range whenever `writeAovs` is on -- the Tree of Life
-  project's default -- and **nothing ever writes them**. It grows by one framebuffer per frame: about
-  140 MB per 1080p frame, so tens of gigabytes over a 240-frame shot. A reader-less buffer and a
-  memory leak in one.
+- `pathtrace::TraceJob` (single frame) has the denoise + AOV scaling defect described above: it sets
+  `sampleCount = 1` after denoising and then writes feature AOVs that were accumulated over N
+  samples, so albedo, emission and motion come out N times too large. This build has no OIDN, so it
+  was not exercised.
+
 - The path tracer renders the Tree of Life unbent: ADR-360's mesh wind is a GPU vertex stage and
   never reaches the snapshot.
 - The Tree of Life's 4 procedural objects (4,492 instances) hold still while the island they may

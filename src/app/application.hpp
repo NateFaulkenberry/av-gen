@@ -234,7 +234,7 @@ struct AppOptions {
     std::optional<bool> ptDenoise;
     std::optional<bool> ptAovs;
     std::optional<bool> ptProbe;
-    bool ptRebuildBvh = false;   // ADR-582's control arm: no BVH reuse across a traced range
+    bool ptRebuildBvh = false;   // ADR-583's control arm: no BVH reuse across a traced range
     std::optional<std::filesystem::path> queue;
     std::optional<double> rangeStart, rangeEnd;
     std::optional<std::string> codec;

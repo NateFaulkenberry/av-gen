@@ -113,7 +113,7 @@ dependency. Embree owns intersection, the BVH and occlusion queries; **everythin
 
 **Threading.** Embree is given an explicit thread count and the BVH is committed with
 `rtcJoinCommitScene` from threads this process already owns, so Embree starts no pool of its own.
-(Until ADR-582 that was true of the top level only: procedural children went through
+(Until ADR-583 that was true of the top level only: procedural children went through
 `rtcCommitScene`, which does use Embree's pool. Every commit is joined now.)
 `app::JobSystem` is not used and cannot be: it is a two-worker FIFO of whole jobs with no
 parallel-for, and its header forbids waiting on it from a render thread. The render loop uses the
@@ -156,7 +156,7 @@ inheriting them would be the ADR-146 mistake in a new place:
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
 
-## BVH reuse across a sequence (ADR-582)
+## BVH reuse across a sequence (ADR-583)
 
 A `PathTracer` keeps its `EmbreeScene` between renders, and `app::TraceSequence` keeps one tracer for
 the whole range, so each frame rebuilds only what its snapshot changed.

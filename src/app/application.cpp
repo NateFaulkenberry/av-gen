@@ -158,7 +158,7 @@ std::string usageText() {
            "  --pt-denoise        denoise with OIDN (needs -DAVGEN_PATHTRACE_DENOISE=ON)\n"
            "  --pt-probe          report directional albedo above 1 (ADR-352); does not alter the image\n"
            "  --pt-rebuild-bvh    rebuild the whole BVH every frame of a traced range instead of only\n"
-           "                      what changed (ADR-582's control arm); does not alter the image\n"
+           "                      what changed (ADR-583's control arm); does not alter the image\n"
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
            "  --format <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
            "                      EXR sequence, before tone mapping), or video\n"

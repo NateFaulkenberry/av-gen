@@ -40,13 +40,13 @@ struct SurfaceHit {
     float baryV = 0.0f;   // v2
 };
 
-// How `EmbreeScene::update` treats what it built last time (ADR-582).
+// How `EmbreeScene::update` treats what it built last time (ADR-583).
 enum class BvhReuse : std::uint8_t {
     // Keep every acceleration structure whose complete input is bit-for-bit what it was built
     // from, and rebuild the rest. The default, and the only mode a render should use.
     Detect,
     // The control arm: discard everything, device included, and build from scratch -- exactly
-    // what every frame did before ADR-582. Kept as a live setting (`TraceSettings::reuseAcceleration`
+    // what every frame did before ADR-583. Kept as a live setting (`TraceSettings::reuseAcceleration`
     // and `--pt-rebuild-bvh`) so "does reuse change the picture" stays a question anybody can ask.
     Rebuild,
     // TEST ONLY. Reuse whenever the STRUCTURE matches (same objects, same counts) without
@@ -87,7 +87,7 @@ public:
     // (section 54). Equivalent to `update(snapshot, buildThreads, BvhReuse::Rebuild)`.
     [[nodiscard]] Result<void> build(const Snapshot& snapshot, unsigned buildThreads = 0);
 
-    // Brings the BVH to `snapshot`, rebuilding only what changed since the last call (ADR-582).
+    // Brings the BVH to `snapshot`, rebuilding only what changed since the last call (ADR-583).
     //
     // Structure: meshes are grouped by (bitwise-identical) object-to-world transform, each group
     // is one child scene built over OBJECT-space vertices, and a mesh posed by a rig is always a

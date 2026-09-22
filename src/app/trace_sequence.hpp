@@ -19,7 +19,7 @@
 //     that makes the tracer usable while the GPU is busy (ADR-351).
 //
 // The tracer is called, not reimplemented. One `pathtrace::PathTracer` lives for the whole range so
-// its acceleration structure carries from frame to frame and only what moved is rebuilt (ADR-582).
+// its acceleration structure carries from frame to frame and only what moved is rebuilt (ADR-583).
 
 #include "app/frame_range.hpp"
 #include "app/render_settings.hpp"
@@ -47,7 +47,7 @@ struct TraceSequenceRequest {
     std::string backend = "auto";
     int quality = 80;
     bool muxAudio = true;
-    // ADR-582: keep the acceleration structure between frames and rebuild only what changed.
+    // ADR-583: keep the acceleration structure between frames and rebuild only what changed.
     // False is the control arm (`--pt-rebuild-bvh`): every frame builds from scratch, as before.
     // Not persisted in a project -- it is a diagnostic, and it cannot change a pixel.
     bool reuseAcceleration = true;
@@ -71,6 +71,12 @@ struct TraceSequenceRequest {
                                                             std::filesystem::path output,
                                                             const RenderSettings& video);
 
+// Where frame `index`'s multi-layer AOV EXR goes when `trace.writeAovs` is on: beside the beauty
+// frame for an EXR sequence (`frame_000012.aovs.exr` next to `frame_000012.exr`), and in a sibling
+// folder `<movie>_aovs/` for a video, which has no folder of its own to put them in.
+[[nodiscard]] std::filesystem::path traceSequenceAovFile(const TraceSequenceRequest& request,
+                                                         std::uint64_t index);
+
 // Runs on the calling thread. `step()` exists so the editor can pump it between UI frames, the way
 // it pumps a raster render; `run()` is what the CLI uses.
 class TraceSequence {
@@ -91,6 +97,11 @@ public:
     // is "frame 12 of 240, 96 of 128 samples" (ADR-351's progress rule, one level up).
     [[nodiscard]] std::uint32_t frameSamplesDone() const;
     [[nodiscard]] std::uint32_t frameSamplesTotal() const;
+    // Bytes of finished-frame pixels the sequence is holding right now -- frames rendered and not
+    // yet handed to a writer. A sequence must hold at most a frame or two of these however long it
+    // runs; anything that grows with the frame count is a leak on exactly the renders that take
+    // hours. A test holds it flat.
+    [[nodiscard]] std::size_t heldFrameBytes() const;
 
 private:
     struct Impl;

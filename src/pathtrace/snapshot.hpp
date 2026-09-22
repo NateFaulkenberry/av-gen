@@ -82,7 +82,7 @@ struct TriangleMesh {
     std::vector<glm::vec3> previousPositions;
 
     // The same vertices BEFORE the entity transform (after skinning), and that transform, so the
-    // BVH can be built over what is stable and the motion kept in the transform (ADR-582).
+    // BVH can be built over what is stable and the motion kept in the transform (ADR-583).
     //
     // Measured on the Tree of Life: every one of its 33 meshes changes every frame in world space,
     // because the island drifts as a rigid body, and in object space not one vertex changes. A BVH
