@@ -51,6 +51,7 @@
 #include <array>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -761,6 +762,9 @@ public:
         landmarks_ = std::move(landmarks);
         refreshInterestPoints();
     }
+    // Phase D §23: landmarks that are the ground itself. Their interest points carry the semantic
+    // tag "terrain", which an aware decider refuses as a destination.
+    void setTerrainLandmarks(std::vector<std::string> names) { terrainLandmarks_ = std::move(names); }
     // Where `name` is, looking first at entities (which move) and then at landmarks (which do not).
     [[nodiscard]] bool pointOfInterest(std::string_view name, glm::vec3& out) const;
 
@@ -932,9 +936,20 @@ public:
     // seek has no business inheriting it, because the whole promise of a seek is that the same
     // second gives the same frame. What used to be saved by skipping distant bodies is now bounded
     // by `SeekBudget::maxBodySteps` instead, which does it without consulting a camera.
+    // Phase D §63 / ADR-671: what a caller replays alongside the entities, one fixed step at a
+    // time -- the director above them (`before`, as `Composition::updateBehaviour` runs it before
+    // the entity update) and whatever must see the step's settled bodies (`after`). Null, which is
+    // every caller before ADR-671, replays the entities alone.
+    struct SeekHooks {
+        std::function<void(double now, double dt)> before;
+        std::function<void(double now, double dt)> after;
+    };
     void seek(double time, params::ParameterSet* params = nullptr,
               const signals::SignalBus* bus = nullptr, double step = 1.0 / 60.0,
-              SeekBudget budget = {});
+              SeekBudget budget = {}, const SeekHooks* hooks = nullptr);
+    // Writes every entity's offsets onto its node's parameter finals, exactly as `update` does
+    // after each body's step. For a replay hook that has to see the frame a play would have drawn.
+    void applyAllOffsets();
 
     // What the last `seek` actually integrated. Structural quantities rather than milliseconds
     // (ADR-170): "it replayed 5,400 steps over 23 bodies" survives a change of machine in a way
@@ -995,6 +1010,7 @@ private:
     // from compileReactions, which has one; refreshed by bind() and update().
     mutable const params::ParameterSet* params_ = nullptr;
     std::vector<std::pair<std::string, glm::vec3>> landmarks_;
+    std::vector<std::string> terrainLandmarks_;
     std::vector<InterestPoint> interests_;
     std::vector<InterestPoint> extraInterests_;
     // One obstacle per entity with a body, in entity order, so an index into `entities()` is an
@@ -1039,6 +1055,10 @@ private:
     void raiseActionEvents(const std::vector<ActionEvent>& events, std::size_t first,
                            std::size_t entityIndex, double time);
     static void measureStepVelocity(Entity& entity, double dt);
+    static void applyNodeOffsets(Entity& entity);
+    // The Director tier's two halves (ADR-210), shared by `update` and `seek`.
+    static void directorBefore(Entity& entity);
+    static void directorAfter(Entity& entity);
     static void rescaleIntent(EntityState& state);
     // Rebuilds `bodyGrid_` and `bodyPoints_` from where every entity's simulation stands now, and
     // runs one sense tick for `entityIndex` when its cadence says it is due. Shared by `update` and

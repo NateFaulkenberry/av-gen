@@ -1331,12 +1331,17 @@ TEST_CASE("a terrain node is not a wander landmark, whatever it is called",
     REQUIRE(doc["nodes"][0]["kind"] == "terrain");
     doc["nodes"][0]["name"] = "meadow";
     World w(doc);
-    for (const InterestPoint& p : w.world().interestPoints()) {
-        CHECK(p.name != "meadow");
-    }
-    // Subject: other nodes are still landmarks.
+    // It is still a landmark (the pre-Phase-D deciders read the list), and it is tagged for what it is.
+    const std::uint64_t terrain = w.world().semanticTags().bit("terrain");
+    REQUIRE(terrain != 0);
     const auto points = w.world().interestPoints();
-    CHECK(std::any_of(points.begin(), points.end(), [](const InterestPoint& p) { return p.name == "rock-1"; }));
+    const auto meadow = std::find_if(points.begin(), points.end(), [](const InterestPoint& p) { return p.name == "meadow"; });
+    REQUIRE(meadow != points.end());
+    CHECK((meadow->tags & terrain) != 0);
+    // Subject: other nodes are landmarks and are not terrain.
+    const auto rock = std::find_if(points.begin(), points.end(), [](const InterestPoint& p) { return p.name == "rock-1"; });
+    REQUIRE(rock != points.end());
+    CHECK((rock->tags & terrain) == 0);
     bool choseIt = false;
     w.play(60.0, [&] {
         choseIt = choseIt || w.decision("scout").chosen == "meadow" || w.decision("warden").chosen == "meadow";
@@ -1387,4 +1392,37 @@ TEST_CASE("an aware wanderer does not march shore point to shore point",
     INFO("longest run of shore errands: " << withVariety << " with variety, " << without << " without");
     CHECK(without >= 6);        // subject: the fixture does pose the march
     CHECK(withVariety <= 4);
+}
+
+// ---- Success Demonstration steps 15-16: another alien --------------------------------------------
+
+TEST_CASE("the sociable alien walks over to the other one, and does not walk into it",
+          "[entity][phaseD][demo][social]") {
+    if (!assetsPresent()) {
+        WARN("assets missing; skipping");
+        return;
+    }
+    World w(demoJson());
+    const Entity& scout = w.entity("scout");
+    const Entity& warden = w.entity("warden");
+    bool greeted = false;
+    float closestWhileGreeting = 1e9f;
+    bool avoided = false;
+    float nearest = 1e9f;
+    w.play(120.0, [&] {
+        const DecisionDebug s = w.decision("scout");
+        const DecisionDebug d = w.decision("warden");
+        const float gap = glm::length(flat(scout.state().position()) - flat(warden.state().position()));
+        nearest = std::min(nearest, gap);
+        if (s.chosen == "company/greet" && s.subject == "warden") {
+            greeted = true;
+            closestWhileGreeting = std::min(closestWhileGreeting, gap);
+        }
+        avoided = avoided || (d.chosen == "company/avoid" && d.subject == "scout");
+    });
+    INFO("closest while greeting " << closestWhileGreeting << " m; closest ever " << nearest << " m");
+    REQUIRE(greeted);                       // the sociable scout (0.7) sought the warden out
+    CHECK(closestWhileGreeting < 8.0f);     // and actually came over
+    CHECK(nearest > 0.9f);                  // but never walked into it (bodies are 0.9 m)
+    (void)avoided; // the cautious warden may or may not be crowded in this window; not asserted
 }

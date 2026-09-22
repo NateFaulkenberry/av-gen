@@ -71,6 +71,9 @@ struct Options {
     // judge -- the director is reset by a real scrub, so a scene with staged bodies can differ for
     // reasons that are not the decider's.
     double scrub = -1.0;
+    // --legacy-scrub: the pre-ADR-671 scrub (director reset, entities replayed alone), for a
+    // before/after cost comparison on one binary and one machine state.
+    bool legacyScrub = false;
 };
 
 // N deciding bodies from the scene's first one: a grid 6 m apart around it, each with its own seed
@@ -137,6 +140,7 @@ struct Run {
     std::size_t deciders = 0;
     std::size_t decisions = 0;
     std::size_t distinctChoices = 0;
+    double behaviourSeconds = 0.0; // inside Composition::updateBehaviour: director + entity step
     std::vector<float> reach; // per entity: furthest it got from its anchor, on the ground
     std::vector<std::string> reachLines;
 };
@@ -194,7 +198,10 @@ Run simulate(const Options& o, bool withExplain) {
         params.resetFinals();
         comp.updateFields(time, bus, modulator);
         modulator.applyRoutes(bus, params, time.deltaTime);
+        const auto behaviourBegin = std::chrono::steady_clock::now();
         comp.updateBehaviour(time, bus);
+        run.behaviourSeconds +=
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - behaviourBegin).count();
         comp.update(time);
         if (o.crowd == 0) {
             recorder.sample(comp.entityWorld());
@@ -353,9 +360,14 @@ int scrubReport(const Options& o) {
     for (int r = 0; r < o.repeats; ++r) {
         auto s = std::make_unique<Loaded>(o.scene);
         const auto begin = std::chrono::steady_clock::now();
-        s->comp->director().reset(&s->comp->entityWorld(), &s->params);
-        s->comp->entityWorld().seek(t, &s->params, nullptr, step,
-                                    entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 180000});
+        if (o.legacyScrub) {
+            s->comp->director().reset(&s->comp->entityWorld(), &s->params);
+            s->comp->entityWorld().seek(t, &s->params, nullptr, step,
+                                        entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 180000});
+        } else {
+            s->comp->seekWithDirector(t, s->params,
+                                      entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 180000}, step);
+        }
         best = std::min(best, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count());
         scrubbed = std::move(s);
     }
@@ -385,6 +397,43 @@ int scrubReport(const Options& o) {
                     std::string(pd.chosen).c_str(), std::string(sd.chosen).c_str(), d);
     }
     std::printf("deciders differing: %zu; worst %.4f m\n", differing, worst);
+    // Every body, deciding or not: the craft and the animals the director moves.
+    float worstAny = 0.0f;
+    std::string worstName;
+    std::size_t bodies = 0;
+    for (const auto& e : played.comp->entityWorld().entities()) {
+        const entity::Entity* other = scrubbed->comp->entityWorld().find(e->name());
+        const float d = glm::length(e->visualPosition() - other->visualPosition());
+        ++bodies;
+        if (d > worstAny) {
+            worstAny = d;
+            worstName = e->name();
+        }
+    }
+    std::printf("all %zu bodies (drawn positions): worst %.6f m (%s)\n", bodies, worstAny,
+                worstName.empty() ? "-" : worstName.c_str());
+    if (!worstName.empty()) {
+        const entity::Entity* a = played.comp->entityWorld().find(worstName);
+        const entity::Entity* b = scrubbed->comp->entityWorld().find(worstName);
+        const glm::vec3 ma = a->visualPosition() - a->state().position();
+        const glm::vec3 mb = b->visualPosition() - b->state().position();
+        std::printf("  %s: offset play (%.4f %.4f %.4f) scrub (%.4f %.4f %.4f); speed %.4f / %.4f; "
+                    "activity %s / %s; reaction %.3f / %.3f; yaw %.5f / %.5f\n",
+                    worstName.c_str(), ma.x, ma.y, ma.z, mb.x, mb.y, mb.z, a->state().speed,
+                    b->state().speed, entity::activityName(a->locomotion().activity),
+                    entity::activityName(b->locomotion().activity), a->state().reaction,
+                    b->state().reaction, a->state().yaw, b->state().yaw);
+    }
+    // The director's beat, as a check that the scrub landed inside the same moment of the cycle.
+    std::string pb;
+    std::string sb;
+    for (const auto& e : played.comp->director().log()) {
+        if (e.kind == stage::StageEventKind::Beat) pb = e.beat;
+    }
+    for (const auto& e : scrubbed->comp->director().log()) {
+        if (e.kind == stage::StageEventKind::Beat) sb = e.beat;
+    }
+    std::printf("director beat: play '%s', scrub '%s'\n", pb.c_str(), sb.c_str());
     return 0;
 }
 
@@ -405,6 +454,8 @@ int main(int argc, char** argv) {
             o.entity = next();
         } else if (a == "--repeat") {
             o.repeat = true;
+        } else if (a == "--legacy-scrub") {
+            o.legacyScrub = true;
         } else if (a == "--scrub") {
             o.scrub = std::atof(next());
         } else if (a == "--crowd") {
@@ -442,6 +493,8 @@ int main(int argc, char** argv) {
             }
             if (run.wallSeconds < best) {
                 best = run.wallSeconds;
+            }
+            if (kept.steps == 0 || run.behaviourSeconds < kept.behaviourSeconds) {
                 kept = std::move(run);
             }
         }
@@ -452,6 +505,11 @@ int main(int argc, char** argv) {
                     1000.0 * best / static_cast<double>(kept.steps) /
                         static_cast<double>(std::max<std::size_t>(kept.deciders, 1)),
                     kept.decisions, kept.distinctChoices);
+        std::printf("  entity step alone (director + perception + behaviours + actions): %.3f ms/step "
+                    "(min of %d) = %.4f ms/step/decider\n",
+                    1000.0 * kept.behaviourSeconds / static_cast<double>(kept.steps), o.repeats,
+                    1000.0 * kept.behaviourSeconds / static_cast<double>(kept.steps) /
+                        static_cast<double>(std::max<std::size_t>(kept.deciders, 1)));
         return 0;
     }
     const Run first = simulate(o, true);

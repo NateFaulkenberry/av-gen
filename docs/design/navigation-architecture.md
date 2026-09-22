@@ -42,4 +42,5 @@ choice fails fast and is suppressed. Open: area-biased and patrol modes.
 - No ORCA/RVO; dense crowds interpenetrate briefly (bounded in the 20-alien test).
 - The grid refuses to answer for worlds where it disagrees with the analytic terrain (Glowmere),
   falling back to analytic queries — correct, slower.
-- Every scene node is a landmark, including terrain (owner question, architecture doc).
+- Every scene node is a landmark, including terrain; aware deciders refuse the `terrain` tag, the
+  legacy ones still may choose it.

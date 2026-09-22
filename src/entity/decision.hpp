@@ -229,6 +229,7 @@ struct GoalCandidate {
     float weight = 0.0f;
     // Phase D: what it is, as a `SubjectId` (mind.hpp), when it came from a percept; 0 otherwise.
     std::uint64_t subject = 0;
+    std::uint64_t tags = 0; // Phase D §25: the point's or percept's semantic tags
 };
 
 // **The goal model, as one function.** This is the thing that was extracted (ADR-333 §3): taste

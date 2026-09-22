@@ -3008,10 +3008,12 @@ void Engine::seekSeconds(double seconds) {
         // left invisible twenty metres in the air. A scenario that autostarts picks up again on the
         // next frame, which is what makes the seeked second a function of the second rather than of
         // how the playhead got there.
-        {
-            const probe2::Add probeDirector(probe2::frame().directorResetMs); // TEMPORARY: phase 2
-            composition->director().reset(&composition->entityWorld(), &params_);
-        }
+        //
+        // ADR-671 (the owner's ruling, 2026-09-21): and then *replays* it with the entities, so a
+        // scrub -- and a render that starts mid-film -- lands the craft, the animals it lifts and
+        // every character that perceives them exactly where a play from zero puts them. The
+        // reset is inside `seekWithDirector`; what ADR-209 called "picks up again on the next
+        // frame" is now "is where it would have been".
         // ADR-217: and the camera's hold on it, for the same reason. The hold is derived from the
         // scenario's state, and the scenario has just been put back to the top -- a hold left armed
         // across the seek would keep the camera on a shot the new second is nowhere near.
@@ -3025,9 +3027,13 @@ void Engine::seekSeconds(double seconds) {
         // function of where the camera happened to be, and ADR-267 measured that at 50.263 m over
         // eight explorers at thirty seconds. What used to be saved by skipping distant bodies is
         // bounded here instead, in the unit the cost is actually paid in (ADR-273).
-        composition->entityWorld().seek(seconds, &params_, nullptr, 1.0 / 60.0,
-                                        entity::SeekBudget{.maxSeconds = 90.0,
-                                                           .maxBodySteps = seekBodyStepBudget_});
+        {
+            const probe2::Add probeDirector(probe2::frame().directorResetMs); // TEMPORARY: phase 2
+            composition->seekWithDirector(seconds, params_,
+                                          entity::SeekBudget{.maxSeconds = 90.0,
+                                                             .maxBodySteps = seekBodyStepBudget_},
+                                          1.0 / 60.0);
+        }
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were
         // not anywhere a frame ago. Left alone, the first frame after every scrub carries joint
         // motion vectors for a jump nobody made and the character smears. Told here rather than

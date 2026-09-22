@@ -631,8 +631,14 @@ void EntityWorld::refreshInterestPoints() {
     // Phase D §25: what each point *is*. Its kind's own word always; an entity's tags when the
     // point names one. The five kind words are interned first in every world, so this never
     // grows the vocabulary past what `internSemantics` already made.
+    const std::uint64_t terrainBit = terrainLandmarks_.empty() ? 0 : tags_.intern("terrain");
     for (InterestPoint& point : interests_) {
         std::uint64_t mask = tags_.intern(interestKindName(point.kind));
+        if (terrainBit != 0 && point.kind == InterestKind::Landmark &&
+            std::find(terrainLandmarks_.begin(), terrainLandmarks_.end(), point.name) !=
+                terrainLandmarks_.end()) {
+            mask |= terrainBit;
+        }
         if (!point.name.empty()) {
             if (const Entity* named = find(point.name)) {
                 mask |= named->tagMask_;
@@ -1208,7 +1214,7 @@ void EntityWorld::reset() {
 }
 
 void EntityWorld::seek(double time, params::ParameterSet* params, const signals::SignalBus* bus,
-                       double step, SeekBudget budget) {
+                       double step, SeekBudget budget, const SeekHooks* hooks) {
     if (params != nullptr) {
         params->resetFinals();
     }
@@ -1229,7 +1235,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     std::vector<std::uint64_t> needSteps(entities_.size(), 0);
     for (std::size_t i = 0; i < entities_.size(); ++i) {
         const Entity& entity = *entities_[i];
-        bool deep = !entity.desc_.actions.empty() || !entity.schedule_.desc().entries.empty();
+        // ADR-671: a replayed director reads and writes every body it can bind, so with one in the
+        // replay no body's history can be skipped -- a craft classified shallow would be standing
+        // at its anchor on the early steps the director plans its approach from.
+        bool deep = hooks != nullptr || !entity.desc_.actions.empty() ||
+                    !entity.schedule_.desc().entries.empty();
         std::uint64_t need = 1; // every body integrates the step it lands on
         if (!deep) {
             for (const auto& behavior : entity.behaviors_) {
@@ -1341,6 +1351,10 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         const std::uint64_t i = fromZero && k > 0 ? k - 1 : k;
         const double now = zeroStep ? 0.0 : target - static_cast<double>(steps - 1 - i) * dt;
         const double stepDt = zeroStep ? 0.0 : dt;
+        // ADR-671: the tier above the entities, first, as `Composition::updateBehaviour` runs it.
+        if (hooks != nullptr && hooks->before) {
+            hooks->before(now, stepDt);
+        }
 
         // The crowd, as it was at the end of the previous step, built before anything moves so
         // every body separates against the same snapshot. `update` has done this since crowd
@@ -1389,6 +1403,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 continue; // its answer at `target` cannot depend on this step
             }
             Entity& entity = *entities_[entityIndex];
+            // ADR-620's "the speed this body had last step", taken where `update` takes it -- before
+            // the action tier writes this step's. Taken after the queue (as it was), the limiter's
+            // "previous" was the action's new speed and a replayed body started every walk without
+            // its ramp: a scrub 1.7 cm off a play in the Glowmere film (Phase D §63, measured).
+            const float speedBefore = entity.state_.speed;
             entity.motion_ = MotionOffset{};
             entity.state_.hasLookTarget = false;
             entity.state_.reaction = 0.0f;
@@ -1415,6 +1434,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             entity.state_.intent.clear();
             entity.active_ = true;
             entity.everUpdated_ = true;
+
+            // ---- the Director tier (ADR-210), replayed since ADR-671 ----
+            // Inactive on every step of a replay whose caller does not replay the director (its
+            // motion was cleared by `reset`), so this is a no-op for every seek before ADR-671.
+            directorBefore(entity);
 
             // ---- intent, before behaviour (ADR-091) ----
             // Not replayed at all before this: `reset()` put the authored action list back and then
@@ -1478,10 +1502,10 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // ADR-620, and it is applied on BOTH paths for the reason testing.md #31 gives: a
             // limit honoured by `update` and not by `seek` is a body that accelerates differently
             // when scrubbed than when played, which is exactly the class ADR-360 exists to stop.
-            const float speedBefore = entity.state_.speed;
             for (auto& behavior : entity.behaviors_) {
                 behavior->update(bc, entity.state_, entity.motion_);
             }
+            directorAfter(entity);
             limitSpeedToGait(entity.desc_.gait, speedBefore, stepDt, entity.state_.speed);
             rescaleIntent(entity.state_);
             // The facing, canonicalised once after everything that steers has had its turn --
@@ -1503,6 +1527,10 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // harmless while nothing inside the step read it, and a scrub/play divergence the day
             // the awareness layer did (habituation accrues only while a body is still).
             measureStepVelocity(entity, stepDt);
+        }
+        // ADR-671: and whatever has to see this step's settled bodies before the next begins.
+        if (hooks != nullptr && hooks->after) {
+            hooks->after(now, stepDt);
         }
     }
     // Publish the state the next frame will build on, without touching the parameter set.
@@ -1694,6 +1722,74 @@ void EntityWorld::rescaleIntent(EntityState& state) {
     }
 }
 
+void EntityWorld::applyNodeOffsets(Entity& e) {
+    const glm::vec3 offset = e.motion_.position + e.state_.travel;
+    if (e.positionParam_ != nullptr) {
+        for (int i = 0; i < 3; ++i) {
+            const auto c = static_cast<std::size_t>(i);
+            e.positionParam_->setFinalComponent(c, e.positionParam_->finalComponent(c) + offset[i]);
+        }
+    }
+    if (e.rotationParam_ != nullptr) {
+        // Yaw as a *difference* from the facing the author placed the body at, not as a whole
+        // angle added to it (ADR-240). `state_.yaw` starts at `facing_`, so at t = 0 this adds
+        // nothing and the body is drawn exactly where the scene file put it -- and after that
+        // the drawn heading is the heading, rather than the heading plus a placement angle
+        // nobody meant as an offset. Pitch and roll stay additive: those really are offsets on
+        // top of whatever tilt the author authored.
+        const glm::vec3 rotation(e.motion_.rotation.x,
+                                 e.motion_.rotation.y + (e.state_.yaw - e.facing_) * kDegrees,
+                                 e.motion_.rotation.z);
+        for (int i = 0; i < 3; ++i) {
+            const auto c = static_cast<std::size_t>(i);
+            // Folded into (-180, 180] before it is written, because the parameter's hard range
+            // is +/-360 and `setFinalComponent` *clamps*. Euler degrees are 360-periodic, so
+            // this is the same orientation and cannot be anything else; what it removes is the
+            // silent clamp, which is not a rotation at all.
+            e.rotationParam_->setFinalComponent(
+                c, wrapAngle(e.rotationParam_->finalComponent(c) + rotation[i], 180.0f));
+        }
+    }
+    if (e.scaleParam_ != nullptr) {
+        for (int i = 0; i < 3; ++i) {
+            const auto c = static_cast<std::size_t>(i);
+            e.scaleParam_->setFinalComponent(c, e.scaleParam_->finalComponent(c) * e.motion_.scale[i]);
+        }
+    }
+}
+
+void EntityWorld::applyAllOffsets() {
+    for (auto& entity : entities_) {
+        applyNodeOffsets(*entity);
+    }
+}
+
+void EntityWorld::directorBefore(Entity& entity) {
+    // A director says where a body *is*. Written as `travel` rather than as an offset so that
+    // `position()`, the crowd field, the fields pass and every query that reads an entity's
+    // place see the same answer, and `driven` so the locomotor behaviours yield by keeping
+    // their state -- an animal put down after an abduction resumes the walk it was on.
+    if (entity.director_.active) {
+        entity.state_.travel = entity.director_.position - entity.state_.anchor;
+        if (entity.director_.hasYaw) {
+            entity.state_.yaw = entity.director_.yaw;
+        }
+        entity.state_.driven = true;
+        entity.state_.airborne = true;
+    }
+}
+
+void EntityWorld::directorAfter(Entity& entity) {
+    // The director's *additive* half, after the behaviours rather than before them: a craft keeps
+    // hovering, drifting and banking while it is being flown somewhere.
+    if (entity.director_.active) {
+        entity.motion_.rotation += entity.director_.rotation;
+        if (entity.director_.hasSpeed) {
+            entity.state_.speed = entity.director_.speed;
+        }
+    }
+}
+
 void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) {
     if (!parametersLive_) {
         return;
@@ -1761,41 +1857,6 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
     //
     // On a skipped frame the offsets are the ones the last update produced, so the pose is held
     // rather than recomputed. That is what "nothing on screen moves" was always supposed to mean.
-    const auto applyOffsets = [](Entity& e) {
-        const glm::vec3 offset = e.motion_.position + e.state_.travel;
-        if (e.positionParam_ != nullptr) {
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                e.positionParam_->setFinalComponent(c, e.positionParam_->finalComponent(c) + offset[i]);
-            }
-        }
-        if (e.rotationParam_ != nullptr) {
-            // Yaw as a *difference* from the facing the author placed the body at, not as a whole
-            // angle added to it (ADR-240). `state_.yaw` starts at `facing_`, so at t = 0 this adds
-            // nothing and the body is drawn exactly where the scene file put it -- and after that
-            // the drawn heading is the heading, rather than the heading plus a placement angle
-            // nobody meant as an offset. Pitch and roll stay additive: those really are offsets on
-            // top of whatever tilt the author authored.
-            const glm::vec3 rotation(e.motion_.rotation.x,
-                                     e.motion_.rotation.y + (e.state_.yaw - e.facing_) * kDegrees,
-                                     e.motion_.rotation.z);
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                // Folded into (-180, 180] before it is written, because the parameter's hard range
-                // is +/-360 and `setFinalComponent` *clamps*. Euler degrees are 360-periodic, so
-                // this is the same orientation and cannot be anything else; what it removes is the
-                // silent clamp, which is not a rotation at all.
-                e.rotationParam_->setFinalComponent(
-                    c, wrapAngle(e.rotationParam_->finalComponent(c) + rotation[i], 180.0f));
-            }
-        }
-        if (e.scaleParam_ != nullptr) {
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                e.scaleParam_->setFinalComponent(c, e.scaleParam_->finalComponent(c) * e.motion_.scale[i]);
-            }
-        }
-    };
 
     for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
         auto& entityPtr = entities_[entityIndex];
@@ -1833,7 +1894,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                 // The simulation does not advance, but the transform is still written: finals are
                 // rebuilt from bases every frame, so skipping the write puts the node back where
                 // the author placed it rather than leaving it where the entity is.
-                applyOffsets(entity);
+                applyNodeOffsets(entity);
                 continue;
             }
             dt = entity.coarseAccum_;
@@ -1872,14 +1933,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // `position()`, the crowd field, the fields pass and every query that reads an entity's
         // place see the same answer, and `driven` so the locomotor behaviours yield by keeping
         // their state -- an animal put down after an abduction resumes the walk it was on.
-        if (entity.director_.active) {
-            entity.state_.travel = entity.director_.position - entity.state_.anchor;
-            if (entity.director_.hasYaw) {
-                entity.state_.yaw = entity.director_.yaw;
-            }
-            entity.state_.driven = true;
-            entity.state_.airborne = true;
-        }
+        directorBefore(entity);
 
         // ---- intent, before behaviour (ADR-091) ----
         // The hierarchy is read top-down, so the action tier gets its say first and the behaviours
@@ -2007,12 +2061,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // somewhere, and a spin the director asked for is on top of the spin the scene authored.
         // Speed is written last because the gait reads it, and a body carried by a beam should have
         // its legs going even though nothing navigated it there.
-        if (entity.director_.active) {
-            entity.motion_.rotation += entity.director_.rotation;
-            if (entity.director_.hasSpeed) {
-                entity.state_.speed = entity.director_.speed;
-            }
-        }
+        directorAfter(entity);
         // ADR-620. After every writer of intent -- behaviours, the action tier, the director -- and
         // before the arc, the velocity measurement and the gait, all three of which read the speed
         // and would otherwise read one that teleported. The arc's `arcHoldStill_` stop below stays
@@ -2027,7 +2076,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // Fold the behaviours' offsets onto the node's parameter *finals*. Bases are left alone, so
         // saving the project writes back what the author placed rather than wherever the entity
         // happened to be when they hit save.
-        applyOffsets(entity);
+        applyNodeOffsets(entity);
 
         // §21, the return half of the arc. The arc *overrides* an activity while it runs and then
         // stops overriding it; it never writes Idle, never resets a behaviour and never clears a

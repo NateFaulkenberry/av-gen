@@ -388,7 +388,7 @@ std::size_t scoreGoals(const DecisionContext& ctx, const GoalTaste& taste,
         if (weight <= 0.0f) {
             continue;
         }
-        out.push_back(GoalCandidate{point.position, point.name, point.kind, weight});
+        out.push_back(GoalCandidate{point.position, point.name, point.kind, weight, 0, point.tags});
     }
     return out.size() - before;
 }
@@ -433,7 +433,8 @@ std::size_t scoreGoals(const DecisionContext& ctx, const GoalTaste& taste,
                 name = bodies[percept.source]->name();
             }
         }
-        out.push_back(GoalCandidate{percept.position, name, percept.kind, weight, subjectOf(percept)});
+        out.push_back(GoalCandidate{percept.position, name, percept.kind, weight, subjectOf(percept),
+                                    percept.tags});
     }
     return out.size() - before;
 }
@@ -648,6 +649,11 @@ float InvestigateConsiderer::scoreOf(const DecisionContext& ctx, const Percept& 
     }
     // Phase D §25: a semantic filter, when one was authored.
     if (!tags_.empty() && (p.tags & tagMask(ctx)) == 0) {
+        return 0.0f;
+    }
+    // Phase D §23: the ground is not a thing to investigate (aware deciders only).
+    if (ctx.mind != nullptr && ctx.world != nullptr &&
+        (p.tags & ctx.world->semanticTags().bit("terrain")) != 0) {
         return 0.0f;
     }
     // Phase D §21/§22/§59, only for a decider running the awareness layer: a target that could not
@@ -912,6 +918,11 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
         // makes it familiar. Measured on Glowmere before this: `vane` walked at `tide`, failed
         // "stuck", and chose `tide` again at once -- twelve times in 150 s -- because a subjectless
         // option has nothing for the failure memory to hold.
+        // Phase D §23, aware deciders only: the ground is not a place to go to.
+        if (ctx.mind != nullptr && ctx.world != nullptr &&
+            (scratch_[i].tags & ctx.world->semanticTags().bit("terrain")) != 0) {
+            o.score = 0.0f;
+        }
         if (ctx.mind != nullptr && scratch_[i].subject != 0) {
             o.subject = scratch_[i].subject;
             if (ctx.mind->suppressed(o.subject, ctx.time)) {
@@ -1525,12 +1536,16 @@ void SocialConsiderer::consider(const DecisionContext& ctx, std::vector<Option>&
     // the pair cannot take turns (measured: greet -> avoid -> greet inside two seconds before this).
     if (!ctx.mind->suppressed(subject, ctx.time) && gap > space * 1.2f) {
         greetActions_.clear();
+        // Walk to *the other body*, wherever it goes, and stop at the comfortable distance: a Move
+        // to an entity re-aims its last waypoint every step. Aimed at the point it stood on when
+        // the choice was made, the greeting "completed" 9.5 m short of a warden who had walked on
+        // (measured on the autonomy demo).
         ActionDesc walk;
         walk.kind = ActionKind::Move;
         walk.name = greetName_;
-        walk.target.kind = TargetKind::Point;
-        walk.target.point = standOff(here, there, comfortable);
-        walk.tolerance = std::max(comfortable * 0.4f, 0.75f);
+        walk.target.kind = TargetKind::EntityRef;
+        walk.target.name = them.name();
+        walk.tolerance = comfortable;
         walk.arrival = kArrival;
         greetActions_.push_back(walk);
         ActionDesc face;

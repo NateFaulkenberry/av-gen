@@ -92,18 +92,41 @@ Each was a pre-existing system claimed to meet D and never read against D. Verdi
 | 17–20 UFO, looks up, returns | `an alien notices the saucer, looks up…` |
 | determinism | `the same scene twice…`, `a scrub lands on the decision the play made…` |
 
-## Owner-level questions (batched; nothing here has been changed)
+## Owner rulings (2026-09-21) and what was done
 
-1. **Glowmere's cast does not run the awareness layer.** Turning it on means adding a `"mind"`
-   block to five `decide` behaviours in `glowmere-valley-2-multicam`, which is a visible behaviour
-   change. Do you want it, and with which personalities for rook, tide, sage, ember and vane?
-2. **Glowmere's `roam` creeps along shorelines.** The shipping `approach` (8 m) is inside the goal
-   model's `minRange` (12 m), so an errand's target vanishes six metres short of arrival and the
-   body chooses the next shore point, every second. ADR-670's hold fixes this, but only for an
-   aware decider. The demo reproduced it before the fix. Fix it in the scene data, or by opting in?
-3. **Every node is a wander landmark, including the terrain node** (`ground`, at its origin). Both
-   aliens in the demo walk to "ground". Should terrain nodes be filtered out of the landmark list?
-   That changes what the shipping cast can choose.
+1. **Awareness layer on for Glowmere's five aliens** (Q1). Applied by
+   `tools/phase_d/glowmere_awareness.py`, a text edit (no JSON round trip) that adds a `mind` block,
+   a `react` to `abduction/beam` and a `social` considerer to each decider, plus `tags: ["alien"]`
+   and a personality. The director's beats are world events (`"abduction/beam"`, heard within 60 m).
+2. **Roam data made consistent** (Q2): each roam's `minRange` is set to its `approach`, so an
+   errand's target can no longer leave range before the body arrives. Decisions over 180 s: 44→34,
+   47→27, 26→10, 32→37, 24→22 (rook, tide, sage, ember, vane). Running the cast exposed three
+   loops in code, now fixed: a stuck wander target re-chosen at once, a blocked return re-chosen
+   2,758 times in 50 s, and a greeting and a leash trading the slot every dwell.
+3. **Terrain is not a wander destination** (Q3, ruled technical). A terrain node stays in the
+   landmark list and is tagged `terrain` by its kind (never its name); aware deciders refuse it.
+   Removing it from the list outright was tried first and changed three pre-Phase-D golden traces
+   (`test_decision_extraction`, `test_route_pricing`, a perception subset test) whose deciders read
+   the list -- a change nobody asked for, so the refusal lives where the ruling applies.
+4. **A scrub replays the director** (ADR-671). The film lands every body exactly where the play
+   does, abduction included.
+
+### Glowmere's cast, and how each should read on screen
+
+| alien | personality | why | what the owner should see |
+|---|---|---|---|
+| rook | curiosity .85, caution .15, sociability .35 | the scout's scene role: first out, furthest out | walks toward the tractor beam and stands watching from ~18 m; roams widest; short looks |
+| tide | attentionSpan .95, curiosity .6 | its roam already favours water and glow | lingers longest at glow and the water's edge, slow to lose interest |
+| sage | caution .9, curiosity .3 | its `holdPost` grove already made it the homebody | backs away from the beam and from aliens that come close; stays near its grove |
+| ember | sociability .95 | its roam already weights characters highest | seeks the other aliens out and stands with them |
+| vane | eventSensitivity .95, attentionSpan .8 | its `watch` already weights characters 4.8 | the first head to turn to anything that happens or moves nearby |
+
+Authored beats win by construction. The staging binds only `animal`-tagged bodies and flies the
+craft. The aliens' decider fills the lowest authority tier (Routine), so any director or action cue
+outranks it. Maximum distance from anchor over 180 s did not grow: rook 43→41 m, tide 70→57,
+sage 26→26, ember 59→53, vane 68→63. The Glowmere-tuned suites pass unmodified, except the layers
+control, which now also turns off the new second source of look targets and gains an arm that
+proves that source works.
 
 ## Section status (D 1–78)
 
@@ -112,30 +135,30 @@ Each was a pre-existing system claimed to meet D and never read against D. Verdi
 | § | status | § | status | § | status |
 |---|---|---|---|---|---|
 | 1 | done (audit above) | 27 | done | 53 | done (IConsiderer is the seam; no model) |
-| 2 | done (boundary held) | 28 | partial (events yes; audio→event mapping open) | 54 | done (IConsiderer) |
+| 2 | done (boundary held) | 28 | done (signal→semantic events) | 54 | done (IConsiderer) |
 | 3 | done (producer) | 29 | done | 55 | done (decide + queue; ADR-670) |
 | 4 | done (no FSM) | 30 | partial (existing cadences; no budget tiers) | 56 | done |
 | 5 | done | 31 | open | 57 | done |
-| 6 | done | 32 | done (sim ≠ render; LOD caveat D3) | 58 | partial (trace tool; validate open) |
+| 6 | done | 32 | done (sim ≠ render; LOD caveat D3) | 58 | done (trace + validate) |
 | 7 | done | 33 | done (two replay defects fixed) | 59 | partial (unreachable/deleted handled; audit open) |
-| 8 | partial (benchmarks open) | 34 | partial (schedules inject actions; no goal injection) | 60 | done (no teleport path) |
+| 8 | partial (benchmarks open) | 34 | done (goal considerer) | 60 | done (no teleport path) |
 | 9 | done | 35 | open | 61 | done (decides at t = 0) |
 | 10 | done | 36 | open | 62 | done (fixed step) |
-| 11 | done | 37 | done | 63 | done |
-| 12 | done | 38 | partial (no beam reaction) | 64 | done |
-| 13 | done | 39 | partial (2 aliens; 5/20/50/100 open) | 65 | done |
-| 14 | partial (arrive; no ORCA) | 40 | partial (data; no canvas overlay) | 66 | open (owner Q1) |
-| 15 | done | 41 | done | 67 | partial (all but Glowmere) |
-| 16 | partial (InteractionDesc exists; investigate does not use it) | 42 | partial | 68 | partial (glance while idle) |
-| 17 | partial | 43 | partial | 69 | partial (saucer tagged `world_effect`) |
-| 18 | open (capabilities) | 44 | open | 70 | done (as far as events) |
+| 11 | done | 37 | done | 63 | done (director replayed, ADR-671) |
+| 12 | done | 38 | done (beam as event; react) | 64 | done |
+| 13 | done | 39 | done (20-alien test; 1-200 benchmark) | 65 | done |
+| 14 | partial (arrive; no ORCA) | 40 | partial (data; no canvas overlay) | 66 | done (owner ruling Q1) |
+| 15 | done | 41 | done | 67 | done |
+| 16 | done | 42 | partial | 68 | partial (glance while idle) |
+| 17 | done | 43 | partial | 69 | partial (saucer tagged `world_effect`) |
+| 18 | done | 44 | partial (crowd benchmark) | 70 | done (as far as events) |
 | 19 | done | 45 | open (doc) | 71 | done |
 | 20 | done | 46 | partial | 72 | partial (this doc + ADR-670) |
 | 21 | done | 47 | done | 73 | n/a (ordering) |
 | 22 | done | 48 | open | 74 | partial |
 | 23 | partial (interest over percepts) | 49 | partial | 75 | open (final report) |
 | 24 | done (minimal) | 50 | done | 76 | done |
-| 25 | done | 51 | open (research note) | 77 | open (second creature) |
+| 25 | done | 51 | open (research note) | 77 | done (pasture) |
 | 26 | done | 52 | open | 78 | done (this table) |
 
 ## Phase log

@@ -39,11 +39,15 @@ percepts (GridPerception, cadenced)      world events (EntityWorld, strictly ear
 The phase's own expectation — "a utility/goal layer + hierarchical behaviour execution + explicit
 motion requests" (§51) — is what exists: considerers + `ActionQueue` tiers + `CharacterIntent`.
 
-## Hysteresis (§20), all four mechanisms and what each stops
+## Hysteresis (§20), the mechanisms and what each stops
 
 - **dwell** (`dwellTicks`): a briefly stronger challenger.
 - **margin**: a near-equal challenger.
+- **commitment** (`Selector::commit`, aware deciders): a running errand is compared at 1.25x its
+  live score -- a tug between two authored pulls (Glowmere's ember: greeting vs its leash).
 - **hold** (ADR-670): an errand whose proposer went quiet mid-walk (the shore creep).
+- **exclusion** (`Selector::exclude`): an option whose plan just failed, for `failSeconds` (rook's
+  blocked return, 2,758 retries in 50 s).
 - **personal-space band** (`social`): approach/avoid alternating.
 Measured failure each prevents is recorded at its code.
 
@@ -77,9 +81,17 @@ A director targets character, goal, behaviour or event through the same seams; n
 | 2 background | coarse step every `coarseInterval` (existing) — **violates D3**: a coarse step integrates differently | existing band; see character_ai.hpp §1 |
 | 3 dormant | state snapshot only | `cullDistance` (existing); resumes from its snapshot |
 
-D3 forbids a tier that changes the integration step, and tier 2 does; the honest fix is tier 1
-(cadence only), which is a cadence multiplier on the two `hertz` knobs and is the next build step.
-Camera-dependence (§36) must never change what the world *is*: a tier may only change cadence.
+D3 forbids a tier that changes the integration step, and tier 2 does.
+
+**Why tier 1 is not chosen by the camera, and is therefore authored.** A cadence that falls with
+distance *from the camera* makes a character's decisions a function of where the camera was: a
+render from a different shot, or a scrub (which has no camera, ADR-273), would decide differently.
+ADR-671 made a scrub land exactly on the play, and a camera-keyed tier would undo that for every
+distant character. So behaviour LOD here is **authored per character**: the two `hertz` knobs
+(`perception.hertz`, `decide.hertz`) and `memorySeconds` are the tier, set by what a character is
+for in the film, not by what the lens sees this frame. Measured cost says this is enough: 0.011 ms
+per decider per step (performance section of the report), so 1,000 background characters would
+spend about 11 ms, and the scene update, not behaviour, is the limit.
 
 ## Runtime cost
 
@@ -98,4 +110,4 @@ the frame loop (§50).
 
 - Options are scored independently; no joint reasoning across characters (§24 is minimal).
 - Goals are one errand deep; no multi-step planning beyond an action list.
-- Signal-bus events are not reproduced by a scrub (ADR-670).
+- Signal-bus events are not reproduced by a scrub (ADR-670); director beats are (ADR-671).
