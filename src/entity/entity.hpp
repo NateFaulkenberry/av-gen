@@ -350,9 +350,9 @@ public:
     [[nodiscard]] const MotionMemory& motionMemory() const { return motionMemory_; }
     // **Staged and dark** (ADR-615): `motionState_` is touched in exactly one place in the whole
     // tree -- `EntityWorld::reset` calls `.reset()` on it -- and this accessor has no callers. The
-    // controller that would fill it, `entity::stepMotion`, is reached only through
-    // `predictTrajectory`, which is itself test-only. `advanceMotion` builds a `MotionRequest` and
-    // hands it straight to the provider chain; the controller is not in the path.
+    // controller that would fill it, `entity::stepMotion`, is reached through `predictTrajectory`,
+    // whose product caller is the matcher's query (§25), which predicts from the body's state
+    // rather than moving it. Behaviours move the body; this integrator does not.
     [[nodiscard]] const MotionState& motionState() const { return motionState_; }
     [[nodiscard]] const MotionChainResult& motionChainResult() const { return motionChainResult_; }
     [[nodiscard]] const LocomotionPlanState& locomotionPlan() const { return locomotionPlan_; }

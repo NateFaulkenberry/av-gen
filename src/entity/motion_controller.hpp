@@ -1,14 +1,11 @@
 #pragma once
 
-// **Staged and dark (ADR-615).** Nothing in `src/` or `tools/` calls `stepMotion`: its only caller
-// is `predictTrajectory`, which is itself reached only from tests. `Entity` holds a `MotionState`
-// member that is touched in exactly one place in the tree -- `EntityWorld::reset` clearing it --
-// and read by nothing. `Entity::advanceMotion` builds a `MotionRequest` and hands it straight to
-// the provider chain, so this integrator is not on the path any character takes.
-//
-// The code is correct and tested. It is left built, and said to be dark here, rather than wired
-// (a product change with a per-frame cost that no spec section needs) or deleted (it is an
-// unfinished feature, not a cut one, so ADR-441 does not apply).
+// **Reached through prediction, not through the body.** `stepMotion`'s callers are
+// `predictTrajectory` and tests; `predictTrajectory`'s product caller is `MatchMotionProvider`'s
+// query (§25, wired for §48/§65), for a body that opted into motion matching (ADR-623). `grep -rn
+// "predictTrajectory(" src` finds them. The body itself is still not moved by this integrator:
+// `Entity` holds a `MotionState` that only `EntityWorld::reset` touches, and behaviours move the body
+// (ADR-615 records that half as staged and dark, and it still is).
 
 // The motion controller (Phase B §33-§35): intent in, continuous motion out.
 //
