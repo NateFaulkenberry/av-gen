@@ -645,6 +645,21 @@ public:
     // stale box as if it were current.
     [[nodiscard]] bool visualPlacement(std::string_view node,
                                        stage::VisualPlacement& out) const override;
+
+    // ---- a scrub that replays the director (ADR-671) ------------------------------------------
+    //
+    // What `Engine::seekSeconds` calls. The director is reset (ADR-209) and then **replayed** step
+    // for step with the entities -- staging first, the entity step, the node offsets written back
+    // -- so the craft, the animals it lifts and every character that perceives them land where a
+    // play from zero puts them (ADR-360). The owner's ruling of 2026-09-21 replaces ADR-209's "a
+    // scenario picks up again on the next frame": a scrub into an abduction shows it mid-cycle.
+    //
+    // The director asks where nodes are *drawn* (`Anchor::Drawn`), which a play answers from the
+    // previous frame's flattening. The replay does not flatten; it answers from `ReplayPlacement`,
+    // the same arithmetic over the same parameter finals, captured after each replayed step -- one
+    // step old, as the play's is.
+    void seekWithDirector(double seconds, params::ParameterSet& params, entity::SeekBudget budget,
+                          double step = 1.0 / 60.0);
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
@@ -1046,6 +1061,14 @@ public:
     // Setting entities does not mark the composition dirty: an entity moves a node by writing its
     // transform parameters, and nothing it can do requires geometry to be rebuilt.
     [[nodiscard]] const std::vector<entity::EntityDesc>& entities() const { return entityDescs_; }
+    // Phase D §26: how far each named world event carries. Takes effect at the next rebuild.
+    void setEventProfiles(std::vector<entity::EntityWorld::EventProfile> profiles) {
+        eventProfiles_ = std::move(profiles);
+        entityWorld_.setEventProfiles(eventProfiles_);
+    }
+    [[nodiscard]] const std::vector<entity::EntityWorld::EventProfile>& eventProfiles() const {
+        return eventProfiles_;
+    }
     [[nodiscard]] const entity::EntityWorld& entityWorld() const { return entityWorld_; }
     [[nodiscard]] entity::EntityWorld& entityWorld() { return entityWorld_; }
     // Rejects the whole set and names the offender rather than dropping one, for the same reason
@@ -1818,6 +1841,25 @@ private:
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    std::vector<entity::EntityWorld::EventProfile> eventProfiles_; // Phase D §26: "worldEvents"
+    // Phase D §26: the director's beats this update, raised as world events. Shared by
+    // `updateBehaviour` and the replay in `seekWithDirector`.
+    void raiseDirectorBeats(double time);
+    // ADR-671: `visualPlacement` for a replay, one step old, from the finals.
+    class ReplayPlacement final : public stage::IVisualPlacement {
+    public:
+        explicit ReplayPlacement(const Composition& comp) : comp_(comp) {}
+        void invalidate() { valid_.assign(valid_.size(), 0u); }
+        void capture();
+        [[nodiscard]] bool visualPlacement(std::string_view node,
+                                           stage::VisualPlacement& out) const override;
+
+    private:
+        const Composition& comp_;
+        std::vector<stage::VisualPlacement> placed_;
+        std::vector<std::uint8_t> valid_;
+    };
+    friend class ReplayPlacement;
     stage::StagingDesc stagingDesc_;              // ADR-209: authored, round-tripped as "staging"
     stage::Staging staging_;
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"

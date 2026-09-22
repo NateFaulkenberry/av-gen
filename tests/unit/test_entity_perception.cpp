@@ -645,13 +645,14 @@ TEST_CASE("what the cadence costs a replay", "[entity][perception]") {
     INFO(fmt::format("seek({:.0f} s) over 24 perceiving bodies, minima of 5: {:.1f} ms at 4 Hz "
                      "({} sense ticks), {:.1f} ms at 60 Hz ({} ticks)",
                      kSeek, slow, slowTicks, fast, fastTicks));
-    // 1,800 fixed steps x 24 bodies. At 60 Hz every body senses on every step it is replayed for:
-    // 43,200 ticks. At 4 Hz the replay spans tick indices 0 through 120, which is 121 ticks a body
-    // and 2,904 -- except that `senseTick`'s per-body phase pushes one of the twenty-four past the
-    // boundary of tick 0, so it fires 120 times and the total is 2,903. That is the phase doing
-    // exactly what it is for, visible in the count.
-    CHECK(fastTicks == 43200u);
-    CHECK(slowTicks == 2903u);
+    // 1,801 replayed instants x 24 bodies: the 1,800 fixed steps ending at 30 s, and -- since
+    // ADR-670 -- the instant t = 0 that a play integrates with a zero delta and the replay used to
+    // skip. At 60 Hz every body senses on every instant: 43,224 ticks. At 4 Hz the replay spans
+    // tick indices 0 through 120, 121 a body, 2,904. (Before ADR-670 one body's phase put its tick
+    // 0 only at t = 0, which the replay never reached, so it fired 120 times and the total was
+    // 2,903: the missing instant, visible in the count.)
+    CHECK(fastTicks == 43224u);
+    CHECK(slowTicks == 2904u);
     // Which is the cadence, to within the one phase-shifted body: 14.9 times fewer sense ticks for
     // the same replay.
     CHECK(fastTicks > slowTicks * 14u);

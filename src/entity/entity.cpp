@@ -360,8 +360,160 @@ void EntityWorld::setEntities(std::vector<EntityDesc> descs, std::uint32_t scene
     for (const auto& entity : entities_) {
         perceiving_ = perceiving_ || entity->desc_.perceives;
     }
+    internSemantics();
     for (const std::string& problem : problems_) {
         log::warn("{}", problem);
+    }
+}
+
+// Phase D §25. Interns the world's vocabulary -- the five interest kinds first, so their bits are
+// the same in every world, then every entity's tags in entity order -- and stamps each entity's
+// mask. Deterministic by construction: the order is the scene file's.
+void EntityWorld::internSemantics() {
+    tags_.clear();
+    for (std::size_t k = 0; k < 5; ++k) {
+        tags_.intern(interestKindName(static_cast<InterestKind>(k)));
+    }
+    for (const auto& entity : entities_) {
+        for (const std::string& tag : entity->desc_.tags) {
+            tags_.intern(tag);
+        }
+    }
+    for (const auto& entity : entities_) {
+        entity->tagMask_ = tags_.mask(entity->desc_.tags) |
+                           tags_.bit(interestKindName(InterestKind::Character));
+        entity->perceptionTagBits_.clear();
+        for (const auto& [tag, weight] : entity->desc_.perceptionTags) {
+            if (const std::uint64_t b = tags_.bit(tag); b != 0) {
+                entity->perceptionTagBits_.emplace_back(b, weight);
+            }
+        }
+    }
+    if (tags_.overflowed()) {
+        const std::string message = fmt::format(
+            "entities: more than {} distinct tags; the rest carry no semantic bit and a filter "
+            "naming one matches nothing",
+            SemanticTags::kCapacity);
+        if (std::find(problems_.begin(), problems_.end(), message) == problems_.end()) {
+            problems_.push_back(message);
+        }
+    }
+    refreshInterestPoints();
+}
+
+Personality Entity::personality() const {
+    Personality p = desc_.personality;
+    for (std::size_t i = 0; i < Personality::kCount; ++i) {
+        if (personalityParams_[i] != nullptr) {
+            p.set(i, personalityParams_[i]->value());
+        }
+    }
+    return p;
+}
+
+// ---- world events (Phase D §26) ----------------------------------------------------------------
+
+std::uint32_t EntityWorld::eventType(std::string_view name) {
+    if (const std::uint32_t found = findEventType(name); found != 0) {
+        return found;
+    }
+    eventNames_.emplace_back(name);
+    return static_cast<std::uint32_t>(eventNames_.size());
+}
+
+std::uint32_t EntityWorld::findEventType(std::string_view name) const {
+    for (std::size_t i = 0; i < eventNames_.size(); ++i) {
+        if (eventNames_[i] == name) {
+            return static_cast<std::uint32_t>(i + 1);
+        }
+    }
+    return 0;
+}
+
+std::string_view EntityWorld::eventName(std::uint32_t type) const {
+    return type >= 1 && type <= eventNames_.size() ? std::string_view(eventNames_[type - 1])
+                                                   : std::string_view();
+}
+
+void EntityWorld::raiseSignalEvents(const signals::SignalBus* bus, double time) {
+    if (bus == nullptr) {
+        return;
+    }
+    eventSignalLast_.resize(eventProfiles_.size(), -1.0e30);
+    for (std::size_t i = 0; i < eventProfiles_.size(); ++i) {
+        const EventProfile& p = eventProfiles_[i];
+        if (p.signal.empty()) {
+            continue;
+        }
+        const auto id = bus->find(p.signal);
+        if (!id || !bus->event(*id) || bus->value(*id) < p.threshold ||
+            time - eventSignalLast_[i] < static_cast<double>(p.minInterval)) {
+            continue;
+        }
+        eventSignalLast_[i] = time;
+        WorldEvent w;
+        w.type = eventType(p.name);
+        w.time = time;
+        w.radius = p.radius;
+        w.magnitude = std::clamp(bus->value(*id), 0.0f, 1.0f) * p.magnitude;
+        if (!p.at.empty()) {
+            (void)pointOfInterest(p.at, w.position);
+            for (std::size_t e = 0; e < entities_.size(); ++e) {
+                if (entities_[e]->name() == p.at) {
+                    w.source = e;
+                }
+            }
+        }
+        emitEvent(w);
+    }
+}
+
+void EntityWorld::setEventProfiles(std::vector<EventProfile> profiles) {
+    eventProfiles_ = std::move(profiles);
+    eventSignalLast_.clear();
+    for (const EventProfile& profile : eventProfiles_) {
+        eventType(profile.name);
+    }
+}
+
+void EntityWorld::emitEvent(WorldEvent event) {
+    event.sequence = ++eventSequence_;
+    // Bounded in count and in age. Pruned from the front: events arrive in time order on both
+    // paths, so the oldest is always first and the prune is a prefix.
+    std::size_t drop = 0;
+    while (drop < worldEvents_.size() &&
+           (worldEvents_.size() - drop >= kEventCapacity ||
+            event.time - worldEvents_[drop].time > kEventWindowSeconds)) {
+        ++drop;
+    }
+    if (drop > 0) {
+        worldEvents_.erase(worldEvents_.begin(), worldEvents_.begin() + static_cast<std::ptrdiff_t>(drop));
+    }
+    worldEvents_.push_back(event);
+}
+
+void EntityWorld::raiseActionEvents(const std::vector<ActionEvent>& events, std::size_t first,
+                                    std::size_t entityIndex, double time) {
+    for (std::size_t i = first; i < events.size(); ++i) {
+        const ActionEvent& e = events[i];
+        // Only a *named* completion is a world event. A cancelled walk or a skipped step is the
+        // queue's bookkeeping, not something that happened in the world.
+        if (e.event.empty() || e.result != ActionResult::Completed) {
+            continue;
+        }
+        WorldEvent w;
+        w.type = eventType(e.event);
+        w.time = time;
+        w.source = entityIndex;
+        w.position = entities_[entityIndex]->state_.position();
+        for (const EventProfile& profile : eventProfiles_) {
+            if (profile.name == e.event) {
+                w.radius = profile.radius;
+                w.magnitude = profile.magnitude;
+                break;
+            }
+        }
+        emitEvent(w);
     }
 }
 
@@ -383,6 +535,10 @@ void EntityWorld::clear() {
     grid_.clear();
     fieldCounts_ = FieldCounts{};
     fieldsBound_ = false;
+    tags_.clear();
+    worldEvents_.clear();
+    eventSequence_ = 0;
+    eventSignalLast_.clear();
 }
 
 Entity* EntityWorld::find(std::string_view name) {
@@ -471,6 +627,24 @@ void EntityWorld::refreshInterestPoints() {
         for (const glm::vec3& p : grid->vistaPoints()) {
             interests_.push_back(InterestPoint{p, {}, InterestKind::Vista, 1.0f});
         }
+    }
+    // Phase D §25: what each point *is*. Its kind's own word always; an entity's tags when the
+    // point names one. The five kind words are interned first in every world, so this never
+    // grows the vocabulary past what `internSemantics` already made.
+    const std::uint64_t terrainBit = terrainLandmarks_.empty() ? 0 : tags_.intern("terrain");
+    for (InterestPoint& point : interests_) {
+        std::uint64_t mask = tags_.intern(interestKindName(point.kind));
+        if (terrainBit != 0 && point.kind == InterestKind::Landmark &&
+            std::find(terrainLandmarks_.begin(), terrainLandmarks_.end(), point.name) !=
+                terrainLandmarks_.end()) {
+            mask |= terrainBit;
+        }
+        if (!point.name.empty()) {
+            if (const Entity* named = find(point.name)) {
+                mask |= named->tagMask_;
+            }
+        }
+        point.tags |= mask;
     }
 
     // ---- and the index a sense stage scans it through (ADR-270) -------------------------------
@@ -627,6 +801,21 @@ void EntityWorld::registerParameters(params::ParameterSet& params, const std::st
             }
             entity->percepts_.assign(kPerceptCapacityMax, Percept{});
         }
+        // Phase D §29. The personality, as ordinary parameters, for a body that declared one --
+        // so a reaction can make a character bolder on a drop and a track can keyframe its
+        // curiosity. Read back through `Entity::personality()` every decision.
+        entity->personalityParams_.fill(nullptr);
+        if (entity->desc_.hasPersonality) {
+            const std::string base = prefix + entity->name() + "/personality/";
+            const std::span<const std::string_view> traits = personalityTraitNames();
+            for (std::size_t t = 0; t < traits.size(); ++t) {
+                const std::string path = base + std::string(traits[t]);
+                registered_.push_back(path);
+                entity->personalityParams_[t] = &params.add(params::ParamDesc<float>{
+                    .path = path, .defaultValue = entity->desc_.personality.get(t), .hardMin = 0.0f,
+                    .hardMax = 1.0f});
+            }
+        }
         // Declared state, as ordinary parameters. This is the whole of what makes "the headphones
         // are on" readable by anything else: a reaction targets "state/headphones", a track
         // keyframes it, a preset saves it, and none of them has to know an action wrote it.
@@ -663,6 +852,7 @@ void EntityWorld::unregisterParameters(params::ParameterSet& params) {
         // And the senses'. `desc_.perception` is the authored value and survives; what is dropped
         // is the live reading of it, which `perceiveOne` falls back off when the pointers are null.
         entity->perceptionParams_ = Entity::PerceptionParams{};
+        entity->personalityParams_.fill(nullptr);
     }
 }
 
@@ -835,6 +1025,14 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
                 entity->propertyParams_[i]->setBase(entity->propertyValues_[i].second);
             }
         }
+        entity->personalityParams_.fill(nullptr);
+        if (entity->desc_.hasPersonality) {
+            const std::string base = prefix + entity->name() + "/personality/";
+            const std::span<const std::string_view> traits = personalityTraitNames();
+            for (std::size_t t = 0; t < traits.size(); ++t) {
+                entity->personalityParams_[t] = params.findAs<float>(base + std::string(traits[t]));
+            }
+        }
         if (entity->desc_.perceives) {
             const std::string base = prefix + entity->name() + "/perception/";
             Entity::PerceptionParams& pp = entity->perceptionParams_;
@@ -921,6 +1119,12 @@ void Entity::advanceMotion(double time, float dt) {
 void EntityWorld::reset() {
     actionEvents_.clear();
     pendingEvents_.clear();
+    // Phase D §26. Events are simulation state: what happened in the run the playhead just left.
+    // Cleared with everything else, and the sequence restarts, so a replay raises the same events
+    // under the same numbers and a character's "heard it already" memory means the same thing.
+    worldEvents_.clear();
+    eventSequence_ = 0;
+    eventSignalLast_.clear();
     for (auto& entity : entities_) {
         entity->rng_ = Rng(entity->seed_);
         entity->state_ = EntityState{};
@@ -1011,7 +1215,7 @@ void EntityWorld::reset() {
 }
 
 void EntityWorld::seek(double time, params::ParameterSet* params, const signals::SignalBus* bus,
-                       double step, SeekBudget budget) {
+                       double step, SeekBudget budget, const SeekHooks* hooks) {
     if (params != nullptr) {
         params->resetFinals();
     }
@@ -1032,7 +1236,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     std::vector<std::uint64_t> needSteps(entities_.size(), 0);
     for (std::size_t i = 0; i < entities_.size(); ++i) {
         const Entity& entity = *entities_[i];
-        bool deep = !entity.desc_.actions.empty() || !entity.schedule_.desc().entries.empty();
+        // ADR-671: a replayed director reads and writes every body it can bind, so with one in the
+        // replay no body's history can be skipped -- a craft classified shallow would be standing
+        // at its anchor on the early steps the director plans its approach from.
+        bool deep = hooks != nullptr || !entity.desc_.actions.empty() ||
+                    !entity.schedule_.desc().entries.empty();
         // ADR-623: **a provider's memory is an accumulation too.** Its clip time has advanced on
         // every step since the body began, and a matcher's selection depends on every search before
         // it, so neither has a bounded history. A body on the provider chain is replayed in full;
@@ -1136,19 +1344,29 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
     // makes the replayed sequence the same sequence of instants a play from zero produces, and the
     // residual goes to zero; tests/unit/test_entity_seek.cpp holds it there with a 30 Hz arm beside
     // it that must disagree.
-    // ADR-623. A play's first frame advances every provider memory at time 0 with no elapsed time
-    // (its first search). A replay that starts from the very beginning has no step at 0, so it is
-    // given that one here; without it the matcher's first search lands a frame late and every
-    // search after it is shifted by one step.
-    if (steps > 0 && target - static_cast<double>(steps) * dt < 0.5 * dt) {
-        for (std::size_t e = 0; e < entities_.size(); ++e) {
-            if (seekFirstStep_[e] == 0) {
-                entities_[e]->advanceMotion(0.0, 0.0f);
-            }
+    // ADR-623 fixed the same missing instant for provider memory with a one-off
+    // `advanceMotion(0.0, 0.0f)` before this loop; the zero step below subsumes it -- the step body
+    // advances every provider at `now = 0` with `stepDt = 0`, which is exactly that call, now in
+    // its place in the step's order rather than ahead of it. Both branches found the defect
+    // independently; the merge keeps one mechanism, not two.
+    // **And the instant t = 0 itself, when the window reaches back to it** (Phase D §63). A play
+    // from zero integrates its first frame with `deltaTime = 0` (ADR-521) -- nothing moves, but
+    // every decider commits and every action list is handed out. The replay above started at
+    // `dt`, so it made those first decisions one step late and ran every errand one step behind the
+    // play: invisible to a body whose motion is a function of the clock, and a divergence that
+    // compounds into a different decision for one whose motion is a function of its choices.
+    // Measured on the autonomy demo: a scout 111 m from where the play left it at t = 75 s.
+    const bool fromZero = steps > 0 && static_cast<double>(steps) * dt >= target - 1e-9;
+    const std::uint64_t replaySteps = steps + (fromZero ? 1u : 0u);
+    for (std::uint64_t k = 0; k < replaySteps; ++k) {
+        const bool zeroStep = fromZero && k == 0;
+        const std::uint64_t i = fromZero && k > 0 ? k - 1 : k;
+        const double now = zeroStep ? 0.0 : target - static_cast<double>(steps - 1 - i) * dt;
+        const double stepDt = zeroStep ? 0.0 : dt;
+        // ADR-671: the tier above the entities, first, as `Composition::updateBehaviour` runs it.
+        if (hooks != nullptr && hooks->before) {
+            hooks->before(now, stepDt);
         }
-    }
-    for (std::uint64_t i = 0; i < steps; ++i) {
-        const double now = target - static_cast<double>(steps - 1 - i) * dt;
 
         // The crowd, as it was at the end of the previous step, built before anything moves so
         // every body separates against the same snapshot. `update` has done this since crowd
@@ -1197,6 +1415,11 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 continue; // its answer at `target` cannot depend on this step
             }
             Entity& entity = *entities_[entityIndex];
+            // ADR-620's "the speed this body had last step", taken where `update` takes it -- before
+            // the action tier writes this step's. Taken after the queue (as it was), the limiter's
+            // "previous" was the action's new speed and a replayed body started every walk without
+            // its ramp: a scrub 1.7 cm off a play in the Glowmere film (Phase D §63, measured).
+            const float speedBefore = entity.state_.speed;
             entity.motion_ = MotionOffset{};
             entity.state_.hasLookTarget = false;
             entity.state_.reaction = 0.0f;
@@ -1217,8 +1440,17 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             entity.state_.detail = 1.0f;
             entity.state_.driven = false;
             entity.state_.airborne = false;
+            // Phase D §3: intent is what the body wants THIS step, published by whoever moves it and
+            // whoever decided it. Cleared on both paths with the other per-step fields, so a step in
+            // which nobody published one falls back to the polar pair rather than latching the last.
+            entity.state_.intent.clear();
             entity.active_ = true;
             entity.everUpdated_ = true;
+
+            // ---- the Director tier (ADR-210), replayed since ADR-671 ----
+            // Inactive on every step of a replay whose caller does not replay the director (its
+            // motion was cleared by `reset`), so this is a no-op for every seek before ADR-671.
+            directorBefore(entity);
 
             // ---- intent, before behaviour (ADR-091) ----
             // Not replayed at all before this: `reset()` put the authored action list back and then
@@ -1235,7 +1467,7 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 seekEvents_.clear();
                 ActionContext ac;
                 ac.time = now;
-                ac.dt = dt;
+                ac.dt = stepDt;
                 ac.rng = &entity.rng_;
                 ac.self = &entity;
                 ac.world = this;
@@ -1249,6 +1481,10 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
                 // frame: an ADR-360 violation in the one tier ADR-267 defect 3 had already had to
                 // teach this function to replay.
                 const ActionOutput out = entity.actions_.update(ac, entity.state_);
+                // Phase D §26: the events are discarded as *application* events (above), but they
+                // are also world events a replayed character may hear -- and a replay that did not
+                // re-raise them would be a scrub in which the mushroom never bloomed.
+                raiseActionEvents(seekEvents_, 0, entityIndex, now);
                 if (entity.locomotion_.action != out.activity) {
                     entity.locomotion_.action.assign(out.activity);
                 }
@@ -1260,7 +1496,7 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
 
             BehaviorContext bc;
             bc.time = now;
-            bc.dt = dt;
+            bc.dt = stepDt;
             bc.bus = bus;
             bc.nav = &nav_;
             bc.world = this;
@@ -1278,11 +1514,12 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // ADR-620, and it is applied on BOTH paths for the reason testing.md #38 gives: a
             // limit honoured by `update` and not by `seek` is a body that accelerates differently
             // when scrubbed than when played, which is exactly the class ADR-360 exists to stop.
-            const float speedBefore = entity.state_.speed;
             for (auto& behavior : entity.behaviors_) {
                 behavior->update(bc, entity.state_, entity.motion_);
             }
-            limitSpeedToGait(entity.desc_.gait, speedBefore, step, entity.state_.speed);
+            directorAfter(entity);
+            limitSpeedToGait(entity.desc_.gait, speedBefore, stepDt, entity.state_.speed);
+            rescaleIntent(entity.state_);
             // The facing, canonicalised once after everything that steers has had its turn --
             // exactly where `update` does it. Without it a replayed yaw is the total a body has
             // turned rather than the direction it faces, and `angleDelta` against it is a different
@@ -1296,14 +1533,20 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // on exactly the frames where the speed is sitting on a threshold.
             entity.locomotion_.activity =
                 entity.gait_.select(entity.desc_.gait, entity.state_.activity, entity.state_.speed,
-                                    entity.state_.turnRate, dt);
-            // ADR-623: **the provider memory, on every replayed step, at that step's own time.**
-            // This used to run once, after the replay, at the target time. A clip provider's time
-            // and a matcher's selection therefore came out of a seek as the answer to one step from
-            // a reset memory, and every scrubbed provider pose disagreed with the played one. The
-            // matcher's scrub test found it; the clip provider had the same defect with nothing
-            // looking.
-            entity.advanceMotion(now, static_cast<float>(dt));
+                                    entity.state_.turnRate, stepDt);
+            // ADR-545's measured velocity, on this path too (Phase D §63). `update` measured it and
+            // `seek` never did, so a replayed body reported zero velocity for the whole replay --
+            // harmless while nothing inside the step read it, and a scrub/play divergence the day
+            // the awareness layer did (habituation accrues only while a body is still).
+            measureStepVelocity(entity, stepDt);
+            // ADR-623: **the provider memory, on every replayed step, at that step's own time**,
+            // after the measured velocity exactly as `update` orders them. `stepDt`, so the zero
+            // step advances with no elapsed time, as the play's first frame does.
+            entity.advanceMotion(now, static_cast<float>(stepDt));
+        }
+        // ADR-671: and whatever has to see this step's settled bodies before the next begins.
+        if (hooks != nullptr && hooks->after) {
+            hooks->after(now, stepDt);
         }
     }
     // Publish the state the next frame will build on, without touching the parameter set.
@@ -1456,6 +1699,115 @@ bool EntityWorld::direct(std::string_view entity, std::vector<ActionDesc> action
     return true;
 }
 
+// ADR-545: one backward difference of the settled simulation position, and one of the velocity.
+// Shared by `update` and `seek` so the two paths measure the same thing (testing.md #31).
+//
+// `dt <= 0` leaves the previous velocity alone rather than dividing by it. That is not
+// hypothetical: ADR-521 records that `FixedStepClock::tick()` hands out `deltaTime = 0` on the
+// first tick of every render, so a naive division would publish an infinity into the pose layer on
+// frame one of every offline job.
+void EntityWorld::measureStepVelocity(Entity& entity, double dt) {
+    const glm::vec3 settled = entity.state_.position();
+    const glm::vec3 previousVelocity = entity.state_.velocity;
+    if (entity.hasLastPosition_ && dt > 0.0) {
+        entity.state_.velocity = (settled - entity.lastPosition_) / static_cast<float>(dt);
+        // Phase B §19/§35. **Measured once, here, beside the velocity it differences** --
+        // ADR-545's rule applied one derivative out.
+        entity.state_.acceleration =
+            entity.hasLastVelocity_
+                ? (entity.state_.velocity - previousVelocity) / static_cast<float>(dt)
+                : glm::vec3(0.0f);
+        entity.hasLastVelocity_ = true;
+    } else {
+        entity.state_.velocity = glm::vec3(0.0f);
+        entity.state_.acceleration = glm::vec3(0.0f);
+    }
+    entity.lastPosition_ = settled;
+    entity.hasLastPosition_ = true;
+}
+
+// Phase D §15: the gait's acceleration limit applies to the vector intent as well as to `speed`,
+// so the two forms of the intent agree after the limiter exactly as they did before it. Without
+// this, a body whose mover asked for 1.8 m/s on its first step published a 1.8 m/s intent beside a
+// limited 0.05 m/s `speed`, and the MotionRequest would have been built from the unlimited one.
+void EntityWorld::rescaleIntent(EntityState& state) {
+    if (!state.intent.valid) {
+        return;
+    }
+    const float wanted = glm::length(glm::vec2(state.intent.desiredVelocity.x, state.intent.desiredVelocity.z));
+    if (wanted > 1e-6f) {
+        state.intent.desiredVelocity *= state.speed / wanted;
+    }
+}
+
+void EntityWorld::applyNodeOffsets(Entity& e) {
+    const glm::vec3 offset = e.motion_.position + e.state_.travel;
+    if (e.positionParam_ != nullptr) {
+        for (int i = 0; i < 3; ++i) {
+            const auto c = static_cast<std::size_t>(i);
+            e.positionParam_->setFinalComponent(c, e.positionParam_->finalComponent(c) + offset[i]);
+        }
+    }
+    if (e.rotationParam_ != nullptr) {
+        // Yaw as a *difference* from the facing the author placed the body at, not as a whole
+        // angle added to it (ADR-240). `state_.yaw` starts at `facing_`, so at t = 0 this adds
+        // nothing and the body is drawn exactly where the scene file put it -- and after that
+        // the drawn heading is the heading, rather than the heading plus a placement angle
+        // nobody meant as an offset. Pitch and roll stay additive: those really are offsets on
+        // top of whatever tilt the author authored.
+        const glm::vec3 rotation(e.motion_.rotation.x,
+                                 e.motion_.rotation.y + (e.state_.yaw - e.facing_) * kDegrees,
+                                 e.motion_.rotation.z);
+        for (int i = 0; i < 3; ++i) {
+            const auto c = static_cast<std::size_t>(i);
+            // Folded into (-180, 180] before it is written, because the parameter's hard range
+            // is +/-360 and `setFinalComponent` *clamps*. Euler degrees are 360-periodic, so
+            // this is the same orientation and cannot be anything else; what it removes is the
+            // silent clamp, which is not a rotation at all.
+            e.rotationParam_->setFinalComponent(
+                c, wrapAngle(e.rotationParam_->finalComponent(c) + rotation[i], 180.0f));
+        }
+    }
+    if (e.scaleParam_ != nullptr) {
+        for (int i = 0; i < 3; ++i) {
+            const auto c = static_cast<std::size_t>(i);
+            e.scaleParam_->setFinalComponent(c, e.scaleParam_->finalComponent(c) * e.motion_.scale[i]);
+        }
+    }
+}
+
+void EntityWorld::applyAllOffsets() {
+    for (auto& entity : entities_) {
+        applyNodeOffsets(*entity);
+    }
+}
+
+void EntityWorld::directorBefore(Entity& entity) {
+    // A director says where a body *is*. Written as `travel` rather than as an offset so that
+    // `position()`, the crowd field, the fields pass and every query that reads an entity's
+    // place see the same answer, and `driven` so the locomotor behaviours yield by keeping
+    // their state -- an animal put down after an abduction resumes the walk it was on.
+    if (entity.director_.active) {
+        entity.state_.travel = entity.director_.position - entity.state_.anchor;
+        if (entity.director_.hasYaw) {
+            entity.state_.yaw = entity.director_.yaw;
+        }
+        entity.state_.driven = true;
+        entity.state_.airborne = true;
+    }
+}
+
+void EntityWorld::directorAfter(Entity& entity) {
+    // The director's *additive* half, after the behaviours rather than before them: a craft keeps
+    // hovering, drifting and banking while it is being flown somewhere.
+    if (entity.director_.active) {
+        entity.motion_.rotation += entity.director_.rotation;
+        if (entity.director_.hasSpeed) {
+            entity.state_.speed = entity.director_.speed;
+        }
+    }
+}
+
 void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) {
     if (!parametersLive_) {
         return;
@@ -1471,6 +1823,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         actionEvents_.swap(pendingEvents_);
         pendingEvents_.clear();
     }
+    // Phase D §28: the bus's semantic events, raised once per update before anyone steps, so every
+    // character hears them on the next step alike.
+    raiseSignalEvents(ctx.bus, ctx.time);
     // The crowd, as it was at the end of the last update. Built before anything moves so every
     // character separates against the same snapshot: building it as they go would make the answer
     // depend on the order they happen to be stored in.
@@ -1520,41 +1875,6 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
     //
     // On a skipped frame the offsets are the ones the last update produced, so the pose is held
     // rather than recomputed. That is what "nothing on screen moves" was always supposed to mean.
-    const auto applyOffsets = [](Entity& e) {
-        const glm::vec3 offset = e.motion_.position + e.state_.travel;
-        if (e.positionParam_ != nullptr) {
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                e.positionParam_->setFinalComponent(c, e.positionParam_->finalComponent(c) + offset[i]);
-            }
-        }
-        if (e.rotationParam_ != nullptr) {
-            // Yaw as a *difference* from the facing the author placed the body at, not as a whole
-            // angle added to it (ADR-240). `state_.yaw` starts at `facing_`, so at t = 0 this adds
-            // nothing and the body is drawn exactly where the scene file put it -- and after that
-            // the drawn heading is the heading, rather than the heading plus a placement angle
-            // nobody meant as an offset. Pitch and roll stay additive: those really are offsets on
-            // top of whatever tilt the author authored.
-            const glm::vec3 rotation(e.motion_.rotation.x,
-                                     e.motion_.rotation.y + (e.state_.yaw - e.facing_) * kDegrees,
-                                     e.motion_.rotation.z);
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                // Folded into (-180, 180] before it is written, because the parameter's hard range
-                // is +/-360 and `setFinalComponent` *clamps*. Euler degrees are 360-periodic, so
-                // this is the same orientation and cannot be anything else; what it removes is the
-                // silent clamp, which is not a rotation at all.
-                e.rotationParam_->setFinalComponent(
-                    c, wrapAngle(e.rotationParam_->finalComponent(c) + rotation[i], 180.0f));
-            }
-        }
-        if (e.scaleParam_ != nullptr) {
-            for (int i = 0; i < 3; ++i) {
-                const auto c = static_cast<std::size_t>(i);
-                e.scaleParam_->setFinalComponent(c, e.scaleParam_->finalComponent(c) * e.motion_.scale[i]);
-            }
-        }
-    };
 
     for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
         auto& entityPtr = entities_[entityIndex];
@@ -1592,7 +1912,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                 // The simulation does not advance, but the transform is still written: finals are
                 // rebuilt from bases every frame, so skipping the write puts the node back where
                 // the author placed it rather than leaving it where the entity is.
-                applyOffsets(entity);
+                applyNodeOffsets(entity);
                 continue;
             }
             dt = entity.coarseAccum_;
@@ -1621,20 +1941,17 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.state_.turnRate = 0.0f;
         entity.state_.driven = false;
         entity.state_.airborne = false;
+        // Phase D §3: intent is what the body wants THIS step, published by whoever moves it and
+        // whoever decided it. Cleared on both paths with the other per-step fields, so a step in
+        // which nobody published one falls back to the polar pair rather than latching the last.
+        entity.state_.intent.clear();
 
         // ---- the Director tier, above everything (ADR-210) ----
         // A director says where a body *is*. Written as `travel` rather than as an offset so that
         // `position()`, the crowd field, the fields pass and every query that reads an entity's
         // place see the same answer, and `driven` so the locomotor behaviours yield by keeping
         // their state -- an animal put down after an abduction resumes the walk it was on.
-        if (entity.director_.active) {
-            entity.state_.travel = entity.director_.position - entity.state_.anchor;
-            if (entity.director_.hasYaw) {
-                entity.state_.yaw = entity.director_.yaw;
-            }
-            entity.state_.driven = true;
-            entity.state_.airborne = true;
-        }
+        directorBefore(entity);
 
         // ---- intent, before behaviour (ADR-091) ----
         // The hierarchy is read top-down, so the action tier gets its say first and the behaviours
@@ -1652,7 +1969,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             ac.path = &pathProvider();
             ac.gait = &entity.desc_.gait;
             ac.events = &actionEvents_;
+            const std::size_t eventsBefore = actionEvents_.size();
             intent = entity.actions_.update(ac, entity.state_);
+            raiseActionEvents(actionEvents_, eventsBefore, entityIndex, ctx.time);
         }
 
         // §21, the *entry* half of the arc, and it goes here rather than after the behaviours
@@ -1760,17 +2079,13 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // somewhere, and a spin the director asked for is on top of the spin the scene authored.
         // Speed is written last because the gait reads it, and a body carried by a beam should have
         // its legs going even though nothing navigated it there.
-        if (entity.director_.active) {
-            entity.motion_.rotation += entity.director_.rotation;
-            if (entity.director_.hasSpeed) {
-                entity.state_.speed = entity.director_.speed;
-            }
-        }
+        directorAfter(entity);
         // ADR-620. After every writer of intent -- behaviours, the action tier, the director -- and
         // before the arc, the velocity measurement and the gait, all three of which read the speed
         // and would otherwise read one that teleported. The arc's `arcHoldStill_` stop below stays
         // a hard stop on purpose: a body held by a beam is not decelerating, it is being held.
         limitSpeedToGait(entity.desc_.gait, speedBefore, ctx.dt, entity.state_.speed);
+        rescaleIntent(entity.state_);
         // The body's facing, not the total it has turned. Canonicalised here, once, after everything
         // that steers has had its turn and before anything reads it -- the node's rotation, the
         // sockets, and the LocomotionState the animation layer is handed all see the same angle.
@@ -1779,7 +2094,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // Fold the behaviours' offsets onto the node's parameter *finals*. Bases are left alone, so
         // saving the project writes back what the author placed rather than wherever the entity
         // happened to be when they hit save.
-        applyOffsets(entity);
+        applyNodeOffsets(entity);
 
         // §21, the return half of the arc. The arc *overrides* an activity while it runs and then
         // stops overriding it; it never writes Idle, never resets a behaviour and never clears a
@@ -1813,32 +2128,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // hypothetical: ADR-521 records that `FixedStepClock::tick()` hands out `deltaTime = 0` on
         // the first tick of every render, so a naive division would publish an infinity into the
         // pose layer on frame one of every offline job.
-        {
-            const glm::vec3 settled = entity.state_.position();
-            const glm::vec3 previousVelocity = entity.state_.velocity;
-            if (entity.hasLastPosition_ && ctx.dt > 0.0) {
-                entity.state_.velocity = (settled - entity.lastPosition_) / static_cast<float>(ctx.dt);
-                // Phase B §19/§35. **Measured once, here, beside the velocity it differences** --
-                // ADR-545's rule applied one derivative out. Lean, stride and balance all want it
-                // and three subsystems differencing the same vector independently is how the
-                // engine ended up with two answers to "where is this body" (ADR-260).
-                //
-                // The second frame of a body's life has a previous velocity of zero, so its
-                // acceleration reads as the whole of its speed over one step. That is honest --
-                // it did accelerate from rest -- and the lean layer's own limit is what stops it
-                // being a visible snap.
-                entity.state_.acceleration =
-                    entity.hasLastVelocity_
-                        ? (entity.state_.velocity - previousVelocity) / static_cast<float>(ctx.dt)
-                        : glm::vec3(0.0f);
-                entity.hasLastVelocity_ = true;
-            } else {
-                entity.state_.velocity = glm::vec3(0.0f);
-                entity.state_.acceleration = glm::vec3(0.0f);
-            }
-            entity.lastPosition_ = settled;
-            entity.hasLastPosition_ = true;
-        }
+        measureStepVelocity(entity, ctx.dt);
 
         // A character doing nothing else, with a reaction still ringing, is reacting. Resolved
         // here rather than in the behaviour that raised it, because whether there was anything
@@ -2639,6 +2929,17 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
             }
         }
     }
+    if (j.contains("capabilities")) {
+        if (!j["capabilities"].is_array()) {
+            return fail("entity '{}': 'capabilities' must be an array of strings", desc.name);
+        }
+        for (const auto& c : j["capabilities"]) {
+            if (!c.is_string()) {
+                return fail("entity '{}': 'capabilities' must be an array of strings", desc.name);
+            }
+            desc.capabilities.push_back(c.get<std::string>());
+        }
+    }
     if (j.contains("behaviors") && j["behaviors"].is_array()) {
         for (const auto& item : j["behaviors"]) {
             if (!item.is_object() || !item.contains("kind") || !item["kind"].is_string()) {
@@ -2811,6 +3112,29 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
         }
         desc.perception = *perception;
         desc.perceives = true;
+        const nlohmann::json& pj = j["perception"];
+        if (pj.contains("tags")) {
+            if (!pj["tags"].is_object()) {
+                return fail("entity '{}': perception 'tags' must be an object of tag -> weight",
+                            desc.name);
+            }
+            for (const auto& [tag, value] : pj["tags"].items()) {
+                if (!value.is_number() || value.get<float>() < 0.0f) {
+                    return fail("entity '{}': perception tag weight '{}' must be a number >= 0",
+                                desc.name, tag);
+                }
+                desc.perceptionTags.emplace_back(tag, value.get<float>());
+            }
+        }
+    }
+    // Phase D §29. Same opt-in shape as `perception`: the key's presence is the declaration.
+    if (j.contains("personality")) {
+        auto personality = personalityFromJson(j["personality"]);
+        if (!personality) {
+            return fail("entity '{}': {}", desc.name, personality.error().message);
+        }
+        desc.personality = *personality;
+        desc.hasPersonality = true;
     }
     return desc;
 }
@@ -3023,6 +3347,9 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
         }
         j["tags"] = std::move(tags);
     }
+    if (!entity.capabilities.empty()) {
+        j["capabilities"] = entity.capabilities;
+    }
     if (entity.sockets.size() > entity.profileSockets) {
         nlohmann::json sockets = nlohmann::json::array();
         for (const SocketDesc& socket : std::span(entity.sockets).subspan(entity.profileSockets)) {
@@ -3087,6 +3414,17 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     // this repository ships a sense stage it never asked for, on the next save.
     if (entity.perceives) {
         j["perception"] = perceptionToJson(entity.perception);
+        if (!entity.perceptionTags.empty()) {
+            nlohmann::json tags = nlohmann::json::object();
+            for (const auto& [tag, weight] : entity.perceptionTags) {
+                tags[tag] = weight;
+            }
+            j["perception"]["tags"] = std::move(tags);
+        }
+    }
+    // Written when declared and never otherwise, for the reason `perception` is (Phase D §47).
+    if (entity.hasPersonality) {
+        j["personality"] = personalityToJson(entity.personality);
     }
     return j;
 }

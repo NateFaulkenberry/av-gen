@@ -139,6 +139,7 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -245,6 +246,10 @@ struct Percept {
     // clock (D1), so a percept that survives into a coarser update still says how stale it is.
     double seenAt = 0.0;
     float salience = 0.0f;       // 0..1, the sense stage's own ranking; see `PerceptionSettings`
+    // Phase D §25: what the thing *is*, as bits of the world's `SemanticTags` (entity/mind.hpp) --
+    // "glowing", "mushroom", "ufo". Carried on the percept so a considerer filters on meaning
+    // without following `source` back into the world. 0 in a world that interned no words.
+    std::uint64_t tags = 0;
 };
 
 // What a body can notice. Per character, because a six-metre alien and a chicken do not have the
@@ -350,6 +355,13 @@ public:
 // cooldown field: a cooldown is a term in the score, and an option that must win is an option that
 // scores higher. One axis is what makes the result explicable -- an overlay can print the losing
 // scores next to the winner, and "why is it doing that" has an answer.
+// One named contribution to a score (Phase D §41: "Factors: Novelty +0.31, Distance +0.18 ...").
+// `name` is a static string, never built per tick.
+struct ScoreFactor {
+    std::string_view name;
+    float value = 0.0f;
+};
+
 struct Option {
     std::string_view name;          // stable, for the overlay and the test
     float score = 0.0f;             // higher wins; <= 0 is "not applicable now"
@@ -357,7 +369,39 @@ struct Option {
     // wins by doing nothing", which is what an idle is.
     std::span<const ActionDesc> actions;
     Authority tier = Authority::Routine;
+
+    // ---- Phase D §3, §41: what the option is FOR, and why it scored what it did ----------------
+    //
+    // Added after the four fields above and defaulted, so every considerer written before Phase D
+    // -- which builds an `Option` by aggregate initialisation of the first four -- is unchanged.
+    //
+    // The coarse intent this option expresses (§3). What the decider publishes as
+    // `CharacterIntent::type` while the option runs, and what a camera, an overlay and a trace read.
+    IntentType intent = IntentType::Custom;
+    // What it is about, as `mind.hpp`'s `SubjectId` (0 = nothing in particular). Two options with
+    // the same name and different subjects are different courses of action: "investigate" the
+    // mushroom and "investigate" the rock are not one decision.
+    std::uint64_t subject = 0;
+    glm::vec3 target{0.0f};
+    bool hasTarget = false;
+    float urgency = 0.0f;
+    float stoppingDistance = 0.0f;
+    // The `InterestKind` of the place this option goes to, when it is a place (255 otherwise). What
+    // lets a decider remember "I have been to three shorelines in a row" (§22's novelty, one level
+    // up from the single place).
+    std::uint8_t kind = 255;
+    // The terms the score is the sum or product of, largest first by convention. Fixed storage: an
+    // option is copied into the selector's list every tick and must not allocate.
+    std::array<ScoreFactor, 6> factors{};
+    std::uint8_t factorCount = 0;
+    void addFactor(std::string_view factor, float value) {
+        if (factorCount < factors.size()) {
+            factors[factorCount++] = ScoreFactor{factor, value};
+        }
+    }
 };
+
+struct MindView; // entity/mind.hpp
 
 // What a considerer is given. Everything it may read, and nothing else: an option scorer that
 // reached into the world directly could not be tested against a scripted perception.
@@ -384,6 +428,11 @@ struct DecisionContext {
     const signals::SignalBus* bus = nullptr;
     // The character's seed. Draws are (seed, index) hashes (D2), never a stream.
     std::uint32_t seed = 0;
+    // Phase D's awareness layer (`entity/mind.hpp`): attention, memory, novelty, personality and
+    // perceived events, for the considerers that read them. **Null for every decider that did not
+    // opt in**, which is every decider written before Phase D -- so a considerer must treat null as
+    // "neutral personality, nothing remembered, nothing heard" and score exactly as it did.
+    const MindView* mind = nullptr;
 };
 
 // Scores options. One instance per *kind* of character, shared across every character of that kind:

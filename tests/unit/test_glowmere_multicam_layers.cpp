@@ -97,7 +97,7 @@ struct LayerTrack {
 // and a light rig by relative path, and `fromJson` has no base to resolve them against.
 std::map<std::string, LayerTrack> playLayers(double seconds, const json& patch = json::object(),
                                              const char* tag = "plain", bool dwellZero = false,
-                                             double hz = 40.0) {
+                                             double hz = 40.0, bool keepGlance = false) {
     std::ifstream in(worldDir() / kFilm);
     REQUIRE(in.good());
     json doc;
@@ -122,6 +122,12 @@ std::map<std::string, LayerTrack> playLayers(double seconds, const json& patch =
                     if (c.contains("dwell")) {
                         c["dwell"] = 0.0;
                     }
+                }
+                // Phase D: the decider's attention *glance* is the second publisher of a look
+                // target (§10/§11) -- the owner turned the awareness layer on for this cast -- so
+                // the control removes it too, unless the arm is the one measuring the glance.
+                if (!keepGlance && b.contains("mind") && b["mind"].is_object()) {
+                    b["mind"]["attention"]["glance"] = false;
                 }
             }
         }
@@ -397,4 +403,23 @@ TEST_CASE("Every one of the film's five aliens turns its head, and the attend po
     // next person reading a passing control as proof of something it does not say.
     INFO("only sage, whose head is driven by its `interest` behaviour, may still turn");
     CHECK(turningWithoutDwell <= 1);
+
+    // Phase D §10/§11: and the attention glance on its own -- no attend pose anywhere -- turns all
+    // five heads. The control above is what makes this arm mean the glance and nothing else. Only
+    // for a film whose deciders run the awareness layer; without one there is no glance to measure.
+    {
+        std::ifstream film(worldDir() / kFilm);
+        const std::string text((std::istreambuf_iterator<char>(film)), std::istreambuf_iterator<char>());
+        if (text.find("\"mind\"") == std::string::npos) {
+            return;
+        }
+    }
+    const auto glance = playLayers(60.0, json::object(), "nodwell-glance", true, 40.0, true);
+    int turningOnGlance = 0;
+    for (const char* name : kCast) {
+        const auto it = glance.find(name);
+        REQUIRE(it != glance.end());
+        turningOnGlance += it->second.framesLookApplied > 0 ? 1 : 0;
+    }
+    CHECK(turningOnGlance == 5);
 }

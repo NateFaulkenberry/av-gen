@@ -1,6 +1,6 @@
 # ADR-210: The director is a decision layer, not a second behaviour system
 
-**Status:** Accepted
+**Status:** Accepted -- **its seek rule (reset the director; a scenario picks up again on the next frame) is replaced by ADR-671** (the owner, 2026-09-21): a scrub now replays the director with the entities. This is the ADR the code cites as "ADR-209" (a numbering collision).
 **Date:** 2026-09-15
 
 A brief asking for "a lightweight cinematic/world director": the user describes what should happen

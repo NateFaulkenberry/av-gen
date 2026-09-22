@@ -43,7 +43,8 @@ constexpr std::string_view kSceneKeys[] = {
     "lightRig",   "lights",         "navBodyRadius",  "navCellSize",   "navWadeDepth",
     "wind",       "post",           "environment",    "composition",   "heroes",
     "worldEffects", "atmosphericEffects", "entityProfiles", "entities", "fields",
-    "staging",    "graph",          "grids",          "materialPrograms", "nodes"};
+    "staging",    "graph",          "grids",          "materialPrograms", "nodes",
+    "worldEvents"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -2259,6 +2260,7 @@ void Composition::installEntities() {
     std::vector<entity::NodeBinding> bindings;
     bindings.reserve(nodes_.size());
     std::vector<std::pair<std::string, glm::vec3>> landmarks;
+    std::vector<std::string> terrainLandmarks;
     landmarks.reserve(nodes_.size() + heroes_.size());
     for (const auto& nodePtr : nodes_) {
         const CompositionNode& node = *nodePtr;
@@ -2285,6 +2287,13 @@ void Composition::installEntities() {
         const glm::vec3 forward = placed.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
         binding.facing = std::atan2(forward.x, forward.z);
         landmarks.emplace_back(node.name, binding.anchor);
+        // Phase D §23: a terrain is the ground itself, not a place on it -- both aliens of the
+        // autonomy demo opened by walking "to the ground". It stays in the landmark list (the
+        // pre-Phase-D deciders and their golden traces read it) and is *tagged* "terrain", by what
+        // the node is and never by its name, so an aware decider can refuse it.
+        if (node.kind == NodeKind::Terrain) {
+            terrainLandmarks.push_back(node.name);
+        }
         bindings.push_back(std::move(binding));
     }
     // Heroes are landmarks too: "look at the elder" is the natural thing for an author to write,
@@ -2294,6 +2303,7 @@ void Composition::installEntities() {
         landmarks.emplace_back(hero.name, hero.position + glm::vec3(0.0f, hero.height * 0.5f, 0.0f));
     }
     entityWorld_.setBindings(std::move(bindings));
+    entityWorld_.setTerrainLandmarks(std::move(terrainLandmarks));
     entityWorld_.setLandmarks(std::move(landmarks));
 
     // The ground an entity walks on is the ground the terrain was built from -- the same WorldMap
@@ -2301,6 +2311,8 @@ void Composition::installEntities() {
     // on, and never needs a second description of it kept in step by hand.
     entityWorld_.setNavigator(buildNavigator());
     entityWorld_.setExtraInterestPoints(glowInterestPoints());
+    // Phase D §26: how far each named world event carries, as the scene authored it.
+    entityWorld_.setEventProfiles(eventProfiles_);
 
     // Fields go in here rather than in a pass of their own, because they bind against the same node
     // table, the same landmarks and the same entity set -- a field that resolved its source against
@@ -3416,6 +3428,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         // entity arithmetic says it is. One frame old by construction -- see `visualPlacement`.
         stageCtx.visuals = this;
         staging_.update(stageCtx);
+        raiseDirectorBeats(time.renderTime);
     }
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.
@@ -3431,6 +3444,157 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         sink->prepareChain();
     }
     entityWorld_.update(update, *params_);
+}
+
+void Composition::raiseDirectorBeats(double time) {
+    // Phase D §26/§38: a director beat is a world event -- "abduction/beam" -- raised at the
+    // scenario actor's body, so a character can hear the saucer start to beam and react to it
+    // the way it reacts to anything else, and no character code knows a scenario exists. The
+    // authored beats stay the director's; this only tells the world they happened.
+    //
+    // Not reproduced by a scrub: a seek resets the director (ADR-209) and restarts its run,
+    // so a beat heard on a play is not heard on a replay, exactly as the scenario itself is not.
+    for (const stage::StageEvent& event : staging_.events()) {
+        if (event.kind != stage::StageEventKind::Beat) {
+            continue;
+        }
+        entity::WorldEvent w;
+        w.type = entityWorld_.eventType(event.scenario + "/" + event.beat);
+        w.time = time;
+        for (const stage::ScenarioDesc& scenario : stagingDesc_.scenarios) {
+            if (scenario.name != event.scenario) {
+                continue;
+            }
+            for (const stage::ActorDesc& actor : stagingDesc_.actors) {
+                if (actor.name == scenario.actor) {
+                    const auto& all = entityWorld_.entities();
+                    for (std::size_t e = 0; e < all.size(); ++e) {
+                        if (all[e]->name() == actor.driven()) {
+                            w.position = all[e]->state().position();
+                            w.source = e;
+                        }
+                    }
+                }
+            }
+        }
+        for (const entity::EntityWorld::EventProfile& profile : entityWorld_.eventProfiles()) {
+            if (profile.name == entityWorld_.eventName(w.type)) {
+                w.radius = profile.radius;
+                w.magnitude = profile.magnitude;
+            }
+        }
+        entityWorld_.emitEvent(w);
+    }
+}
+
+// ---- ADR-671: a scrub that replays the director -----------------------------------------------
+
+void Composition::ReplayPlacement::capture() {
+    const Composition& c = comp_;
+    const std::size_t count = std::min(c.nodes_.size(), c.ranges_.size());
+    placed_.resize(count);
+    valid_.assign(count, 0u);
+    // The root fold `applyParameters` puts every node through, with the same arithmetic.
+    const float rootScale = (c.rootScale_ != nullptr ? c.rootScale_->value() : 1.0f) +
+                            (c.rootImpulse_ != nullptr ? c.rootImpulse_->value() : 0.0f);
+    Transform root;
+    root.rotation = glm::angleAxis(c.rootAngle_, glm::vec3(0.0f, 1.0f, 0.0f));
+    root.scale = glm::vec3(rootScale);
+    root.position = c.center_ - root.rotation * (c.center_ * rootScale);
+    for (std::size_t i = 0; i < count; ++i) {
+        const CompositionNode& node = *c.nodes_[i];
+        const NodeRange& range = c.ranges_[i];
+        const Transform full = compose(root, c.nodeWorldTransform(node));
+        stage::VisualPlacement& out = placed_[i];
+        out.origin = full.position;
+        out.centre = out.origin;
+        if (node.kind == NodeKind::Particles && range.particleIndex >= 0) {
+            ParticleSystem ps = node.particleRest;
+            applyParticleParameters(node.particleParams, node.particleRest, ps);
+            out.centre = transformPoint(full, ps.position);
+            valid_[i] = 1u;
+            continue;
+        }
+        bool any = false;
+        glm::vec3 lo(0.0f);
+        glm::vec3 hi(0.0f);
+        for (std::size_t k = 0; k < range.entityCount && k < range.restTransforms.size() &&
+                                range.firstEntity + k < c.scene_.entities.size();
+             ++k) {
+            const Entity& entity = c.scene_.entities[range.firstEntity + k];
+            if (entity.mesh >= c.scene_.meshes.size()) {
+                continue;
+            }
+            const Transform world = compose(full, range.restTransforms[k]);
+            const auto& [bmin, bmax] = c.scene_.meshBounds(entity.mesh);
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 p((corner & 1) ? bmax.x : bmin.x, (corner & 2) ? bmax.y : bmin.y,
+                                  (corner & 4) ? bmax.z : bmin.z);
+                const glm::vec3 w = transformPoint(world, p);
+                if (!any) {
+                    lo = w;
+                    hi = w;
+                    any = true;
+                } else {
+                    lo = glm::min(lo, w);
+                    hi = glm::max(hi, w);
+                }
+            }
+        }
+        if (any) {
+            out.centre = (lo + hi) * 0.5f;
+        }
+        valid_[i] = 1u;
+    }
+}
+
+bool Composition::ReplayPlacement::visualPlacement(std::string_view node,
+                                                   stage::VisualPlacement& out) const {
+    for (std::size_t i = 0; i < placed_.size() && i < comp_.nodes_.size(); ++i) {
+        if (comp_.nodes_[i]->name == node) {
+            if (i >= valid_.size() || valid_[i] == 0u) {
+                return false; // nothing "flattened" yet: the play's frame zero answers false too
+            }
+            out = placed_[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
+                                   entity::SeekBudget budget, double step) {
+    staging_.reset(&entityWorld_, &params);
+    if (stagingDesc_.empty()) {
+        entityWorld_.seek(seconds, &params, nullptr, step, budget);
+        return;
+    }
+    ReplayPlacement placement(*this);
+    placement.capture();
+    placement.invalidate(); // the play's first frame has no flattening to ask
+    entity::EntityWorld::SeekHooks hooks;
+    hooks.before = [&](double now, double dt) {
+        // A play frame's top: finals rebuilt from bases, then the director (ADR-209), then the
+        // entities. Routes and reactions are not replayed -- a scrub has no signal history, the
+        // limit every seek in this engine already has.
+        params.resetFinals();
+        stage::StageContext ctx;
+        ctx.time = now;
+        ctx.dt = dt;
+        ctx.world = &entityWorld_;
+        ctx.params = &params;
+        ctx.visuals = &placement;
+        ctx.bus = nullptr;
+        staging_.update(ctx);
+        raiseDirectorBeats(now);
+    };
+    hooks.after = [&](double, double) {
+        // The offsets a play's entity pass writes, and the "flattening" the next step's director
+        // will ask about.
+        entityWorld_.applyAllOffsets();
+        placement.capture();
+    };
+    entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
 }
 
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {
@@ -9325,6 +9489,23 @@ nlohmann::json Composition::toJson() const {
     if (!entityDescs_.empty()) {
         j["entities"] = entity::entitiesToJson(entityDescs_);
     }
+    // Phase D §26. Written when authored and never otherwise (the diff-noise rule, ADR-225).
+    if (!eventProfiles_.empty()) {
+        json events = json::array();
+        for (const entity::EntityWorld::EventProfile& e : eventProfiles_) {
+            json ej{{"name", e.name}, {"radius", e.radius}, {"magnitude", e.magnitude}};
+            if (!e.signal.empty()) {
+                ej["signal"] = e.signal;
+                ej["threshold"] = e.threshold;
+                ej["minInterval"] = e.minInterval;
+            }
+            if (!e.at.empty()) {
+                ej["at"] = e.at;
+            }
+            events.push_back(std::move(ej));
+        }
+        j["worldEvents"] = std::move(events);
+    }
     if (!fieldDescs_.empty()) {
         j["fields"] = entity::fieldsToJson(fieldDescs_);
     }
@@ -10089,6 +10270,44 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         if (auto ok = comp->setEntities(std::move(*entities)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
+    }
+    // Phase D §26: `"worldEvents": [{"name": "bloom", "radius": 45, "magnitude": 0.8}]` -- how far
+    // a named event carries and how loud it is. Before the entities are bound, so the first
+    // `rebuild` hands them to the world.
+    if (j.contains("worldEvents")) {
+        const json& events = j.at("worldEvents");
+        if (!events.is_array()) {
+            return fail("scene file '{}': 'worldEvents' must be an array", scenePath.string());
+        }
+        std::vector<entity::EntityWorld::EventProfile> profiles;
+        for (const json& e : events) {
+            if (!e.is_object() || !e.contains("name") || !e.at("name").is_string()) {
+                return fail("scene file '{}': every world event needs a string 'name'",
+                            scenePath.string());
+            }
+            entity::EntityWorld::EventProfile profile;
+            profile.name = e.at("name").get<std::string>();
+            if (e.contains("radius") && e.at("radius").is_number()) {
+                profile.radius = std::max(0.0f, e.at("radius").get<float>());
+            }
+            if (e.contains("magnitude") && e.at("magnitude").is_number()) {
+                profile.magnitude = std::clamp(e.at("magnitude").get<float>(), 0.0f, 1.0f);
+            }
+            if (e.contains("signal") && e.at("signal").is_string()) {
+                profile.signal = e.at("signal").get<std::string>();
+            }
+            if (e.contains("threshold") && e.at("threshold").is_number()) {
+                profile.threshold = e.at("threshold").get<float>();
+            }
+            if (e.contains("at") && e.at("at").is_string()) {
+                profile.at = e.at("at").get<std::string>();
+            }
+            if (e.contains("minInterval") && e.at("minInterval").is_number()) {
+                profile.minInterval = std::max(0.0f, e.at("minInterval").get<float>());
+            }
+            profiles.push_back(std::move(profile));
+        }
+        comp->setEventProfiles(std::move(profiles));
     }
     if (j.contains("fields")) {
         auto fields = entity::fieldsFromJson(j.at("fields"));

@@ -187,6 +187,11 @@ struct InteractionDesc {
     float range = 1.5f;    // how close the actor must already be. Getting there is a `move`.
     bool exclusive = true; // one user at a time
     std::vector<Condition> conditions; // checked before an actor may begin
+    // Phase D §18: the capabilities an actor must have to use this verb -- "can_inspect",
+    // "can_touch". Matched against `EntityDesc::capabilities`; empty means anyone may. The planner
+    // checks before choosing and the executor checks again before running, so an impossible
+    // interaction is neither selected nor performed.
+    std::vector<std::string> required;
     std::vector<PropertySet> set;      // written on completion; `on` defaults to the **prop**
     std::string onComplete;            // an event name
 };
@@ -217,6 +222,9 @@ struct ActionDesc {
     double duration = 0.0; // seconds; 0 = until the action's own completion test passes
     float speed = 0.0f;    // Move: metres per second; 0 = the gait's walk speed
     float tolerance = 0.0f; // Move: metres that count as arrived. Face: radians. 0 = a default
+    // Move (Phase D §14): metres over which the walk slows into its goal, Reynolds' "arrive".
+    // 0 -- every action written before Phase D -- is the old braking-limit stop, unchanged.
+    float arrival = 0.0f;
     std::string socket;    // Equip: the socket on the actor the node hangs from
     std::vector<Condition> when; // start conditions; unmet -> skipped
     std::string otherwise;  // the label to continue from when `when` fails; "" = simply skip
@@ -320,6 +328,29 @@ public:
     [[nodiscard]] std::size_t pending(Authority authority) const;
     [[nodiscard]] bool empty() const { return pending() == 0; }
 
+    // ---- how a list ended (Phase D §19) -------------------------------------------------------
+    //
+    // A decider that pushes an errand has to learn how it ended -- *completed* so it can mark the
+    // mushroom investigated and choose again, *failed* so it can remember the rock it could not
+    // get round and not choose it again at once (§59's "unbounded path retries"). Before this the
+    // only signal was the event stream, which a behaviour cannot read, and `Decide` could tell a
+    // body that had finished from one that had given up only by noticing that neither was moving.
+    //
+    // Every list a tier is *given* (`override`, or a `push` onto an empty tier) gets a serial; when
+    // the list drains, the tier records the serial it drained and whether any step in it failed.
+    // A caller holds the serial it was handed and compares.
+    struct Drained {
+        std::uint64_t serial = 0; // the list that drained; 0 = none yet
+        bool failed = false;      // any action in it ended Failed
+        std::string reason;       // the first failure's reason
+    };
+    [[nodiscard]] std::uint64_t serial(Authority authority) const {
+        return layers_[static_cast<std::size_t>(authority)].serial;
+    }
+    [[nodiscard]] const Drained& drained(Authority authority) const {
+        return drained_[static_cast<std::size_t>(authority)];
+    }
+
     void setListener(Listener listener) { listener_ = std::move(listener); }
     // Where an event goes when there is no ActionContext to carry it -- a cancellation raised from
     // outside an update. Borrowed; the caller keeps it alive and names the entity for it, because
@@ -352,6 +383,9 @@ private:
         bool heldFlag = false;
         double elapsed = 0.0;
         Progress progress;
+        std::uint64_t serial = 0;  // Phase D §19: which list this is
+        bool anyFailed = false;
+        std::string failReason;
         [[nodiscard]] bool live() const { return !heldFlag && index < actions.size(); }
     };
 
@@ -364,6 +398,8 @@ private:
     [[nodiscard]] std::size_t labelIndex(const Layer& layer, const std::string& label) const;
 
     Layer layers_[kAuthorityCount];
+    std::uint64_t serials_[kAuthorityCount] = {0, 0, 0};
+    Drained drained_[kAuthorityCount];
     int driver_ = -1; // the tier that drove last tick, so a change of driver is noticed
     Listener listener_;
     std::vector<ActionEvent>* sink_ = nullptr;

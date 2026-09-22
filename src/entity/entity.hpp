@@ -36,6 +36,7 @@
 #include "entity/field.hpp"
 #include "entity/character_ai.hpp"
 #include "entity/perception.hpp"
+#include "entity/mind.hpp"
 #include "entity/locomotion.hpp"
 #include "entity/navigation.hpp"
 #include "params/modulation.hpp"
@@ -46,8 +47,11 @@
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -126,6 +130,10 @@ struct EntityDesc {
     // it was built from, so "every NPC built from the dancer profile" is one word in a scene file
     // rather than a list of forty names that goes stale.
     std::vector<std::string> tags;
+    // Phase D §18: what this body can do -- "can_walk", "can_inspect", "can_touch". An interaction a
+    // prop offers lists what it `required`; the two meeting is a valid interaction. Data, never a
+    // branch on what kind of character this is (§77).
+    std::vector<std::string> capabilities;
     // Which animation state plays for each activity, by activity name ("idle", "walk", "run",
     // "turn", "observe", "react"). Declared here rather than chosen in a behaviour because a clip
     // name belongs to an asset: a behaviour that named one would break the day a character shipped
@@ -174,6 +182,21 @@ struct EntityDesc {
     // the same reason.
     PerceptionSettings perception;
     bool perceives = false;
+    // Phase D §9 "target categories, attention weighting": the perception block's `"tags"` --
+    // `{"ufo": 4.0}` -- a taste weight per semantic tag, alongside the per-kind `weight`s. A percept
+    // carrying a weighted tag is ranked by the larger of its kind's weight and its tags', so a
+    // saucer forty metres off is not cut by the capacity limit in favour of the twelve shore points
+    // nearer the body. Empty -- every scene before Phase D -- and the ranking is exactly the old one.
+    std::vector<std::pair<std::string, float>> perceptionTags;
+
+    // ---- personality (Phase D §29) ----
+    //
+    // Nine traits, 0.5 neutral, and a neutral trait changes no score anywhere (`mind.hpp`). The
+    // key's presence is the opt-in, exactly as `perception`'s is: registered as parameters under
+    // `entity/<name>/personality/<trait>` only for a body that declared one, so a reaction can make
+    // a character bolder on a drop and the path set says which bodies have a temperament.
+    Personality personality;
+    bool hasPersonality = false;
 
     // The profile this entity was built from, as written. Round-tripped so saving a scene does not
     // inline what the author deliberately shared -- `profileCount` records how many of each list
@@ -413,6 +436,29 @@ public:
     static constexpr std::uint64_t kNoSenseTick = 0xFFFFFFFFFFFFFFFFull;
     [[nodiscard]] std::uint64_t lastSenseTick() const { return senseTick_; }
 
+    // ---- Phase D: what this body is, and what kind of creature it is --------------------------
+
+    // Its semantic tags as bits of the world's `SemanticTags` (§25). Computed once at
+    // `setEntities`; the words are `desc().tags`.
+    [[nodiscard]] std::uint64_t tagMask() const { return tagMask_; }
+    // Phase D §18: whether this body has every capability in `required` (empty: always).
+    [[nodiscard]] bool can(std::span<const std::string> required) const {
+        for (const std::string& r : required) {
+            if (std::find(desc_.capabilities.begin(), desc_.capabilities.end(), r) ==
+                desc_.capabilities.end()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    // `desc().perceptionTags`, resolved against the world's vocabulary: (bit, weight).
+    [[nodiscard]] std::span<const std::pair<std::uint64_t, float>> perceptionTagWeights() const {
+        return perceptionTagBits_;
+    }
+    // The personality **as the parameters currently read** (ADR-225), falling back to the authored
+    // value when unregistered. Neutral for a body that declared none.
+    [[nodiscard]] Personality personality() const;
+
     // ---- intent (ADR-096) ------------------------------------------------------------------
 
     [[nodiscard]] ActionQueue& actions() { return actions_; }
@@ -485,6 +531,9 @@ private:
     EntityDesc desc_;
     std::uint32_t seed_ = 0;
     Rng rng_;
+    std::uint64_t tagMask_ = 0;
+    std::vector<std::pair<std::uint64_t, float>> perceptionTagBits_;
+    std::array<params::Parameter<float>*, Personality::kCount> personalityParams_{};
     EntityState state_{};
     // ADR-545: where this body was at the end of the previous step, and whether there was one.
     // The measured velocity is a backward difference and this is the thing it differences against;
@@ -735,6 +784,9 @@ public:
         landmarks_ = std::move(landmarks);
         refreshInterestPoints();
     }
+    // Phase D §23: landmarks that are the ground itself. Their interest points carry the semantic
+    // tag "terrain", which an aware decider refuses as a destination.
+    void setTerrainLandmarks(std::vector<std::string> names) { terrainLandmarks_ = std::move(names); }
     // Where `name` is, looking first at entities (which move) and then at landmarks (which do not).
     [[nodiscard]] bool pointOfInterest(std::string_view name, glm::vec3& out) const;
 
@@ -781,6 +833,51 @@ public:
     // this file needs them and because a test that wants to price a scan needs to be able to run
     // one; rebuilt at the top of every update in which anything perceives.
     [[nodiscard]] PerceptionIndex perceptionIndex() const;
+
+    // ---- semantics and events (Phase D §25, §26) ---------------------------------------------
+
+    // The world's vocabulary: every word an entity's `tags` uses, plus the five interest kinds'
+    // names, interned to bits. Percepts carry masks of these (`Percept::tags`).
+    [[nodiscard]] const SemanticTags& semanticTags() const { return tags_; }
+
+    // Things that happened, newest last, for the last `kEventWindowSeconds` and at most
+    // `kEventCapacity` of them. Raised by the world, not by a character: any named `ActionEvent`
+    // (an action's or an interaction's `onComplete`) becomes one at the position of the entity that
+    // raised it, so a mushroom whose schedule sets `"onComplete": "bloom"` is heard blooming by
+    // anyone in earshot. Cleared by `reset`, and re-raised identically by `seek`'s replay, which
+    // runs the same action tier -- so an event's `sequence` is the same number on both paths.
+    static constexpr std::size_t kEventCapacity = 128;
+    static constexpr double kEventWindowSeconds = 60.0;
+    [[nodiscard]] std::span<const WorldEvent> worldEvents() const { return worldEvents_; }
+    // Interns an event name to its type id (never 0). Names are few and fixed per scene.
+    std::uint32_t eventType(std::string_view name);
+    [[nodiscard]] std::uint32_t findEventType(std::string_view name) const;
+    [[nodiscard]] std::string_view eventName(std::uint32_t type) const;
+    // Raises an event. `sequence` is assigned here. Public so a host system -- an audio analyser's
+    // semantic events (§28), a director -- can raise one; the world raises its own from actions.
+    void emitEvent(WorldEvent event);
+    // How far an event named `name` carries and how loud it is, when an author wants it different
+    // from the default 60 m at full strength. Scene-level data (`"worldEvents"`), never code.
+    struct EventProfile {
+        std::string name;
+        float radius = 60.0f;
+        float magnitude = 1.0f;
+        // Phase D §28: raise this event from a signal-bus event -- `"signal": "music.drop"` -- so
+        // the audio analyser's structure reaches characters as a *semantic* event rather than as a
+        // band level a behaviour thresholds (§28: "do not directly tie behaviour to arbitrary audio
+        // bands"). Raised at `at` (an entity or landmark; the world origin when empty) whenever the
+        // signal fires at or above `threshold`, at most once per `minInterval` seconds, and with
+        // the signal's value as its magnitude.
+        //
+        // **Not reproduced by a scrub**: `seek` does not replay the bus's history, so a
+        // signal-raised event is heard on a play and not on a replay. Action-raised events are.
+        std::string signal;
+        float threshold = 0.0f;
+        std::string at;
+        float minInterval = 1.0f;
+    };
+    void setEventProfiles(std::vector<EventProfile> profiles);
+    [[nodiscard]] const std::vector<EventProfile>& eventProfiles() const { return eventProfiles_; }
 
     // Characters not walking through each other (§11 of the world-authoring brief).
     //
@@ -861,9 +958,20 @@ public:
     // seek has no business inheriting it, because the whole promise of a seek is that the same
     // second gives the same frame. What used to be saved by skipping distant bodies is now bounded
     // by `SeekBudget::maxBodySteps` instead, which does it without consulting a camera.
+    // Phase D §63 / ADR-671: what a caller replays alongside the entities, one fixed step at a
+    // time -- the director above them (`before`, as `Composition::updateBehaviour` runs it before
+    // the entity update) and whatever must see the step's settled bodies (`after`). Null, which is
+    // every caller before ADR-671, replays the entities alone.
+    struct SeekHooks {
+        std::function<void(double now, double dt)> before;
+        std::function<void(double now, double dt)> after;
+    };
     void seek(double time, params::ParameterSet* params = nullptr,
               const signals::SignalBus* bus = nullptr, double step = 1.0 / 60.0,
-              SeekBudget budget = {});
+              SeekBudget budget = {}, const SeekHooks* hooks = nullptr);
+    // Writes every entity's offsets onto its node's parameter finals, exactly as `update` does
+    // after each body's step. For a replay hook that has to see the frame a play would have drawn.
+    void applyAllOffsets();
 
     // What the last `seek` actually integrated. Structural quantities rather than milliseconds
     // (ADR-170): "it replayed 5,400 steps over 23 bodies" survives a change of machine in a way
@@ -924,6 +1032,7 @@ private:
     // from compileReactions, which has one; refreshed by bind() and update().
     mutable const params::ParameterSet* params_ = nullptr;
     std::vector<std::pair<std::string, glm::vec3>> landmarks_;
+    std::vector<std::string> terrainLandmarks_;
     std::vector<InterestPoint> interests_;
     std::vector<InterestPoint> extraInterests_;
     // One obstacle per entity with a body, in entity order, so an index into `entities()` is an
@@ -953,6 +1062,26 @@ private:
     std::vector<Percept> perceptScratch_;
     PerceptionCounts perceptionCounts_{};
     bool perceiving_ = false;
+
+    // ---- semantics and events (Phase D) ----
+    SemanticTags tags_;
+    std::vector<WorldEvent> worldEvents_;
+    std::uint64_t eventSequence_ = 0;
+    std::vector<std::string> eventNames_; // type id - 1 -> name
+    std::vector<EventProfile> eventProfiles_;
+    std::vector<double> eventSignalLast_; // per profile: when its signal last raised it
+    void raiseSignalEvents(const signals::SignalBus* bus, double time);
+    void internSemantics();
+    // Turns every named `ActionEvent` in `events` from `first` onward into a `WorldEvent` raised at
+    // `entityIndex`. Shared by `update` and `seek` so the two paths cannot disagree (testing.md #31).
+    void raiseActionEvents(const std::vector<ActionEvent>& events, std::size_t first,
+                           std::size_t entityIndex, double time);
+    static void measureStepVelocity(Entity& entity, double dt);
+    static void applyNodeOffsets(Entity& entity);
+    // The Director tier's two halves (ADR-210), shared by `update` and `seek`.
+    static void directorBefore(Entity& entity);
+    static void directorAfter(Entity& entity);
+    static void rescaleIntent(EntityState& state);
     // Rebuilds `bodyGrid_` and `bodyPoints_` from where every entity's simulation stands now, and
     // runs one sense tick for `entityIndex` when its cadence says it is due. Shared by `update` and
     // `seek` so a scrubbed character's working set is built by the same code as a played one's.
