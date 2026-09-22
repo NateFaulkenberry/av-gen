@@ -34,6 +34,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -326,6 +327,15 @@ struct MotionDatabase {
     // The sample that follows this one in its own clip, or kInvalid at a clip's end. **This is
     // what makes continuation cheap** (§29): playing on is following this index, not searching.
     std::vector<std::uint32_t> sampleNext;
+    // §71: where the body is and which way it faces at each sample, in the clip's own model space:
+    // (x, z, yaw) per sample, the travel joint's horizontal position and the facing the features
+    // were expressed in. And, per clip, whether its travel is real (the root leaves its box, or the
+    // clip carries a heading track). **The simulation owns world translation and heading**, so for
+    // such a clip the provider poses the body with this removed. A travelling clip does not walk
+    // its rig away from the entity, and a turning clip does not turn it twice. An in-place clip keeps
+    // its authored sway.
+    std::vector<float> sampleRoot;           // 3 per sample
+    std::vector<std::uint32_t> clipTravels;  // 1 per clip, 0 or 1
 
     // ---- normalization (§9) -------------------------------------------------------------------
     // Per dimension, so position in metres and velocity in m/s are comparable. Standardised to
@@ -473,5 +483,13 @@ struct MotionSearchPlan {
 // measurement.
 [[nodiscard]] MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
                                        const MotionCostWeights& weights);
+
+// The full cost (every weighted feature term, continuity and transition) over an explicit candidate
+// list, tag filter applied, and the best of them. **The one exact scorer every staged or
+// approximate search finishes with**, so none of them can disagree with the linear scan about what
+// a candidate costs.
+[[nodiscard]] MotionMatch scoreMotionCandidates(const MotionDatabase& db, const MotionQuery& query,
+                                                const MotionCostWeights& weights,
+                                                std::span<const std::uint32_t> candidates);
 
 } // namespace avgen::scene

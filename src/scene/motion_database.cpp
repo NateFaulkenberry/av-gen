@@ -406,6 +406,7 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         const AnimationClip& clip = pack.animation[c];
         const PackClip& meta = pack.clips[c];
         db.clipNames.push_back(meta.name);
+        db.clipTravels.push_back(0u); // set below, once the clip's analysis is known
         const float length = clip.length();
         if (length <= 0.0f) {
             continue;
@@ -462,6 +463,7 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         const ClipAnalysis derived = analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{});
         analysis.travels = derived.travels;
         const std::uint32_t tags = motionTagsFor(meta, analysis);
+        db.clipTravels.back() = (analysis.travels || !meta.heading.empty()) ? 1u : 0u;
 
         const auto frames =
             static_cast<std::uint32_t>(std::max(2.0f, std::floor(length * rate + 0.5f) + 1.0f));
@@ -664,6 +666,9 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             }
 
             db.sampleClip.push_back(static_cast<std::uint32_t>(c));
+            db.sampleRoot.push_back(body.x);
+            db.sampleRoot.push_back(body.z);
+            db.sampleRoot.push_back(std::atan2(heading.x, heading.z));
             db.sampleTime.push_back(t);
             db.samplePhase.push_back(meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start));
             db.sampleTags.push_back(tags);
@@ -994,10 +999,31 @@ MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& quer
     std::sort(candidates.begin(), candidates.end());
     candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
 
-    MotionQuery narrowed = query;
+    MotionMatch scored = scoreMotionCandidates(db, query, weights, candidates);
+    scored.rejected += best.rejected;
+    scored.coarseConsidered = best.coarseConsidered;
+    return scored;
+}
+
+MotionMatch scoreMotionCandidates(const MotionDatabase& db, const MotionQuery& query,
+                                  const MotionCostWeights& weights,
+                                  std::span<const std::uint32_t> candidates) {
+    MotionMatch best;
+    const std::size_t dim = db.dimension;
+    if (dim == 0 || query.features.size() != dim || db.sampleCount() == 0) {
+        return best;
+    }
+    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    const bool weighted = dimWeight.size() == dim;
+    const float* q = query.features.data();
+    const auto passesTags = [&](std::uint32_t s) {
+        const std::uint32_t tags = db.sampleTags[s];
+        return !((query.requireTags != 0 && (tags & query.requireTags) != query.requireTags) ||
+                 (query.rejectTags != 0 && (tags & query.rejectTags) != 0));
+    };
     float bestCost = 0.0f;
     for (const std::uint32_t s : candidates) {
-        if (!passesTags(s)) {
+        if (s >= db.sampleCount() || !passesTags(s)) {
             continue;
         }
         ++best.fullyScored;
@@ -1042,7 +1068,6 @@ MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& quer
     }
     best.considered = best.fullyScored;
     best.cost = bestCost;
-    (void)narrowed;
     return best;
 }
 

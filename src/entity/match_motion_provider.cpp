@@ -4,6 +4,7 @@
 #include "scene/animation.hpp"
 #include "scene/skeleton.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
@@ -95,6 +96,59 @@ Carried carryOn(const scene::MotionDatabase& db, std::uint32_t sample, float tim
     return out;
 }
 
+
+// §71: the body frame a clip's pose is expressed in at `time`, for a clip whose travel is real:
+// the travel joint's horizontal position and facing, interpolated between the sample and the one
+// after it in the same clip. Returns false for an in-place clip, or a database that does not carry
+// root frames, which is posed as authored.
+bool rootFrameAt(const scene::MotionDatabase& db, std::uint32_t sample, float time, glm::vec3& at, float& yaw) {
+    if (db.sampleRoot.size() != 3u * db.sampleCount() || sample >= db.sampleCount()) {
+        return false;
+    }
+    const std::uint32_t clip = db.sampleClip[sample];
+    if (clip >= db.clipTravels.size() || db.clipTravels[clip] == 0u) {
+        return false;
+    }
+    const float* a = db.sampleRoot.data() + (3u * static_cast<std::size_t>(sample));
+    at = glm::vec3(a[0], 0.0f, a[1]);
+    yaw = a[2];
+    const std::uint32_t next = db.sampleNext[sample];
+    if (next != scene::MotionDatabase::kInvalid && next > sample) {
+        const float span = db.sampleTime[next] - db.sampleTime[sample];
+        const float s = span > 0.0f ? std::clamp((time - db.sampleTime[sample]) / span, 0.0f, 1.0f) : 0.0f;
+        const float* b = db.sampleRoot.data() + (3u * static_cast<std::size_t>(next));
+        at = glm::mix(at, glm::vec3(b[0], 0.0f, b[1]), s);
+        float dYaw = b[2] - a[2];
+        while (dYaw > 3.14159265f) { dYaw -= 6.28318531f; }
+        while (dYaw < -3.14159265f) { dYaw += 6.28318531f; }
+        yaw = a[2] + (dYaw * s);
+    }
+    return true;
+}
+
+// Re-express `pose` in its body frame: the travel joint moved to the origin horizontally and turned
+// to face +Z. Applied to the top-level joints, so everything under them follows.
+void toBodyFrame(const scene::Skeleton& skeleton, scene::Pose& pose, const glm::vec3& at, float yaw) {
+    const glm::mat4 w = glm::rotate(glm::mat4(1.0f), -yaw, glm::vec3(0.0f, 1.0f, 0.0f)) *
+                        glm::translate(glm::mat4(1.0f), -at);
+    for (std::size_t j = 0; j < skeleton.joints.size() && j < pose.local.size(); ++j) {
+        if (skeleton.joints[j].parent < 0) {
+            pose.local[j] = scene::Transform::fromMatrix(w * pose.local[j].matrix());
+        }
+    }
+}
+
+// Sample `sample`'s clip at `time`, in its body frame when its travel is real (§71).
+void poseSample(const scene::MotionDatabase& db, const std::vector<scene::AnimationClip>& clips,
+                const scene::Skeleton& skeleton, std::uint32_t sample, float time, scene::Pose& out) {
+    scene::setRestPose(skeleton, out);
+    scene::sampleClip(clips[db.sampleClip[sample]], time, out);
+    glm::vec3 at;
+    float yaw = 0.0f;
+    if (rootFrameAt(db, sample, time, at, yaw)) {
+        toBodyFrame(skeleton, out, at, yaw);
+    }
+}
 } // namespace
 
 void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t current,
@@ -384,9 +438,9 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
         return result;
     }
     const scene::AnimationClip& clip = (*clips_)[clipIndex];
-    scene::setRestPose(skeleton, out);
-    // At the memory's own time, which lies between samples while carrying on (`shownTime`).
-    scene::sampleClip(clip, shownTime(*db_, memory.selection, memory.localTime), out);
+    // At the memory's own time, which lies between samples while carrying on (`shownTime`), and
+    // in the body's frame for a clip that travels (§71: the simulation owns where the body is).
+    poseSample(*db_, *clips_, skeleton, memory.selection, shownTime(*db_, memory.selection, memory.localTime), out);
     result.status = MotionStatus::Produced;
     result.content = clip.name;
 
@@ -434,10 +488,10 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
         if (fromClip >= clips_->size() || toClip >= clips_->size()) {
             continue;
         }
-        scene::setRestPose(skeleton, was);
-        scene::sampleClip((*clips_)[fromClip], blend.fromTime, was);
-        scene::setRestPose(skeleton, became);
-        scene::sampleClip((*clips_)[toClip], blend.toTime, became);
+        // Both ends in their own body frames, as the pose above is: an offset between two poses
+        // expressed in different frames would carry their travel into the blend.
+        poseSample(*db_, *clips_, skeleton, blend.from, blend.fromTime, was);
+        poseSample(*db_, *clips_, skeleton, blend.to, blend.toTime, became);
         applyInertializedOffset(was, became, decay, out);
     }
     return result;

@@ -2375,20 +2375,20 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 47 | Adversarial tests | done | `test_motion_adversarial.cpp` on the golden corpus covers all twelve cases the spec lists, each paired so the no-op fails one arm. Ambiguous cases are judged by how the chosen sample moves, not by the clip's name: a 0.05 m/s request is honestly nearer the end of `Stop` than `Idle` |
 | 48 | Golden motion tests | done | `test_motion_golden_scenarios.cpp`: walk north, turn east, stop, with broad behaviour checked per stretch. Two runs are identical. A control shows the predicted query is what makes the start and the turn choosable |
 | 49 | Search correctness | done | Known best (a sample's own features, zero cost), obviously bad (never chosen), better trajectory and better pose (§78), wrong contact (§78, and §47's tie), and a candidate whose root teleports (never chosen for a smooth walk) |
-| 50 | Performance targeting | **partial** | Build metrics and average/worst query time exist. **Missing: p95/p99, database load timings, and multi-character matching cost** |
-| 51 | Realistic scenarios | **partial** | Single-character scaling to 1M samples (`392bf259`), and 100 characters sharing one database, measured for memory only. **Missing: the characters × samples grid** |
+| 50 | Performance targeting | done (under load; re-take when quiet) | Build throughput, p50/p95/p99 per method, load timing, and 1–100 characters (`test_motion_search_perf.cpp`) |
+| 51 | Realistic scenarios | done (under load) | 1/10k, 10/100k, 50/100k, 100/714k (the largest real corpus here, standing in for 1M) |
 | 52 | CPU/GPU boundary | done | CPU-side, benchmarked (`392bf259`, `51ab0815`). No case for the GPU |
-| 53 | Cache behaviour | **partial** | Contiguous feature arrays, 4.6 ns/sample (`392bf259`). **Missing: an explicit locality or cache measurement** |
-| 54 | Approximate search | **partial** | The strided two-stage search is built and measured, and is not needed at current scale (`02da5d81`, `test_motion_database_scale.cpp:591`). **KD-tree, PCA, ANN and VQ were not investigated** |
-| 55 | Quality vs speed | **partial** | A recall/latency matrix across the plans exists. **Missing: memory, transition-quality and complexity columns** |
-| 59 | Procedural + motion matching | **partial** | The division exists for the clip provider (the §33 audit; `adaptRootMotion`). **No test drives a matcher-selected motion through the layers** |
+| 53 | Cache behaviour | done (under load) | Contiguous vs scattered-and-shuffled: 1.2× at 0.5 MB, rising to 2.1× at 55 MB |
+| 54 | Approximate search | done | PCA, VQ and KD-tree built and measured against linear and strided. The KD-tree is rejected (the curse of dimensionality). None is adopted, because exact search is not too slow at real scale |
+| 55 | Quality vs speed | done | The matrix: latency percentiles, memory, recall, excess and transition quality, and LOC |
+| 59 | Procedural + motion matching | done | Foot layers resolve on the matched alien's pose on every frame (the lab test) |
 | 61 | Dataset strategy | **partial** | 100STYLE is verified (CC BY 4.0, `bc56f7f1`; `assets/100STYLE-ATTRIBUTION.md`; ADR-612 amendment), and a pack refuses to build without a licence (`test_motion_pack.cpp:107`). **ACCAD and CMU are not assessed. The derivative-data rule for a distributable pack is not recorded** |
 | 64 | First vertical slice | **partial** | Every stage exists in isolation, and 100STYLE is retargeted and searched in tests. **No playable alien runs on the matcher in a scene**, because the product installs the clip provider (ADR-615) |
 | 65 | Glowmere demonstration | not started | |
-| 66 | Phase B integration | **partial** | The order is a contract for the clip provider (`7e2e1543`, §33). Nothing is exercised through `MotionMatchingProvider` |
-| 67 | Multi-character demonstration | **partial** | 100 characters share one database, measured for memory (`test_motion_database_scale.cpp:179`). **CPU cost of matching at 10/50/100 is not measured** |
+| 66 | Phase B integration | done | The same test; the matcher does not bypass the layer stack |
+| 67 | Multi-character demonstration | partial | CPU cost measured for 1–100 characters sharing one database. **Missing: a scene with 10/50/100 matched aliens on terrain** |
 | 70 | Failure-case analysis | not started | No classification document exists. The findings so far (§16, §23, §31) are unclassified |
-| 71 | Root-motion policy | **partial** | ADR-337 gives the ownership model for clip root motion. **Nothing states the matcher's position** (it reads velocity and does not move the root) |
+| 71 | Root-motion policy | done | The simulation owns translation and heading; travelling clips are posed in the body frame; in-place clips unchanged |
 | 73 | Cinematic determinism | **partial** | "The matcher keeps nothing, so a replay reproduces a play" (`test_motion_matching.cpp:251`), and ADR-360. **Missing: bit-identity across runs and the pack/config/seed matrix** |
 | 77 | Testing matrix | **partial** | Pack serialisation, version mismatch and corrupt data are covered (`test_motion_pack.cpp`). Search preferences are partly covered (§49). **Missing: empty and one-sample database, missing joints, database swap, and multiple characters** |
 | 78 | Adversarial search test | done | Both constructions, each flipped by its weight: pose vs trajectory, and pose vs contact (`test_motion_adversarial.cpp`) |
@@ -2396,7 +2396,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 89 | Final report | not started | `docs/design/motion-matching.md` does not exist |
 | 91 | First milestone | **partial** | Linear search, the database and the provider run on the Glowmere corpus in tests. **Not on the alien in a scene** |
 | 92 | Second milestone | **partial** | 100STYLE is retargeted, analysed, put in a database and matched in tests (`d67fc36a`). **Not driving Glowmere** |
-| 93 | Third milestone | **partial** | Linear vs strided is compared (§55). **Missing: the memory and complexity columns, and an optimised exact search** |
+| 93 | Third milestone | done (under load) | Linear, the strided exact-ish plan, PCA, VQ and KD-tree on AV Gen's real distributions, reporting latency, quality, memory and LOC |
 | 94 | Final artistic demonstration | not started | |
 
 **Totals for the rows verified** (updated after the anim-cinfra merge). §3–§36 (34 rows): **32 done**, 2 partial (§21, §35). The 29 assigned rows outside §1–§36: **1 done** (§52), 23 partial, and 5 not started (§48, §65, §70, §89, §94). That makes 33 done among the rows verified here.
@@ -2542,6 +2542,95 @@ recorded −16.2% and +7.5%. The direction is unchanged: contacts switch more of
 per transition still adds up to more discontinuity. The fixed-0.05 arm is still degenerate (560 and
 561 of 600 seed returns), but its two means now differ by 3%, so the test asserts its degeneracy by
 switch rate rather than by equal means.
+
+## §50–§55 and §93 — performance, and the search-method matrix
+
+`tests/unit/test_motion_search_perf.cpp` (`[.perf]`, needs the gitignored 100STYLE packs).
+`scene/motion_search_index.*` adds the three structures §54 names beside §16's strided plan: PCA
+(8 components, top 256), VQ (256 k-means cells, 8 probes) and a KD-tree (exact, keep 32). All three
+finish with `scoreMotionCandidates`, the one exact scorer the staged search now shares, so they
+can disagree with the linear scan only about which candidates they looked at. Each is exact at its
+limit (tested).
+
+**Measured under load.** The 1-minute load average was between 5 and 23 on 12 cores (other
+agents' suites). The percentiles below are therefore upper bounds, to be re-taken on a quiet
+machine. Relative comparisons within one run are valid; absolute microseconds are not.
+
+| corpus | method | p50 µs | p95 µs | p99 µs | recall | excess × gap | index MB | LOC |
+|---|---|---|---|---|---|---|---|---|
+| 100STYLE 10k | linear | 67 | 159 | 169 | 100% | 0 | 0 | 133 |
+| | stride 4 | 69 | 73 | 75 | 100% | 0 | 0 | 80 + 66 |
+| | PCA | 84 | 100 | 105 | 100% | 0 | 0.31 | 107 |
+| | VQ | **8** | 12 | 13 | 100% | 0 | 0.07 | 88 |
+| | KD-tree | 114 | 139 | 145 | 100% | 0 | 1.38 | 121 |
+| FW 434k | linear | 2,123 | 3,093 | 4,036 | 100% | 0 | 0 | |
+| | stride 4 | 3,536 | 3,821 | 4,334 | 91.6% | 0.023× | 0 | |
+| | PCA | 1,349 | 1,381 | 1,401 | 100% | 0 | 13.3 | |
+| | VQ | **393** | 617 | 731 | 100% | 0 | 1.69 | |
+| | KD-tree | 4,735 | 9,732 | 12,525 | 100% | 0 | 57.9 | |
+| FW+MIXED 714k | linear | 3,190 | 6,089 | 7,584 | 100% | 0 | 0 | |
+| | stride 4 | 7,666 | 8,435 | 9,177 | 98.0% | 1.081× | 0 | |
+| | PCA | 2,148 | 2,214 | 2,293 | 100% | 0 | 21.8 | |
+| | VQ | **739** | 1,071 | 1,405 | 100% | 0 | 2.76 | |
+| | KD-tree | 7,986 | 17,411 | 21,489 | 100% | 0 | 95.6 | |
+
+- The transition-quality column (the pose gap to the continuation when a method switches) is 0
+  wherever recall is 100%. It is 0.41 for stride 4 at 434k and 0.56 at 714k.
+- Build throughput is ~46,000 samples/s. Index builds take under 2.5 s (VQ trains on 50k samples).
+
+**What the matrix says:**
+- **The KD-tree is slower than the linear scan at every size.** At 33 dimensions it scores 36–79%
+  of the corpus per query, which is the curse of dimensionality, measured, and it costs 12–57× the
+  features in memory. Rejected.
+- **The strided plan is slower than linear in wall time on real data**, although it scores a
+  quarter of the samples. The linear scan's early out (stop a candidate once it passes the best)
+  is worth more than striding, and stage one keeps a heap. §16 measured scored-sample counts and
+  never wall time. This is the first wall-time comparison.
+- **VQ is the fastest by 5–8×** at every size above 10k, at 100% recall on these queries (a sample's
+  own features nudged by the derived duplicate radius). That query distribution favours VQ, because
+  the query lands in its seed's cell. Recall on queries far from any sample is not measured here.
+- **§54's rule decides nothing is adopted.** At this repository's real scale (Glowmere, 1,738
+  samples, about 9 µs a query) the exact search is not too slow. VQ is the structure to reach for if
+  a corpus of 100STYLE size ever ships.
+
+**§50/§51/§67, many characters on one database** (120 frames at 60 Hz, each character with its own
+speed, heading and phase):
+
+| characters | samples | frame ms p50 | p95 | worst | searches/frame | µs/search |
+|---|---|---|---|---|---|---|
+| 1 | 10k | 0.000 | 0.152 | 0.218 | 0.08 | 158 |
+| 10 | 105k | 0.000 | 7.5 | 13.6 | 0.83 | 813 |
+| 50 | Performance targeting | done (under load; re-take when quiet) | Build throughput, p50/p95/p99 per method, load timing, and 1–100 characters (`test_motion_search_perf.cpp`) |
+| 100 | 714k | 0.003 | 411 | 859 | 8.3 | 4,696 |
+
+A frame that searches nothing costs microseconds, because carrying on is an array walk. The cost is
+all in search frames, so p95 is the budget number. At 100 characters on 714k samples the linear scan
+is untenable (411 ms at p95). The search spreads across frames because each character keeps its own
+clock, and §29's 0.2 s minimum continuation means about 1 in 12 frames per character searches.
+
+**§50 load:** a 434k-sample database is a 68 MB file, read and fully verified in 27–41 ms. The first
+read and the second are within noise; the file cache makes "cold" unmeasurable without flushing it.
+**§53 cache:** contiguous features cost 8.5 ns/sample at 0.5 MB, falling to 5.0 at 55 MB. The same
+features scattered one allocation per sample and visited in shuffled order cost 1.2× more at 0.5 MB
+and **2.1× more at 55 MB**. The gap grows with the working set, which is the cache effect §53 asks to
+measure, and it is why the arrays stay contiguous.
+
+## §71 — one authoritative movement result
+
+The simulation owns where the body is and which way it faces. The matcher supplies a pose in the
+body's own frame. `MotionDatabase::sampleRoot` records each sample's travel-joint position and
+facing, and `clipTravels` marks each clip whose travel is real (its root leaves its box, or it
+carries a heading track). For such a clip the provider poses the body with that travel and heading
+removed. Both ends of an inertialization blend get the same treatment. An in-place clip, which is
+every Glowmere cycle, is posed exactly as authored, bit for bit (tested). Before this, a travelling
+clip walked its rig away from the entity over the clip and snapped back at the wrap, and a turning
+clip turned the body on top of the entity's own turn. File version 2 carries the new arrays.
+
+## §59 / §66 — the matcher chooses, Phase B adapts
+
+In the match lab, the matched alien's base pose comes from the matcher on all 181 frames, and both
+of its ground-driven foot layers resolve on top of it on every one of them. Its clip-provider twin
+shows the same count, so the matcher did not route around Phase B.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

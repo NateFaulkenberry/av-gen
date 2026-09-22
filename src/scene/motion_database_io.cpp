@@ -352,6 +352,8 @@ std::uint64_t motionDatabaseIdentity(const MotionDatabase& db) {
     d.array(db.samplePhase);
     d.array(db.sampleTags);
     d.array(db.sampleNext);
+    d.array(db.sampleRoot);
+    d.array(db.clipTravels);
     for (const std::string& name : db.clipNames) {
         d.text(name);
     }
@@ -401,6 +403,8 @@ Result<void> writeMotionDatabase(const MotionDatabase& db, const fs::path& file)
     appendArray(payload, db.samplePhase);
     appendArray(payload, db.sampleTags);
     appendArray(payload, db.sampleNext);
+    appendArray(payload, db.sampleRoot);
+    appendArray(payload, db.clipTravels);
 
     std::error_code ec;
     if (file.has_parent_path()) {
@@ -492,7 +496,8 @@ Result<MotionDatabase> readMotionDatabase(const fs::path& file, const MotionData
     if (!takeArray(at, end, db.features) || !takeArray(at, end, db.mean) ||
         !takeArray(at, end, db.scale) || !takeArray(at, end, db.sampleClip) ||
         !takeArray(at, end, db.sampleTime) || !takeArray(at, end, db.samplePhase) ||
-        !takeArray(at, end, db.sampleTags) || !takeArray(at, end, db.sampleNext) || at != end) {
+        !takeArray(at, end, db.sampleTags) || !takeArray(at, end, db.sampleNext) ||
+        !takeArray(at, end, db.sampleRoot) || !takeArray(at, end, db.clipTravels) || at != end) {
         return fail("motion database '{}': payload is malformed", file.string());
     }
 
@@ -502,7 +507,8 @@ Result<MotionDatabase> readMotionDatabase(const fs::path& file, const MotionData
     const std::size_t dim = db.dimension;
     if (n != db.stats.samples || db.features.size() != n * dim || db.mean.size() != dim ||
         db.scale.size() != dim || db.sampleTime.size() != n || db.samplePhase.size() != n ||
-        db.sampleTags.size() != n || db.sampleNext.size() != n) {
+        db.sampleTags.size() != n || db.sampleNext.size() != n || db.sampleRoot.size() != 3u * n ||
+        db.clipTravels.size() != db.clipNames.size()) {
         return fail("motion database '{}': array lengths disagree with {} samples x {} dimensions",
                     file.string(), db.stats.samples, dim);
     }
@@ -551,6 +557,8 @@ std::string firstMotionDatabaseDifference(const MotionDatabase& a, const MotionD
     if (!sameBits(a.samplePhase, b.samplePhase)) return "samplePhase";
     if (!sameBits(a.sampleTags, b.sampleTags)) return "sampleTags";
     if (!sameBits(a.sampleNext, b.sampleNext)) return "sampleNext";
+    if (!sameBits(a.sampleRoot, b.sampleRoot)) return "sampleRoot";
+    if (!sameBits(a.clipTravels, b.clipTravels)) return "clipTravels";
     if (!sameBits(a.mean, b.mean)) return "mean";
     if (!sameBits(a.scale, b.scale)) return "scale";
     if (a.clipNames != b.clipNames) return "clipNames";
