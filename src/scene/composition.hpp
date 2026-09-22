@@ -660,6 +660,10 @@ public:
     // previous frame's flattening. The replay does not flatten; it answers from `ReplayPlacement`,
     // the same arithmetic over the same parameter finals, captured after each replayed step -- one
     // step old, as the play's is.
+    //
+    // ADR-700: and it does it from the nearest simulation checkpoint rather than from a reset, so
+    // it is exact at any time rather than inside ninety seconds. The composition's half of a
+    // checkpoint is the director (whole), the bases it wrote, and `ReplayPlacement`.
     void seekWithDirector(double seconds, params::ParameterSet& params, entity::SeekBudget budget,
                           double step = 1.0 / 60.0);
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
@@ -1847,6 +1851,8 @@ private:
     // Phase D §26: the director's beats this update, raised as world events. Shared by
     // `updateBehaviour` and the replay in `seekWithDirector`.
     void raiseDirectorBeats(double time);
+    // ADR-700: the director replay's inputs that are not parameter bases, for the checkpoint key.
+    [[nodiscard]] std::uint64_t replayInputKey() const;
     // ADR-671: `visualPlacement` for a replay, one step old, from the finals.
     class ReplayPlacement final : public stage::IVisualPlacement {
     public:
@@ -1855,6 +1861,14 @@ private:
         void capture();
         [[nodiscard]] bool visualPlacement(std::string_view node,
                                            stage::VisualPlacement& out) const override;
+        // ADR-700: what a checkpoint keeps of it -- the last step's "flattening", which the next
+        // step's director reads.
+        [[nodiscard]] const std::vector<stage::VisualPlacement>& placed() const { return placed_; }
+        [[nodiscard]] const std::vector<std::uint8_t>& valid() const { return valid_; }
+        void set(std::vector<stage::VisualPlacement> placed, std::vector<std::uint8_t> valid) {
+            placed_ = std::move(placed);
+            valid_ = std::move(valid);
+        }
 
     private:
         const Composition& comp_;
@@ -1862,6 +1876,15 @@ private:
         std::vector<std::uint8_t> valid_;
     };
     friend class ReplayPlacement;
+    // ADR-700: the replay's last placement, for the first frame after a seek. That frame's director
+    // asks where nodes are drawn, and a play answers from the previous frame's flattening -- but
+    // after a seek the last flattening is from before the jump, a different second entirely. So
+    // until the next `update` flattens, `visualPlacement` answers from what the replay captured
+    // after its last step, which is the flattening the play would have had. Found by checking the
+    // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
+    std::vector<stage::VisualPlacement> seekPlaced_;
+    std::vector<std::uint8_t> seekPlacedValid_;
+    bool seekPlacementLive_ = false;
     stage::StagingDesc stagingDesc_;              // ADR-209: authored, round-tripped as "staging"
     stage::Staging staging_;
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"

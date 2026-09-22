@@ -189,12 +189,36 @@ float lerpRate(float ms, double dt) {
     return 1.0f - std::exp(-static_cast<float>(dt) / (ms * 0.001f));
 }
 
+// ---- checkpoints (ADR-700) ---------------------------------------------------------------------
+//
+// Every behaviour is copied whole, by the copy constructor and copy assignment the compiler writes,
+// so a checkpoint holds every member it has -- including one added after this was written. A
+// behaviour that cannot be copied (it grew a `unique_ptr`, a reference, a `const` member) fails to
+// compile here rather than silently leaving its state out of a checkpoint.
+template <class Derived>
+class CheckpointedBehavior : public IBehavior {
+public:
+    [[nodiscard]] std::unique_ptr<IBehavior> clone() const final {
+        return std::make_unique<Derived>(static_cast<const Derived&>(*this));
+    }
+    void assignState(const IBehavior& from) final {
+        const auto* same = dynamic_cast<const Derived*>(&from);
+        if (same == nullptr) {
+            // The lists are matched by position and kind before this is called; reaching here is
+            // a checkpoint restored into a different entity set, which the input key forbids.
+            log::error("checkpoint: behaviour '{}' restored from a '{}'", kind(), from.kind());
+            return;
+        }
+        static_cast<Derived&>(*this) = *same;
+    }
+};
+
 // ---- hover -----------------------------------------------------------------------------------
 //
 // Low-frequency vertical float with a matching tilt, both driven by the same noise field so the
 // craft leans the way it drifts instead of nodding independently of it. The brief for this one is
 // "cinematic, massive, mysterious": slow, small, and never repeating.
-class Hover final : public IBehavior {
+class Hover final : public CheckpointedBehavior<Hover> {
 public:
     explicit Hover(const nlohmann::json* s)
         : amplitudeDefault_(readFloat(s, "amplitude", 0.6f)),
@@ -270,7 +294,7 @@ private:
 // relationship -- and because `explore/speed` is a registered parameter that a scene already drives
 // from `audio.rms`, the bounce becomes music-reactive through the chain that exists rather than
 // through a second one. That is the whole audio story here: no signal is read in this file.
-class Liveliness final : public IBehavior {
+class Liveliness final : public CheckpointedBehavior<Liveliness> {
 public:
     explicit Liveliness(const nlohmann::json* s)
         : bounceDefault_(readFloat(s, "bounce", 0.0f)),
@@ -381,7 +405,7 @@ private:
 // Lateral wander inside a radius, on its own noise field. Separate from `hover` because vertical
 // and horizontal motion have different scales and different rates on anything that flies, and
 // folding them into one knob makes both wrong.
-class Drift final : public IBehavior {
+class Drift final : public CheckpointedBehavior<Drift> {
 public:
     explicit Drift(const nlohmann::json* s)
         : radiusDefault_(readFloat(s, "radius", 2.0f)), rateDefault_(readFloat(s, "rate", 0.045f)) {}
@@ -446,7 +470,7 @@ private:
 // Lean into the direction of travel. This is the cheapest thing that makes a floating object read
 // as having mass: a craft that translates without leaning looks like a sprite being slid across
 // the frame. Smoothed, because the lean should lag the movement, not track it.
-class Bank final : public IBehavior {
+class Bank final : public CheckpointedBehavior<Bank> {
 public:
     explicit Bank(const nlohmann::json* s)
         : degreesDefault_(readFloat(s, "degrees", 6.0f)),
@@ -507,7 +531,7 @@ private:
 // A yaw *rate* that events push and damping pulls back, rather than a constant rotation. The
 // difference is the whole point: a constant spin is a turntable, and an object that accelerates on
 // a beat and coasts between them is reacting to the music. `baseRate` is deliberately 0 by default.
-class Spin final : public IBehavior {
+class Spin final : public CheckpointedBehavior<Spin> {
 public:
     explicit Spin(const nlohmann::json* s)
         : signal_(readString(s, "signal", "audio.beat")),
@@ -607,7 +631,7 @@ void separateFromCrowd(const BehaviorContext& ctx, EntityState& state, float spe
     state.travel.z += apart.y / distance * limit;
 }
 
-class Wander final : public IBehavior {
+class Wander final : public CheckpointedBehavior<Wander> {
 public:
     explicit Wander(const nlohmann::json* s)
         : speedDefault_(readFloat(s, "speed", 1.6f)),
@@ -817,7 +841,7 @@ private:
 // Turn to face something, at a limited rate. Reads `state.lookTarget` when another behaviour has
 // set one this frame, and falls back to a fixed target named in the scene file. Writes yaw rather
 // than a rotation offset so navigation and facing agree about which way the body points.
-class LookAt final : public IBehavior {
+class LookAt final : public CheckpointedBehavior<LookAt> {
 public:
     explicit LookAt(const nlohmann::json* s)
         : target_(readString(s, "target", "")),
@@ -924,7 +948,7 @@ private:
 //
 // A strong audio event turns it towards whatever it finds interesting -- which is the reusable
 // shape of "react to the music" for any character, not a rule about this one.
-class Interest final : public IBehavior {
+class Interest final : public CheckpointedBehavior<Interest> {
 public:
     explicit Interest(const nlohmann::json* s)
         : signal_(readString(s, "signal", "music.impact")),
@@ -1074,7 +1098,7 @@ private:
 //     came for before it stands still.
 //
 // Seeded throughout, through `ctx.rng`. No wall clock anywhere.
-class Explore final : public IBehavior {
+class Explore final : public CheckpointedBehavior<Explore> {
 public:
     explicit Explore(const nlohmann::json* s)
         : speedDefault_(readFloat(s, "speed", 1.7f)),
@@ -1971,7 +1995,7 @@ private:
 // keyframed walk, a spline, a future scripted sequence. `explore` already grounds itself, so this
 // is not needed alongside it -- it is the same component (ADR-093, §4, §7) exposed as a behaviour
 // so that "follow the terrain" is available without also taking a mind.
-class Ground final : public IBehavior {
+class Ground final : public CheckpointedBehavior<Ground> {
 public:
     explicit Ground(const nlohmann::json* s)
         : alignDefault_(readFloat(s, "slopeAlign", 0.55f)),
@@ -2164,7 +2188,7 @@ private:
     TraitWeights weights_;
 };
 
-class Decide final : public IBehavior {
+class Decide final : public CheckpointedBehavior<Decide> {
 public:
     explicit Decide(const nlohmann::json* s)
         : hertzDefault_(readFloat(s, "hertz", 2.0f)),
@@ -2403,6 +2427,15 @@ public:
             // body re-chose every tick. `Explore` remembers on arrival for the same reason.
             remember(state.position());
             dctx.visited = visited_;
+            // **And the variety window, for the same reason `visited` is re-pointed on the line
+            // above.** `view_.recentKinds` is a span over `recentKinds_`, taken in `sense()` before
+            // this branch pushed onto it. When the push reallocated -- the second completion of a
+            // run, from a capacity of one -- the span pointed at the freed buffer, and the choice
+            // made on this tick read whatever the allocator had left there. Found by ADR-700's
+            // completeness test: a scrub replayed from zero after an earlier run (whose `clear()`
+            // had kept the capacity, so no reallocation) scored `rook`'s glow errand at 0.44 where
+            // a fresh load scored it 0.74, and the aliens were 28 m apart by 90 s.
+            view_.recentKinds = recentKinds_;
         }
 
         // Republish the overlay's list whenever a tick actually fired -- including the very first
@@ -2844,8 +2877,11 @@ private:
     params::Parameter<float>* memorySeconds_ = nullptr;
     std::vector<std::string> paths_;
 
-    std::vector<std::unique_ptr<StockConsiderer>> considerers_;
-    std::vector<std::unique_ptr<TraitScaled>> scaled_;
+    // Shared, not owned: a considerer holds no per-character state (decision.hpp), so a checkpoint's
+    // copy of this decider may point at the same ones (ADR-700). Their `mutable` members are
+    // scratch rebuilt on every call.
+    std::vector<std::shared_ptr<StockConsiderer>> considerers_;
+    std::vector<std::shared_ptr<TraitScaled>> scaled_;
     std::vector<const IConsiderer*> views_;
     Selector selector_;
 
@@ -2895,7 +2931,7 @@ private:
 //
 // Travel slowly around a named point. Separate from `drift` because a craft holding station over
 // something is a composed shot and a craft wandering is not, and an author wants to choose.
-class Orbit final : public IBehavior {
+class Orbit final : public CheckpointedBehavior<Orbit> {
 public:
     explicit Orbit(const nlohmann::json* s)
         : around_(readString(s, "around", "")),

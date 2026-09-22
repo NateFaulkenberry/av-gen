@@ -144,6 +144,10 @@ std::vector<entity::BehaviorDesc> craft() {
             behavior("spin", {{"signal", "none"}, {"baseRate", 40.0}, {"damping", 1.5}})};
 }
 
+// ADR-700 retired the window as the product; these arms are about the window's own classification
+// and budget, so they ask for it by name -- it is kept as a control, not as dead code.
+const entity::SeekBudget kWindow{.mode = entity::SeekMode::Window};
+
 } // namespace
 
 TEST_CASE("a scrub lands where the play landed", "[entity][seek][determinism]") {
@@ -183,7 +187,7 @@ TEST_CASE("a behaviour that is a function of the clock is not replayed", "[entit
     // produce a number the last one overwrites. The saving and the proof that it is free are the
     // two halves of this test and neither means anything alone.
     World hovering(1, {behavior("hover", {{"amplitude", 1.0}, {"rate", 0.3}})});
-    hovering.seekTo(60.0);
+    hovering.seekTo(60.0, kWindow);
     const entity::EntityWorld::SeekWork work = hovering.world.lastSeekWork();
     CHECK(work.steps == 3600);
     CHECK(work.fullBodySteps == 3600);
@@ -197,7 +201,7 @@ TEST_CASE("a behaviour that is a function of the clock is not replayed", "[entit
 
     SECTION("drift needs the step before, and takes exactly that") {
         World drifting(1, {behavior("drift", {{"radius", 2.0}, {"rate", 0.2}})});
-        drifting.seekTo(60.0);
+        drifting.seekTo(60.0, kWindow);
         CHECK(drifting.world.lastSeekWork().bodySteps == 2);
         // ...and the speed it publishes for `bank`, which is the whole reason it is two and not
         // one. Read before the extra frame, because that frame overwrites it.
@@ -211,13 +215,13 @@ TEST_CASE("a behaviour that is a function of the clock is not replayed", "[entit
 
     SECTION("control: an accumulating behaviour is replayed in full, and has to be") {
         World spinning(1, {behavior("spin", {{"signal", "none"}, {"baseRate", 40.0}, {"damping", 1.5}})});
-        spinning.seekTo(60.0);
+        spinning.seekTo(60.0, kWindow);
         CHECK(spinning.world.lastSeekWork().deepBodies == 1);
         CHECK(spinning.world.lastSeekWork().bodySteps == 3600);
         // And the shortcut would be wrong for it: one step of window is a different frame, which is
         // the reason `spin` is not allowed the shortcut `hover` gets.
         World clipped(1, {behavior("spin", {{"signal", "none"}, {"baseRate", 40.0}, {"damping", 1.5}})});
-        clipped.seekTo(60.0, entity::SeekBudget{.maxSeconds = kStep});
+        clipped.seekTo(60.0, entity::SeekBudget{.maxSeconds = kStep, .mode = entity::SeekMode::Window});
         CHECK(worst(clipped.drawnAfter(60.0), spinning.drawnAfter(60.0)) > 1e-4);
     }
 
@@ -226,7 +230,7 @@ TEST_CASE("a behaviour that is a function of the clock is not replayed", "[entit
         wait.kind = entity::ActionKind::Wait;
         wait.duration = 4.0;
         World ordered(1, {behavior("hover", {{"amplitude", 1.0}, {"rate", 0.3}})}, {wait});
-        ordered.seekTo(60.0);
+        ordered.seekTo(60.0, kWindow);
         CHECK(ordered.world.lastSeekWork().deepBodies == 1);
         CHECK(ordered.world.lastSeekWork().bodySteps == 3600);
     }
@@ -237,7 +241,7 @@ TEST_CASE("the replay window is a budget in body-steps", "[entity][seek]") {
     // a small scene and 1,350,000 in the cast the character-AI plan wants, which is the same click
     // costing 161 s instead of 1 s (ADR-267). A budget in the unit the cost is paid in is what makes
     // a bigger scene keep less history rather than take longer.
-    const entity::SeekBudget capped{.maxSeconds = 90.0, .maxBodySteps = 1200};
+    const entity::SeekBudget capped{.maxSeconds = 90.0, .maxBodySteps = 1200, .mode = entity::SeekMode::Window};
     World ten(10, {behavior("spin", {{"signal", "none"}, {"baseRate", 40.0}})});
     ten.seekTo(60.0, capped);
     CHECK(ten.world.lastSeekWork().steps == 120); // 1200 / 10
@@ -262,7 +266,7 @@ TEST_CASE("the replay window is a budget in body-steps", "[entity][seek]") {
 
     SECTION("control: no ceiling is no ceiling") {
         World uncapped(10, {behavior("spin", {{"signal", "none"}, {"baseRate", 40.0}})});
-        uncapped.seekTo(60.0, entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 0});
+        uncapped.seekTo(60.0, entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 0, .mode = entity::SeekMode::Window});
         CHECK(uncapped.world.lastSeekWork().steps == 3600);
         CHECK_FALSE(uncapped.world.lastSeekWork().budgetBound);
     }

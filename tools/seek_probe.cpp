@@ -242,7 +242,7 @@ void perKind(const entity::Navigator& nav, int n, double window, int repeats) {
             buildWorld(world, params, n, kind, nav);
             const auto start = Clock::now();
             world.seek(window, &params, nullptr, 1.0 / 60.0,
-                       entity::SeekBudget{.maxSeconds = window, .maxBodySteps = 0});
+                       entity::SeekBudget{.maxSeconds = window, .maxBodySteps = 0, .mode = entity::SeekMode::Window});
             best = std::min(best, msSince(start));
             travel = std::max(travel, travelled(world));
         }
@@ -268,7 +268,7 @@ void historyDepth(const entity::Navigator& nav, double window) {
             params::ParameterSet params;
             buildWorld(world, params, 8, kind, nav);
             world.seek(t, &params, nullptr, 1.0 / 60.0,
-                       entity::SeekBudget{.maxSeconds = span, .maxBodySteps = 0});
+                       entity::SeekBudget{.maxSeconds = span, .maxBodySteps = 0, .mode = entity::SeekMode::Window});
             return poseAfterNextFrame(world, params, t);
         };
         const auto full = at(window);
@@ -300,7 +300,7 @@ void windowScaling(const entity::Navigator& nav, int n, const char* kind, int re
             buildWorld(world, params, n, kind, nav);
             const auto start = Clock::now();
             world.seek(90.0, &params, nullptr, 1.0 / 60.0,
-                       entity::SeekBudget{.maxSeconds = window, .maxBodySteps = 0});
+                       entity::SeekBudget{.maxSeconds = window, .maxBodySteps = 0, .mode = entity::SeekMode::Window});
             best = std::min(best, msSince(start));
         }
         std::printf("  window %5.1f s: %9.1f ms\n", window, best);
@@ -329,7 +329,7 @@ void authoredScene(scene::Composition& comp, params::ParameterSet& params, doubl
         for (int r = 0; r < repeats; ++r) {
             const auto start = Clock::now();
             world.seek(target, &params, nullptr, 1.0 / 60.0,
-                       entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = cap});
+                       entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = cap, .mode = entity::SeekMode::Window});
             best = std::min(best, msSince(start));
         }
         std::vector<glm::vec3> pose;
@@ -405,7 +405,7 @@ void gridPrize(scene::Composition& comp, params::ParameterSet& params, double ta
         double best = std::numeric_limits<double>::max();
         for (int r = 0; r < repeats; ++r) {
             const auto start = Clock::now();
-            world.seek(target, &params, nullptr, 1.0 / 60.0, entity::SeekBudget{.maxSeconds = 90.0});
+            world.seek(target, &params, nullptr, 1.0 / 60.0, entity::SeekBudget{.maxSeconds = 90.0, .mode = entity::SeekMode::Window});
             best = std::min(best, msSince(start));
         }
         std::vector<glm::vec3> pose;

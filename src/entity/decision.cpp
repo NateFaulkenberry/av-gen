@@ -198,17 +198,14 @@ void Selector::exclude(std::string_view name, std::uint64_t subject, double unti
 }
 
 void Selector::reset() {
-    excluded_.clear();
-    hold_ = false;
-    holdScore_ = 0.0f;
-    options_.clear();
-    current_.clear();
-    currentSubject_ = 0;
-    chosen_ = kNone;
-    committedTick_ = 0;
-    tick_ = 0;
-    started_ = false;
-    counts_ = Counts{};
+    // Everything back to a freshly made selector except its settings -- by assignment rather than
+    // member by member (ADR-700). The member-by-member version forgot `commitment_`, so a scrub
+    // replayed from zero after any earlier run started with the last run's commitment boost on
+    // the incumbent, and the Glowmere aliens' decision scores disagreed with a fresh load from
+    // 14 s on (tests/unit/test_glowmere_scrub.cpp, "however it got there").
+    const SelectorSettings settings = settings_;
+    *this = Selector{};
+    settings_ = settings;
 }
 
 bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* const> considerers) {

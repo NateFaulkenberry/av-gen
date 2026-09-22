@@ -149,6 +149,13 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         // faster seek that draws a different frame is not a faster seek (ADR-182), so this may not
         // be set low enough to bite on a scene that is currently getting a correct answer.
         //
+        // ADR-700 retired the window: a seek now resumes from the nearest checkpoint, and this
+        // ceiling bounds the replay *from* it -- in practice only a first scrub, before the
+        // checkpoints exist, can reach it, and past it the seek falls back to the window and
+        // reports itself inexact. The default rose to `SeekBudget::kEditorBodySteps` (400,000)
+        // so that first scrub of the Glowmere multicam, 257,982 body-steps to its last frame, is
+        // exact. The history of the number, for the record:
+        //
         // 180,000 is the whole ninety seconds for any scene with up to thirty-three bodies that
         // need it -- Glowmere's twenty-two deep bodies cost 118,801, so it keeps its exact frame --
         // and it shrinks from there. What it is actually for is the case ADR-267 called the
@@ -161,7 +168,8 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         if (const char* budget = std::getenv("AVGEN_SEEK_BODY_STEPS")) {
             seekBodyStepBudget_ = std::strtoull(budget, nullptr, 10);
         } else {
-            seekBodyStepBudget_ = 180000;
+            // ADR-700: raised with the window's retirement; see `SeekBudget::kEditorBodySteps`.
+            seekBodyStepBudget_ = entity::SeekBudget::kEditorBodySteps;
         }
     }
     // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
@@ -3228,9 +3236,14 @@ void Engine::seekSeconds(double seconds) {
         // bounded here instead, in the unit the cost is actually paid in (ADR-273).
         {
             const probe2::Add probeDirector(probe2::frame().directorResetMs); // TEMPORARY: phase 2
+            // ADR-700: from the nearest simulation checkpoint, exact at any second. The window
+            // (`AVGEN_SEEK_MODE=window`) and the whole-history replay (`=full`) stay reachable as
+            // A/B arms out of one binary.
+            static const entity::SeekMode seekMode = entity::SeekBudget::modeFromEnvironment();
             composition->seekWithDirector(seconds, params_,
                                           entity::SeekBudget{.maxSeconds = 90.0,
-                                                             .maxBodySteps = seekBodyStepBudget_},
+                                                             .maxBodySteps = seekBodyStepBudget_,
+                                                             .mode = seekMode},
                                           1.0 / 60.0);
         }
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were

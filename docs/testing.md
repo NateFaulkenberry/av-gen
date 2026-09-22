@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Forty ways a green suite has lied
+## Forty-one ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -87,7 +87,7 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 31, 32, 34).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19, 33, 36, 37; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 33, 36, 37, 41; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -1174,6 +1174,26 @@ a wound.
    the honest one.** The instinct is to trust the isolated run; here isolation was the broken
    configuration. Found by an order bisect after the obvious explanation -- RNG seeding -- was
    checked and *failed to explain anything*, which is what made it worth bisecting at all.
+
+41. **Every arm started from a fresh load, so a reset that forgot a field could not be seen.**
+
+   `test_glowmere_scrub.cpp` compared a scrub with a play at 30, 45 and 90 s, and each scrub was a
+   brand-new `Film` -- loaded, seeked once, compared. All green, 0.000000 m. **The editor never
+   does that.** It loads, plays, and then scrubs, so every replay from zero starts from
+   `EntityWorld::reset` on a world that has already run -- and `reset` is hand-written, field by
+   field, in thirteen behaviours and the world. ADR-700's digest test restored into a world that
+   had been somewhere else first and found two things a fresh load hides: `Selector::reset` forgot
+   `commitment_`, and `Decide`'s variety window was a `span` over a vector the same step could
+   reallocate -- after an earlier run `clear()` had kept the capacity, so no reallocation and a
+   different score (0.44 against 0.74), and the aliens 28 m apart at 90 s.
+
+   **The general form: a test of "the same input gives the same output" must vary what came
+   before, not only the input.** A fresh fixture is the one history in which every forgotten reset
+   is invisible. The habit: when a function's contract is "puts it back", test it on something
+   that has been used -- run the subject somewhere else first (past the target, through ordinary
+   frames), then ask. And a `span` or a pointer into a container that the same function can grow is
+   entry 38's family seen from memory: re-point it after every write, as `dctx.visited` already
+   was two lines above the one that was not.
 
 ## The scratchpad is shared by every agent in a session
 
