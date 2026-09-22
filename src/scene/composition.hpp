@@ -1874,6 +1874,15 @@ private:
         std::vector<std::uint8_t> valid_;
     };
     friend class ReplayPlacement;
+    // ADR-700: the replay's last placement, for the first frame after a seek. That frame's director
+    // asks where nodes are drawn, and a play answers from the previous frame's flattening -- but
+    // after a seek the last flattening is from before the jump, a different second entirely. So
+    // until the next `update` flattens, `visualPlacement` answers from what the replay captured
+    // after its last step, which is the flattening the play would have had. Found by checking the
+    // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
+    std::vector<stage::VisualPlacement> seekPlaced_;
+    std::vector<std::uint8_t> seekPlacedValid_;
+    bool seekPlacementLive_ = false;
     stage::StagingDesc stagingDesc_;              // ADR-209: authored, round-tripped as "staging"
     stage::Staging staging_;
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"

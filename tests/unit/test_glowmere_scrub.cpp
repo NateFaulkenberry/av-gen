@@ -299,6 +299,29 @@ std::string firstDifference(const std::string& a, const std::string& b) {
     return a.size() == b.size() ? std::string("(none)") : std::string("(lengths differ)");
 }
 
+// The frame after a scrub and after the play to the same second, drawn: every body, and every
+// particle system's enabled flag, spawn rate, size and emitter position -- the director state a
+// render reads. Advances both films one frame.
+void checkFrameAfter(Film& played, Film& scrubbed) {
+    played.tick();
+    scrubbed.tick();
+    std::string who;
+    const float w = worst(played.drawn(), scrubbed.drawn(), who);
+    INFO("frame after: worst body " << who << ", " << w << " m");
+    CHECK(w == 0.0f);
+    const auto& a = played.comp->scene().particles;
+    const auto& b = scrubbed.comp->scene().particles;
+    REQUIRE(a.size() == b.size());
+    REQUIRE_FALSE(a.empty());
+    for (std::size_t p = 0; p < a.size(); ++p) {
+        INFO("particle system " << a[p].name);
+        CHECK(a[p].enabled == b[p].enabled);
+        CHECK(a[p].spawnRate == b[p].spawnRate);
+        CHECK(a[p].sizeStart == b[p].sizeStart);
+        CHECK(a[p].position == b[p].position);
+    }
+}
+
 } // namespace
 
 TEST_CASE("a scrub of the Glowmere film lands every body where the play did, inside an abduction too",
@@ -321,6 +344,7 @@ TEST_CASE("a scrub of the Glowmere film lands every body where the play did, ins
         const float w = worst(played.drawn(), scrubbed.drawn(), who);
         INFO("worst body: " << who << ", " << w << " m");
         CHECK(w == 0.0f);
+        checkFrameAfter(played, scrubbed);
     }
 }
 
@@ -371,22 +395,8 @@ TEST_CASE("a scrub past the old ninety-second window still lands every body wher
         CHECK(w == 0.0f);
         // Subject: past ninety seconds the old replay could not have got here.
         CHECK(scrubbed.comp->entityWorld().lastSeekWork().exact);
-        // And the frame after, drawn: every body again, and every particle system's enabled flag,
-        // spawn rate, size and emitter position -- the director state a render reads.
-        played.tick();
-        scrubbed.tick();
-        CHECK(worst(played.drawn(), scrubbed.drawn(), who) == 0.0f);
-        const auto& a = played.comp->scene().particles;
-        const auto& b = scrubbed.comp->scene().particles;
-        REQUIRE(a.size() == b.size());
-        REQUIRE_FALSE(a.empty());
-        for (std::size_t p = 0; p < a.size(); ++p) {
-            INFO("particle system " << a[p].name);
-            CHECK(a[p].enabled == b[p].enabled);
-            CHECK(a[p].spawnRate == b[p].spawnRate);
-            CHECK(a[p].sizeStart == b[p].sizeStart);
-            CHECK(a[p].position == b[p].position);
-        }
+        // And the frame after, drawn, particle systems included.
+        checkFrameAfter(played, scrubbed);
     }
 }
 
