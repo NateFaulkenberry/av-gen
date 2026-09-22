@@ -526,6 +526,112 @@ TEST_CASE("probe: where the film's cast is standing, and what it can reach",
 // hero list, which is what the code did before ADR-349. `ClearanceField::heroPenetration` at a
 // body's own feet must be positive with its own hero in the list and zero without it. If that ever
 // stops being a difference, the arm below is measuring nothing.
+// Tagged `[!shouldfail]`: this invariant is CORRECT and the engine does NOT satisfy it.
+//
+// **Saving a project you have not edited moves its hero anchors, by the same amount every time.**
+// Found by the QA pass of 2026-09-22 while smoke-testing `--save-project` on this film: one
+// headless frame and one save, with no editing at any point, and
+//
+//     ember  -67.48 -> -135.48 in x   (68.191 m)
+//     sage    15.17 ->   20.18 in y   ( 5.005 m)
+//     tide     6.44 ->    7.99 in y   ( 1.550 m)
+//     rook, vane                       (stable)
+//
+// and saving *that* file moves them again by exactly the same deltas (ember to -203.48, sage to
+// 25.18, tide to 9.54). The drift is a fixed per-hero offset applied once per save, so N saves put
+// ember 68N metres from where it was authored. That is silent, progressive corruption of authored
+// content, and it needs no user mistake to happen -- only Cmd-S.
+//
+// **It takes one frame of simulation, not just a save.** Serialising immediately after a load
+// reproduces nothing; the first `Engine::update` is what resolves the anchors from live placement,
+// and the save writes those. Worth stating because it is what makes the defect invisible to a
+// round-trip test of the serialiser alone, which is the obvious place to have looked.
+//
+// **`ember`'s 68.191 m is not a coincidence**: it is exactly the gap between this project's
+// `nodes/ember/position` override (-56) and the scene's authored node position (12). So the anchor
+// looks to be re-derived from the *resolved* placement and then has the node override applied
+// again on top, cumulatively -- read A, write A + delta. The y-only drift on `sage` and `tide` is a
+// separate constant per hero and is not explained by that alone, so the mechanism above is a
+// direction for the fix rather than a finding.
+//
+// This is also **why `A starred character is not a wall around itself` below fails today.** Its
+// control arm needs three bodies standing inside their own hero capsules, and every alien's anchor
+// has already been walked 9-36 m away from its body by past saves of this file, so the control
+// finds none. Repairing the anchors and re-deriving that arm's expected count are one job.
+//
+// Not tagged off and not deleted, for the reason ADR-260's slope case gives: a defect nobody
+// measures is a defect nobody remembers, and Catch2 shouts the day this starts passing.
+TEST_CASE("saving a project does not move its hero anchors",
+          "[glowmere][multicam][project][!shouldfail]") {
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(filmProject());
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+
+    // **One frame, and that is the whole mechanism.** Comparing the document straight after a load
+    // finds nothing -- checked, and it passed -- because the anchors are still the file's own. The
+    // drift needs the engine to have *run*: stepping resolves each hero's anchor from live
+    // placement, and the save then writes that back over the authored value. So this is not a
+    // serialiser that mangles what it is given; it is a save that photographs the run, and one
+    // frame of simulation is enough to make it do so.
+    FrameTime time;
+    time.renderTime = 0.0;
+    time.deltaTime = 0.0;
+    time.frameIndex = 0;
+    engine.update(time);
+
+    // `projectDocument` is the document `saveProject` would write, without writing it -- the same
+    // serialiser, so this cannot be a second implementation that happens to agree (ADR-440).
+    std::ifstream onDisk(filmProject());
+    REQUIRE(onDisk.good());
+    const json before = json::parse(onDisk);
+    const json after = engine.projectDocument(filmProject());
+
+    auto anchors = [](const json& doc) {
+        std::map<std::string, std::array<double, 3>> out;
+        if (!doc.contains("heroes")) {
+            return out;
+        }
+        for (const json& h : doc.at("heroes")) {
+            if (!h.contains("name") || !h.contains("position")) {
+                continue;
+            }
+            const json& p = h.at("position");
+            if (p.is_array() && p.size() == 3) {
+                out[h.at("name").get<std::string>()] = {p[0].get<double>(), p[1].get<double>(),
+                                                        p[2].get<double>()};
+            }
+        }
+        return out;
+    };
+    const auto a = anchors(before);
+    const auto b = anchors(after);
+    REQUIRE_FALSE(a.empty());
+    REQUIRE(a.size() == b.size());
+
+    // Every hero, not only the five characters: a save that moves a mushroom's anchor is the same
+    // defect and would otherwise be invisible here.
+    double worst = 0.0;
+    std::string worstName;
+    for (const auto& [name, pa] : a) {
+        const auto it = b.find(name);
+        REQUIRE(it != b.end());
+        const auto& pb = it->second;
+        const double d = std::sqrt(((pb[0] - pa[0]) * (pb[0] - pa[0])) +
+                                   ((pb[1] - pa[1]) * (pb[1] - pa[1])) +
+                                   ((pb[2] - pa[2]) * (pb[2] - pa[2])));
+        if (d > worst) {
+            worst = d;
+            worstName = name;
+        }
+    }
+    INFO(fmt::format("worst anchor movement: '{}' by {:.3f} m across {} heroes", worstName, worst,
+                     a.size()));
+    // A millimetre of tolerance, because the anchors round-trip through float and two of them
+    // already move by 0.003 m for that reason alone. The defect is metres.
+    CHECK(worst < 0.01);
+}
+
 TEST_CASE("A starred character is not a wall around itself", "[glowmere][multicam][entity]") {
     app::Engine engine(app::EngineMode::Offline);
     auto loaded = engine.loadProject(filmProject());
