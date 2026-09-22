@@ -2528,6 +2528,111 @@ std::vector<std::string_view> behaviorKinds() {
             "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide"};
 }
 
+
+// Phase C §65: a body driven through a script of motion requests. **Not a script of clips**: each
+// segment says how the body should move (a speed, a turn rate, and the angle its travel makes with
+// its facing), and whatever provider the body runs on decides what motion to play for it. A
+// sequence of clips would demonstrate nothing about a matcher.
+//
+// The body turns its facing at `turn` rad/s and travels at `speed` in the direction `strafe`
+// degrees off its facing. That is the vector intent ADR-545 introduced and nothing produced
+// (ADR-615), because a strafe cannot be expressed as a speed along a yaw. It publishes that intent,
+// so the motion request carries the strafe, and keeps `speed`/`yaw` in step for the gait and
+// everything else that reads the polar pair. The script's clock is the timeline (time since the
+// body was reset), so a scrub replays it exactly.
+class MotionScript final : public IBehavior {
+public:
+    explicit MotionScript(const nlohmann::json* s) {
+        if (s != nullptr && s->contains("segments") && (*s)["segments"].is_array()) {
+            for (const auto& seg : (*s)["segments"]) {
+                Segment g;
+                g.seconds = std::max(readFloat(&seg, "seconds", 1.0f), 0.0f);
+                g.speed = readFloat(&seg, "speed", 0.0f);
+                g.turn = readFloat(&seg, "turn", 0.0f);
+                g.strafe = readFloat(&seg, "strafe", 0.0f) * 0.0174532925f;
+                segments_.push_back(g);
+            }
+        }
+        loop_ = s != nullptr && s->contains("loop") && (*s)["loop"].is_boolean() && (*s)["loop"].get<bool>();
+        runSpeed_ = readFloat(s, "runSpeed", 4.0f);
+    }
+    [[nodiscard]] std::string_view kind() const override { return "motionScript"; }
+    // The script is authored data, not a set of live knobs, so it registers none.
+    void registerParameters(params::ParameterSet&, const std::string&) override {}
+    void collectParameterPaths(std::vector<std::string>&) const override {}
+    void reset(Rng&) override {
+        facing_ = 0.0f;
+        started_ = false;
+    }
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset&) override {
+        if (segments_.empty()) {
+            return;
+        }
+        if (!started_) {
+            facing_ = state.yaw;
+            started_ = true;
+        }
+        double total = 0.0;
+        for (const Segment& g : segments_) {
+            total += g.seconds;
+        }
+        // **On the timeline, from zero**, not from the first update this body happened to get: a
+        // play's first update is at 0 and a seek's replay begins a step later, and a script timed
+        // from its own first update ran a frame behind on every scrub (5 cm at a walk).
+        double t = ctx.time;
+        if (loop_ && total > 0.0) {
+            t = std::fmod(t, total);
+        }
+        const Segment* seg = &segments_.back();
+        double at = 0.0;
+        for (const Segment& g : segments_) {
+            if (t < at + g.seconds) {
+                seg = &g;
+                break;
+            }
+            at += g.seconds;
+        }
+        const bool finished = !loop_ && t >= total;
+        const float speed = finished ? 0.0f : seg->speed;
+        const float turn = finished ? 0.0f : seg->turn;
+        const float strafe = finished ? 0.0f : seg->strafe;
+        const auto dt = static_cast<float>(ctx.dt);
+        facing_ += turn * dt;
+        const float travelYaw = facing_ + strafe;
+        const glm::vec2 direction(std::sin(travelYaw), std::cos(travelYaw));
+        state.travel.x += direction.x * speed * dt;
+        state.travel.z += direction.y * speed * dt;
+        state.yaw = facing_;
+        state.speed = speed;
+        state.turnRate = turn;
+        state.activity = speed > runSpeed_ * 0.75f ? Activity::Run
+                         : speed > 0.05f          ? Activity::Walk
+                         : std::abs(turn) > 0.3f  ? Activity::Turn
+                                                  : Activity::Idle;
+        state.intent.valid = true;
+        state.intent.desiredVelocity = glm::vec3(direction.x, 0.0f, direction.y) * speed;
+        state.intent.facing = glm::vec3(std::sin(facing_), 0.0f, std::cos(facing_));
+        state.intent.hasFacing = true;
+        if (ctx.nav != nullptr && ctx.nav->valid()) {
+            const glm::vec3 p = state.position();
+            state.travel.y = ctx.nav->groundHeight(glm::vec2(p.x, p.z)) - state.anchor.y;
+        }
+    }
+
+private:
+    struct Segment {
+        float seconds = 1.0f;
+        float speed = 0.0f;
+        float turn = 0.0f;
+        float strafe = 0.0f; // radians
+    };
+    std::vector<Segment> segments_;
+    bool loop_ = false;
+    float runSpeed_ = 4.0f;
+    float facing_ = 0.0f;
+    bool started_ = false;
+};
+
 std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::json* settings) {
     if (kind == "hover") {
         return std::make_unique<Hover>(settings);
@@ -2564,6 +2669,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "decide") {
         return std::make_unique<Decide>(settings);
+    }
+    if (kind == "motionScript") {
+        return std::make_unique<MotionScript>(settings);
     }
     return nullptr;
 }

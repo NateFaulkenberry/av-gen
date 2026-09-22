@@ -78,7 +78,9 @@ enum class MotionTag : std::uint32_t {
 //      pelvis. Before this, every in-place walk read as standing still.
 //   5  a clip that carries a heading (`PackClip::heading`, written by §21's augmentation) is
 //      faced by it rather than by its pelvis.
-inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 5;
+//   6  trajectory facing is the body's future facing, not its direction of travel; an in-place
+//      clip is faced relative to its own mean pelvis yaw, so a turn on the spot turns.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 6;
 
 // A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
 // forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one

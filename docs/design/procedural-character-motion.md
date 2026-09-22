@@ -2356,7 +2356,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 21 | Motion augmentation | done | `scene/motion_augment.*` adds stride, direction, turn, start, stop and mirror, all through one foot-target-plus-IK step. Speed and root-motion adaptation came from Phase B. Each variant is gated by its own IK reach and kept only if it improves §58 coverage. On the scout, 4 of 13 planned were kept (the turns); see "§21" below |
 | 22 | Coverage analysis | done | `03659866`, `8a90148a`, `38017f94` |
 | 23 | Database quality analyzer | done | `8c9165fa`, `4fdde514` |
-| 24 | Trajectory representation | done | `8a90148a`, re-taken in `3b66b565`. `49aeb2ea` voids only its §20 queue item |
+| 24 | Trajectory representation | done | `8a90148a`, re-taken in `3b66b565`. **Facing redefined as the future body facing** (extraction v6, for §65) |
 | 25 | Trajectory prediction | done | `8b286711`. Wired into the matcher's query (a start, a stop and a curve can be chosen): see "§25 wired into the query" |
 | 26 | Matching loop | done | `b6be4544` |
 | 27 | Search frequency | done | `b6be4544`, `cbf01f64` |
@@ -2369,8 +2369,8 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 34 | Matching does not own behaviour | done | `528e5dec`, the audit |
 | 35 | Fallback system | done | ADR-623 (owner-delegated): the matcher is wired opt-in per character, with the clip provider behind it. Every §35 failure is tested falling through, with a control arm that does not |
 | 36 | Database versioning | done (via merge) | `9ebbb173` (`agent/anim-cinfra`, merged in `54f30cc3`): the database is a file with a format version, a feature schema digest, the skeleton digest, a pack content digest that includes the provenance chain (where the retarget profile is recorded), and a tool version. Incompatible files are refused on load. **Added here:** `kMotionFeatureExtractionVersion`, folded into the schema digest, so a change in how a feature is *computed*, not only which features exist, also invalidates stored data |
-| 44 | Motion style | **partial** | Style travels in the request and the clip provider reads it. **The matcher ignores style**: there is no style tag or cost term |
-| 45 | Search weights | **partial** | All 8 weights are configurable and live (ADR-608; `test_motion_cost.cpp:56`). **Missing: a versioned configuration** |
+| 44 | Motion style | partial | Style is in the request and the clip provider. The matcher's authoring surface is now `motionMatching.clips` (per character). **Missing: a style term or tag in the matcher's cost** |
+| 45 | Search weights | done | Configurable (ADR-608) and now **versioned** per character (`motionMatching.weights`, version 1; an unknown version is refused) |
 | 46 | Automated search evaluation | **partial** | The pieces exist: pose-space retrieval (`test_cross_clip_matching.cpp`), jump rate (`test_motion_database_scale.cpp:658`), plant discontinuity. **Missing: one ground-truth harness that reports all seven measures** |
 | 47 | Adversarial tests | done | `test_motion_adversarial.cpp` on the golden corpus covers all twelve cases the spec lists, each paired so the no-op fails one arm. Ambiguous cases are judged by how the chosen sample moves, not by the clip's name: a 0.05 m/s request is honestly nearer the end of `Stop` than `Idle` |
 | 48 | Golden motion tests | done | `test_motion_golden_scenarios.cpp`: walk north, turn east, stop, with broad behaviour checked per stretch. Two runs are identical. A control shows the predicted query is what makes the start and the turn choosable |
@@ -2384,7 +2384,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 59 | Procedural + motion matching | done | Foot layers resolve on the matched alien's pose on every frame (the lab test) |
 | 61 | Dataset strategy | **partial** | 100STYLE is verified (CC BY 4.0, `bc56f7f1`; `assets/100STYLE-ATTRIBUTION.md`; ADR-612 amendment), and a pack refuses to build without a licence (`test_motion_pack.cpp:107`). **ACCAD and CMU are not assessed. The derivative-data rule for a distributable pack is not recorded** |
 | 64 | First vertical slice | done | 100STYLE → IK retarget (ADR-624) → contacts, phase and features → database → runtime matcher → scout in a scene → Phase B layers → inertialization. Test: `test_motion_slice.cpp` |
-| 65 | Glowmere demonstration | not started | |
+| 65 | Glowmere demonstration | done (strafe unserved) | A scripted scene driven by motion requests. Each segment gets its family except strafe, which the scout's corpus cannot serve. See "§65" |
 | 66 | Phase B integration | done | The same test; the matcher does not bypass the layer stack |
 | 67 | Multi-character demonstration | partial | CPU cost measured for 1–100 characters sharing one database. **Missing: a scene with 10/50/100 matched aliens on terrain** |
 | 70 | Failure-case analysis | not started | No classification document exists. The findings so far (§16, §23, §31) are unclassified |
@@ -2517,8 +2517,10 @@ callers that do not say are unchanged.
 | stood, 4.1–4.5 s | `Idle` |
 
 Final facing is 1.57 rad, and two runs are identical. **The control** is the same scenario with the
-held query: while setting off, the chosen motion moves at 1.18 m/s against 0.66 predicted, and it
-plays 0 left-turn frames against 13. The prediction is what makes a start and a turn choosable.
+held query: while setting off, the chosen motion moves at 1.18 m/s against 0.66 predicted, and
+(before extraction v6) it played 0 left-turn frames against 13. Since v6 the trajectory facing
+carries the asked-for facing even in the held query, so both choose the turn (13 and 13). The
+prediction's own contribution is now the start.
 
 ## §20 and §30 re-taken on the rest of 100STYLE
 
@@ -2657,6 +2659,55 @@ now has a yes for the pipeline: real mocap, retargeted onto the character that h
 analysed, stored, searched and posed in a scene. It is not yet a yes for the look. On this one
 slow style the wandering scout mostly picks the backward and sideways clips, and 14% of leg-frames
 are at or past straight. Selection is §65's work, and the look is the owner's call.
+
+## §65 — the Glowmere demonstration, and what it took
+
+`examples/labs/motionmatch/glowmere-motion-matching-demo.scene.json`: a scout driven through
+idle → walk → accelerate → curve left → curve right → run → slow → turn → stop → strafe → walk,
+**by motion requests**, not clips. `motionScript` is a new behaviour that publishes the vector
+intent ADR-545 introduced and nothing produced (ADR-615), timed on the timeline so a scrub
+replays it. The corpus is the scout's clips plus the §21 turns, built by:
+
+```
+avgen_motion pack assets/aliens/alien-scout.glb --out assets/aliens-scout-pack --contacts foot.l,foot.r --license CC0-1.0 --source "Glowmere alien pack"
+avgen_motion augment assets/aliens-scout-pack --out assets/aliens-scout-augmented-pack \
+  --legs thigh_twist.l:leg_stretch.l:foot.l,thigh_twist.r:leg_stretch.r:foot.r \
+  --plan turn:Walking:1.4,turn:Walking:-1.4,turn:Running:1.4,turn:Running:-1.4,start:Walking:0,stop:Walking:0,stride:Walking:0.7,direction:Walking:0.35,direction:Walking:-0.35
+```
+
+What plays in the second half of each segment (the matcher has had time to respond):
+
+| request | plays |
+|---|---|
+| idle | `Idle` |
+| walk | `Walking_low_grav` |
+| accelerate | `Walking` |
+| curve left | `Walking~turn+1.40` |
+| curve right | `Walking~turn-1.40` |
+| run | `Running` |
+| slow | `Walking_low_grav` |
+| turn on the spot | `Idle_turn` |
+| stop | `Idle_turn` |
+| strafe | `Walking~turn+1.40` (**the scout has no strafe**: §21's direction warps were refused by IK or redundant) |
+| walk again | `Walking~turn+1.40` (held from the strafe) |
+
+Every frame came from the matcher, and a scrub into the curve lands on the played sample. Five
+things had to change before it did:
+
+1. **A turning request kept turning.** `predictTrajectory` held the desired velocity fixed over the
+   horizon, so every curve predicted a straight line and got a straight walk. It now turns the
+   request by `desiredTurnRate` over the elapsed time.
+2. **Trajectory facing is the future body facing**, not the direction of travel (extraction v6).
+   Travel direction cannot say "turning on the spot" (there is no travel) or "strafing", which are
+   two of the requests.
+3. **An in-place clip is faced relative to its own mean pelvis yaw.** `Idle_turn` sweeps −71 to −3
+   degrees and now turns; the crouch's −43-degree posture still cancels.
+4. **`motionMatching.clips`** (§14's authoring surface): which clips the matcher may use. The
+   scout's pack has no tags, so `Button_push` served as an idle and `Fight_leg_kick_2` as a strafe.
+5. **`motionMatching.weights`** (§45, versioned, version 1): at the engine defaults the pose half
+   outweighed the request, and the alien stayed in whatever it was playing (walk requests got
+   `Idle`). The demo's weights (joint position 0.3, trajectory position 3, root velocity 3) come
+   from a 12-point sweep, a hidden `[.measure]` case in the demo's test file.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

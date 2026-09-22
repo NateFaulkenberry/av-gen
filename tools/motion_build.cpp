@@ -35,6 +35,7 @@
 #include "scene/motion_quality_report.hpp"
 #include "scene/retarget.hpp"
 #include "scene/retarget_positional.hpp"
+#include "scene/motion_augment.hpp"
 #include "scene/scene.hpp"
 
 #include <random>
@@ -230,6 +231,8 @@ int usage() {
                "  --scale <f>       BVH units to metres (0.01 for centimetres)\n"
                "  --contacts a,b    joints to analyse; the first is the phase reference\n"
                "  --license <id>    SPDX identifier, REQUIRED by `pack`\n"
+               "  augment   <pack> --out <dir> --legs h:k:f,... --plan kind:clip:param,...\n"
+               "                                          Phase C 21: variants kept only where they add coverage\n"
                "  --retarget-to <f> --map s:t,...   pack onto ANOTHER skeleton\n"
                "  --positional-legs sH:sK:sA=tH:tK:tF,...  then re-solve those legs through IK\n"
                "  --source <name>   the corpus this came from, REQUIRED by `pack`\n");
@@ -1622,6 +1625,81 @@ int cmdBenchmark(const Args& args) {
     return 0;
 }
 
+
+// `avgen-motion augment <pack> --out <dir> --legs h:k:f,h:k:f --plan kind:clip:param,...`
+//
+// Phase C §21 as a pipeline step: every planned variant is generated, gated on its own IK reach,
+// and kept only if it adds §58 coverage to the pack. The report says which were kept and why the
+// rest were not. The output pack is the input plus the kept variants, each with its heading track
+// and a provenance entry naming its source, kind and parameter under the source's licence.
+int cmdAugment(const Args& args) {
+    if (args.positional.empty() || !args.has("out") || !args.has("legs") || !args.has("plan")) {
+        fmt::print(stderr, "augment <pack> --out <dir> --legs hip:knee:foot,... --plan kind:clip:param,...\n");
+        return 1;
+    }
+    auto pack = scene::readMotionPack(args.positional.front());
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    const auto split = [](const std::string& s, char sep) {
+        std::vector<std::string> out;
+        std::string cur;
+        for (const char c : s) {
+            if (c == sep) {
+                out.push_back(cur);
+                cur.clear();
+            } else {
+                cur.push_back(c);
+            }
+        }
+        out.push_back(cur);
+        return out;
+    };
+    scene::AugmentPackOptions options;
+    for (const std::string& leg : splitCommas(args.option("legs"))) {
+        const auto parts = split(leg, ':');
+        if (parts.size() != 3) {
+            fmt::print(stderr, "--legs entries are hip:knee:foot, got '{}'\n", leg);
+            return 1;
+        }
+        options.augment.legs.push_back({parts[0], parts[1], parts[2]});
+    }
+    options.database.config = scene::defaultBipedConfig(options.augment.legs.front().tip,
+                                                        options.augment.legs.back().tip, args.option("head", "head.x"));
+    std::vector<scene::AugmentPlanItem> plan;
+    for (const std::string& item : splitCommas(args.option("plan"))) {
+        const auto parts = split(item, ':');
+        if (parts.size() != 3) {
+            fmt::print(stderr, "--plan entries are kind:clip:param, got '{}'\n", item);
+            return 1;
+        }
+        scene::AugmentPlanItem p;
+        const std::string& k = parts[0];
+        p.kind = k == "stride" ? scene::AugmentKind::Stride
+               : k == "direction" ? scene::AugmentKind::Direction
+               : k == "turn" ? scene::AugmentKind::Turn
+               : k == "start" ? scene::AugmentKind::Start
+               : k == "stop" ? scene::AugmentKind::Stop
+               : k == "mirror" ? scene::AugmentKind::Mirror
+                               : scene::AugmentKind::Plant;
+        p.clip = parts[1];
+        p.parameter = std::stof(parts[2]);
+        plan.push_back(p);
+    }
+    auto result = scene::augmentPack(*pack, plan, options);
+    if (!result) {
+        fmt::print(stderr, "{}\n", result.error().message);
+        return 1;
+    }
+    fmt::print("{}", result->report());
+    if (auto ok = scene::writeMotionPack(result->pack, args.option("out")); !ok) {
+        fmt::print(stderr, "{}\n", ok.error().message);
+        return 1;
+    }
+    fmt::print("wrote {} ({} clips)\n", args.option("out"), result->pack.clips.size());
+    return 0;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1670,6 +1748,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "quality") {
         return cmdQuality(args);
+    }
+    if (args.command == "augment") {
+        return cmdAugment(args);
     }
     return usage();
 }

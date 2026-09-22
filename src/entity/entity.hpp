@@ -116,6 +116,25 @@ struct MotionMatchingDesc {
     // not, the body falls back to its clip provider and the log says why.
     std::string pack;
     std::string packResolved;
+    // §14: which clips the matcher may use, as name prefixes ("Walking" admits `Walking_crouch` and
+    // `Walking~turn+1.40`). Empty admits every clip. The scout's pack has no authored tags, so an
+    // action clip like `Button_push` otherwise serves as an idle; this is the authoring surface
+    // that says it may not.
+    std::vector<std::string> clips;
+    // §45: the search weights, as a **versioned** block so a scene saved under one meaning of a
+    // weight is not silently read under another. `weightsVersion` 0 means "no block": the engine's
+    // defaults. Version 1 is the seven feature-term weights of `MotionFeatureConfig` by their
+    // names there, plus the two search penalties of `MotionCostWeights`.
+    std::uint32_t weightsVersion = 0;
+    float jointPositionWeight = 1.0f;
+    float jointVelocityWeight = 0.4f;
+    float trajectoryPositionWeight = 1.0f;
+    float trajectoryFacingWeight = 0.5f;
+    float rootVelocityWeight = 1.0f;
+    float phaseWeight = 0.0f;
+    float contactWeight = 0.0f;
+    float continuityWeight = -1.0f; // below zero: the engine default
+    float transitionWeight = -1.0f;
     friend bool operator==(const MotionMatchingDesc&, const MotionMatchingDesc&) = default;
 };
 

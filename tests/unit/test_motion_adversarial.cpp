@@ -40,6 +40,10 @@ struct Golden {
         entity::MotionRequest request;
         request.desiredVelocity = velocity;
         request.bodyFacing = facing;
+        // Keep facing where the body faces: the question is how to move, not whether to turn.
+        // (Since extraction v6 the trajectory's facing is the future facing, so a request left at
+        // the default +Z would be asking an east-facing body to turn north.)
+        request.desiredFacing = facing;
         entity::MotionMemory memory;
         entity::MotionMemory next;
         const entity::MotionResult r = matcher.advance(request, memory, 0.0, 1.0f / 60.0f, next);

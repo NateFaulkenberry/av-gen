@@ -189,12 +189,13 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
         const TrajectoryPrediction prediction = predictTrajectory(request, state, settings_.limits, horizons);
         for (std::size_t t = 0; t < horizons.size() && t < prediction.points.size(); ++t) {
             const glm::vec3 p = toBody(prediction.points[t].position);
+            // The future facing, in the body's frame (a direction: no unit scaling).
+            const glm::vec3 face = scene::toFacingFrame(prediction.points[t].facing, request.bodyFacing);
             const std::size_t base = layout.trajectory + (t * 4u);
             raw[base + 0] = p.x;
             raw[base + 1] = p.z;
-            const float len = std::sqrt((p.x * p.x) + (p.z * p.z));
-            raw[base + 2] = len > 1e-5f ? p.x / len : 0.0f;
-            raw[base + 3] = len > 1e-5f ? p.z / len : 0.0f;
+            raw[base + 2] = face.x;
+            raw[base + 3] = face.z;
         }
         const glm::vec3 now = toBody(request.bodyVelocity);
         raw[layout.rootVelocity + 0] = now.x;
@@ -208,9 +209,10 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
             const std::size_t base = layout.trajectory + (t * 4u);
             raw[base + 0] = want.x * ahead;
             raw[base + 1] = want.z * ahead;
-            const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
-            raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
-            raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
+            // The facing asked for, in the body's frame.
+            const glm::vec3 face = scene::toFacingFrame(request.desiredFacing, request.bodyFacing);
+            raw[base + 2] = face.x;
+            raw[base + 3] = face.z;
         }
         raw[layout.rootVelocity + 0] = want.x;
         raw[layout.rootVelocity + 1] = want.y;

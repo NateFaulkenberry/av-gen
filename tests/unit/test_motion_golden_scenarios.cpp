@@ -170,9 +170,8 @@ TEST_CASE("§48/§25 the predicted trajectory is what lets a start and a turn be
           "[golden][matching][phaseC]") {
     // The control for everything above: the same scenario with the query built the old way, as
     // the asked-for velocity held. A body told to walk while standing then looks like a body
-    // already walking, so it gets walking motion, and a turn looks like a sidestep, so no turn is
-    // chosen (measured: 0 left-turn frames). If this produced the same answers, the prediction
-    // would be doing nothing.
+    // already walking, so it gets walking motion. If this produced the same set-off, the
+    // prediction would be doing nothing.
     const std::vector<Leg> legs = {{1.5f, kNorth * testsupport::kGoldenWalk},
                                    {3.0f, kEast * testsupport::kGoldenWalk}};
     const auto predicted = drive(legs, true);
@@ -202,5 +201,10 @@ TEST_CASE("§48/§25 the predicted trajectory is what lets a start and a turn be
     // predicted query legitimately moves on to walking motion within the window. Measured: 0.66
     // against 1.18 m/s.
     CHECK(setOffP < 0.75f * setOffH);
-    CHECK(turnsP > turnsH);
+    // **The turn is no longer the prediction's to win.** Since extraction v6 the trajectory's facing
+    // dimensions carry the facing the body will have (the prediction's) or the facing it was asked
+    // for (the held query's), and either says "turn". Both queries choose the left turn now, and the
+    // prediction's own contribution is the start. Recorded as measured: 13 and 13 frames.
+    CHECK(turnsP > 0);
+    CHECK(turnsH > 0);
 }

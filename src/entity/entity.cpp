@@ -2614,6 +2614,40 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
         if (auto ok = names("contacts", desc.motionMatching.contacts); !ok) {
             return std::unexpected(ok.error());
         }
+        if (auto ok = names("clips", desc.motionMatching.clips); !ok) {
+            return std::unexpected(ok.error());
+        }
+        if (m.contains("weights")) {
+            const auto& w = m["weights"];
+            if (!w.is_object() || !w.contains("version") || !w["version"].is_number_integer() ||
+                w["version"].get<std::int64_t>() < 0) {
+                return fail("entity '{}': 'motionMatching.weights' must be an object with a 'version'",
+                            desc.name);
+            }
+            const std::uint32_t version = w["version"].get<std::uint32_t>();
+            if (version != 1u) {
+                // A weights block from another version of their meaning is refused, not guessed at.
+                return fail("entity '{}': 'motionMatching.weights' version {} is not one this build "
+                            "understands (1)",
+                            desc.name, version);
+            }
+            auto& mm = desc.motionMatching;
+            mm.weightsVersion = version;
+            const auto num = [&](const char* key, float& out) {
+                if (w.contains(key) && w[key].is_number()) {
+                    out = w[key].get<float>();
+                }
+            };
+            num("jointPosition", mm.jointPositionWeight);
+            num("jointVelocity", mm.jointVelocityWeight);
+            num("trajectoryPosition", mm.trajectoryPositionWeight);
+            num("trajectoryFacing", mm.trajectoryFacingWeight);
+            num("rootVelocity", mm.rootVelocityWeight);
+            num("phase", mm.phaseWeight);
+            num("contact", mm.contactWeight);
+            num("continuity", mm.continuityWeight);
+            num("transition", mm.transitionWeight);
+        }
         if (m.contains("trajectory")) {
             if (!m["trajectory"].is_array()) {
                 return fail("entity '{}': 'motionMatching.trajectory' must be an array of seconds",
@@ -2990,6 +3024,24 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
         m["trajectory"] = entity.motionMatching.trajectory;
         if (!entity.motionMatching.pack.empty()) {
             m["pack"] = entity.motionMatching.pack; // as authored, so a save moves with its scene
+        }
+        if (!entity.motionMatching.clips.empty()) {
+            m["clips"] = entity.motionMatching.clips;
+        }
+        if (entity.motionMatching.weightsVersion != 0u) {
+            const auto& mm = entity.motionMatching;
+            nlohmann::json w;
+            w["version"] = mm.weightsVersion;
+            w["jointPosition"] = mm.jointPositionWeight;
+            w["jointVelocity"] = mm.jointVelocityWeight;
+            w["trajectoryPosition"] = mm.trajectoryPositionWeight;
+            w["trajectoryFacing"] = mm.trajectoryFacingWeight;
+            w["rootVelocity"] = mm.rootVelocityWeight;
+            w["phase"] = mm.phaseWeight;
+            w["contact"] = mm.contactWeight;
+            w["continuity"] = mm.continuityWeight;
+            w["transition"] = mm.transitionWeight;
+            m["weights"] = std::move(w);
         }
         j["motionMatching"] = std::move(m);
     }

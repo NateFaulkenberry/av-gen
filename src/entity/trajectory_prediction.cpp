@@ -30,8 +30,24 @@ TrajectoryPrediction predictTrajectory(const MotionRequest& request, const Motio
     // Integrate forward with the **controller's own** limits. Anything else -- a straight line at
     // the desired velocity, say -- predicts a future the body cannot reach, and the matcher would
     // then be asked for motion that does not exist.
+    // **A request that is turning keeps turning.** `desiredTurnRate` says the heading the body
+    // wants is itself rotating (a curve, or a turn on the spot). Holding the desired velocity and
+    // facing fixed over the horizon predicted a straight line for every curve, and a matcher asked
+    // for a straight line picks a straight walk. So the request is turned by the rate over the
+    // elapsed time at each step. A rate of zero leaves the request exactly as given.
+    MotionRequest turning = request;
+    const auto yawBy = [](const glm::vec3& v, float a) {
+        const float c = std::cos(a);
+        const float s = std::sin(a);
+        return glm::vec3((v.x * c) + (v.z * s), v.y, (-v.x * s) + (v.z * c));
+    };
     while (elapsed < last && next < horizons.size()) {
-        const MotionSolution solution = stepMotion(request, rolling, limits, step, rolling);
+        if (request.desiredTurnRate != 0.0f) {
+            const float a = request.desiredTurnRate * elapsed;
+            turning.desiredVelocity = yawBy(request.desiredVelocity, a);
+            turning.desiredFacing = yawBy(request.desiredFacing, a);
+        }
+        const MotionSolution solution = stepMotion(turning, rolling, limits, step, rolling);
         position += solution.velocity * step;
         elapsed += step;
         ++out.steps;

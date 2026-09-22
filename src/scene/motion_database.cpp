@@ -550,10 +550,35 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 facing[f] = glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
             }
         } else {
-            facing = analysis.travels ? clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop,
-                                                   options.config.facingWindow)
-                                      : std::vector<glm::vec3>(frames, glm::vec3(0.0f, 0.0f, 1.0f));
+            facing = clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop, options.config.facingWindow);
+            if (!analysis.travels) {
+                // **An in-place clip is faced relative to its own average.** Its pelvis yaw is part
+                // posture (the scout's crouch holds -43 degrees throughout, which is not a heading)
+                // and part turning (`Idle_turn` sweeps -71 to -3 degrees, which is). Measured from
+                // the clip's own mean, the posture cancels and the turning remains, so a turn on the
+                // spot is a turn to the matcher and a crouch walk still walks straight.
+                glm::vec3 mean(0.0f);
+                for (const glm::vec3& f : facing) {
+                    mean += f;
+                }
+                const float meanYaw = std::atan2(mean.x, mean.z);
+                for (glm::vec3& f : facing) {
+                    const float yaw = std::atan2(f.x, f.z) - meanYaw;
+                    f = glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
+                }
+            }
         }
+        // The body's facing at a time `ahead` past sample `f`: a looping clip wraps, anything else
+        // holds its last frame.
+        const auto facingAhead = [&](std::uint32_t f, float ahead) {
+            const auto steps = static_cast<std::int64_t>(std::lround(ahead * rate));
+            std::int64_t i = static_cast<std::int64_t>(f) + steps;
+            const auto n = static_cast<std::int64_t>(frames);
+            if (i >= n) {
+                i = meta.loop && n > 1 ? (i % (n - 1)) : n - 1;
+            }
+            return facing[static_cast<std::size_t>(std::max<std::int64_t>(i, 0))];
+        };
 
         // ---- implied travel, for a cycle authored in place (ADR-540) ------------------------------
         //
@@ -629,11 +654,13 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 const glm::vec3 delta = toFacingFrame(future - body, heading) + (implied * ahead);
                 out[k++] = delta.x;
                 out[k++] = delta.z;
-                // Facing: the direction it is heading at that moment, or zero when it is not
-                // moving -- which is honest rather than a default of "forward".
-                const float len = std::sqrt((delta.x * delta.x) + (delta.z * delta.z));
-                out[k++] = len > 1e-5f ? delta.x / len : 0.0f;
-                out[k++] = len > 1e-5f ? delta.z / len : 0.0f;
+                // **Facing: which way the body will face at that horizon, in its frame now.** It was
+                // the direction of travel, which cannot say "turning on the spot" (there is no
+                // travel) or "strafing" (the travel is not the facing), and those are exactly the
+                // motions §65's demonstration asks for. The future facing can say both.
+                const glm::vec3 ahead3 = toFacingFrame(facingAhead(f, ahead), heading);
+                out[k++] = ahead3.x;
+                out[k++] = ahead3.z;
             }
 
             const glm::vec3 bodyVelocity = toFacingFrame(rootVelocity, heading) + implied;
