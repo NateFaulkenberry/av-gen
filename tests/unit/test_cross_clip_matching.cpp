@@ -1435,13 +1435,18 @@ TEST_CASE("§30 against the content it was written for: transitions in 100STYLE"
     CHECK(switchesOn > 20);
     CHECK(withoutContacts > 0.0);
     // The instrument has to be able to disagree with itself before a null means anything.
-    CHECK(flatOff == Approx(flatOn));  // the degenerate arm, asserted so its failure is visible
+    // The degenerate arm, asserted so its failure is visible. It was asserted as EQUALITY of the
+    // two means while the fixed nudge returned 600 of 600 seeds. After the feature corrections of
+    // 2026-09-21 (extraction v2-v5) it returns 560 and 561 of 600, and the ~40 steps that do move
+    // give means 3% apart (1.5745 vs 1.5238 m). The arm is still degenerate, and what makes it so
+    // is how rarely it switches, not whether two means match to four decimals. So that is what is
+    // asserted: the fixed arm switches under half as often as the derived one.
+    CHECK(flatSwitchesOff * 2 < switchesOff);
+    CHECK(flatSwitchesOn * 2 < switchesOn);
     // Contacts are NOT inert on this content -- the arms disagree, which is the thing Glowmere
     // could not show. Asserted in that direction only; which way the disagreement goes is what
     // the two rows above are for.
     CHECK(withContacts != Approx(withoutContacts));
-    (void)flatSwitchesOff;
-    (void)flatSwitchesOn;
     (void)flatWorstOff;
     (void)flatWorstOn;
 }

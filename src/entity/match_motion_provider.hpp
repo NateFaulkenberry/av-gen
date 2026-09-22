@@ -21,6 +21,7 @@
 // where the legs articulate, and the corpus that travels is a search benchmark rather than
 // playable content until positional retargeting exists.
 
+#include "entity/motion_controller.hpp"
 #include "entity/motion_provider.hpp"
 #include "scene/motion_database.hpp"
 
@@ -74,6 +75,13 @@ struct MatchSettings {
     // is the one weight that is about intent rather than about the data, which is why it is a
     // setting and not part of `MotionFeatureConfig`.
     float intentWeight = 1.0f;
+    // §25: when the request says how the body is moving now, the query's trajectory is PREDICTED
+    // from there by the motion controller under these limits, instead of assuming the body already
+    // moves as asked. That is what lets a start, a stop and a curve be chosen: each is a trajectory
+    // that differs from "the asked-for velocity, held". Off only for callers measuring the older
+    // constant-velocity query.
+    bool predictTrajectory = true;
+    MotionLimits limits;
 
     // ---- §32: the inertialized transition (ADR-613) -------------------------------------------
     //

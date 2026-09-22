@@ -2357,7 +2357,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 22 | Coverage analysis | done | `03659866`, `8a90148a`, `38017f94` |
 | 23 | Database quality analyzer | done | `8c9165fa`, `4fdde514` |
 | 24 | Trajectory representation | done | `8a90148a`, re-taken in `3b66b565`. `49aeb2ea` voids only its §20 queue item |
-| 25 | Trajectory prediction | done | `8b286711` |
+| 25 | Trajectory prediction | done | `8b286711`. Wired into the matcher's query (a start, a stop and a curve can be chosen): see "§25 wired into the query" |
 | 26 | Matching loop | done | `b6be4544` |
 | 27 | Search frequency | done | `b6be4544`, `cbf01f64` |
 | 28 | Hysteresis | done | `cbf01f64` |
@@ -2373,7 +2373,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 45 | Search weights | **partial** | All 8 weights are configurable and live (ADR-608; `test_motion_cost.cpp:56`). **Missing: a versioned configuration** |
 | 46 | Automated search evaluation | **partial** | The pieces exist: pose-space retrieval (`test_cross_clip_matching.cpp`), jump rate (`test_motion_database_scale.cpp:658`), plant discontinuity. **Missing: one ground-truth harness that reports all seven measures** |
 | 47 | Adversarial tests | done | `test_motion_adversarial.cpp` on the golden corpus covers all twelve cases the spec lists, each paired so the no-op fails one arm. Ambiguous cases are judged by how the chosen sample moves, not by the clip's name: a 0.05 m/s request is honestly nearer the end of `Stop` than `Idle` |
-| 48 | Golden motion tests | not started | There is no scenario test of the "walk north, turn east, stop" kind that drives the matcher |
+| 48 | Golden motion tests | done | `test_motion_golden_scenarios.cpp`: walk north, turn east, stop, with broad behaviour checked per stretch. Two runs are identical. A control shows the predicted query is what makes the start and the turn choosable |
 | 49 | Search correctness | done | Known best (a sample's own features, zero cost), obviously bad (never chosen), better trajectory and better pose (§78), wrong contact (§78, and §47's tie), and a candidate whose root teleports (never chosen for a smooth walk) |
 | 50 | Performance targeting | **partial** | Build metrics and average/worst query time exist. **Missing: p95/p99, database load timings, and multi-character matching cost** |
 | 51 | Realistic scenarios | **partial** | Single-character scaling to 1M samples (`392bf259`), and 100 characters sharing one database, measured for memory only. **Missing: the characters × samples grid** |
@@ -2495,6 +2495,53 @@ heading difference no longer measured turning (a body turning while it walks kee
 of it), and pelvis sway was counted as starts and stops. Speed, direction and turn now come from the
 trajectory block: the mean over the furthest horizon, and the path's own curvature. With the old
 reading, a +1.4 rad/s turn variant scored 0 left and 1 right; now it scores 18 left and 0 right.
+
+## §25 wired into the query, and §48 on it
+
+**The matcher now predicts its query trajectory** (`MatchSettings::predictTrajectory`, on by
+default). When a request says how the body is moving now (`bodyVelocity`, `bodyFacing`), the
+trajectory block is `predictTrajectory` stepped from there toward the request, instead of "the
+asked-for velocity, held". The entity supplies its rate-limited speed along its heading, not its
+measured velocity, because the measured one reads zero across a seek and made a scrub disagree with
+the play (caught by ADR-623's scrub test). Without `bodyVelocityKnown`, the old query is used, so
+callers that do not say are unchanged.
+
+**§48, on the golden corpus** ("walk north, turn east, stop", driven by a motion controller):
+
+| stretch | plays |
+|---|---|
+| setting off, 0–0.5 s | `Start` (all 30 frames) |
+| cruise north, 1.0–1.5 s | forward walking |
+| turning east, 1.5–2.5 s | `TurnLeft` 13 frames and `Walk` 47, never `TurnRight` (+X is the body's left) |
+| asked to stop, 3.0–3.8 s | `Idle` 39 and `Walk` 9 |
+| stood, 4.1–4.5 s | `Idle` |
+
+Final facing is 1.57 rad, and two runs are identical. **The control** is the same scenario with the
+held query: while setting off, the chosen motion moves at 1.18 m/s against 0.66 predicted, and it
+plays 0 left-turn frames against 13. The prediction is what makes a start and a turn choosable.
+
+## §20 and §30 re-taken on the rest of 100STYLE
+
+**MIXED** (279,735 samples), the same commands as FW:
+
+| | before (ADR-614) | now |
+|---|---|---|
+| duplicates | 82.36% | 80.31% |
+| stride 4, full prefix: recall | 96.4% | **86.9%** |
+| … worst excess × typical gap | 0.14× | 0.13× |
+| cheap prefix vs full (stride 8, top 32) | −18.8 pts | −21.5 pts |
+| cross-clip bound, median | 1.92× | 1.56× |
+
+Stride-4 holds on FW (94.0%) and drops further on MIXED (86.9%). The *cost* of a miss is unchanged
+at about an eighth of the typical gap, so a miss still lands on an acceptable sample. But "recall
+survives the corpus" no longer holds for mixed movement.
+
+**§30 on TR** (the `[.scale]` test): at the derived perturbation, contacts now cost **−3.2%** per
+transition (1.3956 → 1.3505 m) and **+24.2%** over the run (103.3 → 128.3 m, 74 → 95 switches). ADR-614
+recorded −16.2% and +7.5%. The direction is unchanged: contacts switch more often, so a lower mean
+per transition still adds up to more discontinuity. The fixed-0.05 arm is still degenerate (560 and
+561 of 600 seed returns), but its two means now differ by 3%, so the test asserts its degeneracy by
+switch rate rather than by equal means.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

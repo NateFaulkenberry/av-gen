@@ -1,4 +1,5 @@
 #include "entity/match_motion_provider.hpp"
+#include "entity/trajectory_prediction.hpp"
 
 #include "scene/animation.hpp"
 #include "scene/skeleton.hpp"
@@ -110,30 +111,57 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
         std::copy(sample, sample + db_->dimension, features.begin());
     }
 
-    // The intent half, in raw units, standardised the same way the database was. Root velocity is
-    // what the body wants to be doing; the trajectory block is where it wants to be at each
-    // horizon, which for a constant desired velocity is that velocity times the horizon.
+    // The intent half, in raw units, standardised the same way the database was: the trajectory
+    // block (where the body will be at each horizon) and the root velocity.
     raw.assign(db_->dimension, 0.0f);
-    // **In the body's own frame, because that is the frame the database is in.** A request is
-    // world space. Before this rotation it was compared as-is with features extracted facing +Z,
-    // so a body facing east that asked to walk forward was scored against sideways motion. Every
-    // test built its body facing +Z, where the two frames coincide, so none of them could tell.
-    // And in the asset's own units, because that is the scale the database was extracted in.
-    const glm::vec3 want =
-        scene::toFacingFrame(request.desiredVelocity + request.steering, request.bodyFacing) /
-        worldScale_;
-    for (std::size_t t = 0; t < db_->config.trajectoryTimes.size(); ++t) {
-        const float ahead = db_->config.trajectoryTimes[t];
-        const std::size_t base = layout.trajectory + (t * 4u);
-        raw[base + 0] = want.x * ahead;
-        raw[base + 1] = want.z * ahead;
-        const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
-        raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
-        raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
+    // **In the body's own frame, because that is the frame the database is in (§7), and in the
+    // asset's own units.** A request is world space. Compared as-is with features extracted facing
+    // +Z, a body facing east that asked to walk forward was scored against sideways motion.
+    const auto toBody = [&](const glm::vec3& world) {
+        return scene::toFacingFrame(world, request.bodyFacing) / worldScale_;
+    };
+    const glm::vec3 want = toBody(request.desiredVelocity + request.steering);
+    const std::vector<float>& horizons = db_->config.trajectoryTimes;
+    if (settings_.predictTrajectory && request.bodyVelocityKnown && !horizons.empty()) {
+        // §25: where the body will actually be, stepping the motion controller from how it moves
+        // now toward what it was asked. A standing body asked to walk ramps up; a walking body
+        // asked to face somewhere else curves. The prediction runs in world units and is
+        // expressed in the body's frame, as every database feature is.
+        MotionState state;
+        state.velocity = request.bodyVelocity;
+        state.previousVelocity = request.bodyVelocity;
+        state.facing = request.bodyFacing;
+        state.started = true;
+        const TrajectoryPrediction prediction = predictTrajectory(request, state, settings_.limits, horizons);
+        for (std::size_t t = 0; t < horizons.size() && t < prediction.points.size(); ++t) {
+            const glm::vec3 p = toBody(prediction.points[t].position);
+            const std::size_t base = layout.trajectory + (t * 4u);
+            raw[base + 0] = p.x;
+            raw[base + 1] = p.z;
+            const float len = std::sqrt((p.x * p.x) + (p.z * p.z));
+            raw[base + 2] = len > 1e-5f ? p.x / len : 0.0f;
+            raw[base + 3] = len > 1e-5f ? p.z / len : 0.0f;
+        }
+        const glm::vec3 now = toBody(request.bodyVelocity);
+        raw[layout.rootVelocity + 0] = now.x;
+        raw[layout.rootVelocity + 1] = now.y;
+        raw[layout.rootVelocity + 2] = now.z;
+    } else {
+        // The asked-for velocity, held: where it wants to be at each horizon, for a body already
+        // moving as asked.
+        for (std::size_t t = 0; t < horizons.size(); ++t) {
+            const float ahead = horizons[t];
+            const std::size_t base = layout.trajectory + (t * 4u);
+            raw[base + 0] = want.x * ahead;
+            raw[base + 1] = want.z * ahead;
+            const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
+            raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
+            raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
+        }
+        raw[layout.rootVelocity + 0] = want.x;
+        raw[layout.rootVelocity + 1] = want.y;
+        raw[layout.rootVelocity + 2] = want.z;
     }
-    raw[layout.rootVelocity + 0] = want.x;
-    raw[layout.rootVelocity + 1] = want.y;
-    raw[layout.rootVelocity + 2] = want.z;
     scene::normaliseQuery(*db_, raw);
 
     // Overwrite the intent dimensions of the pose-derived query with what the character wants.
