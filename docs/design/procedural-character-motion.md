@@ -2389,8 +2389,8 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 67 | Multi-character demonstration | partial | CPU cost measured for 1–100 characters sharing one database. **Missing: a scene with 10/50/100 matched aliens on terrain** |
 | 70 | Failure-case analysis | not started | No classification document exists. The findings so far (§16, §23, §31) are unclassified |
 | 71 | Root-motion policy | done | The simulation owns translation and heading; travelling clips are posed in the body frame; in-place clips unchanged |
-| 73 | Cinematic determinism | **partial** | "The matcher keeps nothing, so a replay reproduces a play" (`test_motion_matching.cpp:251`), and ADR-360. **Missing: bit-identity across runs and the pack/config/seed matrix** |
-| 77 | Testing matrix | **partial** | Pack serialisation, version mismatch and corrupt data are covered (`test_motion_pack.cpp`). Search preferences are partly covered (§49). **Missing: empty and one-sample database, missing joints, database swap, and multiple characters** |
+| 73 | Cinematic determinism | done | Extraction is bit-identical (with a sensitivity arm). The match lab scene reproduces itself to the bit (`test_motion_matrix.cpp`). The continuation is frame-rate independent (`6f8bd107`). §48 scenarios repeat exactly |
+| 77 | Testing matrix | done | Database rows: io tests (cinfra) and the adversarial file. Feature rows: `test_motion_matrix.cpp` (deterministic, standardised, dimensions, missing joints). Search rows: adversarial and cost. Runtime rows: the wired tests and the perf harness |
 | 78 | Adversarial search test | done | Both constructions, each flipped by its weight: pose vs trajectory, and pose vs contact (`test_motion_adversarial.cpp`) |
 | 79 | Golden dataset | done | `tests/support/golden_motion.hpp`: ten intentionally distinguishable one-second clips (idle, walk, run, back, both strafes, both turns, start, stop), with heading and contacts. Its header carries §79's caveat |
 | 89 | Final report | not started | `docs/design/motion-matching.md` does not exist |
