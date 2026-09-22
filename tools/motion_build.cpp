@@ -235,6 +235,7 @@ int usage() {
                "                                          Phase C 21: variants kept only where they add coverage\n"
                "  --retarget-to <f> --map s:t,...   pack onto ANOTHER skeleton\n"
                "  --positional-legs sH:sK:sA=tH:tK:tF,...  then re-solve those legs through IK\n"
+               "  --max-reach <r>     cap each leg at r of its length (default 0.956, the alien's own; 0 = off)\n"
                "  --source <name>   the corpus this came from, REQUIRED by `pack`\n");
     return 1;
 }
@@ -492,6 +493,12 @@ int cmdPack(const Args& args) {
         }
         positionalLegs.push_back({from[0], from[1], from[2], {to[0], to[1], to[2]}});
     }
+    // The reach cap (ADR-624, owner ruling 22 Sep): the alien's own longest leg by default. 0 turns it
+    // off, for measuring what it costs.
+    float maxReach = scene::kAlienMaxLegReach;
+    if (const std::string r = args.option("max-reach"); !r.empty()) {
+        maxReach = std::stof(r);
+    }
     if (!positionalLegs.empty() && !retargeting) {
         fmt::print(stderr, "--positional-legs needs --retarget-to\n");
         return 1;
@@ -513,13 +520,17 @@ int cmdPack(const Args& args) {
                                          : std::string();
                 rescale.rootScale = binding.rootScale;
                 out = scene::retargetLegsPositional(clip, first->skeleton, out, packSkeleton, positionalLegs,
-                                                    30.0f, &legStats, rescale);
+                                                    30.0f, &legStats, rescale, scene::PositionalReachCap{maxReach, true});
                 if (!legStats.problem.empty()) {
                     fmt::print(stderr, "{}\n", legStats.problem);
                 }
                 provenance.processing.push_back(fmt::format(
-                    "positional legs '{}': {} frames, worst foot miss {:.3f}% of the leg", clip.name,
-                    legStats.frames, legStats.worstShortfall * 100.0f));
+                    "positional legs '{}': {} frames, worst foot miss {:.3f}% of the leg, reach cap {:.3f} "
+                    "lowered the body on {} frames (mean {:.4f}, worst {:.4f}) and pulled {} of {} leg-frames in "
+                    "(mean {:.4f}, worst {:.4f})",
+                    clip.name, legStats.frames, legStats.worstShortfall * 100.0f, maxReach, legStats.droppedFrames,
+                    legStats.meanDrop, legStats.worstDrop, legStats.cappedLegFrames, legStats.legFrames,
+                    legStats.meanCapPull, legStats.worstCapPull));
             }
             // The retarget's own error, per clip, into the provenance. A pack that cannot say how
             // accurately its motion was transferred is a pack nobody can judge.

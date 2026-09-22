@@ -177,3 +177,123 @@ TEST_CASE("§64/§92 100STYLE onto the alien: the legs flex, where the rotation 
     CHECK(flexed.hi - flexed.lo > 0.5f * (sourceReach.hi - sourceReach.lo));
     CHECK(std::abs(flexed.mean - sourceReach.mean) < 0.1f);
 }
+
+TEST_CASE("§64 the reach cap: human legs never straighten past the alien's own, and planted feet stay planted",
+          "[retarget][aliens][phaseC]") {
+    // Owner ruling, 22 Sep (ADR-624): borrowed human motion must never look hyperextended on the
+    // alien. The cap is the alien's own longest reach (0.956), applied inside the retarget. The gate
+    // is the one that caught ADR-624's three wrong turns, planted-foot slide; the cost is how far the
+    // feet are pulled in on the longest strides, measured here.
+    const fs::path glb = fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb";
+    const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "assets" / "100style";
+    if (!fs::exists(dir / "Neutral_FW.bvh") || !fs::exists(glb)) {
+        SKIP("100STYLE or the scout is not present (100STYLE is gitignored; see assets/100STYLE-ATTRIBUTION.md)");
+    }
+    scene::Scene sc;
+    assets::GltfLoadOptions gltf;
+    gltf.loadImages = false;
+    REQUIRE(assets::loadGltf(glb, sc, gltf).has_value());
+    const scene::Skeleton& alien = sc.rigs.front().skeleton;
+    const std::vector<scene::PositionalLeg> legs = {
+        {"LeftHip", "LeftKnee", "LeftAnkle", {"thigh_twist.l", "leg_stretch.l", "foot.l"}},
+        {"RightHip", "RightKnee", "RightAnkle", {"thigh_twist.r", "leg_stretch.r", "foot.r"}},
+    };
+    // A walk, a run and two sidesteps: the long strides are where the cap bites.
+    std::string report = "clip              mode        reach max  body lowered: frames mean/worst (m)  feet pulled: leg-frames mean/worst (m)  planted slide (m/s)\n";
+    for (const char* name : {"Neutral_FW", "Strutting_FR", "Strutting_SW", "March_SR"}) {
+        fs::path bvh = dir / (std::string(name) + ".bvh");
+        if (!fs::exists(bvh)) {
+            bvh = dir.parent_path() / "100style-mixed" / (std::string(name) + ".bvh");
+        }
+        if (!fs::exists(bvh)) {
+            continue;
+        }
+        assets::BvhLoadOptions load;
+        load.scale = 0.01f;
+        auto source = assets::loadBvh(bvh, load);
+        REQUIRE(source.has_value());
+        scene::AnimationClip clip = source->clip;
+        clip.duration = std::min(clip.duration, clip.start + 6.0f);
+        scene::RetargetProfile profile;
+        profile.name = "100style-to-scout";
+        for (const auto& [s, t] : {std::pair{"Hips", "root.x"}, std::pair{"LeftHip", "thigh_twist.l"},
+                                   std::pair{"LeftKnee", "leg_stretch.l"}, std::pair{"LeftAnkle", "foot.l"},
+                                   std::pair{"LeftToe", "toes_01.l"}, std::pair{"RightHip", "thigh_twist.r"},
+                                   std::pair{"RightKnee", "leg_stretch.r"}, std::pair{"RightAnkle", "foot.r"},
+                                   std::pair{"RightToe", "toes_01.r"}}) {
+            profile.joints.push_back(scene::JointMapping{s, t, scene::roleForJointName(t)});
+        }
+        const scene::RetargetBinding binding = scene::bindRetarget(source->skeleton, alien, profile);
+        REQUIRE(binding.usable());
+        const scene::AnimationClip rotation = scene::retargetClip(clip, source->skeleton, alien, binding);
+        scene::PositionalRootRescale rescale;
+        rescale.targetRoot = "root.x";
+        rescale.rootScale = binding.rootScale;
+
+        const auto footSpeed = [&](const scene::AnimationClip& c, const char* joint, int f) {
+            scene::Pose pose;
+            std::vector<glm::mat4> model;
+            const auto pos = [&](float time) {
+                scene::setRestPose(alien, pose);
+                scene::sampleClip(c, time, pose);
+                scene::poseToModel(alien, pose, model);
+                return glm::vec3(model[static_cast<std::size_t>(alien.find(joint))][3]);
+            };
+            const glm::vec3 a = pos(c.start + static_cast<float>(f) / 30.0f);
+            const glm::vec3 b = pos(c.start + static_cast<float>(f + 1) / 30.0f);
+            return std::hypot(b.x - a.x, b.z - a.z) * 30.0f;
+        };
+        const auto sourceSpeed = [&](const char* joint, int f) {
+            scene::Pose pose;
+            std::vector<glm::mat4> model;
+            const auto pos = [&](float time) {
+                scene::setRestPose(source->skeleton, pose);
+                scene::sampleClip(clip, time, pose);
+                scene::poseToModel(source->skeleton, pose, model);
+                return glm::vec3(model[static_cast<std::size_t>(source->skeleton.find(joint))][3]);
+            };
+            const glm::vec3 a = pos(clip.start + static_cast<float>(f) / 30.0f);
+            const glm::vec3 b = pos(clip.start + static_cast<float>(f + 1) / 30.0f);
+            return std::hypot(b.x - a.x, b.z - a.z) * 30.0f;
+        };
+
+        float slide[3] = {0.0f, 0.0f, 0.0f};
+        float reachMax[3] = {0.0f, 0.0f, 0.0f};
+        float pullMean[3] = {0.0f, 0.0f, 0.0f};
+        const char* modes[3] = {"uncapped", "lower body", "pull feet"};
+        for (int arm = 0; arm < 3; ++arm) {
+            const scene::PositionalReachCap cap{arm == 0 ? 0.0f : scene::kAlienMaxLegReach, arm == 1};
+            scene::PositionalRetargetStats stats;
+            const scene::AnimationClip out = scene::retargetLegsPositional(clip, source->skeleton, rotation, alien, legs,
+                                                                           30.0f, &stats, rescale, cap);
+            REQUIRE(stats.problem.empty());
+            const Reach l = reachOf(alien, out, "thigh_twist.l", "leg_stretch.l", "foot.l");
+            const Reach r = reachOf(alien, out, "thigh_twist.r", "leg_stretch.r", "foot.r");
+            reachMax[arm] = std::max(l.hi, r.hi);
+            double sum = 0.0;
+            int planted = 0;
+            for (int f = 0; f + 1 < static_cast<int>(clip.length() * 30.0f); ++f) {
+                for (const auto& [s, t] : {std::pair{"LeftAnkle", "foot.l"}, std::pair{"RightAnkle", "foot.r"}}) {
+                    if (sourceSpeed(s, f) < 0.1f) {
+                        sum += footSpeed(out, t, f);
+                        ++planted;
+                    }
+                }
+            }
+            REQUIRE(planted > 30);
+            slide[arm] = static_cast<float>(sum / planted);
+            pullMean[arm] = stats.meanCapPull;
+            report += fmt::format("{:<16}  {:<10}  {:9.3f}  {:>5}  {:.4f} / {:.4f}              {:>5} of {:<5} {:.4f} / {:.4f}  (+{} after the solve) knee re-lengthened {}  {:.4f}\n",
+                                  name, modes[arm], reachMax[arm], stats.droppedFrames, stats.meanDrop, stats.worstDrop,
+                                  stats.cappedLegFrames, stats.legFrames, stats.meanCapPull, stats.worstCapPull, stats.resolvedLegFrames, stats.relengthedLegFrames, slide[arm]);
+        }
+        // Never past the alien's own reach (a hair over, for the solver's own residual), either way.
+        CHECK(reachMax[1] <= scene::kAlienMaxLegReach + 0.005f);
+        CHECK(reachMax[2] <= scene::kAlienMaxLegReach + 0.005f);
+        // The gate: with the body lowered, planted feet slide no more than uncapped (within 3 mm/s).
+        CHECK(slide[1] <= slide[0] + 0.003f);
+        // The control: pulling the feet in is what slides, so the gate can tell the two apart.
+        CHECK(slide[2] > slide[1]);
+    }
+    WARN(report);
+}

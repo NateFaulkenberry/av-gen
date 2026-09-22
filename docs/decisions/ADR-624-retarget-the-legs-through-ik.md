@@ -74,3 +74,52 @@ the same latent defect, and it is fixed there too.
   is an owner question.
 - §64 and §92 are unblocked: a scout matches on retargeted 100STYLE in a scene, with its foot layers
   on top, and scrubs to the played frame.
+
+---
+
+## Amendment, 2026-09-22: the reach cap (owner ruling), and a knee left behind
+
+**Ruling (owner, 22 Sep):** "cap it at the alien's own maximum (0.956 of leg length)". Borrowed
+human motion must never look hyperextended on the alien. The cap goes in this retarget, not in the
+pose layers as a clamp after the fact. Planted-foot slide stays the gate.
+
+**Built:** `PositionalReachCap` (`kAlienMaxLegReach` = 0.956), on by default in
+`avgen-motion pack --positional-legs`; `--max-reach 0` turns it off. Tests:
+`test_retarget_positional.cpp`, "the reach cap".
+
+**Two ways to cap were measured, and the gate chose between them.** Lowering the body brings the
+hips down to the feet. Pulling the feet in brings them toward the hips.
+
+| clip | mode | reach max | planted slide (m/s) | cost |
+|---|---|---|---|---|
+| Neutral_FW | uncapped | 1.000 | 0.0193 | — |
+| | **lower the body** | **0.956** | **0.0175** | body lowered on 174 of 181 frames, mean 0.023, worst 0.050 |
+| | pull the feet | 0.956 | 0.0267 | 240 of 362 leg-frames pulled, mean 0.020, worst 0.043 |
+| Strutting_FR | uncapped / lower / pull | 1.000 / 0.956 / 0.956 | 0.0227 / 0.0201 / 0.0318 | lowered mean 0.025, worst 0.049 |
+| Strutting_SW | uncapped / lower / pull | 1.000 / 0.956 / 0.956 | 0.0158 / 0.0142 / 0.0198 | lowered mean 0.024, worst 0.054 |
+| March_SR | uncapped / lower / pull | 1.000 / 0.956 / 0.956 | 0.0142 / 0.0125 / 0.0208 | lowered mean 0.025, worst 0.050 |
+
+(Units are the scout's model units; the scout is drawn at 1.94×.)
+
+**Lowering the body is the default.** A planted foot cannot slide if it does not move. Slide with
+the cap on is *lower* than without it on all four clips. Pulling the feet in makes each planted foot
+follow its moving hip, which is +40–60% slide. That is exactly the failure the gate exists for.
+
+**The cost the ruling anticipated, feet landing short, does not occur this way.** The feet land
+where the source put them. The cost moves to the body instead: it dips by about 0.025 on average
+(about 4% of the leg) and at most 0.054 on the longest strides. A human pelvis does the same. Whether
+that dip reads well on the alien is a look question. The pull-feet mode is kept, and its numbers
+are above, if the owner prefers short feet to a lower body.
+
+**A latent defect, found by the cap.** The alien's `leg_stretch` (the knee) is a child of the
+armature root, while `thigh_twist` and `foot` are children of the travel joint `root.x`. So as the
+retargeted body travels, the knee is left behind: 1.1 from the hip at the first frame of a walk and
+2.6 after six seconds, against a rest 0.28. The two-bone solve takes its bone lengths from the pose
+it is handed, so it solved with a thigh four to nine times too long, and put the knee there.
+
+The foot still landed within 0.8% of its target, which is why none of this ADR's reach or slide
+numbers showed it. The cap did: with that thigh the leg's *shortest* reach was past 0.956, and
+`Strutting_FR` stayed at 0.979 whatever it was asked. The knee and foot are now put back at their
+rest distances before every solve. Uncapped reach tops out at exactly 1.000, not 1.022; a reach above
+1 had been the knee's error showing through. **Packs built before this commit carry the displaced
+knee and must be rebuilt.**

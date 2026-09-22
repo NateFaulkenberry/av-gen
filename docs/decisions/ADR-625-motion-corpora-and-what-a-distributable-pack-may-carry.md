@@ -77,3 +77,38 @@ allows travels with every clip, which is why `Provenance` is per clip (ADR-612).
 - **Owner-level question, batched:** will AV Gen ever ship a MotionPack as a separate artefact (a
   download, a marketplace item) rather than inside a rendered output? The answer decides CMU's
   `Redistribution` and whether point 1's no-added-restriction rule constrains packaging.
+
+---
+
+## Amendment, 2026-09-22: the owner's answer
+
+**Ruling (owner, 22 Sep):** AV Gen will not ship a motion library on its own. Packs only ever travel
+inside AV Gen projects or builds, never as a separate download or marketplace item.
+
+**What follows:**
+
+- **CMU.** Its one prohibition, "you may not resell this data directly, even in converted form", is
+  not triggered by a pack that is never sold separately. The conditions that remain:
+  - **inclusion in a commercial product is allowed** ("You may include this data in
+    commercially-sold products"), and a pack inside a project or build is that case. Met;
+  - **no warranty** ("We do not guarantee the quality of the data"). This imposes no obligation, only
+    a risk AV Gen accepts;
+  - **the acknowledgement is requested, not required** ("we would appreciate ..."), and only for
+    published results. It is carried anyway, in `CREDITS.md`, when CMU data is added: "The data
+    used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding
+    from NSF EIA-0196217."
+
+  CMU's `Redistribution` becomes **Allowed for embedded use**. The SPDX field stays
+  `LicenseRef-CMU-mocap`, never a CC identifier. **No CMU data is added by this amendment.**
+- **CC BY §2(a)(5)(B)** (no effective technological measures). It no longer arises for a standalone
+  pack, because there is none. **It can still matter for a pack embedded in a shipped build.** If a
+  build encrypts or DRM-protects its assets, and a recipient could otherwise extract the CC BY motion,
+  the measure restricts the licensed material. The licence text makes no exception for "embedded".
+  An ordinary packed or compressed asset format is not a technological measure. So the rule is: **a
+  build may pack or compress CC BY motion but must not encrypt or DRM-lock it.** No build path
+  encrypts assets today; this is recorded so one does not start to without the question being
+  asked.
+- **Attribution still travels with the work.** Every project or build that carries a CC BY pack
+  carries its credit lines (`CREDITS.md`: 100STYLE, and ACCAD's `Open Motion Project by ACCAD/The
+  Ohio State University` if it is added), a licence link, and the pack's printed change chain
+  (`Provenance::processing`).

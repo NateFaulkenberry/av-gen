@@ -37,6 +37,17 @@ struct PositionalLeg {
 struct PositionalRetargetStats {
     std::uint32_t frames = 0;
     float worstShortfall = 0.0f; // the target foot's miss, as a fraction of its leg
+    // The reach cap (owner ruling, 22 Sep; ADR-624): how many leg-frames it shortened, and by how
+    // much the foot was pulled in, in the target's model units.
+    std::uint32_t legFrames = 0;
+    std::uint32_t cappedLegFrames = 0;
+    float meanCapPull = 0.0f;  // over the capped leg-frames
+    float worstCapPull = 0.0f;
+    std::uint32_t relengthedLegFrames = 0; // leg-frames whose knee was off its rest distance from the hip
+    std::uint32_t resolvedLegFrames = 0; // leg-frames whose solved foot still passed the cap, pulled in after
+    std::uint32_t droppedFrames = 0; // frames the body was lowered to bring the feet within reach
+    float meanDrop = 0.0f;           // over those frames, model units
+    float worstDrop = 0.0f;
     std::vector<float> legScale; // target leg length over source leg length, per leg
     std::string problem;         // non-empty when a leg did not resolve
 };
@@ -52,12 +63,26 @@ struct PositionalRootRescale {
     float rootScale = 0.0f;  // what the rotation retarget scaled it by
 };
 
+// The Glowmere alien's own longest leg: hip (`thigh_twist`) to foot over the leg's rest length, the
+// most its authored clips ever reach (ADR-624). **Owner ruling, 22 Sep: borrowed human motion must
+// never look hyperextended on the alien**, so a positional retarget onto it caps each leg here.
+inline constexpr float kAlienMaxLegReach = 0.956f;
+
+// The reach cap. `maxReach` 0 leaves the legs uncapped. `lowerBody` brings the hips down to the feet
+// (a planted foot stays planted); off, the feet are pulled in toward the hips instead (a planted foot
+// follows its hip and slides). See the .cpp and ADR-624 for the measurement that chose the default.
+struct PositionalReachCap {
+    float maxReach = 0.0f;
+    bool lowerBody = true;
+};
+
 // Re-solve the legs of `retargeted` (the rotation retarget of `source` onto `target`) so each target
 // foot follows its source ankle.
 [[nodiscard]] AnimationClip retargetLegsPositional(const AnimationClip& source, const Skeleton& sourceSkeleton,
                                                    const AnimationClip& retargeted, const Skeleton& targetSkeleton,
                                                    const std::vector<PositionalLeg>& legs, float sampleRate,
                                                    PositionalRetargetStats* stats = nullptr,
-                                                   const PositionalRootRescale& root = {});
+                                                   const PositionalRootRescale& root = {},
+                                                   const PositionalReachCap& cap = {});
 
 } // namespace avgen::scene
