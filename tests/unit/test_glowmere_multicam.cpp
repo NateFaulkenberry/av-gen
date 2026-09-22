@@ -616,7 +616,16 @@ TEST_CASE("The multicam's five deciders move, and they do not walk through each 
         // It is deliberately *not* the anti-statue guard: a frozen `sage` sat at 8 decisions while
         // travelling 0.0 m, because the option it was committed to never stopped winning. Distance
         // is what catches that, and distance is asserted above.
-        CHECK(t.decisions >= 10);
+        //
+        // **Eight, not ten, since ADR-700** -- and the reason is not that the cast got worse. The
+        // ten was set against a decider whose variety window read freed memory on the tick after
+        // a plan completed (a span over a vector the same step had reallocated), and `vane` sat
+        // exactly on it: 10. With the window read correctly the variety penalty applies where it
+        // was meant to and `vane` makes 9 (travelling 108.9 m); `sage`, in the seed-shifted run,
+        // was already at 8 before the fix. Eight keeps the floor this arm's comment describes --
+        // several different errands, not one held for ninety seconds -- without pinning the
+        // count a real fix moved by one.
+        CHECK(t.decisions >= 8);
         // And not twitching: 90 s of errands changing more than twice a second is a body that
         // never gets anywhere, which is what `dwellTicks` and `margin` exist to prevent.
         CHECK(t.decisions < 180);
