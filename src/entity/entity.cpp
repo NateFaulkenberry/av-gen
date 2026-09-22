@@ -1620,7 +1620,9 @@ void EntityWorld::seekWindow(double time, params::ParameterSet* params, const si
         // ADR-671: a replayed director reads and writes every body it can bind, so with one in the
         // replay no body's history can be skipped -- a craft classified shallow would be standing
         // at its anchor on the early steps the director plans its approach from.
-        bool deep = hooks != nullptr || !entity.desc_.actions.empty() ||
+        // (A hook set that only carries ADR-700's checkpoint key replays no director.)
+        const bool director = hooks != nullptr && (hooks->before || hooks->after);
+        bool deep = director || !entity.desc_.actions.empty() ||
                     !entity.schedule_.desc().entries.empty();
         // ADR-623: **a provider's memory is an accumulation too.** Its clip time has advanced on
         // every step since the body began, and a matcher's selection depends on every search before

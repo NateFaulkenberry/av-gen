@@ -346,7 +346,7 @@ TEST_CASE("a render that starts past the old window draws the frames a render fr
     SECTION("from 150 s, through the beam's cut-out") { renderFromMatchesFull(150.0, 11.0, true); }
     // And a seek that lands mid-beam, which is where the beam's own state -- its size, its drain --
     // is director state the checkpoint had to carry.
-    SECTION("from 154 s, a seek that lands mid-beam") { renderFromMatchesFull(154.0, 7.0); }
+    SECTION("from 154 s, a seek that lands mid-beam") { renderFromMatchesFull(154.0, 7.0, true); }
 }
 
 TEST_CASE("a scrub past the old ninety-second window still lands every body where the play did",

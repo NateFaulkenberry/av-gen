@@ -1,6 +1,8 @@
 # ADR-671: A scrub replays the director -- the Glowmere film lands where the play does, abduction included
 
 **Status:** Accepted -- the owner's ruling, 2026-09-21
+**Superseded in part by:** ADR-700 -- the ninety-second window below (§"The replay window still bounds
+exactness") is retired; a seek resumes from a simulation checkpoint and is exact at any second.
 **Date:** 2026-09-21
 **Replaces:** the seek rule of the director POC -- "reset the director on a seek; a scenario that
 autostarts picks up again on the next frame" (`Engine::seekSeconds`, cited in code as ADR-209; the

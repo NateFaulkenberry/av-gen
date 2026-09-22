@@ -148,6 +148,13 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         // faster seek that draws a different frame is not a faster seek (ADR-182), so this may not
         // be set low enough to bite on a scene that is currently getting a correct answer.
         //
+        // ADR-700 retired the window: a seek now resumes from the nearest checkpoint, and this
+        // ceiling bounds the replay *from* it -- in practice only a first scrub, before the
+        // checkpoints exist, can reach it, and past it the seek falls back to the window and
+        // reports itself inexact. The default rose to `SeekBudget::kEditorBodySteps` (400,000)
+        // so that first scrub of the Glowmere multicam, 257,982 body-steps to its last frame, is
+        // exact. The history of the number, for the record:
+        //
         // 180,000 is the whole ninety seconds for any scene with up to thirty-three bodies that
         // need it -- Glowmere's twenty-two deep bodies cost 118,801, so it keeps its exact frame --
         // and it shrinks from there. What it is actually for is the case ADR-267 called the

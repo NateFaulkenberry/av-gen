@@ -722,9 +722,9 @@ struct SeekBudget {
     // The live editor's ceiling since ADR-700, raised from ADR-273's 180,000. That number bought
     // "the whole ninety-second window for up to 33 bodies"; with the window retired, the question
     // is instead whether a first scrub with no checkpoint yet can replay the whole film exactly.
-    // Glowmere's multicam is 16 bodies over 13,578 steps -- 217,248 body-steps to its last frame --
-    // so 180,000 would have made its first scrub to the end inexact. 400,000 covers 16 bodies for
-    // 416 s and still bounds ADR-267's 250-character cast to 27 s of exact history per click.
+    // Glowmere's multicam is 19 entities over 13,578 steps -- 257,982 body-steps to its last frame
+    // -- so 180,000 would have made its first scrub to the end inexact. 400,000 covers 19 entities
+    // for 351 s and still bounds ADR-267's 250-character cast to 27 s of exact history per click.
     static constexpr std::uint64_t kEditorBodySteps = 400000;
     // `AVGEN_SEEK_MODE` = checkpointed | window | full, for an A/B out of one binary. Unset or
     // unrecognised is `Checkpointed`.
