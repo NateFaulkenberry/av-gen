@@ -113,6 +113,8 @@ dependency. Embree owns intersection, the BVH and occlusion queries; **everythin
 
 **Threading.** Embree is given an explicit thread count and the BVH is committed with
 `rtcJoinCommitScene` from threads this process already owns, so Embree starts no pool of its own.
+(Until ADR-582 that was true of the top level only: procedural children went through
+`rtcCommitScene`, which does use Embree's pool. Every commit is joined now.)
 `app::JobSystem` is not used and cannot be: it is a two-worker FIFO of whole jobs with no
 parallel-for, and its header forbids waiting on it from a render thread. The render loop uses the
 banded scanline split that `src/world/terrain.cpp` and `src/world/ecology.cpp` already established
@@ -153,6 +155,27 @@ inheriting them would be the ADR-146 mistake in a new place:
 * `Entity::cameraCulled`, which means "outside the realtime frustum", not "not in the scene";
   off-screen geometry still casts shadows and still bounces light into the frame;
 * procedural LOD rungs 2 and 3, which are camera-facing billboards.
+
+## BVH reuse across a sequence (ADR-582)
+
+A `PathTracer` keeps its `EmbreeScene` between renders, and `app::TraceSequence` keeps one tracer for
+the whole range, so each frame rebuilds only what its snapshot changed.
+
+* **Built over object space.** `TriangleMesh::objectPositions` + `objectToWorld` are what the BVH
+  holds; `positions` stays world space for shading. The Tree of Life moves every vertex every frame
+  in world space and none in object space -- the island drifts as a rigid body -- so this is what
+  makes reuse possible at all there.
+* **Always two levels.** Meshes sharing a bit-identical transform share a child scene (a rigid
+  assembly keeps a single-level BVH); a rigged mesh is always alone; each procedural source is a
+  child. The structure is a function of the snapshot only, never of history.
+* **Exact change detection.** A child is kept only if its members, counts, vertices and indices are
+  bit-identical to the buffers Embree holds; the top level only if every child and every transform
+  is. Everything else is rebuilt from scratch through the first frame's code.
+* **The control arm is live:** `TraceSettings::reuseAcceleration = false`, `--pt-rebuild-bvh`. A
+  reused range and a rebuilt one write byte-identical EXRs; `test_pathtrace_bvh_reuse.cpp` holds the
+  unit arms, each with a control that fails with detection switched off.
+* The sequence logs each frame's update: objects built/kept, triangles built/kept, whether the top
+  level was rebuilt, how many transforms moved, and the compare/build split.
 
 ## Phase 8 in particular (partly)
 

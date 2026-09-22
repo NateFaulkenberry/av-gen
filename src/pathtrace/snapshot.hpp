@@ -81,6 +81,22 @@ struct TriangleMesh {
     // mesh -- re-scattered foliage and re-tessellated terrain both do this.
     std::vector<glm::vec3> previousPositions;
 
+    // The same vertices BEFORE the entity transform (after skinning), and that transform, so the
+    // BVH can be built over what is stable and the motion kept in the transform (ADR-582).
+    //
+    // Measured on the Tree of Life: every one of its 33 meshes changes every frame in world space,
+    // because the island drifts as a rigid body, and in object space not one vertex changes. A BVH
+    // keyed on `positions` would therefore be rebuilt every frame for a scene with no deforming
+    // geometry at all. `positions` stays the world-space truth everything else shades from; this is
+    // only what the acceleration structure is built from. Empty means "`positions` is already
+    // object space and the transform is identity", which is what a hand-assembled mesh is.
+    std::vector<glm::vec3> objectPositions;
+    glm::mat4 objectToWorld{1.0f};
+    // The vertices are posed by a rig, so they may change in place every frame. Such a mesh gets
+    // an acceleration structure of its own rather than sharing one with static meshes that happen
+    // to have the same transform -- one walking character must not rebuild the scenery.
+    bool deforming = false;
+
     scene::Material material;
     std::string entityName;            // for diagnostics only
     std::uint32_t entityIndex = 0;     // index into the source Scene::entities

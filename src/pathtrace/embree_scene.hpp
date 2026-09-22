@@ -40,6 +40,41 @@ struct SurfaceHit {
     float baryV = 0.0f;   // v2
 };
 
+// How `EmbreeScene::update` treats what it built last time (ADR-582).
+enum class BvhReuse : std::uint8_t {
+    // Keep every acceleration structure whose complete input is bit-for-bit what it was built
+    // from, and rebuild the rest. The default, and the only mode a render should use.
+    Detect,
+    // The control arm: discard everything, device included, and build from scratch -- exactly
+    // what every frame did before ADR-582. Kept as a live setting (`TraceSettings::reuseAcceleration`
+    // and `--pt-rebuild-bvh`) so "does reuse change the picture" stays a question anybody can ask.
+    Rebuild,
+    // TEST ONLY. Reuse whenever the STRUCTURE matches (same objects, same counts) without
+    // comparing vertices, indices or transforms. This is change detection switched off, and it
+    // exists so the tests that prove detection works can show themselves failing without it
+    // (ADR-182). Never reachable from a setting.
+    TrustStructure,
+};
+
+// What one `update` did. Printed per frame by the sequence so the reuse is visible, not assumed.
+struct BvhUpdateStats {
+    bool deviceCreated = false;
+    std::size_t objects = 0;            // child acceleration structures the frame needs
+    std::size_t objectsBuilt = 0;       // of which were (re)built this call
+    std::size_t trianglesBuilt = 0;
+    std::size_t trianglesReused = 0;
+    std::size_t topLevelInstances = 0;
+    std::size_t transformsChanged = 0;  // top-level transforms that differ from the last frame
+    bool topLevelBuilt = false;
+    double compareSeconds = 0.0;        // change detection
+    double objectSeconds = 0.0;         // child builds
+    double topLevelSeconds = 0.0;
+    // Embree's own allocations (BVHs, vertex/index copies, build scratch), from its memory monitor:
+    // what is held once the update returns, and the most held at any moment during it.
+    std::int64_t heldBytes = 0;
+    std::int64_t peakBytes = 0;
+};
+
 class EmbreeScene {
 public:
     EmbreeScene();
@@ -47,9 +82,29 @@ public:
     EmbreeScene(const EmbreeScene&) = delete;
     EmbreeScene& operator=(const EmbreeScene&) = delete;
 
-    // Builds the BVH. `buildThreads` is how many of this process's own threads join the commit;
-    // 0 means "one, the caller's". Fails loudly rather than returning an empty scene (section 54).
+    // Builds the BVH from scratch. `buildThreads` is how many of this process's own threads join
+    // the commit; 0 means "one, the caller's". Fails loudly rather than returning an empty scene
+    // (section 54). Equivalent to `update(snapshot, buildThreads, BvhReuse::Rebuild)`.
     [[nodiscard]] Result<void> build(const Snapshot& snapshot, unsigned buildThreads = 0);
+
+    // Brings the BVH to `snapshot`, rebuilding only what changed since the last call (ADR-582).
+    //
+    // Structure: meshes are grouped by (bitwise-identical) object-to-world transform, each group
+    // is one child scene built over OBJECT-space vertices, and a mesh posed by a rig is always a
+    // group of its own. Each procedural object is one child scene, as before. The top level holds
+    // one instance per group and one per procedural copy. The structure is a pure function of the
+    // snapshot, never of history, so a reused frame and a rebuilt one trace the same BVH.
+    //
+    // A child is reused only if its members, their counts, and every vertex and index are
+    // bit-identical to the buffers Embree holds (compared against Embree's own copy, so no second
+    // copy is kept and no hash can collide). The top level is reused only if every child is and
+    // every transform is bit-identical. Anything else is rebuilt from scratch through the same
+    // code the first frame used.
+    [[nodiscard]] Result<void> update(const Snapshot& snapshot, unsigned buildThreads,
+                                      BvhReuse mode = BvhReuse::Detect);
+
+    // Releases everything, device included.
+    void reset();
 
     [[nodiscard]] SurfaceHit intersect(const Snapshot& snapshot, const glm::vec3& origin,
                                        const glm::vec3& direction, float tnear, float tfar) const;
@@ -60,6 +115,7 @@ public:
 
     [[nodiscard]] bool valid() const { return impl_ != nullptr; }
     [[nodiscard]] std::size_t geometryCount() const { return geometryCount_; }
+    [[nodiscard]] const BvhUpdateStats& lastUpdate() const { return lastUpdate_; }
 
     // The material of whatever a hit landed on, from either list. Callers should not have to know.
     [[nodiscard]] static const scene::Material& materialOf(const Snapshot& snap, const SurfaceHit& hit);
@@ -69,8 +125,10 @@ private:
     // unit that merely wants to trace a ray. It also keeps `embree` a PRIVATE link dependency of
     // avgen_core rather than something the whole engine inherits.
     struct Impl;
+    [[nodiscard]] Result<void> updateInner(const Snapshot& snapshot, unsigned buildThreads, BvhReuse mode);
     std::unique_ptr<Impl> impl_;
     std::size_t geometryCount_ = 0;
+    BvhUpdateStats lastUpdate_{};
 };
 
 // The offset that keeps a shadow ray from hitting the surface it started on. Scaled by the hit

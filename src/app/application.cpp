@@ -157,6 +157,8 @@ std::string usageText() {
            "  --pt-aovs           write one multi-layer EXR with albedo, normal, emission, depth, id\n"
            "  --pt-denoise        denoise with OIDN (needs -DAVGEN_PATHTRACE_DENOISE=ON)\n"
            "  --pt-probe          report directional albedo above 1 (ADR-352); does not alter the image\n"
+           "  --pt-rebuild-bvh    rebuild the whole BVH every frame of a traced range instead of only\n"
+           "                      what changed (ADR-582's control arm); does not alter the image\n"
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
            "  --format <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
            "                      EXR sequence, before tone mapping), or video\n"
@@ -420,6 +422,8 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.ptAovs = true;
         } else if (arg == "--pt-probe") {
             options.ptProbe = true;
+        } else if (arg == "--pt-rebuild-bvh") {
+            options.ptRebuildBvh = true;
         } else if (arg == "--queue") {
             auto v = need(i, "--queue");
             if (!v) return std::unexpected(v.error());
@@ -5333,6 +5337,7 @@ int Application::runTraceSequence(const std::filesystem::path& projectFile,
         traceSequenceRequestFrom(projectFile, authored, options_.width, options_.height,
                                  *options_.pathtrace, video);
 
+    request.reuseAcceleration = !options_.ptRebuildBvh;
     if (auto ok = request.validate(); !ok) {
         log::error("pathtrace: {}", ok.error().message);
         return 2;

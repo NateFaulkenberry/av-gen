@@ -18,8 +18,8 @@
 //     path-traced frame could not become a video frame without a GPU, which is exactly the property
 //     that makes the tracer usable while the GPU is busy (ADR-351).
 //
-// The tracer itself is untouched. `pathtrace::PathTracer`, `buildSnapshot` and the Embree scene are
-// called, not modified.
+// The tracer is called, not reimplemented. One `pathtrace::PathTracer` lives for the whole range so
+// its acceleration structure carries from frame to frame and only what moved is rebuilt (ADR-582).
 
 #include "app/frame_range.hpp"
 #include "app/render_settings.hpp"
@@ -47,6 +47,10 @@ struct TraceSequenceRequest {
     std::string backend = "auto";
     int quality = 80;
     bool muxAudio = true;
+    // ADR-582: keep the acceleration structure between frames and rebuild only what changed.
+    // False is the control arm (`--pt-rebuild-bvh`): every frame builds from scratch, as before.
+    // Not persisted in a project -- it is a diagnostic, and it cannot change a pixel.
+    bool reuseAcceleration = true;
 
     [[nodiscard]] Result<void> validate() const;
 };

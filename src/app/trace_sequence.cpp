@@ -85,6 +85,7 @@ public:
         : engine_(engine), request_(request), cancelled_(cancelled), samplesDone_(samplesDone),
           samplesTotal_(samplesTotal) {
         settings_ = traceSettingsFrom(request_.trace, request_.width, request_.height);
+        settings_.reuseAcceleration = request_.reuseAcceleration;
         samplesTotal_.store(settings_.samplesPerPixel);
         // Motion is an AOV, and the AOVs are the only consumer of the previous frame.
         wantsMotion_ = request_.trace.writeAovs;
@@ -123,12 +124,30 @@ public:
 
         pathtrace::Framebuffer fb;
         samplesDone_.store(0);
-        pathtrace::PathTracer tracer;
+        // ONE tracer for the range (ADR-582): it keeps the BVH, and `render` rebuilds only what
+        // this frame's snapshot changed. A fresh tracer per frame was a full rebuild per frame --
+        // 1.7 s on the Tree of Life, for geometry that had not changed shape.
+        pathtrace::PathTracer& tracer = tracer_;
         auto ok = tracer.render(
             snapshot, settings_, fb, [this] { return cancelled_.load(); },
             [this](std::uint32_t done, std::uint32_t) { samplesDone_.store(done); });
         if (!ok) {
             return std::unexpected(ok.error());
+        }
+        {
+            const pathtrace::TraceStats& st = tracer.stats();
+            const pathtrace::BvhUpdateStats& b = st.bvh;
+            log::info("trace sequence: frame {} bvh {:.1f} ms ({}: {}/{} objects built, {} tri built, "
+                      "{} tri kept, top level {} over {} instances, {} transforms moved; compare "
+                      "{:.1f} ms, objects {:.1f} ms, top {:.1f} ms; embree holds {:.0f} MB, peak "
+                      "{:.0f} MB), render {:.0f} ms",
+                      index, st.buildSeconds * 1000.0,
+                      settings_.reuseAcceleration ? "reuse" : "rebuild", b.objectsBuilt, b.objects,
+                      b.trianglesBuilt, b.trianglesReused, b.topLevelBuilt ? "built" : "kept",
+                      b.topLevelInstances, b.transformsChanged, b.compareSeconds * 1000.0,
+                      b.objectSeconds * 1000.0, b.topLevelSeconds * 1000.0,
+                      static_cast<double>(b.heldBytes) / 1e6, static_cast<double>(b.peakBytes) / 1e6,
+                      st.renderSeconds * 1000.0);
         }
         if (cancelled_.load()) {
             // Cancelled between batches. Not an error, and not a frame either: returning here
@@ -216,6 +235,7 @@ private:
     std::vector<pathtrace::Framebuffer> aovFrames_;
     bool wantsMotion_ = false;
     std::optional<scene::Scene> previous_;
+    pathtrace::PathTracer tracer_;   // outlives a frame so its BVH does (ADR-582)
 };
 
 } // namespace

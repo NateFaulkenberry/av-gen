@@ -522,9 +522,15 @@ Result<void> PathTracer::render(const Snapshot& snapshot, const TraceSettings& s
 
     if (stage_) stage_("acceleration");
     const auto buildStart = std::chrono::steady_clock::now();
-    EmbreeScene embree;
-    if (auto ok = embree.build(snapshot, threadCount); !ok) return ok;
+    if (auto ok = embree_.update(snapshot, threadCount,
+                                 settings.reuseAcceleration ? BvhReuse::Detect : BvhReuse::Rebuild);
+        !ok) {
+        embree_.reset();   // a half-updated structure must never be traced by the next render
+        return ok;
+    }
+    const EmbreeScene& embree = embree_;
     stats_.buildSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - buildStart).count();
+    stats_.bvh = embree_.lastUpdate();
 
     out.resize(settings.width, settings.height);
     if (settings.albedoProbe.enabled) {
