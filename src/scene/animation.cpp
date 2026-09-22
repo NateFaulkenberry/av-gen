@@ -671,4 +671,39 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
     return stats;
 }
 
+
+void pruneRestChannels(AnimationClip& clip, const Skeleton& skeleton, float tolerance) {
+    std::vector<AnimationChannel> kept;
+    kept.reserve(clip.channels.size());
+    for (AnimationChannel& channel : clip.channels) {
+        if (channel.joint >= skeleton.joints.size()) {
+            kept.push_back(std::move(channel));
+            continue;
+        }
+        const Transform& rest = skeleton.joints[channel.joint].rest;
+        glm::vec4 restValue;
+        switch (channel.path) {
+        case AnimationPath::Translation: restValue = glm::vec4(rest.position, 0.0f); break;
+        case AnimationPath::Rotation: restValue = glm::vec4(rest.rotation.x, rest.rotation.y, rest.rotation.z, rest.rotation.w); break;
+        case AnimationPath::Scale: restValue = glm::vec4(rest.scale, 0.0f); break;
+        }
+        bool atRest = channel.interpolation != Interpolation::CubicSpline;
+        for (const glm::vec4& v : channel.values) {
+            if (!atRest) {
+                break;
+            }
+            glm::vec4 d = v - restValue;
+            if (channel.path == AnimationPath::Rotation && glm::dot(v, restValue) < 0.0f) {
+                d = v + restValue; // q and -q are one rotation
+            }
+            atRest = std::abs(d.x) <= tolerance && std::abs(d.y) <= tolerance && std::abs(d.z) <= tolerance &&
+                     std::abs(d.w) <= tolerance;
+        }
+        if (!atRest) {
+            kept.push_back(std::move(channel));
+        }
+    }
+    clip.channels = std::move(kept);
+}
+
 } // namespace avgen::scene

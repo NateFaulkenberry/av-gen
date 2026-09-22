@@ -34,6 +34,8 @@
 #include "scene/motion_pack.hpp"
 #include "scene/motion_quality_report.hpp"
 #include "scene/retarget.hpp"
+#include "scene/retarget_positional.hpp"
+#include "scene/motion_augment.hpp"
 #include "scene/scene.hpp"
 
 #include <random>
@@ -206,6 +208,7 @@ int usage() {
                "  retarget  <src> <dst> --map s:t,s:t     move motion between skeletons\n"
                "  pack      <file...> --out <dir>         build a MotionPack\n"
                "  validate  <pack>                        the report; exit 2 on FAIL\n"
+               "  merge     <pack> <pack>... --out <dir>  one pack from several for the same skeleton\n"
                "  reach     <pack> [--chain h:k:a,...]    how close each pose is to a straight leg\n"
                "  database  <pack> --joints a,b,c [--bench]  build a motion database and search it\n"
                "  build-db  <pack> --joints a,b,c [--name n] [--force]\n"
@@ -229,7 +232,11 @@ int usage() {
                "  --scale <f>       BVH units to metres (0.01 for centimetres)\n"
                "  --contacts a,b    joints to analyse; the first is the phase reference\n"
                "  --license <id>    SPDX identifier, REQUIRED by `pack`\n"
+               "  augment   <pack> --out <dir> --legs h:k:f,... --plan kind:clip:param,...\n"
+               "                                          Phase C 21: variants kept only where they add coverage\n"
                "  --retarget-to <f> --map s:t,...   pack onto ANOTHER skeleton\n"
+               "  --positional-legs sH:sK:sA=tH:tK:tF,...  then re-solve those legs through IK\n"
+               "  --max-reach <r>     cap each leg at r of its length (default 0.956, the alien's own; 0 = off)\n"
                "  --source <name>   the corpus this came from, REQUIRED by `pack`\n");
     return 1;
 }
@@ -459,6 +466,45 @@ int cmdPack(const Args& args) {
                    binding.rootScale);
     }
 
+    // `--positional-legs sHip:sKnee:sAnkle=tHip:tKnee:tFoot,...` re-solves each named leg through IK
+    // after the rotation retarget, so the target's feet follow the source's (§64/§92). It exists for
+    // the Glowmere alien, whose feet a rotation retarget cannot move (ADR-553).
+    std::vector<scene::PositionalLeg> positionalLegs;
+    for (const std::string& spec : splitCommas(args.option("positional-legs"))) {
+        const std::size_t eq = spec.find('=');
+        const auto parts = [](const std::string& s) {
+            std::vector<std::string> out;
+            std::string cur;
+            for (const char c : s) {
+                if (c == ':') {
+                    out.push_back(cur);
+                    cur.clear();
+                } else {
+                    cur.push_back(c);
+                }
+            }
+            out.push_back(cur);
+            return out;
+        };
+        const std::vector<std::string> from = eq == std::string::npos ? std::vector<std::string>{} : parts(spec.substr(0, eq));
+        const std::vector<std::string> to = eq == std::string::npos ? std::vector<std::string>{} : parts(spec.substr(eq + 1));
+        if (from.size() != 3 || to.size() != 3) {
+            fmt::print(stderr, "--positional-legs entries are sHip:sKnee:sAnkle=tHip:tKnee:tFoot, got '{}'\n", spec);
+            return 1;
+        }
+        positionalLegs.push_back({from[0], from[1], from[2], {to[0], to[1], to[2]}});
+    }
+    // The reach cap (ADR-624, owner ruling 22 Sep): the alien's own longest leg by default. 0 turns it
+    // off, for measuring what it costs.
+    float maxReach = scene::kAlienMaxLegReach;
+    if (const std::string r = args.option("max-reach"); !r.empty()) {
+        maxReach = std::stof(r);
+    }
+    if (!positionalLegs.empty() && !retargeting) {
+        fmt::print(stderr, "--positional-legs needs --retarget-to\n");
+        return 1;
+    }
+
     const auto convert = [&](std::vector<scene::AnimationClip>& source) {
         if (!retargeting) {
             return;
@@ -467,6 +513,26 @@ int cmdPack(const Args& args) {
             scene::RetargetStats stats;
             scene::AnimationClip out =
                 scene::retargetClip(clip, first->skeleton, packSkeleton, binding, &stats);
+            if (!positionalLegs.empty()) {
+                scene::PositionalRetargetStats legStats;
+                scene::PositionalRootRescale rescale;
+                rescale.targetRoot = binding.rootLink >= 0
+                                         ? packSkeleton.joints[static_cast<std::size_t>(binding.links[static_cast<std::size_t>(binding.rootLink)].target)].name
+                                         : std::string();
+                rescale.rootScale = binding.rootScale;
+                out = scene::retargetLegsPositional(clip, first->skeleton, out, packSkeleton, positionalLegs,
+                                                    30.0f, &legStats, rescale, scene::PositionalReachCap{maxReach, true});
+                if (!legStats.problem.empty()) {
+                    fmt::print(stderr, "{}\n", legStats.problem);
+                }
+                provenance.processing.push_back(fmt::format(
+                    "positional legs '{}': {} frames, worst foot miss {:.3f}% of the leg, reach cap {:.3f} "
+                    "lowered the body on {} frames (mean {:.4f}, worst {:.4f}) and pulled {} of {} leg-frames in "
+                    "(mean {:.4f}, worst {:.4f})",
+                    clip.name, legStats.frames, legStats.worstShortfall * 100.0f, maxReach, legStats.droppedFrames,
+                    legStats.meanDrop, legStats.worstDrop, legStats.cappedLegFrames, legStats.legFrames,
+                    legStats.meanCapPull, legStats.worstCapPull));
+            }
             // The retarget's own error, per clip, into the provenance. A pack that cannot say how
             // accurately its motion was transferred is a pack nobody can judge.
             provenance.processing.push_back(fmt::format(
@@ -477,6 +543,54 @@ int cmdPack(const Args& args) {
         }
     };
 
+    // `--range a:b` keeps seconds a..b of each clip, renamed `<clip>@a-b` so several stretches of one
+    // take can sit in one pack. For a long corpus take whose parts are different motions: a 100STYLE
+    // sidestep file walks forward, stands, then sidesteps for half a minute, and only the last part
+    // is a sidestep (§65).
+    float rangeFrom = 0.0f;
+    float rangeTo = 0.0f;
+    if (const std::string r = args.option("range"); !r.empty()) {
+        const std::size_t colon = r.find(':');
+        if (colon == std::string::npos) {
+            fmt::print(stderr, "--range is a:b in seconds, got '{}'\n", r);
+            return 1;
+        }
+        rangeFrom = std::stof(r.substr(0, colon));
+        rangeTo = std::stof(r.substr(colon + 1));
+    }
+    const auto trim = [&](std::vector<scene::AnimationClip>& source) {
+        if (rangeTo <= rangeFrom) {
+            return;
+        }
+        for (scene::AnimationClip& clip : source) {
+            const float from = clip.start + rangeFrom;
+            const float to = std::min(clip.start + rangeTo, clip.duration);
+            scene::AnimationClip cut;
+            cut.name = fmt::format("{}@{:g}-{:g}", clip.name, rangeFrom, rangeTo);
+            cut.start = 0.0f;
+            for (const scene::AnimationChannel& c : clip.channels) {
+                scene::AnimationChannel k = c;
+                k.times.clear();
+                k.values.clear();
+                for (std::size_t i = 0; i < c.times.size(); ++i) {
+                    if (c.times[i] >= from - 1e-5f && c.times[i] <= to + 1e-5f) {
+                        k.times.push_back(c.times[i] - from);
+                        k.values.push_back(c.values[i]);
+                    }
+                }
+                if (k.times.empty() && !c.times.empty()) {
+                    k.times.push_back(0.0f);
+                    k.values.push_back(c.values.front());
+                }
+                cut.channels.push_back(std::move(k));
+            }
+            cut.duration = to - from;
+            provenance.processing.push_back(fmt::format("cut '{}' to {:.2f}..{:.2f} s as '{}'", clip.name, rangeFrom,
+                                                        rangeTo, cut.name));
+            clip = std::move(cut);
+        }
+    };
+    trim(first->clips);
     convert(first->clips);
     std::vector<scene::AnimationClip> clips = first->clips;
     for (std::size_t i = 1; i < args.positional.size(); ++i) {
@@ -492,6 +606,7 @@ int cmdPack(const Args& args) {
                        args.positional[i], args.positional.front());
             return 1;
         }
+        trim(more->clips);
         convert(more->clips);
         for (scene::AnimationClip& clip : more->clips) {
             clips.push_back(std::move(clip));
@@ -1571,6 +1686,134 @@ int cmdBenchmark(const Args& args) {
     return 0;
 }
 
+
+// `avgen-motion augment <pack> --out <dir> --legs h:k:f,h:k:f --plan kind:clip:param,...`
+//
+// Phase C §21 as a pipeline step: every planned variant is generated, gated on its own IK reach,
+// and kept only if it adds §58 coverage to the pack. The report says which were kept and why the
+// rest were not. The output pack is the input plus the kept variants, each with its heading track
+// and a provenance entry naming its source, kind and parameter under the source's licence.
+// Phase C §65: one pack from several built for the same skeleton, so a character can match on its
+// own clips and on motion retargeted onto it (the scout's corpus plus 100STYLE's sidesteps).
+// Provenance stays per clip: each input's provenance entries are carried and every clip's index is
+// shifted to its own, so a merged pack still says which clip may ship under which licence.
+int cmdMerge(const Args& args) {
+    if (args.positional.size() < 2 || !args.has("out")) {
+        fmt::print(stderr, "merge <pack> <pack>... --out <dir> [--name n]\n");
+        return 1;
+    }
+    auto merged = scene::readMotionPack(args.positional.front());
+    if (!merged) {
+        fmt::print(stderr, "{}\n", merged.error().message);
+        return 1;
+    }
+    for (std::size_t i = 1; i < args.positional.size(); ++i) {
+        auto more = scene::readMotionPack(args.positional[i]);
+        if (!more) {
+            fmt::print(stderr, "{}\n", more.error().message);
+            return 1;
+        }
+        if (more->skeletonDigest != merged->skeletonDigest) {
+            fmt::print(stderr, "'{}' was built for another skeleton; retarget it first\n", args.positional[i]);
+            return 1;
+        }
+        const auto offset = static_cast<std::uint32_t>(merged->provenance.size());
+        for (const scene::Provenance& p : more->provenance) {
+            merged->provenance.push_back(p);
+        }
+        for (std::size_t c = 0; c < more->clips.size(); ++c) {
+            if (merged->findClip(more->clips[c].name) >= 0) {
+                fmt::print(stderr, "clip '{}' is in two of the packs; a merged pack cannot tell them apart\n",
+                           more->clips[c].name);
+                return 1;
+            }
+            scene::PackClip clip = more->clips[c];
+            clip.provenance += offset;
+            merged->clips.push_back(std::move(clip));
+            merged->animation.push_back(more->animation[c]);
+        }
+    }
+    merged->name = args.option("name", merged->name);
+    const scene::PackValidation validation = scene::validateMotionPack(*merged);
+    fmt::print("{}", validation.report());
+    if (auto ok = scene::writeMotionPack(*merged, args.option("out")); !ok) {
+        fmt::print(stderr, "{}\n", ok.error().message);
+        return 1;
+    }
+    fmt::print("wrote {} ({} clips, {} provenance entries)\n", args.option("out"), merged->clips.size(),
+               merged->provenance.size());
+    return validation.ok() ? 0 : 2;
+}
+
+int cmdAugment(const Args& args) {
+    if (args.positional.empty() || !args.has("out") || !args.has("legs") || !args.has("plan")) {
+        fmt::print(stderr, "augment <pack> --out <dir> --legs hip:knee:foot,... --plan kind:clip:param,...\n");
+        return 1;
+    }
+    auto pack = scene::readMotionPack(args.positional.front());
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    const auto split = [](const std::string& s, char sep) {
+        std::vector<std::string> out;
+        std::string cur;
+        for (const char c : s) {
+            if (c == sep) {
+                out.push_back(cur);
+                cur.clear();
+            } else {
+                cur.push_back(c);
+            }
+        }
+        out.push_back(cur);
+        return out;
+    };
+    scene::AugmentPackOptions options;
+    for (const std::string& leg : splitCommas(args.option("legs"))) {
+        const auto parts = split(leg, ':');
+        if (parts.size() != 3) {
+            fmt::print(stderr, "--legs entries are hip:knee:foot, got '{}'\n", leg);
+            return 1;
+        }
+        options.augment.legs.push_back({parts[0], parts[1], parts[2]});
+    }
+    options.augment.cycles = static_cast<std::uint32_t>(std::stoul(args.option("cycles", "3")));
+    options.database.config = scene::defaultBipedConfig(options.augment.legs.front().tip,
+                                                        options.augment.legs.back().tip, args.option("head", "head.x"));
+    std::vector<scene::AugmentPlanItem> plan;
+    for (const std::string& item : splitCommas(args.option("plan"))) {
+        const auto parts = split(item, ':');
+        if (parts.size() != 3) {
+            fmt::print(stderr, "--plan entries are kind:clip:param, got '{}'\n", item);
+            return 1;
+        }
+        scene::AugmentPlanItem p;
+        const std::string& k = parts[0];
+        p.kind = k == "stride" ? scene::AugmentKind::Stride
+               : k == "direction" ? scene::AugmentKind::Direction
+               : k == "turn" ? scene::AugmentKind::Turn
+               : k == "start" ? scene::AugmentKind::Start
+               : k == "stop" ? scene::AugmentKind::Stop
+               : k == "mirror" ? scene::AugmentKind::Mirror
+                               : scene::AugmentKind::Plant;
+        p.clip = parts[1];
+        p.parameter = std::stof(parts[2]);
+        plan.push_back(p);
+    }
+    auto result = scene::augmentPack(*pack, plan, options);
+    if (!result) {
+        fmt::print(stderr, "{}\n", result.error().message);
+        return 1;
+    }
+    fmt::print("{}", result->report());
+    if (auto ok = scene::writeMotionPack(result->pack, args.option("out")); !ok) {
+        fmt::print(stderr, "{}\n", ok.error().message);
+        return 1;
+    }
+    fmt::print("wrote {} ({} clips)\n", args.option("out"), result->pack.clips.size());
+    return 0;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1619,6 +1862,12 @@ int main(int argc, char** argv) {
     }
     if (args.command == "quality") {
         return cmdQuality(args);
+    }
+    if (args.command == "merge") {
+        return cmdMerge(args);
+    }
+    if (args.command == "augment") {
+        return cmdAugment(args);
     }
     return usage();
 }

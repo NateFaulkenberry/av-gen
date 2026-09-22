@@ -103,6 +103,18 @@ struct MatchSettings {
     // transition, the third buys 10% more (ADR-613). Clamped to `MotionMemory::kBlendSlots`.
     std::size_t blendSlots = MotionMemory::kBlendSlots;
 
+    // ---- §44: style --------------------------------------------------------------------------
+    //
+    // What a clip outside the character's style pays, as a fraction of the database's measured
+    // cost spread (the unit `switchMargin` uses, ADR-389). Inert unless the provider has a style
+    // (`setStyle`). **It must sit between two measured gaps**: above what separates two versions
+    // of the same motion (a walk from a slightly slower walk), so the style decides between them,
+    // and below what separates the right motion from the wrong one (a walk from an idle), so the
+    // style never buys its identity with the wrong motion. On the golden corpus those are 0.01 and
+    // 0.06-0.3 of the spread; at 1 (a whole spread) the style was a filter, and a strutting body
+    // asked to stand strutted. 0.05 is inside the band. See §44 in the phase log.
+    float styleWeight = 0.05f;
+
     // True when `searchInterval` cannot change the behaviour because `minimumContinuation` is the
     // later gate. Not an error -- it is a legitimate configuration -- but it is the difference
     // between "search frequency does not matter" and "this dial is not the one in control", and a
@@ -119,7 +131,10 @@ public:
                         const std::vector<scene::AnimationClip>* clips, std::string name)
         : db_(db), clips_(clips), name_(std::move(name)) {}
 
-    void setDatabase(const scene::MotionDatabase* db) { db_ = db; }
+    void setDatabase(const scene::MotionDatabase* db) {
+        db_ = db;
+        resolveStyle();
+    }
     // Phase C §4 requires the database be "shared between character instances", and §6's
     // measurement is why that clause is load-bearing rather than tidy: at a million samples the
     // database is 144.96 MB, so a hundred characters each holding one is 14.5 GB. Exposed so a
@@ -137,7 +152,28 @@ public:
     // drawn at 1.94x asking for 3 m/s is asking its clips for 1.55. Without this the matcher would
     // look for motion 1.94x faster than the body is moving.
     void setWorldScale(float scale) { worldScale_ = scale > 1e-6f ? scale : 1.0f; }
-    void setSettings(MatchSettings settings) { settings_ = settings; }
+    void setSettings(MatchSettings settings) {
+        settings_ = settings;
+        resolveStyle();
+    }
+    // Phase C §44: the character's style, and which clips carry which style. A rule names a style
+    // and the clip-name prefixes that carry it, as `motionMatching.clips` does ("Strutting" admits
+    // `Strutting_FW`). A clip may carry several styles. **The style is the character's, not the
+    // request's**: `MotionRequest::style` is the clip provider's exact-match key and a fallback
+    // behind this provider must keep getting what it always got, and §44 says style selection is
+    // not yet a behaviour concern. Empty style, or a style no clip carries, adds no cost at all.
+    struct StyleRule {
+        std::string style;
+        std::vector<std::string> prefixes;
+    };
+    void setStyle(std::string style, std::vector<StyleRule> rules) {
+        style_ = std::move(style);
+        styleRules_ = std::move(rules);
+        resolveStyle();
+    }
+    [[nodiscard]] std::string_view style() const { return style_; }
+    // How many of the database's clips carry the style. 0 means the style changes nothing.
+    [[nodiscard]] std::size_t clipsInStyle() const { return clipsInStyle_; }
     [[nodiscard]] const MatchSettings& settings() const { return settings_; }
 
     [[nodiscard]] std::string_view name() const override { return name_; }
@@ -179,8 +215,15 @@ private:
     void fillQuery(const MotionRequest& request, std::uint32_t current, scene::MotionQuery& query,
                    std::vector<float>& raw) const;
 
+    void resolveStyle();
+
     const scene::MotionDatabase* db_ = nullptr;
     const std::vector<scene::AnimationClip>* clips_ = nullptr;
+    // §44: resolved once per database and settings, so a search reads a span and allocates nothing.
+    std::string style_;
+    std::vector<StyleRule> styleRules_;
+    std::vector<float> styleClipCost_;
+    std::size_t clipsInStyle_ = 0;
     MatchSettings settings_;
     std::string name_ = "match";
     std::string expectedSkeleton_;

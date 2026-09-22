@@ -203,7 +203,7 @@ std::string motionTagNames(std::uint32_t tags) {
         {MotionTag::Walk, "walk"},             {MotionTag::Run, "run"},
         {MotionTag::Turn, "turn"},             {MotionTag::Airborne, "airborne"},
         {MotionTag::Cyclic, "cyclic"},         {MotionTag::Travelling, "travelling"},
-        {MotionTag::OneShot, "oneshot"},
+        {MotionTag::OneShot, "oneshot"},        {MotionTag::Terminal, "terminal"},
     };
     std::string out;
     for (const auto& [tag, name] : kNames) {
@@ -320,6 +320,9 @@ std::string MotionCostBreakdown::report() const {
     if (transition != 0.0f) {
         out += fmt::format("transition={:.4f} ", transition);
     }
+    if (style != 0.0f) {
+        out += fmt::format("style={:.4f} ", style);
+    }
     out += fmt::format("| total={:.4f}", total());
     return out;
 }
@@ -402,6 +405,62 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
     std::vector<glm::mat4> model;
     std::vector<glm::mat4> modelAhead;
 
+    // **One body joint for the whole pack.** ADR-337's rule picks the travel joint per clip (the
+    // lowest-indexed translated joint), and a pack whose clips disagree then measures their poses
+    // from different origins. The Glowmere alien's own clips translate `root.x`, at hip height; a
+    // §21 variant or a retargeted clip carries its travel on `rig`, above it, so that the spine,
+    // hands and knees (children of `rig`) travel with the body. Measured per clip, every variant's
+    // feet sat 0.78 higher than its own source's, and a turn variant cost as much in pose as a
+    // straight walk cost in trajectory: the matcher could not tell a warped walk was a walk.
+    //
+    // So when the clips' travel joints differ and one of them lies **below all the others** in the
+    // hierarchy, every clip is measured from that one: a joint under the travel joint travels with
+    // it, so its model position is still the body, and it is the joint the other clips already
+    // use. (Not "the joint every clip translates": a retargeted clip's `root.x` is at rest relative
+    // to `rig`, so its channel is pruned, and that rule picked a foot.)
+    int packRoot = -1;
+    {
+        const auto travelOf = [](const AnimationClip& clip) {
+            int root = -1;
+            for (const AnimationChannel& channel : clip.channels) {
+                if (channel.path == AnimationPath::Translation && (root < 0 || static_cast<int>(channel.joint) < root)) {
+                    root = static_cast<int>(channel.joint);
+                }
+            }
+            return root < 0 ? 0 : root;
+        };
+        const auto isAncestorOrSelf = [&](int ancestor, int joint) {
+            for (int j = joint; j >= 0 && static_cast<std::size_t>(j) < pack.skeleton.joints.size();
+                 j = pack.skeleton.joints[static_cast<std::size_t>(j)].parent) {
+                if (j == ancestor) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        std::vector<int> roots;
+        for (const AnimationClip& clip : pack.animation) {
+            if (clip.length() > 0.0f) {
+                const int r = travelOf(clip);
+                if (std::find(roots.begin(), roots.end(), r) == roots.end()) {
+                    roots.push_back(r);
+                }
+            }
+        }
+        if (roots.size() > 1) {
+            for (const int candidate : roots) {
+                bool belowAll = true;
+                for (const int other : roots) {
+                    belowAll = belowAll && isAncestorOrSelf(other, candidate);
+                }
+                if (belowAll) {
+                    packRoot = candidate;
+                    break;
+                }
+            }
+        }
+    }
+
     for (std::size_t c = 0; c < pack.animation.size() && c < pack.clips.size(); ++c) {
         const AnimationClip& clip = pack.animation[c];
         const PackClip& meta = pack.clips[c];
@@ -421,6 +480,9 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         }
         if (root < 0) {
             root = 0;
+        }
+        if (packRoot >= 0) {
+            root = packRoot;
         }
         // **The pack already knows this, and re-deriving it here was silently wrong.** This line
         // used to call `analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{})` -- with an
@@ -550,10 +612,35 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 facing[f] = glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
             }
         } else {
-            facing = analysis.travels ? clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop,
-                                                   options.config.facingWindow)
-                                      : std::vector<glm::vec3>(frames, glm::vec3(0.0f, 0.0f, 1.0f));
+            facing = clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop, options.config.facingWindow);
+            if (!analysis.travels) {
+                // **An in-place clip is faced relative to its own average.** Its pelvis yaw is part
+                // posture (the scout's crouch holds -43 degrees throughout, which is not a heading)
+                // and part turning (`Idle_turn` sweeps -71 to -3 degrees, which is). Measured from
+                // the clip's own mean, the posture cancels and the turning remains, so a turn on the
+                // spot is a turn to the matcher and a crouch walk still walks straight.
+                glm::vec3 mean(0.0f);
+                for (const glm::vec3& f : facing) {
+                    mean += f;
+                }
+                const float meanYaw = std::atan2(mean.x, mean.z);
+                for (glm::vec3& f : facing) {
+                    const float yaw = std::atan2(f.x, f.z) - meanYaw;
+                    f = glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
+                }
+            }
         }
+        // The body's facing at a time `ahead` past sample `f`: a looping clip wraps, anything else
+        // holds its last frame.
+        const auto facingAhead = [&](std::uint32_t f, float ahead) {
+            const auto steps = static_cast<std::int64_t>(std::lround(ahead * rate));
+            std::int64_t i = static_cast<std::int64_t>(f) + steps;
+            const auto n = static_cast<std::int64_t>(frames);
+            if (i >= n) {
+                i = meta.loop && n > 1 ? (i % (n - 1)) : n - 1;
+            }
+            return facing[static_cast<std::size_t>(std::max<std::int64_t>(i, 0))];
+        };
 
         // ---- implied travel, for a cycle authored in place (ADR-540) ------------------------------
         //
@@ -629,11 +716,13 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 const glm::vec3 delta = toFacingFrame(future - body, heading) + (implied * ahead);
                 out[k++] = delta.x;
                 out[k++] = delta.z;
-                // Facing: the direction it is heading at that moment, or zero when it is not
-                // moving -- which is honest rather than a default of "forward".
-                const float len = std::sqrt((delta.x * delta.x) + (delta.z * delta.z));
-                out[k++] = len > 1e-5f ? delta.x / len : 0.0f;
-                out[k++] = len > 1e-5f ? delta.z / len : 0.0f;
+                // **Facing: which way the body will face at that horizon, in its frame now.** It was
+                // the direction of travel, which cannot say "turning on the spot" (there is no
+                // travel) or "strafing" (the travel is not the facing), and those are exactly the
+                // motions §65's demonstration asks for. The future facing can say both.
+                const glm::vec3 ahead3 = toFacingFrame(facingAhead(f, ahead), heading);
+                out[k++] = ahead3.x;
+                out[k++] = ahead3.z;
             }
 
             const glm::vec3 bodyVelocity = toFacingFrame(rootVelocity, heading) + implied;
@@ -671,7 +760,21 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             db.sampleRoot.push_back(std::atan2(heading.x, heading.z));
             db.sampleTime.push_back(t);
             db.samplePhase.push_back(meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start));
-            db.sampleTags.push_back(tags);
+            {
+                // §46: a non-looping clip's last stretch, where the future is extrapolated.
+                const float longest = options.config.trajectoryTimes.empty()
+                                          ? 0.2f
+                                          : *std::max_element(options.config.trajectoryTimes.begin(),
+                                                              options.config.trajectoryTimes.end());
+                // Only a clip that ENDS MOVING: its extrapolated future is motion it does not
+                // contain, and re-choosing its last frame freezes a walking body. A clip that ends
+                // at rest (a stop, a death) extrapolates to rest, which is true, and its last frames
+                // are exactly what a request to stand should find. Ruling those out left "walking,
+                // asked to stop" playing the walk (§47).
+                const bool endsMoving = glm::length(endVelocity) > 0.1f || glm::length(implied) > 0.1f;
+                const bool terminal = !meta.loop && endsMoving && (clip.duration - t) < longest;
+                db.sampleTags.push_back(tags | (terminal ? static_cast<std::uint32_t>(MotionTag::Terminal) : 0u));
+            }
             // Filled below, once the clip's extent is known.
             db.sampleNext.push_back(MotionDatabase::kInvalid);
         }
@@ -880,6 +983,8 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
                 }
             }
         }
+        // §44: the style term, last, so the early out above stays a lower bound.
+        cost += motionClipCost(db, query, s);
         ++best.considered;
         if (!best.found() || cost < bestCost) {
             best.sample = s;
@@ -894,6 +999,7 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
     // partial sums would be wrong anyway. Recomputing the winner in full is one extra pass over
     // `dim` floats, and it is the only one anything reads.
     if (best.found() && weighted) {
+        best.breakdown.style = motionClipCost(db, query, best.sample);
         const float* f = db.featuresFor(best.sample);
         for (std::size_t d = 0; d < dim; ++d) {
             const float delta = q[d] - f[d];
@@ -1061,6 +1167,7 @@ MotionMatch scoreMotionCandidates(const MotionDatabase& db, const MotionQuery& q
                 }
             }
         }
+        cost += motionClipCost(db, query, s);
         if (!best.found() || cost < bestCost) {
             best.sample = s;
             bestCost = cost;

@@ -1128,7 +1128,21 @@ void Entity::advanceMotion(double time, float dt) {
     // measured `state_.velocity`. The measured one is a backward difference that reads zero on a
     // body's first steps and across a seek, so a prediction built on it made a scrub disagree with
     // the play it is supposed to reproduce (ADR-360). The limited speed is replayed exactly.
-    request.bodyVelocity = heading * state_.speed;
+    //
+    // **Along the direction the body travels, which is not always the way it faces.** This was
+    // `heading * speed`, and for a strafe (vector intent: travel at 90 degrees to the facing) the
+    // request then said the body was moving forward while it moved sideways, and the §25 prediction
+    // curved from a forward walk into the strafe. The travel direction is the intent's, when a
+    // behaviour published one; the speed is still the limited one, so a scrub still replays it.
+    glm::vec3 travelDirection = heading;
+    if (state_.intent.valid) {
+        const glm::vec3 v(state_.intent.desiredVelocity.x, 0.0f, state_.intent.desiredVelocity.z);
+        const float len = glm::length(v);
+        if (len > 1e-4f) {
+            travelDirection = v / len;
+        }
+    }
+    request.bodyVelocity = travelDirection * state_.speed;
     request.bodyVelocityKnown = true;
     request.mode = state_.airborne ? MovementMode::Airborne : MovementMode::Ground;
     MotionMemory next;
@@ -3299,6 +3313,83 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
         if (auto ok = names("contacts", desc.motionMatching.contacts); !ok) {
             return std::unexpected(ok.error());
         }
+        if (auto ok = names("clips", desc.motionMatching.clips); !ok) {
+            return std::unexpected(ok.error());
+        }
+        if (m.contains("weights")) {
+            const auto& w = m["weights"];
+            if (!w.is_object() || !w.contains("version") || !w["version"].is_number_integer() ||
+                w["version"].get<std::int64_t>() < 0) {
+                return fail("entity '{}': 'motionMatching.weights' must be an object with a 'version'",
+                            desc.name);
+            }
+            const std::uint32_t version = w["version"].get<std::uint32_t>();
+            if (version != 1u) {
+                // A weights block from another version of their meaning is refused, not guessed at.
+                return fail("entity '{}': 'motionMatching.weights' version {} is not one this build "
+                            "understands (1)",
+                            desc.name, version);
+            }
+            auto& mm = desc.motionMatching;
+            mm.weightsVersion = version;
+            const auto num = [&](const char* key, float& out) {
+                if (w.contains(key) && w[key].is_number()) {
+                    out = w[key].get<float>();
+                }
+            };
+            num("jointPosition", mm.jointPositionWeight);
+            num("jointVelocity", mm.jointVelocityWeight);
+            num("trajectoryPosition", mm.trajectoryPositionWeight);
+            num("trajectoryFacing", mm.trajectoryFacingWeight);
+            num("rootVelocity", mm.rootVelocityWeight);
+            num("phase", mm.phaseWeight);
+            num("contact", mm.contactWeight);
+            num("continuity", mm.continuityWeight);
+            num("transition", mm.transitionWeight);
+            num("style", mm.styleWeight);
+            num("switchMargin", mm.switchMargin);
+        }
+        if (m.contains("style")) {
+            if (!m["style"].is_string()) {
+                return fail("entity '{}': 'motionMatching.style' must be a style name", desc.name);
+            }
+            desc.motionMatching.style = m["style"].get<std::string>();
+        }
+        if (m.contains("styles")) {
+            const auto& s = m["styles"];
+            if (!s.is_object()) {
+                return fail("entity '{}': 'motionMatching.styles' must map a style to clip-name prefixes",
+                            desc.name);
+            }
+            for (const auto& [style, prefixes] : s.items()) {
+                std::vector<std::string> list;
+                if (!prefixes.is_array()) {
+                    return fail("entity '{}': 'motionMatching.styles.{}' must be an array of clip-name prefixes",
+                                desc.name, style);
+                }
+                for (const auto& p : prefixes) {
+                    if (!p.is_string()) {
+                        return fail("entity '{}': 'motionMatching.styles.{}' must be an array of clip-name "
+                                    "prefixes",
+                                    desc.name, style);
+                    }
+                    list.push_back(p.get<std::string>());
+                }
+                desc.motionMatching.styles.emplace_back(style, std::move(list));
+            }
+        }
+        if (!desc.motionMatching.style.empty()) {
+            // A style the character cannot resolve would add no cost and change nothing: refused,
+            // because a typo here is otherwise a control that does nothing (ADR-558).
+            bool known = false;
+            for (const auto& [style, prefixes] : desc.motionMatching.styles) {
+                known = known || style == desc.motionMatching.style;
+            }
+            if (!known) {
+                return fail("entity '{}': 'motionMatching.style' '{}' is not one of 'motionMatching.styles'",
+                            desc.name, desc.motionMatching.style);
+            }
+        }
         if (m.contains("trajectory")) {
             if (!m["trajectory"].is_array()) {
                 return fail("entity '{}': 'motionMatching.trajectory' must be an array of seconds",
@@ -3312,6 +3403,15 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
                 }
                 desc.motionMatching.trajectory.push_back(s.get<float>());
             }
+        }
+        if (m.contains("pack")) {
+            if (!m["pack"].is_string() || m["pack"].get<std::string>().empty()) {
+                return fail("entity '{}': 'motionMatching.pack' must be a path", desc.name);
+            }
+            desc.motionMatching.pack = m["pack"].get<std::string>();
+            const std::filesystem::path authored(desc.motionMatching.pack);
+            desc.motionMatching.packResolved =
+                (authored.is_absolute() ? authored : (baseDir / authored)).lexically_normal().string();
         }
         desc.motionMatching.enabled = true;
         desc.proceduralMotion = true;
@@ -3698,6 +3798,43 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
             m["contacts"] = entity.motionMatching.contacts;
         }
         m["trajectory"] = entity.motionMatching.trajectory;
+        if (!entity.motionMatching.pack.empty()) {
+            m["pack"] = entity.motionMatching.pack; // as authored, so a save moves with its scene
+        }
+        if (!entity.motionMatching.clips.empty()) {
+            m["clips"] = entity.motionMatching.clips;
+        }
+        if (entity.motionMatching.weightsVersion != 0u) {
+            const auto& mm = entity.motionMatching;
+            nlohmann::json w;
+            w["version"] = mm.weightsVersion;
+            w["jointPosition"] = mm.jointPositionWeight;
+            w["jointVelocity"] = mm.jointVelocityWeight;
+            w["trajectoryPosition"] = mm.trajectoryPositionWeight;
+            w["trajectoryFacing"] = mm.trajectoryFacingWeight;
+            w["rootVelocity"] = mm.rootVelocityWeight;
+            w["phase"] = mm.phaseWeight;
+            w["contact"] = mm.contactWeight;
+            w["continuity"] = mm.continuityWeight;
+            w["transition"] = mm.transitionWeight;
+            if (mm.styleWeight >= 0.0f) {
+                w["style"] = mm.styleWeight; // only when authored, so older blocks round-trip unchanged
+            }
+            if (mm.switchMargin >= 0.0f) {
+                w["switchMargin"] = mm.switchMargin;
+            }
+            m["weights"] = std::move(w);
+        }
+        if (!entity.motionMatching.style.empty()) {
+            m["style"] = entity.motionMatching.style;
+        }
+        if (!entity.motionMatching.styles.empty()) {
+            nlohmann::json s = nlohmann::json::object();
+            for (const auto& [style, prefixes] : entity.motionMatching.styles) {
+                s[style] = prefixes;
+            }
+            m["styles"] = std::move(s);
+        }
         j["motionMatching"] = std::move(m);
     }
     if (entity.behaviors.size() > entity.profileBehaviors) {

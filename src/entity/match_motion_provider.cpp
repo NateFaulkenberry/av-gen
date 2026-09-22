@@ -151,6 +151,44 @@ void poseSample(const scene::MotionDatabase& db, const std::vector<scene::Animat
 }
 } // namespace
 
+void MatchMotionProvider::resolveStyle() {
+    styleClipCost_.clear();
+    clipsInStyle_ = 0;
+    if (db_ == nullptr || style_.empty()) {
+        return;
+    }
+    const std::size_t n = db_->clipNames.size();
+    std::vector<std::uint8_t> in(n, 0u);
+    for (const StyleRule& rule : styleRules_) {
+        if (rule.style != style_) {
+            continue;
+        }
+        for (std::size_t c = 0; c < n; ++c) {
+            for (const std::string& prefix : rule.prefixes) {
+                if (db_->clipNames[c].rfind(prefix, 0) == 0) {
+                    in[c] = 1u;
+                }
+            }
+        }
+    }
+    for (const std::uint8_t v : in) {
+        clipsInStyle_ += v;
+    }
+    // A style nothing carries costs every clip the same, which changes no choice: leave it empty
+    // rather than add a constant to every candidate.
+    if (clipsInStyle_ == 0 || clipsInStyle_ == n) {
+        return;
+    }
+    const float penalty = std::max(settings_.styleWeight, 0.0f) * db_->stats.costSpread;
+    if (penalty <= 0.0f) {
+        return;
+    }
+    styleClipCost_.resize(n);
+    for (std::size_t c = 0; c < n; ++c) {
+        styleClipCost_[c] = in[c] != 0u ? 0.0f : penalty;
+    }
+}
+
 void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t current,
                                     scene::MotionQuery& query, std::vector<float>& raw) const {
     const FeatureLayout layout = layoutOf(db_->config);
@@ -189,12 +227,13 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
         const TrajectoryPrediction prediction = predictTrajectory(request, state, settings_.limits, horizons);
         for (std::size_t t = 0; t < horizons.size() && t < prediction.points.size(); ++t) {
             const glm::vec3 p = toBody(prediction.points[t].position);
+            // The future facing, in the body's frame (a direction: no unit scaling).
+            const glm::vec3 face = scene::toFacingFrame(prediction.points[t].facing, request.bodyFacing);
             const std::size_t base = layout.trajectory + (t * 4u);
             raw[base + 0] = p.x;
             raw[base + 1] = p.z;
-            const float len = std::sqrt((p.x * p.x) + (p.z * p.z));
-            raw[base + 2] = len > 1e-5f ? p.x / len : 0.0f;
-            raw[base + 3] = len > 1e-5f ? p.z / len : 0.0f;
+            raw[base + 2] = face.x;
+            raw[base + 3] = face.z;
         }
         const glm::vec3 now = toBody(request.bodyVelocity);
         raw[layout.rootVelocity + 0] = now.x;
@@ -208,9 +247,10 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
             const std::size_t base = layout.trajectory + (t * 4u);
             raw[base + 0] = want.x * ahead;
             raw[base + 1] = want.z * ahead;
-            const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
-            raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
-            raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
+            // The facing asked for, in the body's frame.
+            const glm::vec3 face = scene::toFacingFrame(request.desiredFacing, request.bodyFacing);
+            raw[base + 2] = face.x;
+            raw[base + 3] = face.z;
         }
         raw[layout.rootVelocity + 0] = want.x;
         raw[layout.rootVelocity + 1] = want.y;
@@ -228,9 +268,12 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
 
     query.requireTags = 0;
     query.current = haveCurrent ? current : scene::MotionDatabase::kInvalid;
+    // §44: the style term. Empty unless a style is set and some clip carries it.
+    query.clipCost = styleClipCost_;
     // §14: a body on the ground never wants an airborne sample. One AND per sample, and it removes
     // whole clips before anything is scored.
-    query.rejectTags = static_cast<std::uint32_t>(scene::MotionTag::Airborne);
+    query.rejectTags = static_cast<std::uint32_t>(scene::MotionTag::Airborne) |
+                       static_cast<std::uint32_t>(scene::MotionTag::Terminal);
 }
 
 std::optional<scene::MotionQuery> MatchMotionProvider::queryFor(const MotionRequest& request,
@@ -358,6 +401,9 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
                 const float delta = query.features[d] - f[d];
                 continueCost += scene::motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
             }
+            // §44: and the same style term the search added, or an out-of-style continuation
+            // would be compared as if it were free.
+            continueCost += scene::motionClipCost(*db_, query, follow);
             // §28: the margin is a fraction of the measured spread, so it is in the cost
             // function's own scale rather than in raw units that mean nothing without it.
             const float margin = settings_.switchMargin * db_->stats.costSpread;

@@ -228,6 +228,29 @@ TEST_CASE("the motionMatching key round-trips, and its absence writes nothing",
     CHECK_FALSE(plain->motionMatching.enabled);
     CHECK_FALSE(entity::entitiesToJson({*plain}).at(0).contains("motionMatching"));
 
+    // §45 and §14: the versioned weights block and the clip allow-list survive the same trip.
+    const nlohmann::json weighted = {
+        {"name", "weighted"},
+        {"motionMatching",
+         {{"joints", {"foot.l", "foot.r"}},
+          {"clips", {"Walking", "Idle"}},
+          {"weights", {{"version", 1}, {"trajectoryPosition", 3.0}, {"jointPosition", 0.3}, {"continuity", 0.5}}}}}};
+    auto w = entity::entityFromJson(weighted, {}, nullptr);
+    REQUIRE(w.has_value());
+    CHECK(w->motionMatching.weightsVersion == 1u);
+    CHECK(w->motionMatching.trajectoryPositionWeight == 3.0f);
+    CHECK(w->motionMatching.jointPositionWeight == 0.3f);
+    CHECK(w->motionMatching.continuityWeight == 0.5f);
+    CHECK(w->motionMatching.clips == std::vector<std::string>{"Walking", "Idle"});
+    auto w2 = entity::entityFromJson(entity::entitiesToJson({*w}).at(0), {}, nullptr);
+    REQUIRE(w2.has_value());
+    CHECK(w2->motionMatching == w->motionMatching);
+    // A weights block from a version whose meaning this build does not know is refused.
+    CHECK_FALSE(entity::entityFromJson(nlohmann::json{{"name", "x"},
+                                                      {"motionMatching", {{"joints", {"foot.l"}}, {"weights", {{"version", 2}}}}}},
+                                       {}, nullptr)
+                    .has_value());
+
     // Malformed is an error, not a silent no-op.
     CHECK_FALSE(entity::entityFromJson(nlohmann::json{{"name", "x"}, {"motionMatching", {{"contacts", {"foot.l"}}}}}, {}, nullptr)
                     .has_value());

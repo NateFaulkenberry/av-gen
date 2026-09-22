@@ -52,16 +52,18 @@ enum class IntentType : std::uint8_t {
 // The inverse, for a scene file that names an option's intent. False for an unknown name.
 [[nodiscard]] bool intentTypeFromName(std::string_view name, IntentType& out);
 
-// **Who writes it (Phase D, superseding ADR-615's "no producer").** Two writers, one per half:
+// **Who writes it.** Three producers now; ADR-615 recorded this as dark with none.
 //
-//   * the **HOW** -- `desiredVelocity`, `facing`, `valid` -- is written by the mover that knows
-//     it: `ActionKind::Move` and `ActionKind::Face` in `action.cpp`, every step they run;
+//   * the **HOW** -- `desiredVelocity`, `facing`, `valid` -- is written by the mover that knows it:
+//     `ActionKind::Move` and `ActionKind::Face` in `action.cpp`, every step they run (Phase D);
 //   * the **WHAT** -- `type`, `targetPosition`, `urgency`, `stoppingDistance` -- is written by the
-//     `decide` behaviour from the option it has committed to.
+//     `decide` behaviour from the option it has committed to (Phase D);
+//   * the **`motionScript` behaviour** writes an authored one (Phase C §65, with ADR-623).
 //
-// Cleared at the top of every entity step on both paths (`update` and `seek`), so a step nobody
-// published one in falls back to the polar pair. `Entity::advanceMotion` reads it when
-// `proceduralMotion` is on; with it off (every shipping scene), nothing downstream of the seam
+// Find any others with `grep -rn "intent.valid = true" src`. Cleared at the top of every entity
+// step on both paths (`update` and `seek`), so a step nobody published one in falls back to the
+// polar `speed`/`yaw` reconstruction underneath it. `Entity::advanceMotion` reads it when
+// `proceduralMotion` is on; with it off -- every shipping scene -- nothing downstream of the seam
 // reads the vector half, which is why producing it changed no rendered frame.
 struct CharacterIntent {
     IntentType type = IntentType::Idle;

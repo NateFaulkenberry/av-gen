@@ -30,6 +30,7 @@
 #include "scene/motion_analysis.hpp"
 #include "scene/motion_coverage.hpp"
 #include "scene/motion_database.hpp"
+#include "scene/ik.hpp"
 #include "scene/motion_pack.hpp"
 #include "scene/skeleton.hpp"
 
@@ -72,6 +73,10 @@ struct AugmentOptions {
     // §9 forbids, so a start begins at a short step and a stop ends at one.
     float rampFloor = 0.2f;
     float rampShare = 0.6f;
+    // A looping source is repeated this many cycles before a turn, start or stop is applied to it.
+    // One cycle of the scout's walk is a second, and a one-second turn spends 0.6 s of it in the
+    // `Terminal` stretch a matcher may not choose; three cycles leave it 2.4 s to be chosen in.
+    std::uint32_t cycles = 1;
     // Mirror: how a left joint's name maps to its right twin. Tried in order, both ways.
     std::vector<std::pair<std::string, std::string>> mirrorSuffixes{
         {".l", ".r"}, {".L", ".R"}, {"_l", "_r"}, {"_L", "_R"}, {"Left", "Right"}, {"left", "right"}};
@@ -92,6 +97,17 @@ struct AugmentResult {
     bool accepted = false;
     std::string refusal; // why not, when refused
 };
+
+// Solve one leg of `pose` so its tip lands on `target` (model space), with the tip's model rotation
+// set to `footRotation`. `root`, `mid` and `tip` need not be a parent chain. This is the one leg
+// solve augmentation and the positional retarget share.
+struct LegSolve {
+    IkStatus status = IkStatus::Solved;
+    float shortfall = 0.0f; // target-to-tip distance, as a fraction of the leg's length
+};
+[[nodiscard]] LegSolve solveLegInPose(const Skeleton& skeleton, Pose& pose, int root, int mid, int tip,
+                                      const glm::vec3& target, const glm::mat3& footRotation,
+                                      const glm::vec3& forward);
 
 // The body velocity a clip's planted feet imply at each frame, model space, horizontal. A frame
 // with no planted foot takes the value interpolated from its neighbours (wrapping on a loop).

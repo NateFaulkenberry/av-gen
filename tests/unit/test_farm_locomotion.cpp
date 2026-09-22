@@ -959,5 +959,8 @@ TEST_CASE("every farm animal's rate floor is visible, and a save keeps it", "[fa
         }
     }
     // The scenes must actually contain farm bodies, or this checks nothing.
-    CHECK(checked == 80);
+    // 83, not the 80 ce4c619a raised: bull-21, horse-22 and cow-23 were added to the multicam on
+    // main after that commit's branch point, so the sweep never saw them. The merge raised those
+    // three too (testing.md 39), and this count is what would catch a fourth arriving the same way.
+    CHECK(checked == 83);
 }

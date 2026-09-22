@@ -114,6 +114,37 @@ struct MotionMatchingDesc {
     std::vector<std::string> joints;
     std::vector<std::string> contacts;
     std::vector<float> trajectory{0.2f, 0.4f, 0.6f};
+    // §64/§92: a MotionPack to match on instead of the rig's own clips, for motion retargeted onto
+    // this rig (e.g. 100STYLE through `--positional-legs`). As authored (relative to the scene file)
+    // and as resolved at load. It must be built for this rig's skeleton; if it is missing or is
+    // not, the body falls back to its clip provider and the log says why.
+    std::string pack;
+    std::string packResolved;
+    // §14: which clips the matcher may use, as name prefixes ("Walking" admits `Walking_crouch` and
+    // `Walking~turn+1.40`). Empty admits every clip. The scout's pack has no authored tags, so an
+    // action clip like `Button_push` otherwise serves as an idle; this is the authoring surface
+    // that says it may not.
+    std::vector<std::string> clips;
+    // §45: the search weights, as a **versioned** block so a scene saved under one meaning of a
+    // weight is not silently read under another. `weightsVersion` 0 means "no block": the engine's
+    // defaults. Version 1 is the seven feature-term weights of `MotionFeatureConfig` by their
+    // names there, plus the two search penalties of `MotionCostWeights`.
+    std::uint32_t weightsVersion = 0;
+    float jointPositionWeight = 1.0f;
+    float jointVelocityWeight = 0.4f;
+    float trajectoryPositionWeight = 1.0f;
+    float trajectoryFacingWeight = 0.5f;
+    float rootVelocityWeight = 1.0f;
+    float phaseWeight = 0.0f;
+    float contactWeight = 0.0f;
+    float continuityWeight = -1.0f; // below zero: the engine default
+    float transitionWeight = -1.0f;
+    float styleWeight = -1.0f;      // §44, a fraction of the cost spread; below zero: the default
+    float switchMargin = -1.0f;     // §28, a fraction of the cost spread; below zero: the default
+    // §44: this character's style, and which clips carry which style, as name prefixes like
+    // `clips`. The matcher prefers clips in the style (a cost, not a filter). Empty style: none.
+    std::string style;
+    std::vector<std::pair<std::string, std::vector<std::string>>> styles;
     friend bool operator==(const MotionMatchingDesc&, const MotionMatchingDesc&) = default;
 };
 
@@ -374,9 +405,9 @@ public:
     [[nodiscard]] const MotionMemory& motionMemory() const { return motionMemory_; }
     // **Staged and dark** (ADR-615): `motionState_` is touched in exactly one place in the whole
     // tree -- `EntityWorld::reset` calls `.reset()` on it -- and this accessor has no callers. The
-    // controller that would fill it, `entity::stepMotion`, is reached only through
-    // `predictTrajectory`, which is itself test-only. `advanceMotion` builds a `MotionRequest` and
-    // hands it straight to the provider chain; the controller is not in the path.
+    // controller that would fill it, `entity::stepMotion`, is reached through `predictTrajectory`,
+    // whose product caller is the matcher's query (§25), which predicts from the body's state
+    // rather than moving it. Behaviours move the body; this integrator does not.
     [[nodiscard]] const MotionState& motionState() const { return motionState_; }
     [[nodiscard]] const MotionChainResult& motionChainResult() const { return motionChainResult_; }
     [[nodiscard]] const LocomotionPlanState& locomotionPlan() const { return locomotionPlan_; }

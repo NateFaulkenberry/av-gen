@@ -56,6 +56,13 @@ enum class MotionTag : std::uint32_t {
     Cyclic = 1u << 6,   // the clip loops and has a phase
     Travelling = 1u << 7, // ADR-552: its root leaves a box the size of its body
     OneShot = 1u << 8,
+    // A sample of a clip that does not loop and ends moving, closer to its end than the longest
+    // trajectory horizon. Its future is extrapolated rather than recorded, and it has nowhere to
+    // continue to. (A clip that ends at rest is not terminal: its extrapolation is true.)
+    // **A matcher that could choose it would freeze on it**: the end of a start is an excellent match
+    // for a walk, the clip ends, the search runs again and finds the same last frame. Found by §46's
+    // harness: 60 switches a second, 0% continuity, on a corpus the matcher should reproduce.
+    Terminal = 1u << 9,
 };
 [[nodiscard]] std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis);
 [[nodiscard]] std::string motionTagNames(std::uint32_t tags);
@@ -78,7 +85,13 @@ enum class MotionTag : std::uint32_t {
 //      pelvis. Before this, every in-place walk read as standing still.
 //   5  a clip that carries a heading (`PackClip::heading`, written by §21's augmentation) is
 //      faced by it rather than by its pelvis.
-inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 5;
+//   6  trajectory facing is the body's future facing, not its direction of travel; an in-place
+//      clip is faced relative to its own mean pelvis yaw, so a turn on the spot turns.
+//   7  samples near the end of a non-looping clip carry `MotionTag::Terminal`.
+//   8  when a pack's clips travel on different joints and one lies below all the others (a §21
+//      variant or a retargeted clip travels on `rig`, the alien's own clips on `root.x`), every
+//      clip is measured from that one.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 8;
 
 // A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
 // forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one
@@ -221,8 +234,9 @@ struct MotionCostBreakdown {
     float terms[static_cast<std::size_t>(MotionFeatureGroup::Count)] = {};
     float continuity = 0.0f;
     float transition = 0.0f;
+    float style = 0.0f; // §44: what the sample paid for not being in the requested style
     [[nodiscard]] float total() const {
-        float sum = continuity + transition;
+        float sum = continuity + transition + style;
         for (const float t : terms) {
             sum += t;
         }
@@ -389,7 +403,23 @@ struct MotionQuery {
     // Where the character is now, so continuity and transition costs have something to be relative
     // to (§11/§12). kInvalid on the first query of a character's life.
     std::uint32_t current = MotionDatabase::kInvalid;
+    // Phase C §44: an extra cost per clip, indexed like `MotionDatabase::clipNames`, added to every
+    // sample of that clip. Empty means none. The provider fills it from the requested style: a
+    // clip outside the style pays the style weight, a clip inside it pays nothing. **A cost, not a
+    // filter**, which is the point: when no clip carries the requested style every clip pays the
+    // same and the choice is unchanged, and when the corpus cannot serve the request in style, the
+    // best motion out of style still beats a styled motion that does the wrong thing.
+    std::span<const float> clipCost;
 };
+
+// §44: the per-clip cost `query` adds to sample `s`, 0 when there is none.
+[[nodiscard]] inline float motionClipCost(const MotionDatabase& db, const MotionQuery& query, std::uint32_t s) {
+    if (query.clipCost.empty() || s >= db.sampleClip.size()) {
+        return 0.0f;
+    }
+    const std::uint32_t clip = db.sampleClip[s];
+    return clip < query.clipCost.size() ? query.clipCost[clip] : 0.0f;
+}
 
 struct MotionCostWeights {
     // §11. How much a candidate is penalised for not being the continuation of what is playing.

@@ -86,6 +86,13 @@ void sampleClip(const AnimationClip& clip, float time, Pose& pose);
 // first, across every clip, before any short name is considered. One copy of that rule, because
 // `SkinnedRig::findClip` and the layer stack both have to obey it and two copies drift.
 [[nodiscard]] int findClip(const std::vector<AnimationClip>& clips, std::string_view name);
+// Drop every channel whose value never leaves the joint's rest transform: sampling the clip gives
+// the same pose without it. **Needed by anything that writes a clip for every joint** (§21's
+// augmentation, the positional retarget), because the travel joint is found as the lowest-indexed
+// joint with a translation channel (ADR-337). A clip that keys an unmoving armature root first makes
+// that root the travel joint, and then the database reads a walk as standing still.
+void pruneRestChannels(AnimationClip& clip, const Skeleton& skeleton, float tolerance = 1e-6f);
+
 
 // ---- the state machine -------------------------------------------------------------------------
 //

@@ -1077,6 +1077,9 @@ public:
     }
     [[nodiscard]] const entity::EntityWorld& entityWorld() const { return entityWorld_; }
     [[nodiscard]] entity::EntityWorld& entityWorld() { return entityWorld_; }
+    // Phase C §4/§67: how many motion databases the scene holds. One per (skeleton, feature config),
+    // however many bodies match on it; a crowd that built one each would say so here.
+    [[nodiscard]] std::size_t motionDatabaseCount() const { return matchAssets_.size(); }
     // Rejects the whole set and names the offender rather than dropping one, for the same reason
     // setHeroes does: an entity silently missing is a scene that does nothing with no explanation.
     Result<void> setEntities(std::vector<entity::EntityDesc> entities);

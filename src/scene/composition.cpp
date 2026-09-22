@@ -2677,6 +2677,29 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
                 scale = glm::length(glm::vec3(owner_.nodeWorldTransform(*node).matrix()[0]));
             }
             matchProvider_.setWorldScale(scale);
+            // §45: the search penalties, when the scene set them.
+            const entity::MotionMatchingDesc& mm = entity_.desc().motionMatching;
+            entity::MatchSettings settings = matchProvider_.settings();
+            if (mm.weightsVersion != 0u && mm.continuityWeight >= 0.0f) {
+                settings.weights.continuity = mm.continuityWeight;
+            }
+            if (mm.weightsVersion != 0u && mm.transitionWeight >= 0.0f) {
+                settings.weights.transition = mm.transitionWeight;
+            }
+            if (mm.weightsVersion != 0u && mm.styleWeight >= 0.0f) {
+                settings.styleWeight = mm.styleWeight;
+            }
+            if (mm.weightsVersion != 0u && mm.switchMargin >= 0.0f) {
+                settings.switchMargin = mm.switchMargin;
+            }
+            matchProvider_.setSettings(settings);
+            // §44: the character's style. Not part of the database key: the database is the same
+            // whichever style its reader prefers.
+            std::vector<entity::MatchMotionProvider::StyleRule> rules;
+            for (const auto& [style, prefixes] : mm.styles) {
+                rules.push_back({style, prefixes});
+            }
+            matchProvider_.setStyle(mm.style, std::move(rules));
             chain_.add(&matchProvider_);
         }
     }
@@ -2722,7 +2745,7 @@ std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& 
                                                               const entity::MotionMatchingDesc& m,
                                                               const std::string& who) {
     // The key is everything the database is a function of: the skeleton, and the config.
-    std::string key = skeletonDigest(rig.skeleton) + "|j";
+    std::string key = skeletonDigest(rig.skeleton) + "|p" + m.packResolved + "|j";
     for (const std::string& j : m.joints) {
         key += ":" + j;
     }
@@ -2730,6 +2753,13 @@ std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& 
     for (const std::string& c : m.contacts) {
         key += ":" + c;
     }
+    key += "|k";
+    for (const std::string& c : m.clips) {
+        key += ":" + c;
+    }
+    key += fmt::format("|w{}:{}:{}:{}:{}:{}:{}:{}", m.weightsVersion, m.jointPositionWeight, m.jointVelocityWeight,
+                       m.trajectoryPositionWeight, m.trajectoryFacingWeight, m.rootVelocityWeight, m.phaseWeight,
+                       m.contactWeight);
     key += "|t";
     for (const float t : m.trajectory) {
         key += fmt::format(":{:.6f}", t);
@@ -2751,7 +2781,36 @@ std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& 
         packOptions.contactJoints.push_back(ContactJoint{c, ContactKind::Foot});
     }
     packOptions.toolVersion = "avgen-runtime-match";
-    auto pack = buildMotionPack(who, rig.skeleton, rig.clips, provenance, packOptions);
+    // §64/§92: a pack named by the scene replaces the rig's own clips. It has to be built for this
+    // skeleton (ADR-650's digest); a pack for another rig would pose one character with another's
+    // joints, so it is refused here and the body stays on its clip provider.
+    Result<MotionPack> pack = m.packResolved.empty()
+                                  ? buildMotionPack(who, rig.skeleton, rig.clips, provenance, packOptions)
+                                  : readMotionPack(m.packResolved);
+    if (pack && !m.packResolved.empty() && pack->skeletonDigest != skeletonDigest(rig.skeleton)) {
+        pack = fail("pack '{}' was built for another skeleton", m.packResolved);
+    }
+    // §14: only the clips the scene admits. Filtered before the database is built, so a refused
+    // clip costs nothing at search time and can never be chosen.
+    if (pack && !m.clips.empty()) {
+        MotionPack kept = *pack;
+        kept.clips.clear();
+        kept.animation.clear();
+        for (std::size_t c = 0; c < pack->clips.size() && c < pack->animation.size(); ++c) {
+            for (const std::string& prefix : m.clips) {
+                if (pack->clips[c].name.rfind(prefix, 0) == 0) {
+                    kept.clips.push_back(pack->clips[c]);
+                    kept.animation.push_back(pack->animation[c]);
+                    break;
+                }
+            }
+        }
+        if (kept.clips.empty()) {
+            pack = fail("no clip matches motionMatching.clips");
+        } else {
+            pack = std::move(kept);
+        }
+    }
     std::shared_ptr<const MotionAsset> out;
     if (!pack) {
         log::warn("entity '{}': motion matching is on but its pack did not build ({}); the body "
@@ -2762,6 +2821,17 @@ std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& 
         dbOptions.config.joints = m.joints;
         dbOptions.config.contactJoints = m.contacts;
         dbOptions.config.trajectoryTimes = m.trajectory;
+        if (m.weightsVersion != 0u) {
+            // §45: the scene's weights, applied at search time (the database stores unweighted
+            // features, so a weight change needs no rebuild of the features themselves).
+            dbOptions.config.jointPositionWeight = m.jointPositionWeight;
+            dbOptions.config.jointVelocityWeight = m.jointVelocityWeight;
+            dbOptions.config.trajectoryPositionWeight = m.trajectoryPositionWeight;
+            dbOptions.config.trajectoryFacingWeight = m.trajectoryFacingWeight;
+            dbOptions.config.rootVelocityWeight = m.rootVelocityWeight;
+            dbOptions.config.phaseWeight = m.phaseWeight;
+            dbOptions.config.contactWeight = m.contactWeight;
+        }
         auto db = buildMotionDatabase(*pack, dbOptions);
         if (!db) {
             log::warn("entity '{}': motion matching is on but its database did not build ({}); the "
