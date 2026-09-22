@@ -185,6 +185,46 @@ const char* stageEventKindName(StageEventKind kind) {
 Staging::Staging() = default;
 Staging::~Staging() = default;
 
+Staging::Checkpoint Staging::checkpoint(const params::ParameterSet& params) const {
+    Checkpoint out;
+    out.copy = std::shared_ptr<const Staging>(new Staging(*this));
+    out.bases.reserve(written_.size());
+    for (const Written& w : written_) {
+        std::vector<float> now;
+        if (const params::IParameter* p = params.find(w.path); p != nullptr) {
+            for (std::size_t c = 0; c < p->componentCount(); ++c) {
+                now.push_back(p->baseComponent(c));
+            }
+        }
+        out.bases.push_back(std::move(now));
+    }
+    return out;
+}
+
+void Staging::restore(const Checkpoint& checkpoint, params::ParameterSet& params) {
+    if (checkpoint.copy == nullptr) {
+        return;
+    }
+    // What this director wrote goes back to the authored value first, as `reset` does, so a path the
+    // checkpoint's director had not yet touched is left as the scene describes it.
+    for (const Written& w : written_) {
+        if (params::IParameter* p = params.find(w.path); p != nullptr) {
+            for (std::size_t c = 0; c < w.base.size() && c < p->componentCount(); ++c) {
+                p->setBaseComponent(c, w.base[c]);
+            }
+        }
+    }
+    *this = *checkpoint.copy;
+    for (std::size_t i = 0; i < written_.size() && i < checkpoint.bases.size(); ++i) {
+        if (params::IParameter* p = params.find(written_[i].path); p != nullptr) {
+            const std::vector<float>& b = checkpoint.bases[i];
+            for (std::size_t c = 0; c < b.size() && c < p->componentCount(); ++c) {
+                p->setBaseComponent(c, b[c]);
+            }
+        }
+    }
+}
+
 namespace {
 
 // Resolves one `Value` against a scenario's parameter list. A name that is not there is an error
@@ -317,6 +357,7 @@ namespace {
 } // namespace
 
 Result<void> Staging::setDesc(StagingDesc desc) {
+    ++epoch_; // ADR-700
     // Validate and resolve before anything is installed, so a description that would have run
     // half-way is refused whole.
     for (const ActorDesc& actor : desc.actors) {
@@ -435,6 +476,7 @@ Result<void> Staging::setDesc(StagingDesc desc) {
 }
 
 void Staging::clear() {
+    ++epoch_; // ADR-700
     desc_ = StagingDesc{};
     runs_.clear();
     claims_.clear();
@@ -453,6 +495,7 @@ void Staging::clear() {
 // ---- parameters ---------------------------------------------------------------------------------
 
 void Staging::registerParameters(params::ParameterSet& params, const std::string& prefix) {
+    ++epoch_; // ADR-700
     prefix_ = prefix;
     registered_.clear();
     for (std::size_t i = 0; i < desc_.scenarios.size(); ++i) {
@@ -474,6 +517,7 @@ void Staging::registerParameters(params::ParameterSet& params, const std::string
 }
 
 void Staging::unregisterParameters(params::ParameterSet& params) {
+    ++epoch_; // ADR-700
     for (const std::string& path : registered_) {
         params.remove(path);
     }

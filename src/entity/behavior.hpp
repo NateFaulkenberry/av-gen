@@ -347,6 +347,25 @@ public:
     static constexpr int kAllOfIt = -1;
     [[nodiscard]] virtual int historySteps() const { return kAllOfIt; }
 
+    // ---- simulation checkpoints (ADR-700) ----------------------------------------------------
+    //
+    // A seek restores the nearest checkpoint and replays forward from it, so a checkpoint has to
+    // hold **every** piece of state a step reads -- and a behaviour's state is whatever its class
+    // happens to have as members. So a checkpoint copies the whole object rather than asking the
+    // behaviour for a list of what matters: a member added tomorrow is in the copy without anybody
+    // remembering to put it there, which is the failure a hand-written save/load pair invites.
+    //
+    // Pure virtual on purpose. A new behaviour does not compile until it says how it is copied,
+    // and every one in `behaviors.cpp` says it the same way, through `CheckpointedBehavior<T>` --
+    // the copy constructor and the copy assignment the compiler writes.
+    //
+    // `clone` makes a copy a checkpoint can keep. `assignState` copies `from`'s state into this
+    // object *in place*, so the live behaviour keeps its address (a UI pass or a debug overlay may
+    // hold it) and the borrowed parameter pointers it copies back are the ones it already had --
+    // a restore is only attempted while the inputs that produced the checkpoint are unchanged.
+    [[nodiscard]] virtual std::unique_ptr<IBehavior> clone() const = 0;
+    virtual void assignState(const IBehavior& from) = 0;
+
     // Fills `out` and returns true when this behaviour navigates. The spans point into the
     // behaviour and are valid until its next update, which is enough for a UI pass that runs in
     // the same frame and is why nothing is copied here.

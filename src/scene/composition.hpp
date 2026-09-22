@@ -658,6 +658,10 @@ public:
     // previous frame's flattening. The replay does not flatten; it answers from `ReplayPlacement`,
     // the same arithmetic over the same parameter finals, captured after each replayed step -- one
     // step old, as the play's is.
+    //
+    // ADR-700: and it does it from the nearest simulation checkpoint rather than from a reset, so
+    // it is exact at any time rather than inside ninety seconds. The composition's half of a
+    // checkpoint is the director (whole), the bases it wrote, and `ReplayPlacement`.
     void seekWithDirector(double seconds, params::ParameterSet& params, entity::SeekBudget budget,
                           double step = 1.0 / 60.0);
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
@@ -1845,6 +1849,8 @@ private:
     // Phase D §26: the director's beats this update, raised as world events. Shared by
     // `updateBehaviour` and the replay in `seekWithDirector`.
     void raiseDirectorBeats(double time);
+    // ADR-700: the director replay's inputs that are not parameter bases, for the checkpoint key.
+    [[nodiscard]] std::uint64_t replayInputKey() const;
     // ADR-671: `visualPlacement` for a replay, one step old, from the finals.
     class ReplayPlacement final : public stage::IVisualPlacement {
     public:
@@ -1853,6 +1859,14 @@ private:
         void capture();
         [[nodiscard]] bool visualPlacement(std::string_view node,
                                            stage::VisualPlacement& out) const override;
+        // ADR-700: what a checkpoint keeps of it -- the last step's "flattening", which the next
+        // step's director reads.
+        [[nodiscard]] const std::vector<stage::VisualPlacement>& placed() const { return placed_; }
+        [[nodiscard]] const std::vector<std::uint8_t>& valid() const { return valid_; }
+        void set(std::vector<stage::VisualPlacement> placed, std::vector<std::uint8_t> valid) {
+            placed_ = std::move(placed);
+            valid_ = std::move(valid);
+        }
 
     private:
         const Composition& comp_;

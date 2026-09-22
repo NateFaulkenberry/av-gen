@@ -74,6 +74,16 @@ struct Options {
     // --legacy-scrub: the pre-ADR-671 scrub (director reset, entities replayed alone), for a
     // before/after cost comparison on one binary and one machine state.
     bool legacyScrub = false;
+    // --seek-mode checkpointed|window|full (ADR-700): which replay the scrub uses. Default is the
+    // product's, checkpointed.
+    entity::SeekMode seekMode = entity::SeekMode::Checkpointed;
+    // --warm SECONDS (ADR-700): before timing, seek once to SECONDS on the same composition so the
+    // checkpoints up to there exist, then time scrubs to T on that composition -- the cost after the
+    // first scrub, which is the one an owner pays on every click after it. Without --warm each
+    // repeat is a fresh load, which is the first-time cost.
+    double warm = -1.0;
+    // --interval SECONDS: the checkpoint interval (ADR-700), for choosing it.
+    double interval = -1.0;
 };
 
 // N deciding bodies from the scene's first one: a grid 6 m apart around it, each with its own seed
@@ -357,22 +367,60 @@ int scrubReport(const Options& o) {
     // The scrub, timed, as the engine does it (minus the renderer).
     double best = 1e30;
     std::unique_ptr<Loaded> scrubbed;
+    const entity::SeekBudget budget{.maxSeconds = 90.0, .maxBodySteps = entity::SeekBudget::kEditorBodySteps,
+                                    .mode = o.seekMode};
+    std::unique_ptr<Loaded> warmed;
+    const auto configure = [&](Loaded& l) {
+        if (o.interval > 0.0) {
+            entity::CheckpointSettings cs = l.comp->entityWorld().checkpointSettings();
+            cs.intervalSeconds = o.interval;
+            l.comp->entityWorld().setCheckpointSettings(cs);
+        }
+    };
+    if (o.warm >= 0.0) {
+        warmed = std::make_unique<Loaded>(o.scene);
+        configure(*warmed);
+        const auto begin = std::chrono::steady_clock::now();
+        warmed->comp->seekWithDirector(o.warm, warmed->params, budget, step);
+        const auto stats = warmed->comp->entityWorld().checkpointStats();
+        std::printf("warm: seek to %.2f s took %.1f ms and left %zu checkpoints, %.2f MB, last %.1f KB, "
+                    "interval %.1f s\n",
+                    o.warm, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count(),
+                    stats.count, static_cast<double>(stats.bytes) / 1048576.0,
+                    static_cast<double>(stats.lastBytes) / 1024.0, stats.intervalSeconds);
+    }
     for (int r = 0; r < o.repeats; ++r) {
-        auto s = std::make_unique<Loaded>(o.scene);
+        auto s = warmed ? std::unique_ptr<Loaded>() : std::make_unique<Loaded>(o.scene);
+        Loaded& target = warmed ? *warmed : *s;
+        if (!warmed) {
+            configure(target);
+        }
         const auto begin = std::chrono::steady_clock::now();
         if (o.legacyScrub) {
-            s->comp->director().reset(&s->comp->entityWorld(), &s->params);
-            s->comp->entityWorld().seek(t, &s->params, nullptr, step,
-                                        entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 180000});
+            target.comp->director().reset(&target.comp->entityWorld(), &target.params);
+            target.comp->entityWorld().seek(t, &target.params, nullptr, step,
+                                            entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 180000,
+                                                               .mode = entity::SeekMode::Window});
         } else {
-            s->comp->seekWithDirector(t, s->params,
-                                      entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = 180000}, step);
+            target.comp->seekWithDirector(t, target.params, budget, step);
         }
         best = std::min(best, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count());
-        scrubbed = std::move(s);
+        if (!warmed) {
+            scrubbed = std::move(s);
+        }
     }
-    std::printf("scrub to %.2f s: %.1f ms (min of %d); %llu body-steps replayed\n", t, best, o.repeats,
-                static_cast<unsigned long long>(scrubbed->comp->entityWorld().lastSeekWork().bodySteps));
+    if (warmed) {
+        scrubbed = std::move(warmed);
+    }
+    const auto work = scrubbed->comp->entityWorld().lastSeekWork();
+    const auto stats = scrubbed->comp->entityWorld().checkpointStats();
+    std::printf("scrub to %.2f s: %.1f ms (min of %d); mode %s%s; %llu body-steps replayed from %.2f s; "
+                "exact %s; checkpoints %zu (%.2f MB), restore %.3f ms, capture %.3f ms\n",
+                t, best, o.repeats, std::string(entity::seekModeName(work.mode)).c_str(),
+                work.fellBack ? " (fell back)" : "",
+                static_cast<unsigned long long>(work.bodySteps), work.restoredFrom < 0.0 ? 0.0 : work.restoredFrom,
+                work.exact ? "yes" : "no", stats.count, static_cast<double>(stats.bytes) / 1048576.0,
+                stats.lastRestoreMs, stats.lastCaptureMs);
     float worst = 0.0f;
     std::size_t differing = 0;
     for (const auto& e : played.comp->entityWorld().entities()) {
@@ -456,6 +504,15 @@ int main(int argc, char** argv) {
             o.repeat = true;
         } else if (a == "--legacy-scrub") {
             o.legacyScrub = true;
+        } else if (a == "--interval") {
+            o.interval = std::atof(next());
+        } else if (a == "--warm") {
+            o.warm = std::atof(next());
+        } else if (a == "--seek-mode") {
+            const std::string m = next();
+            o.seekMode = m == "window" ? entity::SeekMode::Window
+                         : m == "full" ? entity::SeekMode::FullHistory
+                                       : entity::SeekMode::Checkpointed;
         } else if (a == "--scrub") {
             o.scrub = std::atof(next());
         } else if (a == "--crowd") {

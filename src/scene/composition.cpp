@@ -4,6 +4,7 @@
 
 #include "core/json_keys.hpp"
 #include "core/log.hpp"
+#include "core/phase_profiler.hpp"
 #include "assets/asset_library.hpp"
 #include "assets/mesh_lod.hpp"
 #include "entity/gait.hpp"
@@ -3562,11 +3563,54 @@ bool Composition::ReplayPlacement::visualPlacement(std::string_view node,
     return false;
 }
 
+namespace {
+
+// ADR-700: the composition's half of a checkpoint. Everything the replay hooks read across steps:
+// the director, whole, with the bases it had written, and the one-step-old placement it asks.
+struct DirectorCheckpoint final : entity::HostCheckpoint {
+    stage::Staging::Checkpoint staging;
+    std::vector<stage::VisualPlacement> placed;
+    std::vector<std::uint8_t> valid;
+    std::size_t measured = 0;
+    [[nodiscard]] std::size_t bytes() const override { return measured; }
+};
+
+} // namespace
+
+std::uint64_t Composition::replayInputKey() const {
+    // What the director's replay reads that is not a parameter base (the bases are hashed by the
+    // entity world): the staging description and registration, and the root fold and centre
+    // `ReplayPlacement` composes every node through. A structural edit of the scene re-flattens,
+    // and a flatten re-installs the navigator, which moves the entity world's own epoch.
+    std::uint64_t h = 0x9e3779b97f4a7c15ull;
+    const auto mix = [&h](std::uint64_t v) {
+        h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    };
+    const auto bits = [](float f) {
+        std::uint32_t u = 0;
+        std::memcpy(&u, &f, sizeof u);
+        return static_cast<std::uint64_t>(u);
+    };
+    mix(staging_.epoch());
+    mix(stagingDesc_.empty() ? 0u : 1u);
+    mix(bits(rootAngle_));
+    mix(bits(center_.x));
+    mix(bits(center_.y));
+    mix(bits(center_.z));
+    mix(nodes_.size());
+    mix(ranges_.size());
+    mix(scene_.meshes.size());
+    mix(scene_.entities.size());
+    return h;
+}
+
 void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                                    entity::SeekBudget budget, double step) {
     staging_.reset(&entityWorld_, &params);
     if (stagingDesc_.empty()) {
-        entityWorld_.seek(seconds, &params, nullptr, step, budget);
+        entity::EntityWorld::SeekHooks hooks;
+        hooks.inputKey = replayInputKey();
+        entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
         return;
     }
     ReplayPlacement placement(*this);
@@ -3594,6 +3638,21 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         entityWorld_.applyAllOffsets();
         placement.capture();
     };
+    hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
+        auto c = std::make_shared<DirectorCheckpoint>();
+        const std::uint64_t before = core::allocCounters().bytes;
+        c->staging = staging_.checkpoint(params);
+        c->placed = placement.placed();
+        c->valid = placement.valid();
+        c->measured = static_cast<std::size_t>(core::allocCounters().bytes - before) + sizeof(DirectorCheckpoint);
+        return c;
+    };
+    hooks.restore = [&](const entity::HostCheckpoint& host) {
+        const auto& c = static_cast<const DirectorCheckpoint&>(host);
+        staging_.restore(c.staging, params);
+        placement.set(c.placed, c.valid);
+    };
+    hooks.inputKey = replayInputKey();
     entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
 }
 

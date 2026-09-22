@@ -327,9 +327,35 @@ enum class SocketResolution : std::uint8_t {
 // only need to know whether there is a place to put something.
 [[nodiscard]] constexpr bool resolved(SocketResolution r) { return r != SocketResolution::None; }
 
+// An entity's behaviours, as a *value* (ADR-700). A plain vector of `unique_ptr` cannot be copied,
+// and that made `Entity` uncopyable -- which is the only thing that stood between a checkpoint and
+// "copy the whole entity". With this the compiler writes `Entity`'s copy constructor and copy
+// assignment, so a checkpoint holds every member an entity has, including ones added after
+// ADR-700 was written. Copy-constructing clones each behaviour; copy-assigning copies each
+// behaviour's state into the one already there (`IBehavior::assignState`), so the live objects keep
+// their addresses across a restore.
+class BehaviorList : public std::vector<std::unique_ptr<IBehavior>> {
+public:
+    BehaviorList() = default;
+    BehaviorList(BehaviorList&&) noexcept = default;
+    BehaviorList& operator=(BehaviorList&&) noexcept = default;
+    BehaviorList(const BehaviorList& other);
+    BehaviorList& operator=(const BehaviorList& other);
+    ~BehaviorList() = default;
+};
+
 class Entity {
 public:
     Entity(EntityDesc desc, std::uint32_t sceneSeed);
+    // Copyable, member for member, for a checkpoint (ADR-700). Deliberately implicit: every member
+    // is a value or a borrowed pointer the host keeps alive, and a checkpoint is only restored into
+    // the entity it was taken from while the inputs that produced it are unchanged. Anything new
+    // added below is copied without anyone having to remember it -- which is the point.
+    Entity(const Entity&) = default;
+    Entity& operator=(const Entity&) = default;
+    Entity(Entity&&) = default;
+    Entity& operator=(Entity&&) = default;
+    ~Entity() = default;
 
     [[nodiscard]] const EntityDesc& desc() const { return desc_; }
     // The animation state for `activity`, or empty when the entity declared none. Falls back to
@@ -545,7 +571,7 @@ private:
     MotionOffset motion_{};
     DirectorMotion director_{};
     LocomotionState locomotion_{};
-    std::vector<std::unique_ptr<IBehavior>> behaviors_;
+    BehaviorList behaviors_;
 
     // Resolved once at bind; null until then and after a parameter set is cleared.
     params::Parameter<glm::vec3>* positionParam_ = nullptr;
@@ -671,9 +697,62 @@ private:
 // **Zero means no cap**, and that is deliberate: an offline render, a test and the command hub all
 // want the whole window whatever it costs, because none of them is waiting for a person. Only the
 // live editor sets a ceiling, and it sets it explicitly (see `Engine::seekSeconds`).
+//
+// **ADR-700 retired the ninety-second window.** A seek now restores the nearest simulation
+// checkpoint at or before the target and replays forward from it, so it is exact at any time rather
+// than only inside the window; `maxSeconds` is read only by `SeekMode::Window`, which is kept as a
+// test control and an A/B arm, not as the product. `maxBodySteps` keeps its meaning in the unit it
+// always had -- the most one seek may integrate -- and applies to the replay *from the checkpoint*:
+// when even that is more than a click may cost (a first scrub deep into a big cast with nothing
+// recorded yet), the seek falls back to the window and says so (`SeekWork::exact == false`).
+enum class SeekMode : std::uint8_t {
+    // Restore the nearest checkpoint, replay forward, record checkpoints as the replay passes them.
+    Checkpointed,
+    // The pre-ADR-700 replay: at most `maxSeconds` from a reset state. A control, not the product.
+    Window,
+    // Every step from t = 0, touching no checkpoint. The reference a checkpointed seek must equal.
+    FullHistory,
+};
+[[nodiscard]] std::string_view seekModeName(SeekMode mode);
+
 struct SeekBudget {
     double maxSeconds = 90.0;
     std::uint64_t maxBodySteps = 0;
+    SeekMode mode = SeekMode::Checkpointed;
+    // The live editor's ceiling since ADR-700, raised from ADR-273's 180,000. That number bought
+    // "the whole ninety-second window for up to 33 bodies"; with the window retired, the question
+    // is instead whether a first scrub with no checkpoint yet can replay the whole film exactly.
+    // Glowmere's multicam is 16 bodies over 13,578 steps -- 217,248 body-steps to its last frame --
+    // so 180,000 would have made its first scrub to the end inexact. 400,000 covers 16 bodies for
+    // 416 s and still bounds ADR-267's 250-character cast to 27 s of exact history per click.
+    static constexpr std::uint64_t kEditorBodySteps = 400000;
+    // `AVGEN_SEEK_MODE` = checkpointed | window | full, for an A/B out of one binary. Unset or
+    // unrecognised is `Checkpointed`.
+    [[nodiscard]] static SeekMode modeFromEnvironment();
+};
+
+// How often a checkpoint is taken and how much memory the set may hold (ADR-700). Measured on
+// `glowmere-valley-2-multicam`; see the ADR for the numbers behind the defaults.
+struct CheckpointSettings {
+    bool enabled = true;
+    // One second. Measured on the multicam (ADR-700): a checkpoint is 55 KB and takes 0.2 ms to
+    // take, so a second's interval is 12 MB over the whole 226 s film, and the worst scrub after
+    // the first -- one second of replay -- measured 17.9 ms against 104.6 ms at five seconds.
+    double intervalSeconds = 1.0;
+    // The ceiling on the whole set. Past it every other checkpoint is dropped and the interval
+    // doubles, so the set thins out evenly rather than losing its far end.
+    std::size_t maxBytes = std::size_t{256} << 20;
+    // **Test control only.** Keeps the set across a change of inputs, which is exactly the defect
+    // the input key exists to prevent; the invalidation test uses it to show the stale answer is
+    // wrong. Nothing in the product sets it.
+    bool ignoreInputKey = false;
+};
+
+// What a host (the composition) keeps in a checkpoint beside the entities: the director and
+// whatever the replay hooks drive. Opaque here; the host that captured it is the one that restores it.
+struct HostCheckpoint {
+    virtual ~HostCheckpoint() = default;
+    [[nodiscard]] virtual std::size_t bytes() const = 0;
 };
 
 class EntityWorld {
@@ -695,6 +774,7 @@ public:
     [[nodiscard]] const NodeBinding* binding(const std::string& node) const;
 
     void setNavigator(Navigator nav) {
+        ++inputEpoch_;
         nav_ = std::move(nav);
         refreshInterestPoints();
         navPath_.setNavigator(&nav_);
@@ -706,7 +786,10 @@ public:
     // How a `move` action finds its way. Defaults to the straight-line provider over the
     // navigator set above, which is everything that exists today; §5/§6's planner installs itself
     // here and nothing else changes. The pointer is borrowed: the caller keeps it alive.
-    void setPathProvider(const IPathProvider* path) { path_ = path; }
+    void setPathProvider(const IPathProvider* path) {
+        ++inputEpoch_;
+        path_ = path;
+    }
     [[nodiscard]] const IPathProvider& pathProvider() const { return path_ != nullptr ? *path_ : navPath_; }
 
     // Every completion, failure, skip and cancellation from the last update(), in the order they
@@ -781,12 +864,16 @@ public:
     // Named places a behaviour may attend to: the scene's heroes, and any node an entity drives.
     // Set by the host, because only the host knows what the scene contains.
     void setLandmarks(std::vector<std::pair<std::string, glm::vec3>> landmarks) {
+        ++inputEpoch_;
         landmarks_ = std::move(landmarks);
         refreshInterestPoints();
     }
     // Phase D §23: landmarks that are the ground itself. Their interest points carry the semantic
     // tag "terrain", which an aware decider refuses as a destination.
-    void setTerrainLandmarks(std::vector<std::string> names) { terrainLandmarks_ = std::move(names); }
+    void setTerrainLandmarks(std::vector<std::string> names) {
+        ++inputEpoch_;
+        terrainLandmarks_ = std::move(names);
+    }
     // Where `name` is, looking first at entities (which move) and then at landmarks (which do not).
     [[nodiscard]] bool pointOfInterest(std::string_view name, glm::vec3& out) const;
 
@@ -806,7 +893,10 @@ public:
     // below, which is everything that exists today; a test installs a `ScriptedPerception` here so
     // a decision layer can be asserted without a world, exactly as `setPathProvider` lets an action
     // be. The pointer is borrowed: the caller keeps it alive.
-    void setPerception(const IPerception* perception) { perception_ = perception; }
+    void setPerception(const IPerception* perception) {
+        ++inputEpoch_;
+        perception_ = perception;
+    }
     [[nodiscard]] const IPerception& perception() const {
         return perception_ != nullptr ? *perception_ : gridPerception_;
     }
@@ -962,9 +1052,19 @@ public:
     // time -- the director above them (`before`, as `Composition::updateBehaviour` runs it before
     // the entity update) and whatever must see the step's settled bodies (`after`). Null, which is
     // every caller before ADR-671, replays the entities alone.
+    //
+    // ADR-700 adds the host's half of a checkpoint. `capture` is called after `after` on each step
+    // a checkpoint is recorded at and returns everything the host's replay reads across steps;
+    // `restore` puts that back before the replay resumes from the checkpoint. When the replay
+    // starts from zero instead, the host is expected to have reset itself before calling `seek`
+    // (`seekWithDirector` does). `inputKey` is the host's contribution to the checkpoints'
+    // validity: anything the host's replay reads that is not a parameter base must change it.
     struct SeekHooks {
         std::function<void(double now, double dt)> before;
         std::function<void(double now, double dt)> after;
+        std::function<std::shared_ptr<const HostCheckpoint>()> capture;
+        std::function<void(const HostCheckpoint&)> restore;
+        std::uint64_t inputKey = 0;
     };
     void seek(double time, params::ParameterSet* params = nullptr,
               const signals::SignalBus* bus = nullptr, double step = 1.0 / 60.0,
@@ -984,8 +1084,42 @@ public:
         std::size_t deepBodies = 0;    // bodies that needed the whole window
         std::size_t shallowBodies = 0; // ...and bodies whose answer is a function of the target
         bool budgetBound = false;      // true when the step budget, not the policy, chose the span
+        // ADR-700.
+        SeekMode mode = SeekMode::Window;  // the mode that actually ran (a fallback reports Window)
+        bool exact = false;            // the answer equals a replay of the whole history
+        bool fellBack = false;         // Checkpointed was asked for and the budget forced Window
+        double restoredFrom = -1.0;    // the checkpoint's time, or -1 when it replayed from zero
+        std::size_t recorded = 0;      // checkpoints this seek added
+        bool invalidated = false;      // this seek found the inputs changed and dropped the set
     };
     [[nodiscard]] SeekWork lastSeekWork() const { return seekWork_; }
+
+    // ---- simulation checkpoints (ADR-700) ----------------------------------------------------
+    void setCheckpointSettings(const CheckpointSettings& settings);
+    [[nodiscard]] const CheckpointSettings& checkpointSettings() const { return checkpointSettings_; }
+    // Drops every checkpoint. The input key already does this for any change it can see; this is
+    // for a caller that knows of one it cannot.
+    void dropCheckpoints();
+    struct CheckpointStats {
+        std::size_t count = 0;
+        std::size_t bytes = 0;          // the whole set, measured as heap bytes allocated to copy it
+        std::size_t lastBytes = 0;      // the most recent checkpoint alone
+        double latestSeconds = -1.0;    // the furthest one, or -1
+        double intervalSeconds = 0.0;   // the interval in force (it doubles when the cap thins)
+        std::uint64_t invalidations = 0;
+        double lastCaptureMs = 0.0;
+        double lastRestoreMs = 0.0;
+    };
+    [[nodiscard]] CheckpointStats checkpointStats() const;
+    // The key the current inputs would give a checkpoint: the world's structure epoch, every
+    // entity's borrowed providers, every parameter base, the step and the host's key. Public so a
+    // test can show that an edit moves it.
+    [[nodiscard]] std::uint64_t checkpointInputKey(const params::ParameterSet* params, double step,
+                                                   std::uint64_t hostKey) const;
+    // Bumped by everything that changes what a replay would compute other than a parameter base:
+    // the entity set, bindings, the navigator, landmarks, interest points, fields, event profiles,
+    // parameter registration, the path provider and the sense stage.
+    [[nodiscard]] std::uint64_t structureEpoch() const { return inputEpoch_; }
 
     // Everything that could not be resolved, for the editor and the log. Never silently empty
     // because a problem was swallowed.
@@ -1015,6 +1149,51 @@ private:
     // seen it -- but the queue still has to be given somewhere to put them or it cannot run.
     std::vector<std::uint64_t> seekFirstStep_;
     std::vector<ActionEvent> seekEvents_;
+
+    // ---- simulation checkpoints (ADR-700) ----
+    //
+    // A checkpoint is the state after grid step `step` (the instant `step / rate`), complete:
+    // every entity copied whole (`Entity`'s implicit copy -- see `BehaviorList`), the world's own
+    // simulation state listed below, and the host's half. **The world-level list is the one
+    // hand-written part**, so it is guarded: `test_seek_checkpoints.cpp` fails when `EntityWorld`
+    // changes size, and the message says to decide whether the new member is state (add it here
+    // and to `captureCheckpoint`/`restoreCheckpoint`) or configuration (bump `inputEpoch_` where
+    // it is set).
+    struct Checkpoint {
+        std::uint64_t step = 0;
+        std::vector<Entity> entities;
+        std::vector<WorldEvent> worldEvents;
+        std::uint64_t eventSequence = 0;
+        std::vector<double> eventSignalLast;
+        std::vector<ActionEvent> actionEvents;
+        std::vector<ActionEvent> pendingEvents;
+        std::shared_ptr<const HostCheckpoint> host;
+        std::size_t bytes = 0;
+    };
+    std::vector<Checkpoint> checkpoints_; // ascending by step
+    CheckpointSettings checkpointSettings_{};
+    std::uint64_t checkpointKey_ = 0;
+    double checkpointStep_ = 0.0;
+    std::uint64_t checkpointInterval_ = 0; // in steps; doubles when the byte cap thins the set
+    std::uint64_t checkpointInvalidations_ = 0;
+    double lastCaptureMs_ = 0.0;
+    double lastRestoreMs_ = 0.0;
+    std::uint64_t inputEpoch_ = 1;
+    void captureCheckpoint(std::uint64_t step, const SeekHooks* hooks);
+    void restoreCheckpoint(const Checkpoint& checkpoint, const SeekHooks* hooks);
+    void thinCheckpoints();
+    // One fixed replay step, shared by every seek mode so they cannot disagree (testing.md #31/#38):
+    // the host's `before`, the crowd and sense snapshots, every body's step, the host's `after`.
+    // `i` is compared against `seekFirstStep_` (the window's shallow bodies); `buildCrowd` is false
+    // only when the window found no deep body.
+    void replayStep(double now, double stepDt, std::uint64_t i, const signals::SignalBus* bus,
+                    const SeekHooks* hooks, bool buildCrowd);
+    // What every seek publishes on the way out, so the next frame builds on it.
+    void publishSeek(double target, double dt, bool replayedNothing);
+    void seekWindow(double time, params::ParameterSet* params, const signals::SignalBus* bus,
+                    double step, SeekBudget budget, const SeekHooks* hooks);
+    void seekExact(double time, params::ParameterSet* params, const signals::SignalBus* bus,
+                   double step, SeekBudget budget, const SeekHooks* hooks);
 
     std::vector<std::unique_ptr<Entity>> entities_;
     std::vector<NodeBinding> bindings_;

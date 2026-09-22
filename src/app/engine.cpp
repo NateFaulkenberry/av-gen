@@ -160,7 +160,8 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         if (const char* budget = std::getenv("AVGEN_SEEK_BODY_STEPS")) {
             seekBodyStepBudget_ = std::strtoull(budget, nullptr, 10);
         } else {
-            seekBodyStepBudget_ = 180000;
+            // ADR-700: raised with the window's retirement; see `SeekBudget::kEditorBodySteps`.
+            seekBodyStepBudget_ = entity::SeekBudget::kEditorBodySteps;
         }
     }
     // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
@@ -3130,9 +3131,14 @@ void Engine::seekSeconds(double seconds) {
         // bounded here instead, in the unit the cost is actually paid in (ADR-273).
         {
             const probe2::Add probeDirector(probe2::frame().directorResetMs); // TEMPORARY: phase 2
+            // ADR-700: from the nearest simulation checkpoint, exact at any second. The window
+            // (`AVGEN_SEEK_MODE=window`) and the whole-history replay (`=full`) stay reachable as
+            // A/B arms out of one binary.
+            static const entity::SeekMode seekMode = entity::SeekBudget::modeFromEnvironment();
             composition->seekWithDirector(seconds, params_,
                                           entity::SeekBudget{.maxSeconds = 90.0,
-                                                             .maxBodySteps = seekBodyStepBudget_},
+                                                             .maxBodySteps = seekBodyStepBudget_,
+                                                             .mode = seekMode},
                                           1.0 / 60.0);
         }
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were

@@ -6,6 +6,7 @@
 
 #include "core/hash.hpp"
 #include "core/log.hpp"
+#include "core/phase_profiler.hpp"
 #include "params/serialization.hpp"
 #include "scene/procedural_detail.hpp"
 
@@ -13,6 +14,9 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
 #include <optional>
 #include <cmath>
 #include <fstream>
@@ -325,6 +329,8 @@ SocketResolution Entity::socketTransform(std::string_view socket, scene::Transfo
 // ---- EntityWorld -----------------------------------------------------------------------------
 
 void EntityWorld::setEntities(std::vector<EntityDesc> descs, std::uint32_t sceneSeed) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
+    dropCheckpoints(); // and it holds copies of entities that are about to be destroyed
     entities_.clear();
     problems_.clear();
     sceneSeed_ = sceneSeed;
@@ -469,6 +475,7 @@ void EntityWorld::raiseSignalEvents(const signals::SignalBus* bus, double time) 
 }
 
 void EntityWorld::setEventProfiles(std::vector<EventProfile> profiles) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
     eventProfiles_ = std::move(profiles);
     eventSignalLast_.clear();
     for (const EventProfile& profile : eventProfiles_) {
@@ -518,6 +525,8 @@ void EntityWorld::raiseActionEvents(const std::vector<ActionEvent>& events, std:
 }
 
 void EntityWorld::clear() {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
+    dropCheckpoints(); // and it holds copies of entities that are about to be destroyed
     entities_.clear();
     bindings_.clear();
     landmarks_.clear();
@@ -554,6 +563,7 @@ const Entity* EntityWorld::find(std::string_view name) const {
 }
 
 void EntityWorld::setBindings(std::vector<NodeBinding> bindings) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
     bindings_ = std::move(bindings);
     for (auto& entity : entities_) {
         if (const NodeBinding* b = binding(entity->desc_.driven())) {
@@ -598,6 +608,7 @@ const char* interestKindName(InterestKind kind) {
 }
 
 void EntityWorld::setExtraInterestPoints(std::vector<InterestPoint> extras) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
     extraInterests_ = std::move(extras);
     refreshInterestPoints();
 }
@@ -743,6 +754,7 @@ void EntityWorld::perceiveOne(std::size_t entityIndex, double time) {
 }
 
 void EntityWorld::registerParameters(params::ParameterSet& params, const std::string& prefix) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
     prefix_ = prefix;
     registered_.clear();
     fieldParams_.assign(fields_.size(), FieldParams{});
@@ -836,6 +848,7 @@ void EntityWorld::registerParameters(params::ParameterSet& params, const std::st
 }
 
 void EntityWorld::unregisterParameters(params::ParameterSet& params) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
     for (const std::string& path : registered_) {
         params.remove(path);
     }
@@ -986,6 +999,7 @@ bool EntityWorld::needsNode(const Entity& entity) {
 }
 
 void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
     prefix_ = prefix;
     params_ = &params;
     for (auto& entity : entities_) {
@@ -1214,8 +1228,375 @@ void EntityWorld::reset() {
     fieldCounts_ = FieldCounts{};
 }
 
+// ---- simulation checkpoints (ADR-700) ---------------------------------------------------------
+
+std::string_view seekModeName(SeekMode mode) {
+    switch (mode) {
+    case SeekMode::Checkpointed: return "checkpointed";
+    case SeekMode::Window: return "window";
+    case SeekMode::FullHistory: return "full-history";
+    }
+    return "?";
+}
+
+SeekMode SeekBudget::modeFromEnvironment() {
+    const char* v = std::getenv("AVGEN_SEEK_MODE");
+    if (v == nullptr) {
+        return SeekMode::Checkpointed;
+    }
+    const std::string_view mode(v);
+    if (mode == "window") {
+        return SeekMode::Window;
+    }
+    if (mode == "full") {
+        return SeekMode::FullHistory;
+    }
+    return SeekMode::Checkpointed;
+}
+
+BehaviorList::BehaviorList(const BehaviorList& other) {
+    reserve(other.size());
+    for (const auto& behavior : other) {
+        push_back(behavior != nullptr ? behavior->clone() : nullptr);
+    }
+}
+
+BehaviorList& BehaviorList::operator=(const BehaviorList& other) {
+    if (this == &other) {
+        return *this;
+    }
+    // In place when the lists line up -- which a restore into the entity the checkpoint was taken
+    // from always does -- so every live behaviour keeps its address.
+    bool aligned = size() == other.size();
+    for (std::size_t i = 0; aligned && i < size(); ++i) {
+        aligned = (*this)[i] != nullptr && other[i] != nullptr && (*this)[i]->kind() == other[i]->kind();
+    }
+    if (aligned) {
+        for (std::size_t i = 0; i < size(); ++i) {
+            (*this)[i]->assignState(*other[i]);
+        }
+        return *this;
+    }
+    BehaviorList copy(other);
+    swap(copy);
+    return *this;
+}
+
+namespace {
+
+// FNV-1a over 64-bit words: order-sensitive, cheap, and all the key needs -- it is compared for
+// equality with the key the same inputs produced a moment ago, never stored or sent anywhere.
+struct KeyHash {
+    std::uint64_t h = 0xcbf29ce484222325ull;
+    void word(std::uint64_t v) {
+        for (int i = 0; i < 8; ++i) {
+            h ^= (v >> (i * 8)) & 0xffu;
+            h *= 0x100000001b3ull;
+        }
+    }
+    void ptr(const void* p) { word(static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(p))); }
+    void f32(float f) {
+        std::uint32_t bits = 0;
+        std::memcpy(&bits, &f, sizeof bits);
+        word(bits);
+    }
+    void f64(double d) {
+        std::uint64_t bits = 0;
+        std::memcpy(&bits, &d, sizeof bits);
+        word(bits);
+    }
+};
+
+double msSince(std::chrono::steady_clock::time_point begin) {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+}
+
+} // namespace
+
+std::uint64_t EntityWorld::checkpointInputKey(const params::ParameterSet* params, double step,
+                                              std::uint64_t hostKey) const {
+    KeyHash k;
+    k.word(inputEpoch_);
+    k.f64(step);
+    k.word(hostKey);
+    k.word(entities_.size());
+    // The borrowed providers an entity steps through. Installed by the host after `setEntities`
+    // (which already bumps the epoch), but installable again later, and a restore must never copy
+    // back a pointer the host has since replaced.
+    for (const auto& entity : entities_) {
+        k.ptr(entity.get());
+        k.ptr(entity->motionChain_);
+        k.ptr(entity->pose_);
+        k.ptr(entity->skeleton_);
+        k.ptr(entity->rootMotion_);
+        k.word(entity->behaviors_.size());
+    }
+    // **Every parameter base, and which parameter holds it.** A seek resets the finals to the bases
+    // and the replay reads nothing else of the parameter set, so the bases *are* the parameter
+    // inputs. Called after the director and the entities have put back every base they write, so
+    // what is hashed is the authored scene plus whatever a person has changed -- and a change to
+    // any of it, relevant or not, drops the set. Conservative on purpose (ADR-700): a light slider
+    // costs one replay from zero, where a missed edit would cost a scrub that silently disagrees.
+    if (params != nullptr) {
+        k.word(params->ordered().size());
+        for (const params::IParameter* p : params->ordered()) {
+            k.ptr(p);
+            const std::size_t n = p->componentCount();
+            for (std::size_t c = 0; c < n; ++c) {
+                k.f32(p->baseComponent(c));
+            }
+        }
+    }
+    return k.h;
+}
+
+void EntityWorld::setCheckpointSettings(const CheckpointSettings& settings) {
+    checkpointSettings_ = settings;
+    dropCheckpoints();
+}
+
+void EntityWorld::dropCheckpoints() {
+    if (!checkpoints_.empty()) {
+        ++checkpointInvalidations_;
+    }
+    checkpoints_.clear();
+    checkpoints_.shrink_to_fit();
+    checkpointInterval_ = 0;
+}
+
+EntityWorld::CheckpointStats EntityWorld::checkpointStats() const {
+    CheckpointStats out;
+    out.count = checkpoints_.size();
+    for (const Checkpoint& c : checkpoints_) {
+        out.bytes += c.bytes;
+    }
+    if (!checkpoints_.empty()) {
+        out.lastBytes = checkpoints_.back().bytes;
+        out.latestSeconds = static_cast<double>(checkpoints_.back().step) * checkpointStep_;
+    }
+    out.intervalSeconds = static_cast<double>(checkpointInterval_) * checkpointStep_;
+    out.invalidations = checkpointInvalidations_;
+    out.lastCaptureMs = lastCaptureMs_;
+    out.lastRestoreMs = lastRestoreMs_;
+    return out;
+}
+
+void EntityWorld::captureCheckpoint(std::uint64_t step, const SeekHooks* hooks) {
+    const auto begin = std::chrono::steady_clock::now();
+    const std::uint64_t bytesBefore = core::allocCounters().bytes;
+    Checkpoint c;
+    c.step = step;
+    c.entities.reserve(entities_.size());
+    for (const auto& entity : entities_) {
+        c.entities.push_back(*entity); // the whole entity: see `BehaviorList`
+    }
+    c.worldEvents = worldEvents_;
+    c.eventSequence = eventSequence_;
+    c.eventSignalLast = eventSignalLast_;
+    c.actionEvents = actionEvents_;
+    c.pendingEvents = pendingEvents_;
+    if (hooks != nullptr && hooks->capture) {
+        c.host = hooks->capture();
+    }
+    // Measured, not estimated: the heap bytes the copy allocated, plus the inline size of the
+    // copies. The host's half allocated inside the same window, so it is in the count too.
+    c.bytes = static_cast<std::size_t>(core::allocCounters().bytes - bytesBefore) +
+              c.entities.size() * sizeof(Entity) + sizeof(Checkpoint);
+    const auto at = std::lower_bound(checkpoints_.begin(), checkpoints_.end(), step,
+                                     [](const Checkpoint& x, std::uint64_t s) { return x.step < s; });
+    if (at != checkpoints_.end() && at->step == step) {
+        *at = std::move(c);
+    } else {
+        checkpoints_.insert(at, std::move(c));
+    }
+    thinCheckpoints();
+    lastCaptureMs_ = msSince(begin);
+}
+
+void EntityWorld::thinCheckpoints() {
+    std::size_t total = 0;
+    for (const Checkpoint& c : checkpoints_) {
+        total += c.bytes;
+    }
+    while (total > checkpointSettings_.maxBytes && checkpoints_.size() > 1 && checkpointInterval_ > 0) {
+        // Keep every other one: the survivors are the multiples of twice the interval, so the set
+        // stays evenly spaced and the replay after any seek stays bounded by the new interval.
+        const std::uint64_t wider = checkpointInterval_ * 2;
+        std::erase_if(checkpoints_, [wider](const Checkpoint& c) { return c.step % wider != 0; });
+        checkpointInterval_ = wider;
+        total = 0;
+        for (const Checkpoint& c : checkpoints_) {
+            total += c.bytes;
+        }
+    }
+}
+
+void EntityWorld::restoreCheckpoint(const Checkpoint& checkpoint, const SeekHooks* hooks) {
+    const auto begin = std::chrono::steady_clock::now();
+    for (std::size_t i = 0; i < entities_.size() && i < checkpoint.entities.size(); ++i) {
+        Entity& entity = *entities_[i];
+        entity = checkpoint.entities[i];
+        // The one piece of an entity's state that lives outside it: its declared properties are
+        // mirrored onto parameter bases, and `reset` rewrote those to the authored values.
+        for (std::size_t p = 0; p < entity.propertyValues_.size() && p < entity.propertyParams_.size(); ++p) {
+            if (entity.propertyParams_[p] != nullptr) {
+                entity.propertyParams_[p]->setBase(entity.propertyValues_[p].second);
+            }
+        }
+    }
+    worldEvents_ = checkpoint.worldEvents;
+    eventSequence_ = checkpoint.eventSequence;
+    eventSignalLast_ = checkpoint.eventSignalLast;
+    actionEvents_ = checkpoint.actionEvents;
+    pendingEvents_ = checkpoint.pendingEvents;
+    if (checkpoint.host != nullptr && hooks != nullptr && hooks->restore) {
+        hooks->restore(*checkpoint.host);
+    }
+    lastRestoreMs_ = msSince(begin);
+}
+
 void EntityWorld::seek(double time, params::ParameterSet* params, const signals::SignalBus* bus,
                        double step, SeekBudget budget, const SeekHooks* hooks) {
+    if (budget.mode == SeekMode::Window) {
+        seekWindow(time, params, bus, step, budget, hooks);
+        return;
+    }
+    seekExact(time, params, bus, step, budget, hooks);
+}
+
+// ADR-700. The replay runs on a fixed grid: step 0 is the instant t = 0 with no elapsed time (the
+// play's first frame, ADR-521), and step k > 0 is the instant k / rate with dt = 1 / rate -- the
+// instants a play from zero integrates, spelled the way the play spells them, so a checkpoint taken
+// on the way to one target is the same state a replay to any other target passes through. That is
+// what the old window could not have: it counted back from the target, so its instants were a
+// function of where the seek landed and a state it passed through belonged to that seek alone.
+void EntityWorld::seekExact(double time, params::ParameterSet* params, const signals::SignalBus* bus,
+                            double step, SeekBudget budget, const SeekHooks* hooks) {
+    if (params != nullptr) {
+        params->resetFinals();
+    }
+    reset();
+    navPath_.setNavigator(&nav_);
+    const double target = std::max(time, 0.0);
+    const double dt = std::max(step, 1e-3);
+
+    // The grid. An integral rate (60 Hz) spells instants as k / rate, exactly as `frame / 60.0`;
+    // anything else as k * dt.
+    const double rateReal = 1.0 / dt;
+    const double rateRound = std::round(rateReal);
+    const bool integralRate = std::abs(rateReal - rateRound) < 1e-9 * rateRound;
+    const auto instant = [&](std::uint64_t k) {
+        return integralRate ? static_cast<double>(k) / rateRound : static_cast<double>(k) * dt;
+    };
+    const double exactSteps = target / dt;
+    std::uint64_t last = static_cast<std::uint64_t>(std::llround(exactSteps));
+    const bool onGrid = std::abs(exactSteps - static_cast<double>(last)) <= 1e-6;
+    if (!onGrid) {
+        last = static_cast<std::uint64_t>(std::floor(exactSteps));
+    }
+    // A target between two grid instants gets one short step from the last instant to it. That
+    // step is never recorded, so the grid's checkpoints stay the grid's.
+    const double partialDt = onGrid ? 0.0 : target - instant(last);
+
+    // Which checkpoints are valid: the ones taken with exactly these inputs. Computed *after*
+    // `reset` and after the host's own reset (`seekWithDirector` resets the director first), so the
+    // parameter bases hashed are the authored ones and not whatever the last frame's director
+    // wrote over them.
+    const bool useStore = budget.mode == SeekMode::Checkpointed && checkpointSettings_.enabled;
+    bool invalidated = false;
+    if (useStore) {
+        const std::uint64_t key = checkpointInputKey(params, dt, hooks != nullptr ? hooks->inputKey : 0);
+        const bool changed = key != checkpointKey_ || dt != checkpointStep_;
+        if (changed && !(checkpointSettings_.ignoreInputKey && !checkpoints_.empty())) {
+            invalidated = !checkpoints_.empty();
+            dropCheckpoints();
+            checkpointKey_ = key;
+            checkpointStep_ = dt;
+        }
+        if (checkpointInterval_ == 0) {
+            checkpointInterval_ = std::max<std::uint64_t>(
+                1, static_cast<std::uint64_t>(std::llround(checkpointSettings_.intervalSeconds / dt)));
+        }
+    }
+    const Checkpoint* from = nullptr;
+    if (useStore) {
+        // Strictly before the target step, so at least one step is always replayed. A seek that
+        // landed *on* a checkpoint and replayed nothing would leave the parameter finals as the
+        // reset left them rather than as the target step wrote them (the director's writes and
+        // every body's offsets), which is a different state even though the next frame rebuilds
+        // them -- and the digest test caught exactly that.
+        // (A target between grid instants always replays its short last step, so there the
+        // checkpoint *at* the last grid instant is fair game.)
+        const std::uint64_t bound = partialDt > 0.0 ? last + 1 : last;
+        const auto after = std::lower_bound(checkpoints_.begin(), checkpoints_.end(), bound,
+                                            [](const Checkpoint& c, std::uint64_t s) { return c.step < s; });
+        if (after != checkpoints_.begin()) {
+            from = &*std::prev(after);
+        }
+    }
+    const std::uint64_t first = from != nullptr ? from->step + 1 : 0;
+    const std::uint64_t replaySteps = (last + 1 - first) + (partialDt > 0.0 ? 1u : 0u);
+    const std::uint64_t bodySteps = replaySteps * static_cast<std::uint64_t>(entities_.size());
+
+    // The price cap, in the unit it was always in. Only a replay that would cost more than one click
+    // may pay falls back -- to the window, which is inexact past ninety seconds and says so.
+    if (budget.mode == SeekMode::Checkpointed && budget.maxBodySteps > 0 && bodySteps > budget.maxBodySteps) {
+        SeekBudget window = budget;
+        window.mode = SeekMode::Window;
+        seekWindow(time, params, bus, step, window, hooks);
+        seekWork_.fellBack = true;
+        seekWork_.exact = false;
+        seekWork_.invalidated = invalidated;
+        return;
+    }
+
+    seekFirstStep_.assign(entities_.size(), 0);
+    perceptionCounts_ = PerceptionCounts{};
+    gridPerception_.resetCounts();
+    seekWork_ = SeekWork{};
+    seekWork_.mode = budget.mode;
+    seekWork_.exact = true;
+    seekWork_.invalidated = invalidated;
+    seekWork_.steps = replaySteps;
+    seekWork_.spanSeconds = target - (from != nullptr ? instant(from->step) : 0.0);
+    seekWork_.bodySteps = bodySteps;
+    seekWork_.fullBodySteps = bodySteps;
+    seekWork_.deepBodies = entities_.size();
+    seekWork_.restoredFrom = from != nullptr ? instant(from->step) : -1.0;
+    // TEMPORARY (ui-responsiveness phase 2): what the re-simulation actually integrated.
+    probe2::frame().entitySimSteps += replaySteps;
+    probe2::frame().entitySimBodies += bodySteps;
+    const probe2::Add probeEntitySeek(probe2::frame().entitySeekMs);
+    // ADR-483: the replay reads the terrain and never writes it.
+    std::optional<world::WorldMap::HeightCacheScope> heightCache;
+    if (nav_.map() != nullptr) {
+        heightCache.emplace(*nav_.map());
+    }
+
+    if (from != nullptr) {
+        restoreCheckpoint(*from, hooks);
+    }
+    for (std::uint64_t k = first; k <= last; ++k) {
+        replayStep(instant(k), k == 0 ? 0.0 : dt, k, bus, hooks, true);
+        if (useStore && k > 0 && k % checkpointInterval_ == 0) {
+            const auto at = std::lower_bound(
+                checkpoints_.begin(), checkpoints_.end(), k,
+                [](const Checkpoint& c, std::uint64_t v) { return c.step < v; });
+            const bool have = at != checkpoints_.end() && at->step == k;
+            if (!have) {
+                captureCheckpoint(k, hooks);
+                ++seekWork_.recorded;
+            }
+        }
+    }
+    if (partialDt > 0.0) {
+        replayStep(target, partialDt, last + 1, bus, hooks, true);
+    }
+    publishSeek(target, dt, false);
+}
+
+void EntityWorld::seekWindow(double time, params::ParameterSet* params, const signals::SignalBus* bus,
+                             double step, SeekBudget budget, const SeekHooks* hooks) {
     if (params != nullptr) {
         params->resetFinals();
     }
@@ -1363,196 +1744,207 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         const std::uint64_t i = fromZero && k > 0 ? k - 1 : k;
         const double now = zeroStep ? 0.0 : target - static_cast<double>(steps - 1 - i) * dt;
         const double stepDt = zeroStep ? 0.0 : dt;
-        // ADR-671: the tier above the entities, first, as `Composition::updateBehaviour` runs it.
-        if (hooks != nullptr && hooks->before) {
-            hooks->before(now, stepDt);
-        }
-
-        // The crowd, as it was at the end of the previous step, built before anything moves so
-        // every body separates against the same snapshot. `update` has done this since crowd
-        // separation existed and `seek` never did, so a scrub separated against whatever the last
-        // *played* frame happened to leave behind -- state surviving across the one call whose
-        // whole job is to remove state (ADR-267 defect 2).
-        //
-        // Skipped entirely when nothing needs the window. A body is classified shallow because its
-        // answer at the target is a function of the target, and a crowd query is not: `state_.radius`
-        // is written by `explore`, the crowd is read by `explore`, and `explore` is replayed in full.
-        // Without this an all-craft scene pays 5,400 sweeps over its entities to build a field that
-        // is empty every time and that nothing asks.
-        if (deepBodies > 0) {
-            crowd_.clear();
-            crowdOwner_.clear();
-            for (std::size_t e = 0; e < entities_.size(); ++e) {
-                const Entity& entity = *entities_[e];
-                if (!entity.active_ || entity.state_.radius <= 0.0f) {
-                    continue;
-                }
-                const glm::vec3 at = entity.state_.position();
-                spatial::NavigationObstacle body;
-                body.center = glm::vec2(at.x, at.z);
-                body.radius = entity.state_.radius;
-                body.base = at.y;
-                body.height = std::max(entity.state_.radius * 2.0f, 1.0f);
-                body.type = spatial::ObstacleType::Creature;
-                crowd_.add(body);
-                crowdOwner_.push_back(e);
-            }
-            crowd_.build();
-        }
-        // And the sense stage's snapshot, on the same terms. A replay that skipped it would leave
-        // every character knowing nothing at the second the scrub landed on, which is a working set
-        // reconstructed wrongly rather than not at all -- and D4 is the promise that the replay
-        // *is* the memory. `senseTick` is a pure function of the instant, so a replayed body senses
-        // at the same instants a played one does and arrives at the same working set.
-        if (perceiving_) {
-            buildBodyIndex();
-            gridPerception_.setIndex(perceptionIndex());
-            gridPerception_.setClearance(nav_.valid() ? &nav_.clearance() : nullptr);
-        }
-
-        for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
-            if (i < seekFirstStep_[entityIndex]) {
-                continue; // its answer at `target` cannot depend on this step
-            }
-            Entity& entity = *entities_[entityIndex];
-            // ADR-620's "the speed this body had last step", taken where `update` takes it -- before
-            // the action tier writes this step's. Taken after the queue (as it was), the limiter's
-            // "previous" was the action's new speed and a replayed body started every walk without
-            // its ramp: a scrub 1.7 cm off a play in the Glowmere film (Phase D §63, measured).
-            const float speedBefore = entity.state_.speed;
-            entity.motion_ = MotionOffset{};
-            entity.state_.hasLookTarget = false;
-            entity.state_.reaction = 0.0f;
-            // **`turnRate` is a RATE, so it is cleared with `activity` and for the same reason**
-            // (ADR-619). Every turner writes it while it turns and none wrote zero when it
-            // stopped, and `EntityState` persists -- so the last rate a body turned at survived
-            // until something happened to write another. `Gait::select` reads it as this frame's
-            // rate, which is the only reading under which its `turnEnter` band means anything, and
-            // a standing body therefore kept classifying as `Activity::Turn`: measured at 509 of
-            // 600 stationary frames, at a stale 2.094 rad/s against a 0.35 threshold.
-            //
-            // Clearing it here makes the contract the same one `activity` already has -- a
-            // behaviour publishes what is true this frame, and silence means nothing is happening.
-            // Every existing writer already computes an instantaneous `turned / dt`, so none of
-            // them relied on the latch.
-            entity.state_.activity = Activity::Idle;
-            entity.state_.turnRate = 0.0f;
-            entity.state_.detail = 1.0f;
-            entity.state_.driven = false;
-            entity.state_.airborne = false;
-            // Phase D §3: intent is what the body wants THIS step, published by whoever moves it and
-            // whoever decided it. Cleared on both paths with the other per-step fields, so a step in
-            // which nobody published one falls back to the polar pair rather than latching the last.
-            entity.state_.intent.clear();
-            entity.active_ = true;
-            entity.everUpdated_ = true;
-
-            // ---- the Director tier (ADR-210), replayed since ADR-671 ----
-            // Inactive on every step of a replay whose caller does not replay the director (its
-            // motion was cleared by `reset`), so this is a no-op for every seek before ADR-671.
-            directorBefore(entity);
-
-            // ---- intent, before behaviour (ADR-091) ----
-            // Not replayed at all before this: `reset()` put the authored action list back and then
-            // nothing integrated it, so ADR-091's Cinematic Action tier was the one tier a scrub
-            // could not reproduce (ADR-267 defect 3). The events it raises are collected and thrown
-            // away -- they belong to the moment they happened, and the moment is eighty seconds ago.
-            entity.schedule_.update(now, entity.actions_);
-            // The activity this action wants played, kept across the loop so the publish below can
-            // carry it. It has to survive the iteration rather than be read at the end, because on
-            // the final step the queue may have nothing pending and the answer is still whatever
-            // the last step decided.
-            entity.locomotion_.action.clear();
-            if (entity.actions_.pending() > 0) {
-                seekEvents_.clear();
-                ActionContext ac;
-                ac.time = now;
-                ac.dt = stepDt;
-                ac.rng = &entity.rng_;
-                ac.self = &entity;
-                ac.world = this;
-                ac.path = &pathProvider();
-                ac.gait = &entity.desc_.gait;
-                ac.events = &seekEvents_;
-                // **The result was discarded here, with a literal `(void)`.** `update` captures it
-                // and publishes `locomotion_.action`, which is what picks the clip -- an action's
-                // activity first, the gait's second. Throwing it away meant a body that sits while
-                // the timeline runs stood up and walked the moment anyone scrubbed to the same
-                // frame: an ADR-360 violation in the one tier ADR-267 defect 3 had already had to
-                // teach this function to replay.
-                const ActionOutput out = entity.actions_.update(ac, entity.state_);
-                // Phase D §26: the events are discarded as *application* events (above), but they
-                // are also world events a replayed character may hear -- and a replay that did not
-                // re-raise them would be a scrub in which the mushroom never bloomed.
-                raiseActionEvents(seekEvents_, 0, entityIndex, now);
-                if (entity.locomotion_.action != out.activity) {
-                    entity.locomotion_.action.assign(out.activity);
-                }
-            }
-
-            if (perceiving_) {
-                perceiveOne(entityIndex, now);
-            }
-
-            BehaviorContext bc;
-            bc.time = now;
-            bc.dt = stepDt;
-            bc.bus = bus;
-            bc.nav = &nav_;
-            bc.world = this;
-            // Which body this is. Omitted here and present in `update`, so every character
-            // separated from entity 0 instead of from itself (ADR-267 defect 1) -- which for the
-            // body that *is* entity 0 meant it pushed itself, and for everything else meant one
-            // neighbour was invisible and one phantom was not.
-            bc.self = entityIndex;
-            bc.rng = &entity.rng_;
-            // ADR-333. The same seam the played frame has, and it has to be here or a decider
-            // would be the one tier a scrub could not reproduce -- which is ADR-267 defect 3 again,
-            // one layer up. A decision taken during a replay pushes onto the queue the replay is
-            // already integrating, so the replayed second contains the errand the played one did.
-            bc.actions = &entity.actions_;
-            // ADR-620, and it is applied on BOTH paths for the reason testing.md #38 gives: a
-            // limit honoured by `update` and not by `seek` is a body that accelerates differently
-            // when scrubbed than when played, which is exactly the class ADR-360 exists to stop.
-            for (auto& behavior : entity.behaviors_) {
-                behavior->update(bc, entity.state_, entity.motion_);
-            }
-            directorAfter(entity);
-            limitSpeedToGait(entity.desc_.gait, speedBefore, stepDt, entity.state_.speed);
-            rescaleIntent(entity.state_);
-            // The facing, canonicalised once after everything that steers has had its turn --
-            // exactly where `update` does it. Without it a replayed yaw is the total a body has
-            // turned rather than the direction it faces, and `angleDelta` against it is a different
-            // number after 5,400 steps than after 1.
-            entity.state_.yaw = wrapAngle(entity.state_.yaw, 3.14159265358979323846f);
-            if (entity.state_.activity == Activity::Idle && entity.state_.reaction > 0.4f) {
-                entity.state_.activity = Activity::React;
-            }
-            // The gait, with its hysteresis, because the hysteresis is state: a seek that published
-            // the raw activity landed on a different clip from the play it is supposed to match,
-            // on exactly the frames where the speed is sitting on a threshold.
-            entity.locomotion_.activity =
-                entity.gait_.select(entity.desc_.gait, entity.state_.activity, entity.state_.speed,
-                                    entity.state_.turnRate, stepDt);
-            // ADR-545's measured velocity, on this path too (Phase D §63). `update` measured it and
-            // `seek` never did, so a replayed body reported zero velocity for the whole replay --
-            // harmless while nothing inside the step read it, and a scrub/play divergence the day
-            // the awareness layer did (habituation accrues only while a body is still).
-            measureStepVelocity(entity, stepDt);
-            // ADR-623: **the provider memory, on every replayed step, at that step's own time**,
-            // after the measured velocity exactly as `update` orders them. `stepDt`, so the zero
-            // step advances with no elapsed time, as the play's first frame does.
-            entity.advanceMotion(now, static_cast<float>(stepDt));
-        }
-        // ADR-671: and whatever has to see this step's settled bodies before the next begins.
-        if (hooks != nullptr && hooks->after) {
-            hooks->after(now, stepDt);
-        }
+        replayStep(now, stepDt, i, bus, hooks, deepBodies > 0);
     }
+    seekWork_.mode = SeekMode::Window;
+    seekWork_.exact = !budgetBound && fromZero;
+    publishSeek(target, dt, steps == 0);
+}
+
+void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const signals::SignalBus* bus,
+                             const SeekHooks* hooks, bool buildCrowd) {
+    // ADR-671: the tier above the entities, first, as `Composition::updateBehaviour` runs it.
+    if (hooks != nullptr && hooks->before) {
+        hooks->before(now, stepDt);
+    }
+
+    // The crowd, as it was at the end of the previous step, built before anything moves so
+    // every body separates against the same snapshot. `update` has done this since crowd
+    // separation existed and `seek` never did, so a scrub separated against whatever the last
+    // *played* frame happened to leave behind -- state surviving across the one call whose
+    // whole job is to remove state (ADR-267 defect 2).
+    //
+    // Skipped entirely when nothing needs the window. A body is classified shallow because its
+    // answer at the target is a function of the target, and a crowd query is not: `state_.radius`
+    // is written by `explore`, the crowd is read by `explore`, and `explore` is replayed in full.
+    // Without this an all-craft scene pays 5,400 sweeps over its entities to build a field that
+    // is empty every time and that nothing asks.
+    if (buildCrowd) {
+        crowd_.clear();
+        crowdOwner_.clear();
+        for (std::size_t e = 0; e < entities_.size(); ++e) {
+            const Entity& entity = *entities_[e];
+            if (!entity.active_ || entity.state_.radius <= 0.0f) {
+                continue;
+            }
+            const glm::vec3 at = entity.state_.position();
+            spatial::NavigationObstacle body;
+            body.center = glm::vec2(at.x, at.z);
+            body.radius = entity.state_.radius;
+            body.base = at.y;
+            body.height = std::max(entity.state_.radius * 2.0f, 1.0f);
+            body.type = spatial::ObstacleType::Creature;
+            crowd_.add(body);
+            crowdOwner_.push_back(e);
+        }
+        crowd_.build();
+    }
+    // And the sense stage's snapshot, on the same terms. A replay that skipped it would leave
+    // every character knowing nothing at the second the scrub landed on, which is a working set
+    // reconstructed wrongly rather than not at all -- and D4 is the promise that the replay
+    // *is* the memory. `senseTick` is a pure function of the instant, so a replayed body senses
+    // at the same instants a played one does and arrives at the same working set.
+    if (perceiving_) {
+        buildBodyIndex();
+        gridPerception_.setIndex(perceptionIndex());
+        gridPerception_.setClearance(nav_.valid() ? &nav_.clearance() : nullptr);
+    }
+
+    for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
+        if (i < seekFirstStep_[entityIndex]) {
+            continue; // its answer at `target` cannot depend on this step
+        }
+        Entity& entity = *entities_[entityIndex];
+        // ADR-620's "the speed this body had last step", taken where `update` takes it -- before
+        // the action tier writes this step's. Taken after the queue (as it was), the limiter's
+        // "previous" was the action's new speed and a replayed body started every walk without
+        // its ramp: a scrub 1.7 cm off a play in the Glowmere film (Phase D §63, measured).
+        const float speedBefore = entity.state_.speed;
+        entity.motion_ = MotionOffset{};
+        entity.state_.hasLookTarget = false;
+        entity.state_.reaction = 0.0f;
+        // **`turnRate` is a RATE, so it is cleared with `activity` and for the same reason**
+        // (ADR-619). Every turner writes it while it turns and none wrote zero when it
+        // stopped, and `EntityState` persists -- so the last rate a body turned at survived
+        // until something happened to write another. `Gait::select` reads it as this frame's
+        // rate, which is the only reading under which its `turnEnter` band means anything, and
+        // a standing body therefore kept classifying as `Activity::Turn`: measured at 509 of
+        // 600 stationary frames, at a stale 2.094 rad/s against a 0.35 threshold.
+        //
+        // Clearing it here makes the contract the same one `activity` already has -- a
+        // behaviour publishes what is true this frame, and silence means nothing is happening.
+        // Every existing writer already computes an instantaneous `turned / dt`, so none of
+        // them relied on the latch.
+        entity.state_.activity = Activity::Idle;
+        entity.state_.turnRate = 0.0f;
+        entity.state_.detail = 1.0f;
+        entity.state_.driven = false;
+        entity.state_.airborne = false;
+        // Phase D §3: intent is what the body wants THIS step, published by whoever moves it and
+        // whoever decided it. Cleared on both paths with the other per-step fields, so a step in
+        // which nobody published one falls back to the polar pair rather than latching the last.
+        entity.state_.intent.clear();
+        entity.active_ = true;
+        entity.everUpdated_ = true;
+
+        // ---- the Director tier (ADR-210), replayed since ADR-671 ----
+        // Inactive on every step of a replay whose caller does not replay the director (its
+        // motion was cleared by `reset`), so this is a no-op for every seek before ADR-671.
+        directorBefore(entity);
+
+        // ---- intent, before behaviour (ADR-091) ----
+        // Not replayed at all before this: `reset()` put the authored action list back and then
+        // nothing integrated it, so ADR-091's Cinematic Action tier was the one tier a scrub
+        // could not reproduce (ADR-267 defect 3). The events it raises are collected and thrown
+        // away -- they belong to the moment they happened, and the moment is eighty seconds ago.
+        entity.schedule_.update(now, entity.actions_);
+        // The activity this action wants played, kept across the loop so the publish below can
+        // carry it. It has to survive the iteration rather than be read at the end, because on
+        // the final step the queue may have nothing pending and the answer is still whatever
+        // the last step decided.
+        entity.locomotion_.action.clear();
+        if (entity.actions_.pending() > 0) {
+            seekEvents_.clear();
+            ActionContext ac;
+            ac.time = now;
+            ac.dt = stepDt;
+            ac.rng = &entity.rng_;
+            ac.self = &entity;
+            ac.world = this;
+            ac.path = &pathProvider();
+            ac.gait = &entity.desc_.gait;
+            ac.events = &seekEvents_;
+            // **The result was discarded here, with a literal `(void)`.** `update` captures it
+            // and publishes `locomotion_.action`, which is what picks the clip -- an action's
+            // activity first, the gait's second. Throwing it away meant a body that sits while
+            // the timeline runs stood up and walked the moment anyone scrubbed to the same
+            // frame: an ADR-360 violation in the one tier ADR-267 defect 3 had already had to
+            // teach this function to replay.
+            const ActionOutput out = entity.actions_.update(ac, entity.state_);
+            // Phase D §26: the events are discarded as *application* events (above), but they
+            // are also world events a replayed character may hear -- and a replay that did not
+            // re-raise them would be a scrub in which the mushroom never bloomed.
+            raiseActionEvents(seekEvents_, 0, entityIndex, now);
+            if (entity.locomotion_.action != out.activity) {
+                entity.locomotion_.action.assign(out.activity);
+            }
+        }
+
+        if (perceiving_) {
+            perceiveOne(entityIndex, now);
+        }
+
+        BehaviorContext bc;
+        bc.time = now;
+        bc.dt = stepDt;
+        bc.bus = bus;
+        bc.nav = &nav_;
+        bc.world = this;
+        // Which body this is. Omitted here and present in `update`, so every character
+        // separated from entity 0 instead of from itself (ADR-267 defect 1) -- which for the
+        // body that *is* entity 0 meant it pushed itself, and for everything else meant one
+        // neighbour was invisible and one phantom was not.
+        bc.self = entityIndex;
+        bc.rng = &entity.rng_;
+        // ADR-333. The same seam the played frame has, and it has to be here or a decider
+        // would be the one tier a scrub could not reproduce -- which is ADR-267 defect 3 again,
+        // one layer up. A decision taken during a replay pushes onto the queue the replay is
+        // already integrating, so the replayed second contains the errand the played one did.
+        bc.actions = &entity.actions_;
+        // ADR-620, and it is applied on BOTH paths for the reason testing.md #38 gives: a
+        // limit honoured by `update` and not by `seek` is a body that accelerates differently
+        // when scrubbed than when played, which is exactly the class ADR-360 exists to stop.
+        for (auto& behavior : entity.behaviors_) {
+            behavior->update(bc, entity.state_, entity.motion_);
+        }
+        directorAfter(entity);
+        limitSpeedToGait(entity.desc_.gait, speedBefore, stepDt, entity.state_.speed);
+        rescaleIntent(entity.state_);
+        // The facing, canonicalised once after everything that steers has had its turn --
+        // exactly where `update` does it. Without it a replayed yaw is the total a body has
+        // turned rather than the direction it faces, and `angleDelta` against it is a different
+        // number after 5,400 steps than after 1.
+        entity.state_.yaw = wrapAngle(entity.state_.yaw, 3.14159265358979323846f);
+        if (entity.state_.activity == Activity::Idle && entity.state_.reaction > 0.4f) {
+            entity.state_.activity = Activity::React;
+        }
+        // The gait, with its hysteresis, because the hysteresis is state: a seek that published
+        // the raw activity landed on a different clip from the play it is supposed to match,
+        // on exactly the frames where the speed is sitting on a threshold.
+        entity.locomotion_.activity =
+            entity.gait_.select(entity.desc_.gait, entity.state_.activity, entity.state_.speed,
+                                entity.state_.turnRate, stepDt);
+        // ADR-545's measured velocity, on this path too (Phase D §63). `update` measured it and
+        // `seek` never did, so a replayed body reported zero velocity for the whole replay --
+        // harmless while nothing inside the step read it, and a scrub/play divergence the day
+        // the awareness layer did (habituation accrues only while a body is still).
+        measureStepVelocity(entity, stepDt);
+        // ADR-623: **the provider memory, on every replayed step, at that step's own time**,
+        // after the measured velocity exactly as `update` orders them. `stepDt`, so the zero
+        // step advances with no elapsed time, as the play's first frame does.
+        entity.advanceMotion(now, static_cast<float>(stepDt));
+    }
+    // ADR-671: and whatever has to see this step's settled bodies before the next begins.
+    if (hooks != nullptr && hooks->after) {
+        hooks->after(now, stepDt);
+    }
+}
+
+void EntityWorld::publishSeek(double target, double dt, bool replayedNothing) {
     // Publish the state the next frame will build on, without touching the parameter set.
     for (auto& entityPtr : entities_) {
         Entity& entity = *entityPtr;
-        if (steps == 0) {
+        if (replayedNothing) {
             entity.locomotion_.activity = entity.state_.activity;
         }
         entity.locomotion_.playbackRate =
@@ -1593,7 +1985,7 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
         // Phase B: the provider memory. Advanced inside the replay above, once per step (ADR-623).
         // Only a seek with nothing to replay advances it here, once, at the target, as the played
         // frame at that instant did.
-        if (steps == 0) {
+        if (replayedNothing) {
             entity.advanceMotion(entity.locomotion_.time, 0.0f);
         }
         entity.locomotion_.reaction = entity.state_.reaction;
@@ -2295,6 +2687,7 @@ glm::vec3 Entity::fieldPosition() const {
 }
 
 void EntityWorld::setFields(std::vector<FieldDesc> fields) {
+    ++inputEpoch_; // ADR-700: a checkpoint taken before this is for different inputs
     fields_ = std::move(fields);
     fieldParams_.assign(fields_.size(), FieldParams{});
     fieldsBound_ = false;
