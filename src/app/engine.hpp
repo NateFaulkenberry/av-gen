@@ -63,6 +63,18 @@ namespace avgen::app {
 
 enum class EngineMode { Live, Offline };
 
+// ADR-582: what a deliberate hand-back of the camera takes *off* the camera, kept exactly as it was
+// so it can be put back. The focus schedule (`Engine::shotSpans`) is not in here, because parking
+// does not touch it: effects keep following it while the director is parked.
+struct ParkedDirectorsCut {
+    std::vector<params::Track> tracks;          // the `directedCameraTargets()` tracks, unbound
+    std::vector<scene::AimFollow> aimFollow;    // ADR-158's table
+    std::vector<scene::CameraShot> cameraShots; // ADR-249's `Origin::Directed` shots
+    [[nodiscard]] bool empty() const {
+        return tracks.empty() && aimFollow.empty() && cameraShots.empty();
+    }
+};
+
 // Where the beat clock (beat.* signals, SourceContext tempo fields, the timeline's beat time)
 // comes from: the audio analyzer, or an incoming MIDI clock (ADR-021 follow-up). With MidiClock
 // selected but no running clock the analyzer is used; the analyzer keeps running either way.
@@ -484,11 +496,34 @@ public:
     // on and it must not be introduced by a button.
     std::size_t addDefaultAtmosphericRoutes(std::string_view effectName);
 
-    // The director's cut, flattened to what an effect needs for time gating (ADR-207). Installed by
-    // `app::installSequence` and cleared by `releaseDirectedCamera`; empty means nothing is directing
-    // the camera, in which case `CameraTravel` and `HeroFocus` effects simply never activate.
+    // The director's cut, flattened to what an effect needs for time gating (ADR-207): the film's
+    // **focus schedule**. Installed by `app::installSequence` and replaced or removed only by an
+    // explicit re-bake or `app::discardDirectorsCut` (ADR-582). Taking the camera back does NOT
+    // clear it: who is steering the camera and when the film holds each hero are different facts,
+    // and `CameraTravel` and `HeroFocus` effects follow the schedule whether the director is
+    // steering or parked. Empty means no cut was ever made, and those effects never activate.
     void setShotSpans(std::vector<world::ShotSpan> spans) { shotSpans_ = std::move(spans); }
     [[nodiscard]] std::span<const world::ShotSpan> shotSpans() const { return shotSpans_; }
+
+    // ADR-582: the half of a director's cut that *steers the camera*, taken off the camera and kept.
+    //
+    // `app::releaseDirectedCamera` moves the director-owned camera tracks, the aim-follow table and
+    // the directed camera shots here instead of erasing them, and `app::resumeDirectedCamera` moves
+    // them back unchanged. Held on the engine rather than in the application's `DirectorState` for
+    // the reason `autoDirector_` is: it is saved with the project (`parkedDirector`), because a
+    // parked cut that only lived in memory is a cut the next session does not have.
+    //
+    // The tracks are kept out of the timeline rather than disabled inside it. A disabled track still
+    // answers `findTrack`, so the first camera key somebody recorded while parked would have landed
+    // on the director's own track and changed the cut that "Resume" promises to restore exactly.
+    [[nodiscard]] const ParkedDirectorsCut& parkedCut() const { return parkedCut_; }
+    void setParkedCut(ParkedDirectorsCut cut) { parkedCut_ = std::move(cut); }
+    [[nodiscard]] bool directorParked() const { return !parkedCut_.empty(); }
+
+    // Bumped every time the scene controller is replaced -- a project load, a scene swap, an
+    // assistant rollback. The director's state compares it so a revision counter from one scene is
+    // never read as a change in the next one (ADR-582: that coincidence was an implicit re-cut).
+    [[nodiscard]] std::uint64_t sceneGeneration() const { return sceneGeneration_; }
 
     // ADR-225: the Auto-director's controls, saved with the project.
     //
@@ -830,6 +865,8 @@ private:
     // instead of sixty times a second. Cleared whenever the effect list changes.
     std::vector<std::string> reportedDeadFields_;
     std::vector<world::ShotSpan> shotSpans_;
+    ParkedDirectorsCut parkedCut_;      // ADR-582: the steering half of a cut, kept while parked
+    std::uint64_t sceneGeneration_ = 0; // ADR-582: see sceneGeneration()
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     SongPlan songPlan_;                 // ADR-249: the same, for Song Mode's authored intents
     std::uint32_t lastWorldEffectCount_ = 0;

@@ -262,6 +262,13 @@ struct CameraShot {
         return seconds >= startSeconds && seconds < endSeconds;
     }
 
+    // One shot's document. `CameraDirection` writes and reads its shot list through these, and so
+    // does a project's parked director's cut (ADR-582), so the two cannot disagree about a field.
+    // `fromJson` checks the shot's own fields only; whether its camera exists is the collection's
+    // question (`CameraDirection::validate`).
+    [[nodiscard]] nlohmann::json toJson() const;
+    [[nodiscard]] static Result<CameraShot> fromJson(const nlohmann::json& doc);
+
     friend bool operator==(const CameraShot&, const CameraShot&) = default;
 };
 

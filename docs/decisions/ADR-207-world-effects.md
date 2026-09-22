@@ -1,6 +1,6 @@
 # ADR-207: World effects propagate through one frame-global block, not through per-object state
 
-Status: Accepted
+Status: Accepted; the rule that a cut-gated effect stops firing once the cut stops driving the camera is superseded by [ADR-582](ADR-582-taking-the-camera-back-parks-the-cut-it-never-destroys-it.md) (owner's ruling, 2026-09-21): taking the camera back parks the cut, and HeroFocus and CameraTravel effects keep following its saved schedule.
 
 ## Context / Problem
 

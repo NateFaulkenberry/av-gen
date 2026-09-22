@@ -1,6 +1,6 @@
 # ADR-249 — A section says what it wants, not which camera
 
-**Status:** Accepted
+**Status:** Accepted; handing the camera back no longer deletes the directed camera shots. They are parked and restored by Resume Director, per [ADR-582](ADR-582-taking-the-camera-back-parks-the-cut-it-never-destroys-it.md) (2026-09-21).
 **Date:** 2026-09-16
 
 

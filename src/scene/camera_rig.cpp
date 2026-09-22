@@ -233,6 +233,57 @@ Result<void> CameraDirection::validate() const {
     return {};
 }
 
+json CameraShot::toJson() const {
+    json s = json::object();
+    s["camera"] = camera;
+    s["start"] = startSeconds;
+    s["end"] = endSeconds;
+    s["transition"] = shotTransitionName(transition);
+    if (transition == ShotTransition::Blend) {
+        s["blend"] = blendSeconds;
+    }
+    if (locked) {
+        s["locked"] = true;
+    }
+    if (!label.empty()) {
+        s["label"] = label;
+    }
+    // Written only when it is not the default, so an untouched project is byte-identical.
+    if (origin == Origin::Directed) {
+        s["origin"] = "directed";
+    }
+    return s;
+}
+
+Result<CameraShot> CameraShot::fromJson(const json& sh) {
+    if (!sh.is_object()) {
+        return fail("a camera shot must be a JSON object");
+    }
+    CameraShot shot;
+    shot.camera = sh.value("camera", kNoCamera);
+    shot.startSeconds = sh.value("start", 0.0);
+    shot.endSeconds = sh.value("end", 0.0);
+    if (const auto t = sh.find("transition"); t != sh.end() && t->is_string()) {
+        const auto parsed = shotTransitionFromName(t->get<std::string>());
+        if (!parsed) {
+            return fail("shot transition '{}' is not one of cut, blend", t->get<std::string>());
+        }
+        shot.transition = *parsed;
+    }
+    shot.blendSeconds = sh.value("blend", 0.0);
+    shot.locked = sh.value("locked", false);
+    shot.label = sh.value("label", std::string());
+    if (const auto o = sh.find("origin"); o != sh.end() && o->is_string()) {
+        const std::string origin = o->get<std::string>();
+        if (origin == "directed") {
+            shot.origin = Origin::Directed;
+        } else if (origin != "authored") {
+            return fail("shot origin '{}' is not one of authored, directed", origin);
+        }
+    }
+    return shot;
+}
+
 json CameraDirection::toJson() const {
     json cams = json::array();
     for (const CameraRig& rig : cameras) {
@@ -295,25 +346,7 @@ json CameraDirection::toJson() const {
     }
     json shotArray = json::array();
     for (const CameraShot& shot : shots) {
-        json s = json::object();
-        s["camera"] = shot.camera;
-        s["start"] = shot.startSeconds;
-        s["end"] = shot.endSeconds;
-        s["transition"] = shotTransitionName(shot.transition);
-        if (shot.transition == ShotTransition::Blend) {
-            s["blend"] = shot.blendSeconds;
-        }
-        if (shot.locked) {
-            s["locked"] = true;
-        }
-        if (!shot.label.empty()) {
-            s["label"] = shot.label;
-        }
-        // Written only when it is not the default, so an untouched project is byte-identical.
-        if (shot.origin == CameraShot::Origin::Directed) {
-            s["origin"] = "directed";
-        }
-        shotArray.push_back(std::move(s));
+        shotArray.push_back(shot.toJson());
     }
     return json{{"cameras", std::move(cams)},
                 {"shots", std::move(shotArray)},
@@ -387,29 +420,11 @@ Result<CameraDirection> CameraDirection::fromJson(const json& doc) {
             if (!sh.is_object()) {
                 return fail("every entry of cameraDirection.shots must be an object");
             }
-            CameraShot shot;
-            shot.camera = sh.value("camera", kNoCamera);
-            shot.startSeconds = sh.value("start", 0.0);
-            shot.endSeconds = sh.value("end", 0.0);
-            if (const auto t = sh.find("transition"); t != sh.end() && t->is_string()) {
-                const auto parsed = shotTransitionFromName(t->get<std::string>());
-                if (!parsed) {
-                    return fail("shot transition '{}' is not one of cut, blend", t->get<std::string>());
-                }
-                shot.transition = *parsed;
+            auto shot = CameraShot::fromJson(sh);
+            if (!shot) {
+                return std::unexpected(shot.error());
             }
-            shot.blendSeconds = sh.value("blend", 0.0);
-            shot.locked = sh.value("locked", false);
-            shot.label = sh.value("label", std::string());
-            if (const auto o = sh.find("origin"); o != sh.end() && o->is_string()) {
-                const std::string origin = o->get<std::string>();
-                if (origin == "directed") {
-                    shot.origin = CameraShot::Origin::Directed;
-                } else if (origin != "authored") {
-                    return fail("shot origin '{}' is not one of authored, directed", origin);
-                }
-            }
-            out.shots.push_back(std::move(shot));
+            out.shots.push_back(std::move(*shot));
         }
     }
     out.defaultCamera = doc.value("default", kMainCamera);
