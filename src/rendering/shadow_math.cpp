@@ -278,11 +278,23 @@ CasterState casterEligibility(const scene::Entity& entity) {
     if (!entity.castsShadow) {
         return CasterState::ShadowDisabled;
     }
-    // The three exclusions the shadow passes apply, and they are the opaque list's own membership
-    // test: a grid is a wireframe, water is translucent (ADR-099), and a blended surface casting a
-    // hard silhouette is the bug that flag was added to avoid.
-    if (entity.style == scene::MeshStyle::Grid || entity.style == scene::MeshStyle::Water ||
-        entity.material.alphaMode == scene::AlphaMode::Blend) {
+    // The exclusions the shadow passes apply: a grid is a wireframe, water is translucent
+    // (ADR-099).
+    if (entity.style == scene::MeshStyle::Grid || entity.style == scene::MeshStyle::Water) {
+        return CasterState::StyleExcluded;
+    }
+    // A blended surface was excluded here too, on the grounds that "a blended surface casting a
+    // hard silhouette is the bug that flag was added to avoid". It no longer casts a hard one:
+    // `fs_depth` in pbr.wgsl discards an ordered fraction of its depth texels, so what it casts is
+    // proportional to its alpha. Excluding it outright was the *other* bug -- under ADR-385 a
+    // fading body is promoted to Blend for exactly the frames it is under 1.0 opacity, so this
+    // line deleted an abducted animal's shadow on the first frame of a 1.2 s dissolve and left it
+    // standing in a beam with no shadow for a second before it was gone.
+    //
+    // Fully transparent is still not a caster: there is nothing to cast, the dither would discard
+    // every fragment of it anyway, and skipping it saves the draw. Still `StyleExcluded`, because
+    // the reason is the material rather than the geometry or the frustum.
+    if (entity.material.alphaMode == scene::AlphaMode::Blend && entity.material.opacity <= 0.0f) {
         return CasterState::StyleExcluded;
     }
     return CasterState::Caster;

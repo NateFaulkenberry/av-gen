@@ -3128,6 +3128,28 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 continue;
             }
             blended.push_back(*item);
+            // A blended body still casts, and it casts *less* the more transparent it is.
+            //
+            // It used to cast nothing: this arm ended at the line above, and only the `else`
+            // below ever reached `shadowCasters`. That was survivable while "blended" meant a
+            // pane of glass or a leaf card, and stopped being survivable when ADR-385 gave the
+            // engine a fade -- a node under 1.0 opacity is *promoted* to Blend for the frames it
+            // is fading, so the abducted animal left the caster list on the first frame of its
+            // dissolve and its shadow vanished a second before it did. Measured on the shipped
+            // film: `shadows.entityDraws` fell 31 -> 30 at t = 13.717 s, at an opacity of 0.998,
+            // and the body was not gone until 14.85 s.
+            //
+            // The depth pass does the proportioning (`fs_depth` in pbr.wgsl discards an ordered
+            // fraction of the texels), so what is decided here is only whether the caster is
+            // offered at all -- and that question is asked of `casterEligibility`, the same
+            // function the Shadow Lab's diagnostic asks, rather than of a second copy of the rule
+            // written out here. The header above it says why: two copies of this test in two
+            // files is how a diagnostic and the pass it describes come to disagree about one
+            // entity. A body at zero opacity comes back excluded, which is right twice over --
+            // there is nothing to cast, and the dither would discard every fragment anyway.
+            if (casts(casterEligibility(entity))) {
+                shadowCasters.push_back(*item);
+            }
         } else {
             opaque.push_back(*item);
             if (entity.castsShadow) {
