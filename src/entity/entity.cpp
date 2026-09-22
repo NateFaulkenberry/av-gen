@@ -1110,6 +1110,12 @@ void Entity::advanceMotion(double time, float dt) {
     }
     request.desiredTurnRate = state_.turnRate;
     request.bodyFacing = state_.facing();
+    // How the body is moving now: its rate-limited speed along its heading (ADR-620), not the
+    // measured `state_.velocity`. The measured one is a backward difference that reads zero on a
+    // body's first steps and across a seek, so a prediction built on it made a scrub disagree with
+    // the play it is supposed to reproduce (ADR-360). The limited speed is replayed exactly.
+    request.bodyVelocity = heading * state_.speed;
+    request.bodyVelocityKnown = true;
     request.mode = state_.airborne ? MovementMode::Airborne : MovementMode::Ground;
     MotionMemory next;
     motionChainResult_ = motionChain_->advance(request, motionMemory_, time, dt, next);

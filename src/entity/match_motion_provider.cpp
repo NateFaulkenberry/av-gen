@@ -1,8 +1,10 @@
 #include "entity/match_motion_provider.hpp"
+#include "entity/trajectory_prediction.hpp"
 
 #include "scene/animation.hpp"
 #include "scene/skeleton.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
@@ -94,6 +96,59 @@ Carried carryOn(const scene::MotionDatabase& db, std::uint32_t sample, float tim
     return out;
 }
 
+
+// §71: the body frame a clip's pose is expressed in at `time`, for a clip whose travel is real:
+// the travel joint's horizontal position and facing, interpolated between the sample and the one
+// after it in the same clip. Returns false for an in-place clip, or a database that does not carry
+// root frames, which is posed as authored.
+bool rootFrameAt(const scene::MotionDatabase& db, std::uint32_t sample, float time, glm::vec3& at, float& yaw) {
+    if (db.sampleRoot.size() != 3u * db.sampleCount() || sample >= db.sampleCount()) {
+        return false;
+    }
+    const std::uint32_t clip = db.sampleClip[sample];
+    if (clip >= db.clipTravels.size() || db.clipTravels[clip] == 0u) {
+        return false;
+    }
+    const float* a = db.sampleRoot.data() + (3u * static_cast<std::size_t>(sample));
+    at = glm::vec3(a[0], 0.0f, a[1]);
+    yaw = a[2];
+    const std::uint32_t next = db.sampleNext[sample];
+    if (next != scene::MotionDatabase::kInvalid && next > sample) {
+        const float span = db.sampleTime[next] - db.sampleTime[sample];
+        const float s = span > 0.0f ? std::clamp((time - db.sampleTime[sample]) / span, 0.0f, 1.0f) : 0.0f;
+        const float* b = db.sampleRoot.data() + (3u * static_cast<std::size_t>(next));
+        at = glm::mix(at, glm::vec3(b[0], 0.0f, b[1]), s);
+        float dYaw = b[2] - a[2];
+        while (dYaw > 3.14159265f) { dYaw -= 6.28318531f; }
+        while (dYaw < -3.14159265f) { dYaw += 6.28318531f; }
+        yaw = a[2] + (dYaw * s);
+    }
+    return true;
+}
+
+// Re-express `pose` in its body frame: the travel joint moved to the origin horizontally and turned
+// to face +Z. Applied to the top-level joints, so everything under them follows.
+void toBodyFrame(const scene::Skeleton& skeleton, scene::Pose& pose, const glm::vec3& at, float yaw) {
+    const glm::mat4 w = glm::rotate(glm::mat4(1.0f), -yaw, glm::vec3(0.0f, 1.0f, 0.0f)) *
+                        glm::translate(glm::mat4(1.0f), -at);
+    for (std::size_t j = 0; j < skeleton.joints.size() && j < pose.local.size(); ++j) {
+        if (skeleton.joints[j].parent < 0) {
+            pose.local[j] = scene::Transform::fromMatrix(w * pose.local[j].matrix());
+        }
+    }
+}
+
+// Sample `sample`'s clip at `time`, in its body frame when its travel is real (§71).
+void poseSample(const scene::MotionDatabase& db, const std::vector<scene::AnimationClip>& clips,
+                const scene::Skeleton& skeleton, std::uint32_t sample, float time, scene::Pose& out) {
+    scene::setRestPose(skeleton, out);
+    scene::sampleClip(clips[db.sampleClip[sample]], time, out);
+    glm::vec3 at;
+    float yaw = 0.0f;
+    if (rootFrameAt(db, sample, time, at, yaw)) {
+        toBodyFrame(skeleton, out, at, yaw);
+    }
+}
 } // namespace
 
 void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t current,
@@ -110,30 +165,57 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
         std::copy(sample, sample + db_->dimension, features.begin());
     }
 
-    // The intent half, in raw units, standardised the same way the database was. Root velocity is
-    // what the body wants to be doing; the trajectory block is where it wants to be at each
-    // horizon, which for a constant desired velocity is that velocity times the horizon.
+    // The intent half, in raw units, standardised the same way the database was: the trajectory
+    // block (where the body will be at each horizon) and the root velocity.
     raw.assign(db_->dimension, 0.0f);
-    // **In the body's own frame, because that is the frame the database is in.** A request is
-    // world space. Before this rotation it was compared as-is with features extracted facing +Z,
-    // so a body facing east that asked to walk forward was scored against sideways motion. Every
-    // test built its body facing +Z, where the two frames coincide, so none of them could tell.
-    // And in the asset's own units, because that is the scale the database was extracted in.
-    const glm::vec3 want =
-        scene::toFacingFrame(request.desiredVelocity + request.steering, request.bodyFacing) /
-        worldScale_;
-    for (std::size_t t = 0; t < db_->config.trajectoryTimes.size(); ++t) {
-        const float ahead = db_->config.trajectoryTimes[t];
-        const std::size_t base = layout.trajectory + (t * 4u);
-        raw[base + 0] = want.x * ahead;
-        raw[base + 1] = want.z * ahead;
-        const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
-        raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
-        raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
+    // **In the body's own frame, because that is the frame the database is in (§7), and in the
+    // asset's own units.** A request is world space. Compared as-is with features extracted facing
+    // +Z, a body facing east that asked to walk forward was scored against sideways motion.
+    const auto toBody = [&](const glm::vec3& world) {
+        return scene::toFacingFrame(world, request.bodyFacing) / worldScale_;
+    };
+    const glm::vec3 want = toBody(request.desiredVelocity + request.steering);
+    const std::vector<float>& horizons = db_->config.trajectoryTimes;
+    if (settings_.predictTrajectory && request.bodyVelocityKnown && !horizons.empty()) {
+        // §25: where the body will actually be, stepping the motion controller from how it moves
+        // now toward what it was asked. A standing body asked to walk ramps up; a walking body
+        // asked to face somewhere else curves. The prediction runs in world units and is
+        // expressed in the body's frame, as every database feature is.
+        MotionState state;
+        state.velocity = request.bodyVelocity;
+        state.previousVelocity = request.bodyVelocity;
+        state.facing = request.bodyFacing;
+        state.started = true;
+        const TrajectoryPrediction prediction = predictTrajectory(request, state, settings_.limits, horizons);
+        for (std::size_t t = 0; t < horizons.size() && t < prediction.points.size(); ++t) {
+            const glm::vec3 p = toBody(prediction.points[t].position);
+            const std::size_t base = layout.trajectory + (t * 4u);
+            raw[base + 0] = p.x;
+            raw[base + 1] = p.z;
+            const float len = std::sqrt((p.x * p.x) + (p.z * p.z));
+            raw[base + 2] = len > 1e-5f ? p.x / len : 0.0f;
+            raw[base + 3] = len > 1e-5f ? p.z / len : 0.0f;
+        }
+        const glm::vec3 now = toBody(request.bodyVelocity);
+        raw[layout.rootVelocity + 0] = now.x;
+        raw[layout.rootVelocity + 1] = now.y;
+        raw[layout.rootVelocity + 2] = now.z;
+    } else {
+        // The asked-for velocity, held: where it wants to be at each horizon, for a body already
+        // moving as asked.
+        for (std::size_t t = 0; t < horizons.size(); ++t) {
+            const float ahead = horizons[t];
+            const std::size_t base = layout.trajectory + (t * 4u);
+            raw[base + 0] = want.x * ahead;
+            raw[base + 1] = want.z * ahead;
+            const float len = std::sqrt((want.x * want.x) + (want.z * want.z));
+            raw[base + 2] = len > 1e-5f ? want.x / len : 0.0f;
+            raw[base + 3] = len > 1e-5f ? want.z / len : 0.0f;
+        }
+        raw[layout.rootVelocity + 0] = want.x;
+        raw[layout.rootVelocity + 1] = want.y;
+        raw[layout.rootVelocity + 2] = want.z;
     }
-    raw[layout.rootVelocity + 0] = want.x;
-    raw[layout.rootVelocity + 1] = want.y;
-    raw[layout.rootVelocity + 2] = want.z;
     scene::normaliseQuery(*db_, raw);
 
     // Overwrite the intent dimensions of the pose-derived query with what the character wants.
@@ -356,9 +438,9 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
         return result;
     }
     const scene::AnimationClip& clip = (*clips_)[clipIndex];
-    scene::setRestPose(skeleton, out);
-    // At the memory's own time, which lies between samples while carrying on (`shownTime`).
-    scene::sampleClip(clip, shownTime(*db_, memory.selection, memory.localTime), out);
+    // At the memory's own time, which lies between samples while carrying on (`shownTime`), and
+    // in the body's frame for a clip that travels (§71: the simulation owns where the body is).
+    poseSample(*db_, *clips_, skeleton, memory.selection, shownTime(*db_, memory.selection, memory.localTime), out);
     result.status = MotionStatus::Produced;
     result.content = clip.name;
 
@@ -406,10 +488,10 @@ MotionResult MatchMotionProvider::pose(const MotionMemory& memory, const scene::
         if (fromClip >= clips_->size() || toClip >= clips_->size()) {
             continue;
         }
-        scene::setRestPose(skeleton, was);
-        scene::sampleClip((*clips_)[fromClip], blend.fromTime, was);
-        scene::setRestPose(skeleton, became);
-        scene::sampleClip((*clips_)[toClip], blend.toTime, became);
+        // Both ends in their own body frames, as the pose above is: an offset between two poses
+        // expressed in different frames would carry their travel into the blend.
+        poseSample(*db_, *clips_, skeleton, blend.from, blend.fromTime, was);
+        poseSample(*db_, *clips_, skeleton, blend.to, blend.toTime, became);
         applyInertializedOffset(was, became, decay, out);
     }
     return result;

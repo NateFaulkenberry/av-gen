@@ -52,7 +52,7 @@ namespace avgen::scene {
 
 // Bumped when the on-disk layout of a `.motiondb` changes. Separate from `MotionDatabase::kVersion`,
 // which versions what the arrays *mean*; this versions how they are laid out in a file.
-inline constexpr std::uint32_t kMotionDatabaseFileVersion = 1;
+inline constexpr std::uint32_t kMotionDatabaseFileVersion = 2; // 2: sampleRoot and clipTravels (§71)
 inline constexpr char kMotionDatabaseExtension[] = ".motiondb";
 
 // ---- digests (§36/§82) --------------------------------------------------------------------------

@@ -374,3 +374,43 @@ TEST_CASE("a scrub lands on the frame a play reached, on the matcher (ADR-360)",
         CHECK(std::abs(atScrub.memory.blends[b].elapsed - atPlay.memory.blends[b].elapsed) < 1e-4f);
     }
 }
+
+TEST_CASE("§59/§66: the matcher chooses the pose and Phase B's layers still adapt it",
+          "[motionmatching][lab][aliens][phaseC]") {
+    // §59: "motion matching should choose a good source motion, while Phase B procedural systems
+    // adapt it." §66: "do not bypass Phase B." The matched alien's base pose comes from the
+    // matcher, and its foot layers (ground-driven, with body compensation) must still resolve on
+    // top of it, on the same frames. The twin, on the clip provider, is the control: the layers
+    // behave the same way on both, so the matcher did not route around them.
+    if (!fs::exists(matchLab()) ||
+        !fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb")) {
+        SKIP("the match lab or the scout is not present");
+    }
+    Lab lab;
+    int matchedWithLayers = 0;
+    int twinWithLayers = 0;
+    for (int f = 0; f <= 180; ++f) {
+        lab.frame(f);
+        for (const auto& [node, counter] : {std::pair{"alien-match", &matchedWithLayers}, std::pair{"alien-clip", &twinWithLayers}}) {
+            const scene::Composition::MotionDebug d = lab.comp->motionDebug(node);
+            REQUIRE(d.found);
+            if (!d.posedByProvider) {
+                continue;
+            }
+            int applied = 0;
+            for (const auto& row : d.layers) {
+                applied += (row.resolution == scene::LayerResolution::Applied ||
+                            row.resolution == scene::LayerResolution::Clamped)
+                               ? 1
+                               : 0;
+            }
+            *counter += applied == 2 ? 1 : 0; // both feet
+        }
+    }
+    WARN(fmt::format("frames with both foot layers resolved on a provider pose: matched {}, twin {}",
+                     matchedWithLayers, twinWithLayers));
+    CHECK(matchedWithLayers > 150);
+    CHECK(twinWithLayers > 150);
+    // And the matched body really is on the matcher on those frames.
+    CHECK(lab.comp->motionDebug("alien-match").provider == kMatcher);
+}

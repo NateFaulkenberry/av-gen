@@ -103,6 +103,14 @@ struct MotionRequest {
     // facing, so a world-space velocity means nothing to it until it is expressed relative to this.
     // The default is +Z, the frame every clip is authored in.
     glm::vec3 bodyFacing{0.0f, 0.0f, 1.0f};
+    // World space, m/s: how the body is actually moving now, and whether anyone said. Like
+    // `bodyFacing`, this is state rather than intent. It is what a matcher predicts the future
+    // trajectory FROM (§25): a body asked for 1.2 m/s while standing will be moving slowly for the
+    // next half-second, and the motion that matches that is a start, not a walk. When not known,
+    // the matcher assumes the body is already doing what it was asked, as it did before this
+    // existed.
+    glm::vec3 bodyVelocity{0.0f};
+    bool bodyVelocityKnown = false;
     MovementMode mode = MovementMode::Ground;
 
     // §38. Where the body will want to be heading shortly, so a turn can begin before the corner
