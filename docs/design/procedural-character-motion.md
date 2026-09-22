@@ -2372,9 +2372,9 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 44 | Motion style | **partial** | Style travels in the request and the clip provider reads it. **The matcher ignores style**: there is no style tag or cost term |
 | 45 | Search weights | **partial** | All 8 weights are configurable and live (ADR-608; `test_motion_cost.cpp:56`). **Missing: a versioned configuration** |
 | 46 | Automated search evaluation | **partial** | The pieces exist: pose-space retrieval (`test_cross_clip_matching.cpp`), jump rate (`test_motion_database_scale.cpp:658`), plant discontinuity. **Missing: one ground-truth harness that reports all seven measures** |
-| 47 | Adversarial tests | **partial** | Present: stationary / near-zero velocity, reverse, and a single-candidate case. **Missing: empty database, strafe, sharp turn, high-speed, start, stop, contact transition, incompatible candidate set, and an explicit no-op guard** |
+| 47 | Adversarial tests | done | `test_motion_adversarial.cpp` on the golden corpus covers all twelve cases the spec lists, each paired so the no-op fails one arm. Ambiguous cases are judged by how the chosen sample moves, not by the clip's name: a 0.05 m/s request is honestly nearer the end of `Stop` than `Idle` |
 | 48 | Golden motion tests | not started | There is no scenario test of the "walk north, turn east, stop" kind that drives the matcher |
-| 49 | Search correctness | **partial** | Continuity, the tag filter, airborne fall-through, replay and pose-from-sample are tested (`test_motion_matching.cpp`), and better trajectory vs better pose is too (`test_motion_cost.cpp:56`). **Missing: wrong-contact, discontinuous-root and obvious-bad candidates as named cases** |
+| 49 | Search correctness | done | Known best (a sample's own features, zero cost), obviously bad (never chosen), better trajectory and better pose (§78), wrong contact (§78, and §47's tie), and a candidate whose root teleports (never chosen for a smooth walk) |
 | 50 | Performance targeting | **partial** | Build metrics and average/worst query time exist. **Missing: p95/p99, database load timings, and multi-character matching cost** |
 | 51 | Realistic scenarios | **partial** | Single-character scaling to 1M samples (`392bf259`), and 100 characters sharing one database, measured for memory only. **Missing: the characters × samples grid** |
 | 52 | CPU/GPU boundary | done | CPU-side, benchmarked (`392bf259`, `51ab0815`). No case for the GPU |
@@ -2391,8 +2391,8 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 71 | Root-motion policy | **partial** | ADR-337 gives the ownership model for clip root motion. **Nothing states the matcher's position** (it reads velocity and does not move the root) |
 | 73 | Cinematic determinism | **partial** | "The matcher keeps nothing, so a replay reproduces a play" (`test_motion_matching.cpp:251`), and ADR-360. **Missing: bit-identity across runs and the pack/config/seed matrix** |
 | 77 | Testing matrix | **partial** | Pack serialisation, version mismatch and corrupt data are covered (`test_motion_pack.cpp`). Search preferences are partly covered (§49). **Missing: empty and one-sample database, missing joints, database swap, and multiple characters** |
-| 78 | Adversarial search test | **partial** | Pose vs trajectory under configured weights: done (`test_motion_cost.cpp:56`). **Pose vs contact is not constructed** |
-| 79 | Golden dataset | **partial** | Synthetic fixtures exist, one per test file (`twoGaitPack`, `tinyDatabase`). **Missing: one shared, intentionally distinguishable golden database** |
+| 78 | Adversarial search test | done | Both constructions, each flipped by its weight: pose vs trajectory, and pose vs contact (`test_motion_adversarial.cpp`) |
+| 79 | Golden dataset | done | `tests/support/golden_motion.hpp`: ten intentionally distinguishable one-second clips (idle, walk, run, back, both strafes, both turns, start, stop), with heading and contacts. Its header carries §79's caveat |
 | 89 | Final report | not started | `docs/design/motion-matching.md` does not exist |
 | 91 | First milestone | **partial** | Linear search, the database and the provider run on the Glowmere corpus in tests. **Not on the alien in a scene** |
 | 92 | Second milestone | **partial** | 100STYLE is retargeted, analysed, put in a database and matched in tests (`d67fc36a`). **Not driving Glowmere** |
