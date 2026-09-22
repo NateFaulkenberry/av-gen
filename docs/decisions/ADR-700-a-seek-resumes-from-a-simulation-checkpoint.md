@@ -183,7 +183,8 @@ against 0.4 to 1.4 s before. The warm cost varies with where the target falls in
 ## Found on the way
 
 The digest test's first run failed, and not because of checkpoints. **A replay from zero after an
-earlier run did not equal a fresh load's.** Two defects in the reset every such replay relies on:
+earlier run did not equal a fresh load's.** Three defects in all, two of them in the reset that
+every such replay relies on:
 
 - `Decide` kept its variety window as a `span` into `recentKinds_`, taken in `sense()` *before* the
   same step's plan-completion branch pushed onto that vector. When the push reallocated (the second
@@ -194,8 +195,15 @@ earlier run did not equal a fresh load's.** Two defects in the reset every such 
   `dctx.visited` already was two lines above. This changes what the aliens choose on those ticks
   compared with the previous binary, which was reading freed memory.
 - `Selector::reset` forgot `commitment_`. It now resets by assignment, keeping only its settings.
+- **The first frame after a seek asked the pre-seek flattening where nodes were drawn.** It predates
+  this ADR: ADR-671's director reads `Anchor::Drawn` from the previous frame's flattening, and after
+  a seek that flattening belongs to the second the playhead left. Extending the 30/45/90 s arm to
+  compare the frame after the scrub found `bull-18`, mid-abduction at 30 s, 43 m from the play. The
+  render tests from 44, 150 and 154 s passed only because their first frames fell in beats with no
+  drawn anchor. `seekWithDirector` now keeps the replay's last `ReplayPlacement`, and
+  `visualPlacement` answers from it until the next `update` flattens.
 
-Every earlier scrub test used a fresh load for each scrub, which is the one history in which a
+The first two were in the reset path. Every earlier scrub test used a fresh load for each scrub, which is the one history in which a
 forgotten reset is invisible (testing.md #41).
 
 ## Alternatives considered
