@@ -527,6 +527,8 @@ struct AimFollow {
     double endSeconds = 0.0;
     std::string hero;            // names a hero in `Composition::heroes()`
     glm::vec3 heroAtCut{0.0f};   // where that hero stood when the shot was cut
+
+    friend bool operator==(const AimFollow&, const AimFollow&) = default;
 };
 
 

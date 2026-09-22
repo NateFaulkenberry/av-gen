@@ -759,13 +759,17 @@ TEST_CASE("A hero walking about during playback does not re-cut the film", "[dir
     CHECK(frame(1.0) == app::Redirect::Nothing);
     CHECK(frame(1.1) == app::Redirect::Nothing);
 
-    // Parked, the same movement is an edit and does re-cut: this is somebody placing a hero. One
-    // frame later than the edit, because the settle happens inside the update and `refreshDirection`
-    // runs at the top of the next one -- the same order the application uses.
+    // Parked, the same movement used to re-cut the whole film -- and a paused scrub re-simulates
+    // the world, so walkers settling after a scrub replaced the cut with a re-bake nobody asked for
+    // (ADR-582, ADR-344). Now it is reported once as `Stale` and the cut is left exactly as it was;
+    // re-baking is an explicit Enable. One frame later than the edit, because the settle happens
+    // inside the update and `refreshDirection` runs at the top of the next one.
+    const nlohmann::json cutBefore = engine.timeline().toJson();
     walk(30.0f);
     CHECK(frame(1.2) == app::Redirect::Nothing);
-    CHECK(frame(1.3) == app::Redirect::Recut);
+    CHECK(frame(1.3) == app::Redirect::Stale);
     CHECK(frame(1.4) == app::Redirect::Nothing);
+    CHECK(engine.timeline().toJson() == cutBefore);
 
     // And a change to the cast re-cuts wherever the playhead is, because that is somebody asking.
     REQUIRE(engine.play().has_value());
@@ -1029,12 +1033,13 @@ TEST_CASE("A directed shot's aim follows the hero it was cut for", "[director][c
     const glm::vec3 pastAgain = aimAt(lastEnd + 5.0);
     CHECK(glm::length(past - pastAgain) < 1e-4f);
 
-    // Handing the camera back takes the table with it, or a camera the viewport owns would still be
-    // nudged by a film nobody is running.
+    // Handing the camera back takes the table off the camera, or a camera the viewport owns would
+    // still be nudged by a film nobody is running -- parked with the rest of the cut (ADR-582).
     app::DirectorState state;
     app::noteDirected(engine, state);
     static_cast<void>(app::releaseDirectedCamera(engine, state));
     CHECK(composition->aimFollow().empty());
+    CHECK(engine.parkedCut().aimFollow == follow);
 #endif
 }
 
@@ -1561,16 +1566,18 @@ TEST_CASE("a locked camera keeps its bake through a drag and a save", "[camera][
     }
 
     // THE CONTROL, and it is what makes every assertion above mean something: unlocked, the same
-    // gesture does discard the cut. Without this arm the test passes against a
-    // `releaseDirectedCamera` that had quietly stopped doing anything at all.
+    // gesture does take the camera from the director. Without this arm the test passes against a
+    // `releaseDirectedCamera` that had quietly stopped doing anything at all. Since ADR-582 what it
+    // does is PARK the cut: the steering half moves to `parkedCut()`, and the spans stay live.
     REQUIRE(ui::viewportMayReleaseDirector(state.directed, /*locked=*/false, /*deliberate=*/false,
                                            app::directedCameraBakeSize(engine) > 0));
     static_cast<void>(app::releaseDirectedCamera(engine, state));
     CHECK_FALSE(engine.timeline().isAutomated("camera/position"));
     CHECK(engine.composition()->aimFollow().empty());
-    CHECK(engine.shotSpans().empty());
-    // And once it is gone the counter says so, which is what makes the lock stop firing on a
-    // project that has already been handed back.
+    CHECK(engine.parkedCut().aimFollow.size() == aimFollowBefore);
+    CHECK(engine.shotSpans().size() == spansBefore);
+    // And once the steering half is off the camera the counter says so, which is what makes the
+    // lock stop firing on a project that has already been handed back.
     CHECK(app::directedCameraBakeSize(engine) == 0);
 #endif
 }

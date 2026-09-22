@@ -231,14 +231,18 @@ struct DirectorState {
     // arrives on the first parked frame -- and re-cutting for it there would be re-cutting for
     // something that happened while the piece was playing, one frame after somebody pressed pause.
     bool wasPlaying = false;
+    // Which scene the revisions above were read from (`Engine::sceneGeneration`, ADR-582), so a
+    // project load is never mistaken for the heroes changing.
+    std::uint64_t sceneGeneration = 0;
     // The panel's settings, carried on the state so a re-cut uses what the user last chose.
     AutoDirectorSettings settings;
 };
 
 enum class Redirect : std::uint8_t {
     Nothing,      // not directed, or the heroes have not moved on
-    Recut,        // the shot was cut again from the heroes as they are now
-    HandedBack,   // the last hero went, so the camera went back to the viewport
+    Recut,        // the cast changed, so the shot was cut again from the heroes as they are now
+    Stale,        // a hero moved while parked; the cut is kept, and a re-bake is the user's call
+    HandedBack,   // the last hero went, so the cut was parked and the camera went to the viewport
     Released,     // somebody else took the camera: the automation is gone or no longer ours
 };
 
@@ -250,31 +254,52 @@ enum class Redirect : std::uint8_t {
 // those places having to know that a director exists.
 //
 // Changing the *cast* re-cuts at once, wherever the playhead is: that is somebody clicking a star and
-// asking to see the result. A hero merely *moving* re-cuts only while the transport is parked --
-// during playback that is the world moving rather than an edit (Glowmere's wanderer walks), and
-// replacing the whole film every time it stops for breath is what made the director look stuck on
-// one hero. Movement during playback is absorbed, not queued, so pausing does not fire a re-cut for
-// something that happened three minutes ago.
+// asking to see the result. A hero merely *moving* never re-cuts (ADR-582): during playback that is
+// the world moving (Glowmere's wanderer walks), and while parked it is as likely a scrub
+// re-simulating the world as a person dragging a hero -- and either way a re-cut would replace the
+// film with one re-photographed at wherever the heroes happened to stand (ADR-344). It reports
+// `Stale` once instead, and re-baking is the user's explicit choice.
 //
-// An empty hero set hands the camera back instead of failing. A shot with nothing to point at is
-// not a shot, and leaving the last trajectory running would be a camera flying a path towards
-// something the user has just said is not there.
+// A different scene (a project load, a scene swap) takes the claim up afresh rather than comparing
+// one composition's revision counters against another's.
+//
+// An empty hero set hands the camera back instead of failing -- parking the cut, like every
+// hand-back. A shot with nothing to point at is not a shot, and leaving the last trajectory running
+// would be a camera flying a path towards something the user has just said is not there.
 [[nodiscard]] Result<Redirect> refreshDirection(Engine& engine, DirectorState& state);
 
-// Takes the camera back from the director: removes the tracks it owns and ends its claim. Returns
-// how many tracks went.
+// Takes the camera back from the director and ends its claim, **parking** its cut (ADR-582): the
+// camera tracks it owns, its aim-follow table and its directed camera shots leave the camera and
+// are kept on the engine (`Engine::parkedCut`, saved as `parkedDirector`). The shot spans -- the
+// film's focus schedule -- are not touched, so HeroFocus and CameraTravel effects keep firing on
+// schedule under whatever camera replaces it. Returns how many camera tracks were parked.
+//
+// Nothing is destroyed. A cut that is already parked is left exactly as it is, and a project that
+// was never directed gets nothing new.
 //
 // Everything that hands the camera back goes through here -- the menu item, the last hero being
 // unstarred, and a viewport drag -- so there is one answer to what handing it back means. Tracks
 // driving anything that is not the camera are somebody's work and are left alone.
 std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state);
 
-// How much a `releaseDirectedCamera` would actually destroy, without destroying it: camera-owned
-// timeline tracks, plus the `cameraAimFollow` and `cameraShotSpans` tables, plus the camera shots
-// the director wrote. Zero means handing the camera back costs nothing.
+// Puts a parked cut back exactly as it was parked -- tracks, aim-follow and directed shots -- with
+// no re-bake, and takes up the claim again. Refuses, changing nothing, when nothing is parked, when
+// the camera has since been given keys of its own on a director target (resuming would replace
+// them), or when a parked shot names a camera the scene no longer has. Returns the tracks restored.
+[[nodiscard]] Result<std::size_t> resumeDirectedCamera(Engine& engine, DirectorState& state);
+
+// The explicit "throw the director's cut away" (ADR-582): the parked cut if there is one, otherwise
+// the steering one, and in both cases the shot spans. One of only two things allowed to delete a
+// cut; the other is a re-bake replacing it. Returns how many items went.
+std::size_t discardDirectorsCut(Engine& engine, DirectorState& state);
+
+// How much a `releaseDirectedCamera` would take off the camera, without doing it: camera-owned
+// timeline tracks, the `cameraAimFollow` table and the camera shots the director wrote. Zero means
+// handing the camera back changes nothing. Shot spans are not counted: a release leaves them.
 //
-// This exists because ADR-386's lock is a guard on live data LOSS, and a guard with nothing to
-// guard is only a cost. Locked unconditionally, the viewport could not move the camera on any
+// This exists because ADR-386's lock was a guard on live data LOSS, and a guard with nothing to
+// guard is only a cost. Since ADR-582 a release parks rather than destroys, so what the lock now
+// protects is the director's *steering* from an incidental gesture; nothing is lost either way. Locked unconditionally, the viewport could not move the camera on any
 // directed project -- including the Tree of Life, which carries 0 tracks, 0 aim-follow entries and
 // 0 shot spans, so the gesture was being refused to protect nothing at all. The multicam film
 // carries 42 and 37 and is exactly the case the lock was written for.
