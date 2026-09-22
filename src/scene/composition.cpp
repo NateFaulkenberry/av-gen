@@ -2629,7 +2629,17 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
             if (mm.weightsVersion != 0u && mm.transitionWeight >= 0.0f) {
                 settings.weights.transition = mm.transitionWeight;
             }
+            if (mm.weightsVersion != 0u && mm.styleWeight >= 0.0f) {
+                settings.styleWeight = mm.styleWeight;
+            }
             matchProvider_.setSettings(settings);
+            // §44: the character's style. Not part of the database key: the database is the same
+            // whichever style its reader prefers.
+            std::vector<entity::MatchMotionProvider::StyleRule> rules;
+            for (const auto& [style, prefixes] : mm.styles) {
+                rules.push_back({style, prefixes});
+            }
+            matchProvider_.setStyle(mm.style, std::move(rules));
             chain_.add(&matchProvider_);
         }
     }

@@ -90,6 +90,8 @@ MotionCandidateCost motionCandidateCost(const MotionDatabase& db, const MotionQu
             }
         }
     }
+    out.breakdown.style = motionClipCost(db, query, sample);
+    cost += out.breakdown.style;
     out.total = cost;
     return out;
 }
@@ -400,6 +402,10 @@ std::string MotionMatchExplanation::report(const MotionDatabase& db, const Motio
     out += fmt::format("\n  {:<23}", "transition");
     for (const Column& c : columns) {
         out += fmt::format("{:>11.4f}", c.cost->breakdown.transition);
+    }
+    out += fmt::format("\n  {:<23}", "style");
+    for (const Column& c : columns) {
+        out += fmt::format("{:>11.4f}", c.cost->breakdown.style);
     }
     out += fmt::format("\n  {:<23}", "TOTAL");
     for (const Column& c : columns) {

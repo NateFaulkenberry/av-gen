@@ -231,8 +231,9 @@ struct MotionCostBreakdown {
     float terms[static_cast<std::size_t>(MotionFeatureGroup::Count)] = {};
     float continuity = 0.0f;
     float transition = 0.0f;
+    float style = 0.0f; // §44: what the sample paid for not being in the requested style
     [[nodiscard]] float total() const {
-        float sum = continuity + transition;
+        float sum = continuity + transition + style;
         for (const float t : terms) {
             sum += t;
         }
@@ -399,8 +400,23 @@ struct MotionQuery {
     // Where the character is now, so continuity and transition costs have something to be relative
     // to (§11/§12). kInvalid on the first query of a character's life.
     std::uint32_t current = MotionDatabase::kInvalid;
+    // Phase C §44: an extra cost per clip, indexed like `MotionDatabase::clipNames`, added to every
+    // sample of that clip. Empty means none. The provider fills it from the requested style: a
+    // clip outside the style pays the style weight, a clip inside it pays nothing. **A cost, not a
+    // filter**, which is the point: when no clip carries the requested style every clip pays the
+    // same and the choice is unchanged, and when the corpus cannot serve the request in style, the
+    // best motion out of style still beats a styled motion that does the wrong thing.
+    std::span<const float> clipCost;
 };
 
+// §44: the per-clip cost `query` adds to sample `s`, 0 when there is none.
+[[nodiscard]] inline float motionClipCost(const MotionDatabase& db, const MotionQuery& query, std::uint32_t s) {
+    if (query.clipCost.empty() || s >= db.sampleClip.size()) {
+        return 0.0f;
+    }
+    const std::uint32_t clip = db.sampleClip[s];
+    return clip < query.clipCost.size() ? query.clipCost[clip] : 0.0f;
+}
 
 struct MotionCostWeights {
     // §11. How much a candidate is penalised for not being the continuation of what is playing.

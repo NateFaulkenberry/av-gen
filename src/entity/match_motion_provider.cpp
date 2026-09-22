@@ -151,6 +151,44 @@ void poseSample(const scene::MotionDatabase& db, const std::vector<scene::Animat
 }
 } // namespace
 
+void MatchMotionProvider::resolveStyle() {
+    styleClipCost_.clear();
+    clipsInStyle_ = 0;
+    if (db_ == nullptr || style_.empty()) {
+        return;
+    }
+    const std::size_t n = db_->clipNames.size();
+    std::vector<std::uint8_t> in(n, 0u);
+    for (const StyleRule& rule : styleRules_) {
+        if (rule.style != style_) {
+            continue;
+        }
+        for (std::size_t c = 0; c < n; ++c) {
+            for (const std::string& prefix : rule.prefixes) {
+                if (db_->clipNames[c].rfind(prefix, 0) == 0) {
+                    in[c] = 1u;
+                }
+            }
+        }
+    }
+    for (const std::uint8_t v : in) {
+        clipsInStyle_ += v;
+    }
+    // A style nothing carries costs every clip the same, which changes no choice: leave it empty
+    // rather than add a constant to every candidate.
+    if (clipsInStyle_ == 0 || clipsInStyle_ == n) {
+        return;
+    }
+    const float penalty = std::max(settings_.styleWeight, 0.0f) * db_->stats.costSpread;
+    if (penalty <= 0.0f) {
+        return;
+    }
+    styleClipCost_.resize(n);
+    for (std::size_t c = 0; c < n; ++c) {
+        styleClipCost_[c] = in[c] != 0u ? 0.0f : penalty;
+    }
+}
+
 void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t current,
                                     scene::MotionQuery& query, std::vector<float>& raw) const {
     const FeatureLayout layout = layoutOf(db_->config);
@@ -230,6 +268,8 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
 
     query.requireTags = 0;
     query.current = haveCurrent ? current : scene::MotionDatabase::kInvalid;
+    // §44: the style term. Empty unless a style is set and some clip carries it.
+    query.clipCost = styleClipCost_;
     // §14: a body on the ground never wants an airborne sample. One AND per sample, and it removes
     // whole clips before anything is scored.
     query.rejectTags = static_cast<std::uint32_t>(scene::MotionTag::Airborne) |
@@ -361,6 +401,9 @@ MotionResult MatchMotionProvider::advance(const MotionRequest& request, const Mo
                 const float delta = query.features[d] - f[d];
                 continueCost += scene::motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
             }
+            // §44: and the same style term the search added, or an out-of-style continuation
+            // would be compared as if it were free.
+            continueCost += scene::motionClipCost(*db_, query, follow);
             // §28: the margin is a fraction of the measured spread, so it is in the cost
             // function's own scale rather than in raw units that mean nothing without it.
             const float margin = settings_.switchMargin * db_->stats.costSpread;

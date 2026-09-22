@@ -107,7 +107,8 @@ function every search and the explainer call), plus:
 - a **transition** penalty for leaving the current motion family (§12).
 
 The seven group weights and the two penalties are configurable per character in a **versioned**
-block (`motionMatching.weights`, version 1; an unknown version is refused).
+block (`motionMatching.weights`, version 1; an unknown version is refused). The block's optional
+`style` weight and the `style`/`styles` keys add §44's style term.
 
 ## 7. Search strategy (§15, §16, §54)
 
@@ -233,8 +234,10 @@ Build throughput is ~46,000 samples/s. A 68 MB database loads verified in 27–4
 - **Selection quality on a real corpus depends on authored filtering and weights.** The demo needed
   an allow-list and a weight sweep, and the weights did not survive a corpus rebuild (trajectory
   position 3 became 6 when the turn variants grew to three cycles). A velocity-only request under-determines which walk plays (§46).
-- **Style** is in the request and in the clip provider, but it is not yet a term in the matcher's
-  cost (§44).
+- **Style is a soft cost** (§44), per character; the default weight is tuned on the golden
+  corpus's gaps and has not been re-measured on the scout.
+- **Strafe and turn clips of a travelling corpus read as forward**, because travelling clips are
+  faced by their travel (seen on 100STYLE under §44).
 - **Human legs straighten more than the alien's**: 14% of retargeted leg-frames are at or past
   straight. The look is the owner's call.
 - **Timings were taken under load**; to re-take.
@@ -246,8 +249,9 @@ Build throughput is ~46,000 samples/s. A 68 MB database loads verified in 27–4
 - **Intent in, pose out.** Phase D writes `EntityState::intent` (vector intent, facing, steering),
   and the chain turns it into motion. `motionScript` is the first producer and a model for how.
 - **Avoidance** arrives as `MotionRequest::steering`, added to the desired velocity, never blended.
-- **Style** (`MotionRequest::style`) is the hook for behaviour-level mood. It needs §44's cost term to
-  reach the matcher.
+- **Style** in the matcher is per character (`motionMatching.style`, §44), priced as a cost.
+  `MotionRequest::style` stays the clip provider's key. Letting a behaviour change the matcher's
+  style per request is the Phase D step, and the provider's `setStyle` is where it plugs in.
 - **Diagnostics**: `MotionDebug` (provider, fall-through, layers), `avgen-motion explain` (why a
   sample won), and the §46 harness.
 

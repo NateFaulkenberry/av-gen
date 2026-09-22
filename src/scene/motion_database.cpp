@@ -320,6 +320,9 @@ std::string MotionCostBreakdown::report() const {
     if (transition != 0.0f) {
         out += fmt::format("transition={:.4f} ", transition);
     }
+    if (style != 0.0f) {
+        out += fmt::format("style={:.4f} ", style);
+    }
     out += fmt::format("| total={:.4f}", total());
     return out;
 }
@@ -921,6 +924,8 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
                 }
             }
         }
+        // §44: the style term, last, so the early out above stays a lower bound.
+        cost += motionClipCost(db, query, s);
         ++best.considered;
         if (!best.found() || cost < bestCost) {
             best.sample = s;
@@ -935,6 +940,7 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
     // partial sums would be wrong anyway. Recomputing the winner in full is one extra pass over
     // `dim` floats, and it is the only one anything reads.
     if (best.found() && weighted) {
+        best.breakdown.style = motionClipCost(db, query, best.sample);
         const float* f = db.featuresFor(best.sample);
         for (std::size_t d = 0; d < dim; ++d) {
             const float delta = q[d] - f[d];
@@ -1102,6 +1108,7 @@ MotionMatch scoreMotionCandidates(const MotionDatabase& db, const MotionQuery& q
                 }
             }
         }
+        cost += motionClipCost(db, query, s);
         if (!best.found() || cost < bestCost) {
             best.sample = s;
             bestCost = cost;

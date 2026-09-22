@@ -135,6 +135,11 @@ struct MotionMatchingDesc {
     float contactWeight = 0.0f;
     float continuityWeight = -1.0f; // below zero: the engine default
     float transitionWeight = -1.0f;
+    float styleWeight = -1.0f;      // §44, a fraction of the cost spread; below zero: the default
+    // §44: this character's style, and which clips carry which style, as name prefixes like
+    // `clips`. The matcher prefers clips in the style (a cost, not a filter). Empty style: none.
+    std::string style;
+    std::vector<std::pair<std::string, std::vector<std::string>>> styles;
     friend bool operator==(const MotionMatchingDesc&, const MotionMatchingDesc&) = default;
 };
 

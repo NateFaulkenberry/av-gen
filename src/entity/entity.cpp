@@ -2647,6 +2647,48 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
             num("contact", mm.contactWeight);
             num("continuity", mm.continuityWeight);
             num("transition", mm.transitionWeight);
+            num("style", mm.styleWeight);
+        }
+        if (m.contains("style")) {
+            if (!m["style"].is_string()) {
+                return fail("entity '{}': 'motionMatching.style' must be a style name", desc.name);
+            }
+            desc.motionMatching.style = m["style"].get<std::string>();
+        }
+        if (m.contains("styles")) {
+            const auto& s = m["styles"];
+            if (!s.is_object()) {
+                return fail("entity '{}': 'motionMatching.styles' must map a style to clip-name prefixes",
+                            desc.name);
+            }
+            for (const auto& [style, prefixes] : s.items()) {
+                std::vector<std::string> list;
+                if (!prefixes.is_array()) {
+                    return fail("entity '{}': 'motionMatching.styles.{}' must be an array of clip-name prefixes",
+                                desc.name, style);
+                }
+                for (const auto& p : prefixes) {
+                    if (!p.is_string()) {
+                        return fail("entity '{}': 'motionMatching.styles.{}' must be an array of clip-name "
+                                    "prefixes",
+                                    desc.name, style);
+                    }
+                    list.push_back(p.get<std::string>());
+                }
+                desc.motionMatching.styles.emplace_back(style, std::move(list));
+            }
+        }
+        if (!desc.motionMatching.style.empty()) {
+            // A style the character cannot resolve would add no cost and change nothing: refused,
+            // because a typo here is otherwise a control that does nothing (ADR-558).
+            bool known = false;
+            for (const auto& [style, prefixes] : desc.motionMatching.styles) {
+                known = known || style == desc.motionMatching.style;
+            }
+            if (!known) {
+                return fail("entity '{}': 'motionMatching.style' '{}' is not one of 'motionMatching.styles'",
+                            desc.name, desc.motionMatching.style);
+            }
         }
         if (m.contains("trajectory")) {
             if (!m["trajectory"].is_array()) {
@@ -3041,7 +3083,20 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
             w["contact"] = mm.contactWeight;
             w["continuity"] = mm.continuityWeight;
             w["transition"] = mm.transitionWeight;
+            if (mm.styleWeight >= 0.0f) {
+                w["style"] = mm.styleWeight; // only when authored, so older blocks round-trip unchanged
+            }
             m["weights"] = std::move(w);
+        }
+        if (!entity.motionMatching.style.empty()) {
+            m["style"] = entity.motionMatching.style;
+        }
+        if (!entity.motionMatching.styles.empty()) {
+            nlohmann::json s = nlohmann::json::object();
+            for (const auto& [style, prefixes] : entity.motionMatching.styles) {
+                s[style] = prefixes;
+            }
+            m["styles"] = std::move(s);
         }
         j["motionMatching"] = std::move(m);
     }

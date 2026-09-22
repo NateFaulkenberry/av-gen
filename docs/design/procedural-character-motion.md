@@ -2369,7 +2369,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 34 | Matching does not own behaviour | done | `528e5dec`, the audit |
 | 35 | Fallback system | done | ADR-623 (owner-delegated): the matcher is wired opt-in per character, with the clip provider behind it. Every §35 failure is tested falling through, with a control arm that does not |
 | 36 | Database versioning | done (via merge) | `9ebbb173` (`agent/anim-cinfra`, merged in `54f30cc3`): the database is a file with a format version, a feature schema digest, the skeleton digest, a pack content digest that includes the provenance chain (where the retarget profile is recorded), and a tool version. Incompatible files are refused on load. **Added here:** `kMotionFeatureExtractionVersion`, folded into the schema digest, so a change in how a feature is *computed*, not only which features exist, also invalidates stored data |
-| 44 | Motion style | partial | Style is in the request and the clip provider. The matcher's authoring surface is now `motionMatching.clips` (per character). **Missing: a style term or tag in the matcher's cost** |
+| 44 | Motion style | done | A per-character style, priced as a cost per clip (`MotionQuery::clipCost`, default 0.05 of the spread, measured between the within-motion and wrong-motion gaps), not a filter. `test_motion_style.cpp`. On 100STYLE, in-style frames go from 0.19 to 1.00. See "§44" |
 | 45 | Search weights | done | Configurable (ADR-608) and now **versioned** per character (`motionMatching.weights`, version 1; an unknown version is refused) |
 | 46 | Automated search evaluation | done | `entity/motion_evaluation.*`: one ground-truth harness reports all seven measures, with floor, left-out and broken-matcher arms (`test_motion_evaluation.cpp`). See "§46" |
 | 47 | Adversarial tests | done | `test_motion_adversarial.cpp` on the golden corpus covers all twelve cases the spec lists, each paired so the no-op fails one arm. Ambiguous cases are judged by how the chosen sample moves, not by the clip's name: a 0.05 m/s request is honestly nearer the end of `Stop` than `Idle` |
@@ -2382,7 +2382,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 54 | Approximate search | done | PCA, VQ and KD-tree built and measured against linear and strided. The KD-tree is rejected (the curse of dimensionality). None is adopted, because exact search is not too slow at real scale |
 | 55 | Quality vs speed | done | The matrix: latency percentiles, memory, recall, excess and transition quality, and LOC |
 | 59 | Procedural + motion matching | done | Foot layers resolve on the matched alien's pose on every frame (the lab test) |
-| 61 | Dataset strategy | **partial** | 100STYLE is verified (CC BY 4.0, `bc56f7f1`; `assets/100STYLE-ATTRIBUTION.md`; ADR-612 amendment), and a pack refuses to build without a licence (`test_motion_pack.cpp:107`). **ACCAD and CMU are not assessed. The derivative-data rule for a distributable pack is not recorded** |
+| 61 | Dataset strategy | done (assessed) | ADR-625: ACCAD (CC BY 3.0) and CMU (bespoke terms, no resale "even in converted form") read at source and assessed against all six §61 criteria. The derivative-data rule for a distributable pack is recorded. AMASS is ruled out as a route. **Owner question:** will a pack ever ship as a separate artefact? That answer settles CMU |
 | 64 | First vertical slice | done | 100STYLE → IK retarget (ADR-624) → contacts, phase and features → database → runtime matcher → scout in a scene → Phase B layers → inertialization. Test: `test_motion_slice.cpp` |
 | 65 | Glowmere demonstration | done (strafe unserved) | A scripted scene driven by motion requests. Each segment gets its family except strafe, which the scout's corpus cannot serve. Re-taken with the `Terminal` tag and three-cycle turns; the weights moved to trajectory position 6. See "§65" |
 | 66 | Phase B integration | done | The same test; the matcher does not bypass the layer stack |
@@ -2751,6 +2751,45 @@ mismatch, phase mismatch, transitions per second. `test_motion_evaluation.cpp`:
 The failure taxonomy (§70) and the final report (§89) are `docs/design/motion-matching.md`. §70's
 table classifies every defect Phase C found by the spec's categories and names the layer the fix
 went into.
+
+## §44 — style, as a cost
+
+"Style metadata may eventually influence query cost." It now does. A character has a style
+(`motionMatching.style`) and a map from style to clip-name prefixes (`motionMatching.styles`); a
+clip outside the style pays `styleWeight` × the database's cost spread (`weights.style`, default
+0.05, the unit `switchMargin` uses). The term is `MotionQuery::clipCost`, added in the linear
+search, the staged scorer and the explainer alike, and shown in the breakdown as `style`. A style
+nothing carries adds no cost; an undefined style is refused at load. The style is the character's,
+not the request's: `MotionRequest::style` stays the clip provider's exact-match key, so the
+fallback behind the matcher gets what it always got. `test_motion_style.cpp`.
+
+**The default is a measured band, not a guess.** On the golden corpus, two versions of one walk
+differ by about 0.01 of the spread and the right motion beats the wrong one by 0.06–0.3. The first
+default, a whole spread, was a filter: a strutting body asked to stand still strutted, and asked to
+run strutted. 0.05 sits inside the band: the style decides between walks, and idle and run are
+still chosen. An arm at 1000× shows the filter behaviour, so the difference is visible.
+
+**A fixture that lied first.** The first strut variant was slower than the walk, and it won
+*without* any style: from the database's mean pose a shorter stride is nearer, and continuity then
+held it. The choice is path-dependent, so the variant had to be worse from every direction (faster,
+1.35 m/s).
+
+**On 100STYLE** (the MIXED pack, twelve styles), each style's own forward walk replayed as
+requests:
+
+| | in style | forward (FW/FR) |
+|---|---|---|
+| no style | 0.19 | 0.26 |
+| the style | **1.00** | **0.66** |
+
+Two observations, recorded and not chased:
+- **At the engine's default weights the matcher is pose-locked on this corpus too.** A forward
+  request held `DuckFoot_TR1` for two seconds on its pose alone (a joint-position cost of 0.34
+  against 2.0 for `Aeroplane_FW`). The measurement uses §65's request-led weights.
+- **Strafe and turn clips read as forward.** Travelling clips are faced by their smoothed travel,
+  so `_SR` and `_TR1` present as slow forward motion. Without a style they win forward requests
+  (0.26 forward). With one, the style's own `_FW` is usually the nearest of its eight clips. Four
+  styles still land on `_TR1` or `_SW`.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

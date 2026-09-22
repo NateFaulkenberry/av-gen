@@ -39,8 +39,8 @@ struct MotionCandidateCost {
     float total = 0.0f;
     bool passesFilter = true;
     [[nodiscard]] bool valid() const { return sample != MotionDatabase::kInvalid; }
-    // Everything but continuity and transition: how well the sample fits the query.
-    [[nodiscard]] float featureCost() const { return breakdown.total() - breakdown.continuity - breakdown.transition; }
+    // Everything but continuity, transition and style: how well the sample fits the query.
+    [[nodiscard]] float featureCost() const { return breakdown.total() - breakdown.continuity - breakdown.transition - breakdown.style; }
 };
 
 [[nodiscard]] MotionCandidateCost motionCandidateCost(const MotionDatabase& db, const MotionQuery& query,
