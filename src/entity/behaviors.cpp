@@ -3025,7 +3025,11 @@ std::vector<std::string_view> behaviorKinds() {
 // so the motion request carries the strafe, and keeps `speed`/`yaw` in step for the gait and
 // everything else that reads the polar pair. The script's clock is the timeline (time since the
 // body was reset), so a scrub replays it exactly.
-class MotionScript final : public IBehavior {
+// ADR-700: a behaviour is checkpointed by being copyable, and `CheckpointedBehavior` is how every
+// behaviour in this file says so. §65 added this one on a branch cut before that hook existed, so
+// the merge would not compile until it opted in -- which is the guard working: a behaviour whose
+// state a checkpoint would silently drop fails the build instead.
+class MotionScript final : public CheckpointedBehavior<MotionScript> {
 public:
     explicit MotionScript(const nlohmann::json* s) {
         if (s != nullptr && s->contains("segments") && (*s)["segments"].is_array()) {
