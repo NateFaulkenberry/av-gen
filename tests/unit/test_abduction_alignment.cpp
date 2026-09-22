@@ -23,6 +23,16 @@
 // GPU-free: the composition, the entity layer and the director are all CPU, and `Composition::
 // update` is the same call the engine makes every frame -- which is what puts the beam's emitter
 // into world space, so it is the call this file needs and the abduction POC does not make.
+//
+// WHAT THIS FILE DOES NOT MEASURE, said here because it was read as though it did. The word "fade"
+// below always means the **glow**: `peakGlow` and `lastGlow` are sampled from
+// `nodes/<animal>/emissiveBoost`, and `opacity` -- ADR-385's dissolve, which is what an owner
+// means by "the animals fade out" -- appears nowhere in this file. It also loads
+// `glowmere-valley-2.scene.json` rather than the film's project, so the numbers here are not the
+// ones the film runs (ADR-264). A dissolve that had stopped being written, stopped reaching the
+// material, or stopped agreeing between `update` and `seek` would leave every assertion below
+// green. `tests/unit/test_abduction_fade.cpp` is the one that can see it, on the animal's own
+// meshes and on both paths; `tests/rendering/test_abduction_fade_gpu.cpp` is its shadow.
 
 #include "assets/asset_registry.hpp"
 #include "core/time.hpp"
