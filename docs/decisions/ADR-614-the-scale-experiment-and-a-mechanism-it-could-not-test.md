@@ -12,7 +12,7 @@ Phase C §16, §20, §22, §23
 **Corpus:** `assets/100STYLE-ATTRIBUTION.md` — terms, the exact file list, the digests and the
 commands. **Every number below is conditioned on the subset named beside it.**
 
-**Amended 2026-09-21:** re-taken after four corrections to the feature values (extraction version 4). Stride-4 still survives on FW, but by less: 94.0% recall, with a miss at 0.07× of the typical gap. FW is more resolvable: 87.0% duplicates, radius ÷ NN 1.47. Only the *sweep* cost spread still transfers. The figures are in `docs/design/procedural-character-motion.md`, "Feature values corrected". The body below is the original record.
+**Amended 2026-09-21:** re-taken after four corrections to the feature values (extraction version 4). Stride-4 still survives on FW, but by less: 94.0% recall, with a miss at 0.07× of the typical gap. FW is more resolvable: 87.0% duplicates, radius ÷ NN 1.47. Only the *sweep* cost spread still transfers. The figures are in `docs/design/procedural-character-motion.md`, "Feature values corrected". The body below is the original record. **Second amendment, same day:** MIXED re-taken. Stride-4 recall falls to 86.9% (was 96.4%); a miss still costs about an eighth of the typical gap. §30 on TR: contacts cost −3.2% per transition and +24.2% over the run (was −16.2% / +7.5%), so the direction is unchanged. Wall time was measured for the first time and the strided plan is *slower* than the linear scan on real data (the scan's early out wins); see "§50–§55" in the phase log.
 
 ---
 
