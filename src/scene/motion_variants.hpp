@@ -33,12 +33,23 @@
 
 namespace avgen::scene {
 
-// What was done to a source clip to produce this one. §43's list, as far as it is implemented.
+// What was done to a source clip to produce this one.
+//
+// **`generateVariants` below produces `Source` and `SpeedWarp`, and nothing else.** The other two
+// are §43's taxonomy rather than this module's output, and they are kept only so a provenance
+// record read back from an older pack still has a name. Phase B shipped speed alone; mirroring and
+// the rest of §43 are `scene/motion_augment.hpp`, which is where later work on them belongs.
+//
+// This block used to read "§43's list, as far as it is implemented", beside a `StrideWarp` that
+// had a complete implementation no caller reached and a `VariantOptions::mirror` flag the
+// generator never read -- a knob a caller could set and be silently ignored by. The QA pass of
+// 2026-09-22 removed both rather than wiring them, because `motion_augment` had already become the
+// module that does this work and two generators for one job is the worse outcome.
 enum class VariantKind : std::uint8_t {
     Source,       // not a variant: the clip as authored
     SpeedWarp,    // time-warped: the same motion at a different pace
-    StrideWarp,   // the step lengthened or shortened in space, at the same pace
-    Mirror,       // left and right exchanged
+    StrideWarp,   // §43, not produced here; the step lengthened or shortened in space
+    Mirror,       // §43, not produced here; left and right exchanged -- see motion_augment
 };
 [[nodiscard]] const char* variantKindName(VariantKind kind);
 
@@ -74,7 +85,6 @@ struct VariantOptions {
     // Bounds on the warp. Past these the honest answer is a different source clip.
     float minWarp = 0.6f;
     float maxWarp = 1.7f;
-    bool mirror = false;
     std::string tool = "avgen-motion/1";
     // **What the gate is allowed to measure, and without it the gate always passes.** An
     // unmeasured metric never fails (§44, deliberately), so a generator that gates with no
