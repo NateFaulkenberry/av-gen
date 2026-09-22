@@ -286,6 +286,8 @@ TEST_CASE("the matcher poses from the sample it chose", "[matching][provider]") 
     // cross -- and measured a 5e-8 separation. The arithmetic was wrong, not the provider.
     memory.selection = 7;
     memory.generation = 1;
+    // A hand-built memory says which database it indexes, as one `advance` settled would (§40).
+    memory.database = db.identity;
     scene::Pose pose;
     const scene::Skeleton sk = bodyRig();
     const entity::MotionResult r = provider.pose(memory, sk, pose);

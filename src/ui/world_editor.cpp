@@ -375,6 +375,25 @@ void WorldEditor::updateNavigation(app::Engine& engine, const scene::Camera& cam
                 out.label += fmt::format("  leg {}/{}", std::min(leg + 1, out.waypoints.size()),
                                          out.waypoints.size());
             }
+            // Phase D §40: what the decider chose, about what, and what the body is attending to --
+            // the one-line form of `entity::explainCharacter`, on the label a selected walker
+            // already carries. Nothing here for a body that does not decide.
+            for (const std::unique_ptr<entity::IBehavior>& behavior : entity->behaviors()) {
+                entity::DecisionDebug d;
+                if (!behavior->decisionDebug(d)) {
+                    continue;
+                }
+                out.label += fmt::format("  | {} {}", d.chosen.empty() ? "(none)" : d.chosen,
+                                         d.subject.empty() ? std::string() : "[" + std::string(d.subject) + "]");
+                out.label += fmt::format(" intent {}", entity::intentTypeName(entity->state().intent.type));
+                if (!d.attentionSubject.empty()) {
+                    out.label += fmt::format("  attending {} ({})", d.attentionSubject, d.attentionReason);
+                }
+                if (!d.lastOutcome.empty()) {
+                    out.label += fmt::format("  last plan {}", d.lastOutcome);
+                }
+                break;
+            }
             visuals_.navRoutes.push_back(std::move(out));
         }
     }

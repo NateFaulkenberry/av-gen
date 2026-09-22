@@ -4,6 +4,7 @@
 
 #include "core/json_keys.hpp"
 #include "core/log.hpp"
+#include "core/phase_profiler.hpp"
 #include "assets/asset_library.hpp"
 #include "assets/mesh_lod.hpp"
 #include "entity/gait.hpp"
@@ -43,7 +44,8 @@ constexpr std::string_view kSceneKeys[] = {
     "lightRig",   "lights",         "navBodyRadius",  "navCellSize",   "navWadeDepth",
     "wind",       "post",           "environment",    "composition",   "heroes",
     "worldEffects", "atmosphericEffects", "entityProfiles", "entities", "fields",
-    "staging",    "graph",          "grids",          "materialPrograms", "nodes"};
+    "staging",    "graph",          "grids",          "materialPrograms", "nodes",
+    "worldEvents"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -2259,6 +2261,7 @@ void Composition::installEntities() {
     std::vector<entity::NodeBinding> bindings;
     bindings.reserve(nodes_.size());
     std::vector<std::pair<std::string, glm::vec3>> landmarks;
+    std::vector<std::string> terrainLandmarks;
     landmarks.reserve(nodes_.size() + heroes_.size());
     for (const auto& nodePtr : nodes_) {
         const CompositionNode& node = *nodePtr;
@@ -2285,6 +2288,13 @@ void Composition::installEntities() {
         const glm::vec3 forward = placed.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
         binding.facing = std::atan2(forward.x, forward.z);
         landmarks.emplace_back(node.name, binding.anchor);
+        // Phase D §23: a terrain is the ground itself, not a place on it -- both aliens of the
+        // autonomy demo opened by walking "to the ground". It stays in the landmark list (the
+        // pre-Phase-D deciders and their golden traces read it) and is *tagged* "terrain", by what
+        // the node is and never by its name, so an aware decider can refuse it.
+        if (node.kind == NodeKind::Terrain) {
+            terrainLandmarks.push_back(node.name);
+        }
         bindings.push_back(std::move(binding));
     }
     // Heroes are landmarks too: "look at the elder" is the natural thing for an author to write,
@@ -2294,6 +2304,7 @@ void Composition::installEntities() {
         landmarks.emplace_back(hero.name, hero.position + glm::vec3(0.0f, hero.height * 0.5f, 0.0f));
     }
     entityWorld_.setBindings(std::move(bindings));
+    entityWorld_.setTerrainLandmarks(std::move(terrainLandmarks));
     entityWorld_.setLandmarks(std::move(landmarks));
 
     // The ground an entity walks on is the ground the terrain was built from -- the same WorldMap
@@ -2301,6 +2312,8 @@ void Composition::installEntities() {
     // on, and never needs a second description of it kept in step by hand.
     entityWorld_.setNavigator(buildNavigator());
     entityWorld_.setExtraInterestPoints(glowInterestPoints());
+    // Phase D §26: how far each named world event carries, as the scene authored it.
+    entityWorld_.setEventProfiles(eventProfiles_);
 
     // Fields go in here rather than in a pass of their own, because they bind against the same node
     // table, the same landmarks and the same entity set -- a field that resolved its source against
@@ -2325,6 +2338,7 @@ void Composition::installEntities() {
     // none gets one too and it does nothing -- which is the point: a craft, a rock and a character
     // are the same kind of thing here, and only the data says which.
     animationSinks_.clear();
+    matchAssets_.clear();
     for (const entity::EntityDesc& desc : entityDescs_) {
         entity::Entity* live = entityWorld_.find(desc.name);
         if (live == nullptr) {
@@ -2644,6 +2658,52 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
     entryFor(entity::Activity::Walk, entity_.desc().gait.walkSpeed);
     entryFor(entity::Activity::Run, entity_.desc().gait.runSpeed);
 
+    // ADR-623: the matcher goes in front when this body opted in and its database could be built.
+    // When the database could not be built, the chain is the clip provider alone and the log says
+    // so: falling back is the designed behaviour, and doing it silently is not.
+    matchAsset_.reset();
+    matchProvider_.setDatabase(nullptr);
+    matchProvider_.setClips(nullptr);
+    if (entity_.desc().motionMatching.enabled) {
+        matchAsset_ = owner_.matchAssetFor(rig, entity_.desc().motionMatching, entity_.desc().name);
+        if (matchAsset_ != nullptr) {
+            matchProvider_.setDatabase(&matchAsset_->db);
+            matchProvider_.setClips(&matchAsset_->pack.animation);
+            matchProvider_.setExpectedSkeleton(skeletonDigest(rig.skeleton));
+            // The node's own scale, taken from its world transform's first basis column. Uniform
+            // scale is assumed, as it is everywhere a Glowmere body is drawn.
+            float scale = 1.0f;
+            if (const CompositionNode* node = owner_.findNode(node_); node != nullptr) {
+                scale = glm::length(glm::vec3(owner_.nodeWorldTransform(*node).matrix()[0]));
+            }
+            matchProvider_.setWorldScale(scale);
+            // §45: the search penalties, when the scene set them.
+            const entity::MotionMatchingDesc& mm = entity_.desc().motionMatching;
+            entity::MatchSettings settings = matchProvider_.settings();
+            if (mm.weightsVersion != 0u && mm.continuityWeight >= 0.0f) {
+                settings.weights.continuity = mm.continuityWeight;
+            }
+            if (mm.weightsVersion != 0u && mm.transitionWeight >= 0.0f) {
+                settings.weights.transition = mm.transitionWeight;
+            }
+            if (mm.weightsVersion != 0u && mm.styleWeight >= 0.0f) {
+                settings.styleWeight = mm.styleWeight;
+            }
+            if (mm.weightsVersion != 0u && mm.switchMargin >= 0.0f) {
+                settings.switchMargin = mm.switchMargin;
+            }
+            matchProvider_.setSettings(settings);
+            // §44: the character's style. Not part of the database key: the database is the same
+            // whichever style its reader prefers.
+            std::vector<entity::MatchMotionProvider::StyleRule> rules;
+            for (const auto& [style, prefixes] : mm.styles) {
+                rules.push_back({style, prefixes});
+            }
+            matchProvider_.setStyle(mm.style, std::move(rules));
+            chain_.add(&matchProvider_);
+        }
+    }
+
     // **The fallback chain, with its one implementation.** Phase C's matcher and Phase E's neural
     // provider are added in front of this; the clip provider stays at the back, because ADR-541
     // corollary 1 says every character can run in Clip mode and Clip mode is the fallback for
@@ -2663,6 +2723,134 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
     }
 }
 
+void Composition::AnimationSink::prepareChain() {
+    if (!entity_.desc().proceduralMotion) {
+        return;
+    }
+    const CompositionNode* node = owner_.findNode(node_);
+    if (node == nullptr || node->rigs.empty()) {
+        return;
+    }
+    const RigId id = node->rigs.front();
+    if (id >= owner_.scene_.rigs.size() || !owner_.scene_.rigs[id].skeleton.valid()) {
+        return;
+    }
+    if (!chainBuilt_ || chainRig_ != id) {
+        buildChain(owner_.scene_.rigs[id]);
+        chainRig_ = id;
+    }
+}
+
+std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& rig,
+                                                              const entity::MotionMatchingDesc& m,
+                                                              const std::string& who) {
+    // The key is everything the database is a function of: the skeleton, and the config.
+    std::string key = skeletonDigest(rig.skeleton) + "|p" + m.packResolved + "|j";
+    for (const std::string& j : m.joints) {
+        key += ":" + j;
+    }
+    key += "|c";
+    for (const std::string& c : m.contacts) {
+        key += ":" + c;
+    }
+    key += "|k";
+    for (const std::string& c : m.clips) {
+        key += ":" + c;
+    }
+    key += fmt::format("|w{}:{}:{}:{}:{}:{}:{}:{}", m.weightsVersion, m.jointPositionWeight, m.jointVelocityWeight,
+                       m.trajectoryPositionWeight, m.trajectoryFacingWeight, m.rootVelocityWeight, m.phaseWeight,
+                       m.contactWeight);
+    key += "|t";
+    for (const float t : m.trajectory) {
+        key += fmt::format(":{:.6f}", t);
+    }
+    if (auto it = matchAssets_.find(key); it != matchAssets_.end()) {
+        return it->second;
+    }
+    // Built at load from the rig this scene already has. **In memory, for this process only**: it
+    // is never written or shipped, so its provenance says what it is rather than claiming a
+    // licence for the asset it was derived from.
+    Provenance provenance;
+    provenance.source = "scene rig (runtime matching)";
+    provenance.license = "LicenseRef-scene-asset";
+    provenance.notes = "built at load from the scene's own rig for ADR-623 motion matching; "
+                       "held in memory and never written";
+    provenance.processing = {"ADR-623 runtime build"};
+    PackBuildOptions packOptions;
+    for (const std::string& c : m.contacts.empty() ? m.joints : m.contacts) {
+        packOptions.contactJoints.push_back(ContactJoint{c, ContactKind::Foot});
+    }
+    packOptions.toolVersion = "avgen-runtime-match";
+    // §64/§92: a pack named by the scene replaces the rig's own clips. It has to be built for this
+    // skeleton (ADR-650's digest); a pack for another rig would pose one character with another's
+    // joints, so it is refused here and the body stays on its clip provider.
+    Result<MotionPack> pack = m.packResolved.empty()
+                                  ? buildMotionPack(who, rig.skeleton, rig.clips, provenance, packOptions)
+                                  : readMotionPack(m.packResolved);
+    if (pack && !m.packResolved.empty() && pack->skeletonDigest != skeletonDigest(rig.skeleton)) {
+        pack = fail("pack '{}' was built for another skeleton", m.packResolved);
+    }
+    // §14: only the clips the scene admits. Filtered before the database is built, so a refused
+    // clip costs nothing at search time and can never be chosen.
+    if (pack && !m.clips.empty()) {
+        MotionPack kept = *pack;
+        kept.clips.clear();
+        kept.animation.clear();
+        for (std::size_t c = 0; c < pack->clips.size() && c < pack->animation.size(); ++c) {
+            for (const std::string& prefix : m.clips) {
+                if (pack->clips[c].name.rfind(prefix, 0) == 0) {
+                    kept.clips.push_back(pack->clips[c]);
+                    kept.animation.push_back(pack->animation[c]);
+                    break;
+                }
+            }
+        }
+        if (kept.clips.empty()) {
+            pack = fail("no clip matches motionMatching.clips");
+        } else {
+            pack = std::move(kept);
+        }
+    }
+    std::shared_ptr<const MotionAsset> out;
+    if (!pack) {
+        log::warn("entity '{}': motion matching is on but its pack did not build ({}); the body "
+                  "falls back to its clip provider",
+                  who, pack.error().message);
+    } else {
+        MotionDatabaseOptions dbOptions;
+        dbOptions.config.joints = m.joints;
+        dbOptions.config.contactJoints = m.contacts;
+        dbOptions.config.trajectoryTimes = m.trajectory;
+        if (m.weightsVersion != 0u) {
+            // §45: the scene's weights, applied at search time (the database stores unweighted
+            // features, so a weight change needs no rebuild of the features themselves).
+            dbOptions.config.jointPositionWeight = m.jointPositionWeight;
+            dbOptions.config.jointVelocityWeight = m.jointVelocityWeight;
+            dbOptions.config.trajectoryPositionWeight = m.trajectoryPositionWeight;
+            dbOptions.config.trajectoryFacingWeight = m.trajectoryFacingWeight;
+            dbOptions.config.rootVelocityWeight = m.rootVelocityWeight;
+            dbOptions.config.phaseWeight = m.phaseWeight;
+            dbOptions.config.contactWeight = m.contactWeight;
+        }
+        auto db = buildMotionDatabase(*pack, dbOptions);
+        if (!db) {
+            log::warn("entity '{}': motion matching is on but its database did not build ({}); the "
+                      "body falls back to its clip provider",
+                      who, db.error().message);
+        } else {
+            auto asset = std::make_shared<MotionAsset>();
+            asset->pack = std::move(*pack);
+            asset->db = std::move(*db);
+            log::info("entity '{}': motion matching on, {} samples x {} dimensions over {} clips",
+                      who, asset->db.sampleCount(), asset->db.dimension, asset->db.clipNames.size());
+            out = std::move(asset);
+        }
+    }
+    // A failure is cached too, so a body that cannot match does not rebuild every frame.
+    matchAssets_[key] = out;
+    return out;
+}
+
 Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
     MotionDebug out;
     for (const auto& sink : animationSinks_) {
@@ -2674,8 +2862,37 @@ Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
         out.posedByProvider = sink->posedByProvider();
         if (const CompositionNode* n = findNode(std::string(node));
             n != nullptr && !n->rigs.empty() && n->rigs.front() < scene_.rigs.size()) {
-            out.externalPoseFrames = scene_.rigs[n->rigs.front()].externalPoseFrames;
+            const SkinnedRig& rig = scene_.rigs[n->rigs.front()];
+            out.externalPoseFrames = rig.externalPoseFrames;
+            // §50. Read from the stack as the frame left it, never re-derived: a diagnostic that
+            // recomputes what it is diagnosing agrees with itself (ADR-182).
+            const PoseLayerStack& stack = rig.layers;
+            const std::vector<LayerResolution>& results = stack.results();
+            const std::vector<IkStatus>& statuses = stack.ikStatuses();
+            out.layers.reserve(stack.layers().size());
+            for (std::size_t i = 0; i < stack.layers().size(); ++i) {
+                const PoseLayer& layer = stack.layers()[i];
+                MotionDebug::LayerRow row;
+                row.name = layer.name;
+                row.kind = layer.kind;
+                row.requestedWeight = layer.weight;
+                row.realizedWeight = layer.effectiveWeight();
+                row.resolution = i < results.size() ? results[i] : LayerResolution::Inactive;
+                row.ik = i < statuses.size() ? statuses[i] : IkStatus::Solved;
+                row.hasTarget = layer.hasTarget;
+                row.hasGround = layer.hasGround;
+                out.layers.push_back(std::move(row));
+            }
+            out.bodyCompensation = stack.bodyCompensation().translation;
+            out.unreachableAfterCompensation = stack.bodyCompensation().unreachableAfter;
         }
+        const MotionContext& ctx = sink->motion();
+        out.mode = ctx.mode;
+        out.motionPhase = ctx.motionPhase;
+        out.groundSpeed = ctx.groundSpeed;
+        out.turnRate = ctx.turnRate;
+        out.hasGroundPlane = ctx.hasGroundPlane;
+        out.hasLookTarget = ctx.hasLookTarget;
         out.status = sink->chainResult().result.status;
         if (live != nullptr) {
             out.optedIn = live->desc().proceduralMotion;
@@ -2697,6 +2914,11 @@ const MotionContext* Composition::motionContext(std::string_view node) const {
     }
     return nullptr;
 }
+
+// Phase B §46: how long a look layer takes to arrive. A head turn, not a reach -- 0.25s is a
+// glance; the slice sets its reach layer to 0.45s because the hand has 0.8m to travel and 0.25s
+// would put it at 3.2 m/s.
+namespace { constexpr float kLookBlendSeconds = 0.25f; }
 
 void Composition::AnimationSink::driveLayers(const entity::LocomotionState& state) {
     CompositionNode* node = owner_.findNode(node_);
@@ -2794,6 +3016,17 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     motion_.groundSpeed =
         std::sqrt((state.velocity.x * state.velocity.x) + (state.velocity.z * state.velocity.z));
     motion_.turnRate = state.turnRate;
+    motion_.acceleration = glm::mat3(inverse) * state.acceleration;
+    switch (state.phase) {
+    case entity::LocomotionPhase::Idle: motion_.motionPhase = MotionPhase::Idle; break;
+    case entity::LocomotionPhase::Starting: motion_.motionPhase = MotionPhase::Starting; break;
+    case entity::LocomotionPhase::Moving: motion_.motionPhase = MotionPhase::Moving; break;
+    case entity::LocomotionPhase::Stopping: motion_.motionPhase = MotionPhase::Stopping; break;
+    case entity::LocomotionPhase::Turning: motion_.motionPhase = MotionPhase::Turning; break;
+    case entity::LocomotionPhase::Strafing: motion_.motionPhase = MotionPhase::Strafing; break;
+    }
+    motion_.phaseStride = state.phaseStride;
+    motion_.strafeAngle = state.strafeAngle;
     // The intent, as the polar pair the mover authored it in: a scalar along a heading. Converted
     // to a vector here so a layer never has to know which of the two forms the seam used.
     motion_.desiredFacing =
@@ -2817,6 +3050,18 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
     motion_.strideRatio =
         entity::Gait::footSlip(entity_.desc().gait, state.activity, state.speed);
     motion_.ground = &ground;
+    // §40. Once per frame, across the body's own footprint, and converted into the rig's frame
+    // like everything else here. `restHeight * 0.55` is a body's stance width rather than a
+    // number: a footprint measured in metres would be wrong the moment a scene scales a character.
+    {
+        const glm::vec3 centre = glm::vec3(world[3]);
+        const EnvironmentSample env =
+            sampleEnvironment(ground, centre, std::max(motion_.restHeight * 0.55f, 0.1f));
+        motion_.environment = env;
+        motion_.environment.downhill =
+            glm::length(env.downhill) > 1e-5f ? glm::normalize(glm::mat3(inverse) * env.downhill)
+                                              : glm::vec3(0.0f);
+    }
     motion_.worldFromLocal = world;
     motion_.localFromWorld = inverse;
     motion_.groundPoint = localGround;
@@ -2864,18 +3109,61 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
             // silently does nothing. One source for it: `MotionContext::strideRatio`, which is
             // `Gait::footSlip` (ADR-260).
             if (layer.kind == PoseLayerKind::Stride) {
-                layer.strideRatio = motion_.strideRatio;
+                // Two independent reasons a step should be shorter, multiplied rather than
+                // fought over: **how fast the body is travelling against its authored stride**
+                // (`strideRatio`, `Gait::footSlip`), and **where it is in the arc of a movement**
+                // (`phaseStride`, §8's ramp in and §9's brake out). A start at a quarter speed
+                // wants both, and picking one would make the other invisible.
+                layer.strideRatio = motion_.strideRatio * motion_.phaseStride;
+                layer.bodySlope = motion_.environment.slope;
             }
             if (layer.kind == PoseLayerKind::Secondary) {
                 layer.bodySpeed = motion_.groundSpeed;
             }
+            if (layer.kind == PoseLayerKind::Lean) {
+                layer.bodyAcceleration = motion_.acceleration;
+                layer.bodyTurnRate = motion_.turnRate;
+                layer.bodySlope = motion_.environment.slope;
+                layer.bodyDownhill = motion_.environment.downhill;
+            }
+            // §49. Every layer on this node gets the node's seed and its own, whatever its drive
+            // and whatever the scene authored -- a seed is an identity, not a setting. The
+            // secondary layer is the only reader today; giving it to all of them is what makes
+            // the next procedural layer deterministic without anyone remembering to wire it.
+            //
+            // Derived from names rather than from an index, because an index changes when someone
+            // reorders the nodes in a scene file, and a render that changes because two characters
+            // swapped places in a JSON array is exactly the kind of irreproducibility §49 exists
+            // to prevent.
+            layer.characterSeed = seedFromName(node_);
+            layer.layerSeed = seedFromName(layer.name);
+
             switch (layer.drive) {
             case PoseLayerDrive::Manual:
                 break;
             case PoseLayerDrive::Look:
+                // Phase B §46. Not `haveTarget ? 1 : 0` any more. The vertical slice measured what
+                // that costs: a layer arriving at full weight in one frame moved what it drives
+                // 0.803 m between two frames, thirty-five times the distance the body covered in
+                // the same frame, and it did so identically with the motion controller bypassed --
+                // which is how it was clear the controller was not the thing at fault.
+                //
+                // The schedule comes off the seam rather than being accumulated here, because a
+                // scrub poses the rig once at frame N with no frame N-1 to have ramped from
+                // (ADR-557). `lookTargetSince` is a time; the realized weight is a pure function
+                // of it and `now`, so seeking into the middle of a blend gives the middle of the
+                // blend. `EntityWorld` may remember -- it re-simulates on a seek -- and this tier
+                // may not.
                 layer.weight = haveTarget ? 1.0f : 0.0f;
+                layer.weightBefore = state.lookTargetBefore ? 1.0f : 0.0f;
+                layer.blendElapsed =
+                    static_cast<float>(std::max(state.time - state.lookTargetSince, 0.0));
+                layer.blendSeconds = kLookBlendSeconds;
                 layer.target = localTarget;
-                layer.hasTarget = haveTarget;
+                // The target stays live while the weight fades *out*, or the layer reaches weight
+                // 0.4 with nothing to aim at and resolves `NoTarget`, which is a snap wearing the
+                // costume of a blend.
+                layer.hasTarget = haveTarget || layer.effectiveWeight() > 0.0f;
                 break;
             case PoseLayerDrive::Reaction:
                 layer.weight = reaction;
@@ -2898,6 +3186,55 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 // across their own footprint, and not one foot clamped or compensated.
                 //
                 // So each foot layer that can be placed asks the terrain under its own tip.
+                // §14/§15. Which contact span this foot is in, and how far through it -- read
+                // from the contact track the clip already carries (Phase A) rather than from a
+                // detector run again here, because two answers to "is this foot down" is how
+                // ADR-260 started.
+                if (layer.kind == PoseLayerKind::Foot && layer.footLock > 0.0f) {
+                    layer.inContact = false;
+                    layer.bodyVelocity = motion_.velocity;
+                    const SkinnedRig& rig = owner_.scene_.rigs[id];
+                    const int stateIndex = rig.player.currentStateIndex();
+                    if (stateIndex >= 0 &&
+                        static_cast<std::size_t>(stateIndex) < rig.player.states().size()) {
+                        const std::uint32_t clipIndex =
+                            rig.player.states()[static_cast<std::size_t>(stateIndex)].clip;
+                        if (clipIndex < rig.clipContacts.size() && clipIndex < rig.clips.size()) {
+                            const std::vector<ContactTrack>& tracks = rig.clipContacts[clipIndex];
+                            // Matched by the tip joint's NAME, not by layer order: the contact
+                            // tracks are indexed by the node's `contacts` list and the layers by
+                            // the node's `layers` list, and nothing makes those parallel. An
+                            // off-by-one between two lists that merely look parallel is exactly
+                            // the bug ADR-551 records.
+                            for (const ContactTrack& track : tracks) {
+                                if (track.joint != layer.chainTip) {
+                                    continue;
+                                }
+                                const float local =
+                                    rig.player.stateTime(rig.clips, state.time);
+                                for (const ContactSpan& span : track.spans) {
+                                    const float length = span.clipLength;
+                                    const bool inside =
+                                        span.wraps() ? (local >= span.start || local <= span.end)
+                                                     : (local >= span.start && local <= span.end);
+                                    if (!inside) {
+                                        continue;
+                                    }
+                                    layer.inContact = true;
+                                    layer.contactElapsed =
+                                        span.wraps() && local <= span.end
+                                            ? (length - span.start) + local
+                                            : local - span.start;
+                                    const float duration = span.duration();
+                                    layer.contactRemaining =
+                                        std::max(duration - layer.contactElapsed, 0.0f);
+                                    break;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
                 if (haveGround && layer.kind == PoseLayerKind::Foot &&
                     thisLayer < owner_.scene_.rigs[id].layers.chains().size()) {
                     const glm::ivec3 chain = owner_.scene_.rigs[id].layers.chains()[thisLayer];
@@ -3162,6 +3499,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         // entity arithmetic says it is. One frame old by construction -- see `visualPlacement`.
         stageCtx.visuals = this;
         staging_.update(stageCtx);
+        raiseDirectorBeats(time.renderTime);
     }
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.
@@ -3173,7 +3511,223 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     update.bus = &bus;
     update.viewPosition = scene_.camera.position;
     update.distanceDetail = scene_.detailLimits.entityDistanceCull; // ADR-186
+    for (const auto& sink : animationSinks_) {
+        sink->prepareChain();
+    }
     entityWorld_.update(update, *params_);
+}
+
+void Composition::raiseDirectorBeats(double time) {
+    // Phase D §26/§38: a director beat is a world event -- "abduction/beam" -- raised at the
+    // scenario actor's body, so a character can hear the saucer start to beam and react to it
+    // the way it reacts to anything else, and no character code knows a scenario exists. The
+    // authored beats stay the director's; this only tells the world they happened.
+    //
+    // Not reproduced by a scrub: a seek resets the director (ADR-209) and restarts its run,
+    // so a beat heard on a play is not heard on a replay, exactly as the scenario itself is not.
+    for (const stage::StageEvent& event : staging_.events()) {
+        if (event.kind != stage::StageEventKind::Beat) {
+            continue;
+        }
+        entity::WorldEvent w;
+        w.type = entityWorld_.eventType(event.scenario + "/" + event.beat);
+        w.time = time;
+        for (const stage::ScenarioDesc& scenario : stagingDesc_.scenarios) {
+            if (scenario.name != event.scenario) {
+                continue;
+            }
+            for (const stage::ActorDesc& actor : stagingDesc_.actors) {
+                if (actor.name == scenario.actor) {
+                    const auto& all = entityWorld_.entities();
+                    for (std::size_t e = 0; e < all.size(); ++e) {
+                        if (all[e]->name() == actor.driven()) {
+                            w.position = all[e]->state().position();
+                            w.source = e;
+                        }
+                    }
+                }
+            }
+        }
+        for (const entity::EntityWorld::EventProfile& profile : entityWorld_.eventProfiles()) {
+            if (profile.name == entityWorld_.eventName(w.type)) {
+                w.radius = profile.radius;
+                w.magnitude = profile.magnitude;
+            }
+        }
+        entityWorld_.emitEvent(w);
+    }
+}
+
+// ---- ADR-671: a scrub that replays the director -----------------------------------------------
+
+void Composition::ReplayPlacement::capture() {
+    const Composition& c = comp_;
+    const std::size_t count = std::min(c.nodes_.size(), c.ranges_.size());
+    placed_.resize(count);
+    valid_.assign(count, 0u);
+    // The root fold `applyParameters` puts every node through, with the same arithmetic.
+    const float rootScale = (c.rootScale_ != nullptr ? c.rootScale_->value() : 1.0f) +
+                            (c.rootImpulse_ != nullptr ? c.rootImpulse_->value() : 0.0f);
+    Transform root;
+    root.rotation = glm::angleAxis(c.rootAngle_, glm::vec3(0.0f, 1.0f, 0.0f));
+    root.scale = glm::vec3(rootScale);
+    root.position = c.center_ - root.rotation * (c.center_ * rootScale);
+    for (std::size_t i = 0; i < count; ++i) {
+        const CompositionNode& node = *c.nodes_[i];
+        const NodeRange& range = c.ranges_[i];
+        const Transform full = compose(root, c.nodeWorldTransform(node));
+        stage::VisualPlacement& out = placed_[i];
+        out.origin = full.position;
+        out.centre = out.origin;
+        if (node.kind == NodeKind::Particles && range.particleIndex >= 0) {
+            ParticleSystem ps = node.particleRest;
+            applyParticleParameters(node.particleParams, node.particleRest, ps);
+            out.centre = transformPoint(full, ps.position);
+            valid_[i] = 1u;
+            continue;
+        }
+        bool any = false;
+        glm::vec3 lo(0.0f);
+        glm::vec3 hi(0.0f);
+        for (std::size_t k = 0; k < range.entityCount && k < range.restTransforms.size() &&
+                                range.firstEntity + k < c.scene_.entities.size();
+             ++k) {
+            const Entity& entity = c.scene_.entities[range.firstEntity + k];
+            if (entity.mesh >= c.scene_.meshes.size()) {
+                continue;
+            }
+            const Transform world = compose(full, range.restTransforms[k]);
+            const auto& [bmin, bmax] = c.scene_.meshBounds(entity.mesh);
+            for (int corner = 0; corner < 8; ++corner) {
+                const glm::vec3 p((corner & 1) ? bmax.x : bmin.x, (corner & 2) ? bmax.y : bmin.y,
+                                  (corner & 4) ? bmax.z : bmin.z);
+                const glm::vec3 w = transformPoint(world, p);
+                if (!any) {
+                    lo = w;
+                    hi = w;
+                    any = true;
+                } else {
+                    lo = glm::min(lo, w);
+                    hi = glm::max(hi, w);
+                }
+            }
+        }
+        if (any) {
+            out.centre = (lo + hi) * 0.5f;
+        }
+        valid_[i] = 1u;
+    }
+}
+
+bool Composition::ReplayPlacement::visualPlacement(std::string_view node,
+                                                   stage::VisualPlacement& out) const {
+    for (std::size_t i = 0; i < placed_.size() && i < comp_.nodes_.size(); ++i) {
+        if (comp_.nodes_[i]->name == node) {
+            if (i >= valid_.size() || valid_[i] == 0u) {
+                return false; // nothing "flattened" yet: the play's frame zero answers false too
+            }
+            out = placed_[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+namespace {
+
+// ADR-700: the composition's half of a checkpoint. Everything the replay hooks read across steps:
+// the director, whole, with the bases it had written, and the one-step-old placement it asks.
+struct DirectorCheckpoint final : entity::HostCheckpoint {
+    stage::Staging::Checkpoint staging;
+    std::vector<stage::VisualPlacement> placed;
+    std::vector<std::uint8_t> valid;
+    std::size_t measured = 0;
+    [[nodiscard]] std::size_t bytes() const override { return measured; }
+};
+
+} // namespace
+
+std::uint64_t Composition::replayInputKey() const {
+    // What the director's replay reads that is not a parameter base (the bases are hashed by the
+    // entity world): the staging description and registration, and the root fold and centre
+    // `ReplayPlacement` composes every node through. A structural edit of the scene re-flattens,
+    // and a flatten re-installs the navigator, which moves the entity world's own epoch.
+    std::uint64_t h = 0x9e3779b97f4a7c15ull;
+    const auto mix = [&h](std::uint64_t v) {
+        h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+    };
+    const auto bits = [](float f) {
+        std::uint32_t u = 0;
+        std::memcpy(&u, &f, sizeof u);
+        return static_cast<std::uint64_t>(u);
+    };
+    mix(staging_.epoch());
+    mix(stagingDesc_.empty() ? 0u : 1u);
+    mix(bits(rootAngle_));
+    mix(bits(center_.x));
+    mix(bits(center_.y));
+    mix(bits(center_.z));
+    mix(nodes_.size());
+    mix(ranges_.size());
+    mix(scene_.meshes.size());
+    mix(scene_.entities.size());
+    return h;
+}
+
+void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
+                                   entity::SeekBudget budget, double step) {
+    staging_.reset(&entityWorld_, &params);
+    seekPlacementLive_ = false;
+    if (stagingDesc_.empty()) {
+        entity::EntityWorld::SeekHooks hooks;
+        hooks.inputKey = replayInputKey();
+        entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
+        return;
+    }
+    ReplayPlacement placement(*this);
+    placement.capture();
+    placement.invalidate(); // the play's first frame has no flattening to ask
+    entity::EntityWorld::SeekHooks hooks;
+    hooks.before = [&](double now, double dt) {
+        // A play frame's top: finals rebuilt from bases, then the director (ADR-209), then the
+        // entities. Routes and reactions are not replayed -- a scrub has no signal history, the
+        // limit every seek in this engine already has.
+        params.resetFinals();
+        stage::StageContext ctx;
+        ctx.time = now;
+        ctx.dt = dt;
+        ctx.world = &entityWorld_;
+        ctx.params = &params;
+        ctx.visuals = &placement;
+        ctx.bus = nullptr;
+        staging_.update(ctx);
+        raiseDirectorBeats(now);
+    };
+    hooks.after = [&](double, double) {
+        // The offsets a play's entity pass writes, and the "flattening" the next step's director
+        // will ask about.
+        entityWorld_.applyAllOffsets();
+        placement.capture();
+    };
+    hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
+        auto c = std::make_shared<DirectorCheckpoint>();
+        const std::uint64_t before = core::allocCounters().bytes;
+        c->staging = staging_.checkpoint(params);
+        c->placed = placement.placed();
+        c->valid = placement.valid();
+        c->measured = static_cast<std::size_t>(core::allocCounters().bytes - before) + sizeof(DirectorCheckpoint);
+        return c;
+    };
+    hooks.restore = [&](const entity::HostCheckpoint& host) {
+        const auto& c = static_cast<const DirectorCheckpoint&>(host);
+        staging_.restore(c.staging, params);
+        placement.set(c.placed, c.valid);
+    };
+    hooks.inputKey = replayInputKey();
+    entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
+    seekPlaced_ = placement.placed();
+    seekPlacedValid_ = placement.valid();
+    seekPlacementLive_ = true;
 }
 
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {
@@ -3417,6 +3971,17 @@ bool Composition::visualPlacement(std::string_view node, stage::VisualPlacement&
     // anything parented is a point in the wrong space entirely (the tractor beam's would be the
     // world origin, two hundred metres from the saucer).
     const auto index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+    // The first frame after a seek: the flattening is from before the jump, and the replay's last
+    // step is what a play would have flattened (ADR-700; see `seekPlaced_`).
+    if (seekPlacementLive_ && !dirty_) {
+        if (index < seekPlaced_.size() && index < seekPlacedValid_.size() && seekPlacedValid_[index] != 0u) {
+            out = seekPlaced_[index];
+            return true;
+        }
+        out.origin = glm::vec3(0.0f);
+        out.centre = out.origin;
+        return false;
+    }
     // Everything below comes out of the last flattening and nothing out of the parameters, for the
     // reason written on `NodeRange::world`: the finals are reset at the top of the frame and the
     // director runs before the entity pass writes them back, so a parameter read here is the
@@ -6467,6 +7032,9 @@ void Composition::rebuild() {
 // ---- per-frame ---------------------------------------------------------------------------------
 
 void Composition::update(const FrameTime& time) {
+    // This frame flattens, so from here on `visualPlacement` answers from the flattening again
+    // rather than from the last seek's replay (ADR-700).
+    seekPlacementLive_ = false;
     if (graphDirty_) {
         if (auto r = evaluateGraph(time.renderTime); !r) {
             log::warn("graph '{}': {}", graph_ ? graph_->name : std::string("?"), r.error().message);
@@ -8774,10 +9342,31 @@ nlohmann::json Composition::toJson() const {
                     if (layer.drive != PoseLayerDrive::Manual) {
                         l["drive"] = poseLayerDriveName(layer.drive);
                     }
+                    // **`weight` is authored state for a Manual layer and per-frame state for every
+                    // other drive, and only the first kind may be saved.** The parser already draws
+                    // exactly this line -- `layer.weight = drive == Manual ? *weight : 0.0f` -- and
+                    // this side did not, so a manual layer's authored weight was read and never
+                    // written back. Loading and saving `glowmere-valley-2-multicam` turned fifteen
+                    // layers off: both stride warpers and the secondary-motion layer on all five
+                    // aliens, silently, in a file that still loaded cleanly (ADR-618).
+                    //
+                    // Written **here, before the Foot/Reach early-out below**, deliberately. There
+                    // are two `push_back` sites in this loop and a key added to one of them is a
+                    // key the other drops -- which is the same defect one level down, and the
+                    // reason this comment is at the top of the function rather than beside a
+                    // `l["weight"]` in each branch.
+                    if (layer.drive == PoseLayerDrive::Manual && layer.weight != 0.0f) {
+                        l["weight"] = layer.weight;
+                    }
                     // ADR-359: a foot layer is a different set of keys, not the same set with some
                     // of them empty. Written through the shared path it came out with `"joints":
                     // []` and `"clip": ""`, and the file it produced would not load -- a save that
                     // breaks the scene it saved is worse than one that refuses.
+                    if (layer.kind == PoseLayerKind::Lean) {
+                        l["degreesPerAccel"] = layer.leanDegreesPerAccel;
+                        l["degreesPerTurn"] = layer.leanDegreesPerTurn;
+                        l["maxDegrees"] = layer.leanMaxDegrees;
+                    }
                     if (layer.kind == PoseLayerKind::Secondary) {
                         l["degrees"] = layer.secondaryDegrees;
                         l["period"] = layer.secondaryPeriod;
@@ -8796,7 +9385,8 @@ nlohmann::json Composition::toJson() const {
                         l["strideMax"] = layer.strideMax;
                         l["strideLift"] = layer.strideLift;
                     }
-                    if (layer.kind == PoseLayerKind::Foot) {
+                    if (layer.kind == PoseLayerKind::Foot ||
+                        layer.kind == PoseLayerKind::Reach) {
                         l["chain"] = json::array({layer.chainRoot, layer.chainMid, layer.chainTip});
                         if (glm::dot(layer.poleDirection, layer.poleDirection) > 0.0f) {
                             l["poleDirection"] = vecToJson(layer.poleDirection);
@@ -8809,6 +9399,9 @@ nlohmann::json Composition::toJson() const {
                         }
                         if (layer.extension != 1.0f) {
                             l["extension"] = layer.extension;
+                        }
+                        if (layer.footLock != 0.0f) {
+                            l["footLock"] = layer.footLock;
                         }
                         if (glm::dot(layer.soleUp, layer.soleUp) > 0.0f) {
                             l["soleUp"] = vecToJson(layer.soleUp);
@@ -9042,6 +9635,23 @@ nlohmann::json Composition::toJson() const {
     }
     if (!entityDescs_.empty()) {
         j["entities"] = entity::entitiesToJson(entityDescs_);
+    }
+    // Phase D §26. Written when authored and never otherwise (the diff-noise rule, ADR-225).
+    if (!eventProfiles_.empty()) {
+        json events = json::array();
+        for (const entity::EntityWorld::EventProfile& e : eventProfiles_) {
+            json ej{{"name", e.name}, {"radius", e.radius}, {"magnitude", e.magnitude}};
+            if (!e.signal.empty()) {
+                ej["signal"] = e.signal;
+                ej["threshold"] = e.threshold;
+                ej["minInterval"] = e.minInterval;
+            }
+            if (!e.at.empty()) {
+                ej["at"] = e.at;
+            }
+            events.push_back(std::move(ej));
+        }
+        j["worldEvents"] = std::move(events);
     }
     if (!fieldDescs_.empty()) {
         j["fields"] = entity::fieldsToJson(fieldDescs_);
@@ -9808,6 +10418,44 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }
+    // Phase D §26: `"worldEvents": [{"name": "bloom", "radius": 45, "magnitude": 0.8}]` -- how far
+    // a named event carries and how loud it is. Before the entities are bound, so the first
+    // `rebuild` hands them to the world.
+    if (j.contains("worldEvents")) {
+        const json& events = j.at("worldEvents");
+        if (!events.is_array()) {
+            return fail("scene file '{}': 'worldEvents' must be an array", scenePath.string());
+        }
+        std::vector<entity::EntityWorld::EventProfile> profiles;
+        for (const json& e : events) {
+            if (!e.is_object() || !e.contains("name") || !e.at("name").is_string()) {
+                return fail("scene file '{}': every world event needs a string 'name'",
+                            scenePath.string());
+            }
+            entity::EntityWorld::EventProfile profile;
+            profile.name = e.at("name").get<std::string>();
+            if (e.contains("radius") && e.at("radius").is_number()) {
+                profile.radius = std::max(0.0f, e.at("radius").get<float>());
+            }
+            if (e.contains("magnitude") && e.at("magnitude").is_number()) {
+                profile.magnitude = std::clamp(e.at("magnitude").get<float>(), 0.0f, 1.0f);
+            }
+            if (e.contains("signal") && e.at("signal").is_string()) {
+                profile.signal = e.at("signal").get<std::string>();
+            }
+            if (e.contains("threshold") && e.at("threshold").is_number()) {
+                profile.threshold = e.at("threshold").get<float>();
+            }
+            if (e.contains("at") && e.at("at").is_string()) {
+                profile.at = e.at("at").get<std::string>();
+            }
+            if (e.contains("minInterval") && e.at("minInterval").is_number()) {
+                profile.minInterval = std::max(0.0f, e.at("minInterval").get<float>());
+            }
+            profiles.push_back(std::move(profile));
+        }
+        comp->setEventProfiles(std::move(profiles));
+    }
     if (j.contains("fields")) {
         auto fields = entity::fieldsFromJson(j.at("fields"));
         if (!fields) {
@@ -10219,7 +10867,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             std::string known;
                             for (const PoseLayerKind k :
                                  {PoseLayerKind::Aim, PoseLayerKind::Additive, PoseLayerKind::Foot,
-                                  PoseLayerKind::Stride, PoseLayerKind::Secondary}) {
+                                  PoseLayerKind::Stride, PoseLayerKind::Secondary,
+                                  PoseLayerKind::Lean, PoseLayerKind::Reach}) {
                                 if (!known.empty()) {
                                     known += ", ";
                                 }
@@ -10288,6 +10937,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         // ADR-359: a foot layer is addressed by a chain and never by a mask, so it
                         // reads a different set of keys and refuses a mask outright here rather
                         // than letting `bind` report a no-op after the scene has loaded.
+                        if (layer.kind == PoseLayerKind::Lean) {
+                            auto accel = readFloat(entry, "degreesPerAccel", layer.leanDegreesPerAccel);
+                            auto turn = readFloat(entry, "degreesPerTurn", layer.leanDegreesPerTurn);
+                            auto cap = readFloat(entry, "maxDegrees", layer.leanMaxDegrees);
+                            if (!accel) return std::unexpected(accel.error());
+                            if (!turn) return std::unexpected(turn.error());
+                            if (!cap) return std::unexpected(cap.error());
+                            layer.leanDegreesPerAccel = *accel;
+                            layer.leanDegreesPerTurn = *turn;
+                            layer.leanMaxDegrees = *cap;
+                            if (layer.leanMaxDegrees < 0.0f) {
+                                return fail("node '{}': animation layer '{}': 'maxDegrees' cannot be "
+                                            "negative",
+                                            node.name, layer.name);
+                            }
+                        }
                         if (layer.kind == PoseLayerKind::Secondary) {
                             // Phase B §26-§28. Masked like an aim layer, because the oscillation
                             // is applied per joint and a chest and a head are different amounts of
@@ -10345,11 +11010,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                             node.name, layer.name, layer.strideMin, layer.strideMax);
                             }
                         }
-                        if (layer.kind == PoseLayerKind::Foot) {
+                        if (layer.kind == PoseLayerKind::Foot ||
+                            layer.kind == PoseLayerKind::Reach) {
                             if (!entry.contains("chain")) {
-                                return fail("node '{}': animation layer '{}': a foot layer needs a 'chain' "
-                                            "of exactly three joint names -- the hip, the knee and the foot",
-                                            node.name, layer.name);
+                                return fail("node '{}': animation layer '{}': a {} layer needs a "
+                                            "'chain' of exactly three joint names -- root, mid and tip",
+                                            node.name, layer.name, poseLayerKindName(layer.kind));
                             }
                             const json& chain = entry.at("chain");
                             if (!chain.is_array() || chain.size() != 3 ||
@@ -10371,12 +11037,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                             auto align = readFloat(entry, "footAlign", 1.0f);
                             auto offset = readFloat(entry, "groundOffset", 0.0f);
                             auto reach = readFloat(entry, "extension", 1.0f);
+                            // ADR-615: `footLock` is parsed here because its four neighbours above
+                            // always were and it never was -- an omission, not a decision. Until
+                            // this line existed a scene that authored the key was told it "is not
+                            // one this build reads and was ignored", which was true and made the
+                            // whole foot-lock subsystem (ADR-557's derived anchor, `inContact`,
+                            // `contactElapsed`, `bodyVelocity`) unreachable from any scene. The
+                            // default stays 0 -- off -- so nothing changes until an author asks.
+                            auto lock = readFloat(entry, "footLock", 0.0f);
                             if (!align) return std::unexpected(align.error());
                             if (!offset) return std::unexpected(offset.error());
                             if (!reach) return std::unexpected(reach.error());
+                            if (!lock) return std::unexpected(lock.error());
                             layer.footAlign = *align;
                             layer.groundOffset = *offset;
                             layer.extension = *reach;
+                            layer.footLock = *lock;
                             if (entry.contains("poleDirection")) {
                                 auto pole = readVec<3>(entry, "poleDirection", layer.poleDirection);
                                 if (!pole) return std::unexpected(pole.error());
@@ -10414,7 +11090,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 std::string_view{"weight"},    std::string_view{"chain"},
                                 std::string_view{"poleDirection"}, std::string_view{"footAlign"},
                                 std::string_view{"groundOffset"},  std::string_view{"extension"},
-                                std::string_view{"soleUp"},
+                                std::string_view{"soleUp"},        std::string_view{"footLock"},
                                 // Stride (Phase B §7)
                                 std::string_view{"joint"},     std::string_view{"origin"},
                                 std::string_view{"strideMin"}, std::string_view{"strideMax"},
@@ -10422,7 +11098,11 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 // Secondary motion (Phase B §26-§28)
                                 std::string_view{"degrees"},   std::string_view{"period"},
                                 std::string_view{"phase"},     std::string_view{"spread"},
-                                std::string_view{"stillness"}, std::string_view{"axis"}};
+                                std::string_view{"stillness"}, std::string_view{"axis"},
+                                // Lean (Phase B §19)
+                                std::string_view{"degreesPerAccel"},
+                                std::string_view{"degreesPerTurn"},
+                                std::string_view{"maxDegrees"}};
                             if (std::find(kLayerKeys.begin(), kLayerKeys.end(), key.key()) ==
                                 kLayerKeys.end()) {
                                 log::warn("scene file '{}': node '{}': animation layer key '{}' is not one "

@@ -78,6 +78,13 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
     for (const float w : settings.weight) {
         maxWeight = std::max(maxWeight, w);
     }
+    // Phase D §9: per-tag taste, when this body declared any. Empty for every body written before
+    // Phase D, which leaves `maxWeight` and every salience below exactly as they were.
+    const std::span<const std::pair<std::uint64_t, float>> tagWeights = me.perceptionTagWeights();
+    for (const auto& [bit, w] : tagWeights) {
+        (void)bit;
+        maxWeight = std::max(maxWeight, w);
+    }
     const float invWeight = maxWeight > 0.0f ? 1.0f / maxWeight : 0.0f;
 
     candidates_.clear();
@@ -86,7 +93,8 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
     // bodies first in entity order, then interest points in list order. A tie broken on the lower
     // index is the same rule `NavGrid`'s A* breaks a tie on cell index with, and it is what stops
     // the answer depending on the order the grid happened to visit its cells.
-    const auto add = [&](InterestKind kind, std::size_t scanIndex, const glm::vec3& at) {
+    const auto add = [&](InterestKind kind, std::size_t scanIndex, const glm::vec3& at,
+                         std::uint64_t tags) {
         const glm::vec3 delta = at - eye;
         const glm::vec2 flat(delta.x, delta.z);
         const float distance = glm::length(delta);
@@ -112,8 +120,14 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
         p.visibility = 1.0f;
         p.tested = false;
         p.seenAt = time;
+        p.tags = tags; // Phase D §25: what the thing is, carried rather than looked up later
         const auto slot = static_cast<std::size_t>(kind);
-        const float weight = slot < 5 ? settings.weight[slot] : 1.0f;
+        float weight = slot < 5 ? settings.weight[slot] : 1.0f;
+        for (const auto& [bit, w] : tagWeights) {
+            if ((tags & bit) != 0) {
+                weight = std::max(weight, w);
+            }
+        }
         // **Salience deliberately does not include `visibility`.** It is taste times nearness and
         // nothing else. Folding in a visibility that only a round-robin subset of the percepts ever
         // measured would make the ranking -- and so the capacity cut, and so what the character
@@ -135,7 +149,8 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
             if (body == self || body >= index_.bodyPositions.size()) {
                 continue; // a character does not perceive itself
             }
-            add(InterestKind::Character, body, index_.bodyPositions[body]);
+            add(InterestKind::Character, body, index_.bodyPositions[body],
+                body < world.entities().size() ? world.entities()[body]->tagMask() : 0);
         }
     }
     const std::span<const InterestPoint> interests = world.interestPoints();
@@ -151,7 +166,8 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
             if (source >= interests.size()) {
                 continue;
             }
-            add(interests[source].kind, bodyCount + source, interests[source].position);
+            add(interests[source].kind, bodyCount + source, interests[source].position,
+                interests[source].tags);
         }
     }
 

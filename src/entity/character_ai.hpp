@@ -9,27 +9,53 @@
 // what an implementation agent owes it. Two do not exist and are declared here, with contracts and
 // no implementation, so that the agent who writes the first one writes it against this.
 //
-// Nothing in this file compiles into the engine. `src/CMakeLists.txt` globs `entity/*.cpp`; a
-// header nobody includes is inert by construction, which is the point: Phase 0 ships a contract,
-// not a runtime.
+// **STALE AS WRITTEN (ADR-615).** This said "Nothing in this file compiles into the engine… a
+// header nobody includes is inert by construction". It is included by `entity/decision.hpp`,
+// `entity/perception.hpp` and `entity/entity.hpp`, so `Percept`, `PerceptionSettings`, `Option`,
+// `DecisionContext` and `IConsiderer` are compiled runtime types and editing this header is not
+// free. Phase 0 shipped a contract; the contract has since been implemented around it.
 //
 // ------------------------------------------------------------------------------------------------
 // §0. What already exists. Do not build a second one of any of these.
 // ------------------------------------------------------------------------------------------------
 //
-// | the brief's name  | the type that already is it        | where                       |
-// |-------------------|------------------------------------|-----------------------------|
-// | character state   | `entity::EntityState`              | entity/behavior.hpp:48      |
-// |                   | + `entity::Entity`                 | entity/entity.hpp:256       |
-// | navigation        | `entity::Navigator`                | entity/navigation.hpp:113   |
-// |                   | + `NavGrid`, `PathRequest/Result`  | entity/nav_grid.hpp         |
-// |                   | + `entity::IPathProvider`          | entity/action.hpp:83        |
-// | behaviour state   | `entity::IBehavior`                | entity/behavior.hpp:126     |
-// |                   | + `entity::ActionQueue`/`Authority`| entity/action.hpp:253,281   |
-// |                   | + `entity::Schedule`               | entity/action.hpp:393       |
-// | animation intent  | `entity::LocomotionState`          | entity/locomotion.hpp:52    |
-// |                   | + `IPoseSink`, `ISkeletonQuery`    | entity/locomotion.hpp:90,99 |
-// | directed staging  | `stage::Staging`                   | stage/staging.hpp:485       |
+// **Names, and the command that locates them. No line numbers, and that is deliberate** -- see
+// "why this section is written this way" at the end of §0.
+//
+// | the brief's name  | the type that already is it                                    |
+// |-------------------|----------------------------------------------------------------|
+// | character state   | `entity::EntityState`, `entity::Entity`                        |
+// | navigation        | `entity::Navigator`, `NavGrid`, `PathRequest`/`PathResult`,    |
+// |                   | `entity::IPathProvider`                                        |
+// | behaviour state   | `entity::IBehavior`, `entity::ActionQueue`, `entity::Authority`,|
+// |                   | `entity::Schedule`                                             |
+// | animation intent  | `entity::LocomotionState`, `IPoseSink`, `ISkeletonQuery`       |
+// | directed staging  | `stage::Staging`                                               |
+//
+// To find any of them, and to find every implementation of an interface:
+//
+//     grep -rn --include='*.hpp' -E "(struct|class) <Name>\b" src/
+//     grep -rn --include='*.cpp' --include='*.hpp' -E ": public <Interface>\b" src/
+//
+// **The second one searches `.cpp` as well, and that is not a detail.** Interfaces here are
+// commonly implemented in a translation unit rather than a header -- every `IBehavior` lives in
+// `entity/behaviors.cpp` -- so a header-only search for implementations reports **none** and reads
+// exactly like "nobody has built one yet". That is the failure this whole section exists to avoid,
+// reintroduced through the instruction meant to prevent it. A first draft of these two lines had
+// it. Run an instruction before you write it down.
+//
+// **Why this section is written this way, so that nobody restores the old form.** It used to carry
+// a `file:line` for every entry. When it was audited, **0 of 12 coordinates landed on the type they
+// named** -- one pointed at a blank line, one at a closing brace, one at an unrelated `scale`
+// member. Not one was wrong when written; all twelve rotted, because this file is structurally the
+// **last** thing anyone edits and a line number is invalidated by any insertion above it.
+//
+// So this section asserts as little as it can get away with. **A name survives a move and a line
+// number does not, and a command that finds the answer cannot be wrong about what the answer is.**
+// A document that tells you how to check is strictly harder to falsify than one that tells you what
+// is true. If you are tempted to add an inventory here -- a count, a coordinate, a list of what
+// does or does not exist yet -- add the grep that produces it instead. ADR-615 and ADR-617 record
+// what this cost.
 //
 // The four rules that go with them, each of which has cost this project a shipped defect:
 //
@@ -113,6 +139,7 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -121,9 +148,57 @@
 namespace avgen::entity {
 
 // ------------------------------------------------------------------------------------------------
-// §2. Perception -- the layer that genuinely does not exist
+// §2. Perception -- what it is for, and what must stay true of it
 // ------------------------------------------------------------------------------------------------
 //
+// **Before building anything here, run this. It answers "does it exist and how many are there"
+// better than any sentence in this file can:**
+//
+//     grep -rn --include='*.cpp' --include='*.hpp' -E ": public IPerception\b" src/
+//     ls src/entity/perception.*
+//
+// ---- purpose -----------------------------------------------------------------------------------
+//
+// **One perception layer, shared, so that "what a character knows" has a single answer.** The
+// failure this prevents is not a missing feature; it is several behaviours each deciding privately
+// what their character can see, after which no two agree and none can be tested. A percept is
+// something a body **knows**; an order is something it was **told**; the two arrive by different
+// routes and must not be merged into one list.
+//
+// ---- invariants, which survive any refactor of the implementation ------------------------------
+//
+// **P1. Perception is a query, not a store.** What a character knows is reconstructed by the
+// replay, never persisted -- the same rule as D4 below. A seek that inherited the last played
+// frame's percepts would be state surviving the one call whose job is to remove state.
+//
+// **P2. Cost scales with the number of characters, so the per-character budget is the design
+// constraint, not the per-query one.** The sightline figures below are why: a ray budget that is
+// fine for one hero is not fine for a crowd, and the interface is shaped by that rather than by
+// what a single character could afford.
+//
+// **P3. A perception source is selectable, and "omniscient" stays available.** A behaviour that
+// can only run against real percepts cannot be bisected against one that sees everything, and that
+// comparison is how a perception bug is found at all.
+//
+// **P4. Nothing downstream may read the global interest list directly** once it is scoring
+// percepts. Two sources for one question is how the two tiers drift apart.
+//
+// ---- history, and why this section no longer states what exists --------------------------------
+//
+// This section used to be headed *"Perception -- the layer that genuinely does not exist"*, and
+// said every character sees everything with no distance limit, no facing and no occlusion. It was
+// true in Phase 0. It was false for a long time before anyone noticed, and because this file
+// declares itself normative and exists **specifically** to stop parallel agents each inventing a
+// perception layer, the heading had become a build instruction to write a second one. A document
+// that causes the outcome it was written to prevent is the worst failure available to it.
+//
+// So the section now carries purpose, invariants and a command, and **asserts nothing about code
+// state**. Invariants are falsified by a design change, which is a thing someone does on purpose;
+// inventory is falsified by an ordinary edit somewhere else, which is a thing nobody notices.
+// See §0's note, ADR-615 and ADR-617. The Phase 0 text below is kept as the brief that produced
+// the layer -- **read it as history, not as a description of this engine.**
+//
+// ================================ PHASE 0 BRIEF -- HISTORY ======================================
 // Today every character sees everything. `EntityWorld::interestPoints()` is one global list --
 // **505 entries** on `glowmere-valley-2` -- and `Explore` scores all of them every time it picks a
 // goal, with no distance limit, no facing, no occlusion and no notion of having noticed something.
@@ -171,6 +246,10 @@ struct Percept {
     // clock (D1), so a percept that survives into a coarser update still says how stale it is.
     double seenAt = 0.0;
     float salience = 0.0f;       // 0..1, the sense stage's own ranking; see `PerceptionSettings`
+    // Phase D §25: what the thing *is*, as bits of the world's `SemanticTags` (entity/mind.hpp) --
+    // "glowing", "mushroom", "ufo". Carried on the percept so a considerer filters on meaning
+    // without following `source` back into the world. 0 in a world that interned no words.
+    std::uint64_t tags = 0;
 };
 
 // What a body can notice. Per character, because a six-metre alien and a chicken do not have the
@@ -276,6 +355,13 @@ public:
 // cooldown field: a cooldown is a term in the score, and an option that must win is an option that
 // scores higher. One axis is what makes the result explicable -- an overlay can print the losing
 // scores next to the winner, and "why is it doing that" has an answer.
+// One named contribution to a score (Phase D §41: "Factors: Novelty +0.31, Distance +0.18 ...").
+// `name` is a static string, never built per tick.
+struct ScoreFactor {
+    std::string_view name;
+    float value = 0.0f;
+};
+
 struct Option {
     std::string_view name;          // stable, for the overlay and the test
     float score = 0.0f;             // higher wins; <= 0 is "not applicable now"
@@ -283,7 +369,39 @@ struct Option {
     // wins by doing nothing", which is what an idle is.
     std::span<const ActionDesc> actions;
     Authority tier = Authority::Routine;
+
+    // ---- Phase D §3, §41: what the option is FOR, and why it scored what it did ----------------
+    //
+    // Added after the four fields above and defaulted, so every considerer written before Phase D
+    // -- which builds an `Option` by aggregate initialisation of the first four -- is unchanged.
+    //
+    // The coarse intent this option expresses (§3). What the decider publishes as
+    // `CharacterIntent::type` while the option runs, and what a camera, an overlay and a trace read.
+    IntentType intent = IntentType::Custom;
+    // What it is about, as `mind.hpp`'s `SubjectId` (0 = nothing in particular). Two options with
+    // the same name and different subjects are different courses of action: "investigate" the
+    // mushroom and "investigate" the rock are not one decision.
+    std::uint64_t subject = 0;
+    glm::vec3 target{0.0f};
+    bool hasTarget = false;
+    float urgency = 0.0f;
+    float stoppingDistance = 0.0f;
+    // The `InterestKind` of the place this option goes to, when it is a place (255 otherwise). What
+    // lets a decider remember "I have been to three shorelines in a row" (§22's novelty, one level
+    // up from the single place).
+    std::uint8_t kind = 255;
+    // The terms the score is the sum or product of, largest first by convention. Fixed storage: an
+    // option is copied into the selector's list every tick and must not allocate.
+    std::array<ScoreFactor, 6> factors{};
+    std::uint8_t factorCount = 0;
+    void addFactor(std::string_view factor, float value) {
+        if (factorCount < factors.size()) {
+            factors[factorCount++] = ScoreFactor{factor, value};
+        }
+    }
 };
+
+struct MindView; // entity/mind.hpp
 
 // What a considerer is given. Everything it may read, and nothing else: an option scorer that
 // reached into the world directly could not be tested against a scripted perception.
@@ -310,6 +428,11 @@ struct DecisionContext {
     const signals::SignalBus* bus = nullptr;
     // The character's seed. Draws are (seed, index) hashes (D2), never a stream.
     std::uint32_t seed = 0;
+    // Phase D's awareness layer (`entity/mind.hpp`): attention, memory, novelty, personality and
+    // perceived events, for the considerers that read them. **Null for every decider that did not
+    // opt in**, which is every decider written before Phase D -- so a considerer must treat null as
+    // "neutral personality, nothing remembered, nothing heard" and score exactly as it did.
+    const MindView* mind = nullptr;
 };
 
 // Scores options. One instance per *kind* of character, shared across every character of that kind:
@@ -352,6 +475,36 @@ public:
 // (`scene/composition.cpp:1892-1906` uses only `action`, `activity`, `time`, `blend`,
 // `playbackRate`). The seam is wider than the implementation on the far side of it.
 //
+// ================================================================================================
+// **EVERYTHING IN THE NEXT PARAGRAPH WAS TRUE IN PHASE 0 AND IS FALSE NOW. A1-A4 ARE ALL DONE.**
+//
+// This is the first file anyone reads before working on characters, and it declares itself
+// normative. It spent a phase telling new readers that four shipped subsystems do not exist, which
+// is the opposite failure from every other stale claim in this codebase: those describe code that
+// does less than it promises, and this describes code that does **more**. A grep for a dead symbol
+// cannot find it, because the symbols are alive. ADR-615 records the shape.
+//
+// What is actually there now, each verified:
+//
+//   * **masks and a layer stack**: `JointMaskSpec`/`JointMask`/`resolveJointMask` in
+//     `scene/skeleton.hpp`, `PoseLayerKind::Additive`, and the whole `PoseLayerStack`. The grep the
+//     paragraph below tells you to run now returns hits.
+//   * **IK**: `scene/ik.{hpp,cpp}`, `IkStatus`, `PoseLayerKind::Foot` and `Reach`.
+//   * **root motion**: `scene/root_motion.{hpp,cpp}`, `SkinnedRig::rootMotionAt`, compensation
+//     applied in `SkinnedRig::evaluate`, behind ADR-337's per-clip opt-in. `Landing` is not
+//     discarded.
+//   * **`ISkeletonQuery` is implemented** -- `Composition::AnimationSink`, which says so at its
+//     definition -- and **`Entity::setSkeleton` is called**, from `Composition`.
+//   * **`socketTransform` reports the fallback**: it returns a three-valued `SocketResolution` and
+//     produces `Joint`, so it no longer returns `true` while quietly using the entity frame.
+//
+// Morph targets are still refused at import, which is the one clause that survives.
+//
+// The paragraph is kept rather than rewritten because the four work items below are the record of
+// what Phase 0 saw, and a reader tracing why the engine has a layer stack should find the argument
+// that produced it. **Read it as history. It is not a description of this engine.**
+// ================================================================================================
+//
 // And underneath, the animation layer is smaller than the brief assumes. Verified: one cross-fade
 // between exactly two clip slots (`scene/animation.cpp:346-356`); **no additive, no masks, no layer
 // stack** (grep for `additive`, `jointMask`, `layerWeight` in `src/scene/animation.*` and
@@ -362,7 +515,8 @@ public:
 // `Entity::socketTransform` returns the entity frame for every socket and returns `true` while
 // doing it, which is worse than returning false.
 //
-// So the animation-intent work is not "design an interface". It is:
+// So the animation-intent work is not "design an interface". It is: [ALL FOUR ARE DONE -- see the
+// block above.]
 //
 //   A1. Implement `ISkeletonQuery` over `scene::SkinnedRig` and call `Entity::setSkeleton`. This is
 //       the smallest change with the largest reach: it is the only thing between the engine and

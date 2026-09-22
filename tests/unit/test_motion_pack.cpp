@@ -27,6 +27,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 
@@ -416,4 +417,128 @@ TEST_CASE("the real Glowmere pack builds, validates and round-trips", "[motionpa
     CHECK(validateMotionPack(*read).ok());
     fs::remove_all(dir);
 #endif
+}
+
+TEST_CASE("how far each scout clip's end is from its start", "[.measure][motionpack][aliens]") {
+    // The measurement kLoopClosureSteps was chosen from. Hidden: it prints, it does not assert.
+#ifdef AVGEN_SOURCE_DIR
+    const fs::path path = fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb";
+    if (!fs::exists(path)) {
+        SKIP("assets are not present");
+    }
+    avgen::scene::Scene scene;
+    avgen::assets::GltfLoadOptions gltf;
+    gltf.loadImages = false;
+    REQUIRE(avgen::assets::loadGltf(path, scene, gltf));
+    const SkinnedRig& rig = scene.rigs.front();
+    std::string report;
+    for (const AnimationClip& clip : rig.clips) {
+        const LoopClosure c = measureLoopClosure(rig.skeleton, clip, 30.0f);
+        report += "  " + clip.name + std::string(24 - std::min<std::size_t>(clip.name.size(), 23), ' ') +
+                  "gap " + std::to_string(c.gap) + "  step " + std::to_string(c.typicalStep) +
+                  "  ratio " + std::to_string(c.gap / std::max(c.typicalStep, 1e-5f)) + "\n";
+    }
+    WARN(report);
+#endif
+}
+
+namespace {
+
+// A cycle that closes: the foot plants, lifts and comes back to where it started.
+AnimationClip closingCycle(const char* name) {
+    AnimationClip clip;
+    clip.name = name;
+    clip.start = 0.0f;
+    clip.duration = 1.0f;
+    AnimationChannel c;
+    c.joint = 1;
+    c.path = AnimationPath::Translation;
+    c.interpolation = Interpolation::Linear;
+    for (int i = 0; i <= 30; ++i) {
+        const float t = static_cast<float>(i) / 30.0f;
+        c.times.push_back(t);
+        const float lift = i < 15 ? 0.0f : 0.4f * std::sin(3.14159265f * static_cast<float>(i - 15) / 15.0f);
+        // Slides back 0.2 m while planted and swings forward again: the in-place treadmill, so the
+        // track has a slide to report.
+        const float slide = i < 15 ? -0.2f * static_cast<float>(i) / 15.0f
+                                   : -0.2f + (0.2f * static_cast<float>(i - 15) / 15.0f);
+        c.values.emplace_back(0.0f, -1.0f + lift, slide, 0.0f);
+    }
+    clip.channels.push_back(std::move(c));
+    return clip;
+}
+
+// A fall: the body sinks 0.8 m and stays down. Its end is nowhere near its start.
+AnimationClip fall(const char* name) {
+    AnimationClip clip;
+    clip.name = name;
+    clip.start = 0.0f;
+    clip.duration = 1.0f;
+    AnimationChannel c;
+    c.joint = 0;
+    c.path = AnimationPath::Translation;
+    c.interpolation = Interpolation::Linear;
+    for (int i = 0; i <= 30; ++i) {
+        const float t = static_cast<float>(i) / 30.0f;
+        c.times.push_back(t);
+        c.values.emplace_back(0.0f, -0.8f * std::min(t * 2.0f, 1.0f), 0.0f, 0.0f);
+    }
+    clip.channels.push_back(std::move(c));
+    return clip;
+}
+
+} // namespace
+
+TEST_CASE("a pack reads whether each clip loops from the clip", "[motionpack]") {
+    // `PackClip::loop` defaulted to true and nothing set it, so every clip in every pack looped:
+    // deaths, landings, every mocap take. The database then wrapped a fall back into its own start,
+    // and §13's `OneShot` tag had no writer.
+    const Skeleton sk = stubRig();
+    const auto pack = buildMotionPack("loops", sk, {closingCycle("walk"), fall("die")}, goodProvenance(),
+                                      optionsWithFeet());
+    REQUIRE(pack.has_value());
+    REQUIRE(pack->clips.size() == 2u);
+    CHECK(pack->clips[0].loop);
+    CHECK_FALSE(pack->clips[1].loop);
+
+    // And the answer survives the disk.
+    const fs::path dir = scratchDir("avgen-pack-loops");
+    REQUIRE(writeMotionPack(*pack, dir).has_value());
+    const auto read = readMotionPack(dir);
+    REQUIRE(read.has_value());
+    CHECK(read->clips[0].loop);
+    CHECK_FALSE(read->clips[1].loop);
+}
+
+TEST_CASE("a contact track survives the disk, joint index and slide included", "[motionpack]") {
+    // Read back, every track used to have `jointIndex == -1` and no slide figures, because the file
+    // stored the name and the two slide numbers were never written. A reader that trusted the index
+    // found no contacts at all.
+    const Skeleton sk = stubRig();
+    const auto built = buildMotionPack("contacts", sk, {closingCycle("walk")}, goodProvenance(),
+                                       optionsWithFeet());
+    REQUIRE(built.has_value());
+    REQUIRE_FALSE(built->clips[0].contacts.empty());
+    const ContactTrack& before = built->clips[0].contacts[0];
+    // The subject exists: the built track is resolved and has spans.
+    REQUIRE(before.jointIndex == sk.find("foot"));
+    REQUIRE_FALSE(before.spans.empty());
+    REQUIRE(before.worstSlide > 0.0f);
+
+    const fs::path dir = scratchDir("avgen-pack-contacts");
+    REQUIRE(writeMotionPack(*built, dir).has_value());
+    const auto read = readMotionPack(dir);
+    REQUIRE(read.has_value());
+    REQUIRE(read->clips[0].contacts.size() == built->clips[0].contacts.size());
+    const ContactTrack& after = read->clips[0].contacts[0];
+    CHECK(after.joint == before.joint);
+    CHECK(after.jointIndex == before.jointIndex);
+    CHECK(after.worstSlide == before.worstSlide);
+    CHECK(after.meanSlide == before.meanSlide);
+    CHECK(after.dutyCycle == before.dutyCycle);
+    REQUIRE(after.spans.size() == before.spans.size());
+    for (std::size_t i = 0; i < after.spans.size(); ++i) {
+        CHECK(after.spans[i].start == before.spans[i].start);
+        CHECK(after.spans[i].end == before.spans[i].end);
+    }
 }

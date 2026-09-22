@@ -86,8 +86,70 @@ enum class PoseLayerKind : std::uint8_t {
     // Fades out as the body travels (`secondaryStillness`), because idle life is what a standing
     // body does and a walking one has a gait instead.
     Secondary,
+    // **Movement lean (Phase B §19, the pose half of B.F).** Tilt the body into what it is doing:
+    // forward when accelerating, back when braking, and into the inside of a turn.
+    //
+    // This is the half of "turn and directional movement" that `stepMotion` cannot supply. B.D
+    // built the *rate limits* -- how fast a velocity may change direction, and how fast a body may
+    // come round to face somewhere -- and those decide where the character goes. A lean is what
+    // the body does about it, and it lives in the pose.
+    //
+    // Driven by the **measured** acceleration (ADR-545's rule, one derivative out), not by the
+    // desired one: a body leans into the force it is actually under, and a character leaning into
+    // an acceleration its legs were never given is a character falling over on purpose.
+    Lean,
+    // **Reach / hand IK (Phase B §23).** Put a hand on a target: touch a mushroom, gesture toward
+    // something, hold a prop.
+    //
+    // **The same solve as `Foot`, deliberately and without a second implementation.** ADR-543's
+    // arbitrary-chain write-back was built for the alien's legs, whose three joints sit on three
+    // separate branches. Its arms are the same shape and worse: `shoulder.l` hangs off
+    // `spine_05.x` while `forearm_stretch.l` and `hand.l` both hang off `rig` -- **three different
+    // parents for one limb**. So this is the second consumer of that decision on the same rig, and
+    // it needed no change to it. A generality that survives its second consumer unchanged is worth
+    // recording as such rather than as a lucky guess.
+    //
+    // What differs from `Foot` is only the intent: a reach is addressed by a target and never by a
+    // ground plane, and §24's reachability is the honest answer when the target is out of range --
+    // `IkStatus::Clamped` and a limb stopped at its own limit, rather than a broken arm.
+    //
+    // §23 is explicit that this is **not** a grasping system. Target -> reach pose -> IK, and
+    // nothing about what the hand then does with the thing.
+    Reach,
 };
 [[nodiscard]] const char* poseLayerKindName(PoseLayerKind kind);
+
+// ---- the pipeline order (Phase B §5) -----------------------------------------------------------
+//
+// §5's chain is `base locomotion -> speed/direction adaptation -> stride adjustment -> turn
+// adaptation -> foot placement -> body adaptation`, and until this existed the order layers ran in
+// was **the order a scene file happened to list them**.
+//
+// That is a convention an author can break silently, and the way it breaks is specific: **a foot
+// planted and then displaced by a stride warp is planted nowhere.** The IK solves the foot onto the
+// ground, the stride layer then scales the foot's excursion about the body, and the carefully
+// solved contact slides off the surface. Nothing reports it; the character just has bad feet.
+//
+// So the order is a property of the *kind*, not of the file. `poseLayerStage` is the contract, and
+// `PoseLayerStack` sorts by it -- a scene may list layers in any order and get the right one. The
+// same move as the `-Wswitch` tripwire: the thing that cannot be got wrong beats the thing that is
+// currently right (ADR-600).
+//
+// Ties inside a stage keep their authored order, which is what makes two foot layers stay left
+// then right.
+[[nodiscard]] int poseLayerStage(PoseLayerKind kind);
+
+// Phase B §49. A phase in [0,1) derived from two seeds, with **no generator and no state**: the
+// same pair gives the same number for the life of the repository, which is what makes a render
+// reproducible, a test repeatable and an offline bake deterministic.
+//
+// `seedPhase(0, 0)` is exactly 0.0f, so an unseeded layer is byte-for-byte unchanged.
+[[nodiscard]] float seedPhase(std::uint32_t characterSeed, std::uint32_t layerSeed);
+
+// The seed a name deterministically produces. FNV-1a, so it is the same on every platform and
+// does not depend on `std::hash`, whose value is explicitly allowed to differ between runs of the
+// same program -- which would make a "deterministic" seed reproducible only by accident.
+[[nodiscard]] std::uint32_t seedFromName(std::string_view name);
 [[nodiscard]] bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out);
 
 // Which field of the animation-intent seam moves this layer.
@@ -214,6 +276,40 @@ struct PoseLayer {
     // pose's up needs no authoring and cannot be wrong about a rig it has read.
     glm::vec3 soleUp{0.0f};
 
+    // ---- Foot planting and release (Phase B §14/§15) ---------------------------------------------
+    // How strongly a foot is held in the WORLD while its contact span lasts. 0 is the behaviour
+    // every scene had before this: the foot lands on the ground under it and then travels with the
+    // body, which is the foot slide `Gait::footSlip` has been reporting across the whole cast.
+    //
+    // **The anchor is derived, never accumulated.** A lock that remembered where the foot landed
+    // would be state in a pose layer, and `EntityWorld::seek` poses the rigs once at the end of a
+    // replay -- so a scrubbed frame would hold an anchor from a timeline the scrub abolished. This
+    // one computes the same answer from values already on the seam: in the body's own frame a
+    // planted foot must slide **backwards at the body's speed**, so the offset is
+    // `-velocity * elapsed-in-contact` and needs no memory at all.
+    //
+    // The approximation is exact at constant velocity and drifts under acceleration by
+    // `0.5 * a * t^2` over a stance -- at 2 m/s^2 across a 0.3 s stance, 9 cm, which is why the
+    // lock is weighted rather than absolute and why `lockBlendSeconds` eases both edges.
+    // How hard a planted foot is held in place. **0 is off, and 0 is still the default** -- no
+    // scene in this repository sets it, so this subsystem is dormant rather than merely unused.
+    //
+    // **It had no authoring surface at all until ADR-615 found the gap**: zero parse sites, zero
+    // serialisation sites, and absent from `kLayerKeys`, so a scene that wrote `"footLock"` was
+    // told the key "is not one this build reads and was ignored" -- true, and the reason ADR-557
+    // derives a foot-lock anchor for something no scene could switch on. Its four neighbours in
+    // this struct (`footAlign`, `groundOffset`, `extension`, `soleUp`) were always parsed and
+    // always serialised; this one was missed. It is wired now, which changed no behaviour and
+    // stopped the system lying to the next author.
+    //
+    // What it gates: the contact-span lookup in `driveLayers`, `inContact`, `contactElapsed`,
+    // `contactRemaining`, `bodyVelocity`, and the lock itself with `lockBlendSeconds`.
+    float footLock = 0.0f;
+    // Seconds of ease at each end of a contact span: §15's approach and release. A lock that
+    // switched on and off at the span boundary is the "foot locked, then teleports" failure §15
+    // names outright.
+    float lockBlendSeconds = 0.08f;
+
     // ---- Stride (Phase B §7) --------------------------------------------------------------------
     // The joint whose horizontal excursion is scaled -- a foot, or a hand on a quadruped forelimb.
     std::string strideJoint;
@@ -231,6 +327,13 @@ struct PoseLayer {
     // and shortening the reach while leaving the lift alone is what makes a shortened walk read as
     // a march. 0 keeps the authored height; 1 scales it with the stride.
     float strideLift = 0.7f;
+    // §40. How much a slope shortens the step, as a fraction removed per radian of incline.
+    // **Bounded by `strideSlopeFloor`, and the bound is the point**: a stride that shortens
+    // indefinitely is a character mincing up a hill, and the cost of shortening it is that the
+    // feet slide by whatever the body still travels -- which is the opposing quantity the tests
+    // measure (ADR-559).
+    float strideSlopeGain = 0.45f;
+    float strideSlopeFloor = 0.55f;
 
     // ---- Secondary (Phase B §26-§28) ------------------------------------------------------------
     // The axis the oscillation turns about, in each masked joint's own local frame. Defaults to
@@ -239,6 +342,29 @@ struct PoseLayer {
     float secondaryDegrees = 1.2f;   // peak amplitude; a breath is small and a shiver is not
     float secondaryPeriod = 4.0f;    // seconds for one full cycle
     float secondaryPhase = 0.0f;     // 0..1, so two layers on one body are not in lockstep
+
+    // **Phase B §49: deterministic randomness.** §49 asks for `characterSeed` and `layerSeed` by
+    // name, and for a reason: "reproducible renders, reproducible tests, deterministic offline
+    // baking, debugging. Do not use uncontrolled global randomness."
+    //
+    // The secondary layer was already free of global randomness -- it is a pure function of the
+    // timeline second (ADR-360) -- so an audit could call §49 met, and mine did. It was generous.
+    // What was missing is the other half: a body's variation was *hand-authored*, one `phase`
+    // number per layer per character in the scene file. That works for five aliens and does not
+    // work for a hundred, and hand-authored spread is not a seed.
+    //
+    // These two are **hashed into a phase offset, never into a generator**. `seedPhase` is a pure
+    // function of the pair: same seeds, same render, on any machine, in any order, under a scrub.
+    // Zero and zero hash to exactly zero, so a layer that sets neither is byte-for-byte what it
+    // was -- and because a knob nobody sets refuses nothing (ADR-600), `driveLayers` sets
+    // `characterSeed` from the node's name and `layerSeed` from the layer's.
+    //
+    // The authored `secondaryPhase` survives as an **offset on top**, rather than being replaced
+    // when it happens to be zero. A rule of the form "the seed applies unless you authored
+    // something" makes the two mechanisms fight over the same field, and which one won would
+    // depend on a number an artist typed.
+    std::uint32_t characterSeed = 0;
+    std::uint32_t layerSeed = 0;
     // How much each successive masked joint lags the one before, in cycles. Zero makes a chest and
     // a head move as one rigid block, which reads as a mechanism rather than a body; a small
     // value is what makes the motion travel up the spine.
@@ -247,8 +373,71 @@ struct PoseLayer {
     // what a standing body does; a walking one has a gait. Zero disables the fade.
     float secondaryStillness = 0.6f;
 
+    // ---- Lean (Phase B §19) ---------------------------------------------------------------------
+    // Degrees of tilt per metre-per-second-squared of acceleration. Small: 1 m/s^2 is a brisk
+    // start, and a body does not lean ten degrees into one.
+    float leanDegreesPerAccel = 2.2f;
+    // Degrees of roll per radian-per-second of turn. A body cornering leans into the inside of the
+    // turn, which is a different input from acceleration and needs its own gain.
+    float leanDegreesPerTurn = 6.0f;
+    // The most it may ever tilt, in degrees, after both terms. A clamp rather than a soft knee,
+    // and `LayerResolution::Clamped` reports it -- the engine has been bitten once by a limiter
+    // that saturated silently for the whole shipping cast (`Gait::playbackRate`).
+    float leanMaxDegrees = 9.0f;
+    // Seconds for the lean to follow a change in acceleration. **Zero, and deliberately so.**
+    // Smoothing here would be memory in a pose layer, which ADR-359 §4 puts in the entity tier
+    // instead: the acceleration this reads has already been measured from a simulation a seek
+    // replays, so the lean is a pure function of it and a scrubbed frame reproduces a played one.
+    // The field exists to say that, and to be the place an argument happens if anyone wants lag.
+    float leanSmoothing = 0.0f;
+    // §40. Degrees of forward lean per radian of uphill slope -- a body leans into a hill. Capped
+    // by `leanMaxDegrees` along with everything else, because a lean that grows without bound is a
+    // character falling over, and the balance margin is what measures that (ADR-559).
+    float leanSlopeDegrees = 14.0f;
+
     // ---- intent, written per frame by whatever drives the layer --------------------------------
     float weight = 0.0f;         // 0 = this layer does nothing at all this frame
+
+    // Phase B §46. A layer that switches on at full weight in one frame teleports whatever it
+    // drives. The slice found it at exactly one place -- the reach layer coming on moved the hand
+    // 0.803 m between two frames, thirty-five times the distance the body covers in that frame --
+    // and it was identical with the motion controller bypassed, which is how it was clear the
+    // controller was not the thing at fault.
+    //
+    // The blend is **derived from a time, never accumulated**, for ADR-557's reason: a scrub poses
+    // the rig once, at frame N, with no frame N-1 to have ramped from. So the driver states the
+    // schedule -- what the weight was, what it is now, and when it changed -- and the realized
+    // weight is a pure function of `now`. Seek to the middle of a blend and you get the middle of
+    // the blend, not the end of it.
+    //
+    // `blendSeconds` at 0 means instant, which is what every caller that has not been taught about
+    // this gets. That is deliberate rather than an oversight to be fixed later: the blend changes
+    // what a layer does, and a default that silently softened every existing layer would rewrite
+    // the farm pack's contacts and this repository's layer tests at the same time.
+    // `blendElapsed` is **seconds since the target changed, not an absolute time**, and that is
+    // not a convenience. The layer stack is applied on the rig's sample clock (ADR-086's fixed
+    // grid), while a driver knows about the entity's; handing this struct an absolute second from
+    // one clock to be compared against `now` from the other is a bug that would only show on a
+    // rate-limited rig. An elapsed duration is computed where both of its terms live, so there is
+    // no clock to get wrong.
+    float blendSeconds = 0.0f;
+    float weightBefore = 0.0f;   // the target weight this layer is blending *from*
+    float blendElapsed = 0.0f;   // seconds since `weight` became the target
+    // The realized weight: `weightBefore` -> `weight` over `blendSeconds`, smoothstepped.
+    [[nodiscard]] float effectiveWeight() const {
+        if (blendSeconds <= 0.0f) {
+            return weight;
+        }
+        const float t = blendElapsed / blendSeconds;
+        if (t <= 0.0f) {
+            return weightBefore;
+        }
+        if (t >= 1.0f) {
+            return weight;
+        }
+        const float s = t * t * (3.0f - 2.0f * t);
+        return weightBefore + (weight - weightBefore) * s;
+    }
     // Stride: how far the body travels against the stride its clip was authored for. 1 means they
     // agree and this layer is a no-op. Written per frame from `MotionContext::strideRatio`, which
     // is `Gait::footSlip` -- one answer to that question rather than a second (ADR-260).
@@ -256,12 +445,33 @@ struct PoseLayer {
     // Secondary: the body's horizontal speed, so the oscillation can fade as it walks. Written per
     // frame from `MotionContext::groundSpeed` -- the measurement (ADR-545), not the intent.
     float bodySpeed = 0.0f;
+    // Lean: the body's MEASURED acceleration and turn rate, in the rig's own frame. Written per
+    // frame from `MotionContext`, which took them from the seam.
+    glm::vec3 bodyAcceleration{0.0f};
+    float bodyTurnRate = 0.0f;
+    // §40, written per frame: the incline the body is on, and which way is downhill in the rig's
+    // own frame. A stride shortens on any slope; a lean only tips into an *uphill* one.
+    float bodySlope = 0.0f;
+    glm::vec3 bodyDownhill{0.0f};
+    // Foot lock, written per frame: whether this foot's contact span is running, how long it has
+    // been running, how long is left, and how fast the body is travelling in its own frame.
+    bool inContact = false;
+    float contactElapsed = 0.0f;
+    float contactRemaining = 0.0f;
+    glm::vec3 bodyVelocity{0.0f};
     glm::vec3 target{0.0f};      // ENTITY-LOCAL (the rig's model space), never world
     bool hasTarget = false;
 };
 
 // What one layer did this frame, for the same reason `entity::SocketResolution` exists: "it did
 // nothing" has four different causes and three of them are mistakes.
+// **Computed in full, consumed as a boolean (ADR-615).** All nine values are produced inside
+// `pose_layers.cpp`, and outside it the product reads them in exactly two places: the debug
+// visualizer tests `!= Inactive`, and `Composition::MotionDebug` copies them into a struct whose
+// only caller is a test. `layerResolutionName` has no caller in `src/` or `tools/`. So the engine
+// works out which of `NoJoints`, `NoPivot`, `NoSource`, `NoTarget`, `NoChain` or `Degenerate`
+// happened, and then answers "it did nothing" -- which is the question the comment below says it
+// exists to stop being the only answer available.
 enum class LayerResolution : std::uint8_t {
     Inactive, // weight 0: nothing was asked of it
     NoJoints, // its mask named joints and this rig carries none of them
@@ -338,6 +548,9 @@ public:
     // reason `chains()` is -- "which joint did this layer actually bind to" is the first question
     // of any report about it, and re-deriving the rule in a debug view would be a second copy.
     [[nodiscard]] const std::vector<glm::ivec2>& strides() const { return stride_; }
+    // The order `apply` runs the layers in: indices into `layers()`, sorted by pipeline stage.
+    // Exposed so a test can assert the contract rather than infer it from an outcome.
+    [[nodiscard]] const std::vector<std::uint32_t>& order() const { return order_; }
     [[nodiscard]] const std::vector<LayerResolution>& results() const { return results_; }
     // Per layer, what the two-bone solver said the last time a `Foot` layer ran. `Solved` on every
     // layer that is not one, which is a lie a caller has to read alongside `results()` -- the point
@@ -386,11 +599,17 @@ public:
                          Pose& pose);
 
 private:
+    // Brings `model_` up to date with `pose`, recomputing only what changed since it was last
+    // brought up to date. Bit-for-bit identical to `poseToModel` for the joints it recomputes,
+    // because it composes the same `parent * local` in the same order.
+    void ensureModel(const Skeleton& skeleton, const Pose& pose);
+
     std::vector<PoseLayer> layers_;
     std::vector<JointMask> masks_;
     // Stride (Phase B §7): the joint whose excursion is scaled, and the joint it is measured from.
     // Parallel to `layers_`, like every other resolved index here.
     std::vector<glm::ivec2> stride_;
+    std::vector<std::uint32_t> order_;
     std::vector<LayerResolution> results_;
     std::vector<int> clipIndex_;  // per layer, resolved once by bind
     std::vector<int> pivotIndex_; // per layer, resolved once by bind
@@ -419,6 +638,18 @@ private:
     std::vector<ReachDemand> demands_;
     // Scratch, kept so a per-frame apply allocates nothing after the first.
     std::vector<glm::mat4> model_;
+    // Phase B §53. `model_` is kept valid **across** the layer loop instead of being rebuilt from
+    // scratch by every layer that needs it. `modelPose_` is the pose `model_` was last built from;
+    // the difference between it and the incoming pose is exactly the set of joints a previous
+    // layer wrote, and only those joints and their descendants need recomputing.
+    //
+    // The dirty set is found by **diffing the pose**, not by consulting each layer's mask. The mask
+    // would be faster and it would be a claim: a layer that wrote outside its mask -- which is the
+    // defect `docs/testing.md` #25 describes -- would silently get a stale model space and a wrong
+    // solve. A diff cannot be wrong about what changed, and 90 transform comparisons are an order
+    // of magnitude cheaper than 90 matrix multiplies.
+    Pose modelPose_;
+    std::vector<std::uint8_t> modelDirty_;
     std::vector<glm::mat4> updated_;
     Pose reference_;
     Pose sampled_;

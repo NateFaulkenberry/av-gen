@@ -23,6 +23,8 @@
 #include "scene/field_params.hpp"
 #include "scene/ground_query.hpp"
 #include "entity/clip_motion_provider.hpp"
+#include "entity/match_motion_provider.hpp"
+#include "scene/motion_library.hpp"
 #include "entity/motion_chain.hpp"
 #include "scene/motion_context.hpp"
 #include "scene/camera_rig.hpp"
@@ -527,6 +529,8 @@ struct AimFollow {
     double endSeconds = 0.0;
     std::string hero;            // names a hero in `Composition::heroes()`
     glm::vec3 heroAtCut{0.0f};   // where that hero stood when the shot was cut
+
+    friend bool operator==(const AimFollow&, const AimFollow&) = default;
 };
 
 
@@ -643,6 +647,25 @@ public:
     // stale box as if it were current.
     [[nodiscard]] bool visualPlacement(std::string_view node,
                                        stage::VisualPlacement& out) const override;
+
+    // ---- a scrub that replays the director (ADR-671) ------------------------------------------
+    //
+    // What `Engine::seekSeconds` calls. The director is reset (ADR-209) and then **replayed** step
+    // for step with the entities -- staging first, the entity step, the node offsets written back
+    // -- so the craft, the animals it lifts and every character that perceives them land where a
+    // play from zero puts them (ADR-360). The owner's ruling of 2026-09-21 replaces ADR-209's "a
+    // scenario picks up again on the next frame": a scrub into an abduction shows it mid-cycle.
+    //
+    // The director asks where nodes are *drawn* (`Anchor::Drawn`), which a play answers from the
+    // previous frame's flattening. The replay does not flatten; it answers from `ReplayPlacement`,
+    // the same arithmetic over the same parameter finals, captured after each replayed step -- one
+    // step old, as the play's is.
+    //
+    // ADR-700: and it does it from the nearest simulation checkpoint rather than from a reset, so
+    // it is exact at any time rather than inside ninety seconds. The composition's half of a
+    // checkpoint is the director (whole), the bases it wrote, and `ReplayPlacement`.
+    void seekWithDirector(double seconds, params::ParameterSet& params, entity::SeekBudget budget,
+                          double step = 1.0 / 60.0);
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
@@ -1044,8 +1067,19 @@ public:
     // Setting entities does not mark the composition dirty: an entity moves a node by writing its
     // transform parameters, and nothing it can do requires geometry to be rebuilt.
     [[nodiscard]] const std::vector<entity::EntityDesc>& entities() const { return entityDescs_; }
+    // Phase D §26: how far each named world event carries. Takes effect at the next rebuild.
+    void setEventProfiles(std::vector<entity::EntityWorld::EventProfile> profiles) {
+        eventProfiles_ = std::move(profiles);
+        entityWorld_.setEventProfiles(eventProfiles_);
+    }
+    [[nodiscard]] const std::vector<entity::EntityWorld::EventProfile>& eventProfiles() const {
+        return eventProfiles_;
+    }
     [[nodiscard]] const entity::EntityWorld& entityWorld() const { return entityWorld_; }
     [[nodiscard]] entity::EntityWorld& entityWorld() { return entityWorld_; }
+    // Phase C §4/§67: how many motion databases the scene holds. One per (skeleton, feature config),
+    // however many bodies match on it; a crowd that built one each would say so here.
+    [[nodiscard]] std::size_t motionDatabaseCount() const { return matchAssets_.size(); }
     // Rejects the whole set and names the offender rather than dropping one, for the same reason
     // setHeroes does: an entity silently missing is a scene that does nothing with no explanation.
     Result<void> setEntities(std::vector<entity::EntityDesc> entities);
@@ -1654,10 +1688,25 @@ private:
         // Built lazily on the first frame the rig exists: a rig is not loaded when the sink is
         // constructed, so building it at bind time would build it against nothing.
         entity::ClipMotionProvider clipProvider_;
+        // ADR-623. In front of the clip provider when the body opted in, and only then. The asset
+        // is shared with every body on the same skeleton and config (ADR-650); holding it here
+        // keeps it alive for as long as this provider points into it.
+        entity::MatchMotionProvider matchProvider_;
+        std::shared_ptr<const MotionAsset> matchAsset_;
         entity::MotionChain chain_;
         bool chainBuilt_ = false;
         RigId chainRig_ = kInvalidRig;
         void buildChain(const SkinnedRig& rig);
+
+    public:
+        // Build this body's chain now if its rig exists and it has not been built. Called before
+        // the entities advance, so the first frame a body is simulated already has its providers:
+        // a chain built lazily at the first *pose* left frame 0 unsimulated, and a seek, which
+        // replays with the chain present, then disagreed with a play (ADR-360).
+        void prepareChain();
+        [[nodiscard]] const entity::MatchMotionProvider* matcher() const {
+            return matchAsset_ != nullptr ? &matchProvider_ : nullptr;
+        }
 
     public:
         // Whether this body's base pose came from the chain on the last frame, and what the chain
@@ -1672,6 +1721,12 @@ private:
         entity::MotionChainResult chainResult_;
     };
     std::vector<std::unique_ptr<AnimationSink>> animationSinks_;
+    // ADR-623/ADR-650: one motion database per (skeleton, feature config), shared by every body
+    // that matches on it. Built on first use from the rig's own clips.
+    std::map<std::string, std::shared_ptr<const MotionAsset>> matchAssets_;
+    [[nodiscard]] std::shared_ptr<const MotionAsset> matchAssetFor(const SkinnedRig& rig,
+                                                                   const entity::MotionMatchingDesc& m,
+                                                                   const std::string& who);
 
 public:
     // The motion context most recently built for `node`, or null when that node drives no entity
@@ -1697,6 +1752,36 @@ public:
         // How many frames the RIG actually consumed an external pose on. Counted by the consumer,
         // which is the only party whose answer cannot be a claim -- see `externalPoseFrames`.
         std::uint64_t externalPoseFrames = 0;
+
+        // **Phase B §50.** Everything above answers "did the provider seam work". These answer
+        // "what is the animation actually doing", which is the question §50 exists for and which
+        // nothing could ask before: the layer state lived inside `PoseLayerStack` and the body
+        // state inside `MotionContext`, and neither was reachable from outside the sink.
+        //
+        // Gathered here rather than read out of ImGui so it can be **tested without a GPU and
+        // without a panel** -- the numbers are the part that can be wrong, and a panel that
+        // renders wrong numbers correctly is not debuggable, it is convincing.
+        struct LayerRow {
+            std::string name;
+            PoseLayerKind kind = PoseLayerKind::Aim;
+            float requestedWeight = 0.0f; // what the driver asked for this frame
+            float realizedWeight = 0.0f;  // what the blend actually applied (§46)
+            LayerResolution resolution = LayerResolution::Inactive;
+            IkStatus ik = IkStatus::Solved;
+            bool hasTarget = false;
+            bool hasGround = false;
+        };
+        std::vector<LayerRow> layers;
+        LocomotionMode mode = LocomotionMode::Idle;
+        MotionPhase motionPhase = MotionPhase::Idle;
+        float groundSpeed = 0.0f;
+        float turnRate = 0.0f;
+        bool hasGroundPlane = false;
+        bool hasLookTarget = false;
+        // The pelvis correction and whether it was enough -- "it ran" and "it worked" are
+        // different answers and a panel that conflates them hides the interesting case.
+        glm::vec3 bodyCompensation{0.0f};
+        std::uint32_t unreachableAfterCompensation = 0;
     };
     [[nodiscard]] MotionDebug motionDebug(std::string_view node) const;
 
@@ -1765,6 +1850,44 @@ private:
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    std::vector<entity::EntityWorld::EventProfile> eventProfiles_; // Phase D §26: "worldEvents"
+    // Phase D §26: the director's beats this update, raised as world events. Shared by
+    // `updateBehaviour` and the replay in `seekWithDirector`.
+    void raiseDirectorBeats(double time);
+    // ADR-700: the director replay's inputs that are not parameter bases, for the checkpoint key.
+    [[nodiscard]] std::uint64_t replayInputKey() const;
+    // ADR-671: `visualPlacement` for a replay, one step old, from the finals.
+    class ReplayPlacement final : public stage::IVisualPlacement {
+    public:
+        explicit ReplayPlacement(const Composition& comp) : comp_(comp) {}
+        void invalidate() { valid_.assign(valid_.size(), 0u); }
+        void capture();
+        [[nodiscard]] bool visualPlacement(std::string_view node,
+                                           stage::VisualPlacement& out) const override;
+        // ADR-700: what a checkpoint keeps of it -- the last step's "flattening", which the next
+        // step's director reads.
+        [[nodiscard]] const std::vector<stage::VisualPlacement>& placed() const { return placed_; }
+        [[nodiscard]] const std::vector<std::uint8_t>& valid() const { return valid_; }
+        void set(std::vector<stage::VisualPlacement> placed, std::vector<std::uint8_t> valid) {
+            placed_ = std::move(placed);
+            valid_ = std::move(valid);
+        }
+
+    private:
+        const Composition& comp_;
+        std::vector<stage::VisualPlacement> placed_;
+        std::vector<std::uint8_t> valid_;
+    };
+    friend class ReplayPlacement;
+    // ADR-700: the replay's last placement, for the first frame after a seek. That frame's director
+    // asks where nodes are drawn, and a play answers from the previous frame's flattening -- but
+    // after a seek the last flattening is from before the jump, a different second entirely. So
+    // until the next `update` flattens, `visualPlacement` answers from what the replay captured
+    // after its last step, which is the flattening the play would have had. Found by checking the
+    // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
+    std::vector<stage::VisualPlacement> seekPlaced_;
+    std::vector<std::uint8_t> seekPlacedValid_;
+    bool seekPlacementLive_ = false;
     stage::StagingDesc stagingDesc_;              // ADR-209: authored, round-tripped as "staging"
     stage::Staging staging_;
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"

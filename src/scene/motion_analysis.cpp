@@ -623,4 +623,60 @@ ClipAnalysis analyseClip(const Skeleton& skeleton, const AnimationClip& clip,
     return out;
 }
 
+
+LoopClosure measureLoopClosure(const Skeleton& skeleton, const AnimationClip& clip, float rate) {
+    LoopClosure out;
+    const float length = clip.length();
+    const int root = travelJointOf(skeleton, clip);
+    if (root < 0 || length <= 0.0f || skeleton.joints.empty()) {
+        return out;
+    }
+    const auto r = static_cast<std::size_t>(root);
+    Pose pose;
+    std::vector<glm::mat4> model;
+    // Every joint relative to the travel joint's ground point: the body's shape and its height,
+    // with its horizontal travel removed, so a walk that has moved on still matches its start.
+    const auto shape = [&](float t, std::vector<glm::vec3>& into) {
+        setRestPose(skeleton, pose);
+        sampleClip(clip, std::min(t, clip.duration), pose);
+        poseToModel(skeleton, pose, model);
+        const glm::vec3 base(model[r][3].x, 0.0f, model[r][3].z);
+        into.resize(model.size());
+        for (std::size_t j = 0; j < model.size(); ++j) {
+            into[j] = glm::vec3(model[j][3]) - base;
+        }
+    };
+    const auto distance = [](const std::vector<glm::vec3>& a, const std::vector<glm::vec3>& b) {
+        float worst = 0.0f;
+        for (std::size_t j = 0; j < a.size() && j < b.size(); ++j) {
+            worst = std::max(worst, glm::length(a[j] - b[j]));
+        }
+        return worst;
+    };
+    const float hz = std::max(rate, 1.0f);
+    const auto steps = static_cast<std::size_t>(std::max(2.0f, std::floor(length * hz + 0.5f) + 1.0f));
+    std::vector<glm::vec3> first;
+    std::vector<glm::vec3> previous;
+    std::vector<glm::vec3> now;
+    shape(clip.start, first);
+    previous = first;
+    std::vector<float> step;
+    step.reserve(steps);
+    for (std::size_t i = 1; i < steps; ++i) {
+        shape(clip.start + (static_cast<float>(i) / hz), now);
+        step.push_back(distance(previous, now));
+        std::swap(previous, now);
+    }
+    // `previous` now holds the last frame.
+    out.gap = distance(previous, first);
+    if (!step.empty()) {
+        std::vector<float> sorted = step;
+        std::nth_element(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(sorted.size() / 2),
+                         sorted.end());
+        out.typicalStep = sorted[sorted.size() / 2];
+    }
+    out.loops = out.gap <= kLoopClosureSteps * std::max(out.typicalStep, 1e-5f);
+    return out;
+}
+
 } // namespace avgen::scene

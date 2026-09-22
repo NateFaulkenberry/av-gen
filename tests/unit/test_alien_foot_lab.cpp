@@ -534,3 +534,91 @@ TEST_CASE("the provider's pose actually reaches the drawn rig", "[aliens][lab][m
     CHECK(worst > 1e-3f);
 #endif
 }
+
+TEST_CASE("§: a foot layer's lock strength survives the scene file", "[labs][footik][layers]") {
+    // **ADR-615 found `footLock` had no authoring surface at all** -- no parse site, no
+    // serialisation site, and absent from `kLayerKeys`, so a scene that wrote the key was told it
+    // "is not one this build reads and was ignored". Its four neighbours in the same struct
+    // (`footAlign`, `groundOffset`, `extension`, `soleUp`) were always parsed and always
+    // serialised. That is an omission rather than a decision, and the whole foot-lock subsystem --
+    // ADR-557's derived anchor, `inContact`, `contactElapsed`, `bodyVelocity` -- was unreachable
+    // from any scene because of it.
+    //
+    // **A setting the application does not keep is not a setting.** This is that claim for the one
+    // field that did not have it, and it is written as a round-trip rather than as a parse, because
+    // a parser that reads a key and a writer that drops it is the same defect wearing a different
+    // face.
+    //
+    // **Teeth-checked**: with `layer.footLock = *lock;` removed from the parser, 16 of this test's
+    // 29 assertions fail. A test for a parse gap that passes without the parse would be the same
+    // class of defect it was written to close.
+    if (!fs::exists(labScene())) {
+        SKIP("the foot-ik lab scene is not present");
+    }
+    assets::AssetRegistry registry(labScene().parent_path());
+    auto loaded = scene::Composition::loadFile(labScene(), registry);
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+
+    // Author a lock on every foot layer the lab declares, in the JSON, the way a scene file would.
+    nlohmann::json doc = (*loaded)->toJson();
+    int authored = 0;
+    for (auto& node : doc.at("nodes")) {
+        if (!node.contains("animation") || !node.at("animation").contains("layers")) {
+            continue;
+        }
+        for (auto& layer : node.at("animation").at("layers")) {
+            if (layer.value("kind", std::string{}) == "foot") {
+                layer["footLock"] = 0.75f;
+                ++authored;
+            }
+        }
+    }
+    REQUIRE(authored > 0); // the fixture must actually contain foot layers, or this tests nothing
+
+    auto reparsed = scene::Composition::fromJson(doc, registry);
+    INFO((reparsed.has_value() ? std::string() : reparsed.error().message));
+    REQUIRE(reparsed.has_value());
+
+    int seen = 0;
+    for (const auto& node : (*reparsed)->nodes()) {
+        for (const scene::PoseLayer& layer : node->animation.layers) {
+            if (layer.kind == scene::PoseLayerKind::Foot) {
+                CHECK(layer.footLock == Approx(0.75f));
+                ++seen;
+            }
+        }
+    }
+    CHECK(seen == authored);
+
+    // And back out again, because a field that parses and does not save is the half of the defect
+    // that a parse test cannot see.
+    const nlohmann::json again = (*reparsed)->toJson();
+    int persisted = 0;
+    for (const auto& node : again.at("nodes")) {
+        if (!node.contains("animation") || !node.at("animation").contains("layers")) {
+            continue;
+        }
+        for (const auto& layer : node.at("animation").at("layers")) {
+            if (layer.value("kind", std::string{}) == "foot") {
+                CHECK(layer.value("footLock", 0.0f) == Approx(0.75f));
+                ++persisted;
+            }
+        }
+    }
+    CHECK(persisted == authored);
+
+    // **The control.** The default must still be 0 and must still not be written, or "it
+    // round-trips" would be a statement about a default rather than about what was authored --
+    // and a `footLock` that silently appeared at 0 would switch the subsystem's gate from
+    // "absent" to "present and off", which is a different thing for `driveLayers` to see.
+    const nlohmann::json original = (*loaded)->toJson();
+    for (const auto& node : original.at("nodes")) {
+        if (!node.contains("animation") || !node.at("animation").contains("layers")) {
+            continue;
+        }
+        for (const auto& layer : node.at("animation").at("layers")) {
+            CHECK_FALSE(layer.contains("footLock"));
+        }
+    }
+}

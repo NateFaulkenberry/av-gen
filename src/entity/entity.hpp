@@ -27,6 +27,7 @@
 //     "reactions": [ { "signal": "audio.bass", "target": "parts/Lamp/emissiveGain", "depth": 3 } ]
 
 #include "core/rng.hpp"
+#include "entity/locomotion_plan.hpp"
 #include "entity/motion_chain.hpp"
 #include "entity/motion_controller.hpp"
 #include "entity/action.hpp"
@@ -35,6 +36,7 @@
 #include "entity/field.hpp"
 #include "entity/character_ai.hpp"
 #include "entity/perception.hpp"
+#include "entity/mind.hpp"
 #include "entity/locomotion.hpp"
 #include "entity/navigation.hpp"
 #include "params/modulation.hpp"
@@ -45,8 +47,11 @@
 #include <glm/glm.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -92,6 +97,57 @@ struct AttachmentDesc {
     std::string socket;
 };
 
+// ADR-623: this body's base pose chosen by the Phase C motion matcher, with the clip provider as
+// its fallback. **Opt-in per character, default off.** Present in a scene as
+//
+//     "motionMatching": { "joints": ["foot.l", "foot.r", "head.x"],
+//                         "contacts": ["foot.l", "foot.r"],
+//                         "trajectory": [0.2, 0.4, 0.6] }
+//
+// `joints` are the feature joints and are required: which joints carry a character's identity is
+// a property of the character (§8). `contacts` are the joints analysed for foot plants, which is
+// where an in-place clip's implied travel comes from. They default to `joints`. `trajectory` is
+// the horizons in seconds, and defaults to the three §24 validated. The key implies
+// `proceduralMotion`, because the matcher is a provider and providers only run on that path.
+struct MotionMatchingDesc {
+    bool enabled = false;
+    std::vector<std::string> joints;
+    std::vector<std::string> contacts;
+    std::vector<float> trajectory{0.2f, 0.4f, 0.6f};
+    // §64/§92: a MotionPack to match on instead of the rig's own clips, for motion retargeted onto
+    // this rig (e.g. 100STYLE through `--positional-legs`). As authored (relative to the scene file)
+    // and as resolved at load. It must be built for this rig's skeleton; if it is missing or is
+    // not, the body falls back to its clip provider and the log says why.
+    std::string pack;
+    std::string packResolved;
+    // §14: which clips the matcher may use, as name prefixes ("Walking" admits `Walking_crouch` and
+    // `Walking~turn+1.40`). Empty admits every clip. The scout's pack has no authored tags, so an
+    // action clip like `Button_push` otherwise serves as an idle; this is the authoring surface
+    // that says it may not.
+    std::vector<std::string> clips;
+    // §45: the search weights, as a **versioned** block so a scene saved under one meaning of a
+    // weight is not silently read under another. `weightsVersion` 0 means "no block": the engine's
+    // defaults. Version 1 is the seven feature-term weights of `MotionFeatureConfig` by their
+    // names there, plus the two search penalties of `MotionCostWeights`.
+    std::uint32_t weightsVersion = 0;
+    float jointPositionWeight = 1.0f;
+    float jointVelocityWeight = 0.4f;
+    float trajectoryPositionWeight = 1.0f;
+    float trajectoryFacingWeight = 0.5f;
+    float rootVelocityWeight = 1.0f;
+    float phaseWeight = 0.0f;
+    float contactWeight = 0.0f;
+    float continuityWeight = -1.0f; // below zero: the engine default
+    float transitionWeight = -1.0f;
+    float styleWeight = -1.0f;      // §44, a fraction of the cost spread; below zero: the default
+    float switchMargin = -1.0f;     // §28, a fraction of the cost spread; below zero: the default
+    // §44: this character's style, and which clips carry which style, as name prefixes like
+    // `clips`. The matcher prefers clips in the style (a cost, not a filter). Empty style: none.
+    std::string style;
+    std::vector<std::pair<std::string, std::vector<std::string>>> styles;
+    friend bool operator==(const MotionMatchingDesc&, const MotionMatchingDesc&) = default;
+};
+
 struct EntityDesc {
     std::string name;
     std::string node;             // the composition node this entity drives; defaults to `name`
@@ -105,6 +161,10 @@ struct EntityDesc {
     // it was built from, so "every NPC built from the dancer profile" is one word in a scene file
     // rather than a list of forty names that goes stale.
     std::vector<std::string> tags;
+    // Phase D §18: what this body can do -- "can_walk", "can_inspect", "can_touch". An interaction a
+    // prop offers lists what it `required`; the two meeting is a valid interaction. Data, never a
+    // branch on what kind of character this is (§77).
+    std::vector<std::string> capabilities;
     // Which animation state plays for each activity, by activity name ("idle", "walk", "run",
     // "turn", "observe", "react"). Declared here rather than chosen in a behaviour because a clip
     // name belongs to an asset: a behaviour that named one would break the day a character shipped
@@ -135,6 +195,10 @@ struct EntityDesc {
     // inert" is a claim that can be measured rather than asserted -- see the rendered-hash
     // comparison in `docs/design/procedural-character-motion.md`.
     bool proceduralMotion = false;
+    // ADR-623. The matcher in front of the clip provider; see `MotionMatchingDesc`.
+    MotionMatchingDesc motionMatching;
+    // Phase B §8-§11. Start, stop, turn-in-place and strafe, on top of the gait's clip family.
+    LocomotionPlanSettings locomotion;
 
     // ---- the senses (ADR-270, ADR-290) ----
     //
@@ -149,6 +213,21 @@ struct EntityDesc {
     // the same reason.
     PerceptionSettings perception;
     bool perceives = false;
+    // Phase D §9 "target categories, attention weighting": the perception block's `"tags"` --
+    // `{"ufo": 4.0}` -- a taste weight per semantic tag, alongside the per-kind `weight`s. A percept
+    // carrying a weighted tag is ranked by the larger of its kind's weight and its tags', so a
+    // saucer forty metres off is not cut by the capacity limit in favour of the twelve shore points
+    // nearer the body. Empty -- every scene before Phase D -- and the ranking is exactly the old one.
+    std::vector<std::pair<std::string, float>> perceptionTags;
+
+    // ---- personality (Phase D §29) ----
+    //
+    // Nine traits, 0.5 neutral, and a neutral trait changes no score anywhere (`mind.hpp`). The
+    // key's presence is the opt-in, exactly as `perception`'s is: registered as parameters under
+    // `entity/<name>/personality/<trait>` only for a body that declared one, so a reaction can make
+    // a character bolder on a drop and the path set says which bodies have a temperament.
+    Personality personality;
+    bool hasPersonality = false;
 
     // The profile this entity was built from, as written. Round-tripped so saving a scene does not
     // inline what the author deliberately shared -- `profileCount` records how many of each list
@@ -279,9 +358,35 @@ enum class SocketResolution : std::uint8_t {
 // only need to know whether there is a place to put something.
 [[nodiscard]] constexpr bool resolved(SocketResolution r) { return r != SocketResolution::None; }
 
+// An entity's behaviours, as a *value* (ADR-700). A plain vector of `unique_ptr` cannot be copied,
+// and that made `Entity` uncopyable -- which is the only thing that stood between a checkpoint and
+// "copy the whole entity". With this the compiler writes `Entity`'s copy constructor and copy
+// assignment, so a checkpoint holds every member an entity has, including ones added after
+// ADR-700 was written. Copy-constructing clones each behaviour; copy-assigning copies each
+// behaviour's state into the one already there (`IBehavior::assignState`), so the live objects keep
+// their addresses across a restore.
+class BehaviorList : public std::vector<std::unique_ptr<IBehavior>> {
+public:
+    BehaviorList() = default;
+    BehaviorList(BehaviorList&&) noexcept = default;
+    BehaviorList& operator=(BehaviorList&&) noexcept = default;
+    BehaviorList(const BehaviorList& other);
+    BehaviorList& operator=(const BehaviorList& other);
+    ~BehaviorList() = default;
+};
+
 class Entity {
 public:
     Entity(EntityDesc desc, std::uint32_t sceneSeed);
+    // Copyable, member for member, for a checkpoint (ADR-700). Deliberately implicit: every member
+    // is a value or a borrowed pointer the host keeps alive, and a checkpoint is only restored into
+    // the entity it was taken from while the inputs that produced it are unchanged. Anything new
+    // added below is copied without anyone having to remember it -- which is the point.
+    Entity(const Entity&) = default;
+    Entity& operator=(const Entity&) = default;
+    Entity(Entity&&) = default;
+    Entity& operator=(Entity&&) = default;
+    ~Entity() = default;
 
     [[nodiscard]] const EntityDesc& desc() const { return desc_; }
     // The animation state for `activity`, or empty when the entity declared none. Falls back to
@@ -298,8 +403,14 @@ public:
     // reconstructs it by replay and a provider that owned it would be the one object in the
     // character pipeline a scrub could not rewind.
     [[nodiscard]] const MotionMemory& motionMemory() const { return motionMemory_; }
+    // **Staged and dark** (ADR-615): `motionState_` is touched in exactly one place in the whole
+    // tree -- `EntityWorld::reset` calls `.reset()` on it -- and this accessor has no callers. The
+    // controller that would fill it, `entity::stepMotion`, is reached through `predictTrajectory`,
+    // whose product caller is the matcher's query (§25), which predicts from the body's state
+    // rather than moving it. Behaviours move the body; this integrator does not.
     [[nodiscard]] const MotionState& motionState() const { return motionState_; }
     [[nodiscard]] const MotionChainResult& motionChainResult() const { return motionChainResult_; }
+    [[nodiscard]] const LocomotionPlanState& locomotionPlan() const { return locomotionPlan_; }
     // Borrowed, owned by whoever built the providers (the composition). Null means this body is
     // driven by its clips, which is every body until a scene opts one in.
     void setMotionChain(const MotionChain* chain) { motionChain_ = chain; }
@@ -307,6 +418,12 @@ public:
     // Advance the provider memory one step. Called from BOTH publish paths -- ADR-554's rule,
     // applied to the very thing that rule was discovered by.
     void advanceMotion(double time, float dt);
+    // Phase B §46. Publishes `hasLookTarget` **and the schedule the pose tier blends against**, in
+    // one place called by both `EntityWorld::update` and `EntityWorld::seek`. One function rather
+    // than two copies of three lines for ADR-554's reason: this struct is the one that rule was
+    // discovered on, and a schedule written by only one of its two publishers is the same defect
+    // with a longer name.
+    void publishLookSchedule();
     // Where the body is **drawn**, as distinct from where the simulation says it is.
     //
     // `state().position()` is the anchor plus `travel` -- what navigation and a director wrote. The
@@ -375,6 +492,29 @@ public:
     // reason. Cleared by `reset`, so a replay rebuilds it rather than inheriting it (D4).
     static constexpr std::uint64_t kNoSenseTick = 0xFFFFFFFFFFFFFFFFull;
     [[nodiscard]] std::uint64_t lastSenseTick() const { return senseTick_; }
+
+    // ---- Phase D: what this body is, and what kind of creature it is --------------------------
+
+    // Its semantic tags as bits of the world's `SemanticTags` (§25). Computed once at
+    // `setEntities`; the words are `desc().tags`.
+    [[nodiscard]] std::uint64_t tagMask() const { return tagMask_; }
+    // Phase D §18: whether this body has every capability in `required` (empty: always).
+    [[nodiscard]] bool can(std::span<const std::string> required) const {
+        for (const std::string& r : required) {
+            if (std::find(desc_.capabilities.begin(), desc_.capabilities.end(), r) ==
+                desc_.capabilities.end()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    // `desc().perceptionTags`, resolved against the world's vocabulary: (bit, weight).
+    [[nodiscard]] std::span<const std::pair<std::uint64_t, float>> perceptionTagWeights() const {
+        return perceptionTagBits_;
+    }
+    // The personality **as the parameters currently read** (ADR-225), falling back to the authored
+    // value when unregistered. Neutral for a body that declared none.
+    [[nodiscard]] Personality personality() const;
 
     // ---- intent (ADR-096) ------------------------------------------------------------------
 
@@ -448,6 +588,9 @@ private:
     EntityDesc desc_;
     std::uint32_t seed_ = 0;
     Rng rng_;
+    std::uint64_t tagMask_ = 0;
+    std::vector<std::pair<std::uint64_t, float>> perceptionTagBits_;
+    std::array<params::Parameter<float>*, Personality::kCount> personalityParams_{};
     EntityState state_{};
     // ADR-545: where this body was at the end of the previous step, and whether there was one.
     // The measured velocity is a backward difference and this is the thing it differences against;
@@ -455,10 +598,11 @@ private:
     // difference across a discontinuity.
     glm::vec3 lastPosition_{0.0f};
     bool hasLastPosition_ = false;
+    bool hasLastVelocity_ = false;
     MotionOffset motion_{};
     DirectorMotion director_{};
     LocomotionState locomotion_{};
-    std::vector<std::unique_ptr<IBehavior>> behaviors_;
+    BehaviorList behaviors_;
 
     // Resolved once at bind; null until then and after a parameter set is cleared.
     params::Parameter<glm::vec3>* positionParam_ = nullptr;
@@ -490,6 +634,7 @@ private:
     MotionMemory motionMemory_;
     MotionState motionState_;
     MotionChainResult motionChainResult_;
+    LocomotionPlanState locomotionPlan_;
     const MotionChain* motionChain_ = nullptr;
     // Authoritative here rather than in the parameter set: an entity may be ticked before anything
     // registers a parameter, and a state that only existed as a parameter would vanish on a scene
@@ -583,9 +728,62 @@ private:
 // **Zero means no cap**, and that is deliberate: an offline render, a test and the command hub all
 // want the whole window whatever it costs, because none of them is waiting for a person. Only the
 // live editor sets a ceiling, and it sets it explicitly (see `Engine::seekSeconds`).
+//
+// **ADR-700 retired the ninety-second window.** A seek now restores the nearest simulation
+// checkpoint at or before the target and replays forward from it, so it is exact at any time rather
+// than only inside the window; `maxSeconds` is read only by `SeekMode::Window`, which is kept as a
+// test control and an A/B arm, not as the product. `maxBodySteps` keeps its meaning in the unit it
+// always had -- the most one seek may integrate -- and applies to the replay *from the checkpoint*:
+// when even that is more than a click may cost (a first scrub deep into a big cast with nothing
+// recorded yet), the seek falls back to the window and says so (`SeekWork::exact == false`).
+enum class SeekMode : std::uint8_t {
+    // Restore the nearest checkpoint, replay forward, record checkpoints as the replay passes them.
+    Checkpointed,
+    // The pre-ADR-700 replay: at most `maxSeconds` from a reset state. A control, not the product.
+    Window,
+    // Every step from t = 0, touching no checkpoint. The reference a checkpointed seek must equal.
+    FullHistory,
+};
+[[nodiscard]] std::string_view seekModeName(SeekMode mode);
+
 struct SeekBudget {
     double maxSeconds = 90.0;
     std::uint64_t maxBodySteps = 0;
+    SeekMode mode = SeekMode::Checkpointed;
+    // The live editor's ceiling since ADR-700, raised from ADR-273's 180,000. That number bought
+    // "the whole ninety-second window for up to 33 bodies"; with the window retired, the question
+    // is instead whether a first scrub with no checkpoint yet can replay the whole film exactly.
+    // Glowmere's multicam is 19 entities over 13,578 steps -- 257,982 body-steps to its last frame
+    // -- so 180,000 would have made its first scrub to the end inexact. 400,000 covers 19 entities
+    // for 351 s and still bounds ADR-267's 250-character cast to 27 s of exact history per click.
+    static constexpr std::uint64_t kEditorBodySteps = 400000;
+    // `AVGEN_SEEK_MODE` = checkpointed | window | full, for an A/B out of one binary. Unset or
+    // unrecognised is `Checkpointed`.
+    [[nodiscard]] static SeekMode modeFromEnvironment();
+};
+
+// How often a checkpoint is taken and how much memory the set may hold (ADR-700). Measured on
+// `glowmere-valley-2-multicam`; see the ADR for the numbers behind the defaults.
+struct CheckpointSettings {
+    bool enabled = true;
+    // One second. Measured on the multicam (ADR-700): a checkpoint is 55 KB and takes 0.2 ms to
+    // take, so a second's interval is 12 MB over the whole 226 s film, and the worst scrub after
+    // the first -- one second of replay -- measured 17.9 ms against 104.6 ms at five seconds.
+    double intervalSeconds = 1.0;
+    // The ceiling on the whole set. Past it every other checkpoint is dropped and the interval
+    // doubles, so the set thins out evenly rather than losing its far end.
+    std::size_t maxBytes = std::size_t{256} << 20;
+    // **Test control only.** Keeps the set across a change of inputs, which is exactly the defect
+    // the input key exists to prevent; the invalidation test uses it to show the stale answer is
+    // wrong. Nothing in the product sets it.
+    bool ignoreInputKey = false;
+};
+
+// What a host (the composition) keeps in a checkpoint beside the entities: the director and
+// whatever the replay hooks drive. Opaque here; the host that captured it is the one that restores it.
+struct HostCheckpoint {
+    virtual ~HostCheckpoint() = default;
+    [[nodiscard]] virtual std::size_t bytes() const = 0;
 };
 
 class EntityWorld {
@@ -607,6 +805,7 @@ public:
     [[nodiscard]] const NodeBinding* binding(const std::string& node) const;
 
     void setNavigator(Navigator nav) {
+        ++inputEpoch_;
         nav_ = std::move(nav);
         refreshInterestPoints();
         navPath_.setNavigator(&nav_);
@@ -618,7 +817,10 @@ public:
     // How a `move` action finds its way. Defaults to the straight-line provider over the
     // navigator set above, which is everything that exists today; §5/§6's planner installs itself
     // here and nothing else changes. The pointer is borrowed: the caller keeps it alive.
-    void setPathProvider(const IPathProvider* path) { path_ = path; }
+    void setPathProvider(const IPathProvider* path) {
+        ++inputEpoch_;
+        path_ = path;
+    }
     [[nodiscard]] const IPathProvider& pathProvider() const { return path_ != nullptr ? *path_ : navPath_; }
 
     // Every completion, failure, skip and cancellation from the last update(), in the order they
@@ -693,8 +895,15 @@ public:
     // Named places a behaviour may attend to: the scene's heroes, and any node an entity drives.
     // Set by the host, because only the host knows what the scene contains.
     void setLandmarks(std::vector<std::pair<std::string, glm::vec3>> landmarks) {
+        ++inputEpoch_;
         landmarks_ = std::move(landmarks);
         refreshInterestPoints();
+    }
+    // Phase D §23: landmarks that are the ground itself. Their interest points carry the semantic
+    // tag "terrain", which an aware decider refuses as a destination.
+    void setTerrainLandmarks(std::vector<std::string> names) {
+        ++inputEpoch_;
+        terrainLandmarks_ = std::move(names);
     }
     // Where `name` is, looking first at entities (which move) and then at landmarks (which do not).
     [[nodiscard]] bool pointOfInterest(std::string_view name, glm::vec3& out) const;
@@ -715,7 +924,10 @@ public:
     // below, which is everything that exists today; a test installs a `ScriptedPerception` here so
     // a decision layer can be asserted without a world, exactly as `setPathProvider` lets an action
     // be. The pointer is borrowed: the caller keeps it alive.
-    void setPerception(const IPerception* perception) { perception_ = perception; }
+    void setPerception(const IPerception* perception) {
+        ++inputEpoch_;
+        perception_ = perception;
+    }
     [[nodiscard]] const IPerception& perception() const {
         return perception_ != nullptr ? *perception_ : gridPerception_;
     }
@@ -742,6 +954,51 @@ public:
     // this file needs them and because a test that wants to price a scan needs to be able to run
     // one; rebuilt at the top of every update in which anything perceives.
     [[nodiscard]] PerceptionIndex perceptionIndex() const;
+
+    // ---- semantics and events (Phase D §25, §26) ---------------------------------------------
+
+    // The world's vocabulary: every word an entity's `tags` uses, plus the five interest kinds'
+    // names, interned to bits. Percepts carry masks of these (`Percept::tags`).
+    [[nodiscard]] const SemanticTags& semanticTags() const { return tags_; }
+
+    // Things that happened, newest last, for the last `kEventWindowSeconds` and at most
+    // `kEventCapacity` of them. Raised by the world, not by a character: any named `ActionEvent`
+    // (an action's or an interaction's `onComplete`) becomes one at the position of the entity that
+    // raised it, so a mushroom whose schedule sets `"onComplete": "bloom"` is heard blooming by
+    // anyone in earshot. Cleared by `reset`, and re-raised identically by `seek`'s replay, which
+    // runs the same action tier -- so an event's `sequence` is the same number on both paths.
+    static constexpr std::size_t kEventCapacity = 128;
+    static constexpr double kEventWindowSeconds = 60.0;
+    [[nodiscard]] std::span<const WorldEvent> worldEvents() const { return worldEvents_; }
+    // Interns an event name to its type id (never 0). Names are few and fixed per scene.
+    std::uint32_t eventType(std::string_view name);
+    [[nodiscard]] std::uint32_t findEventType(std::string_view name) const;
+    [[nodiscard]] std::string_view eventName(std::uint32_t type) const;
+    // Raises an event. `sequence` is assigned here. Public so a host system -- an audio analyser's
+    // semantic events (§28), a director -- can raise one; the world raises its own from actions.
+    void emitEvent(WorldEvent event);
+    // How far an event named `name` carries and how loud it is, when an author wants it different
+    // from the default 60 m at full strength. Scene-level data (`"worldEvents"`), never code.
+    struct EventProfile {
+        std::string name;
+        float radius = 60.0f;
+        float magnitude = 1.0f;
+        // Phase D §28: raise this event from a signal-bus event -- `"signal": "music.drop"` -- so
+        // the audio analyser's structure reaches characters as a *semantic* event rather than as a
+        // band level a behaviour thresholds (§28: "do not directly tie behaviour to arbitrary audio
+        // bands"). Raised at `at` (an entity or landmark; the world origin when empty) whenever the
+        // signal fires at or above `threshold`, at most once per `minInterval` seconds, and with
+        // the signal's value as its magnitude.
+        //
+        // **Not reproduced by a scrub**: `seek` does not replay the bus's history, so a
+        // signal-raised event is heard on a play and not on a replay. Action-raised events are.
+        std::string signal;
+        float threshold = 0.0f;
+        std::string at;
+        float minInterval = 1.0f;
+    };
+    void setEventProfiles(std::vector<EventProfile> profiles);
+    [[nodiscard]] const std::vector<EventProfile>& eventProfiles() const { return eventProfiles_; }
 
     // Characters not walking through each other (§11 of the world-authoring brief).
     //
@@ -822,9 +1079,30 @@ public:
     // seek has no business inheriting it, because the whole promise of a seek is that the same
     // second gives the same frame. What used to be saved by skipping distant bodies is now bounded
     // by `SeekBudget::maxBodySteps` instead, which does it without consulting a camera.
+    // Phase D §63 / ADR-671: what a caller replays alongside the entities, one fixed step at a
+    // time -- the director above them (`before`, as `Composition::updateBehaviour` runs it before
+    // the entity update) and whatever must see the step's settled bodies (`after`). Null, which is
+    // every caller before ADR-671, replays the entities alone.
+    //
+    // ADR-700 adds the host's half of a checkpoint. `capture` is called after `after` on each step
+    // a checkpoint is recorded at and returns everything the host's replay reads across steps;
+    // `restore` puts that back before the replay resumes from the checkpoint. When the replay
+    // starts from zero instead, the host is expected to have reset itself before calling `seek`
+    // (`seekWithDirector` does). `inputKey` is the host's contribution to the checkpoints'
+    // validity: anything the host's replay reads that is not a parameter base must change it.
+    struct SeekHooks {
+        std::function<void(double now, double dt)> before;
+        std::function<void(double now, double dt)> after;
+        std::function<std::shared_ptr<const HostCheckpoint>()> capture;
+        std::function<void(const HostCheckpoint&)> restore;
+        std::uint64_t inputKey = 0;
+    };
     void seek(double time, params::ParameterSet* params = nullptr,
               const signals::SignalBus* bus = nullptr, double step = 1.0 / 60.0,
-              SeekBudget budget = {});
+              SeekBudget budget = {}, const SeekHooks* hooks = nullptr);
+    // Writes every entity's offsets onto its node's parameter finals, exactly as `update` does
+    // after each body's step. For a replay hook that has to see the frame a play would have drawn.
+    void applyAllOffsets();
 
     // What the last `seek` actually integrated. Structural quantities rather than milliseconds
     // (ADR-170): "it replayed 5,400 steps over 23 bodies" survives a change of machine in a way
@@ -837,8 +1115,42 @@ public:
         std::size_t deepBodies = 0;    // bodies that needed the whole window
         std::size_t shallowBodies = 0; // ...and bodies whose answer is a function of the target
         bool budgetBound = false;      // true when the step budget, not the policy, chose the span
+        // ADR-700.
+        SeekMode mode = SeekMode::Window;  // the mode that actually ran (a fallback reports Window)
+        bool exact = false;            // the answer equals a replay of the whole history
+        bool fellBack = false;         // Checkpointed was asked for and the budget forced Window
+        double restoredFrom = -1.0;    // the checkpoint's time, or -1 when it replayed from zero
+        std::size_t recorded = 0;      // checkpoints this seek added
+        bool invalidated = false;      // this seek found the inputs changed and dropped the set
     };
     [[nodiscard]] SeekWork lastSeekWork() const { return seekWork_; }
+
+    // ---- simulation checkpoints (ADR-700) ----------------------------------------------------
+    void setCheckpointSettings(const CheckpointSettings& settings);
+    [[nodiscard]] const CheckpointSettings& checkpointSettings() const { return checkpointSettings_; }
+    // Drops every checkpoint. The input key already does this for any change it can see; this is
+    // for a caller that knows of one it cannot.
+    void dropCheckpoints();
+    struct CheckpointStats {
+        std::size_t count = 0;
+        std::size_t bytes = 0;          // the whole set, measured as heap bytes allocated to copy it
+        std::size_t lastBytes = 0;      // the most recent checkpoint alone
+        double latestSeconds = -1.0;    // the furthest one, or -1
+        double intervalSeconds = 0.0;   // the interval in force (it doubles when the cap thins)
+        std::uint64_t invalidations = 0;
+        double lastCaptureMs = 0.0;
+        double lastRestoreMs = 0.0;
+    };
+    [[nodiscard]] CheckpointStats checkpointStats() const;
+    // The key the current inputs would give a checkpoint: the world's structure epoch, every
+    // entity's borrowed providers, every parameter base, the step and the host's key. Public so a
+    // test can show that an edit moves it.
+    [[nodiscard]] std::uint64_t checkpointInputKey(const params::ParameterSet* params, double step,
+                                                   std::uint64_t hostKey) const;
+    // Bumped by everything that changes what a replay would compute other than a parameter base:
+    // the entity set, bindings, the navigator, landmarks, interest points, fields, event profiles,
+    // parameter registration, the path provider and the sense stage.
+    [[nodiscard]] std::uint64_t structureEpoch() const { return inputEpoch_; }
 
     // Everything that could not be resolved, for the editor and the log. Never silently empty
     // because a problem was swallowed.
@@ -869,6 +1181,51 @@ private:
     std::vector<std::uint64_t> seekFirstStep_;
     std::vector<ActionEvent> seekEvents_;
 
+    // ---- simulation checkpoints (ADR-700) ----
+    //
+    // A checkpoint is the state after grid step `step` (the instant `step / rate`), complete:
+    // every entity copied whole (`Entity`'s implicit copy -- see `BehaviorList`), the world's own
+    // simulation state listed below, and the host's half. **The world-level list is the one
+    // hand-written part**, so it is guarded: `test_seek_checkpoints.cpp` fails when `EntityWorld`
+    // changes size, and the message says to decide whether the new member is state (add it here
+    // and to `captureCheckpoint`/`restoreCheckpoint`) or configuration (bump `inputEpoch_` where
+    // it is set).
+    struct Checkpoint {
+        std::uint64_t step = 0;
+        std::vector<Entity> entities;
+        std::vector<WorldEvent> worldEvents;
+        std::uint64_t eventSequence = 0;
+        std::vector<double> eventSignalLast;
+        std::vector<ActionEvent> actionEvents;
+        std::vector<ActionEvent> pendingEvents;
+        std::shared_ptr<const HostCheckpoint> host;
+        std::size_t bytes = 0;
+    };
+    std::vector<Checkpoint> checkpoints_; // ascending by step
+    CheckpointSettings checkpointSettings_{};
+    std::uint64_t checkpointKey_ = 0;
+    double checkpointStep_ = 0.0;
+    std::uint64_t checkpointInterval_ = 0; // in steps; doubles when the byte cap thins the set
+    std::uint64_t checkpointInvalidations_ = 0;
+    double lastCaptureMs_ = 0.0;
+    double lastRestoreMs_ = 0.0;
+    std::uint64_t inputEpoch_ = 1;
+    void captureCheckpoint(std::uint64_t step, const SeekHooks* hooks);
+    void restoreCheckpoint(const Checkpoint& checkpoint, const SeekHooks* hooks);
+    void thinCheckpoints();
+    // One fixed replay step, shared by every seek mode so they cannot disagree (testing.md #31/#38):
+    // the host's `before`, the crowd and sense snapshots, every body's step, the host's `after`.
+    // `i` is compared against `seekFirstStep_` (the window's shallow bodies); `buildCrowd` is false
+    // only when the window found no deep body.
+    void replayStep(double now, double stepDt, std::uint64_t i, const signals::SignalBus* bus,
+                    const SeekHooks* hooks, bool buildCrowd);
+    // What every seek publishes on the way out, so the next frame builds on it.
+    void publishSeek(double target, double dt, bool replayedNothing);
+    void seekWindow(double time, params::ParameterSet* params, const signals::SignalBus* bus,
+                    double step, SeekBudget budget, const SeekHooks* hooks);
+    void seekExact(double time, params::ParameterSet* params, const signals::SignalBus* bus,
+                   double step, SeekBudget budget, const SeekHooks* hooks);
+
     std::vector<std::unique_ptr<Entity>> entities_;
     std::vector<NodeBinding> bindings_;
     Navigator nav_{};
@@ -885,6 +1242,7 @@ private:
     // from compileReactions, which has one; refreshed by bind() and update().
     mutable const params::ParameterSet* params_ = nullptr;
     std::vector<std::pair<std::string, glm::vec3>> landmarks_;
+    std::vector<std::string> terrainLandmarks_;
     std::vector<InterestPoint> interests_;
     std::vector<InterestPoint> extraInterests_;
     // One obstacle per entity with a body, in entity order, so an index into `entities()` is an
@@ -914,6 +1272,26 @@ private:
     std::vector<Percept> perceptScratch_;
     PerceptionCounts perceptionCounts_{};
     bool perceiving_ = false;
+
+    // ---- semantics and events (Phase D) ----
+    SemanticTags tags_;
+    std::vector<WorldEvent> worldEvents_;
+    std::uint64_t eventSequence_ = 0;
+    std::vector<std::string> eventNames_; // type id - 1 -> name
+    std::vector<EventProfile> eventProfiles_;
+    std::vector<double> eventSignalLast_; // per profile: when its signal last raised it
+    void raiseSignalEvents(const signals::SignalBus* bus, double time);
+    void internSemantics();
+    // Turns every named `ActionEvent` in `events` from `first` onward into a `WorldEvent` raised at
+    // `entityIndex`. Shared by `update` and `seek` so the two paths cannot disagree (testing.md #31).
+    void raiseActionEvents(const std::vector<ActionEvent>& events, std::size_t first,
+                           std::size_t entityIndex, double time);
+    static void measureStepVelocity(Entity& entity, double dt);
+    static void applyNodeOffsets(Entity& entity);
+    // The Director tier's two halves (ADR-210), shared by `update` and `seek`.
+    static void directorBefore(Entity& entity);
+    static void directorAfter(Entity& entity);
+    static void rescaleIntent(EntityState& state);
     // Rebuilds `bodyGrid_` and `bodyPoints_` from where every entity's simulation stands now, and
     // runs one sense tick for `entityIndex` when its cadence says it is due. Shared by `update` and
     // `seek` so a scrubbed character's working set is built by the same code as a played one's.

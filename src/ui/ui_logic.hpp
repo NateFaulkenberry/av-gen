@@ -239,12 +239,15 @@ enum class ViewportIntent : std::uint8_t {
 
 // May this gesture stand the director down?
 //
-// **This is a guard on live data loss, not a preference.** `releaseDirectedCamera` destroys six
+// **Written as a guard on live data loss.** `releaseDirectedCamera` used to destroy six
 // `directedCameraTargets()` worth of timeline tracks, the whole `cameraAimFollow` table and the
 // whole `cameraShotSpans` table -- 37 and 42 entries on the multicam film -- and the next Save
-// writes the loss into the project. It was observed happening for real: the app was open, it saved,
-// and the bake was gone. Re-baking is not a recovery either, because it re-photographs the hero
-// anchors (ADR-344), so the cut comes back different.
+// wrote the loss into the project. It was observed happening for real, twice: the second time a
+// *deliberate* release, which this guard allows by design, silenced the Hero Pulse in every render.
+// Re-baking is not a recovery, because it re-photographs the hero anchors (ADR-344). ADR-582 fixed
+// it at the source: a release now PARKS the cut (nothing is destroyed, "Resume Director" restores
+// it byte for byte) and the spans stay live. What this guard still decides is only whether an
+// incidental gesture may take the camera from the director, not whether anything is lost.
 //
 // While that could only be reached by dragging the viewport under a directed camera it was a defect
 // you had to know the sequence for. The moment a camera is a draggable object in the Canvas it is
@@ -255,8 +258,8 @@ enum class ViewportIntent : std::uint8_t {
 // **navigating the view is not modifying the camera.** An incidental gesture -- a drag, a framing,
 // a dolly -- may not discard a cut. A deliberate one -- the menu's "take the camera back", the
 // Camera panel's unlock -- may, because the user said so in words rather than by moving a mouse.
-// `hasBake` is whether standing the director down would actually destroy anything --
-// `app::directedCameraBakeSize`, which counts the same four things `releaseDirectedCamera` removes.
+// `hasBake` is whether standing the director down would actually take anything off the camera --
+// `app::directedCameraBakeSize`, which counts the same three things `releaseDirectedCamera` parks.
 // A guard on data loss with no data to lose is only a cost, and shipped as one: locked
 // unconditionally, this refused the viewport on EVERY directed project. On the Tree of Life -- 0
 // camera tracks, 0 aim-follow entries, 0 shot spans -- Option-drag became a no-op and a status line

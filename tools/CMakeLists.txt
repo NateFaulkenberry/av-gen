@@ -141,3 +141,13 @@ endif()
 add_executable(avgen_slope_probe _slope_probe.cpp)
 target_link_libraries(avgen_slope_probe PRIVATE avgen_core)
 
+
+# Phase D §58/§64: simulate a scene headless and print one line per decision any character makes,
+# plus the §41 "why" report on request. A permanent tool, not a probe: it is the offline half of
+# "why is this character doing that", and its --repeat and --seek modes are the determinism checks.
+add_executable(avgen_behavior_trace behavior_trace.cpp)
+target_link_libraries(avgen_behavior_trace PRIVATE avgen_core)
+
+# Phase D §58: validate a scene's autonomous characters before runtime.
+add_executable(avgen_character_validate character_validate.cpp)
+target_link_libraries(avgen_character_validate PRIVATE avgen_core)

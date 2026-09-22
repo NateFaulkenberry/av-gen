@@ -49,6 +49,19 @@ enum class Activity : std::uint8_t {
 [[nodiscard]] bool activityFromName(std::string_view name, Activity& out);
 
 // Everything an animation layer needs from a behaviour layer, and nothing else.
+// Where the body is in the arc of a movement. Deliberately orthogonal to `Activity`: a body can be
+// `Activity::Walk` and `LocomotionPhase::Starting` at the same time, and those are two different
+// facts about it.
+enum class LocomotionPhase : std::uint8_t {
+    Idle,      // standing, and not about to stop being
+    Starting,  // §8: accelerating out of a stand, before the stride has settled
+    Moving,    // travelling at a settled pace
+    Stopping,  // §9: braking toward a stand, with a final step still to place
+    Turning,   // §10: turning on the spot, not travelling
+    Strafing,  // §11: travelling, with the heading and the facing meaningfully apart
+};
+[[nodiscard]] const char* locomotionPhaseName(LocomotionPhase phase);
+
 struct LocomotionState {
     Activity activity = Activity::Idle;
     // The timeline second this decision was made at, never a wall clock. The animation layer
@@ -70,12 +83,26 @@ struct LocomotionState {
     // difference against there.
     glm::vec3 velocity{0.0f}; // world
     glm::vec3 facing{0.0f, 0.0f, 1.0f};
-    // **Written by nobody and read by nobody** until Phase B looked for the same publication gap
-    // that hid `velocity` and `action`. Its source is `EntityState::airborne`, which the jump/fall
-    // machinery maintains; a foot placement layer must not plant a foot on a body in mid-air, so it
-    // is published now rather than deleted. The sweep that found it is worth more than the field:
-    // *for each seam field, which paths write it* is a question with an answer, and two of the
-    // three answers were wrong.
+    // What the body's velocity is doing, for a lean layer to tilt into. Published on both paths
+    // (ADR-554), like everything else here.
+    glm::vec3 acceleration{0.0f};
+    // Phase B §8-§11. Where the body is in the arc of a movement, and how much of the authored
+    // stride that phase wants -- a start eases it in, a stop eases it out. Published on both
+    // paths (ADR-554).
+    LocomotionPhase phase = LocomotionPhase::Idle;
+    float phaseStride = 1.0f;
+    float strafeAngle = 0.0f;
+    // **Written on both paths and read by nobody.** Its source is `EntityState::airborne`, which
+    // the jump/fall machinery maintains; a foot placement layer must not plant a foot on a body in
+    // mid-air, so it is published rather than deleted. Nothing consumes it yet: `MotionContext`
+    // carries no `grounded`, and `PoseLayerDrive::Ground` uses `hasGroundPlane` instead.
+    //
+    // **The sentence above used to read "written by nobody and read by nobody", and it was left
+    // there after the write half was fixed.** So this comment spent a phase documenting a defect
+    // the code no longer had -- which misleads in the opposite direction from every other
+    // one-ended contract in this codebase, and is invisible to any sweep for dead symbols because
+    // the symbol is alive and written twice a frame. A comment saying a thing is broken is exactly
+    // the comment nobody re-reads after fixing it. ADR-615 records the shape.
     bool grounded = true;
     // Seconds since the previous step. Carried because `MotionContext` needs it and the entity is
     // the only tier that knows it: deriving it downstream by differencing `time` would be memory
@@ -104,6 +131,16 @@ struct LocomotionState {
     // sentence was true about the intent and false about the engine until there was a layer.
     glm::vec3 lookTarget{0.0f};
     bool hasLookTarget = false;
+    // Phase B §46: the sample second at which `hasLookTarget` last changed, and what it was before.
+    // A look layer that switches on at full weight snaps the head, and the blend that stops it has
+    // to be **derived** rather than accumulated, because the pose tier poses once on a scrub and
+    // has no previous frame to have ramped from (ADR-557).
+    //
+    // The division of labour is the point. This tier may remember -- `EntityWorld::seek` replays
+    // every step, so anything accumulated here is reconstructable at frame N by construction. The
+    // pose tier may not, and so it is handed a *time* instead of a ramp.
+    double lookTargetSince = 0.0;
+    bool lookTargetBefore = false;
 
     // The ground under this body, in WORLD space, and entity-local by the time it reaches a layer
     // -- `Composition::AnimationSink::driveLayers` does the conversion, the same one and for the
@@ -145,9 +182,12 @@ public:
     virtual void setLocomotion(const LocomotionState& state) = 0;
 };
 
-// Implemented by the animation layer so sockets can follow joints. Until one exists, a socket
-// resolves against the entity's own transform, which is correct for a craft and approximate for a
-// character -- approximate being the right failure for a prop that has to be somewhere.
+// Implemented by the animation layer so sockets can follow joints. **One exists** --
+// `Composition::AnimationSink`, installed through `Entity::setSkeleton` -- so the fallback below is
+// the path taken by a body with no rig rather than by every body (ADR-615). Where there is no
+// implementation a socket resolves against the entity's own transform, which is correct for a
+// craft and approximate for a character; approximate is the right failure for a prop that has to
+// be somewhere.
 //
 // **The frame this answers in is the rig's model space, which is the entity's own frame, and not
 // the world** (ADR-274). The method used to be called `jointWorldTransform` and its only consumer,

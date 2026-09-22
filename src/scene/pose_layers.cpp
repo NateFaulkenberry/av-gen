@@ -56,8 +56,56 @@ const char* poseLayerKindName(PoseLayerKind kind) {
     case PoseLayerKind::Foot: return "foot";
     case PoseLayerKind::Stride: return "stride";
     case PoseLayerKind::Secondary: return "secondary";
+    case PoseLayerKind::Lean: return "lean";
+    case PoseLayerKind::Reach: return "reach";
     }
     return "aim";
+}
+
+std::uint32_t seedFromName(std::string_view name) {
+    std::uint32_t h = 2166136261u;
+    for (const char c : name) {
+        h ^= static_cast<std::uint32_t>(static_cast<unsigned char>(c));
+        h *= 16777619u;
+    }
+    return h;
+}
+
+float seedPhase(std::uint32_t characterSeed, std::uint32_t layerSeed) {
+    // Zero and zero means "unseeded", and it has to come out as exactly zero rather than as some
+    // arbitrary hash of two zeroes -- otherwise adding this field would have silently shifted
+    // every existing secondary layer in the repository, and the first anyone would know is that a
+    // render no longer matched.
+    if (characterSeed == 0u && layerSeed == 0u) {
+        return 0.0f;
+    }
+    // A bit-mixer, not a random number generator: no state, no sequence, no order dependence.
+    std::uint32_t h = characterSeed * 2654435761u;
+    h ^= layerSeed + 2654435769u + (h << 6) + (h >> 2);
+    h ^= h >> 16;
+    h *= 2246822507u;
+    h ^= h >> 13;
+    h *= 3266489909u;
+    h ^= h >> 16;
+    return static_cast<float>(h) / 4294967296.0f;
+}
+
+int poseLayerStage(PoseLayerKind kind) {
+    // §5's chain, as numbers. The gaps are deliberate: a kind added between two of these needs a
+    // number, and a dense sequence would force renumbering the ones around it.
+    switch (kind) {
+    case PoseLayerKind::Stride:    return 10;  // stride adjustment, on the base pose
+    case PoseLayerKind::Lean:      return 20;  // turn and acceleration adaptation of the body
+    case PoseLayerKind::Secondary: return 30;  // breathing and idle life, on the adapted body
+    case PoseLayerKind::Aim:       return 40;  // look, which is upper body and independent
+    case PoseLayerKind::Additive:  return 50;  // a reaction played on top of all of it
+    // **The two IK solves run last, and that is the whole point of this function.** They put an
+    // end effector at a place in the world; anything that moved the body afterwards would move the
+    // effector off it. A foot planted and then displaced by a stride warp is planted nowhere.
+    case PoseLayerKind::Foot:      return 60;
+    case PoseLayerKind::Reach:     return 70;
+    }
+    return 100;
 }
 
 bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
@@ -79,6 +127,14 @@ bool poseLayerKindFromName(std::string_view name, PoseLayerKind& out) {
     }
     if (name == "secondary") {
         out = PoseLayerKind::Secondary;
+        return true;
+    }
+    if (name == "lean") {
+        out = PoseLayerKind::Lean;
+        return true;
+    }
+    if (name == "reach") {
+        out = PoseLayerKind::Reach;
         return true;
     }
     return false;
@@ -226,6 +282,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
     chainLinked_.assign(layers_.size(), glm::ivec2(0));
     soleUp_.assign(layers_.size(), glm::vec3(0.0f, 1.0f, 0.0f));
     stride_.assign(layers_.size(), glm::ivec2(-1));
+    order_.clear();
     restTipHeight_.assign(layers_.size(), 0.0f);
     ikStatus_.assign(layers_.size(), IkStatus::Solved);
     bodyResult_ = BodyCompensation{};
@@ -244,6 +301,16 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
         }
     }
     results_.assign(layers_.size(), LayerResolution::Inactive);
+    // §5. The order `apply` will run these in, by pipeline stage rather than by the order the
+    // scene file happened to list them. Stable within a stage, so two foot layers stay left then
+    // right.
+    order_.resize(layers_.size());
+    for (std::size_t i = 0; i < layers_.size(); ++i) {
+        order_[i] = static_cast<std::uint32_t>(i);
+    }
+    std::stable_sort(order_.begin(), order_.end(), [this](std::uint32_t a, std::uint32_t b) {
+        return poseLayerStage(layers_[a].kind) < poseLayerStage(layers_[b].kind);
+    });
     masks_.reserve(layers_.size());
     for (std::size_t i = 0; i < layers_.size(); ++i) {
         const PoseLayer& layer = layers_[i];
@@ -251,6 +318,27 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
         // authored. ADR-359: a two-bone solve is not maskable per joint -- half a knee does not
         // reach half a target -- so an authored mask on one could only be a silent no-op, which is
         // the failure this whole unit exists to stop repeating. It is reported instead.
+        // ---- the tripwire -------------------------------------------------------------------
+        //
+        // **Four times in this programme a branch saying "anything that is not X" has silently
+        // swallowed a new `PoseLayerKind`:** `rebind`'s additive clip lookup, the parser's
+        // hand-written kind list, the scene validator's mask check, and `apply`'s own `kind == Foot`.
+        //
+        // A catch-all is a claim about every value that will ever be added to the enum, and the
+        // author of the next value pays. This switch exists only so the compiler makes them pay
+        // at build time instead: `-Wall` implies `-Wswitch`, so adding a kind without visiting
+        // this function is a build error rather than a silent no-op.
+        switch (layer.kind) {
+        case PoseLayerKind::Aim:
+        case PoseLayerKind::Additive:
+        case PoseLayerKind::Foot:
+        case PoseLayerKind::Stride:
+        case PoseLayerKind::Secondary:
+        case PoseLayerKind::Lean:
+        case PoseLayerKind::Reach:
+            break;
+        }
+
         JointMaskSpec spec = layer.mask;
         if (layer.kind == PoseLayerKind::Stride && spec.joints.empty() && !layer.strideJoint.empty()) {
             // A stride layer's joint set IS its named joint, the same way a foot layer's is its
@@ -258,7 +346,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
             // with itself.
             spec.joints = {layer.strideJoint};
         }
-        if (layer.kind == PoseLayerKind::Foot) {
+        if (layer.kind == PoseLayerKind::Foot || layer.kind == PoseLayerKind::Reach) {
             if (!spec.joints.empty()) {
                 problems.push_back(fmt::format(
                     "layer '{}': a foot layer is driven by its chain and ignores the {} joint(s) its mask "
@@ -341,7 +429,7 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                 origin = -1;
             }
             stride_[i] = glm::ivec2(joint, origin);
-        } else if (layer.kind == PoseLayerKind::Foot) {
+        } else if (layer.kind == PoseLayerKind::Foot || layer.kind == PoseLayerKind::Reach) {
             const int root = skeleton.find(layer.chainRoot);
             const int mid = skeleton.find(layer.chainMid);
             const int tip = skeleton.find(layer.chainTip);
@@ -377,6 +465,10 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                     // scratch pose the additive path also uses; nothing here runs per frame.
                     setRestPose(skeleton, reference_);
                     poseToModel(skeleton, reference_, model_);
+                    // `model_` now holds the REST pose, not whatever `modelPose_` last recorded.
+                    // Clearing the snapshot forces the next `ensureModel` to rebuild in full;
+                    // without it a rig re-bound mid-run would solve against rest positions.
+                    modelPose_.local.clear();
                     const glm::mat3 bind(model_[static_cast<std::size_t>(tip)]);
                     const glm::vec3 authored = glm::dot(layer.soleUp, layer.soleUp) > 1e-8f
                                                    ? glm::normalize(layer.soleUp)
@@ -433,6 +525,45 @@ bool descendsFrom(const Skeleton& skeleton, int joint, int ancestor) {
     return false;
 }
 
+void PoseLayerStack::ensureModel(const Skeleton& skeleton, const Pose& pose) {
+    const std::size_t count = skeleton.joints.size();
+    if (modelPose_.local.size() != pose.local.size() || model_.size() != count ||
+        pose.local.size() != count) {
+        poseToModel(skeleton, pose, model_);
+        modelPose_ = pose;
+        return;
+    }
+    modelDirty_.assign(count, 0u);
+    bool any = false;
+    for (std::size_t j = 0; j < count; ++j) {
+        const Transform& was = modelPose_.local[j];
+        const Transform& now = pose.local[j];
+        if (was.position != now.position || was.rotation != now.rotation || was.scale != now.scale) {
+            modelDirty_[j] = 1u;
+            any = true;
+        }
+    }
+    if (!any) {
+        return;
+    }
+    for (std::size_t j = 0; j < count; ++j) {
+        const int parent = skeleton.joints[j].parent;
+        const bool parentDirty =
+            parent >= 0 && static_cast<std::size_t>(parent) < j && modelDirty_[static_cast<std::size_t>(parent)] != 0u;
+        if (parentDirty) {
+            modelDirty_[j] = 1u;
+        }
+        if (modelDirty_[j] == 0u) {
+            continue;
+        }
+        const glm::mat4 local = pose.local[j].matrix();
+        model_[j] = parent >= 0 && static_cast<std::size_t>(parent) < j
+                        ? model_[static_cast<std::size_t>(parent)] * local
+                        : local;
+        modelPose_.local[j] = pose.local[j];
+    }
+}
+
 PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector<AnimationClip>& clips,
                                      double now, Pose& pose) {
     PoseLayerStats stats;
@@ -445,7 +576,8 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         chain_.size() != layers_.size() || chainLinked_.size() != layers_.size() ||
         ikStatus_.size() != layers_.size() ||
         soleUp_.size() != layers_.size() || restTipHeight_.size() != layers_.size() ||
-        stride_.size() != layers_.size() || pose.size() != skeleton.jointCount()) {
+        stride_.size() != layers_.size() || order_.size() != layers_.size() ||
+        pose.size() != skeleton.jointCount()) {
         return stats;
     }
     const std::size_t count = skeleton.joints.size();
@@ -462,10 +594,13 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
     bodyResult_ = BodyCompensation{};
     if (bodyJoint_ >= 0 && static_cast<std::size_t>(bodyJoint_) < count) {
         demands_.clear();
-        poseToModel(skeleton, pose, model_);
+        ensureModel(skeleton, pose);
         for (std::size_t i = 0; i < layers_.size(); ++i) {
             const PoseLayer& layer = layers_[i];
-            if (layer.kind != PoseLayerKind::Foot || layer.weight <= 0.0f) {
+            // The same realized weight the apply loop will use. Reading `layer.weight` here
+            // instead would let the body compensation see a foot the solve is still blending in,
+            // which is one pipeline stage disagreeing with the next about whether a layer is on.
+            if (layer.kind != PoseLayerKind::Foot || layer.effectiveWeight() <= 0.0f) {
                 continue;
             }
             const glm::ivec3 ids = chain_[i];
@@ -509,11 +644,17 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         }
     }
 
-    for (std::size_t i = 0; i < layers_.size(); ++i) {
+    // §5: pipeline order, not file order. `order_` is sorted by `poseLayerStage`.
+    for (const std::uint32_t slot : order_) {
+        const auto i = static_cast<std::size_t>(slot);
         PoseLayer& layer = layers_[i];
         const JointMask& mask = masks_[i];
         LayerResolution& result = results_[i];
-        if (layer.weight <= 0.0f) {
+        // §46: one read of the realized weight per layer per frame, derived from `now`. Every use
+        // below is of this, not of `layerWeight`, so a blend cannot apply to some of a layer's
+        // effects and not others -- which is the shape of `docs/testing.md` #25.
+        const float layerWeight = layer.effectiveWeight();
+        if (layerWeight <= 0.0f) {
             result = LayerResolution::Inactive;
             continue;
         }
@@ -524,6 +665,92 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // limb this rig does not have.
             result = layer.kind == PoseLayerKind::Foot ? LayerResolution::NoChain
                                                        : LayerResolution::NoJoints;
+            continue;
+        }
+        // ---- the tripwire -------------------------------------------------------------------
+        //
+        // **Four times in this programme a branch saying "anything that is not X" has silently
+        // swallowed a new `PoseLayerKind`:** `rebind`'s additive clip lookup, the parser's
+        // hand-written kind list, the scene validator's mask check, and this function's own
+        // `kind == Foot` -- the last of which made every `Reach` layer report Solved having done
+        // nothing, with an unreachable target coming back successful and the hand at rest.
+        //
+        // A catch-all is a claim about every value that will ever be added to the enum, and the
+        // author of the next value pays. This switch exists only so the compiler makes them pay
+        // at build time instead: `-Wall` implies `-Wswitch`, so adding a kind without visiting
+        // this function is a build error rather than a silent no-op.
+        switch (layer.kind) {
+        case PoseLayerKind::Aim:
+        case PoseLayerKind::Additive:
+        case PoseLayerKind::Foot:
+        case PoseLayerKind::Stride:
+        case PoseLayerKind::Secondary:
+        case PoseLayerKind::Lean:
+        case PoseLayerKind::Reach:
+            break;
+        }
+
+        if (layer.kind == PoseLayerKind::Lean) {
+            // **Into the force, in the body's own frame.**
+            //
+            // The acceleration arrives already converted to the rig's model space, so +Z is the
+            // body's forward and +X its right whichever way it is facing in the world. That is
+            // what makes one set of gains work for a character walking north and the same one
+            // walking south -- and getting it wrong is invisible on a body that only ever walks
+            // one way, which is why the test drives it round a circle.
+            //
+            // Pitch from the forward component, roll from the lateral one plus the turn rate. A
+            // body cornering leans into the inside of the turn, and that is a different input
+            // from its lateral acceleration even though the two usually agree.
+            // §40. A body leans into a hill, and only into an *uphill* one: the sign comes from
+            // how much of the downhill direction points behind the body. On the flat
+            // `bodyDownhill` is zero and this term vanishes, which is why it needs no branch.
+            // **The sign follows the acceleration term's convention, and the first version had
+            // it backwards.** Negative `pitchDegrees` is a forward lean (see the accel term just
+            // below, where accelerating forward gives a negative). Ascending means downhill is
+            // *behind* the body -- `bodyDownhill.z` negative -- and ascending should lean
+            // forward, so the term is `+downhill.z` and not `-`. Descending then leans back,
+            // which is what a body going downhill actually does.
+            const float uphill = layer.bodyDownhill.z * layer.bodySlope * layer.leanSlopeDegrees;
+            const float pitchDegrees =
+                (-layer.bodyAcceleration.z * layer.leanDegreesPerAccel) + uphill;
+            const float rollDegrees = (layer.bodyAcceleration.x * layer.leanDegreesPerAccel) +
+                                      (layer.bodyTurnRate * layer.leanDegreesPerTurn);
+            const float magnitude =
+                std::sqrt((pitchDegrees * pitchDegrees) + (rollDegrees * rollDegrees));
+            const float limit = std::max(layer.leanMaxDegrees, 0.0f);
+            const bool clamped = magnitude > limit + 1e-4f;
+            // Scaled as a pair rather than clamped per axis, so a body accelerating diagonally
+            // leans diagonally instead of squaring off against the limit.
+            const float scale = clamped && magnitude > 1e-6f ? limit / magnitude : 1.0f;
+            const float w = std::clamp(layerWeight, 0.0f, 1.0f);
+            const float pitch = glm::radians(pitchDegrees * scale) * w;
+            const float roll = glm::radians(rollDegrees * scale) * w;
+            if (std::abs(pitch) < 1e-6f && std::abs(roll) < 1e-6f) {
+                // Standing still, or braking exactly as hard as it is turning. Applied, not
+                // inactive: the layer did what it was asked and the answer was nothing.
+                result = clamped ? LayerResolution::Clamped : LayerResolution::Applied;
+                stats.applied += 1u;
+                continue;
+            }
+            std::uint32_t moved = 0;
+            for (std::size_t j = 0; j < mask.weight.size(); ++j) {
+                const float jw = mask.weight[j];
+                if (jw <= 0.0f) {
+                    continue;
+                }
+                // Spread across the masked joints by their weights, so a spine leans along its
+                // length instead of hinging at one vertebra.
+                const glm::quat tilt =
+                    glm::angleAxis(pitch * jw, glm::vec3(1.0f, 0.0f, 0.0f)) *
+                    glm::angleAxis(roll * jw, glm::vec3(0.0f, 0.0f, 1.0f));
+                pose.local[j].rotation = glm::normalize(pose.local[j].rotation * tilt);
+                ++moved;
+            }
+            result = moved == 0   ? LayerResolution::NoJoints
+                     : clamped    ? LayerResolution::Clamped
+                                  : LayerResolution::Applied;
+            stats.applied += moved > 0 ? 1u : 0u;
             continue;
         }
         if (layer.kind == PoseLayerKind::Secondary) {
@@ -538,7 +765,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 fade = 1.0f - std::clamp(layer.bodySpeed / layer.secondaryStillness, 0.0f, 1.0f);
             }
             const float amplitude = glm::radians(layer.secondaryDegrees) * fade *
-                                    std::clamp(layer.weight, 0.0f, 1.0f);
+                                    std::clamp(layerWeight, 0.0f, 1.0f);
             if (amplitude <= 1e-6f) {
                 // Faded out rather than switched off: the layer is doing what it was asked to.
                 result = LayerResolution::Applied;
@@ -557,7 +784,11 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 }
                 // Each successive masked joint lags the one before, so the motion travels up the
                 // body instead of moving it as one rigid block.
+                // §49: authored phase, plus the seeded offset, plus the per-joint spread. Three
+                // terms that are each a pure function of their inputs, summed -- so the whole
+                // thing is reconstructable at frame N without having run frame N-1.
                 const float phase = layer.secondaryPhase +
+                                    seedPhase(layer.characterSeed, layer.layerSeed) +
                                     (static_cast<float>(ordinal) * layer.secondarySpread);
                 ++ordinal;
                 const auto cycles = static_cast<float>(now / static_cast<double>(period));
@@ -589,7 +820,14 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::NoTarget; // nobody told it how far the body is going
                 continue;
             }
-            const float scale = std::clamp(wanted, layer.strideMin, layer.strideMax);
+            // §40. A slope shortens the step whichever way it runs -- climbing and descending
+            // both cost stride -- so the magnitude of the incline is what counts and the floor is
+            // what stops it becoming a mince.
+            const float slopeScale =
+                std::max(1.0f - (std::abs(layer.bodySlope) * layer.strideSlopeGain),
+                         layer.strideSlopeFloor);
+            const float scale =
+                std::clamp(wanted * slopeScale, layer.strideMin, layer.strideMax);
             const bool clamped = std::abs(scale - wanted) > 1e-4f;
             // A ratio of 1 is the authored stride, and doing the arithmetic anyway would be a
             // float round-trip on every joint of every character for no change.
@@ -598,7 +836,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 stats.applied += 1u;
                 continue;
             }
-            poseToModel(skeleton, pose, model_);
+            ensureModel(skeleton, pose);
             const auto jointIndex = static_cast<std::size_t>(ids.x);
             const auto originIndex = static_cast<std::size_t>(ids.y);
             const glm::vec3 jointModel(model_[jointIndex][3]);
@@ -612,7 +850,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 originModel + glm::vec3(excursion.x * scale, excursion.y * lift, excursion.z * scale);
             // Blended by the layer's weight, like every other correction here, so a scene can fade
             // it in rather than snap it (§63).
-            const glm::vec3 finalModel = glm::mix(jointModel, wantedModel, std::clamp(layer.weight, 0.0f, 1.0f));
+            const glm::vec3 finalModel = glm::mix(jointModel, wantedModel, std::clamp(layerWeight, 0.0f, 1.0f));
 
             // Back to the joint's own parent frame. A model position is in the rig's space and a
             // local translation is in the parent's, so the parent's model transform has to come
@@ -639,7 +877,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             // whole of this layer. When the mask spreads the turn over a chain the pivot therefore
             // moves under the joints that already turned; the residual that leaves is measured in
             // tests/unit/test_character_lab_layers.cpp rather than asserted away.
-            poseToModel(skeleton, pose, model_);
+            ensureModel(skeleton, pose);
             const glm::vec3 pivot = glm::vec3(model_[static_cast<std::size_t>(pivotIndex_[i])][3]);
             const glm::vec3 toTarget = layer.target - pivot;
             if (glm::dot(toTarget, toTarget) < 1e-8f) {
@@ -662,7 +900,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                                                   ? updated_[static_cast<std::size_t>(parent)]
                                                   : glm::mat4(1.0f);
                 glm::mat4 world = parentModel * pose.local[j].matrix();
-                const float w = std::min(mask.weight[j] * layer.weight, 1.0f);
+                const float w = std::min(mask.weight[j] * layerWeight, 1.0f);
                 if (w > 0.0f) {
                     const glm::quat turn = w >= 1.0f ? full : glm::slerp(kIdentity, full, w);
                     world = toPivot * glm::mat4_cast(turn) * fromPivot * world;
@@ -685,7 +923,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             stats.joints += wrote;
             continue;
         }
-        if (layer.kind == PoseLayerKind::Foot) {
+        if (layer.kind == PoseLayerKind::Foot || layer.kind == PoseLayerKind::Reach) {
             ikStatus_[i] = IkStatus::Solved;
             const glm::ivec3 ids = chain_[i];
             if (ids.x < 0 || ids.y < 0 || ids.z < 0) {
@@ -695,7 +933,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             const auto r = static_cast<std::size_t>(ids.x);
             const auto m = static_cast<std::size_t>(ids.y);
             const auto t = static_cast<std::size_t>(ids.z);
-            poseToModel(skeleton, pose, model_);
+            ensureModel(skeleton, pose);
             const TwoBoneChain chain{glm::vec3(model_[r][3]), glm::vec3(model_[m][3]),
                                      glm::vec3(model_[t][3])};
             // An explicit target beats the plane, so a test or a timeline can drive one foot by
@@ -704,6 +942,13 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             glm::vec3 target(0.0f);
             if (layer.hasTarget) {
                 target = layer.target;
+            } else if (layer.kind == PoseLayerKind::Reach) {
+                // §23/§24. A reach with nowhere to reach is not a failure and not an invention:
+                // it is a hand that has been given no work. `NoTarget` says exactly that, and the
+                // arm keeps whatever the animation had it doing. A reach never falls back to the
+                // ground plane -- a hand planted on the floor under the shoulder is not a reach.
+                result = LayerResolution::NoTarget;
+                continue;
             } else if (layer.hasGround) {
                 target = plantOnPlane(chain.tip, layer.groundPoint, layer.groundNormal,
                                       layer.groundOffset + restTipHeight_[i]);
@@ -711,6 +956,34 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::NoTarget;
                 continue;
             }
+
+            // ---- §14/§15: hold the foot where it landed, and let it go gracefully ---------------
+            //
+            // In the body's own frame a planted foot slides **backwards at the body's speed**.
+            // Holding it in the world therefore means offsetting the plant target by
+            // `-velocity * elapsed`, which needs no memory: `elapsed` comes from the contact track
+            // the clip already carries, and the velocity from the seam. See `PoseLayer::footLock`
+            // for why an accumulated anchor could not survive a scrub.
+            if (layer.footLock > 0.0f && layer.inContact) {
+                // §15's approach and release. A lock that switched on at the span boundary is the
+                // "foot locked, then teleports" failure named outright in the spec, so both edges
+                // ease -- and the ease is over the *time to the edge*, not over the span's length,
+                // so a long stance and a short one release the same way.
+                const float blend = std::max(layer.lockBlendSeconds, 1e-4f);
+                const float rampIn = std::clamp(layer.contactElapsed / blend, 0.0f, 1.0f);
+                const float rampOut = std::clamp(layer.contactRemaining / blend, 0.0f, 1.0f);
+                const auto smooth = [](float t) { return t * t * (3.0f - (2.0f * t)); };
+                const float hold = std::clamp(layer.footLock, 0.0f, 1.0f) *
+                                   smooth(std::min(rampIn, rampOut));
+                if (hold > 1e-4f) {
+                    const glm::vec3 slid =
+                        target - (layer.bodyVelocity * layer.contactElapsed * hold);
+                    // Only the horizontal component is held. The vertical one is the ground's
+                    // answer and holding it would lift a foot off a slope it is walking down.
+                    target = glm::vec3(slid.x, target.y, slid.z);
+                }
+            }
+
             // The pole direction becomes a pole *position* here, out from the midpoint of the hip
             // and the target by one limb length. Only the component perpendicular to the
             // hip->target axis does anything, and building it this way makes that component exactly
@@ -730,7 +1003,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
                 result = LayerResolution::Degenerate;
                 continue;
             }
-            const float w = std::min(layer.weight, 1.0f);
+            const float w = std::min(layerWeight, 1.0f);
             // The two increments are blended separately, not the composed pair. ADR-359: slerping
             // the mid's *total* rotation makes the knee's share of a half-weight solve depend on
             // the hip's, and it reads as the knee lagging the leg.
@@ -845,7 +1118,7 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
         sampleClip(clip, additivePhase(clip, now, layer.clipRate), sampled_);
         std::uint32_t wrote = 0;
         for (std::size_t j = 0; j < count; ++j) {
-            const float w = std::min(mask.weight[j] * layer.weight, 1.0f);
+            const float w = std::min(mask.weight[j] * layerWeight, 1.0f);
             if (w <= 0.0f) {
                 continue;
             }

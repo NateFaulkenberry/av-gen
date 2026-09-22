@@ -1,0 +1,1124 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "camera": {
+  "mode": 1,
+  "position": [
+   -40.0,
+   45.0,
+   -95.0
+  ],
+  "target": [
+   -20.0,
+   1.5,
+   -5.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "lightRig": "../../lightrigs/bioluminescent.rig.json",
+ "environment": {
+  "stylized": true,
+  "intensity": 0.16,
+  "skyIntensity": 0.32,
+  "background": [
+   0.006,
+   0.01,
+   0.02
+  ],
+  "fogColor": [
+   0.02,
+   0.038,
+   0.07
+  ],
+  "fogDensity": 0.008,
+  "fogHeight": 16.0,
+  "fogHeightFalloff": 0.05
+ },
+ "navBodyRadius": 0.7,
+ "navWadeDepth": 1.8,
+ "post": {
+  "tonemap": 1,
+  "bloomEnabled": true,
+  "bloomIntensity": 0.05,
+  "bloomThreshold": 1.05,
+  "bloomKnee": 0.6
+ },
+ "name": "Autonomy Demo (Phase D)",
+ "heroes": [
+  {
+   "name": "rock-1",
+   "position": [
+    -48.0,
+    0.0,
+    -20.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 3.2,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "cairn-east",
+   "position": [
+    40.0,
+    0.0,
+    -30.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "cairn-west",
+   "position": [
+    -95.0,
+    0.0,
+    -50.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  },
+  {
+   "name": "cairn-north",
+   "position": [
+    -20.0,
+    0.0,
+    45.0
+   ],
+   "yaw": 0.0,
+   "scale": 1.0,
+   "radius": 1.0,
+   "height": 3.0,
+   "importance": 0.2,
+   "focalWeight": 0.4,
+   "preferredCameraDistance": 24.0,
+   "preferredCameraElevation": 8.0,
+   "activationRadius": 140.0,
+   "colorAccent": [
+    0.35,
+    0.95,
+    0.75
+   ],
+   "reactionProfile": ""
+  }
+ ],
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "world": {
+    "name": "autonomy-demo-flat",
+    "seed": 20260918,
+    "size": [
+     240.0,
+     240.0
+    ],
+    "baseHeight": 0.0,
+    "erosion": 0.0,
+    "seaLevel": -100.0,
+    "layers": [],
+    "features": [
+     {
+      "kind": "river",
+      "name": "the-run",
+      "path": [
+       [
+        -108.0,
+        -1.6,
+        20.0
+       ],
+       [
+        -50.0,
+        -1.6,
+        20.0
+       ]
+      ],
+      "width": 14.0,
+      "amplitude": 0.5,
+      "falloff": 1.0,
+      "flatten": 0.9,
+      "roughness": 0.0,
+      "water": true,
+      "waterDepth": 0.9
+     }
+    ]
+   },
+   "terrain": {
+    "chunkSize": 40.0,
+    "resolution": 24,
+    "lodLevels": 3,
+    "lodDistance": 70.0,
+    "viewDistance": 260.0,
+    "skirtDepth": 1.2,
+    "groundMottle": true,
+    "groundGlow": 0.08,
+    "groundGlowScale": 0.06,
+    "groundGlowCoverage": 0.26,
+    "groundGlowColor": [
+     0.1,
+     1.0,
+     0.7
+    ]
+   },
+   "material": {
+    "baseColor": [
+     0.02,
+     0.07,
+     0.05
+    ],
+    "roughness": 0.9,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   }
+  },
+  {
+   "name": "scout",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-scout.glb",
+   "position": [
+    -74.0,
+    0.0,
+    -30.0
+   ],
+   "rotation": [
+    0.0,
+    90.0,
+    0.0
+   ],
+   "scale": [
+    1.94,
+    1.94,
+    1.94
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 360.0,
+    "layers": [
+     {
+      "name": "look",
+      "kind": "aim",
+      "drive": "look",
+      "joints": [
+       "head.x",
+       "Eye_L",
+       "Eye_R",
+       "Mouth",
+       "Antenna"
+      ],
+      "pivot": "head.x",
+      "maxYaw": 75.0,
+      "maxPitch": 30.0
+     },
+     {
+      "name": "startle",
+      "kind": "additive",
+      "drive": "reaction",
+      "clip": "Fight_head_hit",
+      "joints": [
+       "spine_02.x",
+       "spine_03.x",
+       "spine_04.x",
+       "spine_05.x",
+       "neck.x",
+       "head.x"
+      ],
+      "descendants": true
+     },
+     {
+      "name": "foot.l",
+      "kind": "foot",
+      "drive": "ground",
+      "chain": [
+       "thigh_twist.l",
+       "leg_stretch.l",
+       "foot.l"
+      ],
+      "footAlign": 1.0
+     },
+     {
+      "name": "foot.r",
+      "kind": "foot",
+      "drive": "ground",
+      "chain": [
+       "thigh_twist.r",
+       "leg_stretch.r",
+       "foot.r"
+      ],
+      "footAlign": 1.0
+     },
+     {
+      "name": "stride.l",
+      "kind": "stride",
+      "drive": "manual",
+      "joint": "foot.l",
+      "origin": "root.x",
+      "strideMin": 0.4,
+      "strideMax": 1.6,
+      "strideLift": 0.75,
+      "weight": 1.0
+     },
+     {
+      "name": "stride.r",
+      "kind": "stride",
+      "drive": "manual",
+      "joint": "foot.r",
+      "origin": "root.x",
+      "strideMin": 0.4,
+      "strideMax": 1.6,
+      "strideLift": 0.75,
+      "weight": 1.0
+     },
+     {
+      "name": "life",
+      "kind": "secondary",
+      "drive": "manual",
+      "joints": [
+       "spine_02.x",
+       "spine_03.x",
+       "spine_04.x",
+       "neck.x",
+       "head.x"
+      ],
+      "degrees": 1.5,
+      "period": 4.2,
+      "phase": 0.0,
+      "spread": 0.09,
+      "stillness": 0.55,
+      "weight": 1.0,
+      "axis": [
+       1.0,
+       0.0,
+       0.0
+      ]
+     }
+    ],
+    "contacts": [
+     "foot.l",
+     "foot.r"
+    ],
+    "matchPhase": true,
+    "inertialize": 0.12,
+    "bodyCompensation": {
+     "enabled": true,
+     "maxDown": 0.3,
+     "maxUp": 0.05,
+     "maxLateral": 0.04
+    }
+   }
+  },
+  {
+   "name": "warden",
+   "kind": "gltf",
+   "asset": "../../../assets/aliens/alien-pilot.glb",
+   "position": [
+    -6.0,
+    0.0,
+    -44.0
+   ],
+   "rotation": [
+    0.0,
+    -60.0,
+    0.0
+   ],
+   "scale": [
+    1.94,
+    1.94,
+    1.94
+   ],
+   "animation": {
+    "state": "Idle",
+    "blend": 0.35,
+    "speed": 1.0,
+    "updateHz": 30,
+    "nearDistance": 25.0,
+    "farHz": 20.0,
+    "cullDistance": 360.0,
+    "layers": [
+     {
+      "name": "look",
+      "kind": "aim",
+      "drive": "look",
+      "joints": [
+       "head.x",
+       "Eye_L",
+       "Eye_R",
+       "Mouth",
+       "Antenna"
+      ],
+      "pivot": "head.x",
+      "maxYaw": 75.0,
+      "maxPitch": 30.0
+     },
+     {
+      "name": "startle",
+      "kind": "additive",
+      "drive": "reaction",
+      "clip": "Fight_head_hit",
+      "joints": [
+       "spine_02.x",
+       "spine_03.x",
+       "spine_04.x",
+       "spine_05.x",
+       "neck.x",
+       "head.x"
+      ],
+      "descendants": true
+     },
+     {
+      "name": "foot.l",
+      "kind": "foot",
+      "drive": "ground",
+      "chain": [
+       "thigh_twist.l",
+       "leg_stretch.l",
+       "foot.l"
+      ],
+      "footAlign": 1.0
+     },
+     {
+      "name": "foot.r",
+      "kind": "foot",
+      "drive": "ground",
+      "chain": [
+       "thigh_twist.r",
+       "leg_stretch.r",
+       "foot.r"
+      ],
+      "footAlign": 1.0
+     },
+     {
+      "name": "stride.l",
+      "kind": "stride",
+      "drive": "manual",
+      "joint": "foot.l",
+      "origin": "root.x",
+      "strideMin": 0.4,
+      "strideMax": 1.6,
+      "strideLift": 0.75,
+      "weight": 1.0
+     },
+     {
+      "name": "stride.r",
+      "kind": "stride",
+      "drive": "manual",
+      "joint": "foot.r",
+      "origin": "root.x",
+      "strideMin": 0.4,
+      "strideMax": 1.6,
+      "strideLift": 0.75,
+      "weight": 1.0
+     },
+     {
+      "name": "life",
+      "kind": "secondary",
+      "drive": "manual",
+      "joints": [
+       "spine_02.x",
+       "spine_03.x",
+       "spine_04.x",
+       "neck.x",
+       "head.x"
+      ],
+      "degrees": 1.5,
+      "period": 4.2,
+      "phase": 0.0,
+      "spread": 0.09,
+      "stillness": 0.55,
+      "weight": 1.0,
+      "axis": [
+       1.0,
+       0.0,
+       0.0
+      ]
+     }
+    ],
+    "contacts": [
+     "foot.l",
+     "foot.r"
+    ],
+    "matchPhase": true,
+    "inertialize": 0.12,
+    "bodyCompensation": {
+     "enabled": true,
+     "maxDown": 0.3,
+     "maxUp": 0.05,
+     "maxLateral": 0.04
+    }
+   }
+  },
+  {
+   "name": "mushroom-1",
+   "kind": "gltf",
+   "asset": "../../../assets/kenney/mushroom_redTall.glb",
+   "position": [
+    -26.0,
+    0.0,
+    -10.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.0,
+    3.0,
+    3.0
+   ]
+  },
+  {
+   "name": "mushroom-2",
+   "kind": "gltf",
+   "asset": "../../../assets/kenney/mushroom_tanTall.glb",
+   "position": [
+    22.0,
+    0.0,
+    6.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    3.0,
+    3.0,
+    3.0
+   ]
+  },
+  {
+   "name": "rock-1",
+   "kind": "gltf",
+   "asset": "../../../assets/kenney/rock_largeA.glb",
+   "position": [
+    -48.0,
+    0.0,
+    -20.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    4.0,
+    4.0,
+    4.0
+   ]
+  },
+  {
+   "name": "old-tree",
+   "kind": "gltf",
+   "asset": "../../../assets/kenney/tree_tall.glb",
+   "position": [
+    -2.0,
+    0.0,
+    -18.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    5.0,
+    5.0,
+    5.0
+   ]
+  },
+  {
+   "name": "saucer",
+   "kind": "procedural",
+   "position": [
+    60.0,
+    22.0,
+    -5.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "../../../assets/imported/ufo.gltf"
+    },
+    "sourceTransform": {
+     "scale": [
+      0.0347,
+      0.0347,
+      0.0347
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.052,
+      0.058,
+      0.076
+     ],
+     "roughness": 0.3,
+     "metallic": 0.88,
+     "emissiveColor": [
+      0.1,
+      0.52,
+      1.0
+     ],
+     "emissiveIntensity": 1.5
+    }
+   },
+   "visible": true
+  }
+ ],
+ "entities": [
+  {
+   "name": "scout",
+   "node": "scout",
+   "seed": 424242,
+   "tags": [
+    "alien"
+   ],
+   "capabilities": [
+    "can_walk",
+    "can_inspect"
+   ],
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Fight_idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 1.8,
+    "runSpeed": 4.2,
+    "accel": 3.0,
+    "decel": 4.0
+   },
+   "personality": {
+    "curiosity": 0.9,
+    "caution": 0.2,
+    "sociability": 0.7,
+    "eventSensitivity": 0.7,
+    "attentionSpan": 0.5
+   },
+   "behaviors": [
+    {
+     "kind": "decide",
+     "hertz": 2.0,
+     "dwellTicks": 2.0,
+     "margin": 0.08,
+     "memorySeconds": 6.0,
+     "memoryCapacity": 16.0,
+     "visitedCapacity": 6.0,
+     "stallSeconds": 10.0,
+     "stallDistance": 1.5,
+     "mind": {
+      "attention": {
+       "tags": {
+        "ufo": 3.0,
+        "glowing": 1.2,
+        "alien": 0.8
+       },
+       "maxHoldSeconds": 5.0,
+       "minDwellSeconds": 0.8
+      },
+      "memory": {
+       "recoverSeconds": 150.0,
+       "habituationSeconds": 6.0,
+       "failSeconds": 30.0,
+       "eventSeconds": 12.0
+      },
+      "hearing": 1.0
+     },
+     "considerers": [
+      {
+       "kind": "interest",
+       "name": "roam",
+       "weight": 0.45,
+       "source": "perceived",
+       "weights": {
+        "vista": 1.2,
+        "landmark": 1.0,
+        "glow": 1.0,
+        "character": 0.0,
+        "water": 0.9
+       },
+       "approach": 4.0,
+       "dwell": 2.0,
+       "minRange": 10.0,
+       "maxRange": 60.0,
+       "noveltyRadius": 14.0,
+       "noveltyPenalty": 0.15,
+       "traits": {
+        "wanderFrequency": 1.0
+       }
+      },
+      {
+       "kind": "investigate",
+       "name": "investigate",
+       "tags": [
+        "glowing"
+       ],
+       "weight": 1.6,
+       "approach": 2.2,
+       "dwell": 5.0,
+       "maxRange": 45.0,
+       "staleSeconds": 6.0,
+       "affordance": "inspect",
+       "traits": {
+        "curiosity": 1.5
+       }
+      },
+      {
+       "kind": "investigate",
+       "name": "watch-sky",
+       "tags": [
+        "ufo"
+       ],
+       "intent": "observe",
+       "weight": 4.0,
+       "approach": 16.0,
+       "dwell": 10.0,
+       "maxRange": 60.0,
+       "staleSeconds": 4.0,
+       "activity": "observe",
+       "traits": {
+        "curiosity": 1.0
+       }
+      },
+      {
+       "kind": "react",
+       "name": "startle",
+       "events": [
+        "crack",
+        "bloom",
+        "beam"
+       ],
+       "weight": 2.5,
+       "fadeSeconds": 20.0,
+       "approach": 5.0,
+       "flee": 16.0,
+       "dwell": 3.0
+      },
+      {
+       "kind": "social",
+       "name": "company",
+       "tags": [
+        "alien"
+       ],
+       "weight": 1.0,
+       "distance": 3.5,
+       "dwell": 3.0
+      },
+      {
+       "kind": "holdPost",
+       "name": "home",
+       "weight": 0.08,
+       "post": "",
+       "tolerance": 45.0,
+       "pull": 0.02
+      },
+      {
+       "kind": "idle",
+       "name": "idle",
+       "weight": 0.05
+      }
+     ]
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 110.0,
+     "weight": 1.0
+    },
+    {
+     "kind": "ground",
+     "slopeAlign": 0.5,
+     "bodyRadius": 0.9
+    }
+   ],
+   "perception": {
+    "range": 45.0,
+    "fieldOfView": 220.0,
+    "proximityRange": 6.0,
+    "capacity": 16,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0,
+    "tags": {
+     "ufo": 4.0,
+     "glowing": 2.0,
+     "alien": 1.5
+    }
+   }
+  },
+  {
+   "name": "warden",
+   "node": "warden",
+   "seed": 77777,
+   "tags": [
+    "alien"
+   ],
+   "capabilities": [
+    "can_walk",
+    "can_inspect"
+   ],
+   "clips": {
+    "idle": "Idle",
+    "walk": "Walking",
+    "run": "Running",
+    "turn": "Idle_turn",
+    "observe": "Idle",
+    "react": "Fight_idle",
+    "fall": "Fall_loop"
+   },
+   "gait": {
+    "walkSpeed": 1.8,
+    "runSpeed": 4.2,
+    "accel": 3.0,
+    "decel": 4.0
+   },
+   "personality": {
+    "curiosity": 0.3,
+    "caution": 0.85,
+    "sociability": 0.4,
+    "eventSensitivity": 0.8,
+    "attentionSpan": 0.3
+   },
+   "behaviors": [
+    {
+     "kind": "decide",
+     "hertz": 2.0,
+     "dwellTicks": 2.0,
+     "margin": 0.08,
+     "memorySeconds": 6.0,
+     "memoryCapacity": 16.0,
+     "visitedCapacity": 6.0,
+     "stallSeconds": 10.0,
+     "stallDistance": 1.5,
+     "mind": {
+      "attention": {
+       "tags": {
+        "ufo": 3.0,
+        "glowing": 1.2,
+        "alien": 0.8
+       },
+       "maxHoldSeconds": 5.0,
+       "minDwellSeconds": 0.8
+      },
+      "memory": {
+       "recoverSeconds": 150.0,
+       "habituationSeconds": 6.0,
+       "failSeconds": 30.0,
+       "eventSeconds": 12.0
+      },
+      "hearing": 1.0
+     },
+     "considerers": [
+      {
+       "kind": "interest",
+       "name": "roam",
+       "weight": 0.45,
+       "source": "perceived",
+       "weights": {
+        "vista": 1.2,
+        "landmark": 1.0,
+        "glow": 1.0,
+        "character": 0.0,
+        "water": 0.9
+       },
+       "approach": 4.0,
+       "dwell": 2.0,
+       "minRange": 10.0,
+       "maxRange": 60.0,
+       "noveltyRadius": 14.0,
+       "noveltyPenalty": 0.15,
+       "traits": {
+        "wanderFrequency": 1.0
+       }
+      },
+      {
+       "kind": "investigate",
+       "name": "investigate",
+       "tags": [
+        "glowing"
+       ],
+       "weight": 1.6,
+       "approach": 2.2,
+       "dwell": 5.0,
+       "maxRange": 45.0,
+       "staleSeconds": 6.0,
+       "affordance": "inspect",
+       "traits": {
+        "curiosity": 1.5
+       }
+      },
+      {
+       "kind": "investigate",
+       "name": "watch-sky",
+       "tags": [
+        "ufo"
+       ],
+       "intent": "observe",
+       "weight": 4.0,
+       "approach": 16.0,
+       "dwell": 10.0,
+       "maxRange": 60.0,
+       "staleSeconds": 4.0,
+       "activity": "observe",
+       "traits": {
+        "curiosity": 1.0
+       }
+      },
+      {
+       "kind": "react",
+       "name": "startle",
+       "events": [
+        "crack",
+        "bloom",
+        "beam"
+       ],
+       "weight": 2.5,
+       "fadeSeconds": 20.0,
+       "approach": 5.0,
+       "flee": 16.0,
+       "dwell": 3.0
+      },
+      {
+       "kind": "social",
+       "name": "company",
+       "tags": [
+        "alien"
+       ],
+       "weight": 1.0,
+       "distance": 3.5,
+       "dwell": 3.0
+      },
+      {
+       "kind": "holdPost",
+       "name": "home",
+       "weight": 0.08,
+       "post": "",
+       "tolerance": 45.0,
+       "pull": 0.02
+      },
+      {
+       "kind": "idle",
+       "name": "idle",
+       "weight": 0.05
+      }
+     ]
+    },
+    {
+     "kind": "lookAt",
+     "turnRate": 110.0,
+     "weight": 1.0
+    },
+    {
+     "kind": "ground",
+     "slopeAlign": 0.5,
+     "bodyRadius": 0.9
+    }
+   ],
+   "perception": {
+    "range": 45.0,
+    "fieldOfView": 220.0,
+    "proximityRange": 6.0,
+    "capacity": 16,
+    "hertz": 4.0,
+    "occlusionTestsPerSecond": 0.0,
+    "tags": {
+     "ufo": 4.0,
+     "glowing": 2.0,
+     "alien": 1.5
+    }
+   }
+  },
+  {
+   "name": "mushroom-1",
+   "node": "mushroom-1",
+   "tags": [
+    "mushroom",
+    "glowing",
+    "flora"
+   ],
+   "interactions": [
+    {
+     "name": "inspect",
+     "activity": "observe",
+     "duration": 4.0,
+     "range": 3.0,
+     "exclusive": false,
+     "requires": [
+      "can_inspect"
+     ],
+     "onComplete": "inspected"
+    }
+   ]
+  },
+  {
+   "name": "mushroom-2",
+   "node": "mushroom-2",
+   "tags": [
+    "mushroom",
+    "glowing",
+    "flora"
+   ],
+   "interactions": [
+    {
+     "name": "inspect",
+     "activity": "observe",
+     "duration": 4.0,
+     "range": 3.0,
+     "exclusive": false,
+     "requires": [
+      "can_inspect"
+     ],
+     "onComplete": "inspected"
+    }
+   ],
+   "actions": [
+    {
+     "kind": "wait",
+     "duration": 95.0
+    },
+    {
+     "kind": "set",
+     "onComplete": "bloom"
+    }
+   ]
+  },
+  {
+   "name": "old-tree",
+   "node": "old-tree",
+   "tags": [
+    "tree",
+    "landmark"
+   ],
+   "actions": [
+    {
+     "kind": "wait",
+     "duration": 60.0
+    },
+    {
+     "kind": "set",
+     "onComplete": "crack"
+    }
+   ]
+  },
+  {
+   "name": "saucer",
+   "node": "saucer",
+   "tags": [
+    "ufo",
+    "craft",
+    "world_effect"
+   ],
+   "behaviors": [
+    {
+     "kind": "orbit",
+     "authority": "simulation",
+     "radius": 105.0,
+     "rate": 1.5,
+     "phase": -45.0
+    }
+   ],
+   "actions": [
+    {
+     "kind": "wait",
+     "duration": 150.0
+    },
+    {
+     "kind": "set",
+     "onComplete": "beam"
+    },
+    {
+     "kind": "wait",
+     "duration": 5.0
+    },
+    {
+     "kind": "set",
+     "onComplete": "beam"
+    }
+   ]
+  }
+ ],
+ "worldEvents": [
+  {
+   "name": "inspected",
+   "radius": 0.0,
+   "magnitude": 0.0
+  },
+  {
+   "name": "crack",
+   "radius": 80.0,
+   "magnitude": 1.0
+  },
+  {
+   "name": "bloom",
+   "radius": 45.0,
+   "magnitude": 0.8
+  },
+  {
+   "name": "beam",
+   "radius": 70.0,
+   "magnitude": 0.7
+  }
+ ]
+}

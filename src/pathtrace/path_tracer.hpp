@@ -81,6 +81,12 @@ struct TraceSettings {
     // is a single predictable branch per shading event -- not worth a second binary.
     AlbedoProbeSettings albedoProbe;
 
+    // ADR-583. A `PathTracer` keeps its acceleration structure between renders and rebuilds only
+    // what changed. Off is the CONTROL arm -- every render builds from scratch, exactly as before
+    // -- and it is a setting rather than dead code because "does reuse change the picture" has to
+    // stay askable (`--pt-rebuild-bvh`). It cannot change a pixel; a bit-identity test says so.
+    bool reuseAcceleration = true;
+
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] unsigned resolvedThreads() const;
 };
@@ -145,6 +151,7 @@ struct TraceStats {
     std::uint64_t negativeSamples = 0;
     double buildSeconds = 0.0;
     double renderSeconds = 0.0;
+    BvhUpdateStats bvh{};   // what the acceleration update rebuilt and what it kept (ADR-583)
 };
 
 class PathTracer {
@@ -167,10 +174,15 @@ public:
     [[nodiscard]] const TraceStats& stats() const { return stats_; }
     [[nodiscard]] const AlbedoProbeReport& albedoProbe() const { return probe_; }
 
+    // The acceleration structure outlives a render (ADR-583): the next `render` rebuilds only
+    // what its snapshot changed. A sequence keeps one PathTracer for the whole range for this.
+    [[nodiscard]] const EmbreeScene& acceleration() const { return embree_; }
+
 private:
     TraceStats stats_{};
     AlbedoProbeReport probe_{};
     StageFn stage_{};
+    EmbreeScene embree_;
 };
 
 // Writes the framebuffer as scene-linear float EXR through the project's existing tinyexr path.

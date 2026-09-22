@@ -43,6 +43,8 @@
 #include <glm/gtx/euler_angles.hpp>
 
 #include <catch2/catch_approx.hpp>
+#include "support/ramp.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <fmt/format.h>
@@ -53,6 +55,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -396,12 +399,22 @@ TEST_CASE("rate matching covers each farm animal's whole travelling range",
         REQUIRE(p.gait.matchRate);
         REQUIRE(p.cruise > 0.0f);
         // A `wander` travels between nothing and its own `speed`; it has no second, faster gear.
-        // The clamp has to cover that whole band or the clip stops tracking the ground somewhere
-        // inside it, which is sliding by another name.
+        // Above the floor the clamp covers the band and the clip tracks the ground exactly.
+        //
+        // **Below the floor, by the owner's decision (ADR-622, option B, 2026-09-21), it does
+        // not.** The floor was raised to `kVisibleClipRate` so the legs visibly shuffle at the
+        // slowest crawl rather than creep, and the stated price is that there they outrun the
+        // body. This test used to require tracking across the whole band, and it caught that
+        // price exactly: at `moveExit` (0.0162 m/s) the legs now cycle about 4x faster than the
+        // ground moves. So the band is split at the speed where the floor takes over, and the
+        // part below it is **asserted to the exact value the floor implies** rather than dropped:
+        // a floor that governed more or less than it should would still fail here.
+        const float floorSpeed = p.gait.walkSpeed * p.gait.rateMin;
         for (const float v : {p.gait.moveExit, (p.gait.moveExit + p.cruise) * 0.5f, p.cruise}) {
-            INFO("walking at " << v);
+            INFO("walking at " << v << " (the floor governs below " << floorSpeed << ")");
+            const float expected = v >= floorSpeed ? 1.0f : v / floorSpeed;
             CHECK(entity::Gait::footSlip(p.gait, entity::Activity::Walk, v) ==
-                  Approx(1.0f).epsilon(0.02));
+                  Approx(expected).epsilon(0.02));
         }
         // And the cruise is a *walk*.  ADR-226: if the speed the behaviour actually travels at is
         // above `runEnter`, the walk clip the scene names is decoration.  With one clip apiece the
@@ -619,6 +632,11 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
         int slipOut = 0;
         float worstSlip = 1.0f;
         int frozenWhileMoving = 0;
+        float previousSpeed = 0.0f; // for the authored-ramp test below
+        // ADR-622, the owner's rateMin decision. On frames where the playback rate is pinned to the
+        // gait's floor, how far the legs' stride carried beyond where the body actually went, in
+        // metres. Positive is the cost option B was chosen knowing about: legs outrunning travel.
+        std::vector<float> overTravel;
         double travelled = 0.0;
         float worstYawGap = 0.0f;
         int coarse = 0;
@@ -703,9 +721,31 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
             // A clip frozen while the body covers ground.  `idleRate` is 0 on this pack -- these
             // animals have no idle clip, so a standing one freezes its walk cycle mid-stride
             // (ADR-213) -- and a *moving* body doing that is a statue gliding over the terrain.
-            if (loco.playbackRate < 0.02f && len > 0.01f) {
+            // **A body inside its own authored acceleration budget is ramping, not frozen**
+            // (`support/ramp.hpp`, and the same definition `test_abduction_poc` uses for the same
+            // reason). This detector was written when a body was either at speed or stopped, so a
+            // slow clip and a moving body could never coexist honestly. With an authored ramp they
+            // do, for as long as the ramp lasts. Not a tolerance: the budget is authored and the
+            // question is exact.
+            const bool ramping =
+                testsupport::withinAuthoredRamp(r.who->desc().gait, r.previousSpeed, loco.speed, ft.deltaTime);
+            if (!ramping && loco.playbackRate < entity::kVisibleClipRate && len > 0.01f) {
                 ++r.frozenWhileMoving;
             }
+            // **At the floor, measured against what actually moved.** `len` is the drawn
+            // displacement, so it includes the crowd-separation push (ADR-622 records that as a
+            // separate gap); it is what a viewer compares the legs against, which is the point.
+            {
+                const entity::GaitSettings& gait = r.who->desc().gait;
+                const bool atFloor = gait.matchRate && loco.speed > 0.0f &&
+                                     loco.playbackRate <= gait.rateMin + 1e-5f;
+                if (atFloor && ft.deltaTime > 0.0) {
+                    const float legs = clipSpeed[r.species] * loco.playbackRate *
+                                       static_cast<float>(ft.deltaTime);
+                    r.overTravel.push_back(legs - len);
+                }
+            }
+            r.previousSpeed = loco.speed;
 
             if (len < 1e-4f) {
                 continue;
@@ -744,6 +784,44 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
     int totalFrozen = 0;
     int totalSlipOut = 0;
     int totalLocomotor = 0;
+    // ---- ADR-622: what the owner's rateMin decision costs, measured rather than predicted -----
+    //
+    // Reported, not asserted. Option B -- the floor raised to `kVisibleClipRate` -- was chosen
+    // knowing it trades skate *under* the cycle for skate *over* it, and this is the size of that
+    // trade on the pack it applies to. Distribution and worst case, never a mean alone: at a crawl
+    // most frames are near zero and one bad frame is the one a viewer notices.
+    {
+        std::vector<float> all;
+        std::string worstAnimal;
+        float worst = -1e9f;
+        for (const Row& r : rows) {
+            for (const float o : r.overTravel) {
+                all.push_back(o);
+                if (o > worst) {
+                    worst = o;
+                    worstAnimal = r.name;
+                }
+            }
+        }
+        if (!all.empty()) {
+            std::sort(all.begin(), all.end());
+            const auto at = [&](double q) {
+                return all[std::min(all.size() - 1, static_cast<std::size_t>(q * all.size()))];
+            };
+            std::size_t over = 0;
+            for (const float o : all) {
+                over += o > 0.0f ? 1u : 0u;
+            }
+            WARN(fmt::format("ADR-622 floor-pinned frames: {} across the herd; legs outrun the body on "
+                             "{} ({:.1f}%). Over-travel per frame, mm: p50 {:+.3f}  p90 {:+.3f}  "
+                             "p99 {:+.3f}  worst {:+.3f} ({})",
+                             all.size(), over, 100.0 * over / all.size(), 1000.0 * at(0.50),
+                             1000.0 * at(0.90), 1000.0 * at(0.99), 1000.0 * worst, worstAnimal));
+        } else {
+            WARN("ADR-622: no floor-pinned frames in this run");
+        }
+    }
+
     for (const Row& r : rows) {
         INFO(fmt::format("{}: travelled {:.1f} m, moving {} frames, backwards {} (walk-explained "
                          "{}), frozen-while-moving {}, slip outside 1.1x {}/{} (worst {:.2f}x), "
@@ -803,3 +881,86 @@ TEST_CASE("the farm animals travel the way they are drawn facing, at the speed t
     CHECK(totalSlipOut * 20 < totalLocomotor);
 }
 
+
+TEST_CASE("every farm animal's rate floor is visible, and a save keeps it", "[farm][locomotion][gait]") {
+    // **The owner's decision, 2026-09-21: the farm animals' floor is raised to
+    // `kVisibleClipRate`** (ADR-622, option B -- the legs visibly shuffle at the slowest crawl
+    // rather than creeping at 0.5% of walk speed).
+    //
+    // Before this test the floors were 0.005 to 0.0168, below what the frozen detector itself calls
+    // stopped, and nothing said whether that was a choice or a coincidence. **This makes it a
+    // decision the next reader meets**: a farm floor in a live scene below the visible threshold
+    // fails here, with the reason, instead of drifting back down unnoticed.
+    //
+    // And it checks the save, because `rateMin` is written **only when `matchRate` is on** -- a
+    // farm body with rate matching off would have its new floor dropped on the way out, which is
+    // ADR-618's shape exactly. So every farm body must be rate-matched *and* must round-trip.
+    //
+    // **Live scenes only.** `tractor-beam-lab-legacy.scene.json` is a test's "before" arm (ADR-262)
+    // and `_pre-defects.scene.json` reproduces a historical render; both keep their original floors
+    // on purpose and are deliberately not listed.
+    const char* const scenes[] = {
+        "glowmere-valley-2.scene.json",       "glowmere-valley-2-song.scene.json",
+        "glowmere-valley-2-multicam.scene.json", "glowmere-atmospherics.scene.json",
+        "tractor-beam-lab.scene.json",
+    };
+    int checked = 0;
+    for (const char* name : scenes) {
+        const fs::path file = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / name;
+        REQUIRE(fs::exists(file));
+        std::ifstream in(file);
+        const nlohmann::json doc = nlohmann::json::parse(in);
+
+        // A farm body is one whose node loads an asset under assets/farm/ -- decided by the asset,
+        // never by the value it happens to carry.
+        std::map<std::string, std::string> assetOf;
+        std::function<void(const nlohmann::json&)> walk = [&](const nlohmann::json& o) {
+            if (o.is_object()) {
+                if (o.contains("name") && o.contains("asset") && o.at("asset").is_string()) {
+                    assetOf[o.at("name").get<std::string>()] = o.at("asset").get<std::string>();
+                }
+                for (const auto& [k, v] : o.items()) {
+                    walk(v);
+                }
+            } else if (o.is_array()) {
+                for (const auto& v : o) {
+                    walk(v);
+                }
+            }
+        };
+        walk(doc);
+        const auto isFarm = [&](const entity::EntityDesc& d) {
+            const auto it = assetOf.find(d.node);
+            return it != assetOf.end() && it->second.find("/assets/farm/") != std::string::npos;
+        };
+
+        auto loaded = entity::entitiesFromJson(doc.at("entities"), file.parent_path());
+        INFO(name << ": " << (loaded.has_value() ? std::string() : loaded.error().message));
+        REQUIRE(loaded.has_value());
+        const nlohmann::json saved = entity::entitiesToJson(*loaded);
+        REQUIRE(saved.is_array());
+        REQUIRE(saved.size() == loaded->size());
+
+        for (std::size_t i = 0; i < loaded->size(); ++i) {
+            const entity::EntityDesc& d = (*loaded)[i];
+            if (!isFarm(d)) {
+                continue;
+            }
+            INFO(name << " / " << d.name);
+            ++checked;
+            // The decision.
+            CHECK(d.gait.rateMin >= entity::kVisibleClipRate);
+            // The precondition for it to survive a save.
+            CHECK(d.gait.matchRate);
+            // And that it does.
+            const nlohmann::json& g = saved[i].at("gait");
+            REQUIRE(g.contains("rateMin"));
+            CHECK(g.at("rateMin").get<float>() == Catch::Approx(d.gait.rateMin));
+        }
+    }
+    // The scenes must actually contain farm bodies, or this checks nothing.
+    // 83, not the 80 ce4c619a raised: bull-21, horse-22 and cow-23 were added to the multicam on
+    // main after that commit's branch point, so the sweep never saw them. The merge raised those
+    // three too (testing.md 39), and this count is what would catch a fourth arriving the same way.
+    CHECK(checked == 83);
+}

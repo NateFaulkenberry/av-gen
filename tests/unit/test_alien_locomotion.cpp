@@ -1556,3 +1556,276 @@ TEST_CASE("probe: the four aliens travel the way they are drawn facing",
         CHECK(r.worst < 0.5f * r.walkStep);
     }
 }
+
+TEST_CASE("a standing character turning to look is classified as turning, not idle",
+          "[locomotion][behaviour][gait]") {
+    // **`LookAt` is the only turner in this engine that does not write `state.turnRate`.**
+    //
+    // It turns the body -- `state.yaw += clamp(d, -step, step)` -- and announces it by writing
+    // `state.activity = Activity::Turn`. Every other turner (the `turn` helper, `Spin`, `Wander`,
+    // `Explore`, the action tier) writes the field as well.
+    //
+    // `Gait::select` is the consumer, and it does not trust a locomotor proposal: `Activity::Turn`
+    // is a locomotor, so the proposal is **discarded** and re-derived from `speed` and `turnRate`.
+    // With speed 0 and a `turnRate` nobody wrote, `wanted` comes out `Idle`. Both halves are
+    // individually right -- `gait.hpp` says hysteresis lives in exactly one place and a proposal
+    // that bypassed it would be the flicker the class exists to stop -- and together they classify
+    // a body that is visibly rotating as standing still.
+    //
+    // `examples/labs/character/guard-post.scene.json` is the scene this defect is named after: its
+    // `sentry` stands at a post and turns to look at things, with `lookAt` at 120 deg/s, and is the
+    // one entity in it whose whole premise this defeats. It is reproduced here as a fixture rather
+    // than loaded, so the measurement is of the mechanism rather than of that file's contents.
+    params::ParameterSet params;
+    entity::EntityWorld world;
+    registerNode(params, "beacon");
+    registerNode(params, "sentry");
+
+    entity::EntityDesc beacon;
+    beacon.name = "beacon";
+    beacon.node = "beacon";
+    beacon.seed = 1;
+    // Orbiting, so the sentry has to keep turning to track it rather than settling once.
+    beacon.behaviors.push_back(behaviorDesc("orbit", {{"radius", 20.0}, {"rate", 90.0}}));
+
+    entity::EntityDesc sentry;
+    sentry.name = "sentry";
+    sentry.node = "sentry";
+    sentry.seed = 2;
+    // guard-post's own rate.
+    sentry.behaviors.push_back(behaviorDesc("lookAt", {{"target", "beacon"}, {"turnRate", 120.0}}));
+
+    world.setEntities({beacon, sentry}, 7u);
+    world.setBindings({binding("beacon", glm::vec3(0.0f)), binding("sentry", glm::vec3(0.0f))});
+    world.registerParameters(params);
+    world.bind(params);
+
+    const entity::Entity* who = nullptr;
+    for (const auto& e : world.entities()) {
+        if (e->name() == "sentry") {
+            who = e.get();
+        }
+    }
+    REQUIRE(who != nullptr);
+
+    signals::SignalBus bus;
+    int turningFrames = 0;   // frames on which the body's yaw actually moved
+    int classifiedTurn = 0;  // ...and the gait agreed
+    int classifiedIdle = 0;  // ...and the gait said the body was standing still
+    float previousYaw = 0.0f;
+    for (int i = 0; i <= 600; ++i) {
+        params.resetFinals();
+        entity::EntityUpdate u;
+        u.time = static_cast<double>(i) / 60.0;
+        u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
+        u.frameIndex = static_cast<std::uint64_t>(i);
+        u.bus = &bus;
+        world.update(u, params);
+
+        const float yaw = who->locomotion().yaw;
+        if (i > 1) {
+            // Did the body rotate this frame? This is the ground truth, read off the yaw the
+            // engine itself published, not off anything the gait decided.
+            float raw = std::fmod(yaw - previousYaw + 3.14159265f, 6.2831853f);
+            if (raw < 0.0f) {
+                raw += 6.2831853f;
+            }
+            const float moved = std::abs(raw - 3.14159265f);
+            if (moved > 1e-3f) {
+                ++turningFrames;
+                if (who->locomotion().activity == entity::Activity::Turn) {
+                    ++classifiedTurn;
+                } else if (who->locomotion().activity == entity::Activity::Idle) {
+                    ++classifiedIdle;
+                }
+            }
+        }
+        previousYaw = yaw;
+    }
+
+    WARN(fmt::format("sentry turned on {} of 600 frames: classified Turn on {}, Idle on {}",
+                     turningFrames, classifiedTurn, classifiedIdle));
+    // The fixture has to actually turn, or the rest of this measures nothing.
+    REQUIRE(turningFrames > 100);
+    // **The assertion, with the measured before-and-after.** A body whose yaw is changing is not
+    // idle. Before `LookAt` published its turn rate: **599 of 600 frames turning, 0 classified as
+    // Turn, 599 classified Idle.** After: **599 turning, 599 Turn, 0 Idle.** Not a margin that
+    // moved -- a classification that was inverted on every frame it applied to.
+    CHECK(classifiedTurn > turningFrames / 2);
+    CHECK(classifiedIdle == 0);
+}
+
+TEST_CASE("a character that has stopped turning is not still turning", "[locomotion][behaviour][gait]") {
+    // **`EntityState::turnRate` is a latch, not a rate, and `Gait::select` reads it as a rate.**
+    //
+    // Every turner writes it *while it turns* and none writes zero when it stops: `Explore`
+    // maintains it on two of its seven exits, `LookAt` on the frames it is actually turning, and
+    // nothing clears it between frames. `EntityState` persists, so the last rate a body turned at
+    // survives until some behaviour happens to write another one.
+    //
+    // `Gait::select` trusts it to be *this frame's* rate -- which is the only reading under which
+    // the `turnEnter` band means anything -- so a body that has finished turning and is standing
+    // still is classified `Activity::Turn` and plays its turn-in-place clip. On
+    // `glowmere-valley-2` that is `Idle_turn` on five characters, for the whole idle window of
+    // every loop.
+    //
+    // This is the inverse of the defect beside it and the same field: that one was *turning and
+    // reported idle*; this is *standing still and reported turning*. Fixing one does not fix the
+    // other -- the missing half here is a write of **zero**.
+    //
+    // Reproduced with the cheapest thing that exhibits it: a sentry turns to face a stationary
+    // beacon, aligns, and then stops. Once aligned no turner writes the field again.
+    params::ParameterSet params;
+    entity::EntityWorld world;
+    registerNode(params, "beacon");
+    registerNode(params, "sentry");
+
+    entity::EntityDesc beacon;
+    beacon.name = "beacon";
+    beacon.node = "beacon";
+    beacon.seed = 1; // no behaviours: it sits still, so the turn finishes
+
+    entity::EntityDesc sentry;
+    sentry.name = "sentry";
+    sentry.node = "sentry";
+    sentry.seed = 2;
+    sentry.behaviors.push_back(behaviorDesc("lookAt", {{"target", "beacon"}, {"turnRate", 120.0}}));
+
+    world.setEntities({beacon, sentry}, 7u);
+    entity::NodeBinding sentryBinding = binding("sentry", glm::vec3(0.0f));
+    sentryBinding.facing = glm::radians(180.0f); // start facing away, so there is a turn to finish
+    world.setBindings({binding("beacon", glm::vec3(0.0f, 0.0f, 20.0f)), sentryBinding});
+    world.registerParameters(params);
+    world.bind(params);
+
+    const entity::Entity* who = nullptr;
+    for (const auto& e : world.entities()) {
+        if (e->name() == "sentry") {
+            who = e.get();
+        }
+    }
+    REQUIRE(who != nullptr);
+
+    signals::SignalBus bus;
+    int settledFrames = 0;      // frames on which the body did not rotate at all
+    int settledButTurning = 0;  // ...and the gait still said it was turning
+    float worstStaleRate = 0.0f;
+    float previousYaw = 0.0f;
+    for (int i = 0; i <= 600; ++i) {
+        params.resetFinals();
+        entity::EntityUpdate u;
+        u.time = static_cast<double>(i) / 60.0;
+        u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
+        u.frameIndex = static_cast<std::uint64_t>(i);
+        u.bus = &bus;
+        world.update(u, params);
+
+        const float yaw = who->locomotion().yaw;
+        if (i > 1) {
+            float raw = std::fmod(yaw - previousYaw + 3.14159265f, 6.2831853f);
+            if (raw < 0.0f) {
+                raw += 6.2831853f;
+            }
+            const float moved = std::abs(raw - 3.14159265f);
+            if (moved < 1e-5f) { // the body is stationary this frame
+                ++settledFrames;
+                worstStaleRate = std::max(worstStaleRate, std::abs(who->locomotion().turnRate));
+                if (who->locomotion().activity == entity::Activity::Turn) {
+                    ++settledButTurning;
+                }
+            }
+        }
+        previousYaw = yaw;
+    }
+
+    WARN(fmt::format("sentry stood still on {} of 600 frames; classified Turn on {}; worst stale "
+                     "turn rate while stationary {:.3f} rad/s",
+                     settledFrames, settledButTurning, worstStaleRate));
+    // The body must actually finish its turn, or this measures nothing.
+    REQUIRE(settledFrames > 100);
+    // **A body that is not rotating has a turn rate of zero, and is not turning.**
+    CHECK(worstStaleRate == Catch::Approx(0.0f).margin(1e-4));
+    CHECK(settledButTurning == 0);
+}
+
+TEST_CASE("an authored acceleration limits how fast a body may reach its speed",
+          "[locomotion][behaviour][gait]") {
+    // **`GaitSettings::accel` and `decel` are authored, parsed, serialised, and read by nobody for
+    // a behaviour-driven body.**
+    //
+    // `gait.hpp` states what they are for: *"A body that reaches full speed in one frame and stops
+    // in one frame reads as a sprite, not a character. `approach()` is the whole model."* The only
+    // caller of `Gait::approach` in the engine is the **action** tier's `Move` verb, limiting its
+    // own `layer.progress.speed`. Behaviours assign `state.speed` outright -- `Wander`, `Explore`
+    // and the rest -- so a character goes from standing to full walking speed in a single frame,
+    // with the two numbers that would prevent it sitting authored in the scene file.
+    //
+    // `glowmere-valley-2`'s `rook` authors `accel: 4.8151, decel: 6.6207`. Reproduced here as a
+    // fixture with those numbers, because the measurement is of the mechanism.
+    params::ParameterSet params;
+    entity::EntityWorld world;
+    registerNode(params, "rover");
+
+    entity::EntityDesc rover;
+    rover.name = "rover";
+    rover.node = "rover";
+    rover.seed = 3;
+    rover.gait.walkSpeed = 3.0685f;
+    rover.gait.accel = 4.8151f;  // rook's own numbers
+    rover.gait.decel = 6.6207f;
+    // The flag a scene file sets by naming either key. Without it the behaviour tier leaves the
+    // speed alone, which is what every body that inherits the defaults still does (ADR-620).
+    rover.gait.accelAuthored = true;
+    rover.behaviors.push_back(behaviorDesc("wander", {{"speed", 3.0685}, {"radius", 40.0}}));
+
+    world.setEntities({rover}, 11u);
+    world.setBindings({binding("rover", glm::vec3(0.0f))});
+    world.registerParameters(params);
+    world.bind(params);
+
+    const entity::Entity* who = nullptr;
+    for (const auto& e : world.entities()) {
+        if (e->name() == "rover") {
+            who = e.get();
+        }
+    }
+    REQUIRE(who != nullptr);
+
+    signals::SignalBus bus;
+    const float dt = 1.0f / 60.0f;
+    float worstRise = 0.0f;
+    float worstFall = 0.0f;
+    float peakSpeed = 0.0f;
+    float previousSpeed = 0.0f;
+    for (int i = 0; i <= 900; ++i) {
+        params.resetFinals();
+        entity::EntityUpdate u;
+        u.time = static_cast<double>(i) / 60.0;
+        u.dt = i == 0 ? 0.0 : static_cast<double>(dt);
+        u.frameIndex = static_cast<std::uint64_t>(i);
+        u.bus = &bus;
+        world.update(u, params);
+
+        const float speed = who->locomotion().speed;
+        if (i > 1) {
+            const float delta = speed - previousSpeed;
+            worstRise = std::max(worstRise, delta);
+            worstFall = std::max(worstFall, -delta);
+        }
+        peakSpeed = std::max(peakSpeed, speed);
+        previousSpeed = speed;
+    }
+
+    // What the authored numbers permit in one frame.
+    const float riseBudget = rover.gait.accel * dt;
+    const float fallBudget = rover.gait.decel * dt;
+    WARN(fmt::format("rover peak speed {:.3f} m/s; worst rise {:.4f} m/s per frame (budget "
+                     "{:.4f}), worst fall {:.4f} (budget {:.4f})",
+                     peakSpeed, worstRise, riseBudget, worstFall, fallBudget));
+    // The body must actually move, or this measures nothing.
+    REQUIRE(peakSpeed > 1.0f);
+    // **The assertion: an authored acceleration is a limit, or it is decoration.** A small epsilon
+    // for float accumulation only -- not a tolerance that would let a whole frame's jump through.
+    CHECK(worstRise <= riseBudget + 1e-3f);
+    CHECK(worstFall <= fallBudget + 1e-3f);
+}

@@ -17,6 +17,7 @@
 
 #include <filesystem>
 #include <set>
+#include <vector>
 
 using namespace avgen;
 
@@ -246,4 +247,59 @@ TEST_CASE("The output path decides the kind, the same way for the button and the
         CHECK(tiny.width >= 16);
         CHECK(tiny.height >= 16);
     }
+}
+
+TEST_CASE("A path-traced range with AOVs holds a flat amount of memory and writes every AOV frame",
+          "[pathtrace][sequence][aov]") {
+    // `writeAovs` is on by default (the Tree of Life ships with it), and the sequence used to keep
+    // every frame's full framebuffer -- radiance, albedo, normal, emission, motion, depth, id -- in
+    // a vector nothing ever read or wrote: ~140 MB per 1080p frame, for the whole range. Two claims,
+    // both of which that code fails: what is held does not grow with the frame count, and the AOVs
+    // a person asked for are on disk.
+    if (!std::filesystem::exists(projectPath())) {
+        SUCCEED("the shipped project is not in this worktree");
+        return;
+    }
+    const auto dir = scratch("aov");
+    auto request = smallRequest(dir, 12.0, 12.6);   // six frames
+    request.trace.writeAovs = true;
+    app::TraceSequence seq(request);
+    REQUIRE(seq.start().has_value());
+
+    std::vector<std::size_t> held;
+    while (!seq.step(1)) {
+        held.push_back(seq.heldFrameBytes());
+    }
+    held.push_back(seq.heldFrameBytes());
+    const app::SequenceProgress p = seq.progress();
+    INFO(p.error);
+    REQUIRE(p.error.empty());
+    REQUIRE(p.framesWritten == 6);
+    REQUIRE(held.size() >= 6);
+
+    // Flat: the most held at any step is no more than what the first frame's step held. A buffer
+    // that keeps one frame per step fails this by the third.
+    const std::size_t first = held.front();
+    for (std::size_t i = 0; i < held.size(); ++i) {
+        INFO("after step " << i << ": " << held[i] << " bytes held (first step " << first << ")");
+        CHECK(held[i] <= first);
+    }
+
+    for (std::uint64_t i = 0; i < 6; ++i) {
+        const auto aov = app::traceSequenceAovFile(request, i);
+        INFO(aov.string());
+        CHECK(std::filesystem::exists(aov));
+        CHECK(std::filesystem::exists(dir / fmt::format("frame_{:06d}.exr", i)));   // beauty too
+    }
+    CHECK_FALSE(std::filesystem::exists(app::traceSequenceAovFile(request, 6)));
+
+    // CONTROL: with AOVs off none are written, so the arm above is not passing on files that some
+    // other path would have produced anyway.
+    const auto off = scratch("aov-off");
+    auto plain = smallRequest(off, 12.0, 12.2);
+    plain.trace.writeAovs = false;
+    app::TraceSequence none(plain);
+    REQUIRE(none.run().has_value());
+    CHECK_FALSE(std::filesystem::exists(app::traceSequenceAovFile(plain, 0)));
+    CHECK(std::filesystem::exists(off / "frame_000000.exr"));
 }

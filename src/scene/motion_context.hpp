@@ -48,6 +48,18 @@ enum class LocomotionMode : std::uint8_t {
 };
 [[nodiscard]] const char* locomotionModeName(LocomotionMode mode);
 
+// Where the body is in the arc of a movement (Phase B §8-§11). Orthogonal to `LocomotionMode`: a
+// body can be walking AND starting, and those are two different facts about it.
+enum class MotionPhase : std::uint8_t {
+    Idle,
+    Starting,
+    Moving,
+    Stopping,
+    Turning,
+    Strafing,
+};
+[[nodiscard]] const char* motionPhaseName(MotionPhase phase);
+
 struct MotionContext {
     // ---- time ----------------------------------------------------------------------------------
     // Seconds since the previous update. Zero on the first frame after a seek and on a paused
@@ -62,6 +74,9 @@ struct MotionContext {
     glm::vec3 facing{0.0f, 0.0f, 1.0f};    // entity-local, unit
     float groundSpeed = 0.0f;              // horizontal magnitude of `velocity`, m/s
     float turnRate = 0.0f;                 // rad/s, signed
+    // Entity-local, m/s^2. Measured once at the entity beside the velocity it differences
+    // (ADR-545 one derivative out), so lean, stride and balance do not each derive their own.
+    glm::vec3 acceleration{0.0f};
 
     // ---- what it MEANT to do -------------------------------------------------------------------
     // The difference between these and the pair above is the whole of strafing, backing up and
@@ -72,6 +87,19 @@ struct MotionContext {
 
     // ---- what it is playing --------------------------------------------------------------------
     LocomotionMode mode = LocomotionMode::Idle;
+    // Phase B §8-§11. Where the body is in the arc of a movement, how much of the authored stride
+    // that phase wants, and how far the heading is from the facing.
+    //
+    // **Projected from `entity::LocomotionPhase`, not that enum**, for exactly the reason
+    // `LocomotionMode` is (ADR-555): naming the entity type here would drag `entity/locomotion.hpp`
+    // into every pose layer and end the rule that makes a layer a pure function a scrub can replay.
+    // One field's convenience is not worth that, and the projection is five lines at the seam.
+    // Named `motionPhase` rather than `phase`, because `phase` below is the clip's 0..1 position
+    // in its own cycle and that name was here first. Two different meanings of one word in one
+    // struct is how a reader ends up reading the wrong one.
+    MotionPhase motionPhase = MotionPhase::Idle;
+    float phaseStride = 1.0f;
+    float strafeAngle = 0.0f;
     // Clip seconds per timeline second, as the gait resolved it. **Carried so a layer can see that
     // it saturated**: `Gait::playbackRate` clamps, and a clamped rate is the engine saying it could
     // not do the job with the one tool it had. Measured on the shipping Glowmere scene, the aliens
@@ -100,6 +128,12 @@ struct MotionContext {
     glm::vec3 groundPoint{0.0f};           // entity-local
     glm::vec3 groundNormal{0.0f, 1.0f, 0.0f};
     bool hasGroundPlane = false;
+
+    // §40. What the body knows about the ground it is on, as opposed to what a foot knows about
+    // the ground under it. Sampled once per frame across the footprint through the same
+    // `IGroundQuery` everything else asks, because a fourth thing with its own sampling rule is
+    // how a family of divergent copies starts.
+    EnvironmentSample environment;
 
     // ---- targets -------------------------------------------------------------------------------
     glm::vec3 lookTarget{0.0f};            // entity-local

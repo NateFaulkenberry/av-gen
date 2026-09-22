@@ -99,7 +99,28 @@ MotionResult ClipMotionProvider::advance(const MotionRequest& request, const Mot
     next.generation = changed ? in.generation + 1 : in.generation;
     next.phase = clip.length() > 0.0f ? local / clip.length() : 0.0f;
     next.hasPhase = true;
-    next.transitionStart = changed ? time : in.transitionStart;
+    next.decisionTime = changed ? time : in.decisionTime;
+
+    // §32/ADR-613. **The clip change is a transition, and it is inertialized here** rather than
+    // left to `AnimationPlayer`, which is not running when a provider poses the body. The blend's
+    // two ends are clip indices and clip seconds -- this provider's own coordinates, exactly as
+    // `selection` and `localTime` are -- and `pose` recomputes the offset from them.
+    next.tickBlends(dt);
+    const bool blendable = changed && in.generation > 0 &&
+                           static_cast<std::size_t>(in.selection) < clips_->size() &&
+                           inertializeHalflife_ > 0.0f;
+    if (blendable) {
+        const scene::AnimationClip& from = (*clips_)[static_cast<std::size_t>(in.selection)];
+        // Absolute clip seconds on both ends, because that is what `sampleClip` takes and what
+        // `pose` below passes it. `local` is 0 on a change, so the incoming end is the new clip's
+        // own first playable instant.
+        next.pushBlend(in.selection, from.start + in.localTime, selection, clip.start + local,
+                       blendSlots_);
+    } else if (changed) {
+        // A first selection is not a transition -- there is nothing to blend from, and pretending
+        // otherwise would decay an offset against a bind pose.
+        next.clearBlends();
+    }
 
     result.status = MotionStatus::Produced;
     result.content = clip.name;
@@ -130,6 +151,33 @@ MotionResult ClipMotionProvider::pose(const MotionMemory& memory, const scene::S
     scene::sampleClip(clip, clip.start + memory.localTime, out);
     result.status = MotionStatus::Produced;
     result.content = clip.name;
+
+    // §32/ADR-613. What is added is the difference the clip change introduced, decaying to
+    // nothing, so at the instant of the change the output is exactly the outgoing pose. Oldest
+    // slot first: the offsets were introduced in order, and rotations do not commute.
+    if (inertializeHalflife_ <= 0.0f || !memory.blending()) {
+        return result;
+    }
+    thread_local scene::Pose was;
+    thread_local scene::Pose became;
+    const std::size_t slots =
+        std::min(std::max<std::size_t>(blendSlots_, 1), MotionMemory::kBlendSlots);
+    for (std::size_t s = slots; s-- > 0;) {
+        const MotionMemory::Blend& blend = memory.blends[s];
+        if (!blend.live() || static_cast<std::size_t>(blend.from) >= clips_->size() ||
+            static_cast<std::size_t>(blend.to) >= clips_->size()) {
+            continue;
+        }
+        const float decay = inertializationDecay(inertializeHalflife_, blend.elapsed);
+        if (decay <= kInertializationFloor) {
+            continue;
+        }
+        scene::setRestPose(skeleton, was);
+        scene::sampleClip((*clips_)[static_cast<std::size_t>(blend.from)], blend.fromTime, was);
+        scene::setRestPose(skeleton, became);
+        scene::sampleClip((*clips_)[static_cast<std::size_t>(blend.to)], blend.toTime, became);
+        applyInertializedOffset(was, became, decay, out);
+    }
     return result;
 }
 

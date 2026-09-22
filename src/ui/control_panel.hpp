@@ -79,8 +79,13 @@ public:
     // Cuts the camera to the loaded track (ADR-075). A callback rather than something this panel
     // does itself, because directing mutates the engine's timeline and the panel does not own it.
     std::function<void()> onDirectCamera;
-    // Clears whatever the director installed, handing the camera back to the viewport.
+    // Hands the camera back to the viewport, parking the director's cut rather than clearing it
+    // (ADR-582).
     std::function<void()> onClearCameraAutomation;
+    // ADR-582: puts a parked cut back exactly as it was, and throws a cut away on purpose. The
+    // second is the only camera action that deletes anything, so the panel asks first.
+    std::function<void()> onResumeDirector;
+    std::function<void()> onDiscardDirectorsCut;
     // The Auto-director's settings (section 9). Held here rather than inside the panel so the host
     // owns them and a re-cut uses what the user last chose; the panel edits them in place and calls
     // `onDirectCamera` when one changes while the camera is already directed.
@@ -100,7 +105,7 @@ public:
     //
     // ADR-391 left this **deliberate hand-back only**. Navigating no longer needs it -- the editor
     // viewpoint is not the film's camera -- so the only caller left is somebody saying, in words,
-    // "give me the film's camera and discard its cut".
+    // "give me the film's camera". Since ADR-582 that parks the cut rather than discarding it.
     std::function<void()> onFreeCamera;
     // ---- what the viewport is looking through (ADR-391) ----------------------------------------
     //

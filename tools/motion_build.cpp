@@ -13,6 +13,7 @@
 //   avgen-motion retarget  <src> <dst> --profile p    move motion between skeletons
 //   avgen-motion pack      <file...> --out dir        build a MotionPack
 //   avgen-motion validate  <pack>                     the report, and a non-zero exit on FAIL
+//   avgen-motion build-db  <pack> --joints a,b,c      a stored motion database (Phase C §38)
 //   avgen-motion benchmark <file> [--repeat n]        what each stage costs on this machine
 //
 // Exit codes: 0 success, 1 usage or I/O, 2 a validation that FAILED. A validation that passes with
@@ -23,8 +24,18 @@
 #include "assets/gltf_loader.hpp"
 #include "scene/motion_analysis.hpp"
 #include "scene/motion_database.hpp"
+#include "scene/motion_database_io.hpp"
+#include "scene/motion_database_inspect.hpp"
+#include "scene/motion_database_diff.hpp"
+#include "scene/motion_library.hpp"
+#include "scene/motion_match_explain.hpp"
+#include "entity/match_motion_provider.hpp"
+#include "entity/motion_bake.hpp"
 #include "scene/motion_pack.hpp"
+#include "scene/motion_quality_report.hpp"
 #include "scene/retarget.hpp"
+#include "scene/retarget_positional.hpp"
+#include "scene/motion_augment.hpp"
 #include "scene/scene.hpp"
 
 #include <random>
@@ -34,6 +45,9 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <numeric>
+#include <optional>
 #include <map>
 #include <string>
 #include <vector>
@@ -194,15 +208,35 @@ int usage() {
                "  retarget  <src> <dst> --map s:t,s:t     move motion between skeletons\n"
                "  pack      <file...> --out <dir>         build a MotionPack\n"
                "  validate  <pack>                        the report; exit 2 on FAIL\n"
+               "  merge     <pack> <pack>... --out <dir>  one pack from several for the same skeleton\n"
                "  reach     <pack> [--chain h:k:a,...]    how close each pose is to a straight leg\n"
                "  database  <pack> --joints a,b,c [--bench]  build a motion database and search it\n"
+               "  build-db  <pack> --joints a,b,c [--name n] [--force]\n"
+               "                                          Phase C 38: write <pack>/databases/<n>.motiondb,\n"
+               "                                          reused when its inputs are unchanged (82)\n"
+               "  inspect-db <file.motiondb> [--pack dir] [--categories]\n"
+               "                                          Phase C 57/58: contents, memory, coverage,\n"
+               "                                          provenance\n"
+               "  diff-db   <a.motiondb> <b.motiondb>     Phase C 83: samples added/removed/changed\n"
+               "  explain   <pack> --db <name> [--speed v] [--speed2 v --switch t] [--turn r]\n"
+               "            [--seconds s] [--at t] [--stride n]\n"
+               "                                          Phase C 68/69: why each search chose what it did\n"
+               "  bake      <pack> --db <name> --out <dir> [--seconds s] [session flags as explain]\n"
+               "                                          Phase C 72: a matching session as a clip\n"
                "  benchmark <file> [--repeat n]           what each stage costs here\n"
+               "  quality   <pack> --joints a,b,c [--trajectory 0.2,0.4,0.6]\n"
+               "                                          Phase C 20: density, duplicates, search\n"
+               "                                          plan recall, cross-clip coverage bound\n"
                "  survey    <dir>                         per-FILE rotation orders, up axis,\n"
                "                                          skeleton consistency across a corpus\n\n"
                "  --scale <f>       BVH units to metres (0.01 for centimetres)\n"
                "  --contacts a,b    joints to analyse; the first is the phase reference\n"
                "  --license <id>    SPDX identifier, REQUIRED by `pack`\n"
+               "  augment   <pack> --out <dir> --legs h:k:f,... --plan kind:clip:param,...\n"
+               "                                          Phase C 21: variants kept only where they add coverage\n"
                "  --retarget-to <f> --map s:t,...   pack onto ANOTHER skeleton\n"
+               "  --positional-legs sH:sK:sA=tH:tK:tF,...  then re-solve those legs through IK\n"
+               "  --max-reach <r>     cap each leg at r of its length (default 0.956, the alien's own; 0 = off)\n"
                "  --source <name>   the corpus this came from, REQUIRED by `pack`\n");
     return 1;
 }
@@ -432,6 +466,45 @@ int cmdPack(const Args& args) {
                    binding.rootScale);
     }
 
+    // `--positional-legs sHip:sKnee:sAnkle=tHip:tKnee:tFoot,...` re-solves each named leg through IK
+    // after the rotation retarget, so the target's feet follow the source's (§64/§92). It exists for
+    // the Glowmere alien, whose feet a rotation retarget cannot move (ADR-553).
+    std::vector<scene::PositionalLeg> positionalLegs;
+    for (const std::string& spec : splitCommas(args.option("positional-legs"))) {
+        const std::size_t eq = spec.find('=');
+        const auto parts = [](const std::string& s) {
+            std::vector<std::string> out;
+            std::string cur;
+            for (const char c : s) {
+                if (c == ':') {
+                    out.push_back(cur);
+                    cur.clear();
+                } else {
+                    cur.push_back(c);
+                }
+            }
+            out.push_back(cur);
+            return out;
+        };
+        const std::vector<std::string> from = eq == std::string::npos ? std::vector<std::string>{} : parts(spec.substr(0, eq));
+        const std::vector<std::string> to = eq == std::string::npos ? std::vector<std::string>{} : parts(spec.substr(eq + 1));
+        if (from.size() != 3 || to.size() != 3) {
+            fmt::print(stderr, "--positional-legs entries are sHip:sKnee:sAnkle=tHip:tKnee:tFoot, got '{}'\n", spec);
+            return 1;
+        }
+        positionalLegs.push_back({from[0], from[1], from[2], {to[0], to[1], to[2]}});
+    }
+    // The reach cap (ADR-624, owner ruling 22 Sep): the alien's own longest leg by default. 0 turns it
+    // off, for measuring what it costs.
+    float maxReach = scene::kAlienMaxLegReach;
+    if (const std::string r = args.option("max-reach"); !r.empty()) {
+        maxReach = std::stof(r);
+    }
+    if (!positionalLegs.empty() && !retargeting) {
+        fmt::print(stderr, "--positional-legs needs --retarget-to\n");
+        return 1;
+    }
+
     const auto convert = [&](std::vector<scene::AnimationClip>& source) {
         if (!retargeting) {
             return;
@@ -440,6 +513,26 @@ int cmdPack(const Args& args) {
             scene::RetargetStats stats;
             scene::AnimationClip out =
                 scene::retargetClip(clip, first->skeleton, packSkeleton, binding, &stats);
+            if (!positionalLegs.empty()) {
+                scene::PositionalRetargetStats legStats;
+                scene::PositionalRootRescale rescale;
+                rescale.targetRoot = binding.rootLink >= 0
+                                         ? packSkeleton.joints[static_cast<std::size_t>(binding.links[static_cast<std::size_t>(binding.rootLink)].target)].name
+                                         : std::string();
+                rescale.rootScale = binding.rootScale;
+                out = scene::retargetLegsPositional(clip, first->skeleton, out, packSkeleton, positionalLegs,
+                                                    30.0f, &legStats, rescale, scene::PositionalReachCap{maxReach, true});
+                if (!legStats.problem.empty()) {
+                    fmt::print(stderr, "{}\n", legStats.problem);
+                }
+                provenance.processing.push_back(fmt::format(
+                    "positional legs '{}': {} frames, worst foot miss {:.3f}% of the leg, reach cap {:.3f} "
+                    "lowered the body on {} frames (mean {:.4f}, worst {:.4f}) and pulled {} of {} leg-frames in "
+                    "(mean {:.4f}, worst {:.4f})",
+                    clip.name, legStats.frames, legStats.worstShortfall * 100.0f, maxReach, legStats.droppedFrames,
+                    legStats.meanDrop, legStats.worstDrop, legStats.cappedLegFrames, legStats.legFrames,
+                    legStats.meanCapPull, legStats.worstCapPull));
+            }
             // The retarget's own error, per clip, into the provenance. A pack that cannot say how
             // accurately its motion was transferred is a pack nobody can judge.
             provenance.processing.push_back(fmt::format(
@@ -450,6 +543,54 @@ int cmdPack(const Args& args) {
         }
     };
 
+    // `--range a:b` keeps seconds a..b of each clip, renamed `<clip>@a-b` so several stretches of one
+    // take can sit in one pack. For a long corpus take whose parts are different motions: a 100STYLE
+    // sidestep file walks forward, stands, then sidesteps for half a minute, and only the last part
+    // is a sidestep (§65).
+    float rangeFrom = 0.0f;
+    float rangeTo = 0.0f;
+    if (const std::string r = args.option("range"); !r.empty()) {
+        const std::size_t colon = r.find(':');
+        if (colon == std::string::npos) {
+            fmt::print(stderr, "--range is a:b in seconds, got '{}'\n", r);
+            return 1;
+        }
+        rangeFrom = std::stof(r.substr(0, colon));
+        rangeTo = std::stof(r.substr(colon + 1));
+    }
+    const auto trim = [&](std::vector<scene::AnimationClip>& source) {
+        if (rangeTo <= rangeFrom) {
+            return;
+        }
+        for (scene::AnimationClip& clip : source) {
+            const float from = clip.start + rangeFrom;
+            const float to = std::min(clip.start + rangeTo, clip.duration);
+            scene::AnimationClip cut;
+            cut.name = fmt::format("{}@{:g}-{:g}", clip.name, rangeFrom, rangeTo);
+            cut.start = 0.0f;
+            for (const scene::AnimationChannel& c : clip.channels) {
+                scene::AnimationChannel k = c;
+                k.times.clear();
+                k.values.clear();
+                for (std::size_t i = 0; i < c.times.size(); ++i) {
+                    if (c.times[i] >= from - 1e-5f && c.times[i] <= to + 1e-5f) {
+                        k.times.push_back(c.times[i] - from);
+                        k.values.push_back(c.values[i]);
+                    }
+                }
+                if (k.times.empty() && !c.times.empty()) {
+                    k.times.push_back(0.0f);
+                    k.values.push_back(c.values.front());
+                }
+                cut.channels.push_back(std::move(k));
+            }
+            cut.duration = to - from;
+            provenance.processing.push_back(fmt::format("cut '{}' to {:.2f}..{:.2f} s as '{}'", clip.name, rangeFrom,
+                                                        rangeTo, cut.name));
+            clip = std::move(cut);
+        }
+    };
+    trim(first->clips);
     convert(first->clips);
     std::vector<scene::AnimationClip> clips = first->clips;
     for (std::size_t i = 1; i < args.positional.size(); ++i) {
@@ -465,6 +606,7 @@ int cmdPack(const Args& args) {
                        args.positional[i], args.positional.front());
             return 1;
         }
+        trim(more->clips);
         convert(more->clips);
         for (scene::AnimationClip& clip : more->clips) {
             clips.push_back(std::move(clip));
@@ -717,7 +859,18 @@ int cmdReach(const Args& args) {
 // white-noise queries and 0.80x FASTER using near queries on real data, because a real query is
 // close to its answer and far from everything else. So the benchmark below draws its queries from
 // the database itself and perturbs them, which is what a character actually asks.
-int cmdDatabase(const Args& args) {
+// ---- §20: the scale experiment -----------------------------------------------------------------
+//
+// **Why this is a command and not a test.** Every number it produces is a property of a corpus that
+// is gitignored and 612 MB, so a test would skip everywhere it ran and assert nothing where it did
+// not. What makes the figures checkable instead is that the command line is printed beside them and
+// the instruments are the *library* functions the Glowmere tests already use -- `analyseMotionQuality`
+// and `searchMotionStaged` -- rather than second copies that could drift.
+//
+// The trial counts are subsampled and **said to be**: the Glowmere sweep steps the whole database
+// (`s += 7`), which at 434,478 samples and 2 ms a query is nine hours. A fixed number of seeds
+// spread evenly over the corpus measures the same quantity at a stated n.
+int cmdQuality(const Args& args) {
     if (args.positional.empty()) {
         return usage();
     }
@@ -730,9 +883,228 @@ int cmdDatabase(const Args& args) {
     options.sampleRate = std::stof(args.option("rate", "30"));
     const std::vector<std::string> joints = splitCommas(args.option("joints"));
     if (joints.empty()) {
+        fmt::print(stderr, "--joints is required (Phase C §8)\n");
+        return 1;
+    }
+    options.config.joints = joints;
+    // **The trajectory block is what makes this commensurable with the earlier numbers.** Phase C's
+    // published density figures were taken on a 33-dimension database -- 3 joints x 6, plus 3 root
+    // velocity, plus 3 horizons x 4 -- and a 21-dimension run of the same corpus is a different
+    // number system, not a correction to that one. `--trajectory 0.2,0.4,0.6` reproduces it.
+    if (args.has("trajectory")) {
+        for (const std::string& t : splitCommas(args.option("trajectory"))) {
+            options.config.trajectoryTimes.push_back(std::stof(t));
+        }
+    }
+    // §20's follow-up: the mechanism predicted that a corpus **the matcher can resolve** would
+    // break the stride plan, and no corpus tested it, because more data moves a corpus the wrong
+    // way. Resolution is a property of the weighting, so these are how the experiment is run.
+    //
+    // **Set BEFORE the database is built, which is not where they were first written.** The first
+    // version assigned them after `buildMotionDatabase` had already copied `options.config`, so a
+    // 64x sweep of `rootVelocityWeight` printed the weight it had been given and produced four
+    // byte-identical arms. A control that reports itself as set and changes nothing is ADR-558's
+    // shape, and it was caught only because the arms were printed side by side.
+    options.config.jointPositionWeight = std::stof(args.option("joint-pos", "1.0"));
+    options.config.jointVelocityWeight = std::stof(args.option("joint-vel", "0.4"));
+    options.config.trajectoryPositionWeight = std::stof(args.option("traj-pos", "1.0"));
+    options.config.trajectoryFacingWeight = std::stof(args.option("traj-facing", "0.5"));
+    options.config.rootVelocityWeight = std::stof(args.option("root-vel", "1.0"));
+    const auto db = scene::buildMotionDatabase(*pack, options);
+    if (!db) {
+        fmt::print(stderr, "{}\n", db.error().message);
+        return 1;
+    }
+    const int seeds = std::stoi(args.option("seeds", "300"));
+    const scene::MotionCostWeights weights;
+    const std::vector<float> dimWeight = scene::motionFeatureWeights(db->config);
+    const bool weighted = dimWeight.size() == db->dimension;
+    const auto weightedDistance = [&](const float* a, const float* b) {
+        float sum = 0.0f;
+        for (std::size_t d = 0; d < db->dimension; ++d) {
+            const float delta = a[d] - b[d];
+            sum += delta * delta * (weighted ? dimWeight[d] : 1.0f);
+        }
+        return sum;
+    };
+    const std::uint32_t step = std::max(1u, db->sampleCount() / static_cast<std::uint32_t>(seeds));
+
+    fmt::print("corpus: {} clip(s), {} sample(s), {} dimension(s)\n", db->stats.clips,
+               db->sampleCount(), db->dimension);
+    fmt::print("  weights: jointPos {:.2f}  jointVel {:.2f}  trajPos {:.2f}  trajFacing {:.2f}  "
+               "rootVel {:.2f}\n",
+               options.config.jointPositionWeight, options.config.jointVelocityWeight,
+               options.config.trajectoryPositionWeight, options.config.trajectoryFacingWeight,
+               options.config.rootVelocityWeight);
+    fmt::print("  cost spread (build-time): {:.2f}   dead dimensions: {}\n", db->stats.costSpread,
+               db->stats.deadDimensions);
+
+    // ---- density and duplicates (§23's instrument, unchanged) ---------------------------------
+    const scene::MotionQualitySummary quality = scene::analyseMotionQuality(*db);
+    fmt::print("\n{}\n", quality.humanReadable());
+
+    // ---- the cost spread, by the sweep's own definition ---------------------------------------
+    double spread = 0.0;
+    int spreadN = 0;
+    for (std::uint32_t s = 0; s < db->sampleCount(); s += step) {
+        scene::MotionQuery q;
+        q.features.assign(db->dimension, 0.0f);
+        const float* f = db->featuresFor(s);
+        std::copy(f, f + db->dimension, q.features.begin());
+        const scene::MotionMatch best = scene::searchMotion(*db, q, weights);
+        const float* other = db->featuresFor((s + db->sampleCount() / 2u) % db->sampleCount());
+        spread += static_cast<double>(weightedDistance(q.features.data(), other)) -
+                  static_cast<double>(best.cost);
+        ++spreadN;
+    }
+    spread /= std::max(spreadN, 1);
+    fmt::print("cost spread, sweep definition, n={}: a typical candidate is {:.2f} worse than the "
+               "best\n\n",
+               spreadN, spread);
+
+    // ---- §16's search plans, on this corpus ---------------------------------------------------
+    struct Plan {
+        const char* name;
+        std::uint32_t stride;
+        std::uint32_t shortlist;
+        std::uint32_t prefix;
+        std::uint32_t neighbourhood;
+    };
+    const Plan plans[] = {
+        {"stride 8, prefix 12, top 32 ", 8u, 32u, 12u, 8u},
+        {"stride 8, prefix 12, top 128", 8u, 128u, 12u, 8u},
+        {"stride 8, FULL prefix, top 32", 8u, 32u, 0u, 8u},
+        {"stride 4, FULL prefix, top 32", 4u, 32u, 0u, 4u},
+    };
+    // **The same degeneracy §30's contact experiment hit, checked for here before any recall
+    // number is read.** A query built from a sample's own features and nudged by a fixed amount
+    // identifies its own source uniquely once the corpus is large enough, and then every plan
+    // agrees with the exhaustive search trivially: recall reads 100% and measures identifiability
+    // rather than search quality. The perturbation is therefore expressed in the matcher's own
+    // units -- the derived duplicate radius -- so the query is ambiguous by construction at any
+    // corpus size and under any weighting, and the seed-return count is printed beside the recall
+    // so a degenerate run cannot be read as a good one.
+    const float planPerturbation =
+        quality.duplicateRadius > 0.0f
+            ? quality.duplicateRadius / std::sqrt(static_cast<float>(db->dimension))
+            : 0.05f;
+    fmt::print("plan perturbation {:.4f} per dimension (derived radius {:.4f} over {} dims; the "
+               "fixed 0.05 would be {:.1f}x smaller)\n",
+               planPerturbation, quality.duplicateRadius, db->dimension, planPerturbation / 0.05f);
+    fmt::print("plan                           recall   worst excess   x typical gap   scored  "
+               "seed-returns\n");
+    for (const Plan& p : plans) {
+        scene::MotionSearchPlan plan;
+        plan.stride = p.stride;
+        plan.shortlist = p.shortlist;
+        plan.prefixDimensions = p.prefix;
+        plan.neighbourhood = p.neighbourhood;
+        int agreed = 0;
+        int trials = 0;
+        double worstExcess = 0.0;
+        std::uint64_t fullyScored = 0;
+        int returnedSeed = 0;
+        for (std::uint32_t s = 0; s < db->sampleCount(); s += step) {
+            scene::MotionQuery query;
+            query.features.assign(db->dimension, 0.0f);
+            const float* f = db->featuresFor(s);
+            std::copy(f, f + db->dimension, query.features.begin());
+            for (std::size_t d = 0; d < query.features.size(); d += 3) {
+                query.features[d] += planPerturbation;
+            }
+            query.current = s > 0 ? s - 1u : scene::MotionDatabase::kInvalid;
+            const scene::MotionMatch full = scene::searchMotion(*db, query, weights);
+            const scene::MotionMatch staged = scene::searchMotionStaged(*db, query, weights, plan);
+            if (!full.found() || !staged.found()) {
+                continue;
+            }
+            ++trials;
+            if (full.sample == s) {
+                ++returnedSeed;
+            }
+            fullyScored += staged.fullyScored;
+            if (staged.sample == full.sample) {
+                ++agreed;
+            } else {
+                worstExcess = std::max(worstExcess, static_cast<double>(staged.cost) -
+                                                        static_cast<double>(full.cost));
+            }
+        }
+        fmt::print("{}  {:5.1f}%  {:12.4f}  {:11.2f}x  {:12.0f}  {:5.1f}%  (n={})\n", p.name,
+                   100.0 * agreed / std::max(trials, 1), worstExcess,
+                   worstExcess / std::max(spread, 1e-9),
+                   static_cast<double>(fullyScored) / std::max(trials, 1),
+                   100.0 * returnedSeed / std::max(trials, 1), trials);
+    }
+
+    // ---- the cross-clip coverage bound --------------------------------------------------------
+    //
+    // **What any matcher on this corpus is up against, before any feature or weight is chosen.**
+    // For each seed: the distance to the next frame of its own clip -- the smallest step the
+    // content itself can take -- against the nearest sample in a DIFFERENT clip. The ratio bounds
+    // what leaving a clip can cost, and it is a property of the corpus rather than of the search.
+    //
+    // **The mean of the per-seed ratios is the wrong statistic and this is where that was found.**
+    // A seed whose next frame is nearly identical -- a near-static frame, of which stylized idle
+    // and slow locomotion have many -- has an adjacent distance near zero, so its ratio explodes.
+    // On the Glowmere control the mean of ratios reads **2145x** and the worst **294,646x**, both
+    // of them descriptions of the smallest denominator in the set rather than of the corpus. The
+    // median and the ratio of means are reported instead, and they agree with each other.
+    std::vector<double> ratios;
+    double adjacentSum = 0.0;
+    double crossSum = 0.0;
+    int n = 0;
+    for (std::uint32_t s = 0; s < db->sampleCount(); s += step) {
+        const std::uint32_t next = db->sampleNext[s];
+        if (next == scene::MotionDatabase::kInvalid) {
+            continue;
+        }
+        const float* f = db->featuresFor(s);
+        const double adjacent = std::sqrt(static_cast<double>(weightedDistance(f, db->featuresFor(next))));
+        double bestCross = std::numeric_limits<double>::max();
+        const std::uint32_t clip = db->sampleClip[s];
+        for (std::uint32_t o = 0; o < db->sampleCount(); ++o) {
+            if (db->sampleClip[o] == clip) {
+                continue;
+            }
+            bestCross = std::min(bestCross, static_cast<double>(weightedDistance(f, db->featuresFor(o))));
+        }
+        bestCross = std::sqrt(bestCross);
+        if (adjacent <= 1e-9) {
+            continue;
+        }
+        adjacentSum += adjacent;
+        crossSum += bestCross;
+        ratios.push_back(bestCross / adjacent);
+        ++n;
+    }
+    std::sort(ratios.begin(), ratios.end());
+    const double median = ratios.empty() ? 0.0 : ratios[ratios.size() / 2];
+    const double p90 = ratios.empty() ? 0.0 : ratios[(ratios.size() * 9) / 10];
+    fmt::print("\ncross-clip coverage bound, n={}: the best available cross-clip pose is "
+               "**{:.2f}x** further than the next frame of the same clip (median ratio; p90 "
+               "{:.2f}x)\n",
+               n, median, p90);
+    fmt::print("  mean adjacent-frame distance {:.4f}, mean best cross-clip distance {:.4f}, "
+               "ratio of means {:.2f}x\n",
+               adjacentSum / std::max(n, 1), crossSum / std::max(n, 1),
+               (crossSum / std::max(n, 1)) / std::max(adjacentSum / std::max(n, 1), 1e-9));
+    fmt::print("  (the MEAN of the per-seed ratios is {:.2f}x and its worst is {:.2f}x -- both are "
+               "descriptions of the smallest denominator in the set, not of the corpus)\n",
+               std::accumulate(ratios.begin(), ratios.end(), 0.0) / std::max<std::size_t>(ratios.size(), 1),
+               ratios.empty() ? 0.0 : ratios.back());
+    return 0;
+}
+
+// The feature config from the command line, shared by `database` and `build-db` so the two cannot
+// build different databases from the same flags.
+bool databaseOptionsFromArgs(const Args& args, scene::MotionDatabaseOptions& options) {
+    options.sampleRate = std::stof(args.option("rate", "30"));
+    const std::vector<std::string> joints = splitCommas(args.option("joints"));
+    if (joints.empty()) {
         fmt::print(stderr, "--joints is required: the feature joints are a property of the "
                            "character, not of the search (Phase C §8)\n");
-        return 1;
+        return false;
     }
     options.config.joints = joints;
     if (args.has("trajectory")) {
@@ -747,6 +1119,254 @@ int cmdDatabase(const Args& args) {
     }
     if (args.has("contacts-feature")) {
         options.config.contactWeight = std::stof(args.option("contacts-feature", "1"));
+    }
+    if (args.has("contact-joints")) {
+        options.config.contactJoints = splitCommas(args.option("contact-joints"));
+    }
+    return true;
+}
+
+// Phase C §37/§38/§82: build a database into the pack, once. The offline half of the boundary §37
+// draws: the runtime reads `<pack>/databases/<name>.motiondb` and never extracts a feature, and a
+// second run with identical inputs reuses the file instead of rebuilding it.
+int cmdBuildDb(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const fs::path packDir = args.positional.front();
+    const auto pack = scene::readMotionPack(packDir);
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    scene::MotionDatabaseOptions options;
+    if (!databaseOptionsFromArgs(args, options)) {
+        return 1;
+    }
+    const std::string name = args.option("name", "default");
+    const fs::path file = args.has("out") ? fs::path(args.option("out"))
+                                          : scene::motionDatabasePath(packDir, name);
+    if (args.has("force")) {
+        std::error_code ec;
+        fs::remove(file, ec);
+    }
+    const auto t0 = Clock::now();
+    auto result = scene::buildMotionDatabaseCached(*pack, options, file);
+    const double ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+    if (!result) {
+        fmt::print(stderr, "{}\n", result.error().message);
+        return 1;
+    }
+    const scene::MotionDatabase& db = result->db;
+    fmt::print("{} {}  ({:.1f} ms)\n", result->reused ? "reused" : "built", file.string(), ms);
+    fmt::print("  {} samples x {} dimensions, {} clips, {:.2f} MB\n", db.sampleCount(), db.dimension,
+               db.clipNames.size(), static_cast<double>(db.stats.totalBytes()) / (1024.0 * 1024.0));
+    fmt::print("  build key {}  schema {}  source {}\n", db.build.buildKey, db.build.featureSchema,
+               db.build.sourcePackDigest);
+    return 0;
+}
+
+// Phase C §57: what is in a stored database. The pack beside it -- `<pack>/databases/x.motiondb` --
+// is read too when it is there, for the contact distribution and the licences.
+int cmdInspectDb(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const fs::path file = args.positional.front();
+    const auto db = scene::readMotionDatabase(file);
+    if (!db) {
+        fmt::print(stderr, "{}\n", db.error().message);
+        return 1;
+    }
+    fs::path packDir = args.has("pack") ? fs::path(args.option("pack")) : fs::path{};
+    if (packDir.empty() && file.parent_path().filename() == "databases") {
+        packDir = file.parent_path().parent_path();
+    }
+    std::optional<scene::MotionPack> pack;
+    if (!packDir.empty()) {
+        auto read = scene::readMotionPack(packDir);
+        if (read) {
+            pack = std::move(*read);
+        } else {
+            fmt::print(stderr, "(pack not read: {})\n", read.error().message);
+        }
+    }
+    const scene::MotionDatabaseInspection in =
+        scene::inspectMotionDatabase(*db, pack ? &*pack : nullptr);
+    fmt::print("{}", in.report());
+    std::error_code ec;
+    fmt::print("  file {} bytes\n", fs::file_size(file, ec));
+    if (args.has("categories")) {
+        fmt::print("\n{}", in.categories.report());
+    }
+    return 0;
+}
+
+// Phase C §83: what changed between two stored databases.
+int cmdDiffDb(const Args& args) {
+    if (args.positional.size() < 2) {
+        return usage();
+    }
+    const auto a = scene::readMotionDatabase(args.positional[0]);
+    const auto b = scene::readMotionDatabase(args.positional[1]);
+    if (!a || !b) {
+        fmt::print(stderr, "{}\n", !a ? a.error().message : b.error().message);
+        return 1;
+    }
+    const scene::MotionDatabaseDiff diff = scene::diffMotionDatabases(*a, *b);
+    fmt::print("{}", diff.report(args.positional[0], args.positional[1]));
+    return 0;
+}
+
+// The pack and database a session command runs on: `<pack> --db <name or file>`, loaded exactly as
+// the runtime loads them (`loadMotionAsset`), so the tool sees what a character would.
+std::shared_ptr<const scene::MotionAsset> sessionAsset(const Args& args) {
+    if (args.positional.empty()) {
+        return nullptr;
+    }
+    const fs::path packDir = args.positional.front();
+    const std::string db = args.option("db", "default");
+    const fs::path file = db.find(scene::kMotionDatabaseExtension) != std::string::npos
+                              ? fs::path(db)
+                              : scene::motionDatabasePath(packDir, db);
+    auto asset = scene::loadMotionAsset(packDir, file);
+    if (!asset) {
+        fmt::print(stderr, "{}\n", asset.error().message);
+        return nullptr;
+    }
+    return *asset;
+}
+
+// A scripted request: `--speed` m/s along a heading that turns at `--turn` rad/s, optionally
+// switching to `--speed2` at `--switch` seconds. Deterministic, so a session can be re-run.
+entity::MotionRequest scriptedRequest(const Args& args, double time) {
+    const float speed = std::stof(args.option("speed", "1.2"));
+    const float speed2 = std::stof(args.option("speed2", args.option("speed", "1.2")));
+    const float at = std::stof(args.option("switch", "1e9"));
+    const float turn = std::stof(args.option("turn", "0"));
+    const float v = static_cast<float>(time) < at ? speed : speed2;
+    const float heading = turn * static_cast<float>(time);
+    entity::MotionRequest r;
+    r.desiredVelocity = glm::vec3(std::sin(heading) * v, 0.0f, std::cos(heading) * v);
+    if (v > 1e-4f) {
+        r.desiredFacing = glm::normalize(r.desiredVelocity);
+    }
+    return r;
+}
+
+// Phase C §68/§69: run a session and explain its searches -- every one, or the first at or after
+// `--at` seconds. The query explained is the provider's own (`queryFor`), so the explanation is of
+// the decision the provider made.
+int cmdExplain(const Args& args) {
+    const auto asset = sessionAsset(args);
+    if (!asset) {
+        return args.positional.empty() ? usage() : 1;
+    }
+    const scene::MotionDatabase& db = asset->db;
+    entity::MatchMotionProvider provider(&db, &asset->pack.animation, "match");
+    const entity::MatchSettings settings = provider.settings();
+    scene::MotionExplainOptions options;
+    options.switchMargin = settings.switchMargin;
+    if (args.has("stride")) {
+        scene::MotionSearchPlan plan;
+        plan.stride = static_cast<std::uint32_t>(std::stoi(args.option("stride")));
+        plan.shortlist = static_cast<std::uint32_t>(std::stoi(args.option("shortlist", "32")));
+        plan.neighbourhood = static_cast<std::uint32_t>(std::stoi(args.option("neighbourhood", "0")));
+        options.plan = plan;
+    }
+    const double seconds = std::stod(args.option("seconds", "3"));
+    const double at = args.has("at") ? std::stod(args.option("at")) : -1.0;
+    const float dt = 1.0f / 60.0f;
+    entity::MotionMemory memory;
+    int explained = 0;
+    for (double t = 0.0; t <= seconds; t += dt) {
+        const entity::MotionRequest request = scriptedRequest(args, t);
+        const auto query = provider.queryFor(request, memory);
+        const std::uint64_t searches = provider.counters().searches;
+        entity::MotionMemory next;
+        (void)provider.advance(request, memory, t, dt, next);
+        const bool searched = provider.counters().searches > searches;
+        if (searched && query && (at < 0.0 || t >= at)) {
+            const scene::MotionMatchExplanation e =
+                scene::explainMotionMatch(db, *query, settings.weights, options);
+            fmt::print("---- t = {:.3f}s  search {}  -> playing {}\n{}\n", t, provider.counters().searches,
+                       scene::motionSampleLabel(db, next.selection), e.report(db, *query));
+            ++explained;
+            if (at >= 0.0) {
+                break;
+            }
+        }
+        memory = next;
+    }
+    const auto c = provider.counters();
+    fmt::print("session: {:.2f}s, {} searches, {} switches, {} held by margin, {} frames continued\n",
+               seconds, c.searches, c.switches, c.heldByMargin, c.continued);
+    return explained > 0 ? 0 : 1;
+}
+
+// Phase C §72: bake a scripted matching session into a MotionPack holding one clip.
+int cmdBake(const Args& args) {
+    const auto asset = sessionAsset(args);
+    if (!asset || !args.has("out")) {
+        if (asset && !args.has("out")) {
+            fmt::print(stderr, "--out <dir> is required\n");
+        }
+        return 1;
+    }
+    entity::MatchMotionProvider provider(&asset->db, &asset->pack.animation, "match");
+    entity::MotionBakeOptions options;
+    options.name = args.option("name", "baked");
+    options.seconds = std::stof(args.option("seconds", "5"));
+    options.sampleRate = std::stof(args.option("rate", "30"));
+    const auto baked = entity::bakeMotionSession(
+        provider, asset->pack.skeleton,
+        [&](std::uint32_t, double time) { return scriptedRequest(args, time); }, options);
+    if (!baked) {
+        fmt::print(stderr, "{}\n", baked.error().message);
+        return 1;
+    }
+    // The baked clip inherits the corpus's licence -- it is derived from it -- with the bake recorded
+    // in its processing chain, so its ancestry can be printed (Phase A's provenance rule).
+    scene::Provenance provenance =
+        asset->pack.provenance.empty() ? scene::Provenance{} : asset->pack.provenance.front();
+    provenance.processing.push_back(fmt::format(
+        "bake: motion matching session over database {:016x}, {:.2f}s at {:.0f} Hz", asset->db.identity,
+        options.seconds, options.sampleRate));
+    provenance.toolVersion = kToolVersion;
+    scene::PackBuildOptions packOptions;
+    packOptions.sampleRate = options.sampleRate;
+    packOptions.toolVersion = kToolVersion;
+    auto pack = scene::buildMotionPack(options.name, asset->pack.skeleton, {baked->clip}, provenance,
+                                       packOptions);
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    if (auto ok = scene::writeMotionPack(*pack, args.option("out")); !ok) {
+        fmt::print(stderr, "{}\n", ok.error().message);
+        return 1;
+    }
+    std::uint32_t switches = 0;
+    for (std::size_t i = 1; i < baked->memories.size(); ++i) {
+        switches += baked->memories[i].selection != asset->db.sampleNext[baked->memories[i - 1].selection] ? 1u : 0u;
+    }
+    fmt::print("baked {} steps ({} declined, {} switches) into {}\n", baked->steps, baked->declined,
+               switches, args.option("out"));
+    return baked->declined == 0 ? 0 : 2;
+}
+
+int cmdDatabase(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    const auto pack = scene::readMotionPack(args.positional.front());
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    scene::MotionDatabaseOptions options;
+    if (!databaseOptionsFromArgs(args, options)) {
+        return 1;
     }
 
     const auto t0 = Clock::now();
@@ -1066,6 +1686,134 @@ int cmdBenchmark(const Args& args) {
     return 0;
 }
 
+
+// `avgen-motion augment <pack> --out <dir> --legs h:k:f,h:k:f --plan kind:clip:param,...`
+//
+// Phase C §21 as a pipeline step: every planned variant is generated, gated on its own IK reach,
+// and kept only if it adds §58 coverage to the pack. The report says which were kept and why the
+// rest were not. The output pack is the input plus the kept variants, each with its heading track
+// and a provenance entry naming its source, kind and parameter under the source's licence.
+// Phase C §65: one pack from several built for the same skeleton, so a character can match on its
+// own clips and on motion retargeted onto it (the scout's corpus plus 100STYLE's sidesteps).
+// Provenance stays per clip: each input's provenance entries are carried and every clip's index is
+// shifted to its own, so a merged pack still says which clip may ship under which licence.
+int cmdMerge(const Args& args) {
+    if (args.positional.size() < 2 || !args.has("out")) {
+        fmt::print(stderr, "merge <pack> <pack>... --out <dir> [--name n]\n");
+        return 1;
+    }
+    auto merged = scene::readMotionPack(args.positional.front());
+    if (!merged) {
+        fmt::print(stderr, "{}\n", merged.error().message);
+        return 1;
+    }
+    for (std::size_t i = 1; i < args.positional.size(); ++i) {
+        auto more = scene::readMotionPack(args.positional[i]);
+        if (!more) {
+            fmt::print(stderr, "{}\n", more.error().message);
+            return 1;
+        }
+        if (more->skeletonDigest != merged->skeletonDigest) {
+            fmt::print(stderr, "'{}' was built for another skeleton; retarget it first\n", args.positional[i]);
+            return 1;
+        }
+        const auto offset = static_cast<std::uint32_t>(merged->provenance.size());
+        for (const scene::Provenance& p : more->provenance) {
+            merged->provenance.push_back(p);
+        }
+        for (std::size_t c = 0; c < more->clips.size(); ++c) {
+            if (merged->findClip(more->clips[c].name) >= 0) {
+                fmt::print(stderr, "clip '{}' is in two of the packs; a merged pack cannot tell them apart\n",
+                           more->clips[c].name);
+                return 1;
+            }
+            scene::PackClip clip = more->clips[c];
+            clip.provenance += offset;
+            merged->clips.push_back(std::move(clip));
+            merged->animation.push_back(more->animation[c]);
+        }
+    }
+    merged->name = args.option("name", merged->name);
+    const scene::PackValidation validation = scene::validateMotionPack(*merged);
+    fmt::print("{}", validation.report());
+    if (auto ok = scene::writeMotionPack(*merged, args.option("out")); !ok) {
+        fmt::print(stderr, "{}\n", ok.error().message);
+        return 1;
+    }
+    fmt::print("wrote {} ({} clips, {} provenance entries)\n", args.option("out"), merged->clips.size(),
+               merged->provenance.size());
+    return validation.ok() ? 0 : 2;
+}
+
+int cmdAugment(const Args& args) {
+    if (args.positional.empty() || !args.has("out") || !args.has("legs") || !args.has("plan")) {
+        fmt::print(stderr, "augment <pack> --out <dir> --legs hip:knee:foot,... --plan kind:clip:param,...\n");
+        return 1;
+    }
+    auto pack = scene::readMotionPack(args.positional.front());
+    if (!pack) {
+        fmt::print(stderr, "{}\n", pack.error().message);
+        return 1;
+    }
+    const auto split = [](const std::string& s, char sep) {
+        std::vector<std::string> out;
+        std::string cur;
+        for (const char c : s) {
+            if (c == sep) {
+                out.push_back(cur);
+                cur.clear();
+            } else {
+                cur.push_back(c);
+            }
+        }
+        out.push_back(cur);
+        return out;
+    };
+    scene::AugmentPackOptions options;
+    for (const std::string& leg : splitCommas(args.option("legs"))) {
+        const auto parts = split(leg, ':');
+        if (parts.size() != 3) {
+            fmt::print(stderr, "--legs entries are hip:knee:foot, got '{}'\n", leg);
+            return 1;
+        }
+        options.augment.legs.push_back({parts[0], parts[1], parts[2]});
+    }
+    options.augment.cycles = static_cast<std::uint32_t>(std::stoul(args.option("cycles", "3")));
+    options.database.config = scene::defaultBipedConfig(options.augment.legs.front().tip,
+                                                        options.augment.legs.back().tip, args.option("head", "head.x"));
+    std::vector<scene::AugmentPlanItem> plan;
+    for (const std::string& item : splitCommas(args.option("plan"))) {
+        const auto parts = split(item, ':');
+        if (parts.size() != 3) {
+            fmt::print(stderr, "--plan entries are kind:clip:param, got '{}'\n", item);
+            return 1;
+        }
+        scene::AugmentPlanItem p;
+        const std::string& k = parts[0];
+        p.kind = k == "stride" ? scene::AugmentKind::Stride
+               : k == "direction" ? scene::AugmentKind::Direction
+               : k == "turn" ? scene::AugmentKind::Turn
+               : k == "start" ? scene::AugmentKind::Start
+               : k == "stop" ? scene::AugmentKind::Stop
+               : k == "mirror" ? scene::AugmentKind::Mirror
+                               : scene::AugmentKind::Plant;
+        p.clip = parts[1];
+        p.parameter = std::stof(parts[2]);
+        plan.push_back(p);
+    }
+    auto result = scene::augmentPack(*pack, plan, options);
+    if (!result) {
+        fmt::print(stderr, "{}\n", result.error().message);
+        return 1;
+    }
+    fmt::print("{}", result->report());
+    if (auto ok = scene::writeMotionPack(result->pack, args.option("out")); !ok) {
+        fmt::print(stderr, "{}\n", ok.error().message);
+        return 1;
+    }
+    fmt::print("wrote {} ({} clips)\n", args.option("out"), result->pack.clips.size());
+    return 0;
+}
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1088,6 +1836,21 @@ int main(int argc, char** argv) {
     if (args.command == "database") {
         return cmdDatabase(args);
     }
+    if (args.command == "build-db") {
+        return cmdBuildDb(args);
+    }
+    if (args.command == "inspect-db") {
+        return cmdInspectDb(args);
+    }
+    if (args.command == "diff-db") {
+        return cmdDiffDb(args);
+    }
+    if (args.command == "explain") {
+        return cmdExplain(args);
+    }
+    if (args.command == "bake") {
+        return cmdBake(args);
+    }
     if (args.command == "reach") {
         return cmdReach(args);
     }
@@ -1096,6 +1859,15 @@ int main(int argc, char** argv) {
     }
     if (args.command == "benchmark") {
         return cmdBenchmark(args);
+    }
+    if (args.command == "quality") {
+        return cmdQuality(args);
+    }
+    if (args.command == "merge") {
+        return cmdMerge(args);
+    }
+    if (args.command == "augment") {
+        return cmdAugment(args);
     }
     return usage();
 }

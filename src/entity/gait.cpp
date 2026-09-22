@@ -91,6 +91,27 @@ float Gait::playbackRate(const GaitSettings& settings, Activity activity, float 
         // Not walking and not running: an idle, a turn, an observe. `idleRate` decides, because
         // whether that clip should be moving is a property of the *asset* -- an alien has an Idle
         // to play, a farm animal has only its Walk -- and this function cannot see clip names.
+        //
+        // **But only when the body is actually still.** A moving body's cycle must advance
+        // whatever the gait has decided to call it: a clip frozen while the ground goes past is
+        // foot skate, and eliminating that is what rate matching exists for. Keying the rate on
+        // the gait's *activity* rather than on the body's *speed* is a coupling defect -- the two
+        // agree while a body can only be at full speed or stopped, and disagree the moment it
+        // decelerates through the `moveExit` band with real speed left.
+        //
+        // ADR-620 surfaced it: before authored acceleration, speed went 3.07 -> 0 in one frame, so
+        // "the gait says Idle" and "the body has stopped" were the same instant and this branch
+        // was only ever reached at a standstill. With a ramp they separate, and a farm animal --
+        // `idleRate` 0, no idle clip -- froze its walk cycle mid-stride while still covering
+        // ground, on up to 33 frames of one run.
+        //
+        // `speed > 0` rather than a threshold, deliberately: a behaviour that is not moving the
+        // body assigns exactly zero, so the standing case is unchanged and nothing had to be
+        // picked. `rateMin` still floors the result, so a crawl does not play a walk cycle at a
+        // hundredth of its speed.
+        if (speed > 0.0f && settings.walkSpeed > 1e-4f) {
+            return std::clamp(speed / settings.walkSpeed, settings.rateMin, settings.rateMax);
+        }
         return settings.idleRate;
     }
     return std::clamp(speed / authored, settings.rateMin, settings.rateMax);

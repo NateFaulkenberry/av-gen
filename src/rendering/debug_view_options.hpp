@@ -73,6 +73,26 @@ struct DebugViewOptions {
     // Pair it with `entityBounds` + `entityOrigins`: the origin marker is the point the director
     // aims, the box is what a viewer sees, and the gap between them is the other half of ADR-262.
     bool beams = false;
+
+    // **Phase B §50: procedural animation, made debuggable without a test.**
+    //
+    // Every defect this phase found was invisible until something measured it -- a foot sliding
+    // 0.662 m, a layer arriving at full weight in one frame, an arm whose length changed as it
+    // walked. Each took a purpose-built probe, and each probe could only be written once somebody
+    // suspected the thing it measured. These toggles are the other half: they put the same
+    // quantities on the screen continuously, so the next one is *seen* before it is suspected.
+    //
+    // §46's six unauthored discontinuities are the argument. With `motionChains` on, a foot chain
+    // flashing from Solved to Clamped once per stride is visible at a glance; it took a 870-frame
+    // fixture and a control arm to find the same thing numerically.
+    //
+    // Drawn from the *layer state the frame actually ran with*, never from a re-derivation, for
+    // ADR-182's reason: a diagnostic that recomputes what it is diagnosing agrees with itself.
+    bool motionChains = false;      // IK chains, coloured by the solve's status
+    bool motionTargets = false;     // what each aim and IK layer was asked to reach
+    bool motionContacts = false;    // ground planes and the feet planted on them
+    bool motionVectors = false;     // body velocity, facing, and where the body was asked to go
+    bool motionCompensation = false;// the pelvis correction, from where it was to where it went
     // ---- Shadow Lab (§15) --------------------------------------------------------------------
     //
     // The cascades had no overlay at all: `rendering::ShadowView` carried four matrices and nothing

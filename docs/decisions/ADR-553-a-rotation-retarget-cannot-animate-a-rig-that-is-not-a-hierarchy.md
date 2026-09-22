@@ -1,6 +1,6 @@
 # ADR-553: A rotation retarget cannot animate a rig that is not a hierarchy
 
-**Status:** Proposed
+**Status:** Proposed. **The repair it names is built in ADR-624 (2026-09-21).**
 **Date:** 2026-09-20
 **Related:** ADR-337 (which joint carries travel), ADR-385 (a stated reason is not evidence),
 ADR-540 (§10.b corollary: a synthetic fixture proves something about the synthetic fixture),

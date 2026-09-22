@@ -482,3 +482,2613 @@ non-blending one: an architecture win that reads on screen as a regression.
 So the seam is proven reachable where it can be proven (the lab, with two probes each shown failing
 against a deliberate break) and left off where it would look worse. **Named as the first thing to
 fix before the provider drives production characters.**
+
+---
+
+# Phase B, second pass — the stages the scope cut had removed
+
+Scope-cut authority was revoked for A–D. This section is the running note of each outstanding
+stage as it lands.
+
+## B §19 — movement lean (the pose half of B.F)
+
+`PoseLayerKind::Lean`. Tilts the body into what it is doing: pitch from forward acceleration, roll
+from lateral acceleration plus turn rate.
+
+**Acceleration is measured once**, at the entity, beside the velocity it differences — ADR-545's
+rule one derivative out — and published on **both** seam paths (ADR-554). Lean, stride and balance
+all want it, and three subsystems differencing the same vector is how the engine got two answers to
+"where is this body" (ADR-260).
+
+Driven by the **measured** acceleration, not the desired one: a body leans into the force it is
+actually under, and one leaning into an acceleration its legs were never given is falling over on
+purpose.
+
+The clamp is a **magnitude on the pair**, so a diagonal acceleration stays diagonal rather than
+squaring off against a per-axis limit. Tested by stating the prediction as a magnitude
+(`magnitude == 9.0 ± 0.4`, `|pitch| - |roll| < 0.5`) rather than as "does it clamp" — testing.md
+#20.
+
+Measured: 3 m/s² forward gives −6.6° pitch and 0.0° roll; 3 m/s² lateral gives 0.0° pitch and
+−6.6° roll. Half weight gives half the angle.
+
+## B §8, §9, §10, §11 — start, stop, turn-in-place, strafe
+
+`entity::planLocomotion`, a pure function with its memory owned by the entity and replayed by
+`EntityWorld::seek`.
+
+**Not a second gait machine.** `Gait::select` owns the clip *family* (ADR-096) and has no notion of
+the transitional states. This reads the gait's answer and adds a phase to it — a body does not go
+from standing to walking, it goes from standing to **starting** to walking — so there is one answer
+to "which clip family" and a second, orthogonal one to "where in the arc".
+
+| stage | what it does |
+|---|---|
+| §8 start | `Starting`, with **two** exits: reaching the asked-for pace, or running out of start. The second is not optional — a body asked for 4 m/s that can only manage 0.3 would otherwise ramp its stride forever |
+| §9 stop | `Stopping`, easing the stride out to a **final step, never to zero**. A stride scale of zero is both feet in one place, which is the fade §9 forbids |
+| §10 turn | `Turning` for a body turning on the spot, distinct from `Starting` so a stride is not ramped for a body going nowhere |
+| §11 strafe | `Strafing` above 35° between heading and facing, back to `Moving` below 22° |
+
+**The braking test is the one that matters for this cast.** A stop triggers when the body is asked
+to *shed* speed (`desired < speed × 0.35`), not when it is slow. B.A measured 97 of 100 of the
+shipping cast travelling below a quarter of their authored stride — a "is it slow" test would have
+put every one of them into a permanent `Stopping`. Both arms are tested: a body that always creeps
+stays `Moving`; one that was travelling and is asked to stop goes to `Stopping`.
+
+**Flicker, measured rather than argued.** Three seconds sitting exactly on the strafe threshold,
+wobbling ±1° every frame — 180 opportunities to change phase. A single-threshold machine changes
+180 times; this one changes **at most 2**. Both mechanisms are needed and both are present: an
+enter/exit band and a minimum dwell, which is the pair `GaitSettings` already paid for.
+
+**Wired, not shelved.** The plan runs on both publish paths, the phase and its stride ramp cross
+the seam, and the stride layer **multiplies** the phase ramp into the travel ratio — two
+independent reasons a step should be shorter, rather than one overwriting the other.
+
+`MotionContext` projects it as `scene::MotionPhase` rather than importing `entity::LocomotionPhase`,
+for the reason ADR-555 gives about `LocomotionMode`: naming the entity type in a scene header would
+drag `entity/locomotion.hpp` into every pose layer and end the rule that makes a layer a pure
+function a scrub can replay.
+
+## §45 — validated on the alien, and the question it was carrying
+
+§45 asks the stack be validated on the real character rather than on fixtures. It arrived carrying
+a specific question from §5, which is better than a general one: §5's control had refuted my own
+diagnosis of a clamping foot, and the real cause was that on a chain whose steps are not ancestor
+links, `solveTwoBone` reads its bone lengths from the pose it is handed. **Is that visible on the
+shipping alien, or only on a rig I built with no slack?**
+
+It is visible. Across all 26 clips of `alien-scout.glb`:
+
+- `leg.l upper` **0.0%**, `leg.l lower` **0.0%**, `arm.l lower` **0.0%**, `arm.l upper` **21.4%**
+  (worst on `Crazy`, **14.3%** on an ordinary `Walking`).
+
+The three zeros are not "no translation channel" — all 26 clips carry translation on all eight
+joints. They are channels whose values never leave the rest translation. **The legs are safe by
+accident, not by structure**, and the rig is flat: every step of both chains is a sibling hop under
+`rig` or `root.x`, so nothing about the skeleton preserves any of these lengths.
+
+The consequence, measured rather than argued: over `Walking` the arm's `maxReach` runs
+**0.5091 m to 0.5398 m**, a 0.0307 m band — 5.7% of the arm. A Reach layer holding a fixed world
+point in that band reports `Solved` on some frames and `Clamped` on others; the hand leaves the
+target and returns once per stride.
+
+Then the conversion that the foot-lock drift needed too. At Glowmere's cast scale that band is
+6.0 cm. The valley cameras sit 170 m out at a 40° vertical field, which at 1080p is 8.7 px/m — the
+whole alien is sixteen pixels tall — so the band is **0.52 px**. At a character-scale framing it is
+**20.3 px**. Real on shipping content; invisible at the only framing that exists today.
+
+Recorded as ADR-601, with the fix deliberately not made. The obvious fix is optional explicit
+lengths on `TwoBoneChain` defaulting to "derive from the pose": structural, no-op for every existing
+caller, an afternoon. It is also exactly ADR-600 — a knob nobody sets refuses nothing, and shipping
+it would produce an ADR claiming the issue was handled and a test proving the inert default is
+unchanged. Two things have to be true first: a Reach consumer at a framing where 20 px matters, and
+a decision about `assets/farm`, whose bulls bind at 100% of their own span and are the callers a
+rest-derived length would change most.
+
+The leg zeros are asserted, not noted, because the foot lock is the layer that holds a fixed world
+point and it runs on the chain that is currently safe for no reason anyone chose. A re-export that
+keyframes a hip fails `test_alien_validation.cpp` and says which segment moved.
+
+Also from §45's gate pass over real content: 26 clips measured, 13 fail the §44 limits. That is the
+expected shape — `Dying_forward`, `Crazy` and the rest of the non-locomotion half are not clips the
+gate's foot-slide and contact-height limits were written for — but it means **the §44 limits are a
+locomotion gate, not a clip gate**, and a generator that feeds it non-locomotion source will reject
+everything it is given. Noted for §46's slice, which is where a generator first has a source.
+
+## §46 — the first true vertical slice
+
+One continuous 14.5-second run, 870 frames, driven by scripted `MotionRequest`s as §55-57 permits:
+idle → accelerate → walk → turn → curve → slope → look → slow → stop → reach → return. Top speed
+1.41 m/s, facing swept 270°, ground moved 0.00 → 0.35 m, the look layer resolved on 344 frames and
+the reach on 176.
+
+The word doing the work in "should look like a continuous character motion system, not a collection
+of disconnected demos" is *continuous*, and it is measurable: no joint may move further in one frame
+than a body at this speed accounts for. Three arms, because "nothing jumped" is satisfied by a stack
+that does nothing — continuity, then seven separate checks that the run actually happened, then a
+control arm that runs the identical script with the motion controller bypassed and must breach the
+bound.
+
+**The first run breached it by an order of magnitude, and nobody had authored any of it.** The
+causes, each measured after the previous fix: 0.803 m (the reach layer switching on at full weight
+in one frame), 0.301 m (`strideRatio` stepping 0.3 → 1.0 at a threshold), 0.231 m (the script's own
+terrain teleporting between beats), 0.150 m (the stride weight finishing its sweep in four frames),
+0.098 m (a 0.8 m reach blended over 0.25 s — a hand at 3.2 m/s), and then 0.072 m, which is the walk
+clip's own loop seam and the floor.
+
+The first was identical with the controller bypassed, which is how it was clear the controller was
+not at fault — the same shape as §5's control refuting my diagnosis of the clamping foot, and the
+second time in this phase that the arm built to check something else was the arm that found the
+answer.
+
+Recorded as ADR-602, whose two rules are:
+
+1. **A layer arrives over a stated duration**, derived from an elapsed time rather than accumulated
+   (ADR-557: the pose tier poses once on a scrub) and expressed in *elapsed seconds* rather than an
+   absolute one (ADR-086: the stack runs on the rig's clock, the driver knows the entity's — the
+   first implementation mixed them and nothing failed, because nothing rate-limits a rig with a look
+   layer yet). `blendSeconds = 0` is the old behaviour to the bit, and because a default nobody sets
+   is ADR-600, `driveLayers` sets it on the shipping `Look` drive and `LocomotionState` carries the
+   schedule, published by one helper that both `update` and `seek` call (ADR-554).
+2. **A parameter that snaps at a threshold should have been a weight.** `Gait::footSlip` returns
+   1.0 the moment activity leaves Walk — correct about the meaning, wrong about the transition,
+   because a neutral value is not neutral when the thing reading it scales by it. The ratio now runs
+   continuously to zero and the weight falls off instead; and the weight *is* the clamped ratio,
+   one coefficient rather than two.
+
+Three of the six causes were in the driver rather than the stack, and one was in the test's own
+script. That last distinction is kept rather than smoothed over: a continuity bound is only
+meaningful over inputs a world could actually present, so the fix was the script, not the bound.
+
+## §47 — performance baselines
+
+Measured on the Glowmere alien (90 joints, 26 clips), minima over five repeats, never means.
+Microseconds per character per frame, layers switched on cumulatively so each column's difference
+from the last is that kind's marginal cost:
+
+| | clip only | +stride (2) | +lean (1) | +feet (2 IK) | +look (1 aim) | +reach (1 IK) |
+|---|---|---|---|---|---|---|
+| n=1 | 4.74 | 8.87 | 8.94 | 14.37 | 18.88 | 21.43 |
+| n=10 | 4.89 | 9.06 | 9.12 | 14.55 | 19.01 | 21.59 |
+| n=50 | 4.91 | 9.08 | 9.14 | 14.55 | 19.04 | 21.59 |
+| n=100 | 4.92 | 9.07 | 9.26 | 15.03 | 19.20 | 21.91 |
+
+- **Shared cost stays shared**: +0.9% per character from n=1 to n=100. Nothing in the stack
+  duplicates the skeleton, the clips or the resolved masks per instance, and the assertion is
+  written so that it would if it did.
+- **The steady state allocates nothing**: net live heap blocks over a whole repeat is zero at every
+  count, read from the default malloc zone rather than by overriding global `operator new` — which
+  would have been a change to a binary four agents run.
+- **Baseline: 2.16 ms per frame for a hundred characters, full stack.** A measurement on this
+  machine today, not a promise.
+
+The number that does not fit the intuition is the aim layer: a look costs 4.68 µs, more than a
+two-bone IK solve at 2.75 µs. The reason is that every model-space layer calls `poseToModel` over
+all 90 joints to read one to three of them, seven times per character per frame counting the body
+compensation pre-pass. One walk measures 2.048 µs, so **the walks are 14.3 µs of the 21.6 µs total —
+66% of the stack, against solves that are the small part.**
+
+ADR-603 records that, and records that it **cannot be hoisted**: a layer writes the pose and the
+next needs model space as the previous layers left it, which is the entire content of §5's ordering
+contract. One shared rebuild at the top would be fast and silently wrong. The correct optimization
+is incremental — rebuild only beneath what the previous layer wrote — and the stack already knows
+what each layer touches, because `masks_`, `chain_` and `stride_` are resolved at bind time. That is
+§53's work, and the expected win is stated in the ADR *before* the work so that it can be wrong.
+
+## §48 — multi-character architecture
+
+§47 proved the per-character *time* does not grow with the count. §48 asks the question timing
+cannot answer, and the answer came from reading a header rather than running anything:
+`scene::SkinnedRig` holds `Skeleton skeleton` **and `std::vector<AnimationClip> clips` by value.**
+
+On the shipping Glowmere scene, after ticking the composition so its rigs are installed — counting
+straight after `loadFile` reports a confident 0.00 MB, which is `docs/testing.md` family C:
+
+- 14 rigs, **15.45 MB** of skeleton and clip data.
+- Five 90-joint aliens at **3.01 MB each**, clips **byte-identical** across all five by FNV-1a over
+  the key times and values. (The first version of the test compared clip *names and sizes*, which
+  two rigs could satisfy while animating differently in every key.)
+- **12.12 MB — 78% of the total — is a byte-identical second copy.**
+
+The five aliens are five different GLB files with different meshes shipping the same 26-clip pack,
+so the duplication is in the assets as well as in the instancing: one of each character already
+carries five copies.
+
+12 MB is not alarming, which is why ADR-604 records the extrapolation instead: **a hundred
+characters of this rig is 301 MB of animation data of which 298 MB is the same bytes.** The fix
+belongs at load — `AssetRegistry` already keys by source path, every consumer already takes
+`const std::vector<AnimationClip>&`, and ADR-550's digest already answers the identity question. The
+part that makes it more than a five-line change is that `analyse` writes `clipPhases` and
+`clipContacts` *parallel to* `clips` and `rootMotion` binds by clip index: per-rig results derived
+from what would become shared input.
+
+The other half of §48 is in good shape and is now asserted: per-instance state really is
+per-instance — two rigs from the same file have separate storage and posing one leaves the other
+untouched.
+
+## §52 — visual regression, numerically
+
+`tests/data/motion-baseline.txt`: 335 named quantities in metres, recorded for the alien under the
+full seven-layer stack at sixteen samples of one walk loop — joint positions for six tracked joints,
+foot contact heights, and per-sample pose continuity. Compared at 0.1 mm, which is loose enough that
+a fused multiply-add does not fail it and five hundred times tighter than the smallest effect
+measured in this phase (the 0.052 m foot slide).
+
+Named quantities rather than a checksum, deliberately. A screenshot diff and a hash both answer "is
+this different" with a number nobody can act on; this one says *which joint, at which sample, by how
+many millimetres*. Falsified by nudging the reach target 1 cm: it named `hand.l.x` at every sample
+and printed the delta.
+
+The regeneration escape hatch (`AVGEN_WRITE_MOTION_BASELINE=1`) is necessary and is also how this
+kind of test dies — a regression appears, someone regenerates, the diff is a wall nobody reads. The
+mitigation is that the file is small, human-readable and in metres, so regenerating puts the change
+in front of a reviewer instead of hiding it in a hash.
+
+## §53 — profile before optimizing
+
+The profile was §47's. `PoseLayerStack::ensureModel` now keeps `model_` valid across the layer loop
+and recomputes only the joints a previous layer wrote, plus their descendants — found by **diffing
+the pose**, not by consulting each layer's mask, because the mask is a claim and a layer that wrote
+outside it (which is `docs/testing.md` #25, and has already happened once in this phase) would hand
+the next layer a stale model space with nothing to fail.
+
+| | before | after |
+|---|---|---|
+| full stack, per character per frame | 21.91 µs | **14.1–14.3 µs** |
+| 100 characters | 2.16 ms | **1.41 ms** |
+| adding one more model-space layer | 2.64 µs | **1.05 µs** (a full walk is 2.10 µs) |
+
+**ADR-603 predicted the stack would approach 4.9 µs, and it did not — it is three times that.** The
+first `ensureModel` of each frame follows the clip sample, which changes every joint, so one full
+walk per frame is a floor rather than something the optimization removes. Seven walks became one
+walk plus six dirty-set passes, and a dirty-set pass is not free. Recorded as ADR-605: the win
+reported alone is a success, and the win against a stated expectation is a success plus a corrected
+model of where the time goes.
+
+§52 is what makes it safe: the incremental rebuild changed **none** of the 335 baseline quantities,
+to 0.1 mm. An optimization to a solver that cannot show its output unchanged is a rewrite.
+
+## §54 — the final pipeline, and who owns what
+
+§54 requires this before Phase B can be declared complete. The pipeline, in the order it runs, with
+the owner of each decision named — because most of the defects found in this phase were two owners
+answering the same question, or none answering it.
+
+```
+CHARACTER INTENT (entity tier — re-simulated on a seek, so it may remember)
+  CharacterIntent -> planLocomotion -> MotionRequest
+    |
+    v
+  stepMotion(MotionRequest, MotionState, MotionLimits, dt) -> MotionSolution
+    velocity, facing, acceleration, speed, turnRate            [§35, ADR-545]
+    |
+    v
+  LocomotionState  <- THE SEAM. Published by BOTH EntityWorld::update and
+                      EntityWorld::seek, field by field           [ADR-554]
+    |
+================ tier boundary: below here nothing may remember ================
+    |
+    v
+  MotionContext    <- built per frame by driveLayers from the seam, converted
+                      into the rig's frame through the node's world transform,
+                      because a posed rig has no world position   [ADR-274]
+    |
+    v
+  BASE POSE        <- AnimationPlayer samples the clip (or a MotionProvider
+                      produces it) into a rest-seeded Pose
+    |
+    v
+  POSE LAYER STACK, in `poseLayerStage` order, not file order     [§5]
+      10 Stride     scales foot excursion to the travelled distance
+      20 Lean       leans the spine into acceleration and turn
+      30 Secondary  breathing and settle; a pure function of the timeline second
+      40 Aim        head/eyes toward the look target
+      50 Additive   a reaction played over the base
+      60 Foot       plants the feet on the ground plane
+      70 Reach      a hand to a target
+    each layer:  ensureModel -> read -> write joints -> mark the model dirty [§53]
+    |
+    v
+  BODY COMPENSATION   pelvis moves so the feet can reach          [pre-pass + stage]
+    |
+    v
+  FINAL POSE -> skinning palette
+```
+
+**Who owns translation.** The entity tier, exclusively, and there is exactly one authoritative
+movement result (ADR-337). Layers rotate; the two that translate — Stride scaling an excursion and
+Body Compensation moving the pelvis — do so in the rig's own frame and never in the world's. Root
+motion is applied by `applyRootMotionCompensation` *before* the layers, and the two writes are equal
+and opposite so the drawn body does not move.
+
+**Who owns rotation.** The layers. `solveTwoBone` returns two model-space pre-rotations rather than
+composed local transforms, because the caller is the only thing that knows what a local transform is
+on a given rig — and reporting them separately is what lets a partial-weight caller slerp each
+towards identity without the knee's share depending on the hip's.
+
+**Who owns contacts.** The Foot layer owns the *solve*; `IGroundQuery` owns the *answer*, and "no
+answer" is not "no ground" (ADR-551). The entity owns the smoothing of the ground plane, and the
+layer owns the solve against it: everything above `groundPoint` in `LocomotionState` is stateful and
+re-simulated on a seek, and everything below it is a pure function of the pose and that plane
+(ADR-359).
+
+**Who owns IK.** `scene::ik` owns the mathematics and nothing else. It is a pure function of the
+chain it is handed, which is why full extension is a safe default — the next frame does not start
+from this frame's answer, it starts from the animated pose. A limb is three *named joints* and a
+write-back rule, not an ancestor chain (ADR-543), and the price of that is ADR-601: on a rig that is
+not a hierarchy the bone lengths are a property of the frame.
+
+**Layer ordering** is a contract, not a convention (§5). `poseLayerStage` returns the stage;
+`rebind` sorts by it with `std::stable_sort`, so two foot layers stay left-then-right. The order is
+asserted twice — as an order and as an outcome — with a foot-layer-alone control.
+
+**Data ownership.** Shared: `Skeleton`, `AnimationClip`s, resolved masks, chain definitions,
+retarget profiles. Per-instance: `Pose`, `PoseLayerStack` state, `MotionState`, velocity, phase,
+targets, seeds. §47 measured that the *time* does not grow with the count (+0.9% from 1 to 100);
+§48 measured that the *data* does — 78% of the shipping scene's rig memory is a byte-identical second
+copy, and ADR-604 says where the fix belongs.
+
+**Offline / runtime boundary.** Offline: clip analysis (`analyse`, contact tracks, phase tracks),
+motion database construction, variant generation and its quality gate (§41–§44), travel
+classification (ADR-552). Runtime: everything in the diagram above. The rule that keeps the boundary
+honest is that **the offline side may measure the runtime side, and the runtime side may not depend
+on having been measured** — an unmeasured metric never fails a gate, which is correct, and the
+caller configures the gate, which is what makes it able to refuse (ADR-600).
+
+**The one rule that decides the tier boundary**: the entity tier is re-simulated by
+`EntityWorld::seek`, so anything it accumulates is reconstructable at frame N by construction. The
+pose tier poses the rig *once* on a scrub, so it may never accumulate — a foot lock anchor is
+derived (ADR-557), a layer blend is derived from an elapsed time (ADR-602), and a model-space cache
+is invalidated rather than carried (§53).
+
+### Known limitations, stated rather than discovered later
+
+- **ADR-601**: on this rig the solver's reach depends on the frame. Real, sub-pixel at Glowmere's
+  framing, 20 px at a character-scale one, deliberately unfixed.
+- **ADR-604**: five aliens carry five byte-identical copies of the same 26-clip pack; a hundred
+  characters would be 301 MB of which 298 MB is the same bytes.
+- **`Gait::footSlip` still has the threshold** ADR-602 describes. The correct driver shape is
+  demonstrated in the slice; changing the function itself lands on `assets/farm`.
+- The §44 quality limits are a **locomotion** gate, not a clip gate: 13 of the alien's 26 clips fail
+  them, which is the expected shape for `Dying_forward` and `Crazy` and a trap for any generator fed
+  non-locomotion source.
+- The remaining per-frame cost is one full hierarchy walk plus six dirty-set passes (ADR-605).
+
+### Phase C integration points
+
+`IMotionProvider` already splits `advance` from `pose` (ADR-556) so a seek can replay 5,400 steps
+and pose once. `MotionChain` already orders Neural → Matching → Clip with fallback. `MotionDatabase`
+and `searchMotion` exist with feature vectors and continuity cost. Phase C replaces what produces
+the base pose and changes nothing below `MotionContext`.
+
+## §49 — deterministic randomness
+
+My own audit marked this done, and it was wrong. §49's second sentence — "do not use uncontrolled
+global randomness" — was satisfied: the secondary layer is a pure function of the timeline second
+(ADR-360). Its **first** sentence names two fields, `characterSeed` and `layerSeed`, and neither
+existed. Variation was hand-authored, one `phase` per layer per character typed into the scene file.
+**Hand-authored spread is not a seed; it is the absence of one, done by hand.** Five aliens can be
+spread that way and a hundred cannot.
+
+`seedPhase(characterSeed, layerSeed)` is a bit-mixer — no state, no sequence, no order dependence —
+hashed into a phase offset rather than into a generator, with `seedPhase(0, 0)` exactly `0.0f` so an
+unseeded layer is byte-for-byte unchanged. `seedFromName` is FNV-1a rather than `std::hash`, whose
+value is explicitly allowed to differ between runs of the same program, which would make a
+"deterministic" seed reproducible only by accident. Because a knob nobody sets refuses nothing
+(ADR-600), `driveLayers` seeds every layer it drives, from **names** rather than indices: an index
+changes when someone reorders a scene file, and a render that changes because two characters swapped
+places in a JSON array is what §49 exists to prevent. The authored `secondaryPhase` survives as an
+offset on top, rather than being replaced when it happens to be zero.
+
+Measured: a hundred seeded characters, closest pair 0.00002 apart, largest empty gap 0.0583 against
+a 0.25 bound a corner-piling hash would fail. Recorded as ADR-606.
+
+## §50 — editor / debug visualization
+
+What makes this stage load-bearing rather than cosmetic: every defect this phase found was invisible
+until something measured it, and **a probe can only be written once somebody suspects the thing it
+measures**. An overlay works the other way round.
+
+Five toggles beside the existing `Skeletons` one in the World panel, drawn in
+`buildDebugGeometry` — which is testable without a GPU, so the geometry is read back and asserted
+rather than eyeballed:
+
+- **IK chains**, coloured by what the solver said: green solved, amber clamped, red degenerate. The
+  colour is the diagnostic; a chain drawn the same whatever the solve returned is a picture of a leg.
+- **IK targets**, with a line from the thing asked to reach them, so "the hand is off the target"
+  and "the target is not where you think" are different pictures.
+- **Contacts**: the plane under each foot and the gap to the foot — absent, not flat, when there is
+  no ground, because no answer is not no ground (ADR-551).
+- **Motion vectors**: velocity, acceleration and facing, from the state the layers actually ran with.
+- **Body compensation**: where the body joint was and where the solve moved it, red when a limb
+  still cannot reach — "it ran" and "it worked" are different answers.
+
+Everything reads the **realized** weight, not the requested one: a layer at requested 1.0 and
+realized 0.02 is two frames into a blend, and an overlay showing the request would draw §46's defect
+as though it were not happening.
+
+`Composition::MotionDebug` gained the numeric half — per-layer name, kind, requested and realized
+weight, resolution, IK status — plus mode, phase, ground speed, turn rate and the body correction.
+Gathered in the seam rather than in ImGui so it is testable without a GPU and without a panel: the
+numbers are the part that can be wrong, and **a panel that renders wrong numbers correctly is not
+debuggable, it is convincing.** I cannot see ImGui, so what is claimed here is that the data is
+right and the panel is a thin reader of it.
+
+Arms that can fail: each toggle draws nothing when off; moving a reach target out of range recolours
+12 of 36 chain vertices and **not** the other 24, so the diagnostic distinguishes the limb that
+clamped from the two that did not; and `hasGround` false draws nothing at all rather than a plane
+at zero.
+
+## §51 — the audit against the matrix
+
+Twenty-four rows in §51's own list. Eighteen were already covered and are cited by file and test
+name in `tests/unit/test_phase_b_matrix.cpp`'s header. Six were gaps, and two of the six were
+findings rather than formalities:
+
+- **Contact release.** Before §46 a released contact dropped the foot **0.200 m in one frame** — the
+  same defect §46 found on the reach layer, on a different layer, missed by the six-cause list
+  because the slice's script never released a contact. §46's blend fixes it structurally, which is
+  the argument for having put it on `PoseLayer` rather than in the reach code: measured now at
+  0.0231 m worst frame over a 0.25 s release.
+- **Lowered ground.** My row asserted symmetry and failed. Raising the ground 0.20 m moves the foot
+  0.1999 m; lowering it 0.20 m moves the foot 0.0119 m. The engine is right: the alien binds with
+  its leg nearly straight, so there is no slack to extend downward and the solve clamps. **A foot
+  layer alone cannot follow ground that falls** — that is what body compensation is for. The
+  expectation was wrong, not the code.
+
+The other four: elevated ground, a moving reach target (worst tracking error 0.00000 m, worst hand
+step 0.0022 m over 121 frames), and secondary motion **bounded** (1.4993° against an authored 1.5°
+over six minutes) and **stable** (bit-identical one period later, and different half a period later,
+so the check is about the period rather than about the layer doing nothing).
+
+The bounded/stable probes first read **exactly 0.00000 m** because they measured the head's
+*position* on a flat rig, where rotating a sibling moves nothing. That is `docs/testing.md` #33, and
+the second confident zero this rig has produced in one phase.
+
+# Phase C
+
+## §6 and §17 — the database's memory and the scan's cost, measured before anything is built on them
+
+ADR-606 is the standing rule for a phase that arrives with sixteen sections already marked done,
+and it paid on the first pass. `MotionDatabase` genuinely satisfies §4, §5, §7, §8, §9 and §13 —
+struct-of-arrays with indices rather than poses, versioned, `mean`/`scale` normalization,
+data-driven `MotionFeatureConfig`, a tag bitset. It even carries `featureBytes` and `metadataBytes`,
+which is what made §6 look done. **Nothing had ever exercised them at scale.** The alien's 26 clips
+come to a few thousand samples; §6 names a million, and the three scales it names are the
+deliverable. *A field that reports a number is not a measurement of that number.*
+
+Feature dimension 33 floats = 132 bytes, plus five 4-byte per-sample fields = **152 bytes/sample
+exactly**, asserted as arithmetic rather than as "roughly linear" — which is what would catch
+somebody adding a `std::string` or a `Pose` to the per-sample data, the failure §5 and §6 exist to
+prevent.
+
+| samples | features | metadata | total | per sample |
+|---|---|---|---|---|
+| 10,000 | 1.26 MB | 0.19 MB | 1.45 MB | 152.0 |
+| 100,000 | 12.59 MB | 1.91 MB | 14.50 MB | 152.0 |
+| 1,000,000 | 125.89 MB | 19.07 MB | **144.96 MB** | 152.0 |
+
+§17's benchmark, taken **before** §16's two-stage search rather than after, for ADR-603's reason —
+a number written down beforehand can be wrong, and an optimisation whose starting point was never
+recorded cannot be shown to have helped:
+
+| samples | µs per query | queries per 60 Hz frame |
+|---|---|---|
+| 10,000 | 360.8 | 46 |
+| 100,000 | 3,627 | 5 |
+| 1,000,000 | **36,492** | **0** |
+
+**One query at a million samples takes 36.5 ms — more than two whole frames, for one character.**
+Scaling is 101x for 100x the samples, so the scan is honestly linear and the linear scan is the
+right first implementation and the wrong last one. That is §16's justification, measured rather than
+asserted.
+
+The benchmark asserts it actually scanned: every sample carries the required tag, so `considered`
+equals the sample count and `rejected` is zero. A filter that had quietly emptied the candidate set
+would otherwise have produced a very fast and completely meaningless number.
+
+**And the cross-phase catch.** §4 says the database "should be … shared between character
+instances", which is the kind of clause that reads as tidiness. At 144.96 MB it is not: a hundred
+characters each holding one is 14.5 GB. Phase B §48 found exactly this failure one tier up —
+`SkinnedRig` holds its `Skeleton` and every `AnimationClip` by value, and 78% of the Glowmere
+scene's rig memory is a byte-identical second copy (ADR-604) — and it would be invisible to §47's
+timing here for the same reason it was there. `MatchMotionProvider` holds a `const MotionDatabase*`,
+so it is correct today; a hundred providers are now asserted to point at the same `features.data()`,
+because *"it is a pointer today" is not a property anything checks.*
+
+## §15, §17 and §19 — the correction, and what survives it
+
+Re-reading §15 and §17 after writing the §6 benchmark caught that benchmark, an hour old, by the
+author who had just written ADR-606 about exactly this. §15 demands **real** motion distributions as
+the primary benchmark and mine was synthetic; §17 names **1,700 frames**, **average** and
+**worst-case** latency and **build time**, and mine started at 10,000 and reported only a minimum.
+
+What survives is the useful part: a linear scan touches every sample whatever the values are, so
+its cost is distribution-independent and the synthetic timing is valid *as a measurement of a
+linear scan*. Filtering effectiveness and first-stage recall are not distribution-independent at
+all. **Synthetic data may time the scan; only real data may judge a filter or a first stage.**
+
+The real Glowmere database, built from `alien-scout.glb` through `buildMotionPack` and
+`buildMotionDatabase`:
+
+- **26 clips, 1,738 samples, dimension 33** — §17's "1,700 frames" is the actual content, not a
+  round number, which says real-data-first is the intended reading rather than a caution.
+- **0.252 MB at 152.0 bytes/sample**, the same per-sample arithmetic as the synthetic table, which
+  cross-checks both.
+- Build: **32.7 ms** for the pack, **77.2 ms** for the database.
+- Query latency over 500 queries seeded from inside the real distribution: **best 8.88 µs, average
+  9.25 µs, worst 17.46 µs** — worst about twice average, and **955 characters per frame at 60 Hz on
+  the worst case**.
+
+**So §16's two-stage search is justified by the million-sample case and by nothing in this
+repository today.** At present content the linear scan is comfortably correct. Saying so is what
+stops the two-stage search being built for the wrong reason and then defended with a benchmark that
+never needed it.
+
+The benchmark's control: a query seeded with sample 579 returns sample 579 at cost 0.000000.
+Without it every latency number could have been the cost of a fast refusal.
+
+## §10 — the cost function, and seven weights that weighted nothing
+
+§10 was among the sixteen sections Phase C inherited as done, and `MotionFeatureConfig` carries
+exactly the seven weights §10 asks for — which is what made it look met.
+
+**Five of the seven were read by nothing at all.** `jointPositionWeight`, `jointVelocityWeight`,
+`trajectoryPositionWeight`, `trajectoryFacingWeight` and `rootVelocityWeight` appeared in no
+translation unit outside their own declaration. The two that *were* read, `phaseWeight` and
+`contactWeight`, were used only as `> 0` presence tests deciding whether to include a dimension:
+setting one to 2.0 rather than 0.5 changed nothing at all. The search summed every dimension with
+weight 1, so the cost was a single undifferentiated squared distance — **precisely the opaque
+scoring function §10 names, with a tuning surface bolted to the outside of it that did nothing.**
+
+That is ADR-558's family, a control that does nothing, and it is worse than an absent control
+because an absent one is obviously absent.
+
+Fixed by deriving a per-dimension weight vector from the config and applying it in the scan.
+Deriving rather than baking is the load-bearing choice: **a weight is now tunable without
+rebuilding the database**, because the features are unchanged and only what they are multiplied by
+differs. `motionFeatureLayout` states the dimension layout once, so the weights and the breakdown
+cannot drift from what `buildMotionDatabase` writes.
+
+§10's other half — "avoid an opaque scoring function" — is `MotionCostBreakdown`, computed **once
+for the winner** rather than accumulated per candidate: per candidate it would cost seven
+accumulators on every one of a million samples to produce a number thrown away for all but one, and
+the early-out means a losing candidate's partial sums would be wrong anyway.
+
+The probe is built so it fails if the weights ever go inert again: two candidates are made wrong in
+*different groups* by the same amount, so they tie at equal weights, and raising one group's weight
+must flip the answer — impossible unless the weight is read. Both directions are asserted, so it is
+a test of the weights rather than of a tie-break, and nothing touches `db.features` between the
+three searches, which is what demonstrates the tunable-without-rebuild property. Shown failing by
+forcing the weights off: four assertions fail, which is the state the code was actually in.
+
+The breakdown asserts `total() == cost`, so it cannot become a decorative second opinion that
+drifts from the number actually used to choose.
+
+**§11 and §12, audited and recorded rather than changed yet.** Continuity is binary: a candidate
+that is literally `sampleNext[current]` pays nothing and *everything else* pays the full penalty —
+so the sample two frames later in the same clip is penalised exactly as hard as a sample from an
+unrelated clip. §11 lists "current sample, previous sample, source clip, phase, root velocity,
+transition distance" as inputs, and a next-or-not flag is the crudest possible reading of that.
+§12 is met in the respect it cares about — it uses tag metadata, never clip names, which is its one
+explicit prohibition — but is likewise binary. Both are next.
+
+## §16 — the two-stage search, and what recall hid
+
+**The disclaimer first**, because it belongs with the justification: on this repository's content a
+linear scan is comfortably correct — 1,738 samples, 17.46 µs worst case, **955 characters per frame
+at 60 Hz**. §16 exists for the scale §6 and §17 ask about, where one query is **36.5 ms**. A future
+reader finding a two-stage search here should not conclude the linear scan was inadequate.
+
+Swept on **real** Glowmere motion, 249 queries drawn from inside the distribution and perturbed so
+the answer is not trivially the seed. A typical candidate on this database scores 69.72 worse than
+the best one, which is the denominator that makes an excess mean anything:
+
+**Corrected.** The percentages below were first published against an *unweighted* cost spread of
+69.72; the feature-distance sweep found that denominator was in the wrong space and the correct,
+weighted value is **52.57**. The excesses are unchanged — they are differences of weighted search
+costs and only the scale moved — so every percentage rises:
+
+| plan | recall | worst excess | **× the typical gap** | samples fully scored |
+|---|---|---|---|---|
+| stride 8, prefix 12, top 32 | 94.4% | 60.60 | **1.15×** | 2320 |
+| stride 8, prefix 12, top 128 | 99.6% | 48.93 | **0.93×** | 1873 |
+| stride 8, full prefix, top 32 | 96.8% | 59.49 | **1.13×** | 2278 |
+| **stride 4, full prefix, top 32** | **99.6%** | **2.19** | **0.04×** | **84** |
+
+Reported as a **multiple**, not a percentage. A column headed "% of spread" reading 115.3% looks
+like a bug to any reader meeting it cold, and the explanation lived in a document rather than at the
+number — the exact thing three remedies tonight converged on fixing. A multiple carries no
+implication of a ceiling.
+
+**The finding got stronger, and the headline changes.** Three of the four plans have a worst-case
+miss that **exceeds the entire good-to-typical spread** — so the miss is not merely "as bad as a
+random candidate", it is **worse than a typical candidate**.
+
+**A percentage over 100 is legitimate here and not a bug**, which has to be said or a reader will
+assume arithmetic error. `costSpread` is a *typical-minus-best* gap: the mean, over probes, of how
+much worse an arbitrary distant sample scores than the best available. **A worst case is not bounded
+by a typical case.** A search that misses badly can land on something worse than the arbitrary
+sample the scale was built from, and three of these plans do.
+
+**The recommendation is unchanged**, which matters so nobody reads a correction as a reversal:
+stride 4 at full prefix survives at 4.2%, and it was and remains the plan to pick.
+
+**94.4% recall hides that the misses land 86.9% of the way to a random sample.** That matcher does
+not pick a slightly different frame of comparable motion; it picks different motion. And the
+99.6%-recall plan at stride 8 is *still* 70.2% when wrong — **raising recall did not make the
+failures benign.** ADR-559's family in a new place, and the opposing quantity is severity.
+
+Getting the denominator right took three attempts, and the wrong two are recorded because they are
+the instructive part: `staged/full` reported **2957x**, because a query drawn from the database sits
+near a sample so the best cost is near zero — *a ratio whose denominator can approach zero measures
+the denominator*. Excess against the mean best cost was the same defect one step removed. Only the
+measured gap between a good match and a typical one is a scale on which "how bad is this miss" has
+an answer.
+
+**And the cheap prefix bought nothing.** The textbook design ranks coarsely on a prefix; here the
+full-prefix plan at stride 8 was barely better than the 12-dimension one. The entire win is the
+stride, and the safe plan is stride 4 at full prefix: **84 samples fully scored against 1,738, a 20x
+reduction at 99.6% recall and a 3.1% worst case.** Recorded as ADR-609.
+
+## §11 — graded continuity, measured and rejected
+
+§11 names its own metric: *"constantly jump between unrelated clips"* is a **rate**, so it is
+measured by running the matching loop, not by scoring a query.
+
+| continuity | clip jumps/s | mean index step | stalled | worst excess |
+|---|---|---|---|---|
+| binary | 0.50 | 2.47 | **0%** | 0.0612 |
+| graded 0.5–4.0/s | 0.50 | 1.81 | **13%** | 0.0612 |
+
+**Identical jump rate at every rate tried, and the loop stands still on 13% of steps.** The reason
+is structural: a penalty proportional to the distance from the current sample is *zero for the
+current sample*, so not moving is free and the matcher freezes rather than continuing. A freeze is
+the worst outcome wearing the appearance of the best, because a frozen matcher also reports zero
+jumps. Kept at its inert default with the measurement recorded (ADR-610), so a second attempt can
+see it was tried and why it failed — a working version must penalise *not advancing*, which needs
+§11's "previous sample" input as well.
+
+**The fixture was vacuous first.** It queried with `sampleNext[current]`, so the natural
+continuation was always the answer and continuity never decided anything; it reported **0.00 jumps
+per second for every configuration**. Caught by this repository's own rule that an exact zero is a
+reading to distrust. And the vacuous version **carried the evidence of the freeze all along** —
+index step 0.15 against 1.82 — in a test whose headline metric said everything was fine. A probe
+that cannot fail does not merely prove nothing; it can present a real fault as a success.
+
+## §12 and §14 — the transition term does something, and filtering removes 82%
+
+**§14, whose deliverable is "measure how much it helps", measured on the real database:**
+
+| | scored | rejected | time |
+|---|---|---|---|
+| unfiltered | 1738 | 0 | 9.50 µs |
+| require `Locomotion` | 307 | **1431 (82%)** | **4.08 µs (2.33x)** |
+
+The tag distribution is reported first, because **a filter's value is a property of the corpus, not
+of the filter** — on a pack where every sample carried the same tag it would be exactly zero however
+well written it was. Locomotion 18%, idle 14%, walk 15%, run 3%, turn 7% — **and cyclic, travelling
+and oneshot are carried by zero samples.** Three tags with no writer, which is ADR-608's family seen
+from the other side, and worth knowing before anything is built that filters on them.
+
+**§12** is correct in its one explicit prohibition — it keys on tag metadata, never on clip names —
+and it is now checked the way ADR-608 says every configured term must be: make it large and see the
+answer change. With the transition weight at zero the idle wins on features alone; at 0.5 the walk
+wins. Continuity is pinned to zero in both arms so only the transition term differs.
+
+**And the winner's breakdown reports a transition cost of zero, correctly.** The penalty did its
+work on the candidate that *lost*; the chosen sample stayed in the family and paid nothing. A
+breakdown answers "what did this cost", not "what changed the decision" — **a term can be decisive
+and read as zero** — so the penalty is confirmed separately on a query whose surviving choice does
+have to cross. Recorded in ADR-611 as a corollary, because anyone debugging a choice through §50's
+read-out will hit it.
+
+## §13 — the tags, and a seam that dropped one
+
+§14's tag distribution raised the right question, and it is not whether the vocabulary is
+well-formed: **for each tag, is there a writer, a reader, or only one end of the contract?**
+
+| tag | writer | in the database | verdict |
+|---|---|---|---|
+| Locomotion, Walk, Run, Idle, Turn | clip names / authored tags | 18% / 15% / 3% / 14% / 7% | connected |
+| **Cyclic** | `analysis.phase.cyclic` | **0% → 95%** | **was a broken seam** |
+| Travelling | `analysis.travels` | 0% | unreachable, correct verdict for the wrong reason |
+| OneShot | `!clip.loop` | 0% | **no writer on this path** |
+
+**`Cyclic` was the real finding, and it was better than "no writer".** `buildMotionDatabase` called
+`analyseClip(skeleton, clip, {}, 0, {})` — with an **empty contact-joint list** — so the phase
+analysis had no foot plants and `cyclic` came back false for every clip of every pack. Meanwhile
+`buildMotionPack` had already computed it correctly, with the real contact joints, and stored it:
+**25 of the alien's 26 clips are cyclic in the pack, and zero samples carried the tag.** The
+database threw away a correct answer and recomputed it with the inputs missing.
+
+It now reads what the pack stored — one statement of a fact, several readers, the rule
+`motionFeatureLayout` already follows — and the tag goes **0% → 95%**. A filter on `Cyclic` would
+not have sat inert; it would have emptied the candidate set and returned a confident answer computed
+over nothing.
+
+**`OneShot` genuinely has no writer here.** `PackClip::loop` defaults to `true` and is assigned in
+exactly one place — deserialising a pack from JSON — so a pack built from a rig has every clip
+looping, `Dying_forward` included. Recorded rather than fixed: deciding whether a take loops is a
+judgement about content and belongs with the clip analysis, not bolted onto the tagger.
+
+**`Travelling` stays 0, and it is the right answer for the right reason — my first write-up of this
+said otherwise and was wrong.** I claimed the tag was unreachable because the database passes an
+empty contact list. It is not: `analyseClip` computes `travels` from `measureRoot`, whose inputs are
+the travel joint's translation track and the rest height, and whose verdict is
+`extent > restHeight`. Contacts are not an argument to it; the only thing `ContactSettings{}`
+contributes is a 30 Hz sample rate, which is the alien pack's authored rate. **The tag is reachable
+and working**, and reads 0% because ADR-540 holds: every locomotion clip here is authored in place,
+and the five clips whose root moves more than 5 cm are deaths that fall far short of a rest height.
+
+That correction matters more than the fact. *"Travelling remains unreachable"* was a claim in the
+codebase that no test could disagree with — ADR-385, and the same shape as the dead weights and the
+one-ended tags. The next reader concludes the tag is vestigial and deletes it, or works around a
+mechanism that already works.
+
+What *is* wrong there is the cost: the call runs `detectContacts` and `extractPhase` over every
+clip, discards both, and keeps one boolean. The clean fix is the one `phase` just received — have
+the pack store the verdict it already computed — and it is noted for §37's offline/runtime boundary.
+
+## §18 and §19 — the database reproduces its own content
+
+§18 puts a number on the corpus — "only ~1,712 frames … useful for correctness, **not** sufficient
+to prove motion matching quality" — which is the measured 1,738 again, and the third time C's text
+has quoted this repository's own content back at it.
+
+§19's one falsifiable clause is that **the database should be able to reproduce existing animation
+behaviour**, and it is the clause everything downstream assumes silently. Measured by driving the
+matcher along each clip the database was built from, querying with the *next* frame's features
+perturbed so no query lands on a sample, and judging the loop on whether it stays on the clip:
+
+- **19 clips long enough to follow, mean 100.0% of steps stayed on the clip**, worst-case drift 0
+  frames — the matcher reached the exact sample asked for, every step, on every clip.
+
+**The companion assertion was wrong in the instructive direction.** I first asserted
+`worstDrift > 0`, where drift is the *error* between the sample matched and the sample wanted — so
+it demanded the matcher be imperfect, and failed on a run that tracked every clip exactly. A
+companion metric must count that **something happened**, not that something went wrong; those are
+opposite quantities, and they are easy to confuse precisely because ADR-611 is about metrics that
+cannot see failures. The correct companion is that the loop *advanced* — a new sample on 1.00 of
+steps — so 100% on-clip cannot be earned by a matcher returning one sample forever.
+
+**§20 is blocked on data this repository does not have.** It requires a 100STYLE subset, and §18 is
+explicit that third-party licensing must be verified rather than assumed and that dataset terms are
+not interchangeable with code terms. Downloading and repackaging an external corpus is not something
+to do on an assumption, so §20 is recorded as blocked on a licensing check and an import rather than
+attempted with substitute data — which would measure the substitute.
+
+### A note on Phase C's illustrative figures
+
+Three of C's sections quote numbers that turn out to be this repository's own content, each slightly
+stale: §17's "1,700 frames" and §18's "~1,712 frames" against the measured **1,738**, and §6's round
+ladder against a real per-sample size of 152 bytes. **The specification was written with this corpus
+in view, so its figures are stale measurements rather than targets.** Anyone treating one as a
+requirement will be tuning to a number nobody measured. The useful reading is the opposite one: when
+a spec's example matches the repository's actual content, the example is evidence about intent —
+here, that real-data-first was meant literally.
+
+## §20 — RUN. The corpus arrived, and one of the three answers went against the hypothesis
+
+**Superseded by ADR-614; the section below is kept as the record of what was unknown and why.**
+
+100STYLE is **CC BY 4.0** (not CC0 — the first determination said CC0 and was corrected; see
+`docs/dependencies.md`), and `assets/100STYLE-ATTRIBUTION.md` records the exact subsets, their
+digests and the commands. Two subsets, 434,478 and 279,735 database samples, against Glowmere's
+1,738.
+
+Against the four local results this section listed as needing §20:
+
+- the **stride-4, full-prefix** plan: **survives outright** — 98.3% → 98.4% recall at 33
+  dimensions, with the cost of a miss falling from 0.38× to 0.02× of the typical gap. The finding
+  that *the cheap prefix bought nothing* does **not** survive: free on Glowmere, where it beat
+  full-prefix 94.8% to 94.5%, and **−23.1 recall points** at scale;
+- the **69.72 cost spread**: the spread is the one figure that transferred, moving only 32.76 →
+  31.82 across a 250× corpus under this instrument, so severity numbers expressed against it carry
+  better than expected;
+- the **82% rejection rate** and the **95% `Cyclic` share**: not re-measured — both are properties
+  of the tag distribution, and the 100STYLE pack tags every clip alike.
+
+**And §30's contact verdict, which has carried "on this corpus" since it was taken, has now met the
+content it was written for.** On 100STYLE's `TR1` transition files contacts are **not inert**: they
+change the matcher's behaviour substantially where on Glowmere they did nothing but cost. Whether
+they *help* is unresolved — −16.2% per transition against +7.5% over the run, because they switch
+28% more often. ADR-614 §4, including the degenerate first run and how it was caught.
+
+And the prediction that motivated the section — that a corpus the matcher can resolve would break
+the stride plan — is **untested, not refuted**. 100STYLE is *further* under the matcher's
+resolution limit than Glowmere is (radius ÷ mean nearest neighbour 0.95 → 1.71, duplicates 61.68%
+→ 91.66%), so it is not the corpus the prediction was about. **Testing it needs a different
+weighting, not more data.** ADR-614 has the tables, and the retraction: an earlier version of that
+ADR reported the mechanism as refuted, on a 21-dimension run that the rest of the phase's numbers
+are not measured in.
+
+## §20 — the original entry: blocked, and what that blocks knowing
+
+§20 needs a 100STYLE subset. §18 is explicit that third-party dataset licensing must be **verified**
+rather than assumed and that dataset terms are not interchangeable with code terms, so downloading
+and repackaging an external corpus on an assumption is precisely what that instruction exists to
+prevent — and substitute data would measure the substitute (§15). It needs a licensing check and an
+import decision from the owner.
+
+**Recorded as a known gap in what has been proven, not as a section skipped.** §20 is a *scale*
+experiment, and its value is entirely that a large, diverse corpus breaks assumptions a
+1,738-sample one cannot. Several results already on the record are properties of *this* corpus and
+§20 is the section that would say which of them survive:
+
+- the **stride-4, full-prefix** search plan, and the finding that the cheap prefix bought nothing;
+- the **82%** rejection rate of a `Locomotion` filter, which is a property of the tag distribution;
+- the **69.72** cost spread that every severity number in §16 is measured against;
+- the **95%** `Cyclic` share, on a corpus where 25 of 26 clips are cycles.
+
+None of those is wrong. All of them are *local*, and until §20 runs that is what the record should
+say.
+
+## §21 and §22 — the audit, and a gap-finder that could not find a gap
+
+**§21's audit**: C names seven augmentation kinds — mirroring, speed, stride, directional warping,
+turn variation, start/stop variants, root-motion adaptation. Phase B's `VariantKind` has **four**:
+`Source`, `SpeedWarp`, `StrideWarp`, `Mirror`. Directional warping, turn variation and start/stop
+variants are absent; root-motion adaptation exists separately as `adaptRootMotion`. Recorded here
+because "B already has variants" is precisely the audit-from-memory ADR-606 is about.
+
+**§22's audit**: C names six coverage axes. B's `measureCoverage` takes a list of target **speeds** —
+one axis. So `scene::motion_coverage.{hpp,cpp}` is new.
+
+**The denominator was chosen before measuring**, and it is the design decision. The obvious reading
+of "coverage over six axes" is a six-dimensional grid, and it is wrong: at eight bins per axis that
+is 262,144 cells, which 1,738 samples can occupy at most 1,738 of — **under 0.7% for any corpus of
+this size, however complete**. It would measure the dimensionality, not the content. So coverage is
+reported **per axis, marginally**, plus the one pairing where a gap means something concrete.
+
+**Then the instrument failed its own calibration, which is the finding.**
+
+| bins | empty bins across six axes | speed axis |
+|---|---|---|
+| 8 | **0** | 100.0% |
+| 32 | 7 | 78.1% |
+| 128 | 88 | 48.4% |
+| 512 | 788 | 33.0% |
+
+At the default eight bins **every axis is 100% covered with no gaps** — and that is a fact about the
+bin count, not the corpus. It takes only as many distinct values as there are bins to fill an axis,
+which 1,738 samples of varied motion supply trivially. **A gap-finder that cannot report a gap for
+any plausible corpus is ADR-182 in the instrument built to find absences**, and it was caught by the
+standing habit of distrusting a perfect score.
+
+**And the joint occupancy was carrying the information all along: 38 of 64 (speed × turn) cells —
+a 26-cell gap that the marginal report called 100% covered.** That inverts the framing the analyzer
+was written with. The *pairing* is the informative measure; the marginals are the near-vacuous one,
+useful only as a check that every axis is populated at all. The pairing is reported as a **count**
+rather than as a sixth percentage, so it cannot be averaged into the others and lost.
+
+### §22 closed: what justifies the bin count
+
+The calibration table has a failure at **each** end and the first pass named only one. At 8 bins the
+instrument cannot report a gap. At 512 bins it reports 788 empty bins — but 1,738 samples over 3,072
+marginal cells would leave hundreds of holes in a corpus that covered its space perfectly, so most
+of those are **sampling sparsity**. That reading is exactly as untrustworthy as the first and looks
+better, because it reports gaps.
+
+A round number defends against neither. So the width is derived from **a difference the matcher can
+act on**, measured rather than assumed: *how much must the requested speed change before the search
+returns a different sample?* Answer, over 33 probes on the real corpus: **1.083 m/s**, which
+justifies about **three** bins over a 0–3 m/s axis.
+
+Checked before trusting it — the root forward velocity spans **−2.68 to 1.72 m/s**, a 4.4 m/s
+spread, so the feature is live and the coarseness is not a dead dimension. It is **weighting**: root
+velocity is 3 of 33 dimensions and the pose terms swamp it. Now that §10 has made the weights
+actually do something, that is a tunable with evidence behind it rather than a guess — but tuning it
+needs a quality metric, so it is recorded rather than changed.
+
+**Conclusion: the marginal report is demoted to what it is.** Not coverage — a populated-ness check
+that every axis has motion somewhere along it. `report()` now says "populated" rather than printing
+a percentage that reads like coverage, and carries the reason inline. **`jointOccupancy` is the
+informative measure**, and it is a count.
+
+### §21 and §22 do **not** agree, and the correction is the result
+
+I wrote here that the 26 empty (speed × turn) cells were largely *turn* coverage, and that the
+coverage analyzer had independently confirmed §21's missing turn-variation augmentation — two
+sections arriving at the same hole from opposite directions.
+
+**That was measured at eight bins, a number nothing justified.** Once the width is derived from what
+the matcher can distinguish, the grid is 3×3 and **9 of 9 cells are occupied**. The 26-cell gap was
+an artefact of the bin count. The agreement was between an audit and a measurement taken at an
+arbitrary resolution, which is not agreement.
+
+**The honest result is different and more useful: coverage analysis cannot motivate augmentation on
+this corpus**, because every distinction the matcher can make is already populated. The case for
+building turn variation now rests on §21's audit against C's text — which still stands — or on a
+corpus large enough to have gaps at this resolution, which is §20.
+
+The instrument can still see absence when there is absence: pinned to 128 bins it reports gaps. That
+is what distinguishes "no gaps at this resolution" from "cannot report a gap", and it is asserted,
+because without it the result above is indistinguishable from a broken analyzer.
+
+### The resolution is derived per run, not stored
+
+The width is calibrated against the **weight vector**, and §10 made those weights mutable for the
+first time — before that they were read by nothing. A stored resolution would be invalidated by the
+first person to tune them, silently. That is ADR-389: a coefficient tuned against a quantity is
+invalidated by a change to that quantity's distribution.
+
+So `MotionCoverageOptions::bins` defaults to **0, meaning "derive it from the matcher in hand"**. It
+costs a few dozen probe searches per analysis, and it makes the resolution a *reported property of
+the run* — `bin width derived from THIS matcher: 0.876 m/s` — which tells the reader how finely this
+matcher can be interrogated today rather than how finely one could be at some point in the past.
+
+## §24 — the horizons, experimentally validated
+
+`defaultBipedConfig` uses {0.2, 0.4, 0.6} s with a comment citing "the spacing the literature
+converges on". §24 asks for the measurement in as many words, so that comment was ADR-385 sitting in
+a default this whole phase is built on. Leave-one-out retrieval on the real corpus — query with a
+sample's true successor's features, perturbed, `current` deliberately unset so continuity cannot
+hand over the answer:
+
+| horizons | dim | bytes/sample | retrieval | query µs |
+|---|---|---|---|---|
+| none | 21 | 104 | 83.5% | 9.82 |
+| {0.2} | 25 | 120 | 88.0% | 10.33 |
+| **{0.2, 0.4, 0.6}** — shipping default | 33 | 152 | **93.0%** | ~10.9 |
+| {0.1, 0.2, 0.4, 0.8} | 37 | 168 | 92.4% | 11.34 |
+| {0.2, 0.4, 0.6, 0.8, 1.0} | 41 | 184 | 91.1% | 11.84 |
+
+**The shipping default wins, and the claim I can support is the weaker one.** Retrieval is computed
+over ~158 probes, so the standard error on a 93% rate is about 2 points — which means the 93.0 /
+92.4 / 91.1 decline across 33, 37 and 41 dimensions is *suggestive and not significant*, and "more
+horizons make it worse" is more than the data carries.
+
+**What the data does carry is decisive on its own: more horizons buy no measurable gain and cost
+more.** The cost side is exact rather than sampled — 37 and 41 dimensions against 33, 168 and 184
+bytes per sample against 152, 11.34 and 11.84 µs against ~10.9. That is §24's own warning ("do not
+assume every dimension improves quality") demonstrated without needing a noise analysis.
+
+The result is *reported* and only weakly asserted: asserting that the current value is best would be
+the conclusion writing the experiment, and the same scepticism has to apply to the decline.
+
+## §25 — a trajectory predicted from a MotionRequest alone
+
+**The audit finding first, because it is why the file exists.** `entity::sampleTrajectory` already
+existed and looked like §25. It takes a span of **waypoints**, which is a navigation product, and
+§25 explicitly forbids requiring one — the matcher needs a trajectory every frame for every
+character and most of them are not following a route. *"A trajectory predictor exists"* was true and
+answered a neighbouring question.
+
+`entity::predictTrajectory` takes a `MotionRequest`, a `MotionState` and `MotionLimits`, and
+integrates forward with **`stepMotion` itself**. That is the load-bearing choice: the prediction
+agrees with what the body will actually do rather than being a second opinion about it. A prediction
+that disagrees trains the matcher on motion the character cannot produce, and the symptom would be a
+character that consistently selects clips it then fails to follow — which is the kind of fault that
+gets diagnosed as "the clips are wrong".
+
+Measured:
+
+- **Agreement**: predicting 0.6 s ahead gives `(0.3883, 0.7243)`; stepping the controller 0.6 s for
+  real gives `(0.3883, 0.7243)`. Compared against a loop written independently in the test, so this
+  is not a function agreeing with itself, and the 1e-5 margin catches any divergence — including
+  someone later "optimising" the prediction into a closed form.
+- **Limits respected**: asked for 4 m/s from rest, the prediction puts the body at **0.14 m** after
+  0.2 s where a straight line at the desired velocity would say **0.80 m** — 5.7x. The obvious cheap
+  prediction is wrong, not merely approximate.
+- **Lightweight, with a number**: **0.955 µs per call**, ~17,450 characters per 60 Hz frame, so a
+  hundred characters spend under 0.1 ms of their budget on it. §25 says "should be lightweight",
+  which is a claim with a number behind it or it is nothing.
+
+Two horizons falling inside one tick both get a point, because dropping one would leave a zero where
+a position belongs in the feature vector — a silent hole in the thing the matcher searches on.
+
+## §23 — the database quality report
+
+§23 lists eleven candidate metrics, and the audit question is **which of them this repository can
+answer from the database** rather than by re-deriving from the source clips — because §13 has just
+shown what re-deriving costs when the inputs are not the ones the pack used. So the report is
+deliberately narrow, and **says what it does not cover and where that is covered instead**:
+
+```
+motion database quality: 1738 samples x 33 dimensions
+  duplicates            129 (7.42%)
+  nearest neighbour     mean 1.8493, max 11.4375 (normalised units)
+  dead dimensions       0 of 33
+  matcher resolution    0.876 m/s of speed changes its answer
+  speed x turn cells    9 of 9 occupied
+  NOT covered here: foot sliding, contact quality and joint limits need a pose, which
+  a feature vector does not contain. Those are Phase B's measureMotionQuality, run at
+  pack build time on the clip and the skeleton.
+```
+
+**That 7.42% was a property of 0.05, and 0.05 was a number I chose.** Corrected: the radius is now
+derived the way §22's bin width is — the distance a query must move before the search returns a
+different sample, which is the only definition of "duplicate" that licences deleting one. It is
+**1.3945** normalised units, twenty-eight times larger, and *below* the corpus's own mean
+nearest-neighbour distance of 1.8493.
+
+| radius | duplicates |
+|---|---|
+| 0.0100 | 6.44% |
+| 0.0500 | **7.42%** ← the number I first reported |
+| 0.5000 | 26.52% |
+| **1.3945** ← derived from this matcher | **57.02%** |
+| 2.0000 | 66.11% |
+
+The curve is printed beside the figure so nobody mistakes one point on it for a property of the
+corpus.
+
+**And the correction inverts what the number is evidence for.** At 7.42% it read as *"delete 129
+redundant samples"*. At 57% it is not a deletion argument at all — deleting half a corpus because
+the current weight vector cannot resolve it would be **destroying content to flatter an
+instrument**. It is evidence that the corpus is far denser than this matcher can *use*, which points
+at the feature weighting (§22 already found root velocity is 3 of 33 dimensions and swamped by the
+pose terms) or at the sample rate. The radius carries the same ADR-389 property as the bin width: it
+moves when the weights move, so it cannot go stale.
+
+Worth noting the low end is flat — 6.44% at 0.01 against 7.42% at 0.05 — so there really is a small
+core of near-exact duplicates across clips, independent of any radius. That part of the original
+finding survives; the headline did not.
+
+**The duplicate measure excludes consecutive frames of the same clip**, which is the difference
+between measuring the corpus and measuring the sample rate. At 30 Hz adjacent frames are nearly
+identical by construction, so counting them would make the duplicate percentage *rise when the
+sampler got finer* — a number that describes the sampler, not the content. Same denominator
+discipline as §14 and §22.
+
+**Zero dead dimensions**, which independently confirms the §22 finding: the matcher's coarseness on
+speed is weighting, not a feature that fails to vary.
+
+The coverage figures are **cited from `measureMotionCoverage`, not recomputed**, so the report and
+the analyzer cannot disagree about one corpus — §13's lesson applied one section later, and
+asserted. Both human-readable and machine-readable output exist, as §23 asks, and the JSON is
+checked for being parseable rather than merely present (including that it contains no `nan`, which
+is not JSON).
+
+
+## One fact, two instruments — and what it predicts
+
+§16's stride-4 plan scores **84 samples of 1,738 at 99.6% recall with a 3.1% worst case**, and I
+wrote that up as "the entire win is the stride". §23's derived radius says **57% of samples are
+interchangeable to the search**, and its radius of 1.3945 sits *below* the corpus's own mean
+nearest-neighbour distance of 1.8493 — so the distance at which this matcher stops telling two
+samples apart is on the same order as the typical spacing between neighbours. The corpus sits at or
+below the matcher's resolution limit nearly everywhere.
+
+**These are not two results agreeing. They are one property measured twice.** If most samples have a
+near-equivalent, subsampling by four cannot lose much, because three of every four skipped have a
+stand-in among those kept. Presenting them as corroboration would repeat the §21/§22 mistake exactly
+— the retraction there was for treating two views of one arbitrary resolution as independent
+evidence, and this would be treating two views of one real property the same way.
+
+Stated correctly it is an **explanation** rather than a confirmation, which is worth more: §16's
+headline stops being an empirical curiosity and acquires a mechanism — *the two-stage search works
+this well here because the database is oversampled relative to what the matcher can resolve.*
+
+**And a mechanism predicts.** Either a corpus the matcher can actually resolve (§20) or a weight
+vector that stops root velocity being 3 of 33 swamped dimensions (§22's finding) should **degrade
+the stride-4 plan**. That is falsifiable, it is the first prediction this phase has made about
+content it does not have, and it is a better reason to want §20 than any of the six results already
+queued behind it.
+
+## A category, not a list of gaps
+
+Three sections of Phase C have now had the same shape, and it is worth naming because it is the form
+this codebase's gaps actually take:
+
+| section | mechanism | measurement |
+|---|---|---|
+| §14 candidate filtering | tag filter, working | "measure how much it helps" — never done |
+| §24 trajectory horizons | `trajectoryTimes`, working | "experimentally validated" — a literature citation instead |
+| §27 search frequency | `searchInterval`, working | "do not assume every-frame search is necessary. Benchmark." — never done |
+
+**Not absent features. Features shipped without the measurement that would say whether their
+defaults are right.** ADR-608's dead weights are the extreme case — mechanism absent *and*
+measurement absent, with a declaration that made both look present — but the ordinary case is this
+one, and it is invisible to any review that checks whether a thing exists.
+
+## §26–§29 — the loop benchmarked, and a dial that another dial shadows
+
+The mechanisms all existed; the measurement did not. Running the loop as a whole — 600 frames of a
+request that changes its mind, driven through `advance` as the product drives it:
+
+| `searchInterval` | searches | switches | held | µs/frame |
+|---|---|---|---|---|
+| 0.000 s | 150 | 150 | 0 | 2.47 |
+| 0.033 s | 150 | 150 | 0 | 2.46 |
+| **0.100 s** (shipping) | **150** | **150** | 0 | **2.46** |
+| 0.250 s | 120 | 120 | 0 | 1.99 |
+
+**`searchInterval` does nothing at its shipping default.** Identical search counts and within 1% the
+same time from 0 to 0.1 s. A search needs `due && !locked`, where `due` is
+`sinceSearch >= searchInterval` (0.1 s) and `locked` is `sinceSearch < minimumContinuation`
+(**0.2 s**) — the lock is always the later of the two, so it decides every time and the interval
+cannot affect anything below it. Only at 0.25 s, above the lock, does it take over.
+
+That is **ADR-608's family with a twist: not a dial nobody reads, but a dial that is read and then
+shadowed by another one.** Setting it produces no change, so a person tuning search frequency
+concludes it does not matter — the same misdiagnosis cost as the dead weights, from a different
+mechanism. It also means **§27's question is unanswerable as the code stands**: the benchmark C asks
+for cannot distinguish "every-frame search is unnecessary" from "the interval is not in control".
+
+| `switchMargin` | searches | switches | heldByMargin |
+|---|---|---|---|
+| 0.00 | 150 | 150 | 0 |
+| **0.05** (shipping) | 150 | **150** | **0** |
+| 0.50 | 150 | 150 | 0 |
+| 100.00 | 150 | 135 | 15 |
+
+**The hysteresis holds nothing at its shipping value, and every search changes the motion** — which
+is exactly the thrashing §28 exists to prevent, happening at the defaults. Two readings are possible
+and this benchmark cannot separate them: the margin is far too small for this cost scale, or a
+changing request genuinely warrants a change every time. §23's measured cost spread makes the first
+far more likely — **a margin of 0.05 against a spread of 69.72 is four parts in ten thousand**.
+Recorded rather than retuned, because tuning needs a motion-quality metric this phase does not have
+and §22 says this corpus cannot supply.
+
+§29 is the one dial in control: minimum continuation 0 s gives 300 searches, 5 s gives 6. Asserted
+with its companion — the unlocked loop actually moved — so a frozen loop cannot pass by reporting no
+switches (ADR-611).
+
+**All three findings are the same category**: mechanisms shipped without the measurement that would
+say whether their defaults are right. Two of the three defaults turn out to be inert.
+
+### §27 is not answered, and §28 was in the wrong units
+
+**§27's honest state is *not answered*, not *answered no*.** C asked whether every-frame search is
+necessary; the benchmark cannot distinguish "it is unnecessary" from "the interval is not in
+control", because `searchInterval` is shadowed by `minimumContinuation` at the defaults. That the
+thing a benchmark was meant to measure is not currently measurable is a legitimate result, and here
+it is worth more than a number would have been.
+
+The remedy is to make the relationship legible at the value rather than in a table:
+`MatchSettings::searchIntervalShadowed()` says when `searchInterval < minimumContinuation`, which is
+the same fix as `MotionCostBreakdown::caveat()` and the coverage report's inline reason — **meet the
+reader at the number**.
+
+**§28 was a units problem, not a tuning problem.** `switchMargin` was 0.05 in *raw cost units*
+against a measured spread of 69.72 — four parts in ten thousand, which could never hold anything —
+while the value that did hold (100) exceeds the entire spread and so holds indiscriminately. **No
+default in raw units could have been right, because the sensible range depends on a scale nobody had
+measured.** That is the fog bank's per-metre density defect in a new place.
+
+It is now a **fraction of `MotionDatabaseStats::costSpread`**, measured at build time from the corpus
+and the weights together, so it tracks both (ADR-389). The dial became readable immediately: 0.50
+holds 6 of 150, 100.00 holds 147. **Changing the unit makes the default meaningful, not correct** —
+what five percent *should* be still needs a motion-quality metric this phase does not have, and that
+distinction is the point.
+
+### And a bug the units work uncovered
+
+`continueCost` — the cost of staying on the current motion, which the margin is compared against —
+summed **raw squared deltas**, while `match.cost` applies per-dimension weights. §10 made those
+weights live for the first time and nothing here was updated to match, so **the two sides of the
+comparison were computed by different formulas.** At the default weight vector the discrepancy is
+small, which is exactly why it survived; fixing it moved the 0.50 row from 3 held to 6.
+
+**A comparison between two costs computed by different formulas is worse than no comparison: it has
+a defensible-looking number on both sides.** This is the second defect §10's weighting change
+created downstream — the first being the coverage resolution it made mutable — and both were found
+by measuring something else.
+
+## The feature-distance sweep — enumerated rather than tripped over
+
+Two defects had already been found downstream of §10 making the weights live, **both by measuring
+something else entirely**. Two accidents in a row is not a method, so the remaining sites were
+enumerated: *every place that computes a distance, cost or comparison over a feature vector, and
+whether it applies the weight vector.*
+
+| site | was | now | intended? |
+|---|---|---|---|
+| `searchMotion` feature cost | weighted | weighted | yes — §10 |
+| `MotionCostBreakdown` terms | weighted | weighted | yes — must equal the cost |
+| `searchMotionStaged` coarse pass | weighted | weighted | yes |
+| `searchMotionStaged` full pass | weighted | weighted | yes |
+| `MatchMotionProvider::continueCost` | **unweighted** | weighted | **bug — §28** |
+| `MotionDatabaseStats::costSpread` | **unweighted** | weighted | **bug — found here** |
+| quality report nearest-neighbour | **unweighted** | weighted | **bug — found here** |
+| the §16 test's own spread fixture | **unweighted** | weighted | **bug — found here** |
+
+**Three more, and one was a scale I had introduced an hour earlier.** `costSpread` is the
+denominator for §16's search severity and §28's switch margin, both of which compare *weighted*
+costs — an unweighted denominator under a weighted numerator is the identical asymmetry the
+hysteresis had. The quality report's nearest-neighbour distance is compared against
+`duplicateRadius`, which is derived from the search's own discrimination and is therefore weighted.
+
+**Both published numbers moved**: the cost spread from 69.72 to **52.57**, and the duplicate rate
+from 57.02% to **61.68%**. Every severity figure in §16 was divided by the wrong scale.
+
+Some of these could defensibly have been unweighted — a nearest-neighbour statistic describing the
+corpus is arguably a property of the data. The rule is that **each must be unweighted on purpose and
+say so**, not by having been written before the weights existed. Every one here is now weighted
+because every one is compared against something weighted, and the comments say which.
+
+### Why the category is dangerous rather than merely annoying
+
+`costSpread` was written unweighted **by the person who had just finished diagnosing the identical
+asymmetry in the hysteresis**, an hour earlier. That is not carelessness; it is evidence of how
+strong the pull is:
+
+> **A quantity's name does not carry the convention it was computed under, so the mismatch is
+> invisible at the point of use and only visible at the point of definition.**
+
+`costSpread` reads as obviously correct at every site that consumes it. Nothing about the identifier
+says which space it lives in, and the weighted/unweighted distinction lives in the *call*, not in
+the *name*.
+
+**The structural fix is a type, and the comments are an interim measure.** A `WeightedCost` that
+will not compare against a raw sum would have made all four of these bugs *unrepresentable* rather
+than merely documented, and this codebase can express that. It is a larger change than the phase has
+room for and is recorded here as the intended one, so the comments are understood as what they are.
+
+### The general form
+
+> **Making a dormant parameter live retroactively invalidates every consumer written while it was
+> dormant.**
+
+§10 did not introduce a bug into the hysteresis. It revealed that the hysteresis had been written
+against a world in which weights did not exist — and the same for the spread, the nearest-neighbour
+distance and a test fixture. This is a category the "mechanism present, measurement missing" table
+does not cover, and it **predicts where the remaining instances are**: anything written *before*
+§10 that touches feature-space distance. That is a finite, greppable set, which is why enumerating
+it took minutes and finding the third by accident would have taken another night.
+
+### And a rule the remedies keep converging on
+
+`MotionCostBreakdown::caveat()`, the coverage report's inline reason, and
+`MatchSettings::searchIntervalShadowed()` are the same fix three times:
+
+> **A caveat belongs where the number is read, not where the number is explained.**
+
+## §31 — RETRACTED: the +7.0 was an artefact, and the metric cannot measure this
+
+**The first version of this section reported "+7.0 points, to perfect 100.0% leave-one-out
+retrieval" as the largest before/after in Phase C. A control destroyed it.**
+
+| | retrieval (n=158) |
+|---|---|
+| **before** — phase weight 0, as shipped | 76.6% |
+| **after** — phase weighted 1.0, §13 fixed | 89.9% |
+| **control** — phase values *shuffled* across samples | **97.5%** |
+
+**The shuffle control did not merely fail to collapse — it beat the thing it controls for.** Random
+phase retrieves *better* than real phase, and the reason is decisive: **random values are more
+uniquely identifying than real ones.** Real phase is monotone within a clip and similar across
+clips at the same point in a cycle; a shuffle gives every sample its own nonce.
+
+**So leave-one-out retrieval is not a valid measure of phase-aware matching.** It rewards
+*identifiability*, and identifiability is the opposite of what a matcher needs — a matcher exists to
+find a **different** sample that is equivalent, not to find the one it was handed. Phase is very
+close to a primary key within a clip, so adding it to the vector turns a match into a lookup.
+
+**The original figure was an artefact twice over.** The perturbation stepped `d += 5` and the phase
+dimensions sit at 33 and 34 of 35 — neither a multiple of five — so **the query carried the
+held-out sample's exact phase**. And even perturbed, the metric could not have distinguished a
+feature from an index. Perturbing every dimension also drops the *baseline* from 93.0% to 76.6%,
+so the earlier absolute numbers were inflated as well.
+
+**What this does and does not overturn.** §13's fix is still correct and still necessary — `Cyclic`
+really was reaching the database as 0% and really is 95.4% now. What is retracted is the claim that
+the fix buys measurable matching quality, because **nothing here has yet measured matching
+quality.** The honest state of §31 is that phase-aware matching remains unevaluated, and the
+instrument to evaluate it has to be **cross-clip**: does a query from clip A find the right *moment*
+in a different clip of the same gait? Retrieval within a clip is the easy case and the one phase
+trivially solves.
+
+**This was the sixth perfect score to be fake tonight**, and the only one I had a motive to believe
+— it was flattering, and a supervisor's prediction agreed with it in advance. That combination is
+the condition under which a number goes unchecked, and it is why the control was demanded rather
+than offered.
+
+### And a caution that now extends backwards
+
+§24's horizon experiment uses the same leave-one-out retrieval metric. Trajectory horizons are not
+near-unique per sample the way phase is, so the effect should be far weaker — but **§24's numbers
+were taken with the same `d += 5` perturbation**, and its conclusion (more horizons buy no
+measurable gain) survives only if that holds under full perturbation. Flagged rather than assumed.
+
+
+## §24 — RE-TAKEN under full perturbation, and the conclusion moved
+
+The published table used the same `d += 5` perturbation §31 was retracted for, and here it was not
+merely partial but **confounded**. The arms have **21, 25, 33, 37 and 41** dimensions, so the stride
+left *a different subset of each arm's trajectory block* unperturbed — in the `{0.2}` arm the
+trajectory dimensions are 21–24 and the last perturbed index below them is 20, so **that arm's
+entire trajectory block carried exact values.** The flaw landed unevenly on exactly the variable
+under test.
+
+| horizons | dim | published | **corrected (full perturbation)** |
+|---|---|---|---|
+| none | 21 | 83.5% | **69.6% ±3.7** |
+| {0.2} | 25 | 88.0% | **77.2% ±3.3** |
+| **{0.2, 0.4, 0.6}** shipping | 33 | **93.0%** | **76.6% ±3.4** |
+| {0.1, 0.2, 0.4, 0.8} | 37 | 92.4% | **81.0% ±3.1** ← best |
+| {0.2, 0.4, 0.6, 0.8, 1.0} | 41 | 91.1% | **78.5% ±3.3** |
+
+**Both halves of the old conclusion are gone.** The shipping default is no longer the best arm, and
+"more horizons make it worse" is false — the 37-dimension arm leads. But the margins are inside the
+error bars: 81.0 ±3.1 against 76.6 ±3.4 is 4.4 points on a combined error of ~4.6, so **no horizon
+set is distinguishable from another at n=158.**
+
+What survives, weakened: **trajectory features probably help** — 69.6 against 81.0 is ~2.4σ, no
+longer the 3σ the partial perturbation showed, and only 1.4σ against the shipping default. §24's
+honest state is **unresolved at this sample size**, which is a §20 question.
+
+## §19 — checked, and it survives
+
+§19's 100.0%-on-clip was the seventh ceiling and used the same `d += 5`. Re-taken with every
+dimension perturbed: **still 100.0% of steps on the clip, and still a new sample on 1.00 of steps.**
+It is real. The difference from §31 is structural rather than lucky — §19 asks whether the matcher
+stays within the *right clip*, a question with ~66 acceptable answers per clip rather than one, so
+an unperturbed dimension cannot convert it into a lookup the way it can a single-target retrieval.
+
+## The rule that separates what survives from what does not
+
+> **A measurement artefact is harmless exactly when it is constant across the thing being varied.**
+
+- **§16's recall** compares two search plans over the same queries at the same dimensionality. The
+  flaw hit both arms identically — **survives**.
+- **§24's horizons** compares arms of *different* dimensionality, so the flaw landed differently in
+  each — **does not survive**, and re-running moved the answer.
+- **§31's retrieval** was an absolute quality claim with no comparison to shelter it — **did not
+  survive at all**.
+
+This is cheaper than re-running everything: it says in advance which numbers need re-taking. Ask
+what varies between arms, and whether the flaw varies with it.
+
+## On the conditions, not the standards
+
+Six perfect scores were fake tonight and I caught five unprompted. The sixth arrived flattering, at
+a ceiling, with a supervisor's prediction in front of it — and I banked it. Same standards, same
+evidence-handling, different outcome.
+
+**Rigour is not a property you have; it is a property of the conditions you are working under.** The
+five that were caught had nothing riding on them. That is the argument for controls being
+**mandatory rather than discretionary**: the moments you most need one are exactly the moments you
+will feel least need of one.
+
+And the shuffle control did something better than failing. **A control that merely fails says the
+feature is inert. This one beat the thing it controls for**, which says the *metric* is measuring
+the wrong quantity — and that invalidates every use of leave-one-out retrieval as a quality measure,
+not one result.
+
+
+## §24 — VOID, and removed from the §20 queue
+
+The shuffle control was carried forward to the next use of the metric, as it should have been at
+once. It returns §31's verdict and more strongly:
+
+| arm | real | **shuffled** |
+|---|---|---|
+| no trajectory (baseline) | 69.6% | — |
+| shipping `{0.2, 0.4, 0.6}` | 76.6% | **99.4%** |
+| `{0.1, 0.2, 0.4, 0.8}` | 81.0% | **100.0%** |
+
+Permuting the trajectory values destroys their meaning and keeps their distribution, so a feature
+carrying meaning would collapse toward the 69.6% baseline. **It rises to a ceiling instead**, beating
+the real features by 23 and 19 points — random values are more uniquely identifying than real ones,
+exactly as phase was.
+
+**So §24's corrected table measures nothing either, and the correct filing is not "unresolved at
+this sample size".** A larger corpus would give tighter error bars around a meaningless number.
+**§24 is not a §20 question**, and putting it on that queue would have implied a licensing decision
+buys something it cannot.
+
+**The scope is wider than either feature.** This is the second family the metric has failed on,
+which is evidence it fails on any of them: leave-one-out retrieval admits **exactly one correct
+answer per query**, so it rewards whatever identifies that answer, and every added dimension helps.
+The metric is retired as a quality measure, not adjusted.
+
+### The n question, answered — and why it is moot
+
+n = 158 was a **choice**, not a limit: the loop strides `s += 11u` over 1,738 samples, and
+leave-one-out can run on every one. n = 1738 would cut the standard error ~3.3×, turning ±3.4 into
+about ±1.0 and the 4.4-point gap into ~3σ.
+
+**And it would have been the more expensive mistake.** Tightening the bars first would have produced
+a confidently wrong answer — 3σ of precision around a quantity the instrument does not measure.
+**Validity first, then precision**, and validity failed, so the precision work is not worth doing on
+this instrument at all.
+
+### Which metrics are exposed, stated in advance
+
+> **A metric is vulnerable to identifiability in proportion to how few correct answers it admits.**
+
+- **Leave-one-out retrieval** — exactly one correct answer → maximally exposed → **retired**.
+- **§19's stay-on-clip** — ~66 acceptable answers per clip → not exposed → **survives** (and it did,
+  under full perturbation).
+- **§16's recall** — one correct answer, but compared between plans at equal dimensionality, so the
+  exposure is constant across arms → the *comparison* survives even though the absolute rate would
+  not.
+
+That ordering was available before any of these were run, and it is the cheap test for the rest of
+the phase: count the acceptable answers before trusting the number.
+
+## A valid instrument: cross-clip matching judged in pose space
+
+Leave-one-out retrieval is retired. Its replacement had a trap in it that would have wasted the
+build, and it is worth recording because it would have **looked like success at every stage**:
+
+**Cross-clip retrieval needs a definition of "the right moment in another clip", and the obvious one
+is the phase-aligned moment — which is circular.** It would score the matcher on recovering a target
+*defined by the feature under test*; phase would win by construction, win harder the more weight it
+got, and **the shuffle control would not catch it** — a shuffled phase cannot recover a
+phase-defined target, so the control would pass and the result would still be worthless.
+
+So the ground truth is **pose-space agreement**: the correct answers are the samples whose
+model-space joint positions are closest. §23 had already established that the feature vector
+deliberately contains no pose, which is exactly what makes pose available as an independent arbiter
+— and it is what a matcher is ultimately for.
+
+**Three guards are built in rather than run afterwards:**
+
+1. **Many correct answers by construction.** Any sample within a margin of the best achievable
+   cross-clip pose counts, so the question is "did it find an equivalent moment", not "did it find
+   *the* moment". The margin is **derived**: the median pose distance between consecutive frames of
+   one clip — two frames 1/30 s apart are interchangeable for matching — which is **0.0565 m** of
+   mean joint offset. A property of the content, not of the matcher.
+2. **The shuffle control is a test**, asserted, so the next person to add a feature gets the
+   validity check without having to think of it.
+3. **A degeneracy guard** reporting which clips the answers come from, since a matcher always
+   picking the same clip-relative position would score well on similar-length clips without
+   matching anything.
+
+**And it validates:**
+
+| arm | within margin (n=145) |
+|---|---|
+| phase weight 0 (baseline) | 32.4% |
+| phase weighted 1.0 | **35.9%** |
+| **phase SHUFFLED (control)** | **33.1%** |
+
+**The control collapses back toward baseline**, which is the first of the three possible outcomes
+and the one that makes the instrument usable: destroying the feature's meaning costs it almost
+everything it gained. Real phase carries **+3.5** points; shuffled carries **+0.7**. Contrast the
+retired metric, where shuffled phase *beat* real phase by 7.6 points and shuffled trajectory beat
+real by 23.
+
+**It is not yet a result, and the ordering says why.** At n=145 the standard error on a 35% rate is
+~4.0 points, so +3.5 is inside the noise. **Validity is established, so precision is now worth
+buying** — and n is a choice here as it was in §24 (the probe loop strides twice). That is the
+correct order: it would have been wrong to tighten the bars first, and it is right to tighten them
+now.
+
+### The oracle, and then the answer
+
+**The oracle rate is 100% by construction**, which is a correction to how the rates read. The
+criterion is `chosenPose <= bestPose + margin` — within the margin **of the best achievable
+cross-clip answer**, not within the margin absolutely — so the best available always satisfies it
+and the metric never asks for an answer better than the corpus contains. It cannot be measuring
+coverage.
+
+What does need reporting is **how good the best available answer is**: median **0.1578 m**, against
+a margin of 0.0565 m. So the margin is **0.36×** the typical best-answer distance — a demanding but
+not absurd band, and the best cross-clip pose is typically **2.8× further away than two adjacent
+frames of one clip**. That last figure is a real statement about this corpus's cross-clip coverage,
+and it is a §20 quantity.
+
+**The free control passes**: best-achievable is **identical across arms** (0.1578 m with phase off
+and on), so the ground truth is not leaking from the feature vector.
+
+**Then n, in the right order — and raising it dissolved the effect rather than tightening it:**
+
+| | baseline | phase | shuffled | effect |
+|---|---|---|---|---|
+| n = 145 | 32.4% | 35.9% | 33.1% | +3.5 (±4.0 — noise) |
+| **n = 435** | **34.7%** | **34.9%** | **32.0%** | **+0.2 (±2.3 — zero)** |
+
+**Phase-aware matching shows no measurable benefit on this corpus.** The +3.5 was inside its own
+error bar and said so; this is what honouring that warning looks like instead of explaining it away.
+A +0.2 effect would need roughly n = 100,000 to resolve, which this corpus cannot supply at any
+stride, so the honest statement is **no effect detectable here** rather than "not yet significant".
+
+§13's fix remains correct and necessary — `Cyclic` really was 0% and really is 95.4%. What it does
+not do is buy measurable matching quality, which is what the retraction suspected and this now shows
+with an instrument that can tell meaning from identity.
+
+Shuffled scoring *below* baseline (32.0 against 34.7) is the expected sign: dimensions carrying
+noise cost a little.
+
+### A limit on the shuffle control itself
+
+> **A shuffle control validates a feature against a metric. It cannot validate the metric against
+> the question.**
+
+Nothing in a shuffle can tell you the ground truth was drawn from the wrong place — a phase-defined
+target would have made shuffled phase collapse *correctly* while the whole result stayed worthless.
+Two independent things have to be right, and only one of them has an automated check.
+
+
+### Amendment: the third face resolved to "no change needed", and that is the better version
+
+I recorded `phaseWeight = 0` as the third face of the night's category — *a default that was right
+under the old behaviour and is wrong under the new one*. **The measurement has come back and the
+default is not wrong.** With the phase data live and the weight on, there is no detectable benefit on
+this corpus, so **`phaseWeight = 0` remains the correct value.** It stopped being correct for its
+original reason and is now correct for a measured one.
+
+**The category keeps its place and the hazard is unchanged:** *fixing a dead input does not fix the
+configuration that was tuned around it being dead, and the fix has no way to find its own
+dependents.* What changes is the instance: it resolved to **no change needed**, and the only way to
+learn that was to measure rather than to assume the config had gone stale.
+
+That is the stronger form of the lesson. **The hazard is that nobody checks — not that the value is
+necessarily wrong.** And my first instinct, not to move the default until the cost side had been
+measured, turned out right for a reason I did not have at the time.
+
+A category whose every instance happens to be a bug is a category that has been curated. This one
+has an instance that resolved to no-change, which is why both the finding and its resolution stay in
+the record.
+
+### Why the negative is strong rather than merely null
+
+At a 34.7% baseline the matcher picks something notably worse than the best available **roughly two
+thirds of the time** — so there was **ample headroom for phase to help, and it did not.** This is
+not "no room to improve"; it is "plenty of room, and this feature took none of it". A ceiling effect
+would have been the available get-out and there isn't one.
+
+## §30 — and the first valid measurement of what a dimension costs
+
+`dimension()` adds one contact flag per **feature** joint rather than per **contact** joint, so with
+contacts enabled `head.x` carries one. A head does not plant: that dimension is **meaningless by
+construction**, for a reason statable in advance — and **it varies, so it passes the liveness
+check.**
+
+That is the limit of that check, and it completes a set:
+
+> **Liveness distinguishes present from absent. The shuffle distinguishes meaning from identity.
+> Neither distinguishes meaning from noise.**
+
+Each needs its own experiment, and the third one was sitting in the live system for free.
+
+**The measurement.** Neutralising the bogus flag — setting it constant across samples, so it adds
+the same amount to every distance and cannot affect any ranking — isolates the noise from the
+dimension count, which is cleaner than deleting it. The oracle is asserted unchanged between arms,
+since neutralising a feature cannot alter which pose-space answers exist.
+
+| | within margin (n=435) |
+|---|---|
+| contacts, bogus head flag **live** | 33.3% |
+| contacts, bogus head flag **neutral** | 33.3% |
+
+**One meaningless dimension of 36 costs 0.0 points — nothing measurable.**
+
+**That single point was low-powered by construction, and the dose-response reversed it.** One
+dimension of 36 is a small perturbation measured with a bar wide enough to hide the effect: 0.0 ±
+2.3 cannot distinguish "free" from "cheap". The claim under test is about a **slope**, so it needs
+more than one dose.
+
+Appending K fresh random dimensions — fixed at build, at **uniform weights** so that lengthening the
+vector cannot silently change how the existing dimensions are treated:
+
+| K | dimensions | rate | vs K=0 | **per dimension** |
+|---|---|---|---|---|
+| 0 | 33 | 32.2% | — | — |
+| 1 | 34 | 32.4% | +0.2 | +0.23 |
+| 4 | 37 | 31.0% | −1.1 | **−0.29** |
+| 16 | 49 | 27.4% | −4.8 | **−0.30** |
+
+**"Dimensions are not free" is true after all, and now it has a number: about −0.30 points per
+useless dimension.** K=4 and K=16 agree to within 0.01, which is a slope rather than noise, and the
+K=1 point is simply below the resolution of a single measurement — exactly the low-power failure the
+dose-response was run to escape.
+
+**So the earlier "not supported" verdict was wrong, and it was wrong in the direction of my own
+convenience** — it let a claim I had been repeating be quietly retired rather than measured
+properly. The correction: the claim stands, with a magnitude, and the single-point null should have
+been reported as *underpowered* rather than as evidence of absence.
+
+It also reconciles with the shuffle. Two shuffled phase dimensions cost 2.7 points — about 1.35 each
+— against 0.30 for an appended one. Shuffling **destroys a signal and adds noise in its place**;
+appending only adds noise. The larger figure for the destructive operation is what should be
+expected, and the two are consistent rather than corroborating.
+
+It does not contradict the shuffle result. Neutralising removes a dimension's contribution;
+shuffling **replaces it with active noise**, which cost 2.7 points for two dimensions. Removing a
+weak signal and injecting a strong one are different operations and the asymmetry is expected.
+
+**−0.30 is a unit-weight figure and must be cited with that condition attached.** What was measured
+is *the cost of one extra unit-weight dimension in a vector where every dimension carries unit
+weight* — because the dose-response had to run at uniform weights to keep the arms comparable.
+
+**So the obvious use of it is wrong, and I had proposed it.** I suggested subtracting ~2.4 points
+from §24's five-horizon arm for its 8 extra dimensions. That subtraction assumes the extra
+*trajectory* dimensions contribute to the distance the way the synthetic unit-weight ones did, and
+under the production weight vector they do not — a dimension's cost scales with how much it
+contributes. **Importing the constant into a weighted run is the `costSpread` asymmetry again: a
+quantity whose name does not carry the convention it was computed under.**
+
+The clean fix is the one that keeps recurring: **make the conditions constant across the
+comparison.** Re-run §24 at uniform weights too, so the correction is measured and applied under one
+regime. A weighted slope is obtainable but needs the padding trap solved first — by extending the
+weight vector explicitly rather than letting it fall back to unweighted.
+
+**What it changes:** the cost side of every dimension decision now has a real number instead of a
+slogan, for unit-weight vectors.
+
+**But the reasoning published for three decisions was borrowed from an untested claim, and that is
+worth marking even where the conclusion survives**, in the same way the `Travelling` comment was
+corrected rather than quietly replaced:
+
+- **the horizons** — the cost side was argued on "dimensions are not free" before it was measured;
+  the conclusion is void anyway, because §24's instrument was retired.
+- **the phase weight** — declining to move it was justified *independently* once the effect measured
+  zero, so the decision stands; the published reasoning leaned on the untested claim.
+- **the contact flags** — the same, and the flag is wrong for a reason that needs no measurement.
+
+The distinction most likely to be lost is the one that matters: **the earlier reasoning was wrong
+even where the conclusion survives.**
+
+The flag itself is wrong regardless of the measurement — a contact flag on a head is not a judgement
+call — and is fixed separately, after the experiment rather than before it.
+
+## A standing practice, not a note about one case
+
+> **Measure the cost before moving a shipping default.**
+
+Declining to move `phaseWeight` until the cost side had been measured was the rule that survived the
+number turning out to be an artefact. The large, significant-looking +7.0 was retracted; the refusal
+to act on it still stands. **A rule that protects you when your evidence is wrong is doing more work
+than one that protects you when it is right**, which is the argument for this being standing practice
+rather than a remark about that instance.
+
+
+### Two pre-tests now, both available before the result
+
+> **1. Count the acceptable answers before trusting the number.** A metric is vulnerable to
+> identifiability in proportion to how few correct answers it admits.
+>
+> **2. A single-point null is underpowered, not evidence of absence.** One point near the origin
+> cannot distinguish a slope from a flat line, and the tell is available *before* the result.
+
+Both were available in advance of the failures they would have caught, which is what makes them
+pre-tests rather than post-mortems.
+
+# THE THIRD INSTANCE: a statement about the encoding, not about a third feature
+
+Three features intended to describe periodic gait have now been measured on the validated
+cross-clip instrument, each with its own shuffle control:
+
+| feature | baseline | real | shuffled | verdict |
+|---|---|---|---|---|
+| **phase** (2 dims) | 34.7% | 34.9% | 32.0% | no detectable benefit |
+| **trajectory** (on the retired metric) | 69.6% | 76.6% | **99.4%** | shuffled beat real |
+| **contacts** (2 dims) | 34.7% | **33.3%** | **34.9%** | **worse than baseline, and shuffled beat real** |
+
+**Contacts are net −2.0 points**: −1.4 against baseline, plus a **0.6-point dimensional hurdle** (two
+dimensions at the measured −0.30 each, unit weight). This is the first feature in the phase judged
+on *net value* rather than on whether it helps, and the answer is that it is worth less than the
+dimensions it occupies.
+
+**Three independent features behaving this way under one encoding is a statement about the encoding
+rather than three separate feature failures.** Folding it into §30 would lose that.
+
+## The mechanism, stated as a hypothesis with its test
+
+The candidate explanation is **redundancy, not absence of signal.** The pose block already contains
+foot and head positions *and velocities*. A foot's position and velocity jointly encode where in the
+gait cycle the body is and whether that foot is planted — so phase and contact state are **already
+present implicitly**, and the explicit features re-state them.
+
+That predicts exactly what is observed, including the part that looks paradoxical:
+
+- Adding a redundant feature costs its dimensions and buys nothing → phase, at +0.2.
+- A redundant feature **double-counts a signal already present**, over-weighting gait phase relative
+  to everything else in the distance → contacts, at −1.4, *below* baseline.
+- **Shuffling a redundant feature removes the double-counting** while paying only the noise cost →
+  shuffled beats real, which is otherwise hard to explain.
+
+**FALSIFIED.** The correlation test I proposed would have been the weaker instrument and could have
+returned low even under full redundancy, because "is this foot planted" is a joint, non-linear
+function of several pose and velocity dimensions rather than a linear echo of any one. The
+**ablation** is causal where a correlation is associational, and it settles it:
+
+| | contacts vs baseline |
+|---|---|
+| pose velocities **present** | **−1.4** |
+| pose velocities **neutralised** | **−1.4** (33.6% → 32.2%) |
+
+**Removing the implicit copy changes nothing.** Under redundancy, contacts should have become
+positive once the other copy of the signal was gone. They are identically unhelpful. **The
+redundancy hypothesis is dead**, and it was mine.
+
+### What is left, stated narrowly
+
+The rival hypothesis — *the contacts are wrong* — is also weakened, because the detector was checked
+directly and is finding the stance phase: **75% of planted frames are in the lowest height quartile
+against 25% by chance**, with a plausible 0.38 duty cycle. (The velocity tell does not apply here at
+all: ADR-540 says these clips are authored in place, so a planted foot **must** slide backwards at
+gait speed — "a planted foot is not moving" is a tell about root-motion clips and is inverted for
+these.)
+
+So both of the big explanations fail, and the supported claim is narrower and duller than either:
+**a binary per-foot contact flag is not informative for cross-clip pose matching on this corpus.**
+It is not duplicated, it is not detectably wrong, and it is still worth less than the two dimensions
+it costs. Why a correct signal carries no usable information here is open, and the honest state is
+that it is unexplained rather than explained by either candidate.
+
+**The general design rule I was about to write — "an explicit feature that restates implicit
+information double-counts and distorts the distance" — is not supported by this evidence and is
+withdrawn.** It may still be true; nothing here shows it.
+
+**What survives the falsification** is the measurement rather than the explanation: three explicit
+gait features, each measured with its own control, each failing to earn its dimensions. That is
+still a statement about the encoding and still belongs above the section level — but it is now an
+*observation in search of a mechanism* rather than a mechanism with evidence, and it must be written
+as the former.
+
+**And the practical consequence is unchanged by the falsification**: contacts at net −2.0 are not
+worth carrying on this corpus, whatever the reason. What changes is that I cannot say *why*, and so
+cannot predict whether a different corpus or a different encoding would change it.
+
+## And the flag is fixed
+
+`MotionFeatureConfig` now carries `contactJoints` separately from `joints`, because they answer
+different questions: `joints` are the ones whose position and velocity describe the pose, and a head
+is a good pose feature and a meaningless contact. Empty falls back to `joints`, which is the old
+behaviour. `defaultBipedConfig` names the two feet. Contact dimensions: **2 of 35**, down from 3 of
+36.
+
+The natural experiment that bug provided — neutralising the bogus flag — is recorded in the test
+file rather than deleted silently: it measured 0.0 points, **that null was underpowered, and the
+dose-response reversed it.**
+
+
+## §32–§35 — the provider seam, audited and made to blend
+
+**Recorded here as sections; the evidence lives in ADRs 612–620.**
+
+- **§32 — root-motion continuity.** The acceptance bar (ADR-612's 0.0510 m, set before any fix
+  existed) is met. Both motion providers now inertialize at the seam: matcher 0.0892 → 0.0205 m,
+  clip provider 0.4484 → 0.0029 m (ADR-613). **The provider the product actually installs is the
+  clip provider, not the matcher**, so ADR-612's named beneficiary was only reachable through the
+  clip provider, and that defect was the larger one. On a *forced* cross-clip transition the worst
+  frame is still 8.06× the bar, and that residual is accepted: a blend turns a teleport into a fast
+  slide, and only better selection can do more.
+- **§33 — integrate with Phase B's procedural layers.** Satisfied. The external pose replaces the
+  clip player's, root motion runs next, then the layers. One **latent** defect: root motion is
+  looked up through the clip player's state even on frames where a provider supplied the pose. No
+  scene reaches it.
+- **§34 — matching must not own behaviour.** Satisfied, by design: `MotionRequest` carries intent
+  only, and nothing in `src/` reads provider output except diagnostics. One dead output was found:
+  `MotionResult::playbackRate` is written and never read.
+- **§35 — fallback system.** The mechanism is present and typed. **It is unreachable from the
+  product**, because the chain has one entry, and it is recorded as staged and dark (ADR-615)
+  rather than wired.
+
+The provider work also turned up the character-motion defects fixed in ADRs 618–620: layer weights
+lost on save, the two `turnRate` defects, and acceleration that nothing read.
+
+## §30 measured against its own purpose — the third candidate also fails
+
+Pose proximity asks what the body *looks like* at one instant. A contact flag describes **where in
+the gait cycle you are and what the next frames will do** — a temporal property. Two poses can be
+pose-space identical while one has a foot arriving and the other has it leaving, and a single-frame
+score calls those equally good. That would produce exactly what was measured — dimensional cost, no
+gain, shuffling harmless — with the feature neither duplicated nor wrong, but **orthogonal to the
+instrument.**
+
+It is also the shape of the retirement already performed: leave-one-out measured *identity* where
+*meaning* was wanted; pose proximity would be measuring *appearance* where contacts carry
+*continuity*. **Twice the instrument has been at fault rather than the feature**, against a habit of
+suspecting the feature first.
+
+So §30 was measured against the defect it exists to prevent: **foot-plant discontinuity across a
+transition**, which is visible across a switch and invisible within a frame.
+
+| | switches | mean foot jump | worst |
+|---|---|---|---|
+| contacts **off** | 32 | **0.3566 m** | 1.6437 m |
+| contacts **on** | 30 | **0.3792 m** | 1.6437 m |
+
+**Contacts do not reduce plant discontinuity either.** +6% is well inside the spread of a
+distribution whose worst case is 1.64 m, so the honest reading is **no detectable benefit**, not
+"slightly harmful".
+
+### The finding is in the baseline, not the difference
+
+**A foot teleports 0.3566 m on average when the matcher switches motion, with a worst case of
+1.6437 m — identical in both arms.** On a character whose rest height sets the scale that is a
+substantial fraction of a leg, every time the behaviour tier changes its mind, and the identical
+worst case says it comes from a specific reproducible pair of clips.
+
+This table exists to answer "do contacts help". It quietly contains a more important answer to a
+question nobody asked — the §14 lesson one more time: **print the distribution before the ratio, and
+read the quantity the arms share.**
+
+**And it is not a harness artefact.** `MatchMotionProvider::advance` records `transitionStart`, but
+it is read only for the search interval and the continuation lock: **nothing in the provider blends
+or inertialises between the outgoing and incoming samples.** The loop here jumps because the
+provider jumps. That is the same gap Phase B left open when `ClipMotionProvider` transitions were
+deferred, and it means **0.36 m is a property of the shipping path**.
+
+**It belongs to §32** — root-motion continuity — and the number goes there rather than being
+re-derived: any inertialization §32 adds has this as its before figure, measured over ~30 real
+switches on the real corpus.
+
+**The first version of this test produced 4 switches in 300 steps**, and a mean over 4 would have
+been the single-point-null mistake in a new place. It was rebuilt to drive the demanded motion
+across a different clip every 20 steps — which is what a behaviour tier changing its mind looks
+like, and the case §30 is written for.
+
+### Three candidates eliminated
+
+| candidate | verdict | how |
+|---|---|---|
+| redundancy — the pose block already carries it | **falsified** | ablation: −1.4 with the implicit copy, −1.4 without |
+| wrong data — the detector is broken | **weakened** | 75% of plants in the lowest height quartile vs 25% by chance |
+| orthogonal metric — contacts carry continuity, not appearance | **not supported** | no benefit on the transition metric either |
+
+**The contact feature appears genuinely inert on this corpus**, now measured against both what a
+body looks like and how it transitions. That is a narrow, dull, well-supported claim, and it is
+worth more than the elegant mechanism it replaced — which was mine, and wrong.
+
+**What it does not license** is removing contacts from the engine. §30 is in the spec for reasons
+that include content this corpus does not contain: starts, stops and directional changes, where a
+plant disagreement is most visible. The supported statement is about *this corpus*, and the reason
+it is not a §20 item is unchanged — **no mechanism means no prediction, and a queue item without a
+prediction is a wish rather than a question.**
+
+## Phase C recount, 2026-09-21 — §1–§36 plus the sections assigned to `agent/anim-research`
+
+This is checked against `docs/design/specs/phase-c.md`, section by section. The coordinator reduced the scope: §37–§43, §57, §58, §68, §69, §72, §74–§76 and §81–§83 belong to `agent/anim-cinfra`. §56, §60, §62, §63, §80, §84–§88, §90 and §95 are principles, gates or framing, and are not counted. **Done** means built and tested, with a commit or ADR cited. **Partial** says what is missing.
+
+One caution. This log also holds Phase B entries with the same section numbers, for example "§46 — the first true vertical slice" and "§47 — performance baselines". Those are Phase B §46–§54 and **not** Phase C. The headings below this point that carry no "Phase B" label are Phase C.
+
+| § | Title | Status | Evidence / what is missing |
+|---|---|---|---|
+| 1 | Read the existing system first | framing | ADR-606, the audit-from-memory rule. Not counted |
+| 2 | Not "add a nearest-neighbour search" | framing | Met by the query design in §3/§7. Not counted |
+| 3 | Core architecture | done | `40ebee42`: the matcher is a provider on ADR-541's chain. `9404a2d0` |
+| 4 | Motion database | done | `9404a2d0` |
+| 5 | Motion sample | done | `9404a2d0` |
+| 6 | Database memory design | done | `392bf259` |
+| 7 | Feature representation | done (corrected) | `9404a2d0`, `2489d6be`. **A defect was found during the recount and fixed in the next commit:** features were position-relative but never facing-relative, and the matcher's query was world space. Invisible on Glowmere, which is authored facing +Z, and wrong on 100STYLE and for any character not facing +Z |
+| 8 | Feature configuration | done | `2489d6be` (ADR-608) |
+| 9 | Feature normalization | done | `9404a2d0` |
+| 10 | Cost function | done | `2489d6be` (ADR-608); `test_motion_cost.cpp` |
+| 11 | Continuity cost | done | `b5c3b858`. Graded continuity was measured and rejected; binary continuity stays |
+| 12 | Transition cost | done | `b2aab5ee` |
+| 13 | Tags / metadata | done | `09f5f7da` |
+| 14 | Candidate filtering | done | `b2aab5ee` |
+| 15 | Search strategy | done | `51ab0815` |
+| 16 | Two-stage search | done | `02da5d81`, `d535d534` |
+| 17 | Search benchmark | done | `392bf259`, `51ab0815` |
+| 18 | Real data first | done | `369b7027` |
+| 19 | First database from Glowmere | done | `369b7027`. Re-checked in `3b66b565` |
+| 20 | 100STYLE scale experiment | done | `d67fc36a` (ADR-612 amended; the licence is CC BY 4.0, `bc56f7f1`) |
+| 21 | Motion augmentation | done | `scene/motion_augment.*` adds stride, direction, turn, start, stop and mirror, all through one foot-target-plus-IK step. Speed and root-motion adaptation came from Phase B. Each variant is gated by its own IK reach and kept only if it improves §58 coverage. On the scout, 4 of 13 planned were kept (the turns); see "§21" below |
+| 22 | Coverage analysis | done | `03659866`, `8a90148a`, `38017f94` |
+| 23 | Database quality analyzer | done | `8c9165fa`, `4fdde514` |
+| 24 | Trajectory representation | done | `8a90148a`, re-taken in `3b66b565`. **Facing redefined as the future body facing** (extraction v6, for §65) |
+| 25 | Trajectory prediction | done | `8b286711`. Wired into the matcher's query (a start, a stop and a curve can be chosen): see "§25 wired into the query" |
+| 26 | Matching loop | done | `b6be4544` |
+| 27 | Search frequency | done | `b6be4544`, `cbf01f64` |
+| 28 | Hysteresis | done | `cbf01f64` |
+| 29 | Minimum continuation | done | `b6be4544` |
+| 30 | Contact-aware matching | done | `19bce1c7` (the feature is live), `1e081a06`, `c78f6549`, `57594698`. It is built; on this corpus it measures inert |
+| 31 | Phase-aware matching | done (built) | The phase term is live (ADR-608, `09f5f7da`). **Its benefit is unmeasured**: the measurement was retracted in `e0a9cb49` because the metric cannot see it |
+| 32 | Root-motion continuity | done | `275a35d0` (ADR-612, ADR-613). A forced-transition residual was accepted by the owner |
+| 33 | Integrate with Phase B layers | done | `528e5dec`, the audit. One latent defect is recorded there |
+| 34 | Matching does not own behaviour | done | `528e5dec`, the audit |
+| 35 | Fallback system | done | ADR-623 (owner-delegated): the matcher is wired opt-in per character, with the clip provider behind it. Every §35 failure is tested falling through, with a control arm that does not |
+| 36 | Database versioning | done (via merge) | `9ebbb173` (`agent/anim-cinfra`, merged in `54f30cc3`): the database is a file with a format version, a feature schema digest, the skeleton digest, a pack content digest that includes the provenance chain (where the retarget profile is recorded), and a tool version. Incompatible files are refused on load. **Added here:** `kMotionFeatureExtractionVersion`, folded into the schema digest, so a change in how a feature is *computed*, not only which features exist, also invalidates stored data |
+| 44 | Motion style | done | A per-character style, priced as a cost per clip (`MotionQuery::clipCost`, default 0.05 of the spread, measured between the within-motion and wrong-motion gaps), not a filter. `test_motion_style.cpp`. On 100STYLE, in-style frames go from 0.19 to 1.00. See "§44" |
+| 45 | Search weights | done | Configurable (ADR-608) and now **versioned** per character (`motionMatching.weights`, version 1; an unknown version is refused) |
+| 46 | Automated search evaluation | done | `entity/motion_evaluation.*`: one ground-truth harness reports all seven measures, with floor, left-out and broken-matcher arms (`test_motion_evaluation.cpp`). See "§46" |
+| 47 | Adversarial tests | done | `test_motion_adversarial.cpp` on the golden corpus covers all twelve cases the spec lists, each paired so the no-op fails one arm. Ambiguous cases are judged by how the chosen sample moves, not by the clip's name: a 0.05 m/s request is honestly nearer the end of `Stop` than `Idle` |
+| 48 | Golden motion tests | done | `test_motion_golden_scenarios.cpp`: walk north, turn east, stop, with broad behaviour checked per stretch. Two runs are identical. A control shows the predicted query is what makes the start and the turn choosable |
+| 49 | Search correctness | done | Known best (a sample's own features, zero cost), obviously bad (never chosen), better trajectory and better pose (§78), wrong contact (§78, and §47's tie), and a candidate whose root teleports (never chosen for a smooth walk) |
+| 50 | Performance targeting | done (under load; re-take when quiet) | Build throughput, p50/p95/p99 per method, load timing, and 1–100 characters (`test_motion_search_perf.cpp`) |
+| 51 | Realistic scenarios | done (under load) | 1/10k, 10/100k, 50/100k, 100/714k (the largest real corpus here, standing in for 1M) |
+| 52 | CPU/GPU boundary | done | CPU-side, benchmarked (`392bf259`, `51ab0815`). No case for the GPU |
+| 53 | Cache behaviour | done (under load) | Contiguous vs scattered-and-shuffled: 1.2× at 0.5 MB, rising to 2.1× at 55 MB |
+| 54 | Approximate search | done | PCA, VQ and KD-tree built and measured against linear and strided. The KD-tree is rejected (the curse of dimensionality). None is adopted, because exact search is not too slow at real scale |
+| 55 | Quality vs speed | done | The matrix: latency percentiles, memory, recall, excess and transition quality, and LOC |
+| 59 | Procedural + motion matching | done | Foot layers resolve on the matched alien's pose on every frame (the lab test) |
+| 61 | Dataset strategy | done (assessed) | ADR-625: ACCAD (CC BY 3.0) and CMU (bespoke terms, no resale "even in converted form") read at source and assessed against all six §61 criteria. The derivative-data rule for a distributable pack is recorded. AMASS is ruled out as a route. **Owner question:** will a pack ever ship as a separate artefact? That answer settles CMU |
+| 64 | First vertical slice | done | 100STYLE → IK retarget (ADR-624) → contacts, phase and features → database → runtime matcher → scout in a scene → Phase B layers → inertialization. Test: `test_motion_slice.cpp` |
+| 65 | Glowmere demonstration | done (strafe unserved) | A scripted scene driven by motion requests. Each segment gets its family except strafe, which the scout's corpus cannot serve. Re-taken with the `Terminal` tag and three-cycle turns; the weights moved to trajectory position 6. See "§65" |
+| 66 | Phase B integration | done | The same test; the matcher does not bypass the layer stack |
+| 67 | Multi-character demonstration | done | Scenes with 10, 50 and 100 matched scouts on terrain (`glowmere-match-crowd-*`). All are matched, share one database and are not in lockstep (`test_motion_crowd.cpp`). A headless render is clean. See "§67" |
+| 70 | Failure-case analysis | done | `docs/design/motion-matching.md` §15: every Phase C defect classified by the spec's categories, with the layer fixed |
+| 71 | Root-motion policy | done | The simulation owns translation and heading; travelling clips are posed in the body frame; in-place clips unchanged |
+| 73 | Cinematic determinism | done | Extraction is bit-identical (with a sensitivity arm). The match lab scene reproduces itself to the bit (`test_motion_matrix.cpp`). The continuation is frame-rate independent (`6f8bd107`). §48 scenarios repeat exactly |
+| 77 | Testing matrix | done | Database rows: io tests (cinfra) and the adversarial file. Feature rows: `test_motion_matrix.cpp` (deterministic, standardised, dimensions, missing joints). Search rows: adversarial and cost. Runtime rows: the wired tests and the perf harness |
+| 78 | Adversarial search test | done | Both constructions, each flipped by its weight: pose vs trajectory, and pose vs contact (`test_motion_adversarial.cpp`) |
+| 79 | Golden dataset | done | `tests/support/golden_motion.hpp`: ten intentionally distinguishable one-second clips (idle, walk, run, back, both strafes, both turns, start, stop), with heading and contacts. Its header carries §79's caveat |
+| 89 | Final report | done | `docs/design/motion-matching.md` |
+| 91 | First milestone | done | Glowmere corpus → database → linear search → provider → alien in a scene (ADR-623's match lab). Choices vary with velocity, direction and speed (§47/§48) |
+| 92 | Second milestone | done (pipeline) | 100STYLE retargeted, analysed, in a database and matched on the scout in a scene. The look is not yet approved, and selection is §65's work |
+| 93 | Third milestone | done (under load) | Linear, the strided exact-ish plan, PCA, VQ and KD-tree on AV Gen's real distributions, reporting latency, quality, memory and LOC |
+| 94 | Final artistic demonstration | not started | |
+
+**Totals for the rows verified** (updated 2026-09-22, after §44, §46, §61, §65, §67, §70 and §89). §3–§36 (34 rows): **34 done**; §21 and §35 have been done since the recount. The 29 assigned rows outside §1–§36: **28 done**, and 1 not started: §94, which waits on the owner's approval of the look. Several rows are marked "under load"; their timings are re-taken when the machine is quiet. That makes **62 done** of the 63 rows verified here.
+
+**Against the coordinator's audit (C 34/83).** The full table is not in the tree, so only the totals and the flagged rows can be compared:
+
+- **§21 partial: confirmed.**
+- **§35 partial: confirmed**, and it is the owner's call.
+- **§61 partial: confirmed.** 100STYLE is verified; the others are not assessed.
+
+§36 was partial at the time of the recount and is done since the anim-cinfra merge. **§7 is a correction:** the recount found that its features were not in the body's frame (fixed in `fc33c4ef`). The audit's own table is not in the tree, so a row-by-row reconciliation with its 34 cannot be done.
+
+---
+
+## Feature values corrected, 2026-09-21: what moved, and §20 re-taken
+
+Four defects in the *values* the database and matcher compute. Each has a test that fails with the
+change reverted:
+
+| commit | defect | found by |
+|---|---|---|
+| `d53afbb0` | a clip's last sample read zero velocity; the look ahead was clamped at the end, looping walks included | anim-cinfra §58 |
+| `fc33c4ef` | features were position-relative but not facing-relative, and the query was world space (§7) | recount |
+| `cdac0ebe` | in-place cycles read as standing still; the scout, asked to walk, chose a kick | anim-cinfra §68 |
+| `6f8bd107` | the continuation advanced one sample per call, so it played 2x at 60 Hz and 4x at 120 Hz (§73) | reading `explain` |
+
+`kMotionFeatureExtractionVersion` is 4 and is part of the schema digest, so any `.motiondb` written
+before these is refused on load.
+
+**§20 re-taken** with the ADR-614 commands (`avgen-motion pack` then `quality --joints
+LeftAnkle,RightAnkle,Head --seeds 250 --trajectory 0.2,0.4,0.6`), on FW (100 forward walks, 434,478
+samples), with the scout packed by the same CLI as the control. Provenance: 100STYLE CC BY 4.0,
+subset and digests in `assets/100STYLE-ATTRIBUTION.md`; nothing derived is committed.
+
+| | Glowmere before → now | FW before → now |
+|---|---|---|
+| duplicates | 61.68% → 63.52% | 91.66% → **87.02%** |
+| radius ÷ mean NN | 0.95 → 1.03 | 1.71 → **1.47** |
+| matcher speed resolution | 0.876 → 1.342 m/s | 1.168 → **0.718 m/s** |
+| cost spread, sweep | 49.50 → 49.94 | 49.88 → 52.35 |
+| cost spread, build time | 45.73 → **77.41** | 47.59 → 50.06 |
+| stride 4, full prefix: recall | 98.3% → 99.0% | 98.4% → **94.0%** |
+| … worst excess × typical gap | 0.38× → 0.21× | 0.02× → 0.07× |
+| cheap prefix vs full prefix (stride 8, top 32) | 94.8 vs 94.5 → 94.8 vs 95.2 | −23.1 pts → **−24.7 pts** |
+| cross-clip bound, median | 3.53× → 4.70× | 1.90× → 1.75× |
+
+What this changes in ADR-614:
+
+- **Stride-4 still survives, but by less.** On FW, recall falls 98.4% to 94.0%, and a miss now
+  costs 0.07× of the typical gap instead of 0.02×. That is still small, but "survives outright" no
+  longer describes it.
+- **FW is more resolvable than it was.** It has fewer duplicates, a lower radius-to-neighbour
+  ratio, and a finer speed resolution. The world-heading term must have been adding structure the
+  matcher could not use. This is recorded as a measurement; nothing here tests that mechanism.
+- **"The cost spread transferred" holds for the sweep definition only.** The sweep spread is 49.94
+  against 52.35. The build-time spread no longer transfers (77.41 against 50.06), because implied
+  travel changed what Glowmere's walks look like to the search. Severity figures are quoted against
+  the sweep spread.
+- **The cheap prefix still costs ~24 points at scale.** Unchanged in substance.
+- **The Glowmere column is a different system**, not a regression. Its walks now travel, so its
+  duplicate and cross-clip figures describe a corpus the matcher can finally tell apart by speed.
+
+Not re-taken: MIXED, and §30 on TR (the `[.scale]` test). Both are 100STYLE runs that the facing
+frame will move. They are queued rather than claimed.
+
+## §21 — augmentation, kept only where it adds coverage
+
+`scene/motion_augment.{hpp,cpp}`. **One step for five kinds.** An in-place clip is first planted:
+the treadmill becomes travel, using the velocity its planted feet imply. Then a per-frame map
+moves the body, and each planted foot's target is anchored to the map at the start of its stance
+(a swing foot follows the frame's own map, corrected toward both anchors). Each leg is solved
+with `solveTwoBone`. A planted foot stays planted by construction. A foot the leg cannot reach
+refuses the variant (2% of the leg). Every output carries the heading its generator applied
+(`PackClip::heading`), and the database faces by it (feature extraction v5).
+
+On a rotation-driven synthetic leg, every kind does what it says with planted drift around 0:
+- stride and direction hit their target speed and angle;
+- a turn bends the path by exactly ω·t;
+- start and stop ramp 0.31 → 1.20 and 1.20 → 0.35 m/s, never to a standstill;
+- mirroring twice returns the clip to 4e-7.
+
+**On the scout, gated by §58 coverage** (13 planned, 8 passed their own gate, 4 kept):
+
+| variant | verdict |
+|---|---|
+| Walking turn ±1.4 rad/s | **kept**: left turn moderate 14 → good 19, right turn moderate 7 → 12 |
+| Running turn ±1.4 rad/s | **kept**: run limited 3 → moderate 11, high-speed turns poor → limited |
+| Walking stride 1.3, direction ±0.6 and 2.4 | refused by IK: the scout's leg misses by 2.7–10.9% |
+| Walking stride 0.7, start, stop, mirror | redundant: no category gained |
+
+**Strafe stays limited.** The scout's walk cannot be warped 35° sideways without the foot missing,
+so strafe coverage needs a different source clip, not a bigger warp.
+
+**§58's categories had to change first.** After §7 put features in the body's frame, a root-velocity
+heading difference no longer measured turning (a body turning while it walks keeps its travel ahead
+of it), and pelvis sway was counted as starts and stops. Speed, direction and turn now come from the
+trajectory block: the mean over the furthest horizon, and the path's own curvature. With the old
+reading, a +1.4 rad/s turn variant scored 0 left and 1 right; now it scores 18 left and 0 right.
+
+## §25 wired into the query, and §48 on it
+
+**The matcher now predicts its query trajectory** (`MatchSettings::predictTrajectory`, on by
+default). When a request says how the body is moving now (`bodyVelocity`, `bodyFacing`), the
+trajectory block is `predictTrajectory` stepped from there toward the request, instead of "the
+asked-for velocity, held". The entity supplies its rate-limited speed along its heading, not its
+measured velocity, because the measured one reads zero across a seek and made a scrub disagree with
+the play (caught by ADR-623's scrub test). Without `bodyVelocityKnown`, the old query is used, so
+callers that do not say are unchanged.
+
+**§48, on the golden corpus** ("walk north, turn east, stop", driven by a motion controller):
+
+| stretch | plays |
+|---|---|
+| setting off, 0–0.5 s | `Start` (all 30 frames) |
+| cruise north, 1.0–1.5 s | forward walking |
+| turning east, 1.5–2.5 s | `TurnLeft` 13 frames and `Walk` 47, never `TurnRight` (+X is the body's left) |
+| asked to stop, 3.0–3.8 s | `Idle` 39 and `Walk` 9 |
+| stood, 4.1–4.5 s | `Idle` |
+
+Final facing is 1.57 rad, and two runs are identical. **The control** is the same scenario with the
+held query: while setting off, the chosen motion moves at 1.18 m/s against 0.66 predicted, and
+(before extraction v6) it played 0 left-turn frames against 13. Since v6 the trajectory facing
+carries the asked-for facing even in the held query, so both choose the turn (13 and 13). The
+prediction's own contribution is now the start.
+
+## §20 and §30 re-taken on the rest of 100STYLE
+
+**MIXED** (279,735 samples), the same commands as FW:
+
+| | before (ADR-614) | now |
+|---|---|---|
+| duplicates | 82.36% | 80.31% |
+| stride 4, full prefix: recall | 96.4% | **86.9%** |
+| … worst excess × typical gap | 0.14× | 0.13× |
+| cheap prefix vs full (stride 8, top 32) | −18.8 pts | −21.5 pts |
+| cross-clip bound, median | 1.92× | 1.56× |
+
+Stride-4 holds on FW (94.0%) and drops further on MIXED (86.9%). The *cost* of a miss is unchanged
+at about an eighth of the typical gap, so a miss still lands on an acceptable sample. But "recall
+survives the corpus" no longer holds for mixed movement.
+
+**§30 on TR** (the `[.scale]` test): at the derived perturbation, contacts now cost **−3.2%** per
+transition (1.3956 → 1.3505 m) and **+24.2%** over the run (103.3 → 128.3 m, 74 → 95 switches). ADR-614
+recorded −16.2% and +7.5%. The direction is unchanged: contacts switch more often, so a lower mean
+per transition still adds up to more discontinuity. The fixed-0.05 arm is still degenerate (560 and
+561 of 600 seed returns), but its two means now differ by 3%, so the test asserts its degeneracy by
+switch rate rather than by equal means.
+
+## §50–§55 and §93 — performance, and the search-method matrix
+
+`tests/unit/test_motion_search_perf.cpp` (`[.perf]`, needs the gitignored 100STYLE packs).
+`scene/motion_search_index.*` adds the three structures §54 names beside §16's strided plan: PCA
+(8 components, top 256), VQ (256 k-means cells, 8 probes) and a KD-tree (exact, keep 32). All three
+finish with `scoreMotionCandidates`, the one exact scorer the staged search now shares, so they
+can disagree with the linear scan only about which candidates they looked at. Each is exact at its
+limit (tested).
+
+**Measured under load.** The 1-minute load average was between 5 and 23 on 12 cores (other
+agents' suites). The percentiles below are therefore upper bounds, to be re-taken on a quiet
+machine. Relative comparisons within one run are valid; absolute microseconds are not.
+
+| corpus | method | p50 µs | p95 µs | p99 µs | recall | excess × gap | index MB | LOC |
+|---|---|---|---|---|---|---|---|---|
+| 100STYLE 10k | linear | 67 | 159 | 169 | 100% | 0 | 0 | 133 |
+| | stride 4 | 69 | 73 | 75 | 100% | 0 | 0 | 80 + 66 |
+| | PCA | 84 | 100 | 105 | 100% | 0 | 0.31 | 107 |
+| | VQ | **8** | 12 | 13 | 100% | 0 | 0.07 | 88 |
+| | KD-tree | 114 | 139 | 145 | 100% | 0 | 1.38 | 121 |
+| FW 434k | linear | 2,123 | 3,093 | 4,036 | 100% | 0 | 0 | |
+| | stride 4 | 3,536 | 3,821 | 4,334 | 91.6% | 0.023× | 0 | |
+| | PCA | 1,349 | 1,381 | 1,401 | 100% | 0 | 13.3 | |
+| | VQ | **393** | 617 | 731 | 100% | 0 | 1.69 | |
+| | KD-tree | 4,735 | 9,732 | 12,525 | 100% | 0 | 57.9 | |
+| FW+MIXED 714k | linear | 3,190 | 6,089 | 7,584 | 100% | 0 | 0 | |
+| | stride 4 | 7,666 | 8,435 | 9,177 | 98.0% | 1.081× | 0 | |
+| | PCA | 2,148 | 2,214 | 2,293 | 100% | 0 | 21.8 | |
+| | VQ | **739** | 1,071 | 1,405 | 100% | 0 | 2.76 | |
+| | KD-tree | 7,986 | 17,411 | 21,489 | 100% | 0 | 95.6 | |
+
+- The transition-quality column (the pose gap to the continuation when a method switches) is 0
+  wherever recall is 100%. It is 0.41 for stride 4 at 434k and 0.56 at 714k.
+- Build throughput is ~46,000 samples/s. Index builds take under 2.5 s (VQ trains on 50k samples).
+
+**What the matrix says:**
+- **The KD-tree is slower than the linear scan at every size.** At 33 dimensions it scores 36–79%
+  of the corpus per query, which is the curse of dimensionality, measured, and it costs 12–57× the
+  features in memory. Rejected.
+- **The strided plan is slower than linear in wall time on real data**, although it scores a
+  quarter of the samples. The linear scan's early out (stop a candidate once it passes the best)
+  is worth more than striding, and stage one keeps a heap. §16 measured scored-sample counts and
+  never wall time. This is the first wall-time comparison.
+- **VQ is the fastest by 5–8×** at every size above 10k, at 100% recall on these queries (a sample's
+  own features nudged by the derived duplicate radius). That query distribution favours VQ, because
+  the query lands in its seed's cell. Recall on queries far from any sample is not measured here.
+- **§54's rule decides nothing is adopted.** At this repository's real scale (Glowmere, 1,738
+  samples, about 9 µs a query) the exact search is not too slow. VQ is the structure to reach for if
+  a corpus of 100STYLE size ever ships.
+
+**§50/§51/§67, many characters on one database** (120 frames at 60 Hz, each character with its own
+speed, heading and phase):
+
+| characters | samples | frame ms p50 | p95 | worst | searches/frame | µs/search |
+|---|---|---|---|---|---|---|
+| 1 | 10k | 0.000 | 0.152 | 0.218 | 0.08 | 158 |
+| 10 | 105k | 0.000 | 7.5 | 13.6 | 0.83 | 813 |
+| 50 | Performance targeting | done (under load; re-take when quiet) | Build throughput, p50/p95/p99 per method, load timing, and 1–100 characters (`test_motion_search_perf.cpp`) |
+| 100 | 714k | 0.003 | 411 | 859 | 8.3 | 4,696 |
+
+A frame that searches nothing costs microseconds, because carrying on is an array walk. The cost is
+all in search frames, so p95 is the budget number. At 100 characters on 714k samples the linear scan
+is untenable (411 ms at p95). The search spreads across frames because each character keeps its own
+clock, and §29's 0.2 s minimum continuation means about 1 in 12 frames per character searches.
+
+**§50 load:** a 434k-sample database is a 68 MB file, read and fully verified in 27–41 ms. The first
+read and the second are within noise; the file cache makes "cold" unmeasurable without flushing it.
+**§53 cache:** contiguous features cost 8.5 ns/sample at 0.5 MB, falling to 5.0 at 55 MB. The same
+features scattered one allocation per sample and visited in shuffled order cost 1.2× more at 0.5 MB
+and **2.1× more at 55 MB**. The gap grows with the working set, which is the cache effect §53 asks to
+measure, and it is why the arrays stay contiguous.
+
+## §71 — one authoritative movement result
+
+The simulation owns where the body is and which way it faces. The matcher supplies a pose in the
+body's own frame. `MotionDatabase::sampleRoot` records each sample's travel-joint position and
+facing, and `clipTravels` marks each clip whose travel is real (its root leaves its box, or it
+carries a heading track). For such a clip the provider poses the body with that travel and heading
+removed. Both ends of an inertialization blend get the same treatment. An in-place clip, which is
+every Glowmere cycle, is posed exactly as authored, bit for bit (tested). Before this, a travelling
+clip walked its rig away from the entity over the clip and snapped back at the wrap, and a turning
+clip turned the body on top of the entity's own turn. File version 2 carries the new arrays.
+
+## §59 / §66 — the matcher chooses, Phase B adapts
+
+In the match lab, the matched alien's base pose comes from the matcher on all 181 frames, and both
+of its ground-driven foot layers resolve on top of it on every one of them. Its clip-provider twin
+shows the same count, so the matcher did not route around Phase B.
+
+## §64 / §92 — the first vertical slice: 100STYLE on the scout, matched at runtime
+
+ADR-624 builds the positional leg retarget ADR-553 asked for. The slice pack is built with:
+
+```
+avgen_motion pack assets/100style-mixed/Strutting_*.bvh --out assets/100style-scout-strutting-pack \
+  --scale 0.01 --license CC-BY-4.0 --source 100STYLE --contacts foot.l,foot.r \
+  --redistribution allowed --derivedDataAllowed true \
+  --retarget-to assets/aliens/alien-scout.glb \
+  --map Hips:root.x,LeftHip:thigh_twist.l,LeftKnee:leg_stretch.l,LeftAnkle:foot.l,LeftToe:toes_01.l,RightHip:thigh_twist.r,RightKnee:leg_stretch.r,RightAnkle:foot.r,RightToe:toes_01.r \
+  --positional-legs LeftHip:LeftKnee:LeftAnkle=thigh_twist.l:leg_stretch.l:foot.l,RightHip:RightKnee:RightAnkle=thigh_twist.r:leg_stretch.r:foot.r
+```
+
+It is gitignored (100STYLE is CC BY 4.0 and not redistributed). `motionMatching.pack` points a
+character at it. In `examples/labs/motionmatch/alien-match-100style-lab.scene.json` a scout takes
+all 361 frames from the matcher, plays only retargeted 100STYLE clips, keeps both foot layers
+resolved on every frame, and scrubs to the played frame exactly. The database reads the pack as
+motion: 317 s walking, 181 s strafing, 228 s reverse, 272 s turning. In the body frame the forward
+walk goes forward (+0.44 m/s) and the backward walk goes back (−0.31).
+
+**§92's question** ("does this architecture scale beyond the tiny hand-authored Glowmere corpus?")
+now has a yes for the pipeline: real mocap, retargeted onto the character that has to perform it,
+analysed, stored, searched and posed in a scene. It is not yet a yes for the look. On this one
+slow style the wandering scout mostly picks the backward and sideways clips, and 14% of leg-frames
+are at or past straight. Selection is §65's work, and the look is the owner's call.
+
+## §65 — the Glowmere demonstration, and what it took
+
+`examples/labs/motionmatch/glowmere-motion-matching-demo.scene.json`: a scout driven through
+idle → walk → accelerate → curve left → curve right → run → slow → turn → stop → strafe → walk,
+**by motion requests**, not clips. `motionScript` is a new behaviour that publishes the vector
+intent ADR-545 introduced and nothing produced (ADR-615), timed on the timeline so a scrub
+replays it. The corpus is the scout's clips plus the §21 turns, built by:
+
+```
+avgen_motion pack assets/aliens/alien-scout.glb --out assets/aliens-scout-pack --contacts foot.l,foot.r --license CC0-1.0 --source "Glowmere alien pack"
+avgen_motion augment assets/aliens-scout-pack --out assets/aliens-scout-augmented-pack \
+  --legs thigh_twist.l:leg_stretch.l:foot.l,thigh_twist.r:leg_stretch.r:foot.r \
+  --plan turn:Walking:1.4,turn:Walking:-1.4,turn:Running:1.4,turn:Running:-1.4,start:Walking:0,stop:Walking:0,stride:Walking:0.7,direction:Walking:0.35,direction:Walking:-0.35
+```
+
+What plays in the second half of each segment (the matcher has had time to respond):
+
+| request | plays |
+|---|---|
+| idle | `Idle` |
+| walk | `Walking_low_grav` |
+| accelerate | `Walking` |
+| curve left | `Walking~turn+1.40` |
+| curve right | `Walking~turn-1.40` |
+| run | `Running` |
+| slow | `Walking_low_grav` |
+| turn on the spot | `Idle_turn` |
+| stop | `Idle_turn` |
+| strafe | `Walking~turn+1.40` (**the scout has no strafe**: §21's direction warps were refused by IK or redundant) |
+| walk again | `Walking~turn+1.40` (held from the strafe) |
+
+Every frame came from the matcher, and a scrub into the curve lands on the played sample. Five
+things had to change before it did:
+
+1. **A turning request kept turning.** `predictTrajectory` held the desired velocity fixed over the
+   horizon, so every curve predicted a straight line and got a straight walk. It now turns the
+   request by `desiredTurnRate` over the elapsed time.
+2. **Trajectory facing is the future body facing**, not the direction of travel (extraction v6).
+   Travel direction cannot say "turning on the spot" (there is no travel) or "strafing", which are
+   two of the requests.
+3. **An in-place clip is faced relative to its own mean pelvis yaw.** `Idle_turn` sweeps −71 to −3
+   degrees and now turns; the crouch's −43-degree posture still cancels.
+4. **`motionMatching.clips`** (§14's authoring surface): which clips the matcher may use. The
+   scout's pack has no tags, so `Button_push` served as an idle and `Fight_leg_kick_2` as a strafe.
+5. **`motionMatching.weights`** (§45, versioned, version 1): at the engine defaults the pose half
+   outweighed the request, and the alien stayed in whatever it was playing (walk requests got
+   `Idle`). The demo's weights (joint position 0.3, trajectory position 3, root velocity 3) come
+   from a 12-point sweep, a hidden `[.measure]` case in the demo's test file.
+
+### §65 re-taken: the matcher froze on the end of a start
+
+With the corpus rebuilt so the turn variants are three cycles long instead of one, a second defect
+showed. **A walk request after a stop landed on the last frames of `Walking~start`** and stayed
+there: a non-looping clip that ends moving extrapolates past its end, so its final samples promise
+a future the clip cannot play. They are now tagged `Terminal` (a non-looping clip that ends moving,
+within the longest trajectory horizon of its end; extraction v7), and the matcher rejects them with
+`Airborne`. A first version tagged every non-looping clip's tail, which removed the end of `Stop`
+and broke stop-to-idle; the rule is now "ends moving", and a clip that ends at rest keeps its tail.
+
+`avgen-motion augment --cycles N` (default 3) repeats a looping source before a turn, start or stop
+is warped, so a turn variant carries a whole turn rather than a second of one. Coverage rose: left
+turn good 27, right turn 23, run 25.
+
+**The demo's weights moved with the corpus.** At trajectory position 3 the new curves chose
+`Walking_low_grav`; the 12-point sweep, re-run, finds only trajectory position 6 (joint position
+0.3, root velocity 1 or 3) choosing the turns for the curves, `Running` for the run and `Idle_turn`
+for the turn. The scene now carries 6. **Weights tuned on one corpus do not transfer to another**:
+that belongs to §45, and it is why the block is versioned per character, not global. Stop now
+plays `Idle` (25 frames) then `Idle_turn`, and walk-again plays `Walking_low_grav`; strafe is still
+unserved.
+
+## §46 — automated search evaluation
+
+`entity/motion_evaluation.{hpp,cpp}`: `evaluateMatcher` replays a known clip as requests (its own
+body velocity, each step) and reads §46's seven measures off what the matcher chose, all in the
+database's raw body-frame units: continuity, trajectory error, velocity error, pose error, contact
+mismatch, phase mismatch, transitions per second. `test_motion_evaluation.cpp`:
+
+- **Golden corpus, three arms.** With the clip in the database every measure sits at its floor
+  (trajectory 0.000); with it left out trajectory error rises (0.290); with the trajectory,
+  facing and root-velocity weights zeroed, a matcher blind to the request, it rises further (0.480). The no-op fails at least one arm.
+- **The scout, leave-one-out over its walks and runs.** The finding is that *the floor is not a
+  floor* here: `Walking`, `Walking_crouch` and `Walking_injured` score the same in or out, because a
+  velocity-only request cannot tell one in-place walk from another. Removing a clip that is distinct
+  (`Running`, `Walking_low_grav`) makes it worse, which is asserted.
+
+## §70 and §89
+
+The failure taxonomy (§70) and the final report (§89) are `docs/design/motion-matching.md`. §70's
+table classifies every defect Phase C found by the spec's categories and names the layer the fix
+went into.
+
+## §44 — style, as a cost
+
+"Style metadata may eventually influence query cost." It now does. A character has a style
+(`motionMatching.style`) and a map from style to clip-name prefixes (`motionMatching.styles`); a
+clip outside the style pays `styleWeight` × the database's cost spread (`weights.style`, default
+0.05, the unit `switchMargin` uses). The term is `MotionQuery::clipCost`, added in the linear
+search, the staged scorer and the explainer alike, and shown in the breakdown as `style`. A style
+nothing carries adds no cost; an undefined style is refused at load. The style is the character's,
+not the request's: `MotionRequest::style` stays the clip provider's exact-match key, so the
+fallback behind the matcher gets what it always got. `test_motion_style.cpp`.
+
+**The default is a measured band, not a guess.** On the golden corpus, two versions of one walk
+differ by about 0.01 of the spread and the right motion beats the wrong one by 0.06–0.3. The first
+default, a whole spread, was a filter: a strutting body asked to stand still strutted, and asked to
+run strutted. 0.05 sits inside the band: the style decides between walks, and idle and run are
+still chosen. An arm at 1000× shows the filter behaviour, so the difference is visible.
+
+**A fixture that lied first.** The first strut variant was slower than the walk, and it won
+*without* any style: from the database's mean pose a shorter stride is nearer, and continuity then
+held it. The choice is path-dependent, so the variant had to be worse from every direction (faster,
+1.35 m/s).
+
+**On 100STYLE** (the MIXED pack, twelve styles), each style's own forward walk replayed as
+requests:
+
+| | in style | forward (FW/FR) |
+|---|---|---|
+| no style | 0.19 | 0.26 |
+| the style | **1.00** | **0.66** |
+
+Two observations, recorded and not chased:
+- **At the engine's default weights the matcher is pose-locked on this corpus too.** A forward
+  request held `DuckFoot_TR1` for two seconds on its pose alone (a joint-position cost of 0.34
+  against 2.0 for `Aeroplane_FW`). The measurement uses §65's request-led weights.
+- **Strafe and turn clips read as forward.** Travelling clips are faced by their smoothed travel,
+  so `_SR` and `_TR1` present as slow forward motion. Without a style they win forward requests
+  (0.26 forward). With one, the style's own `_FW` is usually the nearest of its eight clips. Four
+  styles still land on `_TR1` or `_SW`.
+  **Corrected 22 Sep:** this was a misreading. The column scored clip *names*, and 100STYLE's
+  sideways files begin with a forward walk. Measured per sample, their sidestep stretches read
+  sideways in the body frame (see "§65 strafe").
+
+## §67 — the crowd: 10, 50 and 100 matched scouts
+
+`examples/labs/motionmatch/glowmere-match-crowd-{10,50,100}.scene.json`, generated by
+`tools/gen_match_crowd.py` from the ADR-623 match lab. N scouts stand on a 5 m grid in the lab's
+valley, each wandering on its own seed. All use the scout's own clips, the allow-list
+`Idle/Walking/Running` and request-led weights. `test_motion_crowd.cpp` checks, at 4 s:
+
+| N | on the matcher | databases | distinct samples | update ms/frame (under load) | worst \|y − ground\| |
+|---|---|---|---|---|---|
+| 10 | 10 | 1 | 6 | 1.89 | 0.053 |
+| 50 | 50 | 1 | 28 | 7.94 | 0.073 |
+| 100 | 100 | 1 | 38 | 16.04 | 0.074 |
+
+- Every body is matched, and none silently fell back.
+- There is **one** database for the whole crowd (`Composition::motionDatabaseCount`, new): §4's
+  sharing, asserted in a scene rather than in a unit test.
+- The crowd is not in lockstep: at least a third of the bodies are on samples nobody else is on.
+  Most of the sharing is idles held at a clip's first sample.
+- The update time is the whole composition update (behaviour, ground, chain, layers, skinning
+  inputs), not the search alone. §50's harness puts 100 characters' search at a fraction of it. It
+  was taken with other agents' work on the machine, so it is under load.
+
+A 1280×720 headless render at 4 s, under the GPU lock, completed with no GPU errors. The render
+log's rig ladder reports **100 posed and 100 rate-limited** on every frame of the deliverable
+("distant characters slid or glided"). The rate limit is the rig LOD, not motion matching.
+Whether a matched crowd should be exempt from it in an offline render is an owner question.
+
+## §65 strafe: served from 100STYLE's sidesteps (owner ruling, 22 Sep)
+
+The owner ruled that the strafe should be served by 100STYLE's sidesteps through the ADR-624
+retarget. The coordinator named the likely blocker: strafes reading as forward motion because clips
+were faced by their travel.
+
+**Measured first, and the premise did not hold.** A clip is already faced by its body: the travel
+joint's rotation, smoothed over a second, not the direction it travels. Retargeted onto the scout,
+the sidestep stretches read 418:11, 283:87, 211:0 and 184:12 sideways to forward
+(`test_motion_body_joint.cpp`). §44's "strafes read as forward" was a misreading of my own metric.
+It scored the *clip name* of each chosen sample, and 100STYLE's `_SW`/`_SR` files are not all
+sidestep: each walks forward, stands, then sidesteps in slow circles for the rest of the take.
+
+**What did block it: four defects, each found by a measurement on the way.**
+
+1. **The request described a strafe as walking forward.** `bodyVelocity` was `heading × speed`, so
+   while the body travelled at 90° to its facing, the request said it moved forward, and the §25
+   prediction curved from a forward walk into the strafe. It now takes the intent's travel
+   direction, at the same rate-limited speed, so scrubbing stays exact. With it, the strafe moved
+   from the slower `SW` to the `SR` stretch, whose sideways speed is the one asked for (2 m/s at
+   1.94× scale). No test fails without this change; it is recorded as such.
+2. **A retargeted body left its upper body behind** (ADR-624 amendment). The alien's spine, hands,
+   backpack and knees are children of `rig`, not of the travel joint `root.x`. The rotation
+   retarget moved `root.x` only, so on a sidestep the spine sat 1.2–2.4 from the hips (0.29 in the
+   alien's own clips). The positional retarget now carries travel, heading and the reach-cap drop
+   on the skeleton's root, and the spine stays exactly at its rest distance. The rotation retarget
+   alone still shows the drift (2.32), as the test's control arm.
+3. **Clips of one pack were measured from different bodies** (extraction v8). §21's variants and
+   retargeted clips travel on `rig`; the alien's own travel on `root.x`. Per clip, a variant's feet
+   sat 0.78 higher than its source's, and leaving a straight walk for a turn cost about 5 in pose.
+   Every clip is now measured from the travel joint that lies below all the others. A turn
+   variant's first pose now equals its source's to 0.00000, against 0.7794 with the rule disabled.
+   A first version of the rule ("the joint every clip translates") picked a foot: a retargeted
+   `root.x` sits at rest relative to `rig`, so its channel had been pruned.
+4. **The switch margin held a straight walk through both curves.** With the sidesteps in the
+   corpus, a turn variant fitted a curve 2.7 better than carrying on (8.9 against 11.6), but the
+   margin (0.05 × a spread of 141 = 7.0) held the walk. `motionMatching.weights.switchMargin` now
+   exists, and the demo uses 0.01.
+
+**The corpus.** Four stretches of `HandsInPockets` sidesteps, retargeted with the reach cap:
+`SW` 9–26 s and 26.5–40 s, and `SR` 7–14 s and 14.5–21 s. They are cut with the new
+`avgen-motion pack --range a:b` and joined to the scout's augmented pack with the new
+`avgen-motion merge`, which keeps each clip's provenance. The character's §44 style is `scout`, its
+own clips, so the borrowed sidesteps win only where nothing of its own serves. `HandsInPockets` was
+chosen because only the legs and hips are retargeted, and its legs walk normally. The upper body
+stays the scout's own, so the pockets never show. It is a look choice, open to the owner.
+
+```
+COMMON="--scale 0.01 --license CC-BY-4.0 --source 100STYLE --contacts foot.l,foot.r \
+  --redistribution allowed --derivedDataAllowed true --retarget-to assets/aliens/alien-scout.glb \
+  --map Hips:root.x,LeftHip:thigh_twist.l,LeftKnee:leg_stretch.l,LeftAnkle:foot.l,LeftToe:toes_01.l,RightHip:thigh_twist.r,RightKnee:leg_stretch.r,RightAnkle:foot.r,RightToe:toes_01.r \
+  --positional-legs LeftHip:LeftKnee:LeftAnkle=thigh_twist.l:leg_stretch.l:foot.l,RightHip:RightKnee:RightAnkle=thigh_twist.r:leg_stretch.r:foot.r"
+avgen_motion pack assets/100style-mixed/HandsInPockets_SW.bvh --out ss1 --range 9:26 $COMMON
+avgen_motion pack assets/100style-mixed/HandsInPockets_SW.bvh --out ss2 --range 26.5:40 $COMMON
+avgen_motion pack assets/100style-mixed/HandsInPockets_SR.bvh --out ss3 --range 7:14 $COMMON
+avgen_motion pack assets/100style-mixed/HandsInPockets_SR.bvh --out ss4 --range 14.5:21 $COMMON
+avgen_motion merge ss1 ss2 ss3 ss4 --out assets/100style-scout-sidestep-pack
+avgen_motion merge assets/aliens-scout-augmented-pack assets/100style-scout-sidestep-pack --out assets/aliens-scout-demo-pack
+```
+
+**The demo now** (second half of each segment):
+
+| request | plays |
+|---|---|
+| idle | `Idle_turn` (was `Idle`) |
+| walk | `Walking` |
+| accelerate | `Walking` |
+| curve left | `Walking~turn+1.40` (56 of 60) |
+| curve right | `Walking~turn-1.40` |
+| run | `Running` |
+| slow | `Walking_low_grav` |
+| turn on the spot | `Idle_turn` |
+| stop | `Idle_turn` (was `Idle` then `Idle_turn`) |
+| **strafe** | **`HandsInPockets_SR@14.5-21`**: a strafe family, asserted |
+| walk again | `Walking` |
+
+**What got worse.** Idle and stop now play `Idle_turn`, a turn on the spot, where they played `Idle`.
+No weight in the sweep fixes both without losing the curves. It is recorded, not asserted, and it
+is part of what the owner will see.
+
+**Crowd rig LOD (§67), my call as delegated.** No exemption. The rig ladder's rate limit applies to
+every body, matched or not, and exempting one kind would make the ladder answer a different
+question for different characters. For a hero-quality offline render the right lever is the
+render's own detail setting, which lifts every body alike. Recorded here; nothing changed.
+
+### Observed under load, not chased: `test_lighting_perf`
+
+Run explicitly by file on 2026-09-21, `test_lighting_perf.cpp:236` read 7.9 ms against its 4.0 ms
+limit (shadow + AO). Three agents' suites were running on the machine at the time. It is not part
+of the default run and not motion work. Recorded here as observed under load, per the coordinator.
+
+# Phase C infrastructure and tooling (`agent/anim-cinfra`)
+
+Sections §37–§43, §57, §58, §68, §69, §72, §74–§76, §81–§83. Built under the programme's faster
+rules: working code plus tests that fail with the change reverted (ADR-182). Every probe below was
+reverted and seen to fail before it was trusted.
+
+## §37/§38/§82 — the database became a file
+
+**Before this a motion database existed only in memory.** Nothing wrote `buildMotionDatabase`'s
+result anywhere, so anything that wanted to search one had to pose every frame of every clip in
+its own process: exactly the offline work §37 says the runtime must not do.
+
+`scene/motion_database_io.{hpp,cpp}`: `<pack>/databases/<name>.motiondb`, one file per feature
+config beside the Phase A pack, whose format is unchanged. One file, not one per array, so
+publishing a rebuild is one rename (§40 on disk). A JSON header (config, stats, build record) and a
+raw little-endian payload. `MotionDatabase` gained a `build` record (source pack content digest,
+feature schema digest, sample rate, tool version, build key) and an `identity` content digest.
+
+A load refuses, with a message, a flipped payload byte, a different rig, a database left behind by
+an older pack ("stale, rebuild"), a config whose recomputed schema disagrees with the recorded one,
+and an unknown file version. A write refuses a database that was changed after it was stamped. The
+schema digest follows meaning and ignores weights, since a weight is tunable without a rebuild.
+
+| real Glowmere scout, 1,738 samples | |
+|---|---|
+| build (poses every frame) | 98.8 ms |
+| `build-db` second run: header key check + verified load | 0.9 ms |
+| round trip | bit-identical; save → load → save byte-identical |
+
+§82 is the build key, which covers source content, full config and weights (because `costSpread`
+is weighted), sample rate and tool version. A matching key is still fully verified by the load, and
+a corrupt cache entry with a matching key is rebuilt rather than trusted. The pack content digest
+includes the provenance processing chain, which is where a retarget profile is recorded, so the
+same source retargeted differently gets a different key.
+
+**Checked against the pack as READ, not as built.** Writing a pack and reading it back reproduces
+the content digest exactly on the real scout. If it had not, every stored database would have
+been stale on arrival.
+
+CLI: `avgen-motion build-db <pack> --joints a,b,c [--name n] [--force]`.
+
+## §39/§40/§76/§81 — load in the background, publish atomically, migrate what was mid-motion
+
+`scene/motion_library.{hpp,cpp}`: `MotionDatabaseSlot`. `requestLoad` returns immediately, and a
+worker thread reads, verifies and cross-checks the pack against the database (skeleton, content
+digest, clip count). Only then does it swap a `shared_ptr<const MotionAsset>` under a lock that is
+held for one pointer copy. The last request wins: an earlier load that finishes later is dropped,
+not published. A failed load leaves the previous asset published. Nothing on the runtime path
+builds a database, so a scrub can never trigger one (§81).
+
+**The migration hazard, and its fix.** After a swap, a character's `MotionMemory::selection` is a
+sample index into the old database. It is usually still in range in the new one, where it names an
+unrelated frame. `MotionMemory` now carries `database` (the identity it indexes).
+`MatchMotionProvider::advance` treats a memory from another database as a first selection with no
+blend, and `pose` declines it rather than posing the stale index. Using an identity rather than a
+load counter keeps a replay against the same database reproducing the same memory (ADR-360).
+
+Three existing tests hand-built a `MotionMemory` and so went dark under the new check. One of them,
+§32's pose-cost benchmark, **failed**, because every arm was timing the refusal path (0.0037 µs
+against 0.0037 µs). Those three tests now stamp their memories. A timing assertion caught a no-op
+it was never written to catch.
+
+## §41/§74/§75 — one immutable database, one provider, many threads, no allocation
+
+- **A data race, found by audit.** `MatchMotionProvider::counters_` were plain integers incremented
+  from a `const` provider that the design shares between every character. That was the only
+  mutable state in an otherwise shareable object. They are now relaxed atomics. Test: 64
+  characters over 8 threads against one provider give memories identical to a serial run, and
+  counters equal to it exactly.
+- **Allocation.** Each search allocated three vectors in `advance` plus two in `searchMotion` (the
+  layout and the weights). They now use per-thread scratch (`motionFeatureLayoutInto` /
+  `motionFeatureWeightsInto`). Test: **0 allocations over 600 warm frames** containing more than 20
+  real searches, using an interposed `operator new` in the test TU (the engine's counters are
+  compiled only with `AVGEN_ALLOC_COUNTERS`). The probe is itself asserted live.
+- `MotionMemory` is tripwired at ≤128 bytes and trivially copyable. A hundred providers bound from
+  one slot share one `features.data()`.
+
+## §42/§43 — the strategy, measured on the cast — DECISION (ADR-650)
+
+Measured on the six Glowmere aliens (`[motionstrategy]`):
+
+| | A: source + runtime retarget | B: retargeted offline per rig |
+|---|---|---|
+| per posed frame | **197 µs** | **2.33 µs** (84.5× less) |
+| 60 characters @ 60 Hz | **710 ms CPU per second** | 8.4 ms CPU per second |
+| per rig offline | — | retarget 348 ms + pack/db 91 ms |
+| memory, 60 characters | 3.41 MB (shared + 2.8 KB binding each) | 4.05 MB per distinct rig |
+
+**The decisive fact: all six aliens share one skeleton digest.** For this cast, B needs no
+retarget at all: the scout's database is every alien's database, and B's memory is one copy.
+
+**Decision: B, keyed by skeleton digest, which is §43's "support both".** Characters with the same
+skeleton share one database. A new, distinct skeleton gets a character-specific pack, retargeted
+offline, and its own database. A is rejected because its runtime cost is 84× B's and makes 60
+characters cost most of a core. Its one advantage, a small memory saving per extra rig (3.8 vs
+4.05 MB), only exists when rigs differ, and this repository's rigs do not. Revisit if a cast of
+many *distinct* skeletons arrives and memory binds before CPU does. The test asserts
+`perPoseA > 5 × perPoseB`, so a faster retargeter re-opens the decision by failing.
+
+Recorded as **ADR-650**. (The numbering table gave 600–649 to `agent/anim-research` and said 650+
+"ask before taking"; the supervisor then assigned 650–669 to this branch.)
+
+## §57 — the inspector
+
+`scene/motion_database_inspect.{hpp,cpp}`, `avgen-motion inspect-db <file> [--pack] [--categories]`.
+It reports clips, samples, dimensions per cost term, trajectory horizons, memory by part, contact
+distribution (from the pack's spans), the phase histogram, tag counts, coverage, search structure
+and provenance, all read from the arrays and never re-derived. On the scout: foot.l planted 45.0%,
+foot.r 43.8%, and 1,658 of 1,738 samples phased, spread flat across the ten tenths (160–180
+each). It says "search structure: none — linear scan" in plain words.
+
+## §58 — coverage in words, with the thresholds printed
+
+`measureMotionCategories` extends `motion_coverage` with eleven categories: idle, walk, run,
+strafe, reverse, left/right turn, fast left/right turn, starts, stops. Each is a predicate over the
+database's own root velocity. The grade counts **matcher commitments** (seconds ÷ the 0.2 s minimum
+continuation, §29), because a category with 0.1 s of content cannot be played even once. Starts
+and stops count events. A category drawn from one clip is capped at moderate. Every threshold is
+printed in the report.
+
+**Two findings from building it:**
+
+1. **Every clip's last sample reads zero root velocity**, looping walks included. The builder's
+   forward difference is clamped at the clip end. Counted naively, that is one fictitious idle
+   sample and one fictitious STOP per moving clip. The report excludes clip-final samples and says
+   so. *For the core agent:* the feature itself carries the artefact, so a query landing on a
+   clip's last frame sees a body at rest.
+2. **On the scout, tags and root velocity disagree sample by sample.** Walk is tagged 8.47 s, but
+   **only 0.57 s of it moves like a walk**. Run is tagged 1.77 s and moves like a run for 0 s. The
+   measured "walking" (7.57 s over 18 clips), the reverse locomotion (7.03 s) and the 64 starts and
+   stops are root sway in in-place clips. This is ADR-540 again, now per sample, and the report
+   flags it on the line where it happens.
+
+## §68/§69 — why did it choose this motion
+
+`scene/motion_match_explain.{hpp,cpp}`. An explanation is **a comparison, not a breakdown**. It
+sets the winner beside the continuation, the best candidate from another clip, the best candidate
+the tag filter removed, and (for a staged plan) the exhaustive answer, all with per-term costs.
+From the differences it attributes the decision to one of §69's eight causes. The weights cause is
+counterfactual: re-evaluate the decisive term at weight 1 and report a flip. The cost it computes
+equals `MotionMatch::cost` **to the bit**, so it cannot drift from the search. Each cause has a test
+case built to be decided by that cause alone.
+
+`MatchMotionProvider::queryFor` rebuilds the provider's own query through the same `fillQuery` that
+`advance` uses, so the explanation covers the decision the provider actually made.
+`avgen-motion explain <pack> --db <n> [--speed --speed2 --switch --turn --at --stride]` prints the
+§68 panel.
+
+**What it found on its first run on the scout.** Asked to stand for a second and then walk at 1.6
+m/s, the matcher plays `Fight_head_hit` and then selects `Fight_leg_kick_1`. Why, in its own words:
+57% of the winner's misfit is trajectory (the query wants to be 0.96 m ahead at +0.6 s, and the
+winner gets 0.36 m), and even the best match costs 174% of the typical gap: "the database may not
+contain this motion". This is the in-place corpus seen from the matcher's side. It belongs to the
+core agent's Glowmere demonstration (§65), and it is now a one-line command to reproduce.
+
+## §72 — baking
+
+`entity/motion_bake.{hpp,cpp}`, `avgen-motion bake <pack> --db <n> --out <dir>`. It runs the
+provider exactly as the entity does and keys `pose`'s output, inertialized blends included. At
+every key the baked clip reproduces the session's pose (< 1e-5), two bakes are bit-identical, and a
+declined step is keyed from rest and counted rather than closed up. The output is a MotionPack whose
+provenance inherits the corpus licence and records the bake. It does not bake world root motion
+(§71 owns that) and says so.
+
+## §83 — diffing
+
+`scene/motion_database_diff.{hpp,cpp}`, `avgen-motion diff-db a b`. Samples are matched by
+(clip name, time), not index, and compared in **raw** units, because each database is normalised
+by its own spread. A clip inserted first is therefore 31 additions and zero changes, not every
+later sample "changed". Schema changes are reported and values across them are not compared. Weight
+and config changes are listed.
+
+## Handover notes for the supervisor
+
+- **Owner-level (batched):** none of this is reachable from a shipping scene, because the product
+  installs the clip provider and the matcher is dark (ADR-615, §35 is the owner's). The slot, the
+  migration and the explainer are ready for the day it is wired. Wiring it changes shipping scene
+  behaviour, so it is not done here.
+- **ADR number** for the §42 decision: ADR-650, from the range the supervisor assigned (650–669).
+- **For the core agent (§65):** the explain output above, and the clip-final zero-velocity artefact.

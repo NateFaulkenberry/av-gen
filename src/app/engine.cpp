@@ -116,6 +116,7 @@ void Engine::setTempoSource(TempoSource source) {
 
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
+    ++sceneGeneration_;
     // Live only. An expensive procedural regeneration is allowed to wait for the slider driving it
     // to stop moving, rather than taking the frame away from the editor on every frame of a drag
     // (see Composition::setInteractiveRebuildBudget). Offline never sets it, because the deferral
@@ -148,6 +149,13 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         // faster seek that draws a different frame is not a faster seek (ADR-182), so this may not
         // be set low enough to bite on a scene that is currently getting a correct answer.
         //
+        // ADR-700 retired the window: a seek now resumes from the nearest checkpoint, and this
+        // ceiling bounds the replay *from* it -- in practice only a first scrub, before the
+        // checkpoints exist, can reach it, and past it the seek falls back to the window and
+        // reports itself inexact. The default rose to `SeekBudget::kEditorBodySteps` (400,000)
+        // so that first scrub of the Glowmere multicam, 257,982 body-steps to its last frame, is
+        // exact. The history of the number, for the record:
+        //
         // 180,000 is the whole ninety seconds for any scene with up to thirty-three bodies that
         // need it -- Glowmere's twenty-two deep bodies cost 118,801, so it keeps its exact frame --
         // and it shrinks from there. What it is actually for is the case ADR-267 called the
@@ -160,7 +168,8 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         if (const char* budget = std::getenv("AVGEN_SEEK_BODY_STEPS")) {
             seekBodyStepBudget_ = std::strtoull(budget, nullptr, 10);
         } else {
-            seekBodyStepBudget_ = 180000;
+            // ADR-700: raised with the window's retirement; see `SeekBudget::kEditorBodySteps`.
+            seekBodyStepBudget_ = entity::SeekBudget::kEditorBodySteps;
         }
     }
     // AVGEN_LEGACY_PROCGEN=1 restores the pre-ADR-233 double generation, in *any* mode, for one
@@ -917,6 +926,95 @@ void visitSceneFileAssets(const std::filesystem::path& sceneFile,
     }
 }
 
+// ADR-158's aim-follow entry, in the one spelling both `cameraAimFollow` and ADR-582's parked copy
+// use. One writer and one reader for both keys, so a field added to one cannot be dropped by the
+// other (docs/testing.md #38: a fact that lives in a copied region lives in N copies).
+nlohmann::json aimFollowToJson(std::span<const scene::AimFollow> follow) {
+    nlohmann::json shots = nlohmann::json::array();
+    for (const scene::AimFollow& shot : follow) {
+        shots.push_back(nlohmann::json{{"start", shot.startSeconds},
+                                       {"end", shot.endSeconds},
+                                       {"hero", shot.hero},
+                                       {"heroAtCut", {shot.heroAtCut.x, shot.heroAtCut.y, shot.heroAtCut.z}}});
+    }
+    return shots;
+}
+
+std::vector<scene::AimFollow> aimFollowFromJson(const nlohmann::json& array, const char* key,
+                                                const std::function<void(std::string)>& warn) {
+    std::vector<scene::AimFollow> shots;
+    if (!array.is_array()) {
+        return shots;
+    }
+    for (const auto& entry : array) {
+        if (!entry.is_object() || !entry.contains("heroAtCut") || !entry["heroAtCut"].is_array() ||
+            entry["heroAtCut"].size() != 3) {
+            warn(fmt::format("{}: a shot without a 'heroAtCut' position was skipped", key));
+            continue;
+        }
+        scene::AimFollow shot;
+        shot.startSeconds = entry.value("start", 0.0);
+        shot.endSeconds = entry.value("end", 0.0);
+        shot.hero = entry.value("hero", std::string{});
+        const auto& at = entry["heroAtCut"];
+        shot.heroAtCut = glm::vec3(at[0].get<float>(), at[1].get<float>(), at[2].get<float>());
+        if (shot.hero.empty() || !(shot.endSeconds > shot.startSeconds)) {
+            warn(fmt::format("{}: a shot with no hero or no duration was skipped", key));
+            continue;
+        }
+        shots.push_back(std::move(shot));
+    }
+    return shots;
+}
+
+// ADR-582's `parkedDirector` block. The tracks go through the timeline's own writer and reader and
+// the shots through `CameraShot`'s, so a parked track or shot is literally the same document a live
+// one is and cannot drift from it in what it supports.
+nlohmann::json parkedCutToJson(const ParkedDirectorsCut& cut) {
+    nlohmann::json out = nlohmann::json::object();
+    params::Timeline scratch;
+    scratch.tracks() = cut.tracks;
+    out["tracks"] = scratch.toJson()["tracks"];
+    out["aimFollow"] = aimFollowToJson(cut.aimFollow);
+    nlohmann::json shots = nlohmann::json::array();
+    for (const scene::CameraShot& shot : cut.cameraShots) {
+        shots.push_back(shot.toJson());
+    }
+    out["cameraShots"] = std::move(shots);
+    return out;
+}
+
+Result<ParkedDirectorsCut> parkedCutFromJson(const nlohmann::json& doc,
+                                             const std::function<void(std::string)>& warn) {
+    if (!doc.is_object()) {
+        return fail("'parkedDirector' must be a JSON object");
+    }
+    ParkedDirectorsCut cut;
+    if (const auto tracks = doc.find("tracks"); tracks != doc.end()) {
+        params::Timeline scratch;
+        if (auto ok = scratch.fromJson(nlohmann::json{{"tracks", *tracks}}); !ok) {
+            return fail("parkedDirector: {}", ok.error().message);
+        }
+        cut.tracks = std::move(scratch.tracks());
+    }
+    if (const auto follow = doc.find("aimFollow"); follow != doc.end()) {
+        cut.aimFollow = aimFollowFromJson(*follow, "parkedDirector.aimFollow", warn);
+    }
+    if (const auto shots = doc.find("cameraShots"); shots != doc.end()) {
+        if (!shots->is_array()) {
+            return fail("parkedDirector.cameraShots must be an array");
+        }
+        for (const auto& entry : *shots) {
+            auto shot = scene::CameraShot::fromJson(entry);
+            if (!shot) {
+                return fail("parkedDirector.cameraShots: {}", shot.error().message);
+            }
+            cut.cameraShots.push_back(std::move(*shot));
+        }
+    }
+    return cut;
+}
+
 } // namespace
 
 nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
@@ -984,14 +1082,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     // project's cut. Written only when there is a cut, so a project that was never directed keeps
     // the file it had.
     if (const auto* comp = composition(); comp != nullptr && !comp->aimFollow().empty()) {
-        nlohmann::json shots = nlohmann::json::array();
-        for (const scene::AimFollow& shot : comp->aimFollow()) {
-            shots.push_back(nlohmann::json{{"start", shot.startSeconds},
-                                           {"end", shot.endSeconds},
-                                           {"hero", shot.hero},
-                                           {"heroAtCut", {shot.heroAtCut.x, shot.heroAtCut.y, shot.heroAtCut.z}}});
-        }
-        doc["cameraAimFollow"] = std::move(shots);
+        doc["cameraAimFollow"] = aimFollowToJson(comp->aimFollow());
     }
     // ADR-207: the other half of the same bake -- when the camera travels and when it holds, which
     // is what a world effect time-gates on. A sibling of `cameraAimFollow` for the identical reason,
@@ -1019,6 +1110,16 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
             spans.push_back(std::move(entry));
         }
         doc["cameraShotSpans"] = std::move(spans);
+    }
+    // ADR-582: a cut whose owner took the camera back is parked, not gone. The spans above are
+    // written whether the director is steering or parked -- they are the film's focus schedule and
+    // effects follow them either way -- and this block holds the half that steers the camera, so
+    // "Resume director" in the next session puts back exactly what was there.
+    //
+    // Written only when something is parked, so a project that was never directed, or one whose
+    // director is steering, keeps the file it had; its presence is the parked marker.
+    if (!parkedCut_.empty()) {
+        doc["parkedDirector"] = parkedCutToJson(parkedCut_);
     }
     // ADR-207 and ADR-230, on the argument `cameraShotSpans` above makes, for the two families it
     // did not cover -- and this time it is not a derived cut but the effects themselves.
@@ -2044,25 +2145,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // inherit the last one's, or the camera would chase a hero this scene has never heard of.
     if (auto* comp = composition()) {
         std::vector<scene::AimFollow> shots;
-        if (doc.contains("cameraAimFollow") && doc["cameraAimFollow"].is_array()) {
-            for (const auto& entry : doc["cameraAimFollow"]) {
-                if (!entry.is_object() || !entry.contains("heroAtCut") || !entry["heroAtCut"].is_array() ||
-                    entry["heroAtCut"].size() != 3) {
-                    warn("cameraAimFollow: a shot without a 'heroAtCut' position was skipped");
-                    continue;
-                }
-                scene::AimFollow shot;
-                shot.startSeconds = entry.value("start", 0.0);
-                shot.endSeconds = entry.value("end", 0.0);
-                shot.hero = entry.value("hero", std::string{});
-                const auto& at = entry["heroAtCut"];
-                shot.heroAtCut = glm::vec3(at[0].get<float>(), at[1].get<float>(), at[2].get<float>());
-                if (shot.hero.empty() || !(shot.endSeconds > shot.startSeconds)) {
-                    warn("cameraAimFollow: a shot with no hero or no duration was skipped");
-                    continue;
-                }
-                shots.push_back(std::move(shot));
-            }
+        if (const auto follow = doc.find("cameraAimFollow"); follow != doc.end()) {
+            shots = aimFollowFromJson(*follow, "cameraAimFollow", warn);
         }
         comp->setAimFollow(std::move(shots));
         // ADR-217, and for exactly the reason the table above round-trips: an offline render reloads
@@ -2106,6 +2190,17 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
         shotSpans_ = std::move(spans);
+    }
+    // ADR-582, and cleared when absent for the same reason: a project with nothing parked must not
+    // inherit the last one's parked cut, or "Resume director" would restore another film's camera.
+    // A project saved before this block existed has none, and opens exactly as it always did.
+    parkedCut_ = ParkedDirectorsCut{};
+    if (const auto parked = doc.find("parkedDirector"); parked != doc.end()) {
+        auto cut = parkedCutFromJson(*parked, warn);
+        if (!cut) {
+            return std::unexpected(cut.error());
+        }
+        parkedCut_ = std::move(*cut);
     }
     cueState_ = {};
     cueApplied_ = false;
@@ -2705,6 +2800,17 @@ Result<void> Engine::installComposition(std::unique_ptr<scene::Composition> comp
     if (!comp->environmentMap().empty()) {
         environmentPath_ = registry_.resolve(comp->environmentMap());
     }
+    // ADR-582: the director's aim-follow table is camera automation, not scene content -- it is
+    // saved beside `timeline`, not in the scene document -- so it survives a composition being
+    // replaced exactly as the camera tracks and the shot spans it belongs with do. Without this an
+    // assistant rollback (`setCompositionJson`) silently emptied it, the next save wrote the loss,
+    // and the cut came back with its keys and without the follow. A project load still replaces it
+    // from the document afterwards, cleared when absent.
+    std::vector<scene::AimFollow> keepFollow;
+    if (const scene::Composition* was = this->composition()) {
+        keepFollow = was->aimFollow();
+    }
+    comp->setAimFollow(std::move(keepFollow));
     installController(std::move(comp));
     // Now the parameters exist. The project's own `parameters` block is applied at the end of the
     // project load and still overrides anything set here.
@@ -3109,10 +3215,12 @@ void Engine::seekSeconds(double seconds) {
         // left invisible twenty metres in the air. A scenario that autostarts picks up again on the
         // next frame, which is what makes the seeked second a function of the second rather than of
         // how the playhead got there.
-        {
-            const probe2::Add probeDirector(probe2::frame().directorResetMs); // TEMPORARY: phase 2
-            composition->director().reset(&composition->entityWorld(), &params_);
-        }
+        //
+        // ADR-671 (the owner's ruling, 2026-09-21): and then *replays* it with the entities, so a
+        // scrub -- and a render that starts mid-film -- lands the craft, the animals it lifts and
+        // every character that perceives them exactly where a play from zero puts them. The
+        // reset is inside `seekWithDirector`; what ADR-209 called "picks up again on the next
+        // frame" is now "is where it would have been".
         // ADR-217: and the camera's hold on it, for the same reason. The hold is derived from the
         // scenario's state, and the scenario has just been put back to the top -- a hold left armed
         // across the seek would keep the camera on a shot the new second is nowhere near.
@@ -3126,9 +3234,18 @@ void Engine::seekSeconds(double seconds) {
         // function of where the camera happened to be, and ADR-267 measured that at 50.263 m over
         // eight explorers at thirty seconds. What used to be saved by skipping distant bodies is
         // bounded here instead, in the unit the cost is actually paid in (ADR-273).
-        composition->entityWorld().seek(seconds, &params_, nullptr, 1.0 / 60.0,
-                                        entity::SeekBudget{.maxSeconds = 90.0,
-                                                           .maxBodySteps = seekBodyStepBudget_});
+        {
+            const probe2::Add probeDirector(probe2::frame().directorResetMs); // TEMPORARY: phase 2
+            // ADR-700: from the nearest simulation checkpoint, exact at any second. The window
+            // (`AVGEN_SEEK_MODE=window`) and the whole-history replay (`=full`) stay reachable as
+            // A/B arms out of one binary.
+            static const entity::SeekMode seekMode = entity::SeekBudget::modeFromEnvironment();
+            composition->seekWithDirector(seconds, params_,
+                                          entity::SeekBudget{.maxSeconds = 90.0,
+                                                             .maxBodySteps = seekBodyStepBudget_,
+                                                             .mode = seekMode},
+                                          1.0 / 60.0);
+        }
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were
         // not anywhere a frame ago. Left alone, the first frame after every scrub carries joint
         // motion vectors for a jump nobody made and the character smears. Told here rather than

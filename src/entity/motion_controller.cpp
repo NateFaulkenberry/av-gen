@@ -8,6 +8,8 @@ namespace {
 
 glm::vec3 flatten(const glm::vec3& v) { return glm::vec3(v.x, 0.0f, v.z); }
 
+float flatLength(const glm::vec3& v) { return std::sqrt((v.x * v.x) + (v.z * v.z)); }
+
 float horizontalLength(const glm::vec3& v) {
     return std::sqrt((v.x * v.x) + (v.z * v.z));
 }
@@ -59,7 +61,25 @@ MotionSolution stepMotion(const MotionRequest& request, const MotionState& in,
     // gets backwards.
     glm::vec3 heading = currentSpeed > limits.headingFloor ? current / currentSpeed : glm::vec3(0.0f);
     if (desiredSpeed > 1e-5f) {
-        const glm::vec3 wanted = desired / desiredSpeed;
+        glm::vec3 wanted = desired / desiredSpeed;
+        // §38. Aim partly at where the body will want to be heading, so a turn begins before the
+        // corner rather than at it. **This is the consumer `futureDirection` did not have**: the
+        // field was added in B.C, written by nobody and read by nothing, which is the same defect
+        // shape as a seam field only one path publishes (ADR-554).
+        //
+        // Blended rather than replaced, and the weight is a dial, because the failure here is not
+        // turning late -- it is turning *early*, which reads as a character anticipating a corner
+        // the viewer cannot see yet and is invisible to an onset measurement.
+        const float future = flatLength(request.futureDirection);
+        if (future > 1e-5f && request.desiredTurnRate == 0.0f) {
+            const glm::vec3 ahead = request.futureDirection / future;
+            const float w = std::clamp(limits.anticipation, 0.0f, 1.0f);
+            const glm::vec3 mixed = flatten((wanted * (1.0f - w)) + (ahead * w));
+            const float mixedLength = horizontalLength(mixed);
+            if (mixedLength > 1e-5f) {
+                wanted = mixed / mixedLength;
+            }
+        }
         if (glm::length(heading) < 1e-5f) {
             heading = wanted; // from rest, any direction is free
         } else {

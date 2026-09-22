@@ -1,5 +1,12 @@
 #pragma once
 
+// **Reached through prediction, not through the body.** `stepMotion`'s callers are
+// `predictTrajectory` and tests; `predictTrajectory`'s product caller is `MatchMotionProvider`'s
+// query (§25, wired for §48/§65), for a body that opted into motion matching (ADR-623). `grep -rn
+// "predictTrajectory(" src` finds them. The body itself is still not moved by this integrator:
+// `Entity` holds a `MotionState` that only `EntityWorld::reset` touches, and behaviours move the body
+// (ADR-615 records that half as staged and dark, and it still is).
+
 // The motion controller (Phase B §33-§35): intent in, continuous motion out.
 //
 // **What it is not.** It does not decide goals -- §33 is explicit, and ADR-091's tiers already say
@@ -42,6 +49,10 @@ struct MotionLimits {
     // body asked to walk east should not have to turn its velocity vector from a direction it does
     // not have. Expressed in m/s because it is about the body, not about the clip.
     float headingFloor = 0.05f;
+    // §38. How much of the turn aims at where the body will be heading rather than where it is
+    // heading. A dial rather than a constant because over-eager anticipation is a real failure
+    // and an onset count cannot see it -- see `test_trajectory.cpp`'s path-deviation arm.
+    float anticipation = 0.5f;
 };
 
 // Everything the controller remembers between steps. A plain value, entity-owned.

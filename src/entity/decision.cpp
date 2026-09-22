@@ -1,6 +1,7 @@
 #include "entity/decision.hpp"
 
 #include "entity/entity.hpp"
+#include "entity/mind.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -23,6 +24,51 @@ std::string readString(const nlohmann::json* j, const char* key, std::string fal
         return fallback;
     }
     return (*j)[key].get<std::string>();
+}
+
+std::vector<std::string> readStrings(const nlohmann::json* j, const char* key) {
+    std::vector<std::string> out;
+    if (j == nullptr || !j->is_object() || !j->contains(key) || !(*j)[key].is_array()) {
+        return out;
+    }
+    for (const auto& v : (*j)[key]) {
+        if (v.is_string()) {
+            out.push_back(v.get<std::string>());
+        }
+    }
+    return out;
+}
+
+// The semantic tags a filter names, as one mask against this world's vocabulary (Phase D §25). A
+// word the world has never heard contributes no bit, so a filter of only unknown words is a mask of
+// 0 -- which callers treat as "matches nothing", not "no filter": an author who wrote a filter
+// meant one.
+std::uint64_t maskOf(const DecisionContext& ctx, const std::vector<std::string>& names) {
+    if (ctx.world == nullptr) {
+        return 0;
+    }
+    std::uint64_t mask = 0;
+    for (const std::string& n : names) {
+        mask |= ctx.world->semanticTags().bit(n);
+    }
+    return mask;
+}
+
+IntentType readIntent(const nlohmann::json* j, IntentType fallback) {
+    if (j == nullptr || !j->is_object() || !j->contains("intent") || !(*j)["intent"].is_string()) {
+        return fallback;
+    }
+    IntentType out = fallback;
+    return intentTypeFromName((*j)["intent"].get<std::string>(), out) ? out : fallback;
+}
+
+// A point `distance` metres from `from`, directly away from `threat`, on the flat. When the two
+// coincide the direction is the body's own facing reversed, so the answer is defined.
+glm::vec3 awayFrom(const glm::vec3& from, const glm::vec3& threat, float distance, float yaw) {
+    glm::vec2 d(from.x - threat.x, from.z - threat.z);
+    const float len = glm::length(d);
+    d = len > 1e-3f ? d / len : glm::vec2(-std::sin(yaw), -std::cos(yaw));
+    return glm::vec3(from.x + d.x * distance, from.y, from.z + d.y * distance);
 }
 
 params::ParamDesc<float> floatDesc(std::string path, float def, float lo, float hi) {
@@ -94,6 +140,11 @@ std::uint32_t hash32(std::uint32_t x) {
 // job and `approach` is the knob: walk to a point `approach` metres this side of it, which is also
 // what "approach" has always meant to an author. 0 keeps the old behaviour of naming the point
 // itself, which is right for a percept of a body -- a body is not a wall.
+// Phase D §14: how far out an aware considerer's approach starts to slow. A body walking up to
+// something it means to look at slows into it over a couple of strides rather than braking in the
+// last one. One constant rather than a knob per considerer until an author needs it to differ.
+constexpr float kArrival = 2.5f;
+
 glm::vec3 standOff(glm::vec3 from, glm::vec3 to, float approach) {
     if (!(approach > 0.0f)) {
         return to;
@@ -128,18 +179,33 @@ std::uint64_t decideTick(double time, float hertz, std::uint32_t seed) {
 
 void Selector::forget() {
     current_.clear();
+    currentSubject_ = 0;
     chosen_ = kNone;
     started_ = false;
 }
 
+void Selector::exclude(std::string_view name, std::uint64_t subject, double until) {
+    for (Exclusion& e : excluded_) {
+        if (e.name == name && e.subject == subject) {
+            e.until = until;
+            return;
+        }
+    }
+    if (excluded_.size() >= 8) {
+        excluded_.erase(excluded_.begin());
+    }
+    excluded_.push_back(Exclusion{std::string(name), subject, until});
+}
+
 void Selector::reset() {
-    options_.clear();
-    current_.clear();
-    chosen_ = kNone;
-    committedTick_ = 0;
-    tick_ = 0;
-    started_ = false;
-    counts_ = Counts{};
+    // Everything back to a freshly made selector except its settings -- by assignment rather than
+    // member by member (ADR-700). The member-by-member version forgot `commitment_`, so a scrub
+    // replayed from zero after any earlier run started with the last run's commitment boost on
+    // the incumbent, and the Glowmere aliens' decision scores disagreed with a fresh load from
+    // 14 s on (tests/unit/test_glowmere_scrub.cpp, "however it got there").
+    const SelectorSettings settings = settings_;
+    *this = Selector{};
+    settings_ = settings;
 }
 
 bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* const> considerers) {
@@ -158,6 +224,17 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
         }
     }
     counts_.scored += options_.size();
+    // Phase D §59: options whose plan failed recently are not on offer.
+    if (!excluded_.empty()) {
+        std::erase_if(excluded_, [&](const Exclusion& e) { return e.until <= ctx.time; });
+        for (Option& o : options_) {
+            for (const Exclusion& e : excluded_) {
+                if (o.name == e.name && o.subject == e.subject) {
+                    o.score = 0.0f;
+                }
+            }
+        }
+    }
 
     // The best applicable option. `<= 0` is "not applicable now" (character_ai.hpp §3), and a tie
     // is broken on the order the considerers appended -- which is the scene file's order, and so is
@@ -178,6 +255,7 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
         ++counts_.empty;
         chosen_ = kNone;
         current_.clear();
+        currentSubject_ = 0;
         return false;
     }
 
@@ -186,7 +264,8 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
     // moves -- so an index kept across a tick names a different option.
     std::size_t incumbent = kNone;
     for (std::size_t i = 0; i < options_.size(); ++i) {
-        if (!current_.empty() && options_[i].name == current_ && options_[i].score > 0.0f) {
+        if (!current_.empty() && options_[i].name == current_ &&
+            options_[i].subject == currentSubject_ && options_[i].score > 0.0f) {
             incumbent = i;
             break;
         }
@@ -194,6 +273,11 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
 
     const bool commit = [&] {
         if (incumbent == kNone) {
+            // Phase D §20: a plan in progress whose proposer went quiet keeps its slot unless beaten.
+            if (hold_ && !current_.empty() && bestScore <= holdScore_ + settings_.margin) {
+                ++counts_.holdRejections;
+                return false;
+            }
             return true; // nothing held, or what was held is no longer on offer
         }
         if (incumbent == best) {
@@ -204,13 +288,17 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
             ++counts_.dwellRejections;
             return false;
         }
-        if (bestScore <= options_[incumbent].score + settings_.margin) {
+        if (bestScore <= options_[incumbent].score * (1.0f + commitment_) + settings_.margin) {
             ++counts_.marginRejections;
             return false;
         }
         return true;
     }();
 
+    if (!commit && incumbent == kNone) {
+        chosen_ = kNone; // held: the running option is not on this tick's list to point at
+        return false;
+    }
     if (!commit) {
         // The chosen option is the one that is *running*, not the one that scored highest. That
         // distinction is the whole value of the overlay: a dwell or a margin refusal is exactly the
@@ -219,9 +307,11 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
         return false;
     }
 
-    const bool changed = current_ != options_[best].name;
+    const bool changed =
+        current_ != options_[best].name || currentSubject_ != options_[best].subject;
     chosen_ = best;
     current_.assign(options_[best].name);
+    currentSubject_ = options_[best].subject;
     if (changed) {
         committedTick_ = tick_;
         ++counts_.decisions;
@@ -295,7 +385,7 @@ std::size_t scoreGoals(const DecisionContext& ctx, const GoalTaste& taste,
         if (weight <= 0.0f) {
             continue;
         }
-        out.push_back(GoalCandidate{point.position, point.name, point.kind, weight});
+        out.push_back(GoalCandidate{point.position, point.name, point.kind, weight, 0, point.tags});
     }
     return out.size() - before;
 }
@@ -340,7 +430,8 @@ std::size_t scoreGoals(const DecisionContext& ctx, const GoalTaste& taste,
                 name = bodies[percept.source]->name();
             }
         }
-        out.push_back(GoalCandidate{percept.position, name, percept.kind, weight});
+        out.push_back(GoalCandidate{percept.position, name, percept.kind, weight, subjectOf(percept),
+                                    percept.tags});
     }
     return out.size() - before;
 }
@@ -391,6 +482,8 @@ void IdleConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
     // drain and the behaviours below carry on, which is what standing there is.
     out.push_back(Option{name_, weight(), std::span<const ActionDesc>(actions_),
                          Authority::Routine});
+    out.back().intent = IntentType::Idle;
+    out.back().addFactor("weight", weight());
 }
 
 // ---- holdPost ----------------------------------------------------------------------------------
@@ -482,6 +575,8 @@ void HoldPostConsiderer::consider(const DecisionContext& ctx, std::vector<Option
         actions_.push_back(std::move(pose));
     }
     out.push_back(Option{name_, score, std::span<const ActionDesc>(actions_), Authority::Routine});
+    out.back().intent = IntentType::ReturnTo;
+    out.back().addFactor("post", score);
 }
 
 // ---- investigate -------------------------------------------------------------------------------
@@ -508,6 +603,14 @@ InvestigateConsiderer::InvestigateConsiderer(const nlohmann::json* settings)
             }
         }
     }
+    tags_ = readStrings(settings, "tags");
+    intent_ = readIntent(settings, IntentType::Investigate);
+    noveltyWeight_ = readFloat(settings, "novelty", 1.0f);
+    affordance_ = readString(settings, "affordance", "");
+}
+
+std::uint64_t InvestigateConsiderer::tagMask(const DecisionContext& ctx) const {
+    return maskOf(ctx, tags_);
 }
 
 void InvestigateConsiderer::registerParameters(params::ParameterSet& params,
@@ -540,6 +643,27 @@ float InvestigateConsiderer::scoreOf(const DecisionContext& ctx, const Percept& 
     if (staleSeconds_ > 0.0f) {
         const auto age = static_cast<float>(std::max(0.0, ctx.time - p.seenAt));
         score *= std::max(0.0f, 1.0f - age / staleSeconds_);
+    }
+    // Phase D §25: a semantic filter, when one was authored.
+    if (!tags_.empty() && (p.tags & tagMask(ctx)) == 0) {
+        return 0.0f;
+    }
+    // Phase D §23: the ground is not a thing to investigate (aware deciders only).
+    if (ctx.mind != nullptr && ctx.world != nullptr &&
+        (p.tags & ctx.world->semanticTags().bit("terrain")) != 0) {
+        return 0.0f;
+    }
+    // Phase D §21/§22/§59, only for a decider running the awareness layer: a target that could not
+    // be reached is left alone for a while, and a thing already investigated -- or stared at until
+    // it is familiar -- is worth its novelty. Without `ctx.mind` this is the pre-Phase-D score.
+    if (ctx.mind != nullptr && score > 0.0f) {
+        const SubjectId id = subjectOf(p);
+        if (ctx.mind->suppressed(id, ctx.time)) {
+            return 0.0f;
+        }
+        if (noveltyWeight_ != 0.0f) {
+            score *= std::pow(std::max(ctx.mind->novelty(id, ctx.time), 0.0f), noveltyWeight_);
+        }
     }
     return score;
 }
@@ -574,6 +698,46 @@ void InvestigateConsiderer::consider(const DecisionContext& ctx, std::vector<Opt
     if (!best(ctx, target, score)) {
         return; // nothing noticed: no option, rather than an option scoring zero
     }
+    // Phase D: a body is looked at where it IS, not where it was perceived -- a saucer crossing the
+    // sky, another alien walking past. Only with the awareness layer on, so a decider written
+    // before Phase D pushes exactly the actions it always did.
+    const bool aware = ctx.mind != nullptr;
+    const Entity* body = aware && target.kind == InterestKind::Character && ctx.world != nullptr &&
+                                 target.source < ctx.world->entities().size()
+                             ? ctx.world->entities()[target.source].get()
+                             : nullptr;
+    const auto aimAt = [&](ActionTarget& t) {
+        if (body != nullptr) {
+            t.kind = TargetKind::EntityRef;
+            t.name = body->name();
+        } else {
+            t.kind = TargetKind::Point;
+            t.point = target.position;
+        }
+    };
+    // Phase D §16–§18: the thing's own affordance, when this considerer names one and the body can
+    // use it. **Capability + affordance = valid interaction**: the prop says what it offers and what
+    // that requires; this body's capabilities say whether it qualifies. When it does not, the
+    // character observes instead (§59: "no interaction affordance -> observe instead"), which is
+    // the pre-§18 behaviour exactly -- so a missing capability degrades, it never fails.
+    const InteractionDesc* verb = nullptr;
+    affordanceState_ = Affordance::None;
+    if (body != nullptr && !affordance_.empty()) {
+        verb = body->interaction(affordance_);
+        const Entity* self = ctx.self < ctx.world->entities().size()
+                                 ? ctx.world->entities()[ctx.self].get()
+                                 : nullptr;
+        if (verb == nullptr) {
+            affordanceState_ = Affordance::NotOffered;
+        } else if (self == nullptr || !self->can(verb->required)) {
+            affordanceState_ = Affordance::NotCapable;
+            verb = nullptr;
+        } else {
+            affordanceState_ = Affordance::Used;
+        }
+    }
+    // Close enough to use it: inside the verb's own range, with a margin for the arrival tolerance.
+    const float approach = verb != nullptr ? std::min(approach_, verb->range * 0.6f) : approach_;
     actions_.clear();
     ActionDesc walk;
     walk.kind = ActionKind::Move;
@@ -583,8 +747,12 @@ void InvestigateConsiderer::consider(const DecisionContext& ctx, std::vector<Opt
     // body's `state().position()` and never its `visualPosition()`, so a guard sent to meet a
     // hovering saucer walks to where the saucer is rather than to where it is drawn.
     walk.target.point = standOff(ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f),
-                                 target.position, approach_);
-    walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
+                                 target.position, approach);
+    walk.tolerance = verb != nullptr ? std::min(std::max(approach * 0.5f, 0.3f), verb->range * 0.3f)
+                                     : std::max(approach_ * 0.5f, 0.75f);
+    if (aware) {
+        walk.arrival = kArrival; // slow into it (§14): it is going there to look at it
+    }
     actions_.push_back(std::move(walk));
 
     ActionDesc look;
@@ -592,9 +760,21 @@ void InvestigateConsiderer::consider(const DecisionContext& ctx, std::vector<Opt
     look.name = name_;
     look.target.kind = TargetKind::Point;
     look.target.point = target.position;
+    if (aware) {
+        aimAt(look.target);
+    }
     actions_.push_back(std::move(look));
 
-    if (dwell_ > 0.0) {
+    if (verb != nullptr) {
+        // The interaction replaces the observation: the prop's verb, its activity and duration.
+        ActionDesc use;
+        use.kind = ActionKind::Interact;
+        use.name = name_;
+        use.target.kind = TargetKind::Interaction;
+        use.target.name = body->name();
+        use.target.member = verb->name;
+        actions_.push_back(std::move(use));
+    } else if (dwell_ > 0.0) {
         ActionDesc attend;
         attend.kind = ActionKind::Pose;
         attend.name = name_;
@@ -606,10 +786,32 @@ void InvestigateConsiderer::consider(const DecisionContext& ctx, std::vector<Opt
         // `NoTarget`.
         attend.target.kind = TargetKind::Point;
         attend.target.point = target.position;
+        if (aware) {
+            aimAt(attend.target);
+        }
         actions_.push_back(std::move(attend));
     }
     out.push_back(Option{name_, weight() * score, std::span<const ActionDesc>(actions_),
                          Authority::Routine});
+    Option& o = out.back();
+    o.intent = intent_;
+    o.target = target.position;
+    o.hasTarget = true;
+    o.stoppingDistance = approach_;
+    if (aware) {
+        // Part of the option's identity only with the awareness layer on: switching from one
+        // mushroom to another is then a change of mind (a new action list), where before it was the
+        // same option and the body kept walking to the first one.
+        o.subject = subjectOf(target);
+        o.addFactor("salience", target.salience);
+        o.addFactor("taste", taste_.weight[static_cast<std::size_t>(target.kind)]);
+        o.addFactor("novelty", ctx.mind->novelty(o.subject, ctx.time));
+        o.addFactor("weight", weight());
+        if (affordanceState_ == Affordance::Used) {
+            o.intent = IntentType::Interact;
+            o.addFactor("affordance", 1.0f);
+        }
+    }
 }
 
 // ---- interest ----------------------------------------------------------------------------------
@@ -622,6 +824,7 @@ InterestConsiderer::InterestConsiderer(const nlohmann::json* settings)
     readTaste(settings, taste_);
     source_ = readString(settings, "source", "perceived") == "omniscient" ? Source::Omniscient
                                                                          : Source::Perceived;
+    variety_ = std::clamp(readFloat(settings, "variety", 0.6f), 0.0f, 1.0f);
 }
 
 void InterestConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
@@ -701,6 +904,51 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
                              std::span<const ActionDesc>(actions_.data() + ranges[i].first,
                                                          ranges[i].second),
                              Authority::Routine});
+        Option& o = out.back();
+        o.intent = IntentType::Wander;
+        o.target = scratch_[i].position;
+        o.hasTarget = true;
+        o.stoppingDistance = approach_;
+        o.kind = static_cast<std::uint8_t>(scratch_[i].kind);
+        // Phase D §19/§59, aware deciders only: an errand to a perceived *thing* has that thing
+        // as its subject, so a failed walk to it is remembered and left alone and a completed one
+        // makes it familiar. Measured on Glowmere before this: `vane` walked at `tide`, failed
+        // "stuck", and chose `tide` again at once -- twelve times in 150 s -- because a subjectless
+        // option has nothing for the failure memory to hold.
+        // Phase D §23, aware deciders only: the ground is not a place to go to.
+        if (ctx.mind != nullptr && ctx.world != nullptr &&
+            (scratch_[i].tags & ctx.world->semanticTags().bit("terrain")) != 0) {
+            o.score = 0.0f;
+        }
+        if (ctx.mind != nullptr && scratch_[i].subject != 0) {
+            o.subject = scratch_[i].subject;
+            if (ctx.mind->suppressed(o.subject, ctx.time)) {
+                o.score = 0.0f;
+            } else {
+                const float n = ctx.mind->novelty(o.subject, ctx.time);
+                o.score *= n;
+                o.addFactor("novelty", n);
+            }
+        }
+        o.addFactor("goal", scratch_[i].weight);
+        o.addFactor("weight", w);
+        // Variety (§23), aware deciders only. Measured on the autonomy demo before this: a
+        // cautious warden walked eleven shore points in a row, 12-16 m apart, for 80 s. Not the
+        // shore creep (every errand completed) but argmax over a dense kind: shore points are the
+        // nearest unvisited candidates wherever the body stands on a bank, so nearness alone keeps
+        // choosing the next one. A body that has just been to the water three times wants
+        // something else.
+        if (ctx.mind != nullptr && variety_ < 1.0f) {
+            int repeats = 0;
+            for (const std::uint8_t k : ctx.mind->recentKinds) {
+                repeats += k == o.kind ? 1 : 0;
+            }
+            if (repeats > 0) {
+                const float v = std::pow(variety_, static_cast<float>(repeats));
+                o.score *= v;
+                o.addFactor("variety", v);
+            }
+        }
     }
 }
 
@@ -1050,13 +1298,427 @@ void RouteConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& 
                              std::span<const ActionDesc>(actions_.data() + ranges[i].first,
                                                          ranges[i].second),
                              Authority::Routine});
+        Option& o = out.back();
+        o.intent = IntentType::MoveTo;
+        o.target = priced_[i].at;
+        o.hasTarget = true;
+        o.addFactor("route cost", -priced_[i].cost);
     }
+}
+
+// ---- react (Phase D §26–§28) ---------------------------------------------------------------------
+
+ReactConsiderer::ReactConsiderer(const nlohmann::json* settings)
+    : events_(readStrings(settings, "events")),
+      approach_(readFloat(settings, "approach", 4.0f)),
+      flee_(readFloat(settings, "flee", 14.0f)),
+      dwell_(static_cast<double>(readFloat(settings, "dwell", 3.0f))),
+      activity_(readString(settings, "activity", "observe")),
+      fleeActivity_(readString(settings, "fleeActivity", "react")),
+      fadeSeconds_(std::max(0.1f, readFloat(settings, "fadeSeconds", 8.0f))),
+      curiosityPull_(readFloat(settings, "curiosityPull", 2.0f)),
+      cautionPull_(readFloat(settings, "cautionPull", 2.0f)) {
+    weightDefault_ = readFloat(settings, "weight", 1.0f);
+}
+
+void ReactConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
+    registerWeight(params, prefix, weightDefault_);
+}
+
+void ReactConsiderer::collectParameterPaths(std::vector<std::string>& out) const {
+    collectWeightPath(out);
+}
+
+void ReactConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {
+    // Nothing heard without the awareness layer: a decider that did not opt in has no ears.
+    if (ctx.mind == nullptr || ctx.state == nullptr || ctx.world == nullptr) {
+        return;
+    }
+    if (approachName_.empty()) {
+        approachName_ = std::string(name()) + "/approach";
+        fleeName_ = std::string(name()) + "/flee";
+    }
+    // The strongest event still worth reacting to. Ties on the lower sequence: the earlier event.
+    const PerceivedEvent* chosen = nullptr;
+    float strength = 0.0f;
+    float fresh = 0.0f;
+    float novelty = 0.0f;
+    for (const PerceivedEvent& e : ctx.mind->events) {
+        if (!events_.empty()) {
+            const std::string_view type = ctx.world->eventName(e.type);
+            if (std::find(events_.begin(), events_.end(), type) == events_.end()) {
+                continue;
+            }
+        }
+        const SubjectId id = eventSubject(e.sequence);
+        if (ctx.mind->suppressed(id, ctx.time)) {
+            continue;
+        }
+        const float age = static_cast<float>(std::max(0.0, ctx.time - e.time));
+        const float f = std::max(0.0f, 1.0f - age / fadeSeconds_);
+        const float n = ctx.mind->novelty(id, ctx.time);
+        const float s = e.intensity * f * n;
+        if (s > strength) {
+            chosen = &e;
+            strength = s;
+            fresh = f;
+            novelty = n;
+        }
+    }
+    if (chosen == nullptr || !(strength > 0.0f)) {
+        return;
+    }
+    const Personality& p =
+        ctx.mind->personality != nullptr ? *ctx.mind->personality : neutralPersonality();
+    const glm::vec3 here = ctx.state->position();
+    const SubjectId subject = eventSubject(chosen->sequence);
+
+    // ---- approach: go and see ----
+    approachActions_.clear();
+    {
+        ActionDesc walk;
+        walk.kind = ActionKind::Move;
+        walk.name = approachName_;
+        walk.target.kind = TargetKind::Point;
+        walk.target.point = standOff(here, chosen->position, approach_);
+        walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
+        walk.arrival = kArrival;
+        approachActions_.push_back(walk);
+        ActionDesc face;
+        face.kind = ActionKind::Face;
+        face.name = approachName_;
+        face.target.kind = TargetKind::Point;
+        face.target.point = chosen->position;
+        approachActions_.push_back(face);
+        if (dwell_ > 0.0) {
+            ActionDesc attend;
+            attend.kind = ActionKind::Pose;
+            attend.name = approachName_;
+            attend.activity = activity_;
+            attend.duration = dwell_;
+            attend.target.kind = TargetKind::Point;
+            attend.target.point = chosen->position;
+            approachActions_.push_back(attend);
+        }
+    }
+    const float curious = traitFactor(p.curiosity, curiosityPull_) * traitFactor(p.caution, -1.0f);
+    out.push_back(Option{approachName_, weight() * strength * curious,
+                         std::span<const ActionDesc>(approachActions_), Authority::Routine});
+    {
+        Option& o = out.back();
+        o.intent = IntentType::Investigate;
+        o.subject = subject;
+        o.target = chosen->position;
+        o.hasTarget = true;
+        o.urgency = std::clamp(chosen->intensity, 0.0f, 1.0f);
+        o.stoppingDistance = approach_;
+        o.addFactor("intensity", chosen->intensity);
+        o.addFactor("freshness", fresh);
+        o.addFactor("novelty", novelty);
+        o.addFactor("personality", curious);
+        o.addFactor("weight", weight());
+    }
+
+    // ---- flee: get away, then watch it ----
+    fleeActions_.clear();
+    {
+        ActionDesc run;
+        run.kind = ActionKind::Move;
+        run.name = fleeName_;
+        run.target.kind = TargetKind::Point;
+        run.target.point = awayFrom(here, chosen->position, flee_, ctx.state->yaw);
+        run.tolerance = 1.5f;
+        fleeActions_.push_back(run);
+        ActionDesc face;
+        face.kind = ActionKind::Face;
+        face.name = fleeName_;
+        face.target.kind = TargetKind::Point;
+        face.target.point = chosen->position;
+        fleeActions_.push_back(face);
+        if (dwell_ > 0.0) {
+            ActionDesc watch;
+            watch.kind = ActionKind::Pose;
+            watch.name = fleeName_;
+            watch.activity = fleeActivity_;
+            watch.duration = dwell_;
+            watch.target.kind = TargetKind::Point;
+            watch.target.point = chosen->position;
+            fleeActions_.push_back(watch);
+        }
+    }
+    const float wary = traitFactor(p.caution, cautionPull_) * traitFactor(p.curiosity, -1.0f);
+    out.push_back(Option{fleeName_, weight() * strength * wary,
+                         std::span<const ActionDesc>(fleeActions_), Authority::Routine});
+    {
+        Option& o = out.back();
+        o.intent = IntentType::Flee;
+        o.subject = subject;
+        o.target = chosen->position;
+        o.hasTarget = true;
+        o.urgency = std::clamp(chosen->intensity * 1.5f, 0.0f, 1.0f);
+        o.addFactor("intensity", chosen->intensity);
+        o.addFactor("freshness", fresh);
+        o.addFactor("novelty", novelty);
+        o.addFactor("personality", wary);
+        o.addFactor("weight", weight());
+    }
+}
+
+// ---- social (Phase D §24) -----------------------------------------------------------------------
+
+SocialConsiderer::SocialConsiderer(const nlohmann::json* settings)
+    : tags_(readStrings(settings, "tags")),
+      relationship_(readString(settings, "relationship", "neutral")),
+      distance_(readFloat(settings, "distance", 3.0f)),
+      personalSpace_(readFloat(settings, "personalSpace", 2.5f)),
+      keepAway_(readFloat(settings, "keepAway", 6.0f)),
+      dwell_(static_cast<double>(readFloat(settings, "dwell", 3.0f))),
+      activity_(readString(settings, "activity", "observe")),
+      sociabilityPull_(readFloat(settings, "sociabilityPull", 2.0f)),
+      cautionPull_(readFloat(settings, "cautionPull", 2.0f)) {
+    weightDefault_ = readFloat(settings, "weight", 1.0f);
+}
+
+void SocialConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
+    registerWeight(params, prefix, weightDefault_);
+}
+
+void SocialConsiderer::collectParameterPaths(std::vector<std::string>& out) const {
+    collectWeightPath(out);
+}
+
+void SocialConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {
+    if (ctx.mind == nullptr || ctx.state == nullptr || ctx.world == nullptr) {
+        return;
+    }
+    if (greetName_.empty()) {
+        greetName_ = std::string(name()) + "/greet";
+        avoidName_ = std::string(name()) + "/avoid";
+    }
+    const std::uint64_t mask = tags_.empty() ? ~std::uint64_t{0} : maskOf(ctx, tags_);
+    // The most salient other body carrying one of the tags. Ties on the lower entity index.
+    const Percept* other = nullptr;
+    for (const Percept& p : ctx.percepts) {
+        if (p.kind != InterestKind::Character || (p.tags & mask) == 0 ||
+            p.source >= ctx.world->entities().size() || p.source == ctx.self) {
+            continue;
+        }
+        if (other == nullptr || p.salience > other->salience ||
+            (p.salience == other->salience && p.source < other->source)) {
+            other = &p;
+        }
+    }
+    if (other == nullptr) {
+        return;
+    }
+    const Entity& them = *ctx.world->entities()[other->source];
+    const SubjectId subject = bodySubject(other->source);
+    const Personality& p =
+        ctx.mind->personality != nullptr ? *ctx.mind->personality : neutralPersonality();
+    const glm::vec3 here = ctx.state->position();
+    const glm::vec3 there = them.state().position(); // R1: where it is now
+    const float gap = glm::length(glm::vec2(there.x - here.x, there.z - here.z));
+    // Never closer than its own personal space allows: a greeting that ended inside the distance
+    // this body backs away from would make "approach" and "avoid" take turns (measured: greet ->
+    // avoid -> greet inside two seconds on the autonomy demo's cautious warden).
+    const float comfortable = std::max(distance_ * (0.5f + p.preferredDistance),
+                                       personalSpace_ * (0.5f + p.preferredDistance) * 1.3f);
+
+    const float space = personalSpace_ * (0.5f + p.preferredDistance);
+
+    // ---- greet: only from outside personal space, with a band ----
+    //
+    // A body does not walk toward someone it is backing away from. Greeting is offered only beyond
+    // 1.2x personal space and avoiding only inside it, so between the two neither is on offer and
+    // the pair cannot take turns (measured: greet -> avoid -> greet inside two seconds before this).
+    if (!ctx.mind->suppressed(subject, ctx.time) && gap > space * 1.2f) {
+        greetActions_.clear();
+        // Walk to *the other body*, wherever it goes, and stop at the comfortable distance: a Move
+        // to an entity re-aims its last waypoint every step. Aimed at the point it stood on when
+        // the choice was made, the greeting "completed" 9.5 m short of a warden who had walked on
+        // (measured on the autonomy demo).
+        ActionDesc walk;
+        walk.kind = ActionKind::Move;
+        walk.name = greetName_;
+        walk.target.kind = TargetKind::EntityRef;
+        walk.target.name = them.name();
+        walk.tolerance = comfortable;
+        walk.arrival = kArrival;
+        greetActions_.push_back(walk);
+        ActionDesc face;
+        face.kind = ActionKind::Face;
+        face.name = greetName_;
+        face.target.kind = TargetKind::EntityRef;
+        face.target.name = them.name();
+        greetActions_.push_back(face);
+        if (dwell_ > 0.0) {
+            ActionDesc attend;
+            attend.kind = ActionKind::Pose;
+            attend.name = greetName_;
+            attend.activity = activity_;
+            attend.duration = dwell_;
+            attend.target.kind = TargetKind::EntityRef;
+            attend.target.name = them.name();
+            greetActions_.push_back(attend);
+        }
+        const float novelty = ctx.mind->novelty(subject, ctx.time);
+        const float social = traitFactor(p.sociability, sociabilityPull_) * traitFactor(p.caution, -0.5f);
+        out.push_back(Option{greetName_, weight() * other->salience * novelty * social,
+                             std::span<const ActionDesc>(greetActions_), Authority::Routine});
+        Option& o = out.back();
+        o.intent = IntentType::Socialize;
+        o.subject = subject;
+        o.target = there;
+        o.hasTarget = true;
+        o.stoppingDistance = comfortable;
+        o.addFactor("salience", other->salience);
+        o.addFactor("novelty", novelty);
+        o.addFactor("personality", social);
+        o.addFactor("weight", weight());
+    }
+
+    // ---- avoid: only when the other body is inside personal space ----
+    if (gap < space) {
+        avoidActions_.clear();
+        ActionDesc step;
+        step.kind = ActionKind::Move;
+        step.name = avoidName_;
+        step.target.kind = TargetKind::Point;
+        step.target.point = awayFrom(here, there, std::max(keepAway_ - gap, 1.0f), ctx.state->yaw);
+        step.tolerance = 0.75f;
+        avoidActions_.push_back(step);
+        ActionDesc face;
+        face.kind = ActionKind::Face;
+        face.name = avoidName_;
+        face.target.kind = TargetKind::EntityRef;
+        face.target.name = them.name();
+        avoidActions_.push_back(face);
+        const float crowding = 1.0f - gap / std::max(space, 1e-3f);
+        const float wary = traitFactor(p.caution, cautionPull_) * traitFactor(p.sociability, -1.0f);
+        out.push_back(Option{avoidName_, weight() * crowding * wary,
+                             std::span<const ActionDesc>(avoidActions_), Authority::Routine});
+        Option& o = out.back();
+        o.intent = IntentType::Avoid;
+        o.subject = subject;
+        o.target = there;
+        o.hasTarget = true;
+        o.urgency = crowding;
+        o.addFactor("crowding", crowding);
+        o.addFactor("personality", wary);
+        o.addFactor("weight", weight());
+    }
+}
+
+// ---- goal (Phase D §34) --------------------------------------------------------------------------
+
+GoalConsiderer::GoalConsiderer(const nlohmann::json* settings)
+    : subject_(readString(settings, "subject", "")),
+      affordance_(readString(settings, "affordance", "")),
+      intent_(readIntent(settings, IntentType::Investigate)),
+      from_(static_cast<double>(readFloat(settings, "from", 0.0f))),
+      until_(static_cast<double>(readFloat(settings, "until", 0.0f))),
+      approach_(readFloat(settings, "approach", 2.0f)),
+      dwell_(static_cast<double>(readFloat(settings, "dwell", 3.0f))),
+      activity_(readString(settings, "activity", "observe")) {
+    weightDefault_ = readFloat(settings, "weight", 5.0f);
+}
+
+void GoalConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
+    registerWeight(params, prefix, weightDefault_);
+}
+
+void GoalConsiderer::collectParameterPaths(std::vector<std::string>& out) const {
+    collectWeightPath(out);
+}
+
+void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {
+    if (ctx.world == nullptr || ctx.state == nullptr || subject_.empty() || !(weight() > 0.0f) ||
+        ctx.time < from_ || (until_ > 0.0 && ctx.time >= until_)) {
+        return;
+    }
+    glm::vec3 at{0.0f};
+    if (!ctx.world->pointOfInterest(subject_, at)) {
+        return; // the named thing does not exist (any more): no option, and the trace says why not
+    }
+    // Which entity it is, if it is one, for identity and for its affordances.
+    const Entity* body = nullptr;
+    std::size_t index = 0;
+    for (std::size_t i = 0; i < ctx.world->entities().size(); ++i) {
+        if (ctx.world->entities()[i]->name() == subject_) {
+            body = ctx.world->entities()[i].get();
+            index = i;
+        }
+    }
+    const SubjectId subject = body != nullptr ? bodySubject(index) : kNoSubject;
+    float novelty = 1.0f;
+    if (ctx.mind != nullptr && subject != kNoSubject) {
+        if (ctx.mind->suppressed(subject, ctx.time)) {
+            return;
+        }
+        // Done since the goal opened: the errand is over. Investigated before it opened does not
+        // count -- a goal set at 32 s is a new request even if the body saw the thing at 10 s.
+        if (const MemoryEntry* e = ctx.mind->memory != nullptr ? ctx.mind->memory->find(subject) : nullptr;
+            e != nullptr && e->investigatedAt >= from_) {
+            return;
+        }
+        novelty = 1.0f;
+    }
+    const InteractionDesc* verb = nullptr;
+    if (body != nullptr && !affordance_.empty()) {
+        verb = body->interaction(affordance_);
+        const Entity* self = ctx.self < ctx.world->entities().size() ? ctx.world->entities()[ctx.self].get() : nullptr;
+        if (verb != nullptr && (self == nullptr || !self->can(verb->required))) {
+            verb = nullptr;
+        }
+    }
+    const float approach = verb != nullptr ? std::min(approach_, verb->range * 0.6f) : approach_;
+    actions_.clear();
+    ActionDesc walk;
+    walk.kind = ActionKind::Move;
+    walk.name = name_;
+    walk.target.kind = TargetKind::Point;
+    walk.target.point = standOff(ctx.state->position(), at, approach);
+    walk.tolerance = std::max(approach * 0.4f, 0.3f);
+    walk.arrival = kArrival;
+    actions_.push_back(walk);
+    ActionDesc face;
+    face.kind = ActionKind::Face;
+    face.name = name_;
+    face.target.kind = TargetKind::Point;
+    face.target.point = at;
+    actions_.push_back(face);
+    if (verb != nullptr) {
+        ActionDesc use;
+        use.kind = ActionKind::Interact;
+        use.name = name_;
+        use.target.kind = TargetKind::Interaction;
+        use.target.name = subject_;
+        use.target.member = verb->name;
+        actions_.push_back(use);
+    } else if (dwell_ > 0.0) {
+        ActionDesc attend;
+        attend.kind = ActionKind::Pose;
+        attend.name = name_;
+        attend.activity = activity_;
+        attend.duration = dwell_;
+        attend.target.kind = TargetKind::Point;
+        attend.target.point = at;
+        actions_.push_back(attend);
+    }
+    out.push_back(Option{name_, weight() * novelty, std::span<const ActionDesc>(actions_), Authority::Routine});
+    Option& o = out.back();
+    o.intent = verb != nullptr ? IntentType::Interact : intent_;
+    o.subject = subject;
+    o.target = at;
+    o.hasTarget = true;
+    o.stoppingDistance = approach;
+    o.addFactor("goal", weight());
 }
 
 // ---- the factory -------------------------------------------------------------------------------
 
 std::vector<std::string_view> considererKinds() {
-    return {"idle", "holdPost", "investigate", "interest", "route"};
+    return {"idle", "holdPost", "investigate", "interest", "route", "react", "social", "goal"};
 }
 
 std::unique_ptr<StockConsiderer> makeConsiderer(std::string_view kind,
@@ -1072,6 +1734,12 @@ std::unique_ptr<StockConsiderer> makeConsiderer(std::string_view kind,
         made = std::make_unique<InterestConsiderer>(settings);
     } else if (kind == "route") {
         made = std::make_unique<RouteConsiderer>(settings);
+    } else if (kind == "react") {
+        made = std::make_unique<ReactConsiderer>(settings);
+    } else if (kind == "social") {
+        made = std::make_unique<SocialConsiderer>(settings);
+    } else if (kind == "goal") {
+        made = std::make_unique<GoalConsiderer>(settings);
     }
     if (made != nullptr) {
         made->setName(readString(settings, "name", std::string(kind)));

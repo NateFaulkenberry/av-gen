@@ -6,7 +6,10 @@
 #include "entity/airborne.hpp"
 #include "entity/grounding.hpp"
 #include "entity/decision.hpp"
+#include "entity/mind.hpp"
 #include "entity/nav_grid.hpp"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <array>
@@ -186,12 +189,36 @@ float lerpRate(float ms, double dt) {
     return 1.0f - std::exp(-static_cast<float>(dt) / (ms * 0.001f));
 }
 
+// ---- checkpoints (ADR-700) ---------------------------------------------------------------------
+//
+// Every behaviour is copied whole, by the copy constructor and copy assignment the compiler writes,
+// so a checkpoint holds every member it has -- including one added after this was written. A
+// behaviour that cannot be copied (it grew a `unique_ptr`, a reference, a `const` member) fails to
+// compile here rather than silently leaving its state out of a checkpoint.
+template <class Derived>
+class CheckpointedBehavior : public IBehavior {
+public:
+    [[nodiscard]] std::unique_ptr<IBehavior> clone() const final {
+        return std::make_unique<Derived>(static_cast<const Derived&>(*this));
+    }
+    void assignState(const IBehavior& from) final {
+        const auto* same = dynamic_cast<const Derived*>(&from);
+        if (same == nullptr) {
+            // The lists are matched by position and kind before this is called; reaching here is
+            // a checkpoint restored into a different entity set, which the input key forbids.
+            log::error("checkpoint: behaviour '{}' restored from a '{}'", kind(), from.kind());
+            return;
+        }
+        static_cast<Derived&>(*this) = *same;
+    }
+};
+
 // ---- hover -----------------------------------------------------------------------------------
 //
 // Low-frequency vertical float with a matching tilt, both driven by the same noise field so the
 // craft leans the way it drifts instead of nodding independently of it. The brief for this one is
 // "cinematic, massive, mysterious": slow, small, and never repeating.
-class Hover final : public IBehavior {
+class Hover final : public CheckpointedBehavior<Hover> {
 public:
     explicit Hover(const nlohmann::json* s)
         : amplitudeDefault_(readFloat(s, "amplitude", 0.6f)),
@@ -251,6 +278,13 @@ private:
 //
 // **What it deliberately does not do.** Lean into a turn is `bank`, which already exists and does it
 // properly with a response time. A second knob for the same thing on the same body would fight it.
+// **STALE (ADR-615): the reason below no longer holds, and this comment now argues against
+// building the right thing.** `ISkeletonQuery` IS implemented -- `Composition::AnimationSink` --
+// and a head can be addressed two ways: `PoseLayerKind::Aim` with a pivot, and
+// `PoseLayerDrive::Look`. So a head knob on `Liveliness` is buildable, and the whole-body nod is a
+// choice rather than the only honest option. Someone reading the paragraph below and building a
+// second whole-body approximation would be doing it for a reason that expired.
+//
 // And "head movement" is not here, because nothing can address a head: `ISkeletonQuery` is declared,
 // stored, and never implemented, so every socket resolves against the entity origin. A whole-body
 // nod is what is honestly available, and that is what `nod` is.
@@ -260,7 +294,7 @@ private:
 // relationship -- and because `explore/speed` is a registered parameter that a scene already drives
 // from `audio.rms`, the bounce becomes music-reactive through the chain that exists rather than
 // through a second one. That is the whole audio story here: no signal is read in this file.
-class Liveliness final : public IBehavior {
+class Liveliness final : public CheckpointedBehavior<Liveliness> {
 public:
     explicit Liveliness(const nlohmann::json* s)
         : bounceDefault_(readFloat(s, "bounce", 0.0f)),
@@ -371,7 +405,7 @@ private:
 // Lateral wander inside a radius, on its own noise field. Separate from `hover` because vertical
 // and horizontal motion have different scales and different rates on anything that flies, and
 // folding them into one knob makes both wrong.
-class Drift final : public IBehavior {
+class Drift final : public CheckpointedBehavior<Drift> {
 public:
     explicit Drift(const nlohmann::json* s)
         : radiusDefault_(readFloat(s, "radius", 2.0f)), rateDefault_(readFloat(s, "rate", 0.045f)) {}
@@ -436,7 +470,7 @@ private:
 // Lean into the direction of travel. This is the cheapest thing that makes a floating object read
 // as having mass: a craft that translates without leaning looks like a sprite being slid across
 // the frame. Smoothed, because the lean should lag the movement, not track it.
-class Bank final : public IBehavior {
+class Bank final : public CheckpointedBehavior<Bank> {
 public:
     explicit Bank(const nlohmann::json* s)
         : degreesDefault_(readFloat(s, "degrees", 6.0f)),
@@ -497,7 +531,7 @@ private:
 // A yaw *rate* that events push and damping pulls back, rather than a constant rotation. The
 // difference is the whole point: a constant spin is a turntable, and an object that accelerates on
 // a beat and coasts between them is reacting to the music. `baseRate` is deliberately 0 by default.
-class Spin final : public IBehavior {
+class Spin final : public CheckpointedBehavior<Spin> {
 public:
     explicit Spin(const nlohmann::json* s)
         : signal_(readString(s, "signal", "audio.beat")),
@@ -597,7 +631,7 @@ void separateFromCrowd(const BehaviorContext& ctx, EntityState& state, float spe
     state.travel.z += apart.y / distance * limit;
 }
 
-class Wander final : public IBehavior {
+class Wander final : public CheckpointedBehavior<Wander> {
 public:
     explicit Wander(const nlohmann::json* s)
         : speedDefault_(readFloat(s, "speed", 1.6f)),
@@ -807,7 +841,7 @@ private:
 // Turn to face something, at a limited rate. Reads `state.lookTarget` when another behaviour has
 // set one this frame, and falls back to a fixed target named in the scene file. Writes yaw rather
 // than a rotation offset so navigation and facing agree about which way the body points.
-class LookAt final : public IBehavior {
+class LookAt final : public CheckpointedBehavior<LookAt> {
 public:
     explicit LookAt(const nlohmann::json* s)
         : target_(readString(s, "target", "")),
@@ -869,9 +903,32 @@ public:
         const float turnRate = (turn_ != nullptr ? turn_->value() : turnDefault_) / kDegrees;
         const float step = turnRate * weight * static_cast<float>(ctx.dt);
         const float d = angleDelta(state.yaw, wanted);
-        state.yaw += std::clamp(d, -step, step);
-        if (std::abs(d) > 0.05f && state.activity == Activity::Idle) {
-            state.activity = Activity::Turn;
+        const float applied = std::clamp(d, -step, step);
+        state.yaw += applied;
+        // **Publish the rate as well as the activity, because the consumer reads the rate.**
+        //
+        // `Gait::select` does not trust a locomotor proposal -- `Activity::Turn` is one, so it is
+        // discarded and re-derived from `speed` and `turnRate`. This was the only turner in the
+        // engine that wrote the activity and not the field, so a standing body rotating at
+        // 120 deg/s came out `Idle` on 599 of 600 frames (ADR-619). **Writing the activity alone
+        // is not publishing a turn.**
+        //
+        // Both writes are guarded on nothing else driving the body -- `LookAt` defers, and a
+        // character that is walking already has a turn rate from the behaviour walking it -- but
+        // **on different quantities, and that distinction is the whole of the fix.** The activity
+        // is claimed when there is a meaningful angle still to cover (`d`, the remaining error).
+        // The rate reports what the body **actually did** (`applied`), which is not the same
+        // thing: a character tracking a moving target holds a small error while turning steadily,
+        // so a rate guarded on the error goes unpublished on exactly the frames it is turning
+        // hardest. The first version of this fix made that mistake and read as correct only
+        // because `turnRate` was still latching a stale value from an earlier frame.
+        if (state.activity == Activity::Idle) {
+            if (std::abs(applied) > 1e-6f) {
+                state.turnRate = applied / std::max(static_cast<float>(ctx.dt), 1e-4f);
+            }
+            if (std::abs(d) > 0.05f) {
+                state.activity = Activity::Turn;
+            }
         }
     }
 
@@ -891,7 +948,7 @@ private:
 //
 // A strong audio event turns it towards whatever it finds interesting -- which is the reusable
 // shape of "react to the music" for any character, not a rule about this one.
-class Interest final : public IBehavior {
+class Interest final : public CheckpointedBehavior<Interest> {
 public:
     explicit Interest(const nlohmann::json* s)
         : signal_(readString(s, "signal", "music.impact")),
@@ -1041,7 +1098,7 @@ private:
 //     came for before it stands still.
 //
 // Seeded throughout, through `ctx.rng`. No wall clock anywhere.
-class Explore final : public IBehavior {
+class Explore final : public CheckpointedBehavior<Explore> {
 public:
     explicit Explore(const nlohmann::json* s)
         : speedDefault_(readFloat(s, "speed", 1.7f)),
@@ -1938,7 +1995,7 @@ private:
 // keyframed walk, a spline, a future scripted sequence. `explore` already grounds itself, so this
 // is not needed alongside it -- it is the same component (ADR-093, §4, §7) exposed as a behaviour
 // so that "follow the terrain" is available without also taking a mind.
-class Ground final : public IBehavior {
+class Ground final : public CheckpointedBehavior<Ground> {
 public:
     explicit Ground(const nlohmann::json* s)
         : alignDefault_(readFloat(s, "slopeAlign", 0.55f)),
@@ -2105,7 +2162,33 @@ private:
 // **R1/R3.** It reads `state().position()` and writes nothing: not `travel`, not `MotionOffset`,
 // not a parameter. Scoring is a read and acting is the queue's job (R3, ADR-210). The only thing it
 // writes anywhere is a list of intentions onto its own entity's queue.
-class Decide final : public IBehavior {
+// A considerer bent by the character's personality (Phase D §29): the inner one's options, each
+// multiplied by `traitFactor`. A wrapper so the stock considerers carry no personality code and a
+// considerer with no `"traits"` is not wrapped at all. Holds no per-character state -- the
+// personality arrives through `ctx.mind` -- so character_ai.hpp §3's rule still holds.
+class TraitScaled final : public IConsiderer {
+public:
+    TraitScaled(const IConsiderer* inner, TraitWeights weights) : inner_(inner), weights_(weights) {}
+    [[nodiscard]] const IConsiderer* inner() const { return inner_; }
+    void consider(const DecisionContext& ctx, std::vector<Option>& out) const override {
+        const std::size_t first = out.size();
+        inner_->consider(ctx, out);
+        if (ctx.mind == nullptr || ctx.mind->personality == nullptr) {
+            return; // no personality in play: neutral, which is a factor of exactly 1
+        }
+        const float f = traitFactor(*ctx.mind->personality, weights_);
+        for (std::size_t i = first; i < out.size(); ++i) {
+            out[i].score *= f;
+            out[i].addFactor("personality", f);
+        }
+    }
+
+private:
+    const IConsiderer* inner_;
+    TraitWeights weights_;
+};
+
+class Decide final : public CheckpointedBehavior<Decide> {
 public:
     explicit Decide(const nlohmann::json* s)
         : hertzDefault_(readFloat(s, "hertz", 2.0f)),
@@ -2145,9 +2228,69 @@ public:
                 log::warn("decide: unknown considerer kind '{}' (known: {})", kind, known);
             }
         }
+        // Phase D §29: a considerer may declare how the character's personality bends its whole
+        // score -- `"traits": {"curiosity": 1.0}` -- and is then wrapped rather than rewritten,
+        // so the six stock considerers need no personality code of their own. A considerer that
+        // declares none is handed to the selector bare, exactly as before.
+        std::size_t index = 0;
+        if (s != nullptr && s->is_object() && s->contains("considerers") &&
+            (*s)["considerers"].is_array()) {
+            for (const auto& entry : (*s)["considerers"]) {
+                if (!entry.is_object() || !entry.contains("kind") || !entry["kind"].is_string()) {
+                    continue;
+                }
+                if (index >= considerers_.size() ||
+                    considerers_[index]->kind() != entry["kind"].get<std::string>()) {
+                    continue; // an unknown kind was skipped above; stay aligned with what loaded
+                }
+                const TraitWeights w = traitWeightsFromJson(&entry, "traits");
+                if (w.any) {
+                    scaled_.push_back(std::make_unique<TraitScaled>(considerers_[index].get(), w));
+                }
+                ++index;
+            }
+        }
         views_.reserve(considerers_.size());
         for (const auto& considerer : considerers_) {
-            views_.push_back(considerer.get());
+            const IConsiderer* view = considerer.get();
+            for (const auto& wrapped : scaled_) {
+                if (wrapped->inner() == considerer.get()) {
+                    view = wrapped.get();
+                }
+            }
+            views_.push_back(view);
+        }
+
+        // Phase D: the awareness layer (entity/mind.hpp), opted into by the presence of `"mind"`.
+        // Absent -- every decider written before Phase D, including the shipping Glowmere cast --
+        // and none of attention, object memory, event hearing or the plan lifecycle runs, so those
+        // characters decide exactly as they did. The key's presence is the opt-in, the rule
+        // `perception` and `personality` follow.
+        if (s != nullptr && s->is_object() && s->contains("mind")) {
+            aware_ = true;
+            const nlohmann::json& m = (*s)["mind"];
+            if (m.is_object()) {
+                if (m.contains("attention")) {
+                    auto a = attentionModelFromJson(m["attention"]);
+                    if (a) {
+                        attention_.setSettings(*a);
+                    } else {
+                        log::warn("decide: {}", a.error().message);
+                    }
+                }
+                if (m.contains("memory")) {
+                    auto mm = memorySettingsFromJson(m["memory"]);
+                    if (mm) {
+                        memorySettings_ = *mm;
+                    } else {
+                        log::warn("decide: {}", mm.error().message);
+                    }
+                }
+                hearing_ = std::max(0.0f, readFloat(&m, "hearing", 1.0f));
+            } else {
+                log::warn("decide: 'mind' must be an object");
+            }
+            objects_.setSettings(memorySettings_);
         }
     }
 
@@ -2191,6 +2334,21 @@ public:
         queue_ = nullptr;
         lastMargin_ = 0.0f;
         stalls_ = 0;
+        // Phase D. Everything the awareness layer and the trace hold is simulation state, so a seek
+        // clears it and the replay rebuilds it (D4).
+        attention_.reset();
+        objects_.reset();
+        eventCursor_ = 0;
+        planSerial_ = 0;
+        planActive_ = false;
+        committed_ = Committed{};
+        lastOutcome_.clear();
+        history_.clear();
+        historyTotal_ = 0;
+        factorsText_.clear();
+        attentionName_.clear();
+        attentionNameFor_ = kNoSubject;
+        recentKinds_.clear();
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
@@ -2225,6 +2383,61 @@ public:
         dctx.bus = ctx.bus;
         dctx.seed = self != nullptr ? self->seed() : 0;
 
+        // ---- Phase D: the awareness layer, between the senses and the choice ------------------
+        if (aware_) {
+            sense(ctx, state, self, dctx);
+            dctx.mind = &view_;
+        }
+        // ---- Phase D §19: how the running plan ended ----------------------------------------
+        //
+        // A plan that drained is over, and the character chooses again *now* rather than standing
+        // on the spot until a margin happens to be cleared: completion forgets the commitment, so
+        // the next `select` is free. What it was about is remembered -- completed means "I have
+        // dealt with that" (§21), failed means "leave it alone for a while" (§59) -- and that is
+        // what stops the same mushroom winning again the instant it was left.
+        if (aware_ && planSerial_ != 0 &&
+            ctx.actions->drained(Authority::Routine).serial == planSerial_) {
+            const ActionQueue::Drained& drained = ctx.actions->drained(Authority::Routine);
+            lastOutcome_ = drained.failed ? "failed: " + drained.reason : "completed";
+            if (!drained.failed && committed_.kind != 255) {
+                recentKinds_.push_back(committed_.kind);
+                while (recentKinds_.size() > kRecentKinds) {
+                    recentKinds_.erase(recentKinds_.begin());
+                }
+            }
+            if (committed_.subject != kNoSubject) {
+                if (drained.failed) {
+                    objects_.failed(committed_.subject, ctx.time);
+                } else {
+                    objects_.investigated(committed_.subject, ctx.time);
+                }
+            }
+            if (drained.failed) {
+                selector_.exclude(committed_.name, committed_.subject,
+                                  ctx.time + static_cast<double>(memorySettings_.failSeconds));
+            }
+            planSerial_ = 0;
+            planActive_ = false;
+            selector_.forget();
+            // Where the errand ended, which is where the body now is. Recorded on arrival rather
+            // than on departure for an aware decider: recording the departure point (below, the
+            // pre-Phase-D rule) discounted every destination within `noveltyRadius` of where the
+            // body set out *one tick after it chose one*, so on a river bank -- shore points four
+            // metres apart -- the committed point was penalised the instant it was chosen and the
+            // body re-chose every tick. `Explore` remembers on arrival for the same reason.
+            remember(state.position());
+            dctx.visited = visited_;
+            // **And the variety window, for the same reason `visited` is re-pointed on the line
+            // above.** `view_.recentKinds` is a span over `recentKinds_`, taken in `sense()` before
+            // this branch pushed onto it. When the push reallocated -- the second completion of a
+            // run, from a capacity of one -- the span pointed at the freed buffer, and the choice
+            // made on this tick read whatever the allocator had left there. Found by ADR-700's
+            // completeness test: a scrub replayed from zero after an earlier run (whose `clear()`
+            // had kept the capacity, so no reallocation) scored `rook`'s glow errand at 0.44 where
+            // a fresh load scored it 0.74, and the aliens were 28 m apart by 90 s.
+            view_.recentKinds = recentKinds_;
+        }
+
         // Republish the overlay's list whenever a tick actually fired -- including the very first
         // one, whose tick index may legitimately be the same 0 the selector starts at. Testing the
         // index alone left the first decision's options invisible, which is the one decision a
@@ -2258,7 +2471,17 @@ public:
         // before valley 3 and a behaviour that changes under everyone is not a fix.
         const float stallSeconds = stallSeconds_ != nullptr ? stallSeconds_->value()
                                                             : stallSecondsDefault_;
-        if (stallSeconds > 0.0f) {
+        // Phase D §19: an aware decider knows how its plan is going, so standing still is a stall
+        // only while the plan is trying to *move*. Measured on the autonomy demo before this: the
+        // scout watching the saucer for its ten-second dwell tripped the ten-second stall breaker,
+        // which forgot the commitment and re-issued the same observation from the start.
+        const ActionDesc* running =
+            aware_ ? ctx.actions->current(Authority::Routine) : nullptr;
+        const bool movingPlan = !aware_ || (running != nullptr && running->kind == ActionKind::Move);
+        if (stallSeconds > 0.0f && !movingPlan) {
+            stallStarted_ = false; // a still body that meant to be still restarts the clock
+        }
+        if (stallSeconds > 0.0f && movingPlan) {
             const glm::vec3 here = state.position();
             if (!stallStarted_) {
                 stallFrom_ = here;
@@ -2295,6 +2518,20 @@ public:
             }
         }
 
+        // Phase D §20: hold a running plan while its subject is still known (see `Selector::hold`).
+        if (aware_ && planActive_ && subjectKnown(dctx, committed_.subject)) {
+            selector_.hold(committed_.score);
+            // Commitment is to an errand in progress, not to standing somewhere indefinitely: a
+            // pose with no duration (a post, an idle) is a body waiting for something better, and
+            // committing to it would pin it there -- measured on Glowmere's `sage`, which sat at its
+            // grove for 170 s once this applied to its holdPost.
+            const ActionDesc* running = ctx.actions->current(Authority::Routine);
+            const bool openEnded =
+                running == nullptr || (running->kind == ActionKind::Pose && running->duration <= 0.0);
+            selector_.commit(openEnded ? 0.0f : kCommitment);
+        } else {
+            selector_.release();
+        }
         const std::uint64_t before = selector_.tick();
         const bool startedBefore = selector_.started();
         const bool changed = selector_.select(dctx, views_);
@@ -2302,10 +2539,12 @@ public:
             publish();
         }
         if (!changed) {
+            publishIntent(ctx, state);
             return;
         }
         const std::size_t chosen = selector_.chosen();
         if (chosen >= selector_.options().size()) {
+            publishIntent(ctx, state);
             return;
         }
         const Option& winner = selector_.options()[chosen];
@@ -2319,7 +2558,11 @@ public:
         // it afterwards.
         ctx.actions->override(std::vector<ActionDesc>(winner.actions.begin(), winner.actions.end()),
                               Authority::Routine, ctx.time);
-        remember(state.position());
+        if (!aware_) {
+            remember(state.position()); // an aware decider remembers on arrival (above)
+        }
+        commit(ctx, winner);
+        publishIntent(ctx, state);
     }
 
     [[nodiscard]] bool decisionDebug(DecisionDebug& out) const override {
@@ -2334,6 +2577,21 @@ public:
         out.marginRejections = counts.marginRejections;
         out.remembered = memory_.remembered();
         out.stalls = stalls_;
+        out.intent = committed_.intent;
+        out.subject = committed_.subjectName;
+        out.factors = factorsText_;
+        out.aware = aware_;
+        const AttentionFocus& focus = attention_.focus();
+        if (aware_ && focus.valid()) {
+            out.attentionSubject = attentionName_;
+            out.attentionReason = focus.reason;
+            out.attentionScore = focus.score;
+            out.attentionPosition = focus.position;
+        }
+        out.planActive = planActive_;
+        out.lastOutcome = lastOutcome_;
+        out.history = history_;
+        out.historyTotal = historyTotal_;
         return true;
     }
 
@@ -2372,6 +2630,212 @@ private:
             }
         }
         lastMargin_ = best - runnerUp;
+        // The committed option's terms, formatted once per decision tick for the overlay (§41).
+        factorsText_.clear();
+        if (chosen < options.size()) {
+            factorsText_ = formatFactors(std::span<const ScoreFactor>(
+                options[chosen].factors.data(), options[chosen].factorCount));
+        }
+    }
+
+    // ---- Phase D: the awareness layer ---------------------------------------------------------
+
+    // Memory, hearing and attention, in that order, once per step. Writes the look target when the
+    // attention model is allowed to glance and nothing else named one this step (§10, §11).
+    void sense(const BehaviorContext& ctx, EntityState& state, const Entity* self,
+               const DecisionContext& dctx) {
+        personality_ = self != nullptr ? self->personality() : Personality{};
+        const EntityWorld& world = *ctx.world;
+        const glm::vec3 here = state.position();
+
+        // What it knows, into what it remembers. `seenAt` rather than now, so a memory of a
+        // percept the sense stage has not refreshed says how old it is.
+        for (const Percept& p : dctx.percepts) {
+            objects_.noticed(subjectOf(p), p.position, p.seenAt);
+        }
+
+        // What it heard (§9 "hearing / world events"). Strictly before this step: an event raised
+        // by a body updated earlier in this same step is heard next step, by every listener alike,
+        // so what is heard does not depend on the order entities are stored in.
+        for (const WorldEvent& e : world.worldEvents()) {
+            if (e.sequence <= eventCursor_) {
+                continue;
+            }
+            if (e.time >= ctx.time) {
+                break;
+            }
+            eventCursor_ = e.sequence;
+            if (e.source == ctx.self) {
+                continue; // a body does not startle at its own doing
+            }
+            const float reach = e.radius * hearing_;
+            const float d = glm::length(e.position - here);
+            if (!(reach > 0.0f) || d > reach) {
+                continue;
+            }
+            PerceivedEvent heard;
+            heard.sequence = e.sequence;
+            heard.type = e.type;
+            heard.position = e.position;
+            heard.intensity = std::clamp(e.magnitude * (1.0f - d / reach), 0.0f, 1.0f);
+            heard.time = e.time;
+            heard.source = e.source;
+            objects_.hear(heard);
+            objects_.noticed(eventSubject(e.sequence), e.position, e.time);
+        }
+        objects_.forgetEventsBefore(ctx.time - static_cast<double>(memorySettings_.eventSeconds));
+
+        view_.personality = &personality_;
+        view_.memory = &objects_;
+        view_.events = objects_.events();
+        view_.attention = &attention_.focus();
+        view_.tags = &world.semanticTags();
+        view_.committed = committed_.subject;
+        view_.spanScale = 0.5f + personality_.attentionSpan;
+        view_.recentKinds = recentKinds_;
+
+        AttentionModel::Inputs in;
+        in.percepts = dctx.percepts;
+        in.events = objects_.events();
+        in.memory = &objects_;
+        in.personality = &personality_;
+        in.tags = &world.semanticTags();
+        in.world = &world;
+        in.relevant = committed_.subject;
+        in.time = ctx.time;
+        in.eventSeconds = memorySettings_.eventSeconds;
+        const AttentionFocus& focus = attention_.update(in);
+        if (!focus.valid()) {
+            return;
+        }
+        // Attending is what habituates (§22): the seconds spent on a thing are what make it stale,
+        // which is how "observes it, loses interest" happens without a timer that says so.
+        //
+        // **Only while the body is still.** A glance on the way past is not study: an alien that
+        // habituated to a mushroom while walking toward it would arrive already bored of it, and
+        // the arrival -- the thing a viewer waits for -- would be the moment it turned away.
+        if (state.groundSpeed() < 0.5f) {
+            objects_.attend(focus.id, static_cast<float>(ctx.dt), ctx.time);
+        }
+        if (attentionNameFor_ != focus.id) {
+            attentionName_ = describeSubject(world, focus.id);
+            attentionNameFor_ = focus.id;
+        }
+        if (attention_.settings().glance && !state.hasLookTarget) {
+            state.lookTarget = lookPoint(world, focus.id, focus.position);
+            state.hasLookTarget = true;
+        }
+    }
+
+    // Whether this body still knows about `subject` -- perceives it, remembers perceiving it, or
+    // remembers hearing it. Subject 0 (a place with no identity) is always known.
+    bool subjectKnown(const DecisionContext& dctx, SubjectId subject) const {
+        if (subject == kNoSubject) {
+            return true;
+        }
+        if (subjectKind(subject) == SubjectKind::Event) {
+            const std::uint64_t sequence = subjectIndex(subject);
+            for (const PerceivedEvent& e : objects_.events()) {
+                if (e.sequence == sequence) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (const Percept& p : dctx.percepts) {
+            if (subjectOf(p) == subject) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Where to look at a subject: a body where it is *now* and at about head height, anything
+    // else where it was perceived. R1: the simulation position, never the drawn one.
+    static glm::vec3 lookPoint(const EntityWorld& world, SubjectId id, const glm::vec3& fallback) {
+        if (subjectKind(id) == SubjectKind::Body) {
+            const std::uint64_t index = subjectIndex(id);
+            if (index < world.entities().size()) {
+                const EntityState& them = world.entities()[index]->state();
+                return them.position() + glm::vec3(0.0f, std::max(them.radius * 1.6f, 1.0f), 0.0f);
+            }
+        }
+        return fallback;
+    }
+
+    // The committed option, copied out of the selector's list (whose spans die at the next tick),
+    // and one line of trace.
+    void commit(const BehaviorContext& ctx, const Option& winner) {
+        const std::string previous = committed_.name;
+        std::string outcome;
+        if (planActive_) {
+            outcome = "interrupted";
+        } else if (!lastOutcome_.empty()) {
+            outcome = lastOutcome_;
+        }
+        committed_.name.assign(winner.name);
+        committed_.subject = winner.subject;
+        committed_.intent = winner.intent;
+        committed_.target = winner.target;
+        committed_.hasTarget = winner.hasTarget;
+        committed_.urgency = winner.urgency;
+        committed_.stoppingDistance = winner.stoppingDistance;
+        committed_.score = winner.score;
+        committed_.kind = winner.kind;
+        committed_.subjectName =
+            winner.subject != kNoSubject ? describeSubject(*ctx.world, winner.subject) : std::string();
+        planSerial_ = winner.actions.empty() ? 0 : ctx.actions->serial(Authority::Routine);
+        planActive_ = planSerial_ != 0;
+        lastOutcome_.clear();
+
+        DecisionTraceEntry entry;
+        entry.time = ctx.time;
+        entry.option = committed_.name;
+        entry.subject = committed_.subjectName;
+        entry.intent = winner.intent;
+        entry.score = winner.score;
+        entry.previous = previous;
+        entry.previousOutcome = std::move(outcome);
+        entry.factors = formatFactors(
+            std::span<const ScoreFactor>(winner.factors.data(), winner.factorCount));
+        const std::span<const Option> options = selector_.options();
+        for (const Option& o : options) {
+            if (&o == &winner || (o.name == winner.name && o.subject == winner.subject)) {
+                continue;
+            }
+            if (o.score > entry.runnerUpScore) {
+                entry.runnerUpScore = o.score;
+                entry.runnerUp.assign(o.name);
+            }
+        }
+        if (aware_ && attention_.focus().valid()) {
+            entry.attention = fmt::format("{} ({})", attentionName_, attention_.focus().reason);
+        }
+        history_.push_back(std::move(entry));
+        ++historyTotal_;
+        while (history_.size() > kHistoryCapacity) {
+            history_.erase(history_.begin());
+        }
+    }
+
+    // The WHAT half of `CharacterIntent` (§3), every step, from the committed option. The HOW half
+    // -- velocity and facing -- is the mover's and was written before this ran.
+    void publishIntent(const BehaviorContext& ctx, EntityState& state) const {
+        if (committed_.name.empty()) {
+            return;
+        }
+        state.intent.type = committed_.intent;
+        state.intent.urgency = committed_.urgency;
+        if (committed_.stoppingDistance > 0.0f) {
+            state.intent.stoppingDistance = committed_.stoppingDistance;
+        }
+        if (committed_.hasTarget) {
+            state.intent.targetPosition =
+                subjectKind(committed_.subject) == SubjectKind::Body && ctx.world != nullptr
+                    ? lookPoint(*ctx.world, committed_.subject, committed_.target)
+                    : committed_.target;
+            state.intent.hasTarget = true;
+        }
     }
 
     // **Where the body was when it changed its mind** -- not where it was going.
@@ -2413,9 +2877,49 @@ private:
     params::Parameter<float>* memorySeconds_ = nullptr;
     std::vector<std::string> paths_;
 
-    std::vector<std::unique_ptr<StockConsiderer>> considerers_;
+    // Shared, not owned: a considerer holds no per-character state (decision.hpp), so a checkpoint's
+    // copy of this decider may point at the same ones (ADR-700). Their `mutable` members are
+    // scratch rebuilt on every call.
+    std::vector<std::shared_ptr<StockConsiderer>> considerers_;
+    std::vector<std::shared_ptr<TraitScaled>> scaled_;
     std::vector<const IConsiderer*> views_;
     Selector selector_;
+
+    // ---- Phase D ----
+    bool aware_ = false;
+    float hearing_ = 1.0f;
+    MemorySettings memorySettings_{};
+    ObjectMemory objects_;
+    AttentionModel attention_;
+    Personality personality_{};
+    MindView view_{};
+    std::uint64_t eventCursor_ = 0;
+    std::uint64_t planSerial_ = 0;
+    bool planActive_ = false;
+    struct Committed {
+        std::string name;
+        SubjectId subject = kNoSubject;
+        IntentType intent = IntentType::Custom;
+        glm::vec3 target{0.0f};
+        bool hasTarget = false;
+        float urgency = 0.0f;
+        float stoppingDistance = 0.0f;
+        float score = 0.0f;
+        std::uint8_t kind = 255;
+        std::string subjectName;
+    };
+    Committed committed_{};
+    std::string lastOutcome_;
+    std::string factorsText_;
+    std::string attentionName_;
+    SubjectId attentionNameFor_ = kNoSubject;
+    static constexpr std::size_t kHistoryCapacity = 256;
+    static constexpr std::size_t kRecentKinds = 4;
+    // A running plan's incumbent is compared at 1.25x its live score (see `Selector::commit`).
+    static constexpr float kCommitment = 0.25f;
+    std::vector<std::uint8_t> recentKinds_;
+    std::vector<DecisionTraceEntry> history_;
+    std::size_t historyTotal_ = 0;
     PerceptMemory memory_;
     std::vector<glm::vec3> visited_;
     std::vector<ScoredOption> scored_;
@@ -2427,13 +2931,14 @@ private:
 //
 // Travel slowly around a named point. Separate from `drift` because a craft holding station over
 // something is a composed shot and a craft wandering is not, and an author wants to choose.
-class Orbit final : public IBehavior {
+class Orbit final : public CheckpointedBehavior<Orbit> {
 public:
     explicit Orbit(const nlohmann::json* s)
         : around_(readString(s, "around", "")),
           radiusDefault_(readFloat(s, "radius", 12.0f)),
           rateDefault_(readFloat(s, "rate", 2.0f)),
-          phaseDefault_(readFloat(s, "phase", 0.0f)) {}
+          phaseDefault_(readFloat(s, "phase", 0.0f)),
+          simulate_(readString(s, "authority", "visual") == "simulation") {}
 
     [[nodiscard]] std::string_view kind() const override { return "orbit"; }
 
@@ -2462,12 +2967,22 @@ public:
             }
         }
         const glm::vec3 offset(std::cos(a) * radius, 0.0f, std::sin(a) * radius);
+        // Phase D: `"authority": "simulation"` moves the *body*, not the drawing (R1,
+        // `MotionAuthority::Simulation`). An orbit that only offsets the drawing is a craft every
+        // character perceives parked at its anchor while it is drawn sweeping across the sky --
+        // which is right for a hover and wrong for a saucer that is supposed to arrive and leave.
+        if (simulate_) {
+            state.travel = (centre - state.anchor) + offset;
+            state.airborne = true;
+            return;
+        }
         motion.position += (centre - state.anchor) + offset;
     }
 
 private:
     std::string around_;
     float radiusDefault_, rateDefault_, phaseDefault_;
+    bool simulate_ = false;
     params::Parameter<float>* radius_ = nullptr;
     params::Parameter<float>* rate_ = nullptr;
     params::Parameter<float>* phase_ = nullptr;
@@ -2497,6 +3012,115 @@ std::vector<std::string_view> behaviorKinds() {
     return {"hover",  "drift",  "bank",     "spin",  "wander",
             "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide"};
 }
+
+
+// Phase C §65: a body driven through a script of motion requests. **Not a script of clips**: each
+// segment says how the body should move (a speed, a turn rate, and the angle its travel makes with
+// its facing), and whatever provider the body runs on decides what motion to play for it. A
+// sequence of clips would demonstrate nothing about a matcher.
+//
+// The body turns its facing at `turn` rad/s and travels at `speed` in the direction `strafe`
+// degrees off its facing. That is the vector intent ADR-545 introduced and nothing produced
+// (ADR-615), because a strafe cannot be expressed as a speed along a yaw. It publishes that intent,
+// so the motion request carries the strafe, and keeps `speed`/`yaw` in step for the gait and
+// everything else that reads the polar pair. The script's clock is the timeline (time since the
+// body was reset), so a scrub replays it exactly.
+// ADR-700: a behaviour is checkpointed by being copyable, and `CheckpointedBehavior` is how every
+// behaviour in this file says so. §65 added this one on a branch cut before that hook existed, so
+// the merge would not compile until it opted in -- which is the guard working: a behaviour whose
+// state a checkpoint would silently drop fails the build instead.
+class MotionScript final : public CheckpointedBehavior<MotionScript> {
+public:
+    explicit MotionScript(const nlohmann::json* s) {
+        if (s != nullptr && s->contains("segments") && (*s)["segments"].is_array()) {
+            for (const auto& seg : (*s)["segments"]) {
+                Segment g;
+                g.seconds = std::max(readFloat(&seg, "seconds", 1.0f), 0.0f);
+                g.speed = readFloat(&seg, "speed", 0.0f);
+                g.turn = readFloat(&seg, "turn", 0.0f);
+                g.strafe = readFloat(&seg, "strafe", 0.0f) * 0.0174532925f;
+                segments_.push_back(g);
+            }
+        }
+        loop_ = s != nullptr && s->contains("loop") && (*s)["loop"].is_boolean() && (*s)["loop"].get<bool>();
+        runSpeed_ = readFloat(s, "runSpeed", 4.0f);
+    }
+    [[nodiscard]] std::string_view kind() const override { return "motionScript"; }
+    // The script is authored data, not a set of live knobs, so it registers none.
+    void registerParameters(params::ParameterSet&, const std::string&) override {}
+    void collectParameterPaths(std::vector<std::string>&) const override {}
+    void reset(Rng&) override {
+        facing_ = 0.0f;
+        started_ = false;
+    }
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset&) override {
+        if (segments_.empty()) {
+            return;
+        }
+        if (!started_) {
+            facing_ = state.yaw;
+            started_ = true;
+        }
+        double total = 0.0;
+        for (const Segment& g : segments_) {
+            total += g.seconds;
+        }
+        // **On the timeline, from zero**, not from the first update this body happened to get: a
+        // play's first update is at 0 and a seek's replay begins a step later, and a script timed
+        // from its own first update ran a frame behind on every scrub (5 cm at a walk).
+        double t = ctx.time;
+        if (loop_ && total > 0.0) {
+            t = std::fmod(t, total);
+        }
+        const Segment* seg = &segments_.back();
+        double at = 0.0;
+        for (const Segment& g : segments_) {
+            if (t < at + g.seconds) {
+                seg = &g;
+                break;
+            }
+            at += g.seconds;
+        }
+        const bool finished = !loop_ && t >= total;
+        const float speed = finished ? 0.0f : seg->speed;
+        const float turn = finished ? 0.0f : seg->turn;
+        const float strafe = finished ? 0.0f : seg->strafe;
+        const auto dt = static_cast<float>(ctx.dt);
+        facing_ += turn * dt;
+        const float travelYaw = facing_ + strafe;
+        const glm::vec2 direction(std::sin(travelYaw), std::cos(travelYaw));
+        state.travel.x += direction.x * speed * dt;
+        state.travel.z += direction.y * speed * dt;
+        state.yaw = facing_;
+        state.speed = speed;
+        state.turnRate = turn;
+        state.activity = speed > runSpeed_ * 0.75f ? Activity::Run
+                         : speed > 0.05f          ? Activity::Walk
+                         : std::abs(turn) > 0.3f  ? Activity::Turn
+                                                  : Activity::Idle;
+        state.intent.valid = true;
+        state.intent.desiredVelocity = glm::vec3(direction.x, 0.0f, direction.y) * speed;
+        state.intent.facing = glm::vec3(std::sin(facing_), 0.0f, std::cos(facing_));
+        state.intent.hasFacing = true;
+        if (ctx.nav != nullptr && ctx.nav->valid()) {
+            const glm::vec3 p = state.position();
+            state.travel.y = ctx.nav->groundHeight(glm::vec2(p.x, p.z)) - state.anchor.y;
+        }
+    }
+
+private:
+    struct Segment {
+        float seconds = 1.0f;
+        float speed = 0.0f;
+        float turn = 0.0f;
+        float strafe = 0.0f; // radians
+    };
+    std::vector<Segment> segments_;
+    bool loop_ = false;
+    float runSpeed_ = 4.0f;
+    float facing_ = 0.0f;
+    bool started_ = false;
+};
 
 std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::json* settings) {
     if (kind == "hover") {
@@ -2534,6 +3158,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "decide") {
         return std::make_unique<Decide>(settings);
+    }
+    if (kind == "motionScript") {
+        return std::make_unique<MotionScript>(settings);
     }
     return nullptr;
 }

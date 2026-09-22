@@ -141,6 +141,8 @@ json contactsToJson(const std::vector<ContactTrack>& tracks) {
         t["kind"] = contactKindName(track.kind);
         t["dutyCycle"] = track.dutyCycle;
         t["lowest"] = track.lowest;
+        t["worstSlide"] = track.worstSlide;
+        t["meanSlide"] = track.meanSlide;
         json spans = json::array();
         for (const ContactSpan& span : track.spans) {
             spans.push_back(json::array({span.start, span.end, span.clipLength}));
@@ -166,6 +168,8 @@ std::vector<ContactTrack> contactsFromJson(const json& j) {
         track.kind = kind;
         track.dutyCycle = t.value("dutyCycle", 0.0f);
         track.lowest = t.value("lowest", 0.0f);
+        track.worstSlide = t.value("worstSlide", 0.0f);
+        track.meanSlide = t.value("meanSlide", 0.0f);
         if (t.contains("spans") && t.at("spans").is_array()) {
             for (const json& s : t.at("spans")) {
                 if (s.is_array() && s.size() == 3) {
@@ -287,8 +291,18 @@ Result<MotionPack> buildMotionPack(std::string name, const Skeleton& skeleton,
         entry.frames = static_cast<std::uint32_t>(
             std::max(2.0f, std::floor(entry.length * options.sampleRate + 0.5f) + 1.0f));
         entry.provenance = 0;
+        // **Whether it loops is read from the clip.** `PackClip::loop` defaults to true and this
+        // never set it, so every clip in every pack built here looped: deaths, landings, and every
+        // 100STYLE take. The database then wrapped a death back into its own start, and §13's
+        // `OneShot` tag had no writer. glTF has no loop flag and a BVH take is a take, so the clip
+        // is the only witness.
+        const LoopClosure closure = measureLoopClosure(skeleton, clip, options.sampleRate);
+        entry.loop = closure.loops;
         if (!options.contactJoints.empty()) {
-            ClipAnalysis analysis = analyseClip(skeleton, clip, options.contactJoints, 0, settings);
+            // A contact span may wrap only on a clip that does.
+            ContactSettings clipSettings = settings;
+            clipSettings.looping = settings.looping && entry.loop;
+            ClipAnalysis analysis = analyseClip(skeleton, clip, options.contactJoints, 0, clipSettings);
             entry.contacts = std::move(analysis.contacts);
             entry.phase = std::move(analysis.phase);
             entry.rootTravel = analysis.rootTravel;
@@ -492,6 +506,9 @@ Result<void> writeMotionPack(const MotionPack& pack, const std::filesystem::path
             c["tags"] = clip.tags;
         }
         c["contacts"] = contactsToJson(clip.contacts);
+        if (!clip.heading.empty()) {
+            c["heading"] = clip.heading;
+        }
         clipIndex.push_back(std::move(c));
     }
     doc["clips"] = std::move(clipIndex);
@@ -687,6 +704,9 @@ Result<MotionPack> readMotionPack(const std::filesystem::path& directory) {
                 }
             }
         }
+        if (c.contains("heading") && c.at("heading").is_array()) {
+            clip.heading = c.at("heading").get<std::vector<float>>();
+        }
         if (c.contains("contacts")) {
             clip.contacts = contactsFromJson(c.at("contacts"));
         }
@@ -705,6 +725,16 @@ Result<MotionPack> readMotionPack(const std::filesystem::path& directory) {
             }
         }
         pack.clips.push_back(std::move(clip));
+    }
+    // **A contact track's joint index, resolved against the skeleton this pack carries.** The file
+    // stores the name, because an index means nothing without its skeleton. Every track read back
+    // used to keep the default of -1, so every reader that trusted the index (implied travel was the
+    // first to notice) silently found no contacts at all. The index is resolved here, from the
+    // skeleton that was just read, exactly as `detectContacts` resolved it when the pack was built.
+    for (PackClip& clip : pack.clips) {
+        for (ContactTrack& track : clip.contacts) {
+            track.jointIndex = pack.skeleton.find(track.joint);
+        }
     }
     return pack;
 }

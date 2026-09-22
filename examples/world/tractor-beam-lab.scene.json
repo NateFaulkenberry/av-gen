@@ -1074,7 +1074,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1114,7 +1114,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1154,7 +1154,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1194,7 +1194,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1234,7 +1234,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1274,7 +1274,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1314,7 +1314,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1354,7 +1354,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1394,7 +1394,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1434,7 +1434,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1474,7 +1474,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1514,7 +1514,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1554,7 +1554,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1594,7 +1594,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1634,7 +1634,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1674,7 +1674,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1714,7 +1714,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1754,7 +1754,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1794,7 +1794,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1834,7 +1834,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1874,7 +1874,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1914,7 +1914,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,
@@ -1974,7 +1974,7 @@
    "gait": {
     "walkSpeed": 6.0,
     "runSpeed": 6.0,
-    "rateMin": 0.005,
+    "rateMin": 0.02,
     "rateMax": 1.0,
     "matchRate": true,
     "idleRate": 0.0,

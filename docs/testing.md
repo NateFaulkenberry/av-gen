@@ -78,16 +78,16 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Thirty-two ways a green suite has lied
+## Forty-one ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
 you are short of time, because it is the only one the exit code cannot save you from.
 
-- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 31, 32).
+- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 31, 32, 34).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 33, 36, 37, 41; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -138,6 +138,24 @@ night from two agents who never spoke to each other.
    So a change to a shader is unverified until something has **rendered a frame** with it. A suite
    that never loads that shader will not tell you, and neither will the compiler.
 3. **A log written by somebody else's process.** See the next section; this is the severe one.
+34. **An edit script that asserts and writes at the end leaves a partial change that looks
+   complete.** The shape is: make N replacements in memory, assert each match count so a silent
+   wrong edit is impossible, write the file once at the end. When the *fourth* assertion fires,
+   the first three are discarded with it — and the file on disk is neither the before nor the
+   after, because some earlier script in the same session did write.
+
+   **The discipline that prevents silent wrong edits is exactly what creates silent partial ones.**
+   Three agents hit this on 2026-09-21, twice within an hour by one of them. One instance left a
+   `PoseLayerKind` dispatch reading `kind == Foot` while two related edits landed, so every `Reach`
+   layer fell through to the additive path and reported **`Solved` with the hand at rest** — an
+   unreachable IK target coming back successful.
+
+   The tell is that a change you believe you made is absent while its siblings are present. **The
+   fix is structural, not careful: write after every successful replacement, or build the entire
+   new content and write once with no assertions between.** Asserting match counts is still right;
+   it is the interleaving of assertions and a single deferred write that is wrong.
+
+   Related but distinct from 1 and 2: those are a stale *binary*, this is a stale *source*.
 
 ### The run happened and you read it wrong
 
@@ -427,6 +445,73 @@ night from two agents who never spoke to each other.
    at all is caught by ADR-182, but **a control that moves, fails on demand, and is nonetheless
    aimed at the wrong region or the wrong mechanism passes every check you would think to run.**
    When a reachability probe reports zero, suspect the sample domain before the knob.
+
+33. **A fixture at a boundary of its own valid range measures the boundary, not the feature.**
+
+   A foot-lock probe reported the lock doing nothing: the held foot and the free foot came out at
+   the same place, on every arm, reproducibly. The lock was correct. The **test rig's leg was
+   straight at rest** — two segments spanning exactly their own combined length — so a leg with
+   zero slack put every horizontal lock offset out of reach, the IK solver clamped, and the probe
+   faithfully measured the clamp.
+
+   Nothing was wrong with the code, the assertion or the sampling. The *fixture* sat on a singular
+   configuration of the thing it was exercising. A straight leg is to an IK solver what a plateau is
+   to a noise field (17) and what a funnel-sized spread is to a cloud four times wider: a place
+   where the mechanism has no authority, so the feature cannot show up however correct it is.
+
+   **The general form: ask what range your fixture's own parameters are valid over, and whether it
+   is sitting at an end of it.** A rig with 0.055 of slack measured the lock immediately. The tell
+   is the same as 13 and 17 — a confident, reproducible zero — and the instinct that catches all
+   three is to suspect the fixture's domain before the feature.
+
+   **The same entry, in time rather than in parameters.** An attention tie-break test drove 300
+   frames — five seconds — against a selector whose attention hold is four. It crossed the hold,
+   caught a legitimate refractory release, and reported it as *reordering thrash*: a real mechanism
+   firing, attributed to the mechanism the test was named after. Shortened to three seconds, inside
+   the hold, it measured the thing it claimed to.
+
+   So the form generalises: **a fixture that spans more than the mechanism under test will measure
+   whichever mechanism fires first.** A boundary can be in a parameter (a straight leg), in a
+   sample domain (a plateau), or in a *duration* — and the third is the easiest to miss, because
+   running a test for longer feels like more evidence rather than less.
+
+   **The fifth instance, and the mechanism was not even running.** A balance-margin arm removed a
+   lean layer's 20° cap and asserted the lean grew. At the default gain that lean is **6.1°** — so
+   the cap never engaged, removing it changed nothing, and the assertion measured a limiter that
+   was not participating. Turning the *gain* up is what makes the margin fall. The same week, a
+   lookahead of exactly 1.0 s reached exactly *to* a corner and never past it, so a right angle
+   read as zero degrees.
+
+   **The sixth, and it is in the sample points rather than the fixture.** A coverage/cost knee was
+   measured at 4 and 16 variants when saturation is past 16, because the generator skips targets it
+   has already covered. The flat part of the curve was sampled and the conclusion drawn was that
+   there is no curve. **Measuring a knee means sampling where the knee is** — and the check is the
+   same as the others: what would have to be true for the phenomenon to appear in this window?
+
+   **The seventh is specific to this engine and worth the extra line.** On a **detached** IK chain
+   (ADR-543) the three joints are posed independently, so `solveTwoBone` reads its bone lengths
+   from the *current pose*. A fixture that posed the tip without moving the mid therefore shortened
+   the limb it was about to ask the solver to extend — the second bone read 0.430 against its rest
+   0.626, total reach fell below the target distance, and the solve clamped. **The fixture was
+   asking for a leg the fixture had just shortened.**
+
+   That one has a product-side corollary worth knowing: any layer that moves a tip without moving
+   its mid changes what a later IK solve believes the limb is. On an ancestor chain this cannot
+   happen, because rotations preserve bone length; on a detached one it is routine.
+
+   **This is the only entry here that is engine-specific rather than a general testing hazard**, and
+   it exists solely because detached chains do (ADR-543). The general lesson still transfers: when
+   a property holds *by construction* in the common case, a fixture exercising the uncommon case
+   can violate it without anything complaining — and the property you relied on is the one nobody
+   thought to assert.
+
+   Seven instances now, in seven different clothes: a parameter at its boundary, a sample domain on a
+   plateau, a duration spanning two mechanisms, a lookahead landing on the feature it was meant to
+   see past, a mechanism with no authority at the default values, sample points that miss the
+   phenomenon entirely, and a fixture that changed the very quantity it was about to measure. **The fix is the same one
+   every time: ask what would have to be true for this mechanism to matter, and put the fixture
+   there.** Not "does the code run" — *does the thing I am measuring have any authority at these
+   values.*
 
 19. **A minimum is robust to contention ARRIVING and defenceless against the machine getting
    quieter.** ADR-170 says "report minima over repeats, never means" and stops, which reads as
@@ -896,6 +981,30 @@ added. **A check that refuses to proceed on an input it cannot resolve is worth 
 resolves it optimistically**, and it is the only entry in this family that is a defence rather than
 a wound.
 
+35. **A position probe cannot see a rotation on a rig that is not a hierarchy.** Phase B §51 asked
+    whether secondary motion is bounded, so it measured how far `head.x` moved over six minutes of
+    timeline and read **exactly 0.00000 m**. The layer was working: measured as a *rotation* it runs
+    at 1.4993 degrees against its authored 1.5. `alien-scout.glb` is flat (ADR-553) -- every joint
+    is a sibling under `rig` -- so rotating `spine_02.x` does not move `head.x`, and rotating
+    `head.x` about its own origin does not move `head.x` either. There was no path from the effect
+    to the probe.
+
+    Family C, and the **second** confident zero this flat rig produced in one phase: §45 read three
+    of four limb segments as 0.0% deviation, which was true and meant something quite different
+    from what it looked like. The general form is that **a probe encodes an assumption about how
+    the effect propagates**, and on an ancestor chain "rotation moves descendants" is so reliably
+    true that nobody states it. State it, or measure the quantity the mechanism actually writes --
+    this layer writes rotations, so the probe should have read rotations from the start.
+- **A panel that renders wrong numbers correctly is not debuggable, it is convincing.** Phase B §50
+  gathers every quantity its overlays and read-outs display in `Composition::motionDebug`, where it
+  is asserted without a GPU and without a panel, and the UI is a thin reader of it. The numbers are
+  the part that can be wrong; a diagnostic that is pleasant to look at and wrong is worse than no
+  diagnostic, because it ends the investigation. The corollary for anyone reading a debug overlay:
+  ask which of the displayed quantities has a test, and treat the rest as a rumour.
+- **This rig produces convincing zeros.** `alien-scout.glb` returned `0.0%` for three of four limb
+  segments in §45 and `0.00000 m` for secondary motion in §51, and both were true readings of the
+  wrong quantity (see 26). **Treat any exact zero from a flat rig as suspect until you know which
+  mechanism produced it.**
 - **When a filter, census or probe returns the number you expected, that is when to check it. A
   surprising number gets checked for free.**
 - **An aggregate cannot separate the two things it sums.** Two instances of the same failure were
@@ -912,6 +1021,179 @@ a wound.
 - **Name every mechanism that could mask the fault before you trust a teeth-check** (16), and
   **suspect the sample domain before the knob when a reachability probe reports zero** (17).
 
+
+36. **A search truncated by `head` is a search you have not done, and its silence is indistinguishable
+   from an answer.**
+
+   Before writing a BVH importer for §20 I checked whether one existed:
+   `grep -rli "bvh" src/ tools/ ... | head`. Ten lines came back, every one of them a *bounding
+   volume hierarchy* in the path tracer, and I concluded there was no Biovision reader.
+   `src/assets/bvh_loader.{hpp,cpp}` — written for 100STYLE specifically, with the scale option and
+   the rotation-order survey already in it — sat below the cut.
+
+   **The pipe reported success and the truncation left no trace in the output.** A `grep` that finds
+   nothing prints nothing; a `grep` piped into `head` that finds sixty things also prints ten, and
+   the two look identical if you only read what came back. The habit that catches it is the one
+   entries 13, 14 and 15 converge on: **read what the scan matched, not just how many lines
+   arrived** — and count the matches separately (`grep -c`) before capping the display.
+
+   The general form: **a filter you added for readability is still a filter.** `head`, `-m`, a
+   `LIMIT`, a default page size and a truncated log all silently narrow a result set, and none of
+   them marks the output as partial.
+
+37. **An instrument can become degenerate as the corpus grows, silently, with nobody touching it.**
+
+   §30's contact experiment perturbs a query built from a database sample's own feature vector by a
+   fixed +0.05 per dimension and asks which sample the matcher picks. On 1,738 Glowmere samples that
+   nudge leaves the choice genuinely open and the experiment works. Re-run unchanged on **420,432**
+   samples, the search returned **the seed sample on 600 of 600 steps**: at that density a vector
+   displaced by a fixed small amount still identifies its own source uniquely, so **no feature could
+   have changed the answer** and the number being compared was the corpus's clip layout rather than
+   the matcher's choices.
+
+   **The tell was three identical columns.** Both arms agreed to four decimals on the mean, on the
+   worst case, *and on the switch count*. Two arms agreeing on a mean is a null result; two arms
+   agreeing on an integer count of events is two arms that made identical decisions, which is a
+   statement about the instrument and not about the feature.
+
+   **The fix is not a bigger constant.** A perturbation of 0.5 would work here and fail again at
+   four million samples. What works at any size is a perturbation in **the matcher's own units** --
+   the derived duplicate radius, the distance at which the search stops being able to tell two
+   samples apart -- so the query is ambiguous by construction whatever the density. Here that was
+   5.8x the fixed value, and seed-return fell from 600/600 to 194/600.
+
+   The general form, and it is the uncomfortable one: **an experiment that passed its own controls
+   at one scale can quietly stop measuring anything at another, and nothing fails.** The test still
+   runs, still asserts, still prints a number with four decimals. Ask what the metric can see
+   before asking what the feature carries -- the same instinct as 13, 17 and 33, arriving through
+   the corpus rather than through the fixture.
+
+38. **Finding a fact in one place tells you nothing about how many places it is in. Grep for the
+   second copy of anything found once.**
+
+   `LocomotionState::grounded` carried a comment saying it was "written by neither and read by
+   nobody". The write half had been fixed; the comment had not. That was found, and fixed, and the
+   class was believed closed — **and it was still there, because `EntityWorld::seek` and
+   `EntityWorld::update` publish the locomotion seam in two separate blocks and both carry the
+   identical sentence.** Fixing one left the other, and the grep that would have said so takes five
+   seconds:
+
+   ```
+   grep -n "written by neither" src/entity/entity.cpp   # two hits, not one
+   ```
+
+   **A duplicated block duplicates its comments, its constants and its bugs.** Any fact that lives
+   inside a copied region lives in N copies, and the first one you find is evidence of N ≥ 1 and
+   nothing more. This is the reason a fix can be correct, tested, and still leave the defect in the
+   tree.
+
+   The habit: **after finding something by reading, search for its own text before believing you
+   have all of it.** Quote a distinctive fragment of the thing itself — the comment sentence, the
+   magic number, the expression — rather than the symbol name, because the symbol is what differs
+   between copies and the body is what does not.
+
+   It generalises past comments. Two `switch` statements over the same enum, two publication paths
+   for one seam, two arms of a test fixture, `seek` and `update`, a JSON reader and a JSON writer:
+   each is a place where a fact was copied and can rot independently. Entry 22's dispatch and
+   entry 23's two kinds are the same family seen from the code side; this is the same family seen
+   from the *fix* side, and it is the one that bites after you think you are done.
+
+39. **Two locally correct decisions can compose into data loss, and no test of either one can see
+   it.**
+
+   `PoseLayer::weight` was parsed and never serialised. Read each half on its own and both are
+   right, with reasons:
+
+   - the **parser** keeps an authored weight only for `Manual` layers, *because a driven layer's
+     weight is written every frame from the seam and an authored one would be overwritten before
+     it was read*;
+   - the **writer** treats weight as per-frame state and does not save it, which is correct for
+     every drive **except** the one case the parser singles out.
+
+   Neither is a mistake. The defect lives in the space between them, and it is not visible from
+   either side: a parser test passes, a writer test passes, and loading and saving the shipping
+   scene turns fifteen layers off on five characters — **the file still loads cleanly**, and the
+   layers report `LayerResolution::Inactive`, which nothing distinguishes from any other reason a
+   layer did nothing. A defect hiding behind a second defect.
+
+   **The general form: a round trip is a contract between two functions, and neither function owns
+   it.** Every asymmetric pair is a candidate — parser and writer, `seek` and `update`, encode and
+   decode, `toJson` and `fromJson`, push and pop. Unit-testing each half is exactly the test that
+   cannot find this.
+
+   The cheap check is to **enumerate the keys one side knows and diff them against the other**, not
+   to reason about either: here, everything in the `kLayerKeys` whitelist should appear in the
+   writer, and `weight` did not. **A key on a read-whitelist is a promise the writer has to keep**,
+   because the whitelist exists to warn an author about ignored keys — and a key the writer drops
+   is ignored silently, on the way out, where no warning fires.
+
+   Distinct from 22 and 23, which are about two code paths that *do* the same thing diverging.
+   This is about two paths that do *opposite* things failing to be inverses.
+
+40. **A test can go green because its subject stopped existing. Absence and compliance are
+   indistinguishable to most assertions.**
+
+   `test_abduction_poc` asserts that wandering animals do not walk into things. It loads
+   `glowmere-valley-2.scene.json`, which carries **forty `"generator": "mushroom"` sources**, and
+   its own comments call the obstacle field load-bearing: *"without the obstacle field the 'not
+   inside a tree' assertion below would be asking a question..."*
+
+   `scene::generatorRegistry()` is a process-global `static` map. **Exactly one thing fills it** --
+   `Engine`'s constructor, via `registerMushroomGenerator()` and `registerTreeGenerator()` -- and
+   `scene::clearGenerators()` empties it. Two tests call that, **one of them from a destructor**,
+   so it hands the rest of the process an empty registry by design. The test constructs no
+   `Engine`, so it inherited whatever the process happened to hold.
+
+   Run alone, the registry was empty, **forty sources produced no geometry at all**, and the
+   obstacle field was missing forty obstacles. **The test passed.** Run after anything that built
+   an `Engine`, the mushrooms existed, the routes had to bend around them, and it failed.
+
+   > **A green run meant there were fewer obstacles, not that the animals avoided them.**
+
+   That is the whole entry. Every other failure in this document announces itself as a wrong
+   number; **this one announces itself as success**, and nothing about a pass invites anyone to
+   look. It is strictly worse than a flaky test: a flaky test is annoying and visible, and this was
+   quiet and reassuring.
+
+   **The general form.** An assertion of the shape *"X never does the bad thing"* is satisfied
+   both by X behaving and by **there being no opportunity** -- no obstacles, no neighbours, no
+   candidates, no content. Any global that a *different* test empties can remove the opportunity.
+   So:
+
+   - **A test that depends on a process-global must populate it or assert it, never inherit it.**
+     The fix here was not to make the test build an `Engine` so the registry happened to be full;
+     it was to register what the scene needs and `REQUIRE(hasGenerator("mushroom"))`. A test that
+     relies on someone else having filled a global will lie again the next time the order changes.
+   - **Assert the size of the haystack, not only the absence of the needle.** "No animal was inside
+     a tree" is worth little without "there were N trees". Any test whose subject is *avoidance*,
+     *collision*, *selection* or *filtering* should assert the population it was choosing from.
+   - **A global cleared by a destructor is a global with a hostile owner.** Clearing on the way
+     *out* of a fixture is correct isolation for that fixture and a landmine for everything after.
+
+   The tell, when it happens: **the test passes alone and fails in company, and the failing run is
+   the honest one.** The instinct is to trust the isolated run; here isolation was the broken
+   configuration. Found by an order bisect after the obvious explanation -- RNG seeding -- was
+   checked and *failed to explain anything*, which is what made it worth bisecting at all.
+
+41. **Every arm started from a fresh load, so a reset that forgot a field could not be seen.**
+
+   `test_glowmere_scrub.cpp` compared a scrub with a play at 30, 45 and 90 s, and each scrub was a
+   brand-new `Film` -- loaded, seeked once, compared. All green, 0.000000 m. **The editor never
+   does that.** It loads, plays, and then scrubs, so every replay from zero starts from
+   `EntityWorld::reset` on a world that has already run -- and `reset` is hand-written, field by
+   field, in thirteen behaviours and the world. ADR-700's digest test restored into a world that
+   had been somewhere else first and found two things a fresh load hides: `Selector::reset` forgot
+   `commitment_`, and `Decide`'s variety window was a `span` over a vector the same step could
+   reallocate -- after an earlier run `clear()` had kept the capacity, so no reallocation and a
+   different score (0.44 against 0.74), and the aliens 28 m apart at 90 s.
+
+   **The general form: a test of "the same input gives the same output" must vary what came
+   before, not only the input.** A fresh fixture is the one history in which every forgotten reset
+   is invisible. The habit: when a function's contract is "puts it back", test it on something
+   that has been used -- run the subject somewhere else first (past the target, through ordinary
+   frames), then ask. And a `span` or a pointer into a container that the same function can grow is
+   entry 38's family seen from memory: re-point it after every write, as `dctx.visited` already
+   was two lines above the one that was not.
 
 ## The scratchpad is shared by every agent in a session
 

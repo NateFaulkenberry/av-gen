@@ -388,9 +388,20 @@ void ControlPanel::drawMenuBar(app::Engine& engine) {
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            tooltip("removes the camera's automation. While the timeline drives the "
-                              "camera, a viewport drag writes a value the timeline replaces on the "
-                              "next frame, so the mouse appears to do nothing.");
+            tooltip("gives you the camera back. The director's cut is kept, not deleted: "
+                    "world effects keep following it, and Resume Director puts it back "
+                    "exactly as it was.");
+        }
+        // ADR-582: beside the hand-back, because it is the way back from it.
+        ImGui::BeginDisabled(!onResumeDirector || !engine.directorParked());
+        if (ImGui::MenuItem("Resume Director")) {
+            onResumeDirector();
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            tooltip(engine.directorParked()
+                        ? "gives the camera back to the director, with the same cut it had"
+                        : "nothing to resume: the director has not been set aside");
         }
         ImGui::EndMenu();
     }
@@ -1153,8 +1164,8 @@ void ControlPanel::drawPreviewFrameControls(app::Engine& engine) {
                                                  : viewportViewNote.c_str());
             } else if (film) {
                 tooltip("The canvas is showing '%s' -- what this project renders. Moving the view\n"
-                        "here MOVES THAT CAMERA, which is how a shot is composed and also how a\n"
-                        "baked cut gets discarded.\n\n"
+                        "here MOVES THAT CAMERA, which is how a shot is composed and also how the\n"
+                        "director is set aside (its cut is kept; Resume Director restores it).\n\n"
                         "Click for the editor's own viewpoint, which the film does not own.",
                         live.name.empty() ? "the main camera" : live.name.c_str());
             } else {
@@ -3993,12 +4004,11 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         ImGui::Text("-- blending %.0f%%", static_cast<double>(active.blend) * 100.0);
     }
 
-    // The lock (viewport brief §7), and it is a guard on data loss rather than a convenience.
-    //
-    // A directed project's cut is **baked**: timeline tracks on six camera targets, an aim-follow
-    // table and a shot-span table. Dragging the viewport used to stand the director down and
-    // discard all of it, and the next Save wrote the loss -- observed for real, recovered from git.
-    // Re-baking does not undo it either, because it re-photographs the hero anchors (ADR-344).
+    // The lock (viewport brief §7). It was written as a guard on data loss: dragging the viewport
+    // used to stand the director down and discard the whole baked cut, and the next Save wrote the
+    // loss. Since ADR-582 standing the director down parks the cut instead, so nothing is lost
+    // either way; what the lock still prevents is an incidental drag taking the film's camera away
+    // from the director at all.
     //
     // Shown only when there is something to protect, so an undirected project is not asked to think
     // about a lock that guards nothing.
@@ -4015,9 +4025,9 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                                "  not the film's camera (ADR-391).");
         } else {
             ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.4f, 1.0f),
-                               "  Unlocked: moving the viewport camera DISCARDS the director's cut\n"
-                               "  (its tracks, aim-follow table and shot spans). Re-running the\n"
-                               "  director makes a different cut, not the same one back.");
+                               "  Unlocked: moving the viewport camera takes the camera from the\n"
+                               "  director. Its cut is kept -- world effects still follow it -- and\n"
+                               "  Resume Director (Auto-director panel) puts it back.");
         }
     }
     ImGui::Separator();
@@ -4408,7 +4418,10 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
                 if (i < engine.songPlan().sections.size()) {
                     engine.songPlan().sections[i].autonomy =
                         static_cast<app::Autonomy>(rowAutonomy);
-                    if (onDirectCamera && engine.timeline().isAutomated("camera/position")) {
+                    // Only while the director steers: a parked cut is replaced by an explicit
+                    // Enable, never by editing a control (ADR-582).
+                    if (onDirectCamera && engine.timeline().isAutomated("camera/position") &&
+                        !engine.directorParked()) {
                         onDirectCamera();
                     }
                 }
@@ -4458,6 +4471,49 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
         onClearCameraAutomation();
     }
     ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        tooltip("Gives you the camera. The cut is kept, and world effects keep following it.");
+    }
+    // ADR-582: taking the camera back parks the cut, so the way back sits beside the way out. Named
+    // for what it does rather than for the mechanism: nobody asked to "restore a parked bake".
+    const bool parked = engine.directorParked();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!parked || !onResumeDirector);
+    if (ImGui::Button("Resume Director")) {
+        onResumeDirector();
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        tooltip(parked ? "Gives the camera back to the director, with exactly the cut it had."
+                       : "Nothing to resume: the director has not been set aside.");
+    }
+    if (parked) {
+        ImGui::TextColored(ImVec4(0.62f, 0.66f, 0.72f, 1.0f),
+                           "The director's cut is set aside, not deleted. World effects still\n"
+                           "follow it, in playback and in renders.");
+    }
+    // Deleting a cut is the one camera action Resume cannot undo, so it asks first.
+    const bool haveCut = parked || directed || !engine.shotSpans().empty();
+    ImGui::BeginDisabled(!haveCut || !onDiscardDirectorsCut);
+    if (ImGui::Button("Discard Director's Cut...")) {
+        ImGui::OpenPopup("Discard the director's cut?");
+    }
+    ImGui::EndDisabled();
+    if (ImGui::BeginPopupModal("Discard the director's cut?", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("This deletes the cut: the camera moves, and the timing that world\n"
+                               "effects such as the hero pulse follow. Enable Auto-director makes a\n"
+                               "new cut, but not the same one.");
+        if (ImGui::Button("Discard")) {
+            onDiscardDirectorsCut();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Keep it")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
     ImGui::Separator();
             app::AutoDirectorSettings& s = *autoDirector;
             const app::AutoDirectorSettings before = s;
@@ -4663,7 +4719,8 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             // `operator==` rather than a memcmp: the struct has padding, and since ADR-217 it has
             // std::strings in it, so comparing its bytes is both undefined and wrong.
             } else if (!(before == s) && onDirectCamera &&
-                       engine.timeline().isAutomated("camera/position")) {
+                       engine.timeline().isAutomated("camera/position") &&
+                       !engine.directorParked()) {
                 // Already directed: a setting that changes the film should change the film,
                 // rather than waiting for somebody to find the menu item again.
                 onDirectCamera();

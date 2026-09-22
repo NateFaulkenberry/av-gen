@@ -10,14 +10,23 @@
 // `EntityWorld::seek` and testable without a world.
 //
 // It is deliberately less capable than `AnimationPlayer`. It plays one clip at a rate, wraps it,
-// and reports its phase. It does not blend, transition or inertialize, because those are the
-// player's job and duplicating them here would be a second answer to a question already settled
-// (ADR-547). What it gives the chain is the guarantee that *something* always poses the body.
+// and reports its phase. What it gives the chain is the guarantee that *something* always poses
+// the body.
+//
+// **It used to say, here, that it does not blend "because those are the player's job and
+// duplicating them here would be a second answer to a question already settled (ADR-547)". That
+// was wrong, and the way it was wrong is worth keeping.** The argument holds only while the player
+// is still consulted. It is not: when a provider poses a body, `SkinnedRig::evaluate` takes the
+// external pose and `AnimationPlayer::evaluate` is never called, so there is no first answer for
+// this to be a second one to. Measured on the Glowmere alien at a gait change: **0.4484 m of foot
+// teleport on average, 8.8x the 0.0510 m bar, worst 0.6410 m** -- worse than the matcher's
+// original defect, and on the only provider the product actually installs (ADR-613).
 //
 // **The obligation it is held to** is ADR-541's: for the case they both cover -- a looping clip
 // playing at a steady rate -- this provider and `AnimationPlayer` must produce the same pose. The
 // test asserts that joint by joint rather than trusting it.
 
+#include "entity/gait.hpp"
 #include "entity/motion_provider.hpp"
 
 #include <string>
@@ -50,6 +59,15 @@ public:
         : clips_(clips), name_(std::move(name)) {}
 
     void setClips(const std::vector<scene::AnimationClip>* clips) { clips_ = clips; }
+
+    // §32/ADR-613. Seconds for the pose offset a clip change introduces to halve; zero is the old
+    // unblended behaviour. **Derived from the soonest one change can follow another**, which for
+    // this provider is the gait tier's minimum dwell -- `Gait::select` will not change its mind
+    // faster than that, so nothing downstream needs to blend faster than that either. A caller
+    // whose gait settings differ should pass its own.
+    void setInertializeHalflife(float seconds) { inertializeHalflife_ = seconds; }
+    [[nodiscard]] float inertializeHalflife() const { return inertializeHalflife_; }
+    void setBlendSlots(std::size_t slots) { blendSlots_ = slots; }
     void addEntry(ClipEntry entry) { entries_.push_back(std::move(entry)); }
     void clearEntries() { entries_.clear(); }
     [[nodiscard]] const std::vector<ClipEntry>& entries() const { return entries_; }
@@ -70,6 +88,9 @@ private:
     const std::vector<scene::AnimationClip>* clips_ = nullptr;
     std::vector<ClipEntry> entries_;
     std::string name_ = "clip";
+    float inertializeHalflife_ =
+        derivedInertializeHalflife(GaitSettings{}.minDwell, kBlendBudgetFrameSeconds);
+    std::size_t blendSlots_ = MotionMemory::kBlendSlots;
 };
 
 } // namespace avgen::entity

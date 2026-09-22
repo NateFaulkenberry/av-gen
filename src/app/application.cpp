@@ -157,6 +157,8 @@ std::string usageText() {
            "  --pt-aovs           write one multi-layer EXR with albedo, normal, emission, depth, id\n"
            "  --pt-denoise        denoise with OIDN (needs -DAVGEN_PATHTRACE_DENOISE=ON)\n"
            "  --pt-probe          report directional albedo above 1 (ADR-352); does not alter the image\n"
+           "  --pt-rebuild-bvh    rebuild the whole BVH every frame of a traced range instead of only\n"
+           "                      what changed (ADR-583's control arm); does not alter the image\n"
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
            "  --format <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
            "                      EXR sequence, before tone mapping), or video\n"
@@ -420,6 +422,8 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.ptAovs = true;
         } else if (arg == "--pt-probe") {
             options.ptProbe = true;
+        } else if (arg == "--pt-rebuild-bvh") {
+            options.ptRebuildBvh = true;
         } else if (arg == "--queue") {
             auto v = need(i, "--queue");
             if (!v) return std::unexpected(v.error());
@@ -1424,12 +1428,34 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // what the user last chose (section 9).
         panel_->autoDirector = &cameraDirection_.settings;
         panel_->onClearCameraAutomation = [this] {
-            // Removing the camera's automation rather than disabling the whole timeline: a project
+            // Parking the camera's automation rather than disabling the whole timeline: a project
             // may automate other things, and handing the camera back is not a reason to stop those.
-            // The same call a viewport drag makes, so both mean exactly one thing.
-            const std::size_t removed = releaseDirectedCamera(*engine_, cameraDirection_);
-            panel_->setStatus("camera handed back to the viewport (" + std::to_string(removed) +
-                              " track(s) removed)");
+            // The same call a viewport drag makes, so both mean exactly one thing (ADR-582: park,
+            // never destroy).
+            static_cast<void>(releaseDirectedCamera(*engine_, cameraDirection_));
+            panel_->setStatus(engine_->directorParked()
+                                  ? "camera handed back to you. The director's cut is kept: world "
+                                    "effects still follow it, and Resume Director puts it back."
+                                  : "camera handed back to you");
+        };
+        // ADR-582: the parked cut back exactly as it was, with no re-bake.
+        panel_->onResumeDirector = [this] {
+            auto resumed = resumeDirectedCamera(*engine_, cameraDirection_);
+            if (!resumed) {
+                panel_->setStatus("could not resume the director: " + resumed.error().message);
+                return;
+            }
+            if (renderer_ != nullptr) {
+                renderer_->resetTemporalHistory();
+            }
+            panel_->setStatus("the director has the camera again, with the same cut as before");
+        };
+        // ADR-582: the one deliberate way to throw a cut away. Only reachable through the panel's
+        // confirmation, because unlike every other camera action it cannot be undone by Resume.
+        panel_->onDiscardDirectorsCut = [this] {
+            const std::size_t removed = discardDirectorsCut(*engine_, cameraDirection_);
+            panel_->setStatus("the director's cut was discarded (" + std::to_string(removed) +
+                              " item(s)); Enable Auto-director makes a new one");
         };
         // One action, three routes (ADR-216): the File menu item, the O shortcut and the Sequencer's
         // Import Audio... button. The menu item and the shortcut are *not* duplicates of each other
@@ -2784,7 +2810,8 @@ void Application::ensureFreeCamera(bool deliberate) {
         if (panel_ != nullptr) {
             panel_->setStatus("this frame is the film's and its cut is baked. Switch the canvas to "
                               "the editor viewpoint to fly without touching it, or unlock in the "
-                              "Cameras panel to edit the cut (that discards it).");
+                              "Cameras panel to take the camera (the cut is kept; Resume Director "
+                              "puts it back).");
         }
         if (!cameraLockAnnounced_) {
             cameraLockAnnounced_ = true;
@@ -2828,7 +2855,8 @@ void Application::ensureFreeCamera(bool deliberate) {
         }
         log::info("viewport: taking the film's camera over from '{}'", comp->activeCamera().name);
         if (panel_ != nullptr) {
-            panel_->setStatus("the film's camera is yours -- the director's cut has been discarded");
+            panel_->setStatus("the film's camera is yours -- the director's cut is parked, and "
+                              "Resume Director puts it back");
         }
     }
     // The viewport is about to move the camera by hand, so whoever else was driving it stops now.
@@ -2841,10 +2869,11 @@ void Application::ensureFreeCamera(bool deliberate) {
     // because a pointer moved would be a far worse surprise than a camera that does not budge; the
     // gesture that meets one of those says so instead (see `handleViewportEvent`).
     if (cameraDirection_.directed) {
-        const std::size_t removed = releaseDirectedCamera(*engine_, cameraDirection_);
-        log::info("viewport: took the camera back from the director ({} track(s) removed)", removed);
+        const std::size_t parked = releaseDirectedCamera(*engine_, cameraDirection_);
+        log::info("viewport: took the camera back from the director ({} track(s) parked)", parked);
         if (panel_ != nullptr) {
-            panel_->setStatus("camera handed back to the viewport -- Enable Auto-director re-cuts it");
+            panel_->setStatus("camera handed back to the viewport -- the cut is kept, and Resume "
+                              "Director puts it back");
         }
     }
     auto* p = engine_->params().find("camera/mode");
@@ -4451,7 +4480,12 @@ int Application::runLive() {
                                               engine_->composition()->heroes().size()));
             } else if (*redirected == Redirect::HandedBack) {
                 renderer_->resetTemporalHistory();
-                panel_->setStatus("no heroes left: the camera is back with the viewport");
+                panel_->setStatus("no heroes left: the camera is back with the viewport, and the "
+                                  "director's cut is kept");
+            } else if (*redirected == Redirect::Stale) {
+                // ADR-582: a moved hero no longer re-cuts by itself; say what would.
+                panel_->setStatus("a hero moved since this cut was made. The cut is unchanged; "
+                                  "Enable Auto-director re-cuts it for where the heroes are now.");
             }
         }
 
@@ -5333,6 +5367,7 @@ int Application::runTraceSequence(const std::filesystem::path& projectFile,
         traceSequenceRequestFrom(projectFile, authored, options_.width, options_.height,
                                  *options_.pathtrace, video);
 
+    request.reuseAcceleration = !options_.ptRebuildBvh;
     if (auto ok = request.validate(); !ok) {
         log::error("pathtrace: {}", ok.error().message);
         return 2;

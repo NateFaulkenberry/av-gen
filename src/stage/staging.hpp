@@ -539,8 +539,7 @@ class Staging {
 public:
     Staging();
     ~Staging();
-    Staging(const Staging&) = delete;
-    Staging& operator=(const Staging&) = delete;
+    // Not copyable by accident; a checkpoint copies it on purpose (ADR-700) through `checkpoint()`.
 
     // Validates and installs. Rejects a scenario whose actor does not exist, a query that binds
     // nothing, a `Value` naming a parameter the scenario never declared, and a `then`/`otherwise`
@@ -646,6 +645,28 @@ public:
     // released. What a timeline seek needs, and what a test needs between arms.
     void reset(entity::EntityWorld* world = nullptr, params::ParameterSet* params = nullptr);
 
+    // ---- simulation checkpoints (ADR-700) ---------------------------------------------------------
+    //
+    // A seek that resumes from a checkpoint needs the director exactly as it was at that step, so a
+    // checkpoint is a copy of the **whole** object -- runs, cues, rngs, claims, the gate's memory,
+    // the log, everything -- by the copy constructor the compiler writes. A member added to this
+    // class later is in the copy without anyone listing it.
+    //
+    // The one thing outside the object is the parameter bases it wrote (`writeParameter` writes the
+    // base, and `reset` puts the authored value back). So a checkpoint also records the current
+    // base of every path in `written_`, and `restore` first puts back the authored values of what
+    // *this* director has written, then becomes the copy, then writes the copy's values -- exactly
+    // the sequence a replay from zero to that step would have left.
+    struct Checkpoint {
+        std::shared_ptr<const Staging> copy;
+        std::vector<std::vector<float>> bases; // per `copy->written_`, the base it held
+    };
+    [[nodiscard]] Checkpoint checkpoint(const params::ParameterSet& params) const;
+    void restore(const Checkpoint& checkpoint, params::ParameterSet& params);
+    // Bumped by everything that changes what a replay would compute other than a parameter base:
+    // the description and the parameter registration.
+    [[nodiscard]] std::uint64_t epoch() const { return epoch_; }
+
     [[nodiscard]] const StageReport& report() const { return report_; }
     // Everything that happened in the last update, in order.
     [[nodiscard]] const std::vector<StageEvent>& events() const { return events_; }
@@ -659,6 +680,11 @@ public:
     [[nodiscard]] const std::vector<std::string>& problems() const { return problems_; }
 
 private:
+    Staging(const Staging&) = default;
+    Staging& operator=(const Staging&) = default;
+
+    std::uint64_t epoch_ = 1;
+
     struct Claim {
         std::string entity;
         std::string holder; // "<scenario>/<role>"

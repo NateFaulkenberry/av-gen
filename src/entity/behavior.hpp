@@ -123,6 +123,10 @@ struct EntityState {
     // form every existing behaviour writes; this is the form that can express a strafe, and it is
     // invalid by default so that a behaviour which writes neither still works exactly as it did.
     CharacterIntent intent;
+
+    // Phase B §19/§35. Measured beside `velocity`, from the same difference, one derivative out.
+    // Zero on a body's first two steps and across a seek, for the same reason `velocity` is.
+    glm::vec3 acceleration{0.0f};
     // How far the body's travel is from its facing, in radians, 0 when standing still. Zero for a
     // body walking where it looks, pi for one backing up, pi/2 for a pure strafe.
     [[nodiscard]] float strafeAngle() const {
@@ -157,6 +161,10 @@ struct InterestPoint {
     std::string name;   // empty for a derived point; a landmark or entity name otherwise
     InterestKind kind = InterestKind::Landmark;
     float weight = 1.0f;
+    // Phase D §25: semantic tags as bits of `EntityWorld::semanticTags()`. Filled by the world in
+    // `refreshInterestPoints` -- the kind's own name, plus the entity's tags when the point names
+    // one -- so whoever supplies a point does not have to know the vocabulary.
+    std::uint64_t tags = 0;
 };
 
 struct BehaviorContext {
@@ -240,7 +248,34 @@ struct ScoredOption {
                             // a dwell or a margin refusal is exactly the case worth seeing
 };
 
+// One decision, as the behaviour trace records it (Phase D §64, §65).
+//
+// Strings, deliberately, and built only when the choice *changes* -- a handful of times a minute
+// per character, never per frame -- because this is the record a person reads and a regression
+// test compares: "12.42 wander -> investigate mushroom-2 (0.82; novelty +0.31 ...)".
+struct DecisionTraceEntry {
+    double time = 0.0;
+    std::string option;        // the option committed to
+    std::string subject;       // what it is about, by name; empty for nothing in particular
+    IntentType intent = IntentType::Custom;
+    float score = 0.0f;
+    std::string runnerUp;      // the best option it beat
+    float runnerUpScore = 0.0f;
+    std::string factors;       // "novelty +0.31, salience +0.18, personality x1.20"
+    std::string previous;      // the option it replaced
+    // How the previous plan ended: "completed", "failed: unreachable", "interrupted", or "" when
+    // there was none. §19's lifecycle, made visible.
+    std::string previousOutcome;
+    std::string attention;     // what the body was attending to at the moment it chose, and why
+};
+
 // What a deciding behaviour is doing, in the terms an overlay draws.
+//
+// **Read by `entity/behavior_trace.cpp`** (Phase D §41, §64): `explainCharacter` turns it into the
+// "why is this character doing that" report and `BehaviorTraceRecorder` into the behaviour trace,
+// which `tools/behavior_trace.cpp` prints. ADR-615 recorded it as produced and read by nobody;
+// that was true until Phase D and is not now. No editor panel draws it yet -- the World editor
+// draws `navDebug` only (§40, open).
 struct DecisionDebug {
     std::span<const ScoredOption> options; // every option scored on the last decision tick, in order
     std::string_view chosen;               // the committed option's name; empty when nothing scored
@@ -255,6 +290,27 @@ struct DecisionDebug {
     // that does not opt in, and zero on one that does and never stalls -- which is the
     // distinction that makes the number worth printing rather than a decoration.
     std::size_t stalls = 0;
+
+    // ---- Phase D §40/§41: the rest of "why is this character doing that" -----------------------
+    IntentType intent = IntentType::Custom;   // the committed option's intent
+    std::string_view subject;                 // what it is about, by name
+    std::string_view factors;                 // the committed option's score terms, formatted
+    // Attention (§10): what the body is attending to, and the largest reason why. Empty when the
+    // decider has no awareness layer or nothing is worth attending to.
+    std::string_view attentionSubject;
+    std::string_view attentionReason;
+    float attentionScore = 0.0f;
+    glm::vec3 attentionPosition{0.0f};
+    // The plan (§19): whether the committed option's action list is still running, and how the
+    // last one ended.
+    bool planActive = false;
+    std::string_view lastOutcome;
+    // The behaviour trace (§64/§65), oldest first, bounded. `historyTotal` counts every entry ever
+    // recorded since the last reset, so a reader polling each frame can tell which entries are new
+    // even after the oldest have been dropped.
+    std::span<const DecisionTraceEntry> history;
+    std::size_t historyTotal = 0;
+    bool aware = false;                       // the decider runs the awareness layer at all
 };
 
 class IBehavior {
@@ -290,6 +346,25 @@ public:
     // against a full replay, with the accumulating kinds as the control that must disagree.
     static constexpr int kAllOfIt = -1;
     [[nodiscard]] virtual int historySteps() const { return kAllOfIt; }
+
+    // ---- simulation checkpoints (ADR-700) ----------------------------------------------------
+    //
+    // A seek restores the nearest checkpoint and replays forward from it, so a checkpoint has to
+    // hold **every** piece of state a step reads -- and a behaviour's state is whatever its class
+    // happens to have as members. So a checkpoint copies the whole object rather than asking the
+    // behaviour for a list of what matters: a member added tomorrow is in the copy without anybody
+    // remembering to put it there, which is the failure a hand-written save/load pair invites.
+    //
+    // Pure virtual on purpose. A new behaviour does not compile until it says how it is copied,
+    // and every one in `behaviors.cpp` says it the same way, through `CheckpointedBehavior<T>` --
+    // the copy constructor and the copy assignment the compiler writes.
+    //
+    // `clone` makes a copy a checkpoint can keep. `assignState` copies `from`'s state into this
+    // object *in place*, so the live behaviour keeps its address (a UI pass or a debug overlay may
+    // hold it) and the borrowed parameter pointers it copies back are the ones it already had --
+    // a restore is only attempted while the inputs that produced the checkpoint are unchanged.
+    [[nodiscard]] virtual std::unique_ptr<IBehavior> clone() const = 0;
+    virtual void assignState(const IBehavior& from) = 0;
 
     // Fills `out` and returns true when this behaviour navigates. The spans point into the
     // behaviour and are valid until its next update, which is enough for a UI pass that runs in

@@ -30,7 +30,11 @@
 #include "scene/motion_pack.hpp"
 #include "scene/skeleton.hpp"
 
+#include <glm/glm.hpp>
+
+#include <cmath>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -52,9 +56,92 @@ enum class MotionTag : std::uint32_t {
     Cyclic = 1u << 6,   // the clip loops and has a phase
     Travelling = 1u << 7, // ADR-552: its root leaves a box the size of its body
     OneShot = 1u << 8,
+    // A sample of a clip that does not loop and ends moving, closer to its end than the longest
+    // trajectory horizon. Its future is extrapolated rather than recorded, and it has nowhere to
+    // continue to. (A clip that ends at rest is not terminal: its extrapolation is true.)
+    // **A matcher that could choose it would freeze on it**: the end of a start is an excellent match
+    // for a walk, the clip ends, the search runs again and finds the same last frame. Found by §46's
+    // harness: 60 switches a second, 0% continuity, on a corpus the matcher should reproduce.
+    Terminal = 1u << 9,
 };
 [[nodiscard]] std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis);
 [[nodiscard]] std::string motionTagNames(std::uint32_t tags);
+
+// **What the feature values mean, as opposed to which dimensions exist.** `MotionFeatureConfig`
+// says which dimensions a vector has. This constant covers how each dimension is computed. It is
+// folded into the feature schema digest (`motionFeatureSchemaDigest`), so a stored database
+// extracted under an older definition is refused on load instead of being searched against
+// queries built under the new one. §36: "changing feature definitions should invalidate
+// incompatible search data."
+//
+//   1  the first definition.
+//   2  looks past a clip's end continue it instead of clamping: a looping clip wraps into its own
+//      start, and anything else extrapolates at its final velocity. Before this, the last sample of
+//      every clip read zero root velocity.
+//   3  every feature is expressed in the body's own facing frame (§7), not only relative to its
+//      position.
+//   4  a clip whose root does not travel carries the travel its planted feet imply, in its root
+//      velocity and its trajectory, and its heading is its authoring frame rather than its
+//      pelvis. Before this, every in-place walk read as standing still.
+//   5  a clip that carries a heading (`PackClip::heading`, written by §21's augmentation) is
+//      faced by it rather than by its pelvis.
+//   6  trajectory facing is the body's future facing, not its direction of travel; an in-place
+//      clip is faced relative to its own mean pelvis yaw, so a turn on the spot turns.
+//   7  samples near the end of a non-looping clip carry `MotionTag::Terminal`.
+//   8  when a pack's clips travel on different joints and one lies below all the others (a §21
+//      variant or a retargeted clip travels on `rig`, the alien's own clips on `root.x`), every
+//      clip is measured from that one.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 8;
+
+// A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
+// forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one
+// definition of that frame: the database builder uses it on every feature, and the matcher uses it
+// on every request. A zero facing leaves the vector unrotated.
+// The body's planar facing at each of a clip's `frames` samples (sample f at
+// `clip.start + f*dt`), as unit vectors in model space (§7). `root` is the travel joint. Its
+// rotation is taken relative to its rest orientation, so a clip authored facing +Z reads +Z at rest
+// whatever the rig's own joint axes are.
+//
+// **Smoothed, because a pelvis is not a heading.** A walking pelvis yaws from side to side with
+// every step. Taken raw, that sway would rotate every feature in time with the gait, while the
+// character's facing in a scene (the frame a query is built in) does not sway. `window` is the
+// span, in seconds, of a centred average of the unit vectors. A looping clip's average wraps; any
+// other clip's is clamped at its ends. A window of 0 takes the raw facing.
+[[nodiscard]] std::vector<glm::vec3> clipFacing(const Skeleton& skeleton, const AnimationClip& clip,
+                                                int root, std::uint32_t frames, float dt, bool loop,
+                                                float window);
+
+// The body velocity implied by a clip authored in place (ADR-540), in the body's facing frame: the
+// opposite of the mean model-space velocity of its planted feet (tracks resolved by joint name), over
+// `frames` samples at `dt` whose facing is `facing` (from `clipFacing`). This is the speed the
+// ground would have to move for the planted feet to stay put. It is zero unless at least two feet
+// each contribute two planted steps: one foot is a pivot or a scuff, not a gait.
+[[nodiscard]] glm::vec3 impliedTravel(const Skeleton& skeleton, const AnimationClip& clip, int root,
+                                      const std::vector<ContactTrack>& contacts,
+                                      const std::vector<glm::vec3>& facing, std::uint32_t frames,
+                                      float dt);
+
+[[nodiscard]] inline glm::vec3 toFacingFrame(const glm::vec3& world, const glm::vec3& facing) {
+    const float len = std::sqrt((facing.x * facing.x) + (facing.z * facing.z));
+    if (len < 1e-6f) {
+        return world;
+    }
+    const float s = facing.x / len; // sin(yaw)
+    const float c = facing.z / len; // cos(yaw)
+    return {(world.x * c) - (world.z * s), world.y, (world.x * s) + (world.z * c)};
+}
+
+// One feature dimension's contribution to a cost: the squared difference, weighted. **A function
+// rather than an expression written out at each site** so that every place a cost is summed
+// (search, staged search, the spread statistic and the explainer) rounds the same way. Written
+// inline as `cost += delta * delta * w`, the compiler may fuse the add into a multiply-add at one
+// site and not at another, and the explainer's "to the bit" agreement with the search then holds
+// only on the data it happened to be checked on. Kept out of the summing expression, the
+// product is rounded once, the same way, everywhere.
+[[nodiscard]] inline float motionFeatureTerm(float delta, float weight) {
+    const float squared = delta * delta;
+    return squared * weight;
+}
 
 // Which features to extract and how much each matters (§8). **Data-driven on purpose**: §8 forbids
 // hardcoding `leftFoot`/`rightFoot`/`pelvis` into the search, because which joints carry a
@@ -65,9 +152,32 @@ struct MotionFeatureConfig {
     // **Not every joint** (§7): a 90-joint alien would give a 540-dimension vector in which the
     // fingers outvote the feet.
     std::vector<std::string> joints;
+    // **Which joints carry a contact flag, when `contactWeight > 0`.** Separate from `joints`
+    // because they are different questions: `joints` are the ones whose position and velocity
+    // describe the pose, and a head is a good pose feature and a meaningless contact. Before this
+    // existed `dimension()` added one flag per *feature* joint, so `head.x` carried a contact flag
+    // -- a dimension meaningless by construction, which nonetheless varied and so passed every
+    // liveness check. Empty falls back to `joints`, which is what the old behaviour was.
+    std::vector<std::string> contactJoints;
+    [[nodiscard]] const std::vector<std::string>& contactJointNames() const {
+        return contactJoints.empty() ? joints : contactJoints;
+    }
     // Seconds ahead to sample the future trajectory. Empty means no trajectory term, which is the
     // honest configuration for an in-place corpus.
     std::vector<float> trajectoryTimes;
+    // Seconds: the span over which the body's facing is averaged before every feature is expressed
+    // relative to it (`clipFacing`). It changes what every dimension means, so it is part of the
+    // schema.
+    //
+    // **One second, measured.** Across the scout's five walk and run cycles, all authored facing
+    // +Z, the raw pelvis facing sways 2.49° RMS on average, 4.51° RMS in the worst clip (`Walking`)
+    // and 9.87° at the worst peak. A 0.25 s window leaves 1.98° RMS, 0.5 s leaves 1.39°, and 1 s
+    // leaves 0.31° (worst peak 2.04°). One second is about one gait cycle, which is the sway's
+    // period, and that is why it cancels. The cost is lag on a real turn, about half the window.
+    // It applies to clips whose root travels. An in-place clip's heading is its authoring frame
+    // (+Z), because its pelvis yaw is posture (see `buildMotionDatabase`).
+    // (test_motion_facing.cpp, "how much a Glowmere pelvis sways".)
+    float facingWindow = 1.0f;
 
     // ---- weights (§10) ---------------------------------------------------------------------
     // Every term is weighted and every weight is named. §10: avoid an opaque scoring function.
@@ -81,6 +191,73 @@ struct MotionFeatureConfig {
 
     [[nodiscard]] std::uint32_t dimension() const;
     friend bool operator==(const MotionFeatureConfig&, const MotionFeatureConfig&) = default;
+};
+
+// Phase C §10: which term of the cost each feature dimension belongs to.
+//
+// §10 requires the cost be `poseCost + trajectoryCost + velocityCost + facingCost + phaseCost +
+// contactCost + transitionCost`, that **every term have a configurable weight**, and that the
+// scoring function not be opaque. Before this existed, none of that was true: five of the seven
+// weights in `MotionFeatureConfig` were read by nothing at all, and the two that were read
+// (`phaseWeight`, `contactWeight`) were used only as `> 0` presence tests deciding whether to
+// *include* the dimension. Setting one to 2.0 rather than 0.5 changed nothing. They were controls
+// that did nothing (ADR-558) wearing the costume of a tuning surface.
+enum class MotionFeatureGroup : std::uint8_t {
+    JointPosition,
+    JointVelocity,
+    TrajectoryPosition,
+    TrajectoryFacing,
+    RootVelocity,
+    Phase,
+    Contact,
+    Count,
+};
+[[nodiscard]] const char* motionFeatureGroupName(MotionFeatureGroup group);
+
+// The group of every dimension, in the order `buildMotionDatabase` writes them. Derived from the
+// config rather than stored per sample: it is a fact about the layout, the same for all million
+// samples, and storing it per sample would be 1 MB of the same byte repeated.
+[[nodiscard]] std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& config);
+
+// The weight of each dimension, so a search multiplies rather than consults. Recomputed from the
+// config, which is what makes a weight **tunable without rebuilding the database**: the features
+// are unchanged, only what they are multiplied by.
+[[nodiscard]] std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config);
+// The same two, written into a caller's vector so a hot path reuses its capacity (§75: no
+// allocation during normal matching).
+void motionFeatureLayoutInto(const MotionFeatureConfig& config, std::vector<MotionFeatureGroup>& out);
+void motionFeatureWeightsInto(const MotionFeatureConfig& config, std::vector<float>& out);
+
+// §10's explicit breakdown, for the sample a search chose. This is the half that makes the scoring
+// function not opaque: "why that sample" has an answer with numbers in it.
+struct MotionCostBreakdown {
+    float terms[static_cast<std::size_t>(MotionFeatureGroup::Count)] = {};
+    float continuity = 0.0f;
+    float transition = 0.0f;
+    float style = 0.0f; // §44: what the sample paid for not being in the requested style
+    [[nodiscard]] float total() const {
+        float sum = continuity + transition + style;
+        for (const float t : terms) {
+            sum += t;
+        }
+        return sum;
+    }
+    [[nodiscard]] std::string report() const;
+
+    // **Any UI that shows this must show this sentence beside it.** A breakdown answers "what did
+    // this cost", not "what changed the decision", and the two differ whenever a term did its work
+    // on a candidate that lost. §12's transition penalty is the worked example: with the penalty
+    // off the idle wins, with it on the walk wins -- and the winner's `transition` reads **zero**,
+    // because the winner never left the motion family and so never paid it. A term can be decisive
+    // and read as zero.
+    //
+    // Provided as a function rather than left in this comment because the person reading a cost
+    // breakdown at two in the morning has not read ADR-611, and the place the warning has to be is
+    // next to the number.
+    [[nodiscard]] static const char* caveat() {
+        return "A cost breakdown says what the CHOSEN sample paid, not what decided the match: a "
+               "term that reads zero may have been decisive by making another candidate expensive.";
+    }
 };
 
 // The default for a biped: the two feet and the head, which is what the literature converges on
@@ -101,6 +278,12 @@ struct MotionDatabaseStats {
     // that. Reported rather than silently carried, because a zero-variance column is the same
     // shape of defect as everything else this project has been catching.
     std::uint32_t deadDimensions = 0;
+    // The measured gap between a good match and a typical one, in the cost function's own units.
+    // **This is the scale every cost threshold has to be expressed against**, and it is measured
+    // at build time rather than assumed because it is a property of the corpus and the weights
+    // together -- change either and it moves (ADR-389). §16 uses it as the denominator for search
+    // severity; §28's switch margin is a fraction of it.
+    float costSpread = 0.0f;
     // **Per feature joint, the spread of its DISTANCE from the body, in model units.**
     //
     // A dead-dimension count is necessary and not sufficient, and this is the statistic that says
@@ -114,6 +297,27 @@ struct MotionDatabaseStats {
     std::vector<float> jointRadiusSpread;
     std::vector<std::string> jointNames;
     std::string report() const;
+};
+
+// Phase C §38/§82: where a database came from, so a stored one can be checked against its inputs
+// and a rebuild with identical inputs can be skipped. Filled by `buildMotionDatabase`, persisted by
+// `writeMotionDatabase` (motion_database_io.hpp), and checked by `readMotionDatabase`.
+struct MotionDatabaseBuildInfo {
+    // `motionPackContentDigest` of the pack it was built from: skeleton, clips, analysis and the
+    // provenance chain (which is where a retarget profile is recorded). Empty for a database that
+    // was synthesised rather than built.
+    std::string sourcePackDigest;
+    // `motionFeatureSchemaDigest` of the config: which dimensions exist and what they mean. Two
+    // databases with the same schema are comparable dimension for dimension; weights are not part
+    // of it, because a weight does not change what a dimension means.
+    std::string featureSchema;
+    float sampleRate = 0.0f;
+    std::string toolVersion;
+    // §82: the content address of this build -- source, full config (weights included, because
+    // `stats.costSpread` is weighted), sample rate and tool version. Equal keys mean an identical
+    // build.
+    std::string buildKey;
+    friend bool operator==(const MotionDatabaseBuildInfo&, const MotionDatabaseBuildInfo&) = default;
 };
 
 struct MotionDatabase {
@@ -137,6 +341,15 @@ struct MotionDatabase {
     // The sample that follows this one in its own clip, or kInvalid at a clip's end. **This is
     // what makes continuation cheap** (§29): playing on is following this index, not searching.
     std::vector<std::uint32_t> sampleNext;
+    // §71: where the body is and which way it faces at each sample, in the clip's own model space:
+    // (x, z, yaw) per sample, the travel joint's horizontal position and the facing the features
+    // were expressed in. And, per clip, whether its travel is real (the root leaves its box, or the
+    // clip carries a heading track). **The simulation owns world translation and heading**, so for
+    // such a clip the provider poses the body with this removed. A travelling clip does not walk
+    // its rig away from the entity, and a turning clip does not turn it twice. An in-place clip keeps
+    // its authored sway.
+    std::vector<float> sampleRoot;           // 3 per sample
+    std::vector<std::uint32_t> clipTravels;  // 1 per clip, 0 or 1
 
     // ---- normalization (§9) -------------------------------------------------------------------
     // Per dimension, so position in metres and velocity in m/s are comparable. Standardised to
@@ -148,6 +361,12 @@ struct MotionDatabase {
 
     std::vector<std::string> clipNames;
     MotionDatabaseStats stats;
+    MotionDatabaseBuildInfo build;
+    // §40/§76: a digest of the searchable content (every per-sample array, the normalization and
+    // the config). **What `MotionMemory::database` is stamped with**, so a character whose memory
+    // indexes one database is never posed from another after a hot swap. Also the integrity check
+    // a stored database is verified against on load. 0 only for a database nobody stamped.
+    std::uint64_t identity = 0;
 
     [[nodiscard]] std::uint32_t sampleCount() const {
         return static_cast<std::uint32_t>(sampleClip.size());
@@ -161,6 +380,9 @@ struct MotionDatabase {
 struct MotionDatabaseOptions {
     float sampleRate = 30.0f;   // samples per second of clip
     MotionFeatureConfig config;
+    // Recorded in `MotionDatabase::build` and folded into its build key (§82): a builder whose
+    // feature extraction changed must not reuse a cached result from the old one.
+    std::string toolVersion = "avgen-motion-db/1";
 };
 
 // Build from a pack. Offline: this walks every frame of every clip and poses the skeleton.
@@ -181,7 +403,23 @@ struct MotionQuery {
     // Where the character is now, so continuity and transition costs have something to be relative
     // to (§11/§12). kInvalid on the first query of a character's life.
     std::uint32_t current = MotionDatabase::kInvalid;
+    // Phase C §44: an extra cost per clip, indexed like `MotionDatabase::clipNames`, added to every
+    // sample of that clip. Empty means none. The provider fills it from the requested style: a
+    // clip outside the style pays the style weight, a clip inside it pays nothing. **A cost, not a
+    // filter**, which is the point: when no clip carries the requested style every clip pays the
+    // same and the choice is unchanged, and when the corpus cannot serve the request in style, the
+    // best motion out of style still beats a styled motion that does the wrong thing.
+    std::span<const float> clipCost;
 };
+
+// §44: the per-clip cost `query` adds to sample `s`, 0 when there is none.
+[[nodiscard]] inline float motionClipCost(const MotionDatabase& db, const MotionQuery& query, std::uint32_t s) {
+    if (query.clipCost.empty() || s >= db.sampleClip.size()) {
+        return 0.0f;
+    }
+    const std::uint32_t clip = db.sampleClip[s];
+    return clip < query.clipCost.size() ? query.clipCost[clip] : 0.0f;
+}
 
 struct MotionCostWeights {
     // §11. How much a candidate is penalised for not being the continuation of what is playing.
@@ -191,18 +429,83 @@ struct MotionCostWeights {
     // §12. An extra penalty for crossing to a different motion family, over and above continuity.
     // Keyed on tags, never on clip names (§12 is explicit about that).
     float transition = 0.25f;
+    // Phase C §11. The flat `continuity` above is **binary**: the one sample that follows the
+    // current one pays nothing and everything else pays in full, so a sample two frames later in
+    // the same clip is penalised exactly as hard as one from an unrelated clip. §11 names six
+    // possible inputs -- current sample, previous sample, source clip, phase, root velocity,
+    // transition distance -- and a next-or-not flag uses one of them.
+    //
+    // This grades the penalty for a candidate **in the same clip** by its transition distance in
+    // seconds: skipping a few frames inside a clip costs a little, leaving the clip costs
+    // `continuity`.
+    //
+    // **The default is 0 -- binary -- and that is a measured result, not an unfinished knob.**
+    // Graded continuity was implemented, run against the binary version on real Glowmere motion,
+    // and **lost**: identical jump rate (0.50/s at every rate from 0.5 to 4.0), and the loop
+    // stalled on 13% of steps against the binary's 0%. The reason is structural and is the useful
+    // part: a penalty proportional to the distance from the current sample is **zero for the
+    // current sample itself**, so standing still is free, and the matcher freezes rather than
+    // continues. §11 asks for coherent continuation and a freeze is not continuation.
+    //
+    // Kept rather than deleted because the negative result is worth more than the absence: a
+    // future reader proposing distance-graded continuity can see it was tried, how it was
+    // measured, and exactly why it fails. Any working version must penalise *not advancing*, which
+    // means the term needs the previous sample as well as the current one -- another of §11's six
+    // named inputs, and the direction a second attempt should take. See ADR-610.
+    float continuityPerSecond = 0.0f;
 };
 
 struct MotionMatch {
     std::uint32_t sample = MotionDatabase::kInvalid;
     float cost = 0.0f;
+    MotionCostBreakdown breakdown; // §10: what the cost was made of, for the winner
     std::uint32_t considered = 0; // how many survived filtering and were scored
     std::uint32_t rejected = 0;   // how many the tag filter removed before scoring
+    // §16: how many the cheap stage looked at, and how many reached the full cost. Equal to
+    // `considered` and to each other for an exhaustive plan.
+    std::uint32_t coarseConsidered = 0;
+    std::uint32_t fullyScored = 0;
     [[nodiscard]] bool found() const { return sample != MotionDatabase::kInvalid; }
 };
 
 // Standardise a raw feature vector in place, using this database's own mean and scale.
 void normaliseQuery(const MotionDatabase& db, std::vector<float>& features);
+
+// Phase C §16: candidate filtering -> cheap feature search -> top N -> full cost -> best.
+//
+// **Read the disclaimer before the implementation.** On this repository's actual content a linear
+// scan is comfortably correct: the real Glowmere database is 1,738 samples and a full search costs
+// 8.88 us at best, 9.25 us on average and 17.46 us at worst -- **955 characters per frame at
+// 60 Hz on the worst case.** Nothing here needs a two-stage search.
+//
+// What needs it is the scale §6 and §17 ask about. At a million samples one query is **36.5 ms**,
+// more than two whole frames, for one character, and the scan is honestly linear (101x for 100x
+// the samples). So this exists for a database two orders of magnitude larger than any in the tree,
+// and a future reader finding it here should NOT conclude the linear scan was inadequate. It was
+// not. The numbers above are the whole of the justification and the whole of the disclaimer, and
+// they are stated together on purpose: an optimisation defended by a benchmark that never needed
+// it becomes permanent without ever having been justified.
+//
+// `stride` is the cheap stage. It scores every `stride`-th sample on a **prefix** of the feature
+// vector, keeps the best `shortlist`, then evaluates the full weighted cost -- including
+// continuity and transition -- on those and on each shortlisted sample's neighbours, so a sample
+// the coarse pass stepped over can still win.
+struct MotionSearchPlan {
+    std::uint32_t stride = 1;      // 1 = exhaustive, which is the linear scan exactly
+    std::uint32_t shortlist = 32;  // how many survive the cheap stage
+    std::uint32_t prefixDimensions = 0; // 0 = all of them
+    // The neighbourhood re-expanded around each shortlisted sample, so striding cannot permanently
+    // hide the true best: with `stride` 8 and `neighbourhood` 8 every sample is reachable.
+    std::uint32_t neighbourhood = 0;
+    [[nodiscard]] bool exhaustive() const { return stride <= 1u; }
+};
+
+// The two-stage search. With a default-constructed plan this is `searchMotion` exactly -- same
+// samples considered, same answer -- which is what makes the plan a tuning surface rather than a
+// second code path that has to be kept in step.
+[[nodiscard]] MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& query,
+                                             const MotionCostWeights& weights,
+                                             const MotionSearchPlan& plan);
 
 // Linear scan (§15's baseline). Benchmarked against real motion distributions rather than a
 // synthetic fixture, for the reason ADR-540 paid to learn: a white-noise fixture made an early-out
@@ -210,5 +513,13 @@ void normaliseQuery(const MotionDatabase& db, std::vector<float>& features);
 // measurement.
 [[nodiscard]] MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
                                        const MotionCostWeights& weights);
+
+// The full cost (every weighted feature term, continuity and transition) over an explicit candidate
+// list, tag filter applied, and the best of them. **The one exact scorer every staged or
+// approximate search finishes with**, so none of them can disagree with the linear scan about what
+// a candidate costs.
+[[nodiscard]] MotionMatch scoreMotionCandidates(const MotionDatabase& db, const MotionQuery& query,
+                                                const MotionCostWeights& weights,
+                                                std::span<const std::uint32_t> candidates);
 
 } // namespace avgen::scene

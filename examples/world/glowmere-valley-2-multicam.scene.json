@@ -8186,6 +8186,16 @@
         "name": "rook",
         "node": "rook",
         "seed": 11235813,
+        "tags": [
+          "alien"
+        ],
+        "personality": {
+          "curiosity": 0.85,
+          "caution": 0.15,
+          "sociability": 0.35,
+          "eventSensitivity": 0.7,
+          "attentionSpan": 0.4
+        },
         "gait": {
           "matchRate": true,
           "walkSpeed": 3.0685,
@@ -8224,7 +8234,42 @@
             "visitedCapacity": 6.0,
             "stallSeconds": 12.0,
             "stallDistance": 1.5,
+            "mind": {
+              "attention": {
+                "tags": {
+                  "alien": 0.8
+                },
+                "maxHoldSeconds": 5.0
+              },
+              "memory": {
+                "recoverSeconds": 150.0,
+                "habituationSeconds": 6.0
+              }
+            },
             "considerers": [
+              {
+                "kind": "react",
+                "name": "beam",
+                "events": [
+                  "abduction/beam"
+                ],
+                "weight": 1.5,
+                "approach": 18.0,
+                "flee": 10.0,
+                "dwell": 4.0,
+                "fadeSeconds": 12.0
+              },
+              {
+                "kind": "social",
+                "name": "company",
+                "tags": [
+                  "alien"
+                ],
+                "weight": 0.5,
+                "distance": 5.0,
+                "personalSpace": 3.0,
+                "dwell": 3.0
+              },
               {
                 "kind": "interest",
                 "name": "roam",
@@ -8240,7 +8285,7 @@
                 "activity": "observe",
                 "approach": 8.0,
                 "dwell": 3.0,
-                "minRange": 12.0,
+                "minRange": 8.0,
                 "maxRange": 150.0,
                 "noveltyRadius": 26.0,
                 "noveltyPenalty": 0.1
@@ -8302,6 +8347,16 @@
         "name": "tide",
         "node": "tide",
         "seed": 31415926,
+        "tags": [
+          "alien"
+        ],
+        "personality": {
+          "curiosity": 0.6,
+          "caution": 0.45,
+          "sociability": 0.4,
+          "eventSensitivity": 0.5,
+          "attentionSpan": 0.95
+        },
         "gait": {
           "matchRate": true,
           "walkSpeed": 3.0654,
@@ -8340,7 +8395,42 @@
             "visitedCapacity": 6.0,
             "stallSeconds": 12.0,
             "stallDistance": 1.5,
+            "mind": {
+              "attention": {
+                "tags": {
+                  "alien": 0.8
+                },
+                "maxHoldSeconds": 5.0
+              },
+              "memory": {
+                "recoverSeconds": 150.0,
+                "habituationSeconds": 6.0
+              }
+            },
             "considerers": [
+              {
+                "kind": "react",
+                "name": "beam",
+                "events": [
+                  "abduction/beam"
+                ],
+                "weight": 1.5,
+                "approach": 18.0,
+                "flee": 10.0,
+                "dwell": 4.0,
+                "fadeSeconds": 12.0
+              },
+              {
+                "kind": "social",
+                "name": "company",
+                "tags": [
+                  "alien"
+                ],
+                "weight": 0.5,
+                "distance": 5.0,
+                "personalSpace": 3.0,
+                "dwell": 3.0
+              },
               {
                 "kind": "interest",
                 "name": "roam",
@@ -8356,7 +8446,7 @@
                 "activity": "observe",
                 "approach": 7.0,
                 "dwell": 6.0,
-                "minRange": 12.0,
+                "minRange": 7.0,
                 "maxRange": 120.0,
                 "noveltyRadius": 22.0,
                 "noveltyPenalty": 0.14
@@ -8419,6 +8509,16 @@
         "name": "sage",
         "node": "sage",
         "seed": 27182818,
+        "tags": [
+          "alien"
+        ],
+        "personality": {
+          "curiosity": 0.3,
+          "caution": 0.9,
+          "sociability": 0.5,
+          "eventSensitivity": 0.8,
+          "attentionSpan": 0.6
+        },
         "gait": {
           "matchRate": true,
           "walkSpeed": 3.0652,
@@ -8457,7 +8557,42 @@
             "visitedCapacity": 6.0,
             "stallSeconds": 12.0,
             "stallDistance": 1.5,
+            "mind": {
+              "attention": {
+                "tags": {
+                  "alien": 0.8
+                },
+                "maxHoldSeconds": 5.0
+              },
+              "memory": {
+                "recoverSeconds": 150.0,
+                "habituationSeconds": 6.0
+              }
+            },
             "considerers": [
+              {
+                "kind": "react",
+                "name": "beam",
+                "events": [
+                  "abduction/beam"
+                ],
+                "weight": 1.5,
+                "approach": 18.0,
+                "flee": 10.0,
+                "dwell": 4.0,
+                "fadeSeconds": 12.0
+              },
+              {
+                "kind": "social",
+                "name": "company",
+                "tags": [
+                  "alien"
+                ],
+                "weight": 0.5,
+                "distance": 5.0,
+                "personalSpace": 3.0,
+                "dwell": 3.0
+              },
               {
                 "kind": "holdPost",
                 "name": "grove",
@@ -8482,7 +8617,7 @@
                 "activity": "observe",
                 "approach": 6.0,
                 "dwell": 6.0,
-                "minRange": 10.0,
+                "minRange": 6.0,
                 "maxRange": 70.0,
                 "homeRadius": 50.0,
                 "noveltyRadius": 14.0,
@@ -8553,6 +8688,16 @@
         "name": "ember",
         "node": "ember",
         "seed": 16180339,
+        "tags": [
+          "alien"
+        ],
+        "personality": {
+          "curiosity": 0.55,
+          "caution": 0.3,
+          "sociability": 0.95,
+          "eventSensitivity": 0.5,
+          "attentionSpan": 0.5
+        },
         "gait": {
           "matchRate": true,
           "walkSpeed": 3.069,
@@ -8591,7 +8736,42 @@
             "visitedCapacity": 6.0,
             "stallSeconds": 12.0,
             "stallDistance": 1.5,
+            "mind": {
+              "attention": {
+                "tags": {
+                  "alien": 0.8
+                },
+                "maxHoldSeconds": 5.0
+              },
+              "memory": {
+                "recoverSeconds": 150.0,
+                "habituationSeconds": 6.0
+              }
+            },
             "considerers": [
+              {
+                "kind": "react",
+                "name": "beam",
+                "events": [
+                  "abduction/beam"
+                ],
+                "weight": 1.5,
+                "approach": 18.0,
+                "flee": 10.0,
+                "dwell": 4.0,
+                "fadeSeconds": 12.0
+              },
+              {
+                "kind": "social",
+                "name": "company",
+                "tags": [
+                  "alien"
+                ],
+                "weight": 0.5,
+                "distance": 5.0,
+                "personalSpace": 3.0,
+                "dwell": 3.0
+              },
               {
                 "kind": "interest",
                 "name": "roam",
@@ -8607,7 +8787,7 @@
                 "activity": "observe",
                 "approach": 8.0,
                 "dwell": 2.5,
-                "minRange": 12.0,
+                "minRange": 8.0,
                 "maxRange": 150.0,
                 "noveltyRadius": 26.0,
                 "noveltyPenalty": 0.12
@@ -8690,6 +8870,16 @@
         "name": "vane",
         "node": "vane",
         "seed": 8814473,
+        "tags": [
+          "alien"
+        ],
+        "personality": {
+          "curiosity": 0.75,
+          "caution": 0.4,
+          "sociability": 0.4,
+          "eventSensitivity": 0.95,
+          "attentionSpan": 0.8
+        },
         "gait": {
           "matchRate": true,
           "walkSpeed": 3.069,
@@ -8728,7 +8918,42 @@
             "visitedCapacity": 6.0,
             "stallSeconds": 12.0,
             "stallDistance": 1.5,
+            "mind": {
+              "attention": {
+                "tags": {
+                  "alien": 0.8
+                },
+                "maxHoldSeconds": 5.0
+              },
+              "memory": {
+                "recoverSeconds": 150.0,
+                "habituationSeconds": 6.0
+              }
+            },
             "considerers": [
+              {
+                "kind": "react",
+                "name": "beam",
+                "events": [
+                  "abduction/beam"
+                ],
+                "weight": 1.5,
+                "approach": 18.0,
+                "flee": 10.0,
+                "dwell": 4.0,
+                "fadeSeconds": 12.0
+              },
+              {
+                "kind": "social",
+                "name": "company",
+                "tags": [
+                  "alien"
+                ],
+                "weight": 0.5,
+                "distance": 5.0,
+                "personalSpace": 3.0,
+                "dwell": 3.0
+              },
               {
                 "kind": "interest",
                 "name": "watch",
@@ -8744,7 +8969,7 @@
                 "activity": "observe",
                 "approach": 7.0,
                 "dwell": 8.0,
-                "minRange": 11.0,
+                "minRange": 7.0,
                 "maxRange": 130.0,
                 "noveltyRadius": 20.0,
                 "noveltyPenalty": 0.14
@@ -8869,7 +9094,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.005,
+        "rateMin": 0.02,
         "runEnter": 3.0911,
         "runExit": 2.2218,
         "runSpeed": 3.2375,
@@ -8930,7 +9155,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.005,
+        "rateMin": 0.02,
         "runEnter": 3.0911,
         "runExit": 2.2218,
         "runSpeed": 3.2375,
@@ -8991,7 +9216,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.005,
+        "rateMin": 0.02,
         "runEnter": 3.0911,
         "runExit": 2.2218,
         "runSpeed": 3.2375,
@@ -9052,7 +9277,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0051,
+        "rateMin": 0.02,
         "runEnter": 2.2202,
         "runExit": 1.5956,
         "runSpeed": 3.1577,
@@ -9113,7 +9338,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0051,
+        "rateMin": 0.02,
         "runEnter": 2.2202,
         "runExit": 1.5956,
         "runSpeed": 3.1577,
@@ -9174,7 +9399,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0054,
+        "rateMin": 0.02,
         "runEnter": 2.5554,
         "runExit": 1.8371,
         "runSpeed": 3.0122,
@@ -9235,7 +9460,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0054,
+        "rateMin": 0.02,
         "runEnter": 2.5554,
         "runExit": 1.8371,
         "runSpeed": 3.0122,
@@ -9296,7 +9521,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0054,
+        "rateMin": 0.02,
         "runEnter": 2.5554,
         "runExit": 1.8371,
         "runSpeed": 3.0122,
@@ -9357,7 +9582,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.005,
+        "rateMin": 0.02,
         "runEnter": 3.2732,
         "runExit": 2.3523,
         "runSpeed": 3.2375,
@@ -9418,7 +9643,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0051,
+        "rateMin": 0.02,
         "runEnter": 2.6066,
         "runExit": 1.8732,
         "runSpeed": 3.1577,
@@ -9479,7 +9704,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0051,
+        "rateMin": 0.02,
         "runEnter": 2.6066,
         "runExit": 1.8732,
         "runSpeed": 3.1577,
@@ -9540,7 +9765,7 @@
         "moveEnter": 0.0323,
         "moveExit": 0.0162,
         "rateMax": 1.0,
-        "rateMin": 0.0054,
+        "rateMin": 0.02,
         "runEnter": 1.9831,
         "runExit": 1.4254,
         "runSpeed": 3.0122,
@@ -9558,6 +9783,13 @@
   ],
   "navWadeDepth": 0.8536,
   "navBodyRadius": 1.2998,
+  "worldEvents": [
+    {
+      "name": "abduction/beam",
+      "radius": 60.0,
+      "magnitude": 1.0
+    }
+  ],
   "staging": {
     "actors": [
       {

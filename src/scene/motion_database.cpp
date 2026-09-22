@@ -1,4 +1,5 @@
 #include "scene/motion_database.hpp"
+#include "scene/motion_database_io.hpp"
 
 #include "scene/animation.hpp"
 
@@ -6,6 +7,7 @@
 #include <cmath>
 
 #include <fmt/format.h>
+#include <utility>
 
 namespace avgen::scene {
 namespace {
@@ -32,7 +34,131 @@ bool contains(const std::string& haystack, std::string_view needle) {
     return false;
 }
 
+
 } // namespace
+
+std::vector<glm::vec3> clipFacing(const Skeleton& skeleton, const AnimationClip& clip, int root,
+                                  std::uint32_t frames, float dt, bool loop, float window) {
+    const auto rotationOf = [](const glm::mat4& m) {
+        return glm::mat3(glm::normalize(glm::vec3(m[0])), glm::normalize(glm::vec3(m[1])),
+                         glm::normalize(glm::vec3(m[2])));
+    };
+    Pose pose;
+    std::vector<glm::mat4> model;
+    setRestPose(skeleton, pose);
+    poseToModel(skeleton, pose, model);
+    const glm::mat3 restInverse = glm::transpose(rotationOf(model[static_cast<std::size_t>(root)]));
+
+    std::vector<glm::vec3> raw(frames, glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::vec3 previous(0.0f, 0.0f, 1.0f);
+    for (std::uint32_t f = 0; f < frames; ++f) {
+        const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
+        setRestPose(skeleton, pose);
+        sampleClip(clip, t, pose);
+        poseToModel(skeleton, pose, model);
+        const glm::vec3 forward =
+            rotationOf(model[static_cast<std::size_t>(root)]) * (restInverse * glm::vec3(0.0f, 0.0f, 1.0f));
+        const float len = std::sqrt((forward.x * forward.x) + (forward.z * forward.z));
+        // A body pitched straight up or down has no planar facing; it keeps the last one it had.
+        previous = len > 1e-4f ? glm::vec3(forward.x / len, 0.0f, forward.z / len) : previous;
+        raw[f] = previous;
+    }
+    const auto half = static_cast<int>(std::lround((std::max(window, 0.0f) * 0.5f) / dt));
+    if (half == 0 || frames < 2) {
+        return raw;
+    }
+    // A looping clip's first and last samples are the same instant, so the period is one less.
+    const int period = loop ? static_cast<int>(frames) - 1 : static_cast<int>(frames);
+    std::vector<glm::vec3> out(frames);
+    for (int f = 0; f < static_cast<int>(frames); ++f) {
+        glm::vec3 sum(0.0f);
+        for (int o = -half; o <= half; ++o) {
+            int i = f + o;
+            if (loop) {
+                i = ((i % period) + period) % period;
+            } else {
+                i = std::clamp(i, 0, static_cast<int>(frames) - 1);
+            }
+            sum += raw[static_cast<std::size_t>(i)];
+        }
+        const float len = std::sqrt((sum.x * sum.x) + (sum.z * sum.z));
+        out[static_cast<std::size_t>(f)] = len > 1e-4f ? glm::vec3(sum.x / len, 0.0f, sum.z / len) : raw[static_cast<std::size_t>(f)];
+    }
+    return out;
+}
+
+glm::vec3 impliedTravel(const Skeleton& skeleton, const AnimationClip& clip, int root,
+                        const std::vector<ContactTrack>& contacts,
+                        const std::vector<glm::vec3>& facing, std::uint32_t frames, float dt) {
+    const auto planted = [](const ContactTrack& track, float local) {
+        for (const ContactSpan& span : track.spans) {
+            if (span.wraps() ? (local >= span.start || local <= span.end)
+                             : (local >= span.start && local <= span.end)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    Pose pose;
+    Pose poseAhead;
+    std::vector<glm::mat4> model;
+    std::vector<glm::mat4> modelAhead;
+    (void)root;
+    glm::vec3 sum(0.0f);
+    std::uint32_t count = 0;
+    std::vector<std::uint32_t> perTrack(contacts.size(), 0u);
+    for (std::uint32_t f = 0; f + 1 < frames && f < facing.size(); ++f) {
+        const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
+        const float t2 = std::min(t + dt, clip.duration);
+        if (t2 <= t) {
+            continue;
+        }
+        bool posed = false;
+        for (std::size_t k = 0; k < contacts.size(); ++k) {
+            const ContactTrack& track = contacts[k];
+            // By name, not `jointIndex`: a pack read from disk carries the name and leaves the index
+            // unresolved (-1), which silently made every track here count for nothing.
+            const int joint = skeleton.find(track.joint);
+            if (track.kind != ContactKind::Foot || joint < 0 ||
+                !planted(track, t - clip.start) || !planted(track, t2 - clip.start)) {
+                continue;
+            }
+            if (!posed) {
+                setRestPose(skeleton, pose);
+                sampleClip(clip, t, pose);
+                poseToModel(skeleton, pose, model);
+                setRestPose(skeleton, poseAhead);
+                sampleClip(clip, t2, poseAhead);
+                poseToModel(skeleton, poseAhead, modelAhead);
+                posed = true;
+            }
+            // In model space, not relative to the root. A planted foot that moves in the clip's own
+            // space is the ground moving under it, whatever the root is doing. A root that sways
+            // with the foot carried along (the scout's kicks) therefore implies no travel, and root
+            // motion that is already there is not counted twice.
+            const auto j = static_cast<std::size_t>(joint);
+            const glm::vec3 v =
+                toFacingFrame((glm::vec3(modelAhead[j][3]) - glm::vec3(model[j][3])) / (t2 - t), facing[f]);
+            sum += glm::vec3(v.x, 0.0f, v.z);
+            ++count;
+            ++perTrack[k];
+        }
+    }
+    // **A gait plants more than one foot.** A single planted foot is a pivot or a scuff: a kick
+    // stands on one leg. So at least two feet must each contribute two planted steps. The count is
+    // not a fraction of the clip, because contact detection on in-place content finds short
+    // stances. The scout's `Running` has 3 planted frames per foot in 22, and a quarter-of-the-clip
+    // rule returned zero for the one run in the pack.
+    std::uint32_t feet = 0;
+    for (const std::uint32_t n : perTrack) {
+        feet += n >= 2u ? 1u : 0u;
+    }
+    if (feet < 2u || count == 0u) {
+        return glm::vec3(0.0f);
+    }
+    return -sum / static_cast<float>(count);
+}
+
 
 std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis) {
     std::uint32_t tags = 0;
@@ -77,7 +203,7 @@ std::string motionTagNames(std::uint32_t tags) {
         {MotionTag::Walk, "walk"},             {MotionTag::Run, "run"},
         {MotionTag::Turn, "turn"},             {MotionTag::Airborne, "airborne"},
         {MotionTag::Cyclic, "cyclic"},         {MotionTag::Travelling, "travelling"},
-        {MotionTag::OneShot, "oneshot"},
+        {MotionTag::OneShot, "oneshot"},        {MotionTag::Terminal, "terminal"},
     };
     std::string out;
     for (const auto& [tag, name] : kNames) {
@@ -101,13 +227,111 @@ std::uint32_t MotionFeatureConfig::dimension() const {
         d += 2u; // phase as (cos, sin), so 0.99 and 0.01 are adjacent rather than a unit apart
     }
     if (contactWeight > 0.0f) {
-        d += static_cast<std::uint32_t>(joints.size()); // one contact flag per watched joint
+        // One flag per CONTACT joint, not per feature joint: a head does not plant.
+        d += static_cast<std::uint32_t>(contactJointNames().size());
     }
     return d;
 }
 
+const char* motionFeatureGroupName(MotionFeatureGroup group) {
+    switch (group) {
+    case MotionFeatureGroup::JointPosition: return "jointPosition";
+    case MotionFeatureGroup::JointVelocity: return "jointVelocity";
+    case MotionFeatureGroup::TrajectoryPosition: return "trajectoryPosition";
+    case MotionFeatureGroup::TrajectoryFacing: return "trajectoryFacing";
+    case MotionFeatureGroup::RootVelocity: return "rootVelocity";
+    case MotionFeatureGroup::Phase: return "phase";
+    case MotionFeatureGroup::Contact: return "contact";
+    case MotionFeatureGroup::Count: break;
+    }
+    return "?";
+}
+
+// The layout `buildMotionDatabase` writes, stated once so the weights and the breakdown cannot
+// drift from it. `dimension()` above computes the same total; this says what each slot *is*.
+void motionFeatureLayoutInto(const MotionFeatureConfig& config, std::vector<MotionFeatureGroup>& out) {
+    out.clear();
+    out.reserve(config.dimension());
+    for (std::size_t j = 0; j < config.joints.size(); ++j) {
+        out.insert(out.end(), 3u, MotionFeatureGroup::JointPosition);
+        out.insert(out.end(), 3u, MotionFeatureGroup::JointVelocity);
+    }
+    for (std::size_t t = 0; t < config.trajectoryTimes.size(); ++t) {
+        out.insert(out.end(), 2u, MotionFeatureGroup::TrajectoryPosition);
+        out.insert(out.end(), 2u, MotionFeatureGroup::TrajectoryFacing);
+    }
+    out.insert(out.end(), 3u, MotionFeatureGroup::RootVelocity);
+    if (config.phaseWeight > 0.0f) {
+        out.insert(out.end(), 2u, MotionFeatureGroup::Phase);
+    }
+    if (config.contactWeight > 0.0f) {
+        out.insert(out.end(), config.contactJointNames().size(), MotionFeatureGroup::Contact);
+    }
+}
+
+std::vector<MotionFeatureGroup> motionFeatureLayout(const MotionFeatureConfig& config) {
+    std::vector<MotionFeatureGroup> out;
+    motionFeatureLayoutInto(config, out);
+    return out;
+}
+
+void motionFeatureWeightsInto(const MotionFeatureConfig& config, std::vector<float>& out) {
+    // Its own scratch, so a caller may pass the layout it also wants without the two aliasing.
+    thread_local std::vector<MotionFeatureGroup> layout;
+    motionFeatureLayoutInto(config, layout);
+    out.clear();
+    out.reserve(layout.size());
+    for (const MotionFeatureGroup group : layout) {
+        switch (group) {
+        case MotionFeatureGroup::JointPosition: out.push_back(config.jointPositionWeight); break;
+        case MotionFeatureGroup::JointVelocity: out.push_back(config.jointVelocityWeight); break;
+        case MotionFeatureGroup::TrajectoryPosition:
+            out.push_back(config.trajectoryPositionWeight);
+            break;
+        case MotionFeatureGroup::TrajectoryFacing:
+            out.push_back(config.trajectoryFacingWeight);
+            break;
+        case MotionFeatureGroup::RootVelocity: out.push_back(config.rootVelocityWeight); break;
+        case MotionFeatureGroup::Phase: out.push_back(config.phaseWeight); break;
+        case MotionFeatureGroup::Contact: out.push_back(config.contactWeight); break;
+        case MotionFeatureGroup::Count: out.push_back(1.0f); break;
+        }
+    }
+}
+
+std::vector<float> motionFeatureWeights(const MotionFeatureConfig& config) {
+    std::vector<float> out;
+    motionFeatureWeightsInto(config, out);
+    return out;
+}
+
+std::string MotionCostBreakdown::report() const {
+    std::string out;
+    for (std::size_t g = 0; g < static_cast<std::size_t>(MotionFeatureGroup::Count); ++g) {
+        if (terms[g] == 0.0f) {
+            continue;
+        }
+        out += fmt::format("{}={:.4f} ", motionFeatureGroupName(static_cast<MotionFeatureGroup>(g)),
+                           terms[g]);
+    }
+    if (continuity != 0.0f) {
+        out += fmt::format("continuity={:.4f} ", continuity);
+    }
+    if (transition != 0.0f) {
+        out += fmt::format("transition={:.4f} ", transition);
+    }
+    if (style != 0.0f) {
+        out += fmt::format("style={:.4f} ", style);
+    }
+    out += fmt::format("| total={:.4f}", total());
+    return out;
+}
+
 MotionFeatureConfig defaultBipedConfig(std::string leftFoot, std::string rightFoot, std::string head) {
     MotionFeatureConfig config;
+    // The feet carry contacts; the head does not. Named explicitly rather than inherited from the
+    // feature joints, which is what put a contact flag on a head.
+    config.contactJoints = {leftFoot, rightFoot};
     config.joints = {std::move(leftFoot), std::move(rightFoot), std::move(head)};
     // 0.2 / 0.4 / 0.6 s, the spacing the literature converges on: far enough apart to describe a
     // turn, near enough that the last one is still a prediction rather than a guess.
@@ -181,10 +405,67 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
     std::vector<glm::mat4> model;
     std::vector<glm::mat4> modelAhead;
 
+    // **One body joint for the whole pack.** ADR-337's rule picks the travel joint per clip (the
+    // lowest-indexed translated joint), and a pack whose clips disagree then measures their poses
+    // from different origins. The Glowmere alien's own clips translate `root.x`, at hip height; a
+    // §21 variant or a retargeted clip carries its travel on `rig`, above it, so that the spine,
+    // hands and knees (children of `rig`) travel with the body. Measured per clip, every variant's
+    // feet sat 0.78 higher than its own source's, and a turn variant cost as much in pose as a
+    // straight walk cost in trajectory: the matcher could not tell a warped walk was a walk.
+    //
+    // So when the clips' travel joints differ and one of them lies **below all the others** in the
+    // hierarchy, every clip is measured from that one: a joint under the travel joint travels with
+    // it, so its model position is still the body, and it is the joint the other clips already
+    // use. (Not "the joint every clip translates": a retargeted clip's `root.x` is at rest relative
+    // to `rig`, so its channel is pruned, and that rule picked a foot.)
+    int packRoot = -1;
+    {
+        const auto travelOf = [](const AnimationClip& clip) {
+            int root = -1;
+            for (const AnimationChannel& channel : clip.channels) {
+                if (channel.path == AnimationPath::Translation && (root < 0 || static_cast<int>(channel.joint) < root)) {
+                    root = static_cast<int>(channel.joint);
+                }
+            }
+            return root < 0 ? 0 : root;
+        };
+        const auto isAncestorOrSelf = [&](int ancestor, int joint) {
+            for (int j = joint; j >= 0 && static_cast<std::size_t>(j) < pack.skeleton.joints.size();
+                 j = pack.skeleton.joints[static_cast<std::size_t>(j)].parent) {
+                if (j == ancestor) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        std::vector<int> roots;
+        for (const AnimationClip& clip : pack.animation) {
+            if (clip.length() > 0.0f) {
+                const int r = travelOf(clip);
+                if (std::find(roots.begin(), roots.end(), r) == roots.end()) {
+                    roots.push_back(r);
+                }
+            }
+        }
+        if (roots.size() > 1) {
+            for (const int candidate : roots) {
+                bool belowAll = true;
+                for (const int other : roots) {
+                    belowAll = belowAll && isAncestorOrSelf(other, candidate);
+                }
+                if (belowAll) {
+                    packRoot = candidate;
+                    break;
+                }
+            }
+        }
+    }
+
     for (std::size_t c = 0; c < pack.animation.size() && c < pack.clips.size(); ++c) {
         const AnimationClip& clip = pack.animation[c];
         const PackClip& meta = pack.clips[c];
         db.clipNames.push_back(meta.name);
+        db.clipTravels.push_back(0u); // set below, once the clip's analysis is known
         const float length = clip.length();
         if (length <= 0.0f) {
             continue;
@@ -200,30 +481,207 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         if (root < 0) {
             root = 0;
         }
-        const ClipAnalysis analysis =
-            analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{});
+        if (packRoot >= 0) {
+            root = packRoot;
+        }
+        // **The pack already knows this, and re-deriving it here was silently wrong.** This line
+        // used to call `analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{})` -- with an
+        // empty contact-joint list -- so the phase analysis had no foot plants to work from and
+        // `cyclic` came back false for every clip in every pack. 25 of the alien's 26 clips are
+        // cyclic in the pack, and **zero samples carried `MotionTag::Cyclic` in the database.**
+        //
+        // Found by §14 printing the tag distribution before using it, which is the only reason
+        // anyone looked: a filter on `Cyclic` would not have been inert, it would have emptied the
+        // candidate set and returned a confident answer computed over nothing.
+        //
+        // `buildMotionPack` computed this correctly, with the real contact joints, and stored it.
+        // Reading what the pack stored is both correct and cheaper -- one statement of a fact,
+        // several readers, the same rule `motionFeatureLayout` follows.
+        ClipAnalysis analysis;
+        analysis.phase = meta.phase;
+        // `travels` is NOT recoverable from what `PackClip` stores: ADR-552 defines travel as the
+        // root's extent against the body's rest height, and the pack keeps `rootTravel`, which is
+        // net displacement -- the very measure ADR-552 rejected, because a 131-second walk that
+        // returns to its start has a net displacement of 0.508 m against a path length of 93 m.
+        // So it is re-derived here.
+        //
+        // **The empty contact list does not affect it, and an earlier version of this comment said
+        // it did.** `analyseClip` computes `travels` from `measureRoot(skeleton, clip, root,
+        // rate)`, whose only inputs are the travel joint's translation track and the rest height:
+        // `travels = extent > restHeight`. Contacts are not an argument to it. The sole thing
+        // `ContactSettings{}` contributes here is `sampleRate`, whose default of 30 Hz is the
+        // alien pack's authored rate, so this verdict is computed correctly.
+        //
+        // `MotionTag::Travelling` therefore reads 0% on this corpus for the **right reason**:
+        // ADR-540, every locomotion clip in this repository is authored in place. The five clips
+        // whose root moves more than 5 cm are all deaths, which fall a long way short of a rest
+        // height. The tag is reachable and working.
+        //
+        // What is genuinely wrong here is the cost: this call runs `detectContacts` and
+        // `extractPhase` over the whole clip, discards both, and keeps one boolean. `measureRoot`
+        // alone would answer it, and is not currently exported. The clean fix is for the pack to
+        // store the verdict it already computed -- the same fix `phase` just received above -- and
+        // that is a note for §37's offline/runtime boundary rather than a change made here.
+        const ClipAnalysis derived = analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{});
+        analysis.travels = derived.travels;
         const std::uint32_t tags = motionTagsFor(meta, analysis);
+        db.clipTravels.back() = (analysis.travels || !meta.heading.empty()) ? 1u : 0u;
 
         const auto frames =
             static_cast<std::uint32_t>(std::max(2.0f, std::floor(length * rate + 0.5f) + 1.0f));
         const std::uint32_t firstSample = db.sampleCount();
 
+        // ---- what lies past the clip's last key ------------------------------------------------
+        //
+        // **Every look ahead used to be clamped at the clip's end**, so the last sample of every
+        // clip read a root velocity of zero and its trajectory shrank to nothing over the final
+        // horizon. That included looping walks. Each moving clip therefore ended in a fictitious
+        // stop, and a query landing on a clip's last frame saw a body at rest. `agent/anim-cinfra`
+        // found it while building §58's category report.
+        //
+        // The honest continuation depends on what the clip is:
+        //   * a **looping** clip continues into its own start, one cycle's travel further on.
+        //     Anything else would contradict `sampleNext`, which already says so;
+        //   * a **non-looping** clip continues at the velocity it ended with. That is the least
+        //     assumption, and a clip that ends at rest (every death here) extrapolates to rest,
+        //     so it is unchanged.
+        const auto rootAt = [&](float time) {
+            setRestPose(pack.skeleton, poseAhead);
+            sampleClip(clip, time, poseAhead);
+            poseToModel(pack.skeleton, poseAhead, modelAhead);
+            return glm::vec3(modelAhead[static_cast<std::size_t>(root)][3]);
+        };
+        const glm::vec3 rootFirst = rootAt(clip.start);
+        const glm::vec3 rootLast = rootAt(clip.duration);
+        const glm::vec3 rootBeforeLast = rootAt(std::max(clip.start, clip.duration - dt));
+        const glm::vec3 cycleTravel =
+            meta.loop ? glm::vec3(rootLast.x - rootFirst.x, 0.0f, rootLast.z - rootFirst.z)
+                      : glm::vec3(0.0f);
+        const glm::vec3 endVelocity =
+            meta.loop ? glm::vec3(0.0f)
+                      : glm::vec3(rootLast.x - rootBeforeLast.x, 0.0f,
+                                  rootLast.z - rootBeforeLast.z) / dt;
+        // Pose `modelAhead` at `time`, which may lie past the end, and return the planar offset
+        // the continuation adds to everything in it. The offset moves the whole body, so it
+        // cancels in body-relative quantities and appears only in the root's own travel.
+        const auto sampleAhead = [&](float time) {
+            float local = time;
+            glm::vec3 offset(0.0f);
+            if (time > clip.duration) {
+                if (meta.loop && length > 0.0f) {
+                    const float over = time - clip.start;
+                    const float cycles = std::floor(over / length);
+                    local = clip.start + (over - (cycles * length));
+                    offset = cycleTravel * cycles;
+                } else {
+                    local = clip.duration;
+                    offset = endVelocity * (time - clip.duration);
+                }
+            }
+            setRestPose(pack.skeleton, poseAhead);
+            sampleClip(clip, local, poseAhead);
+            poseToModel(pack.skeleton, poseAhead, modelAhead);
+            return offset;
+        };
+
+        // ---- the body's facing, per frame (§7) --------------------------------------------------
+        //
+        // §7 says the features are in the body's own frame. The builder removed the body's
+        // position and never its heading, so a walk facing east and the same walk facing north
+        // were different motions to the search. Every Glowmere clip is authored facing +Z, which
+        // is why nothing noticed. 100STYLE turns, and so does any character in a scene.
+        //
+        // **Only for a clip whose root travels.** A clip authored in place (ADR-540) is authored
+        // facing +Z by construction, and its pelvis yaw is posture, not heading. Measured on the
+        // scout: `Idle` and `Walking_crouch` hold the pelvis at -43 degrees for the whole clip, and
+        // reading that as heading turned a straight crouch walk into a 47-degree diagonal.
+        //
+        // **First, a heading the clip carries** (§21): an augmented clip knows the heading its
+        // generator gave it, and a pelvis only guesses. Sampled at this build's rate from the
+        // clip's own, and held at its ends.
+        std::vector<glm::vec3> facing;
+        if (!meta.heading.empty()) {
+            facing.resize(frames);
+            const float headingRate = meta.sampleRate > 0.0f ? meta.sampleRate : rate;
+            for (std::uint32_t f = 0; f < frames; ++f) {
+                const float at = static_cast<float>(f) * dt * headingRate;
+                const auto i0 = std::min(static_cast<std::size_t>(at), meta.heading.size() - 1);
+                const std::size_t i1 = std::min(i0 + 1, meta.heading.size() - 1);
+                const float s = std::clamp(at - static_cast<float>(i0), 0.0f, 1.0f);
+                const float yaw = meta.heading[i0] + ((meta.heading[i1] - meta.heading[i0]) * s);
+                facing[f] = glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
+            }
+        } else {
+            facing = clipFacing(pack.skeleton, clip, root, frames, dt, meta.loop, options.config.facingWindow);
+            if (!analysis.travels) {
+                // **An in-place clip is faced relative to its own average.** Its pelvis yaw is part
+                // posture (the scout's crouch holds -43 degrees throughout, which is not a heading)
+                // and part turning (`Idle_turn` sweeps -71 to -3 degrees, which is). Measured from
+                // the clip's own mean, the posture cancels and the turning remains, so a turn on the
+                // spot is a turn to the matcher and a crouch walk still walks straight.
+                glm::vec3 mean(0.0f);
+                for (const glm::vec3& f : facing) {
+                    mean += f;
+                }
+                const float meanYaw = std::atan2(mean.x, mean.z);
+                for (glm::vec3& f : facing) {
+                    const float yaw = std::atan2(f.x, f.z) - meanYaw;
+                    f = glm::vec3(std::sin(yaw), 0.0f, std::cos(yaw));
+                }
+            }
+        }
+        // The body's facing at a time `ahead` past sample `f`: a looping clip wraps, anything else
+        // holds its last frame.
+        const auto facingAhead = [&](std::uint32_t f, float ahead) {
+            const auto steps = static_cast<std::int64_t>(std::lround(ahead * rate));
+            std::int64_t i = static_cast<std::int64_t>(f) + steps;
+            const auto n = static_cast<std::int64_t>(frames);
+            if (i >= n) {
+                i = meta.loop && n > 1 ? (i % (n - 1)) : n - 1;
+            }
+            return facing[static_cast<std::size_t>(std::max<std::int64_t>(i, 0))];
+        };
+
+        // ---- implied travel, for a cycle authored in place (ADR-540) ------------------------------
+        //
+        // Every Glowmere locomotion cycle is authored in place. Its root does not move, and the
+        // planted foot slides backward at the speed the body would be walking. Read literally,
+        // then, **a walk and an idle have the same root velocity (zero)**, and a request to walk
+        // at 1.6 m/s is closer to a fight clip whose root sways 0.36 m than to any walk.
+        // `agent/anim-cinfra`'s explainer showed exactly that on the scout: asked to walk, it
+        // chose `Fight_leg_kick_1`.
+        //
+        // The travel is in the clip, only in the feet rather than the root. So for a clip whose
+        // root does not travel (ADR-552's box), the opposite of its planted feet's mean velocity is
+        // added to the root's. That is the velocity at which the ground would have to move under
+        // the body for the feet to stay put, and it is what the body's velocity will be when the
+        // clip plays in a scene. A kick or a fall whose feet stay where they are implies nothing.
+        // A clip whose root does travel keeps its root's own answer untouched.
+        //
+        // Not gated on `loop`: a pack built by `avgen-motion pack` marks every clip looping, deaths
+        // included, so the flag says nothing here. The quarter-of-the-clip threshold in
+        // `impliedTravel` is what separates a gait from a scuff.
+        const glm::vec3 implied = !analysis.travels
+                                      ? impliedTravel(pack.skeleton, clip, root, meta.contacts,
+                                                      facing, frames, dt)
+                                      : glm::vec3(0.0f);
+
         for (std::uint32_t f = 0; f < frames; ++f) {
             const float t = std::min(clip.start + (static_cast<float>(f) * dt), clip.duration);
+            const glm::vec3 heading = facing[f];
             setRestPose(pack.skeleton, pose);
             sampleClip(clip, t, pose);
             poseToModel(pack.skeleton, pose, model);
             // One step ahead, for velocities. A forward difference rather than a central one so
             // that the first sample of a clip is not a special case; the error is one frame of
             // acceleration, which is below the noise in the source.
-            const float tAhead = std::min(t + dt, clip.duration);
-            setRestPose(pack.skeleton, poseAhead);
-            sampleClip(clip, tAhead, poseAhead);
-            poseToModel(pack.skeleton, poseAhead, modelAhead);
+            const glm::vec3 aheadOffset = sampleAhead(t + dt);
 
             const glm::vec3 body(model[static_cast<std::size_t>(root)][3]);
+            // Body-relative quantities use the pose as sampled; the continuation's offset moves
+            // the whole body and would cancel anyway.
             const glm::vec3 bodyAhead(modelAhead[static_cast<std::size_t>(root)][3]);
-            const glm::vec3 rootVelocity = (bodyAhead - body) / dt;
+            const glm::vec3 rootVelocity = ((bodyAhead + aheadOffset) - body) / dt;
 
             const std::size_t base = db.features.size();
             db.features.resize(base + dim);
@@ -235,8 +693,10 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             // would make two identical walks at different places look unlike each other.
             for (std::size_t jn = 0; jn < jointIndex.size(); ++jn) {
                 const auto ji = static_cast<std::size_t>(jointIndex[jn]);
-                const glm::vec3 p = glm::vec3(model[ji][3]) - body;
-                const glm::vec3 v = ((glm::vec3(modelAhead[ji][3]) - bodyAhead) - p) / dt;
+                const glm::vec3 pWorld = glm::vec3(model[ji][3]) - body;
+                const glm::vec3 p = toFacingFrame(pWorld, heading);
+                const glm::vec3 v = toFacingFrame(
+                    ((glm::vec3(modelAhead[ji][3]) - bodyAhead) - pWorld) / dt, heading);
                 out[k++] = p.x; out[k++] = p.y; out[k++] = p.z;
                 out[k++] = v.x; out[k++] = v.y; out[k++] = v.z;
                 const double radius = static_cast<double>(glm::length(p));
@@ -250,24 +710,25 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             // repository. Built anyway because it is correct and because 100STYLE exercises it;
             // `deadDimensions` below reports when it contributed nothing.
             for (const float ahead : options.config.trajectoryTimes) {
-                const float ft = std::min(t + ahead, clip.duration);
-                setRestPose(pack.skeleton, poseAhead);
-                sampleClip(clip, ft, poseAhead);
-                poseToModel(pack.skeleton, poseAhead, modelAhead);
-                const glm::vec3 future(modelAhead[static_cast<std::size_t>(root)][3]);
-                const glm::vec3 delta = future - body;
+                const glm::vec3 offset = sampleAhead(t + ahead);
+                const glm::vec3 future =
+                    glm::vec3(modelAhead[static_cast<std::size_t>(root)][3]) + offset;
+                const glm::vec3 delta = toFacingFrame(future - body, heading) + (implied * ahead);
                 out[k++] = delta.x;
                 out[k++] = delta.z;
-                // Facing: the direction it is heading at that moment, or zero when it is not
-                // moving -- which is honest rather than a default of "forward".
-                const float len = std::sqrt((delta.x * delta.x) + (delta.z * delta.z));
-                out[k++] = len > 1e-5f ? delta.x / len : 0.0f;
-                out[k++] = len > 1e-5f ? delta.z / len : 0.0f;
+                // **Facing: which way the body will face at that horizon, in its frame now.** It was
+                // the direction of travel, which cannot say "turning on the spot" (there is no
+                // travel) or "strafing" (the travel is not the facing), and those are exactly the
+                // motions §65's demonstration asks for. The future facing can say both.
+                const glm::vec3 ahead3 = toFacingFrame(facingAhead(f, ahead), heading);
+                out[k++] = ahead3.x;
+                out[k++] = ahead3.z;
             }
 
-            out[k++] = rootVelocity.x;
-            out[k++] = rootVelocity.y;
-            out[k++] = rootVelocity.z;
+            const glm::vec3 bodyVelocity = toFacingFrame(rootVelocity, heading) + implied;
+            out[k++] = bodyVelocity.x;
+            out[k++] = bodyVelocity.y;
+            out[k++] = bodyVelocity.z;
 
             if (options.config.phaseWeight > 0.0f) {
                 const float phase = meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start);
@@ -294,9 +755,26 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             }
 
             db.sampleClip.push_back(static_cast<std::uint32_t>(c));
+            db.sampleRoot.push_back(body.x);
+            db.sampleRoot.push_back(body.z);
+            db.sampleRoot.push_back(std::atan2(heading.x, heading.z));
             db.sampleTime.push_back(t);
             db.samplePhase.push_back(meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start));
-            db.sampleTags.push_back(tags);
+            {
+                // §46: a non-looping clip's last stretch, where the future is extrapolated.
+                const float longest = options.config.trajectoryTimes.empty()
+                                          ? 0.2f
+                                          : *std::max_element(options.config.trajectoryTimes.begin(),
+                                                              options.config.trajectoryTimes.end());
+                // Only a clip that ENDS MOVING: its extrapolated future is motion it does not
+                // contain, and re-choosing its last frame freezes a walking body. A clip that ends
+                // at rest (a stop, a death) extrapolates to rest, which is true, and its last frames
+                // are exactly what a request to stand should find. Ruling those out left "walking,
+                // asked to stop" playing the walk (§47).
+                const bool endsMoving = glm::length(endVelocity) > 0.1f || glm::length(implied) > 0.1f;
+                const bool terminal = !meta.loop && endsMoving && (clip.duration - t) < longest;
+                db.sampleTags.push_back(tags | (terminal ? static_cast<std::uint32_t>(MotionTag::Terminal) : 0u));
+            }
             // Filled below, once the clip's extent is known.
             db.sampleNext.push_back(MotionDatabase::kInvalid);
         }
@@ -354,6 +832,33 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         }
     }
 
+    // §16/§28's scale, measured once here rather than by each consumer. Sparse -- a few dozen
+    // probes is enough for a scale, and this runs on every database build.
+    {
+        double total = 0.0;
+        int counted = 0;
+        // **Weighted, because everything measured against this scale is weighted.** `costSpread`
+        // is the denominator for §16's search severity and for §28's switch margin, both of which
+        // compare *weighted* costs -- computing the scale unweighted would put the numerator and
+        // the denominator in different units, which is the same asymmetry the hysteresis had.
+        // Found by enumerating every feature-distance site rather than by tripping over it.
+        const std::vector<float> spreadWeight = motionFeatureWeights(db.config);
+        const bool spreadWeighted = spreadWeight.size() == dim;
+        const std::uint32_t probe = std::max(db.sampleCount() / 32u, 1u);
+        for (std::uint32_t s = 0; s < db.sampleCount(); s += probe) {
+            const float* a = db.featuresFor(s);
+            const float* b = db.featuresFor((s + db.sampleCount() / 2u) % db.sampleCount());
+            float typical = 0.0f;
+            for (std::size_t d = 0; d < dim; ++d) {
+                const float delta = a[d] - b[d];
+                typical += delta * delta * (spreadWeighted ? spreadWeight[d] : 1.0f);
+            }
+            total += typical;
+            ++counted;
+        }
+        db.stats.costSpread = counted > 0 ? static_cast<float>(total / counted) : 0.0f;
+    }
+
     // The rotation-invariant statistic: how much each feature joint's DISTANCE from the body
     // moved. Computed from the raw features before they were standardised, which is why it is
     // gathered in the loop above rather than here -- see `radiusSum`.
@@ -377,6 +882,8 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         (db.sampleClip.size() * sizeof(std::uint32_t)) + (db.sampleTime.size() * sizeof(float)) +
         (db.samplePhase.size() * sizeof(float)) + (db.sampleTags.size() * sizeof(std::uint32_t)) +
         (db.sampleNext.size() * sizeof(std::uint32_t));
+    // §38/§82: record what this was built from, and the identity a hot swap is checked against.
+    stampMotionDatabase(db, pack, options);
     return db;
 }
 
@@ -396,6 +903,18 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
         return best;
     }
     const float* q = query.features.data();
+    // §10. Per-dimension weights, derived from the config rather than baked into the features, so
+    // a weight is tunable **without rebuilding the database**. Recomputed per search rather than
+    // cached: it is a few dozen floats against a scan of up to a million samples.
+    //
+    // §75: into per-thread scratch rather than fresh vectors, so a search allocates nothing once a
+    // thread has searched once. Recomputed every time, still -- the weights stay tunable without a
+    // rebuild, and a cache keyed on the config would be one more thing to invalidate.
+    thread_local std::vector<MotionFeatureGroup> layout;
+    thread_local std::vector<float> dimWeight;
+    motionFeatureLayoutInto(db.config, layout);
+    motionFeatureWeightsInto(db.config, dimWeight);
+    const bool weighted = dimWeight.size() == dim && layout.size() == dim;
 
     // The family of whatever is playing, for the transition cost (§12). Read from tags and never
     // from a clip name, which §12 is explicit about.
@@ -425,7 +944,7 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
         float cost = 0.0f;
         for (std::size_t d = 0; d < dim; ++d) {
             const float delta = q[d] - f[d];
-            cost += delta * delta;
+            cost += motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
             if (best.found() && cost >= bestCost) {
                 break;
             }
@@ -442,7 +961,16 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
             const bool continues =
                 query.current < db.sampleNext.size() && db.sampleNext[query.current] == s;
             if (!continues) {
-                cost += weights.continuity;
+                // §11: graded inside the clip, flat outside it. A candidate a few frames
+                // further on in the same clip is a small skip; a candidate in another clip is a
+                // cut, and only the second should cost what a cut costs.
+                if (weights.continuityPerSecond > 0.0f && query.current < db.sampleClip.size() &&
+                    db.sampleClip[s] == db.sampleClip[query.current]) {
+                    const float gap = std::abs(db.sampleTime[s] - db.sampleTime[query.current]);
+                    cost += std::min(gap * weights.continuityPerSecond, weights.continuity);
+                } else {
+                    cost += weights.continuity;
+                }
                 // §12 transition: an extra penalty for leaving the motion family, over and above
                 // leaving the clip. A walk finding another walk is cheaper than a walk finding a
                 // fall, even when the poses rhyme.
@@ -455,12 +983,197 @@ MotionMatch searchMotion(const MotionDatabase& db, const MotionQuery& query,
                 }
             }
         }
+        // §44: the style term, last, so the early out above stays a lower bound.
+        cost += motionClipCost(db, query, s);
         ++best.considered;
         if (!best.found() || cost < bestCost) {
             best.sample = s;
             bestCost = cost;
         }
     }
+    best.cost = bestCost;
+
+    // §10's breakdown, computed **once for the winner** rather than accumulated per candidate. Per
+    // candidate it would cost seven accumulators on every one of a million samples to produce a
+    // number thrown away for all but one of them -- and the early out means a losing candidate's
+    // partial sums would be wrong anyway. Recomputing the winner in full is one extra pass over
+    // `dim` floats, and it is the only one anything reads.
+    if (best.found() && weighted) {
+        best.breakdown.style = motionClipCost(db, query, best.sample);
+        const float* f = db.featuresFor(best.sample);
+        for (std::size_t d = 0; d < dim; ++d) {
+            const float delta = q[d] - f[d];
+            best.breakdown.terms[static_cast<std::size_t>(layout[d])] +=
+                delta * delta * dimWeight[d];
+        }
+        if (query.current != MotionDatabase::kInvalid) {
+            const bool continues = query.current < db.sampleNext.size() &&
+                                   db.sampleNext[query.current] == best.sample;
+            if (!continues) {
+                best.breakdown.continuity = weights.continuity;
+                if (weights.continuityPerSecond > 0.0f && query.current < db.sampleClip.size() &&
+                    db.sampleClip[best.sample] == db.sampleClip[query.current]) {
+                    const float gap =
+                        std::abs(db.sampleTime[best.sample] - db.sampleTime[query.current]);
+                    best.breakdown.continuity =
+                        std::min(gap * weights.continuityPerSecond, weights.continuity);
+                }
+                if (db.sampleClip[best.sample] != currentClip) {
+                    const std::uint32_t shared = db.sampleTags[best.sample] & currentTags;
+                    if (currentTags != 0 && shared != currentTags) {
+                        best.breakdown.transition = weights.transition;
+                    }
+                }
+            }
+        }
+    }
+    return best;
+}
+
+
+MotionMatch searchMotionStaged(const MotionDatabase& db, const MotionQuery& query,
+                               const MotionCostWeights& weights, const MotionSearchPlan& plan) {
+    // An exhaustive plan is the linear scan, by delegation rather than by a parallel
+    // implementation that has to be kept in step. §16 says "do not prematurely overengineer it",
+    // and two copies of a cost function is the first way that goes wrong.
+    if (plan.exhaustive()) {
+        MotionMatch out = searchMotion(db, query, weights);
+        out.coarseConsidered = out.considered;
+        out.fullyScored = out.considered;
+        return out;
+    }
+
+    MotionMatch best;
+    const std::size_t dim = db.dimension;
+    if (dim == 0 || query.features.size() != dim || db.sampleCount() == 0) {
+        return best;
+    }
+    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    const bool weighted = dimWeight.size() == dim;
+    const std::size_t prefix =
+        plan.prefixDimensions == 0 ? dim : std::min<std::size_t>(plan.prefixDimensions, dim);
+    const float* q = query.features.data();
+
+    const auto passesTags = [&](std::uint32_t s) {
+        const std::uint32_t tags = db.sampleTags[s];
+        return !((query.requireTags != 0 && (tags & query.requireTags) != query.requireTags) ||
+                 (query.rejectTags != 0 && (tags & query.rejectTags) != 0));
+    };
+
+    // Stage one: a strided pass over a prefix of the feature vector. No early-out here -- it needs
+    // a running best to be worth anything, and the point of this pass is that every candidate is
+    // cheap rather than that some are skipped.
+    std::vector<std::pair<float, std::uint32_t>> shortlist;
+    shortlist.reserve(plan.shortlist + 1u);
+    const std::uint32_t stride = std::max(plan.stride, 1u);
+    for (std::uint32_t s = 0; s < db.sampleCount(); s += stride) {
+        if (!passesTags(s)) {
+            ++best.rejected;
+            continue;
+        }
+        ++best.coarseConsidered;
+        const float* f = db.featuresFor(s);
+        float cost = 0.0f;
+        for (std::size_t d = 0; d < prefix; ++d) {
+            const float delta = q[d] - f[d];
+            cost += motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
+        }
+        if (shortlist.size() < plan.shortlist) {
+            shortlist.emplace_back(cost, s);
+            std::push_heap(shortlist.begin(), shortlist.end());
+        } else if (!shortlist.empty() && cost < shortlist.front().first) {
+            std::pop_heap(shortlist.begin(), shortlist.end());
+            shortlist.back() = {cost, s};
+            std::push_heap(shortlist.begin(), shortlist.end());
+        }
+    }
+
+    // Stage two: the full weighted cost, including continuity and transition, on the shortlist and
+    // on the neighbours the coarse pass stepped over. **The neighbourhood is what stops striding
+    // from permanently hiding an answer**: with stride 8 and neighbourhood 8 every sample in the
+    // database is reachable from some shortlisted one, so the plan trades work for a chance of
+    // missing rather than for a guarantee of it.
+    std::vector<std::uint32_t> candidates;
+    candidates.reserve(shortlist.size() * (2u * plan.neighbourhood + 1u));
+    for (const auto& [cost, s] : shortlist) {
+        const std::uint32_t lo = s > plan.neighbourhood ? s - plan.neighbourhood : 0u;
+        const std::uint32_t hi = std::min(s + plan.neighbourhood, db.sampleCount() - 1u);
+        for (std::uint32_t n = lo; n <= hi; ++n) {
+            candidates.push_back(n);
+        }
+    }
+    std::sort(candidates.begin(), candidates.end());
+    candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+
+    MotionMatch scored = scoreMotionCandidates(db, query, weights, candidates);
+    scored.rejected += best.rejected;
+    scored.coarseConsidered = best.coarseConsidered;
+    return scored;
+}
+
+MotionMatch scoreMotionCandidates(const MotionDatabase& db, const MotionQuery& query,
+                                  const MotionCostWeights& weights,
+                                  std::span<const std::uint32_t> candidates) {
+    MotionMatch best;
+    const std::size_t dim = db.dimension;
+    if (dim == 0 || query.features.size() != dim || db.sampleCount() == 0) {
+        return best;
+    }
+    const std::vector<float> dimWeight = motionFeatureWeights(db.config);
+    const bool weighted = dimWeight.size() == dim;
+    const float* q = query.features.data();
+    const auto passesTags = [&](std::uint32_t s) {
+        const std::uint32_t tags = db.sampleTags[s];
+        return !((query.requireTags != 0 && (tags & query.requireTags) != query.requireTags) ||
+                 (query.rejectTags != 0 && (tags & query.rejectTags) != 0));
+    };
+    float bestCost = 0.0f;
+    for (const std::uint32_t s : candidates) {
+        if (s >= db.sampleCount() || !passesTags(s)) {
+            continue;
+        }
+        ++best.fullyScored;
+        const float* f = db.featuresFor(s);
+        float cost = 0.0f;
+        for (std::size_t d = 0; d < dim; ++d) {
+            const float delta = q[d] - f[d];
+            cost += motionFeatureTerm(delta, weighted ? dimWeight[d] : 1.0f);
+        }
+        if (query.current != MotionDatabase::kInvalid) {
+            const bool continues =
+                query.current < db.sampleNext.size() && db.sampleNext[query.current] == s;
+            if (!continues) {
+                // §11: graded inside the clip, flat outside it. A candidate a few frames
+                // further on in the same clip is a small skip; a candidate in another clip is a
+                // cut, and only the second should cost what a cut costs.
+                if (weights.continuityPerSecond > 0.0f && query.current < db.sampleClip.size() &&
+                    db.sampleClip[s] == db.sampleClip[query.current]) {
+                    const float gap = std::abs(db.sampleTime[s] - db.sampleTime[query.current]);
+                    cost += std::min(gap * weights.continuityPerSecond, weights.continuity);
+                } else {
+                    cost += weights.continuity;
+                }
+                const std::uint32_t currentClip = query.current < db.sampleClip.size()
+                                                      ? db.sampleClip[query.current]
+                                                      : MotionDatabase::kInvalid;
+                if (db.sampleClip[s] != currentClip) {
+                    const std::uint32_t currentTags = query.current < db.sampleTags.size()
+                                                          ? db.sampleTags[query.current]
+                                                          : 0u;
+                    const std::uint32_t shared = db.sampleTags[s] & currentTags;
+                    if (currentTags != 0 && shared != currentTags) {
+                        cost += weights.transition;
+                    }
+                }
+            }
+        }
+        cost += motionClipCost(db, query, s);
+        if (!best.found() || cost < bestCost) {
+            best.sample = s;
+            bestCost = cost;
+        }
+    }
+    best.considered = best.fullyScored;
     best.cost = bestCost;
     return best;
 }

@@ -63,15 +63,16 @@ const scene::CompositionNode* terrainNodeOf(Engine& engine) {
 std::span<const std::string_view> directedCameraTargets() { return kCameraTargets; }
 
 std::size_t directedCameraBakeSize(Engine& engine) {
-    // Deliberately the same four things `releaseDirectedCamera` destroys, counted in the same order,
-    // so the two cannot drift apart into a lock that guards a different set than the one at risk.
+    // What a `releaseDirectedCamera` would take off the camera right now: the same three things it
+    // parks, counted the same way, so the lock cannot come to guard a different set than the one a
+    // release moves. The shot spans are not counted any more (ADR-582): a release leaves them where
+    // they are, because they are the film's focus schedule rather than the camera's steering.
     std::size_t n = 0;
     for (const params::Track& t : engine.timeline().tracks()) {
         if (isCameraTarget(t.target)) {
             ++n;
         }
     }
-    n += engine.shotSpans().size();
     if (const scene::Composition* composition = engine.composition()) {
         n += composition->aimFollow().size();
         for (const scene::CameraShot& s : composition->cameraDirection().shots) {
@@ -83,43 +84,187 @@ std::size_t directedCameraBakeSize(Engine& engine) {
     return n;
 }
 
-std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
-    auto& tracks = engine.timeline().tracks();
-    const std::size_t before = tracks.size();
-    const auto owned = directedCameraTargets();
-    std::erase_if(tracks, [&](const params::Track& t) {
-        return std::find(owned.begin(), owned.end(), t.target) != owned.end();
-    });
-    // The follow table goes with the keys it belongs to. Left behind it would keep nudging a camera
-    // the viewport has just been handed back, which is the sort of thing that gets reported as
-    // "the camera fights me".
-    if (scene::Composition* composition = engine.composition()) {
-        composition->setAimFollow({});
-    }
-    // ADR-207: and so does the shot schedule. A world effect gated on "the camera is travelling"
-    // must not keep firing against a cut that is no longer driving anything.
-    engine.setShotSpans({});
-    // ADR-249: and so do the camera shots Song Mode wrote. Everything the director owns goes;
-    // everything a person authored stays, which is the identical rule the timeline half follows.
-    if (scene::Composition* composition = engine.composition()) {
-        scene::CameraDirection direction = composition->cameraDirection();
-        const std::size_t before = direction.shots.size();
-        std::erase_if(direction.shots, [](const scene::CameraShot& s) {
-            return s.origin == scene::CameraShot::Origin::Directed;
-        });
-        if (direction.shots.size() != before) {
-            if (auto ok = engine.setCameraDirection(std::move(direction)); !ok) {
-                log::warn("auto-director: {}", ok.error().message);
-            }
-        }
-    }
-    // Everything except the settings, which are the user's preferences rather than this cut's state.
-    // Resetting the whole struct wiped the panel's choices every time the camera went back to the
-    // viewport, so a shot mode chosen once survived until the first hand-back and no longer.
+namespace {
+
+// Everything except the settings, which are the user's preferences rather than this cut's state.
+// Resetting the whole struct wiped the panel's choices every time the camera went back to the
+// viewport, so a shot mode chosen once survived until the first hand-back and no longer.
+void endClaim(DirectorState& state) {
     const AutoDirectorSettings keep = state.settings;
     state = DirectorState{};
     state.settings = keep;
-    return before - tracks.size();
+}
+
+} // namespace
+
+std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
+    // ADR-582: taking the camera back PARKS the director's cut. It used to destroy it -- tracks,
+    // aim-follow, directed shots and the shot spans -- and the owner's 18:04 save on 21 Sep wrote
+    // that loss into the project: 45 spans, 39 follow entries, ~122 KB of camera tracks, and a Hero
+    // Pulse that played in the window and was absent from every rendered frame. Re-baking was never
+    // a recovery, because it re-photographs the hero anchors (ADR-344) and the cut comes back
+    // different.
+    //
+    // What stops is the director *steering*: its camera tracks leave the timeline, its follow table
+    // stops nudging the aim and its camera shots stop claiming the frame. What does not stop is the
+    // film's focus schedule -- `Engine::shotSpans` is not touched -- so a HeroFocus or CameraTravel
+    // effect keeps landing where and when the cut says, under a camera the owner is flying. That
+    // overrules ADR-207's "a world effect gated on the camera travelling must not keep firing
+    // against a cut that is no longer driving anything": the owner ruled that it must.
+    //
+    // A cut that is already parked is never overwritten. Parked means the director is not steering,
+    // so any camera track on the timeline now was made by somebody after the hand-back; parking it
+    // over the director's cut would destroy the one thing "Resume director" promises to restore.
+    if (engine.directorParked()) {
+        endClaim(state);
+        return 0;
+    }
+    ParkedDirectorsCut parked;
+    auto& tracks = engine.timeline().tracks();
+    std::vector<params::Track> keep;
+    keep.reserve(tracks.size());
+    for (params::Track& t : tracks) {
+        if (isCameraTarget(t.target)) {
+            // Unbound: a parked track must hold no pointer into a parameter set that a scene swap
+            // may destroy while it waits. `resumeDirectedCamera` binds it again.
+            t.param = nullptr;
+            parked.tracks.push_back(std::move(t));
+        } else {
+            keep.push_back(std::move(t));
+        }
+    }
+    tracks = std::move(keep);
+    if (scene::Composition* composition = engine.composition()) {
+        // The follow table goes with the keys it belongs to. Left on the composition it would keep
+        // nudging a camera the viewport has just been handed back ("the camera fights me").
+        parked.aimFollow = composition->aimFollow();
+        composition->setAimFollow({});
+        // ADR-249's directed camera shots, likewise: parked, and the person's own shots stay.
+        scene::CameraDirection direction = composition->cameraDirection();
+        std::vector<scene::CameraShot> directed;
+        std::erase_if(direction.shots, [&](const scene::CameraShot& s) {
+            if (s.origin == scene::CameraShot::Origin::Directed) {
+                directed.push_back(s);
+                return true;
+            }
+            return false;
+        });
+        if (!directed.empty()) {
+            if (auto ok = engine.setCameraDirection(std::move(direction)); !ok) {
+                // Left on the camera rather than parked: a shot that is in neither place is lost.
+                log::warn("auto-director: {}", ok.error().message);
+            } else {
+                parked.cameraShots = std::move(directed);
+            }
+        }
+    }
+    const std::size_t moved = parked.tracks.size();
+    if (!parked.empty()) {
+        log::info("auto-director: parked the cut ({} camera track(s), {} follow entr(ies), {} camera "
+                  "shot(s)); {} shot span(s) still drive world effects. Resume director restores it.",
+                  parked.tracks.size(), parked.aimFollow.size(), parked.cameraShots.size(),
+                  engine.shotSpans().size());
+        engine.setParkedCut(std::move(parked));
+    }
+    endClaim(state);
+    return moved;
+}
+
+Result<std::size_t> resumeDirectedCamera(Engine& engine, DirectorState& state) {
+    if (!engine.directorParked()) {
+        return fail("there is no parked director's cut to resume");
+    }
+    const ParkedDirectorsCut& cut = engine.parkedCut();
+    params::Timeline& timeline = engine.timeline();
+
+    // Refused rather than overwritten: a camera track on the timeline while the cut is parked is
+    // somebody's own work, and two tracks on one target are not a blend but whichever the timeline
+    // applies last. Checked before anything moves, so a refusal changes nothing.
+    std::string clash;
+    for (const params::Track& t : timeline.tracks()) {
+        if (isCameraTarget(t.target) && clash.find(t.target) == std::string::npos) {
+            clash += clash.empty() ? t.target : ", " + t.target;
+        }
+    }
+    if (!clash.empty()) {
+        return fail("the camera has keys of its own now ({}); delete those tracks first, because "
+                    "resuming over them would replace them",
+                    clash);
+    }
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr && (!cut.aimFollow.empty() || !cut.cameraShots.empty())) {
+        return fail("this scene has no composition to put the director's shots back on");
+    }
+    if (!cut.cameraShots.empty()) {
+        scene::CameraDirection direction = composition->cameraDirection();
+        direction.shots.insert(direction.shots.end(), cut.cameraShots.begin(), cut.cameraShots.end());
+        // The order `installSongDirection` leaves them in, so the list reads back as it was.
+        std::stable_sort(direction.shots.begin(), direction.shots.end(),
+                         [](const scene::CameraShot& a, const scene::CameraShot& b) {
+                             return a.startSeconds < b.startSeconds;
+                         });
+        if (auto ok = direction.validate(); !ok) {
+            return fail("the parked camera shots no longer fit this scene: {}", ok.error().message);
+        }
+        if (auto ok = engine.setCameraDirection(std::move(direction)); !ok) {
+            return std::unexpected(ok.error());
+        }
+    }
+    ParkedDirectorsCut restored = engine.parkedCut();
+    engine.setParkedCut({});
+    const std::size_t count = restored.tracks.size();
+    for (params::Track& t : restored.tracks) {
+        timeline.addTrack(std::move(t));
+    }
+    // What `installSequence` does for the same reason: a directed camera in a disabled timeline
+    // does not move, and an unbound track is skipped in silence.
+    timeline.enabled = true;
+    if (auto bound = timeline.bind(engine.params()); !bound) {
+        log::warn("auto-director: {}", bound.error().message);
+    }
+    if (composition != nullptr) {
+        composition->setAimFollow(std::move(restored.aimFollow));
+    }
+    noteDirected(engine, state);
+    log::info("auto-director: resumed the parked cut ({} camera track(s)), unchanged", count);
+    return count;
+}
+
+std::size_t discardDirectorsCut(Engine& engine, DirectorState& state) {
+    std::size_t removed = 0;
+    if (engine.directorParked()) {
+        // Parked: the director is not steering, so every camera track on the timeline now is
+        // somebody's own and stays. Only the parked copy goes.
+        const ParkedDirectorsCut& cut = engine.parkedCut();
+        removed += cut.tracks.size() + cut.aimFollow.size() + cut.cameraShots.size();
+        engine.setParkedCut({});
+    } else {
+        auto& tracks = engine.timeline().tracks();
+        const std::size_t before = tracks.size();
+        std::erase_if(tracks, [](const params::Track& t) { return isCameraTarget(t.target); });
+        removed += before - tracks.size();
+        if (scene::Composition* composition = engine.composition()) {
+            removed += composition->aimFollow().size();
+            composition->setAimFollow({});
+            scene::CameraDirection direction = composition->cameraDirection();
+            const std::size_t shots = direction.shots.size();
+            std::erase_if(direction.shots, [](const scene::CameraShot& s) {
+                return s.origin == scene::CameraShot::Origin::Directed;
+            });
+            if (direction.shots.size() != shots) {
+                removed += shots - direction.shots.size();
+                if (auto ok = engine.setCameraDirection(std::move(direction)); !ok) {
+                    log::warn("auto-director: {}", ok.error().message);
+                }
+            }
+        }
+    }
+    // The focus schedule goes too: this is the one action that is allowed to say "there is no cut".
+    removed += engine.shotSpans().size();
+    engine.setShotSpans({});
+    endClaim(state);
+    log::info("auto-director: the director's cut was discarded ({} item(s))", removed);
+    return removed;
 }
 
 void noteDirected(Engine& engine, DirectorState& state) {
@@ -128,6 +273,7 @@ void noteDirected(Engine& engine, DirectorState& state) {
     state.heroRevision = composition != nullptr ? composition->heroRevision() : 0;
     state.placementRevision = composition != nullptr ? composition->heroPlacementRevision() : 0;
     state.wasPlaying = engine.transport().isPlaying();
+    state.sceneGeneration = engine.sceneGeneration();
 }
 
 bool cameraLooksDirected(const Engine& engine) {
@@ -165,22 +311,31 @@ Result<Redirect> refreshDirection(Engine& engine, DirectorState& state) {
     // handed back, an undo took the tracks, somebody deleted them by hand. Whatever happened, this
     // is no longer our camera and the next Enable Auto-director starts the relationship again.
     if (composition == nullptr || !engine.timeline().isAutomated("camera/position")) {
-        const AutoDirectorSettings keep = state.settings; // a preference, not this cut's state
-        state = DirectorState{};
-        state.settings = keep;
+        endClaim(state);
         return Redirect::Released;
+    }
+    // ADR-582: a different scene is not a changed cast. The revision counters belong to one
+    // composition, and a project load or a scene swap installs another whose counters say nothing
+    // about the first -- so comparing them re-cut a freshly opened project whenever the numbers
+    // happened to differ, replacing the cut it had just loaded. The claim is taken up afresh.
+    if (engine.sceneGeneration() != state.sceneGeneration) {
+        noteDirected(engine, state);
+        return Redirect::Nothing;
     }
     const bool playing = engine.transport().isPlaying();
     const bool parked = !playing && !state.wasPlaying;
     state.wasPlaying = playing;
     const bool castChanged = composition->heroRevision() != state.heroRevision;
-    const bool movedAndParked = composition->heroPlacementRevision() != state.placementRevision && parked;
-    if (!castChanged && !movedAndParked) {
-        // Absorbed rather than queued: a hero that walked around during playback has already been
-        // followed by everything that reads a position, and re-cutting for it the moment somebody
-        // pauses would be answering a question nobody asked.
+    const bool moved = composition->heroPlacementRevision() != state.placementRevision;
+    if (!castChanged) {
+        // A hero merely *moving* never re-cuts the film any more (ADR-582). It used to, while the
+        // transport was parked -- and a paused scrub re-simulates the world, walkers move, their
+        // heroes follow and settle, and the whole cut was silently replaced by a re-bake that
+        // re-photographed every anchor at wherever the scrub had left them (ADR-344). Only an
+        // explicit re-bake may replace a cut. So it is absorbed, and said once when parked, so
+        // somebody who dragged a hero knows what to press.
         state.placementRevision = composition->heroPlacementRevision();
-        return Redirect::Nothing;
+        return moved && parked ? Redirect::Stale : Redirect::Nothing;
     }
     // Recorded before the work, not after: a re-cut that fails must not be retried every frame for
     // the rest of the session, and the failure is the same one until the heroes change again.
@@ -838,6 +993,14 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
         log::info("auto-director: {} span(s) for world effects: {} travelling, {} holding",
                   spans.size(), travelling, holding);
         engine.setShotSpans(std::move(spans));
+    }
+    // ADR-582: a new cut replaces a parked one. This is the explicit re-bake -- Enable
+    // Auto-director, or a director control moved while it steers -- and it is the only way besides
+    // `discardDirectorsCut` that a parked cut may go. Left behind, "Resume director" would put an
+    // older film's camera back over this one's spans.
+    if (engine.directorParked()) {
+        log::info("auto-director: the new cut replaces the parked one");
+        engine.setParkedCut({});
     }
     log::info("auto-director: {} shot(s), {} track(s) installed, {} replaced",
               sequence.shots.size(), added, removed);

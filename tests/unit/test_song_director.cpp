@@ -831,13 +831,30 @@ TEST_CASE("Installing a song direction writes a camera track and replaces only i
               return s.origin == scene::CameraShot::Origin::Directed;
           }) == static_cast<long>(again->shots.size()));
 
-    // Handing the camera back takes the director's shots with it, and leaves the person's.
+    // Handing the camera back takes the director's shots off the camera -- parked, not deleted
+    // (ADR-582) -- and leaves the person's.
+    const std::vector<scene::CameraShot> directedBefore = [&] {
+        std::vector<scene::CameraShot> out;
+        for (const scene::CameraShot& s : engine.composition()->cameraDirection().shots) {
+            if (s.origin == scene::CameraShot::Origin::Directed) {
+                out.push_back(s);
+            }
+        }
+        return out;
+    }();
+    const std::vector<scene::CameraShot> allBefore = engine.composition()->cameraDirection().shots;
     app::DirectorState state;
     app::noteDirected(engine, state);
     static_cast<void>(app::releaseDirectedCamera(engine, state));
     const auto& released = engine.composition()->cameraDirection().shots;
     CHECK(released.size() == 1);
     CHECK(released.front().label == "mine");
+    CHECK(engine.parkedCut().cameraShots == directedBefore);
+
+    // ...and Resume puts them back where they were, in the order they were in.
+    REQUIRE(app::resumeDirectedCamera(engine, state).has_value());
+    CHECK(engine.composition()->cameraDirection().shots == allBefore);
+    CHECK_FALSE(engine.directorParked());
 }
 
 TEST_CASE("A camera shot's origin round-trips through the scene document", "[song][director][adr225]") {

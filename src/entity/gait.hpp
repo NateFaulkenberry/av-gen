@@ -32,6 +32,22 @@ namespace avgen::entity {
 // How this particular body moves. Authored per entity in the scene file (addendum §26/§27) and
 // never in code: a deer, a robot and a person cross from walking to running at different speeds,
 // and the numbers are the only thing that differs between them.
+// **The rate below which a clip reads as stopped rather than as slow** (ADR-622).
+//
+// One number, in one place, because two things need to agree about it and did not: `rateMin` is
+// the floor a rate-matched clip is clamped to, and `test_farm_locomotion`'s "frozen while moving"
+// detector had its own literal for the same idea. The farm pack authors `rateMin: 0.005`, which is
+// **four times below** what that detector calls frozen -- so a body could be officially playing
+// its clip and officially frozen at once, and neither number knew about the other.
+//
+// Derived from what a viewer can see rather than picked: at 60 fps a rate of 0.02 advances a clip
+// by 1.2 frames of clip time per second, which is the slowest advance that still reads as motion
+// rather than as a held pose. Below it, a clip is a still that happens to be changing.
+//
+// **Anything that needs to ask "is this clip advancing enough to see" reads this**, so the answer
+// cannot diverge again.
+inline constexpr float kVisibleClipRate = 0.02f;
+
 struct GaitSettings {
     float walkSpeed = 1.6f;  // metres per second the walk clip was authored at
     float runSpeed = 4.0f;   // metres per second the run clip was authored at
@@ -48,6 +64,22 @@ struct GaitSettings {
     float minDwell = 0.25f;
     float accel = 6.0f;      // m/s^2 the body may gain speed at
     float decel = 8.0f;      // m/s^2 it may lose it at
+    // **Whether a scene actually asked for these, as distinct from inheriting them** (ADR-620).
+    //
+    // The action tier has always applied `approach` with these numbers, so their defaults are
+    // load-bearing there and may not be zeroed -- `approach` with a rate of 0 returns the speed
+    // unchanged, which would freeze every action-driven body rather than merely unlimit it.
+    //
+    // The *behaviour* tier never applied them at all, and switching it on for every body costs
+    // a scrub: a rate-limited speed is an integrator, so a shallow body's replay grows from one
+    // or two steps to about forty. So the behaviour tier honours them **only where they were
+    // authored**, which puts the cost on the bodies whose author asked for the ramp and leaves
+    // every other body exactly as it was.
+    //
+    // Set by the parser when either key is present, and settable directly by a caller building a
+    // `GaitSettings` in code -- a test that sets `accel` and not this is asking for the old
+    // behaviour, which is a legitimate thing to ask for.
+    bool accelAuthored = false;
     float blend = 0.2f;      // cross-fade seconds between gaits; < 0 = leave it to the clip
     // Playback-rate matching: a walk clip authored at 1.6 m/s played at 2.0 m/s slides its feet
     // unless the clip runs 1.25x. Clamped, because a clip at 3x is a cartoon.
@@ -65,6 +97,14 @@ struct GaitSettings {
     // 0 freezes the clip while the body is not travelling. A statue caught mid-stride is not a good
     // idle, and it is enormously better than feet running on the spot; an asset that wants better
     // needs an idle clip, which is an asset question rather than an engine one.
+    //
+    // **LABELLED COMPENSATION (ADR-622): a rate floor below `kVisibleClipRate` is standing in for
+    // a missing animation.** The farm pack authors `rateMin: 0.005` and `idleRate: 0`, and both
+    // exist because these nine assets ship one clip called `Walk` and no idle. The floor is not a
+    // tuning preference; it is the smallest crawl that keeps a walk cycle from looking like a held
+    // pose on an asset that has nothing else to play. **The actual gap is the missing idle clip**,
+    // which is content work. Recording it here so the number is not read as a considered choice
+    // about playback and quietly "corrected" by someone who does not know what it is covering for.
     float idleRate = 1.0f;
 
     // So a writer can tell "the author set nothing" from "the author set the defaults" and emit

@@ -75,10 +75,28 @@ public:
                                             double time, float dt, MotionMemory& next) const {
         MotionChainResult chain;
         for (std::size_t i = 0; i < count_; ++i) {
-            MotionMemory scratch = in;
-            const MotionResult r = providers_[i]->advance(request, in, time, dt, scratch);
+            // **A memory another provider settled means nothing to this one** (ADR-623). Its
+            // `selection` is an index into the other provider's space: a database sample to the
+            // matcher and a clip to the clip player. Handed over as-is, a fallback read a sample
+            // index as a clip index, and a matcher coming back read a clip index as a sample. So
+            // a provider sees its own memory or a fresh one, never a foreign one.
+            const bool foreign = in.provider >= 0 && in.provider != static_cast<int>(i);
+            MotionMemory fresh;
+            const MotionMemory& mine = foreign ? fresh : in;
+            MotionMemory scratch = mine;
+            const MotionResult r = providers_[i]->advance(request, mine, time, dt, scratch);
             if (r.ok()) {
                 next = scratch;
+                // **A handover is not a transition, and nobody can blend it.** ADR-613's blend
+                // slots name content in the *settling provider's* own index space, so a memory
+                // that changes hands carries two integers that the new provider would read as its
+                // own -- a matcher's database sample posed as a clip index, which is the exact
+                // confusion `MotionMemory::provider` exists to stop. The slots are cleared on the
+                // frame the answer moves. The body therefore jumps once when a provider takes
+                // over, which is honest: the two providers have no common pose to interpolate in.
+                if (in.provider >= 0 && in.provider != static_cast<int>(i)) {
+                    next.clearBlends();
+                }
                 next.provider = static_cast<int>(i);
                 chain.result = r;
                 chain.provider = static_cast<int>(i);

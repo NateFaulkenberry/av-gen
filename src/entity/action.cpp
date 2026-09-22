@@ -253,23 +253,37 @@ float NavigatorPath::groundHeight(glm::vec2 p) const {
 // ---- the queue ---------------------------------------------------------------------------------
 
 void ActionQueue::push(ActionDesc action, Authority authority) {
-    layers_[static_cast<std::size_t>(authority)].actions.push_back(std::move(action));
+    std::vector<ActionDesc> one;
+    one.push_back(std::move(action));
+    push(std::move(one), authority);
 }
 
 void ActionQueue::push(std::vector<ActionDesc> actions, Authority authority) {
-    Layer& layer = layers_[static_cast<std::size_t>(authority)];
+    const auto t = static_cast<std::size_t>(authority);
+    Layer& layer = layers_[t];
+    // A push onto an empty or drained tier starts a new list (Phase D §19); a push onto a running
+    // one extends the list it is running, and keeps its serial.
+    if (layer.index >= layer.actions.size()) {
+        layer.serial = ++serials_[t];
+        layer.anyFailed = false;
+        layer.failReason.clear();
+    }
     layer.actions.insert(layer.actions.end(), std::make_move_iterator(actions.begin()),
                          std::make_move_iterator(actions.end()));
 }
 
 void ActionQueue::override(std::vector<ActionDesc> actions, Authority authority, double now) {
     cancel(authority, now);
-    Layer& layer = layers_[static_cast<std::size_t>(authority)];
+    const auto t = static_cast<std::size_t>(authority);
+    Layer& layer = layers_[t];
     layer.actions = std::move(actions);
     layer.index = 0;
     layer.started = false;
     layer.elapsed = 0.0;
     layer.progress = Progress{};
+    layer.serial = ++serials_[t];
+    layer.anyFailed = false;
+    layer.failReason.clear();
 }
 
 void ActionQueue::cancel(Authority authority, double now) {
@@ -376,6 +390,10 @@ std::size_t ActionQueue::pending(Authority authority) const {
 void ActionQueue::reset() {
     for (Layer& layer : layers_) {
         layer = Layer{};
+    }
+    for (std::size_t t = 0; t < kAuthorityCount; ++t) {
+        serials_[t] = 0;
+        drained_[t] = Drained{};
     }
     driver_ = -1;
 }
@@ -546,10 +564,22 @@ void ActionQueue::finish(Layer& layer, const ActionContext& ctx, ActionResult re
             next = target;
         }
     }
+    if (result == ActionResult::Failed && !layer.anyFailed) {
+        layer.anyFailed = true;
+        layer.failReason = reason;
+    }
     layer.index = next;
     layer.started = false;
     layer.elapsed = 0.0;
     layer.progress = Progress{};
+    // Phase D §19: the list is over. Recorded here, where it happens, rather than inferred later
+    // from `pending() == 0` -- which is also true of a tier that was never given anything.
+    if (layer.index >= layer.actions.size()) {
+        Drained& d = drained_[static_cast<std::size_t>(&layer - layers_)];
+        d.serial = layer.serial;
+        d.failed = layer.anyFailed;
+        d.reason = layer.failReason;
+    }
 }
 
 ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
@@ -763,7 +793,17 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             // Slow into the goal rather than stopping dead on it: v = sqrt(2 a d) is the fastest
             // speed from which the remaining distance is still enough to decelerate in.
             const float arrival = std::sqrt(std::max(0.0f, 2.0f * gait.decel * std::max(0.0f, distance - tolerance)));
-            const float desired = std::min({wantedSpeed * alignment, arrival, wantedSpeed});
+            float desired = std::min({wantedSpeed * alignment, arrival, wantedSpeed});
+            // Phase D §14 "arrive": a slowing radius, when the action asks for one. The line above
+            // is the fastest speed from which the body can still stop -- a braking limit, reached
+            // at the last possible moment, which reads as a walk that hits a wall. This is Reynolds'
+            // arrive: speed proportional to the distance left inside `arrival`, so a character
+            // approaching something it means to look at visibly slows into it. Floored at a fifth
+            // of the pace so the last centimetres are covered rather than approached forever.
+            if (action.arrival > 0.0f) {
+                const float remaining = std::max(0.0f, distance - tolerance);
+                desired = std::min(desired, wantedSpeed * std::clamp(remaining / action.arrival, 0.2f, 1.0f));
+            }
             layer.progress.speed =
                 Gait::approach(layer.progress.speed, desired, gait.accel, gait.decel, ctx.dt);
             const float travel =
@@ -772,6 +812,22 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             state.travel.x += heading.x * travel * static_cast<float>(ctx.dt);
             state.travel.z += heading.y * travel * static_cast<float>(ctx.dt);
             state.speed = travel;
+            // Phase D §3/§15: the vector intent, published by the mover that knows it (ADR-615
+            // recorded `CharacterIntent` as having no producer). The velocity the step commanded,
+            // the facing it turned toward, and where it is going -- the HOW half of the intent.
+            // The WHAT half (`type`) is the decider's and is written after this, by it.
+            //
+            // Equal by construction to the polar reconstruction `Entity::advanceMotion` would
+            // otherwise make (`heading * speed`, and `speed` is `travel`), so publishing it
+            // changes no MotionRequest; what it adds is that the request now *comes from* the
+            // intent, and a mover that wants to strafe has a field that means it.
+            state.intent.desiredVelocity = glm::vec3(heading.x, 0.0f, heading.y) * travel;
+            state.intent.facing = glm::vec3(heading.x, 0.0f, heading.y);
+            state.intent.hasFacing = true;
+            state.intent.targetPosition = point;
+            state.intent.hasTarget = true;
+            state.intent.stoppingDistance = tolerance;
+            state.intent.valid = true;
             if (path != nullptr) {
                 const glm::vec3 p = state.position();
                 state.travel.y = path->groundHeight(glm::vec2(p.x, p.z)) - state.anchor.y;
@@ -821,8 +877,19 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                 reason = "interaction conditions not met";
                 break;
             }
+            // Phase D §18: capability + affordance = valid interaction, checked at execution too.
+            if (ctx.self != nullptr && !ctx.self->can(verb->required)) {
+                failed = true;
+                reason = "missing capability";
+                break;
+            }
             glm::vec3 point{0.0f};
             if (resolvePoint(ctx, action.target, point)) {
+                // Phase D §17: a body using something is looking at it -- the same pose intent a
+                // targeted `Pose` publishes (ADR-300), so an inspect reads as attention on the
+                // thing rather than a stare past it.
+                state.lookTarget = point;
+                state.hasLookTarget = true;
                 const float distance = glm::length(flat(point) - flat(state.position()));
                 if (distance > verb->range) {
                     // Getting there is a `move`, written by whoever wrote the sequence. An
@@ -1115,6 +1182,7 @@ Result<ActionDesc> actionFromJson(const nlohmann::json& j) {
     action.duration = readDouble(j, "duration", 0.0);
     action.speed = readFloat(j, "speed", 0.0f);
     action.tolerance = readFloat(j, "tolerance", 0.0f);
+    action.arrival = std::max(0.0f, readFloat(j, "arrival", 0.0f));
     action.resumable = readBool(j, "resumable", true);
     if (j.contains("target")) {
         auto target = targetFromJson(j["target"]);
@@ -1160,6 +1228,9 @@ nlohmann::json actionToJson(const ActionDesc& action) {
     }
     if (action.tolerance != 0.0f) {
         j["tolerance"] = action.tolerance;
+    }
+    if (action.arrival != 0.0f) {
+        j["arrival"] = action.arrival;
     }
     if (!action.socket.empty()) {
         j["socket"] = action.socket;
@@ -1221,6 +1292,19 @@ Result<InteractionDesc> interactionFromJson(const nlohmann::json& j) {
     interaction.range = readFloat(j, "range", 1.5f);
     interaction.exclusive = readBool(j, "exclusive", true);
     interaction.onComplete = readString(j, "onComplete");
+    if (j.contains("requires")) {
+        if (!j["requires"].is_array()) {
+            return fail("interaction '{}': 'requires' must be an array of capability names",
+                        interaction.name);
+        }
+        for (const auto& c : j["requires"]) {
+            if (!c.is_string()) {
+                return fail("interaction '{}': 'requires' must be an array of capability names",
+                            interaction.name);
+            }
+            interaction.required.push_back(c.get<std::string>());
+        }
+    }
     if (j.contains("conditions")) {
         auto conditions = conditionsFromJson(j["conditions"]);
         if (!conditions) {
@@ -1260,6 +1344,9 @@ nlohmann::json interactionToJson(const InteractionDesc& interaction) {
     }
     if (!interaction.onComplete.empty()) {
         j["onComplete"] = interaction.onComplete;
+    }
+    if (!interaction.required.empty()) {
+        j["requires"] = interaction.required;
     }
     return j;
 }
@@ -1337,6 +1424,8 @@ Result<GaitSettings> gaitFromJson(const nlohmann::json& j) {
     gait.minDwell = readFloat(j, "minDwell", gait.minDwell);
     gait.accel = readFloat(j, "accel", gait.accel);
     gait.decel = readFloat(j, "decel", gait.decel);
+    // ADR-620. Either key means the author asked for a ramp; neither means they inherited one.
+    gait.accelAuthored = j.contains("accel") || j.contains("decel");
     gait.blend = readFloat(j, "blend", gait.blend);
     gait.matchRate = readBool(j, "matchRate", gait.matchRate);
     gait.rateMin = readFloat(j, "rateMin", gait.rateMin);
@@ -1364,8 +1453,14 @@ nlohmann::json gaitToJson(const GaitSettings& gait) {
     j["runExit"] = gait.runExit;
     j["turnEnter"] = gait.turnEnter;
     j["minDwell"] = gait.minDwell;
-    j["accel"] = gait.accel;
-    j["decel"] = gait.decel;
+    // **Written only when authored, or a save would promote every body to authored** (ADR-620,
+    // and it is ADR-618's shape inverted): writing the inherited default back out makes the next
+    // load see an explicit key, and a scene would silently start ramping the first time anyone
+    // saved it. The values are the defaults in that case, so dropping them round-trips identically.
+    if (gait.accelAuthored) {
+        j["accel"] = gait.accel;
+        j["decel"] = gait.decel;
+    }
     j["blend"] = gait.blend;
     if (gait.matchRate) {
         j["matchRate"] = true;
