@@ -70,7 +70,6 @@ private:
     bool librarySearched_ = false;
     std::size_t libraryCount_ = 0;
     std::string libraryLabel_;
-    char assetFilter_[64] = {};
     std::optional<assets::AssetLibrary> library_;
 };
 

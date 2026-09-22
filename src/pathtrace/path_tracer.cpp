@@ -19,27 +19,8 @@
 namespace avgen::pathtrace {
 namespace {
 
-constexpr float kPi = 3.14159265358979323846f;
-constexpr float kInvPi = 0.31830988618379067f;
-
 [[nodiscard]] bool finite(const glm::vec3& v) {
     return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-}
-
-// The emitter's colour times its intensity, with the light's colour temperature already folded in.
-// `colorTemperatureToRgb` is the project's own conversion, so a light looks the same in both
-// renderers; applying it here rather than assuming `color` is final is what keeps that true.
-[[nodiscard]] glm::vec3 lightRadiance(const scene::PunctualLight& l) {
-    return l.color * scene::colorTemperatureToRgb(l.temperature, l.tint) * l.intensity;
-}
-
-// The range window the realtime path applies, transcribed from shaders/lighting.wgsl rather than
-// reinvented, so the two renderers agree about where a light stops reaching.
-[[nodiscard]] float rangeWindow(float dist2, float range) {
-    if (range <= 0.0f) return 1.0f;
-    const float ratio = dist2 / (range * range);
-    const float w = std::clamp(1.0f - ratio * ratio, 0.0f, 1.0f);
-    return w * w;
 }
 
 struct Counters {

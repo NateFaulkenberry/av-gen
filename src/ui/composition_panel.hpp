@@ -44,7 +44,6 @@ private:
     char textBuffer_[1024] = "";
     char nameBuffer_[96] = "";
     char fontFilter_[64] = "";
-    int addKind_ = 0;
 };
 
 } // namespace avgen::ui

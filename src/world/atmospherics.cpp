@@ -46,9 +46,6 @@ bool readBool(const json& j, const char* key, bool fallback) {
 std::string readString(const json& j, const char* key, std::string fallback = {}) {
     return j.contains(key) && j.at(key).is_string() ? j.at(key).get<std::string>() : std::move(fallback);
 }
-glm::vec3 readVec3(const json& j, const char* key, glm::vec3 fallback) {
-    return j.contains(key) ? vec3FromJson(j.at(key), fallback) : fallback;
-}
 
 glm::vec3 safeNormalize(const glm::vec3& v, const glm::vec3& fallback) {
     const float len = glm::length(v);
@@ -343,42 +340,6 @@ Result<void> validateAtmosphericEffects(std::span<const AtmosphericEffect> effec
 // ---- JSON --------------------------------------------------------------------------------------
 
 namespace {
-
-json rainbowToJson(const SkyRainbow& r) {
-    return json{{"enabled", r.enabled}, {"speed", r.speed},           {"scale", r.scale},
-                {"hueOffset", r.hueOffset}, {"saturation", r.saturation}, {"brightness", r.brightness}};
-}
-SkyRainbow rainbowFromJson(const json& j) {
-    SkyRainbow r;
-    if (!j.is_object()) { return r; }
-    r.enabled = readBool(j, "enabled", r.enabled);
-    r.speed = readFloat(j, "speed", r.speed);
-    r.scale = readFloat(j, "scale", r.scale);
-    r.hueOffset = readFloat(j, "hueOffset", r.hueOffset);
-    r.saturation = readFloat(j, "saturation", r.saturation);
-    r.brightness = readFloat(j, "brightness", r.brightness);
-    return r;
-}
-
-json sparkleToJson(const Sparkle& s) {
-    return json{{"enabled", s.enabled},   {"density", s.density}, {"size", s.size},
-                {"intensity", s.intensity}, {"speed", s.speed},   {"fadeDistance", s.fadeDistance},
-                {"seed", s.seed}};
-}
-Sparkle sparkleFromJson(const json& j) {
-    Sparkle s;
-    if (!j.is_object()) { return s; }
-    s.enabled = readBool(j, "enabled", s.enabled);
-    s.density = readFloat(j, "density", s.density);
-    s.size = readFloat(j, "size", s.size);
-    s.intensity = readFloat(j, "intensity", s.intensity);
-    s.speed = readFloat(j, "speed", s.speed);
-    s.fadeDistance = readFloat(j, "fadeDistance", s.fadeDistance);
-    if (j.contains("seed") && j.at("seed").is_number_unsigned()) {
-        s.seed = j.at("seed").get<std::uint32_t>();
-    }
-    return s;
-}
 
 json timingToJson(const Timing& t) {
     return json{{"delay", t.delay},           {"lifetime", t.lifetime},
