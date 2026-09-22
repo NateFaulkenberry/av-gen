@@ -96,6 +96,7 @@ bool TriangleMesh::valid() const {
     if (indices.size() % 3 != 0) return false;
     if (normals.size() != positions.size()) return false;
     if (!uvs.empty() && uvs.size() != positions.size()) return false;
+    if (!objectPositions.empty() && objectPositions.size() != positions.size()) return false;
     return std::all_of(indices.begin(), indices.end(),
                        [&](std::uint32_t i) { return i < positions.size(); });
 }
@@ -219,7 +220,10 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         const glm::mat4 m = e.transform.matrix();
         const glm::mat3 nm = normalMatrix(m);
 
+        out.objectToWorld = m;
+        out.deforming = palette != nullptr;
         out.positions.reserve(src.vertices.size());
+        out.objectPositions.reserve(src.vertices.size());
         out.normals.reserve(src.vertices.size());
         const bool hasUv = true; // scene::Vertex always carries a uv; it is zero when unauthored
         if (hasUv) out.uvs.reserve(src.vertices.size());
@@ -235,6 +239,7 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
                 // too. Using the matrix directly shears the shading and looks like a BSDF fault.
                 nrm = glm::inverseTranspose(glm::mat3(sk)) * nrm;
             }
+            out.objectPositions.push_back(pos);
             out.positions.push_back(glm::vec3(m * glm::vec4(pos, 1.0f)));
             const glm::vec3 n = nm * nrm;
             const float len = glm::length(n);

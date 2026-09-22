@@ -70,6 +70,26 @@ TraceSequenceRequest traceSequenceRequestFrom(std::filesystem::path project,
     return r;
 }
 
+std::filesystem::path traceSequenceAovFile(const TraceSequenceRequest& request, std::uint64_t index) {
+    RenderSettings naming;
+    naming.pattern = RenderSettings::defaultPattern(RenderOutput::ExrSequence);
+    std::filesystem::path dir = request.output;
+    if (request.kind == RenderOutput::Video) {
+        dir = request.output.parent_path() / (request.output.stem().string() + "_aovs");
+    }
+    std::filesystem::path file = naming.frameFile(dir, index);
+    file.replace_extension(".aovs.exr");
+    return file;
+}
+
+namespace {
+
+std::size_t sequenceFrameBytes(const SequenceFrame& f) {
+    return f.rgba8.size() + f.rgbaF.size() * sizeof(float);
+}
+
+} // namespace
+
 // ---- the source ----------------------------------------------------------------------------------
 
 namespace {
@@ -85,6 +105,7 @@ public:
         : engine_(engine), request_(request), cancelled_(cancelled), samplesDone_(samplesDone),
           samplesTotal_(samplesTotal) {
         settings_ = traceSettingsFrom(request_.trace, request_.width, request_.height);
+        settings_.reuseAcceleration = request_.reuseAcceleration;
         samplesTotal_.store(settings_.samplesPerPixel);
         // Motion is an AOV, and the AOVs are the only consumer of the previous frame.
         wantsMotion_ = request_.trace.writeAovs;
@@ -123,12 +144,30 @@ public:
 
         pathtrace::Framebuffer fb;
         samplesDone_.store(0);
-        pathtrace::PathTracer tracer;
+        // ONE tracer for the range (ADR-583): it keeps the BVH, and `render` rebuilds only what
+        // this frame's snapshot changed. A fresh tracer per frame was a full rebuild per frame --
+        // 1.7 s on the Tree of Life, for geometry that had not changed shape.
+        pathtrace::PathTracer& tracer = tracer_;
         auto ok = tracer.render(
             snapshot, settings_, fb, [this] { return cancelled_.load(); },
             [this](std::uint32_t done, std::uint32_t) { samplesDone_.store(done); });
         if (!ok) {
             return std::unexpected(ok.error());
+        }
+        {
+            const pathtrace::TraceStats& st = tracer.stats();
+            const pathtrace::BvhUpdateStats& b = st.bvh;
+            log::info("trace sequence: frame {} bvh {:.1f} ms ({}: {}/{} objects built, {} tri built, "
+                      "{} tri kept, top level {} over {} instances, {} transforms moved; compare "
+                      "{:.1f} ms, objects {:.1f} ms, top {:.1f} ms; embree holds {:.0f} MB, peak "
+                      "{:.0f} MB), render {:.0f} ms",
+                      index, st.buildSeconds * 1000.0,
+                      settings_.reuseAcceleration ? "reuse" : "rebuild", b.objectsBuilt, b.objects,
+                      b.trianglesBuilt, b.trianglesReused, b.topLevelBuilt ? "built" : "kept",
+                      b.topLevelInstances, b.transformsChanged, b.compareSeconds * 1000.0,
+                      b.objectSeconds * 1000.0, b.topLevelSeconds * 1000.0,
+                      static_cast<double>(b.heldBytes) / 1e6, static_cast<double>(b.peakBytes) / 1e6,
+                      st.renderSeconds * 1000.0);
         }
         if (cancelled_.load()) {
             // Cancelled between batches. Not an error, and not a frame either: returning here
@@ -152,6 +191,15 @@ public:
                 return std::unexpected(d.error());
             }
             fb.radiance = std::move(denoised);
+            // `sampleCount = 1` makes the denoised radiance resolve to itself -- and would make
+            // every accumulated feature buffer resolve to N times its value in the AOV file. They
+            // are folded to one sample with it. (Depth and id are first-sample values already.)
+            if (request_.trace.writeAovs) {
+                fb.albedo = albedo;
+                fb.normal = normal;
+                fb.emission = fb.resolvedEmission();
+                fb.motion = fb.resolvedMotion();
+            }
             fb.sampleCount = 1;
         }
 
@@ -170,7 +218,22 @@ public:
             frame.rgbaF = fb.resolveRgba();
         }
         ready_.push_back(std::move(frame));
-        aovFrames_.push_back(request_.trace.writeAovs ? std::move(fb) : pathtrace::Framebuffer{});
+
+        // The AOVs, written now and released with `fb` at the end of this call. They used to be
+        // pushed onto a vector "so the writer can emit the multi-layer EXR beside the beauty
+        // frame" -- and no writer ever read it, so a range with AOVs on (the default) kept every
+        // frame's seven buffers until the job ended: ~140 MB per 1080p frame, tens of gigabytes
+        // over a long shot, and no file on disk to show for it. Written here, on this thread,
+        // because a multi-layer EXR costs milliseconds against a frame that costs seconds and it
+        // keeps nothing alive past the frame that made it.
+        if (request_.trace.writeAovs) {
+            const std::filesystem::path aov = traceSequenceAovFile(request_, index);
+            std::error_code ec;
+            std::filesystem::create_directories(aov.parent_path(), ec);
+            if (auto wrote = pathtrace::writeFramebufferAovExr(fb, aov); !wrote) {
+                return std::unexpected(wrote.error());
+            }
+        }
 
         // The scene as it was, for the next frame's motion pass. A deep copy, which is what
         // `pathtrace::Snapshot`'s own header requires: the controller mutates the scene in place
@@ -198,9 +261,12 @@ public:
 
     Result<void> end() override { return {}; }
 
-    // The AOV framebuffers for frames already collected, in order, so the writer can emit the
-    // multi-layer EXR beside the beauty frame.
-    [[nodiscard]] std::vector<pathtrace::Framebuffer>& aovFrames() { return aovFrames_; }
+    [[nodiscard]] std::size_t heldBytes() const {
+        std::size_t n = 0;
+        for (const auto& f : ready_) n += sequenceFrameBytes(f);
+        return n;
+    }
+
     void setTonemap(const scene::TonemapInputs& t) { tonemap_ = t; }
 
 private:
@@ -213,9 +279,9 @@ private:
     scene::TonemapInputs tonemap_{};
     std::uint64_t frames_ = 0;
     std::vector<SequenceFrame> ready_;
-    std::vector<pathtrace::Framebuffer> aovFrames_;
     bool wantsMotion_ = false;
     std::optional<scene::Scene> previous_;
+    pathtrace::PathTracer tracer_;   // outlives a frame so its BVH does (ADR-583)
 };
 
 } // namespace
@@ -364,5 +430,8 @@ SequenceProgress TraceSequence::progress() const {
 
 std::uint32_t TraceSequence::frameSamplesDone() const { return impl_->samplesDone.load(); }
 std::uint32_t TraceSequence::frameSamplesTotal() const { return impl_->samplesTotal.load(); }
+std::size_t TraceSequence::heldFrameBytes() const {
+    return impl_->source ? impl_->source->heldBytes() : 0;
+}
 
 } // namespace avgen::app
