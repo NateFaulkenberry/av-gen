@@ -88,7 +88,7 @@ Each was a pre-existing system claimed to meet D and never read against D. Verdi
 | 8–10 turns, looks down, observes | same: faces within 15°, look target on the mushroom below the head, ≥ 3 s still |
 | 11–12 loses interest, leaves | same: plan `completed`, no return for 20 s |
 | 13–14 another event, personality | `the same world event, two personalities…` + swapped-personality control |
-| 15–16 another alien | trace: `company/greet` / `company/avoid` (no dedicated test yet) |
+| 15–16 another alien | `the sociable alien walks over to the other one…` |
 | 17–20 UFO, looks up, returns | `an alien notices the saucer, looks up…` |
 | determinism | `the same scene twice…`, `a scrub lands on the decision the play made…` |
 
@@ -153,10 +153,10 @@ proves that source works.
 | 17 | done | 43 | partial | 69 | partial (saucer tagged `world_effect`) |
 | 18 | done | 44 | partial (crowd benchmark) | 70 | done (as far as events) |
 | 19 | done | 45 | open (doc) | 71 | done |
-| 20 | done | 46 | partial | 72 | partial (this doc + ADR-670) |
+| 20 | done | 46 | partial | 72 | done (five design docs + ADR-670/671) |
 | 21 | done | 47 | done | 73 | n/a (ordering) |
 | 22 | done | 48 | open | 74 | partial |
-| 23 | partial (interest over percepts) | 49 | partial | 75 | open (final report) |
+| 23 | partial (interest over percepts) | 49 | partial | 75 | done (docs/reports/…-phase-d-report.md; perf rows to re-take) |
 | 24 | done (minimal) | 50 | done | 76 | done |
 | 25 | done | 51 | open (research note) | 77 | done (pasture) |
 | 26 | done | 52 | open | 78 | done (this table) |
@@ -168,3 +168,20 @@ the shore creep (approach inside minRange, then the novelty memory discounting t
 tick after choosing it); a 16-percept capacity cut dropping the saucer; a watch interrupted by the
 stall breaker at exactly its dwell; greet/avoid alternating inside two seconds; and a scrub 111 m
 from the play. Each is fixed where it lives and cited in the code at the fix.
+
+**2026-09-21 (later): Glowmere and the director.** The owner's rulings are applied (see "Owner
+rulings"). Running the shipping cast exposed three decision loops, all now fixed. The owner then
+chose to replay the director on seek (ADR-671), and the film now scrubs exactly. Along the way two
+more replay defects were found: the director tier was never applied in seek, and the limiter read
+the wrong previous speed.
+
+**Handover / open.**
+- Re-take on a quiet machine: the scrub cost ratio (ADR-671) and the crowd benchmark, including the
+  500 and 1,000 rows.
+- Exactness past the 90 s window needs whole-history replay or checkpoints (§63). That is the
+  owner's call.
+- §36 cinematic signals, §40's canvas overlay beyond the route label, §44's per-subsystem
+  breakdown, §45 threading and §48's inspector are not built. Personality and perception knobs are
+  registered parameters, so the generic parameter panels already show them.
+- Three pre-existing GPU failures on the base commit (`glowmere_valley_2_views`, `sdf_gpu`
+  shadows), plus `frame_profiler` timing under load.
