@@ -50,6 +50,14 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     comp.attach(params, modulator);
 
     for (const char* path : {"scene/volumeDensity", "scene/fogHeight", "scene/fogHeightFalloff",
+                             // ADR-568 (§7): drawn beside the falloff, so they are asked for here.
+                             "scene/fogUpperDensity", "scene/fogHeightCurve",
+                             // ADR-570 (§20/§22): the self-shadow march's two controls.
+                             "scene/volumeShadowSteps", "scene/volumeShadowStrength",
+                             // ADR-573 (§27): two controls that shipped without a way to reach them.
+                             "scene/volumeLocalLights", "scene/volumeMaxDistance",
+                             // ADR-574: ADR-058's coupling, reachable at last.
+                             "scene/fogHeightAmount",
                              "env/intensity", "env/sky/intensity"}) {
         INFO(path);
         CHECK(registered(params, path));

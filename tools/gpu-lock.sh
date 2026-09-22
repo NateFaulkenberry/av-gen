@@ -9,7 +9,7 @@
 #   tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[water]"
 #   tools/gpu-lock.sh ./build/release/src/avgen --headless --frames 120 ...
 #
-# BEFORE YOU READ THE RESULT: docs/testing.md, "Eighteen ways a green suite has lied".
+# BEFORE YOU READ THE RESULT: docs/testing.md, "Forty ways a green suite has lied".
 #
 # It is here because it is not findable from anywhere else. Two agents in one night each
 # walked into a hazard that section already described accurately -- one of them by name,
@@ -26,6 +26,13 @@
 # `$?` immediately after the binary, in the same shell, and read it TOGETHER with the
 # summary: an exit code with no summary is a crash, a summary that disagrees with the exit
 # code is a tooling fault, and neither is a pass.
+#
+# AND THE CPU SUITE COUNTS AS GPU WORK. `avgen_tests` encodes video through the same system
+# frameworks this suite renders with. Run concurrently on 2026-09-21 the CPU suite died with
+# SIGTRAP inside CVPixelBufferPoolCreatePixelBuffer and the render suite reported a DETERMINISM
+# failure -- one project, two fresh engines, two different sequence hashes. Run one after the
+# other, both are clean. Serialise them; a run taken while the other suite is up is not evidence,
+# whichever way it came out. docs/testing.md 29.
 #
 # AND THE INPUTS ARE LIVE. `ShaderLibrary` loads `.wgsl` from the SOURCE TREE when a case asks
 # for a module, so editing a shader while a suite is running mixes two versions into one run --

@@ -942,7 +942,7 @@ over six minutes) and **stable** (bit-identical one period later, and different 
 so the check is about the period rather than about the layer doing nothing).
 
 The bounded/stable probes first read **exactly 0.00000 m** because they measured the head's
-*position* on a flat rig, where rotating a sibling moves nothing. That is `docs/testing.md` #26, and
+*position* on a flat rig, where rotating a sibling moves nothing. That is `docs/testing.md` #33, and
 the second confident zero this rig has produced in one phase.
 
 # Phase C

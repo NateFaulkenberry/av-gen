@@ -679,7 +679,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesCrown",
           "motion": {
             "stiffness": 9.0,
             "mass": 40.0,
@@ -733,7 +733,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 9.0,
             "mass": 40.0,
@@ -787,7 +787,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 9.0,
             "mass": 40.0,
@@ -842,7 +842,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 9.0,
             "mass": 40.0,
@@ -897,7 +897,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesCrown",
           "motion": {
             "stiffness": 12.0,
             "mass": 55.0,
@@ -952,7 +952,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesCrown",
           "motion": {
             "stiffness": 12.0,
             "mass": 55.0,
@@ -1007,7 +1007,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 20.0,
             "mass": 60.0,
@@ -1061,7 +1061,7 @@
           "hueFieldScale": 44.0,
           "hueRandom": 0.035,
           "emissiveSparsity": 0.14,
-          "materialProgram": "",
+          "materialProgram": "glowmereFirefliesScaled",
           "motion": {
             "stiffness": 20.0,
             "mass": 60.0,
@@ -7627,6 +7627,36 @@
         "state": "Walk",
         "updateHz": 30
       },
+      "asset": "../../assets/farm/bull.glb",
+      "kind": "gltf",
+      "name": "bull-21",
+      "position": [
+        -74,
+        17.45,
+        -264
+      ],
+      "rotation": [
+        0.0,
+        -14.2,
+        0.0
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true
+    },
+    {
+      "animation": {
+        "blend": 0.3,
+        "cullDistance": 280.0,
+        "farHz": 15.0,
+        "nearDistance": 20.0,
+        "speed": 1.0,
+        "state": "Walk",
+        "updateHz": 30
+      },
       "asset": "../../assets/farm/horse.glb",
       "kind": "gltf",
       "name": "horse-2",
@@ -7747,6 +7777,36 @@
         "state": "Walk",
         "updateHz": 30
       },
+      "asset": "../../assets/farm/cow.glb",
+      "kind": "gltf",
+      "name": "cow-23",
+      "position": [
+        -146,
+        40.07,
+        -78
+      ],
+      "rotation": [
+        0.0,
+        -121.4,
+        0.0
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true
+    },
+    {
+      "animation": {
+        "blend": 0.3,
+        "cullDistance": 280.0,
+        "farHz": 15.0,
+        "nearDistance": 20.0,
+        "speed": 1.0,
+        "state": "Walk",
+        "updateHz": 30
+      },
       "asset": "../../assets/farm/bull.glb",
       "kind": "gltf",
       "name": "bull-10",
@@ -7807,6 +7867,36 @@
         "state": "Walk",
         "updateHz": 30
       },
+      "asset": "../../assets/farm/horse.glb",
+      "kind": "gltf",
+      "name": "horse-22",
+      "position": [
+        -89,
+        19.88,
+        -67
+      ],
+      "rotation": [
+        0.0,
+        73.6,
+        0.0
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "visible": true
+    },
+    {
+      "animation": {
+        "blend": 0.3,
+        "cullDistance": 280.0,
+        "farHz": 15.0,
+        "nearDistance": 20.0,
+        "speed": 1.0,
+        "state": "Walk",
+        "updateHz": 30
+      },
       "asset": "../../assets/farm/cow.glb",
       "kind": "gltf",
       "name": "cow-12",
@@ -7826,6 +7916,119 @@
         1.94
       ],
       "visible": true
+    },
+    {
+      "name": "tree-fireflies",
+      "kind": "particles",
+      "_note": "Fireflies round one tree in three. The clusters are fly-chorus's (examples/weather/fireflies.scene.json) with their centres moved onto real trees: scatterAnchor reads the valley's eight tree layers, keeps the instances whose instanceRandom.w is below 0.3876 and that emissiveSparsity left lit -- 0.3876 x 0.86 lit = one in three of all trees -- and each frame the nearest clusterCount of them within viewDistance become the table the swarms are born round. Each fly keeps the tree it was born at and the attractor, orbit included, circles it there. Past 30-50 m the glowmereFireflies* material programs take over on the same trees (they test the same instanceRandom.w), so this and they are one effect at two distances. Every other number is fly-chorus's and breaks the same uniformity it breaks there, except two: size is doubled to 0.07 because fly-chorus is seen from eight metres and these from ten to fifty, where 3.4 cm is under a pixel and a fly winks out between pixels rather than on its own pulse; and volumeGlow is 0 because the aggregate is one sphere and these swarms are spread over a hundred metres.",
+      "particles": {
+        "enabled": true,
+        "capacity": 1536,
+        "seed": 71,
+        "shape": "point",
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "scatterAnchor": {
+          "terrain": "valley",
+          "layers": [
+            "canopy",
+            "canopy-broad",
+            "twisted",
+            "twisted-low",
+            "pine-upper",
+            "pine-rim",
+            "deadwood",
+            "deadwood-rim"
+          ],
+          "randomBelow": 0.3876,
+          "litOnly": true,
+          "viewDistance": 50.0
+        },
+        "clusterCount": 64,
+        "clusterRadius": 1.6,
+        "spawnRate": 110.0,
+        "lifetimeMin": 5.0,
+        "lifetimeMax": 11.0,
+        "direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "spread": 1.0,
+        "speedMin": 0.05,
+        "speedMax": 0.3,
+        "gravity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "drag": 1.1,
+        "turbulence": 0.55,
+        "turbulenceScale": 0.55,
+        "turbulenceSpeed": 0.45,
+        "windInfluence": 0.25,
+        "pauseRate": 0.9,
+        "pauseFraction": 0.62,
+        "pulseRate": 0.0,
+        "pulseDepth": 0.0,
+        "pulseSync": 0.88,
+        "pulseSharpness": 9.0,
+        "attractorPosition": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "attractorStrength": 0.3,
+        "attractorRadius": 5.0,
+        "orbit": 0.3,
+        "sizeVariance": 0.45,
+        "sizeSkew": 1.8,
+        "sizeStart": 0.07,
+        "sizeEnd": 0.07,
+        "colorStart": [
+          1.0,
+          0.92,
+          0.42,
+          1.0
+        ],
+        "colorEnd": [
+          0.75,
+          1.0,
+          0.35,
+          1.0
+        ],
+        "opacityCurve": [
+          {
+            "t": 0.0,
+            "value": 0.0
+          },
+          {
+            "t": 0.08,
+            "value": 1.0
+          },
+          {
+            "t": 0.88,
+            "value": 1.0
+          },
+          {
+            "t": 1.0,
+            "value": 0.0
+          }
+        ],
+        "emissive": 9.0,
+        "blend": "additive",
+        "softness": 0.2,
+        "volumeGlow": 0.0,
+        "fogCoupling": 0.8
+      }
     }
   ],
   "post": {
@@ -7846,7 +8049,9 @@
     "../materials/glowmere2-painted-ground.material.json",
     "../materials/glowmere2-tissue.material.json",
     "../materials/glowmere2-tissue-cool.material.json",
-    "../materials/glowmere2-cap.material.json"
+    "../materials/glowmere2-cap.material.json",
+    "../materials/glowmere-fireflies-crown.material.json",
+    "../materials/glowmere-fireflies-scaled.material.json"
   ],
   "wind": {
     "enabled": true,
@@ -8743,6 +8948,67 @@
     {
       "behaviors": [
         {
+          "bounce": 0.026,
+          "bounceRate": 0.84,
+          "kind": "liveliness",
+          "nod": 1.15,
+          "sway": 2.08,
+          "swayRate": 0.218
+        },
+        {
+          "arrive": 0.88,
+          "homeRadius": 18.24,
+          "kind": "wander",
+          "maxRange": 14.31,
+          "minRange": 1.8,
+          "pauseMax": 5.34,
+          "pauseMin": 1.08,
+          "runSpeed": 3.0911,
+          "speed": 1.9319,
+          "turnRate": 76.3
+        },
+        {
+          "bodyRadius": 1.46,
+          "footprint": 2.65,
+          "kind": "ground",
+          "slopeAlign": 0.55
+        }
+      ],
+      "clips": {
+        "idle": "Walk",
+        "run": "Walk",
+        "turn": "Walk",
+        "walk": "Walk"
+      },
+      "coarseInterval": 0.1,
+      "cullDistance": 260.0,
+      "fullDetailDistance": 90.0,
+      "gait": {
+        "accel": 3.0932,
+        "decel": 4.2518,
+        "idleRate": 0.0,
+        "matchRate": true,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
+        "rateMax": 1.0,
+        "rateMin": 0.005,
+        "runEnter": 3.0911,
+        "runExit": 2.2218,
+        "runSpeed": 3.2375,
+        "walkSpeed": 3.2375
+      },
+      "name": "bull-21",
+      "node": "bull-21",
+      "seed": 20356111,
+      "tags": [
+        "animal",
+        "farm",
+        "bull"
+      ]
+    },
+    {
+      "behaviors": [
+        {
           "kind": "liveliness",
           "bounce": 0.057,
           "bounceRate": 1.04,
@@ -8987,6 +9253,67 @@
     {
       "behaviors": [
         {
+          "bounce": 0.024,
+          "bounceRate": 0.86,
+          "kind": "liveliness",
+          "nod": 2.19,
+          "sway": 2.5,
+          "swayRate": 0.098
+        },
+        {
+          "arrive": 0.57,
+          "homeRadius": 15.5,
+          "kind": "wander",
+          "maxRange": 13.02,
+          "minRange": 2.48,
+          "pauseMax": 3.45,
+          "pauseMin": 1.13,
+          "runSpeed": 2.5554,
+          "speed": 1.5973,
+          "turnRate": 110.0
+        },
+        {
+          "bodyRadius": 1.21,
+          "footprint": 2.2,
+          "kind": "ground",
+          "slopeAlign": 0.55
+        }
+      ],
+      "clips": {
+        "idle": "Walk",
+        "run": "Walk",
+        "turn": "Walk",
+        "walk": "Walk"
+      },
+      "coarseInterval": 0.1,
+      "cullDistance": 260.0,
+      "fullDetailDistance": 90.0,
+      "gait": {
+        "accel": 2.5543,
+        "decel": 3.5136,
+        "idleRate": 0.0,
+        "matchRate": true,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
+        "rateMax": 1.0,
+        "rateMin": 0.0054,
+        "runEnter": 2.5554,
+        "runExit": 1.8371,
+        "runSpeed": 3.0122,
+        "walkSpeed": 3.0122
+      },
+      "name": "cow-23",
+      "node": "cow-23",
+      "seed": 20371933,
+      "tags": [
+        "animal",
+        "farm",
+        "cow"
+      ]
+    },
+    {
+      "behaviors": [
+        {
           "kind": "liveliness",
           "bounce": 0.033,
           "bounceRate": 0.81,
@@ -9100,6 +9427,67 @@
       "name": "horse-11",
       "node": "horse-11",
       "seed": 20340118,
+      "tags": [
+        "animal",
+        "farm",
+        "horse"
+      ]
+    },
+    {
+      "behaviors": [
+        {
+          "kind": "liveliness",
+          "bounce": 0.057,
+          "bounceRate": 1.03,
+          "sway": 1.91,
+          "swayRate": 0.152,
+          "nod": 2.12
+        },
+        {
+          "arrive": 0.65,
+          "homeRadius": 20.35,
+          "kind": "wander",
+          "maxRange": 14.0,
+          "minRange": 2.63,
+          "pauseMax": 6.24,
+          "pauseMin": 1.6,
+          "runSpeed": 2.6066,
+          "speed": 1.6291,
+          "turnRate": 81.5
+        },
+        {
+          "kind": "ground",
+          "slopeAlign": 0.55,
+          "footprint": 2.11,
+          "bodyRadius": 1.16
+        }
+      ],
+      "clips": {
+        "idle": "Walk",
+        "run": "Walk",
+        "turn": "Walk",
+        "walk": "Walk"
+      },
+      "coarseInterval": 0.1,
+      "cullDistance": 260.0,
+      "fullDetailDistance": 90.0,
+      "gait": {
+        "accel": 2.6082,
+        "decel": 3.5836,
+        "idleRate": 0.0,
+        "matchRate": true,
+        "moveEnter": 0.0323,
+        "moveExit": 0.0162,
+        "rateMax": 1.0,
+        "rateMin": 0.0051,
+        "runEnter": 2.6066,
+        "runExit": 1.8732,
+        "runSpeed": 3.1577,
+        "walkSpeed": 3.1577
+      },
+      "name": "horse-22",
+      "node": "horse-22",
+      "seed": 20364022,
       "tags": [
         "animal",
         "farm",
@@ -9676,6 +10064,10 @@
               {
                 "role": "actor.beam",
                 "steps": [
+                  {
+                    "kind": "hide",
+                    "name": "beamOut"
+                  },
                   {
                     "kind": "set",
                     "name": "beamFall",

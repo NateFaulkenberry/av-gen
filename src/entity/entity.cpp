@@ -1275,7 +1275,7 @@ void EntityWorld::seek(double time, params::ParameterSet* params, const signals:
             // one layer up. A decision taken during a replay pushes onto the queue the replay is
             // already integrating, so the replayed second contains the errand the played one did.
             bc.actions = &entity.actions_;
-            // ADR-620, and it is applied on BOTH paths for the reason testing.md #31 gives: a
+            // ADR-620, and it is applied on BOTH paths for the reason testing.md #38 gives: a
             // limit honoured by `update` and not by `seek` is a body that accelerates differently
             // when scrubbed than when played, which is exactly the class ADR-360 exists to stop.
             const float speedBefore = entity.state_.speed;
@@ -1616,7 +1616,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.state_.reaction = 0.0f;
         // Cleared on BOTH paths, deliberately: `seek` and `update` reset the per-frame state
         // separately, so a field cleared in one and not the other is cleared for a played frame
-        // and latched for a scrubbed one (ADR-619, testing.md #31).
+        // and latched for a scrubbed one (ADR-619, testing.md #38).
         entity.state_.activity = Activity::Idle;
         entity.state_.turnRate = 0.0f;
         entity.state_.driven = false;

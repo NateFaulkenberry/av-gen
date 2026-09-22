@@ -66,9 +66,14 @@ scene::Scene voidWorld(bool vortexOn, float fogDensity, glm::vec3 eye) {
         const world::EffectSchema* schema = world::effectSchema(e.kind);
         REQUIRE(schema != nullptr);
         REQUIRE(schema->resolve.pack != nullptr);
+        // ADR-566: `packMediumSlot` is the ONE writer of these bytes -- the kind's packer, the
+        // reserved-lane check and the kind tag, in the order that is correct. This used to call
+        // `pack` and then set `.kind` by hand, which is a second copy of the ordering rule and
+        // left lane 15 (the tag the SHADER reads) at zero. It happened to work because zero is
+        // the vortex; a fog bank here would have rendered as a vortex and nothing would have said
+        // so, which is exactly the defect ADR-562 §9 is about.
         s.atmospherics.mediumCount = 1;
-        schema->resolve.pack(e, 1.0f, s.atmospherics.media[0]);
-        s.atmospherics.media[0].kind = static_cast<std::uint32_t>(e.kind);
+        world::packMediumSlot(e, 1.0f, s.atmospherics.media[0]);
     }
     return s;
 }
@@ -196,8 +201,7 @@ TEST_CASE("two placed media in one scene are both marched", "[gpu][vortex][media
         const world::EffectSchema* schema = world::effectSchema(e.kind);
         REQUIRE(schema != nullptr);
         REQUIRE(schema->resolve.pack != nullptr);
-        schema->resolve.pack(e, 1.0f, s.atmospherics.media[slot]);
-        s.atmospherics.media[slot].kind = static_cast<std::uint32_t>(e.kind);
+        world::packMediumSlot(e, 1.0f, s.atmospherics.media[slot]); // ADR-566: the one writer
         s.atmospherics.mediumCount = std::max(s.atmospherics.mediumCount, slot + 1u);
     };
 

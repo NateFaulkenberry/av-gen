@@ -397,6 +397,7 @@ void Window::saveFileDialog(SaveKind kind, std::function<void(std::string)> onCh
     }
     pendingDialog_ = std::move(onChosen);
     static const SDL_DialogFileFilter projectFilters[] = {{"avgen project", "json"}};
+    static const SDL_DialogFileFilter sceneFilters[] = {{"avgen scene", "json"}};
     // QuickTime first: it is the container ProRes needs, and ProRes is the default codec.
     static const SDL_DialogFileFilter videoFilters[] = {{"QuickTime movie", "mov"},
                                                         {"MPEG-4 video", "mp4;m4v"},
@@ -404,7 +405,10 @@ void Window::saveFileDialog(SaveKind kind, std::function<void(std::string)> onCh
     static const SDL_DialogFileFilter exrFilters[] = {{"OpenEXR image", "exr"}};
     const SDL_DialogFileFilter* filters = projectFilters;
     int count = 1;
-    if (kind == SaveKind::Video) {
+    if (kind == SaveKind::Scene) {
+        filters = sceneFilters;
+        count = 1;
+    } else if (kind == SaveKind::Video) {
         filters = videoFilters;
         count = 3;
     } else if (kind == SaveKind::Exr) {

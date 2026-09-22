@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-21
 **Related:** ADR-182 (a probe that cannot fail), ADR-559 (a monotone metric is a direction),
-ADR-609 (recall is not a quality measure), `docs/testing.md` #26 and "this rig produces convincing
+ADR-609 (recall is not a quality measure), `docs/testing.md` #33 and "this rig produces convincing
 zeros", Phase C §11
 **Implemented by:** `src/scene/motion_database.hpp` (`MotionCostWeights::continuityPerSecond`,
 default 0)

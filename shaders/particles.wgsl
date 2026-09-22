@@ -76,6 +76,12 @@ struct Particle {
     // unchanged and every existing pool is bit-identical: a system with no collision response
     // writes 0 here exactly where it used to write 0 there.
     stage: f32,
+    // Scatter-anchored clusters (scene::ScatterAnchor): the crown centre this particle was born
+    // round, w = 1. It is kept per particle rather than looked up in the table each step because
+    // the table follows the camera: a tree that leaves it must not drag its swarm across the valley
+    // to whichever tree took its slot. All zero for every other system, and then the attractor
+    // below is `params.attractor`, exactly as it always was.
+    home: vec4<f32>,
 };
 
 struct Params {
@@ -106,6 +112,7 @@ struct Params {
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
     fog: vec4<f32>,         // volume density, fog height, height falloff, absorption
     fog2: vec4<f32>,        // volume max distance, fog coupling 0..1, glow strength, linear depth 1/0
+    fog3: vec4<f32>,        // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
     // ADR-370: leaf cards. x = shape (0 round, 1 leaf), y = tumble rate (rad/s), z = leaf aspect
     // (length over width), w = two-sided shading depth. All zero is the round dot this always was.
     leaf: vec4<f32>,
@@ -136,6 +143,9 @@ struct Params {
     sizeKeys: array<vec4<f32>, 8>,    // (t, value, 0, 0)
     opacityKeys: array<vec4<f32>, 8>, // (t, value, 0, 0)
     colorKeys: array<vec4<f32>, 8>,   // (t, r, g, b)
+    // Scatter-anchored clusters: x = anchors in the table, y = 1 when the system is anchored.
+    anchorInfo: vec4<f32>,
+    anchors: array<vec4<f32>, 64>,    // crown centres chosen on the CPU for this camera, w = 1
 };
 
 struct DrawArgs {
@@ -322,7 +332,20 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
     // centre from its own uniform box instead would have quietly ignored the emitter shape, which
     // is how a disc emitter ends up spawning a cube of fireflies.
     let clusterCount = u32(max(params.cluster.x, 0.0));
-    if (clusterCount > 0u) {
+    var home = vec4<f32>(0.0);
+    if (params.anchorInfo.y > 0.5) {
+        // Scatter-anchored: the cluster centres are real trees (the CPU's table for this camera),
+        // not `clusterRand` points. Which tree a spawn joins is spawn randomness -- keyed to the
+        // frame like every other spawn roll -- but the tree itself is a place in the world and the
+        // same place at every time the shot can be scrubbed to. The CPU emits nothing when the
+        // table is empty, so `n` is never zero here; the max() only keeps the modulo defined.
+        let n = max(u32(params.anchorInfo.x), 1u);
+        let pick = min(u32(rand3(slot, frame, 5u).x * f32(n)), n - 1u);
+        let a = params.anchors[pick].xyz;
+        let jitter = sphereDir(r1.xy) * pow(r1.z, 1.0 / 3.0) * params.cluster.y;
+        offset = a + jitter - centre;
+        home = vec4<f32>(a, 1.0);
+    } else if (clusterCount > 0u) {
         let c = slot % clusterCount;
         let cr = clusterRand(c, 17u);
         var cOffset = (cr * 2.0 - 1.0) * params.extent.xyz;
@@ -333,6 +356,7 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
         offset = cOffset + jitter;
     }
     p.position = centre + offset;
+    p.home = home;
     let randomDir = sphereDir(r2.xy);
     let dir = normalize(mix(baseDir, randomDir, params.extent.w) + vec3<f32>(1e-5));
     let speed = mix(params.speedLife.x, params.speedLife.y, r2.z);
@@ -421,7 +445,11 @@ fn cs_simulate(@builtin(global_invocation_id) gid: vec3<u32>) {
         // with the wind and then stops accelerating, which is what drag against moving air does.
         force += (flow * params.windMix.x - vec3<f32>(p.velocity.x, 0.0, p.velocity.z)) * params.windMix.x;
     }
-    let toA = params.attractor.xyz - p.position;
+    // A scatter-anchored particle circles the tree it was born at; everything else circles the
+    // system's attractor. `select` picks the same float it always read when `home.w` is 0, so no
+    // other system's arithmetic changes.
+    let attractAt = select(params.attractor.xyz, p.home.xyz, p.home.w > 0.5);
+    let toA = attractAt - p.position;
     let dist = length(toA) + 1e-4;
     let falloff = clamp(1.0 - dist / max(params.attractor2.x, 1e-3), 0.0, 1.0);
     let dirA = toA / dist;
@@ -1019,7 +1047,7 @@ fn fogTransmittance(origin: vec3<f32>, dir: vec3<f32>, dist: f32) -> f32 {
         // a third statement of the model, written out here -- the shape ADR-562 §9 names: every
         // reader of a shared model is a call site to audit, and a reader that restates it is one
         // edit away from being a different atmosphere in the same frame.
-        sum += fogHeightProfile(y - params.fog.y, params.fog.z);
+        sum += fogHeightProfile(y - params.fog.y, params.fog.z, params.fog3.x, params.fog3.y);
     }
     return exp(-density * params.fog.w * (sum * 0.25) * dist);
 }

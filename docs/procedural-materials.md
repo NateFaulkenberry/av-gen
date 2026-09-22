@@ -251,8 +251,8 @@ written against ADR-030 still loads, still validates and still evaluates to the 
 | Offset | Field | Contents |
 |---|---|---|
 | 0 | `outputs` (ivec4) | baseColor, metallic, roughness, emission registers |
-| 16 | `opacityCountPad` (ivec4) | opacity register, **base** op count, layer count, 0 |
-| 32 | `emissionIntensityPad` (vec4) | emissionIntensity, 0, 0, 0 |
+| 16 | `opacityCountPad` (ivec4) | opacity register, **base** op count, layer count, gate lane + 1 (0 = no instance test) |
+| 32 | `emissionIntensityPad` (vec4) | emissionIntensity, gate `below`, gate `near`, gate `far` |
 | 48 | `aux` (ivec4) | normal, occlusion, height registers, total packed op count |
 | 64 | `fieldSlots` (ivec4) | the FieldBlock slot of each distinct field the program names, -1 = unused (ADR-050) |
 | 80 | `layers[4]` | 64 bytes each: `outputs` (baseColor, metallic, roughness, emission), `aux` (normal, occlusion, mask, height), `range` (firstOp, opCount, 0, 0), `params` (emissionIntensity, blendRange, 0, 0) |
@@ -442,6 +442,34 @@ corrected, **before** normal mapping), `uv`, `viewDirection` (fragment → camer
 are new `FrameUniforms` lanes filled from the render's `AnalysisFrame` (rms, bands 0/2/4 as
 bass/mid/treble; bands 1/3 plus the spectral centroid and flux; beat phase, `1 - phase` as the
 pulse, onset strength and a 4/4 bar phase). Without an analysis frame they are zero.
+
+### The gate
+
+A program may say where it runs at all:
+
+```json
+"gate": { "lane": 3, "below": 0.3876, "near": 30.0, "far": 340.0 }
+```
+
+It then runs only on instances whose `instanceRandom[lane] < below`, and only on fragments at
+least `near` and less than `far` metres from the camera (`near` 0 and `far` 0 are no edge; `lane`
+may be left out for a distance band alone). On every other fragment the surface takes the
+**program-less** path, exactly: no interpreter, no early ambient-occlusion read, the material's
+own emission lane — the same pixels as a material with no program at all, and none of the
+program's cost but `materialGeometry`'s four derivatives, which the draw takes anyway. That is the
+difference from a `threshold` op or a `cameraDistance` fade inside the program, which mask the
+result to nothing but still run every op and still take the program path's occlusion read on
+every fragment. On Glowmere's forest (`glowmere-fireflies-*`) the ungated program cost a third
+more scene-pass time, nearly all of it on trees and distances where it drew nothing.
+
+A program should fade its own effect to nothing at the band's edges, so that crossing one is
+invisible: the gate is where the program stops paying, not where its effect stops.
+
+The gate varies per fragment, so it is not uniform control flow: `materialGeometry`'s derivatives
+stay behind the per-draw `programIndex >= 0` guard and are simply unused on a refused fragment. The
+CPU reference (`evaluateMaterialProgram`) returns the base unchanged for a refused context (it reads
+`depth` as the camera distance), and a program without a gate packs zeros in the gate lanes and
+behaves as it always did.
 
 ### Limits
 

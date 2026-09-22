@@ -106,6 +106,21 @@ falloff of 1.4 the old constant left 0.37% of the column outside, so it was stil
 constant that was derived from one function and is still correct under another is a coincidence,
 and the control that ends the coincidence is the one nobody moved.**
 
+**This is ADR-389's family, and it is the clearest instance of it in the tree.** ADR-389: *a
+coefficient tuned against a quantity is invalidated by a change to that quantity's distribution.*
+The three-sigma rule was not a guess -- it was **correct**, for the distribution it was written
+against. What invalidated it was ADR-563 changing the shape the constant described, in a different
+file, one ADR earlier, **by me**. Nothing connected the two: no test failed, no comment pointed
+from the profile to the bound, and the bound's own comment went on describing a Gaussian tail that
+no longer existed.
+
+So the rule this ADR is asking for is narrower and more actionable than "audit your constants":
+**when you change the SHAPE of a quantity, grep for the constants that were sized against the old
+shape.** They are not near the change -- that is the point of them being constants -- and they do
+not announce themselves. In this case the search term was `thickness * 3`, and the thing that
+would have found it is asking, at the moment of writing the new profile, *what else knows how far
+this reaches?*
+
 The fix: carry `bankLength` horizontally, and solve `exp(-h * falloff) = 0.01` vertically, floored
 at the old three thicknesses and capped at forty. 1% of the column left outside, which is below
 what a frame can show.
@@ -167,6 +182,13 @@ be written by both. So it is published from one.
     rendered.
   - The arms run at 256 steps. They are shape arms, not cost arms: at the shipped 32 the march's
     own sampling grain is louder than the silhouette and all six read as the same speckled blob --
+    **and ADR-577 corrects what that speckle is.** "The march's own sampling grain" reads as the
+    per-pixel start jitter and it is not: measured, the jitter's contribution to a frame's
+    high-frequency content at 32 steps and above is a ratio of **1.000** against the jitter off.
+    The speckle is the medium sampled too coarsely along the ray; the jitter is what breaks up its
+    banding rather than what causes it. The arms are still right to run at 256 steps and the
+    sentence below is still true; only the cause named here was wrong, and a misattributed cause
+    sends the next person to the wrong knob --
     §48's point made against my own diagnostic. Cost is Phase I's, with its own arms under the lock.
 
 ## Revisit when

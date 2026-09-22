@@ -160,7 +160,8 @@ std::string usageText() {
            "                      (.mov/.mp4/...); size/fps/range/codec from the project's render settings\n"
            "  --format <kind>     render output kind: png (default for a directory), exr (scene-linear half\n"
            "                      EXR sequence, before tone mapping), or video\n"
-           "  --range <a>:<b>     render time range in seconds (either side may be empty)\n"
+           "  --range <a>:<b>     render time range in seconds (either side may be empty); with\n"
+           "                      --headless and no --render, every benchmark block starts at <a>\n"
            "  --codec <id>        video codec: prores4444, prores422, h264, hevc, or an ffmpeg encoder name\n"
            "  --quality <0-100>   video quality\n"
            "  --queue <file>      run a render queue (JSON list of projects and render settings), headless\n"
@@ -1470,7 +1471,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         panel_->shaderErrorFor = [this](std::uint32_t id) { return renderer_->shaderStack().errorFor(id); };
         panel_->onSaveScene = [this] {
-            window_->saveFileDialog(platform::Window::SaveKind::Project, [this](std::string path) {
+            window_->saveFileDialog(platform::Window::SaveKind::Scene, [this](std::string path) {
                 if (path.empty()) return;
                 if (auto r = engine_->saveComposition(path); !r) {
                     panel_->setStatus(r.error().message);
@@ -1496,11 +1497,14 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->onAddGltfNode = addAssetNode(scene::NodeKind::Gltf, platform::Window::DialogKind::Scene);
         panel_->onAddSceneNode = addAssetNode(scene::NodeKind::Scene, platform::Window::DialogKind::Any);
         auto saveTo = [this](const std::filesystem::path& path) { saveProjectTo(path); };
-        panel_->onSaveProject = [this, saveTo] {
-            window_->saveFileDialog(platform::Window::SaveKind::Project, [saveTo](std::string path) {
-                if (!path.empty()) {
-                    saveTo(path);
+        // Save As takes its own copies. Cmd+S (`onSaveProjectHere`) still writes in place, because
+        // re-copying every asset on every save would be a different command wearing the same name.
+        panel_->onSaveProject = [this] {
+            window_->saveFileDialog(platform::Window::SaveKind::Project, [this](std::string path) {
+                if (path.empty()) {
+                    return;
                 }
+                saveProjectAsCopyTo(std::filesystem::path(path));
             });
         };
         panel_->onSaveProjectHere = [this, saveTo] {
@@ -2446,6 +2450,28 @@ void Application::startRenderFromUi() {
 // modal's Yes all come through here, so "what counts as a successful save" cannot have two answers
 // (ADR-440) -- and `Engine::saveProject` is what clears the dirty state, so the gate reading
 // `projectDirtyCached()` afterwards is reading the save's own verdict rather than a second one.
+// Save As, with copies. The bookkeeping below is `saveProjectTo`'s, because "what counts as a
+// successful save" must not grow a second answer (ADR-440) -- only the writing differs.
+void Application::saveProjectAsCopyTo(const std::filesystem::path& path) {
+    storeOutputsToProject();
+    if (auto r = engine_->saveProjectAsCopy(path); !r) {
+        log::error("save project as: {}", r.error().message);
+        if (panel_ != nullptr) {
+            panel_->setStatus(r.error().message);
+        }
+        return;
+    }
+    const auto written = engine_->projectPath();
+    if (panel_ != nullptr) {
+        panel_->setStatus("saved " + written.filename().string() + " with its own assets");
+    }
+    edits_.markSaved();
+    rememberProject(written);
+    touchedSinceDirtySample_ = false;
+    lastDirtySample_ = std::chrono::steady_clock::now();
+    refreshWindowTitle();
+}
+
 void Application::saveProjectTo(const std::filesystem::path& path) {
     storeOutputsToProject();
     if (auto r = engine_->saveProject(path); !r) {
@@ -5678,7 +5704,10 @@ int Application::runHeadless() {
         // Every block renders the same frame range from the same start, or the arms are not being
         // compared on the same work: a scene whose second 2 differs from its second 0 would put
         // the difference between two blocks into the difference between two arms.
-        clock.restartAt(0.0);
+        // `--range a:` moves that start off zero, so a benchmark can measure the shot the change is
+        // about rather than whatever the timeline opens on -- the multicam opens fifty metres up,
+        // where nothing near the ground is in reach. Still one start for every block.
+        clock.restartAt(options_.rangeStart.value_or(0.0));
         renderer_->resetTemporalHistory();
         if (schedule.size() > 1) {
             log::info("--- block {}/{}: arm '{}' ---", blockIndex + 1, schedule.size(), block.arm);
@@ -5907,11 +5936,14 @@ int Application::runHeadless() {
                               st.entityLod.rungs[1], st.entityLod.rungs[2], st.entityLod.rungs[3],
                               st.entityLod.rungs[4], st.entityLod.changed, st.entityLod.held);
                 }
-                log::info("             workload: volumeSteps={} volumeTarget={}x{} cascades={} shadowRes={} aoTarget={}x{} "
+                log::info("             workload: volumeSteps={} volumeTarget={}x{} "
+                          "media={}+{}dropped fogShadow={}steps cascades={} shadowRes={} aoTarget={}x{} "
                           "aoSlices={}x{} shadowMask={}x{}/{}L postPasses={} bloomLevels={} "
                           "sdf={}ray/{}mesh simGrids={} "
                           "transient={} wind={}obj plants={}/{}awake ({} examined, {} slot writes)",
-                          st.volume.steps, st.volume.marchWidth, st.volume.marchHeight, st.shadows.cascades, st.shadows.resolution, st.ao.width,
+                          st.volume.steps, st.volume.marchWidth, st.volume.marchHeight,
+                          st.volume.media, st.volume.mediaDropped, st.volume.shadowSteps,
+                          st.shadows.cascades, st.shadows.resolution, st.ao.width,
                           st.ao.height, st.ao.slices, st.ao.steps, st.shadowMask.width, st.shadowMask.height,
                           st.shadowMask.lights, st.post.passes, st.post.bloomLevels,
                           st.sdf.raymarchObjects, st.sdf.meshObjects, st.simulation.grids,
@@ -6047,6 +6079,7 @@ int Application::runHeadless() {
             record.counters.particleCapacity = medianOfStat([](const RS& s) { return s.particles.capacity; });
             record.counters.particlesEmitted =
                 medianOfStat([](const RS& s) { return s.particles.emittedThisFrame; });
+            record.counters.particleAnchors = medianOfStat([](const RS& s) { return s.particles.anchors; });
             record.counters.transientTextures = medianOfStat([](const RS& s) { return s.transientTextures; });
             record.counters.entities = medianOfStat([](const RS& s) { return s.entities; });
             record.counters.computeDispatches = medianOfStat([](const RS& s) { return s.computeDispatches; });

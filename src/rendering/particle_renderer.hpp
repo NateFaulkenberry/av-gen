@@ -8,6 +8,7 @@
 
 #include "core/error.hpp"
 #include "core/time.hpp"
+#include "scene/scatter_anchors.hpp"
 #include "scene/scene.hpp"
 
 #include <glm/glm.hpp>
@@ -55,6 +56,10 @@ struct ParticleUniforms {
     glm::vec4 trail2;     // tail alpha fraction, tail tint rgb
     glm::vec4 fog;        // volume density, fog height, height falloff, absorption
     glm::vec4 fog2;       // volume max distance, fog coupling, glow strength, 0
+    // ADR-568 (§7): the height layer's shape. Here because this pass estimates its own
+    // transmittance through the SAME layer the march integrates (ADR-567), and a reader
+    // left on the old model is a third atmosphere in the same frame.
+    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, 0, 0
     glm::vec4 leaf;       // ADR-370: shape (0 round, 1 leaf), tumble rate, aspect, two-sided depth
     // ADR-370: ADR-055's packed wind field, so `cs_simulate` can sample the same air the tree bends
     // in without the particle pipelines growing a frame bind group they have never had.
@@ -79,8 +84,14 @@ struct ParticleUniforms {
     glm::vec4 sizeKeys[scene::kMaxCurveKeys];    // (t, value, 0, 0)
     glm::vec4 opacityKeys[scene::kMaxCurveKeys]; // (t, value, 0, 0)
     glm::vec4 colorKeys[scene::kMaxCurveKeys];   // (t, r, g, b)
+    // Scatter-anchored clusters (scene::ScatterAnchor): x = anchors in the table this frame,
+    // y = 1 when the system is anchored at all, zw = 0. The table is the crown centres the CPU
+    // chose for this camera (scene/scatter_anchors.hpp), xyz = centre, w = 1.
+    glm::vec4 anchorInfo;
+    glm::vec4 anchors[scene::kMaxScatterAnchors];
 };
-static_assert(sizeof(ParticleUniforms) == 128 + 16 * 37 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys);
+static_assert(sizeof(ParticleUniforms) == 128 + 16 * 39 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys +
+                                              16 * scene::kMaxScatterAnchors);
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
@@ -106,6 +117,8 @@ struct ParticleFrameContext {
     float fogDensity = 0.0f;
     float fogHeight = 0.0f;
     float fogHeightFalloff = 0.0f;
+    float fogUpperDensity = 0.0f;   // ADR-568
+    float fogHeightCurve = 0.0f;    // ADR-568
     float fogAbsorption = 1.0f;
     float fogMaxDistance = 200.0f;
     // The ADR-035 R32F linear-depth target, resolved by the depth prepass. Null disables the fog
@@ -129,6 +142,7 @@ struct ParticleStats {
     std::uint32_t glowSystems = 0;      // systems injecting light into the volume (ADR-040)
     std::uint64_t trailBytes = 0;       // history rings currently allocated
     std::uint32_t dispatches = 0;       // compute passes encoded this frame (one per enabled system)
+    std::uint32_t anchors = 0;          // scatter anchors in use this frame, over every anchored system
     double simulateMs = -1.0;           // GPU time of the compute passes (emit..compaction) of the last measured frame; -1 = none / unavailable
 };
 
@@ -216,7 +230,18 @@ private:
         wgpu::BindGroup renderGroup;
         wgpu::TextureView renderDepthView; // the linear-depth view renderGroup was built against
         bool needsReset = true;
+        // A disabled pool is SKIPPED, not stepped, so its particles do not age while it is
+        // off -- they are frozen, not drained. Re-enabling the system somewhere else thaws
+        // them at the new position: Glowmere's tractor beam resumed a five-second pool 210 m
+        // from where it was hidden, as stray particles in unrelated shots. This remembers the
+        // previous frame's state so the transition into disabled can empty the pool once.
+        bool wasEnabled = false;
         bool trailWarned = false; // the memory budget refusal is logged once per pool
+        // Scatter anchors: every gated instance of the named layers, rebuilt when the objects'
+        // structure moves (`anchorVersion`), and the camera's selection from it each frame.
+        std::vector<scene::ScatterAnchorPoint> anchorPoints;
+        std::uint64_t anchorVersion = 0;
+        bool anchorBuilt = false;
     };
 
     Result<void> createPipelines(const wgpu::ShaderModule& module);

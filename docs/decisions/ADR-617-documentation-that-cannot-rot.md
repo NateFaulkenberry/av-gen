@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-21
 **Related:** ADR-615 (staged and dark; the tenth shape), ADR-558 (a control that does nothing),
-ADR-616 (three instrument defects), `docs/testing.md` #29, #31
+ADR-616 (three instrument defects), `docs/testing.md` #36, #38
 **Implemented by:** `src/entity/character_ai.hpp` §0 and §2
 
 ---

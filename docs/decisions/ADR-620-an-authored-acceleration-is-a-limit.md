@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-21
 **Related:** ADR-360 (a scrubbed frame reproduces a played one), ADR-618 (a key read and never
-written), ADR-619 (`turnRate`), ADR-621, ADR-622, `docs/testing.md` #31 and #32
+written), ADR-619 (`turnRate`), ADR-621, ADR-622, `docs/testing.md` #38 and #39
 **Implemented by:** `limitSpeedToGait` and the gait history requirement in `src/entity/entity.cpp`,
 `GaitSettings::accelAuthored`, the `accel`/`decel` parse and write in `src/entity/action.cpp`;
 `fa85caa3`. Follow-on: `Gait::playbackRate` in `src/entity/gait.cpp`, `a4dff7b1`

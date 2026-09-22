@@ -137,6 +137,10 @@ public:
     // unsaved-changes comparison below is the *same function* the save is -- a second serialiser
     // written "to match" is the shape of defect this codebase keeps finding (ADR-440).
     [[nodiscard]] nlohmann::json projectDocument(const std::filesystem::path& path);
+    // Copies every asset the project names into `assetsDir` and writes `projectFile` with
+    // references rewritten to point at the copies. Shared by `exportBundle` and Save As.
+    [[nodiscard]] Result<void> bundleInto(const std::filesystem::path& projectFile,
+                                          const std::filesystem::path& assetsDir);
     // Restores the assets first (a missing one is a warning, see projectWarnings()), then the
     // rest. Fails only when the document itself is invalid.
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
@@ -217,6 +221,10 @@ public:
     // Copies every referenced file into <dir>/assets (scene files rewritten with relative
     // references) and writes <dir>/project.json pointing at the copies.
     [[nodiscard]] Result<void> exportBundle(const std::filesystem::path& dir);
+    // Save As: writes `path` together with its own copies of every asset it names, in
+    // `<stem>_assets/` beside it, and re-opens the session on the copy so later edits cannot
+    // write back over the originals.
+    [[nodiscard]] Result<void> saveProjectAsCopy(const std::filesystem::path& path);
 
     // ---- the 2D composition (ADR-083) ----
     // The layer stack drawn over the finished 3D frame. Every layer property is a parameter in

@@ -22,7 +22,7 @@
 namespace avgen::rendering {
 
 namespace {
-constexpr std::uint32_t kParticleStride = 48;
+constexpr std::uint32_t kParticleStride = 64; // particles.wgsl `Particle`, home included
 constexpr std::uint32_t kWorkgroup = 64;   // cs_emit / cs_simulate
 constexpr std::uint32_t kScanBlock = 1024; // slots per compaction workgroup (256 threads x 4)
 // 0 uniforms, 1 particles, 2 dead list, 3 counters + indirect draw args, 4 alive list,
@@ -525,8 +525,23 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
             resetPool(pool);
         }
         if (!sys.enabled) {
+            // Emptied on the frame it goes off, not on the frame it comes back. A pool that is
+            // merely skipped keeps its particles at the age and the position they had when the
+            // system was disabled, and the next enabled frame resumes them wherever the emitter
+            // has since travelled to. Draining by waiting is not available: ageing only happens
+            // on the stepped path below, which a disabled system never reaches.
+            if (pool.wasEnabled) {
+                // Emptied here rather than by setting `needsReset`: the reset check above has
+                // already run for this frame, so deferring it would leave the pool full for one
+                // more frame than this comment claims. Invisible today, because a disabled system
+                // is not drawn either -- but a claim the code does not keep is the kind that gets
+                // relied on later, and the GPU test asserts the frame this says it does.
+                resetPool(pool);
+                pool.wasEnabled = false;
+            }
             continue;
         }
+        pool.wasEnabled = true;
         const double dt = std::clamp(time.deltaTime, 0.0, 0.1);
         // ADR-360. How many spawns this frame owes, as a function of WHERE ON THE TIMELINE it is
         // rather than of a carry accumulated since the render started. The total emitted by time t
@@ -537,12 +552,55 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         // changes by a particle. What it fixes is the case the carry could not express: a render,
         // or a warm-up, that starts at t > 0 and has no carry to inherit. It is also partition
         // independent, so a stalled frame and two short ones emit the same total.
-        const double rate = static_cast<double>(sys.spawnRate) * static_cast<double>(frame_.spawnScale);
+        // Scatter-anchored clusters (scene::ScatterAnchor). The candidates -- every gated instance of
+        // the named layers -- are rebuilt only when those objects' structure moves; the table is
+        // then chosen for this camera, which makes it a function of where the camera is and never
+        // of which frames came before (ADR-360).
+        std::vector<glm::vec3> anchorTable;
+        const bool anchored = sys.scatterAnchor.active() && sys.clusterCount > 0;
+        const std::uint32_t anchorSlots = std::min(sys.clusterCount, scene::kMaxScatterAnchors);
+        if (anchored) {
+            const std::uint64_t version = scene::scatterAnchorVersion(scene.procedurals, sys.scatterAnchor);
+            if (!pool.anchorBuilt || version != pool.anchorVersion) {
+                scene::ScatterAnchorSet set = scene::scatterAnchorPoints(scene.procedurals, sys.scatterAnchor);
+                // Said out loud, because the failure this guards against is a swarm system that
+                // loads, finds no trees and draws nothing -- indistinguishable, in a frame, from
+                // a camera that simply has none nearby.
+                for (const std::string& layer : set.missing) {
+                    log::warn("particles '{}': scatterAnchor layer '{}' names no scatter object with instances "
+                              "(looked for '{}')",
+                              sys.name, layer, scene::scatterObjectName(sys.scatterAnchor.terrain, layer));
+                }
+                log::info("particles '{}': {} of {} scatter instances carry a swarm ({:.1f}%; {} of them lit)",
+                          sys.name, set.points.size(), set.considered,
+                          set.considered > 0 ? 100.0 * static_cast<double>(set.points.size()) /
+                                                   static_cast<double>(set.considered)
+                                             : 0.0,
+                          set.lit);
+                pool.anchorPoints = std::move(set.points);
+                pool.anchorVersion = set.version;
+                pool.anchorBuilt = true;
+            }
+            anchorTable = scene::nearestScatterAnchors(pool.anchorPoints, frame_.cameraPosition,
+                                                       sys.scatterAnchor.viewDistance, anchorSlots);
+            if (!warming_) {
+                stats_.anchors += static_cast<std::uint32_t>(anchorTable.size());
+            }
+        }
+        double rate = static_cast<double>(sys.spawnRate) * static_cast<double>(frame_.spawnScale);
+        if (anchored) {
+            // `spawnRate` is the rate with the table full, so a tree's swarm is as dense when three
+            // trees are in reach as when sixty are.
+            rate *= static_cast<double>(anchorTable.size()) / static_cast<double>(std::max(anchorSlots, 1u));
+        }
         const double owed = std::floor(rate * time.renderTime) - std::floor(rate * (time.renderTime - dt));
         std::uint32_t emitCount =
             owed > 0.0 ? static_cast<std::uint32_t>(std::min(owed, static_cast<double>(pool.capacity))) : 0u;
         emitCount += static_cast<std::uint32_t>(std::max(0.0f, sys.burst));
         emitCount = std::min(emitCount, pool.capacity);
+        if (anchored && anchorTable.empty()) {
+            emitCount = 0; // nowhere to be born
+        }
 
         // Spline emitters (ADR-026) need an uploaded spline; otherwise the shape falls back to Point.
         int splineSlot = -1;
@@ -595,6 +653,8 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.fog = glm::vec4(frame_.fogDensity, frame_.fogHeight, frame_.fogHeightFalloff, frame_.fogAbsorption);
         u.fog2 = glm::vec4(frame_.fogMaxDistance, std::clamp(sys.fogCoupling, 0.0f, 1.0f),
                            std::max(0.0f, sys.volumeGlow), frame_.linearDepth ? 1.0f : 0.0f);
+        u.fog3 = glm::vec4(std::clamp(frame_.fogUpperDensity, 0.0f, 1.0f),
+                           std::clamp(frame_.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
         // Lifetime curves (ADR-040): at most kMaxCurveKeys keys each; fewer than two disables the
         // curve in the shader and the linear ramp above is used instead.
         const auto keyCount = [](std::size_t n) {
@@ -664,6 +724,10 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         const float sunLen = glm::length(frame_.sunDirection);
         u.sun = sunLen > 1e-4f ? glm::vec4(frame_.sunDirection / sunLen, 1.0f) : glm::vec4(0.0f);
         u.sunColor = glm::vec4(frame_.sunColor, 0.0f);
+        u.anchorInfo = glm::vec4(static_cast<float>(anchorTable.size()), anchored ? 1.0f : 0.0f, 0.0f, 0.0f);
+        for (std::size_t k = 0; k < anchorTable.size(); ++k) {
+            u.anchors[k] = glm::vec4(anchorTable[k], 1.0f);
+        }
         context_.queue().WriteBuffer(pool.uniforms, 0, &u, sizeof(u));
 
         // Pass order (see particles.wgsl): emit -> simulate -> reduce -> top scan -> scatter.

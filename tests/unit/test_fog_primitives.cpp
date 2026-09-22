@@ -272,3 +272,169 @@ TEST_CASE("the bank is what ADR-563 left it", "[fog][primitive]") {
     CHECK(world::fogPrimitiveDistance(sa, glm::vec3(0.0f, 999.0f, 70.0f)) ==
           Approx(world::fogEllipticalRadius(sa, glm::vec3(0.0f, 999.0f, 70.0f))));
 }
+
+
+TEST_CASE("the density response curve is identity at its defaults and a curve away from them",
+          "[fog][density]") {
+    // ADR-571, the brief's §24: raw density -> remap -> final density, with Density, Contrast,
+    // Threshold and Softness exposed. Two properties, and the first is the one that makes the
+    // second safe to ship.
+    //
+    // **`Contrast` was a dead knob before this.** The row has existed since this kind did and all
+    // three styles set it -- Valley Mist 1.5, Glowmere Haze 2.6, Dense Bank 3.4 -- and since
+    // ADR-563 gave the fog its own field nothing read the number. Delete the `pow` in
+    // `fogDensityRemap` and the third section fails; before ADR-571 every assertion in it would
+    // have passed against a field that ignored the control entirely.
+    auto plain = primitive(world::FogShape::Sphere, 1.0f);
+    setRow(plain, "densityThreshold", 0.0f);
+    setRow(plain, "densitySoftness", 0.0f);
+    plain.vortex.field.contrast = 1.0f;
+
+    SECTION("at threshold 0, softness 0 and contrast 1 the curve does nothing") {
+        // The default a bank is made with, so this is the promise that §24 is opt-in. `1e-4` is
+        // float rounding through a divide and a clamp, not a tolerance on the behaviour.
+        const world::MediumSlot m = slotOf(plain);
+        for (const float s : {0.0f, 0.05f, 0.31f, 0.5f, 0.87f, 1.0f}) {
+            INFO("raw density " << s);
+            CHECK(world::fogDensityRemap(m, s) == Approx(s).margin(1e-4));
+        }
+    }
+
+    SECTION("a threshold clears thin density and renormalises what is left") {
+        auto e = plain;
+        setRow(e, "densityThreshold", 0.4f);
+        const world::MediumSlot m = slotOf(e);
+        CHECK(world::fogDensityRemap(m, 0.2f) == 0.0f);   // below it: clear air
+        CHECK(world::fogDensityRemap(m, 0.4f) == 0.0f);   // exactly at it
+        CHECK(world::fogDensityRemap(m, 0.7f) == Approx(0.5f));  // halfway up what remains
+        CHECK(world::fogDensityRemap(m, 1.0f) == Approx(1.0f));  // and the core is untouched
+    }
+
+    SECTION("contrast is a response curve and it REACHES the field") {
+        auto dense = plain;
+        dense.vortex.field.contrast = 3.0f;
+        auto thin = plain;
+        thin.vortex.field.contrast = 0.4f;
+        const world::MediumSlot md = slotOf(dense);
+        const world::MediumSlot mt = slotOf(thin);
+        // Above 1 the mid-range thins and the core stays; below 1 the mid-range fills out. The
+        // ends are fixed points of x^k, which is what makes this a CURVE rather than a scale.
+        CHECK(world::fogDensityRemap(md, 0.5f) < 0.5f);
+        CHECK(world::fogDensityRemap(mt, 0.5f) > 0.5f);
+        CHECK(world::fogDensityRemap(md, 1.0f) == Approx(1.0f));
+        CHECK(world::fogDensityRemap(md, 0.0f) == Approx(0.0f));
+
+        // ...and the same numbers reach `fogShapeAt`, which is the half that was missing: the
+        // control was declared and packed and the field never read it.
+        //
+        // Sampled ON THE RIM and not in the core, because 0 and 1 are fixed points of `x^k`: the
+        // first version of this assertion read the centre of the sphere, got 1.0 from both arms
+        // and failed -- correctly. A curve has to be measured where the curve is.
+        auto rimDense = dense;
+        auto rimThin = thin;
+        setRow(rimDense, "edgeSoftness", 0.6f);
+        setRow(rimThin, "edgeSoftness", 0.6f);
+        const world::MediumSlot rd = slotOf(rimDense);
+        const world::MediumSlot rt = slotOf(rimThin);
+        const glm::vec3 p(100.0f, 0.0f, 0.0f); // the sphere's surface: rim is mid-range here
+        const float withDense = world::fogShapeAt(rd, p);
+        const float withThin = world::fogShapeAt(rt, p);
+        INFO("fogShapeAt with contrast 3.0 = " << withDense << ", with 0.4 = " << withThin);
+        REQUIRE(withThin > 0.0f);
+        CHECK(withDense < withThin);
+    }
+}
+
+
+TEST_CASE("the bank's glow can follow its height", "[fog][emission]") {
+    // ADR-575, the brief's §26: "Optional emission: intensity, color, height influence, density
+    // influence." The march had three of the four. This is the fourth, and it is a SEPARATE number
+    // from the density's height influence on purpose -- a bank can be densest at its floor and
+    // glow evenly, or be uniform and glow only where it is low.
+    auto e = primitive(world::FogShape::Bank, 1.0f);
+    setRow(e, "groundHug", 0.0f);     // densest layer at the floor
+    setRow(e, "heightFalloff", 3.0f); // thinning quickly above it
+
+    SECTION("at zero it is exactly uniform, which is what it has always been") {
+        setRow(e, "emissionHeight", 0.0f);
+        const world::MediumSlot m = slotOf(e);
+        for (const float y : {-60.0f, -10.0f, 0.0f, 25.0f, 90.0f}) {
+            INFO("y = " << y);
+            REQUIRE(world::fogEmissionHeight(m, y) == 1.0f);
+        }
+    }
+
+    SECTION("at one it follows the density's own vertical profile") {
+        // Reusing `fogVerticalProfile` rather than introducing a second vertical shape is the
+        // decision under test: one vertical model for the medium. A version with its own curve
+        // would pass "the glow fades upward" and fail this.
+        setRow(e, "emissionHeight", 1.0f);
+        const world::MediumSlot m = slotOf(e);
+        for (const float y : {-60.0f, -10.0f, 0.0f, 25.0f, 90.0f}) {
+            INFO("y = " << y);
+            // `.margin` rather than a relative tolerance: the profile is 5.8e-5 at the top of
+            // this range, and `1 + (p - 1)` differs from `p` by float rounding that is nothing in
+            // absolute terms and enormous relative to 5.8e-5. A relative tolerance on a quantity
+            // that legitimately approaches zero is a test that fails where the value stops
+            // mattering.
+            CHECK(world::fogEmissionHeight(m, y) ==
+                  Approx(world::fogVerticalProfile(m, y)).margin(1e-6));
+        }
+    }
+
+    SECTION("it is independent of the DENSITY's height influence") {
+        // The two are different rows and must stay different numbers. Setting one must not move
+        // the other, which is the check that they did not end up sharing a lane slot.
+        setRow(e, "emissionHeight", 1.0f);
+        setRow(e, "heightInfluence", 0.0f);
+        const float a = world::fogEmissionHeight(slotOf(e), 30.0f);
+        setRow(e, "heightInfluence", 1.0f);
+        const float b = world::fogEmissionHeight(slotOf(e), 30.0f);
+        INFO("glow at y=30 with density influence 0 and 1: " << a << ", " << b);
+        CHECK(a == b);
+        CHECK(a < 1.0f); // ...and the control is doing something, or the equality is free
+    }
+}
+
+TEST_CASE("a preset is a starting point, not a continuation", "[fog][presets]") {
+    // ADR-579, the brief's §37: "Presets are starting points, not hard-coded special effects."
+    //
+    // `applyStyle` opens with `v = Vortex{}` and a comment explaining exactly why: "a fog preset
+    // applied to an effect that was a vortex a moment ago must not leave a spiral and a throat
+    // behind, and a preset that only set what it wanted would." **That argument is right and it
+    // covers half the parameters.** Since ADR-566 a fog bank's shape, its drift, its density curve
+    // and its glow height live in `AtmosphericEffect::values`, and nothing resets those -- so a
+    // preset applied after an artist set Shape to Box gets a box, and after another preset gets
+    // that preset's leftovers.
+    //
+    // The property, stated so it cannot be satisfied by accident: **applying B must give the same
+    // effect whether or not A was applied first.** Delete the stored-row reset from `applyStyle`
+    // and this fails on the first pair.
+    const world::EffectSchema& s = fogSchema();
+    REQUIRE(!s.styles.empty());
+
+    for (const world::EffectStyle& a : s.styles) {
+        for (const world::EffectStyle& b : s.styles) {
+            world::AtmosphericEffect viaA = s.factory("p");
+            a.apply(viaA);
+            // ...and an artist's own edits in between, which is the case a preset must survive
+            // being applied after.
+            setRow(viaA, "shape", static_cast<float>(static_cast<int>(world::FogShape::Box)));
+            setRow(viaA, "driftSpeed", 17.0f);
+            setRow(viaA, "densityThreshold", 0.7f);
+            b.apply(viaA);
+
+            world::AtmosphericEffect fresh = s.factory("p");
+            b.apply(fresh);
+
+            INFO("'" << b.name << "' applied after '" << a.name << "' and an edit");
+            for (const world::EffectField& f : s.fields) {
+                if (!f.stored || f.type != world::FieldType::Float) {
+                    continue;
+                }
+                INFO("row " << f.leaf);
+                CHECK(world::fieldFloat(f, s, viaA) == world::fieldFloat(f, s, fresh));
+            }
+        }
+    }
+}

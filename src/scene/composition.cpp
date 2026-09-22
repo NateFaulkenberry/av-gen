@@ -11,6 +11,7 @@
 #include "scene/camera.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/mesh_metrics.hpp"
+#include "scene/scatter_anchors.hpp"
 #include "scene/sky.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -50,9 +51,11 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
+    "fogUpperDensity", "fogHeightCurve",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex"};
 constexpr std::string_view kSkyKeys[] = {
@@ -531,6 +534,15 @@ json particlesToJson(const ParticleSystem& s) {
         j["clusterCount"] = s.clusterCount;
         j["clusterRadius"] = s.clusterRadius;
     }
+    if (s.scatterAnchor.active()) {
+        json a = json::object();
+        a["terrain"] = s.scatterAnchor.terrain;
+        a["layers"] = s.scatterAnchor.layers;
+        a["randomBelow"] = s.scatterAnchor.randomBelow;
+        a["litOnly"] = s.scatterAnchor.litOnly;
+        a["viewDistance"] = s.scatterAnchor.viewDistance;
+        j["scatterAnchor"] = std::move(a);
+    }
     if (s.pauseRate != 0.0f) {
         j["pauseRate"] = s.pauseRate;
         j["pauseFraction"] = s.pauseFraction;
@@ -727,6 +739,36 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
             return fail("'clusterCount' must be a positive integer");
         }
         s.clusterCount = j.at("clusterCount").get<std::uint32_t>();
+    }
+    if (j.contains("scatterAnchor")) {
+        const json& a = j.at("scatterAnchor");
+        if (!a.is_object()) {
+            return fail("'scatterAnchor' must be an object");
+        }
+        auto terrain = readString(a, "terrain", "");
+        auto randomBelow = readFloat(a, "randomBelow", s.scatterAnchor.randomBelow);
+        auto litOnly = readBool(a, "litOnly", s.scatterAnchor.litOnly);
+        auto viewDistance = readFloat(a, "viewDistance", s.scatterAnchor.viewDistance);
+        if (!terrain || !randomBelow || !litOnly || !viewDistance) {
+            return fail("'scatterAnchor' needs a string 'terrain', numeric 'randomBelow' and 'viewDistance' and a "
+                        "boolean 'litOnly'");
+        }
+        if (!a.contains("layers") || !a.at("layers").is_array() || a.at("layers").empty()) {
+            return fail("'scatterAnchor' needs a non-empty 'layers' array of scatter layer names");
+        }
+        for (const json& layer : a.at("layers")) {
+            if (!layer.is_string()) {
+                return fail("'scatterAnchor.layers' entries must be strings");
+            }
+            s.scatterAnchor.layers.push_back(layer.get<std::string>());
+        }
+        if (terrain->empty()) {
+            return fail("'scatterAnchor' needs the name of the terrain node whose layers it reads");
+        }
+        s.scatterAnchor.terrain = *terrain;
+        s.scatterAnchor.randomBelow = *randomBelow;
+        s.scatterAnchor.litOnly = *litOnly;
+        s.scatterAnchor.viewDistance = *viewDistance;
     }
     for (const auto& [key, target] : {std::pair<const char*, std::uint32_t*>{"trailLength", &s.trailLength},
                                       std::pair<const char*, std::uint32_t*>{"trailStride", &s.trailStride}}) {
@@ -1308,6 +1350,8 @@ void prefixFieldReferences(ParticleSystem& ps, const std::string& prefix) {
         f.field = prefixed(prefix, f.field);
     }
     ps.spline = prefixed(prefix, ps.spline);
+    // The terrain's scatter objects are named with the same prefix (scatterObjectName below).
+    ps.scatterAnchor.terrain = prefixed(prefix, ps.scatterAnchor.terrain);
 }
 void prefixSdfReferences(spatial::SdfNode& node, const std::string& prefix) {
     node.reference = prefixed(prefix, node.reference);
@@ -4160,6 +4204,14 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                        -20.0f, 40.0f));
     fogHeightFalloff_ = &params.add(floatDesc(prefix_ + "scene/fogHeightFalloff", volumeSetting_.fogHeightFalloff,
                                               0.0f, 10.0f, 0.0f, 1.0f));
+    // ADR-568 (§7). Both hard-clamped to 0..1: `upper` is a fraction of the layer's density and
+    // `curve` a blend weight, and a modulation route driving either outside that range would be
+    // asking for a profile that is not a profile -- negative density, or an extrapolation past the
+    // compact family into one whose integral this does not compute.
+    fogUpperDensity_ = &params.add(floatDesc(prefix_ + "scene/fogUpperDensity", volumeSetting_.fogUpperDensity,
+                                             0.0f, 1.0f, 0.0f, 1.0f));
+    fogHeightCurve_ = &params.add(floatDesc(prefix_ + "scene/fogHeightCurve", volumeSetting_.fogHeightCurve,
+                                            0.0f, 1.0f, 0.0f, 1.0f));
     volumeScattering_ = &params.add(floatDesc(prefix_ + "scene/volumeScattering", volumeSetting_.volumeScattering,
                                               0.0f, 20.0f, 0.0f, 4.0f));
     volumeAbsorption_ = &params.add(floatDesc(prefix_ + "scene/volumeAbsorption", volumeSetting_.volumeAbsorption,
@@ -4181,6 +4233,42 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                                       .softMin = 8,
                                                       .softMax = 96,
                                                       .label = "scene/volumeSteps"});
+    // ADR-570 (§20/§22). The hard maximum is 16 rather than the march's 256: this runs INSIDE the
+    // march, once per light that lights the air, so its cost is multiplicative and a slider that
+    // can reach 256 is a slider that can stall a frame by a factor of a hundred. The soft range
+    // stops at 8, which ADR-570's measurement says is past the point where more steps change the
+    // picture.
+    volumeShadowSteps_ = &params.add(params::ParamDesc<int>{.path = prefix_ + "scene/volumeShadowSteps",
+                                                            .defaultValue = volumeSetting_.volumeShadowSteps,
+                                                            .hardMin = 0,
+                                                            .hardMax = 16,
+                                                            .softMin = 0,
+                                                            .softMax = 8,
+                                                            .label = "scene/volumeShadowSteps"});
+    volumeShadowStrength_ = &params.add(floatDesc(prefix_ + "scene/volumeShadowStrength",
+                                                  volumeSetting_.volumeShadowStrength, 0.0f, 8.0f, 0.0f, 2.0f));
+    // ADR-573, the fog brief's §27: "where practical, local lights should interact with the fog ...
+    // this could be a major visual upgrade for Glowmere and Tree of Life." The interaction has
+    // existed since ADR-053 and reaches the shader through `glow.y`. What did not exist was any
+    // way to ask for it: no parameter, so no panel row, no automation, no modulation route. Twelve
+    // shipped scenes set it -- every Glowmere scene among them -- and every one of them had to be
+    // hand-edited to do it.
+    volumeLocalLights_ = &params.add(floatDesc(prefix_ + "scene/volumeLocalLights",
+                                               volumeSetting_.volumeLocalLights, 0.0f, 8.0f, 0.0f, 2.0f));
+    // ADR-573: the same, for how far the march goes. Thirty-two shipped scenes set it and none of
+    // them could have done so from the editor. The hard maximum is generous because a scene whose
+    // subject is kilometres of air legitimately wants one; the soft range is where a frame budget
+    // survives.
+    volumeMaxDistance_ = &params.add(floatDesc(prefix_ + "scene/volumeMaxDistance",
+                                               volumeSetting_.volumeMaxDistance, 0.01f, 20000.0f,
+                                               10.0f, 4000.0f));
+    // ADR-574: ADR-058's coupling -- how much of the volumetric's mist layer the SURFACE fog
+    // integrates. It had no parameter, on a recorded reason that turned out to be false about the
+    // four lines it sits on (see the comment at the assignment below). The feature is live: the
+    // shader reads it, the renderer uploads it, two GPU cases exercise it at 0 and 1, and nine
+    // shipped scenes set it -- all of them by hand, because there was no row to move.
+    fogHeightAmount_ = &params.add(floatDesc(prefix_ + "scene/fogHeightAmount",
+                                             volumeSetting_.fogHeightAmount, 0.0f, 1.0f, 0.0f, 1.0f));
     // ADR-461. The soft range is the whole of 0..1 because the whole of it is usable and the
     // interesting end is the low one -- a slider whose useful region is in its first hair is the
     // `scene/windSpeed` defect this project has already fixed once.
@@ -5077,6 +5165,8 @@ void Composition::detach() {
     volumeDensity_ = nullptr;
     fogHeight_ = nullptr;
     fogHeightFalloff_ = nullptr;
+    fogUpperDensity_ = nullptr;
+    fogHeightCurve_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -5099,6 +5189,11 @@ void Composition::detach() {
     volumeNoiseSpeed_ = nullptr;
     volumeEmission_ = nullptr;
     volumeSteps_ = nullptr;
+    volumeShadowSteps_ = nullptr;
+    volumeShadowStrength_ = nullptr;
+    volumeLocalLights_ = nullptr;
+    volumeMaxDistance_ = nullptr;
+    fogHeightAmount_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     gridIntensity_ = nullptr;
@@ -5885,7 +5980,7 @@ void Composition::rebuild() {
                     }
                 }
                 ProceduralGeometry pg;
-                pg.name = sanitise(prefix_) + node.name + "_" + layer.name;
+                pg.name = scatterObjectName(sanitise(prefix_) + node.name, layer.name);
                 pg.source.kind = PrimitiveKind::Mesh;
                 pg.source.asset = layer.asset;
                 pg.source.meshBudget = layer.meshBudget;
@@ -7681,6 +7776,8 @@ void Composition::applyParameters() {
         env.volumeDensity = pick(volumeDensity_, volumeSetting_.volumeDensity);
         env.fogHeight = pick(fogHeight_, volumeSetting_.fogHeight);
         env.fogHeightFalloff = pick(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
+        env.fogUpperDensity = pick(fogUpperDensity_, volumeSetting_.fogUpperDensity);
+        env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
         env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
         env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
         env.volumeAnisotropy = pick(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -7689,10 +7786,15 @@ void Composition::applyParameters() {
         env.volumeNoiseSpeed = pick(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
         env.volumeEmission = pick(volumeEmission_, volumeSetting_.volumeEmission);
         env.volumeSteps = volumeSteps_ != nullptr ? volumeSteps_->value() : volumeSetting_.volumeSteps;
+        env.volumeShadowSteps = volumeShadowSteps_ != nullptr ? volumeShadowSteps_->value()
+                                                             : volumeSetting_.volumeShadowSteps;
+        env.volumeShadowStrength = pick(volumeShadowStrength_, volumeSetting_.volumeShadowStrength);
         env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
-        env.volumeMaxDistance = volumeSetting_.volumeMaxDistance;
+        env.volumeMaxDistance = pick(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
+        // ADR-573 (§27): picked, not copied. It used not to be assigned here at all.
+        env.volumeLocalLights = pick(volumeLocalLights_, volumeSetting_.volumeLocalLights);
         // Field names are prefixed like every other reference so a nested scene stays self-contained.
         env.volumeDensityField =
             volumeDensityFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeDensityFieldSetting_;
@@ -7700,9 +7802,22 @@ void Composition::applyParameters() {
             volumeColorFieldSetting_.empty() ? std::string() : sanitise(prefix_) + volumeColorFieldSetting_;
         // ADR-055. A live `scene/windSpeed` parameter so the whole field can be turned up, down or
         // off without editing the file -- which is also how the A/B measurement is taken.
-        // ADR-058: the distance fog's share of the mist layer and the styled hemisphere travel with
-        // the rest of the atmosphere; nothing about them is animated, so they are copied, not picked.
-        env.fogHeightAmount = volumeSetting_.fogHeightAmount;
+        // ADR-574. The comment that used to stand here said the distance fog's share of the mist
+        // layer and the styled hemisphere "are copied, not picked" because "nothing about them is
+        // animated". **It was false about the four lines it covered**: `styledSkyAmbient` and
+        // `styledGroundAmbient` are registered parameters and ARE picked, two lines down. Someone
+        // gave them parameters and left the reason saying they had not.
+        //
+        // And the surviving half of the reason was circular. Nothing animated `fogHeightAmount`
+        // because nothing COULD: with no parameter there is no keyframe, no route and no row. A
+        // reason that is true only because of the thing it justifies is not a reason (ADR-385).
+        //
+        // So it is picked. Still unreachable and worth saying where a reader will meet it:
+        // `styledAmbientFloor` below has no parameter either, and `styledSkyAmbient` and
+        // `styledGroundAmbient` have parameters that no panel draws -- ADR-058 shipped four
+        // controls and not one of them is on a panel. Those three are lighting rather than fog;
+        // ADR-574 records the measurement and leaves them to their owner.
+        env.fogHeightAmount = pick(fogHeightAmount_, volumeSetting_.fogHeightAmount);
         env.styledSkyAmbient =
             styledSkyAmbient_ != nullptr ? styledSkyAmbient_->value() : volumeSetting_.styledSkyAmbient;
         env.styledGroundAmbient = styledGroundAmbient_ != nullptr ? styledGroundAmbient_->value()
@@ -8663,8 +8778,14 @@ nlohmann::json Composition::toJson() const {
         const scene::Environment envDefaults;
         const auto& v = volumeSetting_;
         const auto colourEq3 = [](const glm::vec3& a, const glm::vec3& b) { return a == b; };
-        if (v.fogHeightAmount != envDefaults.fogHeightAmount) {
-            environment["fogHeightAmount"] = v.fogHeightAmount;
+        // ADR-574: the PARAMETER's base where there is one, not the authored setting. A control an
+        // artist can move and cannot keep is not a control -- the same half of "reachable" ADR-573's
+        // case asks about, and writing `v.fogHeightAmount` here would have lost every change made
+        // through the row this ADR just added.
+        const float heightAmount =
+            fogHeightAmount_ != nullptr ? fogHeightAmount_->base() : v.fogHeightAmount;
+        if (heightAmount != envDefaults.fogHeightAmount) {
+            environment["fogHeightAmount"] = heightAmount;
         }
         if (!colourEq3(v.styledSkyAmbient, envDefaults.styledSkyAmbient)) {
             environment["styledSkyAmbient"] = {v.styledSkyAmbient.r, v.styledSkyAmbient.g, v.styledSkyAmbient.b};
@@ -8688,18 +8809,24 @@ nlohmann::json Composition::toJson() const {
             environment["volumeDensity"] = density;
             environment["fogHeight"] = base(fogHeight_, volumeSetting_.fogHeight);
             environment["fogHeightFalloff"] = base(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
+            environment["fogUpperDensity"] = base(fogUpperDensity_, volumeSetting_.fogUpperDensity);
+            environment["fogHeightCurve"] = base(fogHeightCurve_, volumeSetting_.fogHeightCurve);
             environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
             environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
             environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
-            environment["volumeLocalLights"] = volumeSetting_.volumeLocalLights;
+            environment["volumeLocalLights"] = base(volumeLocalLights_, volumeSetting_.volumeLocalLights);
             environment["volumeNoise"] = base(volumeNoise_, volumeSetting_.volumeNoiseAmount);
             environment["volumeNoiseScale"] = base(volumeNoiseScale_, volumeSetting_.volumeNoiseScale);
             environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
             environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
             environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
+            environment["volumeShadowSteps"] =
+                volumeShadowSteps_ != nullptr ? volumeShadowSteps_->base() : volumeSetting_.volumeShadowSteps;
+            environment["volumeShadowStrength"] =
+                base(volumeShadowStrength_, volumeSetting_.volumeShadowStrength);
             environment["volumeJitter"] = base(volumeJitter_, volumeSetting_.volumeJitter);
             environment["shadowCascades"] = volumeSetting_.shadowCascades;
-            environment["volumeMaxDistance"] = volumeSetting_.volumeMaxDistance;
+            environment["volumeMaxDistance"] = base(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
             if (!volumeDensityFieldSetting_.empty()) {
                 environment["volumeDensityField"] = volumeDensityFieldSetting_;
             }
@@ -9668,6 +9795,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             for (const FloatKey fk : {FloatKey{"volumeDensity", &v.volumeDensity},
                                       FloatKey{"fogHeight", &v.fogHeight},
                                       FloatKey{"fogHeightFalloff", &v.fogHeightFalloff},
+                                      FloatKey{"fogUpperDensity", &v.fogUpperDensity},
+                                      FloatKey{"fogHeightCurve", &v.fogHeightCurve},
+                                      FloatKey{"volumeShadowStrength", &v.volumeShadowStrength},
                                       FloatKey{"volumeScattering", &v.volumeScattering},
                                       FloatKey{"volumeAbsorption", &v.volumeAbsorption},
                                       FloatKey{"volumeAnisotropy", &v.volumeAnisotropy},
@@ -9738,6 +9868,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("'volumeSteps' must be an integer");
                 }
                 v.volumeSteps = std::clamp(e["volumeSteps"].get<int>(), 4, 256);
+            }
+            // ADR-570: clamped to the same 0..16 the parameter is, so a hand-written scene cannot
+            // ask for a cost the slider refuses to offer.
+            if (e.contains("volumeShadowSteps")) {
+                if (!e["volumeShadowSteps"].is_number_integer()) {
+                    return fail("'volumeShadowSteps' must be an integer");
+                }
+                v.volumeShadowSteps = std::clamp(e["volumeShadowSteps"].get<int>(), 0, 16);
             }
             if (e.contains("volumeJitter")) {
                 if (!e["volumeJitter"].is_number()) {

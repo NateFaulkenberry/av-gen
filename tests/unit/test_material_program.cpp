@@ -956,10 +956,19 @@ TEST_CASE("examples/materials/*.material.json parse, validate and name their pro
         CHECK(program->validate().has_value());
         CHECK(!program->name.empty());
         CHECK(!program->ops.empty());
-        // A program that names no output would shade exactly like the material without it.
+        // A program that names no output would shade exactly like the material without it. A layer's
+        // output counts: a layer composites over the base, so a program whose base keeps every
+        // material value and whose layer writes emission (glowmere-fireflies-*) does shade.
+        bool layerWrites = false;
+        for (const MaterialLayer& layer : program->layers) {
+            layerWrites = layerWrites || (layer.enabled && (layer.baseColorRegister >= 0 || layer.metallicRegister >= 0 ||
+                                                            layer.roughnessRegister >= 0 || layer.emissionRegister >= 0 ||
+                                                            layer.normalRegister >= 0 || layer.occlusionRegister >= 0));
+        }
+        INFO(file);
         CHECK((program->baseColorRegister >= 0 || program->metallicRegister >= 0 ||
                program->roughnessRegister >= 0 || program->emissionRegister >= 0 ||
-               program->opacityRegister >= 0));
+               program->opacityRegister >= 0 || layerWrites));
         names.push_back(program->name);
     }
     // Names must be unique, because a scene references a program by name and a duplicate would

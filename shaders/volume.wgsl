@@ -35,6 +35,10 @@
 // vortex.wgsl is included after fields.wgsl -- the include directive does not de-duplicate, and
 // this file must not pull noise.wgsl in twice.
 #include "fog.wgsl"
+// ADR-580, the Tornado: the second density function a medium slot can select. It needs
+// `fbm3` and deliberately does not include `noise.wgsl` -- the include directive does not
+// de-duplicate and `fields.wgsl` above has already brought it in.
+#include "tornado.wgsl"
 
 struct VolumeUniforms {
     params0: vec4<f32>,   // density, fogHeight, fogHeightFalloff, scattering
@@ -42,9 +46,11 @@ struct VolumeUniforms {
     noiseParams: vec4<f32>, // noiseAmount, noiseScale, noiseSpeed, time (seconds)
     info: vec4<f32>,      // steps, density field slot (-1 none), colour field slot (-1 none), frame index
     sizes: vec4<f32>,     // march width, march height, full width, full height (ADR-139)
-    depthParams: vec4<f32>, // camera near, camera far, 0, 0
+    depthParams: vec4<f32>, // camera near, camera far, march start jitter (ADR-461), 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
-    glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), yzw = 0
+    glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), y = local-light strength
+    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    selfShadow: vec4<f32>, // ADR-570: x = shadow march steps (0 = off), y = strength, zw = 0
     // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
     //
     // Was twelve named `vortexN` members carrying exactly ONE medium, so the second placed medium
@@ -61,6 +67,21 @@ struct VolumeUniforms {
 };
 
 // Slot `s`'s lane `l`. The one place the flattening is expressed.
+//
+// **THE SAME LANE MEANS DIFFERENT THINGS TO DIFFERENT KINDS, AND THAT IS NOT A BUG.** A slot is
+// one kind -- `mediumKind(s)` says which -- and never two at once, so each kind reads the sixteen
+// lanes through its own map:
+//
+//   lanes 0..12   vortex/fog: the shared `VortexField`.     tornado: its own `TornadoField`.
+//   lanes 13..14  fog: its shape controls (ADR-563).        tornado: colour + per-metre coefficient.
+//   lane  15      the KIND TAG, for every kind (ADR-562). No packer may write it; it is set
+//                 centrally in `buildAtmosphericFrame` after each kind's `pack` returns.
+//
+// So a reviewer reading `mediaLane(s, 13u)` in two places and seeing two different meanings is
+// looking at the design rather than at a collision. `agent/tornado`'s packer DID collide with lane
+// 15 once, writing a colour over the tag -- had the tag landed first that would have presented as
+// a tornado intermittently rendering as a comet, which is a long thing to chase. The lane budget
+// for a new kind is 0..14; fifteen is spoken for.
 fn mediaLane(s: u32, l: u32) -> vec4<f32> {
     return vol.media[s * 16u + l];
 }
@@ -182,12 +203,63 @@ fn mediumKind(s: u32) -> u32 {
 // primitive rather than a second primitive (ADR-500's argument, still standing).
 fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
     return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u),
-                           mediaLane(s, 7u), mediaLane(s, 12u));
+                           mediaLane(s, 7u), mediaLane(s, 12u), mediaLane(s, 2u),
+                           mediaLane(s, 6u));
 }
 
+// ADR-580's tornado: the first kind whose field is a DIFFERENT function rather than a different
+// reading of the same lanes. A fog bank and a cosmic vortex are one primitive with two authoring
+// surfaces and share `vortexShapeAt`; a tornado is a different phenomenon.
+const kMediumKindTornado: u32 = 5u; // AtmosphereKind::Tornado
+
+// The packed tornado uniforms for slot `s`, in the order `shaders/tornado.wgsl` names them. Its
+// thirteen field lanes are 0..12 and its appearance is 13..14 -- the same two lanes a fog bank
+// uses for its shape, read differently, because a slot is one kind and never both.
+fn mediumTornadoUniforms(s: u32) -> TornadoUniformsWgsl {
+    return TornadoUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 1u), mediaLane(s, 2u),
+                               mediaLane(s, 3u), mediaLane(s, 4u), mediaLane(s, 5u),
+                               mediaLane(s, 6u), mediaLane(s, 7u), mediaLane(s, 8u),
+                               mediaLane(s, 9u), mediaLane(s, 10u), mediaLane(s, 11u),
+                               mediaLane(s, 12u));
+}
+
+// The per-metre EXTINCTION for slot `s`. Kind-aware for the same reason `mediumShape` is: a
+// vortex and a fog bank share a lane layout because they share a field, and a tornado does not.
+// Reading `lane(1).w` unconditionally -- which both call sites used to do -- gives a tornado its
+// own `radiusMidControl` as a density, which is a number in the tens rather than the hundredths.
+fn mediumDensityCoeff(s: u32) -> f32 {
+    if (mediumKind(s) == kMediumKindTornado) {
+        return mediaLane(s, 13u).w;
+    }
+    return mediaLane(s, 1u).w;
+}
+
+// How much of the SCENE's light this medium scatters (ADR-388). A tornado defaults to LIT and a
+// cosmic vortex to unlit, which is the reversal that makes one smoke and the other a nebula.
+fn mediumScatterWeight(s: u32) -> f32 {
+    if (mediumKind(s) == kMediumKindTornado) {
+        return mediaLane(s, 12u).w;
+    }
+    return mediaLane(s, 5u).z;
+}
+
+// How much of a COMET's light this medium takes. A tornado has no such control -- it is a cosmic
+// vortex's, for the one shot that needed it -- so it answers zero rather than reading a lane that
+// means something else entirely.
+fn mediumCometResponse(s: u32) -> f32 {
+    if (mediumKind(s) == kMediumKindTornado) {
+        return 0.0;
+    }
+    return mediaLane(s, 5u).x;
+}
+
+// The dispatch the kind tag exists for.
 fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
     if (mediumKind(s) == kMediumKindFog) {
         return fogShapeAt(mediumFogUniforms(s), p, t);
+    }
+    if (mediumKind(s) == kMediumKindTornado) {
+        return tornadoDensityAt(mediumTornadoUniforms(s), p, t, vortexFilterWidth());
     }
     return vortexShapeAt(mediumVortexUniforms(s), p, t, vortexFilterWidth());
 }
@@ -195,6 +267,21 @@ fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
 // The medium's own light. Emissive rather than lit: nothing in this scene could illuminate
 // something that size, and the brief's reference is a nebula, which glows.
 fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
+    if (mediumKind(s) == kMediumKindTornado) {
+        // A tornado is SMOKE and is mostly LIT rather than glowing, so its emission may be zero and
+        // it still reads -- the opposite default from a nebula. Two colours rather than three: the
+        // vortex's luminous accent is a filament highlight, and a tornado's equivalent is the
+        // helical striations, which are geometry here rather than colour.
+        // Lanes 13 and 14 carry a colour and its own per-metre coefficient each; lane 15 is the
+        // kind tag and is not appearance.
+        let thin = mediaLane(s, 13u);
+        let thick = mediaLane(s, 14u);
+        if (shape <= 0.0 || thick.w <= 0.0) {
+            return vec3<f32>(0.0);
+        }
+        let c = mix(thin.rgb, thick.rgb, smoothstep(0.0, 0.85, shape));
+        return c * (shape * thick.w);
+    }
     let l3 = mediaLane(s, 3u);
     if (shape <= 0.0 || l3.z <= 0.0) {
         return vec3<f32>(0.0);
@@ -205,7 +292,17 @@ fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
     var c = mix(mediaLane(s, 9u).rgb, mediaLane(s, 10u).rgb, smoothstep(0.0, 0.45, shape));
     let filament = smoothstep(0.62, 0.95, shape) * clamp(l3.w, 0.0, 4.0);
     c = c + mediaLane(s, 11u).rgb * filament;
-    return c * (shape * l3.z);
+    // ADR-575 (§26): the emission's own height influence, as a per-kind ARM rather than a lane
+    // read. `mediumEmissionAt` is a shared accessor and lane 12's meaning is per-kind, which is
+    // precisely the shape ADR-562 §9 recorded three defects of -- so the fog's number is reached
+    // through the same dispatch `mediumShape` uses and a kind that has no such control is
+    // untouched, by construction rather than by a zero.
+    var height = 1.0;
+    if (mediumKind(s) == kMediumKindFog) {
+        let f = mediumFogUniforms(s);
+        height = fogEmissionHeight(f, p.y - f.f0.y);
+    }
+    return c * (shape * l3.z * height);
 }
 
 // ADR-566: the bound the interval below is built from -- (radiusXZ, yBot, yTop).
@@ -231,6 +328,36 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
     let thickness = max(mediaLane(s, 1u).x, 1e-3);
     let depth = max(mediaLane(s, 4u).x, 0.0);
     let centre = l0.xyz;
+
+    // ADR-580. A tornado's bound is the same cylinder with different numbers, and it is the case
+    // the cylinder was chosen for: a column 80 m across and 800 m tall is 1% of its own bounding
+    // sphere. `l0.w` is the HEIGHT here rather than a radius, and `l0.xyz` is the GROUND CONTACT
+    // rather than a centre -- the two conventions differ on purpose, and this is one of the two
+    // places both are read, so it is where they could be confused.
+    //
+    // Moved here from `mediumInterval` when `agent/fog` factored the bound out (ADR-566): the
+    // bound now has a CPU twin, `world::mediumBound`, and a per-kind arm that lived in the
+    // interval would have been invisible to it.
+    if (mediumKind(s) == kMediumKindTornado) {
+        let l1 = mediaLane(s, 1u);
+        let l2 = mediaLane(s, 2u);
+        let l4 = mediaLane(s, 4u);
+        let l7 = mediaLane(s, 7u);
+        let l8 = mediaLane(s, 8u);
+        // The radius curve is a quadratic Bezier, so it never leaves the convex hull of its three
+        // control values -- taking the largest is a provable bound and not an estimate.
+        let widest = max(l1.x, max(l1.y, l1.z));
+        let funnel = widest * (1.0 + max(l2.x, 0.0) + max(mediaLane(s, 3u).x, 0.0));
+        let skirt = l1.x * max(l4.x, 1.0) * (1.0 + max(l4.w, 0.0));
+        let cloud = l1.z * max(l8.w, 1.0);
+        // The axis is a curve: the lean displaces the top and the wobble swings it, and both move
+        // the whole column sideways within the bound rather than deforming it.
+        let lateral = length(vec2<f32>(l7.x, l7.y)) + max(l7.z, 0.0);
+        // Vertically the field is compactly supported: `h > 1.08` and `h < -0.02` both return zero.
+        return vec3<f32>(max(funnel, max(skirt, cloud)) + lateral,
+                         centre.y - radius * 0.02,
+                         centre.y + radius * 1.08);
+    }
 
     if (mediumKind(s) != kMediumKindFog) {
         return vec3<f32>(radius * breath * 1.35,
@@ -338,7 +465,8 @@ fn volumeDensityAt(p: vec3<f32>) -> f32 {
     // this file's include of common.wgsl). It used to be this expression written out here and the
     // antiderivative written out in common.wgsl -- two statements of one model, in two files, with
     // nothing asserting they were a function and its integral.
-    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z);
+    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z,
+                                      vol.heightFog.x, vol.heightFog.y);
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);
     if (densitySlot >= 0) {
@@ -360,7 +488,7 @@ fn volumeTotalDensityAt(p: vec3<f32>, t: f32) -> f32 {
     var total = volumeDensityAt(p);
     let count = u32(vol.mediaInfo.x);
     for (var s = 0u; s < count; s = s + 1u) {
-        total = total + mediumShape(s, p, t) * mediaLane(s, 1u).w;
+        total = total + mediumShape(s, p, t) * mediumDensityCoeff(s);
     }
     return total;
 }
@@ -410,6 +538,86 @@ fn lightTowards(index: i32, p: vec3<f32>) -> vec3<f32> {
     return toLight * inverseSqrt(max(dot(toLight, toLight), 1e-4));
 }
 
+// ADR-570 (the brief's §20 and §22): the SHARED self-shadow march.
+//
+// **What it is.** At a sample `p`, march a short secondary ray toward a light through the placed
+// media's own density and attenuate that light's in-scatter by the transmittance. That is the one
+// missing term between "fog that is lit" and "fog that is lit FROM A DIRECTION": without it a bank
+// is equally bright on the side facing the sun and the side away from it, which is why ADR-358
+// refused to build a volumetric beam without shadow sampling and why §20's "backlit fog" and
+// "dark moody fog" were not reachable by any setting of the existing controls.
+//
+// **And it is §22's answer without a second system.** A shaft is what you see when the air behind
+// an occluder is dark and the air beside it is not. The occluder here is the medium itself, so a
+// spotlight aimed through a fog bank produces a beam out of the same density the march already
+// integrates -- "light -> fog -> scattering -> visible beam" from one field, which is what §22 asks
+// for and what it warns against faking with a 2D radial blur.
+//
+// **Why it lives HERE and dispatches through `mediumShape`.** `agent/tornado` needs the same term
+// and must not write a second one. This marches whatever each slot's kind says its density is, so
+// a kind added tomorrow self-shadows correctly without touching this function -- the same property
+// ADR-562 gave the primary march, and ADR-562 §9 is the record of what happens when a shared
+// reader is left assuming one kind's layout.
+//
+// **The cost, stated because it is the reason this is off by default.** ADR-562 §8 measured that
+// the field evaluation IS the cost of this pass. This multiplies the field evaluations per march
+// step by (lights that light the air) x (slots the shadow ray crosses) x `steps`. What keeps it
+// from being catastrophic is that the per-slot interval (ADR-562 §4) culls the shadow ray the same
+// way it culls the primary one: a ray toward the sun from a point nowhere near a medium costs four
+// analytic interval tests and evaluates no field at all. So the cost concentrates where the media
+// actually are, which is where it should be. It is still a multiple, and `volumeShadowSteps`
+// defaults to 0, which returns 1.0 from the first branch and leaves every existing frame
+// bit-identical.
+fn mediumSelfShadow(p: vec3<f32>, towards: vec3<f32>, t: f32) -> f32 {
+    let steps = i32(vol.selfShadow.x);
+    let strength = vol.selfShadow.y;
+    if (steps <= 0 || strength <= 0.0) {
+        return 1.0;
+    }
+    let mediumCount = u32(vol.mediaInfo.x);
+    var tau = 0.0;
+    for (var s = 0u; s < mediumCount; s = s + 1u) {
+        // The SAME bound the primary march clips to (ADR-566), so the shadow ray cannot miss part
+        // of a medium the camera ray can see -- and so an ADR-566-style defect could not be
+        // introduced here separately: there is one bound and this is a second reader of it.
+        let iv = mediumInterval(s, p, towards, 1.0e7);
+        if (iv.y <= iv.x) {
+            continue;
+        }
+        let dt = (iv.y - iv.x) / f32(steps);
+        // Through the KIND-AWARE accessor, not `mediaLane(s, 1u).w`. That direct read is what this
+        // line said when ADR-570 wrote it on `agent/fog`, where the only kinds were the vortex and
+        // the fog bank and they share a lane layout. `agent/tornado` brought a kind that does not:
+        // lane 1 is its radius curve, so an unconditional read hands the shadow march
+        // `radiusMidControl` -- a number in the tens -- as an extinction in the hundredths, and a
+        // tornado would swallow every light that crossed it. The merge created that defect by
+        // putting a new shared reader and a new kind in the same tree; `mediumDensityCoeff` is the
+        // accessor that already existed for exactly this and this is now its third call site.
+        let extinctionPerShape = mediumDensityCoeff(s);
+        for (var k = 0; k < steps; k = k + 1) {
+            let x = p + towards * (iv.x + (f32(k) + 0.5) * dt);
+            let shape = mediumShape(s, x, t);
+            if (shape > 0.0) {
+                tau = tau + shape * extinctionPerShape * dt;
+            }
+            // NO EARLY-OUT HERE, and that is a measurement rather than an oversight. The primary
+            // march breaks at `transmittance < 0.002` and the same test was written into this
+            // loop, expecting the same win. Measured interleaved at 4 steps with one volumetric
+            // light, three repeats: +1.57, +0.85, -0.78 ms. **Mixed sign, so no effect is
+            // established** (docs/testing.md 19's discard rule: discard on sign disagreement,
+            // never on spread), and it was removed rather than kept on the argument that it must
+            // help. At four steps the loop can save at most three evaluations and only deep
+            // inside a thick medium, which is probably why. If `volumeShadowSteps`' cap of 16 is
+            // ever raised, measure it again before assuming the answer is the same.
+        }
+    }
+    // `params1.x` is the absorption the primary march turns density into extinction with, so the
+    // shadow ray and the camera ray agree about how opaque the medium is. `strength` is the
+    // artist's dial on top: 1 is physical, less is a softer bank that light reaches further into,
+    // and more is a bank that swallows light -- which is a look, not an error.
+    return exp(-tau * vol.params1.x * strength);
+}
+
 fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32) -> vec3<f32> {
     var total = vec3<f32>(0.0);
     let count = min(i32(frame.envParams.z), 8);
@@ -420,7 +628,11 @@ fn inScatterAt(p: vec3<f32>, direction: vec3<f32>, anisotropy: f32) -> vec3<f32>
         }
         let towards = lightTowards(i, p);
         let phase = henyeyGreenstein(dot(direction, towards), anisotropy);
-        total = total + strength * phase * lightRadiance(i, p).rgb;
+        // ADR-570: and how much of this light actually reaches `p` through the media. One shadow
+        // march per light that lights the air; a light with `volumetricStrength` 0 skipped above
+        // costs nothing here either, which is what makes a rig with one volumetric key affordable.
+        let shadow = mediumSelfShadow(p, towards, vol.noiseParams.w);
+        total = total + strength * phase * shadow * lightRadiance(i, p).rgb;
     }
     return total;
 }
@@ -493,6 +705,11 @@ fn localInScatterAt(p: vec3<f32>, screenUv: vec2<f32>, viewDepth: f32, direction
             attenuation = attenuation * t * t;
         }
         let phase = henyeyGreenstein(dot(direction, towards), anisotropy);
+        // ADR-570 deliberately does NOT self-shadow the clustered local lights, and the reason is
+        // arithmetic rather than principle: this loop runs over a froxel's whole light list, so a
+        // shadow march here is one per light per sample with no `volumetricStrength` gate to thin
+        // it. The eight frame lights are gated and few; a froxel's list is neither. If a scene
+        // wants a shadowed practical it should be one of the eight. Revisit with a measurement.
         sum = sum + light.colorIntensity.rgb * (attenuation * phase);
     }
     return sum * gain;
@@ -612,15 +829,14 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
             if (shape <= 0.0) {
                 continue;
             }
-            let l1 = mediaLane(s, 1u);
             let l5 = mediaLane(s, 5u);
-            let d = shape * l1.w;
+            let d = shape * mediumDensityCoeff(s);
             mediumDensity = mediumDensity + d;
             // Per-slot scene-light scattering weight (ADR-388), so a dark forward-scattering
             // tornado and a self-luminous nebula can stand in one frame without sharing a knob.
-            mediumScatter = mediumScatter + d * l5.z;
+            mediumScatter = mediumScatter + d * mediumScatterWeight(s);
             mediumEmission = mediumEmission + mediumEmissionAt(s, p, shape, vol.noiseParams.w);
-            cometLit = cometLit + shape * l5.x;
+            cometLit = cometLit + shape * mediumCometResponse(s);
         }
         let density = fogDensity + mediumDensity;
         if (density <= 0.0) {

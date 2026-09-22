@@ -119,7 +119,10 @@ public:
     // sequence in front of the person who had just chosen Video.
     // Exr (ADR-366): the path tracer writes scene-linear EXR and nothing else, so its save
     // dialog must not offer a container that would produce a file of the wrong kind.
-    enum class SaveKind { Project, Video, Exr };
+    // Scene is separate from Project because the dialog's filter is the only thing that tells a
+    // person which of the two they are writing: both are `.json`, and "Save Scene As..." used
+    // the Project filter, so it opened a dialog labelled "avgen project" and wrote a scene.
+    enum class SaveKind { Project, Scene, Video, Exr };
     // Native save dialog. Same delivery contract as openFileDialog.
     void saveFileDialog(SaveKind kind, std::function<void(std::string)> onChosen);
     // Native folder picker, for the outputs that are a directory rather than a file -- an image

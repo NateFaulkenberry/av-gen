@@ -563,6 +563,25 @@ struct Environment {
     // glowing flora had nothing darker to glow against, and distance fog lighter than the ground
     // could not separate a far ridge from a near one. The defaults below are exactly the constants
     // the shader used to carry, so a styled scene that names none of them renders as it did.
+    // ADR-574, recorded HERE rather than only in a fog ADR because these three are lighting and
+    // their owner will read this struct before they read anything about fog. **None of ADR-058's
+    // four controls is drawn on any panel.** `fogHeightAmount` above now has a parameter and a
+    // row; these three do not have a row, and two of them do have parameters:
+    //
+    //   styledSkyAmbient      registered parameter, NO panel row
+    //   styledGroundAmbient   registered parameter, NO panel row
+    //   styledAmbientFloor    no parameter at all, NO panel row
+    //
+    // The middle state is the strange one and is worth naming: **a quantity a machine can drive
+    // and a person cannot find.** A modulation route or an automation curve can move the styled
+    // ambient; an artist looking for it in the Environment panel will conclude the engine does not
+    // have the control. ADR-574's rule: a capability with no control teaches an artist that the
+    // system cannot do it, and nobody files a bug about a feature they do not know exists.
+    //
+    // The comment that used to justify all four -- "nothing about them is animated, so they are
+    // copied, not picked" -- was false about two of them and circular about the rest; see
+    // ADR-574. This is a measurement, not a request: whoever owns the styled hemisphere decides
+    // whether it wants rows.
     glm::vec3 styledSkyAmbient{0.38f, 0.56f, 0.65f};   // reaches an up-facing normal
     glm::vec3 styledGroundAmbient{0.12f, 0.10f, 0.22f}; // reaches a down-facing one (bounce)
     float styledAmbientFloor = 0.68f;                   // ambient left where occlusion is total
@@ -573,9 +592,31 @@ struct Environment {
     // field term is the named scalar field's sample (1 when unset). Lit by the key light with a
     // Henyey–Greenstein phase (volumeAnisotropy) and self-emitting with volumeEmission × the
     // named colour field (or fogColor).
-    float volumeDensity = 0.0f;            // 0 = off
+    float volumeDensity = 0.0f;            // 0 = off; also §7's "ground density" -- the layer's full value
     float fogHeight = 0.0f;                // height above which density falls off
     float fogHeightFalloff = 0.0f;         // 0 = uniform
+    // ADR-568 (the fog brief's §7). Both default to the model this had before, exactly: at
+    // `fogUpperDensity` 0 and `fogHeightCurve` 0 the profile is `exp(-falloff * max(0, y - height))`
+    // to the last bit, which `test_height_fog_gpu.cpp` asserts rather than assumes.
+    //
+    // They live here rather than on the fog-bank effect because they describe the WHOLE
+    // atmosphere: the volumetric march, the surface distance fog and the particle transmittance
+    // estimate all read the same layer (ADR-567), and a scene whose passes disagree about where
+    // the air is does not read as one place.
+    float fogUpperDensity = 0.0f;          // fraction of the layer's density left at any height
+    float fogHeightCurve = 0.0f;           // 0 = exponential tail, 1 = a layer with a definite top
+    // ADR-570 (the fog brief's §20 and §22): the self-shadow march. At each march sample a short
+    // secondary ray goes toward each light that lights the air, through the PLACED MEDIA's own
+    // density, and that light's in-scatter is attenuated by the transmittance. It is what makes a
+    // bank brighter on the side facing the light than the side away from it, and it is where a
+    // light shaft comes from -- the same density, not a screen-space effect (§22 asks for exactly
+    // that and warns against the cheap version).
+    //
+    // 0 steps is OFF and is the default, because this multiplies the field evaluations per march
+    // step and ADR-562 §8 measured that those are the cost of this pass. 2 is enough for a soft
+    // directional darkening; 4-6 reads as a shaft. See ADR-570 for the measured numbers.
+    int volumeShadowSteps = 0;             // 0 = off
+    float volumeShadowStrength = 1.0f;     // 1 = physical; less lets light further in
     float volumeScattering = 1.0f;         // in-scatter strength
     float volumeAbsorption = 0.5f;         // extinction multiplier
     float volumeAnisotropy = 0.3f;         // HG g in (-1, 1)

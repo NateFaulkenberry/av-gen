@@ -45,6 +45,14 @@ class FieldUniforms;
 struct VolumeStats {
     std::uint32_t steps = 0;            // raymarch samples per pixel this frame (0 = fog off)
     std::uint32_t glowSystems = 0;      // emissive particle systems lighting the fog (ADR-040)
+    // ADR-578, the brief's §39: "capture GPU ms, CPU ms, memory, resolution, step count, ACTIVE
+    // VOLUME COUNT". Every item on that list was reported except this one, and it is the item
+    // ADR-560's headline defect was about -- a second medium in a scene rendered as nothing and
+    // no record said so. The count and the shadow steps are the two numbers that decide what this
+    // pass costs, and neither reached the workload line.
+    std::uint32_t media = 0;            // placed media the march marched this frame
+    std::uint32_t mediaDropped = 0;     // ...and the ones that did not fit (ADR-560)
+    std::uint32_t shadowSteps = 0;      // ADR-570's self-shadow march, 0 = off
     bool halfResolution = true;         // true when the march runs below the scene's resolution
     // ADR-139: what the tier actually asked for and what it produced, so a reader of a record
     // can tell a scale that was applied from one that was clamped away by a small viewport.
@@ -59,16 +67,28 @@ struct VolumeStats {
     double volumeMs = -1.0;             // GPU time of the march + composite passes (-1 = none)
 };
 
-// Group 1 binding 1 of both passes (112 bytes). Mirrors `VolumeUniforms` in shaders/volume.wgsl.
+// Group 1 binding 1 of both passes. Mirrors `VolumeUniforms` in shaders/volume.wgsl. The size is
+// asserted below rather than stated here, because the literal that used to be stated here (112
+// bytes) stopped being true three lanes ago and nothing noticed.
 struct VolumeUniforms {
     glm::vec4 params0;     // density, fogHeight, fogHeightFalloff, scattering
     glm::vec4 params1;     // absorption, anisotropy, emission, maxDistance
     glm::vec4 noiseParams; // noiseAmount, noiseScale, noiseSpeed, time
     glm::vec4 info;        // steps, density field slot, colour field slot, frame index
     glm::vec4 sizes;       // half width, half height, full width, full height
-    glm::vec4 depthParams; // camera near, camera far, 0, 0
+    glm::vec4 depthParams; // camera near, camera far, march start jitter (ADR-461), 0
     glm::vec4 fogColor;    // rgb, w = 0
-    glm::vec4 glow;        // x = particle glow systems (ADR-040), yzw = 0
+    glm::vec4 glow;        // x = particle glow systems (ADR-040), y = local-light strength, zw = 0
+    // ADR-568 (§7): the height layer's SHAPE, in a lane of its own rather than in the zeroes of a
+    // lane that means something else. ADR-562 §9's finding is what that costs when it goes wrong,
+    // and `VolumeUniforms` has no lane budget to defend -- it is not a packed per-kind block, it
+    // is a uniform with a sizeof assertion, so a named lane is free and a reused one is not.
+    // x = fogUpperDensity, y = fogHeightCurve, zw = 0.
+    glm::vec4 heightFog;
+    // ADR-570 (§20/§22): the shared self-shadow march. x = steps along the ray toward each light
+    // (0 = off and the shader returns 1.0 from its first branch, so every existing frame is
+    // bit-identical), y = strength, zw = 0.
+    glm::vec4 selfShadow;
     // ADR-562: the placed media, as lanes. Was twelve named `vortexN` members carrying exactly one
     // medium; a slot is `world::kMediumLanes` `vec4` and there are `world::kMaxMedia` of them, so a
     // second medium is a slot rather than a rewrite. `mediaInfo.x` is how many are live and the
@@ -78,7 +98,17 @@ struct VolumeUniforms {
     glm::vec4 mediaInfo;
     glm::vec4 media[world::kMaxMedia * world::kMediumLanes];
 };
-static_assert(sizeof(VolumeUniforms) == 16 * (8 + 1 + world::kMaxMedia * world::kMediumLanes));
+// **Counted against the merged struct, not inherited from either branch.** Ten shared `vec4`s --
+// the original eight, plus `heightFog` (ADR-568) and `selfShadow` (ADR-570) from `agent/fog` --
+// then `mediaInfo`, then the lanes. `agent/fog` asserted `10 + 1` and `agent/tornado` asserted
+// `8 + 1`; each was true of its own struct and the merged one is neither branch's, so the number
+// below was recounted from the members above rather than chosen between them.
+//
+// `agent/tornado`'s comment beside its assertion named a `mediaKind` member that no longer
+// exists: the kind tag moved into each slot's own last lane (`MediumSlot::lane[15].x`, ADR-562),
+// which is why it costs nothing here. That stale comment is exactly why this one counts members
+// instead of describing them.
+static_assert(sizeof(VolumeUniforms) == 16 * (10 + 1 + world::kMaxMedia * world::kMediumLanes));
 
 class VolumeRenderer {
 public:

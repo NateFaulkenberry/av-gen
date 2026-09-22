@@ -98,7 +98,7 @@ TEST_CASE("§38: a stored database loads bit-identical to the one that was built
     }
 
     // A second write of the loaded database is byte-identical to the first file: save -> load ->
-    // save does not drift (testing.md #31).
+    // save does not drift (testing.md #38).
     const fs::path again = scene::motionDatabasePath(scratch("roundtrip2"), "probe");
     REQUIRE(scene::writeMotionDatabase(*loaded, again).has_value());
     std::ifstream a(file, std::ios::binary);

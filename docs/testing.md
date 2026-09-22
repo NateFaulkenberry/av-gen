@@ -78,16 +78,16 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Thirty-three ways a green suite has lied
+## Forty ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
 you are short of time, because it is the only one the exit code cannot save you from.
 
-- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 27).
+- **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 31, 32, 34).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19, 26, 29, 30; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 33, 36, 37; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -116,8 +116,29 @@ night from two agents who never spoke to each other.
    pointing at a line that is a closing brace, for a test name that no longer exists in the file.
    The tell is that the failure text does not match source you can read. `git clean` the test object
    directory after a merge is cheaper than the check.
+31. **A build that compiled nothing you changed, and said exit 0.** `cmake --build && ./tests`
+   chained with `&&` looks safe and is not: if the build fails, the shell short-circuits and you
+   never run the suite — but if you *piped* the build (`cmake --build ... | tail`) the exit code is
+   the pipe's, the build's failure is invisible, and the suite then runs **the previous binary**.
+   `agent/tornado` hit both ends of this in one night: a `| tail` that reported 0 for a failed
+   build, and later a suite that reported a failure in a test file whose five compile errors meant
+   it had never been rebuilt.
+
+   **The tell is a failure whose line number points into code you have just replaced.** If the
+   assertion text does not match what is on that line now, you are reading a report about a binary
+   that no longer corresponds to the tree. Read the build's exit code off the build, separately,
+   before believing anything the suite says.
+32. **The shader compiles at LOAD, so a green build proves nothing about WGSL.** C++ errors stop the
+   build; a duplicate function in a `.wgsl` file does not exist until `ShaderLibrary` concatenates
+   the includes and hands the result to Dawn — at which point the *render* fails with
+   `redeclaration of ...` and the build is still green. Merging two branches that each added a
+   dispatch arm to `shaders/volume.wgsl` produced exactly that, four redeclarations deep, with a
+   clean `cmake --build`.
+
+   So a change to a shader is unverified until something has **rendered a frame** with it. A suite
+   that never loads that shader will not tell you, and neither will the compiler.
 3. **A log written by somebody else's process.** See the next section; this is the severe one.
-27. **An edit script that asserts and writes at the end leaves a partial change that looks
+34. **An edit script that asserts and writes at the end leaves a partial change that looks
    complete.** The shape is: make N replacements in memory, assert each match count so a silent
    wrong edit is impossible, write the file once at the end. When the *fourth* assertion fires,
    the first three are discarded with it — and the file on disk is neither the before nor the
@@ -184,6 +205,101 @@ night from two agents who never spoke to each other.
    test passes alone, passes with the suspect beside it, and only dies in the full set; the method
    is to bisect the *filter*, not to read the named test. Cumulative GPU memory makes the victim and
    the culprit different tests, and ctest names the victim.
+
+   **DIAGNOSED, 2026-09-21, and it is NOT the mechanism above.** `avgen_render_tests` takes an
+   intermittent SIGBUS, and the cause is in the crash reports, which nobody had opened.
+   `~/Library/Logs/DiagnosticReports/avgen_render_tests-*.ips` held **25 of them**, spanning
+   2026-09-18 to 2026-09-21, and **every single one has the same signature**:
+
+   - `EXC_BAD_ACCESS`, `SIGBUS`, `KERN_PROTECTION_FAILURE`;
+   - the faulting address is **exactly the first byte past the end of a `MALLOC_SMALL` region** --
+     `vmRegionInfo` reports `bytes after start: 0` of the reserved space that follows it, in all
+     twenty-five;
+   - the faulting frame is a Catch2 test body on the main thread, not Metal and not Dawn.
+
+   That is **a heap buffer overrun on the CPU**, not GPU memory exhaustion, and it explains every
+   property that made it look mysterious: a small overrun normally lands in malloc's own slack
+   inside the same region and does nothing at all. It faults only when the allocation happens to
+   sit at the very end of that region's page run. So the crash **moves between runs, is
+   independent of the RNG seed, is independent of machine load, and disappears when you replay the
+   seed that produced it** -- all of which was measured before the reports were read, and none of
+   which pointed at the cause.
+
+   **Read the crash report first.** Four separate sessions treated this as a scheduling or memory
+   mystery and took samples; the answer was sitting in a file the OS had already written, and the
+   one fact that settles it -- *fault address is one past a malloc block* -- takes a minute to get:
+
+   ```sh
+   ls -t ~/Library/Logs/DiagnosticReports/ | grep avgen
+   python3 -c 'import json,sys; b=json.loads(open(sys.argv[1]).read().split("\n",1)[1]); \
+       print(b["exception"]); print(b.get("vmRegionInfo","")[:600])' <report>.ips
+   ```
+
+   **FOUND AND FIXED, same session, by an ASan build.** `-fsanitize=address` named it on the first
+   run, in one line of `tests/rendering/test_lighting_lab_gpu.cpp`:
+
+   ```cpp
+   CHECK(*std::max_element(falloffProfile(*control).begin(),
+                           falloffProfile(*control).end()) > 0.5f);
+   ```
+
+   `falloffProfile` returns a `std::vector<float>` **by value**, and it is called **twice**. So
+   `.begin()` is an iterator into one temporary and `.end()` an iterator into a *different* one,
+   and `max_element` walks from the first vector's start toward an unrelated address in the heap.
+   Where that walk crosses a reserved page, `KERN_PROTECTION_FAILURE`.
+
+   Every property follows from that and none of them needed a new theory:
+
+   - **intermittent** -- it depends on where two temporaries land. If the second is at a *lower*
+     address, `begin >= end`, the loop ends immediately, and nothing happens at all;
+   - **the crash site moves** -- the victim is whoever owns the pages the walk crosses;
+   - **seed- and load-independent** -- it is allocator layout, not scheduling;
+   - **replaying the crashing seed passes** -- same reason;
+   - **one byte past a MALLOC_SMALL region, in all twenty-five reports** -- because that is where a
+     forward walk through the heap first meets a page it may not touch.
+
+   **Sampling could not have found this.** Eight full runs, a seed replay, a concurrency arm and a
+   load check produced a precise description of the *symptom* and not one step toward the cause.
+   The crash report gave the mechanism (a heap overrun) in about a minute, and ASan gave the line
+   in about an hour of unattended build-and-run. Reach for both before the third sample.
+
+   ```sh
+   cmake -S . -B build/asan -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+         -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+         -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+   cmake --build build/asan -j 10 --target avgen_render_tests
+   ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 tools/gpu-lock.sh ./build/asan/tests/avgen_render_tests
+   ```
+
+   It reports `container-overflow` rather than `heap-buffer-overflow`, because ASan's container
+   annotations catch the read between `size()` and `capacity()` of the second vector before the
+   walk reaches unmapped memory. **A `container-overflow` on a range built from two calls is
+   almost always this**: look at whether the two ends came from the same object.
+
+   The general rule, which is not about this suite:
+
+   > **A range needs one object. Two calls that each return by value are two objects**, and a
+   > compiler will not stop you building an iterator pair out of them. Name the result.
+
+   The samples below are what sampling got, and they are kept because the shape of the data is
+   what a heap overrun looks like from the outside -- worth recognising the next time:
+
+   | run | result |
+   |---|---|
+   | 1 | 397 cases, 396 passed, 1 skipped |
+   | 2 | **SIGBUS** (exit 138), ~300 lines in, after *"A generated tree renders, and renders the same way twice"* |
+   | 3 | **SIGBUS** (exit 138), at a **different** point -- a skinning/culling table |
+   | 4 | run 2's own seed replayed: **397 cases, exit 0** |
+
+   So: **not seed-determined, not order-determined in any fixed way, and not a function of machine
+   load.** Replaying a crashing run's seed passes. A quiet-machine explanation was proposed and
+   withdrawn on this data. By the end of the session it was 4 crashes in 8 full runs, one of them
+   with a CPU suite running alongside and one with the machine otherwise idle.
+
+   **It predates the fog branch by three days**: fourteen of the twenty-five reports are from
+   2026-09-18, before any of this work existed. The victim test varies because the victim is
+   whoever owns the allocation that happens to be at the end of a region -- which is also why
+   naming the test it died in has never been informative.
 
 11. **A crash prints NO verdict line at all, so a failure grep reports success.** Distinct from 5,
    and the distinction is the whole point: there the summary printed and was honest. Here the
@@ -330,7 +446,7 @@ night from two agents who never spoke to each other.
    aimed at the wrong region or the wrong mechanism passes every check you would think to run.**
    When a reachability probe reports zero, suspect the sample domain before the knob.
 
-26. **A fixture at a boundary of its own valid range measures the boundary, not the feature.**
+33. **A fixture at a boundary of its own valid range measures the boundary, not the feature.**
 
    A foot-lock probe reported the lock doing nothing: the held foot and the free foot came out at
    the same place, on every arm, reproducibly. The lock was correct. The **test rig's leg was
@@ -629,6 +745,194 @@ night from two agents who never spoke to each other.
    - **After editing a shell script, `bash -n` it.** It costs nothing and it is the difference
      between finding a syntax error now and finding it in the exit code of somebody's suite.
 
+26. **`git checkout -- <file>` to undo a break demonstration silently deletes the uncommitted work
+   in that file, and everything still builds.**
+
+   A break demonstration edits a file, runs the suite, and restores it. Restoring from a scratch
+   copy is correct. Restoring with `git checkout --` restores it to **HEAD** -- which is not where
+   it was, if the file also carried an hour of uncommitted work.
+
+   Done on 2026-09-21. Four artist rows and a packed lane went back to HEAD, the build succeeded,
+   the tests that did not cover the reverted lines passed, and the next edit -- which anchored on
+   one of the deleted lines -- **silently did nothing**, because `str.replace` with no match is a
+   no-op. Two layers of silence: the revert and then the failed patch.
+
+   **What caught it was a count taken from the code**: `grep -c 'storedFloat("'` came back 9 where
+   the change should have made it 12. The registry's block-size assertion would have caught it at
+   the next suite too, but the grep caught it one minute after it happened instead of forty.
+
+   Three habits, in the order they pay:
+
+   - **restore from a scratch copy, never from `git`**, when a file has uncommitted work:
+     `cp file $SCRATCH/file.bak` before the break, `cp $SCRATCH/file.bak file` after;
+   - **assert on every scripted edit.** `assert old in t` before `t.replace(old, new)` turns a
+     silent no-op into an immediate failure, and the one replacement in that batch written without
+     an assert is the one that vanished;
+   - **count the thing you changed, from the code, after changing it.** It is the same move as
+     re-deriving a test's expected number from `grep -c` rather than from the red output, and it
+     catches a different failure: not "the test now agrees with the code" but "the code is not what
+     I think it is".
+
+27. **A census of "what the project ships" is answered in part by the project's own instrumentation,
+   and two people running "the same census" will get different numbers.**
+
+   `examples/` holds **119 tracked `_`-prefixed JSON files**, 30 of them `*.scene.json`, written by
+   several agents' diagnostic tooling and committed. Any `grep -rl` over `examples/` finds them. A
+   question like *"how many shipped scenes use X"* therefore has its answer inflated by the arms
+   somebody generated while measuring X -- which is the measurer contaminating the measurement, in
+   the one place nobody looks for it because the files look exactly like data.
+
+   **It happened twice in one session, and the second time it happened to two people at once.**
+   First: a claim that no shipped scene contained a fog bank, published with a command that
+   returned 52 rather than 0, because the filter that made it true lived in the analyst's head.
+   Then: two people ran a corrected census of the same question and got **120 / 57 / 57 / 0**
+   against **90 / 30 / 23 / 1**. Neither was wrong. They differed on two axes that neither command
+   made visible:
+
+   - **what counts as shipped** -- all tracked scenes, or only the ones that are not probes;
+   - **what counts as using a feature** -- the key is present, or its value is non-zero. `"x": 0.0`
+     has the key and does not use the thing.
+
+   Three rules, and the third is the one that actually holds:
+
+   - **exclude probe files explicitly and say so in the command**, not in the sentence around it;
+   - **state the predicate.** Presence and non-zero are different censuses and both are true;
+   - **put the census in a file and cite the file.** `tools/fog_law_census.py` takes both axes as
+     flags and prints the branch, the scope and the predicate above its numbers. A figure in a
+     document that a reader cannot reproduce without the author's shell is a figure that will
+     eventually be disbelieved -- **and it will be disbelieved for a reason that has nothing to do
+     with its subject**, which is the expensive part.
+
+   The general form, which is not about scenes: **when your tooling writes artefacts into the same
+   namespace as the thing it measures, every later measurement of that namespace is contaminated
+   until somebody notices.** Name them so they can be excluded, and exclude them in the command.
+
+28. **A parity test covers the terms it reads. Add a term to the pair and it silently stops being
+   a pair.**
+
+   `test_fog_parity_gpu.cpp` compares a shader against its CPU twin over the same packed bytes, and
+   it existed because the two once drifted for ten minutes (entry in ADR-565). A new term was added
+   to both sides, and the shader's half was then deliberately broken to demonstrate the failure --
+   **and the test passed.** It compared four quantities and the new one was not among them.
+
+   Nothing about the test had changed; it was simply answering the question it had always answered,
+   about a pair that had grown a fifth member. **The gap opens at the moment the feature lands, and
+   it opens silently, because a parity harness has no way to know what it is not reading.**
+
+   Two habits:
+
+   - **when you add a term to a transliterated pair, add an assertion for it in the same edit.**
+     Not the same day -- the same edit, the way a new `case` goes in with its `enum` value;
+   - **break the new term and watch the parity test fail before you believe it covers it.** That is
+     ADR-182 applied to the test you did not write, and it is the only step that would have caught
+     this. The break was being run for a different reason and the pass was the surprise.
+
+   Generalises to any harness with a fixed output shape: a golden-image test whose mask excludes
+   the new region, a round-trip test whose field list is written out by hand, a conformance table
+   with a row per property. **The harness's shape is a claim about what the thing has, and the
+   thing grew.**
+
+29. **Running the CPU suite and the GPU suite at the same time breaks both, and one of the ways it
+   breaks them is a DETERMINISM failure.**
+
+   Measured 2026-09-21. Run concurrently on an idle machine:
+
+   - `avgen_tests` died with `EXC_BREAKPOINT` / `SIGTRAP` inside
+     `CVPixelBufferPoolCreatePixelBuffer`, in the video-writer case -- **exit 133, no verdict
+     line**. CoreVideo's pixel-buffer pool is a system resource and the GPU suite was competing
+     for it;
+   - `avgen_render_tests` failed `CHECK(a == b)` in
+     `test_procedural_examples_gpu.cpp` on `examples/worlds/worlds.json`: **the same project
+     rendered twice, through two fresh engines, produced two different sequence hashes.**
+
+   Run one after the other, the same binaries on the same tree: **2841 cases exit 0, and 401 cases
+   exit 0.**
+
+   **The second failure is the one that matters, because it falsifies a claim this repository was
+   working from.** `render_arms.sh` carried the header *"no gpu-lock (ADR-170 binds TIMING, and
+   pixels are deterministic under contention -- ADR-360)"*, and the practice of rendering image
+   arms without the lock rested on it. Pixels were not deterministic under that contention. Whether
+   the mechanism is contention itself or an intermittent that contention made likely is **not
+   established from one trial each way** -- and that ambiguity is the point: *running them together
+   removed the ability to tell.*
+
+   So the rule is not "it is slower", it is:
+
+   > **ADR-170's lock is about the GPU, and the CPU suite uses the GPU.** It encodes video, and it
+   > goes through the same system frameworks the render suite does. Serialise them. A run taken
+   > while the other suite is up is not evidence, whichever way it came out.
+
+   And the uncomfortable corollary, which is why this is an entry rather than a note: **the green
+   runs taken that way were green, and they were also unsound.** A pass under a method that can
+   produce a false failure can equally produce a false pass, and nothing in the output distinguishes
+   them.
+
+   **But do not re-take everything -- re-take the class where a false PASS has a mechanism.**
+   Contention perturbs timing and resources: it causes crashes, allocator pressure and
+   nondeterminism, and all three push a run toward *failing*. For an ordinary value assertion --
+   a bit-identity check at defaults, a luminance ratio, a parity comparison -- a competing suite
+   has no way to make a false assertion come out true. Those greens are **unproven but not
+   suspect**.
+
+   The exception is **determinism**, because that is precisely the property contention perturbs: a
+   quiet perturbation could have gone the other way and let a real nondeterminism pass as a match.
+   So the re-take list is *every GPU assertion whose subject is reproducibility or bit-identity*,
+   and nothing else. Here that was 44 cases, taken three times sequentially: 23060 assertions each
+   time, exit 0 each time.
+
+   One more thing to watch in the verdict line: **the SKIP count.** A GPU context that fails to
+   create under contention makes a case skip rather than fail, and a skipped case is not a passed
+   one. Ours held at 4 across every run, which is what says nothing was silently dropped.
+
+   Two traps met while assembling that re-take list, both worth the line:
+
+   - **the filter is comma-separated and a test name contained a comma.** `A generated tree
+     renders, and renders the same way twice` split into two specs, neither matching, and the
+     filter quietly selected 42 cases instead of 43 -- family C, in the tool used to investigate
+     family C. Use a trailing `*` for any name with punctuation, and **count the selected cases
+     before running them**;
+   - **`^test cases:` is not printed when everything passes.** Catch2 prints `All tests passed
+     (N assertions in M test cases)` instead, so a guard that greps only for `^test cases:` reads
+     0 verdict lines on a perfect run. Grep for both.
+
+30. **A tolerance is a proxy for a property. When a feature lands that the proxy forbids, the
+   feature working looks exactly like the defect.**
+
+   A case called *"a fog bank is filled to its own axis"* guarded a real defect -- a 200 m hole in
+   the middle of a 900 m bank, inherited from a cyclone's eye. It guarded it by sampling outward
+   from the centre and requiring every sample **within 2% of the axis value**, which was a fair
+   proxy while the field was `rim * profile`.
+
+   Then a density response curve landed, and a bank *should* fall away faster than 2% by half a
+   radius. **The new feature working was indistinguishable from the old defect returning**, and the
+   case failed against correct code.
+
+   The repair is not a wider tolerance. **A hole means the centre reads LOWER than a point further
+   out**, so the case asserts that -- the axis is the maximum -- plus a control that the bank is
+   not simply empty. That form cannot be broken by any legitimate change to how fast the density
+   falls, because it is the property rather than a symptom of it.
+
+   The same case was wrong two more ways for the same underlying reason, and both are worth
+   recognising:
+
+   - **it sampled where the thing was not.** The probe ran at `y = 0`, and a control that slides
+     the densest layer between a bank's floor and its top put that layer a thickness *below* the
+     centre for three of ten presets. It computes the layer from the control now;
+   - **it measured along an axis whose length a preset owns.** Two neighbouring assertions sampled
+     a fixed multiple of the radius along the *long* axis to prove the field ended -- which stops
+     being outside the shape the moment somebody tunes the length. They use the short axis, whose
+     extent no control moves.
+
+   The generalisation, which is the whole of this document in one line: **a test encodes a claim,
+   and a proxy encodes a claim about a claim.** When the thing under test grows a feature, the
+   proxy is the part that silently stops meaning what it meant -- and it fails *loudly against
+   working code*, which is the good case. The bad case is the same drift in a proxy that stays
+   green (entries 22, 28): the harness that quietly narrowed, and the parity test that stopped
+   covering a term.
+
+   **Ask of every tolerance: what property is this standing in for, and can I assert that instead?**
+   Usually you can, and it is usually shorter.
+
 **So `grep -c FAILED` is not a failure count, and neither is its absence.** Two of the cases above
 put a well-formed `FAILED:` block into a perfectly healthy log, and one puts *nothing at all* into a
 log of a process that died. Read the **exit code first, the summary second, and `FAILED:` blocks
@@ -677,7 +981,7 @@ added. **A check that refuses to proceed on an input it cannot resolve is worth 
 resolves it optimistically**, and it is the only entry in this family that is a defence rather than
 a wound.
 
-28. **A position probe cannot see a rotation on a rig that is not a hierarchy.** Phase B §51 asked
+35. **A position probe cannot see a rotation on a rig that is not a hierarchy.** Phase B §51 asked
     whether secondary motion is bounded, so it measured how far `head.x` moved over six minutes of
     timeline and read **exactly 0.00000 m**. The layer was working: measured as a *rotation* it runs
     at 1.4993 degrees against its authored 1.5. `alien-scout.glb` is flat (ADR-553) -- every joint
@@ -718,7 +1022,7 @@ a wound.
   **suspect the sample domain before the knob when a reachability probe reports zero** (17).
 
 
-29. **A search truncated by `head` is a search you have not done, and its silence is indistinguishable
+36. **A search truncated by `head` is a search you have not done, and its silence is indistinguishable
    from an answer.**
 
    Before writing a BVH importer for §20 I checked whether one existed:
@@ -737,7 +1041,7 @@ a wound.
    `LIMIT`, a default page size and a truncated log all silently narrow a result set, and none of
    them marks the output as partial.
 
-30. **An instrument can become degenerate as the corpus grows, silently, with nobody touching it.**
+37. **An instrument can become degenerate as the corpus grows, silently, with nobody touching it.**
 
    §30's contact experiment perturbs a query built from a database sample's own feature vector by a
    fixed +0.05 per dimension and asks which sample the matcher picks. On 1,738 Glowmere samples that
@@ -761,10 +1065,10 @@ a wound.
    The general form, and it is the uncomfortable one: **an experiment that passed its own controls
    at one scale can quietly stop measuring anything at another, and nothing fails.** The test still
    runs, still asserts, still prints a number with four decimals. Ask what the metric can see
-   before asking what the feature carries -- the same instinct as 13, 17 and 26, arriving through
+   before asking what the feature carries -- the same instinct as 13, 17 and 33, arriving through
    the corpus rather than through the fixture.
 
-31. **Finding a fact in one place tells you nothing about how many places it is in. Grep for the
+38. **Finding a fact in one place tells you nothing about how many places it is in. Grep for the
    second copy of anything found once.**
 
    `LocomotionState::grounded` carried a comment saying it was "written by neither and read by
@@ -794,7 +1098,7 @@ a wound.
    entry 23's two kinds are the same family seen from the code side; this is the same family seen
    from the *fix* side, and it is the one that bites after you think you are done.
 
-32. **Two locally correct decisions can compose into data loss, and no test of either one can see
+39. **Two locally correct decisions can compose into data loss, and no test of either one can see
    it.**
 
    `PoseLayer::weight` was parsed and never serialised. Read each half on its own and both are
@@ -826,7 +1130,7 @@ a wound.
    Distinct from 22 and 23, which are about two code paths that *do* the same thing diverging.
    This is about two paths that do *opposite* things failing to be inverses.
 
-33. **A test can go green because its subject stopped existing. Absence and compliance are
+40. **A test can go green because its subject stopped existing. Absence and compliance are
    indistinguishable to most assertions.**
 
    `test_abduction_poc` asserts that wandering animals do not walk into things. It loads

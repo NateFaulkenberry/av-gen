@@ -20,6 +20,8 @@
 #include <array>
 #include <cstring>
 #include <set>
+#include <utility>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -441,7 +443,9 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // nothing loads differently -- which is the property this case exists to check and still
         // checks, one line down.
         REQUIRE(doc.contains("fog"));
-        // Ten since ADR-566 added `shape` and `heightInfluence` to ADR-565's eight. This number
+        // Fifteen since ADR-575 added §26's `emissionHeight`. Counted with
+        // `grep -c '    storedFloat("'` (14) plus `grep -c 'storedChoice("'` (1), not read off
+        // the failure -- which is the third time that distinction has caught something. This number
         // moving is the case doing its job rather than breaking: it is the only thing in the suite
         // that notices a kind's stored rows changing what EVERY effect of every kind serialises,
         // because `toJson` writes every kind's block.
@@ -452,7 +456,7 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // now agrees with whatever the code does. Third time this case has reported a true
         // consequence, and both times it caught me it was because a row was added and the count
         // was not re-derived.
-        CHECK(doc["fog"].size() == 10);
+        CHECK(doc["fog"].size() == 15);
         // The shower block holds only its six own numbers.
         REQUIRE(doc.contains("meteors"));
         CHECK(doc["meteors"].size() == 6);
@@ -554,6 +558,54 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
 // This is therefore a deliberate hard-coded list: a name here is a promise that an effect keeps a
 // control an artist can already find in the panel. Removing a control is allowed -- editing this
 // list is how you say so out loud.
+TEST_CASE("no row is drawn under a section header the panel never emitted",
+          "[world][atmospherics][registry]") {
+    // **The panel emits a section header only on the row that declares one, and it filters by page
+    // FIRST.** `drawSchemaRows` is `if (field.page != page) continue;` then
+    // `if (field.section[0]) SeparatorText(...)`. So if a section is declared by a row on one page
+    // and some LATER row of that same section sits on the other page, that row is drawn with no
+    // header of its own -- appended under whatever separator happened to precede it on that page,
+    // which is a different section's, or none.
+    //
+    // It is invisible in the source, where the rows read as one tidy list, and invisible in a
+    // screenshot unless you already know which section a row was meant to be under. It is one
+    // `.main()` away at all times: moving a row between pages is the most ordinary edit there is
+    // and it silently re-parents every row of its section that stayed behind.
+    //
+    // **The first version of this check asserted that the first row on each page declares a
+    // section, and it was wrong** -- it went red on five of six shipped kinds. That is not a
+    // defect, it is the family's deliberate convention: a few ungrouped rows first (a comet's
+    // colours, a vortex's density and radius) and named sections after them. A guard that fires on
+    // working code is not a guard, which is the lesson the kind-name check twenty lines up was
+    // bought with. The property below is the narrow one that is actually true and actually
+    // load-bearing: a row may have no section, but it may not have one the panel did not draw.
+    for (const world::EffectSchema* schema : world::effectSchemas()) {
+        // Each row's owning section is the last one declared at or before it in list order, which
+        // is exactly how the panel accumulates them.
+        std::string owner;
+        std::vector<std::pair<const world::EffectField*, std::string>> owned;
+        std::map<std::string, std::set<world::FieldPage>> declaredOn;
+        for (const world::EffectField& f : schema->fields) {
+            if (f.section[0] != '\0') {
+                owner = f.section;
+                declaredOn[owner].insert(f.page);
+            }
+            owned.emplace_back(&f, owner);
+        }
+        for (const auto& [field, section] : owned) {
+            if (section.empty()) {
+                continue; // an ungrouped row is drawn ungrouped, which is the convention
+            }
+            const auto it = declaredOn.find(section);
+            const bool drawnHere = it != declaredOn.end() && it->second.count(field->page) == 1;
+            INFO(std::string(schema->key) + ": row '" + field->leaf + "' belongs to section '" +
+                 section + "', which no row on its own page declares -- the panel will draw it "
+                 "under a different section's header, or under none");
+            CHECK(drawnHere);
+        }
+    }
+}
+
 TEST_CASE("a kind keeps the leaves its authored scenes and panels already name",
           "[world][atmospherics][registry]") {
     struct Expect {
@@ -584,5 +636,42 @@ TEST_CASE("a kind keeps the leaves its authored scenes and panels already name",
         // than passing because the loop found nothing to check.
         CHECK(have.count("eyeRadius") == 0);
         CHECK(have.count("notAField") == 0);
+    }
+}
+
+TEST_CASE("no panel page draws the same section heading twice", "[world][registry][panels]") {
+    // ADR-579, the brief's §36. `EffectField::sec` marks a row as the START of a section, and
+    // `drawSchemaRows` emits an `ImGui::SeparatorText` whenever it meets one -- **on the page it
+    // is drawing**. So two rows carrying the same section name, with other rows of the same page
+    // between them, draw that heading twice with unrelated controls under each.
+    //
+    // It is a panel defect with no visual test and no compile error, and it has now happened
+    // twice: `agent/tornado`'s section guard found one instance in the fog kind (ADR-566 fixed
+    // it), and enumerating the rows again for §36 found another that the first fix did not cover.
+    // **A defect that recurs in the same file after being fixed once is a defect that needs a
+    // check rather than a fix.**
+    //
+    // The check is per KIND and per PAGE, because a name reused across pages is correct -- each
+    // page draws its own copy and an artist sees one of them.
+    for (const world::AtmosphereKind kind : world::kAtmosphereKinds) {
+        const world::EffectSchema* s = world::effectSchema(kind);
+        if (s == nullptr) {
+            continue;
+        }
+        for (const world::FieldPage page :
+             {world::FieldPage::Main, world::FieldPage::Advanced, world::FieldPage::Hidden}) {
+            std::vector<std::string> seen;
+            for (const world::EffectField& f : s->fields) {
+                if (f.page != page || f.section[0] == '\0') {
+                    continue;
+                }
+                const std::string name = f.section;
+                INFO("kind " << world::atmosphereKindName(kind) << ", page "
+                     << static_cast<int>(page) << ", section '" << name << "' at row '" << f.leaf
+                     << "'");
+                CHECK(std::find(seen.begin(), seen.end(), name) == seen.end());
+                seen.push_back(name);
+            }
+        }
     }
 }

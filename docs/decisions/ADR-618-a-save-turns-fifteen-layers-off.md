@@ -57,7 +57,7 @@ compounding: the one that would have said "this layer is off" is the one nothing
 One line, and its **position is the decision**. `toJson`'s layer loop has **two** `push_back`
 sites — the Foot/Reach early-out and the shared path — so a key added to one is a key the other
 drops. The write goes *before* the branch, so both paths carry it and cannot drift. That is
-`docs/testing.md` #31 applied at the moment of writing rather than after being bitten: **any fact
+`docs/testing.md` #38 applied at the moment of writing rather than after being bitten: **any fact
 that lives in a copied region lives in N copies.**
 
 Guarded by `drive == Manual`, mirroring the parser exactly, because saving a *driven* layer's

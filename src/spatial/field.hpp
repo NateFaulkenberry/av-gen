@@ -43,7 +43,11 @@ enum class FieldKind : std::uint8_t {
     Noise,           // value = fbm3(q * frequency + tau) (in [0, 1))
     Voronoi,         // value = saturate(voronoiF1(q * frequency + tau))
     Distance,        // value = saturate(|q - point| / radius)
-    SdfDistance,     // value = saturate(sdf(q) / radius) (bound to Scene::sdfs by `reference`; 0 when unbound)
+    // ADR-576: DECLARED AND NOT IMPLEMENTED. It evaluates to 0 on the CPU and 0 on the GPU,
+    // so `FieldSpec::validate` REFUSES a spec that names it rather than letting a scene
+    // author select it and get an empty sky. The seam is real -- `Scene::sdfs` exists and
+    // `SdfRenderer` draws it -- and binding it is a feature decision, not a defect fix.
+    SdfDistance,     // value = saturate(sdf(q) / radius) when bound; REFUSED at load until it is
     Wave,            // travelling wave: value = envelope(s) * shape(k s) with s = dist(q) - waveSpeed * t (see WaveShape)
     // vector
     Direction,       // value = axis

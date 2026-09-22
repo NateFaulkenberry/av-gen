@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-21
 **Related:** ADR-615 (one-ended contracts), ADR-618 (a key the parser read and the writer never
-wrote), ADR-091 (the gait is remembered across a pass-through), `docs/testing.md` #32
+wrote), ADR-091 (the gait is remembered across a pass-through), `docs/testing.md` #39
 **Implemented by:** `LookAt::update` in `src/entity/behaviors.cpp`
 **Tests:** `tests/unit/test_alien_locomotion.cpp` — "a standing character turning to look is
 classified as turning, not idle"
@@ -111,7 +111,7 @@ claim on the error: **599 of 599, with the latch gone.**
 
 ## Consequences
 
-- **`docs/testing.md` #32 is the general form** — two locally correct decisions composing into a
+- **`docs/testing.md` #39 is the general form** — two locally correct decisions composing into a
   defect neither side's tests can see. This is that shape in behaviour rather than in
   serialisation, and it is the second instance found in one day.
 - **A published signal is only published if its consumer reads *that* signal.** `LookAt` wrote a
@@ -120,5 +120,5 @@ claim on the error: **599 of 599, with the latch gone.**
 - **`Explore` maintains `turnRate` on two of its seven exits**, which is now correct rather than
   incomplete: with the field cleared per frame, "write it when I turn" is the whole contract, and
   the five exits that do not write it are publishing zero, which is true.
-- **`docs/testing.md` #31 applied again**: the clear had to go on both `seek` and `update`, which
+- **`docs/testing.md` #38 applied again**: the clear had to go on both `seek` and `update`, which
   reset per-frame state in two separate blocks.

@@ -389,7 +389,42 @@ struct EffectResolve {
     // in the air, which is what scaling an extinction and an emissive density does, while fading its
     // COLOURS would leave a full-strength grey ghost and fading its RADIUS would shrink it rather
     // than dim it (ADR-387).
-    void (*pack)(const AtmosphericEffect&, float envelope, MediumSlot& out) = nullptr;
+    //
+    // ADR-572 (§17): `flow` is what the air is doing where this medium is -- the subscription the
+    // effect already declares, resolved. It is handed to the packer because the packer is where a
+    // medium's MOTION is computed, and §17 asks a medium to respond to a flow field.
+    //
+    // Every kind's packer changed in one commit rather than an overload being added beside the old
+    // one: ADR-441 is explicit that this engine takes no compatibility shims while it is in heavy
+    // development, and a half-converted hook is the state in which the two versions disagree about
+    // which is authoritative.
+    //
+    // **This is the ONLY channel by which a medium answers the wind, and it is one on purpose.**
+    // `agent/fog` and `agent/tornado` each built an answer to the same question and they collided
+    // at the merge. ADR-580 §68 had added a SECOND function pointer beside this one,
+    // `lean(AtmosphericEffect&, downwind, influence)`, called by `buildAtmosphericFrame` on a copy
+    // of the effect just before packing it. Two hooks, one question, and nothing downstream able
+    // to disagree about which was authoritative -- this repository's signature defect (ADR-576,
+    // and the three subsystems with no users found in one night). It was removed at the merge.
+    //
+    // **ADR-580 §68's insight is kept and it lives in the packers now.** A kind's answer to the
+    // wind IS per kind and the frame builder must not know it: a cosmic vortex is a disc whose
+    // shape the march's coefficients were tuned against, so it answers by MOVING; a fog bank is the
+    // same placed medium and answers the same way; a tornado's axis is already a CURVE rather than
+    // a line, so it answers by BENDING, which is both what a storm column visibly does and free,
+    // since the lean term is evaluated per sample whatever its value. All three of those are now
+    // the body of a packer that was handed `flow` anyway, and a kind with no wind response simply
+    // ignores its `flow` argument -- which is a legitimate answer, and one that
+    // `effect_conformance`'s `flow-reaches` check still says out loud, because that check compares
+    // PACKED FRAMES and never knew which hook produced them.
+    //
+    // What made the hook removable rather than merely redundant: `buildAtmosphericFrame` called it
+    // on a local copy of the effect whose only reader was `packMediumSlot`, so nothing between the
+    // mutation and the pack could observe it. A future kind that needs the world changed BEFORE
+    // some other stage reads it does not get a second hook here; it gets a reason recorded in an
+    // ADR first.
+    void (*pack)(const AtmosphericEffect&, float envelope, const MediumFlowInput& flow,
+                 MediumSlot& out) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.
@@ -458,12 +493,13 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
+inline constexpr std::array<AtmosphereKind, 6> kAtmosphereKinds{
     AtmosphereKind::Comet,         //
     AtmosphereKind::Aurora,        //
     AtmosphereKind::Vortex,        //
     AtmosphereKind::MeteorShower,  //
     AtmosphereKind::VolumetricFog, //
+    AtmosphereKind::Tornado,       // ADR-580
 };
 
 // The kind's position in `kAtmosphereKinds`, or `size()` for an enumerator that is not in it --
@@ -488,6 +524,7 @@ inline constexpr std::array<AtmosphereKind, 5> kAtmosphereKinds{
 
 static_assert(atmosphereKindIndex(AtmosphereKind::Comet) == 0);
 static_assert(atmosphereKindIndex(AtmosphereKind::VolumetricFog) == 4);
+static_assert(atmosphereKindIndex(AtmosphereKind::Tornado) == 5);
 
 [[nodiscard]] inline std::span<const AtmosphereKind> declaredAtmosphereKinds() { return kAtmosphereKinds; }
 
