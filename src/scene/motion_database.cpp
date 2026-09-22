@@ -203,7 +203,7 @@ std::string motionTagNames(std::uint32_t tags) {
         {MotionTag::Walk, "walk"},             {MotionTag::Run, "run"},
         {MotionTag::Turn, "turn"},             {MotionTag::Airborne, "airborne"},
         {MotionTag::Cyclic, "cyclic"},         {MotionTag::Travelling, "travelling"},
-        {MotionTag::OneShot, "oneshot"},
+        {MotionTag::OneShot, "oneshot"},        {MotionTag::Terminal, "terminal"},
     };
     std::string out;
     for (const auto& [tag, name] : kNames) {
@@ -698,7 +698,21 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
             db.sampleRoot.push_back(std::atan2(heading.x, heading.z));
             db.sampleTime.push_back(t);
             db.samplePhase.push_back(meta.phase.empty() ? 0.0f : meta.phase.at(t - clip.start));
-            db.sampleTags.push_back(tags);
+            {
+                // §46: a non-looping clip's last stretch, where the future is extrapolated.
+                const float longest = options.config.trajectoryTimes.empty()
+                                          ? 0.2f
+                                          : *std::max_element(options.config.trajectoryTimes.begin(),
+                                                              options.config.trajectoryTimes.end());
+                // Only a clip that ENDS MOVING: its extrapolated future is motion it does not
+                // contain, and re-choosing its last frame freezes a walking body. A clip that ends
+                // at rest (a stop, a death) extrapolates to rest, which is true, and its last frames
+                // are exactly what a request to stand should find. Ruling those out left "walking,
+                // asked to stop" playing the walk (§47).
+                const bool endsMoving = glm::length(endVelocity) > 0.1f || glm::length(implied) > 0.1f;
+                const bool terminal = !meta.loop && endsMoving && (clip.duration - t) < longest;
+                db.sampleTags.push_back(tags | (terminal ? static_cast<std::uint32_t>(MotionTag::Terminal) : 0u));
+            }
             // Filled below, once the clip's extent is known.
             db.sampleNext.push_back(MotionDatabase::kInvalid);
         }

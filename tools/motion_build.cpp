@@ -1665,6 +1665,7 @@ int cmdAugment(const Args& args) {
         }
         options.augment.legs.push_back({parts[0], parts[1], parts[2]});
     }
+    options.augment.cycles = static_cast<std::uint32_t>(std::stoul(args.option("cycles", "3")));
     options.database.config = scene::defaultBipedConfig(options.augment.legs.front().tip,
                                                         options.augment.legs.back().tip, args.option("head", "head.x"));
     std::vector<scene::AugmentPlanItem> plan;

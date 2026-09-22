@@ -56,6 +56,13 @@ enum class MotionTag : std::uint32_t {
     Cyclic = 1u << 6,   // the clip loops and has a phase
     Travelling = 1u << 7, // ADR-552: its root leaves a box the size of its body
     OneShot = 1u << 8,
+    // A sample of a clip that does not loop and ends moving, closer to its end than the longest
+    // trajectory horizon. Its future is extrapolated rather than recorded, and it has nowhere to
+    // continue to. (A clip that ends at rest is not terminal: its extrapolation is true.)
+    // **A matcher that could choose it would freeze on it**: the end of a start is an excellent match
+    // for a walk, the clip ends, the search runs again and finds the same last frame. Found by §46's
+    // harness: 60 switches a second, 0% continuity, on a corpus the matcher should reproduce.
+    Terminal = 1u << 9,
 };
 [[nodiscard]] std::uint32_t motionTagsFor(const PackClip& clip, const ClipAnalysis& analysis);
 [[nodiscard]] std::string motionTagNames(std::uint32_t tags);
@@ -80,7 +87,8 @@ enum class MotionTag : std::uint32_t {
 //      faced by it rather than by its pelvis.
 //   6  trajectory facing is the body's future facing, not its direction of travel; an in-place
 //      clip is faced relative to its own mean pelvis yaw, so a turn on the spot turns.
-inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 6;
+//   7  samples near the end of a non-looping clip carry `MotionTag::Terminal`.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 7;
 
 // A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
 // forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one
@@ -392,6 +400,7 @@ struct MotionQuery {
     // to (§11/§12). kInvalid on the first query of a character's life.
     std::uint32_t current = MotionDatabase::kInvalid;
 };
+
 
 struct MotionCostWeights {
     // §11. How much a candidate is penalised for not being the continuation of what is playing.

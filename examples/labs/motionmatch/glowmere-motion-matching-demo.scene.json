@@ -1826,7 +1826,7 @@
      "version": 1,
      "jointPosition": 0.3,
      "jointVelocity": 0.4,
-     "trajectoryPosition": 3.0,
+     "trajectoryPosition": 6.0,
      "trajectoryFacing": 0.5,
      "rootVelocity": 3.0
     }

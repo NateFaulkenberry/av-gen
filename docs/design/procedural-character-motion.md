@@ -2371,7 +2371,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 36 | Database versioning | done (via merge) | `9ebbb173` (`agent/anim-cinfra`, merged in `54f30cc3`): the database is a file with a format version, a feature schema digest, the skeleton digest, a pack content digest that includes the provenance chain (where the retarget profile is recorded), and a tool version. Incompatible files are refused on load. **Added here:** `kMotionFeatureExtractionVersion`, folded into the schema digest, so a change in how a feature is *computed*, not only which features exist, also invalidates stored data |
 | 44 | Motion style | partial | Style is in the request and the clip provider. The matcher's authoring surface is now `motionMatching.clips` (per character). **Missing: a style term or tag in the matcher's cost** |
 | 45 | Search weights | done | Configurable (ADR-608) and now **versioned** per character (`motionMatching.weights`, version 1; an unknown version is refused) |
-| 46 | Automated search evaluation | **partial** | The pieces exist: pose-space retrieval (`test_cross_clip_matching.cpp`), jump rate (`test_motion_database_scale.cpp:658`), plant discontinuity. **Missing: one ground-truth harness that reports all seven measures** |
+| 46 | Automated search evaluation | done | `entity/motion_evaluation.*`: one ground-truth harness reports all seven measures, with floor, left-out and broken-matcher arms (`test_motion_evaluation.cpp`). See "§46" |
 | 47 | Adversarial tests | done | `test_motion_adversarial.cpp` on the golden corpus covers all twelve cases the spec lists, each paired so the no-op fails one arm. Ambiguous cases are judged by how the chosen sample moves, not by the clip's name: a 0.05 m/s request is honestly nearer the end of `Stop` than `Idle` |
 | 48 | Golden motion tests | done | `test_motion_golden_scenarios.cpp`: walk north, turn east, stop, with broad behaviour checked per stretch. Two runs are identical. A control shows the predicted query is what makes the start and the turn choosable |
 | 49 | Search correctness | done | Known best (a sample's own features, zero cost), obviously bad (never chosen), better trajectory and better pose (§78), wrong contact (§78, and §47's tie), and a candidate whose root teleports (never chosen for a smooth walk) |
@@ -2384,16 +2384,16 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 59 | Procedural + motion matching | done | Foot layers resolve on the matched alien's pose on every frame (the lab test) |
 | 61 | Dataset strategy | **partial** | 100STYLE is verified (CC BY 4.0, `bc56f7f1`; `assets/100STYLE-ATTRIBUTION.md`; ADR-612 amendment), and a pack refuses to build without a licence (`test_motion_pack.cpp:107`). **ACCAD and CMU are not assessed. The derivative-data rule for a distributable pack is not recorded** |
 | 64 | First vertical slice | done | 100STYLE → IK retarget (ADR-624) → contacts, phase and features → database → runtime matcher → scout in a scene → Phase B layers → inertialization. Test: `test_motion_slice.cpp` |
-| 65 | Glowmere demonstration | done (strafe unserved) | A scripted scene driven by motion requests. Each segment gets its family except strafe, which the scout's corpus cannot serve. See "§65" |
+| 65 | Glowmere demonstration | done (strafe unserved) | A scripted scene driven by motion requests. Each segment gets its family except strafe, which the scout's corpus cannot serve. Re-taken with the `Terminal` tag and three-cycle turns; the weights moved to trajectory position 6. See "§65" |
 | 66 | Phase B integration | done | The same test; the matcher does not bypass the layer stack |
 | 67 | Multi-character demonstration | partial | CPU cost measured for 1–100 characters sharing one database. **Missing: a scene with 10/50/100 matched aliens on terrain** |
-| 70 | Failure-case analysis | not started | No classification document exists. The findings so far (§16, §23, §31) are unclassified |
+| 70 | Failure-case analysis | done | `docs/design/motion-matching.md` §15: every Phase C defect classified by the spec's categories, with the layer fixed |
 | 71 | Root-motion policy | done | The simulation owns translation and heading; travelling clips are posed in the body frame; in-place clips unchanged |
 | 73 | Cinematic determinism | done | Extraction is bit-identical (with a sensitivity arm). The match lab scene reproduces itself to the bit (`test_motion_matrix.cpp`). The continuation is frame-rate independent (`6f8bd107`). §48 scenarios repeat exactly |
 | 77 | Testing matrix | done | Database rows: io tests (cinfra) and the adversarial file. Feature rows: `test_motion_matrix.cpp` (deterministic, standardised, dimensions, missing joints). Search rows: adversarial and cost. Runtime rows: the wired tests and the perf harness |
 | 78 | Adversarial search test | done | Both constructions, each flipped by its weight: pose vs trajectory, and pose vs contact (`test_motion_adversarial.cpp`) |
 | 79 | Golden dataset | done | `tests/support/golden_motion.hpp`: ten intentionally distinguishable one-second clips (idle, walk, run, back, both strafes, both turns, start, stop), with heading and contacts. Its header carries §79's caveat |
-| 89 | Final report | not started | `docs/design/motion-matching.md` does not exist |
+| 89 | Final report | done | `docs/design/motion-matching.md` |
 | 91 | First milestone | done | Glowmere corpus → database → linear search → provider → alien in a scene (ADR-623's match lab). Choices vary with velocity, direction and speed (§47/§48) |
 | 92 | Second milestone | done (pipeline) | 100STYLE retargeted, analysed, in a database and matched on the scout in a scene. The look is not yet approved, and selection is §65's work |
 | 93 | Third milestone | done (under load) | Linear, the strided exact-ish plan, PCA, VQ and KD-tree on AV Gen's real distributions, reporting latency, quality, memory and LOC |
@@ -2708,6 +2708,49 @@ things had to change before it did:
    outweighed the request, and the alien stayed in whatever it was playing (walk requests got
    `Idle`). The demo's weights (joint position 0.3, trajectory position 3, root velocity 3) come
    from a 12-point sweep, a hidden `[.measure]` case in the demo's test file.
+
+### §65 re-taken: the matcher froze on the end of a start
+
+With the corpus rebuilt so the turn variants are three cycles long instead of one, a second defect
+showed. **A walk request after a stop landed on the last frames of `Walking~start`** and stayed
+there: a non-looping clip that ends moving extrapolates past its end, so its final samples promise
+a future the clip cannot play. They are now tagged `Terminal` (a non-looping clip that ends moving,
+within the longest trajectory horizon of its end; extraction v7), and the matcher rejects them with
+`Airborne`. A first version tagged every non-looping clip's tail, which removed the end of `Stop`
+and broke stop-to-idle; the rule is now "ends moving", and a clip that ends at rest keeps its tail.
+
+`avgen-motion augment --cycles N` (default 3) repeats a looping source before a turn, start or stop
+is warped, so a turn variant carries a whole turn rather than a second of one. Coverage rose: left
+turn good 27, right turn 23, run 25.
+
+**The demo's weights moved with the corpus.** At trajectory position 3 the new curves chose
+`Walking_low_grav`; the 12-point sweep, re-run, finds only trajectory position 6 (joint position
+0.3, root velocity 1 or 3) choosing the turns for the curves, `Running` for the run and `Idle_turn`
+for the turn. The scene now carries 6. **Weights tuned on one corpus do not transfer to another**:
+that belongs to §45, and it is why the block is versioned per character, not global. Stop now
+plays `Idle` (25 frames) then `Idle_turn`, and walk-again plays `Walking_low_grav`; strafe is still
+unserved.
+
+## §46 — automated search evaluation
+
+`entity/motion_evaluation.{hpp,cpp}`: `evaluateMatcher` replays a known clip as requests (its own
+body velocity, each step) and reads §46's seven measures off what the matcher chose, all in the
+database's raw body-frame units: continuity, trajectory error, velocity error, pose error, contact
+mismatch, phase mismatch, transitions per second. `test_motion_evaluation.cpp`:
+
+- **Golden corpus, three arms.** With the clip in the database every measure sits at its floor
+  (trajectory 0.000); with it left out trajectory error rises (0.290); with the trajectory,
+  facing and root-velocity weights zeroed, a matcher blind to the request, it rises further (0.480). The no-op fails at least one arm.
+- **The scout, leave-one-out over its walks and runs.** The finding is that *the floor is not a
+  floor* here: `Walking`, `Walking_crouch` and `Walking_injured` score the same in or out, because a
+  velocity-only request cannot tell one in-place walk from another. Removing a clip that is distinct
+  (`Running`, `Walking_low_grav`) makes it worse, which is asserted.
+
+## §70 and §89
+
+The failure taxonomy (§70) and the final report (§89) are `docs/design/motion-matching.md`. §70's
+table classifies every defect Phase C found by the spec's categories and names the layer the fix
+went into.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

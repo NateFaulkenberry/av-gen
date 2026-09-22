@@ -232,7 +232,8 @@ void MatchMotionProvider::fillQuery(const MotionRequest& request, std::uint32_t 
     query.current = haveCurrent ? current : scene::MotionDatabase::kInvalid;
     // §14: a body on the ground never wants an airborne sample. One AND per sample, and it removes
     // whole clips before anything is scored.
-    query.rejectTags = static_cast<std::uint32_t>(scene::MotionTag::Airborne);
+    query.rejectTags = static_cast<std::uint32_t>(scene::MotionTag::Airborne) |
+                       static_cast<std::uint32_t>(scene::MotionTag::Terminal);
 }
 
 std::optional<scene::MotionQuery> MatchMotionProvider::queryFor(const MotionRequest& request,

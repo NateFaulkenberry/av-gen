@@ -347,10 +347,60 @@ AugmentResult mirrorClip(const Skeleton& skeleton, const AnimationClip& source, 
 
 } // namespace
 
+
+namespace {
+
+// `cycles` repeats of a looping clip, as one clip, with its contact spans repeated to match.
+std::pair<AnimationClip, std::vector<ContactTrack>> repeated(const Skeleton& skeleton, const AnimationClip& clip,
+                                                             const std::vector<ContactTrack>& contacts,
+                                                             std::uint32_t cycles, float rate) {
+    const float length = clip.length();
+    Baked baked;
+    baked.dt = 1.0f / std::max(rate, 1.0f);
+    const auto frames = static_cast<std::size_t>(std::floor(length * static_cast<float>(cycles) * rate + 0.5f) + 1.0f);
+    baked.frames.resize(frames);
+    for (std::size_t f = 0; f < frames; ++f) {
+        float local = std::fmod(baked.timeOf(f), length);
+        if (f + 1 == frames) {
+            local = length; // the last frame is the cycle's end, which a loop's first frame repeats
+        }
+        setRestPose(skeleton, baked.frames[f]);
+        sampleClip(clip, clip.start + local, baked.frames[f]);
+    }
+    AnimationClip out = unbake(skeleton, baked, clip.name);
+    std::vector<ContactTrack> tracks = contacts;
+    for (ContactTrack& track : tracks) {
+        std::vector<ContactSpan> spans;
+        for (std::uint32_t i = 0; i < cycles; ++i) {
+            const float shift = static_cast<float>(i) * length;
+            for (const ContactSpan& s : track.spans) {
+                if (s.wraps()) {
+                    spans.push_back(ContactSpan{s.start + shift, s.end + shift + length, length * static_cast<float>(cycles)});
+                } else {
+                    spans.push_back(ContactSpan{s.start + shift, s.end + shift, length * static_cast<float>(cycles)});
+                }
+            }
+        }
+        track.spans = std::move(spans);
+    }
+    return {std::move(out), std::move(tracks)};
+}
+
+} // namespace
+
 AugmentResult augmentClip(const Skeleton& skeleton, const AnimationClip& source, bool loop,
                           AugmentKind kind, float parameter, const AugmentOptions& options) {
     if (kind == AugmentKind::Mirror) {
         return mirrorClip(skeleton, source, options);
+    }
+    const bool repeat = loop && options.cycles > 1 &&
+                        (kind == AugmentKind::Turn || kind == AugmentKind::Start || kind == AugmentKind::Stop);
+    if (repeat) {
+        auto [longer, tracks] = repeated(skeleton, source, options.contacts, options.cycles, options.sampleRate);
+        AugmentOptions once = options;
+        once.cycles = 1;
+        once.contacts = std::move(tracks);
+        return augmentClip(skeleton, longer, loop, kind, parameter, once);
     }
     AugmentResult out;
     out.kind = kind;

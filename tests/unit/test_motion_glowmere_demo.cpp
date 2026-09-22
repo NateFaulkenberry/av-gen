@@ -8,8 +8,11 @@
 // log.
 //
 // The weights are the scene's own (§45's versioned block): joint position 0.3, trajectory position
-// 3, root velocity 3. They were chosen from the sweep below: at the engine defaults the pose half
+// 6, root velocity 3. They were chosen from the sweep below: at the engine defaults the pose half
 // outweighs the request, and the alien stays in whatever it is playing (walk requests got `Idle`).
+// **They are corpus-sensitive.** With the one-second turn variants a trajectory weight of 3 chose
+// the curves; with three-cycle variants and the `Terminal` tag it takes 6. That sensitivity is a
+// result, recorded in the phase log, not a tuning detail.
 //
 // **What is asserted is what the spec asks the demonstration to show**: that the matcher selects an
 // appropriate continuation for each kind of request. For each segment, the family of motion it plays
