@@ -2628,6 +2628,15 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
                 desc.motionMatching.trajectory.push_back(s.get<float>());
             }
         }
+        if (m.contains("pack")) {
+            if (!m["pack"].is_string() || m["pack"].get<std::string>().empty()) {
+                return fail("entity '{}': 'motionMatching.pack' must be a path", desc.name);
+            }
+            desc.motionMatching.pack = m["pack"].get<std::string>();
+            const std::filesystem::path authored(desc.motionMatching.pack);
+            desc.motionMatching.packResolved =
+                (authored.is_absolute() ? authored : (baseDir / authored)).lexically_normal().string();
+        }
         desc.motionMatching.enabled = true;
         desc.proceduralMotion = true;
     }
@@ -2979,6 +2988,9 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
             m["contacts"] = entity.motionMatching.contacts;
         }
         m["trajectory"] = entity.motionMatching.trajectory;
+        if (!entity.motionMatching.pack.empty()) {
+            m["pack"] = entity.motionMatching.pack; // as authored, so a save moves with its scene
+        }
         j["motionMatching"] = std::move(m);
     }
     if (entity.behaviors.size() > entity.profileBehaviors) {

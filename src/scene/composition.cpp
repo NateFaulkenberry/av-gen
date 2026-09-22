@@ -2665,7 +2665,7 @@ std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& 
                                                               const entity::MotionMatchingDesc& m,
                                                               const std::string& who) {
     // The key is everything the database is a function of: the skeleton, and the config.
-    std::string key = skeletonDigest(rig.skeleton) + "|j";
+    std::string key = skeletonDigest(rig.skeleton) + "|p" + m.packResolved + "|j";
     for (const std::string& j : m.joints) {
         key += ":" + j;
     }
@@ -2694,7 +2694,15 @@ std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& 
         packOptions.contactJoints.push_back(ContactJoint{c, ContactKind::Foot});
     }
     packOptions.toolVersion = "avgen-runtime-match";
-    auto pack = buildMotionPack(who, rig.skeleton, rig.clips, provenance, packOptions);
+    // §64/§92: a pack named by the scene replaces the rig's own clips. It has to be built for this
+    // skeleton (ADR-650's digest); a pack for another rig would pose one character with another's
+    // joints, so it is refused here and the body stays on its clip provider.
+    Result<MotionPack> pack = m.packResolved.empty()
+                                  ? buildMotionPack(who, rig.skeleton, rig.clips, provenance, packOptions)
+                                  : readMotionPack(m.packResolved);
+    if (pack && !m.packResolved.empty() && pack->skeletonDigest != skeletonDigest(rig.skeleton)) {
+        pack = fail("pack '{}' was built for another skeleton", m.packResolved);
+    }
     std::shared_ptr<const MotionAsset> out;
     if (!pack) {
         log::warn("entity '{}': motion matching is on but its pack did not build ({}); the body "

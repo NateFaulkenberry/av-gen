@@ -34,6 +34,7 @@
 #include "scene/motion_pack.hpp"
 #include "scene/motion_quality_report.hpp"
 #include "scene/retarget.hpp"
+#include "scene/retarget_positional.hpp"
 #include "scene/scene.hpp"
 
 #include <random>
@@ -230,6 +231,7 @@ int usage() {
                "  --contacts a,b    joints to analyse; the first is the phase reference\n"
                "  --license <id>    SPDX identifier, REQUIRED by `pack`\n"
                "  --retarget-to <f> --map s:t,...   pack onto ANOTHER skeleton\n"
+               "  --positional-legs sH:sK:sA=tH:tK:tF,...  then re-solve those legs through IK\n"
                "  --source <name>   the corpus this came from, REQUIRED by `pack`\n");
     return 1;
 }
@@ -459,6 +461,39 @@ int cmdPack(const Args& args) {
                    binding.rootScale);
     }
 
+    // `--positional-legs sHip:sKnee:sAnkle=tHip:tKnee:tFoot,...` re-solves each named leg through IK
+    // after the rotation retarget, so the target's feet follow the source's (§64/§92). It exists for
+    // the Glowmere alien, whose feet a rotation retarget cannot move (ADR-553).
+    std::vector<scene::PositionalLeg> positionalLegs;
+    for (const std::string& spec : splitCommas(args.option("positional-legs"))) {
+        const std::size_t eq = spec.find('=');
+        const auto parts = [](const std::string& s) {
+            std::vector<std::string> out;
+            std::string cur;
+            for (const char c : s) {
+                if (c == ':') {
+                    out.push_back(cur);
+                    cur.clear();
+                } else {
+                    cur.push_back(c);
+                }
+            }
+            out.push_back(cur);
+            return out;
+        };
+        const std::vector<std::string> from = eq == std::string::npos ? std::vector<std::string>{} : parts(spec.substr(0, eq));
+        const std::vector<std::string> to = eq == std::string::npos ? std::vector<std::string>{} : parts(spec.substr(eq + 1));
+        if (from.size() != 3 || to.size() != 3) {
+            fmt::print(stderr, "--positional-legs entries are sHip:sKnee:sAnkle=tHip:tKnee:tFoot, got '{}'\n", spec);
+            return 1;
+        }
+        positionalLegs.push_back({from[0], from[1], from[2], {to[0], to[1], to[2]}});
+    }
+    if (!positionalLegs.empty() && !retargeting) {
+        fmt::print(stderr, "--positional-legs needs --retarget-to\n");
+        return 1;
+    }
+
     const auto convert = [&](std::vector<scene::AnimationClip>& source) {
         if (!retargeting) {
             return;
@@ -467,6 +502,22 @@ int cmdPack(const Args& args) {
             scene::RetargetStats stats;
             scene::AnimationClip out =
                 scene::retargetClip(clip, first->skeleton, packSkeleton, binding, &stats);
+            if (!positionalLegs.empty()) {
+                scene::PositionalRetargetStats legStats;
+                scene::PositionalRootRescale rescale;
+                rescale.targetRoot = binding.rootLink >= 0
+                                         ? packSkeleton.joints[static_cast<std::size_t>(binding.links[static_cast<std::size_t>(binding.rootLink)].target)].name
+                                         : std::string();
+                rescale.rootScale = binding.rootScale;
+                out = scene::retargetLegsPositional(clip, first->skeleton, out, packSkeleton, positionalLegs,
+                                                    30.0f, &legStats, rescale);
+                if (!legStats.problem.empty()) {
+                    fmt::print(stderr, "{}\n", legStats.problem);
+                }
+                provenance.processing.push_back(fmt::format(
+                    "positional legs '{}': {} frames, worst foot miss {:.3f}% of the leg", clip.name,
+                    legStats.frames, legStats.worstShortfall * 100.0f));
+            }
             // The retarget's own error, per clip, into the provenance. A pack that cannot say how
             // accurately its motion was transferred is a pack nobody can judge.
             provenance.processing.push_back(fmt::format(

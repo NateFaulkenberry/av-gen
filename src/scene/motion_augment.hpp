@@ -30,6 +30,7 @@
 #include "scene/motion_analysis.hpp"
 #include "scene/motion_coverage.hpp"
 #include "scene/motion_database.hpp"
+#include "scene/ik.hpp"
 #include "scene/motion_pack.hpp"
 #include "scene/skeleton.hpp"
 
@@ -92,6 +93,17 @@ struct AugmentResult {
     bool accepted = false;
     std::string refusal; // why not, when refused
 };
+
+// Solve one leg of `pose` so its tip lands on `target` (model space), with the tip's model rotation
+// set to `footRotation`. `root`, `mid` and `tip` need not be a parent chain. This is the one leg
+// solve augmentation and the positional retarget share.
+struct LegSolve {
+    IkStatus status = IkStatus::Solved;
+    float shortfall = 0.0f; // target-to-tip distance, as a fraction of the leg's length
+};
+[[nodiscard]] LegSolve solveLegInPose(const Skeleton& skeleton, Pose& pose, int root, int mid, int tip,
+                                      const glm::vec3& target, const glm::mat3& footRotation,
+                                      const glm::vec3& forward);
 
 // The body velocity a clip's planted feet imply at each frame, model space, horizontal. A frame
 // with no planted foot takes the value interpolated from its neighbours (wrapping on a loop).

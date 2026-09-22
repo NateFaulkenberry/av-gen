@@ -2383,7 +2383,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 55 | Quality vs speed | done | The matrix: latency percentiles, memory, recall, excess and transition quality, and LOC |
 | 59 | Procedural + motion matching | done | Foot layers resolve on the matched alien's pose on every frame (the lab test) |
 | 61 | Dataset strategy | **partial** | 100STYLE is verified (CC BY 4.0, `bc56f7f1`; `assets/100STYLE-ATTRIBUTION.md`; ADR-612 amendment), and a pack refuses to build without a licence (`test_motion_pack.cpp:107`). **ACCAD and CMU are not assessed. The derivative-data rule for a distributable pack is not recorded** |
-| 64 | First vertical slice | **partial** | Every stage exists in isolation, and 100STYLE is retargeted and searched in tests. **No playable alien runs on the matcher in a scene**, because the product installs the clip provider (ADR-615) |
+| 64 | First vertical slice | done | 100STYLE → IK retarget (ADR-624) → contacts, phase and features → database → runtime matcher → scout in a scene → Phase B layers → inertialization. Test: `test_motion_slice.cpp` |
 | 65 | Glowmere demonstration | not started | |
 | 66 | Phase B integration | done | The same test; the matcher does not bypass the layer stack |
 | 67 | Multi-character demonstration | partial | CPU cost measured for 1–100 characters sharing one database. **Missing: a scene with 10/50/100 matched aliens on terrain** |
@@ -2394,8 +2394,8 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 78 | Adversarial search test | done | Both constructions, each flipped by its weight: pose vs trajectory, and pose vs contact (`test_motion_adversarial.cpp`) |
 | 79 | Golden dataset | done | `tests/support/golden_motion.hpp`: ten intentionally distinguishable one-second clips (idle, walk, run, back, both strafes, both turns, start, stop), with heading and contacts. Its header carries §79's caveat |
 | 89 | Final report | not started | `docs/design/motion-matching.md` does not exist |
-| 91 | First milestone | **partial** | Linear search, the database and the provider run on the Glowmere corpus in tests. **Not on the alien in a scene** |
-| 92 | Second milestone | **partial** | 100STYLE is retargeted, analysed, put in a database and matched in tests (`d67fc36a`). **Not driving Glowmere** |
+| 91 | First milestone | done | Glowmere corpus → database → linear search → provider → alien in a scene (ADR-623's match lab). Choices vary with velocity, direction and speed (§47/§48) |
+| 92 | Second milestone | done (pipeline) | 100STYLE retargeted, analysed, in a database and matched on the scout in a scene. The look is not yet approved, and selection is §65's work |
 | 93 | Third milestone | done (under load) | Linear, the strided exact-ish plan, PCA, VQ and KD-tree on AV Gen's real distributions, reporting latency, quality, memory and LOC |
 | 94 | Final artistic demonstration | not started | |
 
@@ -2631,6 +2631,32 @@ clip turned the body on top of the entity's own turn. File version 2 carries the
 In the match lab, the matched alien's base pose comes from the matcher on all 181 frames, and both
 of its ground-driven foot layers resolve on top of it on every one of them. Its clip-provider twin
 shows the same count, so the matcher did not route around Phase B.
+
+## §64 / §92 — the first vertical slice: 100STYLE on the scout, matched at runtime
+
+ADR-624 builds the positional leg retarget ADR-553 asked for. The slice pack is built with:
+
+```
+avgen_motion pack assets/100style-mixed/Strutting_*.bvh --out assets/100style-scout-strutting-pack \
+  --scale 0.01 --license CC-BY-4.0 --source 100STYLE --contacts foot.l,foot.r \
+  --redistribution allowed --derivedDataAllowed true \
+  --retarget-to assets/aliens/alien-scout.glb \
+  --map Hips:root.x,LeftHip:thigh_twist.l,LeftKnee:leg_stretch.l,LeftAnkle:foot.l,LeftToe:toes_01.l,RightHip:thigh_twist.r,RightKnee:leg_stretch.r,RightAnkle:foot.r,RightToe:toes_01.r \
+  --positional-legs LeftHip:LeftKnee:LeftAnkle=thigh_twist.l:leg_stretch.l:foot.l,RightHip:RightKnee:RightAnkle=thigh_twist.r:leg_stretch.r:foot.r
+```
+
+It is gitignored (100STYLE is CC BY 4.0 and not redistributed). `motionMatching.pack` points a
+character at it. In `examples/labs/motionmatch/alien-match-100style-lab.scene.json` a scout takes
+all 361 frames from the matcher, plays only retargeted 100STYLE clips, keeps both foot layers
+resolved on every frame, and scrubs to the played frame exactly. The database reads the pack as
+motion: 317 s walking, 181 s strafing, 228 s reverse, 272 s turning. In the body frame the forward
+walk goes forward (+0.44 m/s) and the backward walk goes back (−0.31).
+
+**§92's question** ("does this architecture scale beyond the tiny hand-authored Glowmere corpus?")
+now has a yes for the pipeline: real mocap, retargeted onto the character that has to perform it,
+analysed, stored, searched and posed in a scene. It is not yet a yes for the look. On this one
+slow style the wandering scout mostly picks the backward and sideways clips, and 14% of leg-frames
+are at or past straight. Selection is §65's work, and the look is the owner's call.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

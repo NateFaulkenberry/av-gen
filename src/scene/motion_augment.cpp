@@ -101,6 +101,8 @@ AnimationClip unbake(const Skeleton& skeleton, const Baked& baked, std::string n
         clip.channels.push_back(std::move(r));
         clip.channels.push_back(std::move(s));
     }
+    // Only what moves, so the travel joint is still the travel joint (ADR-337; `pruneRestChannels`).
+    pruneRestChannels(clip, skeleton);
     return clip;
 }
 
@@ -156,6 +158,49 @@ float smooth(float t) {
 }
 
 } // namespace
+
+LegSolve solveLegInPose(const Skeleton& skeleton, Pose& pose, int root, int mid, int tip, const glm::vec3& target,
+                        const glm::mat3& footRotation, const glm::vec3& forward) {
+    LegSolve out;
+    std::vector<glm::mat4> now;
+    poseToModel(skeleton, pose, now);
+    TwoBoneChain chain;
+    chain.root = positionOf(now[static_cast<std::size_t>(root)]);
+    chain.mid = positionOf(now[static_cast<std::size_t>(mid)]);
+    chain.tip = positionOf(now[static_cast<std::size_t>(tip)]);
+    // A pole in front of the knee, for the one case the solve needs it: a leg that is straight now,
+    // whose bend plane the current pose cannot name. A bent leg keeps its own plane whatever the pole
+    // says. `forward` is the body's, which is where a biped's knee points.
+    const float reach = glm::length(chain.mid - chain.root) + glm::length(chain.tip - chain.mid);
+    const glm::vec3 pole = (0.5f * (chain.root + target)) + (glm::normalize(forward) * reach);
+    const TwoBoneSolution sol = solveTwoBone(chain, target, pole, true);
+    out.status = sol.status;
+    if (sol.status == IkStatus::DegenerateBone || sol.status == IkStatus::DegenerateTarget) {
+        return out;
+    }
+    const float length = sol.upperLength + sol.lowerLength;
+    out.shortfall = length > 0.0f ? glm::length(target - sol.tip) / length : 0.0f;
+    // The two model-space pre-rotations `pose_layers` applies, about the hip and the knee.
+    const auto pre = [](const glm::vec3& pivot, const glm::quat& q, const glm::mat4& m) {
+        return glm::translate(glm::mat4(1.0f), pivot) * glm::mat4_cast(q) * glm::translate(glm::mat4(1.0f), -pivot) * m;
+    };
+    const glm::mat4 hipModel = pre(chain.root, sol.rootDelta, now[static_cast<std::size_t>(root)]);
+    const glm::vec3 knee = chain.root + (sol.rootDelta * (chain.mid - chain.root));
+    const glm::quat bendHere = sol.rootDelta * sol.midBend * glm::conjugate(sol.rootDelta);
+    const glm::mat4 kneeModel = pre(knee, bendHere, pre(chain.root, sol.rootDelta, now[static_cast<std::size_t>(mid)]));
+    // The foot at the solved tip, with the orientation it was given. Scale is carried from the pose.
+    const glm::mat4& was = now[static_cast<std::size_t>(tip)];
+    const glm::vec3 sc(glm::length(glm::vec3(was[0])), glm::length(glm::vec3(was[1])), glm::length(glm::vec3(was[2])));
+    glm::mat4 footModel(1.0f);
+    footModel[0] = glm::vec4(glm::normalize(footRotation[0]) * sc.x, 0.0f);
+    footModel[1] = glm::vec4(glm::normalize(footRotation[1]) * sc.y, 0.0f);
+    footModel[2] = glm::vec4(glm::normalize(footRotation[2]) * sc.z, 0.0f);
+    footModel[3] = glm::vec4(sol.tip, 1.0f);
+    setModel(skeleton, pose, static_cast<std::size_t>(root), hipModel);
+    setModel(skeleton, pose, static_cast<std::size_t>(mid), kneeModel);
+    setModel(skeleton, pose, static_cast<std::size_t>(tip), footModel);
+    return out;
+}
 
 std::vector<glm::vec3> plantedVelocity(const Skeleton& skeleton, const AnimationClip& clip,
                                        const std::vector<ContactTrack>& contacts, float sampleRate,
@@ -488,7 +533,6 @@ AugmentResult augmentClip(const Skeleton& skeleton, const AnimationClip& source,
     }
 
     Baked result = baked;
-    std::vector<glm::mat4> now;
     std::vector<glm::vec3> planted0(legs.size());
     for (std::size_t f = 0; f < n; ++f) {
         Pose& pose = result.frames[f];
@@ -522,45 +566,18 @@ AugmentResult augmentClip(const Skeleton& skeleton, const AnimationClip& source,
                 }
             }
 
-            poseToModel(skeleton, pose, now);
-            TwoBoneChain chain;
-            chain.root = positionOf(now[static_cast<std::size_t>(leg.root)]);
-            chain.mid = positionOf(now[static_cast<std::size_t>(leg.mid)]);
-            chain.tip = positionOf(now[static_cast<std::size_t>(leg.tip)]);
-            // A pole in front of the knee, for the one case the solve needs it: a leg that is
-            // straight now, whose bend plane the current pose cannot name. A bent leg keeps its own
-            // plane whatever the pole says. Forward is the body's, turned by this frame's heading,
-            // which is where a biped's knee points.
+            // The foot keeps the orientation it had, turned by the heading of its anchor.
+            const glm::mat4 sourceFoot = model[f][static_cast<std::size_t>(leg.tip)];
+            const glm::mat3 footRotation =
+                glm::mat3(glm::rotate(glm::mat4(1.0f), yaw, glm::vec3(0.0f, 1.0f, 0.0f)) * sourceFoot);
             const glm::vec3 forward = yawMatrix(maps[f].yaw) * glm::vec3(0.0f, 0.0f, 1.0f);
-            const float reach = glm::length(chain.mid - chain.root) + glm::length(chain.tip - chain.mid);
-            const glm::vec3 pole = (0.5f * (chain.root + target)) + (forward * reach);
-            const TwoBoneSolution sol = solveTwoBone(chain, target, pole, true);
-            if (sol.status == IkStatus::DegenerateBone || sol.status == IkStatus::DegenerateTarget) {
+            const LegSolve solved = solveLegInPose(skeleton, pose, leg.root, leg.mid, leg.tip, target,
+                                                   footRotation, forward);
+            if (solved.status == IkStatus::DegenerateBone || solved.status == IkStatus::DegenerateTarget) {
                 out.refusal = fmt::format("the solve for {} was degenerate at frame {}", skeleton.joints[static_cast<std::size_t>(leg.tip)].name, f);
                 return out;
             }
-            const float length = sol.upperLength + sol.lowerLength;
-            if (length > 0.0f) {
-                out.worstShortfall = std::max(out.worstShortfall, glm::length(target - sol.tip) / length);
-            }
-            // The two model-space pre-rotations `pose_layers` applies, about the hip and the knee.
-            const auto pre = [](const glm::vec3& pivot, const glm::quat& q, const glm::mat4& m) {
-                return glm::translate(glm::mat4(1.0f), pivot) * glm::mat4_cast(q) *
-                       glm::translate(glm::mat4(1.0f), -pivot) * m;
-            };
-            const glm::mat4 hipModel = pre(chain.root, sol.rootDelta, now[static_cast<std::size_t>(leg.root)]);
-            const glm::vec3 knee = chain.root + (sol.rootDelta * (chain.mid - chain.root));
-            const glm::quat bendHere = sol.rootDelta * sol.midBend * glm::conjugate(sol.rootDelta);
-            const glm::mat4 kneeModel =
-                pre(knee, bendHere, pre(chain.root, sol.rootDelta, now[static_cast<std::size_t>(leg.mid)]));
-            // The foot keeps the orientation it had, turned by the heading of its anchor.
-            const glm::mat4 sourceFoot = model[f][static_cast<std::size_t>(leg.tip)];
-            glm::mat4 footModel = glm::rotate(glm::mat4(1.0f), yaw, glm::vec3(0.0f, 1.0f, 0.0f)) * sourceFoot;
-            footModel[3] = glm::vec4(sol.tip, 1.0f);
-
-            setModel(skeleton, pose, static_cast<std::size_t>(leg.root), hipModel);
-            setModel(skeleton, pose, static_cast<std::size_t>(leg.mid), kneeModel);
-            setModel(skeleton, pose, static_cast<std::size_t>(leg.tip), footModel);
+            out.worstShortfall = std::max(out.worstShortfall, solved.shortfall);
         }
     }
 

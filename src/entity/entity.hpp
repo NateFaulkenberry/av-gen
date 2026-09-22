@@ -110,6 +110,12 @@ struct MotionMatchingDesc {
     std::vector<std::string> joints;
     std::vector<std::string> contacts;
     std::vector<float> trajectory{0.2f, 0.4f, 0.6f};
+    // §64/§92: a MotionPack to match on instead of the rig's own clips, for motion retargeted onto
+    // this rig (e.g. 100STYLE through `--positional-legs`). As authored (relative to the scene file)
+    // and as resolved at load. It must be built for this rig's skeleton; if it is missing or is
+    // not, the body falls back to its clip provider and the log says why.
+    std::string pack;
+    std::string packResolved;
     friend bool operator==(const MotionMatchingDesc&, const MotionMatchingDesc&) = default;
 };
 
