@@ -2399,7 +2399,7 @@ One caution. This log also holds Phase B entries with the same section numbers, 
 | 93 | Third milestone | done (under load) | Linear, the strided exact-ish plan, PCA, VQ and KD-tree on AV Gen's real distributions, reporting latency, quality, memory and LOC |
 | 94 | Final artistic demonstration | not started | |
 
-**Totals for the rows verified** (updated after the anim-cinfra merge). §3–§36 (34 rows): **32 done**, 2 partial (§21, §35). The 29 assigned rows outside §1–§36: **1 done** (§52), 23 partial, and 5 not started (§48, §65, §70, §89, §94). That makes 33 done among the rows verified here.
+**Totals for the rows verified** (updated 2026-09-22, after §44, §46, §61, §65, §67, §70 and §89). §3–§36 (34 rows): **34 done**; §21 and §35 have been done since the recount. The 29 assigned rows outside §1–§36: **28 done**, and 1 not started: §94, which waits on the owner's approval of the look. Several rows are marked "under load"; their timings are re-taken when the machine is quiet. That makes **62 done** of the 63 rows verified here.
 
 **Against the coordinator's audit (C 34/83).** The full table is not in the tree, so only the totals and the flagged rows can be compared:
 
