@@ -217,6 +217,10 @@ Build throughput is ~46,000 samples/s. A 68 MB database loads verified in 27–4
 | Fallback read the matcher's sample index as a clip | G. bad transition | chain hands over only a provider's own memory |
 | Seek never replayed provider memory | G. bad transition | replay on every step |
 | Matcher froze on the end of a start | F. bad candidate filtering | `Terminal` tag rejected |
+| A turn variant's pose read 0.78 off its source's | C. bad features | one body joint per pack (extraction v8) |
+| A retargeted body left its upper body and knees behind | B. bad retarget | travel carried on the skeleton root (ADR-624) |
+| A strafe request said the body moved forward | E. bad trajectory | body velocity along the travel direction |
+| A decisive better fit held by the switch margin (0.05 × spread) | D. bad weights | per-character `switchMargin` |
 | Curves predicted as straight lines | E. bad trajectory | turn-rate integration in prediction |
 | A turn on the spot invisible to the search | C. bad features | future-facing feature; in-place mean-relative facing |
 | Pose half outweighed the request (the alien stayed idle) | D. bad weights | per-character versioned weights |
@@ -229,20 +233,23 @@ Build throughput is ~46,000 samples/s. A 68 MB database loads verified in 27–4
 
 ## 16. Known limitations
 
-- **The scout cannot strafe.** It has no strafe clip, and warping its walk 35° sideways fails the IK
-  gate.
+- **The scout strafes on borrowed motion.** It has no strafe clip of its own, and warping its walk
+  35° sideways fails the IK gate. The strafe is served by 100STYLE's sidesteps, retargeted
+  (owner ruling, 22 Sep). Only the legs and hips are retargeted, and the upper body stays the
+  scout's own.
 - **Selection quality on a real corpus depends on authored filtering and weights.** The demo needed
   an allow-list and a weight sweep, and the weights did not survive a corpus rebuild (trajectory
-  position 3 became 6 when the turn variants grew to three cycles). A velocity-only request under-determines which walk plays (§46).
+  position 3 became 6 when the turn variants grew to three cycles, and adding the sidesteps needed a
+  switch margin of 0.01 instead of 0.05). A velocity-only request under-determines which walk
+  plays (§46). In the demo, idle and stop play `Idle_turn`.
 - **Style is a soft cost** (§44), per character; the default weight is tuned on the golden
   corpus's gaps and has not been re-measured on the scout.
-- **Strafe and turn clips of a travelling corpus read as forward**, because travelling clips are
-  faced by their travel (seen on 100STYLE under §44).
-- **Human legs straighten more than the alien's**: 14% of retargeted leg-frames are at or past
-  straight. The look is the owner's call.
+- **Human legs are capped at the alien's own reach** (0.956, owner ruling), by lowering the body:
+  mean 0.025, worst 0.054 model units on the longest strides.
 - **Timings were taken under load**; to re-take.
 - **Glowmere ships on the clip provider** until the owner approves a matcher-driven alien.
-- **Dataset licences**: 100STYLE is verified (CC BY 4.0). ACCAD and CMU are not yet assessed (§61).
+- **Dataset licences**: 100STYLE is verified (CC BY 4.0). ACCAD and CMU are assessed (ADR-625), and
+  packs never ship on their own (owner, 22 Sep).
 
 ## 17. Phase D integration points
 

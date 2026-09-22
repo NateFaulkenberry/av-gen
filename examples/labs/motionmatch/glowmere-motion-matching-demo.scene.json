@@ -1816,11 +1816,12 @@
      0.4,
      0.6
     ],
-    "pack": "../../../assets/aliens-scout-augmented-pack",
+    "pack": "../../../assets/aliens-scout-demo-pack",
     "clips": [
      "Idle",
      "Walking",
-     "Running"
+     "Running",
+     "HandsInPockets_S"
     ],
     "weights": {
      "version": 1,
@@ -1828,7 +1829,16 @@
      "jointVelocity": 0.4,
      "trajectoryPosition": 6.0,
      "trajectoryFacing": 0.5,
-     "rootVelocity": 3.0
+     "rootVelocity": 3.0,
+     "switchMargin": 0.01
+    },
+    "style": "scout",
+    "styles": {
+     "scout": [
+      "Idle",
+      "Walking",
+      "Running"
+     ]
     }
    }
   }

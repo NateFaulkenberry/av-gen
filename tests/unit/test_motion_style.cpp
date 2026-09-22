@@ -160,12 +160,13 @@ TEST_CASE("§44 the style keys round-trip, and a style nothing defines is refuse
                                {{"joints", {"foot.l"}},
                                 {"style", "strut"},
                                 {"styles", {{"strut", {"Strutting"}}, {"march", {"March", "Marching"}}}},
-                                {"weights", {{"version", 1}, {"style", 0.5}}}}}};
+                                {"weights", {{"version", 1}, {"style", 0.5}, {"switchMargin", 0.01}}}}}};
     auto desc = entity::entityFromJson(j, {}, nullptr);
     REQUIRE(desc.has_value());
     CHECK(desc->motionMatching.style == "strut");
     REQUIRE(desc->motionMatching.styles.size() == 2u);
     CHECK(desc->motionMatching.styleWeight == 0.5f);
+    CHECK(desc->motionMatching.switchMargin == 0.01f);
     auto again = entity::entityFromJson(entity::entitiesToJson({*desc}).at(0), {}, nullptr);
     REQUIRE(again.has_value());
     CHECK(again->motionMatching == desc->motionMatching);
@@ -175,6 +176,7 @@ TEST_CASE("§44 the style keys round-trip, and a style nothing defines is refuse
         nlohmann::json{{"name", "b"}, {"motionMatching", {{"joints", {"foot.l"}}, {"weights", {{"version", 1}}}}}}, {}, nullptr);
     REQUIRE(older.has_value());
     CHECK_FALSE(entity::entitiesToJson({*older}).at(0)["motionMatching"]["weights"].contains("style"));
+    CHECK_FALSE(entity::entitiesToJson({*older}).at(0)["motionMatching"]["weights"].contains("switchMargin"));
 
     CHECK_FALSE(entity::entityFromJson(
                     nlohmann::json{{"name", "c"}, {"motionMatching", {{"joints", {"foot.l"}}, {"style", "strut"}}}}, {}, nullptr)

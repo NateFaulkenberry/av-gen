@@ -123,3 +123,16 @@ numbers showed it. The cap did: with that thigh the leg's *shortest* reach was p
 rest distances before every solve. Uncapped reach tops out at exactly 1.000, not 1.022; a reach above
 1 had been the knee's error showing through. **Packs built before this commit carry the displaced
 knee and must be rebuilt.**
+
+### Second defect of the same shape: the upper body left behind
+
+The knee was not the only joint under `rig` rather than `root.x`: so are the spine, hands, backpack
+and antenna. The rotation retarget moves `root.x`, so a travelling retargeted clip left the whole
+upper body where the clip began. On 100STYLE's sidesteps the spine sat 1.2–2.4 from the hips,
+against a rest 0.29. The positional retarget now moves the travel, the smoothed heading and the
+reach-cap drop to the skeleton's root (as §21's augmentation always did), and `root.x` keeps
+exactly the model pose it had. The spine's distance from the hips is now its rest distance on every
+frame; the rotation retarget alone still shows 2.32 (`test_retarget_positional.cpp`, "the upper
+body travels with the hips"). The body's lowering for the reach cap is applied at the root for the
+same reason. Because retargeted clips now travel on `rig` while the alien's own travel on `root.x`,
+the motion database measures every clip of a pack from the lower of the two (extraction v8).

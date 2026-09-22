@@ -88,7 +88,10 @@ enum class MotionTag : std::uint32_t {
 //   6  trajectory facing is the body's future facing, not its direction of travel; an in-place
 //      clip is faced relative to its own mean pelvis yaw, so a turn on the spot turns.
 //   7  samples near the end of a non-looping clip carry `MotionTag::Terminal`.
-inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 7;
+//   8  when a pack's clips travel on different joints and one lies below all the others (a §21
+//      variant or a retargeted clip travels on `rig`, the alien's own clips on `root.x`), every
+//      clip is measured from that one.
+inline constexpr std::uint32_t kMotionFeatureExtractionVersion = 8;
 
 // A world-space vector expressed in the frame of a body facing `facing` (world space, planar; +Z is
 // forward, +X is the body's left-to-right axis exactly as it is in an unrotated clip). The one

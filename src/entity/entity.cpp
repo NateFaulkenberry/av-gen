@@ -916,7 +916,21 @@ void Entity::advanceMotion(double time, float dt) {
     // measured `state_.velocity`. The measured one is a backward difference that reads zero on a
     // body's first steps and across a seek, so a prediction built on it made a scrub disagree with
     // the play it is supposed to reproduce (ADR-360). The limited speed is replayed exactly.
-    request.bodyVelocity = heading * state_.speed;
+    //
+    // **Along the direction the body travels, which is not always the way it faces.** This was
+    // `heading * speed`, and for a strafe (vector intent: travel at 90 degrees to the facing) the
+    // request then said the body was moving forward while it moved sideways, and the §25 prediction
+    // curved from a forward walk into the strafe. The travel direction is the intent's, when a
+    // behaviour published one; the speed is still the limited one, so a scrub still replays it.
+    glm::vec3 travelDirection = heading;
+    if (state_.intent.valid) {
+        const glm::vec3 v(state_.intent.desiredVelocity.x, 0.0f, state_.intent.desiredVelocity.z);
+        const float len = glm::length(v);
+        if (len > 1e-4f) {
+            travelDirection = v / len;
+        }
+    }
+    request.bodyVelocity = travelDirection * state_.speed;
     request.bodyVelocityKnown = true;
     request.mode = state_.airborne ? MovementMode::Airborne : MovementMode::Ground;
     MotionMemory next;
@@ -2648,6 +2662,7 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
             num("continuity", mm.continuityWeight);
             num("transition", mm.transitionWeight);
             num("style", mm.styleWeight);
+            num("switchMargin", mm.switchMargin);
         }
         if (m.contains("style")) {
             if (!m["style"].is_string()) {
@@ -3085,6 +3100,9 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
             w["transition"] = mm.transitionWeight;
             if (mm.styleWeight >= 0.0f) {
                 w["style"] = mm.styleWeight; // only when authored, so older blocks round-trip unchanged
+            }
+            if (mm.switchMargin >= 0.0f) {
+                w["switchMargin"] = mm.switchMargin;
             }
             m["weights"] = std::move(w);
         }

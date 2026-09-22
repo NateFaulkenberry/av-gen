@@ -2790,6 +2790,9 @@ Two observations, recorded and not chased:
   so `_SR` and `_TR1` present as slow forward motion. Without a style they win forward requests
   (0.26 forward). With one, the style's own `_FW` is usually the nearest of its eight clips. Four
   styles still land on `_TR1` or `_SW`.
+  **Corrected 22 Sep:** this was a misreading. The column scored clip *names*, and 100STYLE's
+  sideways files begin with a forward walk. Measured per sample, their sidestep stretches read
+  sideways in the body frame (see "§65 strafe").
 
 ## §67 — the crowd: 10, 50 and 100 matched scouts
 
@@ -2817,6 +2820,91 @@ A 1280×720 headless render at 4 s, under the GPU lock, completed with no GPU er
 log's rig ladder reports **100 posed and 100 rate-limited** on every frame of the deliverable
 ("distant characters slid or glided"). The rate limit is the rig LOD, not motion matching.
 Whether a matched crowd should be exempt from it in an offline render is an owner question.
+
+## §65 strafe: served from 100STYLE's sidesteps (owner ruling, 22 Sep)
+
+The owner ruled that the strafe should be served by 100STYLE's sidesteps through the ADR-624
+retarget. The coordinator named the likely blocker: strafes reading as forward motion because clips
+were faced by their travel.
+
+**Measured first, and the premise did not hold.** A clip is already faced by its body: the travel
+joint's rotation, smoothed over a second, not the direction it travels. Retargeted onto the scout,
+the sidestep stretches read 418:11, 283:87, 211:0 and 184:12 sideways to forward
+(`test_motion_body_joint.cpp`). §44's "strafes read as forward" was a misreading of my own metric.
+It scored the *clip name* of each chosen sample, and 100STYLE's `_SW`/`_SR` files are not all
+sidestep: each walks forward, stands, then sidesteps in slow circles for the rest of the take.
+
+**What did block it: four defects, each found by a measurement on the way.**
+
+1. **The request described a strafe as walking forward.** `bodyVelocity` was `heading × speed`, so
+   while the body travelled at 90° to its facing, the request said it moved forward, and the §25
+   prediction curved from a forward walk into the strafe. It now takes the intent's travel
+   direction, at the same rate-limited speed, so scrubbing stays exact. With it, the strafe moved
+   from the slower `SW` to the `SR` stretch, whose sideways speed is the one asked for (2 m/s at
+   1.94× scale). No test fails without this change; it is recorded as such.
+2. **A retargeted body left its upper body behind** (ADR-624 amendment). The alien's spine, hands,
+   backpack and knees are children of `rig`, not of the travel joint `root.x`. The rotation
+   retarget moved `root.x` only, so on a sidestep the spine sat 1.2–2.4 from the hips (0.29 in the
+   alien's own clips). The positional retarget now carries travel, heading and the reach-cap drop
+   on the skeleton's root, and the spine stays exactly at its rest distance. The rotation retarget
+   alone still shows the drift (2.32), as the test's control arm.
+3. **Clips of one pack were measured from different bodies** (extraction v8). §21's variants and
+   retargeted clips travel on `rig`; the alien's own travel on `root.x`. Per clip, a variant's feet
+   sat 0.78 higher than its source's, and leaving a straight walk for a turn cost about 5 in pose.
+   Every clip is now measured from the travel joint that lies below all the others. A turn
+   variant's first pose now equals its source's to 0.00000, against 0.7794 with the rule disabled.
+   A first version of the rule ("the joint every clip translates") picked a foot: a retargeted
+   `root.x` sits at rest relative to `rig`, so its channel had been pruned.
+4. **The switch margin held a straight walk through both curves.** With the sidesteps in the
+   corpus, a turn variant fitted a curve 2.7 better than carrying on (8.9 against 11.6), but the
+   margin (0.05 × a spread of 141 = 7.0) held the walk. `motionMatching.weights.switchMargin` now
+   exists, and the demo uses 0.01.
+
+**The corpus.** Four stretches of `HandsInPockets` sidesteps, retargeted with the reach cap:
+`SW` 9–26 s and 26.5–40 s, and `SR` 7–14 s and 14.5–21 s. They are cut with the new
+`avgen-motion pack --range a:b` and joined to the scout's augmented pack with the new
+`avgen-motion merge`, which keeps each clip's provenance. The character's §44 style is `scout`, its
+own clips, so the borrowed sidesteps win only where nothing of its own serves. `HandsInPockets` was
+chosen because only the legs and hips are retargeted, and its legs walk normally. The upper body
+stays the scout's own, so the pockets never show. It is a look choice, open to the owner.
+
+```
+COMMON="--scale 0.01 --license CC-BY-4.0 --source 100STYLE --contacts foot.l,foot.r \
+  --redistribution allowed --derivedDataAllowed true --retarget-to assets/aliens/alien-scout.glb \
+  --map Hips:root.x,LeftHip:thigh_twist.l,LeftKnee:leg_stretch.l,LeftAnkle:foot.l,LeftToe:toes_01.l,RightHip:thigh_twist.r,RightKnee:leg_stretch.r,RightAnkle:foot.r,RightToe:toes_01.r \
+  --positional-legs LeftHip:LeftKnee:LeftAnkle=thigh_twist.l:leg_stretch.l:foot.l,RightHip:RightKnee:RightAnkle=thigh_twist.r:leg_stretch.r:foot.r"
+avgen_motion pack assets/100style-mixed/HandsInPockets_SW.bvh --out ss1 --range 9:26 $COMMON
+avgen_motion pack assets/100style-mixed/HandsInPockets_SW.bvh --out ss2 --range 26.5:40 $COMMON
+avgen_motion pack assets/100style-mixed/HandsInPockets_SR.bvh --out ss3 --range 7:14 $COMMON
+avgen_motion pack assets/100style-mixed/HandsInPockets_SR.bvh --out ss4 --range 14.5:21 $COMMON
+avgen_motion merge ss1 ss2 ss3 ss4 --out assets/100style-scout-sidestep-pack
+avgen_motion merge assets/aliens-scout-augmented-pack assets/100style-scout-sidestep-pack --out assets/aliens-scout-demo-pack
+```
+
+**The demo now** (second half of each segment):
+
+| request | plays |
+|---|---|
+| idle | `Idle_turn` (was `Idle`) |
+| walk | `Walking` |
+| accelerate | `Walking` |
+| curve left | `Walking~turn+1.40` (56 of 60) |
+| curve right | `Walking~turn-1.40` |
+| run | `Running` |
+| slow | `Walking_low_grav` |
+| turn on the spot | `Idle_turn` |
+| stop | `Idle_turn` (was `Idle` then `Idle_turn`) |
+| **strafe** | **`HandsInPockets_SR@14.5-21`**: a strafe family, asserted |
+| walk again | `Walking` |
+
+**What got worse.** Idle and stop now play `Idle_turn`, a turn on the spot, where they played `Idle`.
+No weight in the sweep fixes both without losing the curves. It is recorded, not asserted, and it
+is part of what the owner will see.
+
+**Crowd rig LOD (§67), my call as delegated.** No exemption. The rig ladder's rate limit applies to
+every body, matched or not, and exempting one kind would make the ladder answer a different
+question for different characters. For a hero-quality offline render the right lever is the
+render's own detail setting, which lifts every body alike. Recorded here; nothing changed.
 
 ### Observed under load, not chased: `test_lighting_perf`
 

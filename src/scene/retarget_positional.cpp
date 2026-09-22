@@ -140,6 +140,32 @@ AnimationClip retargetLegsPositional(const AnimationClip& source, const Skeleton
             const glm::vec3 restPosition = targetSkeleton.joints[r].rest.position;
             tPose.local[r].position = restPosition + ((tPose.local[r].position - restPosition) * (ids.front().scale / root.rootScale));
         }
+        // **The travel belongs to the whole body, not to one joint of it.** The rotation retarget
+        // moves the travel joint (`root.x`), and on the alien the spine, hands, backpack, antenna
+        // and knees are children of `rig`, above it. So a retargeted walk left the upper body where
+        // the clip began: the spine 1.2-2.4 from the hips on 100STYLE's sidesteps, against 0.29 in
+        // the alien's own clips. The travel and heading are moved up to the skeleton's root, the way
+        // §21's augmentation carries them, and the travel joint keeps exactly the model pose it had.
+        if (rootIndex >= 0 && targetSkeleton.joints[static_cast<std::size_t>(rootIndex)].parent >= 0) {
+            poseToModel(targetSkeleton, tPose, tModel);
+            const auto r = static_cast<std::size_t>(rootIndex);
+            const glm::mat4 rootModel = tModel[r];
+            const glm::vec3 restRoot = at(tRest, rootIndex);
+            const glm::vec3 now = at(tModel, rootIndex);
+            const glm::vec3 fh = facing[std::min(f, facing.size() - 1)];
+            const float bodyYaw = std::atan2(fh.x, fh.z);
+            const glm::mat4 body = glm::translate(glm::mat4(1.0f), now) *
+                                   glm::rotate(glm::mat4(1.0f), bodyYaw, glm::vec3(0.0f, 1.0f, 0.0f)) *
+                                   glm::translate(glm::mat4(1.0f), -restRoot);
+            for (std::size_t j = 0; j < targetSkeleton.joints.size(); ++j) {
+                if (targetSkeleton.joints[j].parent < 0) {
+                    tPose.local[j] = Transform::fromMatrix(body * tPose.local[j].matrix());
+                }
+            }
+            poseToModel(targetSkeleton, tPose, tModel);
+            const int parent = targetSkeleton.joints[r].parent;
+            tPose.local[r] = Transform::fromMatrix(glm::inverse(tModel[static_cast<std::size_t>(parent)]) * rootModel);
+        }
         poseToModel(targetSkeleton, tPose, tModel);
 
         // The target body's forward, for the knee's pole: from its own two hips this frame.
@@ -201,11 +227,14 @@ AnimationClip retargetLegsPositional(const AnimationClip& source, const Skeleton
                 drop = std::max(drop, d.y - std::sqrt((limit * limit) - horizontal2));
             }
             if (drop > 0.0f) {
-                const auto b = static_cast<std::size_t>(tBody);
-                const int parent = targetSkeleton.joints[b].parent;
-                const glm::mat3 toLocal =
-                    parent >= 0 ? glm::inverse(glm::mat3(tModel[static_cast<std::size_t>(parent)])) : glm::mat3(1.0f);
-                tPose.local[b].position += toLocal * glm::vec3(0.0f, -drop, 0.0f);
+                // The whole body goes down, from the skeleton's root, so the upper body comes with
+                // the hips (see the travel above).
+                const glm::mat4 down = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -drop, 0.0f));
+                for (std::size_t j = 0; j < targetSkeleton.joints.size(); ++j) {
+                    if (targetSkeleton.joints[j].parent < 0) {
+                        tPose.local[j] = Transform::fromMatrix(down * tPose.local[j].matrix());
+                    }
+                }
                 poseToModel(targetSkeleton, tPose, tModel);
                 ++out.droppedFrames;
                 out.meanDrop += drop;

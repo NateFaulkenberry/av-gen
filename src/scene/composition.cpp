@@ -2632,6 +2632,9 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
             if (mm.weightsVersion != 0u && mm.styleWeight >= 0.0f) {
                 settings.styleWeight = mm.styleWeight;
             }
+            if (mm.weightsVersion != 0u && mm.switchMargin >= 0.0f) {
+                settings.switchMargin = mm.switchMargin;
+            }
             matchProvider_.setSettings(settings);
             // §44: the character's style. Not part of the database key: the database is the same
             // whichever style its reader prefers.

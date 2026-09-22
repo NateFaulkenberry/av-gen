@@ -405,6 +405,62 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
     std::vector<glm::mat4> model;
     std::vector<glm::mat4> modelAhead;
 
+    // **One body joint for the whole pack.** ADR-337's rule picks the travel joint per clip (the
+    // lowest-indexed translated joint), and a pack whose clips disagree then measures their poses
+    // from different origins. The Glowmere alien's own clips translate `root.x`, at hip height; a
+    // §21 variant or a retargeted clip carries its travel on `rig`, above it, so that the spine,
+    // hands and knees (children of `rig`) travel with the body. Measured per clip, every variant's
+    // feet sat 0.78 higher than its own source's, and a turn variant cost as much in pose as a
+    // straight walk cost in trajectory: the matcher could not tell a warped walk was a walk.
+    //
+    // So when the clips' travel joints differ and one of them lies **below all the others** in the
+    // hierarchy, every clip is measured from that one: a joint under the travel joint travels with
+    // it, so its model position is still the body, and it is the joint the other clips already
+    // use. (Not "the joint every clip translates": a retargeted clip's `root.x` is at rest relative
+    // to `rig`, so its channel is pruned, and that rule picked a foot.)
+    int packRoot = -1;
+    {
+        const auto travelOf = [](const AnimationClip& clip) {
+            int root = -1;
+            for (const AnimationChannel& channel : clip.channels) {
+                if (channel.path == AnimationPath::Translation && (root < 0 || static_cast<int>(channel.joint) < root)) {
+                    root = static_cast<int>(channel.joint);
+                }
+            }
+            return root < 0 ? 0 : root;
+        };
+        const auto isAncestorOrSelf = [&](int ancestor, int joint) {
+            for (int j = joint; j >= 0 && static_cast<std::size_t>(j) < pack.skeleton.joints.size();
+                 j = pack.skeleton.joints[static_cast<std::size_t>(j)].parent) {
+                if (j == ancestor) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        std::vector<int> roots;
+        for (const AnimationClip& clip : pack.animation) {
+            if (clip.length() > 0.0f) {
+                const int r = travelOf(clip);
+                if (std::find(roots.begin(), roots.end(), r) == roots.end()) {
+                    roots.push_back(r);
+                }
+            }
+        }
+        if (roots.size() > 1) {
+            for (const int candidate : roots) {
+                bool belowAll = true;
+                for (const int other : roots) {
+                    belowAll = belowAll && isAncestorOrSelf(other, candidate);
+                }
+                if (belowAll) {
+                    packRoot = candidate;
+                    break;
+                }
+            }
+        }
+    }
+
     for (std::size_t c = 0; c < pack.animation.size() && c < pack.clips.size(); ++c) {
         const AnimationClip& clip = pack.animation[c];
         const PackClip& meta = pack.clips[c];
@@ -424,6 +480,9 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
         }
         if (root < 0) {
             root = 0;
+        }
+        if (packRoot >= 0) {
+            root = packRoot;
         }
         // **The pack already knows this, and re-deriving it here was silently wrong.** This line
         // used to call `analyseClip(pack.skeleton, clip, {}, 0, ContactSettings{})` -- with an

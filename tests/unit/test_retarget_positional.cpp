@@ -297,3 +297,71 @@ TEST_CASE("§64 the reach cap: human legs never straighten past the alien's own,
     }
     WARN(report);
 }
+
+TEST_CASE("§64 the upper body travels with the hips", "[retarget][aliens][phaseC]") {
+    // The alien's spine, hands and knees are children of `rig`, not of the travel joint `root.x`. A
+    // retarget that moved only `root.x` left the upper body where the clip began: 1.2-2.4 from the
+    // hips on 100STYLE's sidesteps, against 0.29 in the alien's own clips. The travel is carried on
+    // the skeleton's root, and the spine stays at its rest distance from the hips.
+    const fs::path bvh = fs::path(AVGEN_SOURCE_DIR) / "assets" / "100style" / "Neutral_FW.bvh";
+    const fs::path glb = fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb";
+    if (!fs::exists(bvh) || !fs::exists(glb)) {
+        SKIP("100STYLE or the scout is not present");
+    }
+    assets::BvhLoadOptions load;
+    load.scale = 0.01f;
+    auto source = assets::loadBvh(bvh, load);
+    REQUIRE(source.has_value());
+    scene::AnimationClip clip = source->clip;
+    clip.duration = std::min(clip.duration, clip.start + 6.0f);
+    scene::Scene sc;
+    assets::GltfLoadOptions gltf;
+    gltf.loadImages = false;
+    REQUIRE(assets::loadGltf(glb, sc, gltf).has_value());
+    const scene::Skeleton& alien = sc.rigs.front().skeleton;
+    scene::RetargetProfile profile;
+    profile.name = "100style-to-scout";
+    for (const auto& [s, t] : {std::pair{"Hips", "root.x"}, std::pair{"LeftHip", "thigh_twist.l"},
+                               std::pair{"LeftKnee", "leg_stretch.l"}, std::pair{"LeftAnkle", "foot.l"},
+                               std::pair{"LeftToe", "toes_01.l"}, std::pair{"RightHip", "thigh_twist.r"},
+                               std::pair{"RightKnee", "leg_stretch.r"}, std::pair{"RightAnkle", "foot.r"},
+                               std::pair{"RightToe", "toes_01.r"}}) {
+        profile.joints.push_back(scene::JointMapping{s, t, scene::roleForJointName(t)});
+    }
+    const scene::RetargetBinding binding = scene::bindRetarget(source->skeleton, alien, profile);
+    REQUIRE(binding.usable());
+    const scene::AnimationClip rotation = scene::retargetClip(clip, source->skeleton, alien, binding);
+    const std::vector<scene::PositionalLeg> legs = {
+        {"LeftHip", "LeftKnee", "LeftAnkle", {"thigh_twist.l", "leg_stretch.l", "foot.l"}},
+        {"RightHip", "RightKnee", "RightAnkle", {"thigh_twist.r", "leg_stretch.r", "foot.r"}},
+    };
+    scene::PositionalRootRescale rescale;
+    rescale.targetRoot = "root.x";
+    rescale.rootScale = binding.rootScale;
+    const scene::AnimationClip out = scene::retargetLegsPositional(clip, source->skeleton, rotation, alien, legs, 30.0f,
+                                                                   nullptr, rescale, {scene::kAlienMaxLegReach, true});
+    const auto drift = [&](const scene::AnimationClip& c) {
+        const int rx = alien.find("root.x");
+        const int sp = alien.find("spine_05.x");
+        scene::Pose pose;
+        std::vector<glm::mat4> m;
+        scene::setRestPose(alien, pose);
+        scene::poseToModel(alien, pose, m);
+        const float rest = glm::length(glm::vec3(m[static_cast<std::size_t>(sp)][3]) - glm::vec3(m[static_cast<std::size_t>(rx)][3]));
+        float worst = 0.0f;
+        for (int f = 0; f <= static_cast<int>(c.length() * 30.0f); ++f) {
+            scene::setRestPose(alien, pose);
+            scene::sampleClip(c, std::min(c.start + static_cast<float>(f) / 30.0f, c.duration), pose);
+            scene::poseToModel(alien, pose, m);
+            const float d = glm::length(glm::vec3(m[static_cast<std::size_t>(sp)][3]) - glm::vec3(m[static_cast<std::size_t>(rx)][3]));
+            worst = std::max(worst, std::abs(d - rest));
+        }
+        return worst;
+    };
+    const float before = drift(rotation);
+    const float after = drift(out);
+    WARN(fmt::format("spine-to-hips distance, worst departure from rest: rotation retarget {:.3f}, positional {:.3f}",
+                     before, after));
+    CHECK(before > 0.5f); // the control: the rotation retarget alone leaves the spine behind
+    CHECK(after < 0.05f);
+}

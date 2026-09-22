@@ -2,22 +2,27 @@
 // accelerate, curve left, curve right, run, slow, turn, stop, strafe, walk again, **driven through
 // motion requests** (the `motionScript` behaviour), with the matcher choosing what to play.
 //
-// The corpus is the scout's own 26 clips plus the §21 variants the coverage gate kept (the four
-// turns), built by `avgen-motion augment` into assets/aliens-scout-augmented-pack. It is gitignored
-// like every asset, so the test skips where the pack has not been built. The command is in the phase
-// log.
+// The corpus is the scout's own 26 clips, the §21 variants the coverage gate kept (the four turns),
+// and four stretches of 100STYLE's `HandsInPockets` sidesteps retargeted onto the scout through
+// ADR-624 (the owner's ruling of 22 Sep: serve the strafe from 100STYLE), merged into
+// assets/aliens-scout-demo-pack. It is gitignored like every asset (100STYLE is not redistributed),
+// so the test skips where the pack has not been built. The commands are in the phase log.
+//
+// The character's §44 style is its own clips (`scout`), so the borrowed sidesteps are chosen only
+// where the scout has nothing that serves: the strafe.
 //
 // The weights are the scene's own (§45's versioned block): joint position 0.3, trajectory position
-// 6, root velocity 3. They were chosen from the sweep below: at the engine defaults the pose half
-// outweighs the request, and the alien stays in whatever it is playing (walk requests got `Idle`).
-// **They are corpus-sensitive.** With the one-second turn variants a trajectory weight of 3 chose
-// the curves; with three-cycle variants and the `Terminal` tag it takes 6. That sensitivity is a
+// 6, root velocity 3, and a switch margin of 0.01 of the cost spread. They were chosen from the sweep
+// below: at the engine defaults the pose half outweighs the request, and the alien stays in whatever
+// it is playing (walk requests got `Idle`). **They are corpus-sensitive.** With the one-second turn
+// variants a trajectory weight of 3 chose the curves; with three-cycle variants and the `Terminal`
+// tag it takes 6; with the sidesteps in the corpus, the default margin (0.05) held a straight walk
+// through both curves although the turn fit 2.7 better, and 0.01 lets it go. That sensitivity is a
 // result, recorded in the phase log, not a tuning detail.
 //
 // **What is asserted is what the spec asks the demonstration to show**: that the matcher selects an
 // appropriate continuation for each kind of request. For each segment, the family of motion it plays
-// is checked, never exact samples. Where the corpus cannot serve a request (the scout has no strafe
-// clip), the test records what it chose rather than pretending.
+// is checked, never exact samples.
 
 #include "assets/asset_registry.hpp"
 #include "core/time.hpp"
@@ -63,7 +68,7 @@ bool contains(const std::string& s, const char* part) {
 
 TEST_CASE("§65 the Glowmere demonstration: the matcher picks a continuation for each request",
           "[glowmeredemo][motionmatching][aliens][phaseC]") {
-    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens-scout-augmented-pack" / "pack.json")) {
+    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens-scout-demo-pack" / "pack.json")) {
         SKIP("the augmented scout pack is not present (see the phase log, §65)");
     }
     assets::AssetRegistry registry(demo().parent_path());
@@ -140,6 +145,8 @@ TEST_CASE("§65 the Glowmere demonstration: the matcher picks a continuation for
     // A turn on the spot gets the scout's turn on the spot, which §7/§24's future-facing feature is
     // what makes visible to the search at all.
     CHECK(share(7, {"Idle_turn"}) > 0.5f);
+    // The strafe is served by a strafe family: 100STYLE's sidesteps, retargeted (owner, 22 Sep).
+    CHECK(share(9, {"HandsInPockets_S"}) > 0.5f);
 }
 
 #include <fstream>
@@ -148,7 +155,7 @@ TEST_CASE("§65 the Glowmere demonstration: the matcher picks a continuation for
 TEST_CASE("§65 the scripted demonstration scrubs to the played frame", "[glowmeredemo][scrub][aliens][phaseC]") {
     // The script's clock is the timeline, and the provider memory replays on every seek step (ADR-623),
     // so a scrub into the middle of the curve lands on the played sample.
-    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens-scout-augmented-pack" / "pack.json")) {
+    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens-scout-demo-pack" / "pack.json")) {
         SKIP("the augmented scout pack is not present");
     }
     assets::AssetRegistry registry(demo().parent_path());
@@ -190,20 +197,22 @@ TEST_CASE("§65 the scripted demonstration scrubs to the played frame", "[glowme
 }
 
 TEST_CASE("§45/§65 the demonstration under different weights", "[.measure][glowmeredemo][aliens][phaseC]") {
-    // The sweep the demonstration's weights were chosen from. Hidden: it prints, it does not assert.
-    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens-scout-augmented-pack" / "pack.json")) {
+    // The sweep the demonstration's weights were chosen from, at the scene's switch margin (0.01).
+    // Hidden: it prints, it does not assert.
+    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens-scout-demo-pack" / "pack.json")) {
         SKIP("the augmented scout pack is not present");
     }
     std::ifstream in(demo());
     const nlohmann::json base = nlohmann::json::parse(in);
-    std::string report = "jointPos trajPos rootVel | walk curveL curveR run turn stop strafe\n";
-    for (const float joint : {1.0f, 0.3f}) {
-        for (const float traj : {1.0f, 3.0f, 6.0f}) {
-            for (const float root : {1.0f, 3.0f}) {
+    std::string report = "jointPos trajPos facing | idle walk curveL curveR run turn stop strafe\n";
+    for (const float joint : {0.3f, 0.1f}) {
+        for (const float traj : {3.0f, 6.0f, 10.0f}) {
+            for (const float facing : {0.5f, 2.0f}) {
+                const float root = 3.0f;
                 nlohmann::json scene = base;
                 auto& m = scene["entities"][0]["motionMatching"];
                 m["weights"] = {{"version", 1}, {"jointPosition", joint}, {"trajectoryPosition", traj},
-                                {"rootVelocity", root}, {"trajectoryFacing", 0.5}, {"jointVelocity", 0.4}};
+                                {"rootVelocity", root}, {"trajectoryFacing", facing}, {"jointVelocity", 0.4}, {"switchMargin", 0.01}};
                 const fs::path file = demo().parent_path() / ".sweep.scene.json";
                 {
                     std::ofstream out(file);
@@ -252,8 +261,8 @@ TEST_CASE("§45/§65 the demonstration under different weights", "[.measure][glo
                     }
                     return best;
                 };
-                report += fmt::format("{:>8} {:>7} {:>7} | {} | {} | {} | {} | {} | {} | {}\n", joint, traj, root, top(1), top(3),
-                                      top(4), top(5), top(7), top(8), top(9));
+                report += fmt::format("{:>8} {:>7} {:>6} | {} | {} | {} | {} | {} | {} | {} | {}\n", joint, traj, facing, top(0),
+                                      top(1), top(3), top(4), top(5), top(7), top(8), top(9));
             }
         }
     }
