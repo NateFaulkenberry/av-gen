@@ -129,14 +129,32 @@ TEST_CASE("the shadow caster rule answers for every shape, not only for a centre
               CasterState::ShadowDisabled);
     }
 
-    SECTION("the three styles the shadow passes skip are reported as one reason") {
+    SECTION("the styles the shadow passes skip are reported as one reason") {
         thin.style = scene::MeshStyle::Water;
         CHECK(rendering::casterState(thin, s.meshBounds(thin.mesh), planes) == CasterState::StyleExcluded);
         thin.style = scene::MeshStyle::Grid;
         CHECK(rendering::casterState(thin, s.meshBounds(thin.mesh), planes) == CasterState::StyleExcluded);
+    }
+
+    // ADR-701. This section used to be "the *three* styles the shadow passes skip", and the third
+    // was any blended material at all. That stopped being right the day ADR-385 gave the engine a
+    // fade: a fade PROMOTES a node under 1.0 opacity to Blend for exactly the frames it is fading,
+    // so the exclusion deleted the abducted animal's shadow at an opacity of 0.998 and the animal
+    // was not gone until 1.13 s later. `fs_depth` discards an ordered fraction of a blended
+    // caster's depth texels instead, so what it casts is proportional to its alpha -- and the only
+    // blended body that casts nothing is one nobody can see.
+    SECTION("a blended body casts in proportion to its alpha, and only zero casts nothing") {
         thin.style = scene::MeshStyle::Lit;
         thin.material.alphaMode = scene::AlphaMode::Blend;
-        CHECK(rendering::casterState(thin, s.meshBounds(thin.mesh), planes) == CasterState::StyleExcluded);
+        for (const float opacity : {1.0f, 0.5f, 0.002f}) {
+            thin.material.opacity = opacity;
+            INFO("a blended caster at opacity " << opacity);
+            CHECK(rendering::casterState(thin, s.meshBounds(thin.mesh), planes) ==
+                  CasterState::Caster);
+        }
+        thin.material.opacity = 0.0f;
+        CHECK(rendering::casterState(thin, s.meshBounds(thin.mesh), planes) ==
+              CasterState::StyleExcluded);
     }
 
     SECTION("an invisible entity is not drawable rather than not casting") {

@@ -8,7 +8,9 @@
 // at group(1) @binding(3); each module declares `fieldBlock` exactly once.
 //
 // `fs_depth` is the depth-only entry the prepass and the shadow passes use: the same vertex stage,
-// so the depth it writes matches the lit pass exactly, and no fragment work beyond alpha cutout.
+// so the depth it writes matches the lit pass exactly, and no fragment work beyond deciding
+// whether the fragment blocks at all -- an alpha cutout for MASK, and an ordered dither against
+// alpha for BLEND, which is how a half-transparent caster throws half a shadow (ADR-701).
 #include "common.wgsl"
 // ADR-138: whether this module's draws are the procedural scatter, which is the share tier
 // assignment could actually reach on Glowmere (authored entities are 77% of coverage and the
@@ -42,16 +44,45 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     return out;
 }
 
+// A 4x4 ordered (Bayer) threshold in (0, 1), indexed by the depth target's own pixel.
+//
+// Ordered rather than hashed, on purpose. A depth map stores one occluder per texel and has
+// nowhere to put "half blocked", so the only way a caster can throw a partial shadow is by
+// claiming a *fraction of the texels* it covers -- and whichever fraction it claims has to be the
+// same every time the same frame is drawn, or an offline render stops reproducing (the project
+// checks that by hashing captured frames). A Bayer matrix is a pure function of the texel; a hash
+// of the world position is not, once the caster moves. Sixteen levels, which is also the tap count
+// of the Poisson disc in shadows.wgsl that averages them back into a smooth term.
+fn orderedDither(pixel: vec2<f32>) -> f32 {
+    var m = array<u32, 16>(0u, 8u, 2u, 10u, 12u, 4u, 14u, 6u, 3u, 11u, 1u, 9u, 15u, 7u, 13u, 5u);
+    let p = vec2<u32>(pixel);
+    return (f32(m[(p.y & 3u) * 4u + (p.x & 3u)]) + 0.5) / 16.0;
+}
+
 @fragment
 fn fs_depth(in: VertexOut) {
     let alphaMode = object.flags.x;
+    let texMask = u32(object.flags.w + 0.5);
+    var alpha = object.baseColor.a;
+    // Uniform control flow, which `textureSample` requires: both conditions read the object
+    // uniform, so every fragment of a draw takes the same branch.
+    if (alphaMode > 0.5 && (texMask & 1u) != 0u) {
+        alpha = alpha * textureSample(baseColorTex, materialSampler, in.uv).a;
+    }
     if (alphaMode > 0.5 && alphaMode < 1.5) {
-        let texMask = u32(object.flags.w + 0.5);
-        var alpha = object.baseColor.a;
-        if ((texMask & 1u) != 0u) {
-            alpha = alpha * textureSample(baseColorTex, materialSampler, in.uv).a;
-        }
         if (alpha < object.flags.y) {
+            discard;
+        }
+    } else if (alphaMode > 1.5) {
+        // BLEND, and this arm is the whole of the second half of the abduction defect. Without it
+        // a blended surface writes depth like an opaque one -- and `SceneRenderer` compensated by
+        // not making it a caster at all, so ADR-385's fade lost its shadow on the FIRST frame its
+        // opacity fell below 1, a full second before the body itself was gone. Stochastic
+        // transparency instead: the caster claims `alpha` of the depth texels it covers, so the
+        // term the PCF disc averages falls with the body rather than switching off ahead of it. At
+        // alpha 1 nothing is discarded and the shadow is the opaque one; at 0 everything is and
+        // there is no shadow left to pop.
+        if (alpha <= 0.0 || orderedDither(in.clip.xy) >= alpha) {
             discard;
         }
     }
