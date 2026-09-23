@@ -502,6 +502,56 @@ TEST_CASE("Composition registers parameters that drive instances, materials and 
         CHECK(sc.entities.size() == 2);
         CHECK(sc.particles.empty());
     }
+    SECTION("a detached composition follows its authored values, not the set it left") {
+        // The same defect as the section below, caught **without a sanitizer**.
+        //
+        // `Composition::detach` nulls a hundred and twelve cached `Parameter<T>*` by hand, and it
+        // has been stale: on 2026-09-22 it was missing five scalars, the whole `dayNightParams_`
+        // group, `authoredLightParams_` and each node's `materialPartParams`, which ASan reported
+        // as a heap-use-after-free. The section below reproduces that by clearing the set, so the
+        // surviving pointer reads freed memory -- which only a sanitizer can see, and the suite
+        // was green on it for as long as the bug existed.
+        //
+        // Here the parameter stays **alive** and is moved somewhere the scene never authored. A
+        // pointer that survived `detach` then produces a wrong *value* rather than a wrong read,
+        // and a value is something a CHECK can see in an ordinary release run.
+        comp.update(FrameTime{});
+        const glm::vec3 authored = sc.entities[0].transform.position;
+        auto* position = params.findAs<glm::vec3>("nodes/a/position");
+        REQUIRE(position != nullptr);
+        const glm::vec3 base = position->base();
+
+        // The premise (ADR-182): while attached the composition really does follow the set, so the
+        // check after detaching measures the detach and not a parameter nothing reads.
+        position->setBase(glm::vec3(99.0f, -99.0f, 99.0f));
+        params.resetFinals();
+        comp.update(FrameTime{});
+        REQUIRE(glm::length(sc.entities[0].transform.position - authored) > 1.0f);
+
+        // **Put it back before detaching**, and this ordering is the whole test. `detach` does not
+        // revert what has already been applied -- a node's *final* keeps the last value it was
+        // given -- so moving the parameter while still attached and then detaching proves nothing:
+        // the scene would hold 99 whether or not a pointer survived. The first draft of this did
+        // exactly that and read as a leak. The parameter has to move only **after** the detach.
+        position->setBase(base);
+        params.resetFinals();
+        comp.update(FrameTime{});
+        REQUIRE(glm::length(sc.entities[0].transform.position - authored) < 1e-3f);
+
+        comp.detach();
+        CHECK_FALSE(comp.attached());
+        // Now move it, with the composition detached. A cached pointer that survived `detach`
+        // still points at this live parameter and would follow it here.
+        position->setBase(glm::vec3(99.0f, -99.0f, 99.0f));
+        params.resetFinals();
+        comp.update(FrameTime{});
+        INFO("authored " << authored.x << "," << authored.y << "," << authored.z
+                         << "  after detach " << sc.entities[0].transform.position.x << ","
+                         << sc.entities[0].transform.position.y << ","
+                         << sc.entities[0].transform.position.z);
+        checkVec(sc.entities[0].transform.position, authored);
+    }
+
     SECTION("detach leaves no dangling use; attaching to a fresh set works") {
         comp.detach();
         CHECK_FALSE(comp.attached());
