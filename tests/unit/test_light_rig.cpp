@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <string>
 
 #include <nlohmann/json.hpp>
 
@@ -217,6 +218,41 @@ TEST_CASE("a rig round-trips through JSON", "[lightrig]") {
     nlohmann::json badType = j;
     badType["lights"][0]["type"] = "hexagon";
     CHECK_FALSE(scene::LightRig::fromJson(badType).has_value());
+
+    // The version the writer records has to be the one the reader enforces, or the check in
+    // `a rig from a newer format version is refused` guards a number nothing produces.
+    CHECK(j.at("version").get<int>() == 1);
+}
+
+TEST_CASE("a rig from a newer format version is refused, not reinterpreted", "[lightrig]") {
+    // `toJson` wrote `"version"` from the beginning and `fromJson` never read it, so a rig written
+    // by a later build loaded silently as the current revision. Whatever that revision changed
+    // would then be reinterpreted rather than reported -- the quiet half of a format break.
+    nlohmann::json j = threePoint().toJson();
+
+    SECTION("the version it writes is accepted") {
+        REQUIRE(scene::LightRig::fromJson(j).has_value());
+    }
+    SECTION("a newer version is refused, and says so") {
+        j["version"] = 2;
+        const auto rig = scene::LightRig::fromJson(j);
+        REQUIRE_FALSE(rig.has_value());
+        CHECK(rig.error().message.find("version 2") != std::string::npos);
+    }
+    SECTION("a version that is not an integer is refused") {
+        j["version"] = "one";
+        CHECK_FALSE(scene::LightRig::fromJson(j).has_value());
+    }
+    SECTION("an absent version still reads, because hand-written rigs have none") {
+        // Refusing these would break authoring and buy no safety: only a *newer* version can
+        // misread, and a file with no version cannot be from a newer build's writer.
+        j.erase("version");
+        CHECK(scene::LightRig::fromJson(j).has_value());
+    }
+    SECTION("the format name is still what identifies the file") {
+        j["format"] = "avgen-scene";
+        CHECK_FALSE(scene::LightRig::fromJson(j).has_value());
+    }
 }
 
 TEST_CASE("the shipped rigs load, validate and expand", "[lightrig]") {

@@ -1447,9 +1447,9 @@
       "importance": 0.5,
       "name": "rook",
       "position": [
-        -91.00517272949219,
-        16.79424285888672,
-        -49.31064224243164
+        -74.0,
+        7.619999885559082,
+        -18.0
       ],
       "preferredCameraDistance": 7.528364181518555,
       "preferredCameraElevation": 8.0,
@@ -1469,9 +1469,9 @@
       "importance": 0.5,
       "name": "tide",
       "position": [
-        -31.216970443725586,
-        6.443708896636963,
-        -12.367923736572266
+        -28.0,
+        7.619999885559082,
+        -46.0
       ],
       "preferredCameraDistance": 7.563477993011475,
       "preferredCameraElevation": 8.0,
@@ -1491,9 +1491,9 @@
       "importance": 0.5,
       "name": "sage",
       "position": [
-        -113.10901641845703,
-        15.17423152923584,
-        7.072813987731934
+        -112.0,
+        7.619999885559082,
+        16.0
       ],
       "preferredCameraDistance": 8.042852401733398,
       "preferredCameraElevation": 8.0,
@@ -1513,9 +1513,9 @@
       "importance": 0.5,
       "name": "ember",
       "position": [
-        -67.47543334960938,
-        8.769521713256836,
-        25.064807891845703
+        -56.0,
+        7.619999885559082,
+        34.0
       ],
       "preferredCameraDistance": 8.304945945739746,
       "preferredCameraElevation": 8.0,
@@ -1535,9 +1535,9 @@
       "importance": 0.5,
       "name": "vane",
       "position": [
-        28.73776626586914,
-        11.310033798217773,
-        -23.29877471923828
+        20.0,
+        8.829999923706055,
+        -10.0
       ],
       "preferredCameraDistance": 8.2046480178833,
       "preferredCameraElevation": 8.0,

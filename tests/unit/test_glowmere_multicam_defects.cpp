@@ -526,6 +526,106 @@ TEST_CASE("probe: where the film's cast is standing, and what it can reach",
 // hero list, which is what the code did before ADR-349. `ClearanceField::heroPenetration` at a
 // body's own feet must be positive with its own hero in the list and zero without it. If that ever
 // stops being a difference, the arm below is measuring nothing.
+// Saving a project must not move its hero anchors. **This was a P0 and is now fixed**; the test is
+// kept because it is the only thing that would notice it coming back.
+//
+// It was tagged `[!shouldfail]` when written on 2026-09-22, because the invariant was correct and
+// the engine did not satisfy it: one headless frame and one save, with nothing edited, walked
+// `ember`'s anchor 68.191 m, `sage`'s 5.005 m and `tide`'s 1.550 m, and saving the result did it
+// again, identically, without limit. Hero anchors are what the Auto-director frames, so a project
+// saved a few times aimed its cameras at empty ground.
+//
+// **Two causes, and the second only became visible once the first was gone.**
+//
+//   1. `syncHeroesToNodes` tracked each node's `nodeWorldTransform` -- the base *plus* whatever the
+//      simulation had folded on this instant. A hero's anchor therefore chased its body, and since
+//      the anchor is what `toJson` writes, every save recorded the chase. Reading
+//      `nodeWorldBaseTransform` instead gives heroes the split nodes already had: the anchor
+//      follows an author moving the node and ignores the character walking.
+//
+//   2. `setHeroes` then seeded the anchors eagerly, during the **scene** load -- so it captured the
+//      scene's position, the **project** applied its own `nodes/<name>/position` over the top, and
+//      the next sync read that legitimate change as a drag. Only `ember` showed it, being the only
+//      hero whose override (-56) differs from its scene node (12) -- by exactly the 68.000 m that
+//      was left after cause 1 was fixed. `syncHeroesToNodes` already adopts a node on first sight
+//      without moving the hero, so deleting the eager seed was the whole fix.
+//
+// The suspiciously round 68.000 m is what said the job was not finished: cause 1 alone took the
+// drift from 68.191 to 68.000 and zeroed `sage` and `tide`, which reads like success.
+//
+// Verified beyond this test: two consecutive headless saves now move all sixteen heroes by
+// 0.000000 m.
+TEST_CASE("saving a project does not move its hero anchors",
+          "[glowmere][multicam][project]") {
+    app::Engine engine(app::EngineMode::Offline);
+    auto loaded = engine.loadProject(filmProject());
+    INFO((loaded.has_value() ? std::string() : loaded.error().message));
+    REQUIRE(loaded.has_value());
+
+    // **One frame, and that is the whole mechanism.** Comparing the document straight after a load
+    // finds nothing -- checked, and it passed -- because the anchors are still the file's own. The
+    // drift needs the engine to have *run*: stepping resolves each hero's anchor from live
+    // placement, and the save then writes that back over the authored value. So this is not a
+    // serialiser that mangles what it is given; it is a save that photographs the run, and one
+    // frame of simulation is enough to make it do so.
+    FrameTime time;
+    time.renderTime = 0.0;
+    time.deltaTime = 0.0;
+    time.frameIndex = 0;
+    engine.update(time);
+
+    // `projectDocument` is the document `saveProject` would write, without writing it -- the same
+    // serialiser, so this cannot be a second implementation that happens to agree (ADR-440).
+    std::ifstream onDisk(filmProject());
+    REQUIRE(onDisk.good());
+    const json before = json::parse(onDisk);
+    const json after = engine.projectDocument(filmProject());
+
+    auto anchors = [](const json& doc) {
+        std::map<std::string, std::array<double, 3>> out;
+        if (!doc.contains("heroes")) {
+            return out;
+        }
+        for (const json& h : doc.at("heroes")) {
+            if (!h.contains("name") || !h.contains("position")) {
+                continue;
+            }
+            const json& p = h.at("position");
+            if (p.is_array() && p.size() == 3) {
+                out[h.at("name").get<std::string>()] = {p[0].get<double>(), p[1].get<double>(),
+                                                        p[2].get<double>()};
+            }
+        }
+        return out;
+    };
+    const auto a = anchors(before);
+    const auto b = anchors(after);
+    REQUIRE_FALSE(a.empty());
+    REQUIRE(a.size() == b.size());
+
+    // Every hero, not only the five characters: a save that moves a mushroom's anchor is the same
+    // defect and would otherwise be invisible here.
+    double worst = 0.0;
+    std::string worstName;
+    for (const auto& [name, pa] : a) {
+        const auto it = b.find(name);
+        REQUIRE(it != b.end());
+        const auto& pb = it->second;
+        const double d = std::sqrt(((pb[0] - pa[0]) * (pb[0] - pa[0])) +
+                                   ((pb[1] - pa[1]) * (pb[1] - pa[1])) +
+                                   ((pb[2] - pa[2]) * (pb[2] - pa[2])));
+        if (d > worst) {
+            worst = d;
+            worstName = name;
+        }
+    }
+    INFO(fmt::format("worst anchor movement: '{}' by {:.3f} m across {} heroes", worstName, worst,
+                     a.size()));
+    // A millimetre of tolerance, because the anchors round-trip through float and two of them
+    // already move by 0.003 m for that reason alone. The defect is metres.
+    CHECK(worst < 0.01);
+}
+
 TEST_CASE("A starred character is not a wall around itself", "[glowmere][multicam][entity]") {
     app::Engine engine(app::EngineMode::Offline);
     auto loaded = engine.loadProject(filmProject());

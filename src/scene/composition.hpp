@@ -750,6 +750,14 @@ public:
     // not be able to move, resize or relight anything. A rebuild triggered from here would be a
     // rebuild that only risks changing a frame.
     [[nodiscard]] const std::vector<world::HeroPoint>& heroes() const { return heroes_; }
+    // The same heroes with their **authored** positions rather than their live ones, which is what
+    // every serialiser wants and what `heroes()` cannot give it.
+    //
+    // `heroes()` returns positions that follow their node's final, so a hero riding a moving body
+    // moves with it -- required by the director and by the editor, and wrong to write to a file.
+    // Saving `heroes()` is what walked `ember` 68 m per save until 2026-09-22. Both the scene
+    // serialiser and `Engine::projectDocument` go through here instead.
+    [[nodiscard]] std::vector<world::HeroPoint> authoredHeroes() const;
     // Rejects the whole set rather than dropping the bad member, and names it. A hero silently
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
@@ -1466,26 +1474,6 @@ private:
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
     // original paths keep their spelling (`scene/windSpeed`, `scene/windDirection`): renaming them
     // to `scene/wind/*` would orphan the value in every project that already has one.
-    // ADR-371: the cosmic vortex.
-    params::Parameter<float>* vortexRadius_ = nullptr;
-    params::Parameter<float>* vortexDensity_ = nullptr;
-    params::Parameter<float>* vortexEmission_ = nullptr;
-    params::Parameter<float>* vortexSwirl_ = nullptr;
-    params::Parameter<float>* vortexRotation_ = nullptr;
-    params::Parameter<float>* vortexTurbulence_ = nullptr;
-    params::Parameter<float>* vortexInnerVoid_ = nullptr;
-    params::Parameter<float>* vortexContrast_ = nullptr;
-    params::Parameter<float>* vortexBreath_ = nullptr;
-    params::Parameter<float>* vortexThickness_ = nullptr;
-    params::Parameter<float>* vortexFilaments_ = nullptr;
-    params::Parameter<float>* vortexSpill_ = nullptr;
-    params::Parameter<float>* vortexCometResponse_ = nullptr;
-    params::Parameter<float>* vortexFunnelDepth_ = nullptr;
-    params::Parameter<float>* vortexThroat_ = nullptr;
-    params::Parameter<float>* vortexThroatDensity_ = nullptr;
-    params::Parameter<glm::vec3>* vortexColorDeep_ = nullptr;
-    params::Parameter<glm::vec3>* vortexColorMid_ = nullptr;
-    params::Parameter<glm::vec3>* vortexColorAccent_ = nullptr;
     params::Parameter<bool>* windEnabled_ = nullptr;
     params::Parameter<float>* windSpeed_ = nullptr;
     params::Parameter<float>* windDirection_ = nullptr;
@@ -1817,6 +1805,26 @@ private:
     // Parallel to `heroes_`. An empty optional means "no node of that name", which is a legitimate
     // state: a hero may name an assembly of several nodes rather than one object.
     std::vector<std::optional<glm::vec3>> heroAnchors_;
+    // The authoring half of the same idea, and the reason there are two of these.
+    //
+    // `heroAnchors_` tracks each node's **final** transform, and `HeroPoint::position` follows it.
+    // That is required: a hero riding a flying object has to move with it or the director cannot
+    // aim at it (`test_camera_aim`), and an editor drag has to carry the hero along
+    // (`test_world_editor`). But the same field is what `toJson` writes, so following the final
+    // meant every save recorded wherever the character had wandered to -- the P0 of 2026-09-22,
+    // 68 m per save for `ember`, compounding without limit.
+    //
+    // So the live position keeps following the final, and these two carry the authored value that
+    // is actually saved: `heroBaseAnchors_` tracks each node's **base**, and `heroBasePositions_`
+    // moves only when that does. An author dragging a node writes the base and moves both; a
+    // character walking writes only the final and moves only the live position.
+    //
+    // `heroBaseAnchors_` is adopted **lazily** -- on first sight in `syncHeroesToNodes` rather than
+    // eagerly here -- because a node's base legitimately changes during a load, when the project's
+    // `nodes/<name>/position` is applied over the scene's. Seeding eagerly made that look like a
+    // drag and moved the hero by the difference, which was the last 68.000 m of the same defect.
+    std::vector<std::optional<glm::vec3>> heroBaseAnchors_;
+    std::vector<glm::vec3> heroBasePositions_;
     std::vector<AimFollow> aimFollow_;  // ADR-158; empty unless a director cut this camera
     // One trail per node some rig chases. Empty -- and costing nothing -- until a rig asks for a
     // lag, which is what keeps every existing camera bit-identical.

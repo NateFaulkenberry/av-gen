@@ -73,29 +73,6 @@ AnimationClip timeWarp(const AnimationClip& source, float factor) {
     return out;
 }
 
-// Stride warp: the step lengthened or shortened in space at the same pace. Only the translation
-// channels of the joints that move horizontally are touched, and **the vertical is left alone**
-// for the reason §37 gives -- scaling Y sinks a foot through the ground it was authored on.
-AnimationClip strideWarp(const AnimationClip& source, float factor) {
-    AnimationClip out = source;
-    for (AnimationChannel& channel : out.channels) {
-        if (channel.path != AnimationPath::Translation) {
-            continue;
-        }
-        // Scale the deviation from the channel's own first key, so a limb keeps its rest offset
-        // and only its excursion changes. Scaling the absolute value would move the whole limb.
-        if (channel.values.empty()) {
-            continue;
-        }
-        const glm::vec4 base = channel.values.front();
-        for (glm::vec4& v : channel.values) {
-            v.x = base.x + ((v.x - base.x) * factor);
-            v.z = base.z + ((v.z - base.z) * factor);
-        }
-    }
-    return out;
-}
-
 } // namespace
 
 std::vector<MotionVariant> generateVariants(const Skeleton& skeleton, const AnimationClip& source,

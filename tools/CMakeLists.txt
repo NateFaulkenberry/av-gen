@@ -151,3 +151,24 @@ target_link_libraries(avgen_behavior_trace PRIVATE avgen_core)
 # Phase D §58: validate a scene's autonomous characters before runtime.
 add_executable(avgen_character_validate character_validate.cpp)
 target_link_libraries(avgen_character_validate PRIVATE avgen_core)
+
+# ---- sanitizer runtimes ------------------------------------------------------------------------
+# Every executable above links `avgen_core`, which is instrumented under `--preset asan` and
+# `--preset tsan`. A tool that does not also link the sanitizer runtime fails with undefined
+# `___asan_*` symbols -- and because ninja stops at the first failing target and these are ordered
+# *before* `avgen_tests`, that broke the whole documented sanitizer workflow: `docs/testing.md`
+# tells you to run `cmake --preset asan && cmake --build --preset asan && ctest --preset asan`, and
+# the suite binary was never reached. Found by the QA pass of 2026-09-22, which went looking for an
+# ownership audit and found it could not build one.
+#
+# Applied to every target in this directory rather than named one at a time, because the defect was
+# exactly that thirteen of fourteen tools had been added without the call and a fourteenth would
+# have been added the same way. `avgen_overlay_shot` already gets these through
+# `avgen_set_warnings`; repeating a `-fsanitize` flag is idempotent.
+get_property(avgen_tool_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(avgen_tool IN LISTS avgen_tool_targets)
+    get_target_property(avgen_tool_type ${avgen_tool} TYPE)
+    if(avgen_tool_type STREQUAL "EXECUTABLE")
+        avgen_set_sanitizers(${avgen_tool})
+    endif()
+endforeach()

@@ -41,15 +41,8 @@ constexpr std::array<Name, static_cast<std::size_t>(Interaction::Count)> kNames{
     return millis(*from, *to);
 }
 
-// "12.34" or "  --  ". An unavailable statistic is rendered as a dash rather than a zero, in the
+// "12.3" or "  --  ". An unavailable statistic is rendered as a dash rather than a zero, in the
 // report as well as in the type, because a table is where a zero gets quoted from.
-[[nodiscard]] std::string cell(const std::optional<double>& v, int width) {
-    if (!v) {
-        return fmt::format("{:>{}}", "--", width);
-    }
-    return fmt::format("{:>{}.2f}", *v, width);
-}
-
 [[nodiscard]] std::string cell(const LatencyDistribution& d, double LatencyDistribution::*field,
                                int width) {
     if (!d.available()) {

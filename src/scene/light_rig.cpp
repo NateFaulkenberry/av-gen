@@ -24,6 +24,15 @@ namespace avgen::scene {
 // This lab's own fixture was written with `"coneDegrees"` first and silently got the 45-degree
 // default; reading the parser is what caught it, which is not a check. `core/json_keys.hpp` carries
 // the reasoning for warning rather than refusing, and the `_`-prefix exemption.
+
+// The file this module reads, and the only revision of it this build understands. `toJson` wrote
+// the version from the start and `fromJson` never looked at it, so a rig saved by a newer build
+// loaded as though it were this one -- silently, and with whatever the newer revision changed
+// reinterpreted rather than reported. Composition files have been checked this way all along
+// (`kFormatName`/`kFormatVersion` in `composition.cpp`); this is the same check, spelled the same.
+constexpr std::string_view kFormatName = "avgen-lightrig";
+constexpr int kFormatVersion = 1;
+
 constexpr std::string_view kRigKeys[] = {"format",           "version",          "name",
                                          "description",      "keyIntensity",     "ambientIntensity",
                                          "ambientColor",     "ambientTemperature", "lights"};
@@ -385,8 +394,8 @@ std::uint64_t LightRig::structuralHash() const {
 
 nlohmann::json LightRig::toJson() const {
     json j = json::object();
-    j["format"] = "avgen-lightrig";
-    j["version"] = 1;
+    j["format"] = kFormatName;
+    j["version"] = kFormatVersion;
     j["name"] = name;
     if (!description.empty()) {
         j["description"] = description;
@@ -431,8 +440,20 @@ Result<LightRig> LightRig::fromJson(const nlohmann::json& j) {
     if (!format) {
         return std::unexpected(format.error());
     }
-    if (*format != "avgen-lightrig") {
+    if (*format != kFormatName) {
         return fail("not a light rig file (format '{}')", *format);
+    }
+    // Absent means a rig written before `toJson` recorded one. Every rig in `examples/lightrigs`
+    // carries `"version": 1`, so an absent version can only be a hand-written file, and refusing
+    // those would break authoring for no safety -- it is a newer version that has to be refused.
+    if (j.contains("version")) {
+        if (!j.at("version").is_number_integer()) {
+            return fail("light rig: 'version' must be an integer");
+        }
+        if (const int version = j.at("version").get<int>(); version > kFormatVersion) {
+            return fail("unsupported light rig version {} (this build reads {})", version,
+                        kFormatVersion);
+        }
     }
     LightRig rig;
     auto name = readString(j, "name", rig.name);

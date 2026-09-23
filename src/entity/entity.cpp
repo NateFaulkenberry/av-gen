@@ -2290,6 +2290,22 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
     // On a skipped frame the offsets are the ones the last update produced, so the pose is held
     // rather than recomputed. That is what "nothing on screen moves" was always supposed to mean.
 
+    // The activity an action asked for, copied out of the queue while it is still there.
+    //
+    // `ActionOutput::activity` is a `std::string_view` into the **current** `ActionDesc`, and
+    // `intent` is taken above the behaviours while it is read below them -- ADR-091 puts the action
+    // tier first on purpose, so the behaviours can see `driven` and yield. A behaviour that decides
+    // otherwise calls `ActionQueue::override`, which cancels the layer and move-assigns its
+    // `vector<ActionDesc>`, freeing the very string the view points at. Reading it afterwards was a
+    // heap-use-after-free: found by AddressSanitizer on 2026-09-22, and invisible in release, where
+    // freed memory simply reads as whatever happens to be there.
+    //
+    // Copying rather than re-querying after the behaviours is what preserves the semantics. ADR-091
+    // says this is the *pre-behaviour* intent and that is what the locomotion layer is meant to
+    // see; re-querying would quietly change which action the pose follows. Hoisted out of the loop
+    // and `assign`ed so a steady state reuses its capacity, for the reason the assignment into
+    // `locomotion_.action` below gives.
+    std::string intentActivity;
     for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
         auto& entityPtr = entities_[entityIndex];
         Entity& entity = *entityPtr;
@@ -2373,6 +2389,10 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // destination and its pause timer, which is what makes the fall-back a resume.
         entity.schedule_.update(ctx.time, entity.actions_);
         ActionOutput intent;
+        // Per entity, not per loop: the buffer is hoisted only to keep its capacity, so it has to
+        // be emptied here or a body with no pending action inherits the previous body's activity.
+        // `clear` keeps the capacity, which is the whole point of hoisting it.
+        intentActivity.clear();
         if (entity.actions_.pending() > 0) {
             ActionContext ac;
             ac.time = ctx.time;
@@ -2385,6 +2405,8 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             ac.events = &actionEvents_;
             const std::size_t eventsBefore = actionEvents_.size();
             intent = entity.actions_.update(ac, entity.state_);
+            // While the view is still valid: see `intentActivity`'s declaration.
+            intentActivity.assign(intent.activity);
             raiseActionEvents(actionEvents_, eventsBefore, entityIndex, ctx.time);
         }
 
@@ -2583,8 +2605,8 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         entity.locomotion_.blend = entity.desc_.gait.blend;
         // What an action asked to be played, if it asked for anything. Assigned rather than
         // rebuilt so a steady state reuses the string's capacity.
-        if (entity.locomotion_.action != intent.activity) {
-            entity.locomotion_.action.assign(intent.activity);
+        if (entity.locomotion_.action != intentActivity) {
+            entity.locomotion_.action.assign(intentActivity);
         }
         entity.locomotion_.time = ctx.time;
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
