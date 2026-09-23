@@ -168,6 +168,8 @@ void hashDiagnosticFrame(RendererDiagnosticFrame& frame) {
 
 } // namespace
 
+// ---- diagnostics --------------------------------------------------------------------------------
+
 const RenderObjectDiagnostic* SceneRenderer::diagnosticObject(std::string_view name) const {
     for (const RenderObjectDiagnostic& object : diagnosticFrame_.objects) {
         if (object.name == name) {
@@ -201,6 +203,8 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
 }
 
 SceneRenderer::~SceneRenderer() = default;
+
+// ---- construction -------------------------------------------------------------------------------
 
 Result<void> SceneRenderer::init() {
     const auto& device = context_.device();
@@ -518,6 +522,8 @@ Result<void> SceneRenderer::init() {
     return {};
 }
 
+// ---- the environment the scene is lit by --------------------------------------------------------
+
 void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
     const scene::TextureId id = scene.environment.environmentMap;
     const bool valid = id != scene::kInvalidTexture && id < scene.textures.size() && scene.textures[id].isHdr();
@@ -618,6 +624,8 @@ struct ClusterParamsGpu {
 static_assert(sizeof(ClusterParamsGpu) == 32 + 16 * kMaxSceneLights);
 constexpr std::uint32_t kClusterBufferWords = kClusterCount * (1 + kMaxLightsPerCluster);
 } // namespace
+
+// ---- GPU resources: lights, frame bind groups, aux targets --------------------------------------
 
 Result<void> SceneRenderer::createLightResources() {
     const auto& device = context_.device();
@@ -898,6 +906,11 @@ void SceneRenderer::setQuality(QualityTier tier) {
         ao_->resetHistory();
     }
 }
+
+// ---- pipeline construction (ADR-117's arms are further down) ------------------------------------
+//
+// Everything from here to `resize` builds pipelines and the resources they bind. It is the
+// half of this file that runs once; the half that runs every frame starts at `uploadMeshes`.
 
 Result<void> SceneRenderer::createPipelines() {
     auto pbr = shaders_.load("pbr.wgsl");
@@ -1394,6 +1407,8 @@ Result<wgpu::RenderPipeline> SceneRenderer::tonemapPipelineFor(wgpu::TextureForm
     return pipeline;
 }
 
+// ---- resize -------------------------------------------------------------------------------------
+
 Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     if (width == 0 || height == 0) {
         return fail("resize to zero size ({}x{})", width, height);
@@ -1453,6 +1468,8 @@ Result<void> SceneRenderer::resize(std::uint32_t width, std::uint32_t height) {
     }
     return {};
 }
+
+// ---- pass and quality arms -- the A/B measurement surface (ADR-117) -----------------------------
 
 std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
     using T = SceneRenderer::PassToggles;
@@ -1675,6 +1692,8 @@ void SceneRenderer::setQualitySettings(const QualitySettings& settings) {
     }
 }
 
+// ---- history, IBL and shader reload -------------------------------------------------------------
+
 void SceneRenderer::resetTemporalHistory() {
     resetScreenHistory();
     // The particle pools are temporal history too, and they were the one kind this call did not
@@ -1857,6 +1876,8 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     return first;
 }
 
+// ---- per-frame inputs: spectrum, post targets, tonemap ------------------------------------------
+
 void SceneRenderer::updateSpectrum(const analysis::AnalysisFrame* frame) {
     if (frame == nullptr || frame->spectrum.empty()) {
         return;
@@ -1935,6 +1956,10 @@ wgpu::BindGroup SceneRenderer::tonemapBindGroupFor(const wgpu::TextureView& view
     tonemapGroups_[view.Get()] = group;
     return group;
 }
+
+// ---- uploads and per-material state -------------------------------------------------------------
+//
+// From here on is per-frame work.
 
 void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
     // Address, identity and version, all three. The address alone is not an identity: a scene
@@ -2278,6 +2303,15 @@ void SceneRenderer::ensureObjectCapacity(std::uint32_t objects) {
         skinning_->setObjectBuffer(objectUniforms_, sizeof(ObjectUniforms));
     }
 }
+
+// ---- the frame ----------------------------------------------------------------------------------
+//
+// `render` below is **1,942 lines** -- longer than most files in this repository and by far
+// the largest function in it. Sections inside it are marked with `// -- ` sub-headers rather
+// than split out, because the QA pass of 2026-09-23 that added these headers did not have the
+// evidence to say where the seams are: it is one pass sequence sharing a great deal of local
+// state, and carving it up on a guess is how a renderer acquires a subtle frame-ordering bug.
+// docs/reports/qa-2026-09-22.md records it as the largest single decomposition question left.
 
 Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
                                    const gpu::TargetView& target, const ShaderFrameInputs* shaderInputs) {
@@ -4239,6 +4273,8 @@ Result<wgpu::Texture> makeReadbackTarget(gpu::Context& context, std::uint32_t wi
 }
 
 } // namespace
+
+// ---- submission, timings and the image paths ----------------------------------------------------
 
 Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, const FrameTime& time,
                                                      std::uint32_t width, std::uint32_t height,

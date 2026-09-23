@@ -87,6 +87,8 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     }
 }
 
+// ---- control source, tempo and the scene controller -------------------------------------------
+
 void Engine::ensureControlSource() {
     auto* existing = sources_.find("control", "control");
     if (existing == nullptr) {
@@ -337,6 +339,8 @@ void Engine::refreshLayerParameters() {
     rebind();
 }
 
+// ---- cameras, layers and the routes a scene gets for free -------------------------------------
+
 scene::ActiveCameraState Engine::activeCamera() const {
     if (const auto* comp = dynamic_cast<const scene::Composition*>(controller_.get()); comp != nullptr) {
         return comp->activeCamera();
@@ -497,6 +501,8 @@ void Engine::addDefaultPostRoutes() {
     }
 }
 
+// ---- binding, effects and the parameter surface -----------------------------------------------
+
 void Engine::rebind() {
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels must exist on the bus first
@@ -591,6 +597,8 @@ params::Track* Engine::recordKey(const std::string& path, int component, params:
     }
     return track;
 }
+
+// ---- sources, presets, states and world macros ------------------------------------------------
 
 signals::Source& Engine::addSource(const std::string& kind, const std::string& baseName) {
     std::string name = baseName;
@@ -1016,6 +1024,12 @@ Result<ParkedDirectorsCut> parkedCutFromJson(const nlohmann::json& doc,
 }
 
 } // namespace
+
+// ---- the project document -- what a save writes, and what it compares against -----------------
+//
+// `projectDocument` is the serialiser; `saveProject` below writes what it returns, and the
+// unsaved-changes check at ADR-440 compares against it. One function, so a save and a dirty
+// check cannot disagree about what the project is.
 
 nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_);
@@ -1576,6 +1590,8 @@ void Engine::markProjectSaved() {
     projectBaselineValid_ = true;
     projectDirty_ = false;
 }
+
+// ---- loading a project, and starting a new one ------------------------------------------------
 
 Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // ---- the stages, and what they cost -----------------------------------------------------
@@ -2419,6 +2435,8 @@ void Engine::newProject() {
     markProjectSaved();
 }
 
+// ---- referenced files and bundle export -------------------------------------------------------
+
 std::vector<std::filesystem::path> Engine::referencedFiles() const {
     std::vector<std::filesystem::path> files;
     auto add = [&](const std::filesystem::path& p) {
@@ -2731,6 +2749,8 @@ Result<void> Engine::saveProjectAsCopy(const std::filesystem::path& path) {
     return loadProject(file);
 }
 
+// ---- scenes, compositions and the environment -------------------------------------------------
+
 Result<void> Engine::loadScene(const std::filesystem::path& path) {
     // Import first so a failed load leaves the current scene, parameters and routes untouched.
     auto ctrl = scene::GltfScene::load(path);
@@ -2972,6 +2992,8 @@ Engine::~Engine() {
     player_.reset();
 }
 
+// ---- audio ------------------------------------------------------------------------------------
+
 Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) {
     if (!file || file->frameCount() == 0) {
         // An empty arrangement is "no audio", which is an ordinary state -- not a device with
@@ -3121,6 +3143,8 @@ Result<void> Engine::rebuildAudio() {
     }
     return {};
 }
+
+// ---- transport --------------------------------------------------------------------------------
 
 Result<void> Engine::play() {
     refreshTransport();
