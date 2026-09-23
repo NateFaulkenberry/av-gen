@@ -315,8 +315,21 @@ TEST_CASE("holdPost wants its post back in proportion to how far it is from it",
     CHECK(scoreAt(glm::vec3(0.0f)).actions.empty());
 
     // Twenty metres off it: 1 + 0.25 * (20 - 1.5).
+    //
+    // **The resting score is taken first, and it has to be.** `Option::actions` is a
+    // `std::span` into the considerer's own `actions_`, and `HoldPostConsiderer::consider` opens
+    // with `actions_.clear()` -- so any later `scoreAt` empties the vector `away.actions` points
+    // into. Scoring the rest case *after* taking `away` left the reads below addressing a span of
+    // size one over a vector of size zero, which they did for as long as this test existed:
+    // `clear()` does not overwrite, so the bytes were still the right ones and every assertion
+    // passed. AddressSanitizer reported it as a container-overflow on 2026-09-23, in the first
+    // full-suite ASan run this project has had.
+    //
+    // `REQUIRE(away.actions.size() == 1)` is no guard against it either: a span is a copy of a
+    // pointer and a length, so it goes on reporting one element after the vector is emptied.
+    const float restScore = scoreAt(glm::vec3(0.0f)).score;
     const Option away = scoreAt(glm::vec3(20.0f, 0.0f, 0.0f));
-    CHECK(away.score > scoreAt(glm::vec3(0.0f)).score);
+    CHECK(away.score > restScore);
     CHECK(std::abs(away.score - (1.0f + 0.25f * 18.5f)) < 1e-4f);
     REQUIRE(away.actions.size() == 1);
     CHECK(away.actions[0].kind == ActionKind::Move);
