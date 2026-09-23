@@ -790,11 +790,48 @@ TEST_CASE("Composition nests scene files and flattens them with prefixed paramet
     CHECK(j["nodes"][0]["asset"] == child.filename().string());
 
     // Removing the nested node drops every nested parameter.
+    //
+    // **Swept, not spot-checked**, for the reason `removeNode unregisters its parameters` gives
+    // further up this file. Three named paths were checked here before, and three named paths test
+    // the three somebody thought of: `Composition::unregisterParameters` removes its scene-level
+    // parameters from a **hand-written list of twenty-seven path strings**
+    // (`camera/*`, `env/*`, `scene/*`, `root/*`) while `attach` registers them one by one, and a
+    // registrar that gains a parameter without the list gaining it too leaks silently. That is the
+    // same shape as the `unregisterNodeParameters` suffix tables, and the same shape as
+    // `Composition::detach` releasing 72 of its 77 cached pointers, which was a real
+    // use-after-free found on 2026-09-22.
+    const auto nested = [&]() {
+        std::vector<std::string> out;
+        for (const params::IParameter* q : params.ordered()) {
+            if (q->path().starts_with("nodes/inner/") || q->path().starts_with("particles/nodes_inner_")) {
+                out.push_back(q->path());
+            }
+        }
+        return out;
+    };
+    // The premise (ADR-182): the child really does own parameters, so removing it has work to do.
+    // Without this the sweep below would hold for a child that registered none.
+    const std::size_t nestedBefore = nested().size();
+    REQUIRE(nestedBefore > 3); // more than the three this used to name
+    const std::size_t othersBefore = params.size() - nestedBefore;
+
     CHECK(comp.removeNode("inner"));
     CHECK(params.find("nodes/inner/nodes/orb/position") == nullptr);
     CHECK(params.find("nodes/inner/camera/distance") == nullptr);
     CHECK(params.find("particles/nodes_inner_p/spawnRate") == nullptr);
     CHECK(params.find("nodes/grid/position") != nullptr);
+    {
+        // Named rather than counted: a count says a leak exists, not which parameter it is, and
+        // the whole point is that the twenty-seven-path list goes stale one entry at a time.
+        std::string leaked;
+        for (const std::string& path : nested()) {
+            leaked += path + " ";
+        }
+        INFO("survived removeNode(\"inner\"): " << leaked);
+        CHECK(nested().empty());
+    }
+    // ...and nobody else's went with them.
+    CHECK(params.size() == othersBefore);
     comp.update(FrameTime{});
     CHECK(sc.entities.size() == 1);
 }

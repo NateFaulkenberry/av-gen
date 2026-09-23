@@ -1804,6 +1804,20 @@ private:
     //
     // Parallel to `heroes_`. An empty optional means "no node of that name", which is a legitimate
     // state: a hero may name an assembly of several nodes rather than one object.
+    // Exactly the paths `attach` added to the set, taken as the difference between the set before
+    // and after it ran, and removed verbatim by `unregisterParameters`.
+    //
+    // It used to be a hand-written list of twenty-seven path strings while `attach` registered
+    // them one at a time, and it had fallen behind by **sixty-four**: all of `camera/shake/*`,
+    // `camera/mode`, `camera/position`, `camera/target`, the whole `env/dayNight/*` group and the
+    // `scene/volume*` family survived removing a nested scene, leaving ghost rows in the
+    // Parameters panel for a scene that no longer existed and writing them back on the next save.
+    // Found on 2026-09-23 by widening the nested-removal test from three named paths to a sweep.
+    //
+    // A diff rather than a list because the list is the thing that goes stale: this cannot fall
+    // behind a registrar it is computed from. It is also why the ninety-one `params.add` calls in
+    // `attach` needed no edit.
+    std::vector<std::string> registeredPaths_;
     std::vector<std::optional<glm::vec3>> heroAnchors_;
     // The authoring half of the same idea, and the reason there are two of these.
     //

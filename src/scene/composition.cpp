@@ -33,6 +33,7 @@
 #include <nlohmann/json.hpp>
 #include <span>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 namespace avgen::scene {
@@ -3607,6 +3608,15 @@ float Composition::fitDistance() const {
 
 void Composition::attach(params::ParameterSet& params, params::Modulator& modulator,
                          const std::string& prefix) {
+    // What the set held before this composition touched it. The difference at the end of `attach`
+    // is exactly what this composition registered, and that is what `unregisterParameters` removes
+    // -- see `registeredPaths_`.
+    std::unordered_set<std::string> before;
+    before.reserve(params.size() * 2);
+    for (const params::IParameter* q : params.ordered()) {
+        before.insert(q->path());
+    }
+
     params_ = &params;
     modulator_ = &modulator;
     graphModulator_ = &modulator;
@@ -3924,6 +3934,13 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // Last, because an entity binds against the parameters every node above has just registered
     // and against the material part names the rebuild resolved.
     installEntities();
+
+    registeredPaths_.clear();
+    for (const params::IParameter* q : params.ordered()) {
+        if (!before.contains(q->path())) {
+            registeredPaths_.push_back(q->path());
+        }
+    }
 }
 
 // ADR-358: the authored lights' live knobs. Every light gets intensity, colour and an enable;
@@ -4664,17 +4681,13 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
 
 void Composition::unregisterParameters() {
     if (params_ != nullptr) {
-        for (const char* path : {"camera/distance", "camera/height", "camera/orbitSpeed", "camera/fov",
-                                 "camera/splineT", "camera/lookAhead", "camera/splineOffset",
-                                 "env/intensity", "env/rotation", "scene/brightness", "scene/gridIntensity", "scene/stylized",
-                                 "env/sky/enabled", "env/sky/background", "env/sky/zenithColor",
-                                 "env/sky/horizonColor", "env/sky/groundColor", "env/sky/sunColor",
-                                 "env/sky/haze", "env/sky/sunIntensity", "env/sky/sunSize",
-                                 "env/sky/sunGlow", "env/sky/intensity",
-                                 "scene/shadowRange",
-                                 "root/scale", "root/rotationSpeed", "root/impulse"}) {
-            params_->remove(prefix_ + path);
+        // Exactly what `attach` recorded registering. This was a list of twenty-seven path
+        // strings, kept by hand beside a registrar that adds them one at a time, and it had fallen
+        // sixty-four behind -- see `registeredPaths_`.
+        for (const std::string& path : registeredPaths_) {
+            params_->remove(path);
         }
+        registeredPaths_.clear();
         if (!lightRigParams_.all.empty()) {
             unregisterLightRigParameters(*params_, lightRigParams_);
             lightRigParams_ = {};
