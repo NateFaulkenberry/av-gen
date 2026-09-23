@@ -526,43 +526,37 @@ TEST_CASE("probe: where the film's cast is standing, and what it can reach",
 // hero list, which is what the code did before ADR-349. `ClearanceField::heroPenetration` at a
 // body's own feet must be positive with its own hero in the list and zero without it. If that ever
 // stops being a difference, the arm below is measuring nothing.
-// Tagged `[!shouldfail]`: this invariant is CORRECT and the engine does NOT satisfy it.
+// Saving a project must not move its hero anchors. **This was a P0 and is now fixed**; the test is
+// kept because it is the only thing that would notice it coming back.
 //
-// **Saving a project you have not edited moves its hero anchors, by the same amount every time.**
-// Found by the QA pass of 2026-09-22 while smoke-testing `--save-project` on this film: one
-// headless frame and one save, with no editing at any point, and
+// It was tagged `[!shouldfail]` when written on 2026-09-22, because the invariant was correct and
+// the engine did not satisfy it: one headless frame and one save, with nothing edited, walked
+// `ember`'s anchor 68.191 m, `sage`'s 5.005 m and `tide`'s 1.550 m, and saving the result did it
+// again, identically, without limit. Hero anchors are what the Auto-director frames, so a project
+// saved a few times aimed its cameras at empty ground.
 //
-//     ember  -67.48 -> -135.48 in x   (68.191 m)
-//     sage    15.17 ->   20.18 in y   ( 5.005 m)
-//     tide     6.44 ->    7.99 in y   ( 1.550 m)
-//     rook, vane                       (stable)
+// **Two causes, and the second only became visible once the first was gone.**
 //
-// and saving *that* file moves them again by exactly the same deltas (ember to -203.48, sage to
-// 25.18, tide to 9.54). The drift is a fixed per-hero offset applied once per save, so N saves put
-// ember 68N metres from where it was authored. That is silent, progressive corruption of authored
-// content, and it needs no user mistake to happen -- only Cmd-S.
+//   1. `syncHeroesToNodes` tracked each node's `nodeWorldTransform` -- the base *plus* whatever the
+//      simulation had folded on this instant. A hero's anchor therefore chased its body, and since
+//      the anchor is what `toJson` writes, every save recorded the chase. Reading
+//      `nodeWorldBaseTransform` instead gives heroes the split nodes already had: the anchor
+//      follows an author moving the node and ignores the character walking.
 //
-// **It takes one frame of simulation, not just a save.** Serialising immediately after a load
-// reproduces nothing; the first `Engine::update` is what resolves the anchors from live placement,
-// and the save writes those. Worth stating because it is what makes the defect invisible to a
-// round-trip test of the serialiser alone, which is the obvious place to have looked.
+//   2. `setHeroes` then seeded the anchors eagerly, during the **scene** load -- so it captured the
+//      scene's position, the **project** applied its own `nodes/<name>/position` over the top, and
+//      the next sync read that legitimate change as a drag. Only `ember` showed it, being the only
+//      hero whose override (-56) differs from its scene node (12) -- by exactly the 68.000 m that
+//      was left after cause 1 was fixed. `syncHeroesToNodes` already adopts a node on first sight
+//      without moving the hero, so deleting the eager seed was the whole fix.
 //
-// **`ember`'s 68.191 m is not a coincidence**: it is exactly the gap between this project's
-// `nodes/ember/position` override (-56) and the scene's authored node position (12). So the anchor
-// looks to be re-derived from the *resolved* placement and then has the node override applied
-// again on top, cumulatively -- read A, write A + delta. The y-only drift on `sage` and `tide` is a
-// separate constant per hero and is not explained by that alone, so the mechanism above is a
-// direction for the fix rather than a finding.
+// The suspiciously round 68.000 m is what said the job was not finished: cause 1 alone took the
+// drift from 68.191 to 68.000 and zeroed `sage` and `tide`, which reads like success.
 //
-// This is also **why `A starred character is not a wall around itself` below fails today.** Its
-// control arm needs three bodies standing inside their own hero capsules, and every alien's anchor
-// has already been walked 9-36 m away from its body by past saves of this file, so the control
-// finds none. Repairing the anchors and re-deriving that arm's expected count are one job.
-//
-// Not tagged off and not deleted, for the reason ADR-260's slope case gives: a defect nobody
-// measures is a defect nobody remembers, and Catch2 shouts the day this starts passing.
+// Verified beyond this test: two consecutive headless saves now move all sixteen heroes by
+// 0.000000 m.
 TEST_CASE("saving a project does not move its hero anchors",
-          "[glowmere][multicam][project][!shouldfail]") {
+          "[glowmere][multicam][project]") {
     app::Engine engine(app::EngineMode::Offline);
     auto loaded = engine.loadProject(filmProject());
     INFO((loaded.has_value() ? std::string() : loaded.error().message));

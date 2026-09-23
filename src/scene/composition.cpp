@@ -1361,6 +1361,14 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
             heroAnchors_[i] = nodeWorldTransform(*node).position;
         }
     }
+    // The authored positions start as the ones the file gave, which is the whole point: this is
+    // the value `toJson` writes back, so it must survive everything the simulation does. The base
+    // anchors are deliberately left unadopted -- see their declaration.
+    heroBasePositions_.resize(heroes_.size());
+    for (std::size_t i = 0; i < heroes_.size(); ++i) {
+        heroBasePositions_[i] = heroes_[i].position;
+    }
+    heroBaseAnchors_.assign(heroes_.size(), std::nullopt);
     heroMotionPending_ = false;
     ++heroRevision_;
     // ADR-193: a hero is an obstacle. `rebuild()` is the only thing that calls
@@ -1494,17 +1502,40 @@ FollowTrail::Sample Composition::followTrailAt(const std::string& node, double s
     return out;
 }
 
+std::vector<world::HeroPoint> Composition::authoredHeroes() const {
+    std::vector<world::HeroPoint> out = heroes_;
+    for (std::size_t i = 0; i < out.size() && i < heroBasePositions_.size(); ++i) {
+        out[i].position = heroBasePositions_[i];
+    }
+    return out;
+}
+
 void Composition::syncHeroesToNodes() {
     if (heroes_.empty()) {
         return;
     }
     heroAnchors_.resize(heroes_.size());
+    heroBaseAnchors_.resize(heroes_.size());
+    heroBasePositions_.resize(heroes_.size());
     bool moved = false;
     for (std::size_t i = 0; i < heroes_.size(); ++i) {
         const CompositionNode* node = findNode(heroes_[i].name);
         if (node == nullptr) {
             heroAnchors_[i].reset();
+            heroBaseAnchors_[i].reset();
             continue;
+        }
+        // The authoring half, independent of the live half below. Only a change to the node's
+        // *base* -- an author moving it -- carries the hero's authored position with it.
+        const glm::vec3 base = nodeWorldBaseTransform(*node).position;
+        if (!heroBaseAnchors_[i]) {
+            heroBaseAnchors_[i] = base;
+        } else {
+            const glm::vec3 baseDelta = base - *heroBaseAnchors_[i];
+            if (glm::dot(baseDelta, baseDelta) >= 1e-8f) {
+                heroBasePositions_[i] += baseDelta;
+                heroBaseAnchors_[i] = base;
+            }
         }
         const glm::vec3 at = nodeWorldTransform(*node).position;
         if (!heroAnchors_[i]) {
@@ -1643,7 +1674,18 @@ Result<void> Composition::editHero(const std::string& name, const world::HeroPoi
     if (auto ok = value.validate(); !ok) {
         return ok;
     }
+    const std::size_t index = static_cast<std::size_t>(std::distance(heroes_.begin(), it));
     *it = value;
+    // An authoring edit, so it writes the authored position as well as the live one -- otherwise
+    // moving a hero in the editor would be discarded by the next save.
+    if (index < heroBasePositions_.size()) {
+        heroBasePositions_[index] = value.position;
+    }
+    if (index < heroBaseAnchors_.size()) {
+        // Re-adopt: the hero has been placed outright, so whatever offset it had from its node is
+        // replaced rather than carried.
+        heroBaseAnchors_[index].reset();
+    }
     markHeroesMoved();
     return {};
 }
@@ -9066,7 +9108,7 @@ nlohmann::json Composition::toJson() const {
     // when there are heroes, so every scene that never declared one keeps the file it had.
     if (!heroes_.empty()) {
         json heroes = json::array();
-        for (const world::HeroPoint& hero : heroes_) {
+        for (const world::HeroPoint& hero : authoredHeroes()) {
             heroes.push_back(hero.toJson());
         }
         j["heroes"] = std::move(heroes);

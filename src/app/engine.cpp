@@ -1211,8 +1211,12 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         // `cameraAimFollow` above names heroes by name, and this is what makes that table mean
         // something after a reload: a cut whose heroes did not survive the save is a cut aimed at
         // nothing (`Composition::applyDirectedAim` skips an entry whose hero is not in `heroes()`).
+        // `authoredHeroes()`, not `heroes()`. The live list follows each hero's node *final*, so a
+        // hero on a moving body walks with it; writing that is what made every save record the
+        // walk. The note further down recording `heroes (the key appears once the herd has
+        // walked)` as expected churn was this defect being logged as noise rather than diagnosed.
         nlohmann::json liveHeroes = nlohmann::json::array();
-        for (const world::HeroPoint& hero : comp->heroes()) {
+        for (const world::HeroPoint& hero : comp->authoredHeroes()) {
             liveHeroes.push_back(hero.toJson());
         }
         if (liveHeroes != onDisk("heroes", [](const nlohmann::json& j) {
