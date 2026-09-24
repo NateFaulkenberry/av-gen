@@ -58,6 +58,12 @@ namespace avgen::world {
 // The types an owner of this kind may take, in registry order. What the Add Effect menu lists.
 [[nodiscard]] std::vector<EffectKind> effectKindsFor(EffectTarget target);
 
+// Makes an instance valid for the owner it has: a type whose factory's source is "my owner" gets
+// "whatever the cut is on" when the owner is the World (or a light), which has no position of its
+// own to lend. Endpoint-generic -- it reads the schema's endpoint accessors, never a type. Called by
+// `insertEffect` and `makeEffect`.
+void adaptEffectToOwner(EffectInstance& effect);
+
 // Appends a new instance of `kind` at the BOTTOM of `owner`'s stack, made by the type's factory,
 // with a fresh id. Refused, with the list untouched, when the type does not support the owner's
 // target kind or the owner is malformed (a World owner with a name, an entity owner without one).

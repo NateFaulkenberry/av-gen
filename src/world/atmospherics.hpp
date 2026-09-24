@@ -417,7 +417,9 @@ enum class EffectStatus : std::uint8_t;
 // False when the name is not a style of that kind -- which is what the UI relies on to leave the
 // preset combo where it was rather than silently doing nothing to the effect.
 bool applyEffectStyle(EffectInstance& effect, EffectKind kind, std::string_view style);
-// The ready-made effect the "Add" button makes and the conformance probe uses, for any kind.
+// The ready-made effect the "Add" button makes and the conformance probe uses, for any kind. It
+// carries an id derived from `name` (ADR-702) and is owned by the World; attach it elsewhere with
+// `insertEffect` after setting `owner`.
 [[nodiscard]] EffectInstance makeEffect(EffectKind kind, std::string name);
 
 [[nodiscard]] std::span<const std::string_view> cometStyleNames();

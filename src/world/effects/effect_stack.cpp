@@ -76,7 +76,7 @@ int nextOrder(std::span<const EffectInstance> effects, const EffectOwner& owner)
 // one the factory's source cannot stand on -- an `Owner` source on the World, which has no position
 // -- the source becomes "whatever the cut is on", which is the only World-sized answer to "where am
 // I". Endpoint-generic: it reads the schema's endpoint accessors, never a type.
-void adaptToOwner(EffectInstance& e) {
+void adaptToOwnerImpl(EffectInstance& e) {
     const EffectSchema* schema = effectSchema(e.kind);
     if (schema == nullptr || schema->getSource == nullptr || schema->setSource == nullptr) {
         return;
@@ -89,6 +89,8 @@ void adaptToOwner(EffectInstance& e) {
 }
 
 } // namespace
+
+void adaptEffectToOwner(EffectInstance& effect) { adaptToOwnerImpl(effect); }
 
 std::vector<std::size_t> effectsOf(std::span<const EffectInstance> effects, const EffectOwner& owner) {
     std::vector<std::size_t> out;
@@ -168,7 +170,7 @@ Result<std::string> insertEffect(std::vector<EffectInstance>& effects, EffectIns
                     schema != nullptr ? schema->displayName : "this effect type",
                     effectTargetName(effect.owner.kind), effect.owner.label());
     }
-    adaptToOwner(effect);
+    adaptEffectToOwner(effect);
     if (effect.id.empty() || idTaken(effects, effect.id) || effect.id.find('/') != std::string::npos) {
         effect.id = newEffectId(effects, effect.owner, effect.kind);
     }

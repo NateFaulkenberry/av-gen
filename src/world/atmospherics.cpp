@@ -1,6 +1,7 @@
 #include "world/atmospherics.hpp"
 
 #include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_stack.hpp"
 
 #include <glm/gtc/constants.hpp>
 #include <nlohmann/json.hpp>
@@ -361,13 +362,21 @@ bool applyEffectStyle(EffectInstance& e, EffectKind kind, std::string_view style
 
 EffectInstance makeEffect(EffectKind kind, std::string name) {
     const EffectSchema* schema = effectSchema(kind);
+    EffectInstance e;
     if (schema == nullptr || schema->factory == nullptr) {
-        EffectInstance e;
         e.name = std::move(name);
         e.kind = kind;
-        return e;
+    } else {
+        e = schema->factory(std::move(name));
     }
-    return schema->factory(std::move(name));
+    // ADR-702: a ready-made instance is a VALID one, so it carries an id -- derived from its name,
+    // which is unique on its own. A caller putting several into one list makes them unique with
+    // `insertEffect` / `uniqueEffectId`, which is what the Add Effect menu does.
+    if (e.id.empty()) {
+        e.id = uniqueEffectId({}, e.name);
+    }
+    adaptEffectToOwner(e);
+    return e;
 }
 
 std::span<const std::string_view> cometStyleNames() { return styleNamesOf(EffectKind::Comet); }
