@@ -130,6 +130,27 @@ It renders **byte-identical** to the pre-refactor binary at 16 frames over t = 2
 
 ## Tests
 
+**Full suites on the merged branch** (`1e508d14`, reconfigured, and a second build doing no work
+before the run):
+
+- **CPU** (`avgen_tests`): 3,192 cases — 3,175 passed, 16 skipped, 1 failed as expected (the
+  deliberate `[!shouldfail]` at `test_character_lab_slopes.cpp:187`); 8,700,080 assertions; exit 0.
+- **GPU** (`avgen_render_tests`): 419 cases — 418 passed, 1 skipped (texture sharing, no Syphon
+  client); 524,200 assertions; exit 0.
+
+The CPU port (on `agent/entity-effects-tests`, now merged) found and fixed four `src/` defects in
+separate commits:
+
+- a malformed wave endpoint silently became the default instead of refusing the file;
+- the Sparkle toggle row was filed under a section its page never draws;
+- a vortex published its flow field under its display name, not its id;
+- the panel registry was sized one larger than its entries, so one panel had an empty id.
+
+New CPU tests: `test_effect_stack.cpp` (13 cases), `test_effects_project.cpp` (4 cases, including
+save→load→save on Glowmere after a frame has run), `test_effects_panel.cpp` (10 cases), and the
+conformance test extended to all 8 types. Each new guard was seen failing against deliberately
+broken code before being restored.
+
 - **Unit/integration (CPU):** see the full-suite line below.
 - **GPU:** `test_effect_stack_gpu.cpp`:
   - Tornado + Aurora on a fixture, shown able to fail;
