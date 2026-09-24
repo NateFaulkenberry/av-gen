@@ -738,20 +738,43 @@ Result<MotionDatabase> buildMotionDatabase(const MotionPack& pack,
                 out[k++] = std::sin(6.283185307179586f * phase);
             }
             if (options.config.contactWeight > 0.0f) {
-                for (std::size_t ji = 0; ji < jointIndex.size(); ++ji) {
+                // One flag per **contact** joint, in `contactJointNames()` order -- the layout
+                // `dimension()`, `motionFeatureLayout` and the schema digest all declare. This loop
+                // used to run over the *feature* joints instead and index `meta.contacts` by
+                // feature-joint position, which was wrong twice: a config whose `contactJoints` is
+                // shorter than its `joints` wrote past the end of the sample (AddressSanitizer,
+                // heap-buffer-overflow, 2026-09-23 -- a silent out-of-bounds write in release), and
+                // a pack whose contact tracks are not stored in feature-joint order read the wrong
+                // joint's contacts. Tracks are found by name, as `clipFacing`'s loop above already
+                // insists: "By name, not `jointIndex`".
+                const float local = t - clip.start;
+                for (const std::string& contactName : options.config.contactJointNames()) {
                     bool planted = false;
-                    if (ji < meta.contacts.size()) {
-                        for (const ContactSpan& span : meta.contacts[ji].spans) {
-                            const float local = t - clip.start;
+                    for (const ContactTrack& track : meta.contacts) {
+                        if (track.joint != contactName) {
+                            continue;
+                        }
+                        for (const ContactSpan& span : track.spans) {
                             if (span.wraps() ? (local >= span.start || local <= span.end)
                                              : (local >= span.start && local <= span.end)) {
                                 planted = true;
                                 break;
                             }
                         }
+                        break;
                     }
                     out[k++] = planted ? 1.0f : 0.0f;
                 }
+            }
+            // Every sample is a slice of ONE `db.features` vector, so a writer that disagrees with
+            // `dimension()` does not usually overrun anything a sanitizer can see: it writes the
+            // next sample's first feature. AddressSanitizer only caught the contact-block overflow
+            // above on the *last* sample, where the slice ends at the allocation. This check is
+            // what catches the rest, in a release build, on the first sample.
+            if (k != dim) {
+                return fail("motion database: sample {} of clip '{}' wrote {} features into a {}-wide "
+                            "slot -- the feature writer and MotionFeatureConfig::dimension() disagree",
+                            db.sampleClip.size(), clip.name, k, dim);
             }
 
             db.sampleClip.push_back(static_cast<std::uint32_t>(c));
