@@ -132,7 +132,14 @@ public:
 
     [[nodiscard]] const std::string& id() const { return id_; }
     [[nodiscard]] const std::string& prompt() const { return prompt_; }
-    [[nodiscard]] TaskState state() const { return state_.load(std::memory_order_relaxed); }
+    // **Acquire**, to pair with the release stores in `finish` and `setState`. A terminal state is
+    // a promise that the outcome, the activities and everything the provider recorded are already
+    // written -- `finish`'s own comment says a UI "is entitled to assume the outcome is already
+    // there" -- and a relaxed load keeps no such promise: it may observe the state and still not
+    // observe the writes that came before it. ThreadSanitizer reported eight races on exactly that
+    // (2026-09-23), all of them the main thread reading a finished task's data. `finish` stored with
+    // release all along; the reading side was the half that was missing.
+    [[nodiscard]] TaskState state() const { return state_.load(std::memory_order_acquire); }
     [[nodiscard]] bool finished() const { return taskStateIsTerminal(state()); }
     [[nodiscard]] const CancelToken& cancel() const { return cancel_; }
     void requestCancel() const { cancel_.cancel(); }

@@ -79,7 +79,10 @@ double AgentTask::elapsedSeconds() const {
 }
 
 void AgentTask::setState(TaskState state) {
-    state_.store(state, std::memory_order_relaxed);
+    // Release, not relaxed: this path publishes *terminal* states too -- `run` sets `Failed` here
+    // when a task cannot start -- and a terminal state stored relaxed synchronises with nothing, so
+    // a reader that sees it has no guarantee of seeing why. See `AgentTask::state`.
+    state_.store(state, std::memory_order_release);
     Activity activity;
     activity.kind = ActivityKind::StateChanged;
     activity.title = taskStateName(state);
