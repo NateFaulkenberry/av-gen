@@ -147,26 +147,29 @@ TEST_CASE("the shipped project's vortex routes name parameters that exist",
     // kind or it asserts a fact about which effect the deliverable happened to use. Reading it from
     // the registry -- whatever kind is there, is it routed correctly -- is what makes it survive
     // the next replacement as well as this one.
+    // ADR-702: the one `effects` array, each entry's `type`, and the prefix is the entry's ID.
     std::string mediumName;
+    std::string mediumId;
     world::EffectKind mediumKind = world::EffectKind::Vortex;
-    for (const auto& e : doc.value("atmosphericEffects", json::array())) {
-        const std::string key = e.value("kind", std::string{});
+    for (const auto& e : doc.value("effects", json::array())) {
+        const std::string key = e.value("type", std::string{});
         const world::EffectSchema* s = world::effectSchema(key);
         if (s != nullptr && s->resolve.bucket == world::EffectBucket::Medium) {
             mediumName = e.value("name", std::string{});
+            mediumId = e.value("id", std::string{});
             mediumKind = s->kind;
         }
     }
-    REQUIRE_FALSE(mediumName.empty());
-    const std::string vortexName = mediumName;
+    REQUIRE_FALSE(mediumId.empty());
 
     const world::EffectSchema* schema = world::effectSchema(mediumKind);
     REQUIRE(schema != nullptr);
     REQUIRE(schema->factory != nullptr);
     params::ParameterSet params;
     std::vector<world::EffectInstance> effects{schema->factory(mediumName)};
+    effects[0].id = mediumId;
     world::registerEffectParameters(params, effects);
-    const std::string prefix = world::effectParameterPrefix(vortexName);
+    const std::string prefix = world::effectParameterPrefix(mediumId);
 
     // Every route that is about the vortex must name a parameter that exists. A route whose target
     // does not resolve is dropped with a warning nobody reads: the picture keeps its funnel and the

@@ -15,12 +15,14 @@
 #include "scene/composition.hpp"
 #include "world/effects/effect_params.hpp"
 #include "world/atmospherics.hpp"
+#include "world/effects/effect_stack.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -71,8 +73,8 @@ world::EffectInstance plainComet(std::string name = "probe") {
     return e;
 }
 
-world::AtmosphericContext contextAt(double seconds) {
-    world::AtmosphericContext ctx;
+world::EffectContext contextAt(double seconds) {
+    world::EffectContext ctx;
     ctx.seconds = seconds;
     ctx.cameraPosition = glm::vec3(0.0f);
     return ctx;
@@ -98,10 +100,12 @@ TEST_CASE("an atmospheric effect round-trips through JSON", "[world][atmospheric
     e.comet.rainbow.scale = 2.25f;
     e.ground.mode = world::GroundGlow::Strong;
     e.ground.color = glm::vec3(0.2f, 0.7f, 0.9f);
-    e.aurora.appearance.intensity = 4.5f; // the payload it is *not* using still round-trips
+    e.aurora.appearance.intensity = 4.5f; // the payload it is *not* using
 
-    const auto back = world::EffectInstance::fromJson(e.toJson());
+    const nlohmann::json j = e.toJson();
+    const auto back = world::EffectInstance::fromJson(j);
     REQUIRE(back.has_value());
+    CHECK(back->id == e.id);
     CHECK(back->name == e.name);
     CHECK(back->kind == world::EffectKind::Comet);
     CHECK(back->style == e.style);
@@ -109,15 +113,19 @@ TEST_CASE("an atmospheric effect round-trips through JSON", "[world][atmospheric
     CHECK_THAT(back->comet.rainbow.scale, WithinAbs(2.25f, 1e-5f));
     CHECK(back->ground.mode == world::GroundGlow::Strong);
     CHECK_THAT(back->ground.color.g, WithinAbs(0.7f, 1e-5f));
-    // The unused payload survives, which is the whole reason both live on one struct rather than in
-    // a variant: switching an effect's kind must not throw away what the other kind was set to.
-    CHECK_THAT(back->aurora.appearance.intensity, WithinAbs(4.5f, 1e-5f));
     CHECK_THAT(back->comet.appearance.tailLength, WithinAbs(e.comet.appearance.tailLength, 1e-3f));
+    // ADR-702 reversed ADR-230's rule here, on purpose: an instance's type never changes (switching
+    // is removing one and adding another), so only its OWN type's rows are written and the payload
+    // it is not using is dead weight that does not reach the file.
+    CHECK(j.at("type") == "comet");
+    const world::EffectInstance defaults;
+    CHECK_THAT(back->aurora.appearance.intensity, WithinAbs(defaults.aurora.appearance.intensity, 1e-5f));
+    CHECK(back->toJson() == j);
 }
 
 TEST_CASE("an atmospheric effect keeps the defaults of everything the file omits",
           "[world][atmospherics][json]") {
-    const nlohmann::json minimal = {{"name", "Sparse"}, {"kind", "aurora"}};
+    const nlohmann::json minimal = {{"id", "sparse"}, {"type", "aurora"}, {"name", "Sparse"}};
     const auto e = world::EffectInstance::fromJson(minimal);
     REQUIRE(e.has_value());
     CHECK(e->kind == world::EffectKind::Aurora);
@@ -129,8 +137,10 @@ TEST_CASE("an atmospheric effect keeps the defaults of everything the file omits
 }
 
 TEST_CASE("an invalid atmospheric effect is refused rather than clamped", "[world][atmospherics]") {
-    SECTION("a name is half of a parameter path") {
-        world::EffectInstance e = plainComet("bad/name");
+    SECTION("an id is half of a parameter path") {
+        world::EffectInstance e = plainComet("bad name");
+        REQUIRE(e.validate().has_value()); // the control: the same comet with a clean id is valid
+        e.id = "bad/name";
         CHECK_FALSE(e.validate().has_value());
     }
     SECTION("a comet that would not move") {
@@ -151,9 +161,12 @@ TEST_CASE("an invalid atmospheric effect is refused rather than clamped", "[worl
         e.aurora.shape.curtainCount = 9.0f;
         CHECK_FALSE(e.validate().has_value());
     }
-    SECTION("two effects may not share a name") {
-        const std::array<world::EffectInstance, 2> both{plainComet("same"), plainComet("same")};
+    SECTION("two effects may not share an id") {
+        std::array<world::EffectInstance, 2> both{plainComet("same"), plainComet("same")};
+        both[1].order = 1;
         CHECK_FALSE(world::validateEffects(both).has_value());
+        both[1].id = "same-2";
+        CHECK(world::validateEffects(both).has_value());
     }
 }
 
@@ -346,13 +359,27 @@ TEST_CASE("no more than the GPU limit of atmospheric effects is ever written",
         a.timing.fadeIn = 0.0;
         many.push_back(a);
     }
+    for (std::size_t i = 0; i < many.size(); ++i) {
+        many[i].order = static_cast<int>(i); // one World stack, top to bottom
+    }
     REQUIRE(world::validateEffects(many).has_value());
 
     world::AtmosphericFrame frame;
-    world::buildAtmosphericFrame(many, contextAt(2.0), frame);
+    std::vector<world::EffectStatus> status(many.size(), world::EffectStatus::Dormant);
+    world::buildAtmosphericFrame(many, contextAt(2.0), frame, {}, status);
     CHECK(frame.cometCount == world::kMaxGpuComets);
     CHECK(frame.auroraCount == world::kMaxGpuAuroras);
     CHECK(frame.any());
+    // ADR-702: what did not fit is SAID, per instance -- the reader `AtmosphericCounts::dropped`
+    // never had. The first in stack order win the slots.
+    const auto count = [&](world::EffectStatus which) {
+        return std::count(status.begin(), status.end(), which);
+    };
+    CHECK(count(world::EffectStatus::Drawn) ==
+          static_cast<std::ptrdiff_t>(world::kMaxGpuComets + world::kMaxGpuAuroras));
+    CHECK(count(world::EffectStatus::Dropped) == 4 + 3);
+    CHECK(status[world::kMaxGpuComets - 1] == world::EffectStatus::Drawn);
+    CHECK(status[world::kMaxGpuComets] == world::EffectStatus::Dropped);
 }
 
 TEST_CASE("packing puts every authored number in the lane the shader reads",
@@ -405,7 +432,7 @@ TEST_CASE("an aurora's spectrum reaches the packed record, and silence is neutra
     for (std::size_t i = 0; i < bands.size(); ++i) {
         bands[i] = static_cast<float>(i) / static_cast<float>(bands.size() - 1);
     }
-    world::AtmosphericContext ctx = contextAt(10.0);
+    world::EffectContext ctx = contextAt(10.0);
     ctx.spectrum = bands;
     REQUIRE(world::resolveAtmosphericEffects(set, ctx, comets, auroras).auroras == 1);
     const world::AuroraGpu g = world::packAurora(auroras[0], bands);
@@ -533,6 +560,9 @@ TEST_CASE("every meaningful atmospheric parameter is declared and modulatable",
     params::ParameterSet params;
     std::vector<world::EffectInstance> effects{world::bioluminescentComet("Comet"),
                                                   world::glowmereAurora("Sky")};
+    // ADR-702: addressed by id -- the factory slugs "Comet" to `comet` -- not by display name.
+    REQUIRE(effects[0].id == "comet");
+    REQUIRE(effects[1].id == "sky");
     world::EffectParameters registered = world::registerEffectParameters(params, effects);
     REQUIRE(registered.effects.size() == 2);
 
@@ -547,35 +577,35 @@ TEST_CASE("every meaningful atmospheric parameter is declared and modulatable",
     // A sample across every group the brief names, rather than all ninety: what this is guarding is
     // that the table reaches each family, and a row that is present works in all three directions
     // by construction.
-    for (const char* path : {"atmos/Comet/enabled", "atmos/Comet/coreColor", "atmos/Comet/coreIntensity",
-                             "atmos/Comet/tailLength", "atmos/Comet/tailWidth", "atmos/Comet/sparkleDensity",
-                             "atmos/Comet/rainbowScale", "atmos/Comet/startAzimuth", "atmos/Comet/distance",
-                             "atmos/Comet/speed", "atmos/Comet/acceleration", "atmos/Comet/curvature",
-                             "atmos/Comet/groundIntensity", "atmos/Comet/fadeIn", "atmos/Comet/windowStart"}) {
+    for (const char* path : {"fx/comet/enabled", "fx/comet/coreColor", "fx/comet/coreIntensity",
+                             "fx/comet/tailLength", "fx/comet/tailWidth", "fx/comet/sparkleDensity",
+                             "fx/comet/rainbowScale", "fx/comet/startAzimuth", "fx/comet/distance",
+                             "fx/comet/speed", "fx/comet/acceleration", "fx/comet/curvature",
+                             "fx/comet/groundIntensity", "fx/comet/fadeIn", "fx/comet/windowStart"}) {
         require(path);
     }
-    for (const char* path : {"atmos/Sky/lowColor", "atmos/Sky/topColor", "atmos/Sky/intensity",
-                             "atmos/Sky/curtainHeight", "atmos/Sky/curtains", "atmos/Sky/waveAmplitude",
-                             "atmos/Sky/complexity", "atmos/Sky/audioBass", "atmos/Sky/audioHigh",
-                             "atmos/Sky/spectrumShape", "atmos/Sky/filaments", "atmos/Sky/horizonGlow"}) {
+    for (const char* path : {"fx/sky/lowColor", "fx/sky/topColor", "fx/sky/intensity",
+                             "fx/sky/curtainHeight", "fx/sky/curtains", "fx/sky/waveAmplitude",
+                             "fx/sky/complexity", "fx/sky/audioBass", "fx/sky/audioHigh",
+                             "fx/sky/spectrumShape", "fx/sky/filaments", "fx/sky/horizonGlow"}) {
         require(path);
     }
 
     SECTION("only the kind's own parameters are registered") {
         // Registering both payloads would put ninety parameters in the table for every one an artist
         // can reach, half of them doing nothing -- which is worse than their being absent.
-        CHECK(params.find("atmos/Comet/curtainHeight") == nullptr);
-        CHECK(params.find("atmos/Sky/tailLength") == nullptr);
+        CHECK(params.find("fx/comet/curtainHeight") == nullptr);
+        CHECK(params.find("fx/sky/tailLength") == nullptr);
     }
 
     SECTION("a hard range is wider than the slider, so a route has somewhere to go") {
-        params::IParameter* core = params.find("atmos/Comet/coreIntensity");
+        params::IParameter* core = params.find("fx/comet/coreIntensity");
         REQUIRE(core != nullptr);
         CHECK(core->hardMax(0) > core->softMax(0));
     }
 
     SECTION("finals reach the live set and bases reach the authored one") {
-        params::IParameter* core = params.find("atmos/Comet/coreIntensity");
+        params::IParameter* core = params.find("fx/comet/coreIntensity");
         REQUIRE(core != nullptr);
         core->setBaseComponent(0, 11.0f);
         core->setFinalComponent(0, 30.0f); // as a route would, this frame
@@ -590,8 +620,8 @@ TEST_CASE("every meaningful atmospheric parameter is declared and modulatable",
 
     SECTION("unregistering is exact") {
         world::unregisterEffectParameters(params, registered);
-        CHECK(params.find("atmos/Comet/coreIntensity") == nullptr);
-        CHECK(params.find("atmos/Sky/intensity") == nullptr);
+        CHECK(params.find("fx/comet/coreIntensity") == nullptr);
+        CHECK(params.find("fx/sky/intensity") == nullptr);
         CHECK(registered.effects.empty());
     }
 }
@@ -604,8 +634,8 @@ TEST_CASE("the default routes name real parameters and leave silence alone",
     world::registerEffectParameters(params, effects);
 
     for (const auto kind : {world::EffectKind::Aurora, world::EffectKind::Comet}) {
-        const char* name = kind == world::EffectKind::Aurora ? "Sky" : "Comet";
-        const auto routes = world::defaultEffectRoutes(name, kind);
+        const char* id = kind == world::EffectKind::Aurora ? "sky" : "comet";
+        const auto routes = world::defaultEffectRoutes(id, kind);
         CHECK_FALSE(routes.empty());
         for (const params::ModRoute& r : routes) {
             INFO(r.target);
@@ -620,55 +650,59 @@ TEST_CASE("the default routes name real parameters and leave silence alone",
 
 TEST_CASE("atmospheric effects round-trip through a scene file",
           "[world][atmospherics][json][composition]") {
-    // A sibling of `"worldEffects"`, and the properties that matter are the ones a hand-edited file
-    // depends on: a scene that never declared one is unchanged, a scene that did gets it back, and a
-    // malformed one is refused with the index in the message.
+    // ADR-702: the one `"effects"` array, and the properties that matter are the ones a hand-edited
+    // file depends on: a scene that never declared one is unchanged, a scene that did gets it back,
+    // and a malformed one is refused with the index in the message.
     const std::string base = R"({"format": "avgen-scene", "version": 1, "name": "fx", "nodes": []})";
     assets::AssetRegistry registry;
+    const auto stacked = [](world::EffectInstance e, int order) {
+        e.order = order;
+        return e.toJson();
+    };
 
     SECTION("a scene with none has none, and writes none back") {
         auto comp = scene::Composition::fromJson(nlohmann::json::parse(base), registry);
         REQUIRE(comp);
-        CHECK((*comp)->atmosphericEffects().empty());
-        CHECK_FALSE((*comp)->toJson().contains("atmosphericEffects"));
+        CHECK((*comp)->effects().empty());
+        CHECK_FALSE((*comp)->toJson().contains("effects"));
     }
 
     SECTION("a declared effect survives the trip") {
         nlohmann::json doc = nlohmann::json::parse(base);
-        doc["atmosphericEffects"] = nlohmann::json::array(
-            {world::bioluminescentComet("Comet").toJson(), world::glowmereAurora("Sky").toJson()});
+        doc["effects"] = nlohmann::json::array(
+            {stacked(world::bioluminescentComet("Comet"), 0), stacked(world::glowmereAurora("Sky"), 1)});
         auto comp = scene::Composition::fromJson(doc, registry);
         REQUIRE(comp);
-        REQUIRE((*comp)->atmosphericEffects().size() == 2);
-        CHECK((*comp)->atmosphericEffects()[0].name == "Comet");
-        CHECK((*comp)->atmosphericEffects()[1].kind == world::EffectKind::Aurora);
+        REQUIRE((*comp)->effects().size() == 2);
+        CHECK((*comp)->effects()[0].name == "Comet");
+        CHECK((*comp)->effects()[1].kind == world::EffectKind::Aurora);
         const nlohmann::json written = (*comp)->toJson();
-        REQUIRE(written.contains("atmosphericEffects"));
-        CHECK(written["atmosphericEffects"] == doc["atmosphericEffects"]);
+        REQUIRE(written.contains("effects"));
+        CHECK(written["effects"] == doc["effects"]);
     }
 
     SECTION("a malformed effect is refused, and the message says which one") {
         nlohmann::json doc = nlohmann::json::parse(base);
-        doc["atmosphericEffects"] = nlohmann::json::array(
-            {world::glowmereAurora("Sky").toJson(),
-             nlohmann::json{{"name", "bad"}, {"kind", "comet"},
-                            {"comet", {{"path", {{"distance", -5.0}}}}}}});
+        nlohmann::json bad = stacked(world::bioluminescentComet("Bad"), 1);
+        REQUIRE(bad["parameters"]["path"].contains("distance"));
+        bad["parameters"]["path"]["distance"] = -5.0;
+        doc["effects"] = nlohmann::json::array({stacked(world::glowmereAurora("Sky"), 0), bad});
         auto comp = scene::Composition::fromJson(doc, registry);
         REQUIRE_FALSE(comp);
-        CHECK(comp.error().message.find("atmosphericEffects[1]") != std::string::npos);
+        CHECK(comp.error().message.find("effects[1]") != std::string::npos);
     }
 
-    SECTION("two effects of one name are refused, because a name is half a parameter path") {
+    SECTION("two effects of one id are refused, because an id is half a parameter path") {
         nlohmann::json doc = nlohmann::json::parse(base);
-        doc["atmosphericEffects"] = nlohmann::json::array(
-            {world::bioluminescentComet("Same").toJson(), world::glowmereAurora("Same").toJson()});
+        doc["effects"] = nlohmann::json::array(
+            {stacked(world::bioluminescentComet("Same"), 0), stacked(world::glowmereAurora("Same"), 1)});
         CHECK_FALSE(scene::Composition::fromJson(doc, registry));
     }
 }
 
 TEST_CASE("the shipped Glowmere Atmospherics scene declares what the demonstration needs",
           "[world][atmospherics][glowmere]") {
-    // The counterpart of test_world_effects.cpp's Glowmere assertion. What it guards is that the
+    // The counterpart of test_wave_effects.cpp's Glowmere assertion. What it guards is that the
     // example somebody opens actually contains the thing it is an example of -- the failure mode
     // being a regenerated scene that quietly lost its effects.
     const std::filesystem::path scene =
@@ -680,23 +714,26 @@ TEST_CASE("the shipped Glowmere Atmospherics scene declares what the demonstrati
     REQUIRE(in);
     nlohmann::json doc;
     in >> doc;
-    REQUIRE(doc.contains("atmosphericEffects"));
+    REQUIRE(doc.contains("effects"));
+    CHECK_FALSE(doc.contains("atmosphericEffects"));
 
     std::size_t comets = 0;
     std::size_t auroras = 0;
     bool rainbow = false;
     bool sparkle = false;
     bool ground = false;
-    for (const nlohmann::json& j : doc.at("atmosphericEffects")) {
+    for (const nlohmann::json& j : doc.at("effects")) {
         const auto e = world::EffectInstance::fromJson(j);
-        INFO(j.value("name", "?"));
+        INFO(j.value("id", "?"));
         REQUIRE(e.has_value());
         if (e->kind == world::EffectKind::Comet) {
             ++comets;
             rainbow = rainbow || e->comet.rainbow.enabled;
             sparkle = sparkle || e->comet.sparkle.enabled;
-        } else {
+        } else if (e->kind == world::EffectKind::Aurora) {
             ++auroras;
+        } else {
+            continue; // a surface wave: its ground term is not this list's `ground`
         }
         ground = ground || e->ground.mode != world::GroundGlow::Off;
     }

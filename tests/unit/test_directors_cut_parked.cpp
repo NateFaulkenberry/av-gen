@@ -20,6 +20,7 @@
 #include "params/timeline.hpp"
 #include "scene/composition.hpp"
 #include "ui/ui_logic.hpp"
+#include "world/atmospherics.hpp"
 #include "world/wave_effect.hpp"
 
 #include <nlohmann/json.hpp>
@@ -79,14 +80,15 @@ void directedWithEffects(app::Engine& engine) {
     engine.newComposition();
     REQUIRE(engine.loadAudio(*scoreWav()).has_value());
     REQUIRE(engine.composition()->setHeroes(threeHeroes()).has_value());
+    // ADR-702: both on the World, where a Ground Pulse's source is "whoever the cut holds".
     REQUIRE(engine
-                .setWorldEffects({world::heroGroundPulse("Hero Pulse"),
-                                  world::cameraTravelBeam("Camera Travel Beam")})
+                .setEffects({world::makeEffect(world::EffectKind::GroundPulse, "Hero Pulse"),
+                             world::makeEffect(world::EffectKind::TravelBeam, "Camera Travel Beam")})
                 .has_value());
     REQUIRE(app::directEngine(engine, engine.composition()->heroes(), {}).has_value());
 }
 
-// How many world effects the engine packs for the GPU at `seconds`: the number the renderer draws.
+// How many surface waves the engine packs for the GPU at `seconds`: the number the renderer draws.
 // Driven through `update` exactly as a frame is, rather than by calling the resolver by hand, so
 // what is measured is what reaches the scene the renderer reads.
 std::uint32_t activeEffectsAt(app::Engine& engine, double seconds) {
@@ -94,7 +96,7 @@ std::uint32_t activeEffectsAt(app::Engine& engine, double seconds) {
     engine.seekSeconds(seconds);
     clock.seek(seconds);
     engine.update(engine.tick(clock));
-    return engine.scene().worldEffects.count;
+    return engine.scene().waves.count;
 }
 
 // A moment the cut is *holding* a hero -- spotlit and not travelling -- far enough into a long
@@ -360,7 +362,7 @@ TEST_CASE("a parked director's effects render exactly as they play", "[director]
     REQUIRE(live.composition()->setHeroes(threeHeroes()).has_value());
     // The pulse alone: its source is the spotlit hero and its direction is authored, so no lane
     // depends on where the (differently driven) camera happens to be.
-    REQUIRE(live.setWorldEffects({world::heroGroundPulse("Hero Pulse")}).has_value());
+    REQUIRE(live.setEffects({world::makeEffect(world::EffectKind::GroundPulse, "Hero Pulse")}).has_value());
     REQUIRE(app::directEngine(live, live.composition()->heroes(), {}).has_value());
     app::DirectorState state;
     app::noteDirected(live, state);
@@ -385,9 +387,9 @@ TEST_CASE("a parked director's effects render exactly as they play", "[director]
         INFO("t = " << t);
         REQUIRE(a == b);
         for (std::uint32_t i = 0; i < a; ++i) {
-            CHECK(std::memcmp(&live.scene().worldEffects.effects[i],
-                              &render.scene().worldEffects.effects[i],
-                              sizeof(world::WorldEffectGpu)) == 0);
+            CHECK(std::memcmp(&live.scene().waves.effects[i],
+                              &render.scene().waves.effects[i],
+                              sizeof(world::WaveGpu)) == 0);
         }
         ++sampled;
         active += a > 0 ? 1 : 0;

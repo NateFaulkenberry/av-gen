@@ -5,6 +5,9 @@
 // it". It implemented nothing: the function had no caller anywhere in `src/`, so adding an aurora
 // from the World Effects panel produced an aurora that answered nothing.
 //
+// ADR-702: every effect type is in one registry and one list now, so these cases walk all eight
+// types -- the surface waves included -- and address each instance by its id (`fx/<id>/`).
+//
 // These cases are about the wiring, not about the table -- `tests/unit/test_effect_conformance.cpp`
 // owns the question of whether the routes name real paths. Here the questions are: does adding an
 // effect attach them, does adding it twice stack them, does the right kind get the right ones, and
@@ -48,26 +51,33 @@ std::vector<std::string> targetsUnder(app::Engine& engine, const std::string& pr
     return out;
 }
 
+// The conformance probe of `kind`, under the id the case addresses it by.
+world::EffectInstance probe(world::EffectKind kind, const std::string& id) {
+    world::EffectInstance e = conf::probeEffect(kind, id);
+    e.id = id;
+    return e;
+}
+
 } // namespace
 
-TEST_CASE("adding an atmospheric effect attaches its default audio routes",
-          "[integration][atmospherics][modulation]") {
+TEST_CASE("adding an effect attaches its default audio routes",
+          "[integration][atmospherics][effects][modulation]") {
     for (const world::EffectKind kind : conf::kEffectKinds) {
-        const std::string name = std::string("Added ") + world::effectKindName(kind);
+        const std::string id = std::string("added-") + world::effectKindName(kind);
         INFO("kind: " << world::effectKindName(kind));
 
         app::Engine engine(app::EngineMode::Offline);
         engine.newComposition();
-        const std::string prefix = world::effectParameterPrefix(name);
+        const std::string prefix = world::effectParameterPrefix(id);
 
         // The control: before the effect exists, there is nothing to attach and nothing is
         // attached. Without this arm, "routes appeared" would not distinguish the wiring from a
         // function that adds routes to anything it is handed (ADR-182).
-        CHECK(engine.addDefaultAtmosphericRoutes(name) == 0);
+        CHECK(engine.addDefaultEffectRoutes(id) == 0);
         CHECK(targetsUnder(engine, prefix).empty());
 
-        REQUIRE(engine.setAtmosphericEffects({conf::probeEffect(kind, name)}).has_value());
-        const std::size_t added = engine.addDefaultAtmosphericRoutes(name);
+        REQUIRE(engine.setEffects({probe(kind, id)}).has_value());
+        const std::size_t added = engine.addDefaultEffectRoutes(id);
         CHECK(added > 0);
 
         const std::vector<std::string> targets = targetsUnder(engine, prefix);
@@ -81,33 +91,38 @@ TEST_CASE("adding an atmospheric effect attaches its default audio routes",
 
         // Idempotent. Pressing the button twice, or adding a second effect and coming back, must
         // not stack a second set on top of the first.
-        CHECK(engine.addDefaultAtmosphericRoutes(name) == 0);
+        CHECK(engine.addDefaultEffectRoutes(id) == 0);
         CHECK(targetsUnder(engine, prefix) == targets);
     }
 }
 
 TEST_CASE("each kind gets its own routes and not another kind's",
-          "[integration][atmospherics][modulation]") {
+          "[integration][atmospherics][effects][modulation]") {
     // The defect this whole change came from, stated as an assertion: a vortex used to fall into
     // the comet's `else` arm. If it ever does again, its target set is a comet's.
     std::vector<std::vector<std::string>> leafSets;
     for (const world::EffectKind kind : conf::kEffectKinds) {
-        const std::string name = "Probe";
+        const std::string id = "probe";
         app::Engine engine(app::EngineMode::Offline);
         engine.newComposition();
-        REQUIRE(engine.setAtmosphericEffects({conf::probeEffect(kind, name)}).has_value());
-        REQUIRE(engine.addDefaultAtmosphericRoutes(name) > 0);
+        REQUIRE(engine.setEffects({probe(kind, id)}).has_value());
+        REQUIRE(engine.addDefaultEffectRoutes(id) > 0);
 
-        const std::string prefix = world::effectParameterPrefix(name);
+        const std::string prefix = world::effectParameterPrefix(id);
         std::vector<std::string> leaves;
-        for (const std::string& t : targetsUnder(engine, prefix)) {
-            leaves.push_back(t.substr(prefix.size()));
+        for (const params::ModRoute& r : engine.modulator().routes()) {
+            if (r.target.starts_with(prefix)) {
+                leaves.push_back(r.source + " -> " + r.target.substr(prefix.size()));
+            }
         }
+        std::sort(leaves.begin(), leaves.end());
         INFO("kind: " << world::effectKindName(kind));
         CHECK_FALSE(leaves.empty());
         leafSets.push_back(std::move(leaves));
     }
-    // Pairwise distinct: no two kinds are handed the same set of leaves.
+    // Pairwise distinct: no two kinds are handed the same set of routes. Compared as
+    // `source -> leaf`, because the two surface waves share ONE row table (`wave_rows.hpp`) and so
+    // legitimately target the same leaf (`intensity`) -- from different signals.
     for (std::size_t i = 0; i < leafSets.size(); ++i) {
         for (std::size_t j = i + 1; j < leafSets.size(); ++j) {
             INFO(world::effectKindName(conf::kEffectKinds[i])
@@ -118,20 +133,22 @@ TEST_CASE("each kind gets its own routes and not another kind's",
 }
 
 TEST_CASE("a default route survives the project the render loads",
-          "[integration][atmospherics][modulation][project]") {
+          "[integration][atmospherics][effects][modulation][project]") {
     // ADR-350's prescribed round trip, and ADR-264's boundary: a route the session holds and the
     // document does not is absent from every frame anybody exports. A route attached by a button
     // is worth nothing if the save drops it.
     const fs::path dir = scratch("roundtrip");
     std::vector<std::string> before;
-    const std::string name = "Sky";
-    const std::string prefix = world::effectParameterPrefix(name);
+    const std::string id = "sky";
+    const std::string prefix = world::effectParameterPrefix(id);
 
     {
         app::Engine session(app::EngineMode::Offline);
         session.newComposition();
-        REQUIRE(session.setAtmosphericEffects({world::glowmereAurora(name)}).has_value());
-        REQUIRE(session.addDefaultAtmosphericRoutes(name) > 0);
+        world::EffectInstance aurora = world::glowmereAurora("Sky");
+        aurora.id = id;
+        REQUIRE(session.setEffects({aurora}).has_value());
+        REQUIRE(session.addDefaultEffectRoutes(id) > 0);
         before = targetsUnder(session, prefix);
         REQUIRE_FALSE(before.empty());
         REQUIRE(session.saveComposition(dir / "scene.json").has_value());
