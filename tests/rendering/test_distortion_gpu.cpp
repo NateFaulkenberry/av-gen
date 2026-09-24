@@ -277,9 +277,11 @@ TEST_CASE("DF: a cube in front of the warp is not bent, and never leaks into the
     initialise(renderer);
 
     scene::Scene s = wallScene();
-    // A green cube 8 m away whose edge crosses the field's centre line, well in front of the lens
-    // plane at 15 m. Pixels beside it pull toward the field's centre -- that is, onto the cube.
-    addBody(s, "cube", scene::makeCube(1.2f), glm::vec3(1.2f, 0.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    // A green cube 8 m away, well in front of the lens plane at 15 m, sitting across the field's
+    // strongest band. Both rules get a case: background pixels to its right pull toward the field's
+    // centre -- onto the cube (the leak mask) -- and the cube's own left edge would pull toward the
+    // centre onto the background (the pixel rule: nothing nearer than the lens is bent).
+    addBody(s, "cube", scene::makeCube(0.8f), glm::vec3(1.8f, 0.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     const gpu::Image8 plain = render(renderer, s);
     s.distortion = frameOf({warpInstance("w", glm::vec3(0.0f, 0.0f, -15.0f), 6.0f, 1.4f)});
     const gpu::Image8 warped = render(renderer, s);
@@ -317,15 +319,22 @@ TEST_CASE("DF: the owner of an entity warp stays crisp while what is behind it b
     rendering::SceneRenderer renderer(*ctx, shaders);
     initialise(renderer);
 
+    // A red SAUCER -- wide and flat -- seen from above, the shape the rule exists for: the far half of
+    // its top is BEHIND its centre, so a lens plane at the centre alone would bend the owner's own
+    // back. The exclusion radius (the bounds' half-diagonal) puts the lens plane behind all of it.
     scene::Scene s = wallScene();
+    s.camera.position = glm::vec3(0.0f, 7.0f, 0.0f);
     const glm::vec3 centre(0.0f, 0.0f, -15.0f);
-    addBody(s, "owner", scene::makeIcosphere(2.0f, 3), centre, glm::vec3(1.0f, 0.0f, 0.0f));
+    s.camera.target = centre;
+    const glm::vec3 half(3.5f, 0.35f, 3.5f);
+    addBody(s, "owner", scene::makeCube(1.0f), centre, glm::vec3(1.0f, 0.0f, 0.0f));
+    s.entities.back().transform.scale = half;
     const gpu::Image8 plain = render(renderer, s);
 
-    // Owned by the red sphere: fitted to its bounds, its exclusion radius the bounds' half-diagonal.
+    // Owned by the red saucer: fitted to its bounds, its exclusion radius the bounds' half-diagonal.
     OwnerScene owner;
     owner.centre = centre;
-    owner.half = glm::vec3(2.0f);
+    owner.half = half;
     world::EffectInstance warp = warpInstance("owned", glm::vec3(0.0f), 1.0f, 1.4f);
     warp.owner = world::EffectOwner::entity("owner");
     warp.values.setFloat("spaceWarp/boundsScale", 2.4f);
@@ -384,10 +393,14 @@ TEST_CASE("DF: with no producer the frame is byte-identical, before and after a 
     const gpu::Image8 after = render(used, s);
     CHECK_FALSE(used.distortionStats().encoded);
 
+    // Compared as booleans: a failing `==` over two images prints every byte (ADR-362's killed run).
     REQUIRE(reference.rgba.size() == before.rgba.size());
-    CHECK(before.rgba == reference.rgba);
-    CHECK(after.rgba == reference.rgba);
-    CHECK(warped.rgba != reference.rgba); // the control: the warped frame really was different
+    const bool beforeIdentical = before.rgba == reference.rgba;
+    const bool afterIdentical = after.rgba == reference.rgba;
+    const bool warpedDiffers = warped.rgba != reference.rgba;
+    CHECK(beforeIdentical);
+    CHECK(afterIdentical);
+    CHECK(warpedDiffers); // the control: the warped frame really was different
 }
 
 TEST_CASE("DF: two overlapping warps superpose rather than one replacing the other",
@@ -471,7 +484,8 @@ TEST_CASE("DF: a full budget of 64 proxies renders in one pass", "[gpu][effects]
     CHECK(renderer.distortionStats().proxies == 64);
     CHECK(renderer.distortionStats().dropped == 1);
     CHECK(ctx->errorCount() == 0);
-    CHECK(many.rgba != none.rgba);
+    const bool manyDiffers = many.rgba != none.rgba;
+    CHECK(manyDiffers);
 }
 
 TEST_CASE("DF: the edge glow reaches HDR and the emission target, so bloom sees it",
