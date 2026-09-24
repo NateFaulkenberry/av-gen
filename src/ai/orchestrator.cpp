@@ -218,15 +218,49 @@ void Orchestrator::run(AgentTask& task) {
             return;
         }
         // Captured before the sink opens, so the diff is measured against the same instant the
-        // rollback point is.
-        (void)queue_->run([&] { before = SnapshotStore::captureDocument(*engine_); },
-                          task.cancel());
-        transaction = std::make_unique<Transaction>(*sink_, task.prompt());
+        // rollback point is -- and both on the thread that pumps. The sink reads the whole engine
+        // (a snapshot; since ADR-752 every domain `EditCapture` measures), and a sink opened from
+        // this worker would read it while the frame loop writes it.
+        (void)queue_->run(
+            [&] {
+                before = SnapshotStore::captureDocument(*engine_);
+                transaction = std::make_unique<Transaction>(*sink_, task.prompt());
+            },
+            task.cancel());
+        if (!transaction) {
+            return; // cancelled or the queue shut down before it opened; no tool will run either
+        }
         Activity a;
         a.kind = ActivityKind::TransactionOpened;
         a.title = "Rollback point taken";
         a.detail = std::string(sink_->kind());
         task.append(std::move(a));
+    };
+
+    // Commit or roll back on the pumping thread, for the reason the open is there. A FRESH cancel
+    // token, deliberately: a cancelled task is exactly the one whose rollback must still run, and
+    // the task's own token would make the queue refuse it. If the queue is already shut down the
+    // application is tearing the engine down; touching it from here would be the race this exists
+    // to prevent, so the transaction is abandoned instead and says so.
+    const auto closeOnMainThread = [&](bool commit) {
+        if (!transaction || !transaction->open()) {
+            return;
+        }
+        const bool ran = queue_->run(
+            [&] {
+                if (commit) {
+                    transaction->commit();
+                    outcome.editState = sink_->committedEditState();
+                } else {
+                    transaction->rollback();
+                }
+            },
+            CancelToken{});
+        if (!ran) {
+            log::warn("ai: {} could not {} its transaction: the application stopped servicing it",
+                      task.id(), commit ? "commit" : "roll back");
+            transaction->abandon();
+        }
     };
 
     std::string finalText;
@@ -255,7 +289,7 @@ void Orchestrator::run(AgentTask& task) {
         if (!response) {
             task.setState(TaskState::RollingBack);
             if (transaction) {
-                transaction->rollback();
+                closeOnMainThread(false);
                 outcome.rolledBack = true;
                 Activity a;
                 a.kind = ActivityKind::TransactionRolledBack;
@@ -360,7 +394,7 @@ void Orchestrator::run(AgentTask& task) {
     if (task.cancel().cancelled()) {
         task.setState(TaskState::RollingBack);
         if (transaction) {
-            transaction->rollback();
+            closeOnMainThread(false);
             outcome.rolledBack = true;
             Activity a;
             a.kind = ActivityKind::TransactionRolledBack;
@@ -387,7 +421,7 @@ void Orchestrator::run(AgentTask& task) {
         if (auto* snapshotSink = dynamic_cast<SnapshotTransactionSink*>(sink_)) {
             outcome.snapshotId = snapshotSink->openSnapshotId();
         }
-        transaction->commit();
+        closeOnMainThread(true);
         Activity a;
         a.kind = ActivityKind::TransactionCommitted;
         a.title = "Committed";

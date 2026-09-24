@@ -1355,6 +1355,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->preview.panX = 0.0f;
         panel_->preview.panY = 0.0f;
         panel_->ai.plane = ai_.get();
+        panel_->ai.edits = &edits_;
         panel_->settings.plane = ai_.get();
         panel_->settings.settings = &settings_;
         panel_->settings.onAppearanceChanged = [this](app::AppearanceTheme theme) {

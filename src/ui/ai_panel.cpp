@@ -1,4 +1,6 @@
 #include "ui/ai_panel.hpp"
+#include "ui/ai_panel_logic.hpp"
+#include "app/edit_system.hpp"
 
 #include "ui/style.hpp"
 #include "ai/control_plane.hpp"
@@ -173,18 +175,24 @@ void AiPanel::drawConversation(app::Engine& engine) {
                     ImGui::TreePop();
                 }
             }
-            if (!outcome.snapshotId.empty() &&
-                plane->snapshots().find(outcome.snapshotId) != nullptr) {
-                ImGui::SameLine();
-                // §26: the user undoes the whole task as one logical action, however many
-                // underlying modifications it made. Safe to press from here: the panel draws on
-                // the frame thread, which is the thread the tools themselves run on.
-                if (ImGui::SmallButton("Undo this task")) {
-                    if (auto r = plane->snapshots().restore(engine, outcome.snapshotId); !r) {
-                        status_ = r.error().message;
-                    } else {
-                        status_ = "restored the project to before \"" + task->prompt() + "\"";
+            // §26: the user undoes the whole task as one logical action, however many underlying
+            // modifications it made -- and through the editor's own history (ADR-752), so it is the
+            // same undo Cmd+Z performs rather than a second one. Offered only while the task's
+            // command is the one an undo would take; after later edits it is reached in the
+            // history list like any other command.
+            if (edits != nullptr) {
+                const TaskUndo undoable = taskUndoState(outcome.editState, edits->history().stateId(),
+                                                        edits->history().canUndo());
+                if (undoable == TaskUndo::Available) {
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Undo this task")) {
+                        if (edits->execute(app::EditAction::Undo, engine)) {
+                            status_ = "undid \"" + task->prompt() + "\"";
+                        }
                     }
+                } else if (undoable == TaskUndo::Superseded) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(later edits: undo it from the history)");
                 }
             }
             if (outcome.usage.inputTokens > 0 || outcome.usage.outputTokens > 0) {

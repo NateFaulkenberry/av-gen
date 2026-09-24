@@ -24,8 +24,11 @@ std::size_t EditCommand::touched() const {
                                         ? lights->after.size() - lights->before.size()
                                         : lights->before.size() - lights->after.size(),
                                     1);
+    // A timeline-and-routes record and a camera-collection record are one thing each to the person
+    // who made the edit ("Delete camera", "Add key"), whatever the size of what they rewrote.
     return params.size() + parents.size() + heroes.size() + added.size() + removed.size() +
-           (timeline != nullptr ? 1 : 0) + lightsTouched;
+           (timeline != nullptr ? 1 : 0) + lightsTouched + (automation != nullptr ? 1 : 0) +
+           (cameras != nullptr ? 1 : 0);
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -101,6 +104,74 @@ bool setBaseComponents(app::Engine& engine, const std::string& path, const std::
     return true;
 }
 
+scene::CameraDirection capturedCameraDirection(app::Engine& engine) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        scene::CameraDirection none;
+        none.ensureMainCamera();
+        return none;
+    }
+    scene::CameraDirection out = composition->cameraDirection();
+    const auto read3 = [&](const std::string& path, glm::vec3& into) {
+        if (const std::vector<float> v = baseComponents(engine, path); v.size() == 3) {
+            into = glm::vec3(v[0], v[1], v[2]);
+        }
+    };
+    const auto read1 = [&](const std::string& path, float& into) {
+        if (const std::vector<float> v = baseComponents(engine, path); v.size() == 1) {
+            into = v[0];
+        }
+    };
+    for (scene::CameraRig& rig : out.cameras) {
+        if (rig.id == scene::kMainCamera || rig.slug.empty()) {
+            continue; // the main camera's channels are `camera/*`, owned by the composition's settings
+        }
+        // The same channel list `Composition::registerCameraChannels` registers, so a field added
+        // there and not here is a field a restored camera would lose -- and the round-trip test in
+        // test_director_undo.cpp compares every one of them.
+        const std::string p = rig.channelPrefix();
+        read3(p + "position", rig.position);
+        read3(p + "target", rig.target);
+        read1(p + "fov", rig.fovDegrees);
+        read1(p + "focalLength", rig.focalLength);
+        read1(p + "splineT", rig.splineT);
+        read1(p + "lookAhead", rig.lookAhead);
+        read3(p + "splineOffset", rig.splineOffset);
+    }
+    return out;
+}
+
+EditCommand editCameraDirection(app::Engine& engine, std::string label, scene::CameraDirection next,
+                                std::string* problem) {
+    EditCommand command(std::move(label));
+    auto cameras = std::make_unique<CameraDirectionChange>();
+    auto automation = std::make_unique<AutomationChange>();
+    cameras->before = capturedCameraDirection(engine);
+    // Unbound at once: the copy shares the live tracks' `IParameter*`, and deleting a camera frees
+    // exactly those parameters -- a bound copy would hold dangling pointers from the next line on.
+    automation->before = engine.timeline();
+    automation->before.unbind();
+    if (auto r = engine.setCameraDirection(std::move(next)); !r) {
+        if (problem != nullptr) {
+            *problem = r.error().message;
+        }
+        return EditCommand{};
+    }
+    cameras->after = capturedCameraDirection(engine);
+    automation->after = engine.timeline();
+    automation->after.unbind();
+    if (cameras->before == cameras->after) {
+        return EditCommand{};
+    }
+    command.cameras = std::move(cameras);
+    // Only when the install actually took tracks with it (a deleted camera's automation): an edit
+    // that left the timeline alone should not carry a copy of it.
+    if (automation->before.toJson() != automation->after.toJson()) {
+        command.automation = std::move(automation);
+    }
+    return command;
+}
+
 bool heroNamesNode(const world::HeroPoint& hero, const std::string& node) {
     return hero.name == node;
 }
@@ -116,6 +187,32 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         core::interactions().beginWithoutInput(core::Interaction::WorldEdit);
         core::interactions().markCommand();
         core::applyInjectedDelayForOpenInteraction();
+    }
+
+    // The author's automation first (ADR-752), because the two records after it rebind onto it:
+    // `setCameraDirection` re-registers camera channels and rebinds, and a camera that comes back
+    // must find the tracks aimed at it already in the timeline. The copies carry whatever
+    // `IParameter*` was bound when they were captured, so they are unbound on arrival; the rebind at
+    // the end of this function (or the one inside `setCameraDirection`) binds them to live ones.
+    if (command.automation != nullptr) {
+        const AutomationChange& change = *command.automation;
+        engine.timeline() = forward ? change.after : change.before;
+        engine.timeline().unbind();
+        if (change.routesTouched) {
+            engine.modulator().routes() = forward ? change.routesAfter : change.routesBefore;
+        }
+        out.automationInstalled = 1;
+    }
+    // The camera collection (ADR-752). Before the sequence, whose bake may name a camera-track shot's
+    // time span but never a camera, and before the composition check below, because
+    // `setCameraDirection` needs a composition and says so in its own words.
+    if (command.cameras != nullptr) {
+        const CameraDirectionChange& change = *command.cameras;
+        if (auto r = engine.setCameraDirection(forward ? change.after : change.before); !r) {
+            out.problems.push_back(r.error().message);
+        } else {
+            out.cameraDirectionsInstalled = 1;
+        }
     }
 
     // The sequencer's half, first and on its own terms. It is settled before the composition is
@@ -161,10 +258,15 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
     if (composition == nullptr) {
         // Not a failure when the command was the sequencer's: there was nothing here for a
         // composition to do.
-        if ((command.timeline == nullptr && command.lights == nullptr) || !command.params.empty() ||
+        if ((command.timeline == nullptr && command.lights == nullptr && command.automation == nullptr &&
+             command.cameras == nullptr) ||
+            !command.params.empty() ||
             !command.added.empty() || !command.removed.empty() || !command.parents.empty() ||
             !command.heroes.empty()) {
             out.problems.push_back("there is no composition to edit");
+        }
+        if (command.automation != nullptr) {
+            engine.rebind(); // the timeline was replaced above and nothing else will bind it
         }
         if (ownsRecord) {
             // Nothing was edited, so there is no latency to book. Abandoned rather than filed: a

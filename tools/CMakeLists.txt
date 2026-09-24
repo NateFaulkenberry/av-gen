@@ -47,6 +47,7 @@ if(TARGET avgen_platform)
         "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp")
@@ -121,6 +122,7 @@ if(APPLE)
         "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
         # `edit_system.cpp` and `ai_edit_sink.cpp` reach into the editor's undo stack, which lives

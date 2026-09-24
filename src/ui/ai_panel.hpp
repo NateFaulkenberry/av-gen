@@ -21,6 +21,7 @@
 #include <string>
 
 namespace avgen::app {
+class EditSystem;
 class Engine;
 } // namespace avgen::app
 
@@ -37,6 +38,9 @@ public:
     avgen::ai::ControlPlane* plane = nullptr;
     // Opens the Settings panel on the AI section. The panel does not reach into the layout itself.
     std::function<void()> onOpenSettings;
+    // The editor's history, where every task's edit lands as one command (ADR-752). Null means
+    // tasks leave nothing undoable here, and the panel offers no undo.
+    app::EditSystem* edits = nullptr;
 
     void draw(app::Engine& engine);
 

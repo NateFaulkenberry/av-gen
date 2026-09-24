@@ -120,6 +120,9 @@ struct TaskOutcome {
     int toolCalls = 0;
     int iterations = 0;
     std::string snapshotId; // the rollback point, empty when nothing was mutated
+    // The editor-history state this task's commit produced, 0 when it pushed none (ADR-752). The
+    // host undoes the task through its history with it; the AI layer never interprets it.
+    std::uint64_t editState = 0;
     std::vector<std::string> changedTargets;
 };
 

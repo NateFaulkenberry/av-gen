@@ -31,6 +31,9 @@
 
 #include "audio/arrangement.hpp"
 #include "core/error.hpp"
+#include "params/modulation.hpp"
+#include "params/timeline.hpp"
+#include "scene/camera_rig.hpp"
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
 
@@ -122,6 +125,42 @@ struct TimelineChange {
     bool clipsTouched = false;
 };
 
+// The author's automation, before and after: the timeline's tracks, keys and cues, and the
+// modulation routes (ADR-752).
+//
+// Recorded **whole**, on `TimelineChange`'s argument. A `params::Timeline` is a few hundred keys of
+// plain values plus path strings, and a route list is a handful of structs, so one before-and-after
+// reverses every edit either can take -- a key added, dragged or deleted, a track removed, a cue
+// moved, a route created -- without an inverse per gesture. The runtime half of each (a track's or
+// a route's bound `IParameter*`) is not state: it is re-derived by the rebind `applyEdit` ends with,
+// and the copies are unbound the moment they are installed so nothing can reach a stale pointer in
+// between.
+//
+// It also carries a camera removal's other half. `Engine::setCameraDirection` erases every track
+// aimed at a departing camera's `cameras/<slug>/`, so undoing "delete this camera" must put those
+// tracks back as well as the camera -- which is why a command that removes a camera carries this
+// record beside its `CameraDirectionChange`.
+struct AutomationChange {
+    params::Timeline before;
+    params::Timeline after;
+    bool routesTouched = false;
+    std::vector<params::ModRoute> routesBefore;
+    std::vector<params::ModRoute> routesAfter;
+};
+
+// The composition's camera collection and camera track, before and after (ADR-245, ADR-752).
+//
+// Recorded **whole**, on `LightChange`'s argument: a handful of rigs and shots of plain values, and
+// exactly the shape `Engine::setCameraDirection` takes, so either direction is one call. Both sides
+// are `capturedCameraDirection` -- the collection with each rig's current parameter BASES written
+// into it -- because a camera that comes back registers its `cameras/<slug>/*` channels from the
+// struct, and a struct that still held the position it was created at would put a moved camera back
+// where it started.
+struct CameraDirectionChange {
+    scene::CameraDirection before;
+    scene::CameraDirection after;
+};
+
 // One object's authored-light list, before and after.
 //
 // Recorded **whole**, on `TimelineChange`'s argument rather than `NodeRecord`'s. The note at the
@@ -157,6 +196,10 @@ struct EditCommand {
     // The sequencer's side of the same history, or null for the world edits that are most of it.
     // A pointer so that a command which moves eleven rocks does not carry a sequence-shaped hole.
     std::unique_ptr<TimelineChange> timeline;
+    // The author's timeline and routes either side, or null (ADR-752).
+    std::unique_ptr<AutomationChange> automation;
+    // The camera collection and camera track either side, or null (ADR-752).
+    std::unique_ptr<CameraDirectionChange> cameras;
     // The authored lights either side, or null for the edits that are most of them. A pointer for
     // the same reason `timeline` is one: a command that moves eleven rocks should not carry a
     // light-list-shaped hole.
@@ -175,7 +218,8 @@ struct EditCommand {
 
     [[nodiscard]] bool empty() const {
         return params.empty() && parents.empty() && heroes.empty() && added.empty() &&
-               removed.empty() && timeline == nullptr && lights == nullptr;
+               removed.empty() && timeline == nullptr && lights == nullptr &&
+               automation == nullptr && cameras == nullptr;
     }
     // How many things the user would say this touched, for the label and for tests.
     [[nodiscard]] std::size_t touched() const;
@@ -196,6 +240,10 @@ struct EditApply {
     // 1 when this command installed an authored-light list, 0 otherwise. Counted rather than
     // flagged so the field reads like the others beside it.
     std::size_t lightListsInstalled = 0;
+    // 1 when this command installed a timeline-and-routes record, 0 otherwise (ADR-752).
+    std::size_t automationInstalled = 0;
+    // 1 when this command installed a camera collection, 0 otherwise (ADR-752).
+    std::size_t cameraDirectionsInstalled = 0;
     std::vector<std::string> problems;
     [[nodiscard]] bool ok() const { return problems.empty(); }
 };
@@ -304,5 +352,18 @@ private:
 // Writes one back. False when the parameter does not exist or the arity disagrees -- which is the
 // signal that a command was recorded against a scene that has since changed underneath it.
 bool setBaseComponents(app::Engine& engine, const std::string& path, const std::vector<float>& values);
+
+// The composition's camera collection with each authored rig's current parameter BASES written into
+// its struct (position, target, fov, focal length, spline controls), so that a rig re-registered
+// from it comes back where it was rather than where it was created (ADR-752). Empty -- a default
+// collection holding only the main camera -- when the session has no composition.
+[[nodiscard]] scene::CameraDirection capturedCameraDirection(app::Engine& engine);
+
+// A camera-collection edit as one reversible command: captures the collection and the author
+// timeline, installs `next` through `Engine::setCameraDirection`, captures both again, and returns
+// the command -- already applied, ready for `EditHistory::push`. An installation the engine refuses
+// changes nothing and returns an empty command with the refusal in `problem`.
+[[nodiscard]] EditCommand editCameraDirection(app::Engine& engine, std::string label,
+                                              scene::CameraDirection next, std::string* problem = nullptr);
 
 } // namespace avgen::ui
