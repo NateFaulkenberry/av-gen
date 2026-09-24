@@ -74,7 +74,8 @@ def load_exceptions(path: str) -> dict:
         kind, name, reason = (part.strip() for part in line.split("|", 2))
         if kind not in out:
             raise SystemExit(f"{path}: unknown kind '{kind}' in: {raw}")
-        if "," in name or '"' in name:
+        # Only an exclusion becomes a Catch2 spec; a needs-assets name is matched against the XML.
+        if kind == "exclude" and ("," in name or '"' in name):
             raise SystemExit(f"{path}: '{name}' has a comma or quote; Catch2 would split it (testing.md 14)")
         out[kind][name] = reason
     return out
