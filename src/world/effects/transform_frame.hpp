@@ -131,6 +131,23 @@ void buildTransformFrame(std::span<const EffectInstance> effects, const EffectCo
                          TransformFrame& out, std::span<const std::uint32_t> order,
                          std::span<EffectStatus> status, std::span<std::string> reasons);
 
+// The composed offset `node` has at `ctx.seconds`, from the same producers, gates and stacking rule
+// as `buildTransformFrame`, without touching any status: for re-applying the offset at a PAST
+// instant (a Trail's body, a velocity over the drawn path). The instant is `ctx.seconds`; the
+// parameters are this frame's finals, so a row a route is moving is exact only for the instants in
+// which it did not move -- an unrouted Orbit or Float is exact at every sample. False when no live
+// instance offsets `node` then (`out` is the identity offset).
+[[nodiscard]] bool transformOffsetAt(std::span<const EffectInstance> effects, std::span<const std::uint32_t> order,
+                                     const EffectContext& ctx, std::string_view node, TransformOffset& out);
+// Does any Transform-bucket instance name `node` as its owner at all (live or not)? The cheap test
+// that lets a reader keep its pre-XFORM path, bit for bit, for every owner nothing offsets.
+[[nodiscard]] bool hasTransformProducer(std::span<const EffectInstance> effects, std::string_view node);
+// The drawn origin of a root node whose simulated transform is (position, rotation, scale) under
+// `offset`: T(translation) * M * L applied to the local origin. A nested node's parent-space
+// translation is treated as world-space here (the history holds world transforms, not the parent's).
+[[nodiscard]] glm::vec3 drawnOrigin(const TransformOffset& offset, const glm::vec3& position,
+                                    const glm::quat& rotation, const glm::vec3& scale);
+
 // ---- shared motion maths (pure, deterministic) -----------------------------------------------------
 
 // FNV-1a of an instance id folded to [0, 1): a per-instance phase seed that is the same on every run

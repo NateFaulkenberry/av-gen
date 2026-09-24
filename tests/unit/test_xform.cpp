@@ -27,6 +27,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -402,4 +403,34 @@ TEST_CASE("XFORM: Bounce squashes on contact and stretches in flight, preserving
     }
     CHECK(minY < 0.85f); // squashed at some contact
     CHECK(maxY > 1.05f); // stretched in some flight
+}
+
+// A hovering craft on an Orbit carries a Trail. HIST holds the craft's simulated spot (it does not
+// move); the Trail must be drawn along the ORBIT, which the craft is drawn on, not collapse to the
+// simulated spot -- that was a visible streak from the drawn saucer back to its unmoving centre.
+TEST_CASE("XFORM: a Trail on an orbiting owner follows the drawn orbit, not the simulated spot",
+          "[xform][effects][trail]") {
+    app::Engine engine(app::EngineMode::Offline);
+    installCraftAndLamp(engine);
+    install(engine, {motion(world::EffectKind::Orbit, "craft", "Guardian Orb"),
+                     motion(world::EffectKind::Trail, "craft", "UFO Wake")});
+    for (long long f = 0; f <= 180; ++f) {
+        frameAt(engine, f);
+    }
+    for (const world::EffectInstance& e : engine.effects()) {
+        INFO(e.id);
+        REQUIRE(engine.effectStatus(e.id) == world::EffectStatus::Drawn);
+    }
+    const glm::vec3 centre = simulated(engine, "craft").position;
+    const float radius = glm::length(translation(drawn(engine, "craft")) - centre);
+    REQUIRE(radius > 0.5f); // the control: the orbit is live
+
+    const auto& ribbons = engine.scene().ribbons;
+    REQUIRE_FALSE(ribbons.vertices.empty());
+    float nearest = 1e9f;
+    for (const world::RibbonVertex& v : ribbons.vertices) {
+        nearest = std::min(nearest, glm::length(glm::vec3(v.positionSide) - centre));
+    }
+    INFO("orbit radius " << radius << ", nearest trail point to the simulated centre " << nearest);
+    CHECK(nearest > 0.5f * radius);
 }

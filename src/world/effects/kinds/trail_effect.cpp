@@ -299,6 +299,13 @@ EffectStatus emit(const E& e, const EffectContext& ctx, const HistoryBank& histo
         return r;
     };
 
+    // The body follows where the owner was DRAWN, not where it was simulated: HIST is the
+    // pre-offset path (exact under seek), so an Orbit or Float on the owner is re-applied at each
+    // sample instant. Without it the head (drawn) and the body (simulated) are joined by a streak.
+    const auto drawn = [&](double at, const glm::vec3& simulated) {
+        glm::vec3 p;
+        return ctx.scene != nullptr && ctx.scene->nodeDrawnPosition(e.owner.name, at, p) ? p : simulated;
+    };
     std::array<RibbonPoint, kMaxControlPoints + 2> points{};
     std::size_t n = 0;
     points[n++] = point(head, now);
@@ -310,12 +317,12 @@ EffectStatus emit(const E& e, const EffectContext& ctx, const HistoryBank& histo
     for (; t > tail + 1e-9 && n + 1 < points.size(); t -= step) {
         HistorySample s;
         if (history.sampleAt(ring, t, s)) {
-            points[n++] = point(s.position, t);
+            points[n++] = point(drawn(t, s.position), t);
         }
     }
     HistorySample cut;
     if (history.sampleAt(ring, tail, cut)) {
-        points[n++] = point(cut.position, tail);
+        points[n++] = point(drawn(tail, cut.position), tail);
     }
 
     RibbonStyle style;
