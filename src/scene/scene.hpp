@@ -21,6 +21,7 @@
 #include "world/effects/entity_fx.hpp"
 #include "world/wave_effect.hpp"
 #include "world/effects/ribbon_frame.hpp"
+#include "world/effects/star_field.hpp"
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
@@ -118,6 +119,9 @@ struct Scene {
     //   `ribbons`      RenderStage::Particles  -- ADR-703's camera-facing strips (a Trail), drawn in
     //                  pass 1's blended section; empty means no draw at all
     world::RibbonFrame ribbons;
+    //   `stars`        RenderStage::Sky        -- Wave 2's star field (Stars), read by the background
+    //                  pass in place of its fixed stars; `on == false` is the fixed field.
+    world::StarField stars;
     // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
     // scene with no LOD carries an empty vector, which is every scene that does not ask for it.
     // LOD0 is never in here; see MeshLodChain.

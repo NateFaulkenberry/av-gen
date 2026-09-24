@@ -443,6 +443,7 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Fresnel, {EffectTarget::Entity}},
         {EffectKind::RimLight, {EffectTarget::Entity}},
         {EffectKind::ColorCycling, {EffectTarget::Entity}},
+        {EffectKind::Stars, {EffectTarget::World}}, // Wave 2: the sky has one star field
         {EffectKind::MotionSmear, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
@@ -494,6 +495,7 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         case world::EffectBucket::Emitter: return world::RenderStage::Particles;
         // Wave 2: XFORM offsets are composed by the flatten, before any pass draws.
         case world::EffectBucket::Transform: return world::RenderStage::Geometry;
+        case world::EffectBucket::Starfield: return world::RenderStage::Sky;
         }
         return world::RenderStage::PostProcess; // unreachable for a real bucket, and wrong for all
     };

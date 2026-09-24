@@ -415,6 +415,9 @@ enum class EffectBucket : std::uint8_t {
     // the flatten and composed into the owner node's transform by the Composition: Orbit, Spiral,
     // Float, Shake, Bounce.
     Transform,
+    // The sky's star field (world/effects/star_field.hpp): one per frame, drawn by the background
+    // pass in place of its fixed stars. Stars.
+    Starfield,
 };
 
 // The three buckets `resolveAtmosphericEffects` owns. Everything else has a builder of its own.
@@ -626,7 +629,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 29> kEffectKinds{
+inline constexpr std::array<EffectKind, 30> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -656,6 +659,7 @@ inline constexpr std::array<EffectKind, 29> kEffectKinds{
     EffectKind::RimLight,      // Wave 2 (FXL surface)
     EffectKind::ColorCycling,  // Wave 2 (FXL surface)
     EffectKind::MotionSmear,   // Wave 2 (FXL surface)
+    EffectKind::Stars,         // Wave 2 (the sky's star field)
 };
 
 // The kind's position in `kEffectKinds`, or `size()` for an enumerator that is not in it --

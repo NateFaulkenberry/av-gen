@@ -69,6 +69,8 @@ enum class EffectKind : std::uint8_t {
     RimLight = 28,         // a one-sided kicker rim, fixed in view space
     ColorCycling = 29,     // the owner's hue turns over time
     MotionSmear = 31,      // the owner's trailing side stretches back along its path
+    // Wave 2 (the lead's): the sky's star field, owned by an effect instead of skybox constants.
+    Stars = 32, // a controllable star field: density, magnitudes, colour, twinkle, a galactic band
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

@@ -2788,6 +2788,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // `upper` would make the distance through the air shorter than the ray.
     frame.fogShape = glm::vec4(std::clamp(scene.environment.fogUpperDensity, 0.0f, 1.0f),
                                std::clamp(scene.environment.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
+    // Effect Library Wave 2: the Stars effect's field. All zero with no live instance, which the
+    // background pass reads as "draw your own fixed field", so the frame is unchanged.
+    if (const world::StarField& stars = scene.stars; stars.on) {
+        frame.starsA = glm::vec4(1.0f, stars.density, stars.brightness * stars.envelope, stars.magnitudeSlope);
+        frame.starsB = glm::vec4(stars.colorSpread, stars.twinkle, stars.twinkleRate, stars.horizonFade);
+        frame.starsC = glm::vec4(stars.band, stars.bandTilt, stars.daylight, stars.seconds);
+    } else {
+        frame.starsA = glm::vec4(0.0f);
+        frame.starsB = glm::vec4(0.0f);
+        frame.starsC = glm::vec4(0.0f);
+    }
     // ADR-058: the styled hemisphere, authorable because a scene that is lit mostly by its ambient
     // needs to say how dark the side facing away from the sky is allowed to get.
     frame.styledSky = glm::vec4(scene.environment.styledSkyAmbient,

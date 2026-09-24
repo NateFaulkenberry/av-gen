@@ -50,7 +50,7 @@ void step(app::Engine& engine, double seconds) {
 
 } // namespace
 
-TEST_CASE("generate the Wave 1 UFO stack demo", "[.generate][effects][demo]") {
+TEST_CASE("generate the Wave 1 UFO stack demo", "[.generate]") {
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(sourceProject()).has_value());
 
@@ -163,7 +163,7 @@ bool sameBytes(const std::vector<T>& a, const std::vector<T>& b) {
 // under investigation outside this branch (probably audio-driven world events, which the replay
 // runs without a signal bus). Un-hide this when that lands. The Wave 1 chain's play = scrub proof is
 // the next case, on an owner whose motion the Engine's seek reproduces exactly.
-TEST_CASE("the UFO stack at 150 s is the same played and scrubbed", "[.known-defect][effects][demo][seek][adr700]") {
+TEST_CASE("the UFO stack at 150 s is the same played and scrubbed", "[.known-defect][adr700]") {
     REQUIRE(fs::exists(demoProject()));
     constexpr double kLate = 150.0;
     const auto withoutFlies = [](app::Engine& engine) {
