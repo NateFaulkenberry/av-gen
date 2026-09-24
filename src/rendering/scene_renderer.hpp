@@ -52,7 +52,7 @@
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
 #include "world/atmospherics.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 
 #include "analysis/analyzer.hpp"
 
@@ -181,7 +181,7 @@ struct RenderStats {
     PostStats post;
     TemporalStats temporal;     // ADR-410; ring occupancy, settling state, and what it costs
     std::uint32_t transientTextures = 0;
-    std::uint32_t worldEffects = 0; // ADR-207: effects live in the frame block this frame
+    std::uint32_t waves = 0; // ADR-207/702: surface-wave records in the frame block this frame
     std::uint32_t comets = 0;       // ADR-230: comets live in the frame block this frame
     std::uint32_t auroras = 0;      // ADR-230: auroras live in the frame block this frame
 };
@@ -283,13 +283,13 @@ struct FrameUniforms {
     // shadow views copy the whole block, so a swaying plant and its shadow cannot disagree.
     wind::WindUniforms wind;
     LightUniform lights[kMaxLights];
-    // ADR-207: the world effects this frame. Appended *after* `lights` so no offset above moved,
+    // ADR-207/702: the surface waves this frame. Appended *after* `lights` so no offset above moved,
     // and frame-global for the same reason the wind is -- a phenomenon propagating through the
     // world is a property of the world, and the shadow views copy the whole block.
     // x = how many of `effects` are live; the rest of the vector is spare.
-    glm::vec4 worldEffectCount{0.0f};
-    world::WorldEffectGpu worldEffects[world::kMaxGpuWorldEffects];
-    // ADR-230: the atmospheric effects this frame. Appended after the world effects for the same
+    glm::vec4 waveCount{0.0f};
+    world::WaveGpu waves[world::kMaxGpuWaves];
+    // ADR-230: the atmospheric effects this frame. Appended after the surface waves for the same
     // reason those were appended after `lights` -- no offset above moves -- and frame-global for the
     // same reason again: the sky is a property of the world, not of a draw.
     // x = live comets, y = live auroras, z = tail march samples (the §12 quality control), w = 0.
@@ -299,7 +299,7 @@ struct FrameUniforms {
     world::SkyGroundGpu skyGround;
     // ADR-345: the analytic sky's own parameters, so the background pass can evaluate it directly
     // instead of sampling whatever cube the IBL happens to be built from. Appended at the very end
-    // for the same reason `atmosCount` was appended after the world effects: no offset above moves,
+    // for the same reason `atmosCount` was appended after the surface waves: no offset above moves,
     // so every other pass's view of this block is byte-identical to what it was.
     //
     // Before this, "which thing lights the scene" and "which thing is drawn behind it" were one
@@ -322,11 +322,11 @@ struct FrameUniforms {
     // below change. x = fogUpperDensity, y = fogHeightCurve, zw = 0.
     glm::vec4 fogShape{0.0f};
 };
-// 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 world effects. The middle
+// 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 surface waves. The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
 // the same field in the same place, which is the whole reason it is written as a sum rather than a
 // number.
-static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWorldEffects +
+static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWaves +
                                        16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
                                        64 + // ADR-345: four vec4s of analytic sky
                                        32 + // ADR-379: two vec4s of vortex glow
@@ -345,8 +345,8 @@ static_assert(offsetof(FrameUniforms, shadowMaskParams) == 544);
 static_assert(offsetof(FrameUniforms, materialTier) == 560);
 static_assert(offsetof(FrameUniforms, wind) == 576);
 static_assert(offsetof(FrameUniforms, lights) == 640);
-static_assert(offsetof(FrameUniforms, worldEffectCount) == 1152);
-static_assert(offsetof(FrameUniforms, worldEffects) == 1168);
+static_assert(offsetof(FrameUniforms, waveCount) == 1152);
+static_assert(offsetof(FrameUniforms, waves) == 1168);
 static_assert(offsetof(FrameUniforms, atmosCount) == 2320);
 static_assert(offsetof(FrameUniforms, comets) == 2336);
 static_assert(offsetof(FrameUniforms, auroras) == 3296);
@@ -543,9 +543,9 @@ public:
         // honestly answer it: a terrain chunk arrives as an ordinary lit entity with no flag saying
         // where it came from, and a name-prefix guess would be a control that lies at the first
         // scene that names something `chunk`.
-        // ADR-207. Off: the frame block reports zero world effects, so the per-fragment loop
+        // ADR-207. Off: the frame block reports zero surface waves, so the per-fragment loop
         // returns on its first compare. The arm for "what does the system cost when it is idle".
-        bool worldEffects = true;
+        bool waves = true;
         // ADR-230. Off: the atmospheric sky layer is not drawn at all -- not a uniform branch, the
         // whole draw is skipped. The arm §12 asks for: "Glowmere + effects disabled" measured
         // against "Glowmere baseline" is vacuous unless the two really differ in what runs.

@@ -739,7 +739,7 @@ const std::vector<Pairing>& pairings() {
          // ADR-230 appended the atmospheric block after that. The bundle has to carry both headers
          // or the audit cannot resolve the element types -- and an unresolved type stops the audit
          // rather than being skipped, which is how this test caught ADR-230 adding three.
-         {"rendering/scene_renderer.hpp", "core/wind.hpp", "world/effects.hpp",
+         {"rendering/scene_renderer.hpp", "core/wind.hpp", "world/wave_effect.hpp",
           "world/atmospherics.hpp"},
          "FrameUniforms",
          // The wind field is one nested struct on the C++ side and four loose vec4s in the shader.

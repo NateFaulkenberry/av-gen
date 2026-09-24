@@ -41,10 +41,10 @@ fs::path examples() { return fs::path(AVGEN_SOURCE_DIR) / "examples"; }
 fs::path projectA() { return examples() / "world" / "glowmere-valley-2-multicam.json"; }
 fs::path projectB() { return examples() / "hero" / "hero.json"; }
 
-// A parameter that exists in exactly one of the two, checked by name. `atmos/Aurora/...` is one of
-// A's atmospheric effects; `sources/turn/rate` is B's procedural source. Neither project has any
+// A parameter that exists in exactly one of the two, checked by name. `fx/aurora/...` is one of
+// A's effects (ADR-702: keyed by the effect's id); `sources/turn/rate` is B's procedural source. Neither project has any
 // reason to register the other's.
-constexpr const char* kOnlyInA = "atmos/Aurora/baseHeight";
+constexpr const char* kOnlyInA = "fx/aurora/baseHeight";
 constexpr const char* kOnlyInB = "sources/turn/rate";
 
 bool hasParameter(app::Engine& engine, const char* path) {

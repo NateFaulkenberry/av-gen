@@ -17,6 +17,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 #include "world/atmospherics.hpp"
+#include "world/effects/effect_instance.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -74,7 +75,7 @@ scene::Scene cometSky(double seconds) {
     s.camera.position = {0.0f, 0.0f, 0.0f};
     s.camera.target = {1.0f, 0.0f, 0.0f};
 
-    world::AtmosphericEffect e = world::bioluminescentComet("probe");
+    world::EffectInstance e = world::bioluminescentComet("probe");
     e.comet.path.distance = 400.0f;
     e.comet.appearance.haloSize = 95.0f;
     e.comet.appearance.haloIntensity = 3.8f;
@@ -82,8 +83,8 @@ scene::Scene cometSky(double seconds) {
     e.comet.appearance.tailLength = 2000.0f;
     e.activation = world::Activation::Always;
 
-    const std::vector<world::AtmosphericEffect> effects{e};
-    world::AtmosphericContext ctx;
+    const std::vector<world::EffectInstance> effects{e};
+    world::EffectContext ctx;
     ctx.seconds = seconds;
     ctx.cameraPosition = s.camera.position;
     world::buildAtmosphericFrame(effects, ctx, s.atmospherics);

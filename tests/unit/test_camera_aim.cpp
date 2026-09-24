@@ -14,7 +14,7 @@
 #include "app/camera_director.hpp"
 #include "app/engine.hpp"
 #include "core/time.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 #include "entity/entity.hpp"
 #include "params/parameter_set.hpp"
 #include "params/timeline.hpp"

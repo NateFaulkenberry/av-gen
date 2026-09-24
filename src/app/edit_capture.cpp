@@ -38,6 +38,16 @@ nlohmann::json routesJson(const Engine& engine) {
     return out;
 }
 
+// The authored effect list as a document. Decided on this rather than on the captured list, for the
+// cameras' reason: a slider that moved is a parameter edit, not a new list.
+nlohmann::json effectsJson(const Engine& engine) {
+    nlohmann::json out = nlohmann::json::array();
+    for (const world::EffectInstance& e : engine.effects()) {
+        out.push_back(e.toJson());
+    }
+    return out;
+}
+
 std::map<std::string, std::string> captureParents(Engine& engine) {
     std::map<std::string, std::string> out;
     if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
@@ -68,6 +78,8 @@ void EditCapture::begin(Engine& engine) {
     routesJson_ = routesJson(engine);
     parents_ = captureParents(engine);
     plans_ = engine.directingPlans();
+    effectsAuthored_ = effectsJson(engine);
+    effects_ = engine.capturedEffects();
     unrecoverable_.clear();
     open_ = true;
 }
@@ -108,6 +120,15 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
         change->before = std::move(plans_);
         change->after = engine.directingPlans();
         command.plans = std::move(change);
+    }
+
+    // ---- the effect list (ADR-702) --------------------------------------------------------------
+    if (effectsJson(engine) != effectsAuthored_) {
+        auto change = std::make_unique<ui::EffectChange>();
+        change->before = std::move(effects_);
+        change->after = engine.capturedEffects();
+        change->routesTouched = false; // routes are AutomationChange's, never two records' (see header)
+        command.effects = std::move(change);
     }
 
     // ---- the author's automation --------------------------------------------------------------

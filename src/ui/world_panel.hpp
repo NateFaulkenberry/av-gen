@@ -7,6 +7,7 @@
 
 #include "app/engine.hpp"
 #include "rendering/debug_draw.hpp"
+#include "ui/effects_panel.hpp"
 #include "ui/ui_logic.hpp"
 
 #include <string>
@@ -15,6 +16,7 @@
 namespace avgen::ui {
 
 class WorldEditor;
+class EditHistory;
 
 // Which parameters a layer shows. Beginner: world macros, atmosphere, camera, post. Intermediate:
 // + generators (procedural/*), fields, materials, deformers, particles, splines, sdf. Advanced:
@@ -80,18 +82,28 @@ public:
     std::string focusRouteSource;
     std::string focusRouteTarget;
 
+    // Set to scroll the Inspector so its Effects section is at the top on the next draw; cleared
+    // when done. The headless capture hook uses it (`AVGEN_CAPTURE_WORLD_INSPECTOR`), because a
+    // long Properties list otherwise keeps the section below the fold of a screenshot.
+    bool scrollToEffects = false;
+
 private:
     // ADR-421: why the last structural deformer edit was refused, if it was. Held rather than
     // logged, for the reason ADR-420's dead-subscription line is: a refusal an artist cannot see is
     // a refusal that looks like the button not working.
     std::string deformerStatus_;
+    // ADR-702: the selected owner's effect stack. One section, whatever the owner is.
+    EffectsSection effects_;
 
 public:
     [[nodiscard]] bool wantsRouteFocus() const { return !focusRouteTarget.empty(); }
 
     // The tabs; each is drawn inside the caller's window/tab bar.
     void drawOverview(app::Engine& engine);
-    void drawInspector(app::Engine& engine);
+    // `history` is the editor's undo stack, for the Effects section's edits (ADR-702); null records
+    // nothing. The selection decides whose effect stack the section shows: Environment -> the World,
+    // a node -> that entity (a hero is a node, ADR-107), Camera -> the camera.
+    void drawInspector(app::Engine& engine, EditHistory* history = nullptr);
     // ADR-421: the deformer stack of the selected procedural object, as a stack rather than as
     // eight anonymous groups of numbers. Drawn from `drawInspector`; separate so a test can ask
     // what leaves it names (`deformerRowLeaves`, in ui_logic.hpp) without an ImGui context.

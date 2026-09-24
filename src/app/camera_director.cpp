@@ -703,8 +703,8 @@ Result<std::size_t> installSongDirection(Engine& engine, const SongDirection& di
     // So Song Mode goes back to what the other two director modes do: bake the framing onto the
     // timeline and leave the sequencer alone. `installSequence` is the same call `Continuous shot`
     // and `Edited sequence` make, which also means Song Mode regains the thing it had silently lost
-    // by not calling it -- **`setShotSpans`**, the flattened cut that world effects gate on. Without
-    // it the World Effects panel correctly reported "No directed camera: effects gated on the cut
+    // by not calling it -- **`setShotSpans`**, the flattened cut that effects gate on. Without
+    // it the (since removed, ADR-702) World Effects panel correctly reported "No directed camera: effects gated on the cut
     // cannot fire", because there was no cut to gate on.
     const auto installed = installSequence(engine, direction.sequence, settings);
     if (!installed) {
@@ -976,7 +976,7 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
     // ADR-207: the cut, flattened for world effects to time-gate against. Installed with the keys
     // rather than derived per frame, for the same reason the keys exist at all -- a shot schedule is
     // a fold over a whole track and the frame you are on cannot know it. Nothing here runs per
-    // frame; `resolveWorldEffects` does a linear scan of single digits of spans.
+    // frame; `resolveWaves` does a linear scan of single digits of spans.
     {
         std::vector<world::ShotSpan> spans = sequence.shotSpans();
         // At debug level, because "why is my world effect not firing" is otherwise unanswerable

@@ -32,7 +32,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -86,8 +86,8 @@ scene::Scene bankScene(int shadowSteps, float shadowStrength) {
     key.color = glm::vec3(1.0f);
     s.addLight(key);
 
-    world::AtmosphericEffect e =
-        world::makeAtmosphericEffect(world::AtmosphereKind::VolumetricFog, "bank");
+    world::EffectInstance e =
+        world::makeEffect(world::EffectKind::VolumetricFog, "bank");
     world::Vortex& v = e.vortex;
     v.field.center = {0.0f, 0.0f, 0.0f};
     v.field.radius = 160.0f;

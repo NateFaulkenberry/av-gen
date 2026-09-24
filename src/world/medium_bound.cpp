@@ -43,7 +43,7 @@ MediumBound mediumBound(const MediumSlot& m) {
     const float thickness = std::max(m.lane[1].x, 1e-3f);
     const float depth = std::max(m.lane[4].x, 0.0f);
     const glm::vec3 centre(m.lane[0]);
-    const auto kind = static_cast<AtmosphereKind>(static_cast<int>(m.lane[15].x + 0.5f));
+    const auto kind = static_cast<EffectKind>(static_cast<int>(m.lane[15].x + 0.5f));
 
     // ---- the tornado (ADR-580) ---------------------------------------------------------------
     //
@@ -55,7 +55,7 @@ MediumBound mediumBound(const MediumSlot& m) {
     // function and the shader's are the only two places that read both conventions, so they are
     // the only two places the two could be confused -- which is the argument for them being
     // transliterations of each other rather than two derivations.
-    if (kind == AtmosphereKind::Tornado) {
+    if (kind == EffectKind::Tornado) {
         const float height = radius; // named for what lane[0].w carries here
         // The radius curve is a quadratic Bezier, so it never leaves the convex hull of its three
         // control values -- the largest is a provable bound, not an estimate.
@@ -76,7 +76,7 @@ MediumBound mediumBound(const MediumSlot& m) {
         return b;
     }
 
-    if (kind != AtmosphereKind::VolumetricFog) {
+    if (kind != EffectKind::VolumetricFog) {
         b.radiusXZ = radius * breath * 1.35f;
         b.yTop = centre.y + thickness * 3.0f;
         b.yBot = centre.y - depth - thickness * 3.0f;

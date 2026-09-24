@@ -286,80 +286,598 @@
       "reactionProfile": "organism"
     }
   ],
-  "worldEffects": [
+  "effects": [
     {
-      "name": "Camera Travel Beam",
+      "id": "valley-aurora",
+      "type": "aurora",
+      "name": "Valley Aurora",
+      "owner": {
+        "kind": "world"
+      },
       "enabled": true,
-      "style": "Bioluminescent",
-      "source": {
-        "kind": "camera",
-        "position": [
-          0.0,
-          0.0,
-          0.0
-        ]
+      "order": 0,
+      "style": "Glowmere Bioluminescence",
+      "activation": "always",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 3.0,
+        "fadeOut": 0.0,
+        "lifetime": 0.0,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 0.0,
+        "windowStart": 0.0
       },
-      "target": {
-        "kind": "focusHero"
-      },
-      "activation": "cameraTravel",
-      "propagation": {
-        "kind": "directional",
-        "direction": "blended",
-        "explicitDirection": [
-          0.0,
-          0.0,
-          -1.0
-        ],
-        "forwardWeight": 1.0,
-        "velocityWeight": 0.6,
-        "targetWeight": 1.2,
-        "speed": 110.0,
-        "range": 300.0,
-        "frontWidth": 10.0,
-        "trailLength": 30.0,
-        "falloff": 2.2,
-        "startOffset": 10.0,
-        "verticalExtent": 40.0,
-        "verticalGrowth": 0.15,
-        "ringCount": 0.0,
-        "beamRadius": 0.0
-      },
-      "appearance": {
+      "ground": {
         "color": [
-          0.07,
-          0.78,
+          0.16,
+          0.74,
+          0.6
+        ],
+        "falloff": 2.0,
+        "intensity": 0.55,
+        "mode": "subtle",
+        "radius": 220.0
+      },
+      "parameters": {
+        "appearance": {
+          "edgeBrightness": 3.2,
+          "emission": 1.0,
+          "filaments": 0.949999988079071,
+          "horizonGlow": 0.75,
+          "intensity": 3.6,
+          "lowColor": [
+            0.14000000059604645,
+            1.0,
+            0.6200000047683716
+          ],
+          "midColor": [
+            0.1599999964237213,
+            0.8199999928474426,
+            1.0
+          ],
+          "opacity": 0.8500000238418579,
+          "sparkle": 0.5,
+          "topColor": [
+            0.5799999833106995,
+            0.3199999928474426,
+            1.0
+          ]
+        },
+        "audio": {
+          "bass": 0.95,
+          "beat": 0.4,
+          "high": 0.8,
+          "lowMid": 0.6,
+          "mid": 0.5,
+          "sensitivity": 1.15,
+          "spectrumShape": 0.8
+        },
+        "rainbow": {
+          "brightness": 1.0,
+          "enabled": false,
+          "hueOffset": 0.0,
+          "saturation": 0.8500000238418579,
+          "scale": 1.100000023841858,
+          "speed": 0.2199999988079071
+        },
+        "shape": {
+          "anchor": "camera",
+          "anchorPosition": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "baseHeight": -120.0,
+          "complexity": 26.0,
+          "curtainCount": 4.0,
+          "curtainHeight": 4200.0,
+          "driftSpeed": 0.12999999523162842,
+          "flowSpeed": 0.054999999701976776,
+          "layerSpacing": 0.34,
+          "radius": 5200.0,
+          "turbulence": 0.44999998807907104,
+          "verticalSpeed": 0.07000000029802322,
+          "waveAmplitude": 0.30000001192092896,
+          "waveScale": 2.4000000953674316
+        }
+      }
+    },
+    {
+      "id": "hero-comet",
+      "type": "comet",
+      "name": "Hero Comet",
+      "owner": {
+        "kind": "world"
+      },
+      "enabled": true,
+      "order": 1,
+      "style": "Bioluminescent Cyan",
+      "activation": "window",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.5,
+        "fadeOut": 1.8,
+        "lifetime": 0.0,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 9.5,
+        "windowStart": 3000.0
+      },
+      "ground": {
+        "color": [
+          0.34,
+          0.86,
           1.0
         ],
-        "intensity": 1.0,
-        "edgeColor": [
-          0.72,
-          1.0,
-          0.92
+        "falloff": 2.2,
+        "intensity": 0.85,
+        "mode": "strong",
+        "radius": 520.0
+      },
+      "parameters": {
+        "appearance": {
+          "coreColor": [
+            0.550000011920929,
+            1.0,
+            1.0
+          ],
+          "coreIntensity": 20.0,
+          "flowSpeed": 0.3499999940395355,
+          "haloColor": [
+            0.1599999964237213,
+            0.7799999713897705,
+            1.0
+          ],
+          "haloIntensity": 2.0999999046325684,
+          "haloSize": 95.0,
+          "headSize": 19.0,
+          "tailColor": [
+            0.41999998688697815,
+            0.3400000035762787,
+            1.0
+          ],
+          "tailFalloff": 1.850000023841858,
+          "tailIntensity": 5.0,
+          "tailLength": 2000.0,
+          "tailWidth": 38.0,
+          "wispAmount": 62.0,
+          "wispScale": 0.002199999988079071
+        },
+        "path": {
+          "acceleration": 0.0,
+          "anchor": "world",
+          "anchorPosition": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "arcLift": 180.0,
+          "curvature": -120.0,
+          "distance": 2600.0,
+          "endAzimuth": 86.0,
+          "endElevation": 2.0,
+          "speedScale": 1.0,
+          "startAzimuth": -2.0,
+          "startElevation": 30.0,
+          "travelSeconds": 7.6
+        },
+        "rainbow": {
+          "brightness": 1.0,
+          "enabled": false,
+          "hueOffset": 0.0,
+          "saturation": 0.8500000238418579,
+          "scale": 1.100000023841858,
+          "speed": 0.2199999988079071
+        },
+        "sparkle": {
+          "density": 0.010999999940395355,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 7.0,
+          "seed": 1,
+          "size": 0.12999999523162842,
+          "speed": 1.2999999523162842
+        }
+      }
+    },
+    {
+      "id": "rainbow-comet",
+      "type": "comet",
+      "name": "Rainbow Comet",
+      "owner": {
+        "kind": "world"
+      },
+      "enabled": true,
+      "order": 2,
+      "style": "Rainbow Cosmic",
+      "activation": "window",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.5,
+        "fadeOut": 1.8,
+        "lifetime": 0.0,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 9.0,
+        "windowStart": 3000.0
+      },
+      "ground": {
+        "color": [
+          0.7,
+          0.45,
+          1.0
         ],
-        "edgeIntensity": 3.2,
-        "width": 1.0,
-        "rainbow": false,
-        "rainbowSpeed": 0.35,
-        "rainbowScale": 0.012,
-        "rainbowSaturation": 0.85,
-        "rainbowBrightness": 1.0
+        "falloff": 2.0,
+        "intensity": 0.6,
+        "mode": "subtle",
+        "radius": 220.0
       },
-      "sparkle": {
-        "enabled": true,
-        "density": 1.1,
-        "size": 0.22,
-        "intensity": 2.4,
-        "speed": 0.6,
-        "fadeDistance": 85.0,
-        "seed": 1
+      "parameters": {
+        "appearance": {
+          "coreColor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "coreIntensity": 13.0,
+          "flowSpeed": 0.41999998688697815,
+          "haloColor": [
+            0.8999999761581421,
+            0.8999999761581421,
+            1.0
+          ],
+          "haloIntensity": 2.200000047683716,
+          "haloSize": 105.0,
+          "headSize": 21.0,
+          "tailColor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "tailFalloff": 1.649999976158142,
+          "tailIntensity": 5.5,
+          "tailLength": 2400.0,
+          "tailWidth": 44.0,
+          "wispAmount": 78.0,
+          "wispScale": 0.0019000000320374966
+        },
+        "path": {
+          "acceleration": 0.0,
+          "anchor": "world",
+          "anchorPosition": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "arcLift": 210.0,
+          "curvature": 150.0,
+          "distance": 2300.0,
+          "endAzimuth": 2.0,
+          "endElevation": 4.0,
+          "speedScale": 1.0,
+          "startAzimuth": 88.0,
+          "startElevation": 26.0,
+          "travelSeconds": 7.2
+        },
+        "rainbow": {
+          "brightness": 1.0499999523162842,
+          "enabled": true,
+          "hueOffset": 0.0,
+          "saturation": 0.9200000166893005,
+          "scale": 1.25,
+          "speed": 0.2800000011920929
+        },
+        "sparkle": {
+          "density": 0.013000000268220901,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 8.5,
+          "seed": 1,
+          "size": 0.15000000596046448,
+          "speed": 1.600000023841858
+        }
+      }
+    },
+    {
+      "id": "burst-emerald",
+      "type": "comet",
+      "name": "Burst Emerald",
+      "owner": {
+        "kind": "world"
       },
-      "response": {
-        "ground": 0.45,
-        "foliage": 1.1,
-        "surface": 0.7,
-        "emissive": 1.2
+      "enabled": true,
+      "order": 3,
+      "style": "Emerald Teal",
+      "activation": "window",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.5,
+        "fadeOut": 1.8,
+        "lifetime": 0.0,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 7.5,
+        "windowStart": 3000.0
       },
+      "ground": {
+        "color": [
+          0.30000001192092896,
+          0.8500000238418579,
+          1.0
+        ],
+        "falloff": 2.0,
+        "intensity": 0.6000000238418579,
+        "mode": "off",
+        "radius": 220.0
+      },
+      "parameters": {
+        "appearance": {
+          "coreColor": [
+            0.550000011920929,
+            1.0,
+            0.7799999713897705
+          ],
+          "coreIntensity": 17.0,
+          "flowSpeed": 0.3100000023841858,
+          "haloColor": [
+            0.10000000149011612,
+            0.8500000238418579,
+            0.6200000047683716
+          ],
+          "haloIntensity": 1.899999976158142,
+          "haloSize": 88.0,
+          "headSize": 17.0,
+          "tailColor": [
+            0.12999999523162842,
+            0.9200000166893005,
+            0.7200000286102295
+          ],
+          "tailFalloff": 2.0,
+          "tailIntensity": 4.599999904632568,
+          "tailLength": 1750.0,
+          "tailWidth": 34.0,
+          "wispAmount": 54.0,
+          "wispScale": 0.002400000113993883
+        },
+        "path": {
+          "acceleration": 0.0,
+          "anchor": "world",
+          "anchorPosition": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "arcLift": 140.0,
+          "curvature": 80.0,
+          "distance": 3400.0,
+          "endAzimuth": 66.0,
+          "endElevation": 6.0,
+          "speedScale": 1.0,
+          "startAzimuth": 12.0,
+          "startElevation": 28.0,
+          "travelSeconds": 6.0
+        },
+        "rainbow": {
+          "brightness": 1.0,
+          "enabled": false,
+          "hueOffset": 0.0,
+          "saturation": 0.8500000238418579,
+          "scale": 1.100000023841858,
+          "speed": 0.2199999988079071
+        },
+        "sparkle": {
+          "density": 0.009999999776482582,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 6.5,
+          "seed": 1,
+          "size": 0.11999999731779099,
+          "speed": 1.2000000476837158
+        }
+      }
+    },
+    {
+      "id": "burst-magenta",
+      "type": "comet",
+      "name": "Burst Magenta",
+      "owner": {
+        "kind": "world"
+      },
+      "enabled": true,
+      "order": 4,
+      "style": "Magenta Blue",
+      "activation": "window",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.5,
+        "fadeOut": 1.8,
+        "lifetime": 0.0,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 6.8,
+        "windowStart": 3000.0
+      },
+      "ground": {
+        "color": [
+          0.30000001192092896,
+          0.8500000238418579,
+          1.0
+        ],
+        "falloff": 2.0,
+        "intensity": 0.6000000238418579,
+        "mode": "off",
+        "radius": 220.0
+      },
+      "parameters": {
+        "appearance": {
+          "coreColor": [
+            1.0,
+            0.6800000071525574,
+            1.0
+          ],
+          "coreIntensity": 19.0,
+          "flowSpeed": 0.3799999952316284,
+          "haloColor": [
+            0.8500000238418579,
+            0.2199999988079071,
+            0.949999988079071
+          ],
+          "haloIntensity": 2.0,
+          "haloSize": 98.0,
+          "headSize": 19.0,
+          "tailColor": [
+            0.30000001192092896,
+            0.3199999928474426,
+            1.0
+          ],
+          "tailFalloff": 1.75,
+          "tailIntensity": 5.199999809265137,
+          "tailLength": 1900.0,
+          "tailWidth": 40.0,
+          "wispAmount": 66.0,
+          "wispScale": 0.002099999925121665
+        },
+        "path": {
+          "acceleration": 0.0,
+          "anchor": "world",
+          "anchorPosition": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "arcLift": 160.0,
+          "curvature": -90.0,
+          "distance": 3000.0,
+          "endAzimuth": 18.0,
+          "endElevation": 4.0,
+          "speedScale": 1.0,
+          "startAzimuth": 72.0,
+          "startElevation": 24.0,
+          "travelSeconds": 5.6
+        },
+        "rainbow": {
+          "brightness": 1.0,
+          "enabled": false,
+          "hueOffset": 0.0,
+          "saturation": 0.8500000238418579,
+          "scale": 1.100000023841858,
+          "speed": 0.2199999988079071
+        },
+        "sparkle": {
+          "density": 0.012000000104308128,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 7.5,
+          "seed": 1,
+          "size": 0.14000000059604645,
+          "speed": 1.399999976158142
+        }
+      }
+    },
+    {
+      "id": "burst-spark",
+      "type": "comet",
+      "name": "Burst Spark",
+      "owner": {
+        "kind": "world"
+      },
+      "enabled": true,
+      "order": 5,
+      "style": "Subtle Shooting Star",
+      "activation": "window",
+      "timing": {
+        "delay": 0.0,
+        "fadeIn": 0.5,
+        "fadeOut": 1.8,
+        "lifetime": 0.0,
+        "repeatSeconds": 0.0,
+        "windowSeconds": 5.0,
+        "windowStart": 3000.0
+      },
+      "ground": {
+        "color": [
+          0.30000001192092896,
+          0.8500000238418579,
+          1.0
+        ],
+        "falloff": 2.0,
+        "intensity": 0.6000000238418579,
+        "mode": "off",
+        "radius": 220.0
+      },
+      "parameters": {
+        "appearance": {
+          "coreColor": [
+            0.9200000166893005,
+            0.9700000286102295,
+            1.0
+          ],
+          "coreIntensity": 7.0,
+          "flowSpeed": 0.20000000298023224,
+          "haloColor": [
+            0.550000011920929,
+            0.7200000286102295,
+            1.0
+          ],
+          "haloIntensity": 0.699999988079071,
+          "haloSize": 34.0,
+          "headSize": 6.0,
+          "tailColor": [
+            0.6000000238418579,
+            0.75,
+            1.0
+          ],
+          "tailFalloff": 2.5999999046325684,
+          "tailIntensity": 1.5,
+          "tailLength": 700.0,
+          "tailWidth": 11.0,
+          "wispAmount": 6.0,
+          "wispScale": 0.004000000189989805
+        },
+        "path": {
+          "acceleration": 0.0,
+          "anchor": "world",
+          "anchorPosition": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "arcLift": 50.0,
+          "curvature": 0.0,
+          "distance": 1900.0,
+          "endAzimuth": 62.0,
+          "endElevation": 15.0,
+          "speedScale": 1.0,
+          "startAzimuth": 34.0,
+          "startElevation": 31.0,
+          "travelSeconds": 2.4
+        },
+        "rainbow": {
+          "brightness": 1.0,
+          "enabled": false,
+          "hueOffset": 0.0,
+          "saturation": 0.8500000238418579,
+          "scale": 1.100000023841858,
+          "speed": 0.2199999988079071
+        },
+        "sparkle": {
+          "density": 0.009999999776482582,
+          "enabled": false,
+          "fadeDistance": 85.0,
+          "intensity": 3.0,
+          "seed": 1,
+          "size": 0.18000000715255737,
+          "speed": 1.0
+        }
+      }
+    },
+    {
+      "id": "camera-travel-beam",
+      "type": "travelBeam",
+      "name": "Camera Travel Beam",
+      "owner": {
+        "kind": "world"
+      },
+      "enabled": true,
+      "order": 6,
+      "style": "Bioluminescent",
+      "activation": "cameraTravel",
       "timing": {
         "delay": 0.15,
         "lifetime": 0.0,
@@ -368,74 +886,90 @@
         "windowStart": 0.0,
         "windowSeconds": 6.0,
         "repeatSeconds": 2.6
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "directional",
+          "direction": "blended",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 110.0,
+          "range": 300.0,
+          "frontWidth": 10.0,
+          "trailLength": 30.0,
+          "falloff": 2.2,
+          "startOffset": 10.0,
+          "verticalExtent": 40.0,
+          "verticalGrowth": 0.15,
+          "ringCount": 0.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.07,
+            0.78,
+            1.0
+          ],
+          "intensity": 1.0,
+          "edgeColor": [
+            0.72,
+            1.0,
+            0.92
+          ],
+          "edgeIntensity": 3.2,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.1,
+          "size": 0.22,
+          "intensity": 2.4,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 1
+        },
+        "response": {
+          "ground": 0.45,
+          "foliage": 1.1,
+          "surface": 0.7,
+          "emissive": 1.2
+        },
+        "source": {
+          "kind": "camera",
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "target": {
+          "kind": "focusHero"
+        }
       }
     },
     {
+      "id": "elder-2-cap-hero-pulse",
+      "type": "groundPulse",
       "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "elder-2-cap"
+      },
       "enabled": true,
+      "order": 0,
       "style": "Bioluminescent",
-      "source": {
-        "kind": "focusHero",
-        "groundOffset": 0.0
-      },
       "activation": "heroFocus",
-      "propagation": {
-        "kind": "radial",
-        "direction": "explicit",
-        "explicitDirection": [
-          0.0,
-          0.0,
-          -1.0
-        ],
-        "forwardWeight": 1.0,
-        "velocityWeight": 0.6,
-        "targetWeight": 1.2,
-        "speed": 13.0,
-        "range": 58.0,
-        "frontWidth": 3.5,
-        "trailLength": 20.0,
-        "falloff": 1.5,
-        "startOffset": 0.0,
-        "verticalExtent": 9.0,
-        "verticalGrowth": 0.65,
-        "ringCount": 2.0,
-        "beamRadius": 0.0
-      },
-      "appearance": {
-        "color": [
-          0.16,
-          0.92,
-          0.62
-        ],
-        "intensity": 5.0,
-        "edgeColor": [
-          0.78,
-          1.0,
-          0.88
-        ],
-        "edgeIntensity": 9.0,
-        "width": 1.0,
-        "rainbow": false,
-        "rainbowSpeed": 0.35,
-        "rainbowScale": 0.012,
-        "rainbowSaturation": 0.85,
-        "rainbowBrightness": 1.0
-      },
-      "sparkle": {
-        "enabled": true,
-        "density": 1.4,
-        "size": 0.2,
-        "intensity": 2.6,
-        "speed": 0.6,
-        "fadeDistance": 85.0,
-        "seed": 2
-      },
-      "response": {
-        "ground": 1.0,
-        "foliage": 1.5,
-        "surface": 0.9,
-        "emissive": 1.3
-      },
       "timing": {
         "delay": 0.35,
         "lifetime": 0.0,
@@ -444,6 +978,919 @@
         "windowStart": 0.0,
         "windowSeconds": 6.0,
         "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "lantern-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "lantern-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "spire-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "spire-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "bloom-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "bloom-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "veil-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "veil-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "umbra-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "umbra-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "cairn-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "cairn-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "visitor-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "visitor"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "ridge-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "ridge-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "scree-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "scree-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
+      }
+    },
+    {
+      "id": "ember-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "ember-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "lifetime": 0.0,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "windowStart": 0.0,
+        "windowSeconds": 6.0,
+        "repeatSeconds": 4.5
+      },
+      "parameters": {
+        "propagation": {
+          "kind": "radial",
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "forwardWeight": 1.0,
+          "velocityWeight": 0.6,
+          "targetWeight": 1.2,
+          "speed": 13.0,
+          "range": 58.0,
+          "frontWidth": 3.5,
+          "trailLength": 20.0,
+          "falloff": 1.5,
+          "startOffset": 0.0,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.65,
+          "ringCount": 2.0,
+          "beamRadius": 0.0
+        },
+        "appearance": {
+          "color": [
+            0.16,
+            0.92,
+            0.62
+          ],
+          "intensity": 5.0,
+          "edgeColor": [
+            0.78,
+            1.0,
+            0.88
+          ],
+          "edgeIntensity": 9.0,
+          "width": 1.0,
+          "rainbow": false,
+          "rainbowSpeed": 0.35,
+          "rainbowScale": 0.012,
+          "rainbowSaturation": 0.85,
+          "rainbowBrightness": 1.0
+        },
+        "sparkle": {
+          "enabled": true,
+          "density": 1.4,
+          "size": 0.2,
+          "intensity": 2.6,
+          "speed": 0.6,
+          "fadeDistance": 85.0,
+          "seed": 2
+        },
+        "response": {
+          "ground": 1.0,
+          "foliage": 1.5,
+          "surface": 0.9,
+          "emissive": 1.3
+        },
+        "source": {
+          "kind": "owner",
+          "groundOffset": 0.0
+        }
       }
     }
   ],
@@ -9280,937 +10727,5 @@
         ]
       }
     ]
-  },
-  "atmosphericEffects": [
-    {
-      "activation": "always",
-      "aurora": {
-        "appearance": {
-          "edgeBrightness": 3.2,
-          "emission": 1.0,
-          "filaments": 0.949999988079071,
-          "horizonGlow": 0.75,
-          "intensity": 3.6,
-          "lowColor": [
-            0.14000000059604645,
-            1.0,
-            0.6200000047683716
-          ],
-          "midColor": [
-            0.1599999964237213,
-            0.8199999928474426,
-            1.0
-          ],
-          "opacity": 0.8500000238418579,
-          "sparkle": 0.5,
-          "topColor": [
-            0.5799999833106995,
-            0.3199999928474426,
-            1.0
-          ]
-        },
-        "audio": {
-          "bass": 0.95,
-          "beat": 0.4,
-          "high": 0.8,
-          "lowMid": 0.6,
-          "mid": 0.5,
-          "sensitivity": 1.15,
-          "spectrumShape": 0.8
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "shape": {
-          "anchor": "camera",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "baseHeight": -120.0,
-          "complexity": 26.0,
-          "curtainCount": 4.0,
-          "curtainHeight": 4200.0,
-          "driftSpeed": 0.12999999523162842,
-          "flowSpeed": 0.054999999701976776,
-          "layerSpacing": 0.34,
-          "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
-          "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
-          "waveScale": 2.4000000953674316
-        }
-      },
-      "comet": {
-        "appearance": {
-          "coreColor": [
-            0.550000011920929,
-            1.0,
-            1.0
-          ],
-          "coreIntensity": 18.0,
-          "flowSpeed": 0.3499999940395355,
-          "haloColor": [
-            0.20000000298023224,
-            0.75,
-            1.0
-          ],
-          "haloIntensity": 2.200000047683716,
-          "haloSize": 150.0,
-          "headSize": 26.0,
-          "tailColor": [
-            0.44999998807907104,
-            0.3499999940395355,
-            1.0
-          ],
-          "tailFalloff": 1.899999976158142,
-          "tailIntensity": 4.5,
-          "tailLength": 900.0,
-          "tailWidth": 70.0,
-          "wispAmount": 55.0,
-          "wispScale": 0.002400000113993883
-        },
-        "path": {
-          "acceleration": 0.0,
-          "anchor": "world",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "arcLift": 180.0,
-          "curvature": 0.0,
-          "distance": 2600.0,
-          "endAzimuth": 55.0,
-          "endElevation": 9.0,
-          "speedScale": 1.0,
-          "startAzimuth": -70.0,
-          "startElevation": 34.0,
-          "travelSeconds": 7.0
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "sparkle": {
-          "density": 1.100000023841858,
-          "enabled": false,
-          "fadeDistance": 85.0,
-          "intensity": 1.600000023841858,
-          "seed": 1,
-          "size": 0.2199999988079071,
-          "speed": 0.6000000238418579
-        }
-      },
-      "enabled": true,
-      "ground": {
-        "color": [
-          0.16,
-          0.74,
-          0.6
-        ],
-        "falloff": 2.0,
-        "intensity": 0.55,
-        "mode": "subtle",
-        "radius": 220.0
-      },
-      "kind": "aurora",
-      "name": "Valley Aurora",
-      "style": "Glowmere Bioluminescence",
-      "timing": {
-        "delay": 0.0,
-        "fadeIn": 3.0,
-        "fadeOut": 0.0,
-        "lifetime": 0.0,
-        "repeatSeconds": 0.0,
-        "windowSeconds": 0.0,
-        "windowStart": 0.0
-      }
-    },
-    {
-      "activation": "window",
-      "aurora": {
-        "appearance": {
-          "edgeBrightness": 2.4000000953674316,
-          "emission": 1.0,
-          "filaments": 0.8999999761581421,
-          "horizonGlow": 0.550000011920929,
-          "intensity": 2.5999999046325684,
-          "lowColor": [
-            0.15000000596046448,
-            1.0,
-            0.550000011920929
-          ],
-          "midColor": [
-            0.20000000298023224,
-            0.8500000238418579,
-            1.0
-          ],
-          "opacity": 0.8500000238418579,
-          "sparkle": 0.5,
-          "topColor": [
-            0.6499999761581421,
-            0.30000001192092896,
-            1.0
-          ]
-        },
-        "audio": {
-          "bass": 0.8500000238418579,
-          "beat": 0.3499999940395355,
-          "high": 0.699999988079071,
-          "lowMid": 0.550000011920929,
-          "mid": 0.44999998807907104,
-          "sensitivity": 1.0,
-          "spectrumShape": 0.75
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "shape": {
-          "anchor": "camera",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "baseHeight": -40.0,
-          "complexity": 26.0,
-          "curtainCount": 3.0,
-          "curtainHeight": 2600.0,
-          "driftSpeed": 0.12999999523162842,
-          "flowSpeed": 0.054999999701976776,
-          "layerSpacing": 0.3400000035762787,
-          "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
-          "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
-          "waveScale": 2.4000000953674316
-        }
-      },
-      "comet": {
-        "appearance": {
-          "coreColor": [
-            0.550000011920929,
-            1.0,
-            1.0
-          ],
-          "coreIntensity": 20.0,
-          "flowSpeed": 0.3499999940395355,
-          "haloColor": [
-            0.1599999964237213,
-            0.7799999713897705,
-            1.0
-          ],
-          "haloIntensity": 2.0999999046325684,
-          "haloSize": 95.0,
-          "headSize": 19.0,
-          "tailColor": [
-            0.41999998688697815,
-            0.3400000035762787,
-            1.0
-          ],
-          "tailFalloff": 1.850000023841858,
-          "tailIntensity": 5.0,
-          "tailLength": 2000.0,
-          "tailWidth": 38.0,
-          "wispAmount": 62.0,
-          "wispScale": 0.002199999988079071
-        },
-        "path": {
-          "acceleration": 0.0,
-          "anchor": "world",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "arcLift": 180.0,
-          "curvature": -120.0,
-          "distance": 2600.0,
-          "endAzimuth": 86.0,
-          "endElevation": 2.0,
-          "speedScale": 1.0,
-          "startAzimuth": -2.0,
-          "startElevation": 30.0,
-          "travelSeconds": 7.6
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "sparkle": {
-          "density": 0.010999999940395355,
-          "enabled": true,
-          "fadeDistance": 85.0,
-          "intensity": 7.0,
-          "seed": 1,
-          "size": 0.12999999523162842,
-          "speed": 1.2999999523162842
-        }
-      },
-      "enabled": true,
-      "ground": {
-        "color": [
-          0.34,
-          0.86,
-          1.0
-        ],
-        "falloff": 2.2,
-        "intensity": 0.85,
-        "mode": "strong",
-        "radius": 520.0
-      },
-      "kind": "comet",
-      "name": "Hero Comet",
-      "style": "Bioluminescent Cyan",
-      "timing": {
-        "delay": 0.0,
-        "fadeIn": 0.5,
-        "fadeOut": 1.8,
-        "lifetime": 0.0,
-        "repeatSeconds": 0.0,
-        "windowSeconds": 9.5,
-        "windowStart": 3000.0
-      }
-    },
-    {
-      "activation": "window",
-      "aurora": {
-        "appearance": {
-          "edgeBrightness": 2.4000000953674316,
-          "emission": 1.0,
-          "filaments": 0.8999999761581421,
-          "horizonGlow": 0.550000011920929,
-          "intensity": 2.5999999046325684,
-          "lowColor": [
-            0.15000000596046448,
-            1.0,
-            0.550000011920929
-          ],
-          "midColor": [
-            0.20000000298023224,
-            0.8500000238418579,
-            1.0
-          ],
-          "opacity": 0.8500000238418579,
-          "sparkle": 0.5,
-          "topColor": [
-            0.6499999761581421,
-            0.30000001192092896,
-            1.0
-          ]
-        },
-        "audio": {
-          "bass": 0.8500000238418579,
-          "beat": 0.3499999940395355,
-          "high": 0.699999988079071,
-          "lowMid": 0.550000011920929,
-          "mid": 0.44999998807907104,
-          "sensitivity": 1.0,
-          "spectrumShape": 0.75
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "shape": {
-          "anchor": "camera",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "baseHeight": -40.0,
-          "complexity": 26.0,
-          "curtainCount": 3.0,
-          "curtainHeight": 2600.0,
-          "driftSpeed": 0.12999999523162842,
-          "flowSpeed": 0.054999999701976776,
-          "layerSpacing": 0.3400000035762787,
-          "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
-          "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
-          "waveScale": 2.4000000953674316
-        }
-      },
-      "comet": {
-        "appearance": {
-          "coreColor": [
-            1.0,
-            1.0,
-            1.0
-          ],
-          "coreIntensity": 13.0,
-          "flowSpeed": 0.41999998688697815,
-          "haloColor": [
-            0.8999999761581421,
-            0.8999999761581421,
-            1.0
-          ],
-          "haloIntensity": 2.200000047683716,
-          "haloSize": 105.0,
-          "headSize": 21.0,
-          "tailColor": [
-            1.0,
-            1.0,
-            1.0
-          ],
-          "tailFalloff": 1.649999976158142,
-          "tailIntensity": 5.5,
-          "tailLength": 2400.0,
-          "tailWidth": 44.0,
-          "wispAmount": 78.0,
-          "wispScale": 0.0019000000320374966
-        },
-        "path": {
-          "acceleration": 0.0,
-          "anchor": "world",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "arcLift": 210.0,
-          "curvature": 150.0,
-          "distance": 2300.0,
-          "endAzimuth": 2.0,
-          "endElevation": 4.0,
-          "speedScale": 1.0,
-          "startAzimuth": 88.0,
-          "startElevation": 26.0,
-          "travelSeconds": 7.2
-        },
-        "rainbow": {
-          "brightness": 1.0499999523162842,
-          "enabled": true,
-          "hueOffset": 0.0,
-          "saturation": 0.9200000166893005,
-          "scale": 1.25,
-          "speed": 0.2800000011920929
-        },
-        "sparkle": {
-          "density": 0.013000000268220901,
-          "enabled": true,
-          "fadeDistance": 85.0,
-          "intensity": 8.5,
-          "seed": 1,
-          "size": 0.15000000596046448,
-          "speed": 1.600000023841858
-        }
-      },
-      "enabled": true,
-      "ground": {
-        "color": [
-          0.7,
-          0.45,
-          1.0
-        ],
-        "falloff": 2.0,
-        "intensity": 0.6,
-        "mode": "subtle",
-        "radius": 220.0
-      },
-      "kind": "comet",
-      "name": "Rainbow Comet",
-      "style": "Rainbow Cosmic",
-      "timing": {
-        "delay": 0.0,
-        "fadeIn": 0.5,
-        "fadeOut": 1.8,
-        "lifetime": 0.0,
-        "repeatSeconds": 0.0,
-        "windowSeconds": 9.0,
-        "windowStart": 3000.0
-      }
-    },
-    {
-      "activation": "window",
-      "aurora": {
-        "appearance": {
-          "edgeBrightness": 2.4000000953674316,
-          "emission": 1.0,
-          "filaments": 0.8999999761581421,
-          "horizonGlow": 0.550000011920929,
-          "intensity": 2.5999999046325684,
-          "lowColor": [
-            0.15000000596046448,
-            1.0,
-            0.550000011920929
-          ],
-          "midColor": [
-            0.20000000298023224,
-            0.8500000238418579,
-            1.0
-          ],
-          "opacity": 0.8500000238418579,
-          "sparkle": 0.5,
-          "topColor": [
-            0.6499999761581421,
-            0.30000001192092896,
-            1.0
-          ]
-        },
-        "audio": {
-          "bass": 0.8500000238418579,
-          "beat": 0.3499999940395355,
-          "high": 0.699999988079071,
-          "lowMid": 0.550000011920929,
-          "mid": 0.44999998807907104,
-          "sensitivity": 1.0,
-          "spectrumShape": 0.75
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "shape": {
-          "anchor": "camera",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "baseHeight": -40.0,
-          "complexity": 26.0,
-          "curtainCount": 3.0,
-          "curtainHeight": 2600.0,
-          "driftSpeed": 0.12999999523162842,
-          "flowSpeed": 0.054999999701976776,
-          "layerSpacing": 0.3400000035762787,
-          "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
-          "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
-          "waveScale": 2.4000000953674316
-        }
-      },
-      "comet": {
-        "appearance": {
-          "coreColor": [
-            0.550000011920929,
-            1.0,
-            0.7799999713897705
-          ],
-          "coreIntensity": 17.0,
-          "flowSpeed": 0.3100000023841858,
-          "haloColor": [
-            0.10000000149011612,
-            0.8500000238418579,
-            0.6200000047683716
-          ],
-          "haloIntensity": 1.899999976158142,
-          "haloSize": 88.0,
-          "headSize": 17.0,
-          "tailColor": [
-            0.12999999523162842,
-            0.9200000166893005,
-            0.7200000286102295
-          ],
-          "tailFalloff": 2.0,
-          "tailIntensity": 4.599999904632568,
-          "tailLength": 1750.0,
-          "tailWidth": 34.0,
-          "wispAmount": 54.0,
-          "wispScale": 0.002400000113993883
-        },
-        "path": {
-          "acceleration": 0.0,
-          "anchor": "world",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "arcLift": 140.0,
-          "curvature": 80.0,
-          "distance": 3400.0,
-          "endAzimuth": 66.0,
-          "endElevation": 6.0,
-          "speedScale": 1.0,
-          "startAzimuth": 12.0,
-          "startElevation": 28.0,
-          "travelSeconds": 6.0
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "sparkle": {
-          "density": 0.009999999776482582,
-          "enabled": true,
-          "fadeDistance": 85.0,
-          "intensity": 6.5,
-          "seed": 1,
-          "size": 0.11999999731779099,
-          "speed": 1.2000000476837158
-        }
-      },
-      "enabled": true,
-      "ground": {
-        "color": [
-          0.30000001192092896,
-          0.8500000238418579,
-          1.0
-        ],
-        "falloff": 2.0,
-        "intensity": 0.6000000238418579,
-        "mode": "off",
-        "radius": 220.0
-      },
-      "kind": "comet",
-      "name": "Burst Emerald",
-      "style": "Emerald Teal",
-      "timing": {
-        "delay": 0.0,
-        "fadeIn": 0.5,
-        "fadeOut": 1.8,
-        "lifetime": 0.0,
-        "repeatSeconds": 0.0,
-        "windowSeconds": 7.5,
-        "windowStart": 3000.0
-      }
-    },
-    {
-      "activation": "window",
-      "aurora": {
-        "appearance": {
-          "edgeBrightness": 2.4000000953674316,
-          "emission": 1.0,
-          "filaments": 0.8999999761581421,
-          "horizonGlow": 0.550000011920929,
-          "intensity": 2.5999999046325684,
-          "lowColor": [
-            0.15000000596046448,
-            1.0,
-            0.550000011920929
-          ],
-          "midColor": [
-            0.20000000298023224,
-            0.8500000238418579,
-            1.0
-          ],
-          "opacity": 0.8500000238418579,
-          "sparkle": 0.5,
-          "topColor": [
-            0.6499999761581421,
-            0.30000001192092896,
-            1.0
-          ]
-        },
-        "audio": {
-          "bass": 0.8500000238418579,
-          "beat": 0.3499999940395355,
-          "high": 0.699999988079071,
-          "lowMid": 0.550000011920929,
-          "mid": 0.44999998807907104,
-          "sensitivity": 1.0,
-          "spectrumShape": 0.75
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "shape": {
-          "anchor": "camera",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "baseHeight": -40.0,
-          "complexity": 26.0,
-          "curtainCount": 3.0,
-          "curtainHeight": 2600.0,
-          "driftSpeed": 0.12999999523162842,
-          "flowSpeed": 0.054999999701976776,
-          "layerSpacing": 0.3400000035762787,
-          "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
-          "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
-          "waveScale": 2.4000000953674316
-        }
-      },
-      "comet": {
-        "appearance": {
-          "coreColor": [
-            1.0,
-            0.6800000071525574,
-            1.0
-          ],
-          "coreIntensity": 19.0,
-          "flowSpeed": 0.3799999952316284,
-          "haloColor": [
-            0.8500000238418579,
-            0.2199999988079071,
-            0.949999988079071
-          ],
-          "haloIntensity": 2.0,
-          "haloSize": 98.0,
-          "headSize": 19.0,
-          "tailColor": [
-            0.30000001192092896,
-            0.3199999928474426,
-            1.0
-          ],
-          "tailFalloff": 1.75,
-          "tailIntensity": 5.199999809265137,
-          "tailLength": 1900.0,
-          "tailWidth": 40.0,
-          "wispAmount": 66.0,
-          "wispScale": 0.002099999925121665
-        },
-        "path": {
-          "acceleration": 0.0,
-          "anchor": "world",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "arcLift": 160.0,
-          "curvature": -90.0,
-          "distance": 3000.0,
-          "endAzimuth": 18.0,
-          "endElevation": 4.0,
-          "speedScale": 1.0,
-          "startAzimuth": 72.0,
-          "startElevation": 24.0,
-          "travelSeconds": 5.6
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "sparkle": {
-          "density": 0.012000000104308128,
-          "enabled": true,
-          "fadeDistance": 85.0,
-          "intensity": 7.5,
-          "seed": 1,
-          "size": 0.14000000059604645,
-          "speed": 1.399999976158142
-        }
-      },
-      "enabled": true,
-      "ground": {
-        "color": [
-          0.30000001192092896,
-          0.8500000238418579,
-          1.0
-        ],
-        "falloff": 2.0,
-        "intensity": 0.6000000238418579,
-        "mode": "off",
-        "radius": 220.0
-      },
-      "kind": "comet",
-      "name": "Burst Magenta",
-      "style": "Magenta Blue",
-      "timing": {
-        "delay": 0.0,
-        "fadeIn": 0.5,
-        "fadeOut": 1.8,
-        "lifetime": 0.0,
-        "repeatSeconds": 0.0,
-        "windowSeconds": 6.8,
-        "windowStart": 3000.0
-      }
-    },
-    {
-      "activation": "window",
-      "aurora": {
-        "appearance": {
-          "edgeBrightness": 2.4000000953674316,
-          "emission": 1.0,
-          "filaments": 0.8999999761581421,
-          "horizonGlow": 0.550000011920929,
-          "intensity": 2.5999999046325684,
-          "lowColor": [
-            0.15000000596046448,
-            1.0,
-            0.550000011920929
-          ],
-          "midColor": [
-            0.20000000298023224,
-            0.8500000238418579,
-            1.0
-          ],
-          "opacity": 0.8500000238418579,
-          "sparkle": 0.5,
-          "topColor": [
-            0.6499999761581421,
-            0.30000001192092896,
-            1.0
-          ]
-        },
-        "audio": {
-          "bass": 0.8500000238418579,
-          "beat": 0.3499999940395355,
-          "high": 0.699999988079071,
-          "lowMid": 0.550000011920929,
-          "mid": 0.44999998807907104,
-          "sensitivity": 1.0,
-          "spectrumShape": 0.75
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "shape": {
-          "anchor": "camera",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "baseHeight": -40.0,
-          "complexity": 26.0,
-          "curtainCount": 3.0,
-          "curtainHeight": 2600.0,
-          "driftSpeed": 0.12999999523162842,
-          "flowSpeed": 0.054999999701976776,
-          "layerSpacing": 0.3400000035762787,
-          "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
-          "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
-          "waveScale": 2.4000000953674316
-        }
-      },
-      "comet": {
-        "appearance": {
-          "coreColor": [
-            0.9200000166893005,
-            0.9700000286102295,
-            1.0
-          ],
-          "coreIntensity": 7.0,
-          "flowSpeed": 0.20000000298023224,
-          "haloColor": [
-            0.550000011920929,
-            0.7200000286102295,
-            1.0
-          ],
-          "haloIntensity": 0.699999988079071,
-          "haloSize": 34.0,
-          "headSize": 6.0,
-          "tailColor": [
-            0.6000000238418579,
-            0.75,
-            1.0
-          ],
-          "tailFalloff": 2.5999999046325684,
-          "tailIntensity": 1.5,
-          "tailLength": 700.0,
-          "tailWidth": 11.0,
-          "wispAmount": 6.0,
-          "wispScale": 0.004000000189989805
-        },
-        "path": {
-          "acceleration": 0.0,
-          "anchor": "world",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "arcLift": 50.0,
-          "curvature": 0.0,
-          "distance": 1900.0,
-          "endAzimuth": 62.0,
-          "endElevation": 15.0,
-          "speedScale": 1.0,
-          "startAzimuth": 34.0,
-          "startElevation": 31.0,
-          "travelSeconds": 2.4
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "sparkle": {
-          "density": 0.009999999776482582,
-          "enabled": false,
-          "fadeDistance": 85.0,
-          "intensity": 3.0,
-          "seed": 1,
-          "size": 0.18000000715255737,
-          "speed": 1.0
-        }
-      },
-      "enabled": true,
-      "ground": {
-        "color": [
-          0.30000001192092896,
-          0.8500000238418579,
-          1.0
-        ],
-        "falloff": 2.0,
-        "intensity": 0.6000000238418579,
-        "mode": "off",
-        "radius": 220.0
-      },
-      "kind": "comet",
-      "name": "Burst Spark",
-      "style": "Subtle Shooting Star",
-      "timing": {
-        "delay": 0.0,
-        "fadeIn": 0.5,
-        "fadeOut": 1.8,
-        "lifetime": 0.0,
-        "repeatSeconds": 0.0,
-        "windowSeconds": 5.0,
-        "windowStart": 3000.0
-      }
-    }
-  ]
+  }
 }

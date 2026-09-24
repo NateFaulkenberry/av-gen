@@ -14,7 +14,8 @@
 // panel. What is left here is world state that every scene has -- the sky, the fog, and what the
 // air is doing (ADR-055). What left:
 //
-//   * the cosmic vortex      -> an authored atmospheric effect, in the World Effects panel
+//   * the cosmic vortex      -> an effect instance on the World (ADR-702), in the World panel
+//                               Inspector's Environment selection
 //   * a node's wind response -> the World panel's Inspector, which edits the selected object's
 //                               own parameters and groups them by the sub-prefix they register
 //                               under, so `nodes/<n>/wind/*` is a "wind" group on that node

@@ -17,7 +17,7 @@
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
 #include "world/atmospherics.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
@@ -94,14 +94,17 @@ struct Scene {
     DetailLimits detailLimits{};
     PostSettings post;                // built-in post-processing (copied in by the Engine)
     TemporalSettings temporal;        // ADR-410: frame echo and the rest of the temporal family
-    // ADR-207: the world effects live *this frame*, already resolved and packed. Copied in by the
-    // Engine the way `post` is, and for the same reason: resolving a source to a world position
-    // needs the hero table and the director's cut, neither of which a renderer has any business
-    // knowing about. Not serialised -- the authored effects live on the Composition.
-    world::WorldEffectFrame worldEffects;
-    // ADR-230: the atmospheric effects live *this frame*, resolved and packed the same way and by
-    // the same owner, for the same reason -- a comet's launch window is gated on the director's cut
-    // and its spectrum comes from the analysis track, neither of which a renderer should know.
+    // ADR-702: the effects' RENDER CONTRIBUTIONS for this frame, one block per render stage that has
+    // an integrator, already evaluated and packed by the Engine from the scene's one effect list.
+    // The renderer copies them and executes its stages in frame order; it never evaluates an
+    // effect, because resolving a source to a world position needs the hero table and the
+    // director's cut, neither of which a renderer has any business knowing about. Not serialised --
+    // the authored effects live on the Composition.
+    //
+    //   `waves`        RenderStage::Material   -- ADR-207's surface term, in the lit pass
+    //   `atmospherics` RenderStage::Sky        -- comets and auroras, at the far plane
+    //                  RenderStage::Volumetric -- placed media (`atmospherics.media`), in the march
+    world::WaveFrame waves;
     world::AtmosphericFrame atmospherics;
     // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
     // scene with no LOD carries an empty vector, which is every scene that does not ask for it.

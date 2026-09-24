@@ -81,7 +81,7 @@ TEST_CASE("every shipped weather scene loads, and none of them is empty", "[weat
 
 TEST_CASE("no weather system names a field its scene does not define", "[weather][examples][fields]") {
     // A subscription that names nothing must be a stated problem, not a still picture -- the
-    // principle `world/world_effects/field_bus.hpp` is built on, applied to the one place ADR-520
+    // principle `world/effects/field_bus.hpp` is built on, applied to the one place ADR-520
     // added a name-by-string.
     std::string dangling;
     std::size_t masksChecked = 0;

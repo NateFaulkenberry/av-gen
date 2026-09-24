@@ -30,7 +30,7 @@
 //     is the half that stops the first two being satisfied by giving up.
 
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -44,12 +44,12 @@ using namespace avgen;
 namespace {
 
 const world::EffectSchema& fogSchema() {
-    const world::EffectSchema* s = world::effectSchema(world::AtmosphereKind::VolumetricFog);
+    const world::EffectSchema* s = world::effectSchema(world::EffectKind::VolumetricFog);
     REQUIRE(s != nullptr);
     return *s;
 }
 
-void setRow(world::AtmosphericEffect& e, std::string_view leaf, float v) {
+void setRow(world::EffectInstance& e, std::string_view leaf, float v) {
     const world::EffectSchema& s = fogSchema();
     for (const world::EffectField& f : s.fields) {
         if (std::string_view(f.leaf) == leaf) {
@@ -63,7 +63,7 @@ void setRow(world::AtmosphericEffect& e, std::string_view leaf, float v) {
 // The bytes the march reads, through the one writer that produces them (ADR-566's
 // `packMediumSlot`): the kind's packer, the reserved-lane check and the kind tag, in order. A test
 // that packed and then wrote the tag itself would be asserting about its own copy of the sequence.
-world::MediumSlot slotOf(const world::AtmosphericEffect& e) {
+world::MediumSlot slotOf(const world::EffectInstance& e) {
     world::MediumSlot slot{};
     world::packMediumSlot(e, 1.0f, slot);
     return slot;
@@ -95,10 +95,10 @@ constexpr Case kCases[] = {
     {"cylinder", 5, 2.0f, 50.0f, 1.4f, 0.8f, 1.0f},
 };
 
-world::AtmosphericEffect bankFor(const Case& c) {
+world::EffectInstance bankFor(const Case& c) {
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.factory != nullptr);
-    world::AtmosphericEffect e = s.factory("bank");
+    world::EffectInstance e = s.factory("bank");
     e.vortex.field.center = glm::vec3(0.0f, 120.0f, 0.0f);
     e.vortex.field.radius = 240.0f;
     e.vortex.field.thickness = 70.0f;
@@ -118,7 +118,7 @@ world::AtmosphericEffect bankFor(const Case& c) {
 TEST_CASE("the march's bound contains the field it clips", "[fog][bound]") {
     for (const Case& c : kCases) {
         INFO("case: " << c.name);
-        const world::AtmosphericEffect e = bankFor(c);
+        const world::EffectInstance e = bankFor(c);
         const world::MediumSlot slot = slotOf(e);
         const world::MediumBound bound = world::mediumBound(slot);
         REQUIRE(bound.radiusXZ > 0.0f);

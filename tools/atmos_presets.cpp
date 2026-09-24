@@ -9,9 +9,10 @@
 //   avgen_atmos_presets "Rainbow Cosmic" [name]   -- one preset, as a scene-ready effect
 //
 // The one-preset form is what the emitter calls: it names the style and the effect, and gets back
-// exactly what `AtmosphericEffect::toJson` would write, defaults and all.
+// exactly what `EffectInstance::toJson` would write, defaults and all.
 
-#include "world/atmospherics.hpp"
+#include "world/effects/effect_instance.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -27,8 +28,9 @@ int main(int argc, char** argv) {
     if (argc >= 2) {
         const std::string style = argv[1];
         const std::string name = argc >= 3 ? argv[2] : style;
-        world::AtmosphericEffect effect;
+        world::EffectInstance effect;
         effect.name = name;
+        effect.kind = world::EffectKind::Comet;
         if (world::applyCometStyle(effect, style)) {
             // The shipped comet lifecycle: an event with a window a sequencer can move, not scenery.
             effect = world::bioluminescentComet(name);
@@ -40,6 +42,8 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "unknown preset '%s'\n", style.c_str());
             return 2;
         }
+        // ADR-702: an instance needs an id; a preset dumped for a scene is World-owned.
+        effect.id = "preset";
         if (auto ok = effect.validate(); !ok) {
             std::fprintf(stderr, "preset '%s' does not validate: %s\n", style.c_str(),
                          ok.error().message.c_str());
@@ -52,22 +56,24 @@ int main(int argc, char** argv) {
     json out;
     json comets = json::object();
     for (const std::string_view style : world::cometStyleNames()) {
-        world::AtmosphericEffect e = world::bioluminescentComet(std::string(style));
+        world::EffectInstance e = world::bioluminescentComet(std::string(style));
         if (!world::applyCometStyle(e, style)) {
             std::fprintf(stderr, "comet style '%.*s' did not apply\n", static_cast<int>(style.size()),
                          style.data());
             return 3;
         }
+        e.id = "preset";
         comets[std::string(style)] = e.toJson();
     }
     json auroras = json::object();
     for (const std::string_view style : world::auroraStyleNames()) {
-        world::AtmosphericEffect e = world::glowmereAurora(std::string(style));
+        world::EffectInstance e = world::glowmereAurora(std::string(style));
         if (!world::applyAuroraStyle(e, style)) {
             std::fprintf(stderr, "aurora style '%.*s' did not apply\n", static_cast<int>(style.size()),
                          style.data());
             return 3;
         }
+        e.id = "preset";
         auroras[std::string(style)] = e.toJson();
     }
     out["comet"] = std::move(comets);

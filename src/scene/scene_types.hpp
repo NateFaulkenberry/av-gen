@@ -656,7 +656,7 @@ struct Environment {
     float volumeJitter = 1.0f;
     float volumeMaxDistance = 200.0f;
     // ADR-387: the cosmic vortex used to live here, as a singleton on the environment. It is an
-    // authored `world::AtmosphericEffect` of kind `Vortex` now, for the reason the consolidation
+    // authored `world::EffectInstance` of kind `Vortex` now, for the reason the consolidation
     // spec gives: a scene's artistic phenomena are instances inside a reusable system, not fields
     // on the world. A scene file that still carries `environment.vortex` is migrated on load.
     std::string volumeDensityField;        // scalar field name ("" = none)

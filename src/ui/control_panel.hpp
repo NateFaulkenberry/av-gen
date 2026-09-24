@@ -41,7 +41,6 @@
 #include "app/edit_capture.hpp"
 #include "app/edit_system.hpp"
 #include "ui/world_editor.hpp"
-#include "ui/world_effects_panel.hpp"
 #include "ui/world_panel.hpp"
 
 #include <filesystem>
@@ -311,9 +310,6 @@ public:
     // World authoring (ADR-031): layers, overview, inspector, states, macros, debug options.
     // The host reads `world.debug` to build the debug-draw geometry each frame.
     WorldPanel world;
-    // ADR-207: the world effects library -- the effects a scene declares, their styles, and the one
-    // slider that writes a beat route.
-    WorldEffectsPanel worldEffects;
     // ADR-066: the recipe, Generate World, and the job monitor. Given the job system
     // and builder by the host so the panel owns no scheduling of its own.
     WorldBuilderPanel worldBuilder;

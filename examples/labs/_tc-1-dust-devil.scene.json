@@ -55,13 +55,18 @@
    "intensity": 4.0
   }
  ],
- "atmosphericEffects": [
+ "effects": [
   {
+   "id": "2-classic-cone",
+   "type": "tornado",
    "name": "2 Classic Cone",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": false,
-   "kind": "tornado",
+   "order": 0,
    "activation": "always",
-   "tornado": {
+   "parameters": {
     "base": [
      2554.4,
      0.0,
@@ -134,11 +139,16 @@
    }
   },
   {
+   "id": "1-dust-devil",
+   "type": "tornado",
    "name": "1 Dust Devil",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": true,
-   "kind": "tornado",
+   "order": 1,
    "activation": "always",
-   "tornado": {
+   "parameters": {
     "base": [
      11.2,
      0.0,
@@ -211,11 +221,16 @@
    }
   },
   {
+   "id": "3-wedge",
+   "type": "tornado",
    "name": "3 Wedge",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": false,
-   "kind": "tornado",
+   "order": 2,
    "activation": "always",
-   "tornado": {
+   "parameters": {
     "base": [
      1088.7,
      0.0,
@@ -288,11 +303,16 @@
    }
   },
   {
+   "id": "5-thick-cloud",
+   "type": "tornado",
    "name": "5 Thick Cloud",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": false,
-   "kind": "tornado",
+   "order": 3,
    "activation": "always",
-   "tornado": {
+   "parameters": {
     "base": [
      3839.0,
      0.0,
@@ -365,11 +385,16 @@
    }
   },
   {
+   "id": "6-thin-rope",
+   "type": "tornado",
    "name": "6 Thin Rope",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": false,
-   "kind": "tornado",
+   "order": 4,
    "activation": "always",
-   "tornado": {
+   "parameters": {
     "base": [
      5036.9,
      0.0,
@@ -442,11 +467,16 @@
    }
   },
   {
+   "id": "7-cosmic-storm",
+   "type": "tornado",
    "name": "7 Cosmic Storm",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": false,
-   "kind": "tornado",
+   "order": 5,
    "activation": "always",
-   "tornado": {
+   "parameters": {
     "base": [
      6279.4,
      0.0,
@@ -519,11 +549,16 @@
    }
   },
   {
+   "id": "4-tall-column",
+   "type": "tornado",
    "name": "4 Tall Column",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": false,
-   "kind": "tornado",
+   "order": 6,
    "activation": "always",
-   "tornado": {
+   "parameters": {
     "base": [
      7857.3,
      0.0,

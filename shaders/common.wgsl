@@ -12,9 +12,9 @@ struct Light {
                                // z = volumetric strength (volume.wgsl), w = 0
 };
 
-// One world effect, as world::packWorldEffect writes it (ADR-207). The evaluation lives in
-// world_effects.wgsl; the layout lives here because it is part of the frame block.
-struct WorldEffect {
+// One surface wave (a Ground Pulse or Travel Beam instance), as world::packWave writes it (ADR-207). The evaluation lives in
+// wave_effects.wgsl; the layout lives here because it is part of the frame block.
+struct Wave {
     originKind: vec4<f32>, // xyz = origin (world), w = kind (0 directional, 1 radial)
     axisFront: vec4<f32>,  // xyz = unit axis (directional only), w = metres the front has travelled
     shape: vec4<f32>,      // x = front width, y = trail length, z = range, w = trail falloff exponent
@@ -110,13 +110,13 @@ struct FrameUniforms {
     windTurb: vec4<f32>,       // x = tau/turbulenceScale, y = turbulenceSpeed (m/s),
                                // z = tau/flutterScale, w = 0
     lights: array<Light, 8>,
-    // ADR-207 world effects. Appended after `lights` so no existing offset moved, and in the frame
+    // ADR-207 surface waves (ADR-702: the Ground Pulse and Travel Beam types). Appended after `lights` so no existing offset moved, and in the frame
     // block for the same reason the wind is (ADR-055): a phenomenon propagating through the world is
     // frame-global because the world is, and the shadow views inherit it with the rest of the block.
     // x = how many of the array below are live; the rest of the vector is spare.
-    worldEffectCount: vec4<f32>,
-    worldEffects: array<WorldEffect, 8>,
-    // ADR-230 atmospheric effects. Appended after the world effects for the same reason those were
+    waveCount: vec4<f32>,
+    waves: array<Wave, 8>,
+    // ADR-230 atmospheric effects. Appended after the surface waves for the same reason those were
     // appended after `lights`: no offset above it moves, so nothing already reading this block can
     // be broken by adding to the end of it.
     // x = live comets, y = live auroras, z = how many samples the tail march takes, w = 0.

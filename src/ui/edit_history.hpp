@@ -37,6 +37,7 @@
 #include "scene/camera_rig.hpp"
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
+#include "world/effects/effect_instance.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -193,6 +194,31 @@ struct PlanListChange {
     std::vector<directing::Plan> after;
 };
 
+// The scene's effect list, before and after (ADR-702).
+//
+// Recorded **whole**, on `LightChange`'s argument: the list is every owner's effects -- a handful to
+// a few dozen instances of plain values -- and one before-and-after reverses every structural edit
+// the Effects section can make (add, remove, duplicate, reorder, preset, reset, a source or anchor
+// change), including the ones nobody has written yet. It is also the exact shape
+// `Engine::setEffects` takes, so applying it either way is one call.
+//
+// Both sides are `Engine::capturedEffects()` -- the authored list with every slider's current BASE
+// captured into it -- because `setEffects` registers the parameters FROM the list, and a snapshot of
+// the authored list alone would put every slider moved since the last structural edit back where it
+// started. A slider move on its own is a `ParamChange`, like every other parameter in this editor.
+//
+// `routesTouched` is for "+ Add Effect", which also attaches the type's default audio routes: undoing
+// the add without taking them back would leave routes aimed at parameters that no longer exist, and
+// every rebind would then report them. Only that gesture sets it; the route list is otherwise the
+// Modulation panel's to edit.
+struct EffectChange {
+    std::vector<world::EffectInstance> before;
+    std::vector<world::EffectInstance> after;
+    bool routesTouched = false;
+    std::vector<params::ModRoute> routesBefore;
+    std::vector<params::ModRoute> routesAfter;
+};
+
 // One reversible change. Move-only, because it owns nodes.
 struct EditCommand {
     // What the user did, in their words, for the status bar and the history list: "Place 12 x fern",
@@ -216,6 +242,8 @@ struct EditCommand {
     // the same reason `timeline` is one: a command that moves eleven rocks should not carry a
     // light-list-shaped hole.
     std::unique_ptr<LightChange> lights;
+    // The effect list either side (ADR-702), or null for the edits that are most of them.
+    std::unique_ptr<EffectChange> effects;
     // The selection either side, so undoing a delete gives you back what you had selected rather
     // than leaving you staring at a scene with nothing chosen and no idea what came back.
     std::vector<std::string> selectionBefore;
@@ -230,7 +258,7 @@ struct EditCommand {
 
     [[nodiscard]] bool empty() const {
         return params.empty() && parents.empty() && heroes.empty() && added.empty() &&
-               removed.empty() && timeline == nullptr && lights == nullptr &&
+               removed.empty() && timeline == nullptr && lights == nullptr && effects == nullptr &&
                automation == nullptr && cameras == nullptr && plans == nullptr;
     }
     // How many things the user would say this touched, for the label and for tests.
@@ -252,6 +280,8 @@ struct EditApply {
     // 1 when this command installed an authored-light list, 0 otherwise. Counted rather than
     // flagged so the field reads like the others beside it.
     std::size_t lightListsInstalled = 0;
+    // 1 when this command installed an effect list, 0 otherwise.
+    std::size_t effectListsInstalled = 0;
     // 1 when this command installed a timeline-and-routes record, 0 otherwise (ADR-752).
     std::size_t automationInstalled = 0;
     // 1 when this command installed a camera collection, 0 otherwise (ADR-752).

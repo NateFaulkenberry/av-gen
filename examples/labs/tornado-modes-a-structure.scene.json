@@ -55,14 +55,19 @@
    "intensity": 4.0
   }
  ],
- "atmosphericEffects": [
+ "effects": [
   {
+   "id": "tornado",
+   "type": "tornado",
    "name": "Tornado",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": true,
-   "kind": "tornado",
-   "activation": "always",
+   "order": 0,
    "style": "Classic Cone",
-   "tornado": {
+   "activation": "always",
+   "parameters": {
     "base": [
      0.0,
      0.0,

@@ -18,7 +18,7 @@
 
 #include "core/error.hpp"
 #include "signals/musical_events.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>

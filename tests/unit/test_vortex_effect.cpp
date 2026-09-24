@@ -5,7 +5,7 @@
 //
 //   1. does a vortex survive a save and a load, field for field?
 //   2. does a scene written in the *old* form still load, with its values intact? (§19)
-//   3. does every parameter path the World Effects panel asks for on a vortex actually exist?
+//   3. does every parameter path the Effects panel asks for on a vortex actually exist?
 //      This is the shape of the defect ADR-382 records: a panel computed a path by string
 //      arithmetic, got it wrong, drew nothing and said nothing. The row lists are data now, so the
 //      test walks the same list the panel walks.
@@ -16,9 +16,8 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "ui/editor_layout.hpp"
-#include "world/world_effects/effect_registry.hpp"
-#include "ui/world_effects_panel.hpp"
-#include "world/atmospheric_params.hpp"
+#include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_params.hpp"
 #include "world/atmospherics.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -102,20 +101,25 @@ std::filesystem::path writeScene(const char* file, bool legacy) {
     if (legacy) {
         doc["environment"] = json{{"vortex", shippedVortex()}};
     } else {
-        doc["atmosphericEffects"] = json::array({json{{"name", "Cosmic Vortex"},
-                                                      {"enabled", true},
-                                                      {"kind", "vortex"},
-                                                      {"activation", "always"},
-                                                      {"vortex", shippedVortex()}}});
+        // ADR-702's canonical entry: the vortex's own rows under `parameters`, which keep the
+        // key layout the ADR-387 `vortex` block had.
+        doc["effects"] = json::array({json{{"id", "cosmic-vortex"},
+                                           {"type", "vortex"},
+                                           {"name", "Cosmic Vortex"},
+                                           {"owner", json{{"kind", "world"}}},
+                                           {"enabled", true},
+                                           {"order", 0},
+                                           {"activation", "always"},
+                                           {"parameters", shippedVortex()}}});
     }
     const auto path = scratch() / file;
     std::ofstream(path) << doc.dump(1);
     return path;
 }
 
-const world::AtmosphericEffect* firstVortex(const std::vector<world::AtmosphericEffect>& effects) {
-    for (const world::AtmosphericEffect& e : effects) {
-        if (e.kind == world::AtmosphereKind::Vortex) {
+const world::EffectInstance* firstVortex(const std::vector<world::EffectInstance>& effects) {
+    for (const world::EffectInstance& e : effects) {
+        if (e.kind == world::EffectKind::Vortex) {
             return &e;
         }
     }
@@ -125,14 +129,15 @@ const world::AtmosphericEffect* firstVortex(const std::vector<world::Atmospheric
 } // namespace
 
 TEST_CASE("a vortex round-trips through JSON as an atmospheric effect", "[vortex][atmospherics]") {
-    world::AtmosphericEffect e = world::cosmicVortex("Funnel");
+    world::EffectInstance e = world::cosmicVortex("Funnel");
     e.vortex.field.center = {3.0f, -70.0f, -8.0f};
     e.vortex.spill = 4.25f;
 
-    const auto back = world::AtmosphericEffect::fromJson(e.toJson());
+    const auto back = world::EffectInstance::fromJson(e.toJson());
     REQUIRE(back.has_value());
-    CHECK(back->kind == world::AtmosphereKind::Vortex);
+    CHECK(back->kind == world::EffectKind::Vortex);
     CHECK(back->name == "Funnel");
+    CHECK(back->id == e.id);
     CHECK(back->vortex.field.center.z == Approx(-8.0f));
     CHECK(back->vortex.spill == Approx(4.25f));
     CHECK(back->vortex.field.radius == Approx(e.vortex.field.radius));
@@ -140,9 +145,9 @@ TEST_CASE("a vortex round-trips through JSON as an atmospheric effect", "[vortex
 
     // THE CONTROL: an effect of another kind does not come back as a vortex, and a comet's payload
     // is not quietly overwritten by the vortex default that now sits beside it.
-    const auto comet = world::AtmosphericEffect::fromJson(world::bioluminescentComet("C").toJson());
+    const auto comet = world::EffectInstance::fromJson(world::bioluminescentComet("C").toJson());
     REQUIRE(comet.has_value());
-    CHECK(comet->kind == world::AtmosphereKind::Comet);
+    CHECK(comet->kind == world::EffectKind::Comet);
     CHECK_FALSE(comet->vortex.active());
     CHECK(comet->comet.appearance.coreIntensity > 0.0f);
 }
@@ -157,9 +162,10 @@ TEST_CASE("a scene authoring a vortex effect reaches the frame", "[vortex][atmos
     REQUIRE(loaded.has_value());
     (*loaded)->attach(params, modulator);
 
-    const world::AtmosphericEffect* e = firstVortex((*loaded)->atmosphericEffects());
+    const world::EffectInstance* e = firstVortex((*loaded)->effects());
     REQUIRE(e != nullptr);
     CHECK(e->name == "Cosmic Vortex");
+    CHECK(e->id == "cosmic-vortex");
     checkShippedValues(e->vortex);
 }
 
@@ -174,7 +180,7 @@ TEST_CASE("a scene in the legacy environment.vortex form is migrated, values int
     REQUIRE(loaded.has_value());
     (*loaded)->attach(params, modulator);
 
-    const world::AtmosphericEffect* e = firstVortex((*loaded)->atmosphericEffects());
+    const world::EffectInstance* e = firstVortex((*loaded)->effects());
     REQUIRE(e != nullptr);
     CHECK(e->enabled);
     CHECK(e->activation == world::Activation::Always);
@@ -182,9 +188,12 @@ TEST_CASE("a scene in the legacy environment.vortex form is migrated, values int
 
     // Saved in the new format, and the old key is gone rather than written twice.
     const json saved = (*loaded)->toJson();
-    REQUIRE(saved.contains("atmosphericEffects"));
-    CHECK(saved["atmosphericEffects"].size() == 1);
-    CHECK(saved["atmosphericEffects"][0]["kind"] == "vortex");
+    REQUIRE(saved.contains("effects"));
+    CHECK_FALSE(saved.contains("atmosphericEffects"));
+    CHECK(saved["effects"].size() == 1);
+    CHECK(saved["effects"][0]["type"] == "vortex");
+    CHECK(saved["effects"][0]["owner"]["kind"] == "world");
+    CHECK_FALSE(saved["effects"][0].value("id", std::string()).empty());
     CHECK_FALSE(saved.value("environment", json::object()).contains("vortex"));
 }
 
@@ -192,7 +201,7 @@ TEST_CASE("a legacy vortex that was switched off does not become an effect",
           "[vortex][atmospherics][composition][migration]") {
     // THE CONTROL for the migration: `radius` 0 was ADR-371's "off", and every scene in the
     // repository but one has no vortex at all. Turning those into disabled effect instances would
-    // put a row in the World Effects panel for something nobody authored.
+    // put a row in the Effects panel for something nobody authored.
     assets::AssetRegistry registry;
     registry.setBaseDirectory(scratch());
     json doc;
@@ -205,16 +214,17 @@ TEST_CASE("a legacy vortex that was switched off does not become an effect",
 
     auto loaded = scene::Composition::loadFile(path, registry);
     REQUIRE(loaded.has_value());
-    CHECK(firstVortex((*loaded)->atmosphericEffects()) == nullptr);
+    CHECK(firstVortex((*loaded)->effects()) == nullptr);
 }
 
-TEST_CASE("every parameter the World Effects panel asks a vortex for exists",
+TEST_CASE("every parameter the Effects panel asks a vortex for exists",
           "[vortex][atmospherics][params][ui]") {
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex("Funnel")};
-    world::registerAtmosphericParameters(params, effects);
+    std::vector<world::EffectInstance> effects{world::cosmicVortex("Funnel")};
+    world::registerEffectParameters(params, effects);
 
-    const std::string prefix = world::atmosphericParameterPrefix("Funnel");
+    REQUIRE(effects[0].id == "funnel");
+    const std::string prefix = world::effectParameterPrefix(effects[0].id);
     const auto requireLeaf = [&](std::string_view leaf) {
         const std::string path = prefix + std::string(leaf);
         INFO(path);
@@ -225,7 +235,7 @@ TEST_CASE("every parameter the World Effects panel asks a vortex for exists",
     };
     // ADR-500: the vortex's rows are its schema's, which is also what the panel walks -- so this
     // asks the same question of the same data the panel asks (ADR-382).
-    const world::EffectSchema* schema = world::effectSchema(world::AtmosphereKind::Vortex);
+    const world::EffectSchema* schema = world::effectSchema(world::EffectKind::Vortex);
     REQUIRE(schema != nullptr);
     REQUIRE(schema->fields.size() > 10);
     for (const world::EffectField& f : schema->fields) {
@@ -236,9 +246,10 @@ TEST_CASE("every parameter the World Effects panel asks a vortex for exists",
                              "windowStart", "windowSeconds"}) {
         requireLeaf(leaf);
     }
-    // The beat route's target, computed the way the panel computes it rather than asserted as a
-    // literal -- ADR-382's defect was in exactly that arithmetic.
-    CHECK(params.find(ui::atmosphericBeatTarget("Funnel", world::AtmosphereKind::Vortex)) != nullptr);
+    // The beat route's target, computed from the schema's `beatLeaf` the way the panel computes it
+    // rather than asserted as a literal -- ADR-382's defect was in exactly that arithmetic.
+    REQUIRE(schema->beatLeaf[0] != '\0');
+    CHECK(params.find(prefix + schema->beatLeaf) != nullptr);
 
     // THE CONTROL: a leaf that does not exist is not found, so the loop above could have failed.
     CHECK(params.find(prefix + "sunsetAmount") == nullptr);
@@ -257,7 +268,6 @@ TEST_CASE("the Tree panel is gone and the Environment panel is generic", "[ui][p
     // THE CONTROL: the predicate finds the panels that are there, so the line above is a fact about
     // the registry rather than about a typo in the predicate.
     CHECK(named("Environment"));
-    CHECK(named("World Effects"));
     CHECK(named("Parameters"));
 
     // The Environment panel's blurb no longer names one scene's furniture.
@@ -270,7 +280,8 @@ TEST_CASE("the Tree panel is gone and the Environment panel is generic", "[ui][p
 
 // ADR-387 §19, the half that nearly shipped broken: the PATHS.
 //
-// Moving the vortex from `scene/vortex/*` to `atmos/<name>/*` orphans every route, key, preset
+// Moving the vortex from `scene/vortex/*` to `atmos/<name>/*` (and, ADR-702, on to `fx/<id>/*`)
+// orphans every route, key, preset
 // member and macro that named the old one. The shipped Tree of Life project has five such routes,
 // and without the rewrite the migrated scene rendered 95.35% of its pixels differently -- an
 // unmodulated funnel. Nothing failed, nothing warned loudly, and a uniform probe confirmed that
@@ -304,7 +315,8 @@ TEST_CASE("the shipped project drives the vortex through a path that exists",
         // check is updated rather than removed: it is still the control proving the project really
         // does route to its placed medium, which is what makes the `sawLegacy` line above a fact
         // about the migration rather than about a project that never mentioned one.
-        if (target.rfind("atmos/", 0) == 0 && target.find("Tornado") != std::string::npos) {
+        // ADR-702 moved the prefix again, to `fx/<id>/`, keyed by the instance's id.
+        if (target.rfind("fx/cosmic-tornado/", 0) == 0) {
             vortexTargets.push_back(target);
         }
     }
@@ -317,11 +329,12 @@ TEST_CASE("the shipped project drives the vortex through a path that exists",
     // that matters, because a retarget that names a leaf the new kind does not declare is a dead
     // route, and a dead route is a setting the picture does not keep.
     params::ParameterSet params;
-    const world::EffectSchema* tornado = world::effectSchema(world::AtmosphereKind::Tornado);
+    const world::EffectSchema* tornado = world::effectSchema(world::EffectKind::Tornado);
     REQUIRE(tornado != nullptr);
     REQUIRE(tornado->factory != nullptr);
-    std::vector<world::AtmosphericEffect> effects{tornado->factory("Cosmic Tornado")};
-    world::registerAtmosphericParameters(params, effects);
+    std::vector<world::EffectInstance> effects{world::makeEffect(world::EffectKind::Tornado, "Cosmic Tornado")};
+    REQUIRE(effects[0].id == "cosmic-tornado");
+    world::registerEffectParameters(params, effects);
     for (const std::string& target : vortexTargets) {
         INFO(target);
         CHECK(params.find(target) != nullptr);
@@ -338,16 +351,16 @@ TEST_CASE("the vortex's scene-light scattering is off by default and reachable",
     CHECK(world::Vortex{}.scattering == 0.0f);
     CHECK(world::cosmicVortex("V").vortex.scattering == 0.0f);
     for (const std::string_view style : world::vortexStyleNames()) {
-        world::AtmosphericEffect e = world::cosmicVortex("V");
+        world::EffectInstance e = world::cosmicVortex("V");
         REQUIRE(world::applyVortexStyle(e, style));
         INFO(style);
         CHECK(e.vortex.scattering == 0.0f);
     }
 
     // It round-trips, so a scene that turns it on keeps it turned on.
-    world::AtmosphericEffect e = world::cosmicVortex("V");
+    world::EffectInstance e = world::cosmicVortex("V");
     e.vortex.scattering = 0.42f;
-    const auto back = world::AtmosphericEffect::fromJson(e.toJson());
+    const auto back = world::EffectInstance::fromJson(e.toJson());
     REQUIRE(back.has_value());
     CHECK(back->vortex.scattering == Approx(0.42f));
 
@@ -356,9 +369,9 @@ TEST_CASE("the vortex's scene-light scattering is off by default and reachable",
     // 0..1, so 1.0 is the soft maximum; the hard maximum is higher because that is what a
     // modulation route clamps to.
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex("V")};
-    world::registerAtmosphericParameters(params, effects);
-    params::IParameter* p = params.find("atmos/V/scattering");
+    std::vector<world::EffectInstance> effects{world::cosmicVortex("V")};
+    world::registerEffectParameters(params, effects);
+    params::IParameter* p = params.find("fx/v/scattering");
     REQUIRE(p != nullptr);
     CHECK(p->softMin(0) == Approx(0.0f));
     CHECK(p->softMax(0) == Approx(1.0f));

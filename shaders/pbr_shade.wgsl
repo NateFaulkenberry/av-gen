@@ -21,10 +21,10 @@
 #include "material.wgsl"
 #include "lighting.wgsl"
 // ADR-207. Included here, so the one file every shading path goes through is also the one
-// place world effects are applied: entities, skinned characters, the procedural scatter and
+// place surface waves are applied: entities, skinned characters, the procedural scatter and
 // raymarched SDF surfaces all receive a wave with no per-asset code. It reads `kProceduralDraw`,
 // which every includer of this file already defines.
-#include "world_effects.wgsl"
+#include "wave_effects.wgsl"
 // ADR-230 §6. Only the ground half: the comet marching and the aurora shells belong to the sky
 // draw, and a surface fragment has no use for them.
 #include "atmosphere_ground.wgsl"
@@ -338,7 +338,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     if (object.flags.z > 0.5) { // unlit
         // ADR-207: additive, even here. An unlit surface is one the lighting does not reach, not one
         // the world cannot touch.
-        let fx = worldEffectsAt(worldPos, n, emissive);
+        let fx = wavesAt(worldPos, n, emissive);
         result.color = vec4<f32>(applyFog(baseColor.rgb + emissive + fx.radiance, worldPos), alpha);
         result.normal = n;
         result.emission = baseColor.rgb + emissive + fx.radiance;
@@ -387,7 +387,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         // ADR-207: the world-effect contribution, added to the radiance *before* fog so a wave far
         // down a valley is seen through the air that is between it and the eye, and added to the
         // emission target so the bloom chain sees it too.
-        let fx = worldEffectsAt(worldPos, n, emissive);
+        let fx = wavesAt(worldPos, n, emissive);
         // ADR-230 §6: the sky's light on the ground. Multiplied by the albedo because it is
         // *incoming light* and not paint -- adding it flat would lift every black surface in the
         // valley to the aurora's colour, which is the "flattens the scene" failure §6 warns about.
@@ -504,7 +504,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     let rim = pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * matEmissive.w);
 
     // ADR-207, as on the styled path above: additive, pre-fog, and into the emission target.
-    let fx = worldEffectsAt(worldPos, n, emissive);
+    let fx = wavesAt(worldPos, n, emissive);
     // ADR-230 §6, as on the styled path above: albedo-multiplied, and not into the emission target.
     let skyLit = atmosphereGroundAt(worldPos, n) * baseColor.rgb;
     result.color = vec4<f32>(applyFog(direct + ambient + emissive + rim + fx.radiance + skyLit, worldPos), alpha);

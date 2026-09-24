@@ -15,6 +15,12 @@
 //   automation       the author timeline (tracks, keys, cues) and the modulation routes
 //   nodes            nodes the operation ADDED (undo detaches them) and parent changes
 //   plans            the project's Director Plans (ADR-755), so provenance and content undo together
+//   effects          the effect list (ADR-702), every owner's, with the sliders' bases captured
+//
+// Routes live in exactly ONE record: `AutomationChange` (the whole route list, when it moved). The
+// effect record this builds never sets `EffectChange::routesTouched` -- that flag belongs to the
+// Effects panel's own "+ Add Effect" command -- so a captured command cannot carry two route lists
+// that disagree about which is applied last.
 //
 // The records are the history's own whole-domain ones (`TimelineChange`, `CameraDirectionChange`,
 // `AutomationChange`), so an operation measured here is undone by exactly the code a person's edit
@@ -74,6 +80,8 @@ private:
     nlohmann::json routesJson_;
     std::map<std::string, std::string> parents_; // node -> parent, "" for a root
     std::vector<directing::Plan> plans_;
+    nlohmann::json effectsAuthored_;                 // decides whether the list changed
+    std::vector<world::EffectInstance> effects_;     // what undo installs: bases captured
     std::vector<std::string> unrecoverable_;
 };
 

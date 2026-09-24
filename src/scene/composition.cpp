@@ -16,6 +16,7 @@
 #include "scene/particle_io.hpp"
 #include "scene/scatter_anchors.hpp"
 #include "scene/sky.hpp"
+#include "world/effects/effect_stack.hpp"
 #include "spatial/detail.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -47,7 +48,7 @@ constexpr std::string_view kSceneKeys[] = {
     "format",     "version",        "name",           "camera",        "cameraDirection",
     "lightRig",   "lights",         "navBodyRadius",  "navCellSize",   "navWadeDepth",
     "wind",       "post",           "environment",    "composition",   "heroes",
-    "worldEffects", "atmosphericEffects", "entityProfiles", "entities", "fields",
+    "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
     "worldEvents"};
 constexpr std::string_view kEnvironmentKeys[] = {
@@ -1014,31 +1015,20 @@ Result<void> Composition::addGrid(spatial::GridField grid) {
 // ADR-074. Validated as a set, and all-or-nothing: a scene that declares a hero the director cannot
 // use should say so at load rather than silently render without it. Note the deliberate absence of
 // `dirty_ = true` -- see the header; heroes describe nodes that are already placed.
-Result<void> Composition::setWorldEffects(std::vector<world::WorldEffect> effects) {
-    // The whole set or none of it (ADR-207, and the same rule `setHeroes` follows): an effect whose
-    // name collides with another's is two things writing one parameter path, and an effect dropped
-    // for being invalid is an effect that never fires with nothing saying why.
-    if (auto ok = world::validateWorldEffects(effects); !ok) {
+Result<void> Composition::setEffects(std::vector<world::EffectInstance> effects) {
+    // The whole set or none of it (ADR-702, and the rule `setHeroes` follows): an effect whose id
+    // collides with another's is two things writing one parameter path, and an effect dropped for
+    // being invalid is an effect that never fires with nothing saying why.
+    if (auto ok = world::validateEffects(effects); !ok) {
         return ok;
     }
-    worldEffects_ = std::move(effects);
-    // Deliberately no `dirty_`: a world effect places nothing, occludes nothing and is not an
-    // obstacle, so there is nothing for a flatten to do. What reads them is the Engine, per frame.
+    effects_ = std::move(effects);
+    // Deliberately no `dirty_`: an effect places nothing, occludes nothing and is not an obstacle,
+    // so there is nothing for a flatten to do. What reads them is the Engine, per frame.
     return {};
 }
 
-// ADR-230, on exactly the terms `setWorldEffects` states above: the whole set or none of it, and a
-// duplicate name refused because a name is half of a parameter path. No `dirty_` for the same reason
-// again -- an aurora places nothing and occludes nothing.
-Result<void> Composition::setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects) {
-    if (auto ok = world::validateAtmosphericEffects(effects); !ok) {
-        return ok;
-    }
-    atmosphericEffects_ = std::move(effects);
-    return {};
-}
-
-// ADR-278. The whole set or none of it, for the reason `setWorldEffects` states: a duplicate name is
+// ADR-278. The whole set or none of it, for the reason `setEffects` states: a duplicate name is
 // two lights that cannot be told apart in a warning, in an overlay or in a parameter path. Unlike
 // the effects this *is* dirty -- a light is part of the picture, and `rebuild` is where the picture
 // is assembled.
@@ -4141,8 +4131,8 @@ void Composition::applyCanopyEmitters() {
         // rather than reading a field off the environment. Still no scene knowledge: it binds to
         // whatever vortex the scene contains, and to nothing if it contains none.
         const world::Vortex* found = nullptr;
-        for (const world::AtmosphericEffect& e : atmosphericEffects_) {
-            if (e.kind == world::AtmosphereKind::Vortex && e.enabled && e.vortex.active()) {
+        for (const world::EffectInstance& e : effects_) {
+            if (e.kind == world::EffectKind::Vortex && e.enabled && e.vortex.active()) {
                 found = &e.vortex;
                 break;
             }
@@ -8940,23 +8930,15 @@ nlohmann::json Composition::toJson() const {
         }
         j["heroes"] = std::move(heroes);
     }
-    // ADR-207. Written only when there are effects, so every scene that never declared one writes
-    // back exactly the file it had.
-    if (!worldEffects_.empty()) {
+    // ADR-702. Written only when there are effects, so every scene that never declared one writes
+    // back exactly the file it had. Stored grouped by owner in stack order, so the file lists every
+    // stack top to bottom -- the order a person sees in the panel.
+    if (!effects_.empty()) {
         json effects = json::array();
-        for (const world::WorldEffect& effect : worldEffects_) {
+        for (const world::EffectInstance& effect : effects_) {
             effects.push_back(effect.toJson());
         }
-        j["worldEffects"] = std::move(effects);
-    }
-    // ADR-230. Written only when there are effects, so every scene that never declared one writes
-    // back exactly the file it had.
-    if (!atmosphericEffects_.empty()) {
-        json atmospherics = json::array();
-        for (const world::AtmosphericEffect& effect : atmosphericEffects_) {
-            atmospherics.push_back(effect.toJson());
-        }
-        j["atmosphericEffects"] = std::move(atmospherics);
+        j["effects"] = std::move(effects);
     }
     if (!profileLibraryPath_.empty()) {
         j["entityProfiles"] = profileLibraryPath_;
@@ -9222,7 +9204,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     }
     // ADR-387 §19: a scene saved before the vortex became an authored effect carries it under
     // `environment.vortex`. It is read into this and converted into an effect instance after the
-    // `atmosphericEffects` array is read, because the conversion has to know what names are taken.
+    // `effects` array is read, because the conversion has to know what ids are taken.
     std::optional<world::Vortex> legacyVortex;
     if (j.contains("environment")) {
         const json& e = j.at("environment");
@@ -9640,46 +9622,35 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }
-    // ADR-207: the world effects. Read after the heroes, because a `hero` source names one and a
-    // reader who sees the effects first cannot say whether that name is real.
-    if (j.contains("worldEffects")) {
-        const json& effectsJson = j.at("worldEffects");
-        if (!effectsJson.is_array()) {
-            return fail("scene file '{}': 'worldEffects' must be an array", scenePath.string());
+    // ADR-702: the effects, every owner's, in one array. Read after the heroes, because an effect can
+    // be attached to one and a `hero` source names one. A malformed entry is an error rather than a
+    // silent omission, because an effect that does not load is an effect that never fires with
+    // nothing saying why -- and that includes an entry in the pre-ADR-702 format, which is named.
+    for (const char* legacy : {"worldEffects", "atmosphericEffects"}) {
+        if (j.contains(legacy)) {
+            return fail("scene file '{}': '{}' is the pre-ADR-702 effect format; effects are one "
+                        "'effects' array now (tools/migrate_effects.py converts a file)",
+                        scenePath.string(), legacy);
         }
-        std::vector<world::WorldEffect> effects;
+    }
+    if (j.contains("effects")) {
+        const json& effectsJson = j.at("effects");
+        if (!effectsJson.is_array()) {
+            return fail("scene file '{}': 'effects' must be an array", scenePath.string());
+        }
+        std::vector<world::EffectInstance> effects;
         effects.reserve(effectsJson.size());
         for (std::size_t i = 0; i < effectsJson.size(); ++i) {
-            auto effect = world::WorldEffect::fromJson(effectsJson[i]);
+            auto effect = world::EffectInstance::fromJson(effectsJson[i]);
             if (!effect) {
-                return fail("scene file '{}': worldEffects[{}]: {}", scenePath.string(), i,
-                            effect.error().message);
+                return fail("scene file '{}': effects[{}]: {}", scenePath.string(), i, effect.error().message);
             }
             effects.push_back(std::move(*effect));
         }
-        if (auto ok = comp->setWorldEffects(std::move(effects)); !ok) {
-            return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
-        }
-    }
-    // ADR-230: the atmospheric effects. Read beside the world effects and on the same terms -- a
-    // malformed one is an error rather than a silent omission, because an effect that does not load
-    // is an effect that never fires with nothing saying why.
-    if (j.contains("atmosphericEffects")) {
-        const json& atmosJson = j.at("atmosphericEffects");
-        if (!atmosJson.is_array()) {
-            return fail("scene file '{}': 'atmosphericEffects' must be an array", scenePath.string());
-        }
-        std::vector<world::AtmosphericEffect> atmospherics;
-        atmospherics.reserve(atmosJson.size());
-        for (std::size_t i = 0; i < atmosJson.size(); ++i) {
-            auto effect = world::AtmosphericEffect::fromJson(atmosJson[i]);
-            if (!effect) {
-                return fail("scene file '{}': atmosphericEffects[{}]: {}", scenePath.string(), i,
-                            effect.error().message);
-            }
-            atmospherics.push_back(std::move(*effect));
-        }
-        if (auto ok = comp->setAtmosphericEffects(std::move(atmospherics)); !ok) {
+        // Stored in stack order whatever order the file listed them in; `validateEffects` below then
+        // checks the orders the file stated were a real stack.
+        world::normaliseEffectOrder(effects);
+        if (auto ok = comp->setEffects(std::move(effects)); !ok) {
             return fail("scene file '{}': {}", scenePath.string(), ok.error().message);
         }
     }
@@ -9689,26 +9660,24 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     // re-defaulted: §10 asks that the Tree of Life look identical, and the only way to be sure of
     // that is for the numbers to be the same numbers.
     if (legacyVortex && legacyVortex->active()) {
-        std::vector<world::AtmosphericEffect> effects = comp->atmosphericEffects_;
+        std::vector<world::EffectInstance> effects = comp->effects_;
         const bool alreadyAuthored =
-            std::any_of(effects.begin(), effects.end(), [](const world::AtmosphericEffect& e) {
-                return e.kind == world::AtmosphereKind::Vortex;
+            std::any_of(effects.begin(), effects.end(), [](const world::EffectInstance& e) {
+                return e.kind == world::EffectKind::Vortex;
             });
         if (!alreadyAuthored) {
-            std::string name = "vortex";
-            int suffix = 2;
-            while (std::any_of(effects.begin(), effects.end(),
-                               [&name](const world::AtmosphericEffect& e) { return e.name == name; })) {
-                name = std::format("vortex{}", suffix++);
-            }
-            world::AtmosphericEffect e;
-            e.name = std::move(name);
-            e.kind = world::AtmosphereKind::Vortex;
+            world::EffectInstance e;
+            e.id = world::uniqueEffectId(effects, "vortex");
+            e.name = "vortex";
+            e.kind = world::EffectKind::Vortex;
             e.enabled = true;
             e.activation = world::Activation::Always;
             e.vortex = *legacyVortex;
-            effects.push_back(std::move(e));
-            if (auto ok = comp->setAtmosphericEffects(std::move(effects)); !ok) {
+            if (auto added = world::insertEffect(effects, std::move(e)); !added) {
+                return fail("scene file '{}': migrating 'environment.vortex': {}", scenePath.string(),
+                            added.error().message);
+            }
+            if (auto ok = comp->setEffects(std::move(effects)); !ok) {
                 return fail("scene file '{}': migrating 'environment.vortex': {}", scenePath.string(),
                             ok.error().message);
             }
@@ -10928,7 +10897,7 @@ nlohmann::json nodeEditsAgainst(const nlohmann::json& liveNodes, const nlohmann:
 // Not `nodeEditsAgainst`'s shape, and the difference is the whole reason this exists. That function
 // compares **by name**, a set difference, because a node's numbers already live in the `parameters`
 // block. Lights are the opposite: most of a light's 25 fields -- `type`, `role`, `node`, `width`,
-// `up` -- will never be parameters, so the list has to be copied whole, the way `worldEffects` and
+// `up` -- will never be parameters, so the list has to be copied whole, the way `effects` and
 // `heroes` are, and a whole-list copy can only be decided by comparing the lists.
 //
 // Which forces the canonicalisation below. `authoredLightToJson` omits defaults, so comparing the

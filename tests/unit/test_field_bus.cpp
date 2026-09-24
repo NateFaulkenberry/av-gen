@@ -8,10 +8,10 @@
 
 #include "core/vortex.hpp"
 #include "core/wind.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_conformance.hpp"
-#include "world/world_effects/field_bus.hpp"
+#include "world/effects/effect_conformance.hpp"
+#include "world/effects/field_bus.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -242,24 +242,24 @@ TEST_CASE("the subscription survives save and load, both halves",
     // ADR-350, and specifically the hole ADR-392 names: `toJson(fromJson(toJson(e))) == toJson(e)`
     // passes when a key is missing from BOTH directions. So the value is checked by name on the way
     // out and by value on the way back, and the document is checked for the key's presence.
-    world::AtmosphericEffect e = world::glowmereAurora("Valley Aurora");
-    e.flow.field = "atmos/Cosmic Vortex";
+    world::EffectInstance e = world::glowmereAurora("Valley Aurora");
+    e.flow.field = "fx/cosmic-vortex";
     e.flow.influence = 1.37f;
 
     const nlohmann::json doc = e.toJson();
     REQUIRE(doc.contains("flow"));
-    CHECK(doc.at("flow").at("field").get<std::string>() == "atmos/Cosmic Vortex");
+    CHECK(doc.at("flow").at("field").get<std::string>() == "fx/cosmic-vortex");
 
-    const auto back = world::AtmosphericEffect::fromJson(doc);
+    const auto back = world::EffectInstance::fromJson(doc);
     REQUIRE(back.has_value());
-    CHECK(back->flow.field == "atmos/Cosmic Vortex");
+    CHECK(back->flow.field == "fx/cosmic-vortex");
     CHECK(back->flow.influence == Catch::Approx(1.37f));
 
     // A document written before §68 existed has no `flow` block and must load as an unsubscribed
     // effect rather than failing -- which is every scene and project in the repository today.
     nlohmann::json old = doc;
     old.erase("flow");
-    const auto legacy = world::AtmosphericEffect::fromJson(old);
+    const auto legacy = world::EffectInstance::fromJson(old);
     REQUIRE(legacy.has_value());
     CHECK(legacy->flow.field.empty());
     CHECK(legacy->flow.influence == 0.0f);
@@ -271,20 +271,34 @@ TEST_CASE("every kind registers the leaf the panel's field row names",
     // ADR-382, and ADR-500's form of it: the shared rows are a table the panel walks by leaf, so
     // the panel and this test read the same data and cannot disagree. A leaf five characters wrong
     // draws an empty box and says nothing.
+    //
+    // ADR-702: "every kind" is every kind the evaluator samples a field for. The surface waves are
+    // not sampled (`sharedFieldApplies`), so they must register NO flow row -- a slider there would
+    // move nothing -- and that half is checked too, so the exemption cannot hide a sky kind.
     std::vector<std::string_view> leaves;
+    const world::EffectField* flowRow = nullptr;
     for (const world::EffectField& f : world::sharedEffectFields()) {
         if (std::string_view(f.leaf) == "flowInfluence") {
             leaves.push_back(f.leaf);
+            flowRow = &f;
         }
     }
     REQUIRE_FALSE(leaves.empty());
+    REQUIRE(flowRow != nullptr);
 
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
-        INFO("kind: " << world::atmosphereKindName(kind));
+    std::size_t subscribed = 0;
+    for (const world::EffectKind kind : conf::kEffectKinds) {
+        INFO("kind: " << world::effectKindName(kind));
+        const world::EffectSchema* schema = world::effectSchema(kind);
+        REQUIRE(schema != nullptr);
+        const bool samplesFields = schema->resolve.bucket != world::EffectBucket::Surface;
+        CHECK(world::sharedFieldApplies(*schema, *flowRow) == samplesFields);
         const conf::Report r = conf::checkLeavesExist(kind, leaves, "panel-flow-row");
         INFO(r.summary());
-        CHECK(r.clean());
+        CHECK(r.clean() == samplesFields);
+        subscribed += samplesFields ? 1u : 0u;
     }
+    CHECK(subscribed == 6); // comet, aurora, vortex, shower, fog, tornado
 }
 
 TEST_CASE("a comet subscribed to the wind is moved by where it is, not only by when",
@@ -293,11 +307,11 @@ TEST_CASE("a comet subscribed to the wind is moved by where it is, not only by w
     // field, two places in the world: the packed lanes must differ. A shared clock would give the
     // same answer to both, and a shared clock is what this replaces.
     fx::FieldBus bus = windBus();
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = 3.0;
     ctx.fieldBus = &bus;
 
-    world::AtmosphericEffect e = world::bioluminescentComet("Streak");
+    world::EffectInstance e = world::bioluminescentComet("Streak");
     // A comet is an event with a window (§3.5), and its factory's window opens at 4 s. Make it
     // permanent so the case is about the field rather than about the clock.
     e.activation = world::Activation::Always;
@@ -337,11 +351,11 @@ TEST_CASE("a dead subscription renders as still air rather than as nothing at al
     // the scene refuses to load. Neither. The effect renders exactly as an unsubscribed one, and
     // the name is reported elsewhere.
     fx::FieldBus bus = windBus();
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = 3.0;
     ctx.fieldBus = &bus;
 
-    world::AtmosphericEffect e = world::glowmereAurora("Curtain");
+    world::EffectInstance e = world::glowmereAurora("Curtain");
     world::AtmosphericFrame unsubscribed{};
     world::buildAtmosphericFrame(std::span(&e, 1), ctx, unsubscribed);
 
@@ -368,13 +382,13 @@ TEST_CASE("a subscribed frame is a pure function of the transport second",
     // break it, so the frame it produces is built in ascending order and then in scrambled order
     // and the two must agree exactly.
     fx::FieldBus bus = windBus();
-    bus.publishVortex(fx::vortexFieldName("Cosmic Vortex"), vortex::packVortex(funnel()));
+    bus.publishVortex(fx::vortexFieldName("cosmic-vortex"), vortex::packVortex(funnel()));
 
-    std::vector<world::AtmosphericEffect> effects;
+    std::vector<world::EffectInstance> effects;
     effects.push_back(world::bioluminescentComet("Streak"));
     effects.push_back(world::glowmereAurora("Curtain"));
     effects.push_back(world::cosmicVortex("Cosmic Vortex"));
-    for (world::AtmosphericEffect& e : effects) {
+    for (world::EffectInstance& e : effects) {
         // Permanent, so every second sampled below has all three effects live in it and the case is
         // about determinism rather than about which windows happened to be open.
         e.activation = world::Activation::Always;
@@ -387,7 +401,7 @@ TEST_CASE("a subscribed frame is a pure function of the transport second",
     const std::array<double, 5> scrambled{5.5, 0.25, 7.25, 4.0, 1.5};
 
     const auto frameAt = [&](double t) {
-        world::AtmosphericContext ctx;
+        world::EffectContext ctx;
         ctx.seconds = t;
         ctx.fieldBus = &bus;
         world::AtmosphericFrame f{};
@@ -423,11 +437,11 @@ TEST_CASE("a subscribed frame is a pure function of the transport second",
 TEST_CASE("the funnel leans downwind, by a bounded amount, and only when asked",
           "[world][atmospherics][fields]") {
     fx::FieldBus bus = windBus();
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = 6.0;
     ctx.fieldBus = &bus;
 
-    world::AtmosphericEffect e = world::cosmicVortex("Cosmic Vortex");
+    world::EffectInstance e = world::cosmicVortex("Cosmic Vortex");
     e.vortex.field.radius = 400.0f;
     e.vortex.field.center = glm::vec3(0.0f, 60.0f, 0.0f);
 
@@ -457,10 +471,10 @@ TEST_CASE("a vortex inside a closed activation window does not reach the march",
     // The defect §68's wiring exposed. `buildAtmosphericFrame` used to walk `effects` a second time
     // and test only `enabled`, under a comment claiming the resolve had already applied activation
     // and lifetime. It had not: the resolve takes `span<const>` and cannot write anything back.
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = 0.0;
 
-    world::AtmosphericEffect e = world::cosmicVortex("Cosmic Vortex");
+    world::EffectInstance e = world::cosmicVortex("Cosmic Vortex");
     e.vortex.field.radius = 400.0f;
     e.activation = world::Activation::Window;
     e.timing.windowStart = 100.0;
@@ -484,14 +498,14 @@ TEST_CASE("a vortex fades with its lifetime envelope instead of switching off",
     // The other half of the same defect. A fade is a fade: the two PER-METRE coefficients (ADR-374)
     // scale, and nothing else does -- fading the colours would leave a full-strength grey funnel and
     // fading the radius would shrink it rather than dim it.
-    world::AtmosphericEffect e = world::cosmicVortex("Cosmic Vortex");
+    world::EffectInstance e = world::cosmicVortex("Cosmic Vortex");
     e.vortex.field.radius = 400.0f;
     e.activation = world::Activation::Window;
     e.timing.windowStart = 0.0;
     e.timing.windowSeconds = 10.0;
     e.timing.fadeIn = 4.0;
 
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     const auto vortexAt = [&](double t) {
         ctx.seconds = t;
         world::AtmosphericFrame f{};
