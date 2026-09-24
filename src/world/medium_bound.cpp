@@ -23,6 +23,8 @@
 
 #include "world/atmospherics.hpp"
 
+#include "core/tornado.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -70,9 +72,16 @@ MediumBound mediumBound(const MediumSlot& m) {
         const float lateral = std::sqrt(m.lane[7].x * m.lane[7].x + m.lane[7].y * m.lane[7].y) +
                               std::max(m.lane[7].z, 0.0f);
         b.radiusXZ = std::max(funnel, std::max(skirt, cloud)) + lateral;
-        // Vertically the field is compactly supported: `h > 1.08` and `h < -0.02` are both zero.
+        // Vertically the field is compactly supported: nothing above `h = 1.08`, and nothing below
+        // the funnel's tip or the debris cloud's rounded underside (ADR-706) -- asked of the field's
+        // own `supportBelow`, which reads only lanes 3 and 4, so the bound and the early-out are
+        // one expression. The shader's twin is `tornadoSupportBelow`.
+        tornado::TornadoUniforms u;
+        u.t3 = m.lane[3];
+        u.t4 = m.lane[4];
+        const float below = tornado::supportBelow(u);
         b.yTop = centre.y + height * 1.08f;
-        b.yBot = centre.y - height * 0.02f;
+        b.yBot = centre.y - height * below;
         return b;
     }
 

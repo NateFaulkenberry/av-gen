@@ -29,6 +29,7 @@
 //   - widen the bound to something enormous and "the bound is not vacuous" fails instead, which
 //     is the half that stops the first two being satisfied by giving up.
 
+#include "core/tornado.hpp"
 #include "world/atmospherics.hpp"
 #include "world/effects/effect_registry.hpp"
 
@@ -194,5 +195,114 @@ TEST_CASE("the march's bound contains the field it clips", "[fog][bound]") {
              << " (grid step " << stepXZ << " x " << stepY << ")");
         CHECK(insideMaxR + 2.0f * stepXZ > bound.radiusXZ * 0.55f);
         CHECK(insideMaxY - centre.y + 2.0f * stepY > (bound.yTop - centre.y) * 0.5f);
+    }
+}
+
+// ---- the tornado arm (ADR-580, ADR-706) ----------------------------------------------------------
+//
+// ADR-566's transliteration carried the tornado's arm, and nothing sampled it: this file's cases are
+// all fog banks. ADR-706 then moved the tornado's support BELOW its ground contact -- the funnel now
+// ends in a rounded tip that reaches `-footSoft`, and the debris cloud has a rounded underside that
+// reaches `-kDebrisUnder * skirtHeight` -- so the bound's floor moved with it, and this is the
+// check that it moved far enough in both twins' shared expression.
+//
+// **How it fails.** Put `b.yBot` back to `centre.y - height * 0.02f` in `medium_bound.cpp` and the
+// deep-underside and long-tip cases report dense samples below the claimed floor. Set `below` to
+// something enormous and the vacuity half fails instead.
+
+namespace {
+
+tornado::TornadoUniforms fieldOf(const world::MediumSlot& slot) {
+    tornado::TornadoUniforms u;
+    glm::vec4* lanes[] = {&u.t0, &u.t1, &u.t2, &u.t3, &u.t4, &u.t5, &u.t6,
+                          &u.t7, &u.t8, &u.t9, &u.t10, &u.t11, &u.t12};
+    for (int i = 0; i < 13; ++i) {
+        *lanes[i] = slot.lane[i];
+    }
+    return u;
+}
+
+struct TornadoCase {
+    const char* name;
+    float skirtDensity;
+    float skirtHeight;
+    float footSoft;
+    float touchdown;
+    glm::vec2 lean;
+    float wobble;
+};
+
+constexpr TornadoCase kTornadoCases[] = {
+    {"classic cone", 0.8f, 0.10f, 0.04f, 1.0f, {0.0f, 0.0f}, 18.0f},
+    {"deep debris underside", 2.5f, 0.6f, 0.04f, 1.0f, {0.0f, 0.0f}, 0.0f},
+    {"long soft tip, no debris", 0.0f, 0.10f, 0.35f, 1.0f, {0.0f, 0.0f}, 0.0f},
+    {"hanging funnel over its debris", 1.2f, 0.25f, 0.1f, 0.55f, {0.0f, 0.0f}, 0.0f},
+    {"leaning and wobbling", 0.8f, 0.10f, 0.04f, 1.0f, {120.0f, -60.0f}, 70.0f},
+};
+
+} // namespace
+
+TEST_CASE("the march's bound contains the tornado it clips, tip and debris underside included",
+          "[tornado][bound]") {
+    const world::EffectSchema* schema = world::effectSchema(world::EffectKind::Tornado);
+    REQUIRE(schema != nullptr);
+    for (const TornadoCase& c : kTornadoCases) {
+        INFO("case: " << c.name);
+        world::EffectInstance e = schema->factory("storm");
+        tornado::TornadoField& f = e.tornado.field;
+        f.base = glm::vec3(300.0f, 40.0f, -200.0f);
+        f.skirtDensity = c.skirtDensity;
+        f.skirtHeight = c.skirtHeight;
+        f.footSoft = c.footSoft;
+        f.touchdown = c.touchdown;
+        f.lean = c.lean;
+        f.wobbleAmount = c.wobble;
+        f.cloudAmount = 0.0f; // the shape; detail is a mean-1 multiply on it and cannot widen it
+        const world::MediumSlot slot = slotOf(e);
+        const world::MediumBound bound = world::mediumBound(slot);
+        const tornado::TornadoUniforms u = fieldOf(slot);
+
+        // The window is sized from the FIELD, not from the bound, so a bound that is too small
+        // cannot hide its own defect by shrinking the search.
+        const float height = f.height;
+        const float spanXZ = f.radiusTop * f.cloudWidth + std::hypot(c.lean.x, c.lean.y) + c.wobble + 200.0f;
+        const float yLo = f.base.y - height * 0.5f;
+        const float yHi = f.base.y + height * 1.2f;
+        constexpr int kNXZ = 60;
+        constexpr int kNY = 160;
+        float worstOutside = 0.0f;
+        glm::vec3 worstAt(0.0f);
+        float lowestInside = yHi;
+        for (int iy = 0; iy <= kNY; ++iy) {
+            const float y = yLo + (yHi - yLo) * float(iy) / float(kNY);
+            for (int ix = 0; ix <= kNXZ; ++ix) {
+                for (int iz = 0; iz <= kNXZ; ++iz) {
+                    const glm::vec3 p(f.base.x - spanXZ + 2.0f * spanXZ * float(ix) / float(kNXZ), y,
+                                      f.base.z - spanXZ + 2.0f * spanXZ * float(iz) / float(kNXZ));
+                    const float d = tornado::tornadoDensity(u, p, 6.0f);
+                    if (d <= 0.0f) {
+                        continue;
+                    }
+                    const float r = std::hypot(p.x - f.base.x, p.z - f.base.z);
+                    const bool inside = r <= bound.radiusXZ && p.y >= bound.yBot && p.y <= bound.yTop;
+                    if (inside) {
+                        lowestInside = std::min(lowestInside, p.y);
+                    } else if (d > worstOutside) {
+                        worstOutside = d;
+                        worstAt = p;
+                    }
+                }
+            }
+        }
+        INFO("densest sample outside: " << worstOutside << " at (" << worstAt.x << ", " << worstAt.y
+             << ", " << worstAt.z << "); bound r=" << bound.radiusXZ << " y=[" << bound.yBot << ", "
+             << bound.yTop << "]");
+        // Compactly supported: exactly zero outside, no tolerance owed.
+        CHECK(worstOutside == 0.0f);
+        // Not vacuous at the floor: the field reaches to within a few grid steps of the claimed
+        // bottom, so the floor is where the storm ends and not somewhere safely below it.
+        const float stepY = (yHi - yLo) / float(kNY);
+        INFO("the field's lowest sample is " << lowestInside << ", the bound's floor " << bound.yBot);
+        CHECK(lowestInside - bound.yBot < 3.0f * stepY + 0.02f * height);
     }
 }

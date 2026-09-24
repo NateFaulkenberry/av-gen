@@ -295,6 +295,44 @@ struct TornadoShape {
     inside: bool,
 };
 
+// ADR-706: how far below the ground contact the debris cloud's rounded underside reaches, as a
+// fraction of `skirtHeight`.
+const kTornadoDebrisUnder: f32 = 0.3;
+
+// ADR-706: how far below `h = 0` the field has support, in heights. The funnel's tip reaches
+// `-footSoft` at most and the debris underside `-kTornadoDebrisUnder * skirtHeight`; 0.02 is the
+// floor the field always had. `mediumBoundOf` in `volume.wgsl` and `world::mediumBound` carry the
+// same expression, and `test_medium_bound.cpp` fails when one of the three moves alone.
+fn tornadoSupportBelow(v: TornadoUniformsWgsl) -> f32 {
+    return max(0.02, max(max(v.t3.w, 1e-3), kTornadoDebrisUnder * max(v.t4.y, 1e-3)));
+}
+
+// The condensation shell's cross-section (§15, §22), as a function of a normalised distance `x`
+// from an axis.
+//
+// A tornado's condensation funnel is a SURFACE, not a filled cone: water condenses where the
+// pressure drop is steepest, which is the sheath around the core, and the literature is explicit
+// that a funnel is "initially transparent, only becoming opaque when it kicks up dust, debris or
+// rain". So the density peaks in a shell at `x = 1` and the interior is a separate, artist-owned
+// amount. `coreDensity` at 0 is a hollow tube whose far wall shows through its near one, at 1 a
+// solid smoke column, and `coreRadius` slides the boundary between them.
+//
+// ADR-706 made this a function because it now has two callers: the funnel, around the funnel
+// radius, and the debris cloud, around its own. A debris cloud is the same kind of thing -- a
+// rotating sheath of particulate around a core -- so it takes the same cross-section rather than
+// a fifth set of rules.
+fn tornadoSheath(v: TornadoUniformsWgsl, x: f32) -> f32 {
+    let edgeSoft = max(v.t3.x, 1e-3);
+    let shellWidth = max(v.t2.x, 1e-3);
+    let d = (x - 1.0) / shellWidth;
+    let shell = exp(-d * d) * max(v.t2.y, 0.0);
+    let interior = max(v.t2.w, 0.0) * (1.0 - smoothstep(clamp(v.t2.z, 0.0, 1.0), 1.0, x));
+    // The outer fade starts beyond the shell's crest, or it would eat the outer half of the very
+    // feature it is there to bound.
+    let outer = 1.0 - smoothstep(1.0 + shellWidth, 1.0 + shellWidth + edgeSoft, x);
+    return (shell + interior) * outer;
+}
+
 fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f32) -> TornadoShape {
     var s: TornadoShape;
     s.density = 0.0;
@@ -314,9 +352,11 @@ fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f3
     s.heightT = h;
 
     // Compact support in height, and compactly so (ADR-369's lesson about early-outs that are
-    // exact rather than approximate). Nothing above the wall cloud; nothing below the skirt.
+    // exact rather than approximate). Nothing above the wall cloud; nothing below the funnel's tip
+    // or the debris cloud's underside, whichever reaches further (ADR-706).
     let skirtHeight = max(v.t4.y, 1e-3);
-    if (h > 1.08 || h < -0.02) {
+    let footSoft = max(v.t3.w, 1e-3);
+    if (h > 1.08 || h < -tornadoSupportBelow(v)) {
         return s;
     }
 
@@ -325,13 +365,12 @@ fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f3
     let planar = s.rel.xz - s.axis;
     let dist = length(planar);
     let radius = max(tornadoRadiusAt(v, hc), 1e-3);
-    let rr = dist / radius;
-    s.radialT = rr;
+    s.radialT = dist / radius;
 
     let edgeSoft = max(v.t3.x, 1e-3);
     let shellWidth = max(v.t2.x, 1e-3);
-    // The skirt reaches further out than the funnel does, so the early-out has to clear both or it
-    // clips the one feature that most says "tornado".
+    // The debris cloud reaches further out than the funnel does, so the early-out has to clear
+    // both or it clips the one feature that most says "tornado".
     let skirtRadius = max(v.t1.x * max(v.t4.x, 1.0) * (1.0 + max(v.t4.w, 0.0)), 1e-3);
     // The cloud reaches further out than either of the other two, so all three bounds go into the
     // early-out. A bound that clips the widest feature is a bound that deletes the silhouette it
@@ -343,63 +382,77 @@ fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f3
 
     // ---- the funnel ----------------------------------------------------------------------------
     //
-    // §15 and §22. A tornado's condensation funnel is a SURFACE, not a filled cone: water condenses
-    // where the pressure drop is steepest, which is the sheath around the core, and the literature
-    // is explicit that a funnel is "initially transparent, only becoming opaque when it kicks up
-    // dust, debris or rain". So the density peaks in a shell at the funnel wall and the interior is
-    // a separate, artist-owned amount.
+    // §16's lifecycle, as one control. `touchdown` is how far down the funnel has condensed: at 1
+    // it reaches the ground, and below that it hangs, with only the debris cloud marking the
+    // circulation at the surface. That is not a stylisation -- it is the order real tornadoes do it
+    // in, and the references are blunt that "debris swirls are usually evident PRIOR TO the
+    // condensation funnel reaching the surface".
     //
-    // That one decision is what gives §15 its four requested looks from two numbers: `coreDensity`
-    // at 0 is a hollow tube whose far wall shows through its near one, at 1 a solid smoke column,
-    // and `coreRadius` slides the boundary between them.
-    let d = (rr - 1.0) / shellWidth;
-    let shell = exp(-d * d) * max(v.t2.y, 0.0);
-    let interior = max(v.t2.w, 0.0) * (1.0 - smoothstep(clamp(v.t2.z, 0.0, 1.0), 1.0, rr));
-    // The outer fade starts beyond the shell's crest, or it would eat the outer half of the very
-    // feature it is there to bound.
-    let outer = 1.0 - smoothstep(1.0 + shellWidth, 1.0 + shellWidth + edgeSoft, rr);
-    var funnel = (shell + interior) * outer;
+    // ADR-706: and the funnel ENDS IN A TIP, not a plane. This used to fade the density across a
+    // horizontal band at full radius, which at any camera above the base is the column's lower
+    // rim seen as an ellipse -- "a column that stops". The radius now closes with the same ramp
+    // (a square root, so the end is rounded rather than pointed), which is the shape a condensation
+    // funnel actually has where it stops: a hanging funnel tapers, it is not sawn off.
+    let reach = 1.0 - clamp(v.t3.z, 0.0, 1.0);
+    let foot = smoothstep(reach - footSoft, reach + footSoft, h);
+    let tip = sqrt(foot);
+    let rr = dist / max(radius * tip, 1e-3);
 
+    var funnel = tornadoSheath(v, rr);
     // A slight thickening of the funnel ITSELF toward the top. The mass of the wall cloud is a
     // separate term further down; this is only the funnel widening into it.
     let wallCloud = 1.0 + max(v.t3.y, 0.0) * smoothstep(0.55, 1.0, hc);
     let cap = 1.0 - smoothstep(1.0, 1.06, h);
-
-    // §16's lifecycle, as one control. `touchdown` is how far down the funnel has condensed: at 1
-    // it reaches the ground, and below that it hangs, with only the debris skirt marking the
-    // circulation at the surface. That is not a stylisation -- it is the order real tornadoes do it
-    // in, and the references are blunt that "debris swirls are usually evident PRIOR TO the
-    // condensation funnel reaching the surface".
-    let reach = 1.0 - clamp(v.t3.z, 0.0, 1.0);
-    let footSoft = max(v.t3.w, 1e-3);
-    let foot = smoothstep(reach - footSoft, reach + footSoft, h);
     funnel = funnel * wallCloud * cap * foot;
 
     let angle = atan2(planar.y, planar.x);
     funnel = funnel * tornadoStripes(v, rr, hc, angle, t);
-    // Applied to the funnel and to the SKIRT below, but not to the cloud: suction vortices are a
+    // Applied to the funnel and to the debris below, but not to the cloud: suction vortices are a
     // feature of the column and of where it meets the ground, and putting lobes on the wall cloud
     // would read as a fairground ride.
     let suction = tornadoSuction(v, rr, hc, angle, t);
     funnel = funnel * suction;
 
-    // ---- the debris skirt ----------------------------------------------------------------------
+    // ---- the debris cloud (ADR-706) ------------------------------------------------------------
     //
-    // The strongest read cue after the silhouette itself, and it is STRUCTURE rather than a
-    // decoration applied to a finished funnel. Wider than the funnel (the references put it at
-    // 1.5x to 3x the funnel's ground width), only a few per cent of the height, and it flares
-    // DOWNWARD -- the opposite sense to the funnel's taper, which is what produces the
-    // characteristic hourglass read where the two meet.
+    // Where the column meets the ground, and the strongest read cue after the silhouette. It was a
+    // radially filled disc whose density fell as the square of height -- most of its mass in the
+    // bottom few metres and a hard plane under it, which from a camera above the base is a pool on
+    // the floor. It is now the SAME sheath cross-section as the funnel, around a radius that is a
+    // MOUND in height:
     //
-    // It is deliberately not multiplied by `foot`: the skirt is there whether or not the funnel has
-    // condensed to the ground.
+    //   * widest at the ground by `skirtFlare`, a LINEAR flare. The first version squared it, and
+    //     rendered as a concave trumpet foot -- a lamp base on the cone, and a hard-edged pyramid on
+    //     the dust devil, which had been a soft mound before. Debris is a convex mass;
+    //   * superelliptic shoulders (`(1 - hd^4)^(1/4)`), full for most of the height and then
+    //     rounding over. The plain `sqrt(1 - hd^2)` dome, rendered, still came back a cone at the
+    //     dust devil's proportions;
+    //   * thinning over its upper two thirds, the way lifted dust does, so its top is soft while its
+    //     sides are a silhouette;
+    //   * a short rounded UNDERSIDE, `kTornadoDebrisUnder` of its height, so a column standing on
+    //     nothing does not end in a disc -- and one standing on terrain loses nothing, because the
+    //     ground hides it.
+    //
+    // It carries the striations and the suction lobes, so it turns with the column, and it is
+    // deliberately not multiplied by `foot`: the debris is there whether or not the funnel has
+    // condensed to the ground. `u` is scaled so the sheath's whole outer fade lies inside the
+    // mound, which keeps `skirtWidth` meaning the cloud's outer width and keeps the bound unchanged.
     var skirt = 0.0;
-    if (h < skirtHeight && v.t4.z > 0.0) {
-        let sk = 1.0 - smoothstep(0.0, skirtHeight, max(h, 0.0));
-        let flare = max(v.t1.x * max(v.t4.x, 1.0) * (1.0 + max(v.t4.w, 0.0) * sk), 1e-3);
-        skirt = v.t4.z * (1.0 - smoothstep(0.30, 1.0, dist / flare)) * sk * sk;
-        // Fade out just below the contact point rather than clipping at it.
-        skirt = skirt * smoothstep(-0.02, 0.0, h) * suction;
+    if (v.t4.z > 0.0 && h < skirtHeight) {
+        let hd = h / skirtHeight;
+        let rTop = v.t1.x * max(v.t4.x, 1.0);
+        var rb = 0.0;
+        if (hd >= 0.0) {
+            let hd2 = hd * hd;
+            let shoulder = sqrt(sqrt(max(1.0 - hd2 * hd2, 0.0)));
+            rb = rTop * (1.0 + max(v.t4.w, 0.0) * (1.0 - hd)) * shoulder;
+        } else {
+            let q = hd / kTornadoDebrisUnder;
+            rb = skirtRadius * sqrt(max(1.0 - q * q, 0.0));
+        }
+        let u = dist * (1.0 + shellWidth + edgeSoft) / max(rb, 1e-3);
+        let thin = 1.0 - smoothstep(0.3, 1.0, max(hd, 0.0));
+        skirt = v.t4.z * tornadoSheath(v, u) * thin * tornadoStripes(v, u, hc, angle, t) * suction;
     }
 
     // ---- the wall cloud ---------------------------------------------------------------------
@@ -445,7 +498,7 @@ fn tornadoEvaluate(v: TornadoUniformsWgsl, p: vec3<f32>, t: f32, filterWidth: f3
     // `cloudAmount` 0 the detail term is exactly 1 and the density is the analytic field, which is
     // §38's Mode 1 -- a slider rather than a rebuild, and the render the brief asks to be shown
     // before any detail is added.
-    s.density = envelope * tornadoDetail(v, rr, hc, angle, envelope, radius, t, filterWidth);
+    s.density = envelope * tornadoDetail(v, s.radialT, hc, angle, envelope, radius, t, filterWidth);
     return s;
 }
 
