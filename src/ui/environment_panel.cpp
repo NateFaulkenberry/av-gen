@@ -26,7 +26,7 @@ void rowLabel(const char* label) {
 }
 
 // A row over a parameter's own soft range, writing its BASE. Base and not final, for the reason
-// world_effects_panel.cpp gives: final is this frame's modulated value, and a slider that writes it
+// param_widget.hpp gives: final is this frame's modulated value, and a slider that writes it
 // snaps back on the next frame, which is how a panel loses somebody's trust.
 bool slider(app::Engine& engine, const char* path, const char* label, const char* fmt = "%.3f",
             bool logarithmic = false) {

@@ -1,6 +1,6 @@
-// World effects on the GPU (ADR-207): the shader half, on pixels.
+// Surface waves on the GPU (ADR-207, ADR-702): the shader half of Ground Pulse and Travel Beam, on pixels.
 //
-// The CPU tests in tests/unit/test_world_effects.cpp cover resolution, activation, timing and the
+// The CPU tests in tests/unit/test_wave_effects.cpp cover resolution, activation, timing and the
 // packing. What they cannot answer is whether the packed block reaches `pbr_shade.wgsl` at all,
 // whether the off switch is genuinely off, and whether the wave lands where its distance metric says
 // it should. Those are pixel questions, and the frame this renders is deliberately tiny -- a lit
@@ -17,6 +17,8 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
+#include "world/effects/effect_instance.hpp"
+#include "world/effects/effect_registry.hpp"
 #include "world/wave_effect.hpp"
 
 #include <glm/gtc/constants.hpp>
@@ -78,8 +80,9 @@ scene::Scene groundScene() {
 
 // A radial wave centred on the origin, packed as the engine packs one. The front is placed rather
 // than advanced, so the frame under test depends on nothing but this number.
-world::WorldEffectFrame radialAt(float frontDistance, float intensity = 6.0f) {
-    world::WorldEffect e = world::heroGroundPulse("probe");
+world::WaveFrame radialAt(float frontDistance, float intensity = 6.0f) {
+    world::EffectInstance instance = world::makeEffect(world::EffectKind::GroundPulse, "probe");
+    world::WaveEffect& e = instance.wave;
     e.appearance.intensity = intensity;
     e.appearance.edgeIntensity = intensity * 1.5f;
     e.appearance.color = glm::vec3(0.1f, 1.0f, 0.4f);
@@ -92,8 +95,8 @@ world::WorldEffectFrame radialAt(float frontDistance, float intensity = 6.0f) {
     e.propagation.ringCount = 0.0f;
     e.response = world::MaterialResponse{1.0f, 1.0f, 1.0f, 0.0f};
 
-    world::ResolvedEffect r;
-    r.effect = &e;
+    world::ResolvedWave r;
+    r.effect = &instance;
     r.origin = glm::vec3(0.0f);
     r.axis = glm::vec3(0.0f, 1.0f, 0.0f);
     r.frontDistance = frontDistance;
@@ -101,9 +104,9 @@ world::WorldEffectFrame radialAt(float frontDistance, float intensity = 6.0f) {
     r.elapsed = 0.0;
     r.color = e.appearance.color;
 
-    world::WorldEffectFrame frame;
+    world::WaveFrame frame;
     frame.count = 1;
-    frame.effects[0] = world::packWorldEffect(r);
+    frame.effects[0] = world::packWave(r);
     return frame;
 }
 
@@ -152,8 +155,8 @@ double meanAtRadius(const gpu::Image8& image, const scene::Scene& scene, float r
 
 } // namespace
 
-TEST_CASE("a world effect reaches the shared surface shader, and its off switch is complete",
-          "[gpu][worldeffects]") {
+TEST_CASE("a surface wave reaches the shared surface shader, and its off switch is complete",
+          "[gpu][waves]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
@@ -171,7 +174,7 @@ TEST_CASE("a world effect reaches the shared surface shader, and its off switch 
     const gpu::Image8 none = render(scene);
 
     SECTION("a live effect changes the frame") {
-        scene.worldEffects = radialAt(40.0f);
+        scene.waves = radialAt(40.0f);
         const gpu::Image8 lit = render(scene);
         const std::size_t changed = differingPixels(lit, none);
         // Not "some pixels changed": a 4 m front with a 14 m trail on a 240 m plane seen from 90 m
@@ -183,7 +186,7 @@ TEST_CASE("a world effect reaches the shared surface shader, and its off switch 
             // ADR-207's idle arm. Not "nearly the same" -- the whole claim is that a frame with the
             // system switched off is the frame that existed before the system did.
             rendering::SceneRenderer::PassToggles off;
-            off.worldEffects = false;
+            off.waves = false;
             renderer.setPassToggles(off);
             const gpu::Image8 disabled = render(scene);
             renderer.setPassToggles(rendering::SceneRenderer::PassToggles{});
@@ -191,7 +194,7 @@ TEST_CASE("a world effect reaches the shared surface shader, and its off switch 
         }
 
         SECTION("as does a count of zero") {
-            scene.worldEffects = world::WorldEffectFrame{};
+            scene.waves = world::WaveFrame{};
             CHECK(differingPixels(render(scene), none) == 0);
         }
     }
@@ -199,7 +202,7 @@ TEST_CASE("a world effect reaches the shared surface shader, and its off switch 
     SECTION("the same state renders identically twice") {
         // The determinism claim, on pixels. Nothing in the effect path may read a frame counter or a
         // wall clock, so two renders of one state are one image.
-        scene.worldEffects = radialAt(40.0f);
+        scene.waves = radialAt(40.0f);
         const gpu::Image8 first = render(scene);
         const gpu::Image8 second = render(scene);
         CHECK(std::memcmp(first.rgba.data(), second.rgba.data(), first.rgba.size()) == 0);
@@ -208,9 +211,9 @@ TEST_CASE("a world effect reaches the shared surface shader, and its off switch 
     SECTION("the band lands at the radius the front is at, and travels with it") {
         // The point of a world-space propagation: the wave is where its distance metric says, on the
         // ground, not somewhere in screen space. Two fronts, and the brightness has to follow.
-        scene.worldEffects = radialAt(30.0f);
+        scene.waves = radialAt(30.0f);
         const gpu::Image8 near = render(scene);
-        scene.worldEffects = radialAt(70.0f);
+        scene.waves = radialAt(70.0f);
         const gpu::Image8 far = render(scene);
 
         const double baseAt30 = meanAtRadius(none, scene, 30.0f);
@@ -224,9 +227,9 @@ TEST_CASE("a world effect reaches the shared surface shader, and its off switch 
     }
 
     SECTION("intensity is a gain on the contribution, not a switch") {
-        scene.worldEffects = radialAt(40.0f, 2.0f);
+        scene.waves = radialAt(40.0f, 2.0f);
         const double dim = meanAtRadius(render(scene), scene, 40.0f);
-        scene.worldEffects = radialAt(40.0f, 8.0f);
+        scene.waves = radialAt(40.0f, 8.0f);
         const double bright = meanAtRadius(render(scene), scene, 40.0f);
         const double base = meanAtRadius(none, scene, 40.0f);
         CHECK(dim > base + 4.0);

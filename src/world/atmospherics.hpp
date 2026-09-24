@@ -689,7 +689,7 @@ void packMediumSlot(const EffectInstance& e, float envelope, MediumSlot& slot,
                     const MediumFlowInput& flow = {});
 
 // What one frame hands the renderer. A plain aggregate so nothing allocates and `scene::Scene` can
-// hold it by value beside `worldEffects`.
+// hold it by value beside `waves`.
 struct AtmosphericFrame {
     std::uint32_t cometCount = 0;
     std::uint32_t auroraCount = 0;

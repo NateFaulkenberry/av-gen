@@ -19,6 +19,7 @@
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "world/atmospherics.hpp"
+#include "world/effects/effect_instance.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/trigonometric.hpp>
@@ -113,7 +114,7 @@ world::AtmosphericFrame cometFrame(float travelledFraction, bool rainbow = false
     e.ground.mode = world::GroundGlow::Off;
 
     const std::array<world::EffectInstance, 1> set{e};
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = 10.0 * travelledFraction;
     world::AtmosphericFrame frame;
     world::buildAtmosphericFrame(set, ctx, frame);
@@ -134,7 +135,7 @@ world::AtmosphericFrame auroraFrame(float intensity = 3.0f, bool enabled = true)
     e.ground.mode = world::GroundGlow::Off;
 
     const std::array<world::EffectInstance, 1> set{e};
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = 3.0;
     world::AtmosphericFrame frame;
     world::buildAtmosphericFrame(set, ctx, frame);

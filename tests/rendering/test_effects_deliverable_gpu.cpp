@@ -1,4 +1,4 @@
-// The deliverable invariant, in pixels: a world effect the session is drawing is in the frame the
+// The deliverable invariant, in pixels: an effect the session is drawing is in the frame the
 // render writes.
 //
 // The reported defect was "world effects, skybox effects in particular are not rendered as part of
@@ -39,6 +39,7 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "world/atmospherics.hpp"
+#include "world/effects/effect_instance.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -75,6 +76,7 @@ std::unique_ptr<gpu::Context> makeContext() {
 // where the effect goes, not how it looks.
 world::EffectInstance loudAurora() {
     world::EffectInstance e;
+    e.id = "valley-aurora";
     e.name = "Valley Aurora";
     e.kind = world::EffectKind::Aurora;
     e.activation = world::Activation::Always;
@@ -117,7 +119,7 @@ std::unique_ptr<app::Engine> engineAt(const fs::path& scene, double seconds,
     auto engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
     REQUIRE(engine->loadComposition(scene).has_value());
     if (!effects.empty()) {
-        REQUIRE(engine->setAtmosphericEffects(effects).has_value());
+        REQUIRE(engine->setEffects(effects).has_value());
     }
     static_cast<void>(sceneAt(*engine, seconds));
     return engine;
@@ -133,7 +135,7 @@ TEST_CASE("An atmospheric effect the session draws is in the frame a render writ
     REQUIRE(renderer.init().has_value());
 
     const fs::path dir = fs::temp_directory_path() /
-                         ("avgen_worldfx_deliverable_" + std::to_string(getpid()));
+                         ("avgen_effects_deliverable_" + std::to_string(getpid()));
     fs::remove_all(dir);
     fs::create_directories(dir);
 
@@ -147,8 +149,8 @@ TEST_CASE("An atmospheric effect the session draws is in the frame a render writ
     REQUIRE(empty->scene().atmospherics.auroraCount == 0);
     const std::uint64_t none = renderHash(renderer, empty->scene(), kSecond);
 
-    // `setAtmosphericEffects` is the World Effects panel's own call, and the scene file is not
-    // written again -- as it is not when somebody presses Render.
+    // `setEffects` is the Effects panel's own call, and the scene file is not written again -- as
+    // it is not when somebody presses Render.
     const auto session = engineAt(dir / "scene.json", kSecond, {loudAurora()});
     REQUIRE(session->scene().atmospherics.auroraCount == 1);
     const std::uint64_t live = renderHash(renderer, session->scene(), kSecond);

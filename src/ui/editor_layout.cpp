@@ -41,13 +41,14 @@ constexpr std::array<EditorPanel, 21> kPanels{{
     // this list rather than the only camera there is.
     {"Cameras", "Cameras", DockRegion::Right, false,
      "the camera library: what exists, which one is live, and when each is used"},
-    // ADR-207. Beside the Auto-director, because the two shipped effects are gated on its cut and
-    // "why is my beam not firing" is nearly always "nothing is directing the camera".
-    {"World Effects", "World Effects", DockRegion::Right, false,
-     "waves propagating through the world: beams, ripples, their styles and what answers the beat"},
-    // ADR-375. Beside World Effects, because the question "why does the sky look like that" is
-    // asked in the same breath as "why is the beam not firing", and both were answered until now by
-    // scrolling the flat Parameters list.
+    // ADR-702 removed the standalone effects panel that sat here. Effects are instances attached to an
+    // owner, so their controls are where the owner is edited: the World panel's Inspector (the
+    // Environment selection for the World's stack, a node for an entity's, Camera for the camera's)
+    // and the Lights panel for a light's. A saved layout that still names the old panel is harmless
+    // -- `EditorLayout::slot` returns null for an id the registry does not have.
+    //
+    // ADR-375. The Environment panel, because the question "why does the sky look like that" was
+    // answered until then by scrolling the flat Parameters list.
     //
     // ADR-387 removed the "Tree" panel that used to sit on the next line. It was a scene-specific
     // wrapper: five sections that found their subjects by sniffing parameter names for "leaf",

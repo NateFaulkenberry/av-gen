@@ -1249,27 +1249,20 @@ inline constexpr float kMinItemWidth = 60.0f;
     return buffer;
 }
 
-// ---- the vortex's rows in the World Effects panel (ADR-387) -------------------------------------
+// ---- a declared row, for the families that are not effect instances (ADR-387, ADR-410) --------
 //
 // Declared here, as data, for the reason ADR-382's Tree-panel defect gives: that panel computed a
 // parameter path by string arithmetic, got it five characters wrong, drew nothing, and said
 // nothing about it -- and no test could catch it because the arithmetic lived inside an ImGui
 // function nothing could call. A row list that is plain data can be walked by the panel and by a
-// test, and the test's question is the panel's question: does every leaf this asks for exist on a
-// vortex?
+// test, and the test's question is the panel's question: does every leaf this asks for exist?
 //
-// ADR-392: the comet's and the aurora's rows are here too now. They were the mechanical change
-// ADR-387 deferred, and deferring it had a cost -- for as long as those two kinds' rows were
-// string literals inside an ImGui call, `conformance::checkLeavesExist` could be pointed at one of
-// the family's three kinds and not at the other two. A leaf five characters wrong in either of
-// them still drew an empty box and said nothing.
-//
-// The anchor combo in each advanced section stays inline: it writes a `SkyAnchor` enum on the
-// effect, not a parameter, so it is not a row and pretending it were would put a leaf in the table
-// that registration does not produce.
+// Effect instances (ADR-702) do not use this: their rows are `world::EffectSchema::fields`, the same
+// list that registers the parameters, drawn by the Effects section (`effects_panel.hpp`). What still
+// uses it is the scene-level temporal family below, which has a prefix of its own and no schema.
 struct EffectRow {
     std::string_view section; // non-empty starts a new SeparatorText before this row
-    std::string_view leaf;    // appended to `atmos/<name>/`
+    std::string_view leaf;    // appended to the family's prefix, e.g. `temporal/<effect>/`
     std::string_view label;
     std::string_view format;    // empty = the panel's default
     bool logarithmic = false;
@@ -1446,21 +1439,13 @@ inline constexpr scene::DeformerKind kDeformerKinds[] = {
     return prefix + "deform/" + std::to_string(slot + 1) + "/" + std::string(leaf);
 }
 
-// ---- ADR-500: the atmospheric family's rows moved ---------------------------------------------
+// ---- ADR-500/702: effect rows live with their type --------------------------------------------
 //
-// `cometRows`, `cometAdvancedRows`, `auroraRows`, `auroraAdvancedRows`, `vortexRows`,
-// `vortexAdvancedRows`, `skyRainbowRows`, `skyGroundRows` and `atmosphericFlowRows` were here.
-// They are now `EffectSchema::fields` and `world::sharedEffectFields()`, declared beside the
-// parameter each row registers, in `src/world/effects/kinds/<kind>_effect.cpp`.
-//
-// That is the point of ADR-500 rather than a tidy-up. ADR-392 made these tables data so that a
-// test could walk them, which is what caught a leaf five characters wrong -- but it left the row
-// and the registration as two lists that had to agree by hand. They are ONE list now, so they
-// cannot disagree, and the question a test can still usefully ask is the inverse: is every
-// REGISTERED parameter a row somebody can reach? `tests/unit/test_effect_conformance.cpp` asks
-// exactly that, and it can fail.
-//
-// `EffectRow` itself stays. The temporal family (ADR-410) and the propagation family still use it,
-// and `effect_params.cpp`'s three parallel lists are the next thing shaped to take this treatment.
+// The per-kind row tables that used to be here (`cometRows`, `auroraRows`, `vortexRows`, ...) are now
+// `world::EffectSchema::fields` and `world::sharedEffectFields()`, declared beside the parameter each
+// row registers, in `src/world/effects/kinds/<kind>_effect.cpp`, and drawn by the Effects section.
+// The row and the registration are ONE list, so they cannot disagree; the question a test can still
+// usefully ask is the inverse -- is every REGISTERED parameter a row somebody can reach? --
+// which `tests/unit/test_effects_panel.cpp` asks of `ui::effectCardRows`.
 
 } // namespace avgen::ui

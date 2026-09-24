@@ -6,9 +6,9 @@ summary: What each panel holds, and which topic explains it.
 order: 93
 audience: expert
 tags: panels, reference, interface
-keywords: what does this panel do; panel list; where is the parameter panel; world builder; graph editor
+keywords: what does this panel do; panel list; where is the parameter panel; world builder; graph editor; where are the effects; add effect; world effects
 related: start/interface, modulation/parameters, sequencer/overview, rendering/offline-render
-features: panel.world-builder, panel.assets, panel.world, panel.world-effects, panel.parameters, panel.composition, panel.sequence, panel.render, panel.control, panel.analysis, panel.modulation, panel.graph
+features: panel.world-builder, panel.assets, panel.world, panel.parameters, panel.composition, panel.sequence, panel.render, panel.control, panel.analysis, panel.modulation, panel.graph
 ---
 
 # Panel Reference
@@ -34,56 +34,53 @@ Layers, the inspector, scene states, direction, macros and debug draw. It also c
 The world-editing half of this panel is being rewritten and is not documented yet. See
 [The world editor](help://gaps/world-editor).
 
-## World Effects — right
+### Effects
 
-Waves propagating through the world (ADR-207): a camera beam that travels ahead of a directed
-camera on its way to the next hero, a ripple that spreads from the hero it lands on, and whatever
-else a scene declares. **Add camera beam** and **Add hero pulse** create one of each with defaults
-that work; **Style** sets colour, intensity, sparkle and the wave's shape in one go and leaves every
-one of them editable underneath.
+There is no separate effects panel. An effect is attached to something — the World, an object (a
+hero is an object), the camera or a light — and its controls are wherever that thing is edited:
 
-**Beat response** is a slider that writes an ordinary `beat.pulse` modulation route onto the
-effect's intensity. It is not a hidden audio hook: the route it makes appears in the Modulation
-panel, can be curved, enveloped, re-pointed or deleted there, and is saved with the project.
+- **World → Inspector**, with **Atmosphere → environment** selected: the World's effects (an aurora,
+  a comet, a fog bank, a travel beam).
+- **World → Inspector**, with an object selected: that object's effects (a Ground Pulse on a hero).
+- **World → Inspector**, with **Camera & lighting → camera** selected: the camera's effects.
+- **Lights**, with a light selected: that light's effects.
 
-**Advanced** holds the rest — what the effect is about (its source, when it activates, which way a
-directional wave points), the wave's shape, the sparkle, how hard each kind of surface answers it,
-and the timing. Every control in the panel is an ordinary parameter under `worldfx/<name>/`, so the
-Parameters panel shows the same numbers, the timeline can key them and a preset can recall them.
+Every one of those shows the same **Effects** section. **+ Add Effect** lists the effect types that
+can be attached to that kind of thing, grouped by category; hover an entry for what it does. When no
+type can be attached, the button is disabled and the section says so.
 
-Effects gated on the camera need a directed camera to gate against. With none, the panel says so
-rather than leaving you to discover it as an effect that does nothing.
+Each effect is a card, top of the stack first. The header carries its name, a status, an on/off box
+and a **...** menu (**Move up**, **Move down**, **Duplicate**, **Reset parameters**, **Remove**); drag a
+card's header onto another card in the same stack to reorder. The status says what happened on the
+last frame: *drawn*, *dormant* (outside its activation window), *off*, and two warnings — **not
+drawn**, when its render stage's GPU capacity was full and effects above it took every slot, and
+**orphaned**, when the thing it is attached to is not in the scene. Orphaned effects are also listed
+under the World's section, where they can be removed.
 
-### Atmospheric
+Inside a card: **Preset** sets the look in one go and leaves every value editable; the main
+controls; **Ground glow** (off, subtle or strong) for the types that light the ground below them;
+**Beat response**, a slider that writes an ordinary `beat.pulse` modulation route onto the effect —
+visible, editable and deletable in the Modulation panel, and saved with the project; **Source** and
+**Target** pickers for the types that start from, or point at, a thing in the scene. **Advanced** holds
+the rest, including **Follows** (the spatial field the effect's motion answers to) and **Anchored
+to** for sky effects. **Timing** holds the activation and the delay, fades, lifetime and repeat.
 
-Below the propagation effects, the same panel holds the sky ones (ADR-230): **comets** that cross it
-on a great-circle arc, and an **aurora** whose curtains rise from the horizon and take their shape
-from the audio spectrum. They are here rather than in a panel of their own because they are the same
-kind of thing with a different geometry — a source, a lifetime, an appearance and a wish to be
-modulated — and they share every control that describes one.
+Every control is an ordinary parameter under `fx/<effect id>/`, so the Parameters panel shows the
+same numbers, the timeline can key them, a preset can recall them and a route can drive them.
+Right-click a row for **Reset to default** and **Key at current time**. Structural edits — add,
+remove, move, duplicate, preset, reset, activation, source — are one undo step each, and so is each
+slider gesture.
 
-**Add comet** makes an event: a window a sequencer can move, so it launches once. Give it a repeat
-interval to make it a shower. **Add aurora** makes scenery that breathes: always on, fading up.
-**Preset** sets the colours, the shape and the sparkle in one go and leaves every one of them
-editable underneath.
+Effects gated on the camera (*while the camera travels*, *while a hero is in focus*) need a directed
+camera to gate against. With none, the section says so rather than leaving you to discover it as an
+effect that does nothing.
 
-A comet's trajectory is authored in sky coordinates — a bearing and a height to launch from, one to
-fly to, and a distance — and the two bearings mean what they say, because it flies an arc at that
-distance rather than a straight line through the sky. **Anchored to** decides whether it hangs in the
-world, where it has real parallax and can leave frame, or on the camera, where it keeps its bearing
-however far the camera travels.
+### Frame echo
 
-**Ground glow** is off, subtle or strong: how much of the phenomenon lands on the valley below it.
-It is cinematic illumination rather than lighting — a wash weighted by which way a surface faces,
-plus a pool under a low comet — and it casts no shadows.
-
-An aurora's **Audio response** controls are depths on the bands the engine already publishes, not a
-second analyzer: bass raises the curtain, low-mid drives the waves, mid the folds, highs the
-filaments. Its overall shape can also be driven by ordinary modulation routes, and **Beat response**
-writes one, exactly as it does above.
-
-Every control here is an ordinary parameter under `atmos/<name>/`, so the Parameters panel shows the
-same numbers, the timeline can key them, a sequencer event can set them and a preset can recall them.
+With **Atmosphere → environment** selected, below the World's effects: the scene-level temporal
+pass that reaches back over previous frames so a moving object leaves a trail. It is a setting of
+the scene's image, not an effect attached to anything. It describes opaque surfaces only, and the
+line under **Enabled** says whether its frame history is still settling after a seek.
 
 ## Parameters — right
 
