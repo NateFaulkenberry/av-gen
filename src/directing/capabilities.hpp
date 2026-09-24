@@ -132,6 +132,10 @@ public:
     // Reads everything from the composition as it is now (its entities, its loaded rigs, its
     // cameras) and the engine's enums. Pure: the same composition gives the same registry.
     [[nodiscard]] static CapabilityRegistry fromComposition(const scene::Composition& composition);
+    // A registry holding exactly these cards (and the engine's camera and event vocabularies): for a
+    // host that describes characters without a composition, and for tests that need a character the
+    // asset set does not have.
+    [[nodiscard]] static CapabilityRegistry withCharacters(std::vector<CharacterCard> characters);
 
     [[nodiscard]] const std::vector<CharacterCard>& characters() const { return characters_; }
     [[nodiscard]] const CharacterCard* character(std::string_view subject) const;

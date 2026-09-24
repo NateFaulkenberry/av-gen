@@ -43,7 +43,16 @@ enum class IssueCode : std::uint8_t {
     // ---- capability ----
     CapabilityUnavailable,    // the subject cannot do what the plan asks
     Unsupported,              // the Director cannot compile this yet (named, never silently dropped)
+    // ---- feasibility and conflicts ----
+    SpatialInfeasible,        // geometry says no: a jump that cannot clear its obstacle
+    TimingConflict,           // overlaps something that is already there, or another item
+    CameraConflict,           // something with higher precedence may take the frame
+    NonDeterministic,         // a rendered result would depend on live, unrecorded behaviour
+    UnknownEvent,             // a cue waits on a plan event nothing emits
+    HandEdited,               // content this plan made was since edited by hand; a revision will not overwrite it
+    Blocked,                  // cannot happen because something it depends on cannot
 };
+inline constexpr IssueCode kLastIssueCode = IssueCode::Blocked;
 [[nodiscard]] const char* issueCodeName(IssueCode code);
 [[nodiscard]] std::optional<IssueCode> issueCodeFromName(std::string_view name);
 
@@ -52,6 +61,7 @@ struct Issue {
     IssueCode code = IssueCode::SchemaInvalid;
     std::string subject;   // what it is about ("rook", "chorus 2"), may be empty
     std::string location;  // where in the plan: a JSON pointer ("/shots/0/start")
+    std::string item;      // the plan item's key it concerns, when it concerns one
     std::string message;   // one sentence for a person
     std::string cause;     // why, when it is not obvious from the message
     bool recoverable = true; // can a revised plan get past it (false: e.g. a newer schema)

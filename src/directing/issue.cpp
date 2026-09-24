@@ -13,7 +13,7 @@ constexpr std::array<std::pair<Severity, const char*>, 3> kSeverities{{
     {Severity::Error, "error"},
 }};
 
-constexpr std::array<std::pair<IssueCode, const char*>, 13> kCodes{{
+constexpr std::array<std::pair<IssueCode, const char*>, 20> kCodes{{
     {IssueCode::SchemaInvalid, "SCHEMA_INVALID"},
     {IssueCode::SchemaUnknownField, "SCHEMA_UNKNOWN_FIELD"},
     {IssueCode::SchemaVersionUnsupported, "SCHEMA_VERSION_UNSUPPORTED"},
@@ -27,10 +27,17 @@ constexpr std::array<std::pair<IssueCode, const char*>, 13> kCodes{{
     {IssueCode::TimeOutOfRange, "TIME_OUT_OF_RANGE"},
     {IssueCode::CapabilityUnavailable, "CAPABILITY_UNAVAILABLE"},
     {IssueCode::Unsupported, "UNSUPPORTED"},
+    {IssueCode::SpatialInfeasible, "SPATIAL_INFEASIBLE"},
+    {IssueCode::TimingConflict, "TIMING_CONFLICT"},
+    {IssueCode::CameraConflict, "CAMERA_CONFLICT"},
+    {IssueCode::NonDeterministic, "NON_DETERMINISTIC"},
+    {IssueCode::UnknownEvent, "UNKNOWN_EVENT"},
+    {IssueCode::HandEdited, "HAND_EDITED"},
+    {IssueCode::Blocked, "BLOCKED"},
 }};
 // Every code has a row: the table is indexed by nothing, so a code added without one would name
 // itself SCHEMA_INVALID. The last enumerator is checked here, and the round-trip test walks them all.
-static_assert(kCodes.back().first == IssueCode::Unsupported);
+static_assert(kCodes.back().first == kLastIssueCode);
 
 template <typename E, std::size_t N>
 const char* nameIn(const std::array<std::pair<E, const char*>, N>& table, E value) {
@@ -70,6 +77,9 @@ nlohmann::json Issue::toJson() const {
     if (!location.empty()) {
         j["location"] = location;
     }
+    if (!item.empty()) {
+        j["item"] = item;
+    }
     if (!cause.empty()) {
         j["cause"] = cause;
     }
@@ -97,6 +107,7 @@ std::optional<Issue> Issue::fromJson(const nlohmann::json& j) {
     out.message = j.value("message", std::string{});
     out.subject = j.value("subject", std::string{});
     out.location = j.value("location", std::string{});
+    out.item = j.value("item", std::string{});
     out.cause = j.value("cause", std::string{});
     out.recoverable = j.value("recoverable", true);
     out.details = j.value("details", nlohmann::json::object());

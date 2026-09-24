@@ -205,7 +205,7 @@ TEST_CASE("the schema reports each mistake at its location, with suggestions", "
 }
 
 TEST_CASE("every issue code and severity has a stable name that reads back", "[directing][plan]") {
-    for (int i = 0; i <= static_cast<int>(IssueCode::Unsupported); ++i) {
+    for (int i = 0; i <= static_cast<int>(kLastIssueCode); ++i) {
         const auto code = static_cast<IssueCode>(i);
         INFO(i);
         const auto back = issueCodeFromName(issueCodeName(code));

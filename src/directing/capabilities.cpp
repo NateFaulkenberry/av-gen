@@ -258,6 +258,12 @@ CapabilityRegistry CapabilityRegistry::fromComposition(const scene::Composition&
     return out;
 }
 
+CapabilityRegistry CapabilityRegistry::withCharacters(std::vector<CharacterCard> characters) {
+    CapabilityRegistry out;
+    out.characters_ = std::move(characters);
+    return out;
+}
+
 const CharacterCard* CapabilityRegistry::character(std::string_view subject) const {
     const auto it = std::find_if(characters_.begin(), characters_.end(),
                                  [&](const CharacterCard& c) { return c.subject == subject; });

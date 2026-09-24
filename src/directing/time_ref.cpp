@@ -347,9 +347,6 @@ MusicalContext musicalContextFrom(const seq::Sequence& sequence, std::span<const
             run.occurrence = ++it->second;
         }
     }
-    if (ctx.durationSeconds <= 0.0 && !ctx.sections.empty()) {
-        ctx.durationSeconds = ctx.sections.back().endSeconds;
-    }
     return ctx;
 }
 
