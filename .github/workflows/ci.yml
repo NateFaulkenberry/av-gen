@@ -42,12 +42,12 @@ env:
   DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   HOMEBREW_NO_AUTO_UPDATE: "1"
   HOMEBREW_NO_INSTALL_CLEANUP: "1"
-  CCACHE_DIR: ${{ github.workspace }}/../ccache
+  CCACHE_DIR: /Users/runner/ccache    # outside the checkout: test_repo_hygiene walks the tree
   CCACHE_BASEDIR: ${{ github.workspace }}
   CCACHE_COMPRESS: "1"
   CCACHE_MAXSIZE: 2G
   # Where catch2_run.py and build.sh write their results.
-  RESULTS: ${{ github.workspace }}/../ci-results
+  RESULTS: /Users/runner/ci-results   # absolute: upload-artifact rejects '..' in a path
 
 defaults:
   run:
