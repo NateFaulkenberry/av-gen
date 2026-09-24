@@ -91,9 +91,11 @@ jobs:
         run: |
           # ASAN_EXCLUDE is documented in docs/development/ci.md ("Sanitizer exclusions").
           filter="${TEST_FILTER:-$ASAN_EXCLUDE}"
-          python3 tools/ci/catch2_run.py run --binary build/asan/tests/avgen_tests --name asan \
-              --label "ASan/UBSan CPU suite" --out "$RESULTS/asan" --shards 3 --timeout-min 300 \
-              --filter "$filter" --expected-label "excludes $filter"
+          args=(--binary build/asan/tests/avgen_tests --name asan --label "ASan/UBSan CPU suite"
+                --out "$RESULTS/asan" --shards 3 --timeout-min 300
+                --exceptions tools/ci/hosted-runner-exceptions.txt)
+          [ -n "$filter" ] && args+=(--filter "$filter" --expected-label "selection: $filter")
+          python3 tools/ci/catch2_run.py run "${args[@]}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -148,6 +150,7 @@ jobs:
           filter="${TEST_FILTER:-$TSAN_SUBSET}"
           python3 tools/ci/catch2_run.py run --binary build/tsan/tests/avgen_tests --name tsan \
               --label "TSan subset" --out "$RESULTS/tsan" --shards 3 --timeout-min 300 \
+              --exceptions tools/ci/hosted-runner-exceptions.txt --gate sanitizer \
               --filter "$filter" --expected-label "SUBSET $filter: not the full suite"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()

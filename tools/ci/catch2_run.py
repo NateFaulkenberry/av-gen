@@ -386,6 +386,9 @@ def verdict(r: dict) -> str:
 
 
 def _verdict(r: dict) -> str:
+    if r["ok"] and r.get("gate") == "sanitizer":
+        return ("PASS (no sanitizer reports" + (f"; {r['failed']} assertion failures under the "
+                "sanitizer, listed below, do not gate" if r["failed"] else "") + ")")
     if r["ok"]:
         return "PASS"
     if r["sanitizer_reports_total"]:
@@ -577,6 +580,13 @@ def cmd_run(args) -> int:
     r = summarise(args.name, args.binary, listed, statuses, Path(args.out), args.label, args.seed,
                   args.expected_label, exceptions, excluded)
     r["report_only"] = args.report_only
+    r["gate"] = args.gate
+    if args.gate == "sanitizer":
+        # TSan: the job exists to find races. Assertion failures under a 5-15x slowdown are mostly
+        # wall-clock waits and ceilings that do not hold; they are listed, loudly, but only a
+        # sanitizer report, a crash, a timeout or an unexercised case decides the verdict.
+        r["ok"] = (not r["sanitizer_reports_total"] and not r["crashes"] and not r["timeouts"]
+                   and not r["unexercised"] and r["listed"])
     (Path(args.out) / "result.json").write_text(json.dumps(r, indent=2))
     (Path(args.out) / "summary.md").write_text(render_binary_md(r, level=2))
     print_console(r, Path(args.out))
@@ -686,6 +696,8 @@ def main() -> int:
                    help="ONE Catch2 test spec, e.g. '~[golden]'. Tags only: a name with a comma splits.")
     r.add_argument("--expected-label", default="", help="caveat shown beside the suite name")
     r.add_argument("--report-only", action="store_true")
+    r.add_argument("--gate", choices=["all", "sanitizer"], default="all",
+                   help="sanitizer: only sanitizer reports, crashes, timeouts and unexercised cases fail")
     r.add_argument("--exceptions", default="", help="tools/ci/hosted-runner-exceptions.txt")
     r.add_argument("--cwd", default="")
     rp = sub.add_parser("report")

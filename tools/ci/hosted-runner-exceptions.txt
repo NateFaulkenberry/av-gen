@@ -17,6 +17,7 @@
 # Observed on runs 36060799310 and 36065418960 (2026-09-24; main 232a50d7 + CI files).
 
 # --- crashes without the asset: a test defect, reported to the owner; excluded so the shard lives
+exclude | sequence.get_state reports the music video, not the timeline | assets/audio/night-shift.wav absent: fails in Release, but ABORTS (SIGABRT) in the Debug sanitizer builds (TSan run 36060803359), taking its shard with it
 exclude | body compensation survives a scene save and reload | assets/aliens/alien-scout.glb absent -> 0 nodes -> nodes().front() on an empty vector, SIGSEGV (test_body_compensation.cpp:433)
 
 # --- assets/aliens/*.glb (the film's five aliens, the scout, the diver, the pilot)
@@ -53,7 +54,6 @@ needs-assets | A piece that dresses the ground actually covers its tile | assets
 needs-assets | The tree is carried by the island, not animated beside it | assets/treeisle
 
 # --- audio: assets/audio/*.wav (generated) and ~/Desktop/*.mp3
-needs-assets | sequence.get_state reports the music video, not the timeline | assets/audio/night-shift.wav
 needs-assets | sequence.get_state hands back beats only where they were asked for | assets/audio/night-shift.wav
 needs-assets | probe: Save As of the multicam project to an outside folder | ~/Desktop/*.mp3 + assets/aliens (asserts a load with no warnings)
 needs-assets | Save As takes its own copies and stops writing back to the original | ~/Desktop/*.mp3 + assets/aliens
