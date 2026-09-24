@@ -48,7 +48,7 @@ constexpr EffectField kFields[] = {
         .tooltip("How far the view bends. 1 moves the background by a quarter of the field's radius\n"
                  "at the strongest point. The default route drives it from the owner's speed, so a\n"
                  "hovering owner warps gently and a dashing one warps hard."),
-    storedFloat("boundsScale", "Size over owner", 2.4f, 1.0f, 12.0f, 1.2f, 6.0f).main()
+    storedFloat("boundsScale", "Size over owner", 2.0f, 1.0f, 12.0f, 1.2f, 6.0f).main()
         .tooltip("On an entity: the field's radius as a multiple of the owner's bounding radius.\n"
                  "The bend starts at the owner's edge and fades out at this size.\n"
                  "Ignored on the World, which uses Radius."),

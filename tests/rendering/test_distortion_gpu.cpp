@@ -597,3 +597,78 @@ TEST_CASE("DF through the engine: a Space Warp on the World is evaluated, drawn 
     dump(on, "engine-on");
     dump(off, "engine-off");
 }
+
+TEST_CASE("DF: volumetric fog behind the warp bends with the scene it is composited over",
+          "[gpu][effects][distortion][fog]") {
+    // The resolve runs after the volumetric composite, so the fog the march put over the wall is in
+    // the HDR image the copy holds and bends with the wall. A person looks at the dump for halos at
+    // the field's edge and for a fog layer that bends differently from what is behind it.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    initialise(renderer);
+
+    scene::Scene s = wallScene();
+    s.environment.volumeDensity = 0.05f;
+    scene::PunctualLight lamp;
+    lamp.type = scene::PunctualLight::Type::Point;
+    lamp.position = glm::vec3(4.0f, 3.0f, -22.0f);
+    lamp.color = glm::vec3(1.0f, 0.55f, 0.25f);
+    lamp.intensity = 400.0f;
+    lamp.range = 30.0f;
+    s.addLight(lamp);
+    const gpu::Image8 plain = render(renderer, s);
+    s.distortion = frameOf({warpInstance("w", glm::vec3(0.0f, 0.0f, -15.0f), 6.0f, 1.0f)});
+    const gpu::Image8 warped = render(renderer, s);
+    dump(plain, "fog-off");
+    dump(warped, "fog-on");
+    CHECK(renderer.stats().volume.steps > 0); // the control: the march really ran
+    std::size_t bent = 0;
+    for (int y = 0; y < static_cast<int>(kHeight); ++y) {
+        for (int x = 0; x < static_cast<int>(kWidth); ++x) {
+            bent += differs(plain, warped, x, y) ? 1u : 0u;
+        }
+    }
+    CHECK(bent > 500);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("DF: Space Warp's turbulence is temporally coherent, not per-frame noise",
+          "[gpu][effects][distortion][temporal]") {
+    // White noise changes as much between two frames as between two seconds; a flow changes a
+    // little. Measured as the mean absolute difference over the frame, one frame apart against one
+    // second apart, with nothing but the turbulence varying (no radial pull, a fixed camera).
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    initialise(renderer);
+
+    scene::Scene s = wallScene();
+    world::EffectInstance e = warpInstance("t", glm::vec3(0.0f, 0.0f, -15.0f), 6.0f, 1.0f);
+    e.values.setFloat("spaceWarp/radialWeight", 0.0f);
+    e.values.setFloat("spaceWarp/turbulence", 1.0f);
+    e.values.setFloat("spaceWarp/turbulenceSpeed", 1.0f);
+    const auto at = [&](double t) {
+        s.distortion = frameOf({e}, t);
+        return render(renderer, s, t);
+    };
+    const gpu::Image8 a = at(3.0);
+    const gpu::Image8 b = at(3.0 + 1.0 / 60.0);
+    const gpu::Image8 c = at(4.0);
+    dump(a, "turbulence-a");
+    dump(c, "turbulence-c");
+    const auto meanDiff = [](const gpu::Image8& x, const gpu::Image8& y) {
+        double sum = 0.0;
+        for (std::size_t i = 0; i + 3 < x.rgba.size(); i += 4) {
+            for (int ch = 0; ch < 3; ++ch) {
+                sum += std::abs(static_cast<int>(x.rgba[i + ch]) - static_cast<int>(y.rgba[i + ch]));
+            }
+        }
+        return sum / static_cast<double>(x.rgba.size());
+    };
+    const double frame = meanDiff(a, b);
+    const double second = meanDiff(a, c);
+    INFO("mean |diff| one frame apart " << frame << ", one second apart " << second);
+    REQUIRE(second > 0.5); // the control: the turbulence does move the image
+    CHECK(frame < 0.25 * second);
+}
