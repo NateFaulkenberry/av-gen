@@ -1,11 +1,13 @@
-// Shockwave, Ripple and Velocity Distortion (Effect Library Wave 2): TRIGGER's first DF users.
+// Shockwave, Ripple and Velocity Distortion (Effect Library Wave 2): TRIGGER's first DF users, and
+// EMIT's trigger bursts.
 //
 // The producers are asked what a frame block can answer -- a front expands and weakens with age, is
 // released where its owner WAS, several overlap, a ripple train starts at its trigger, a wake lies
 // along the recorded path and a slow owner leaves none -- and then the engine is asked the question
 // the whole design exists for: a Shockwave on the beats of an analysed track, on a moving owner, is
 // the same frame block PLAYED to a second as SCRUBBED to it. Likewise a Proximity-triggered one,
-// whose event comes out of the checkpointed history.
+// whose event comes out of the checkpointed history, and an emitter's burst lands on exactly the
+// frames its beats land on.
 
 #include "app/engine.hpp"
 #include "audio/audio_file.hpp"
@@ -17,6 +19,7 @@
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_stack.hpp"
 #include "world/effects/effect_trigger.hpp"
+#include "world/effects/particle_emitter.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -26,6 +29,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -346,4 +350,36 @@ TEST_CASE("Shockwave on a Proximity trigger is the same played and scrubbed (the
     }
     CHECK(early.scene().distortion.count == 0);
     CHECK(early.effectStatus(early.effects()[0].id) == world::EffectStatus::Dormant);
+}
+
+TEST_CASE("an emitter on a beat trigger bursts on exactly the frames its beats land on", "[trigger][emit]") {
+    world::EffectInstance e = world::makeEffect(world::EffectKind::ParticleEmitter, "Spores");
+    REQUIRE(world::applyEffectStyle(e, world::EffectKind::ParticleEmitter, "Spore Burst"));
+    REQUIRE(e.activation == world::Activation::Trigger);
+    app::Engine engine(app::EngineMode::Offline);
+    installCraft(engine, {e}, true);
+    const std::vector<double>& beats = engine.track()->beats().beatTimes;
+    REQUIRE(beats.size() > 12);
+    const std::string name = world::particleSystemName(engine.effects()[0].id);
+    std::set<long long> burst;
+    constexpr long long kFrames = 6 * 60;
+    for (long long f = 0; f <= kFrames; ++f) {
+        frameAt(engine, f);
+        for (const scene::ParticleSystem& s : engine.scene().particles) {
+            if (s.name == name && s.burst > 0.0f) {
+                CHECK(s.burst == Approx(300.0f));
+                burst.insert(f);
+            }
+        }
+    }
+    // Every 4th beat from the first, each on the frame whose interval (f-1, f] holds it.
+    std::set<long long> expected;
+    for (std::size_t i = 0; i < beats.size(); i += 4) {
+        const long long f = static_cast<long long>(std::ceil(beats[i] * 60.0 - 1e-9));
+        if (f >= 1 && f <= kFrames) {
+            expected.insert(f);
+        }
+    }
+    REQUIRE(expected.size() >= 2);
+    CHECK(burst == expected);
 }

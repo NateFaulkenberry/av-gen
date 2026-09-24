@@ -1,5 +1,5 @@
 // TRIGGER's effects on pixels (Effect Library Wave 2): Shockwave, Ripple and Velocity Distortion
-// through DF's passes.
+// through DF's passes, and the remaining Particle Emitter looks through the particle renderer.
 //
 // The DF fixture is test_distortion_gpu.cpp's: an unlit black-and-white checker wall 30 m down the
 // view axis, so a bend is unambiguous, bloom off unless a case is about the edge glow. Each case
@@ -8,6 +8,7 @@
 // disc and nowhere else, the wake lies behind a moving owner -- and, with AVGEN_EFFECT_DUMP=<dir>,
 // writes every arm as a PNG for a person to look at.
 
+#include "app/engine.hpp"
 #include "assets/image.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
@@ -379,4 +380,80 @@ TEST_CASE("Velocity Distortion on pixels: a wake behind a moving owner, nothing 
         CHECK(ahead == 0);
     }
     CHECK(ctx->errorCount() == 0);
+}
+
+namespace {
+
+// test_particle_emitter_gpu.cpp's runner, for the Wave 2 looks: a fresh engine with one World-owned
+// emitter in `style`, placed where a new composition's camera looks (a carried look's box around the
+// camera itself), the preset's own rows otherwise untouched.
+gpu::Image8 runEmitter(gpu::Context& ctx, const char* style, int frames = 150) {
+    gpu::ShaderLibrary shaders(ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    engine.setViewport(kWidth, kHeight);
+    if (style != nullptr) {
+        world::EffectInstance e = world::makeEffect(world::EffectKind::ParticleEmitter, "Particles");
+        e.id.clear();
+        REQUIRE(world::applyEffectStyle(e, world::EffectKind::ParticleEmitter, style));
+        if (e.activation == world::Activation::Trigger) {
+            e.timing.trigger = repeatAt(0.2, 0.8); // no audio here: a schedule stands in for the beat
+        }
+        std::vector<world::EffectInstance> list;
+        REQUIRE(world::insertEffect(list, e).has_value());
+        REQUIRE(engine.setEffects(list).has_value());
+        const std::string id = engine.effects()[0].id;
+        engine.update(FrameTime{0.0, 1.0 / 60.0, 0});
+        const scene::Camera cam = engine.scene().camera;
+        const float d = glm::length(cam.target - cam.position);
+        const auto set = [&](const char* leaf, float v) {
+            auto* p = engine.params().find(world::effectParameterPrefix(id) + leaf);
+            REQUIRE(p != nullptr);
+            p->setBaseComponent(0, v);
+        };
+        // A carried look's World X/Y/Z is already an offset from the camera, and its box the preset's
+        // own: left alone, so the frame is the preset at its authored scale. A local look is moved to
+        // where the camera looks.
+        const std::string st(style);
+        const bool carried = e.values.getFloat("particleEmitter/look", 0.0f) >= 2.5f &&
+                             e.values.getFloat("particleEmitter/look", 0.0f) <= 5.5f;
+        if (!carried) {
+            set("centerX", cam.target.x);
+            set("centerY", cam.target.y);
+            set("centerZ", cam.target.z);
+            set("radius", std::min(e.values.getFloat("particleEmitter/radius", 1.0f), d * 0.5f));
+        }
+    }
+    gpu::Image8 last;
+    for (int i = 0; i <= frames; ++i) {
+        const double t = i / 60.0;
+        const FrameTime ft{t, 1.0 / 60.0, static_cast<std::uint64_t>(i)};
+        engine.update(ft);
+        auto img = renderer.renderToImage(engine.scene(), ft, kWidth, kHeight);
+        REQUIRE(img.has_value());
+        last = std::move(*img);
+    }
+    CHECK(ctx.errorCount() == 0);
+    return last;
+}
+
+} // namespace
+
+TEST_CASE("every Wave 2 Particle Emitter preset reaches the frame", "[gpu][effects][emit][shockwave]") {
+    auto ctx = makeContext();
+    const gpu::Image8 off = runEmitter(*ctx, nullptr);
+    dump(off, "emitter-off");
+    for (const char* style :
+         {"Light Snow", "Blizzard", "Magical Snow", "Drizzle", "Storm", "Neon Rain", "Volcanic Ashfall", "Burned Forest",
+          "Autumn Leaves", "Cherry Petals", "Glowmere Drift", "Mushroom Puff", "Glowmere Spores", "Spore Burst",
+          "Nebula Drift", "Hyperspace Dust", "Vortex Motes", "Glowmere Canopy", "Burning Debris", "Healing Motes"}) {
+        INFO(style);
+        const gpu::Image8 on = runEmitter(*ctx, style);
+        dump(on, std::string("emitter-") + style);
+        const std::size_t changed = changedPixels(off, on);
+        INFO("visibly changed pixels: " << changed);
+        CHECK(changed > 40);
+    }
 }
