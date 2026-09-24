@@ -1,8 +1,8 @@
 # AV Gen Director System — Development Progress
 Last updated: 2026-09-24 16:30
-Current branch: `agent/director` (worktree `../av-gen-director`; main merged in at 423fdf2b, main = eb8c6679)
-Current commit: 8935a24b (plus this record)
-Overall status: Slice 0 complete (effects included); Slice 1 complete; both full suites green at 8935a24b
+Current branch: `agent/director` (worktree `../av-gen-director`; main merged in at 423fdf2b and 6f0da410; main = 232a50d7)
+Current commit: 6f0da410 (plus this record)
+Overall status: Slice 0 complete (effects included); Slice 1 complete; both full suites green after merging main 232a50d7
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -229,6 +229,13 @@ undo, serialization or compilation will be built on them.
 - **Full suites on the final Slice 1 state (8935a24b):** CPU 3,241 cases, exit 0 (main's 3,192 +
   49), 1 expected shouldfail, 16 hardware skips; GPU 419 cases, exit 0, 1 skip (NDI). One summary
   each; only this worktree's paths.
+- **Full suites after merging main 232a50d7 (Effect Library Wave 1) at 6f0da410:** CPU 3,282
+  cases, exit 0, 1 expected shouldfail, 16 hardware skips; GPU 443 cases, exit 0, 1 skip (NDI).
+  Note: selecting `[effects]` by tag also runs main's hidden `[.known-defect]` "UFO stack at 150 s
+  is the same played and scrubbed". It fails identically, as the known scrub-versus-play defect;
+  it is not part of the default suite and not a regression.
+- The Director does not depend on "seek to T equals play to T" anywhere. Golden plans compare
+  compiled content and fingerprints, and the round-trip steps one frame from zero.
 - Measured (spec §37, release, load ~70): `SceneFacts` 1.7–3.9 ms; validate+compile about 1.2 ms;
   apply about 5 ms on the benchmark. No composition rebuild on any Director path. `EntityWorld::seek`
   (ADR-700) has not been re-measured here.
