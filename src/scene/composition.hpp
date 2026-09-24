@@ -58,6 +58,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -551,6 +552,30 @@ public:
     [[nodiscard]] std::string name() const override { return name_; }
     void update(const FrameTime& time) override;
     void updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) override;
+
+    // ---- scripted performances (ADR-758) -------------------------------------------------------
+    //
+    // A performance takes an entity's body for a span: each step inside it, the entity's director
+    // motion is set from `pose(t)` -- a pure function of time -- so its behaviours yield keeping
+    // their state (ADR-210's `driven`), and at the span's end it is released where the performance
+    // left it and carries on from there. Applied after the staging director on BOTH a play and a
+    // seek's replay, at the same point of the step, so a scrub lands where a play does as far as the
+    // performance is concerned; `signature` is mixed into the replay key, so a changed performance
+    // drops stale checkpoints.
+    struct PerformerPose {
+        glm::vec3 position{0.0f};
+        std::optional<float> yawRadians; // unset: the body keeps the heading it has
+        float speed = 0.0f;              // metres per second, for the gait
+    };
+    struct Performer {
+        std::string entity;
+        double from = 0.0;
+        double to = 0.0;
+        std::function<PerformerPose(double)> pose;
+        std::uint64_t signature = 0;
+    };
+    void setPerformers(std::vector<Performer> performers);
+    [[nodiscard]] const std::vector<Performer>& performers() const { return performers_; }
     void updateFields(const FrameTime& time, signals::SignalBus& bus, params::Modulator& modulator) override;
     [[nodiscard]] const Scene& scene() const override { return scene_; }
     [[nodiscard]] Scene& scene() override { return scene_; }
@@ -1891,6 +1916,8 @@ private:
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    std::vector<Performer> performers_;           // ADR-758: not authored here; the sequence's
+    void applyPerformers(double now, double dt);
     std::vector<entity::EntityWorld::EventProfile> eventProfiles_; // Phase D §26: "worldEvents"
     // Phase D §26: the director's beats this update, raised as world events. Shared by
     // `updateBehaviour` and the replay in `seekWithDirector`.

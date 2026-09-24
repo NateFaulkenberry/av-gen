@@ -1565,6 +1565,15 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
     // ---- actors (spec 12-16) ------------------------------------------------------------------
     for (const auto& actor : actors) {
         const std::string node = actor.nodeName();
+        const bool performer = std::find(options.performerNodes.begin(), options.performerNodes.end(), node) !=
+                               options.performerNodes.end();
+        if (performer) {
+            // ADR-758: moved through its entity, not by tracks. Visibility still bakes.
+            if (!actor.visible) {
+                builder.key("nodes/" + node + "/visible", 0.0, 0.0f, params::KeyInterp::Step);
+            }
+            continue;
+        }
         const std::string positionPath = "nodes/" + node + "/position";
         const std::string rotationPath = "nodes/" + node + "/rotation";
 
