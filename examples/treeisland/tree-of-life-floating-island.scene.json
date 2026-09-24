@@ -139,14 +139,19 @@
    "intensity": 1.0
   }
  },
- "atmosphericEffects": [
+ "effects": [
   {
+   "id": "cosmic-tornado",
+   "type": "tornado",
    "name": "Cosmic Tornado",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": true,
-   "kind": "tornado",
-   "activation": "always",
+   "order": 0,
    "style": "Cosmic Storm",
-   "tornado": {
+   "activation": "always",
+   "parameters": {
     "base": [
      -1496.0,
      -620.0,

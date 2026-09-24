@@ -17,7 +17,8 @@ Why the project and not the scene is also *safe* to rewrite with json.load/json.
 and round-trips byte-identically through `json.dumps(indent=2)`, which this script asserts before it
 writes anything. The scene file is hand-written and does not, which is why nothing here touches it.
 
-Every arm is the shipped project with the "Cosmic Vortex" atmospheric effect REPLACED by a fog bank
+Every arm is the shipped project with its placed medium (the "Cosmic Vortex" when this was written,
+the "Cosmic Tornado" since ADR-580) REPLACED by a fog bank
 of the same placement class -- a bank of medium under the island, filling the lower frame, which is
 the region ADR-389 established the grain metric must be restricted to (the tree's foliage dominates
 the high-frequency energy of the whole frame and moves by 3% across arms that move the medium's own
@@ -58,20 +59,15 @@ from pathlib import Path
 
 # ADR-578: THE SCENE CARRIES A MEDIUM OF ITS OWN AND THESE ARMS DID NOT KNOW.
 #
-# `tree-of-life-floating-island.scene.json` declares a `Cosmic Vortex`, and a project's
-# `atmosphericEffects` list MERGES with the scene's rather than replacing it -- so every arm this
-# file has ever written rendered the vortex as well as whatever it placed. The generator's own
-# comments said otherwise.
+# `tree-of-life-floating-island.scene.json` declares a placed medium of its own, and before ADR-702 a
+# project's `atmosphericEffects` list MERGED with the scene's rather than replacing it -- so every
+# arm this file wrote rendered the scene's medium as well as whatever it placed, and it was switched
+# off by a parameter here (`atmos/Cosmic Vortex/enabled`).
 #
-# It was invisible until §39's "active volume count" reached the headless log (ADR-578): the first
-# arm run after that printed `media=2` where one had been placed, and the second number was the
-# scene's. Nothing else in the record would have said so.
-#
-# What it did and did not invalidate: the vortex was CONSTANT across every arm in a set, so a
-# difference between two arms is still the parameter that differs -- the comparisons stand. What
-# does not stand is any sentence claiming an arm contained one medium, or none. Those are corrected
-# in place, and the vortex is switched off by parameter below.
-DISABLE_SCENE_MEDIUM = {"atmos/Cosmic Vortex/enabled": False}
+# ADR-702: a project's `effects` array is the session's WHOLE list and replaces the scene's
+# (`Engine::loadProject` -> `setEffects`), so the scene's medium cannot leak into an arm any more and
+# there is nothing to switch off. What the old arms' sentences about "one medium, or none" got wrong
+# (ADR-578) is recorded in their notes and stays corrected.
 
 HERE = Path(__file__).resolve().parent.parent
 EX = HERE / "examples" / "treeisland"
@@ -139,30 +135,50 @@ def load_project() -> dict:
     return data
 
 
+# ADR-702's placed-medium types: the ones a fog bank stands in for.
+MEDIA = ("vortex", "tornado", "fog")
+
+
 def as_fog_bank(project: dict) -> None:
-    """Replace the Cosmic Vortex effect with a fog bank of the same placement class."""
-    for effect in project["atmosphericEffects"]:
-        if effect.get("kind") == "vortex":
-            effect["kind"] = "fog"
+    """Replace the placed medium with a fog bank of the same placement class.
+
+    ADR-702's canonical entry: `type` rather than `kind` and a stable `id` -- which is also the
+    `fx/<id>/` prefix its parameters register under, so a route that named the medium it replaces
+    names a different id and is reported at load, as before. A fog bank's medium rows ALIAS the
+    vortex payload (`.json("/vortex/...")` in volumetric_fog_effect.cpp), which since ADR-702 is the
+    `vortex` block INSIDE `parameters`, beside the type's own stored rows."""
+    for effect in project["effects"]:
+        if effect.get("type") in MEDIA:
+            effect["type"] = "fog"
+            effect["id"] = "fog-bank"
             effect["name"] = "Fog Bank"
             effect["style"] = "Valley Fog"
-            effect["vortex"] = dict(BANK)
+            effect["parameters"] = {"vortex": dict(BANK)}
+            effect.pop("ground", None)  # a fog bank does not light the ground
             return
-    raise SystemExit("no vortex effect in the project to replace")
+    raise SystemExit("no placed medium in the project's effects to replace")
+
+
+def bank(project: dict) -> dict:
+    """The fog bank's medium rows, for an arm that moves one of them."""
+    return next(e for e in project["effects"] if e.get("id") == "fog-bank")["parameters"]["vortex"]
 
 
 def no_medium(project: dict) -> None:
     """Remove the placed medium entirely, leaving `Environment`'s own fog as the only one."""
-    project["atmosphericEffects"] = [
-        e for e in project["atmosphericEffects"] if e.get("kind") not in ("vortex", "fog")
-    ]
+    project["effects"] = [e for e in project["effects"] if e.get("type") not in MEDIA]
+    # ADR-702: orders are contiguous per owner, and the loader refuses a stack that is not.
+    counters: dict = {}
+    for e in project["effects"]:
+        owner = (e["owner"]["kind"], e["owner"].get("name", ""))
+        e["order"] = counters.get(owner, 0)
+        counters[owner] = e["order"] + 1
 
 
 def write(name: str, project: dict) -> Path:
     project["post/bloom/enabled"] = None  # placeholder, replaced below
     del project["post/bloom/enabled"]
     project["parameters"]["post/bloom/enabled"] = False
-    project["parameters"].update(DISABLE_SCENE_MEDIUM)  # ADR-578
     project["render"]["width"] = WIDTH
     project["render"]["height"] = HEIGHT
     out = EX / f"_fog-{name}.json"
@@ -183,10 +199,10 @@ def main() -> int:
 
     arm("base")
     arm("nonoise")
-    arms[-1][1]["atmosphericEffects"][-1]["vortex"]["cloudNoise"] = 0.0
+    bank(arms[-1][1])["cloudNoise"] = 0.0
     arm("nojitter", **{"scene/volumeJitter": 0.0})
     arm("nonoise-nojitter", **{"scene/volumeJitter": 0.0})
-    arms[-1][1]["atmosphericEffects"][-1]["vortex"]["cloudNoise"] = 0.0
+    bank(arms[-1][1])["cloudNoise"] = 0.0
     arm("steps256", **{"scene/volumeSteps": 256})
     arm("steps256-nojitter", **{"scene/volumeSteps": 256, "scene/volumeJitter": 0.0})
 

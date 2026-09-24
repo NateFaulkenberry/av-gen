@@ -32,7 +32,7 @@
 //      scene already saved.
 
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -46,12 +46,12 @@ using namespace avgen;
 namespace {
 
 const world::EffectSchema& fogSchema() {
-    const world::EffectSchema* s = world::effectSchema(world::AtmosphereKind::VolumetricFog);
+    const world::EffectSchema* s = world::effectSchema(world::EffectKind::VolumetricFog);
     REQUIRE(s != nullptr);
     return *s;
 }
 
-void setRow(world::AtmosphericEffect& e, std::string_view leaf, float v) {
+void setRow(world::EffectInstance& e, std::string_view leaf, float v) {
     for (const world::EffectField& f : fogSchema().fields) {
         if (std::string_view(f.leaf) == leaf) {
             world::setFieldFloat(f, fogSchema(), e, v);
@@ -66,7 +66,7 @@ void setRow(world::AtmosphericEffect& e, std::string_view leaf, float v) {
 world::MediumSlot bankInFlow(float speed, float rotationDeg, float windAmount,
                              glm::vec3 flow, float influence,
                              world::fields::FlowUnits units = world::fields::FlowUnits::Normalised) {
-    world::AtmosphericEffect e = fogSchema().factory("drift");
+    world::EffectInstance e = fogSchema().factory("drift");
     e.vortex.field.center = glm::vec3(0.0f);
     e.vortex.field.radius = 200.0f;
     e.vortex.field.thickness = 80.0f;
@@ -84,7 +84,7 @@ world::MediumSlot bankInFlow(float speed, float rotationDeg, float windAmount,
 }
 
 world::MediumSlot bank(float speed, float vertical, float rotationDeg, float detail = 0.8f) {
-    world::AtmosphericEffect e = fogSchema().factory("drift");
+    world::EffectInstance e = fogSchema().factory("drift");
     e.vortex.field.center = glm::vec3(0.0f);
     e.vortex.field.radius = 200.0f;
     e.vortex.field.thickness = 80.0f;

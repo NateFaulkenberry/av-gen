@@ -59,7 +59,7 @@ looks good)*
 
 | thing | evidence |
 |---|---|
-| A new `Tornado` kind, analytic, no simulation state | `src/core/tornado.{hpp,cpp}`, `shaders/tornado.wgsl` (535 lines), `src/world/world_effects/effects/tornado_effect.cpp` (755 lines) |
+| A new `Tornado` kind, analytic, no simulation state | `src/core/tornado.{hpp,cpp}`, `shaders/tornado.wgsl` (535 lines), `src/world/effects/kinds/tornado_effect.cpp` (755 lines) |
 | It is reachable from the **World Effects panel** | `effect_registry.cpp` registers `tornadoSchema()`; the panel draws one button per schema with a factory (`world_effects_panel.cpp`, "ADR-500: one button per declared kind"); `tornadoSchema` sets `factory`, `displayName`, `addLabel`, and `resolve.bucket = EffectBucket::Medium`. **Verified by reading both ends of the registry, not by a screenshot** — nothing here has looked at the running UI. |
 | It ships in **content**, not only in a lab | `tree-of-life-floating-island.json` and `.scene.json` both author a `Cosmic Tornado`; the day project and the night project each render one (§4 below) |
 | CPU and GPU evaluate the same field | `tests/rendering/test_tornado_parity_gpu.cpp` (587 lines); ADR-580 §8.5 |
@@ -334,7 +334,7 @@ rather than chased. If you need those, they are gone.
 | `shaders/tornado.wgsl` | the GPU transliteration; the parity test keeps the two in step |
 | `shaders/volume.wgsl` | the shared march, `mediumShape` / `mediumInterval` / `mediumBoundOf` / `mediumEmissionAt` / `mediumSelfShadow`. **Was owned by the fog agent; that branch has landed** (§10) |
 | `src/world/medium_bound.cpp` | ADR-566's CPU twin of `mediumBoundOf`. Change the tornado's extent here **and** in the shader; `tests/unit/test_medium_bound.cpp` fails when only one moves |
-| `src/world/world_effects/effects/tornado_effect.cpp` | the registration: 57 panel rows, JSON, modulation targets, presets |
+| `src/world/effects/kinds/tornado_effect.cpp` | the registration: 57 panel rows, JSON, modulation targets, presets |
 | `examples/labs/tornado-modes-{a,b,c,d}-*.scene.json` | the structure-before-noise ladder; **this is the gate in §1** |
 | `examples/labs/tornado-showcase.scene.json` + `_tc-1`..`_tc-7` | the seven variants; regenerate the arms with `tools/make_tornado_showcase.py` after editing the showcase |
 | `~/Desktop/avgen-tornado-review/` | the five frames the owner has already seen, with the previous agent's own notes on what is wrong in each. Not in the repository, and the best five minutes you can spend |

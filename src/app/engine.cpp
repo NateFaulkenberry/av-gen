@@ -23,7 +23,7 @@
 #include "core/vortex.hpp"
 #include "core/wind.hpp"
 #include "params/serialization.hpp"
-#include "world/atmospheric_params.hpp"
+#include "world/effects/effect_params.hpp"
 
 #include <fmt/ranges.h>
 
@@ -213,28 +213,20 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
         const scene::FocusSettings keepFocus = focus_;
         cameraParams_ = scene::registerCameraParameters(params_, keepLens, keepExposure, keepFocus);
     }
-    // ADR-207: the scene's world effects, and the `worldfx/<name>/...` parameters that make every
-    // number on them automatable, keyable and modulatable. The authored set is copied off the
-    // composition rather than read through it per frame, because the live set is what modulation
-    // writes to and a composition's authored values must survive being modulated.
+    // ADR-702: the scene's effects -- every owner's, one list -- and the `fx/<id>/...` parameters
+    // that make every number on them automatable, keyable and modulatable. The authored set is
+    // copied off the composition rather than read through it per frame, because the live set is
+    // what modulation writes to and a composition's authored values must survive being modulated.
     //
     // Unregistered first and unconditionally: a scene swap replaces the cast of effects, and a
     // registrar that only ever adds leaves the previous scene's paths behind for a route to bind to.
     timeline_.unbind();
-    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
-    world::unregisterAtmosphericParameters(params_, atmosphericParams_);
-    worldEffects_.clear();
-    atmosphericEffects_.clear();
+    world::unregisterEffectParameters(params_, effectParams_);
+    effects_.clear();
     if (const auto* comp = composition()) {
-        worldEffects_ = comp->worldEffects();
-        atmosphericEffects_ = comp->atmosphericEffects();
+        effects_ = comp->effects();
     }
-    if (!worldEffects_.empty()) {
-        worldEffectParams_ = world::registerWorldEffectParameters(params_, worldEffects_);
-    }
-    if (!atmosphericEffects_.empty()) {
-        atmosphericParams_ = world::registerAtmosphericParameters(params_, atmosphericEffects_);
-    }
+    installEffects();
     resetCameraState();
     shaderLayers_.reattach();
     // The composition's layer parameters (ADR-083), with everything else that has to survive a
@@ -447,24 +439,23 @@ void Engine::resetCameraState() {
     cameraStateReset_ = true;
 }
 
-std::size_t Engine::addDefaultAtmosphericRoutes(std::string_view effectName) {
-    // The kind decides the routes, so an effect that is not there has none to add.
-    const auto it = std::find_if(atmosphericEffects_.begin(), atmosphericEffects_.end(),
-                                 [&](const world::AtmosphericEffect& e) { return e.name == effectName; });
-    if (it == atmosphericEffects_.end()) {
+std::size_t Engine::addDefaultEffectRoutes(std::string_view effectId) {
+    // The type decides the routes, so an effect that is not there has none to add.
+    const std::size_t at = world::findEffect(effects_, effectId);
+    if (at == effects_.size()) {
         return 0;
     }
-    const std::string prefix = world::atmosphericParameterPrefix(effectName);
+    const std::string prefix = world::effectParameterPrefix(effectId);
     for (const params::ModRoute& r : modulator_.routes()) {
         if (r.target.starts_with(prefix)) {
             return 0; // already automated; leave whatever somebody set up alone
         }
     }
     std::size_t added = 0;
-    for (params::ModRoute& r : world::defaultAtmosphericRoutes(effectName, it->kind)) {
+    for (params::ModRoute& r : world::defaultEffectRoutes(effectId, effects_[at].kind)) {
         if (params_.find(r.target) == nullptr) {
-            log::warn("default route for '{}' targets '{}', which is not a parameter; skipped",
-                      effectName, r.target);
+            log::warn("default route for effect '{}' targets '{}', which is not a parameter; skipped",
+                      effectId, r.target);
             continue;
         }
         modulator_.addRoute(std::move(r));
@@ -472,7 +463,7 @@ std::size_t Engine::addDefaultAtmosphericRoutes(std::string_view effectName) {
     }
     if (added > 0) {
         rebind(); // the routes hold pointers into the parameter set, and bind is what fills them
-        log::debug("attached {} default audio route(s) to atmospheric effect '{}'", added, effectName);
+        log::debug("attached {} default audio route(s) to effect '{}'", added, effectId);
     }
     return added;
 }
@@ -532,48 +523,96 @@ void Engine::noteBindingProblem(std::string message) {
     projectWarnings_.push_back(std::move(message));
 }
 
-Result<void> Engine::setWorldEffects(std::vector<world::WorldEffect> effects) {
-    // Validated before anything is touched, so a refusal leaves the engine exactly as it was.
-    if (auto ok = world::validateWorldEffects(effects); !ok) {
+// ADR-702. The one entry point that changes which effects exist.
+Result<void> Engine::setEffects(std::vector<world::EffectInstance> effects) {
+    // Stored in stack order whatever order the caller built it in, then validated before anything
+    // is touched, so a refusal leaves the engine exactly as it was.
+    world::normaliseEffectOrder(effects);
+    if (auto ok = world::validateEffects(effects); !ok) {
         return ok;
     }
     // The composition owns the authored set (it is what a save writes); the engine owns the live
     // one. Writing both here is what stops the panel and the file drifting apart.
     if (auto* comp = composition()) {
-        if (auto ok = comp->setWorldEffects(effects); !ok) {
+        if (auto ok = comp->setEffects(effects); !ok) {
             return ok;
         }
     }
     // The parameter set changes shape -- effects appear and disappear -- so the timeline has to let
     // go of its pointers before the old paths are removed, and rebind afterwards.
     timeline_.unbind();
-    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
-    worldEffects_ = std::move(effects);
-    if (!worldEffects_.empty()) {
-        worldEffectParams_ = world::registerWorldEffectParameters(params_, worldEffects_);
-    }
+    world::unregisterEffectParameters(params_, effectParams_);
+    effects_ = std::move(effects);
+    installEffects();
+    reportedDeadFields_.clear();
     rebind();
     return {};
 }
 
-// ADR-230, on exactly the terms `setWorldEffects` states above.
-Result<void> Engine::setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects) {
-    if (auto ok = world::validateAtmosphericEffects(effects); !ok) {
+void Engine::installEffects() {
+    if (!effects_.empty()) {
+        effectParams_ = world::registerEffectParameters(params_, effects_);
+    }
+    world::effectEvaluationOrder(effects_, effectOrder_);
+    effectStatus_.assign(effects_.size(), world::EffectStatus::Dormant);
+}
+
+std::vector<world::EffectInstance> Engine::capturedEffects() const {
+    std::vector<world::EffectInstance> authored;
+    if (const auto* comp = composition()) {
+        authored = comp->effects();
+    } else {
+        authored = effects_;
+    }
+    world::captureEffectParameters(effectParams_, authored);
+    return authored;
+}
+
+Result<void> Engine::editEffects(const std::function<Result<void>(std::vector<world::EffectInstance>&)>& edit) {
+    std::vector<world::EffectInstance> next = capturedEffects();
+    if (auto ok = edit(next); !ok) {
         return ok;
     }
-    if (auto* comp = composition()) {
-        if (auto ok = comp->setAtmosphericEffects(effects); !ok) {
-            return ok;
+    return setEffects(std::move(next));
+}
+
+world::EffectStatus Engine::effectStatus(std::string_view id) const {
+    const std::size_t at = world::findEffect(effects_, id);
+    return at < effectStatus_.size() ? effectStatus_[at] : world::EffectStatus::Dormant;
+}
+
+bool Engine::effectOwnerExists(const world::EffectOwner& owner) const {
+    switch (owner.kind) {
+    case world::EffectTarget::World:
+    case world::EffectTarget::Camera: return true;
+    case world::EffectTarget::Entity: {
+        const auto* comp = composition();
+        if (comp == nullptr) {
+            return false;
         }
+        for (const world::HeroPoint& h : comp->heroes()) {
+            if (h.name == owner.name) {
+                return true;
+            }
+        }
+        return comp->findNode(owner.name) != nullptr;
     }
-    timeline_.unbind();
-    world::unregisterAtmosphericParameters(params_, atmosphericParams_);
-    atmosphericEffects_ = std::move(effects);
-    if (!atmosphericEffects_.empty()) {
-        atmosphericParams_ = world::registerAtmosphericParameters(params_, atmosphericEffects_);
+    case world::EffectTarget::Light: {
+        const auto* comp = composition();
+        if (comp == nullptr) {
+            return false;
+        }
+        // A light owner is named by the light's stable id (ADR-278), the same identity its
+        // `lights/<id>/...` parameters use.
+        for (const auto& light : comp->authoredLights()) {
+            if (scene::Composition::authoredLightId(light) == owner.name) {
+                return true;
+            }
+        }
+        return false;
     }
-    rebind();
-    return {};
+    }
+    return false;
 }
 
 void Engine::detachSceneParameters() {
@@ -583,10 +622,9 @@ void Engine::detachSceneParameters() {
     shaderLayers_.detach();
     layers_.detach();
     timeline_.unbind();
-    // ADR-207. After `timeline_.unbind()`, because a track aimed at a `worldfx/...` path holds a
-    // pointer into the parameter that is about to go.
-    world::unregisterWorldEffectParameters(params_, worldEffectParams_);
-    world::unregisterAtmosphericParameters(params_, atmosphericParams_);
+    // ADR-702. After `timeline_.unbind()`, because a track aimed at an `fx/...` path holds a pointer
+    // into the parameter that is about to go.
+    world::unregisterEffectParameters(params_, effectParams_);
 }
 
 params::Track* Engine::recordKey(const std::string& path, int component, params::KeyInterp interp,
@@ -1138,10 +1176,9 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     // ADR-207 and ADR-230, on the argument `cameraShotSpans` above makes, for the two families it
     // did not cover -- and this time it is not a derived cut but the effects themselves.
     //
-    // The world effects and the atmospheric effects belong to the `Composition`, and a project whose
-    // scene came from a file saves that scene **by reference**: `assets.scene.path` plus a hash of
-    // the bytes already on disk. Nothing writes the scene file. So an aurora added through the World
-    // Effects panel lived in the composition the window was drawing and in no document any render
+    // The effects belong to the `Composition`, and a project whose scene came from a file saves that
+    // scene **by reference**: `assets.scene.path` plus a hash of the bytes already on disk. Nothing
+    // writes the scene file. So an aurora added through the (since removed) World Effects panel lived in the composition the window was drawing and in no document any render
     // reads -- and a render builds its own `Engine` and loads the project (`startRenderFromUi` saves
     // the project for you and then renders *that file*). That is the whole of "the sky effects are in
     // the app and not in the video".
@@ -1160,7 +1197,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     // authored value and must not read as an edit.
     //
     // Nothing is written for an inlined composition: `assets.scene.inline` is `Composition::toJson`,
-    // which already carries both arrays. A second copy beside it would be a second answer.
+    // which already carries the `effects` array. A second copy beside it would be a second answer.
     if (const scene::Composition* comp = composition(); comp != nullptr && !compositionPath_.empty()) {
         nlohmann::json sceneDoc;
         if (std::ifstream sceneIn(compositionPath_); sceneIn) {
@@ -1184,23 +1221,15 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
             }
             return out;
         };
-        nlohmann::json liveWorld = nlohmann::json::array();
-        for (const world::WorldEffect& effect : comp->worldEffects()) {
-            liveWorld.push_back(effect.toJson());
+        // ADR-702: one list, every owner's, under one key.
+        nlohmann::json liveEffects = nlohmann::json::array();
+        for (const world::EffectInstance& effect : comp->effects()) {
+            liveEffects.push_back(effect.toJson());
         }
-        if (liveWorld != onDisk("worldEffects", [](const nlohmann::json& j) {
-                return world::WorldEffect::fromJson(j);
+        if (liveEffects != onDisk("effects", [](const nlohmann::json& j) {
+                return world::EffectInstance::fromJson(j);
             })) {
-            doc["worldEffects"] = std::move(liveWorld);
-        }
-        nlohmann::json liveAtmos = nlohmann::json::array();
-        for (const world::AtmosphericEffect& effect : comp->atmosphericEffects()) {
-            liveAtmos.push_back(effect.toJson());
-        }
-        if (liveAtmos != onDisk("atmosphericEffects", [](const nlohmann::json& j) {
-                return world::AtmosphericEffect::fromJson(j);
-            })) {
-            doc["atmosphericEffects"] = std::move(liveAtmos);
+            doc["effects"] = std::move(liveEffects);
         }
         // ADR-276, and it is the same defect a third time. Starring an object in the world editor
         // calls `Composition::setHeroes`; the composition is saved **by reference**; so the star
@@ -1246,7 +1275,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         // save and a reload**. The object came back, so it was in every frame of every export.
         //
         // Not the three keys above's shape, and the difference is the whole of why this one is
-        // harder. `worldEffects`, `atmosphericEffects` and `heroes` are small lists the project can
+        // harder. `effects` and `heroes` are small lists the project can
         // simply hold a copy of. The nodes are the scene: a copy would be 80 objects, would make the
         // shared scene file dead for this project the moment anybody corrected it, and would be a
         // second answer to every question the `parameters` block already answers about where a node
@@ -1280,7 +1309,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         // project only owes the *set*. Most of a light's twenty-five fields -- `type`, `role`,
         // `node`, `up`, the area extents -- are not parameters and never will be, so a by-name
         // difference would record which lights exist and lose what they are. That puts lights in
-        // `worldEffects`/`heroes`' family, which is small lists the project can simply hold.
+        // `effects`/`heroes`' family, which is small lists the project can simply hold.
         //
         // `authoredLightsAgainst` canonicalises the file's own list out and back through the same
         // parser before comparing, so a scene that spells out `"intensity": 1.0` does not read as
@@ -1860,11 +1889,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     }
 
     stage(5);
-    // ---- the session's world and atmospheric effects, over the ones its scene authors ----
+    // ---- the session's effects, over the ones its scene authors ----
     //
     // Here, and for the reason the 2D composition below is here: the parameter block a few lines
-    // down carries `worldfx/<name>/...` and `atmos/<name>/...` values, and `setWorldEffects` /
-    // `setAtmosphericEffects` are what *register* those paths. Applied after the parameters, an
+    // down carries `fx/<id>/...` values, and `setEffects` is what *registers* those paths. Applied after the parameters, an
     // effect would arrive with every number back at its default and the project's own values would
     // already have been refused as unknown -- which is exactly what the 94 warnings this fix was
     // found by say.
@@ -1872,8 +1900,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // Over rather than instead of: the scene file is still the state that runs first (ADR-264), and
     // an absent key changes nothing. A present one is the session's answer, including an empty array,
     // which is how a deleted effect stays deleted.
-    // ADR-276: the session's heroes, over the ones its scene authors. **Before** the world effects,
-    // and not by taste: a `WorldEffect` may name a hero as its source, and `Composition::setHeroes`
+    // ADR-276: the session's heroes, over the ones its scene authors. **Before** the effects, and
+    // not by taste: an effect may be attached to a hero or name one as its source, and `Composition::setHeroes`
     // is what decides whether that name is real. The scene file's own reader orders them the same
     // way and says so (`composition.cpp`, "read after the heroes").
     //
@@ -1926,124 +1954,34 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
     }
-    if (const auto entry = doc.find("worldEffects"); entry != doc.end() && entry->is_array()) {
-        std::vector<world::WorldEffect> effects;
+    // ADR-702: the session's effects -- every owner's, one list -- over the ones its scene authors.
+    // After the heroes, because an effect can be attached to one. The pre-ADR-702 keys are named
+    // rather than read (ADR-441: every tracked project was converted in the repository).
+    for (const char* legacy : {"worldEffects", "atmosphericEffects"}) {
+        if (doc.contains(legacy)) {
+            warn(fmt::format("'{}' is the pre-ADR-702 effect format and was ignored; effects are one "
+                             "'effects' array now (tools/migrate_effects.py converts a project)",
+                             legacy));
+        }
+    }
+    if (const auto entry = doc.find("effects"); entry != doc.end() && entry->is_array()) {
+        std::vector<world::EffectInstance> effects;
         effects.reserve(entry->size());
         bool readable = true;
         for (std::size_t i = 0; i < entry->size(); ++i) {
-            auto one = world::WorldEffect::fromJson((*entry)[i]);
+            auto one = world::EffectInstance::fromJson((*entry)[i]);
             if (!one) {
-                warn(fmt::format("worldEffects[{}]: {}", i, one.error().message));
+                // Named, and the whole block refused rather than the member skipped: an effect that
+                // quietly failed to load looks exactly like one nobody declared.
+                warn(fmt::format("effects[{}]: {}", i, one.error().message));
                 readable = false;
                 break;
             }
             effects.push_back(std::move(*one));
         }
         if (readable) {
-            if (auto ok = setWorldEffects(std::move(effects)); !ok) {
-                warn("worldEffects: " + ok.error().message);
-            }
-        }
-    }
-    if (const auto entry = doc.find("atmosphericEffects"); entry != doc.end() && entry->is_array()) {
-        std::vector<world::AtmosphericEffect> effects;
-        effects.reserve(entry->size());
-        bool readable = true;
-        for (std::size_t i = 0; i < entry->size(); ++i) {
-            auto one = world::AtmosphericEffect::fromJson((*entry)[i]);
-            if (!one) {
-                warn(fmt::format("atmosphericEffects[{}]: {}", i, one.error().message));
-                readable = false;
-                break;
-            }
-            effects.push_back(std::move(*one));
-        }
-        if (readable) {
-            // ADR-387 §19, the second half of the migration. A project's `atmosphericEffects` block
-            // is a COPY of the scene's list and REPLACES it (ADR-264), so a project saved before the
-            // vortex was an effect carries a list that cannot contain one -- and the vortex the
-            // scene's own migration just produced would be thrown away by a project that is exactly
-            // as legacy as the scene it names. Measured: the intermediate state where only the scene
-            // had been migrated rendered 97.96% of pixels different, with the funnel gone.
-            //
-            // Carried over by KIND rather than by name, because the thing being migrated is a format
-            // that predates the kind. A project that authors its own vortex is not legacy and is left
-            // alone, which is the control: this can only ever add the one the file could not express.
-            const bool projectHasVortex =
-                std::any_of(effects.begin(), effects.end(), [](const world::AtmosphericEffect& e) {
-                    return e.kind == world::AtmosphereKind::Vortex;
-                });
-            if (!projectHasVortex) {
-                for (const world::AtmosphericEffect& e : atmosphericEffects_) {
-                    if (e.kind == world::AtmosphereKind::Vortex) {
-                        effects.push_back(e);
-                        break;
-                    }
-                }
-            }
-            if (auto ok = setAtmosphericEffects(std::move(effects)); !ok) {
-                warn("atmosphericEffects: " + ok.error().message);
-            }
-        }
-    }
-    // ADR-387 §19, the third and last half of the migration: the PATHS. Moving the vortex from
-    // `scene/vortex/*` to `atmos/<name>/*` orphans every route, key, preset member and macro that
-    // named the old one -- silently, because a route whose target does not resolve is dropped with
-    // a warning nobody reads and the picture simply stops answering the music.
-    //
-    // This was not theory. The shipped Tree of Life project carries five of them (bass -> density
-    // and breath, mid -> turbulence, treble -> filaments, progress -> emission), and without this
-    // the migrated scene rendered 95.35% of its pixels differently from the scene it replaced --
-    // an unmodulated funnel, dimmest exactly where the vortex is brightest. Three renders and a
-    // uniform probe said the values reaching the GPU were correct to the last decimal before the
-    // routes turned out to be what had moved.
-    //
-    // Rewritten over the WHOLE document rather than over `routes`, because a path is a string in
-    // six places (a route target, a timeline track, a cue, a preset member, a macro target, a
-    // control binding) and a migration that knows about one of them is a migration that fails
-    // quietly in the other five.
-    if (!atmosphericEffects_.empty()) {
-        std::string vortexName;
-        for (const world::AtmosphericEffect& e : atmosphericEffects_) {
-            if (e.kind == world::AtmosphereKind::Vortex) {
-                vortexName = e.name;
-                break;
-            }
-        }
-        if (!vortexName.empty()) {
-            const std::string from = "scene/vortex/";
-            const std::string to = world::atmosphericParameterPrefix(vortexName);
-            std::size_t moved = 0;
-            const auto rewrite = [&](auto&& self, nlohmann::json& node) -> void {
-                if (node.is_string()) {
-                    const std::string& v = node.get_ref<const std::string&>();
-                    if (v.compare(0, from.size(), from) == 0) {
-                        node = to + v.substr(from.size());
-                        ++moved;
-                    }
-                    return;
-                }
-                if (node.is_array()) {
-                    for (nlohmann::json& child : node) { self(self, child); }
-                    return;
-                }
-                if (!node.is_object()) { return; }
-                nlohmann::json rebuilt = nlohmann::json::object();
-                for (auto& [key, value] : node.items()) {
-                    self(self, value);
-                    if (key.size() > from.size() && key.compare(0, from.size(), from) == 0) {
-                        rebuilt[to + key.substr(from.size())] = std::move(value);
-                        ++moved;
-                    } else {
-                        rebuilt[key] = std::move(value);
-                    }
-                }
-                node = std::move(rebuilt);
-            };
-            rewrite(rewrite, doc);
-            if (moved > 0) {
-                log::info("project: migrated {} reference(s) from 'scene/vortex/' to '{}' (ADR-387)",
-                          moved, to);
+            if (auto ok = setEffects(std::move(effects)); !ok) {
+                warn("effects: " + ok.error().message);
             }
         }
     }
@@ -3858,9 +3796,9 @@ void Engine::applyCues() {
 
 namespace {
 
-// Where the world's nodes are, for a world effect resolving a `node:` source (ADR-207). An interface
+// Where the world's nodes are, for an effect resolving a `node:` or `owner` source (ADR-207/702). An interface
 // rather than a lambda so resolution allocates nothing: the engine counts allocations per frame.
-class CompositionEffectScene final : public world::WorldEffectScene {
+class CompositionEffectScene final : public world::EffectSceneQuery {
 public:
     explicit CompositionEffectScene(const scene::Composition* comp) : comp_(comp) {}
 
@@ -3923,47 +3861,11 @@ glm::vec3 Engine::cameraVelocityOnTimeline() const {
     return delta / static_cast<float>(kStep);
 }
 
-// Resolves this frame's world effects into the scene (ADR-207).
-//
-// Called from `update()` after the camera has been placed and after the modulation routes have run,
-// so the numbers it reads are this frame's finals and the camera it reads is this frame's camera.
-// Everything it does is a pure function of the transport second, which is what keeps an offline
-// render of second N identical to a playthrough of second N.
-void Engine::updateWorldEffects() {
-    scene::Scene& live = controller_->scene();
-    if (worldEffects_.empty()) {
-        live.worldEffects = world::WorldEffectFrame{};
-        return;
-    }
-    world::applyWorldEffectParameters(worldEffectParams_, worldEffects_);
-
-    const CompositionEffectScene sceneAdapter(composition());
-    world::WorldEffectContext ctx;
-    ctx.seconds = timelineClock_.seconds;
-    ctx.cameraPosition = live.camera.position;
-    ctx.cameraTarget = live.camera.target;
-    const glm::vec3 aim = live.camera.target - live.camera.position;
-    ctx.cameraForward = glm::length(aim) > 1e-5f ? glm::normalize(aim) : glm::vec3(0.0f, 0.0f, -1.0f);
-    ctx.cameraVelocity = cameraVelocityOnTimeline();
-    ctx.shots = shotSpans_;
-    ctx.scene = &sceneAdapter;
-    if (const auto* comp = composition()) {
-        ctx.heroes = comp->heroes();
-    }
-    world::buildWorldEffectFrame(worldEffects_, ctx, live.worldEffects);
-    // Logged on the edge rather than per frame: "why is my effect not firing" is a question about
-    // when it started and stopped, and a line per frame would bury the answer.
-    if (live.worldEffects.count != lastWorldEffectCount_) {
-        lastWorldEffectCount_ = live.worldEffects.count;
-        log::debug("world effects: {} live at {:.2f}s", live.worldEffects.count, ctx.seconds);
-    }
-}
-
 // The aurora's spectrum, folded from the analysis frame into `kAuroraBands` log-spaced bins.
 //
 // **This is the one place an effect reads audio directly, and it is deliberate.** The rule
 // `world/effect_params.hpp` states -- audio reaches an effect as a modulation route, never as a hook
-// -- holds for every scalar an aurora has, and `defaultAtmosphericRoutes` is what implements it. It
+// -- holds for every scalar an aurora has, and `defaultEffectRoutes` is what implements it. It
 // cannot hold for the curtain's *shape*, because that is sixteen numbers across the sky and a route
 // carries one. So the vector rides in the resolution context instead, and it is read from
 // `latestFrame()` -- the same frame the signal bus, the material inputs and the camera director all
@@ -4019,7 +3921,7 @@ void Engine::updateAuroraSpectrum() {
 // §68, one field many subscribers: everything this scene publishes, rebuilt each frame.
 //
 // This function is the whole of why the field bus is not another thing that exists and is never
-// reached. `defaultAtmosphericRoutes` was correct for a year with no caller (ADR-385/392), and a
+// reached. `defaultEffectRoutes` was correct for a year with no caller (ADR-385/392), and a
 // bus nobody published into would have been the same defect wearing a newer word. So it is called
 // from `updateAtmosphericEffects`, on the shipping path, before the resolve that reads it -- and
 // the test that proves an effect's subscription reaches its picture goes through this call rather
@@ -4046,8 +3948,8 @@ void Engine::publishFields() {
     // is the effect's and a scene may author several even though only the first is marched --
     // subscribing to the second is then a thing an artist can express and a thing the report can
     // explain, rather than a silent mismatch between what the panel lists and what resolves.
-    for (const world::AtmosphericEffect& e : atmosphericEffects_) {
-        if (e.kind != world::AtmosphereKind::Vortex || !e.enabled || !e.vortex.active()) {
+    for (const world::EffectInstance& e : effects_) {
+        if (e.kind != world::EffectKind::Vortex || !e.enabled || !e.vortex.active()) {
             continue;
         }
         // ADR-562, and this site was BROKEN before it. It hand-copied `world::Vortex` into a
@@ -4065,7 +3967,7 @@ void Engine::publishFields() {
         //
         // Composing the field removes the copy rather than correcting it. There is nothing left
         // here to fall behind.
-        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(e.vortex.field));
+        fieldBus_.publishVortex(world::fields::vortexFieldName(e.id), vortex::packVortex(e.vortex.field));
     }
 
     // The loud half. A subscription naming a field nobody publishes is this repository's signature
@@ -4073,9 +3975,9 @@ void Engine::publishFields() {
     // frame rate is a message nobody reads, which is the same failure from the other end.
     std::vector<std::string> names;
     std::vector<world::fields::Subscription> subs;
-    names.reserve(atmosphericEffects_.size());
-    subs.reserve(atmosphericEffects_.size());
-    for (const world::AtmosphericEffect& e : atmosphericEffects_) {
+    names.reserve(effects_.size());
+    subs.reserve(effects_.size());
+    for (const world::EffectInstance& e : effects_) {
         names.push_back(e.name);
         subs.push_back(e.flow);
     }
@@ -4086,64 +3988,98 @@ void Engine::publishFields() {
             continue;
         }
         reportedDeadFields_.push_back(key);
-        log::warn("atmospheric effect '{}' subscribes to field '{}', which this scene does not "
+        log::warn("effect '{}' subscribes to field '{}', which this scene does not "
                   "publish; its flow influence does nothing. Published: {}",
                   dead.subscriber, dead.field, fmt::join(fieldBus_.names(), ", "));
     }
 }
 
-// Resolves this frame's atmospheric effects into the scene (ADR-230).
+// ADR-702: the one evaluator. Resolves this frame's effects -- every owner's, every type's -- into
+// the scene's render contributions.
 //
-// Called from `update()` beside `updateWorldEffects`, for the same reasons: after the camera has
-// been placed and after the modulation routes have run, so the numbers it reads are this frame's
-// finals. Everything it does is a pure function of the transport second.
-void Engine::updateAtmosphericEffects() {
+// Called from `update()` after the camera has been placed and after the modulation routes have run,
+// so the numbers it reads are this frame's finals and the camera it reads is this frame's camera.
+// Everything it does is a pure function of the transport second, which is what keeps an offline
+// render of second N identical to a playthrough of second N (ADR-091).
+//
+// The shape is ADR-702 §28's: apply the parameters, build ONE context, then ask each render stage's
+// builder for its contribution. The builders walk `effectOrder_` (render stage, priority, stack
+// position -- computed when the list changed, so nothing here allocates) and each writes the status
+// of the instances it owns. Stages are not forced through one implementation: the surface waves
+// are a per-fragment term in the lit pass, the sky is a far-plane draw, the media are marched --
+// and all three coexist because each writes its own block of the frame and its own slots in it.
+void Engine::updateEffects() {
     scene::Scene& live = controller_->scene();
-    if (atmosphericEffects_.empty()) {
+    if (effects_.empty()) {
+        live.waves = world::WaveFrame{};
         live.atmospherics = world::AtmosphericFrame{};
         return;
     }
-    world::applyAtmosphericParameters(atmosphericParams_, atmosphericEffects_);
+    world::applyEffectParameters(effectParams_, effects_);
     updateAuroraSpectrum();
     publishFields();
 
-    world::AtmosphericContext ctx;
+    const CompositionEffectScene sceneAdapter(composition());
+    world::EffectContext ctx;
     ctx.seconds = timelineClock_.seconds;
     ctx.cameraPosition = live.camera.position;
+    ctx.cameraTarget = live.camera.target;
+    const glm::vec3 aim = live.camera.target - live.camera.position;
+    ctx.cameraForward = glm::length(aim) > 1e-5f ? glm::normalize(aim) : glm::vec3(0.0f, 0.0f, -1.0f);
+    ctx.cameraVelocity = cameraVelocityOnTimeline();
     ctx.shots = shotSpans_;
+    ctx.scene = &sceneAdapter;
+    if (const auto* comp = composition()) {
+        ctx.heroes = comp->heroes();
+    }
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
-    world::buildAtmosphericFrame(atmosphericEffects_, ctx, live.atmospherics);
-    // ADR-562: say it out loud. `AtmosphericCounts::dropped` existed for two ADRs and had exactly
-    // ONE reader in the whole tree -- a CPU conformance finding -- so in a running editor or a
-    // headless render the number did not exist, while two comments claimed the limit was "reported,
-    // not a silent no-op". It was not reported. ADR-560 measured what that cost: a fog bank and a
-    // vortex authored together rendered byte-identical to whichever came first, with the loser
-    // contributing not one pixel.
-    //
-    // `agent/tornado` produced the worst case -- a seven-variant showcase that renders a FLAT GREY
-    // FRAME, because the one surviving medium was a 70 m dust devil sub-pixel at group distance.
-    // This line is the difference between that being a mystery and being a sentence.
-    //
-    // Once per changed count rather than per frame: a message repeated at frame rate is a message
-    // nobody reads, which is the same failure from the other end (the §68 dead-subscription
-    // warning next to this one says so too).
-    if (live.atmospherics.mediaDropped != lastMediaDropped_) {
-        lastMediaDropped_ = live.atmospherics.mediaDropped;
-        if (live.atmospherics.mediaDropped > 0) {
-            log::warn("{} placed medium/media were not drawn: the volumetric march carries {} and "
-                      "the scene enables more. The first ones in the effect list win.",
-                      live.atmospherics.mediaDropped, world::kMaxMedia);
+
+    if (effectStatus_.size() != effects_.size()) {
+        effectStatus_.assign(effects_.size(), world::EffectStatus::Dormant);
+    }
+    // RenderStage::Material -- the surface waves.
+    world::buildWaveFrame(effects_, ctx, live.waves, effectOrder_, effectStatus_);
+    // RenderStage::Sky and RenderStage::Volumetric -- comets, auroras and placed media.
+    world::buildAtmosphericFrame(effects_, ctx, live.atmospherics, effectOrder_, effectStatus_);
+    // An instance attached to an entity the scene does not have is reported as such, whatever its
+    // builder said: "orphaned" is the actionable answer, "dormant" would send somebody looking at
+    // its timing.
+    std::uint32_t dropped = 0;
+    for (std::size_t i = 0; i < effects_.size(); ++i) {
+        if (effects_[i].owner.kind != world::EffectTarget::World && !effectOwnerExists(effects_[i].owner)) {
+            effectStatus_[i] = world::EffectStatus::Orphaned;
+        }
+        dropped += effectStatus_[i] == world::EffectStatus::Dropped ? 1u : 0u;
+    }
+    // ADR-562/702: say it out loud, once per changed count rather than per frame. Before ADR-562 a
+    // fog bank and a vortex authored together rendered byte-identical to whichever came first, and
+    // the one counter that knew was read by nothing.
+    if (dropped != lastEffectDropped_) {
+        lastEffectDropped_ = dropped;
+        if (dropped > 0) {
+            log::warn("{} effect(s) are active but not drawn: their render stage's GPU capacity is "
+                      "full (surface waves {}, comets {}, auroras {}, placed media {}). The Effects "
+                      "panel marks which.",
+                      dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
+                      world::kMaxMedia);
         }
     }
+    lastMediaDropped_ = live.atmospherics.mediaDropped;
     // The §12 quality control. Offline renders get the full march; live playback takes two thirds of
     // it, which is a difference nobody sees on a moving comet and a third of the tail's cost.
     live.atmospherics.cometSteps = mode_ == EngineMode::Offline ? 28u : 18u;
 
+    // Logged on the edge rather than per frame: "why is my effect not firing" is a question about
+    // when it started and stopped, and a line per frame would bury the answer.
+    if (live.waves.count != lastWaveCount_) {
+        lastWaveCount_ = live.waves.count;
+        log::debug("surface waves: {} live at {:.2f}s", live.waves.count, ctx.seconds);
+    }
     const std::uint32_t total = live.atmospherics.cometCount + live.atmospherics.auroraCount;
     if (total != lastAtmosphericCount_) {
         lastAtmosphericCount_ = total;
-        log::debug("atmospheric effects: {} comet(s), {} aurora(s) live at {:.2f}s",
+        log::debug("sky effects: {} comet(s), {} aurora(s) live at {:.2f}s",
                    live.atmospherics.cometCount, live.atmospherics.auroraCount, ctx.seconds);
     }
 }
@@ -4416,8 +4352,7 @@ void Engine::update(const FrameTime& time) {
     // ADR-039's selective bloom and ADR-035's identifier mask were both shipped missing exactly
     // this assignment, and both were invisible because the feature simply never ran.
     controller_->scene().temporal = temporal_;
-    updateWorldEffects();
-    updateAtmosphericEffects();
+    updateEffects();
     {
         shaders::StdUniforms base;
         const auto& f = latest_;

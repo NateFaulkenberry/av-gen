@@ -1482,10 +1482,10 @@ std::span<const SceneRenderer::PassArm> SceneRenderer::passArms() {
         {"cameramotion", &T::cameraMotion},  {"animationmotion", &T::animationMotion},
         {"auxstore", &T::auxTargetStores},   {"fxaa", &T::antialias},
         // ADR-207. Off: the frame block reports zero effects, so the per-fragment loop in
-        // world_effects.wgsl executes one uniform compare and returns. This is the arm that answers
-        // "what does World Effects cost when nothing is running", which §22 of the brief asks for
+        // wave_effects.wgsl executes one uniform compare and returns. This is the arm that answers
+        // "what do the surface waves cost when nothing is running", which §22 of the brief asks for
         // separately from "what does one cost when it is".
-        {"worldeffects", &T::worldEffects},
+        {"waves", &T::waves},
         // ADR-230. Off: the sky-layer draw is skipped entirely, which is what makes the "effects
         // disabled" arm in §12 a real arm rather than a frame that renders the same pixels.
         {"atmospherics", &T::atmospherics},
@@ -2746,20 +2746,20 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                            static_cast<float>(std::max(stats_.shadowMask.width, 1u)),
                                            static_cast<float>(std::max(stats_.shadowMask.height, 1u)));
     }
-    // ADR-207: the world effects, already resolved and packed by whoever owns the scene. The
+    // ADR-207/702: the surface waves (RenderStage::Material), already resolved and packed by whoever owns the scene. The
     // renderer copies them and never resolves them -- a source is a hero name or the camera's
     // trajectory, and a renderer that knew about either would be a renderer that has to be given
     // the director.
-    if (toggles_.worldEffects) {
+    if (toggles_.waves) {
         const std::uint32_t effects =
-            std::min<std::uint32_t>(scene.worldEffects.count, world::kMaxGpuWorldEffects);
-        frame.worldEffectCount = glm::vec4(static_cast<float>(effects), 0.0f, 0.0f, 0.0f);
+            std::min<std::uint32_t>(scene.waves.count, world::kMaxGpuWaves);
+        frame.waveCount = glm::vec4(static_cast<float>(effects), 0.0f, 0.0f, 0.0f);
         for (std::uint32_t i = 0; i < effects; ++i) {
-            frame.worldEffects[i] = scene.worldEffects.effects[i];
+            frame.waves[i] = scene.waves.effects[i];
         }
-        stats_.worldEffects = effects;
+        stats_.waves = effects;
     } else {
-        stats_.worldEffects = 0;
+        stats_.waves = 0;
     }
     // ADR-230: the atmospheric effects, on the same terms. `drawAtmosphere_` is read again at the
     // draw site, so the toggle removes the fragment work and the uniform content together -- an arm

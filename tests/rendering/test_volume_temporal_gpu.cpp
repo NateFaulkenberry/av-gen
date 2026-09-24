@@ -31,7 +31,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -82,8 +82,8 @@ scene::Scene stillScene(float jitter, float density = 1.4f, int steps = 32) {
     key.volumetricStrength = 1.0f;
     s.addLight(key);
 
-    world::AtmosphericEffect e =
-        world::makeAtmosphericEffect(world::AtmosphereKind::VolumetricFog, "still");
+    world::EffectInstance e =
+        world::makeEffect(world::EffectKind::VolumetricFog, "still");
     world::Vortex& v = e.vortex;
     v.field.center = {0.0f, 0.0f, 0.0f};
     v.field.radius = 170.0f;

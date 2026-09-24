@@ -12,7 +12,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "rendering/volume_renderer.hpp"
 #include "scene/scene.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 #include "support/image_diff.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -53,8 +53,8 @@ scene::Scene voidWorld(bool vortexOn, float fogDensity, glm::vec3 eye) {
         // packs it through the kind's own `packMedium` -- the same call `buildAtmosphericFrame`
         // makes. Setting lanes by hand here would be a fourth copy of the packing, which is the
         // defect ADR-401/561/562 each found in turn.
-        world::AtmosphericEffect e =
-            world::makeAtmosphericEffect(world::AtmosphereKind::Vortex, "probe");
+        world::EffectInstance e =
+            world::makeEffect(world::EffectKind::Vortex, "probe");
         world::Vortex& v = e.vortex;
         v.field.center = {0.0f, -600.0f, 0.0f};
         v.field.radius = 1500.0f;
@@ -187,8 +187,8 @@ TEST_CASE("two placed media in one scene are both marched", "[gpu][vortex][media
     // that dropped one cannot accidentally look like a march that kept both.
     const auto seat = [&](scene::Scene& s, std::uint32_t slot, glm::vec3 centre, float radius,
                           glm::vec3 colour) {
-        world::AtmosphericEffect e =
-            world::makeAtmosphericEffect(world::AtmosphereKind::Vortex, "m");
+        world::EffectInstance e =
+            world::makeEffect(world::EffectKind::Vortex, "m");
         e.vortex.field.center = centre;
         e.vortex.field.radius = radius;
         e.vortex.field.thickness = 200.0f;

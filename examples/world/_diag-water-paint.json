@@ -13,15 +13,33 @@
              "kind": "composition",
              "path": {
                "path": "glowmere-valley-2-multicam.scene.json",
-               "sha256": "ebb2990af2c43b3e88c7327e677a2881a9502c59990c281901c357b4f14f88d9",
-               "size": 243026
+               "sha256": "e1703f9891d4c2c3b562cb99048359af5f2d4c784c0415dc9b2f06ef2d57990e",
+               "size": 263720
              }
            }
  },
- "atmosphericEffects": [
+ "effects": [
   {
    "activation": "always",
-   "aurora": {
+   "enabled": true,
+   "ground": {
+    "color": [
+     0.1599999964237213,
+     0.7200000286102295,
+     0.5799999833106995
+    ],
+    "falloff": 2.0,
+    "intensity": 0.5,
+    "mode": "subtle",
+    "radius": 220.0
+   },
+   "id": "aurora",
+   "name": "Aurora",
+   "order": 0,
+   "owner": {
+    "kind": "world"
+   },
+   "parameters": {
     "appearance": {
      "edgeBrightness": 2.5999999046325684,
      "emission": 1.0,
@@ -84,85 +102,6 @@
      "waveScale": 2.4000000953674316
     }
    },
-   "comet": {
-    "appearance": {
-     "coreColor": [
-      0.550000011920929,
-      1.0,
-      1.0
-     ],
-     "coreIntensity": 18.0,
-     "flowSpeed": 0.3499999940395355,
-     "haloColor": [
-      0.20000000298023224,
-      0.75,
-      1.0
-     ],
-     "haloIntensity": 2.200000047683716,
-     "haloSize": 150.0,
-     "headSize": 26.0,
-     "tailColor": [
-      0.44999998807907104,
-      0.3499999940395355,
-      1.0
-     ],
-     "tailFalloff": 1.899999976158142,
-     "tailIntensity": 4.5,
-     "tailLength": 900.0,
-     "tailWidth": 70.0,
-     "wispAmount": 55.0,
-     "wispScale": 0.002400000113993883
-    },
-    "path": {
-     "acceleration": 0.0,
-     "anchor": "world",
-     "anchorPosition": [
-      0.0,
-      0.0,
-      0.0
-     ],
-     "arcLift": 180.0,
-     "curvature": 0.0,
-     "distance": 2600.0,
-     "endAzimuth": 55.0,
-     "endElevation": 9.0,
-     "speedScale": 1.0,
-     "startAzimuth": -70.0,
-     "startElevation": 34.0,
-     "travelSeconds": 7.0
-    },
-    "rainbow": {
-     "brightness": 1.0,
-     "enabled": false,
-     "hueOffset": 0.0,
-     "saturation": 0.8500000238418579,
-     "scale": 1.100000023841858,
-     "speed": 0.2199999988079071
-    },
-    "sparkle": {
-     "density": 1.100000023841858,
-     "enabled": false,
-     "fadeDistance": 85.0,
-     "intensity": 1.600000023841858,
-     "seed": 1,
-     "size": 0.2199999988079071,
-     "speed": 0.6000000238418579
-    }
-   },
-   "enabled": true,
-   "ground": {
-    "color": [
-     0.1599999964237213,
-     0.7200000286102295,
-     0.5799999833106995
-    ],
-    "falloff": 2.0,
-    "intensity": 0.5,
-    "mode": "subtle",
-    "radius": 220.0
-   },
-   "kind": "aurora",
-   "name": "Aurora",
    "style": "Glowmere Bioluminescence",
    "timing": {
     "delay": 0.0,
@@ -172,7 +111,1438 @@
     "repeatSeconds": 0.0,
     "windowSeconds": 6.0,
     "windowStart": 0.0
-   }
+   },
+   "type": "aurora"
+  },
+  {
+   "activation": "always",
+   "enabled": true,
+   "id": "camera-travel-beam",
+   "name": "Camera Travel Beam",
+   "order": 1,
+   "owner": {
+    "kind": "world"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.5799999833106995,
+      0.36000001430511475,
+      1.0
+     ],
+     "edgeColor": [
+      0.9599999785423279,
+      0.8399999737739563,
+      1.0
+     ],
+     "edgeIntensity": 3.0,
+     "intensity": 1.899999976158142,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "blended",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.2000000476837158,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5999999046325684,
+     "kind": "radial",
+     "range": 300.0,
+     "ringCount": 4.0,
+     "speed": 110.0,
+     "startOffset": 10.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 24.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 40.0,
+     "verticalGrowth": 0.15000000596046448
+    },
+    "response": {
+     "emissive": 1.2000000476837158,
+     "foliage": 1.100000023841858,
+     "ground": 0.6899999976158142,
+     "surface": 0.699999988079071
+    },
+    "source": {
+     "kind": "camera"
+    },
+    "sparkle": {
+     "density": 0.699999988079071,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.0,
+     "seed": 1,
+     "size": 0.3799999952316284,
+     "speed": 0.6000000238418579
+    },
+    "target": {
+     "kind": "focusHero"
+    }
+   },
+   "style": "Magical",
+   "timing": {
+    "delay": 0.15000000596046448,
+    "fadeIn": 0.5,
+    "fadeOut": 1.100000023841858,
+    "lifetime": 0.0,
+    "repeatSeconds": 9.239999771118164,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "travelBeam"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "visitor-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "visitor"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "elder-2-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "elder-2-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "rook-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "rook"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "tide-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "tide"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "sage-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "sage"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "ember-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "ember"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "vane-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "vane"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "lantern-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "lantern-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "spire-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "spire-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "bloom-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "bloom-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "veil-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "veil-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "umbra-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "umbra-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "cairn-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "cairn-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "ridge-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "ridge-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "scree-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "scree-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
+  },
+  {
+   "activation": "heroFocus",
+   "enabled": true,
+   "id": "ember-cap-hero-pulse",
+   "name": "Hero Pulse",
+   "order": 0,
+   "owner": {
+    "kind": "entity",
+    "name": "ember-cap"
+   },
+   "parameters": {
+    "appearance": {
+     "color": [
+      0.1599999964237213,
+      0.9200000166893005,
+      0.6200000047683716
+     ],
+     "edgeColor": [
+      0.7799999713897705,
+      1.0,
+      0.8799999952316284
+     ],
+     "edgeIntensity": 9.0,
+     "intensity": 5.0,
+     "rainbow": false,
+     "rainbowBrightness": 1.0,
+     "rainbowSaturation": 0.8500000238418579,
+     "rainbowScale": 0.012000000104308128,
+     "rainbowSpeed": 0.3499999940395355,
+     "width": 1.0
+    },
+    "propagation": {
+     "beamRadius": 0.0,
+     "direction": "explicit",
+     "explicitDirection": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "falloff": 1.5,
+     "forwardWeight": 1.0,
+     "frontWidth": 3.5,
+     "kind": "radial",
+     "range": 58.0,
+     "ringCount": 2.0,
+     "speed": 13.0,
+     "startOffset": 0.0,
+     "targetWeight": 1.2000000476837158,
+     "trailLength": 20.0,
+     "velocityWeight": 0.6000000238418579,
+     "verticalExtent": 9.0,
+     "verticalGrowth": 0.6499999761581421
+    },
+    "response": {
+     "emissive": 1.2999999523162842,
+     "foliage": 1.5,
+     "ground": 1.0,
+     "surface": 0.8999999761581421
+    },
+    "source": {
+     "kind": "owner"
+    },
+    "sparkle": {
+     "density": 1.399999976158142,
+     "enabled": true,
+     "fadeDistance": 85.0,
+     "intensity": 2.5999999046325684,
+     "seed": 2,
+     "size": 0.20000000298023224,
+     "speed": 0.6000000238418579
+    }
+   },
+   "style": "Bioluminescent",
+   "timing": {
+    "delay": 0.3499999940395355,
+    "fadeIn": 0.6000000238418579,
+    "fadeOut": 1.2000000476837158,
+    "lifetime": 0.0,
+    "repeatSeconds": 4.5,
+    "windowSeconds": 6.0,
+    "windowStart": 0.0
+   },
+   "type": "groundPulse"
   }
  ],
  "autoDirector": {
@@ -1541,69 +2911,6 @@
   }
  ],
  "parameters": {
-  "atmos/Aurora/audioBass": 0.8500000238418579,
-  "atmos/Aurora/audioBeat": 0.3499999940395355,
-  "atmos/Aurora/audioHigh": 0.699999988079071,
-  "atmos/Aurora/audioLowMid": 0.550000011920929,
-  "atmos/Aurora/audioMid": 0.44999998807907104,
-  "atmos/Aurora/audioSensitivity": 1.0,
-  "atmos/Aurora/baseHeight": -40.0,
-  "atmos/Aurora/complexity": 26.0,
-  "atmos/Aurora/curtainHeight": 2600.0,
-  "atmos/Aurora/curtains": 3.0,
-  "atmos/Aurora/delay": 0.0,
-  "atmos/Aurora/driftSpeed": 0.12999999523162842,
-  "atmos/Aurora/edgeBrightness": 2.5999999046325684,
-  "atmos/Aurora/emission": 1.0,
-  "atmos/Aurora/enabled": true,
-  "atmos/Aurora/fadeIn": 2.0,
-  "atmos/Aurora/fadeOut": 0.0,
-  "atmos/Aurora/filaments": 0.949999988079071,
-  "atmos/Aurora/flowSpeed": 0.054999999701976776,
-  "atmos/Aurora/groundColor": [
-   0.1599999964237213,
-   0.7200000286102295,
-   0.5799999833106995
-  ],
-  "atmos/Aurora/groundFalloff": 2.0,
-  "atmos/Aurora/groundIntensity": 0.5,
-  "atmos/Aurora/groundRadius": 220.0,
-  "atmos/Aurora/horizonGlow": 0.6000000238418579,
-  "atmos/Aurora/intensity": 2.799999952316284,
-  "atmos/Aurora/layerSpacing": 0.3400000035762787,
-  "atmos/Aurora/lifetime": 0.0,
-  "atmos/Aurora/lowColor": [
-   0.14000000059604645,
-   1.0,
-   0.6200000047683716
-  ],
-  "atmos/Aurora/midColor": [
-   0.1599999964237213,
-   0.8199999928474426,
-   1.0
-  ],
-  "atmos/Aurora/opacity": 0.8500000238418579,
-  "atmos/Aurora/radius": 5200.0,
-  "atmos/Aurora/rainbow": false,
-  "atmos/Aurora/rainbowBrightness": 0.7599999904632568,
-  "atmos/Aurora/rainbowHue": 0.0,
-  "atmos/Aurora/rainbowSaturation": 0.8500000238418579,
-  "atmos/Aurora/rainbowScale": 1.100000023841858,
-  "atmos/Aurora/rainbowSpeed": 0.2199999988079071,
-  "atmos/Aurora/repeat": 0.0,
-  "atmos/Aurora/sparkle": 0.5,
-  "atmos/Aurora/spectrumShape": 0.75,
-  "atmos/Aurora/topColor": [
-   0.5799999833106995,
-   0.3199999928474426,
-   1.0
-  ],
-  "atmos/Aurora/turbulence": 0.44999998807907104,
-  "atmos/Aurora/verticalSpeed": 0.07000000029802322,
-  "atmos/Aurora/waveAmplitude": 0.30000001192092896,
-  "atmos/Aurora/waveScale": 2.4000000953674316,
-  "atmos/Aurora/windowSeconds": 6.0,
-  "atmos/Aurora/windowStart": 0.0,
   "audio/inputGain": 1.0,
   "camera/distance": 1000.0,
   "camera/exposure/aperture": 5.599999904632568,
@@ -2204,6 +3511,783 @@
    0.01600000075995922,
    0.04800000041723251
   ],
+  "fx/aurora/audioBass": 0.8500000238418579,
+  "fx/aurora/audioBeat": 0.3499999940395355,
+  "fx/aurora/audioHigh": 0.699999988079071,
+  "fx/aurora/audioLowMid": 0.550000011920929,
+  "fx/aurora/audioMid": 0.44999998807907104,
+  "fx/aurora/audioSensitivity": 1.0,
+  "fx/aurora/baseHeight": -40.0,
+  "fx/aurora/complexity": 26.0,
+  "fx/aurora/curtainHeight": 2600.0,
+  "fx/aurora/curtains": 3.0,
+  "fx/aurora/delay": 0.0,
+  "fx/aurora/driftSpeed": 0.12999999523162842,
+  "fx/aurora/edgeBrightness": 2.5999999046325684,
+  "fx/aurora/emission": 1.0,
+  "fx/aurora/enabled": true,
+  "fx/aurora/fadeIn": 2.0,
+  "fx/aurora/fadeOut": 0.0,
+  "fx/aurora/filaments": 0.949999988079071,
+  "fx/aurora/flowSpeed": 0.054999999701976776,
+  "fx/aurora/groundColor": [
+   0.1599999964237213,
+   0.7200000286102295,
+   0.5799999833106995
+  ],
+  "fx/aurora/groundFalloff": 2.0,
+  "fx/aurora/groundIntensity": 0.5,
+  "fx/aurora/groundRadius": 220.0,
+  "fx/aurora/horizonGlow": 0.6000000238418579,
+  "fx/aurora/intensity": 2.799999952316284,
+  "fx/aurora/layerSpacing": 0.3400000035762787,
+  "fx/aurora/lifetime": 0.0,
+  "fx/aurora/lowColor": [
+   0.14000000059604645,
+   1.0,
+   0.6200000047683716
+  ],
+  "fx/aurora/midColor": [
+   0.1599999964237213,
+   0.8199999928474426,
+   1.0
+  ],
+  "fx/aurora/opacity": 0.8500000238418579,
+  "fx/aurora/radius": 5200.0,
+  "fx/aurora/rainbow": false,
+  "fx/aurora/rainbowBrightness": 0.7599999904632568,
+  "fx/aurora/rainbowHue": 0.0,
+  "fx/aurora/rainbowSaturation": 0.8500000238418579,
+  "fx/aurora/rainbowScale": 1.100000023841858,
+  "fx/aurora/rainbowSpeed": 0.2199999988079071,
+  "fx/aurora/repeat": 0.0,
+  "fx/aurora/sparkle": 0.5,
+  "fx/aurora/spectrumShape": 0.75,
+  "fx/aurora/topColor": [
+   0.5799999833106995,
+   0.3199999928474426,
+   1.0
+  ],
+  "fx/aurora/turbulence": 0.44999998807907104,
+  "fx/aurora/verticalSpeed": 0.07000000029802322,
+  "fx/aurora/waveAmplitude": 0.30000001192092896,
+  "fx/aurora/waveScale": 2.4000000953674316,
+  "fx/aurora/windowSeconds": 6.0,
+  "fx/aurora/windowStart": 0.0,
+  "fx/bloom-cap-hero-pulse/beamRadius": 0.0,
+  "fx/bloom-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/bloom-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/bloom-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/bloom-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/bloom-cap-hero-pulse/enabled": true,
+  "fx/bloom-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/bloom-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/bloom-cap-hero-pulse/falloff": 1.5,
+  "fx/bloom-cap-hero-pulse/frontWidth": 3.5,
+  "fx/bloom-cap-hero-pulse/intensity": 5.0,
+  "fx/bloom-cap-hero-pulse/lifetime": 0.0,
+  "fx/bloom-cap-hero-pulse/rainbow": false,
+  "fx/bloom-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/bloom-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/bloom-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/bloom-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/bloom-cap-hero-pulse/range": 58.0,
+  "fx/bloom-cap-hero-pulse/repeat": 4.5,
+  "fx/bloom-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/bloom-cap-hero-pulse/response/foliage": 1.5,
+  "fx/bloom-cap-hero-pulse/response/ground": 1.0,
+  "fx/bloom-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/bloom-cap-hero-pulse/ringCount": 2.0,
+  "fx/bloom-cap-hero-pulse/sparkle": true,
+  "fx/bloom-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/bloom-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/bloom-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/bloom-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/bloom-cap-hero-pulse/speed": 13.0,
+  "fx/bloom-cap-hero-pulse/startOffset": 0.0,
+  "fx/bloom-cap-hero-pulse/trailLength": 20.0,
+  "fx/bloom-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/bloom-cap-hero-pulse/width": 1.0,
+  "fx/cairn-cap-hero-pulse/beamRadius": 0.0,
+  "fx/cairn-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/cairn-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/cairn-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/cairn-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/cairn-cap-hero-pulse/enabled": true,
+  "fx/cairn-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/cairn-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/cairn-cap-hero-pulse/falloff": 1.5,
+  "fx/cairn-cap-hero-pulse/frontWidth": 3.5,
+  "fx/cairn-cap-hero-pulse/intensity": 5.0,
+  "fx/cairn-cap-hero-pulse/lifetime": 0.0,
+  "fx/cairn-cap-hero-pulse/rainbow": false,
+  "fx/cairn-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/cairn-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/cairn-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/cairn-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/cairn-cap-hero-pulse/range": 58.0,
+  "fx/cairn-cap-hero-pulse/repeat": 4.5,
+  "fx/cairn-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/cairn-cap-hero-pulse/response/foliage": 1.5,
+  "fx/cairn-cap-hero-pulse/response/ground": 1.0,
+  "fx/cairn-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/cairn-cap-hero-pulse/ringCount": 2.0,
+  "fx/cairn-cap-hero-pulse/sparkle": true,
+  "fx/cairn-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/cairn-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/cairn-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/cairn-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/cairn-cap-hero-pulse/speed": 13.0,
+  "fx/cairn-cap-hero-pulse/startOffset": 0.0,
+  "fx/cairn-cap-hero-pulse/trailLength": 20.0,
+  "fx/cairn-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/cairn-cap-hero-pulse/width": 1.0,
+  "fx/camera-travel-beam/beamRadius": 0.0,
+  "fx/camera-travel-beam/color": [
+   0.5799999833106995,
+   0.36000001430511475,
+   1.0
+  ],
+  "fx/camera-travel-beam/delay": 0.15000000596046448,
+  "fx/camera-travel-beam/edgeColor": [
+   0.9599999785423279,
+   0.8399999737739563,
+   1.0
+  ],
+  "fx/camera-travel-beam/edgeIntensity": 3.0,
+  "fx/camera-travel-beam/enabled": true,
+  "fx/camera-travel-beam/fadeIn": 0.5,
+  "fx/camera-travel-beam/fadeOut": 1.100000023841858,
+  "fx/camera-travel-beam/falloff": 1.2000000476837158,
+  "fx/camera-travel-beam/frontWidth": 3.5999999046325684,
+  "fx/camera-travel-beam/intensity": 1.899999976158142,
+  "fx/camera-travel-beam/lifetime": 0.0,
+  "fx/camera-travel-beam/rainbow": true,
+  "fx/camera-travel-beam/rainbowBrightness": 1.0,
+  "fx/camera-travel-beam/rainbowSaturation": 0.8500000238418579,
+  "fx/camera-travel-beam/rainbowScale": 0.012000000104308128,
+  "fx/camera-travel-beam/rainbowSpeed": 0.3499999940395355,
+  "fx/camera-travel-beam/range": 300.0,
+  "fx/camera-travel-beam/repeat": 9.239999771118164,
+  "fx/camera-travel-beam/response/emissive": 1.2000000476837158,
+  "fx/camera-travel-beam/response/foliage": 1.100000023841858,
+  "fx/camera-travel-beam/response/ground": 0.6899999976158142,
+  "fx/camera-travel-beam/response/surface": 0.699999988079071,
+  "fx/camera-travel-beam/ringCount": 4.0,
+  "fx/camera-travel-beam/sparkle": true,
+  "fx/camera-travel-beam/sparkleDensity": 0.699999988079071,
+  "fx/camera-travel-beam/sparkleIntensity": 2.0,
+  "fx/camera-travel-beam/sparkleSize": 0.3799999952316284,
+  "fx/camera-travel-beam/sparkleSpeed": 0.6000000238418579,
+  "fx/camera-travel-beam/speed": 110.0,
+  "fx/camera-travel-beam/startOffset": 10.0,
+  "fx/camera-travel-beam/trailLength": 24.0,
+  "fx/camera-travel-beam/verticalExtent": 40.0,
+  "fx/camera-travel-beam/width": 1.0,
+  "fx/elder-2-cap-hero-pulse/beamRadius": 0.0,
+  "fx/elder-2-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/elder-2-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/elder-2-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/elder-2-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/elder-2-cap-hero-pulse/enabled": true,
+  "fx/elder-2-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/elder-2-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/elder-2-cap-hero-pulse/falloff": 1.5,
+  "fx/elder-2-cap-hero-pulse/frontWidth": 3.5,
+  "fx/elder-2-cap-hero-pulse/intensity": 5.0,
+  "fx/elder-2-cap-hero-pulse/lifetime": 0.0,
+  "fx/elder-2-cap-hero-pulse/rainbow": false,
+  "fx/elder-2-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/elder-2-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/elder-2-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/elder-2-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/elder-2-cap-hero-pulse/range": 58.0,
+  "fx/elder-2-cap-hero-pulse/repeat": 4.5,
+  "fx/elder-2-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/elder-2-cap-hero-pulse/response/foliage": 1.5,
+  "fx/elder-2-cap-hero-pulse/response/ground": 1.0,
+  "fx/elder-2-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/elder-2-cap-hero-pulse/ringCount": 2.0,
+  "fx/elder-2-cap-hero-pulse/sparkle": true,
+  "fx/elder-2-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/elder-2-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/elder-2-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/elder-2-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/elder-2-cap-hero-pulse/speed": 13.0,
+  "fx/elder-2-cap-hero-pulse/startOffset": 0.0,
+  "fx/elder-2-cap-hero-pulse/trailLength": 20.0,
+  "fx/elder-2-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/elder-2-cap-hero-pulse/width": 1.0,
+  "fx/ember-cap-hero-pulse/beamRadius": 0.0,
+  "fx/ember-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/ember-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/ember-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/ember-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/ember-cap-hero-pulse/enabled": true,
+  "fx/ember-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/ember-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/ember-cap-hero-pulse/falloff": 1.5,
+  "fx/ember-cap-hero-pulse/frontWidth": 3.5,
+  "fx/ember-cap-hero-pulse/intensity": 5.0,
+  "fx/ember-cap-hero-pulse/lifetime": 0.0,
+  "fx/ember-cap-hero-pulse/rainbow": false,
+  "fx/ember-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/ember-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/ember-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/ember-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/ember-cap-hero-pulse/range": 58.0,
+  "fx/ember-cap-hero-pulse/repeat": 4.5,
+  "fx/ember-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/ember-cap-hero-pulse/response/foliage": 1.5,
+  "fx/ember-cap-hero-pulse/response/ground": 1.0,
+  "fx/ember-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/ember-cap-hero-pulse/ringCount": 2.0,
+  "fx/ember-cap-hero-pulse/sparkle": true,
+  "fx/ember-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/ember-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/ember-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/ember-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/ember-cap-hero-pulse/speed": 13.0,
+  "fx/ember-cap-hero-pulse/startOffset": 0.0,
+  "fx/ember-cap-hero-pulse/trailLength": 20.0,
+  "fx/ember-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/ember-cap-hero-pulse/width": 1.0,
+  "fx/ember-hero-pulse/beamRadius": 0.0,
+  "fx/ember-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/ember-hero-pulse/delay": 0.3499999940395355,
+  "fx/ember-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/ember-hero-pulse/edgeIntensity": 9.0,
+  "fx/ember-hero-pulse/enabled": true,
+  "fx/ember-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/ember-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/ember-hero-pulse/falloff": 1.5,
+  "fx/ember-hero-pulse/frontWidth": 3.5,
+  "fx/ember-hero-pulse/intensity": 5.0,
+  "fx/ember-hero-pulse/lifetime": 0.0,
+  "fx/ember-hero-pulse/rainbow": false,
+  "fx/ember-hero-pulse/rainbowBrightness": 1.0,
+  "fx/ember-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/ember-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/ember-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/ember-hero-pulse/range": 58.0,
+  "fx/ember-hero-pulse/repeat": 4.5,
+  "fx/ember-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/ember-hero-pulse/response/foliage": 1.5,
+  "fx/ember-hero-pulse/response/ground": 1.0,
+  "fx/ember-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/ember-hero-pulse/ringCount": 2.0,
+  "fx/ember-hero-pulse/sparkle": true,
+  "fx/ember-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/ember-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/ember-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/ember-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/ember-hero-pulse/speed": 13.0,
+  "fx/ember-hero-pulse/startOffset": 0.0,
+  "fx/ember-hero-pulse/trailLength": 20.0,
+  "fx/ember-hero-pulse/verticalExtent": 9.0,
+  "fx/ember-hero-pulse/width": 1.0,
+  "fx/lantern-cap-hero-pulse/beamRadius": 0.0,
+  "fx/lantern-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/lantern-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/lantern-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/lantern-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/lantern-cap-hero-pulse/enabled": true,
+  "fx/lantern-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/lantern-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/lantern-cap-hero-pulse/falloff": 1.5,
+  "fx/lantern-cap-hero-pulse/frontWidth": 3.5,
+  "fx/lantern-cap-hero-pulse/intensity": 5.0,
+  "fx/lantern-cap-hero-pulse/lifetime": 0.0,
+  "fx/lantern-cap-hero-pulse/rainbow": false,
+  "fx/lantern-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/lantern-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/lantern-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/lantern-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/lantern-cap-hero-pulse/range": 58.0,
+  "fx/lantern-cap-hero-pulse/repeat": 4.5,
+  "fx/lantern-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/lantern-cap-hero-pulse/response/foliage": 1.5,
+  "fx/lantern-cap-hero-pulse/response/ground": 1.0,
+  "fx/lantern-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/lantern-cap-hero-pulse/ringCount": 2.0,
+  "fx/lantern-cap-hero-pulse/sparkle": true,
+  "fx/lantern-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/lantern-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/lantern-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/lantern-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/lantern-cap-hero-pulse/speed": 13.0,
+  "fx/lantern-cap-hero-pulse/startOffset": 0.0,
+  "fx/lantern-cap-hero-pulse/trailLength": 20.0,
+  "fx/lantern-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/lantern-cap-hero-pulse/width": 1.0,
+  "fx/ridge-cap-hero-pulse/beamRadius": 0.0,
+  "fx/ridge-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/ridge-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/ridge-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/ridge-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/ridge-cap-hero-pulse/enabled": true,
+  "fx/ridge-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/ridge-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/ridge-cap-hero-pulse/falloff": 1.5,
+  "fx/ridge-cap-hero-pulse/frontWidth": 3.5,
+  "fx/ridge-cap-hero-pulse/intensity": 5.0,
+  "fx/ridge-cap-hero-pulse/lifetime": 0.0,
+  "fx/ridge-cap-hero-pulse/rainbow": false,
+  "fx/ridge-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/ridge-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/ridge-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/ridge-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/ridge-cap-hero-pulse/range": 58.0,
+  "fx/ridge-cap-hero-pulse/repeat": 4.5,
+  "fx/ridge-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/ridge-cap-hero-pulse/response/foliage": 1.5,
+  "fx/ridge-cap-hero-pulse/response/ground": 1.0,
+  "fx/ridge-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/ridge-cap-hero-pulse/ringCount": 2.0,
+  "fx/ridge-cap-hero-pulse/sparkle": true,
+  "fx/ridge-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/ridge-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/ridge-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/ridge-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/ridge-cap-hero-pulse/speed": 13.0,
+  "fx/ridge-cap-hero-pulse/startOffset": 0.0,
+  "fx/ridge-cap-hero-pulse/trailLength": 20.0,
+  "fx/ridge-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/ridge-cap-hero-pulse/width": 1.0,
+  "fx/rook-hero-pulse/beamRadius": 0.0,
+  "fx/rook-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/rook-hero-pulse/delay": 0.3499999940395355,
+  "fx/rook-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/rook-hero-pulse/edgeIntensity": 9.0,
+  "fx/rook-hero-pulse/enabled": true,
+  "fx/rook-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/rook-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/rook-hero-pulse/falloff": 1.5,
+  "fx/rook-hero-pulse/frontWidth": 3.5,
+  "fx/rook-hero-pulse/intensity": 5.0,
+  "fx/rook-hero-pulse/lifetime": 0.0,
+  "fx/rook-hero-pulse/rainbow": false,
+  "fx/rook-hero-pulse/rainbowBrightness": 1.0,
+  "fx/rook-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/rook-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/rook-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/rook-hero-pulse/range": 58.0,
+  "fx/rook-hero-pulse/repeat": 4.5,
+  "fx/rook-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/rook-hero-pulse/response/foliage": 1.5,
+  "fx/rook-hero-pulse/response/ground": 1.0,
+  "fx/rook-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/rook-hero-pulse/ringCount": 2.0,
+  "fx/rook-hero-pulse/sparkle": true,
+  "fx/rook-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/rook-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/rook-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/rook-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/rook-hero-pulse/speed": 13.0,
+  "fx/rook-hero-pulse/startOffset": 0.0,
+  "fx/rook-hero-pulse/trailLength": 20.0,
+  "fx/rook-hero-pulse/verticalExtent": 9.0,
+  "fx/rook-hero-pulse/width": 1.0,
+  "fx/sage-hero-pulse/beamRadius": 0.0,
+  "fx/sage-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/sage-hero-pulse/delay": 0.3499999940395355,
+  "fx/sage-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/sage-hero-pulse/edgeIntensity": 9.0,
+  "fx/sage-hero-pulse/enabled": true,
+  "fx/sage-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/sage-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/sage-hero-pulse/falloff": 1.5,
+  "fx/sage-hero-pulse/frontWidth": 3.5,
+  "fx/sage-hero-pulse/intensity": 5.0,
+  "fx/sage-hero-pulse/lifetime": 0.0,
+  "fx/sage-hero-pulse/rainbow": false,
+  "fx/sage-hero-pulse/rainbowBrightness": 1.0,
+  "fx/sage-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/sage-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/sage-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/sage-hero-pulse/range": 58.0,
+  "fx/sage-hero-pulse/repeat": 4.5,
+  "fx/sage-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/sage-hero-pulse/response/foliage": 1.5,
+  "fx/sage-hero-pulse/response/ground": 1.0,
+  "fx/sage-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/sage-hero-pulse/ringCount": 2.0,
+  "fx/sage-hero-pulse/sparkle": true,
+  "fx/sage-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/sage-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/sage-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/sage-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/sage-hero-pulse/speed": 13.0,
+  "fx/sage-hero-pulse/startOffset": 0.0,
+  "fx/sage-hero-pulse/trailLength": 20.0,
+  "fx/sage-hero-pulse/verticalExtent": 9.0,
+  "fx/sage-hero-pulse/width": 1.0,
+  "fx/scree-cap-hero-pulse/beamRadius": 0.0,
+  "fx/scree-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/scree-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/scree-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/scree-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/scree-cap-hero-pulse/enabled": true,
+  "fx/scree-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/scree-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/scree-cap-hero-pulse/falloff": 1.5,
+  "fx/scree-cap-hero-pulse/frontWidth": 3.5,
+  "fx/scree-cap-hero-pulse/intensity": 5.0,
+  "fx/scree-cap-hero-pulse/lifetime": 0.0,
+  "fx/scree-cap-hero-pulse/rainbow": false,
+  "fx/scree-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/scree-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/scree-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/scree-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/scree-cap-hero-pulse/range": 58.0,
+  "fx/scree-cap-hero-pulse/repeat": 4.5,
+  "fx/scree-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/scree-cap-hero-pulse/response/foliage": 1.5,
+  "fx/scree-cap-hero-pulse/response/ground": 1.0,
+  "fx/scree-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/scree-cap-hero-pulse/ringCount": 2.0,
+  "fx/scree-cap-hero-pulse/sparkle": true,
+  "fx/scree-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/scree-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/scree-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/scree-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/scree-cap-hero-pulse/speed": 13.0,
+  "fx/scree-cap-hero-pulse/startOffset": 0.0,
+  "fx/scree-cap-hero-pulse/trailLength": 20.0,
+  "fx/scree-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/scree-cap-hero-pulse/width": 1.0,
+  "fx/spire-cap-hero-pulse/beamRadius": 0.0,
+  "fx/spire-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/spire-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/spire-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/spire-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/spire-cap-hero-pulse/enabled": true,
+  "fx/spire-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/spire-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/spire-cap-hero-pulse/falloff": 1.5,
+  "fx/spire-cap-hero-pulse/frontWidth": 3.5,
+  "fx/spire-cap-hero-pulse/intensity": 5.0,
+  "fx/spire-cap-hero-pulse/lifetime": 0.0,
+  "fx/spire-cap-hero-pulse/rainbow": false,
+  "fx/spire-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/spire-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/spire-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/spire-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/spire-cap-hero-pulse/range": 58.0,
+  "fx/spire-cap-hero-pulse/repeat": 4.5,
+  "fx/spire-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/spire-cap-hero-pulse/response/foliage": 1.5,
+  "fx/spire-cap-hero-pulse/response/ground": 1.0,
+  "fx/spire-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/spire-cap-hero-pulse/ringCount": 2.0,
+  "fx/spire-cap-hero-pulse/sparkle": true,
+  "fx/spire-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/spire-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/spire-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/spire-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/spire-cap-hero-pulse/speed": 13.0,
+  "fx/spire-cap-hero-pulse/startOffset": 0.0,
+  "fx/spire-cap-hero-pulse/trailLength": 20.0,
+  "fx/spire-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/spire-cap-hero-pulse/width": 1.0,
+  "fx/tide-hero-pulse/beamRadius": 0.0,
+  "fx/tide-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/tide-hero-pulse/delay": 0.3499999940395355,
+  "fx/tide-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/tide-hero-pulse/edgeIntensity": 9.0,
+  "fx/tide-hero-pulse/enabled": true,
+  "fx/tide-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/tide-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/tide-hero-pulse/falloff": 1.5,
+  "fx/tide-hero-pulse/frontWidth": 3.5,
+  "fx/tide-hero-pulse/intensity": 5.0,
+  "fx/tide-hero-pulse/lifetime": 0.0,
+  "fx/tide-hero-pulse/rainbow": false,
+  "fx/tide-hero-pulse/rainbowBrightness": 1.0,
+  "fx/tide-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/tide-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/tide-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/tide-hero-pulse/range": 58.0,
+  "fx/tide-hero-pulse/repeat": 4.5,
+  "fx/tide-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/tide-hero-pulse/response/foliage": 1.5,
+  "fx/tide-hero-pulse/response/ground": 1.0,
+  "fx/tide-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/tide-hero-pulse/ringCount": 2.0,
+  "fx/tide-hero-pulse/sparkle": true,
+  "fx/tide-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/tide-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/tide-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/tide-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/tide-hero-pulse/speed": 13.0,
+  "fx/tide-hero-pulse/startOffset": 0.0,
+  "fx/tide-hero-pulse/trailLength": 20.0,
+  "fx/tide-hero-pulse/verticalExtent": 9.0,
+  "fx/tide-hero-pulse/width": 1.0,
+  "fx/umbra-cap-hero-pulse/beamRadius": 0.0,
+  "fx/umbra-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/umbra-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/umbra-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/umbra-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/umbra-cap-hero-pulse/enabled": true,
+  "fx/umbra-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/umbra-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/umbra-cap-hero-pulse/falloff": 1.5,
+  "fx/umbra-cap-hero-pulse/frontWidth": 3.5,
+  "fx/umbra-cap-hero-pulse/intensity": 5.0,
+  "fx/umbra-cap-hero-pulse/lifetime": 0.0,
+  "fx/umbra-cap-hero-pulse/rainbow": false,
+  "fx/umbra-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/umbra-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/umbra-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/umbra-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/umbra-cap-hero-pulse/range": 58.0,
+  "fx/umbra-cap-hero-pulse/repeat": 4.5,
+  "fx/umbra-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/umbra-cap-hero-pulse/response/foliage": 1.5,
+  "fx/umbra-cap-hero-pulse/response/ground": 1.0,
+  "fx/umbra-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/umbra-cap-hero-pulse/ringCount": 2.0,
+  "fx/umbra-cap-hero-pulse/sparkle": true,
+  "fx/umbra-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/umbra-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/umbra-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/umbra-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/umbra-cap-hero-pulse/speed": 13.0,
+  "fx/umbra-cap-hero-pulse/startOffset": 0.0,
+  "fx/umbra-cap-hero-pulse/trailLength": 20.0,
+  "fx/umbra-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/umbra-cap-hero-pulse/width": 1.0,
+  "fx/vane-hero-pulse/beamRadius": 0.0,
+  "fx/vane-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/vane-hero-pulse/delay": 0.3499999940395355,
+  "fx/vane-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/vane-hero-pulse/edgeIntensity": 9.0,
+  "fx/vane-hero-pulse/enabled": true,
+  "fx/vane-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/vane-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/vane-hero-pulse/falloff": 1.5,
+  "fx/vane-hero-pulse/frontWidth": 3.5,
+  "fx/vane-hero-pulse/intensity": 5.0,
+  "fx/vane-hero-pulse/lifetime": 0.0,
+  "fx/vane-hero-pulse/rainbow": false,
+  "fx/vane-hero-pulse/rainbowBrightness": 1.0,
+  "fx/vane-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/vane-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/vane-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/vane-hero-pulse/range": 58.0,
+  "fx/vane-hero-pulse/repeat": 4.5,
+  "fx/vane-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/vane-hero-pulse/response/foliage": 1.5,
+  "fx/vane-hero-pulse/response/ground": 1.0,
+  "fx/vane-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/vane-hero-pulse/ringCount": 2.0,
+  "fx/vane-hero-pulse/sparkle": true,
+  "fx/vane-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/vane-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/vane-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/vane-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/vane-hero-pulse/speed": 13.0,
+  "fx/vane-hero-pulse/startOffset": 0.0,
+  "fx/vane-hero-pulse/trailLength": 20.0,
+  "fx/vane-hero-pulse/verticalExtent": 9.0,
+  "fx/vane-hero-pulse/width": 1.0,
+  "fx/veil-cap-hero-pulse/beamRadius": 0.0,
+  "fx/veil-cap-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/veil-cap-hero-pulse/delay": 0.3499999940395355,
+  "fx/veil-cap-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/veil-cap-hero-pulse/edgeIntensity": 9.0,
+  "fx/veil-cap-hero-pulse/enabled": true,
+  "fx/veil-cap-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/veil-cap-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/veil-cap-hero-pulse/falloff": 1.5,
+  "fx/veil-cap-hero-pulse/frontWidth": 3.5,
+  "fx/veil-cap-hero-pulse/intensity": 5.0,
+  "fx/veil-cap-hero-pulse/lifetime": 0.0,
+  "fx/veil-cap-hero-pulse/rainbow": false,
+  "fx/veil-cap-hero-pulse/rainbowBrightness": 1.0,
+  "fx/veil-cap-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/veil-cap-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/veil-cap-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/veil-cap-hero-pulse/range": 58.0,
+  "fx/veil-cap-hero-pulse/repeat": 4.5,
+  "fx/veil-cap-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/veil-cap-hero-pulse/response/foliage": 1.5,
+  "fx/veil-cap-hero-pulse/response/ground": 1.0,
+  "fx/veil-cap-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/veil-cap-hero-pulse/ringCount": 2.0,
+  "fx/veil-cap-hero-pulse/sparkle": true,
+  "fx/veil-cap-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/veil-cap-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/veil-cap-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/veil-cap-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/veil-cap-hero-pulse/speed": 13.0,
+  "fx/veil-cap-hero-pulse/startOffset": 0.0,
+  "fx/veil-cap-hero-pulse/trailLength": 20.0,
+  "fx/veil-cap-hero-pulse/verticalExtent": 9.0,
+  "fx/veil-cap-hero-pulse/width": 1.0,
+  "fx/visitor-hero-pulse/beamRadius": 0.0,
+  "fx/visitor-hero-pulse/color": [
+   0.1599999964237213,
+   0.9200000166893005,
+   0.6200000047683716
+  ],
+  "fx/visitor-hero-pulse/delay": 0.3499999940395355,
+  "fx/visitor-hero-pulse/edgeColor": [
+   0.7799999713897705,
+   1.0,
+   0.8799999952316284
+  ],
+  "fx/visitor-hero-pulse/edgeIntensity": 9.0,
+  "fx/visitor-hero-pulse/enabled": true,
+  "fx/visitor-hero-pulse/fadeIn": 0.6000000238418579,
+  "fx/visitor-hero-pulse/fadeOut": 1.2000000476837158,
+  "fx/visitor-hero-pulse/falloff": 1.5,
+  "fx/visitor-hero-pulse/frontWidth": 3.5,
+  "fx/visitor-hero-pulse/intensity": 5.0,
+  "fx/visitor-hero-pulse/lifetime": 0.0,
+  "fx/visitor-hero-pulse/rainbow": false,
+  "fx/visitor-hero-pulse/rainbowBrightness": 1.0,
+  "fx/visitor-hero-pulse/rainbowSaturation": 0.8500000238418579,
+  "fx/visitor-hero-pulse/rainbowScale": 0.012000000104308128,
+  "fx/visitor-hero-pulse/rainbowSpeed": 0.3499999940395355,
+  "fx/visitor-hero-pulse/range": 58.0,
+  "fx/visitor-hero-pulse/repeat": 4.5,
+  "fx/visitor-hero-pulse/response/emissive": 1.2999999523162842,
+  "fx/visitor-hero-pulse/response/foliage": 1.5,
+  "fx/visitor-hero-pulse/response/ground": 1.0,
+  "fx/visitor-hero-pulse/response/surface": 0.8999999761581421,
+  "fx/visitor-hero-pulse/ringCount": 2.0,
+  "fx/visitor-hero-pulse/sparkle": true,
+  "fx/visitor-hero-pulse/sparkleDensity": 1.399999976158142,
+  "fx/visitor-hero-pulse/sparkleIntensity": 2.5999999046325684,
+  "fx/visitor-hero-pulse/sparkleSize": 0.20000000298023224,
+  "fx/visitor-hero-pulse/sparkleSpeed": 0.6000000238418579,
+  "fx/visitor-hero-pulse/speed": 13.0,
+  "fx/visitor-hero-pulse/startOffset": 0.0,
+  "fx/visitor-hero-pulse/trailLength": 20.0,
+  "fx/visitor-hero-pulse/verticalExtent": 9.0,
+  "fx/visitor-hero-pulse/width": 1.0,
   "lightrig/GlowmereValley/ambientColor": [
    0.3799999952316284,
    0.5,
@@ -5319,6 +7403,7 @@
    0.0,
    0.0
   ],
+  "nodes/valley/water/glowCoverage": 1.0,
   "nodes/valley/water/ripple": 1.0,
   "nodes/valley/water/sparkle": 0.6000000238418579,
   "nodes/valley/water/swell": 0.0,
@@ -13175,92 +15260,7 @@
   "staging/abduction/minRange": 25.0,
   "staging/abduction/searchRadius": 260.0,
   "staging/abduction/targetClearance": 6.5,
-  "staging/abduction/travelSpeed": 30.0,
-  "worldfx/Camera Travel Beam/beamRadius": 0.0,
-  "worldfx/Camera Travel Beam/color": [
-   0.5799999833106995,
-   0.36000001430511475,
-   1.0
-  ],
-  "worldfx/Camera Travel Beam/delay": 0.15000000596046448,
-  "worldfx/Camera Travel Beam/edgeColor": [
-   0.9599999785423279,
-   0.8399999737739563,
-   1.0
-  ],
-  "worldfx/Camera Travel Beam/edgeIntensity": 3.0,
-  "worldfx/Camera Travel Beam/enabled": true,
-  "worldfx/Camera Travel Beam/fadeIn": 0.5,
-  "worldfx/Camera Travel Beam/fadeOut": 1.100000023841858,
-  "worldfx/Camera Travel Beam/falloff": 1.2000000476837158,
-  "worldfx/Camera Travel Beam/frontWidth": 3.5999999046325684,
-  "worldfx/Camera Travel Beam/intensity": 1.899999976158142,
-  "worldfx/Camera Travel Beam/lifetime": 0.0,
-  "worldfx/Camera Travel Beam/rainbow": true,
-  "worldfx/Camera Travel Beam/rainbowBrightness": 1.0,
-  "worldfx/Camera Travel Beam/rainbowSaturation": 0.8500000238418579,
-  "worldfx/Camera Travel Beam/rainbowScale": 0.012000000104308128,
-  "worldfx/Camera Travel Beam/rainbowSpeed": 0.3499999940395355,
-  "worldfx/Camera Travel Beam/range": 300.0,
-  "worldfx/Camera Travel Beam/repeat": 9.239999771118164,
-  "worldfx/Camera Travel Beam/response/emissive": 1.2000000476837158,
-  "worldfx/Camera Travel Beam/response/foliage": 1.100000023841858,
-  "worldfx/Camera Travel Beam/response/ground": 0.6899999976158142,
-  "worldfx/Camera Travel Beam/response/surface": 0.699999988079071,
-  "worldfx/Camera Travel Beam/ringCount": 4.0,
-  "worldfx/Camera Travel Beam/sparkle": true,
-  "worldfx/Camera Travel Beam/sparkleDensity": 0.699999988079071,
-  "worldfx/Camera Travel Beam/sparkleIntensity": 2.0,
-  "worldfx/Camera Travel Beam/sparkleSize": 0.3799999952316284,
-  "worldfx/Camera Travel Beam/sparkleSpeed": 0.6000000238418579,
-  "worldfx/Camera Travel Beam/speed": 110.0,
-  "worldfx/Camera Travel Beam/startOffset": 10.0,
-  "worldfx/Camera Travel Beam/trailLength": 24.0,
-  "worldfx/Camera Travel Beam/verticalExtent": 40.0,
-  "worldfx/Camera Travel Beam/width": 1.0,
-  "worldfx/Hero Pulse/beamRadius": 0.0,
-  "worldfx/Hero Pulse/color": [
-   0.1599999964237213,
-   0.9200000166893005,
-   0.6200000047683716
-  ],
-  "worldfx/Hero Pulse/delay": 0.3499999940395355,
-  "worldfx/Hero Pulse/edgeColor": [
-   0.7799999713897705,
-   1.0,
-   0.8799999952316284
-  ],
-  "worldfx/Hero Pulse/edgeIntensity": 9.0,
-  "worldfx/Hero Pulse/enabled": true,
-  "worldfx/Hero Pulse/fadeIn": 0.6000000238418579,
-  "worldfx/Hero Pulse/fadeOut": 1.2000000476837158,
-  "worldfx/Hero Pulse/falloff": 1.5,
-  "worldfx/Hero Pulse/frontWidth": 3.5,
-  "worldfx/Hero Pulse/intensity": 5.0,
-  "worldfx/Hero Pulse/lifetime": 0.0,
-  "worldfx/Hero Pulse/rainbow": false,
-  "worldfx/Hero Pulse/rainbowBrightness": 1.0,
-  "worldfx/Hero Pulse/rainbowSaturation": 0.8500000238418579,
-  "worldfx/Hero Pulse/rainbowScale": 0.012000000104308128,
-  "worldfx/Hero Pulse/rainbowSpeed": 0.3499999940395355,
-  "worldfx/Hero Pulse/range": 58.0,
-  "worldfx/Hero Pulse/repeat": 4.5,
-  "worldfx/Hero Pulse/response/emissive": 1.2999999523162842,
-  "worldfx/Hero Pulse/response/foliage": 1.5,
-  "worldfx/Hero Pulse/response/ground": 1.0,
-  "worldfx/Hero Pulse/response/surface": 0.8999999761581421,
-  "worldfx/Hero Pulse/ringCount": 2.0,
-  "worldfx/Hero Pulse/sparkle": true,
-  "worldfx/Hero Pulse/sparkleDensity": 1.399999976158142,
-  "worldfx/Hero Pulse/sparkleIntensity": 2.5999999046325684,
-  "worldfx/Hero Pulse/sparkleSize": 0.20000000298023224,
-  "worldfx/Hero Pulse/sparkleSpeed": 0.6000000238418579,
-  "worldfx/Hero Pulse/speed": 13.0,
-  "worldfx/Hero Pulse/startOffset": 0.0,
-  "worldfx/Hero Pulse/trailLength": 20.0,
-  "worldfx/Hero Pulse/verticalExtent": 9.0,
-  "worldfx/Hero Pulse/width": 1.0,
-  "nodes/valley/water/glowCoverage": 1.0
+  "staging/abduction/travelSpeed": 30.0
  },
  "presets": [],
  "render": {
@@ -13971,7 +15971,7 @@
    "op": "add",
    "polarity": "unipolar",
    "source": "beat.pulse",
-   "target": "worldfx/Hero Pulse/intensity"
+   "target": "fx/visitor-hero-pulse/intensity"
   },
   {
    "amount": 8.0,
@@ -14001,7 +16001,457 @@
    "op": "add",
    "polarity": "unipolar",
    "source": "beat.pulse",
-   "target": "worldfx/Camera Travel Beam/intensity"
+   "target": "fx/elder-2-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/rook-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/tide-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/sage-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/ember-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/vane-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/lantern-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/spire-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/bloom-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/veil-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/umbra-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/cairn-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/ridge-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/scree-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/ember-cap-hero-pulse/intensity"
+  },
+  {
+   "amount": 8.0,
+   "chain": {
+    "attackMs": 10.0,
+    "clampEnabled": false,
+    "clampMax": 1.0,
+    "clampMin": 0.0,
+    "curve": "linear",
+    "curveAmount": 1.0,
+    "decayMs": 260.0,
+    "envelope": "none",
+    "envelopeFallPerSecond": 4.0,
+    "envelopeHoldMs": 0.0,
+    "gain": 1.0,
+    "offset": 0.0,
+    "remapEnabled": false,
+    "remapInMax": 1.0,
+    "remapInMin": 0.0,
+    "remapOutMax": 1.0,
+    "remapOutMin": 0.0,
+    "threshold": "none",
+    "thresholdLevel": 0.5
+   },
+   "component": -1,
+   "enabled": true,
+   "op": "add",
+   "polarity": "unipolar",
+   "source": "beat.pulse",
+   "target": "fx/camera-travel-beam/intensity"
   },
   {
    "amount": 2.6999998092651367,
@@ -14031,7 +16481,7 @@
    "op": "add",
    "polarity": "unipolar",
    "source": "beat.pulse",
-   "target": "atmos/Aurora/edgeBrightness"
+   "target": "fx/aurora/edgeBrightness"
   }
  ],
  "sceneNodes": {
@@ -24235,160 +26685,5 @@
    }
   ]
  },
- "version": 4,
- "worldEffects": [
-  {
-   "activation": "always",
-   "appearance": {
-    "color": [
-     0.5799999833106995,
-     0.36000001430511475,
-     1.0
-    ],
-    "edgeColor": [
-     0.9599999785423279,
-     0.8399999737739563,
-     1.0
-    ],
-    "edgeIntensity": 3.0,
-    "intensity": 1.899999976158142,
-    "rainbow": false,
-    "rainbowBrightness": 1.0,
-    "rainbowSaturation": 0.8500000238418579,
-    "rainbowScale": 0.012000000104308128,
-    "rainbowSpeed": 0.3499999940395355,
-    "width": 1.0
-   },
-   "enabled": true,
-   "name": "Camera Travel Beam",
-   "propagation": {
-    "beamRadius": 0.0,
-    "direction": "blended",
-    "explicitDirection": [
-     0.0,
-     0.0,
-     -1.0
-    ],
-    "falloff": 1.2000000476837158,
-    "forwardWeight": 1.0,
-    "frontWidth": 3.5999999046325684,
-    "kind": "radial",
-    "range": 300.0,
-    "ringCount": 4.0,
-    "speed": 110.0,
-    "startOffset": 10.0,
-    "targetWeight": 1.2000000476837158,
-    "trailLength": 24.0,
-    "velocityWeight": 0.6000000238418579,
-    "verticalExtent": 40.0,
-    "verticalGrowth": 0.15000000596046448
-   },
-   "response": {
-    "emissive": 1.2000000476837158,
-    "foliage": 1.100000023841858,
-    "ground": 0.6899999976158142,
-    "surface": 0.699999988079071
-   },
-   "source": {
-    "kind": "camera"
-   },
-   "sparkle": {
-    "density": 0.699999988079071,
-    "enabled": true,
-    "fadeDistance": 85.0,
-    "intensity": 2.0,
-    "seed": 1,
-    "size": 0.3799999952316284,
-    "speed": 0.6000000238418579
-   },
-   "style": "Magical",
-   "target": {
-    "kind": "focusHero"
-   },
-   "timing": {
-    "delay": 0.15000000596046448,
-    "fadeIn": 0.5,
-    "fadeOut": 1.100000023841858,
-    "lifetime": 0.0,
-    "repeatSeconds": 9.239999771118164,
-    "windowSeconds": 6.0,
-    "windowStart": 0.0
-   }
-  },
-  {
-   "activation": "heroFocus",
-   "appearance": {
-    "color": [
-     0.1599999964237213,
-     0.9200000166893005,
-     0.6200000047683716
-    ],
-    "edgeColor": [
-     0.7799999713897705,
-     1.0,
-     0.8799999952316284
-    ],
-    "edgeIntensity": 9.0,
-    "intensity": 5.0,
-    "rainbow": false,
-    "rainbowBrightness": 1.0,
-    "rainbowSaturation": 0.8500000238418579,
-    "rainbowScale": 0.012000000104308128,
-    "rainbowSpeed": 0.3499999940395355,
-    "width": 1.0
-   },
-   "enabled": true,
-   "name": "Hero Pulse",
-   "propagation": {
-    "beamRadius": 0.0,
-    "direction": "explicit",
-    "explicitDirection": [
-     0.0,
-     0.0,
-     -1.0
-    ],
-    "falloff": 1.5,
-    "forwardWeight": 1.0,
-    "frontWidth": 3.5,
-    "kind": "radial",
-    "range": 58.0,
-    "ringCount": 2.0,
-    "speed": 13.0,
-    "startOffset": 0.0,
-    "targetWeight": 1.2000000476837158,
-    "trailLength": 20.0,
-    "velocityWeight": 0.6000000238418579,
-    "verticalExtent": 9.0,
-    "verticalGrowth": 0.6499999761581421
-   },
-   "response": {
-    "emissive": 1.2999999523162842,
-    "foliage": 1.5,
-    "ground": 1.0,
-    "surface": 0.8999999761581421
-   },
-   "source": {
-    "kind": "focusHero"
-   },
-   "sparkle": {
-    "density": 1.399999976158142,
-    "enabled": true,
-    "fadeDistance": 85.0,
-    "intensity": 2.5999999046325684,
-    "seed": 2,
-    "size": 0.20000000298023224,
-    "speed": 0.6000000238418579
-   },
-   "style": "Bioluminescent",
-   "timing": {
-    "delay": 0.3499999940395355,
-    "fadeIn": 0.6000000238418579,
-    "fadeOut": 1.2000000476837158,
-    "lifetime": 0.0,
-    "repeatSeconds": 4.5,
-    "windowSeconds": 6.0,
-    "windowStart": 0.0
-   }
-  }
- ]
+ "version": 4
 }

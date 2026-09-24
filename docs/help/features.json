@@ -32,12 +32,6 @@
    "document": "reference/panels"
   },
   {
-   "id": "panel.world-effects",
-   "kind": "panel",
-   "category": "Reference",
-   "document": "reference/panels"
-  },
-  {
    "id": "panel.parameters",
    "kind": "panel",
    "category": "Modulation",

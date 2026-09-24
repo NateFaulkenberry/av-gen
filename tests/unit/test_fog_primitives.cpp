@@ -29,7 +29,7 @@
 //      `heightInfluence` branch and case 5 fails.
 
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -47,7 +47,7 @@ using namespace avgen;
 namespace {
 
 const world::EffectSchema& fogSchema() {
-    const world::EffectSchema* s = world::effectSchema(world::AtmosphereKind::VolumetricFog);
+    const world::EffectSchema* s = world::effectSchema(world::EffectKind::VolumetricFog);
     REQUIRE(s != nullptr);
     return *s;
 }
@@ -62,14 +62,14 @@ const world::EffectField& row(std::string_view leaf) {
     return fogSchema().fields.front();
 }
 
-void setRow(world::AtmosphericEffect& e, std::string_view leaf, float v) {
+void setRow(world::EffectInstance& e, std::string_view leaf, float v) {
     world::setFieldFloat(row(leaf), fogSchema(), e, v);
 }
 
 // One bank, placed at the origin with round numbers, so the geometry below is arithmetic an
 // unaided reader can check: radius 100 across, 300 along at `bankLength` 3, 40 tall.
-world::AtmosphericEffect primitive(world::FogShape shape, float bankLength = 3.0f) {
-    world::AtmosphericEffect e = fogSchema().factory("p");
+world::EffectInstance primitive(world::FogShape shape, float bankLength = 3.0f) {
+    world::EffectInstance e = fogSchema().factory("p");
     e.vortex.field.center = glm::vec3(0.0f);
     e.vortex.field.radius = 100.0f;
     e.vortex.field.thickness = 40.0f;
@@ -83,13 +83,13 @@ world::AtmosphericEffect primitive(world::FogShape shape, float bankLength = 3.0
     return e;
 }
 
-world::MediumSlot slotOf(const world::AtmosphericEffect& e) {
+world::MediumSlot slotOf(const world::EffectInstance& e) {
     world::MediumSlot slot{};
     world::packMediumSlot(e, 1.0f, slot);
     return slot;
 }
 
-float distanceAt(const world::AtmosphericEffect& e, glm::vec3 rel) {
+float distanceAt(const world::EffectInstance& e, glm::vec3 rel) {
     return world::fogPrimitiveDistance(slotOf(e), rel);
 }
 
@@ -403,7 +403,7 @@ TEST_CASE("a preset is a starting point, not a continuation", "[fog][presets]") 
     // applied to an effect that was a vortex a moment ago must not leave a spiral and a throat
     // behind, and a preset that only set what it wanted would." **That argument is right and it
     // covers half the parameters.** Since ADR-566 a fog bank's shape, its drift, its density curve
-    // and its glow height live in `AtmosphericEffect::values`, and nothing resets those -- so a
+    // and its glow height live in `EffectInstance::values`, and nothing resets those -- so a
     // preset applied after an artist set Shape to Box gets a box, and after another preset gets
     // that preset's leftovers.
     //
@@ -415,7 +415,7 @@ TEST_CASE("a preset is a starting point, not a continuation", "[fog][presets]") 
 
     for (const world::EffectStyle& a : s.styles) {
         for (const world::EffectStyle& b : s.styles) {
-            world::AtmosphericEffect viaA = s.factory("p");
+            world::EffectInstance viaA = s.factory("p");
             a.apply(viaA);
             // ...and an artist's own edits in between, which is the case a preset must survive
             // being applied after.
@@ -424,7 +424,7 @@ TEST_CASE("a preset is a starting point, not a continuation", "[fog][presets]") 
             setRow(viaA, "densityThreshold", 0.7f);
             b.apply(viaA);
 
-            world::AtmosphericEffect fresh = s.factory("p");
+            world::EffectInstance fresh = s.factory("p");
             b.apply(fresh);
 
             INFO("'" << b.name << "' applied after '" << a.name << "' and an edit");

@@ -19,6 +19,7 @@
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "world/atmospherics.hpp"
+#include "world/effects/effect_instance.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/trigonometric.hpp>
@@ -90,7 +91,7 @@ scene::Scene skyScene() {
 // asserted: a supra-pixel fragment shows, and a sub-pixel one is removed.
 world::AtmosphericFrame cometFrame(float travelledFraction, bool rainbow = false, bool sparkle = false,
                                    float fragmentSize = 0.5f) {
-    world::AtmosphericEffect e = world::bioluminescentComet("probe");
+    world::EffectInstance e = world::bioluminescentComet("probe");
     e.comet.path.anchor = world::SkyAnchor::World;
     e.comet.path.anchorPosition = glm::vec3(0.0f, 0.0f, 0.0f);
     e.comet.path.startAzimuth = 200.0f; // behind-left and high, crossing to behind-right and low
@@ -112,8 +113,8 @@ world::AtmosphericFrame cometFrame(float travelledFraction, bool rainbow = false
     e.timing.fadeOut = 0.0;
     e.ground.mode = world::GroundGlow::Off;
 
-    const std::array<world::AtmosphericEffect, 1> set{e};
-    world::AtmosphericContext ctx;
+    const std::array<world::EffectInstance, 1> set{e};
+    world::EffectContext ctx;
     ctx.seconds = 10.0 * travelledFraction;
     world::AtmosphericFrame frame;
     world::buildAtmosphericFrame(set, ctx, frame);
@@ -121,7 +122,7 @@ world::AtmosphericFrame cometFrame(float travelledFraction, bool rainbow = false
 }
 
 world::AtmosphericFrame auroraFrame(float intensity = 3.0f, bool enabled = true) {
-    world::AtmosphericEffect e = world::glowmereAurora("sky");
+    world::EffectInstance e = world::glowmereAurora("sky");
     e.enabled = enabled;
     e.aurora.shape.anchor = world::SkyAnchor::World;
     e.aurora.shape.anchorPosition = glm::vec3(0.0f);
@@ -133,8 +134,8 @@ world::AtmosphericFrame auroraFrame(float intensity = 3.0f, bool enabled = true)
     e.timing.fadeIn = 0.0;
     e.ground.mode = world::GroundGlow::Off;
 
-    const std::array<world::AtmosphericEffect, 1> set{e};
-    world::AtmosphericContext ctx;
+    const std::array<world::EffectInstance, 1> set{e};
+    world::EffectContext ctx;
     ctx.seconds = 3.0;
     world::AtmosphericFrame frame;
     world::buildAtmosphericFrame(set, ctx, frame);

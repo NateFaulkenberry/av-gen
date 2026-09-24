@@ -7,6 +7,7 @@
 #include "params/parameter.hpp"
 #include "scene/composition.hpp"
 #include "ui/edit_history.hpp"
+#include "ui/effects_panel.hpp"
 #include "ui/lights_panel_logic.hpp"
 #include "ui/world_edit.hpp"
 
@@ -437,6 +438,14 @@ void drawLightsPanel(app::Engine& engine, Selection& selection, EditHistory& his
         slider(engine, base + "volumetric", "In-scatter", "%.2f");
         ImGui::TextColored(kMuted, "  How much this light lights the fog. The volume march treats an"
                                    " area light as its centre.");
+    }
+
+    // ---- effects attached to this light (ADR-702) --------------------------------------------------
+    // Keyed by the light's id, not its display name, for the reason the rename box above gives:
+    // the id is what survives a rename, so an effect on a light is not orphaned by renaming it.
+    {
+        static EffectsSection effects;
+        effects.draw(engine, world::EffectOwner::light(id), &history);
     }
 
     // ---- actions --------------------------------------------------------------------------------

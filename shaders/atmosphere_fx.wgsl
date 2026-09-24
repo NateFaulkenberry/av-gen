@@ -1,6 +1,6 @@
 // Atmospheric effects (ADR-230): the per-ray half of a celestial phenomenon.
 //
-// ADR-207's world effects are an additive term on a *shaded surface*. These are not, and cannot be:
+// ADR-207's surface waves are an additive term on a *shaded surface*. These are not, and cannot be:
 // the sky has no surface, so a comet and an aurora are things you see instead of geometry. What they
 // have instead of a surface position is a **view ray**, and everything in this file is a function of
 // one -- an origin at the camera and a unit direction -- evaluated in a direction-space draw that
@@ -28,7 +28,7 @@
 // **Anti-aliasing is angular, not distance-based.** `pixelAngle` is the screen-space derivative of
 // the view ray, taken once in uniform control flow at the top of `atmosphereSkyAt`. A comet's tail
 // is never thinner than a pixel and a shed fragment smaller than one is faded out rather than
-// sampled -- which is the same rule `world_effects.wgsl` applies to its sparkle, stated in the units
+// sampled -- which is the same rule `wave_effects.wgsl` applies to its sparkle, stated in the units
 // that actually govern it rather than in metres of view distance.
 
 const kAtmosTau: f32 = 6.28318531;
@@ -41,7 +41,7 @@ const kAtmosTailGain: f32 = 6.0;
 
 // ---- shared helpers ----------------------------------------------------------------------------
 
-// This module's own hashes rather than noise.wgsl's, for the reason world_effects.wgsl gives: the
+// This module's own hashes rather than noise.wgsl's, for the reason wave_effects.wgsl gives: the
 // modules that include this one do not all reach noise.wgsl, and a helper that exists in three of
 // four consumers is a compile error waiting for the fourth.
 fn atmosHash21(p: vec2<f32>) -> f32 {

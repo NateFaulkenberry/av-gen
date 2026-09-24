@@ -20,15 +20,24 @@
  "lights": [
   {"name": "key", "type": "directional", "direction": [-0.45, -0.55, -0.70], "color": [1.0, 0.96, 0.90], "intensity": 4.0}
  ],
- "atmosphericEffects": [
+ "effects": [
   {
+   "id": "tornado",
+   "type": "tornado",
    "name": "Tornado",
+   "owner": {
+    "kind": "world"
+   },
    "enabled": true,
-   "kind": "tornado",
-   "activation": "always",
+   "order": 0,
    "style": "Classic Cone",
-   "tornado": {
-    "base": [0.0, 0.0, 0.0],
+   "activation": "always",
+   "parameters": {
+    "base": [
+     0.0,
+     0.0,
+     0.0
+    ],
     "height": 800.0,
     "radiusBottom": 40.0,
     "radiusMid": 52.0,
@@ -45,7 +54,7 @@
     "cloudDensity": 0.9,
     "touchdown": 1.0,
     "skirtWidth": 2.2,
-    "skirtHeight": 0.10,
+    "skirtHeight": 0.1,
     "skirtDensity": 0.8,
     "skirtFlare": 0.6,
     "stripeCount": 4.0,
@@ -55,8 +64,16 @@
     "density": 0.06,
     "emission": 0.0,
     "scattering": 1.0,
-    "colorThin": [0.62, 0.60, 0.58],
-    "colorThick": [0.16, 0.15, 0.16]
+    "colorThin": [
+     0.62,
+     0.6,
+     0.58
+    ],
+    "colorThick": [
+     0.16,
+     0.15,
+     0.16
+    ]
    }
   }
  ],

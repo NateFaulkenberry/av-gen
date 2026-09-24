@@ -43,8 +43,7 @@
 #include "scene/scene_controller.hpp"
 #include "world/city.hpp"
 #include "world/ecology.hpp"
-#include "world/atmospherics.hpp"
-#include "world/effects.hpp"
+#include "world/effects/effect_instance.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
 #include "world/terrain_query.hpp"
@@ -762,28 +761,24 @@ public:
     // dropped is a camera director that frames nothing with no explanation of why.
     Result<void> setHeroes(std::vector<world::HeroPoint> heroes);
 
-    // ---- world effects (ADR-207) ----------------------------------------------------------------
+    // ---- effects (ADR-702) -----------------------------------------------------------------------
     //
-    // Authored here and round-tripped as `"worldEffects"`, a sibling of `"heroes"` for the same
-    // reason: an effect is a thing in the world. Nothing here *runs* them -- resolving a source to a
-    // world position needs the camera, the shot schedule and the transport clock, all of which the
-    // Engine has and a Composition does not.
-    [[nodiscard]] const std::vector<world::WorldEffect>& worldEffects() const { return worldEffects_; }
-    // Rejects the whole set on a duplicate name or an invalid effect, and names it -- an effect
-    // silently dropped is an effect that never fires with nothing saying why. Duplicates matter more
-    // here than they would elsewhere: a name is half of a parameter path.
-    Result<void> setWorldEffects(std::vector<world::WorldEffect> effects);
-
-    // ---- atmospheric effects (ADR-230) -----------------------------------------------------------
+    // The scene's ONE effect list: every effect instance on every owner -- the World, an entity, a
+    // camera, a light -- round-tripped as `"effects"`. Before ADR-702 there were two lists here,
+    // `worldEffects` (ADR-207's surface waves) and `atmosphericEffects` (ADR-230's sky and medium
+    // effects), with two setters and two serialisers; "the World's effects" and "rook's effects" are
+    // now two filtered views of this list (`world::effectsOf`), stored grouped by owner in stack
+    // order (see `world/effects/effect_stack.hpp`).
     //
-    // A separate list from the world effects, round-tripped as `"atmosphericEffects"`, for the same
-    // reason ADR-230 gives a comet its own rendering path: the two families share a lifecycle and
-    // nothing else. Folding them into one array would mean one `kind` field deciding which half of a
-    // much larger struct is meaningful, and a file in which most of every record is ignored.
-    [[nodiscard]] const std::vector<world::AtmosphericEffect>& atmosphericEffects() const {
-        return atmosphericEffects_;
-    }
-    Result<void> setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects);
+    // Nothing here *runs* them -- resolving a source to a world position needs the camera, the shot
+    // schedule and the transport clock, all of which the Engine has and a Composition does not. And
+    // nothing here registers their parameters: the Engine does, into a container it releases
+    // wholesale, so there are no effect pointers in this class to go stale.
+    [[nodiscard]] const std::vector<world::EffectInstance>& effects() const { return effects_; }
+    // Rejects the whole set on a duplicate id, an unsupported owner, a broken stack order or an
+    // invalid effect, and names it -- an effect silently dropped is one that never fires with
+    // nothing saying why.
+    Result<void> setEffects(std::vector<world::EffectInstance> effects);
 
     // ---- authored lights (ADR-278) ---------------------------------------------------------------
     //
@@ -906,7 +901,7 @@ public:
     static void lightAngles(const glm::vec3& travelDirection, float& azimuthDegrees, float& elevationDegrees);
     [[nodiscard]] static glm::vec3 lightDirectionFromAngles(float azimuthDegrees, float elevationDegrees);
     // Rejects the whole set on a duplicate or empty name, and names it, for the reason
-    // `setWorldEffects` does: a name is half of an identity, and a light nobody can name is a light
+    // `setEffects` does: a name is half of an identity, and a light nobody can name is a light
     // nobody can find in a frame that has thirty of them.
     Result<void> setAuthoredLights(std::vector<AuthoredLight> lights);
 
@@ -1775,9 +1770,7 @@ public:
 
 private:
 
-    std::vector<world::WorldEffect> worldEffects_; // ADR-207: authored, round-tripped as "worldEffects"
-    // ADR-230: authored, round-tripped as "atmosphericEffects"
-    std::vector<world::AtmosphericEffect> atmosphericEffects_;
+    std::vector<world::EffectInstance> effects_; // ADR-702: authored, round-tripped as "effects"
     // ADR-278: authored, round-tripped as the top-level "lights".
     std::vector<AuthoredLight> authoredLights_;
     std::vector<AuthoredLight> authoredLightsRest_; // structure only; see authoredLightsRest()
@@ -2099,7 +2092,7 @@ private:
 
 // Null when the session's authored lights are the scene file's, so a project nobody edited stays
 // byte-stable through a save (ADR-182's control). Otherwise the whole live list, which is the shape
-// `worldEffects` and `heroes` use -- most of a light's fields are not parameters, so there is no
+// `effects` and `heroes` use -- most of a light's fields are not parameters, so there is no
 // by-name difference to record the way `nodeEditsAgainst` can. Pure, so it is testable without an
 // engine; the converters it needs stay file-local.
 // Parses a `"lights"` array -- a scene file's or a project's -- into the list `setAuthoredLights`
