@@ -37,12 +37,13 @@ const world::EffectSchema& schemaFor(world::EffectKind kind) {
     return *s;
 }
 
-// Where a row lives in an instance's document: `parameters/<jsonPath or leaf>`, or a root-relative
-// path when the row's `jsonPath` starts with '/' (the meteor shower's aliased comet rows).
+// Where a row lives in an instance's document: `parameters/<jsonPath or leaf>`. A row whose
+// `jsonPath` starts with '/' names a BORROWED block (a meteor shower's arc is a `comet`, a fog
+// bank's medium a `vortex`), which since ADR-702 is also inside `parameters`.
 const nlohmann::json* rowJson(const nlohmann::json& doc, const world::EffectField& f) {
     const std::string declared = f.jsonPath[0] != '\0' ? f.jsonPath : f.leaf;
     const std::string pointer =
-        declared.front() == '/' ? declared : "/parameters/" + declared;
+        declared.front() == '/' ? "/parameters" + declared : "/parameters/" + declared;
     const nlohmann::json::json_pointer ptr(pointer);
     return doc.contains(ptr) ? &doc.at(ptr) : nullptr;
 }
@@ -480,13 +481,18 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // of its rows' paths, its anchor block, or what its `writeExtra` writes.
         std::set<std::string> accounted;
         for (const world::EffectField& f : own.fields) {
-            const std::string_view path = f.jsonPath[0] != '\0' ? f.jsonPath : f.leaf;
-            if (!path.starts_with('/')) {
-                accounted.insert(head(path));
+            std::string_view path = f.jsonPath[0] != '\0' ? f.jsonPath : f.leaf;
+            if (path.starts_with('/')) {
+                path.remove_prefix(1); // a borrowed block, inside `parameters` all the same
             }
+            accounted.insert(head(path));
         }
-        if (own.anchorJson != nullptr && own.anchorJson[0] != '/') {
-            accounted.insert(head(own.anchorJson));
+        if (own.anchorJson != nullptr) {
+            std::string_view anchor(own.anchorJson);
+            if (anchor.starts_with('/')) {
+                anchor.remove_prefix(1);
+            }
+            accounted.insert(head(anchor));
         }
         if (own.writeExtra != nullptr) {
             nlohmann::json extra = nlohmann::json::object();
@@ -504,7 +510,11 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
         // that happens to spell one of this type's own groups -- the fog's `shape` against the
         // aurora's `shape` block -- is this type's group, and is skipped).
         for (const world::EffectField* f : foreign) {
-            if (accounted.count(head(f->jsonPath[0] != '\0' ? f->jsonPath : f->leaf)) == 1) {
+            std::string_view path = f->jsonPath[0] != '\0' ? f->jsonPath : f->leaf;
+            if (path.starts_with('/')) {
+                path.remove_prefix(1);
+            }
+            if (accounted.count(head(path)) == 1) {
                 continue;
             }
             INFO(world::effectKindName(kind) << " carries another type's stored row '" << f->leaf << "'");
@@ -569,7 +579,8 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
         // mid-flight for the first meteors and nothing at all for the last.
         nlohmann::json later = doc;
         later["timing"]["repeatSeconds"] = 6.0;
-        later["comet"] = nlohmann::json{
+        // ADR-702: the shower's borrowed `comet` block lives inside `parameters`.
+        later["parameters"]["comet"] = nlohmann::json{
             {"path", {{"anchor", "world"}, {"anchorPosition", {0.0, 0.0, 0.0}},
                       {"startAzimuth", -70.0}, {"startElevation", 34.0},
                       {"endAzimuth", 55.0}, {"endElevation", 9.0},

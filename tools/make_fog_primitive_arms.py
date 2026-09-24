@@ -112,14 +112,13 @@ def load_project() -> dict:
 
 def as_primitive(project: dict, shape: str) -> None:
     # ADR-702's canonical entry. A fog bank's medium rows alias the vortex payload and are read from
-    # the root `vortex` block; its own stored rows (FOG_ROWS, the shape) are under `parameters`.
+    # the `vortex` block inside `parameters`, beside its own stored rows (FOG_ROWS, the shape).
     for effect in project["effects"]:
         if effect.get("type") in ("vortex", "tornado", "fog"):
             effect["type"] = "fog"
             effect["id"] = f"fog-{shape.lower()}"
             effect["name"] = f"Fog {shape}"
-            effect["vortex"] = dict(VOLUME)
-            effect["parameters"] = dict(FOG_ROWS, shape=shape)
+            effect["parameters"] = dict(FOG_ROWS, shape=shape, vortex=dict(VOLUME))
             effect.pop("ground", None)
             return
     raise SystemExit("no medium effect in the project to replace")

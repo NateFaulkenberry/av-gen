@@ -145,16 +145,15 @@ def as_fog_bank(project: dict) -> None:
     ADR-702's canonical entry: `type` rather than `kind` and a stable `id` -- which is also the
     `fx/<id>/` prefix its parameters register under, so a route that named the medium it replaces
     names a different id and is reported at load, as before. A fog bank's medium rows ALIAS the
-    vortex payload (`.json("/vortex/...")` in volumetric_fog_effect.cpp), so BANK is written to the
-    root `vortex` block; its own stored rows would go under `parameters`."""
+    vortex payload (`.json("/vortex/...")` in volumetric_fog_effect.cpp), which since ADR-702 is the
+    `vortex` block INSIDE `parameters`, beside the type's own stored rows."""
     for effect in project["effects"]:
         if effect.get("type") in MEDIA:
             effect["type"] = "fog"
             effect["id"] = "fog-bank"
             effect["name"] = "Fog Bank"
             effect["style"] = "Valley Fog"
-            effect["vortex"] = dict(BANK)
-            effect["parameters"] = {}
+            effect["parameters"] = {"vortex": dict(BANK)}
             effect.pop("ground", None)  # a fog bank does not light the ground
             return
     raise SystemExit("no placed medium in the project's effects to replace")
@@ -162,7 +161,7 @@ def as_fog_bank(project: dict) -> None:
 
 def bank(project: dict) -> dict:
     """The fog bank's medium rows, for an arm that moves one of them."""
-    return next(e for e in project["effects"] if e.get("id") == "fog-bank")["vortex"]
+    return next(e for e in project["effects"] if e.get("id") == "fog-bank")["parameters"]["vortex"]
 
 
 def no_medium(project: dict) -> None:
