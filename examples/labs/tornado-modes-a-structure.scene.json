@@ -33,6 +33,8 @@
   "volumeAbsorption": 1.0,
   "volumeScattering": 1.0,
   "volumeAnisotropy": 0.25,
+  "volumeShadowSteps": 4,
+  "volumeShadowStrength": 0.45,
   "sky": {
    "enabled": false,
    "background": false
@@ -96,8 +98,8 @@
     "stripePitch": 3.4,
     "stripeDepth": 0.35,
     "stripeHarmonic": 0.4,
-    "density": 0.06,
-    "emission": 0.0,
+    "density": 0.03,
+    "emission": 0.01,
     "scattering": 1.0,
     "colorThin": [
      0.62,
