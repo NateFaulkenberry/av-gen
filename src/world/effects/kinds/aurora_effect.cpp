@@ -284,6 +284,9 @@ EffectSchema buildSchema() {
     s.key = "aurora";
     s.enumName = "Aurora";
     s.displayName = "Aurora";
+    s.description = "Curtains of light rising from the horizon on stepped shells, their tops shaped by the music's spectrum.";
+    s.performance = PerformanceClass::Medium;
+    s.primaryCost = CostFragment;
     s.addLabel = "Add aurora";
     s.addTip = "Curtains rising from the horizon, shaped by the audio spectrum.\n"
                "Always on and fading up: an aurora is scenery that breathes.";

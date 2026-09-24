@@ -44,6 +44,7 @@
 #include "world/city.hpp"
 #include "world/ecology.hpp"
 #include "world/effects/effect_instance.hpp"
+#include "world/effects/history_bank.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
 #include "world/terrain_query.hpp"
@@ -618,6 +619,12 @@ public:
     // body by up to its own diagonal, which on a 3.6x farm animal is a metre of beam.
     [[nodiscard]] std::vector<glm::vec3> nodeCorners(const std::string& name);
 
+    // ADR-703. What an entity-owned effect needs of the node it is attached to, from the LAST
+    // FLATTENING (the rule `NodeRange::world` explains): its drawn world matrix, the world AABB of
+    // its drawn meshes, and its range in `scene().entities`. False when there is no such node or
+    // nothing has been flattened. Const and allocation-free: the effect evaluator asks it per frame.
+    [[nodiscard]] bool nodeView(std::string_view node, world::NodeView& out) const;
+
     // ---- what a node contributes to the picture (`stage::IVisualPlacement`) ----
     //
     // "Where is this node's contribution to the picture centred, and where is the node itself?"
@@ -665,6 +672,21 @@ public:
     // checkpoint is the director (whole), the bases it wrote, and `ReplayPlacement`.
     void seekWithDirector(double seconds, params::ParameterSet& params, entity::SeekBudget budget,
                           double step = 1.0 / 60.0);
+
+    // ---- ADR-703: HIST, the transform history entity effects read -----------------------------
+    //
+    // The bank is the engine's (world/effects/history_bank.hpp). The composition RECORDS it --
+    // `recordHistory` after each played frame's flattening, and the seek replay above at every
+    // replayed step -- and carries it in the ADR-700 checkpoint, so a scrub to second N holds the
+    // history a play to N recorded. Null (the default) records nothing and leaves the replay and
+    // its checkpoints exactly as they were.
+    void setHistoryBank(world::HistoryBank* bank) { historyBank_ = bank; }
+    [[nodiscard]] world::HistoryBank* historyBank() const { return historyBank_; }
+    // One sample per subscribed node at `seconds`: its drawn world transform, the root fold and the
+    // parent chain over the parameter finals -- the flattening's arithmetic and `ReplayPlacement`'s.
+    // `automation` re-applies the play's transform automation, for the replay, which has none.
+    void recordHistory(world::HistoryBank& bank, double seconds,
+                       const world::HistoryAutomation* automation = nullptr) const;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
@@ -1334,6 +1356,10 @@ private:
     std::chrono::steady_clock::time_point lastRebuildPollTime_{};
     void rebuildSdfs();
     [[nodiscard]] Transform nodeTransform(const CompositionNode& node) const; // params or authored values (local)
+    // ADR-703: `nodeWorldTransform` with the play's transform automation re-applied at `seconds`.
+    [[nodiscard]] Transform automatedWorldTransform(const CompositionNode& node,
+                                                    const world::HistoryAutomation& automation,
+                                                    double seconds) const;
     // The same, from the parameter **bases**: where the file puts the node rather than where this
     // instant's modulation has it. What an entity's anchor must be -- see the note on the
     // definition, and ADR-264.
@@ -1900,6 +1926,7 @@ private:
     // until the next `update` flattens, `visualPlacement` answers from what the replay captured
     // after its last step, which is the flattening the play would have had. Found by checking the
     // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
+    world::HistoryBank* historyBank_ = nullptr; // ADR-703: the engine's; see `setHistoryBank`
     std::vector<stage::VisualPlacement> seekPlaced_;
     std::vector<std::uint8_t> seekPlacedValid_;
     bool seekPlacementLive_ = false;

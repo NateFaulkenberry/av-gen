@@ -742,6 +742,9 @@ EffectSchema buildSchema() {
     s.key = "fog";
     s.enumName = "VolumetricFog";
     s.displayName = "Volumetric Fog";
+    s.description = "A placed bank of fog you can see the shape of: a volumetric medium lit by the scene, with structure before noise.";
+    s.performance = PerformanceClass::High;
+    s.primaryCost = CostFragment | CostExtraPass;
     s.addLabel = "Add fog bank";
     s.addTip = "A placed bank of medium with a soft rim and a billowing interior: mist in a\n"
                "valley, or a glowing haze around an island. It is drawn by the volumetric\n"
