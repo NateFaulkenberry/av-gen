@@ -31,6 +31,7 @@
 
 #include "audio/arrangement.hpp"
 #include "core/error.hpp"
+#include "directing/plan.hpp"
 #include "params/modulation.hpp"
 #include "params/timeline.hpp"
 #include "scene/camera_rig.hpp"
@@ -183,6 +184,15 @@ struct LightChange {
     std::vector<scene::Composition::AuthoredLight> after;
 };
 
+// The project's Director Plans, before and after (ADR-755). Whole, for the reason every record above
+// is whole: a handful of small documents. Applying the Director's plan writes the plan AND its
+// content, and undoing it must take back both, or the project would hold the provenance of content
+// that is no longer there.
+struct PlanListChange {
+    std::vector<directing::Plan> before;
+    std::vector<directing::Plan> after;
+};
+
 // One reversible change. Move-only, because it owns nodes.
 struct EditCommand {
     // What the user did, in their words, for the status bar and the history list: "Place 12 x fern",
@@ -200,6 +210,8 @@ struct EditCommand {
     std::unique_ptr<AutomationChange> automation;
     // The camera collection and camera track either side, or null (ADR-752).
     std::unique_ptr<CameraDirectionChange> cameras;
+    // The Director Plans either side, or null (ADR-755).
+    std::unique_ptr<PlanListChange> plans;
     // The authored lights either side, or null for the edits that are most of them. A pointer for
     // the same reason `timeline` is one: a command that moves eleven rocks should not carry a
     // light-list-shaped hole.
@@ -219,7 +231,7 @@ struct EditCommand {
     [[nodiscard]] bool empty() const {
         return params.empty() && parents.empty() && heroes.empty() && added.empty() &&
                removed.empty() && timeline == nullptr && lights == nullptr &&
-               automation == nullptr && cameras == nullptr;
+               automation == nullptr && cameras == nullptr && plans == nullptr;
     }
     // How many things the user would say this touched, for the label and for tests.
     [[nodiscard]] std::size_t touched() const;

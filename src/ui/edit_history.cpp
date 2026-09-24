@@ -28,7 +28,7 @@ std::size_t EditCommand::touched() const {
     // who made the edit ("Delete camera", "Add key"), whatever the size of what they rewrote.
     return params.size() + parents.size() + heroes.size() + added.size() + removed.size() +
            (timeline != nullptr ? 1 : 0) + lightsTouched + (automation != nullptr ? 1 : 0) +
-           (cameras != nullptr ? 1 : 0);
+           (cameras != nullptr ? 1 : 0) + (plans != nullptr ? 1 : 0);
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -208,6 +208,12 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         }
     }
 
+    // The Director Plans (ADR-755): plain values the engine holds and nothing derives from, so they
+    // can go first and need no rebind.
+    if (command.plans != nullptr) {
+        engine.directingPlans() = forward ? command.plans->after : command.plans->before;
+    }
+
     // The author's automation (ADR-752), AFTER the sequence. The record holds the whole timeline as
     // it was captured, the tracks the sequence baked included -- so the sequence must already be the
     // side being restored when it lands: `setSequence` above re-baked exactly those tracks (a bake
@@ -268,7 +274,7 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         // Not a failure when the command was the sequencer's: there was nothing here for a
         // composition to do.
         if ((command.timeline == nullptr && command.lights == nullptr && command.automation == nullptr &&
-             command.cameras == nullptr) ||
+             command.cameras == nullptr && command.plans == nullptr) ||
             !command.params.empty() ||
             !command.added.empty() || !command.removed.empty() || !command.parents.empty() ||
             !command.heroes.empty()) {

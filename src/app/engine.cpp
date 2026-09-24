@@ -1089,6 +1089,18 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     if (!songPlan_.empty()) {
         doc["songPlan"] = songPlan_.toJson();
     }
+    // ADR-755: the Director Plans this project's content came from, as its provenance. Written only
+    // when there is one, so a project that never used the Director is byte-for-byte what it was.
+    if (!directingPlans_.empty() || !unreadableDirectingPlans_.empty()) {
+        nlohmann::json plans = nlohmann::json::array();
+        for (const directing::Plan& plan : directingPlans_) {
+            plans.push_back(plan.toJson());
+        }
+        for (const nlohmann::json& raw : unreadableDirectingPlans_) {
+            plans.push_back(raw);
+        }
+        doc["directingPlans"] = std::move(plans);
+    }
     // ADR-158: which hero each directed shot was cut for, beside the tracks it accompanies.
     //
     // A sibling of `timeline` rather than part of the scene, because that is what it belongs to: the
@@ -2218,6 +2230,26 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // ADR-249. Cleared when absent for the same reason the settings are reset: a project with no
     // plan must not inherit the last one's, or Song Mode would direct this piece to another one's
     // sections.
+    // ADR-755. Cleared when absent, like the song plan: a project must not inherit another's
+    // provenance. A plan this build cannot read is a warning and is kept verbatim, because dropping
+    // it here would make the next save delete it -- the defect family this program exists to avoid.
+    directingPlans_.clear();
+    unreadableDirectingPlans_.clear();
+    if (const auto plans = doc.find("directingPlans"); plans != doc.end() && plans->is_array()) {
+        for (std::size_t i = 0; i < plans->size(); ++i) {
+            directing::PlanParse parsed = directing::parsePlan((*plans)[i]);
+            if (parsed.plan) {
+                directingPlans_.push_back(std::move(*parsed.plan));
+                continue;
+            }
+            unreadableDirectingPlans_.push_back((*plans)[i]);
+            const auto firstError = std::find_if(parsed.issues.begin(), parsed.issues.end(), [](const directing::Issue& issue) {
+                return issue.severity == directing::Severity::Error;
+            });
+            warn(fmt::format("directingPlans[{}]: kept but not read: {}", i,
+                             firstError != parsed.issues.end() ? firstError->message : std::string("unreadable")));
+        }
+    }
     songPlan_ = SongPlan{};
     if (const auto plan = doc.find("songPlan"); plan != doc.end()) {
         auto parsed = songPlanFromJson(*plan);
@@ -2445,6 +2477,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
 }
 
 void Engine::newProject() {
+    directingPlans_.clear();
+    unreadableDirectingPlans_.clear();
     sequence_ = seq::Sequence{};
     sequenceTargets_.clear();
     sequenceReport_ = seq::InstallReport{};

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "rook-umbra",
+  "revision": 1,
+  "title": "Rook flips over Umbra",
+  "tier": "baked",
+  "provenance": {
+    "author": "script",
+    "source": "tests/data/directing/rook_umbra.plan.json",
+    "request": "At 1:30, create a 5-second shot where Rook runs toward the Umbra hero mushroom, jumps, performs a backflip over it, and continues running. Use a low-angle chase camera that rises over Rook during the flip and continues forward past him. Trigger a slow-motion frame-drag effect during the flip and activate the Umbra hero effect at the backflip peak."
+  },
+  "subjects": [
+    {"alias": "rook", "text": "Rook"},
+    {"alias": "umbra", "text": "the Umbra hero mushroom", "hint": "hero"}
+  ],
+  "shots": [
+    {
+      "key": "rook-umbra",
+      "name": "rook-umbra",
+      "start": "1:30",
+      "durationSeconds": 5.0,
+      "subject": "rook",
+      "transition": "cut",
+      "locked": true,
+      "camera": [
+        {"move": "low_angle"},
+        {"move": "chase", "heightMetres": 0.4, "distanceMetres": 3.0},
+        {"move": "rise_over", "at": {"text": "1:32.2"}},
+        {"move": "pass", "at": {"seconds": 93.2}}
+      ]
+    }
+  ],
+  "markers": [],
+  "performances": [
+    {
+      "key": "rook-run",
+      "subject": "rook",
+      "mode": "scripted",
+      "beats": [
+        {"action": "run_to", "target": "umbra"},
+        {"action": "jump", "target": "umbra", "emits": "rook.jump_started"},
+        {"action": "backflip", "target": "umbra", "emits": "rook.backflip_peak", "clearanceMetres": 0.5},
+        {"action": "land", "emits": "rook.landed"},
+        {"action": "run", "seconds": 1.2}
+      ]
+    }
+  ],
+  "cues": [
+    {"key": "frame-drag", "parameter": "temporal/echo/strength", "on": "rook.jump_started", "value": 0.8, "rampSeconds": 0.1, "holdSeconds": 0.8},
+    {"key": "umbra-pulse", "effect": {"owner": "umbra", "type": "groundPulse"}, "on": "rook.backflip_peak", "holdSeconds": 1.5}
+  ],
+  "retimes": [
+    {"key": "flip-slowmo", "performance": "rook-run", "from": "1:32", "until": "1:33", "factor": 0.35}
+  ],
+  "produced": []
+}

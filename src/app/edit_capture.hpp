@@ -14,6 +14,7 @@
 //   cameras          the camera collection and camera track, rigs carrying their current bases
 //   automation       the author timeline (tracks, keys, cues) and the modulation routes
 //   nodes            nodes the operation ADDED (undo detaches them) and parent changes
+//   plans            the project's Director Plans (ADR-755), so provenance and content undo together
 //
 // The records are the history's own whole-domain ones (`TimelineChange`, `CameraDirectionChange`,
 // `AutomationChange`), so an operation measured here is undone by exactly the code a person's edit
@@ -72,6 +73,7 @@ private:
     std::vector<params::ModRoute> routes_;
     nlohmann::json routesJson_;
     std::map<std::string, std::string> parents_; // node -> parent, "" for a root
+    std::vector<directing::Plan> plans_;
     std::vector<std::string> unrecoverable_;
 };
 

@@ -5,6 +5,7 @@
 // read the Scene / parameters. Two modes (ADR-012): Live (audio device is the clock, analysis
 // runs on a thread) and Offline (fixed-step clock, analysis precomputed and indexed by time).
 
+#include "directing/plan.hpp"
 #include "analysis/analysis_runner.hpp"
 #include "app/camera_director.hpp"
 #include "app/control_hub.hpp"
@@ -557,6 +558,18 @@ public:
     [[nodiscard]] SongPlan& songPlan() { return songPlan_; }
     [[nodiscard]] const SongPlan& songPlan() const { return songPlan_; }
 
+    // ---- Director Plans (ADR-755) -------------------------------------------------------------
+    //
+    // The plans whose content this project contains, kept as that content's PROVENANCE (the
+    // owner's ruling of 2026-09-24): a follow-up request revises the plan that made a shot rather
+    // than starting again. Saved under "directingPlans", only when there is one. A plan this build
+    // cannot read (a newer schema) is kept verbatim and written back, never dropped by a save.
+    [[nodiscard]] std::vector<directing::Plan>& directingPlans() { return directingPlans_; }
+    [[nodiscard]] const std::vector<directing::Plan>& directingPlans() const { return directingPlans_; }
+    [[nodiscard]] const std::vector<nlohmann::json>& unreadableDirectingPlans() const {
+        return unreadableDirectingPlans_;
+    }
+
     [[nodiscard]] params::Timeline& timeline() { return timeline_; }
     [[nodiscard]] const params::Timeline& timeline() const { return timeline_; }
     // The clock the timeline is evaluated against this frame: audio time (render time without
@@ -877,6 +890,8 @@ private:
     ParkedDirectorsCut parkedCut_;      // ADR-582: the steering half of a cut, kept while parked
     std::uint64_t sceneGeneration_ = 0; // ADR-582: see sceneGeneration()
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
+    std::vector<directing::Plan> directingPlans_;           // ADR-755
+    std::vector<nlohmann::json> unreadableDirectingPlans_;  // ...kept verbatim, written back
     SongPlan songPlan_;                 // ADR-249: the same, for Song Mode's authored intents
     std::uint32_t lastWorldEffectCount_ = 0;
     std::uint32_t lastAtmosphericCount_ = 0;

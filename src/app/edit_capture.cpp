@@ -67,6 +67,7 @@ void EditCapture::begin(Engine& engine) {
     routes_ = engine.modulator().routes();
     routesJson_ = routesJson(engine);
     parents_ = captureParents(engine);
+    plans_ = engine.directingPlans();
     unrecoverable_.clear();
     open_ = true;
 }
@@ -99,6 +100,14 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
         if (!parentsNow.contains(name)) {
             unrecoverable_.push_back(name);
         }
+    }
+
+    // ---- the Director Plans (ADR-755) ---------------------------------------------------------
+    if (engine.directingPlans() != plans_) {
+        auto change = std::make_unique<ui::PlanListChange>();
+        change->before = std::move(plans_);
+        change->after = engine.directingPlans();
+        command.plans = std::move(change);
     }
 
     // ---- the author's automation --------------------------------------------------------------
