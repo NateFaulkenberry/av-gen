@@ -17,6 +17,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 #include "world/atmospherics.hpp"
+#include "world/effects/effect_instance.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -83,7 +84,7 @@ scene::Scene cometSky(double seconds) {
     e.activation = world::Activation::Always;
 
     const std::vector<world::EffectInstance> effects{e};
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = seconds;
     ctx.cameraPosition = s.camera.position;
     world::buildAtmosphericFrame(effects, ctx, s.atmospherics);
