@@ -14,7 +14,7 @@
 #   ./build/release/tests/avgen_tests "[aliens]"   (etc. -- by tag, never by name)
 # Entries were taken from observed CI failures, not predicted; add one only with a run URL.
 #
-# Observed on run 36060799310 (2026-09-24, commit on agent/ci == main 232a50d7 + CI files).
+# Observed on runs 36060799310 and 36065418960 (2026-09-24; main 232a50d7 + CI files).
 
 # --- crashes without the asset: a test defect, reported to the owner; excluded so the shard lives
 exclude | body compensation survives a scene save and reload | assets/aliens/alien-scout.glb absent -> 0 nodes -> nodes().front() on an empty vector, SIGSEGV (test_body_compensation.cpp:433)
@@ -23,6 +23,7 @@ exclude | body compensation survives a scene save and reload | assets/aliens/ali
 needs-assets | an object deleted from the owner's own film stays deleted | assets/aliens
 needs-assets | The squad stands three on one bank and two on the other | assets/aliens
 needs-assets | the motion context reaches the alien, in the alien's own space | assets/aliens
+needs-assets | the Glowmere alien stands on terrain with its feet on the ground | assets/aliens (first seen on 36065418960; the crash hid it before)
 needs-assets | the opt-in body is posed by its provider chain, and the others are not | assets/aliens
 needs-assets | the provider's pose actually reaches the drawn rig | assets/aliens
 needs-assets | §: a foot layer's lock strength survives the scene file | assets/aliens
