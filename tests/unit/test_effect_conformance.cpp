@@ -431,6 +431,19 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Float, {EffectTarget::Entity}},
         {EffectKind::Shake, {EffectTarget::Entity}},
         {EffectKind::Bounce, {EffectTarget::Entity}},
+        // Wave 2 (FXL surface). Entity only: a lane is a per-draw change of an owner's surface. The
+        // catalog's World preset of Bioluminescence (the recipe ladder) and a Light owner's Rim Light
+        // are later waves.
+        {EffectKind::Dissolve, {EffectTarget::Entity}},
+        {EffectKind::Growth, {EffectTarget::Entity}},
+        {EffectKind::Breathing, {EffectTarget::Entity}},
+        {EffectKind::OrganicPulsation, {EffectTarget::Entity}},
+        {EffectKind::Bioluminescence, {EffectTarget::Entity}},
+        {EffectKind::PulsingVeins, {EffectTarget::Entity}},
+        {EffectKind::Fresnel, {EffectTarget::Entity}},
+        {EffectKind::RimLight, {EffectTarget::Entity}},
+        {EffectKind::ColorCycling, {EffectTarget::Entity}},
+        {EffectKind::MotionSmear, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {

@@ -1078,7 +1078,9 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     desc.label = label;
     desc.layout = scenePipelineLayout_;
     desc.vertex.module = module;
-    desc.vertex.entryPoint = "vs_main";
+    // `vs_main` plus the Effect Library's per-entity displacement (pbr.wgsl); the depth-only pipeline
+    // below uses the same entry, so the prepass, the shadows and the colour see the same surface.
+    desc.vertex.entryPoint = "vs_entity";
     desc.vertex.bufferCount = 1;
     desc.vertex.buffers = &vertex.layout;
     desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
@@ -1224,7 +1226,7 @@ Result<wgpu::RenderPipeline> SceneRenderer::createDepthOnlyPipeline(const wgpu::
     desc.label = "depth-only";
     desc.layout = scenePipelineLayout_;
     desc.vertex.module = module;
-    desc.vertex.entryPoint = "vs_main";
+    desc.vertex.entryPoint = "vs_entity"; // the lit pipelines' vertex stage, displacement included
     desc.vertex.bufferCount = 1;
     desc.vertex.buffers = &vertex.layout;
     desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
@@ -2930,6 +2932,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // field and none of them can look the choice up a second time and get a different answer.
         const GpuMesh* geometry = nullptr;
         std::uint8_t lodLevel = 0;
+        // Effect Library Wave 2 (FXL): the owner is clipped (Dissolve, Growth), so its inside shows
+        // through the holes -- drawn without back-face culling, as a double-sided material is.
+        bool fxTwoSided = false;
         [[nodiscard]] bool skinned() const { return skin.valid(); }
     };
     std::vector<DrawItem> opaque;
@@ -3206,10 +3211,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-703 (FXL): the entity's effect lanes, copied from its owner's record -- the inline
         // pair every draw reads, and the record index the shader follows for the rest. An entity no
         // lane effect touches keeps both zero.
+        bool fxTwoSided = false;
         if (const std::uint32_t record = scene.entityFx.recordFor(thisEntity);
             record != 0 && record < scene.entityFx.records.size() && record < entityFxCapacity_) {
             obj.fxA = scene.entityFx.records[record].lanes[world::kFxLaneA];
             obj.fxB = scene.entityFx.records[record].lanes[world::kFxLaneB];
+            // Wave 2: the previous frame's time, which `vs_entity` evaluates the displacement at for
+            // the velocity target -- the lane mesh wind already carries it in (gated there by
+            // `windShape.y`, so writing it on a windless draw changes nothing).
+            obj.windTune.w = windPrevTime_;
+            fxTwoSided = (static_cast<std::uint32_t>(obj.fxA.z + 0.5f) & world::kFxClip) != 0;
         }
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
@@ -3221,6 +3232,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         diagnostic.cullReason = "submitted";
         ++objectIndex;
         DrawItem out{offset, &entity, depth, skin};
+        out.fxTwoSided = fxTwoSided;
         // A skinned mesh never has a chain (the builder declines them: every level re-orders the
         // vertex buffer and MeshData::skin is parallel to the one it came from), so this asks only
         // for static geometry and the skinned path is untouched.
@@ -3774,9 +3786,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                 skinnedBound);
                     rp.SetBindGroup(2, materialBindGroup(m));
                 } else if (lit) {
-                    rp.SetPipeline(m.alphaMode == scene::AlphaMode::Blend ? litBlend_
-                                   : m.doubleSided                        ? litOpaqueNoCull_
-                                                                          : litOpaqueCull_);
+                    rp.SetPipeline(m.alphaMode == scene::AlphaMode::Blend      ? litBlend_
+                                   : (m.doubleSided || item.fxTwoSided) ? litOpaqueNoCull_
+                                                                        : litOpaqueCull_);
                     rp.SetBindGroup(2, materialBindGroup(m));
                     rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
                 } else {
