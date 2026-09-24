@@ -76,8 +76,10 @@ TransformGate transformGate(const EffectInstance& e, const EffectContext& ctx) {
     }
     // An entity-owned instance fires for its OWN subject under `HeroFocus` (Ground Pulse's pattern).
     const bool world = e.owner.kind == EffectTarget::World;
-    const auto window = resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots, world,
-                                                world ? std::string_view{} : std::string_view(e.owner.name));
+    const std::string_view owner = world ? std::string_view{} : std::string_view(e.owner.name);
+    // Through the context so a Trigger activation works: a triggered Shake or Bounce's `age` is then
+    // `t - t0` of the latest event, which is what its envelope decays over.
+    const auto window = resolveActivationWindow(e.activation, e.timing, ctx, world, owner, owner);
     if (!window) {
         return gate;
     }

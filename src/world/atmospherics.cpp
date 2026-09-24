@@ -530,7 +530,7 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const EffectInstance> effe
         }
         // ADR-207's gating, unchanged. An atmospheric effect has no source endpoint, so it never
         // follows a spotlit hero by name -- a `HeroFocus` aurora fires for whichever hero is up.
-        const auto window = resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots, true);
+        const auto window = resolveActivationWindow(e.activation, e.timing, ctx, true, {}, {});
         if (!window) {
             continue;
         }

@@ -55,7 +55,7 @@ Liveness liveContribution(const EffectInstance& e, const EffectContext& ctx, Nod
     // Ground Pulse follows -- never "whoever is in focus": a glow on the saucer does not light up
     // because the camera found a mushroom.
     const auto window =
-        resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots, false, e.owner.name);
+        resolveActivationWindow(e.activation, e.timing, ctx, false, e.owner.name, e.owner.name);
     if (!window) {
         return Liveness::Dormant;
     }

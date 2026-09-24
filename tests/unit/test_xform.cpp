@@ -18,6 +18,7 @@
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_trigger.hpp"
 #include "world/effects/transform_frame.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -433,4 +434,31 @@ TEST_CASE("XFORM: a Trail on an orbiting owner follows the drawn orbit, not the 
     }
     INFO("orbit radius " << radius << ", nearest trail point to the simulated centre " << nearest);
     CHECK(nearest > 0.5f * radius);
+}
+
+// Wave 2 wiring: a Trigger-activated Shake takes its age from the latest event, so it kicks on
+// each beat and settles before the next -- the "one line" the motion slice left for TRIGGER.
+TEST_CASE("XFORM: a Beat-triggered Shake kicks on the beat and settles before the next",
+          "[xform][effects][trigger]") {
+    world::TriggerClock clock;
+    const std::vector<double> beats{1.0, 3.0};
+    clock.setBeats(beats);
+    world::EffectInstance e = motion(world::EffectKind::Shake, "craft");
+    e.id = "shake";
+    e.activation = world::Activation::Trigger;
+    e.timing.trigger.source = world::TriggerSource::Beat;
+    e.timing.fadeIn = 0.0;
+    e.timing.fadeOut = 0.0;
+    e.timing.lifetime = 1.5;
+    const std::vector<world::EffectInstance> list{e};
+    const auto gateAt = [&](double t) {
+        world::EffectContext ctx;
+        ctx.seconds = t;
+        ctx.triggers = &clock;
+        return world::transformGate(list[0], ctx);
+    };
+    CHECK(gateAt(0.5).envelope == 0.0f);              // before the first beat: nothing
+    CHECK(gateAt(1.25).age == Catch::Approx(0.25));   // a quarter second after beat one
+    CHECK(gateAt(2.75).envelope == 0.0f);             // lifetime over, next beat not yet
+    CHECK(gateAt(3.10).age == Catch::Approx(0.10));   // re-armed by beat two
 }

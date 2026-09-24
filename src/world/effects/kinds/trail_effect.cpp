@@ -200,8 +200,7 @@ bool live(const E& e, const EffectContext& ctx, Live& out) {
     if (!e.enabled || e.owner.kind != EffectTarget::Entity || e.owner.name.empty()) {
         return false;
     }
-    const auto window = resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots, false,
-                                                e.owner.name);
+    const auto window = resolveActivationWindow(e.activation, e.timing, ctx, false, e.owner.name, e.owner.name);
     if (!window) {
         return false;
     }
