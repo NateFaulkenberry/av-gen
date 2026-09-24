@@ -1,6 +1,8 @@
 # ADR-569: two fogs, one atmosphere, and they cross at 79 metres
 
-Status: **finding, no behaviour change.** Date: 2026-09-21. Phase D of the Fog Bank brief
+Status: **finding, no behaviour change -- resolved by ADR-705** (2026-09-24: the owner chose option 2;
+the surface pass is now the march's own air under the march's own law, and Horizon Density is built
+on it). Date: 2026-09-21. Phase D of the Fog Bank brief
 (§5, §6, §7's Horizon Density).
 
 ## What this is
