@@ -25,6 +25,7 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
+#include "scene/procedural.hpp"
 #include "scene/scene.hpp"
 #include "support/image_diff.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -595,5 +596,126 @@ TEST_CASE("LIGHTMOD: a Glow's spill lights the ground, and the 17th spill is Par
         const gpu::Image8 crowded = render(h.renderer, many);
         dump(crowded, "fxl-spill-seventeen");
         CHECK(h.renderer.stats().shadedLights >= world::kEffectLightBudget);
+    }
+}
+
+namespace {
+
+// A procedural node: three sphere instances drawn by the procedural renderer, on the left of the
+// frame, with no scene entity at all -- the shape of Glowmere's `visitor` saucer.
+scene::Scene proceduralOrbs() {
+    scene::Scene s = twoOrbs(0.05f);
+    s.entities[1].visible = false; // orb A's place is taken by the procedural cluster
+    scene::ProceduralGeometry g;
+    g.name = "saucer";
+    g.source.kind = scene::PrimitiveKind::Sphere;
+    g.source.radius = 0.6f;
+    g.source.radialSegments = 24;
+    g.source.heightSegments = 12;
+    for (int i = 0; i < 3; ++i) {
+        scene::InstanceRecord r{};
+        r.position = {-3.4f + 1.1f * static_cast<float>(i), 1.2f, 0.0f, 1.0f};
+        r.rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+        r.scale = {1.0f, 1.0f, 1.0f, 0.0f};
+        r.color = {1.0f, 1.0f, 1.0f, static_cast<float>(i)};
+        r.emissive = {1.0f, 1.0f, 1.0f, 0.0f};
+        g.instances.push_back(r);
+    }
+    g.structureVersion = 1;
+    g.meshHash = 0x5A0CE2ull;
+    g.material.baseColor = {0.3f, 0.3f, 0.32f};
+    g.material.roughness = 0.5f;
+    g.material.emissiveColor = {1.0f, 0.6f, 0.3f};
+    g.material.emissiveIntensity = 0.05f;
+    s.procedurals.push_back(g);
+    return s;
+}
+
+// The procedural node answers with its procedural range and no entities, as Composition::nodeView
+// does for a procedural node.
+class ProceduralNodeScene final : public world::EffectSceneQuery {
+public:
+    [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
+        out = glm::vec3(-2.3f, 1.2f, 0.0f);
+        return name == "saucer";
+    }
+    [[nodiscard]] bool nodeView(std::string_view name, world::NodeView& out) const override {
+        if (name != "saucer") {
+            return false;
+        }
+        out = world::NodeView{};
+        out.boundsMin = glm::vec3(-4.0f, 0.6f, -0.6f);
+        out.boundsMax = glm::vec3(-0.6f, 1.8f, 0.6f);
+        out.hasBounds = true;
+        out.world[3] = glm::vec4(-2.3f, 1.2f, 0.0f, 1.0f);
+        out.firstProcedural = 0;
+        out.proceduralCount = 1;
+        return true;
+    }
+};
+
+Evaluated evaluateProcedural(scene::Scene& s, const std::vector<world::EffectInstance>& effects, double t = 1.0) {
+    const ProceduralNodeScene query;
+    world::EffectContext ctx;
+    ctx.seconds = t;
+    ctx.scene = &query;
+    ctx.cameraPosition = s.camera.position;
+    Evaluated out;
+    out.status.assign(effects.size(), EffectStatus::Dormant);
+    out.reasons.assign(effects.size(), std::string());
+    world::buildEntityFxFrame(effects, ctx, s.entityFx, {}, out.status, out.reasons);
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("FXL on a procedural node: Glow gain 4 is four times the emission of gain 1", "[gpu][effects][fxl]") {
+    Harness h;
+    h.renderer.setAuxDebugView(rendering::AuxDebugView::Emission);
+    h.renderer.setAuxDebugScale(1.0f);
+    scene::Scene one = proceduralOrbs();
+    REQUIRE(evaluateProcedural(one, {pureGain("saucer", 1.0f)}).status[0] == EffectStatus::Drawn);
+    const gpu::Image8 control = render(h.renderer, one);
+    scene::Scene four = proceduralOrbs();
+    REQUIRE(evaluateProcedural(four, {pureGain("saucer", 4.0f)}).status[0] == EffectStatus::Drawn);
+    const gpu::Image8 glowing = render(h.renderer, four);
+    h.renderer.setAuxDebugView(rendering::AuxDebugView::None);
+    dump(control, "fxl-proc-emission-gain1");
+    dump(glowing, "fxl-proc-emission-gain4");
+    const double a = meanOver(control, control, true);
+    const double b = meanOver(glowing, control, true);
+    INFO("procedural emission red: gain 1 " << a << ", gain 4 " << b << ", ratio " << b / a);
+    CHECK(b / a > 3.6);
+    CHECK(b / a < 4.4);
+    CHECK(differingIn(control, glowing, 1) == 0); // orb B (an entity, no effect) untouched
+}
+
+TEST_CASE("FXL off is byte-identical for a procedural scene", "[gpu][effects][fxl][gate]") {
+    Harness h;
+    const gpu::Image8 base = render(h.renderer, proceduralOrbs());
+    SECTION("a disabled Glow on the procedural node writes nothing") {
+        scene::Scene s = proceduralOrbs();
+        world::EffectInstance g = pureGain("saucer", 4.0f);
+        g.enabled = false;
+        CHECK(evaluateProcedural(s, {g}).status[0] == EffectStatus::Disabled);
+        REQUIRE(s.entityFx.empty());
+        const auto d = testing::byteDiff(base.rgba, render(h.renderer, s).rgba);
+        INFO(d.describe());
+        REQUIRE(d.identical());
+    }
+    SECTION("a neutral Glow on it, with the gate open, is invisible") {
+        scene::Scene s = proceduralOrbs();
+        static_cast<void>(evaluateProcedural(s, {pureGain("saucer", 1.0f)}));
+        REQUIRE(s.entityFx.recordForProcedural(0) != 0);
+        const auto d = testing::byteDiff(base.rgba, render(h.renderer, s).rgba);
+        INFO(d.describe());
+        CHECK(d.identical());
+    }
+    SECTION("the control: a real Glow on it changes the frame") {
+        scene::Scene s = proceduralOrbs();
+        static_cast<void>(evaluateProcedural(s, {pureGain("saucer", 4.0f)}));
+        const gpu::Image8 lit = render(h.renderer, s);
+        dump(lit, "fxl-proc-glow4");
+        CHECK(differingIn(base, lit, -1) > kVisible);
     }
 }

@@ -131,6 +131,11 @@ struct NodeView {
     bool hasBounds = false;         // ...when it has any (a light or an empty node has none)
     std::uint32_t firstEntity = 0;  // range in scene.entities
     std::uint32_t entityCount = 0;
+    // ADR-703: a procedural node (one placed asset such as Glowmere's `visitor` saucer, or a scatter
+    // layer) draws through `scene.procedurals` rather than entities: its range there, the asset and
+    // its other material parts. Zero count for a node that has none.
+    std::uint32_t firstProcedural = 0;
+    std::uint32_t proceduralCount = 0;
 };
 
 class EffectSceneQuery {

@@ -44,6 +44,8 @@ public:
         std::uint32_t count = 1;
         glm::vec3 centre{0.0f};
         float half = 1.0f;
+        std::uint32_t firstProcedural = 0; // a procedural node: its range in scene.procedurals
+        std::uint32_t proceduralCount = 0;
     };
     std::map<std::string, Node, std::less<>> nodes;
 
@@ -65,9 +67,11 @@ public:
         out.world[3] = glm::vec4(it->second.centre, 1.0f);
         out.boundsMin = it->second.centre - glm::vec3(it->second.half);
         out.boundsMax = it->second.centre + glm::vec3(it->second.half);
-        out.hasBounds = it->second.count > 0;
+        out.hasBounds = it->second.count > 0 || it->second.proceduralCount > 0;
         out.firstEntity = it->second.first;
         out.entityCount = it->second.count;
+        out.firstProcedural = it->second.firstProcedural;
+        out.proceduralCount = it->second.proceduralCount;
         return true;
     }
 };
@@ -429,4 +433,31 @@ TEST_CASE("The pulse waveforms are 0 at both ends of a cycle and reach 1", "[eff
         }
         CHECK(peak > 0.93f);
     }
+}
+
+TEST_CASE("FXL: a procedural owner (the Glowmere saucer's kind of node) is Drawn, and its parts share the record",
+          "[effects][fxl]") {
+    FakeScene scene = twoOwners();
+    // No scene entities at all: the node draws through scene.procedurals 2..4 (an asset and its two
+    // other material parts), which is what Glowmere's `visitor` is.
+    scene.nodes["visitor"] = {0, 0, glm::vec3(0.0f, 20.0f, 0.0f), 4.0f, 2, 3};
+    std::vector<world::EffectInstance> effects{make(EffectKind::Glow, "visitor", "g"),
+                                               make(EffectKind::Pulse, "visitor", "p")};
+    effects[0].values.setFloat("glow/gain", 3.0f);
+    const Built b = build(effects, scene);
+    CHECK(b.status[0] == EffectStatus::Drawn);
+    CHECK(b.status[1] == EffectStatus::Drawn);
+    CHECK(b.reasons[0].empty());
+    const std::uint32_t r = b.frame.recordForProcedural(2);
+    REQUIRE(r != 0);
+    CHECK(b.frame.recordForProcedural(3) == r);
+    CHECK(b.frame.recordForProcedural(4) == r);
+    CHECK(b.frame.recordForProcedural(1) == 0); // not this node's
+    CHECK(b.frame.recordForProcedural(5) == 0);
+    CHECK(b.frame.recordFor(0) == 0);           // and no scene entity picked it up
+    CHECK(b.frame.records[r].lanes[world::kFxLaneA].z != 0.0f);
+    // A node with neither entities nor procedurals is still the named drop.
+    scene.nodes["empty"] = {0, 0, glm::vec3(0.0f), 1.0f, 0, 0};
+    const Built e = build({make(EffectKind::Glow, "empty", "x")}, scene);
+    CHECK(e.status[0] == EffectStatus::Dropped);
 }

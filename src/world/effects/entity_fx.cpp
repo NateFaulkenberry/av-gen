@@ -67,7 +67,9 @@ Liveness liveContribution(const EffectInstance& e, const EffectContext& ctx, Nod
         // No such node, or nothing flattened yet. The engine reports the first as Orphaned.
         return Liveness::Dormant;
     }
-    if (view.entityCount == 0) {
+    // Neither scene entities nor procedural objects: nothing is drawn for a lane to change. (A
+    // procedural node -- Glowmere's `visitor` saucer -- has procedurals and no entities.)
+    if (view.entityCount == 0 && view.proceduralCount == 0) {
         return Liveness::EmptyOwner;
     }
     c = EntityLaneContribution{};
@@ -206,6 +208,7 @@ EntityFxRecord packEntityFx(const EntityLaneContribution& c, std::uint32_t index
 void EntityFxFrame::clear() {
     records.clear();
     entityRecord.clear();
+    proceduralRecord.clear();
     lights.count = 0;
     lights.dropped = 0;
     dropped = 0;
@@ -310,48 +313,59 @@ void buildEntityFxFrame(std::span<const EffectInstance> effects, const EffectCon
     }
     out.records.push_back(zero);
     s.recordContribution.push_back(EntityLaneContribution{});
-    std::uint32_t highest = 0;
+    std::uint32_t highestEntity = 0;
+    std::uint32_t highestProcedural = 0;
     for (const Group& group : s.groups) {
-        highest = std::max(highest, group.view.firstEntity + group.view.entityCount);
+        highestEntity = std::max(highestEntity, group.view.firstEntity + group.view.entityCount);
+        highestProcedural = std::max(highestProcedural, group.view.firstProcedural + group.view.proceduralCount);
     }
-    out.entityRecord.assign(highest, 0u);
+    out.entityRecord.assign(highestEntity, 0u);
+    out.proceduralRecord.assign(highestProcedural, 0u);
+    // Points one draw (an entity or a procedural object) at group `g`'s record. Two owners covering
+    // one draw (a node nested in another that also carries lanes) give it both, folded by the same
+    // rules, through one combined record per distinct pair; the band stays with whichever owner
+    // claimed it first. Entities and procedurals are two address spaces for the SAME records.
+    const auto point = [&](std::uint32_t& slot, std::uint32_t g) {
+        const Group& group = s.groups[g];
+        const std::uint32_t existing = slot;
+        if (existing == 0) {
+            slot = group.record;
+            return;
+        }
+        const std::uint64_t key = (static_cast<std::uint64_t>(existing) << 32) | g;
+        std::uint32_t combined = 0;
+        for (const auto& [k, r] : s.combos) {
+            if (k == key) {
+                combined = r;
+                break;
+            }
+        }
+        if (combined == 0 && out.records.size() < kMaxEntityFxRecords) {
+            EntityLaneContribution both = s.recordContribution[existing];
+            foldEntityLanes(both, group.c);
+            if (!both.hasBand && group.c.hasBand) {
+                both.hasBand = true;
+                both.band = group.c.band;
+            }
+            combined = addRecord(out, s, both);
+            s.combos.emplace_back(key, combined);
+        }
+        if (combined != 0) {
+            slot = combined;
+        }
+    };
     for (std::uint32_t g = 0; g < s.groups.size(); ++g) {
-        Group& group = s.groups[g];
         if (out.records.size() >= kMaxEntityFxRecords) {
-            group.record = 0;
+            s.groups[g].record = 0;
             continue;
         }
-        group.record = addRecord(out, s, group.c);
-        for (std::uint32_t e = group.view.firstEntity; e < group.view.firstEntity + group.view.entityCount; ++e) {
-            const std::uint32_t existing = out.entityRecord[e];
-            if (existing == 0) {
-                out.entityRecord[e] = group.record;
-                continue;
-            }
-            // Two owners covering one entity (a node nested in another that also carries lanes):
-            // the entity takes both, folded by the same rules, through one combined record per
-            // distinct pair. The band stays with whichever owner claimed it first.
-            const std::uint64_t key = (static_cast<std::uint64_t>(existing) << 32) | g;
-            std::uint32_t combined = 0;
-            for (const auto& [k, r] : s.combos) {
-                if (k == key) {
-                    combined = r;
-                    break;
-                }
-            }
-            if (combined == 0 && out.records.size() < kMaxEntityFxRecords) {
-                EntityLaneContribution both = s.recordContribution[existing];
-                foldEntityLanes(both, group.c);
-                if (!both.hasBand && group.c.hasBand) {
-                    both.hasBand = true;
-                    both.band = group.c.band;
-                }
-                combined = addRecord(out, s, both);
-                s.combos.emplace_back(key, combined);
-            }
-            if (combined != 0) {
-                out.entityRecord[e] = combined;
-            }
+        s.groups[g].record = addRecord(out, s, s.groups[g].c);
+        const NodeView& v = s.groups[g].view;
+        for (std::uint32_t e = v.firstEntity; e < v.firstEntity + v.entityCount; ++e) {
+            point(out.entityRecord[e], g);
+        }
+        for (std::uint32_t p = v.firstProcedural; p < v.firstProcedural + v.proceduralCount; ++p) {
+            point(out.proceduralRecord[p], g);
         }
     }
 

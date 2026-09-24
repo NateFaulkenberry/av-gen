@@ -164,6 +164,10 @@ struct EntityFxFrame {
     std::vector<EntityFxRecord> records;
     // Scene entity index -> record index (0 = no effect). Sized to the highest affected entity + 1.
     std::vector<std::uint32_t> entityRecord;
+    // `scene.procedurals` index -> record (0 = no effect): a procedural owner (Glowmere's `visitor`
+    // saucer, a hero cap) draws through the procedural renderer, and every instance of each of its
+    // material parts takes the owner's record. The same records, a second address space.
+    std::vector<std::uint32_t> proceduralRecord;
     // LIGHTMOD's pool this frame (Glow spills). Nested here rather than a second scene field; when
     // a Light- or World-owned client lands it becomes the Lighting stage's own block.
     EffectLightFrame lights;
@@ -172,6 +176,9 @@ struct EntityFxFrame {
     [[nodiscard]] bool empty() const { return records.size() <= 1; }
     [[nodiscard]] std::uint32_t recordFor(std::size_t entity) const {
         return entity < entityRecord.size() ? entityRecord[entity] : 0u;
+    }
+    [[nodiscard]] std::uint32_t recordForProcedural(std::size_t procedural) const {
+        return procedural < proceduralRecord.size() ? proceduralRecord[procedural] : 0u;
     }
     // Empties the frame but keeps every vector's storage, so a steady frame allocates nothing.
     void clear();

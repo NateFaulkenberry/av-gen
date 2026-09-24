@@ -33,10 +33,10 @@
 //
 // Glow, Pulse and Bloom Source reach a surface through these (world/effects/entity_fx.hpp). They are
 // a module-scope PRIVATE variable rather than a read of the `entityFx` buffer because only pbr.wgsl
-// (the entity and skinned pipelines) binds that buffer: procedural.wgsl and sdf_raymarch.wgsl include
-// this file with group-1 layouts of their own, and a function here that named the binding would put
-// it in their pipelines too. pbr.wgsl's `fs_main` fills this before calling `shadeSurface`; every
-// other includer leaves it zero, which is the gate's "off" -- so no includer needs a line for it.
+// and procedural.wgsl bind that buffer, each at its own group-1 binding (sdf_raymarch.wgsl binds
+// none), and a function here that named a binding would put it in every includer's pipeline. Each
+// binding includer fills this through `setEntityFxLanes` before calling `shadeSurface`; an includer
+// that does not leaves it zero, which is the gate's "off".
 struct EntityFxLanes {
     a: vec4<f32>,        // object.fxA: x = gain, y = bloom share, z = flags, w = record index
     b: vec4<f32>,        // object.fxB: rgb = tint on the material's own emission
@@ -46,6 +46,18 @@ struct EntityFxLanes {
     band: vec4<f32>,     // record lane 5: x = centre, y = half width, z = waveform, w = depth
 };
 var<private> entityFxLanes: EntityFxLanes;
+
+// Fills the lanes from a draw's inline pair and its record. Called by each includer that binds the
+// record buffer (pbr.wgsl for entities and skinned characters, procedural.wgsl for procedural
+// objects) behind its own `fxA.z != 0` gate, so there is one reading of the record, not one per path.
+fn setEntityFxLanes(a: vec4<f32>, b: vec4<f32>, record: EntityFx) {
+    entityFxLanes.a = a;
+    entityFxLanes.b = b;
+    entityFxLanes.add = record.lanes[2];
+    entityFxLanes.rim = record.lanes[3];
+    entityFxLanes.bandAxis = record.lanes[4];
+    entityFxLanes.band = record.lanes[5];
+}
 
 // One cycle of a pulse waveform, x in [0, 1): 0 at both ends, 1 at the crest. The GPU twin of
 // `world::pulseWave` (entity_fx.cpp); the numbering is `world::FxWaveform`'s and is append-only.
