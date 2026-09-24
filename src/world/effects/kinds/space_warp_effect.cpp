@@ -161,8 +161,12 @@ struct Look {
 // The catalog's four presets. Each is a complete look: applying one never depends on what the
 // instance held before.
 constexpr Look kLooks[] = {
-    // A craft's field: the bow wave carries it, speed-driven by the default route.
-    {"UFO Warp", 0.55f, 0.3f, 0.8f, 0.0f, 0.2f, 2.0f, 0.5f, 0.2f, {0.55f, 0.85f, 1.0f}, 0.35f, 0.08f, 2.0f, 1.2f},
+    // A craft's field: the bow wave carries it, speed-driven by the default route. No edge glow and a
+    // modest stretch, both from looking at it on the Glowmere saucer (ADR-703): the rim of a proxy
+    // stretched 2.2x along a flight path towards the camera drew a pale arc across half the frame,
+    // tens of metres from the craft -- geometrically the field's edge, visually a stray streak. The
+    // craft's light is Glow's job in a stack; a rim belongs to the Portal and Magical looks.
+    {"UFO Warp", 0.55f, 0.3f, 0.8f, 0.0f, 0.2f, 2.0f, 0.5f, 0.08f, {0.55f, 0.85f, 1.0f}, 0.0f, 0.08f, 2.0f, 0.6f},
     // Pure lensing: no motion terms, no rim, a broad falloff.
     {"Gravitational Warp", 0.9f, 1.0f, 0.0f, 0.0f, 0.05f, 1.5f, 0.2f, 0.1f, {1.0f, 1.0f, 1.0f}, 0.0f, 0.08f, 1.2f, 0.0f},
     // A spell: swirl and a faster flow, with a violet rim.
@@ -203,8 +207,14 @@ constexpr EffectStyle kStyles[] = {
 // calm and a dashing one warps. `owner.` is resolved against the instance's owner when routes are
 // installed (parameters-and-modulation.md §2.3). The beat route is a gentle breath on the downbeat,
 // so a World-owned warp -- which has no `owner.speed` -- is not silent either.
+//
+// The speed depth is PER METRE PER SECOND, because `entity.<name>.speed` is published raw. 0.8 (the
+// first value) added 24 to the strength of a craft flying at 30 m/s -- six times the row's hard
+// maximum -- so every dash pinned the warp at 4 and smeared rainbow fringes across a third of the
+// frame. Found by looking at the stacked demo, which is the first render in which an owner both had
+// a velocity and carried a warp. 0.03 makes a 30 m/s dash add about one preset's worth.
 constexpr EffectRoute kRoutes[] = {
-    {"owner.speed", "strength", 0.8f, 80.0f, 600.0f},
+    {"owner.speed", "strength", 0.03f, 80.0f, 600.0f},
     {"beat.pulse", "strength", 0.15f, 10.0f, 260.0f},
 };
 

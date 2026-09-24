@@ -216,6 +216,8 @@ TEST_CASE("Space Warp honours activation and timing", "[effects][distortion][tim
     }
     SECTION("the envelope scales the displacement and the rim, not the size") {
         e.timing.fadeIn = 2.0;
+        // A rim of its own: the UFO Warp preset has none (ADR-703), and this asks about the envelope.
+        setStored(e, "rimIntensity", 2.0f);
         const Built half = build({e}, contextAt(1.0, nullptr));
         const Built full = build({e}, contextAt(3.0, nullptr));
         REQUIRE(half.frame.count == 1);
