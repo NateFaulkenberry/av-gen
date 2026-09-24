@@ -605,6 +605,15 @@ struct Environment {
     // the air is does not read as one place.
     float fogUpperDensity = 0.0f;          // fraction of the layer's density left at any height
     float fogHeightCurve = 0.0f;           // 0 = exponential tail, 1 = a layer with a definite top
+    // ADR-715 (ADR-575 §18, "fog sits in valleys"): how far the layer's reference follows the
+    // terrain. The layer's top is `fogHeight + fogGroundFollow * ground(x, z)`, so 0 is the flat
+    // plane this always was -- bit for bit, `test_terrain_fog_gpu.cpp` asserts it -- and 1 measures
+    // `fogHeight` from the terrain surface under each sample -- a blanket of constant thickness,
+    // which is LESS valley-and-ridge contrast than the flat plane, not more (ADR-715's finding).
+    // Between, the layer's surface is a flattened copy of the ground. Every
+    // reader of the layer applies it (the march, the surface integral, the particle estimate), and
+    // a scene with no terrain is unchanged at any value.
+    float fogGroundFollow = 0.0f;
     // ADR-570 (the fog brief's §20 and §22): the self-shadow march. At each march sample a short
     // secondary ray goes toward each light that lights the air, through the PLACED MEDIA's own
     // density, and that light's in-scatter is attenuated by the transmittance. It is what makes a

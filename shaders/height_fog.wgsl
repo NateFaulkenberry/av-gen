@@ -77,3 +77,101 @@ fn fogHeightIntegral(y: f32, b: f32, upper: f32, curve: f32) -> f32 {
     let quadPart = (2.0 / (3.0 * b)) * (1.0 - g * g * g);
     return upper * y + (1.0 - upper) * mix(expPart, quadPart, curve);
 }
+
+// ---- ADR-715: the layer follows the ground (ADR-575 §18, "fog sits in valleys") ---------------
+//
+// `fogGroundFollow` moves the layer's REFERENCE, not its shape: the top of the layer is
+// `top + follow * ground(x, z)`, where `ground` is the terrain's baked height. 0 is the flat plane
+// (and every reader keeps its old expression on that branch, so 0 is bit-identical rather than
+// equal to within rounding); 1 measures `fogHeight` from the ground under the sample.
+//
+// Still no bindings: the height texture and its two lanes of placement come in as ARGUMENTS, so a
+// test can compile this file with a texture of its own and ask the same functions the frame runs.
+
+// The terrain's height at world XZ, in world metres. The CPU twin is `world::TerrainGround::groundAt`.
+//
+//   map0  (world origin x, world origin z, 1 / spacing x, 1 / spacing z) of the vertex-aligned grid
+//   map1  (height scale, height offset, fade metres, 1 when there is a terrain else 0)
+//
+// A manual bilinear of four texel loads: R32F is not filterable without an optional device
+// feature, and four loads are the same arithmetic on every GPU. Outside the footprint the EDGE's
+// height fades to 0 across `fade` metres, so the layer eases back to the flat plane instead of
+// stepping at the world's edge -- and past that it IS the flat plane.
+fn terrainGroundAt(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, xz: vec2<f32>) -> f32 {
+    if (map1.w < 0.5) {
+        return 0.0;
+    }
+    let dims = textureDimensions(tex);
+    let last = vec2<f32>(f32(dims.x - 1u), f32(dims.y - 1u));
+    let g = (xz - map0.xy) * map0.zw;
+    let c = clamp(g, vec2<f32>(0.0), last);
+    let i0 = min(floor(c), last - vec2<f32>(1.0));
+    let f = c - i0;
+    let ij = vec2<i32>(i0);
+    let h00 = textureLoad(tex, ij, 0).r;
+    let h10 = textureLoad(tex, ij + vec2<i32>(1, 0), 0).r;
+    let h01 = textureLoad(tex, ij + vec2<i32>(0, 1), 0).r;
+    let h11 = textureLoad(tex, ij + vec2<i32>(1, 1), 0).r;
+    let h = mix(mix(h00, h10, f.x), mix(h01, h11, f.x), f.y);
+    let outside = length((g - c) / map0.zw);
+    let keep = 1.0 - clamp(outside / map1.z, 0.0, 1.0);
+    return (h * map1.x + map1.y) * keep;
+}
+
+// A point's altitude relative to the layer's top once the top follows the ground. Only ever called
+// with `follow > 0`; the flat branch stays each reader's own `y - top`.
+fn fogLayerAltitude(y: f32, top: f32, follow: f32, ground: f32) -> f32 {
+    return y - (top + follow * ground);
+}
+
+// THE MARCH's height term with the layer on the ground (and the particle estimate's): the profile
+// at this sample's altitude above the followed top. Exactly per sample -- the march already pays
+// for a density evaluation here, and four texel loads are small beside its noise.
+fn fogGroundProfileAt(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, p: vec3<f32>, top: f32,
+                      follow: f32, b: f32, upper: f32, curve: f32) -> f32 {
+    let ground = terrainGroundAt(tex, map0, map1, p.xz);
+    return fogHeightProfile(fogLayerAltitude(p.y, top, follow, ground), b, upper, curve);
+}
+
+// How many pieces the surface pass cuts a ray into (ADR-715). See `fogGroundMean`. Measured on a
+// V-shaped valley with rays swept across its fold (`test_height_fog_gpu.cpp`), the worst gap
+// between the surface pass and the march is 9.1% of the air at 4 pieces, 2.6% at 8 and 0.5% at
+// 16. 8 costs 9 ground reads of 4 texel loads each, and only on the follow branch.
+const kFogGroundSegments: i32 = 8;
+
+// THE SURFACE PASS's mean density along the segment `a -> e` with the layer on the ground: the
+// quantity `applyFog` multiplies the ray's length by. The march's integrand is
+// `profile(y - top - follow * ground(x, z))`, and along a straight ray `y` is linear but
+// `ground` is not -- so no closed form exists for an arbitrary terrain, and ADR-567's rule is
+// that the surface pass integrates rather than samples.
+//
+// The resolution: treat the GROUND as piecewise linear along the ray, between samples at
+// `kFogGroundSegments + 1` evenly spaced points. On each piece the altitude above the followed top
+// is then linear in the distance travelled, which is exactly the case ADR-058's difference
+// quotient integrates in closed form -- the same `fogHeightIntegral`, applied piece by piece.
+// Where the terrain IS linear along the ray (a plane, a slope, any affine ground) this equals the
+// march's integral exactly; where it is not, the error is the gap between the terrain and its
+// chord over an eighth of the ray, which `test_height_fog_gpu.cpp` measures on a valley.
+//
+// Each piece keeps the flat pass's two guards: wholly inside the layer is exactly 1, and a piece
+// that does not climb takes the profile at its start.
+fn fogGroundMean(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, a: vec3<f32>, e: vec3<f32>,
+                 top: f32, follow: f32, b: f32, upper: f32, curve: f32) -> f32 {
+    var sum = 0.0;
+    var d0 = fogLayerAltitude(a.y, top, follow, terrainGroundAt(tex, map0, map1, a.xz));
+    for (var k = 1; k <= kFogGroundSegments; k = k + 1) {
+        let p1 = mix(a, e, f32(k) / f32(kFogGroundSegments));
+        let d1 = fogLayerAltitude(p1.y, top, follow, terrainGroundAt(tex, map0, map1, p1.xz));
+        var mean = 1.0;
+        if (max(d0, d1) > 0.0) {
+            mean = fogHeightProfile(d0, b, upper, curve);
+            let rise = d1 - d0;
+            if (abs(rise) > 1e-3) {
+                mean = (fogHeightIntegral(d1, b, upper, curve) - fogHeightIntegral(d0, b, upper, curve)) / rise;
+            }
+        }
+        sum = sum + mean;
+        d0 = d1;
+    }
+    return sum / f32(kFogGroundSegments);
+}

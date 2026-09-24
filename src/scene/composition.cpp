@@ -59,7 +59,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve",
+    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -4000,6 +4000,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                              0.0f, 1.0f, 0.0f, 1.0f));
     fogHeightCurve_ = &params.add(floatDesc(prefix_ + "scene/fogHeightCurve", volumeSetting_.fogHeightCurve,
                                             0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-715 (ADR-575 §18): the layer follows the terrain. Hard-clamped to 0..1 for the reason
+    // `upper` and `curve` are: 0 is the flat plane and 1 is "measured from the ground under the
+    // sample", and outside that the layer would be steeper than the terrain or tilted against it.
+    fogGroundFollow_ = &params.add(floatDesc(prefix_ + "scene/fogGroundFollow", volumeSetting_.fogGroundFollow,
+                                             0.0f, 1.0f, 0.0f, 1.0f));
     volumeScattering_ = &params.add(floatDesc(prefix_ + "scene/volumeScattering", volumeSetting_.volumeScattering,
                                               0.0f, 20.0f, 0.0f, 4.0f));
     volumeAbsorption_ = &params.add(floatDesc(prefix_ + "scene/volumeAbsorption", volumeSetting_.volumeAbsorption,
@@ -4959,6 +4964,7 @@ void Composition::detach() {
     fogHeightFalloff_ = nullptr;
     fogUpperDensity_ = nullptr;
     fogHeightCurve_ = nullptr;
+    fogGroundFollow_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -5316,6 +5322,7 @@ void Composition::rebuild() {
     }
     scene_.materialPrograms.clear();
     scene_.waters.clear();
+    scene_.terrainGround = world::TerrainGround{};
     ownMaterialCount_ = materialPrograms_.size();
     for (const MaterialProgram& src : materialPrograms_) {
         MaterialProgram mp = src;
@@ -6002,6 +6009,17 @@ void Composition::rebuild() {
                         return scene_.addMesh(std::move(mesh));
                     }, &mutableNode.waterBodies);
                 fresh.chunks = mutableNode.chunks;
+                // ADR-715: the height bake, on the same miss as the meshes and keyed the same way.
+                {
+                    const auto bakeStart = std::chrono::steady_clock::now();
+                    fresh.height = std::make_shared<const world::TerrainHeightField>(
+                        world::bakeTerrainHeight(node.worldMap, terrainKey));
+                    const double bakeMs = std::chrono::duration<double, std::milli>(
+                                              std::chrono::steady_clock::now() - bakeStart)
+                                              .count();
+                    log::info("terrain '{}': height baked, {} x {} samples at {:.2f} m in {:.1f} ms", node.name,
+                              fresh.height->width, fresh.height->depth, fresh.height->spacing, bakeMs);
+                }
                 for (world::TerrainChunk& chunk : fresh.chunks) {
                     // `TerrainChunk::meshes` is value-initialised, so the slots above `lodLevels`
                     // hold 0 rather than kInvalidMesh. Subtracting the base from those wraps, and at
@@ -6020,6 +6038,26 @@ void Composition::rebuild() {
             }
             if (!reusedProducts) {
                 mutableNode.terrainProducts = std::move(fresh);
+            }
+            // ADR-715: the first terrain in the scene is the ground a ground-following fog reads.
+            // One height texture per frame is the binding's budget; a second terrain is said out
+            // loud rather than silently ignored.
+            if (!scene_.terrainGround.valid()) {
+                const glm::quat q = nodeT.rotation;
+                const bool rotated = std::abs(std::abs(q.w) - 1.0f) > 1e-6f;
+                scene_.terrainGround = world::placeTerrainGround(mutableNode.terrainProducts.height, nodeT.position,
+                                                                 nodeT.scale, rotated);
+                if (rotated && !mutableNode.terrainHeightWarned) {
+                    log::warn("terrain '{}': rotated, so its height is not baked for ground-following fog; "
+                              "fogGroundFollow reads a flat plane here (ADR-715)",
+                              node.name);
+                    mutableNode.terrainHeightWarned = true;
+                }
+            } else if (!mutableNode.terrainHeightWarned) {
+                log::warn("terrain '{}': a second terrain in one scene; ground-following fog follows the first "
+                          "only (ADR-715)",
+                          node.name);
+                mutableNode.terrainHeightWarned = true;
             }
             for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
                 const world::TerrainChunk& chunk = mutableNode.chunks[c];
@@ -7594,6 +7632,7 @@ void Composition::applyParameters() {
         env.fogHeightFalloff = pick(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
         env.fogUpperDensity = pick(fogUpperDensity_, volumeSetting_.fogUpperDensity);
         env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
+        env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
         env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
         env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
         env.volumeAnisotropy = pick(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -8650,6 +8689,13 @@ nlohmann::json Composition::toJson() const {
                 environment["volumeColorField"] = volumeColorFieldSetting_;
             }
         }
+        // ADR-715. Outside the gate above because the surface fog reads the layer too
+        // (`fogHeightAmount`), with or without the march; written only when it is not 0, so every
+        // scene saved before the key existed round-trips to the same bytes.
+        const float follow = fogGroundFollow_ != nullptr ? fogGroundFollow_->base() : volumeSetting_.fogGroundFollow;
+        if (follow != 0.0f) {
+            environment["fogGroundFollow"] = follow;
+        }
     }
     j["environment"] = std::move(environment);
     // ADR-278: the lights the scene authored, written back so a save cannot silently delete them --
@@ -9622,6 +9668,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"fogHeightFalloff", &v.fogHeightFalloff},
                                       FloatKey{"fogUpperDensity", &v.fogUpperDensity},
                                       FloatKey{"fogHeightCurve", &v.fogHeightCurve},
+                                      FloatKey{"fogGroundFollow", &v.fogGroundFollow},
                                       FloatKey{"volumeShadowStrength", &v.volumeShadowStrength},
                                       FloatKey{"volumeScattering", &v.volumeScattering},
                                       FloatKey{"volumeAbsorption", &v.volumeAbsorption},

@@ -139,7 +139,12 @@ struct FrameUniforms {
     // FrameUniforms; the sum in scene_renderer.hpp's static_assert catches these drifting apart.
     vortexGlow: vec4<f32>,          // xyz = mouth centre, w = mouth radius
     vortexGlowColor: vec4<f32>,     // rgb = radiance, w = intensity (0 = no vortex)
-    fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow (0 without a terrain), w = 0
+    // ADR-715: where `terrainHeightTex` sits in the world -- `world::TerrainGround::map0/map1`.
+    // Appended last, mirroring FrameUniforms; the sum in scene_renderer.hpp's static_assert
+    // catches the two drifting apart.
+    terrainMap0: vec4<f32>,         // world origin xz, 1 / spacing xz
+    terrainMap1: vec4<f32>,         // height scale, height offset, fade metres, 1 when there is a terrain
 };
 
 struct ObjectUniforms {
@@ -243,6 +248,11 @@ fn materialTierLocalLights(tier: u32) -> u32 {
 
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;
+// ADR-715: the terrain's baked height (R32F, vertex-aligned grid, read by texel fetch through
+// `terrainGroundAt` in height_fog.wgsl). A 1x1 placeholder in a scene with no terrain, where
+// `frame.terrainMap1.w` is 0 and nothing reads it. Read by the two frame-bound readers of the
+// height layer: the surface fog below and the volumetric march.
+@group(0) @binding(12) var terrainHeightTex: texture_2d<f32>;
 
 // ADR-055's wind field, and ADR-360's reason for hoisting it here from procedural.wgsl: the mesh
 // vertex stage below now deforms too, and wind.wgsl needs `frame`, so it has to come after the
@@ -516,7 +526,15 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         var mean = 1.0;
         let upper = frame.fogShape.x;
         let curve = frame.fogShape.y;
-        if (max(y0, y1) > 0.0) {
+        let follow = frame.fogShape.z;
+        if (follow > 0.0 && frame.terrainMap1.w > 0.5) {
+            // ADR-715: the layer's top follows the ground, and the ray is integrated piecewise
+            // against it -- `fogGroundMean` says how, and why it agrees with the march. Only with a
+            // terrain bound: without one the flat branch below is the frame there always was, to
+            // the bit, which eight pieces of a flat layer summed would not be.
+            mean = fogGroundMean(terrainHeightTex, frame.terrainMap0, frame.terrainMap1, frame.cameraPos.xyz,
+                                 worldPos, frame.fogHeight.x, follow, falloff, upper, curve);
+        } else if (max(y0, y1) > 0.0) {
             // Both endpoints below the layer's top puts the whole segment below it, so the mean is
             // exactly one and this branch is skipped -- which is what keeps a scene that sits
             // inside its own fog bank bit-identical when the integration is switched on. Leaving

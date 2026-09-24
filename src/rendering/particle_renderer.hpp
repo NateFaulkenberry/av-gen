@@ -59,7 +59,12 @@ struct ParticleUniforms {
     // ADR-568 (§7): the height layer's shape. Here because this pass estimates its own
     // transmittance through the SAME layer the march integrates (ADR-567), and a reader
     // left on the old model is a third atmosphere in the same frame.
-    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, 0, 0
+    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, fogGroundFollow (ADR-715; 0 without a terrain), 0
+    // ADR-715: where the terrain height texture (render group binding 12) sits in the world, the
+    // same two lanes `FrameUniforms::terrainMap0/1` carry -- so this estimate follows the ground the
+    // march and the surface fog follow, rather than being the third atmosphere ADR-567 warns of.
+    glm::vec4 terrain0;
+    glm::vec4 terrain1;
     glm::vec4 leaf;       // ADR-370: shape (0 round, 1 leaf), tumble rate, aspect, two-sided depth
     // ADR-370: ADR-055's packed wind field, so `cs_simulate` can sample the same air the tree bends
     // in without the particle pipelines growing a frame bind group they have never had.
@@ -90,7 +95,7 @@ struct ParticleUniforms {
     glm::vec4 anchorInfo;
     glm::vec4 anchors[scene::kMaxScatterAnchors];
 };
-static_assert(sizeof(ParticleUniforms) == 128 + 16 * 39 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys +
+static_assert(sizeof(ParticleUniforms) == 128 + 16 * 41 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys +
                                               16 * scene::kMaxScatterAnchors);
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
@@ -119,6 +124,12 @@ struct ParticleFrameContext {
     float fogHeightFalloff = 0.0f;
     float fogUpperDensity = 0.0f;   // ADR-568
     float fogHeightCurve = 0.0f;    // ADR-568
+    // ADR-715: the ground follow, already 0 when there is no terrain, and the terrain's baked
+    // height with its placement. A null view binds a placeholder that is never read.
+    float fogGroundFollow = 0.0f;
+    glm::vec4 terrainMap0{0.0f};
+    glm::vec4 terrainMap1{0.0f};
+    wgpu::TextureView terrainHeight;
     float fogAbsorption = 1.0f;
     float fogMaxDistance = 200.0f;
     // The ADR-035 R32F linear-depth target, resolved by the depth prepass. Null disables the fog
@@ -229,6 +240,7 @@ private:
         wgpu::BindGroup computeGroup;
         wgpu::BindGroup renderGroup;
         wgpu::TextureView renderDepthView; // the linear-depth view renderGroup was built against
+        wgpu::TextureView renderTerrainView; // ADR-715: and the terrain height view
         bool needsReset = true;
         // A disabled pool is SKIPPED, not stepped, so its particles do not age while it is
         // off -- they are frozen, not drained. Re-enabling the system somewhere else thaws

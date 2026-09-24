@@ -49,7 +49,7 @@ struct VolumeUniforms {
     depthParams: vec4<f32>, // camera near, camera far, march start jitter (ADR-461), 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
     glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), y = local-light strength
-    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow, w = 0
     selfShadow: vec4<f32>, // ADR-570: x = shadow march steps (0 = off), y = strength, zw = 0
     // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
     //
@@ -494,8 +494,15 @@ fn volumeDensityAt(p: vec3<f32>) -> f32 {
     // this file's include of common.wgsl). It used to be this expression written out here and the
     // antiderivative written out in common.wgsl -- two statements of one model, in two files, with
     // nothing asserting they were a function and its integral.
-    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z,
+    var heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z,
                                       vol.heightFog.x, vol.heightFog.y);
+    // ADR-715: the layer's top follows the ground. The texture and its placement are the frame's
+    // (group 0, common.wgsl) -- the same two the surface fog reads, so the two readers cannot be
+    // handed different terrains. At follow 0 the line above is the whole of it, bit for bit.
+    if (vol.heightFog.z > 0.0 && frame.terrainMap1.w > 0.5) {
+        heightTerm = fogGroundProfileAt(terrainHeightTex, frame.terrainMap0, frame.terrainMap1, p, vol.params0.y,
+                                        vol.heightFog.z, vol.params0.z, vol.heightFog.x, vol.heightFog.y);
+    }
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);
     if (densitySlot >= 0) {

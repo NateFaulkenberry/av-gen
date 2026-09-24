@@ -19,6 +19,7 @@
 #include "world/atmospherics.hpp"
 #include "world/effects/distortion_frame.hpp"
 #include "world/effects/entity_fx.hpp"
+#include "world/terrain_height.hpp"
 #include "world/wave_effect.hpp"
 #include "world/effects/ribbon_frame.hpp"
 #include "scene/scene_types.hpp"
@@ -89,6 +90,12 @@ struct Scene {
     // MeshStyle::Water finds its settings by the material-program name it carries, which is how a
     // water surface reaches rendering::WaterRenderer without an index on every Entity in a world.
     std::vector<WaterSurface> waters;
+    // ADR-715: the terrain's height, baked once when the terrain was built and placed under its
+    // node's transform. What a ground-following fog layer (`Environment::fogGroundFollow`) measures
+    // its altitude from, on the GPU, without asking the CPU per frame. Invalid in a scene with no
+    // terrain, and then the layer is the flat plane it always was. The field is shared, so copying
+    // a Scene copies a pointer, and the renderer re-uploads only when the field's hash moves.
+    world::TerrainGround terrainGround;
     // ADR-086: the skinned characters. An Entity names one through Entity::rig; scene::updateRigs
     // advances them from the controller's update, never from the renderer.
     std::vector<SkinnedRig> rigs;
