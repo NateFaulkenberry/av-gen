@@ -182,7 +182,7 @@ Slice 3.
    whether it targets the multicam film, the only scene whose aliens are wired.
 
 ## Test status
-- Baseline build of this worktree in progress; no suite run yet on `agent/motion`.
+- Release build of this worktree at 232a50d7 succeeds (both test binaries link). No suite has been run on `agent/motion` yet: nothing but this record has changed from main.
 
 ## Log
 - 2026-09-24: worktree created from main 232a50d7; recount of B §39/§66, C, D, the review build, E
