@@ -33,6 +33,7 @@
 #include "world/atmospherics.hpp"
 #include "world/effects/effect_registry.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -230,6 +231,8 @@ struct TornadoCase {
     float touchdown;
     glm::vec2 lean;
     float wobble;
+    float cloudWidth = -1.0f;  // -1: the factory's
+    float cloudHeight = -1.0f; // -1: the factory's
 };
 
 constexpr TornadoCase kTornadoCases[] = {
@@ -238,6 +241,10 @@ constexpr TornadoCase kTornadoCases[] = {
     {"long soft tip, no debris", 0.0f, 0.10f, 0.35f, 1.0f, {0.0f, 0.0f}, 0.0f},
     {"hanging funnel over its debris", 1.2f, 0.25f, 0.1f, 0.55f, {0.0f, 0.0f}, 0.0f},
     {"leaning and wobbling", 0.8f, 0.10f, 0.04f, 1.0f, {120.0f, -60.0f}, 70.0f},
+    // ADR-710: the Tree of Life's proportions -- a wall cloud five top radii wide over the top fifth,
+    // no debris -- where the bound is a narrow column under a wide cap.
+    {"the hero's wall cloud", 0.0f, 0.09f, 0.04f, 1.0f, {0.0f, 0.0f}, 60.0f, 5.0f, 0.2f},
+    {"a deep wall cloud", 0.8f, 0.10f, 0.04f, 1.0f, {40.0f, 0.0f}, 20.0f, 4.0f, 0.6f},
 };
 
 } // namespace
@@ -257,6 +264,12 @@ TEST_CASE("the march's bound contains the tornado it clips, tip and debris under
         f.touchdown = c.touchdown;
         f.lean = c.lean;
         f.wobbleAmount = c.wobble;
+        if (c.cloudWidth > 0.0f) {
+            f.cloudWidth = c.cloudWidth;
+        }
+        if (c.cloudHeight > 0.0f) {
+            f.cloudHeight = c.cloudHeight;
+        }
         f.cloudAmount = 0.0f; // the shape; detail is a mean-1 multiply on it and cannot widen it
         const world::MediumSlot slot = slotOf(e);
         const world::MediumBound bound = world::mediumBound(slot);
@@ -284,7 +297,10 @@ TEST_CASE("the march's bound contains the tornado it clips, tip and debris under
                         continue;
                     }
                     const float r = std::hypot(p.x - f.base.x, p.z - f.base.z);
-                    const bool inside = r <= bound.radiusXZ && p.y >= bound.yBot && p.y <= bound.yTop;
+                    // ADR-710: the claim is the column OR the cap above it.
+                    const bool inColumn = r <= bound.radiusXZ && p.y >= bound.yBot && p.y <= bound.yTop;
+                    const bool inCap = r <= bound.capRadiusXZ && p.y >= bound.capYBot && p.y <= bound.yTop;
+                    const bool inside = inColumn || inCap;
                     if (inside) {
                         lowestInside = std::min(lowestInside, p.y);
                     } else if (d > worstOutside) {
@@ -305,4 +321,42 @@ TEST_CASE("the march's bound contains the tornado it clips, tip and debris under
         INFO("the field's lowest sample is " << lowestInside << ", the bound's floor " << bound.yBot);
         CHECK(lowestInside - bound.yBot < 3.0f * stepY + 0.02f * height);
     }
+}
+
+// ADR-710: the cap earns its place. The march spends its steps inside the bound, so the bound's size
+// is sampling density; on the hero's proportions the wall cloud must widen only the band it occupies.
+// (Containment -- that the cap still holds every cloud sample -- is the case above, with the hero's
+// proportions among its cases.)
+TEST_CASE("a tornado's wall cloud widens only the top of its bound", "[tornado][bound]") {
+    const world::EffectSchema* schema = world::effectSchema(world::EffectKind::Tornado);
+    REQUIRE(schema != nullptr);
+    world::EffectInstance e = schema->factory("storm");
+    tornado::TornadoField& f = e.tornado.field;
+    f.base = glm::vec3(0.0f);
+    f.height = 1400.0f;
+    f.radiusBottom = 70.0f;
+    f.radiusMid = 110.0f;
+    f.radiusTop = 150.0f;
+    f.cloudWidth = 5.0f;
+    f.cloudHeight = 0.2f;
+    f.cloudDensity = 1.1f;
+    f.skirtDensity = 0.0f;
+    f.wobbleAmount = 60.0f;
+    const world::MediumBound b = world::mediumBound(slotOf(e));
+    INFO("column r=" << b.radiusXZ << ", cap r=" << b.capRadiusXZ << " from y=" << b.capYBot);
+    // The cloud's 750 m is the cap's, not the column's.
+    CHECK(b.capRadiusXZ >= 750.0f);
+    CHECK(b.radiusXZ < 0.5f * b.capRadiusXZ);
+    // The cap starts where the field's cloud gate does: the top fifth.
+    CHECK(b.capYBot == Catch::Approx(1400.0f * 0.8f).margin(1.0));
+    // And with no debris, the debris flare does not widen the column either.
+    f.skirtDensity = 0.8f;
+    const world::MediumBound withDebris = world::mediumBound(slotOf(e));
+    CHECK(withDebris.radiusXZ > b.radiusXZ);
+
+    // A fog bank has no cap: its union is the one cylinder.
+    world::EffectInstance fog = world::effectSchema(world::EffectKind::VolumetricFog)->factory("bank");
+    const world::MediumBound fb = world::mediumBound(slotOf(fog));
+    CHECK(fb.capRadiusXZ == fb.radiusXZ);
+    CHECK(fb.capYBot == fb.yBot);
 }

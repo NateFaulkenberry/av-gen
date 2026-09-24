@@ -663,6 +663,12 @@ struct MediumBound {
     float radiusXZ = -1.0f; // about the slot's centre, in metres
     float yBot = 1.0f;
     float yTop = -1.0f;
+    // ADR-710: a wider CAP on top of the cylinder, for a medium that is broad only near its top (a
+    // tornado's wall cloud). The claim is the union: {r <= radiusXZ, yBot <= y <= yTop} and
+    // {r <= capRadiusXZ, capYBot <= y <= yTop}. A kind with no cap has `capRadiusXZ == radiusXZ` and
+    // `capYBot == yBot`, which makes the union the one cylinder it always was.
+    float capRadiusXZ = -1.0f;
+    float capYBot = 1.0f;
 };
 [[nodiscard]] MediumBound mediumBound(const MediumSlot& m);
 

@@ -103,6 +103,8 @@
   "shadowRange": 420.0,
   "volumeMaxDistance": 4000.0,
   "volumeSteps": 48,
+  "volumeShadowSteps": 4,
+  "volumeShadowStrength": 0.45,
   "sky": {
    "enabled": true,
    "background": false,
