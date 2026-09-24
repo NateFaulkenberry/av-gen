@@ -126,6 +126,33 @@ fn worldAt(ndc: vec2<f32>, z: f32) -> vec3<f32> {
     return p.xyz / p.w;
 }
 
+// ADR-707: the direction of the camera ray through `ndc`, built from the camera's own basis and
+// NOT from `worldAt(ndc, 1.0) - worldAt(ndc, 0.0)`.
+//
+// That subtraction is what this used to be, and it is wrong in a way that depends on WHERE the
+// camera stands. The composition derives the far plane as fifty times the orbit radius, so a
+// camera 4 km from its target has a 212 km far plane and a near/far ratio near 1:400,000. At
+// `z = 1` the inverse view-projection's `w` is about 5e-6 -- the difference of two numbers near 1
+// in f32 -- and its rounding error multiplies the camera's WORLD position into the far point. So
+// the error grows with the distance from the world origin: measured on the CPU in f32 against a
+// double reference, the worst direction error over the `_tc-4` frame is 1.3e-3 rad with the storm
+// at x = 7857 m and 3.0e-5 rad with the same storm at x = 0, which at 4.2 km is 5.6 m against
+// 0.13 m. On the GPU the error came back piecewise-constant across the screen, so whole 60-pixel
+// columns of pixels marched one ray, and a 110 m column 4 km away was hit in some and missed in
+// the rest: the "Tall Column is missing its middle" defect, which is not in the field at all.
+//
+// The basis is exact to f32: `cameraRight/Up/Forward` are orthonormal, and the projection's two
+// scale factors are the lengths of the view-projection's first two rows (the view's rows are
+// unit vectors). This ignores an off-centre projection term, which `Camera::projection` never
+// produces; if one is ever added, add it here.
+fn viewRayDirection(ndc: vec2<f32>) -> vec3<f32> {
+    let vp = frame.viewProj;
+    let sx = length(vec3<f32>(vp[0].x, vp[1].x, vp[2].x));
+    let sy = length(vec3<f32>(vp[0].y, vp[1].y, vp[2].y));
+    return normalize(frame.cameraForward.xyz + frame.cameraRight.xyz * (ndc.x / max(sx, 1e-6)) +
+                     frame.cameraUp.xyz * (ndc.y / max(sy, 1e-6)));
+}
+
 // View-space distance a clip depth stands for (used only to weight the upsample).
 fn linearDepth(z: f32) -> f32 {
     let near = vol.depthParams.x;
@@ -755,8 +782,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     let fullPx = vec2<i32>(min(mapped.x, i32(vol.sizes.z) - 1), min(mapped.y, i32(vol.sizes.w) - 1));
     let ndc = ndcOf((vec2<f32>(fullPx) + vec2<f32>(0.5)) / vol.sizes.zw);
     let origin = worldAt(ndc, 0.0);
-    let farPoint = worldAt(ndc, 1.0);
-    let direction = normalize(farPoint - origin);
+    let direction = viewRayDirection(ndc);
 
     let sceneZ = textureLoad(sceneDepth, fullPx, 0);
     var maxDistance = vol.params1.w;
