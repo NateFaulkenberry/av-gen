@@ -50,6 +50,10 @@ inline constexpr EffectField kFields[] = {
                AVGEN_WAVE_SETF(e.wave.appearance.width)).json("appearance/width").main().floorAt(1e-3f),
     boolField("rainbow", "Rainbow", AVGEN_WAVE_GET(e.wave.appearance.rainbow),
               AVGEN_WAVE_SETB(e.wave.appearance.rainbow)).json("appearance/rainbow").main(),
+    // Beside the Rainbow toggle, BEFORE the Rainbow section opens: a Main-page row after that
+    // section's first row belongs to it, and the Main page never draws its header.
+    boolField("sparkle", "Sparkle", AVGEN_WAVE_GET(e.wave.sparkle.enabled),
+              AVGEN_WAVE_SETB(e.wave.sparkle.enabled)).json("sparkle/enabled").main(),
     floatField("rainbowSpeed", "Rainbow speed", -4.0f, 4.0f, -1.0f, 1.0f,
                AVGEN_WAVE_GET(e.wave.appearance.rainbowSpeed), AVGEN_WAVE_SETF(e.wave.appearance.rainbowSpeed))
         .json("appearance/rainbowSpeed").sec("Rainbow"),
@@ -62,8 +66,6 @@ inline constexpr EffectField kFields[] = {
     floatField("rainbowBrightness", "Rainbow brightness", 0.0f, 4.0f, 0.0f, 2.0f,
                AVGEN_WAVE_GET(e.wave.appearance.rainbowBrightness),
                AVGEN_WAVE_SETF(e.wave.appearance.rainbowBrightness)).json("appearance/rainbowBrightness"),
-    boolField("sparkle", "Sparkle", AVGEN_WAVE_GET(e.wave.sparkle.enabled),
-              AVGEN_WAVE_SETB(e.wave.sparkle.enabled)).json("sparkle/enabled").main(),
     floatField("sparkleDensity", "Sparkle density", 0.0f, 6.0f, 0.05f, 2.0f,
                AVGEN_WAVE_GET(e.wave.sparkle.density), AVGEN_WAVE_SETF(e.wave.sparkle.density))
         .json("sparkle/density").sec("Sparkle"),
