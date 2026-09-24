@@ -47,6 +47,11 @@ const EffectSchema& bloomSourceSchema(); // ADR-703 (FXL)
 const EffectSchema& trailSchema();       // ADR-703 (Wave 1)
 const EffectSchema& spaceWarpSchema();   // ADR-703 (DF)
 const EffectSchema& particleEmitterSchema(); // ADR-703
+const EffectSchema& orbitSchema();       // Wave 2 (XFORM)
+const EffectSchema& spiralSchema();      // Wave 2 (XFORM)
+const EffectSchema& floatSchema();       // Wave 2 (XFORM)
+const EffectSchema& shakeSchema();       // Wave 2 (XFORM)
+const EffectSchema& bounceSchema();      // Wave 2 (XFORM)
 
 namespace {
 
@@ -66,6 +71,11 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &trailSchema(),
         &spaceWarpSchema(),
         &particleEmitterSchema(),
+        &orbitSchema(),
+        &spiralSchema(),
+        &floatSchema(),
+        &shakeSchema(),
+        &bounceSchema(),
     };
     return kSchemas;
 }
@@ -732,6 +742,7 @@ std::vector<RegistryFinding> checkRegistry() {
             case EffectBucket::Ribbon: return RenderStage::Particles;
             case EffectBucket::Distortion: return RenderStage::ScreenSpace;
             case EffectBucket::Emitter: return RenderStage::Particles;
+            case EffectBucket::Transform: return RenderStage::Geometry;
             }
             return RenderStage::Sky;
         }();

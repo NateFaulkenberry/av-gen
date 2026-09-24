@@ -410,6 +410,11 @@ enum class EffectBucket : std::uint8_t {
     Ribbon,      // camera-facing strips drawn in pass 1's blended section (RIBBON): Trail
     Distortion,  // screen-space offsets resolved against a scene-colour copy (DF): Space Warp
     Emitter,     // an effect-owned particle system (EMIT): Particle Emitter
+    // ---- Wave 2 ---------------------------------------------------------------------------------
+    // A per-owner render-transform offset (XFORM, world/effects/transform_frame.hpp), built BEFORE
+    // the flatten and composed into the owner node's transform by the Composition: Orbit, Spiral,
+    // Float, Shake, Bounce.
+    Transform,
 };
 
 // The three buckets `resolveAtmosphericEffects` owns. Everything else has a builder of its own.
@@ -425,7 +430,7 @@ enum class EffectBucket : std::uint8_t {
 // which instance gets a GPU slot first, which is the only thing order can change inside an additive
 // stage. Values are ordered; do not reorder them.
 enum class RenderStage : std::uint8_t {
-    Geometry,    // changes what geometry exists or where it is (none yet: a Space Warp would)
+    Geometry,    // changes what geometry exists or where it is -- XFORM (Orbit, Float, ...), before the flatten
     Material,    // a per-fragment term on lit surfaces -- the surface waves
     Lighting,    // adds or modulates lights (none yet: a Flicker would)
     Sky,         // drawn at the far plane after the opaque pass -- comet, aurora, meteor shower
@@ -621,7 +626,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 14> kEffectKinds{
+inline constexpr std::array<EffectKind, 19> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -636,6 +641,11 @@ inline constexpr std::array<EffectKind, 14> kEffectKinds{
     EffectKind::Trail,         // ADR-703 (Wave 1): RIBBON over HIST
     EffectKind::SpaceWarp,     // ADR-703 (DF)
     EffectKind::ParticleEmitter, // ADR-703
+    EffectKind::Orbit,         // Wave 2 (XFORM)
+    EffectKind::Spiral,        // Wave 2 (XFORM)
+    EffectKind::Float,         // Wave 2 (XFORM)
+    EffectKind::Shake,         // Wave 2 (XFORM)
+    EffectKind::Bounce,        // Wave 2 (XFORM)
 };
 
 // The kind's position in `kEffectKinds`, or `size()` for an enumerator that is not in it --

@@ -424,6 +424,13 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::SpaceWarp, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703 (DF)
         {EffectKind::ParticleEmitter, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703
         {EffectKind::Trail, {EffectTarget::Entity}},
+        // Wave 2 (XFORM). Entity only: the catalog's Light owners need LIGHTMOD to move a light
+        // record, and a Camera orbit or shake is the camera rig's and ADR-098's.
+        {EffectKind::Orbit, {EffectTarget::Entity}},
+        {EffectKind::Spiral, {EffectTarget::Entity}},
+        {EffectKind::Float, {EffectTarget::Entity}},
+        {EffectKind::Shake, {EffectTarget::Entity}},
+        {EffectKind::Bounce, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -472,6 +479,8 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         case world::EffectBucket::Ribbon: return world::RenderStage::Particles;
         case world::EffectBucket::Distortion: return world::RenderStage::ScreenSpace;
         case world::EffectBucket::Emitter: return world::RenderStage::Particles;
+        // Wave 2: XFORM offsets are composed by the flatten, before any pass draws.
+        case world::EffectBucket::Transform: return world::RenderStage::Geometry;
         }
         return world::RenderStage::PostProcess; // unreachable for a real bucket, and wrong for all
     };

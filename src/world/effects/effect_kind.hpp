@@ -52,6 +52,12 @@ enum class EffectKind : std::uint8_t {
     //   surface (FXL 2):  Dissolve = 21, Growth = 22, Breathing = 23, OrganicPulsation = 24,
     //                     Bioluminescence = 25, PulsingVeins = 26, Fresnel = 27, RimLight = 28,
     //                     ColorCycling = 29, MotionSmear = 31
+    // XFORM (transform_frame.hpp): visual-only procedural motion of the owner, before the flatten.
+    Orbit = 14,  // the owner circles its own position
+    Spiral = 15, // the owner corkscrews up or down around its own position
+    Float = 16,  // a slow, never-repeating bob and wobble
+    Shake = 17,  // smooth-noise jitter, continuous or settling after each activation
+    Bounce = 18, // a squash-and-stretch hop, continuous or a recoil
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

@@ -3284,6 +3284,45 @@ Transform Composition::nodeWorldTransform(const CompositionNode& node) const {
     return world;
 }
 
+// Wave 2 (XFORM, transform_frame.hpp): the offset rule. The parent-space translation is added to the
+// node's own position; the local part (rotation and scale about the pivots, already a TRS) is
+// applied inside the node's own transform.
+Transform Composition::nodeDrawnTransform(const CompositionNode& node) const {
+    Transform t = nodeTransform(node);
+    if (effectOffsets_ == nullptr || effectOffsets_->count == 0) {
+        return t;
+    }
+    const world::TransformOffset* offset = effectOffsets_->find(node.name);
+    if (offset == nullptr) {
+        return t;
+    }
+    t.position += offset->translation;
+    Transform local;
+    local.position = offset->localPosition;
+    local.rotation = offset->localRotation;
+    local.scale = offset->localScale;
+    return compose(t, local);
+}
+
+Transform Composition::nodeDrawnWorldTransform(const CompositionNode& node) const {
+    // The gate: with no live offset this IS `nodeWorldTransform`, the same calls in the same order,
+    // so a scene with no XFORM instance flattens to the same bits it always did.
+    if (effectOffsets_ == nullptr || effectOffsets_->count == 0) {
+        return nodeWorldTransform(node);
+    }
+    Transform world = nodeDrawnTransform(node);
+    const CompositionNode* current = &node;
+    for (std::size_t guard = 0; !current->parent.empty() && guard < nodes_.size(); ++guard) {
+        const CompositionNode* parent = findNode(current->parent);
+        if (parent == nullptr || parent == &node) {
+            break;
+        }
+        world = compose(nodeDrawnTransform(*parent), world);
+        current = parent;
+    }
+    return world;
+}
+
 CompositionNode cloneNodeSpec(const CompositionNode& node) {
     CompositionNode copy;
     copy.name = node.name;
@@ -6998,7 +7037,9 @@ void Composition::applyParameters() {
             node.opacityScale = node.opacityParam->base();
         }
 
-        const Transform nodeT = nodeWorldTransform(node);
+        // Wave 2: the DRAWN transform, with any XFORM offset on this node or an ancestor composed in
+        // (the simulation and HIST keep reading `nodeWorldTransform`; see `setEffectOffsets`).
+        const Transform nodeT = nodeDrawnWorldTransform(node);
         bool visible = nodeVisible(node);
         bool dayNightVisibleOverride = true;
         float emissiveBoost =

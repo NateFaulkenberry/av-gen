@@ -464,6 +464,7 @@ Report checkAtmospheric(EffectKind kind) {
             case EffectBucket::Ribbon:
             case EffectBucket::Distortion:
             case EffectBucket::Emitter:
+            case EffectBucket::Transform:
                 mine = schema->resolve.records != nullptr ? schema->resolve.records(live, ctx) : 0;
                 break;
             }
