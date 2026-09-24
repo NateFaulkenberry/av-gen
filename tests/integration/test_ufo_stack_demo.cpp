@@ -154,16 +154,15 @@ bool sameBytes(const std::vector<T>& a, const std::vector<T>& b) {
 // ribbon strips and their vertices, the entity-lane records. The fireflies are off: particles are the
 // engine's one documented seek relaxation (their GPU pools reset), and they would make this test
 // about the particle renderer rather than about the effects.
-// HIDDEN, and why: this is the roadmap's exit test run on the owner's film, and it FAILS -- not on any
-// Wave 1 effect, but because the film itself does not scrub exactly at ENGINE level: a fresh Engine
-// seeked to 150 s puts the saucer 11.6 m from where a 60 Hz play of the same Engine puts it, the
-// nearest played frame being 4.3 m away half a second earlier. The same divergence reproduces on the
-// stock `glowmere-valley-2-multicam.json` with no Wave 1 effect in it, on `agent/entity-effects`, and
-// on `main` (13bc030f) -- identical numbers to the centimetre, so it predates this work.
-// ADR-700's own evidence is composition-level (`test_glowmere_scrub.cpp`'s Film harness, which ticks
-// no modulation routes), where it holds. Recorded in ADR-703 as a finding for the seek's owner. The
-// Wave 1 chain's play = scrub proof is the next case, on an owner whose motion the Engine's seek does
-// reproduce exactly.
+// HIDDEN, and why: this is the roadmap's exit test run on the owner's film, and it still FAILS -- not
+// on any Wave 1 effect, but because the film itself does not scrub exactly at ENGINE level. Found
+// here: a fresh Engine seeked to 150 s put the saucer 11.6 m from where a 60 Hz play of the same
+// Engine put it, reproducing with the stock project, on agent/entity-effects and on main 13bc030f.
+// Most of it is the entity distance cull (a play culls distant bodies, the replay never does; the
+// coordinator's finding) and the cull is off below, which takes the saucer to ~0.15 m. The rest is
+// under investigation outside this branch (probably audio-driven world events, which the replay
+// runs without a signal bus). Un-hide this when that lands. The Wave 1 chain's play = scrub proof is
+// the next case, on an owner whose motion the Engine's seek reproduces exactly.
 TEST_CASE("the UFO stack at 150 s is the same played and scrubbed", "[.known-defect][effects][demo][seek][adr700]") {
     REQUIRE(fs::exists(demoProject()));
     constexpr double kLate = 150.0;
@@ -171,6 +170,12 @@ TEST_CASE("the UFO stack at 150 s is the same played and scrubbed", "[.known-def
         auto* on = engine.params().find("fx/particle-emitter/enabled");
         REQUIRE(on != nullptr);
         on->setBaseComponent(0, 0.0f);
+        // Most of the film's engine-level play/scrub gap is the entity distance cull: a play with the
+        // default detail limits culls distant bodies and the replay never does (the coordinator's
+        // finding, 2026-09-24). Off here, as test_glowmere_scrub.cpp's harness has it.
+        scene::DetailLimits limits = engine.detailLimits();
+        limits.entityDistanceCull = false; // the engine copies its limits into the scene every frame
+        engine.setDetailLimits(limits);
     };
 
     app::Engine played(app::EngineMode::Offline);
