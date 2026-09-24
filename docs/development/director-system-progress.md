@@ -1,8 +1,8 @@
 # AV Gen Director System — Development Progress
 Last updated: 2026-09-24 16:30
 Current branch: `agent/director` (worktree `../av-gen-director`; main merged in at 423fdf2b and 6f0da410; main = 232a50d7)
-Current commit: 6f0da410 (plus this record)
-Overall status: Slice 0 complete (effects included); Slice 1 complete; both full suites green after merging main 232a50d7
+Current commit: f009638d (plus this record)
+Overall status: Slices 0 and 1 complete; Slice 2 core (handoff + scripted performances) implemented; coordinating the entity-side interface with the Motion lead
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -34,23 +34,33 @@ What it cannot do yet is Slice 2–3 work: performances (Rook moving), time-vary
 |---|---|---:|---:|---|
 | 0 Foundations | Complete | 95% | 23 `[directing]` cases | Remaining: human UI edit paths other than Cameras still bypass history (out of Director scope) |
 | 1 Plan + Cameras | Complete | 95% | 26 `[directing]` cases + 10 golden plans | Remaining: the Director panel beyond Approve/Reject (spec §35 says do not overbuild); UI not verified |
-| 2 Scripted Performances | Not started | 0% | 0 | Next: the entity/actor handoff probe (spec §25) |
+| 2 Scripted Performances | In progress | 70% | 14 cases + 1 golden | Handoff probe done and decided (ADR-758); run/walk to/past, hold, look_at compile (ADR-759). Entity-side mechanics to be confirmed with the Motion lead |
 | 3 Airborne + Events | Not started | 0% | 0 | |
 | 4 Autonomous Direction | Not started | 0% | 0 | |
 | 5 Verification + Scale | Started | 10% | golden plans, cost measurement | Golden plans and §37 measurements pulled forward |
 
 ## Current focus
 ### Task
-Slice 1 closed: full CPU and GPU suites on the final state, then report. Next is Slice 2
-(scripted performances).
+Slice 2: scripted performances. The core is in (f009638d). Next is agreeing the entity-side interface
+with the Motion lead (`agent/motion`), who now owns motion mechanics in `src/entity/`.
 
-### Next subtasks (Slice 2)
-- [ ] Entity/actor handoff probe (spec §25): how an entity and a `seq::Actor` each drive a node,
-      whether both can write at once, how the handoff and the return work, and what a seek does.
-      Probe first, then regression tests.
-- [ ] `Performance` → `seq::Actor` compile for run_to / walk_to / run_past / hold / look_at
-- [ ] Plan-time events → Cue markers; cues `on` them compile
-- [ ] Keyed chase camera derived from the actor
+### Subtasks
+- [x] Entity/actor handoff probe (spec §25), measured; decision recorded (ADR-758)
+- [x] Performance → `seq::Actor`: run_to, walk_to, run_past, walk_past, run, walk, hold, look_at (ADR-759)
+- [x] Entity/actor handoff and restoration (performers on play and replay; handed back at the end pose)
+- [x] Character event markers (computed), cues on them
+- [x] Keyed chase camera: not needed. A follow rig on the performed node is deterministic (ADR-759)
+- [~] Hand the entity-side pieces (`DirectorMotion::performance`: re-assertion and unramped
+      speed) to the Motion lead's ownership, or have them confirm they stay
+- [ ] Full CPU and GPU suites on f009638d (targeted suites green so far)
+
+### Acceptance criteria
+- [x] Inside its span the body is exactly where the performance says, on the terrain, in the right
+      gait; outside, the entity owns it; after, it continues from the end mark
+- [x] A seek lands on the performance (checked against the actor, not against a play); a changed
+      performance invalidates checkpoints
+- [x] Computed event times are the performance's actual moments (closest approach, arrival)
+- [x] One undo; survives save/reload (golden plan)
 
 ## Completed work
 
@@ -241,6 +251,7 @@ undo, serialization or compilation will be built on them.
   (ADR-700) has not been re-measured here.
 
 ## Recent changes
+- 2026-09-24: Slice 2 core (f009638d): handoff probe → ADR-758; performance compiler → ADR-759.
 - 2026-09-24: merged main (ADR-702) at 423fdf2b; effects joined the Director (e7104b8d); Slice 1.5
   (ba21a9dc); golden plans (8935a24b).
 
@@ -252,6 +263,13 @@ undo, serialization or compilation will be built on them.
 3. Slice 3: time-varying camera behaviour state (`rise_over`, `pass`), one-shot clip semantics, the
    airborne compiler reusing `Airborne`, and performance-local retime.
 4. Consider fixing the bake's first-shot warning to respect the camera track (engine; small).
+
+## Known issues found in Slice 2 (reported, not worked around)
+- **A seek on an engine that has never stepped a frame** lands differently from the same seek once it
+  has: the same engine, same inputs, seeking to 8 s twice gave (3.864, 1.035) then (-2.828, 2.828) on
+  an orbiting body. This is in the seek investigation's family (the coordinator's item 3). Tests warm
+  engines with one frame and say why.
+- `seq::Actor::headingAt` returns degrees; its header says radians.
 
 ## Questions requiring human decision
 - None blocking. For Slice 2, not blocking yet: when a scripted performance drives Rook's node for
