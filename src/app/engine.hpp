@@ -768,7 +768,7 @@ public:
     [[nodiscard]] const EngineStats& stats() const { return stats_; }
 
     // ADR-410. The renderer publishes what the temporal ring actually holds; the Engine carries it
-    // so the World Effects panel can say "settling -- 3 of 8 frames" without `ui/` reaching into a
+    // so the frame-echo controls (World inspector, Environment) can say "settling -- 3 of 8 frames" without `ui/` reaching into a
     // renderer header. Set once a frame by whoever owns the SceneRenderer; default-constructed
     // (and therefore "complete", because nothing is needed) when nobody does.
     void setTemporalHistoryReport(const scene::TemporalHistoryReport& r) { temporalReport_ = r; }
