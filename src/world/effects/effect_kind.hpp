@@ -58,6 +58,17 @@ enum class EffectKind : std::uint8_t {
     Float = 16,  // a slow, never-repeating bob and wobble
     Shake = 17,  // smooth-noise jitter, continuous or settling after each activation
     Bounce = 18, // a squash-and-stretch hop, continuous or a recoil
+    // FXL Wave 2 (the surface slice): per-entity clip, displacement and pattern lanes.
+    Dissolve = 21,         // the owner burns away through noise, shadow and all
+    Growth = 22,           // the owner grows in behind a glowing front
+    Breathing = 23,        // the owner swells and settles along its normals
+    OrganicPulsation = 24, // bulges travel along the owner
+    Bioluminescence = 25,  // a living light pattern on the owner
+    PulsingVeins = 26,     // light pulses along a vein network on the owner
+    Fresnel = 27,          // a view-angle rim of light
+    RimLight = 28,         // a one-sided kicker rim, fixed in view space
+    ColorCycling = 29,     // the owner's hue turns over time
+    MotionSmear = 31,      // the owner's trailing side stretches back along its path
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not
