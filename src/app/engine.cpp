@@ -25,6 +25,7 @@
 #include "params/serialization.hpp"
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_registry.hpp"
+#include "world/effects/particle_emitter.hpp"
 
 #include <fmt/ranges.h>
 
@@ -4024,6 +4025,9 @@ void Engine::updateEffects() {
     if (effects_.empty()) {
         live.waves = world::WaveFrame{};
         live.atmospherics = world::AtmosphericFrame{};
+        // An emitter's system lives in the scene's particle list, so "no effects" has to take it
+        // back out; the builder removes every `fx:` system whose instance is gone.
+        world::buildParticleFrame({}, world::EffectContext{}, live.particles, {}, {}, {});
         return;
     }
     world::applyEffectParameters(effectParams_, effects_);
@@ -4061,6 +4065,8 @@ void Engine::updateEffects() {
     world::buildWaveFrame(effects_, ctx, live.waves, effectOrder_, effectStatus_);
     // RenderStage::Sky and RenderStage::Volumetric -- comets, auroras and placed media.
     world::buildAtmosphericFrame(effects_, ctx, live.atmospherics, effectOrder_, effectStatus_);
+    // RenderStage::Particles -- effect-owned particle systems (EMIT, ADR-703).
+    world::buildParticleFrame(effects_, ctx, live.particles, effectOrder_, effectStatus_, effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
     // builder said: "orphaned" is the actionable answer, "dormant" would send somebody looking at
     // its timing.

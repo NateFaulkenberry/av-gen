@@ -100,6 +100,7 @@ std::vector<std::string> declaredKindNames() {
     std::vector<std::string> names;
     std::string token;
     bool inLineComment = false;
+    bool skippingValue = false;
     for (std::size_t i = open + 1; i < close; ++i) {
         const char c = text[i];
         if (inLineComment) {
@@ -112,6 +113,26 @@ std::vector<std::string> declaredKindNames() {
             inLineComment = true;
             ++i;
             continue;
+        }
+        // ADR-703: an enumerator may carry an explicit value (`ParticleEmitter = 13`); its NAME is
+        // the token before the '=', and the value up to the next ',' is skipped. Before this a
+        // valued enumerator was silently dropped -- the space before '=' cleared the token.
+        if (skippingValue) {
+            if (c == ',') {
+                skippingValue = false;
+            }
+            continue;
+        }
+        if (c == '=') {
+            if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+                names.push_back(token);
+            }
+            token.clear();
+            skippingValue = true;
+            continue;
+        }
+        if (c == ' ' || c == '\t') {
+            continue; // whitespace inside an item neither ends nor starts a name
         }
         if ((std::isalnum(static_cast<unsigned char>(c)) != 0) || c == '_') {
             token.push_back(c);
@@ -247,7 +268,8 @@ TEST_CASE("a leaf check reports a leaf that is not there, and passes one that is
         const world::EffectSchema* schema = world::effectSchema(kind);
         REQUIRE(schema != nullptr);
         const conf::Report ground = conf::checkLeavesExist(kind, kGround, "ground");
-        CHECK(ground.clean() == (schema->resolve.bucket != world::EffectBucket::Surface));
+        // ADR-703: only the sky and medium types register the shared ground rows.
+        CHECK(ground.clean() == world::isAtmosphericBucket(schema->resolve.bucket));
     }
 }
 
@@ -391,6 +413,7 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Tornado, {EffectTarget::World}},
         {EffectKind::GroundPulse, {EffectTarget::Entity, EffectTarget::World}},
         {EffectKind::TravelBeam, {EffectTarget::World, EffectTarget::Camera}},
+        {EffectKind::ParticleEmitter, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -433,6 +456,13 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         case world::EffectBucket::Comet: return world::RenderStage::Sky;
         case world::EffectBucket::Aurora: return world::RenderStage::Sky;
         case world::EffectBucket::Medium: return world::RenderStage::Volumetric;
+        // ADR-703: the Effect Library's integrators, from the same frame order -- material lanes in
+        // the lit pass, strips and emitters in the blended section beside particles, distortion
+        // after the volumetric composite.
+        case world::EffectBucket::EntityLanes: return world::RenderStage::Material;
+        case world::EffectBucket::Ribbon: return world::RenderStage::Particles;
+        case world::EffectBucket::Distortion: return world::RenderStage::ScreenSpace;
+        case world::EffectBucket::Emitter: return world::RenderStage::Particles;
         }
         return world::RenderStage::PostProcess; // unreachable for a real bucket, and wrong for all
     };
@@ -446,7 +476,7 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
     }
     // The control: the family spans three stages, so the loop compared distinct answers rather
     // than one stage with itself.
-    CHECK(used.size() == 3);
+    CHECK(used.size() >= 3);
 
     SECTION("and the evaluator walks stages in frame order") {
         // One instance of every type, listed in REVERSE registry order; the evaluation order must

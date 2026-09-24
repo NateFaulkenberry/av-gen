@@ -41,6 +41,7 @@ const EffectSchema& volumetricFogSchema();
 const EffectSchema& tornadoSchema();
 const EffectSchema& groundPulseSchema(); // ADR-702
 const EffectSchema& travelBeamSchema();  // ADR-702
+const EffectSchema& particleEmitterSchema(); // ADR-703
 
 namespace {
 
@@ -54,6 +55,7 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &tornadoSchema(),
         &groundPulseSchema(),
         &travelBeamSchema(),
+        &particleEmitterSchema(),
     };
     return kSchemas;
 }
@@ -312,16 +314,31 @@ std::string storeKey(const EffectSchema& schema, const EffectField& field) {
     return key;
 }
 
+namespace {
+// ADR-703. The store key of a stored row, built into a reused per-thread buffer. `storeKey`
+// returns a fresh string, and the accessors below run for every stored row of every instance on
+// every frame (`applyEffectParameters`) -- which made each fog bank allocate a dozen strings a frame.
+// The buffer keeps its capacity, so after the first frame this allocates nothing; the store only
+// allocates when a key is inserted for the first time.
+const std::string& scratchKey(const EffectSchema& schema, const EffectField& field) {
+    thread_local std::string key;
+    key.assign(schema.key);
+    key.push_back('/');
+    key.append(field.leaf);
+    return key;
+}
+} // namespace
+
 float fieldFloat(const EffectField& field, const EffectSchema& schema, const EffectInstance& effect) {
     if (field.stored) {
-        return effect.values.getFloat(storeKey(schema, field), field.storedDefault);
+        return effect.values.getFloat(scratchKey(schema, field), field.storedDefault);
     }
     return field.getFloat != nullptr ? field.getFloat(effect) : 0.0f;
 }
 
 void setFieldFloat(const EffectField& field, const EffectSchema& schema, EffectInstance& effect, float v) {
     if (field.stored) {
-        effect.values.setFloat(storeKey(schema, field), v);
+        effect.values.setFloat(scratchKey(schema, field), v);
         return;
     }
     if (field.setFloat != nullptr) {
@@ -331,7 +348,7 @@ void setFieldFloat(const EffectField& field, const EffectSchema& schema, EffectI
 
 glm::vec3 fieldColor(const EffectField& field, const EffectSchema& schema, const EffectInstance& effect) {
     if (field.stored) {
-        return effect.values.getColor(storeKey(schema, field), field.storedColor);
+        return effect.values.getColor(scratchKey(schema, field), field.storedColor);
     }
     return field.getColor != nullptr ? field.getColor(effect) : glm::vec3(0.0f);
 }
@@ -339,7 +356,7 @@ glm::vec3 fieldColor(const EffectField& field, const EffectSchema& schema, const
 void setFieldColor(const EffectField& field, const EffectSchema& schema, EffectInstance& effect,
                    glm::vec3 v) {
     if (field.stored) {
-        effect.values.setColor(storeKey(schema, field), v);
+        effect.values.setColor(scratchKey(schema, field), v);
         return;
     }
     if (field.setColor != nullptr) {
@@ -349,14 +366,14 @@ void setFieldColor(const EffectField& field, const EffectSchema& schema, EffectI
 
 bool fieldBool(const EffectField& field, const EffectSchema& schema, const EffectInstance& effect) {
     if (field.stored) {
-        return effect.values.getBool(storeKey(schema, field), field.storedDefault >= 0.5f);
+        return effect.values.getBool(scratchKey(schema, field), field.storedDefault >= 0.5f);
     }
     return field.getBool != nullptr && field.getBool(effect);
 }
 
 void setFieldBool(const EffectField& field, const EffectSchema& schema, EffectInstance& effect, bool v) {
     if (field.stored) {
-        effect.values.setBool(storeKey(schema, field), v);
+        effect.values.setBool(scratchKey(schema, field), v);
         return;
     }
     if (field.setBool != nullptr) {

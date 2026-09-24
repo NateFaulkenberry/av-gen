@@ -291,7 +291,8 @@ TEST_CASE("every kind registers the leaf the panel's field row names",
         INFO("kind: " << world::effectKindName(kind));
         const world::EffectSchema* schema = world::effectSchema(kind);
         REQUIRE(schema != nullptr);
-        const bool samplesFields = schema->resolve.bucket != world::EffectBucket::Surface;
+        // ADR-703: only the sky and medium types sample a field.
+        const bool samplesFields = world::isAtmosphericBucket(schema->resolve.bucket);
         CHECK(world::sharedFieldApplies(*schema, *flowRow) == samplesFields);
         const conf::Report r = conf::checkLeavesExist(kind, leaves, "panel-flow-row");
         INFO(r.summary());
