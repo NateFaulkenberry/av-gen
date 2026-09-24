@@ -38,6 +38,7 @@
 #include "ui/help_panel.hpp"
 #include "ui/world_builder_panel.hpp"
 #include "ui/world_edit_panel.hpp"
+#include "app/edit_capture.hpp"
 #include "app/edit_system.hpp"
 #include "ui/world_editor.hpp"
 #include "ui/world_panel.hpp"
@@ -457,6 +458,9 @@ public:
 
 private:
     std::string cameraProblem_;
+    // The lens slider's drag, measured from press to release so a drag is one undo step rather
+    // than sixty (ADR-752). Open only while the slider is held.
+    app::EditCapture lensDrag_;
     void drawControlTab(app::Engine& engine);
     void drawOutputsTab(app::Engine& engine);
     void drawWorldWindow(app::Engine& engine);

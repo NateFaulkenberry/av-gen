@@ -24,10 +24,11 @@ std::size_t EditCommand::touched() const {
                                         ? lights->after.size() - lights->before.size()
                                         : lights->before.size() - lights->after.size(),
                                     1);
-    // An effect edit is one thing to the person who made it -- "Add Aurora", "Move Ground Pulse up"
-    // -- whatever the size of the list it rewrote.
+    // Records of a whole domain are one thing each to the person who made the edit ("Delete camera",
+    // "Add key", "Add Aurora", "Move Ground Pulse up"), whatever the size of what they rewrote.
     return params.size() + parents.size() + heroes.size() + added.size() + removed.size() +
-           (timeline != nullptr ? 1 : 0) + lightsTouched + (effects != nullptr ? 1 : 0);
+           (timeline != nullptr ? 1 : 0) + lightsTouched + (effects != nullptr ? 1 : 0) +
+           (automation != nullptr ? 1 : 0) + (cameras != nullptr ? 1 : 0) + (plans != nullptr ? 1 : 0);
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -103,6 +104,74 @@ bool setBaseComponents(app::Engine& engine, const std::string& path, const std::
     return true;
 }
 
+scene::CameraDirection capturedCameraDirection(app::Engine& engine) {
+    scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        scene::CameraDirection none;
+        none.ensureMainCamera();
+        return none;
+    }
+    scene::CameraDirection out = composition->cameraDirection();
+    const auto read3 = [&](const std::string& path, glm::vec3& into) {
+        if (const std::vector<float> v = baseComponents(engine, path); v.size() == 3) {
+            into = glm::vec3(v[0], v[1], v[2]);
+        }
+    };
+    const auto read1 = [&](const std::string& path, float& into) {
+        if (const std::vector<float> v = baseComponents(engine, path); v.size() == 1) {
+            into = v[0];
+        }
+    };
+    for (scene::CameraRig& rig : out.cameras) {
+        if (rig.id == scene::kMainCamera || rig.slug.empty()) {
+            continue; // the main camera's channels are `camera/*`, owned by the composition's settings
+        }
+        // The same channel list `Composition::registerCameraChannels` registers, so a field added
+        // there and not here is a field a restored camera would lose -- and the round-trip test in
+        // test_director_undo.cpp compares every one of them.
+        const std::string p = rig.channelPrefix();
+        read3(p + "position", rig.position);
+        read3(p + "target", rig.target);
+        read1(p + "fov", rig.fovDegrees);
+        read1(p + "focalLength", rig.focalLength);
+        read1(p + "splineT", rig.splineT);
+        read1(p + "lookAhead", rig.lookAhead);
+        read3(p + "splineOffset", rig.splineOffset);
+    }
+    return out;
+}
+
+EditCommand editCameraDirection(app::Engine& engine, std::string label, scene::CameraDirection next,
+                                std::string* problem) {
+    EditCommand command(std::move(label));
+    auto cameras = std::make_unique<CameraDirectionChange>();
+    auto automation = std::make_unique<AutomationChange>();
+    cameras->before = capturedCameraDirection(engine);
+    // Unbound at once: the copy shares the live tracks' `IParameter*`, and deleting a camera frees
+    // exactly those parameters -- a bound copy would hold dangling pointers from the next line on.
+    automation->before = engine.timeline();
+    automation->before.unbind();
+    if (auto r = engine.setCameraDirection(std::move(next)); !r) {
+        if (problem != nullptr) {
+            *problem = r.error().message;
+        }
+        return EditCommand{};
+    }
+    cameras->after = capturedCameraDirection(engine);
+    automation->after = engine.timeline();
+    automation->after.unbind();
+    if (cameras->before == cameras->after) {
+        return EditCommand{};
+    }
+    command.cameras = std::move(cameras);
+    // Only when the install actually took tracks with it (a deleted camera's automation): an edit
+    // that left the timeline alone should not carry a copy of it.
+    if (automation->before.toJson() != automation->after.toJson()) {
+        command.automation = std::move(automation);
+    }
+    return command;
+}
+
 bool heroNamesNode(const world::HeroPoint& hero, const std::string& node) {
     return hero.name == node;
 }
@@ -138,6 +207,47 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
             out.timelinesInstalled = 1;
         }
     }
+
+    // The Director Plans (ADR-755): plain values the engine holds and nothing derives from, so they
+    // can go first and need no rebind.
+    if (command.plans != nullptr) {
+        engine.directingPlans() = forward ? command.plans->after : command.plans->before;
+    }
+
+    // The author's automation (ADR-752), AFTER the sequence. The record holds the whole timeline as
+    // it was captured, the tracks the sequence baked included -- so the sequence must already be the
+    // side being restored when it lands: `setSequence` above re-baked exactly those tracks (a bake
+    // is a pure function of the sequence) and set the engine's owned targets to match, and this
+    // overwrite puts every track back in its captured order. The other order duplicates them: the
+    // sequence's install erases only the targets the *outgoing* install owned, so it would append a
+    // second copy beside the ones this restored. Found by the redo arm of test_director_undo.cpp.
+    //
+    // Before the cameras: a camera that comes back must find the tracks aimed at it already here.
+    // The copies carry whatever `IParameter*` was bound when they were captured, so they are
+    // unbound on arrival; a later rebind (`setCameraDirection`'s, or the one this function ends
+    // with) binds them to live parameters.
+    if (command.automation != nullptr) {
+        const AutomationChange& change = *command.automation;
+        engine.timeline() = forward ? change.after : change.before;
+        engine.timeline().unbind();
+        if (change.routesTouched) {
+            engine.modulator().routes() = forward ? change.routesAfter : change.routesBefore;
+        }
+        out.automationInstalled = 1;
+    }
+
+    // The camera collection (ADR-752), last of the three: after the automation it needs present, and
+    // before the composition check below, because `setCameraDirection` needs a composition and says
+    // so in its own words. The sequence's bake names no camera, so nothing above depended on it.
+    if (command.cameras != nullptr) {
+        const CameraDirectionChange& change = *command.cameras;
+        if (auto r = engine.setCameraDirection(forward ? change.after : change.before); !r) {
+            out.problems.push_back(r.error().message);
+        } else {
+            out.cameraDirectionsInstalled = 1;
+        }
+    }
+
 
     // The authored lights, before the composition null-check below rejects the command, because a
     // light list needs a composition and says so in its own words.
@@ -180,11 +290,15 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
     if (composition == nullptr) {
         // Not a failure when the command was the sequencer's: there was nothing here for a
         // composition to do.
-        if ((command.timeline == nullptr && command.lights == nullptr && command.effects == nullptr) ||
+        if ((command.timeline == nullptr && command.lights == nullptr && command.effects == nullptr &&
+             command.automation == nullptr && command.cameras == nullptr && command.plans == nullptr) ||
             !command.params.empty() ||
             !command.added.empty() || !command.removed.empty() || !command.parents.empty() ||
             !command.heroes.empty()) {
             out.problems.push_back("there is no composition to edit");
+        }
+        if (command.automation != nullptr) {
+            engine.rebind(); // the timeline was replaced above and nothing else will bind it
         }
         if (ownsRecord) {
             // Nothing was edited, so there is no latency to book. Abandoned rather than filed: a

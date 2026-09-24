@@ -1355,6 +1355,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->preview.panX = 0.0f;
         panel_->preview.panY = 0.0f;
         panel_->ai.plane = ai_.get();
+        panel_->ai.edits = &edits_;
         panel_->settings.plane = ai_.get();
         panel_->settings.settings = &settings_;
         panel_->settings.onAppearanceChanged = [this](app::AppearanceTheme theme) {
@@ -1706,26 +1707,29 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             if (job_) job_->cancel();
         };
         panel_->onEnqueueRender = [this] {
-            if (engine_->projectPath().empty()) {
-                panel_->setStatus("save the project before queueing a render");
-                return;
-            }
             engine_->renderSettings() = uiRender_;
             engine_->pathTraceSettings() = uiPathTrace_;
-            if (auto r = engine_->saveProject(engine_->projectPath()); !r) {
-                panel_->setStatus(r.error().message);
+            // A scratch copy of the session as it is now, not a save over the person's project
+            // (Director program 0.4). It used to require a saved project only because it saved it.
+            auto source = writeRenderSource("queue");
+            if (!source) {
+                panel_->setStatus(source.error().message);
                 return;
             }
-            uiQueue_.emplace_back(engine_->projectPath(), uiRender_);
+            uiQueue_.push_back(QueuedRender{source->scratch, uiRender_, source->outputBase});
             panel_->queuedRenders = uiQueue_.size();
-            panel_->setStatus("queued " + engine_->projectPath().filename().string());
+            panel_->setStatus("queued " + (engine_->projectPath().empty()
+                                               ? std::string("this session")
+                                               : engine_->projectPath().filename().string()));
         };
         panel_->onRunQueue = [this] {
             if (job_ || uiQueue_.empty()) return;
-            auto [project, settings] = uiQueue_.front();
+            const QueuedRender queued = uiQueue_.front();
             uiQueue_.pop_front();
             panel_->queuedRenders = uiQueue_.size();
-            auto job = makeRenderJob(project, settings);
+            auto job = makeRenderJob(queued.scratch, queued.settings, queued.outputBase);
+            std::error_code ec;
+            std::filesystem::remove(queued.scratch, ec); // loaded; the copy has done its job
             if (!job) {
                 panel_->setStatus(job.error().message);
                 return;
@@ -2450,20 +2454,18 @@ void Application::startRenderFromUi() {
     }
     engine_->renderSettings() = uiRender_;
     engine_->pathTraceSettings() = uiPathTrace_;
-    // Renders load a project file: the current one when saved, else a session snapshot.
-    std::filesystem::path projectFile = engine_->projectPath();
-    if (projectFile.empty()) {
-        renderProjectTemp_ = std::filesystem::temp_directory_path() / "avgen_render_session.json";
-        projectFile = renderProjectTemp_;
-    }
-    if (auto r = engine_->saveProject(projectFile); !r) {
-        panel_->setStatus(r.error().message);
+    // Renders load a project FILE, which is what makes them reproducible -- but never the person's
+    // own. This used to `saveProject(projectPath())`: every unsaved edit went into their file and the
+    // "unsaved changes" prompt that would have let them decline was cleared by the same save. A
+    // scratch copy renders exactly what is on screen and leaves their file alone (Director 0.4).
+    auto source = writeRenderSource("render");
+    if (!source) {
+        panel_->setStatus(source.error().message);
         return;
     }
-    if (renderProjectTemp_ == projectFile) {
-        engine_->clearProjectPath(); // the snapshot is not the user's project
-    }
-    auto job = makeRenderJob(projectFile, uiRender_);
+    auto job = makeRenderJob(source->scratch, uiRender_, source->outputBase);
+    std::error_code removeError;
+    std::filesystem::remove(source->scratch, removeError); // loaded; the copy has done its job
     if (!job) {
         panel_->setStatus(job.error().message);
         return;
@@ -5248,8 +5250,18 @@ Result<void> Application::generateWorldFromRecipe(const std::filesystem::path& p
     return {};
 }
 
+Result<RenderSource> Application::writeRenderSource(std::string_view tag) {
+    RenderSource source = renderSourceFor(engine_->projectPath(), std::filesystem::temp_directory_path(), tag,
+                                          ++renderSerial_, static_cast<long long>(::getpid()));
+    if (auto r = engine_->writeProjectCopy(source.scratch); !r) {
+        return std::unexpected(r.error());
+    }
+    return source;
+}
+
 Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesystem::path& projectFile,
-                                                              RenderSettings settings) {
+                                                              RenderSettings settings,
+                                                              const std::filesystem::path& outputBase) {
     auto offline = std::make_unique<Engine>(EngineMode::Offline);
     if (auto r = offline->loadProject(projectFile); !r) {
         return std::unexpected(r.error());
@@ -5258,7 +5270,8 @@ Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesys
         log::warn("render project: {}", w);
     }
     auto job = std::make_unique<RenderJob>(*context_, *shaders_, std::move(offline), std::move(settings),
-                                           std::filesystem::absolute(projectFile).parent_path());
+                                           outputBase.empty() ? std::filesystem::absolute(projectFile).parent_path()
+                                                              : outputBase);
     job->setDebugOptions(debugOptions());
     if (auto r = job->start(); !r) {
         return std::unexpected(r.error());

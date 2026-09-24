@@ -1,0 +1,42 @@
+{
+  "description": "At 0:52, slowly push in on Umbra for 5 s.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "umbra-push",
+    "title": "Push in on Umbra",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "umbra",
+        "text": "the Umbra hero mushroom",
+        "hint": "hero"
+      }
+    ],
+    "shots": [
+      {
+        "key": "push",
+        "name": "umbra-push",
+        "start": "0:52",
+        "durationSeconds": 5,
+        "subject": "umbra",
+        "locked": true,
+        "camera": [
+          {
+            "move": "push_in"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 1,
+      "camera.shot": 1
+    },
+    "diff": [
+      "push_in on umbra-cap"
+    ]
+  }
+}

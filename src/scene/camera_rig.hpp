@@ -74,6 +74,10 @@ enum class ShotTransition : std::uint8_t {
 };
 [[nodiscard]] const char* shotTransitionName(ShotTransition transition);
 [[nodiscard]] std::optional<ShotTransition> shotTransitionFromName(std::string_view name);
+// Every transition, in declaration order -- generated from the same table the names come from, so a
+// capability listing cannot drift from what `shotTransitionFromName` accepts. `shotTransitionName`
+// indexes that table and must only be handed one of these.
+[[nodiscard]] std::span<const ShotTransition> allShotTransitions();
 
 // ---- a camera --------------------------------------------------------------------------------
 

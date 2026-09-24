@@ -1,0 +1,46 @@
+{
+  "description": "Pulse Umbra on the downbeats of bars 40 and 41.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "umbra-downbeats",
+    "title": "Umbra on the downbeat",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "umbra",
+        "text": "the Umbra hero mushroom",
+        "hint": "hero"
+      }
+    ],
+    "cues": [
+      {
+        "key": "b40",
+        "effect": {
+          "owner": "umbra",
+          "type": "groundPulse"
+        },
+        "at": "bar 40",
+        "holdSeconds": 0.5
+      },
+      {
+        "key": "b41",
+        "effect": {
+          "owner": "umbra",
+          "type": "groundPulse"
+        },
+        "at": "bar 41",
+        "holdSeconds": 0.5
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "effect.instance": 2
+    },
+    "diff": [
+      "Effect \"Ground Pulse\" on umbra-cap"
+    ]
+  }
+}

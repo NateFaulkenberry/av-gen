@@ -92,21 +92,15 @@ const std::vector<DomainCapability>& domainCapabilities() { return kDomains; }
 nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engine& engine) {
     auto& mutableEngine = const_cast<app::Engine&>(engine); // NOLINT: the accessors are non-const
 
-    nlohmann::json domains = nlohmann::json::array();
-    for (const DomainCapability& domain : kDomains) {
-        nlohmann::json j;
-        j["id"] = domain.id;
-        j["title"] = domain.title;
-        if (!domain.description.empty()) {
-            j["description"] = domain.description;
-        }
-        j["available"] = domain.available;
-        if (!domain.available) {
-            j["unavailableReason"] = domain.unavailableReason;
-        }
+    // Availability is GENERATED, not declared (Director program 0.5). A domain is available when
+    // the registry has tools in it: the authored `available` flag went stale the moment a tool
+    // landed in a domain it called unavailable -- `entity` and `render` both said "not exposed"
+    // while listing `entity.list` and `render.probe`. The authored reason survives as `limits`,
+    // because what a domain still cannot do is worth saying; it just no longer decides anything.
+    const auto operationsIn = [&](std::string_view id) {
         nlohmann::json operations = nlohmann::json::array();
         for (const Tool* tool : registry.all()) {
-            if (tool->definition.domain() != domain.id) {
+            if (tool->definition.domain() != id) {
                 continue;
             }
             nlohmann::json op;
@@ -122,15 +116,39 @@ nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engin
             op["requiresMainThread"] = tool->definition.annotations.requiresMainThread;
             operations.push_back(std::move(op));
         }
+        return operations;
+    };
+    nlohmann::json domains = nlohmann::json::array();
+    std::vector<std::string> described;
+    for (const DomainCapability& domain : kDomains) {
+        described.push_back(domain.id);
+        nlohmann::json j;
+        j["id"] = domain.id;
+        j["title"] = domain.title;
+        if (!domain.description.empty()) {
+            j["description"] = domain.description;
+        }
+        nlohmann::json operations = operationsIn(domain.id);
+        const bool available = !operations.empty() || domain.available;
+        j["available"] = available;
+        if (!domain.unavailableReason.empty()) {
+            j[available ? "limits" : "unavailableReason"] = domain.unavailableReason;
+        }
         if (!operations.empty()) {
             j["operations"] = std::move(operations);
         }
         domains.push_back(std::move(j));
     }
+    // A domain a tool names that nobody wrote prose for is still a domain: listed, not dropped.
+    for (const Tool* tool : registry.all()) {
+        const std::string id(tool->definition.domain());
+        if (std::find(described.begin(), described.end(), id) != described.end()) {
+            continue;
+        }
+        described.push_back(id);
+        domains.push_back({{"id", id}, {"title", id}, {"available", true}, {"operations", operationsIn(id)}});
+    }
 
-    // What is only knowable by asking this session. An agent told "materials are supported" when
-    // the open scene is the built-in orb, which has no procedural parts, would waste a turn
-    // finding that out.
     nlohmann::json present;
     present["composition"] = mutableEngine.composition() != nullptr;
     present["nodes"] =
@@ -153,9 +171,12 @@ nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engin
     out["domains"] = std::move(domains);
     out["thisSession"] = std::move(present);
     out["transaction"] =
-        "AI changes run inside one transaction per task. The rollback primitive is a snapshot of "
-        "the parameter domain -- parameter values, modulation routes, presets and the timeline -- "
-        "which is exactly the set of things the tools above can change.";
+        "AI changes run inside one transaction per task. A task that fails or is cancelled is rolled "
+        "back to a snapshot of the project taken before its first change. A task that succeeds is "
+        "ONE entry on the editor's undo history, covering parameter values, the sequence, the "
+        "camera collection and camera track, timeline keys, modulation routes and added nodes, so "
+        "the user undoes it with the same Cmd+Z as their own edits. A node a task deletes cannot "
+        "be brought back by that undo.";
     return out;
 }
 

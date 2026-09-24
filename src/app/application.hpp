@@ -16,6 +16,7 @@
 #include "app/world_builder.hpp"
 #include "app/recent_files.hpp"
 #include "app/render_job.hpp"
+#include "app/render_source.hpp"
 #include "app/trace_sequence.hpp"
 #include "pathtrace/trace_job.hpp"
 #include "app/output_manager.hpp"
@@ -375,8 +376,12 @@ private:
     // generated rather than loaded and so cannot go through `Engine::loadFile`.
     [[nodiscard]] Result<void> openAny(const std::filesystem::path& path);
 
+    // `outputBase` resolves a relative output path; empty means the project file's own folder.
     [[nodiscard]] Result<std::unique_ptr<RenderJob>> makeRenderJob(const std::filesystem::path& projectFile,
-                                                                   RenderSettings settings);
+                                                                   RenderSettings settings,
+                                                                   const std::filesystem::path& outputBase = {});
+    // Writes the session to a fresh scratch copy for a render to load (never the person's file).
+    [[nodiscard]] Result<RenderSource> writeRenderSource(std::string_view tag);
     void startPathTraceFromUi();
     int runPathTrace();
     int runTraceSequence(const std::filesystem::path& projectFile, const PathTraceSettings& authored);
@@ -444,8 +449,16 @@ private:
     // playback has them -- but the editor showing a different world from the deliverable is a
     // worse trap than a slower editor, so it is one checkbox away.
     bool liftViewportLimits_ = false;
-    std::deque<std::pair<std::filesystem::path, RenderSettings>> uiQueue_;
-    std::filesystem::path renderProjectTemp_;
+    // A queued render: the scratch copy it will load, its settings, and where its output resolves.
+    // The copy is taken when the render is QUEUED, so it renders the session as it was then -- the
+    // same thing the old save-then-queue did, without writing over the person's file.
+    struct QueuedRender {
+        std::filesystem::path scratch;
+        RenderSettings settings;
+        std::filesystem::path outputBase;
+    };
+    std::deque<QueuedRender> uiQueue_;
+    std::uint64_t renderSerial_ = 0;
     RenderProgress lastRender_;
     // ADR-320's upload target: ONE 512x512 RGBA8 texture, created on the first frame that needs it
     // and then written into in place for the life of the process. Not resized per render and not

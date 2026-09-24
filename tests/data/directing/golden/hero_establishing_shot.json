@@ -1,0 +1,42 @@
+{
+  "description": "Create a 6 s establishing shot of Umbra at 0:45.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "umbra-establish",
+    "title": "Establishing Umbra",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "umbra",
+        "text": "the Umbra hero mushroom",
+        "hint": "hero"
+      }
+    ],
+    "shots": [
+      {
+        "key": "est",
+        "name": "umbra-establish",
+        "start": "0:45",
+        "durationSeconds": 6,
+        "subject": "umbra",
+        "locked": true,
+        "camera": [
+          {
+            "move": "wide"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 1,
+      "camera.shot": 1
+    },
+    "diff": [
+      "wide on umbra-cap"
+    ]
+  }
+}

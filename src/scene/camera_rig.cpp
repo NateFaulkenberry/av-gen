@@ -1,5 +1,7 @@
 #include "scene/camera_rig.hpp"
 
+#include <array>
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -44,6 +46,17 @@ std::optional<CameraPlacement> cameraPlacementFromName(std::string_view name) {
 
 const char* shotTransitionName(ShotTransition transition) {
     return kTransitionNames[static_cast<std::size_t>(transition)];
+}
+
+std::span<const ShotTransition> allShotTransitions() {
+    static const auto all = [] {
+        std::array<ShotTransition, std::size(kTransitionNames)> out{};
+        for (std::size_t i = 0; i < out.size(); ++i) {
+            out[i] = static_cast<ShotTransition>(i);
+        }
+        return out;
+    }();
+    return all;
 }
 
 std::optional<ShotTransition> shotTransitionFromName(std::string_view name) {

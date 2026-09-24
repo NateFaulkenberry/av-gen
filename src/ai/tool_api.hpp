@@ -101,6 +101,12 @@ struct ToolAnnotations {
     bool undoable = false;
     bool supportsCancellation = false;
     bool supportsProgress = false;
+    // The Director's safety model (spec §46-§47). `requiresApproval`: what the tool asks for changes
+    // the project only after a person approves it -- the tool itself changes nothing, and the task
+    // waits in `AwaitingApproval`. `deterministic`: the content it leads to renders the same way
+    // twice (the baked tier, ADR-091).
+    bool requiresApproval = false;
+    bool deterministic = false;
 
     [[nodiscard]] nlohmann::json toJson() const;
 };
