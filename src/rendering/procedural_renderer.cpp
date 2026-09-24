@@ -455,9 +455,10 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[0].buffer.hasDynamicOffset = true;
         entries[0].buffer.minBindingSize = sizeof(ObjectUniforms);
-        // ADR-703 (FXL): the per-owner effect records, read by `fs_proc` at `entityFx[fxA.w]`.
+        // ADR-703 (FXL): the per-owner effect records, read by `fs_proc` at `entityFx[fxA.w]` -- and
+        // (Wave 2) by `vs_proc` for the owner's displacement.
         entries[8].binding = 8;
-        entries[8].visibility = wgpu::ShaderStage::Fragment;
+        entries[8].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[8].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[8].buffer.minBindingSize = sizeof(world::EntityFxRecord);
         entries[1].binding = 1;

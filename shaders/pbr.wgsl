@@ -30,13 +30,44 @@ fn proceduralRungTier() -> f32 { return 0.0; }
 // pipeline that uses that layout -- SceneRenderer's, the skinned renderer's and the meshed SDFs'.
 @group(1) @binding(2) var<storage, read> entityFx: array<EntityFx>;
 
+// The entity vertex stage: `vs_main` (common.wgsl) plus the Effect Library's displacement (FXL
+// Wave 2 -- Breathing, Organic Pulsation, Motion Smear). The lit pipelines, the depth prepass and
+// every shadow view all draw entities with THIS entry, so a swelling owner's depth, shadow and colour
+// agree, and its previous-frame position is displaced at the previous frame's time (`windTune.w`,
+// which the renderer writes for every draw with a record), so its velocity is right. `fxA.z == 0`
+// -- every entity no lane effect touches -- is a uniform branch that runs `vs_main`'s arithmetic
+// unchanged.
+@vertex
+fn vs_entity(in: VertexIn) -> VertexOut {
+    var world = meshWorld(in);
+    var prevWorld = meshPrevWorld(in);
+    if (object.fxA.z != 0.0) {
+        let flags = u32(object.fxA.z + 0.5);
+        if ((flags & FX_DISPLACE) != 0u) {
+            let lanes = fxVertexLanesOf(entityFx[u32(object.fxA.w + 0.5)]);
+            let n = normalize((object.normalMatrix * vec4<f32>(in.normal, 0.0)).xyz);
+            // Both offsets are taken where the vertex is NOW (so the pattern is the same point of the
+            // owner), at this frame's time and at last frame's.
+            let off = fxVertexOffset(world.xyz, n, frame.params.x, flags, lanes);
+            let offPrev = fxVertexOffset(world.xyz, n, object.windTune.w, flags, lanes);
+            world = vec4<f32>(world.xyz + off, world.w);
+            prevWorld = vec4<f32>(prevWorld.xyz + offPrev, prevWorld.w);
+        }
+    }
+    return meshVertexOut(in, world, prevWorld);
+}
+
 @fragment
 fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
     let screenUv = in.clip.xy * frame.targetSize.zw;
     // ADR-703: this draw's effect lanes, for `shadeSurface` (pbr_shade.wgsl). A uniform branch: an
     // entity no lane effect touches has `fxA.z == 0`, reads no record, and leaves the lanes zero.
     if (object.fxA.z != 0.0) {
-        setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
+        let record = u32(object.fxA.w + 0.5);
+        setEntityFxLanes(object.fxA, object.fxB, entityFx[record]);
+        if ((u32(object.fxA.z + 0.5) & FX_EXT) != 0u) {
+            setEntityFxExt(entityFx[record + 1u]);
+        }
     }
     let shaded = shadeSurface(in.worldPos, in.normal, in.uv, frontFacing, vec3<f32>(1.0), vec3<f32>(1.0),
                               materialInstanceZero(in.localPos), screenUv);
@@ -51,6 +82,10 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     out.emission = vec4<f32>(shaded.emission + energy * max(object.energy2.w, 0.0),
                              shaded.bloomWeight);
     out.ids = packIds(object.ids.x, object.ids.y);
+    // Effect Library Wave 2: the clip's discard, last, after every derivative (pbr_shade.wgsl).
+    if (fxClipDiscard) {
+        discard;
+    }
     return out;
 }
 
@@ -71,6 +106,15 @@ fn orderedDither(pixel: vec2<f32>) -> f32 {
 
 @fragment
 fn fs_depth(in: VertexOut) {
+    // Effect Library Wave 2 (FXL): a dissolving or growing owner's clip, the same test the lit pass
+    // makes, so the prepass and every shadow map lose what the colour loses. Decided here (the gate
+    // is uniform per draw), discarded at the end, after the alpha test's texture sample: see
+    // `fxClipDiscard` in pbr_shade.wgsl for why a discard may not precede a derivative.
+    var clipped = false;
+    if (object.fxA.z != 0.0 && (u32(object.fxA.z + 0.5) & FX_CLIP) != 0u) {
+        setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
+        clipped = fxClipped(in.worldPos);
+    }
     let alphaMode = object.flags.x;
     let texMask = u32(object.flags.w + 0.5);
     var alpha = object.baseColor.a;
@@ -95,5 +139,8 @@ fn fs_depth(in: VertexOut) {
         if (alpha <= 0.0 || orderedDither(in.clip.xy) >= alpha) {
             discard;
         }
+    }
+    if (clipped) {
+        discard;
     }
 }

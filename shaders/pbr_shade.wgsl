@@ -44,8 +44,55 @@ struct EntityFxLanes {
     rim: vec4<f32>,      // record lane 3: rgb = rim radiance at grazing, w = rim power
     bandAxis: vec4<f32>, // record lane 4: u = dot(p, xyz) + w runs 0..1 across the owner
     band: vec4<f32>,     // record lane 5: x = centre, y = half width, z = waveform, w = depth
+    // Wave 2 (world::EntityFxLaneIndex 6..14): the owner frame and the clip.
+    frame0: vec4<f32>,   // lanes 6..8: world -> owner space q (rows)
+    frame1: vec4<f32>,
+    frame2: vec4<f32>,
+    shape: vec4<f32>,    // lane 9: xyz = the node's origin in q, w = gy (h = q.y * gy + 0.5)
+    clip: vec4<f32>,     // lane 10: x = mode, y = threshold, z = edge width, w = noise scale
+    clipEdge: vec4<f32>, // lane 11: rgb = edge radiance, w = breakup / direction bias
+    travel: vec4<f32>,   // lane 14 (only .w is read here: 1 / the largest radial distance)
 };
 var<private> entityFxLanes: EntityFxLanes;
+// Set by `shadeSurface` when the clip removes this fragment. The DISCARD is the includer's, at the
+// very end of its fragment entry, after every derivative and implicit-derivative sample: a discard
+// in non-uniform control flow ahead of them left the surviving neighbours of a quad reading
+// undefined derivatives on Metal, and one NaN from that blew the whole frame's exposure out (found
+// by the dissolve shadow test, whose frame went black). Only the includers that fill the lanes
+// (pbr.wgsl, procedural.wgsl) read it; for any other it stays false.
+var<private> fxClipDiscard: bool;
+
+// The extension record (world::EntityFxExtLane), read only when `kFxExt` is set.
+struct EntityFxExtLanes {
+    bio0: vec4<f32>,   // x = pattern, y = scale, z = coverage, w = colour variation
+    bio1: vec4<f32>,   // rgb = radiance, w = breathe rate (Hz)
+    bio2: vec4<f32>,   // x = breathe depth, y = wave speed, z = wave interval (s), w = wave gain
+    veins0: vec4<f32>, // x = scale, y = width, z = noise, w = coordinate (0 height, 1 radial)
+    veins1: vec4<f32>, // rgb = near radiance, w = pulse speed
+    veins2: vec4<f32>, // rgb = far radiance, w = pulse width
+    veins3: vec4<f32>, // x = pulse interval, y = glow between pulses
+    hue0: vec4<f32>,   // x = speed, y = range, z = spatial frequency, w = channel
+    hue1: vec4<f32>,   // xyz = axis (q), w = phase
+    rim0: vec4<f32>,   // rgb = radiance, w = power
+    rim1: vec4<f32>,   // xyz = direction (view space), w = threshold
+    rim2: vec4<f32>,   // x = softness
+};
+var<private> entityFxExt: EntityFxExtLanes;
+
+// The flag bits of `fxA.z` (world::EntityFxFlag).
+const FX_RECORD: u32 = 2u;
+const FX_BAND: u32 = 4u;
+const FX_BLOOM_SHARE: u32 = 8u;
+const FX_CLIP: u32 = 16u;
+const FX_INFLATE: u32 = 32u;
+const FX_TRAVEL: u32 = 64u;
+const FX_SMEAR: u32 = 128u;
+const FX_EXT: u32 = 256u;
+const FX_BIO: u32 = 512u;
+const FX_VEINS: u32 = 1024u;
+const FX_HUE: u32 = 2048u;
+const FX_RIM_LIGHT: u32 = 4096u;
+const FX_DISPLACE: u32 = 224u; // FX_INFLATE | FX_TRAVEL | FX_SMEAR
 
 // Fills the lanes from a draw's inline pair and its record. Called by each includer that binds the
 // record buffer (pbr.wgsl for entities and skinned characters, procedural.wgsl for procedural
@@ -57,6 +104,258 @@ fn setEntityFxLanes(a: vec4<f32>, b: vec4<f32>, record: EntityFx) {
     entityFxLanes.rim = record.lanes[3];
     entityFxLanes.bandAxis = record.lanes[4];
     entityFxLanes.band = record.lanes[5];
+    entityFxLanes.frame0 = record.lanes[6];
+    entityFxLanes.frame1 = record.lanes[7];
+    entityFxLanes.frame2 = record.lanes[8];
+    entityFxLanes.shape = record.lanes[9];
+    entityFxLanes.clip = record.lanes[10];
+    entityFxLanes.clipEdge = record.lanes[11];
+    entityFxLanes.travel = record.lanes[14];
+}
+
+// The extension record (index + 1), by the same includers, only when the flags carry FX_EXT.
+fn setEntityFxExt(record: EntityFx) {
+    entityFxExt.bio0 = record.lanes[0];
+    entityFxExt.bio1 = record.lanes[1];
+    entityFxExt.bio2 = record.lanes[2];
+    entityFxExt.veins0 = record.lanes[3];
+    entityFxExt.veins1 = record.lanes[4];
+    entityFxExt.veins2 = record.lanes[5];
+    entityFxExt.veins3 = record.lanes[6];
+    entityFxExt.hue0 = record.lanes[7];
+    entityFxExt.hue1 = record.lanes[8];
+    entityFxExt.rim0 = record.lanes[9];
+    entityFxExt.rim1 = record.lanes[10];
+    entityFxExt.rim2 = record.lanes[11];
+}
+
+// ---- Wave 2: the owner frame, the vertex sub-blocks and the clip ---------------------------------
+//
+// Everything below is reached only through a flag bit, so a draw whose flags do not carry it -- and
+// every draw with `fxA.z == 0` -- runs none of it. The vertex half is called from each includer's
+// vertex stage (pbr.wgsl `vs_entity`, procedural.wgsl `vs_proc`) for the current AND the previous
+// frame's time, so the velocity target sees the motion; the clip half from the lit fragment AND the
+// depth-only fragment, so the depth prepass and every shadow map lose exactly what the colour does.
+
+// A world point in its owner's space q: node-local, centred on the drawn bounds, divided by their
+// half diagonal (about [-1, 1]), so a pattern or a front rides the owner however it moves.
+fn fxOwnerSpace(p: vec3<f32>, f0: vec4<f32>, f1: vec4<f32>, f2: vec4<f32>) -> vec3<f32> {
+    let h = vec4<f32>(p, 1.0);
+    return vec3<f32>(dot(f0, h), dot(f1, h), dot(f2, h));
+}
+
+// The record lanes the vertex stage reads (world::EntityFxLaneIndex 6..9 and 12..15).
+struct FxVertexLanes {
+    frame0: vec4<f32>,
+    frame1: vec4<f32>,
+    frame2: vec4<f32>,
+    shape: vec4<f32>,
+    inflate: vec4<f32>, // x = amplitude (m), y = rate (Hz), z = asymmetry, w = phase
+    region: vec4<f32>,  // x = region centre (h), y = region width, z = bulge amplitude, w = bulge width
+    travel: vec4<f32>,  // x = speed (h/s), y = interval (h), z = direction, w = radial
+    smear: vec4<f32>,   // xyz = smear vector (m), w = sharpness
+};
+
+fn fxVertexLanesOf(record: EntityFx) -> FxVertexLanes {
+    var l: FxVertexLanes;
+    l.frame0 = record.lanes[6];
+    l.frame1 = record.lanes[7];
+    l.frame2 = record.lanes[8];
+    l.shape = record.lanes[9];
+    l.inflate = record.lanes[12];
+    l.region = record.lanes[13];
+    l.travel = record.lanes[14];
+    l.smear = record.lanes[15];
+    return l;
+}
+
+// One breath, x in cycles: 0 -> 1 -> 0, the swell taking `a` of the cycle and the fall the rest.
+// Asymmetry > 0 is a quick inhale and a long exhale.
+fn fxBreath(x: f32, asymmetry: f32) -> f32 {
+    let a = clamp(0.5 - 0.4 * asymmetry, 0.1, 0.9);
+    let u = fract(x);
+    if (u < a) {
+        return smoothstep(0.0, 1.0, u / a);
+    }
+    return 1.0 - smoothstep(0.0, 1.0, (u - a) / (1.0 - a));
+}
+
+// Where the displacement sub-blocks move a vertex at world position `p` with world normal `n`, at
+// transport second `t`. The modes SUM (rendering-architecture §7): a Breathing, an Organic Pulsation
+// and a Motion Smear on one owner all move it. Only the vertex's position is displaced; the normal is
+// the undisplaced one (a swell of a few centimetres does not need a new normal).
+fn fxVertexOffset(p: vec3<f32>, n: vec3<f32>, t: f32, flags: u32, l: FxVertexLanes) -> vec3<f32> {
+    var off = vec3<f32>(0.0);
+    if ((flags & (FX_INFLATE | FX_TRAVEL)) != 0u) {
+        let q = fxOwnerSpace(p, l.frame0, l.frame1, l.frame2);
+        let h = q.y * l.shape.w + 0.5;
+        if ((flags & FX_INFLATE) != 0u) {
+            var region = 1.0;
+            if (l.region.y > 0.0) {
+                let d = (h - l.region.x) / l.region.y;
+                region = exp(-d * d);
+            }
+            off = off + n * (l.inflate.x * fxBreath(t * l.inflate.y + l.inflate.w, l.inflate.z) * region);
+        }
+        if ((flags & FX_TRAVEL) != 0u) {
+            let s = select(1.0 - h, h, l.travel.z > 0.0);
+            let interval = max(l.travel.y, 1e-3);
+            let u = s - l.travel.x * t;
+            let d = (fract(u / interval + 0.5) - 0.5) * interval;
+            let w = max(l.region.w, 1e-3);
+            off = off + n * (l.region.z * exp(-(d * d) / (w * w)));
+        }
+    }
+    if ((flags & FX_SMEAR) != 0u) {
+        let len = length(l.smear.xyz);
+        let dir = l.smear.xyz / max(len, 1e-6);
+        off = off + l.smear.xyz * pow(clamp(dot(n, dir), 0.0, 1.0), l.smear.w);
+    }
+    return off;
+}
+
+// The clip's keep-value at a world point: kept where k >= the threshold (lane 10.y), which the CPU
+// chose so that "nothing hidden" keeps every k and draws no edge, and "all hidden" keeps none
+// (world::entityFxClipThreshold). Noise: a dissolve, optionally swept by height (bias > 0 from the
+// bottom up, < 0 from the top down). Height and Radial: a growth front, tip or rim first to go and
+// last to come, with noise breaking the front up.
+fn fxClipKeep(worldPos: vec3<f32>) -> f32 {
+    let l = entityFxLanes;
+    let q = fxOwnerSpace(worldPos, l.frame0, l.frame1, l.frame2);
+    let mode = u32(l.clip.x + 0.5);
+    let h = q.y * l.shape.w + 0.5;
+    let breakup = l.clipEdge.w;
+    let noise = fbm3(q * l.clip.w + vec3<f32>(3.7, 1.3, 5.1), 7u);
+    if (mode == 1u) {
+        let k = clamp((noise - 0.5) * 2.0 + 0.5, 0.0, 1.0);
+        return select(mix(k, 1.0 - h, -breakup), mix(k, h, breakup), breakup >= 0.0);
+    }
+    var k = 1.0 - h;
+    if (mode == 3u) {
+        k = 1.0 - length(q - l.shape.xyz) * l.travel.w;
+    }
+    return k + breakup * 0.5 * (noise - 0.5);
+}
+
+// True where the clip removes this fragment; the depth-only entries call this and discard.
+fn fxClipped(worldPos: vec3<f32>) -> bool {
+    return fxClipKeep(worldPos) < entityFxLanes.clip.y;
+}
+
+// The world size of one pixel at a view depth, stretched by grazing: how fine a pattern may get before
+// it has to fade to its mean rather than alias. Derivative-free (the pattern branches are uniform per
+// draw, but the analysis cannot see that through a private variable), from the projection's focal
+// scale -- row 1 of viewProj is P11 times the camera's unit up axis.
+fn fxFootprint(viewDepth: f32, nDotV: f32) -> f32 {
+    let focal = length(vec3<f32>(frame.viewProj[0].y, frame.viewProj[1].y, frame.viewProj[2].y));
+    return viewDepth * 2.0 / max(focal * frame.targetSize.y, 1e-4) / max(nDotV, 0.25);
+}
+
+// Hue rotation about the grey axis (Rodrigues), `turns` of the wheel; luminance is nearly kept.
+fn fxHueRotate(c: vec3<f32>, turns: f32) -> vec3<f32> {
+    let a = turns * 6.28318530718;
+    let k = vec3<f32>(0.57735027);
+    let cs = cos(a);
+    return max(c * cs + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cs), vec3<f32>(0.0));
+}
+
+// Color Cycling: how far the hue is turned here and now. A range of a whole turn or more runs round
+// the wheel; less swings back and forth within it.
+fn fxHueTurns(worldPos: vec3<f32>) -> f32 {
+    let e = entityFxExt;
+    let l = entityFxLanes;
+    let q = fxOwnerSpace(worldPos, l.frame0, l.frame1, l.frame2);
+    let phase = frame.params.x * e.hue0.x + dot(q, e.hue1.xyz) * e.hue0.z + e.hue1.w;
+    if (e.hue0.y >= 1.0) {
+        return phase;
+    }
+    return e.hue0.y * 0.5 * sin(6.28318530718 * phase);
+}
+
+// Bioluminescence: photophores, stripes or cell walls in owner space, each cell breathing on its own
+// phase, with a slow wave rolling up the body now and then. Fades to its mean coverage where a cell
+// is smaller than about a pixel, so a distant creature glows evenly instead of sparkling.
+fn fxBioAt(worldPos: vec3<f32>, viewDepth: f32, nDotV: f32) -> vec3<f32> {
+    let e = entityFxExt;
+    let l = entityFxLanes;
+    let q = fxOwnerSpace(worldPos, l.frame0, l.frame1, l.frame2);
+    let scale = e.bio0.y;
+    let p = q * scale;
+    let cov = clamp(e.bio0.z, 0.0, 1.0);
+    let foot = fxFootprint(viewDepth, nDotV) * length(l.frame0.xyz) * scale; // pixels, in cells
+    let soft = max(0.04, foot);
+    let pattern = u32(e.bio0.x + 0.5);
+    var mask = 0.0;
+    var cell = 0.0;
+    var mean = 0.0;
+    if (pattern == 2u) { // stripes, wavering round the body
+        let s = q.y * scale + 0.6 * (fbm3(p * 0.5, 13u) - 0.5);
+        let f = fract(s) - 0.5;
+        let halfWidth = mix(0.06, 0.4, cov);
+        mask = 1.0 - smoothstep(halfWidth - soft, halfWidth + soft, abs(f));
+        cell = hash01(vec3<i32>(i32(floor(s)), 0, 0), 17u);
+        mean = 2.0 * halfWidth;
+    } else {
+        let w = worleyF1F2(p, 11u);
+        cell = w.z;
+        if (pattern == 3u) { // cell walls
+            let width = mix(0.03, 0.22, cov);
+            mask = 1.0 - smoothstep(width - soft, width + soft, w.y - w.x);
+            mean = 2.5 * width;
+        } else { // spots
+            let r0 = mix(0.12, 0.45, cov);
+            mask = 1.0 - smoothstep(r0 - soft, r0 + soft, w.x);
+            mean = 2.0 * r0 * r0;
+        }
+    }
+    mask = mix(mask, clamp(mean, 0.0, 1.0), smoothstep(0.35, 1.2, foot));
+    let t = frame.params.x;
+    // Asynchronous breathing: every cell on its own phase.
+    let breathe = 1.0 - e.bio2.x * (0.5 + 0.5 * sin(6.28318530718 * (t * e.bio1.w + cell)));
+    // The wave: once every `interval` seconds a band rolls from the bottom of the body to the top.
+    let h = q.y * l.shape.w + 0.5;
+    let front = (t - floor(t / e.bio2.z) * e.bio2.z) * e.bio2.y - 0.2;
+    let dw = (h - front) / 0.12;
+    let wave = e.bio2.w * exp(-dw * dw);
+    let color = fxHueRotate(e.bio1.rgb, (cell - 0.5) * e.bio0.w);
+    return color * mask * (breathe + wave);
+}
+
+// Pulsing Veins: the edges of a domain-warped Worley field (F2 - F1 small) as a vein network,
+// thinning away from the source, with pulses of light travelling outward along it.
+fn fxVeinsAt(worldPos: vec3<f32>, viewDepth: f32, nDotV: f32) -> vec3<f32> {
+    let e = entityFxExt;
+    let l = entityFxLanes;
+    let q = fxOwnerSpace(worldPos, l.frame0, l.frame1, l.frame2);
+    let scale = e.veins0.x;
+    var p = q * scale;
+    p = p + e.veins0.z * fbm3Vec(p * 0.45, 19u);
+    let w = worleyF1F2(p, 23u);
+    let c = select(q.y * l.shape.w + 0.5, length(q - l.shape.xyz) * l.travel.w, e.veins0.w > 0.5);
+    let width = e.veins0.y * mix(1.0, 0.45, clamp(c, 0.0, 1.0));
+    let foot = fxFootprint(viewDepth, nDotV) * length(l.frame0.xyz) * scale;
+    let soft = max(width * 0.35, foot * 0.5);
+    var mask = 1.0 - smoothstep(width - soft, width + soft, w.y - w.x);
+    mask = mix(mask, clamp(width * 2.5, 0.0, 1.0), smoothstep(width * 2.0, width * 8.0, foot));
+    let interval = max(e.veins3.x, 1e-3);
+    let u = c - e.veins1.w * frame.params.x;
+    let d = (fract(u / interval + 0.5) - 0.5) * interval;
+    let pw = max(e.veins2.w, 1e-3);
+    let pulse = exp(-(d * d) / (pw * pw));
+    let intensity = e.veins3.y + (1.0 - e.veins3.y) * pulse;
+    return mix(e.veins1.rgb, e.veins2.rgb, clamp(c, 0.0, 1.0)) * mask * intensity;
+}
+
+// Rim Light: a kicker. Grazing (1 - N.V)^power, but only on the side facing the rim direction, which
+// is fixed in VIEW space so it frames the same way wherever the camera goes.
+fn fxRimLightAt(n: vec3<f32>, v: vec3<f32>) -> vec3<f32> {
+    let e = entityFxExt;
+    let d = e.rim1.xyz;
+    let dir = normalize(frame.cameraRight.xyz * d.x + frame.cameraUp.xyz * d.y + frame.cameraForward.xyz * d.z);
+    let facing = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), max(e.rim0.w, 0.05));
+    let soft = max(e.rim2.x, 1e-3);
+    let side = smoothstep(e.rim1.w - soft, e.rim1.w + soft, dot(n, dir));
+    return e.rim0.rgb * facing * side;
 }
 
 // One cycle of a pulse waveform, x in [0, 1): 0 at both ends, 1 at the crest. The GPU twin of
@@ -403,6 +702,31 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     }
     let alpha = select(1.0, baseColor.a, alphaMode > 1.5);
 
+    // ---- Wave 2 (FXL): the clip and the hue cycle on the base colour ----
+    // Both behind their own flag bit, read from the lanes the includer filled behind `fxA.z != 0`.
+    let fxSurface = u32(entityFxLanes.a.z + 0.5);
+    var fxEdge = vec3<f32>(0.0);
+    if ((fxSurface & FX_CLIP) != 0u) {
+        // The same test `fs_depth` makes (`fxClipped`), so the prepass and the shadows lose exactly
+        // these fragments. Discarded by the includer at the end of its entry point; see above.
+        let keep = fxClipKeep(worldPos) - entityFxLanes.clip.y;
+        fxClipDiscard = keep < 0.0;
+        let w = max(entityFxLanes.clip.z, 1e-4);
+        fxEdge = entityFxLanes.clipEdge.rgb * (1.0 - smoothstep(0.0, w, keep));
+        if (u32(entityFxLanes.clip.x + 0.5) == 1u) {
+            // A dissolve chars just behind its burning edge.
+            let charred = 1.0 - smoothstep(w, 3.0 * w, keep);
+            baseColor = vec4<f32>(baseColor.rgb * (1.0 - 0.85 * charred), baseColor.a);
+        }
+    }
+    var fxHue = 0.0;
+    if ((fxSurface & FX_HUE) != 0u) {
+        fxHue = fxHueTurns(worldPos);
+        if (entityFxExt.hue0.w < 0.5 || entityFxExt.hue0.w > 1.5) {
+            baseColor = vec4<f32>(fxHueRotate(baseColor.rgb, fxHue), baseColor.a);
+        }
+    }
+
     // ---- ADR-703: the entity's effect lanes (FXL) ----
     //
     // `fxFlags == 0` is every draw no lane effect touches, and the branch below is skipped whole --
@@ -424,6 +748,27 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
             let rim = entityFxLanes.rim.rgb * pow(1.0 - facing, max(entityFxLanes.rim.w, 0.05));
             fxAdded = (entityFxLanes.add.rgb + rim) * gain;
         }
+        // Wave 2: the patterns and the kicker are added light like the glow, under the same gain (a
+        // Pulse on the owner pulses them); the clip's edge is its own light and is not.
+        if ((fxFlags & (FX_BIO | FX_VEINS | FX_RIM_LIGHT)) != 0u) {
+            let nDotV = clamp(dot(n, v), 0.0, 1.0);
+            var pattern = vec3<f32>(0.0);
+            if ((fxFlags & FX_BIO) != 0u) {
+                pattern = pattern + fxBioAt(worldPos, viewDepth, nDotV);
+            }
+            if ((fxFlags & FX_VEINS) != 0u) {
+                pattern = pattern + fxVeinsAt(worldPos, viewDepth, nDotV);
+            }
+            if ((fxFlags & FX_RIM_LIGHT) != 0u) {
+                pattern = pattern + fxRimLightAt(n, v);
+            }
+            fxAdded = fxAdded + pattern * gain;
+        }
+        if ((fxFlags & FX_HUE) != 0u && entityFxExt.hue0.w > 0.5) {
+            matEmissive = vec4<f32>(fxHueRotate(matEmissive.rgb, fxHue), matEmissive.w);
+            fxAdded = fxHueRotate(fxAdded, fxHue);
+        }
+        fxAdded = fxAdded + fxEdge;
     }
     let emissiveBase = matEmissive.rgb * emissiveMul;
     var emissive = emissiveBase * matEmissive.w;

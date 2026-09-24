@@ -470,6 +470,23 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
         p2 = p2 + bendDisplacement(srcPos.y + t2.y * eps, bend, proc.windTiming, proc.windPlant,
                                    inst.scale.y);
     }
+    // ---- Effect Library Wave 2 (FXL): the owner's displacement -- Breathing, Organic Pulsation,
+    // Motion Smear -- on all three points, so the finite-difference normal below leans with a
+    // travelling bulge. Uniform per draw; `fxA.z == 0` (every object no lane effect touches) skips it.
+    let p0Rest = p0;
+    var fxMoves = false;
+    var fxLanes: FxVertexLanes;
+    var fxFlags = 0u;
+    if (object.fxA.z != 0.0) {
+        fxFlags = u32(object.fxA.z + 0.5);
+        if ((fxFlags & FX_DISPLACE) != 0u) {
+            fxMoves = true;
+            fxLanes = fxVertexLanesOf(entityFx[u32(object.fxA.w + 0.5)]);
+            p0 = p0 + fxVertexOffset(p0, nRef, now, fxFlags, fxLanes);
+            p1 = p1 + fxVertexOffset(p1, nRef, now, fxFlags, fxLanes);
+            p2 = p2 + fxVertexOffset(p2, nRef, now, fxFlags, fxLanes);
+        }
+    }
     var nw = cross(p1 - p0, p2 - p0);
     if (dot(nw, nw) < 1e-30) {
         nw = nRef;
@@ -488,6 +505,10 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     var pPrev = deformChain(srcPos, n, nRef, inst, proc.prevInfo.x, object.prevModel);
     if (proc.windSway.w > 0.5) {
         pPrev = pPrev + bendDisplacement(srcPos.y, bendPrev, proc.windTiming, proc.windPlant, inst.scale.y);
+    }
+    if (fxMoves) {
+        // At the same point of the owner, at last frame's time: the velocity sees the swell.
+        pPrev = pPrev + fxVertexOffset(p0Rest, nRef, proc.prevInfo.x, fxFlags, fxLanes);
     }
     out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
     return out;
@@ -512,7 +533,11 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     // ADR-703: this object's effect lanes; uniform per draw, and zero for every object no lane
     // effect touches, which leaves `shadeSurface` exactly as it was.
     if (object.fxA.z != 0.0) {
-        setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
+        let record = u32(object.fxA.w + 0.5);
+        setEntityFxLanes(object.fxA, object.fxB, entityFx[record]);
+        if ((u32(object.fxA.z + 0.5) & FX_EXT) != 0u) {
+            setEntityFxExt(entityFx[record + 1u]);
+        }
     }
     let shaded = shadeSurface(in.worldPos, in.normal, in.uv, frontFacing, in.instColor.rgb, emissiveMul, info,
                               screenUv);
@@ -522,6 +547,10 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     out.velocity = screenVelocityAt(in.clip, in.prevClip);
     out.emission = vec4<f32>(shaded.emission, shaded.bloomWeight);
     out.ids = packIds(object.ids.x, object.ids.y);
+    // Effect Library Wave 2: the clip's discard, last, after every derivative (pbr_shade.wgsl).
+    if (fxClipDiscard) {
+        discard;
+    }
     return out;
 }
 
@@ -529,6 +558,14 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
 // matches the lit pass and instanced procedural geometry casts shadows (ADR-034).
 @fragment
 fn fs_proc_depth(in: ProcVertexOut) {
+    // Effect Library Wave 2 (FXL): the owner's clip, as the lit pass makes it, so a dissolving
+    // saucer's shadow dissolves with it. Decided here (uniform gate), discarded after the alpha
+    // test's texture sample -- a discard may not precede a derivative (pbr_shade.wgsl).
+    var clipped = false;
+    if (object.fxA.z != 0.0 && (u32(object.fxA.z + 0.5) & FX_CLIP) != 0u) {
+        setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
+        clipped = fxClipped(in.worldPos);
+    }
     if (object.flags.x > 0.5 && object.flags.x < 1.5) {
         var opacity = object.baseColor.a;
         if ((u32(object.flags.w + 0.5) & 1u) != 0u) {
@@ -537,5 +574,8 @@ fn fs_proc_depth(in: ProcVertexOut) {
         if (opacity < object.flags.y) {
             discard;
         }
+    }
+    if (clipped) {
+        discard;
     }
 }
