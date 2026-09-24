@@ -1,8 +1,8 @@
 # AV Gen Director System — Development Progress
-Last updated: 2026-09-24 13:20
+Last updated: 2026-09-24 13:45
 Current branch: `agent/director` (worktree `../av-gen-director`, branched from `main` at 13bc030f)
 Current commit: 8e0e1752
-Overall status: Slice 0 implemented except the effect domain (blocked on ADR-702 merging); full-suite verification in progress
+Overall status: Slice 0 complete except the effect domain (blocked on ADR-702 merging); both full suites green
 
 ## Executive status
 Slice 0 (Foundations) is implemented and tested, with one domain deliberately deferred. The five
@@ -50,7 +50,7 @@ What the Slice 0 percentages leave out, honestly:
 Close Slice 0: run both full suites, then report. Then Slice 1.1, the Director Plan schema.
 
 ### Subtasks
-- [~] Full CPU suite (release) and full GPU suite
+- [x] Full CPU suite (release) and full GPU suite: both exit 0
 - [ ] Measure `EntityWorld::seek` on the benchmark (ADR-700 claims 17.9 ms worst after the first)
 - [ ] Slice 1.1: Plan schema ADR, `directing::Plan` with versioned JSON, round-trip tests
 
@@ -228,8 +228,11 @@ undo, serialization or compilation will be built on them.
 - New: 18 `[directing]` cases (persistence 6, undo 5, preview 2, capabilities 5), all passing
   (release). `[ai]` 84, `[edits]` 9, `[undo]` 8 and `[camera]` 124 pass. TSan: `[ai]` +
   `[directing][undo]`, 0 warnings.
-- Full CPU suite: running (baseline on main: 3,161 cases, 1 expected `[!shouldfail]`).
-- Full GPU suite: not yet run.
+- **Full CPU suite (release, 2026-09-24, at 8e0e1752):** exit 0. 3,179 cases (the baseline's
+  3,161 plus 18 new): 3,162 passed, 16 skipped (hardware-gated), 1 failed as expected (the
+  `[!shouldfail]` at test_character_lab_slopes.cpp:187). One summary; only this worktree's paths.
+- **Full GPU suite (release):** exit 0. 415 cases: 414 passed, 1 skipped ("NDI sender publishes…",
+  libndi not installed on this machine; environmental, unrelated).
 
 ## Recent changes
 - 2026-09-24: 8b498988 camera direction persistence · 0a265b79 audit + ADR-750 · f142315a unified
