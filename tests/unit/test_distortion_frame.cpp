@@ -5,6 +5,11 @@
 // big, which way it is stretched, what it excludes, whether it exists at all this second, and what
 // the 65th live warp is told.
 
+#include "assets/asset_registry.hpp"
+#include "core/time.hpp"
+#include "params/modulation.hpp"
+#include "params/parameter_set.hpp"
+#include "scene/composition.hpp"
 #include "world/effects/distortion_frame.hpp"
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -16,6 +21,7 @@
 #include <glm/glm.hpp>
 
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -310,4 +316,39 @@ TEST_CASE("every Space Warp style is a complete look that names itself", "[effec
                   fresh.values.getFloat(std::string("spaceWarp/") + leaf, -2.0f));
         }
     }
+}
+
+TEST_CASE("a procedural node's drawn view has bounds, so an effect on it can fit and exclude them",
+          "[effects][distortion][composition]") {
+    // Glowmere's `visitor` saucer is a PROCEDURAL node (one placed asset), which draws through its
+    // own cloud rather than through scene entities. `nodeView` read only entities, so the saucer had
+    // no bounds, its Space Warp fell back to a warp at a point with nothing excluded, and the saucer
+    // bent itself. The drawn view now reads the procedural's tight pair, as `nodeBounds` does.
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(std::filesystem::temp_directory_path());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+    scene::CompositionNode node;
+    node.name = "craft";
+    node.kind = scene::NodeKind::Procedural;
+    node.procedural.name = "craft";
+    node.procedural.source.kind = scene::PrimitiveKind::Box;
+    node.procedural.distribution.kind = scene::DistributionKind::Single;
+    node.transform.position = glm::vec3(5.0f, 12.0f, -40.0f);
+    REQUIRE(comp.addNode(std::move(node)));
+    params.resetFinals();
+    comp.update(FrameTime{});
+
+    world::NodeView view;
+    REQUIRE(comp.nodeView("craft", view));
+    CHECK(view.entityCount == 0); // drawn by its procedural, not by entities
+    REQUIRE(view.hasBounds);
+    const scene::WorldBounds bounds = comp.nodeBounds("craft");
+    REQUIRE(bounds.valid);
+    CHECK(glm::length(view.boundsMin - bounds.min) < 1e-4f);
+    CHECK(glm::length(view.boundsMax - bounds.max) < 1e-4f);
+    const glm::vec3 centre = 0.5f * (view.boundsMin + view.boundsMax);
+    CHECK(glm::length(centre - glm::vec3(5.0f, 12.0f, -40.0f)) < 2.0f);
 }
