@@ -243,16 +243,16 @@ TEST_CASE("the subscription survives save and load, both halves",
     // passes when a key is missing from BOTH directions. So the value is checked by name on the way
     // out and by value on the way back, and the document is checked for the key's presence.
     world::EffectInstance e = world::glowmereAurora("Valley Aurora");
-    e.flow.field = "atmos/Cosmic Vortex";
+    e.flow.field = "fx/cosmic-vortex";
     e.flow.influence = 1.37f;
 
     const nlohmann::json doc = e.toJson();
     REQUIRE(doc.contains("flow"));
-    CHECK(doc.at("flow").at("field").get<std::string>() == "atmos/Cosmic Vortex");
+    CHECK(doc.at("flow").at("field").get<std::string>() == "fx/cosmic-vortex");
 
     const auto back = world::EffectInstance::fromJson(doc);
     REQUIRE(back.has_value());
-    CHECK(back->flow.field == "atmos/Cosmic Vortex");
+    CHECK(back->flow.field == "fx/cosmic-vortex");
     CHECK(back->flow.influence == Catch::Approx(1.37f));
 
     // A document written before §68 existed has no `flow` block and must load as an unsubscribed
@@ -382,7 +382,7 @@ TEST_CASE("a subscribed frame is a pure function of the transport second",
     // break it, so the frame it produces is built in ascending order and then in scrambled order
     // and the two must agree exactly.
     fx::FieldBus bus = windBus();
-    bus.publishVortex(fx::vortexFieldName("Cosmic Vortex"), vortex::packVortex(funnel()));
+    bus.publishVortex(fx::vortexFieldName("cosmic-vortex"), vortex::packVortex(funnel()));
 
     std::vector<world::EffectInstance> effects;
     effects.push_back(world::bioluminescentComet("Streak"));

@@ -3,7 +3,8 @@
 
 Derived from `glowmere-valley-2` rather than authored fresh: the point of the demonstration is the
 two new effects, and a second valley would be a second thing to keep in step. The scene is Glowmere's
-scene plus an `atmosphericEffects` array; the project is Glowmere's project with a camera that looks
+scene with the sky effects added to its `effects` array (ADR-702: one list, every owner's -- the
+World's sky effects above Glowmere's own travel beam and per-hero pulses); the project is Glowmere's project with a camera that looks
 at the sky, the effects' audio routes, and a `sequence` block that fires them.
 
 Why a separate example rather than an edit to `glowmere-valley-2`:
@@ -28,6 +29,9 @@ import math
 import os
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from migrate_effects import slug  # noqa: E402  -- the engine's id slug, mirrored once
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_SCENE = os.path.join(REPO, "examples/world/glowmere-valley-2.scene.json")
@@ -95,11 +99,20 @@ def sky_direction(azimuth_deg, elevation_deg):
     return [horizontal * math.sin(az), math.sin(el), horizontal * math.cos(az)]
 
 
+def fx(name):
+    """`fx/<id>/`: ADR-702's parameter prefix, keyed by the id this script gives the effect."""
+    return "fx/%s/" % slug(name)
+
+
 def preset(tool, style, name):
+    """One ADR-702 instance, as the engine's own preset dump writes it, given the id a scene holds."""
     out = subprocess.run([tool, style, name], capture_output=True, text=True)
     if out.returncode != 0:
         sys.exit("avgen_atmos_presets %r failed: %s" % (style, out.stderr.strip()))
-    return json.loads(out.stdout)
+    effect = json.loads(out.stdout)
+    effect["id"] = slug(name)
+    effect["owner"] = {"kind": "world"}
+    return effect
 
 
 def build_effects(tool):
@@ -112,7 +125,7 @@ def build_effects(tool):
     # -- slide against them. The two anchoring modes in one shot is the parallax demonstration.
     aurora = preset(tool, "Glowmere Bioluminescence", "Valley Aurora")
     aurora["timing"].update(dict(fadeIn=3.0, fadeOut=0.0, windowStart=0.0, windowSeconds=0.0))
-    aurora["aurora"]["shape"].update(dict(
+    aurora["parameters"]["shape"].update(dict(
         anchor="camera",
         curtainCount=4.0,
         radius=5200.0,
@@ -122,8 +135,8 @@ def build_effects(tool):
         baseHeight=-120.0,
         curtainHeight=4200.0,
     ))
-    aurora["aurora"]["appearance"].update(dict(intensity=3.6, edgeBrightness=3.2, horizonGlow=0.75))
-    aurora["aurora"]["audio"].update(dict(
+    aurora["parameters"]["appearance"].update(dict(intensity=3.6, edgeBrightness=3.2, horizonGlow=0.75))
+    aurora["parameters"]["audio"].update(dict(
         bass=0.95, lowMid=0.60, mid=0.50, high=0.80, beat=0.40,
         sensitivity=1.15, spectrumShape=0.80,
     ))
@@ -138,7 +151,7 @@ def build_effects(tool):
         # controlled comet event" a real demonstration rather than an event that writes the value
         # the file already had -- which would be indistinguishable from no sequencer at all.
         comet["timing"].update(dict(windowStart=3000.0, windowSeconds=seconds))
-        comet["comet"]["path"].update(path)
+        comet["parameters"]["path"].update(path)
         # The hero comet is the one section 6 is about: a low, bright, close pass that has something
         # to say to the ground. The burst comets are further off and leave the valley alone, which
         # is what stops three simultaneous washes flattening the scene.
@@ -150,6 +163,10 @@ def build_effects(tool):
         else:
             comet["ground"]["mode"] = "off"
         effects.append(comet)
+    # The World's stack, top to bottom, in the order they are listed (validateEffects refuses a
+    # stack whose orders are not 0..n-1).
+    for i, effect in enumerate(effects):
+        effect["order"] = i
     return effects
 
 
@@ -186,7 +203,7 @@ def routes(effects):
             "chain": {"attackMs": attack, "decayMs": decay},
         })
 
-    aurora = "atmos/Valley Aurora/"
+    aurora = fx("Valley Aurora")
     add("audio.bass", aurora + "curtainHeight", 900.0, 60.0, 420.0)
     add("audio.rms", aurora + "intensity", 0.8, 80.0, 500.0)
     add("audio.lowMid", aurora + "waveAmplitude", 0.12, 50.0, 380.0)
@@ -195,7 +212,7 @@ def routes(effects):
     add("beat.pulse", aurora + "edgeBrightness", 1.1, 10.0, 260.0)
 
     for _, name, _, _, _ in COMETS:
-        base = "atmos/%s/" % name
+        base = fx(name)
         add("audio.rms", base + "coreIntensity", 6.0, 60.0, 400.0)
         add("beat.pulse", base + "tailIntensity", 1.4, 10.0, 280.0)
         add("audio.treble", base + "sparkleIntensity", 4.0, 20.0, 220.0)
@@ -205,7 +222,7 @@ def routes(effects):
 def sequence():
     """The sequencer's half (brief section 7).
 
-    Every one of these is `EventActionKind::SetParameter` aimed at an `atmos/<name>/<property>`
+    Every one of these is `EventActionKind::SetParameter` aimed at an `fx/<id>/<property>`
     path, which is the whole of "use the existing timeline/event infrastructure": the events bake to
     `params::Track` keys through `bakeEventFirings` exactly as a fog-density event does, and there
     is no atmospheric-effect verb because there does not need to be one.
@@ -228,9 +245,9 @@ def sequence():
     # it asks for. Authored at t = 0 with the value the scene already states, so they change nothing
     # except giving every ramp below something to ramp *from*.
     events = [
-        event("aurora.base", 0.0, "atmos/Valley Aurora/intensity", 3.6),
-        event("aurora.base.top", 0.0, "atmos/Valley Aurora/topColor", 0.58),
-        event("comet.hero.base", 0.0, "atmos/Hero Comet/speed", 1.0),
+        event("aurora.base", 0.0, fx("Valley Aurora") + "intensity", 3.6),
+        event("aurora.base.top", 0.0, fx("Valley Aurora") + "topColor", 0.58),
+        event("comet.hero.base", 0.0, fx("Hero Comet") + "speed", 1.0),
     ]
     # Each comet's window starts parked past the end of the piece, and stays parked until its launch
     # event moves it in. Without these baselines the launch value holds *backwards* to t = 0 -- the
@@ -238,25 +255,25 @@ def sequence():
     # not the sequencer ever fired, which is a demonstration of nothing.
     for _, name, _, _, _ in COMETS:
         events.append(event("%s.parked" % name.lower().replace(" ", "."), 0.0,
-                            "atmos/%s/windowStart" % name, 3000.0))
+                            fx(name) + "windowStart", 3000.0))
     events += [
         # Aurora intensity transition: a swell into the second half of the piece and a settle after.
-        event("aurora.swell", 14.0, "atmos/Valley Aurora/intensity", 4.6, seconds=3.0),
-        event("aurora.settle", 26.5, "atmos/Valley Aurora/intensity", 2.4, seconds=3.0),
+        event("aurora.swell", 14.0, fx("Valley Aurora") + "intensity", 4.6, seconds=3.0),
+        event("aurora.settle", 26.5, fx("Valley Aurora") + "intensity", 2.4, seconds=3.0),
         # Aurora colour transition: the curtain's top drifts violet as the comets arrive.
-        event("aurora.violet", 15.0, "atmos/Valley Aurora/topColor", 0.92, seconds=4.0),
+        event("aurora.violet", 15.0, fx("Valley Aurora") + "topColor", 0.92, seconds=4.0),
         # Comet launch, authored as a window move rather than as a new verb: the effect is already
         # there and dormant, and starting it is one number.
-        event("comet.hero.launch", 5.5, "atmos/Hero Comet/windowStart", 6.0),
-        event("comet.rainbow.launch", 14.5, "atmos/Rainbow Comet/windowStart", 15.0),
+        event("comet.hero.launch", 5.5, fx("Hero Comet") + "windowStart", 6.0),
+        event("comet.rainbow.launch", 14.5, fx("Rainbow Comet") + "windowStart", 15.0),
         # Comet burst: three launches inside two and a half seconds.
-        event("comet.burst.1", 20.0, "atmos/Burst Emerald/windowStart", 20.5),
-        event("comet.burst.2", 20.0, "atmos/Burst Magenta/windowStart", 21.6),
-        event("comet.burst.3", 20.0, "atmos/Burst Spark/windowStart", 23.0),
+        event("comet.burst.1", 20.0, fx("Burst Emerald") + "windowStart", 20.5),
+        event("comet.burst.2", 20.0, fx("Burst Magenta") + "windowStart", 21.6),
+        event("comet.burst.3", 20.0, fx("Burst Spark") + "windowStart", 23.0),
         # Comet speed change on the hero, so section 7's "speed changes" has a demonstration.
-        event("comet.hero.accelerate", 9.0, "atmos/Hero Comet/speed", 1.25, seconds=1.5),
+        event("comet.hero.accelerate", 9.0, fx("Hero Comet") + "speed", 1.25, seconds=1.5),
         # Aurora fade-out at the very end.
-        event("aurora.fadeout", 28.5, "atmos/Valley Aurora/intensity", 0.6, seconds=1.5),
+        event("aurora.fadeout", 28.5, fx("Valley Aurora") + "intensity", 0.6, seconds=1.5),
     ]
     return {"events": events}
 
@@ -271,10 +288,17 @@ def main():
     # ---- the scene ----
     scene = json.load(open(SRC_SCENE))
     scene["name"] = "Glowmere Atmospherics"
-    scene["atmosphericEffects"] = build_effects(args.presets)
-    # The world effects Glowmere ships are gated on a director's cut this demonstration does not
-    # have, so they would never fire. Left in place rather than removed: they are part of what
-    # Glowmere is, and an empty `cameraShotSpans` is already the honest "nothing is directing".
+    # The sky effects go on top of the World's stack; Glowmere's own effects -- its travel beam on the
+    # World, one Ground Pulse per hero -- follow, renumbered below them. They are gated on a
+    # director's cut this demonstration does not have, so they would never fire. Left in place rather
+    # than removed: they are part of what Glowmere is, and an empty `cameraShotSpans` is already the
+    # honest "nothing is directing".
+    sky = build_effects(args.presets)
+    glowmere = scene.get("effects", [])
+    for effect in glowmere:
+        if effect["owner"]["kind"] == "world":
+            effect["order"] += len(sky)
+    scene["effects"] = sky + glowmere
     with open(OUT_SCENE, "w") as f:
         json.dump(scene, f, indent=2)
         f.write("\n")
@@ -320,8 +344,8 @@ def main():
         json.dump(proj, f, indent=2)
         f.write("\n")
 
-    print("glowmere-atmospherics.scene.json: %s %d bytes, %d atmospheric effect(s)"
-          % (digest[:16], size, len(scene["atmosphericEffects"])))
+    print("glowmere-atmospherics.scene.json: %s %d bytes, %d sky effect(s), %d effect(s) in all"
+          % (digest[:16], size, len(sky), len(scene["effects"])))
     print("glowmere-atmospherics.json: %d route(s), %d sequence event(s)"
           % (len(proj["routes"]), len(proj["sequence"]["events"])))
 
