@@ -110,19 +110,23 @@ void requireCoexist(const Arms& arms, const char* nameA, const char* nameB) {
 
 // ---- World -> Tornado + Aurora, through the whole engine path ------------------------------------
 
-// A tornado standing where the camera is looking, sized to the camera's distance so the column fills
-// a good part of a 192x108 frame whatever the default camera of a new composition is.
+// A tornado 150 m down the camera's view axis (inside the march's default 200 m reach), about 20 m
+// across and 110 m tall, glowing a little so it reads against a dark sky without a key light.
+// Placed from the camera rather than at fixed coordinates, so the test does not depend on what a new
+// composition's default camera happens to be -- but at a fixed DISTANCE, because every tornado row
+// has a hard range and a column scaled to a camera 2.5 m from its target is clamped back up around
+// the lens.
 world::EffectInstance tornadoFacing(const scene::Camera& camera) {
     world::EffectInstance t = world::makeEffect(world::EffectKind::Tornado, "Tornado");
-    const float distance = glm::length(camera.target - camera.position);
-    t.tornado.field.base = glm::vec3(camera.target.x, camera.target.y - distance * 0.3f, camera.target.z);
-    t.tornado.field.height = distance * 0.8f;
-    t.tornado.field.radiusBottom = distance * 0.04f;
-    t.tornado.field.radiusMid = distance * 0.06f;
-    t.tornado.field.radiusTop = distance * 0.12f;
-    t.tornado.density = 6.0f / std::max(distance * 0.06f, 1.0f); // optically thick across its own radius
-    t.tornado.scattering = 1.0f;
-    t.tornado.emission = 0.4f / std::max(distance * 0.06f, 1.0f); // visible against a dark sky without a key light
+    const glm::vec3 forward = glm::normalize(camera.target - camera.position);
+    const glm::vec3 ahead = camera.position + forward * 150.0f;
+    t.tornado.field.base = glm::vec3(ahead.x, ahead.y - 40.0f, ahead.z);
+    t.tornado.field.height = 110.0f;
+    t.tornado.field.radiusBottom = 8.0f;
+    t.tornado.field.radiusMid = 11.0f;
+    t.tornado.field.radiusTop = 18.0f;
+    t.tornado.density = 0.3f;
+    t.tornado.emission = 0.6f;
     t.activation = world::Activation::Always;
     t.timing.fadeIn = 0.0;
     return t;
