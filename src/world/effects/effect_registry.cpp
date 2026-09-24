@@ -52,6 +52,8 @@ const EffectSchema& spiralSchema();      // Wave 2 (XFORM)
 const EffectSchema& floatSchema();       // Wave 2 (XFORM)
 const EffectSchema& shakeSchema();       // Wave 2 (XFORM)
 const EffectSchema& bounceSchema();      // Wave 2 (XFORM)
+const EffectSchema& shockwaveSchema();   // Wave 2 (TRIGGER + DF)
+const EffectSchema& rippleSchema();      // Wave 2 (TRIGGER + DF)
 const EffectSchema& dissolveSchema();    // Wave 2 (FXL surface)
 const EffectSchema& growthSchema();      // Wave 2 (FXL surface)
 const EffectSchema& breathingSchema();   // Wave 2 (FXL surface)
@@ -61,6 +63,7 @@ const EffectSchema& pulsingVeinsSchema(); // Wave 2 (FXL surface)
 const EffectSchema& fresnelSchema();     // Wave 2 (FXL surface)
 const EffectSchema& rimLightSchema();    // Wave 2 (FXL surface)
 const EffectSchema& colorCyclingSchema(); // Wave 2 (FXL surface)
+const EffectSchema& velocityDistortionSchema(); // Wave 2 (DF over HIST)
 const EffectSchema& motionSmearSchema(); // Wave 2 (FXL surface)
 const EffectSchema& starsSchema();       // Wave 2 (the sky's star field)
 
@@ -87,6 +90,8 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &floatSchema(),
         &shakeSchema(),
         &bounceSchema(),
+        &shockwaveSchema(),
+        &rippleSchema(),
         &dissolveSchema(),
         &growthSchema(),
         &breathingSchema(),
@@ -96,6 +101,7 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &fresnelSchema(),
         &rimLightSchema(),
         &colorCyclingSchema(),
+        &velocityDistortionSchema(),
         &motionSmearSchema(),
         &starsSchema(),
     };

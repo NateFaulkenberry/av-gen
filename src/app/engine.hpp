@@ -36,6 +36,7 @@
 #include "scene/post_settings.hpp"
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_trigger.hpp"
 #include "world/effects/history_bank.hpp"
 #include "world/effects/transform_frame.hpp"
 #include "scene/scene_controller.hpp"
@@ -929,6 +930,10 @@ private:
     // to the effect list or the routes. `publishEntitySignals` writes them, before the routes run,
     // from the last completed step.
     world::HistoryBank historyBank_;
+    // Wave 2 (TRIGGER): the event clock every effect's `lastTriggers` reads, bound to this frame's
+    // track, markers and history in `effectContext` (mutable: binding is bookkeeping, not state an
+    // effect reads back).
+    mutable world::TriggerClock triggerClock_;
     std::unique_ptr<world::HistoryAutomation> historyAutomation_;
     const scene::Composition* historyComposition_ = nullptr;
     struct EntitySignalIds {

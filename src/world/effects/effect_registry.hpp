@@ -629,7 +629,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 30> kEffectKinds{
+inline constexpr std::array<EffectKind, 33> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -649,6 +649,8 @@ inline constexpr std::array<EffectKind, 30> kEffectKinds{
     EffectKind::Float,         // Wave 2 (XFORM)
     EffectKind::Shake,         // Wave 2 (XFORM)
     EffectKind::Bounce,        // Wave 2 (XFORM)
+    EffectKind::Shockwave,     // Wave 2 (TRIGGER + DF)
+    EffectKind::Ripple,        // Wave 2 (TRIGGER + DF)
     EffectKind::Dissolve,      // Wave 2 (FXL surface)
     EffectKind::Growth,        // Wave 2 (FXL surface)
     EffectKind::Breathing,     // Wave 2 (FXL surface)
@@ -658,6 +660,7 @@ inline constexpr std::array<EffectKind, 30> kEffectKinds{
     EffectKind::Fresnel,       // Wave 2 (FXL surface)
     EffectKind::RimLight,      // Wave 2 (FXL surface)
     EffectKind::ColorCycling,  // Wave 2 (FXL surface)
+    EffectKind::VelocityDistortion, // Wave 2 (DF over HIST)
     EffectKind::MotionSmear,   // Wave 2 (FXL surface)
     EffectKind::Stars,         // Wave 2 (the sky's star field)
 };

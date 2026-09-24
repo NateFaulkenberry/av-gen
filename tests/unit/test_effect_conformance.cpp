@@ -431,6 +431,10 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Float, {EffectTarget::Entity}},
         {EffectKind::Shake, {EffectTarget::Entity}},
         {EffectKind::Bounce, {EffectTarget::Entity}},
+        // Wave 2 (TRIGGER + DF). A front or a membrane can stand at a World point; a wake needs an
+        // owner that moves.
+        {EffectKind::Shockwave, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Ripple, {EffectTarget::Entity, EffectTarget::World}},
         // Wave 2 (FXL surface). Entity only: a lane is a per-draw change of an owner's surface. The
         // catalog's World preset of Bioluminescence (the recipe ladder) and a Light owner's Rim Light
         // are later waves.
@@ -443,6 +447,7 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Fresnel, {EffectTarget::Entity}},
         {EffectKind::RimLight, {EffectTarget::Entity}},
         {EffectKind::ColorCycling, {EffectTarget::Entity}},
+        {EffectKind::VelocityDistortion, {EffectTarget::Entity}},
         {EffectKind::Stars, {EffectTarget::World}}, // Wave 2: the sky has one star field
         {EffectKind::MotionSmear, {EffectTarget::Entity}},
     };

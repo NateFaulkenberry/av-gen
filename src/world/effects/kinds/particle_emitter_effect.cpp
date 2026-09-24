@@ -7,6 +7,12 @@
 // look sets is an ordinary `scene::ParticleSystem` field (docs/design/effect-library/
 // catalog-particles.md, "nine of ten are presets"). The presets in the Add Effect menu are styles
 // that set `look` and the rows together.
+//
+// Wave 2 adds the catalog's remaining looks -- snow, rain, ash, leaves, spores, cosmic dust -- and
+// TRIGGER bursts: a Trigger-activated emitter adds `triggerBurst` particles on the frame each of its
+// events lands on (`effectTriggerEdge`). The weather looks (snow, rain, ash) are carried by the camera
+// (ADR-520's `volumeFollow` + `volumeWrap`), so on a World owner their World X/Y/Z is an offset FROM
+// THE CAMERA and `radius` is the half-size of the box that travels with it.
 
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/particle_emitter.hpp"
@@ -17,19 +23,33 @@
 #include <array>
 #include <cmath>
 #include <string>
+#include <utility>
 
 namespace avgen::world {
 namespace {
 
 using E = EffectInstance;
 
-constexpr const char* kLooks[] = {"fireflies", "embers", "magic"};
-enum class Look : int { Fireflies = 0, Embers = 1, Magic = 2 };
+constexpr const char* kLooks[] = {"fireflies", "embers", "magic", "snow", "rain", "ash", "leaves", "spores",
+                                  "cosmicDust"};
+enum class Look : int {
+    Fireflies = 0,
+    Embers = 1,
+    Magic = 2,
+    // Wave 2 (catalog-particles.md's remaining presets). Stars is not here: it is a Sky-stage type.
+    Snow = 3,
+    Rain = 4,
+    Ash = 5,
+    Leaves = 6,
+    Spores = 7,
+    CosmicDust = 8,
+};
+constexpr int kLookCount = static_cast<int>(std::size(kLooks));
 
 constexpr EffectField kFields[] = {
     storedChoice("look", "Look", 0, kLooks).main()
-        .tooltip("The kind of particle: blinking fireflies, rising embers, or orbiting magic motes.\n"
-                 "Each is a base configuration the rows below adjust."),
+        .tooltip("The kind of particle: fireflies, embers, magic motes, snow, rain, ash, leaves, spores\n"
+                 "or cosmic dust. Each is a base configuration the rows below adjust."),
     storedFloat("rate", "Rate", 60.0f, 0.0f, 20000.0f, 0.0f, 2000.0f).main().fmt("%.0f /s")
         .tooltip("Particles emitted per second. Route audio onto it for a swarm that swells."),
     storedFloat("brightness", "Brightness", 8.0f, 0.0f, 40.0f, 0.0f, 16.0f).main()
@@ -57,6 +77,10 @@ constexpr EffectField kFields[] = {
     storedFloat("burst", "Burst", 0.0f, 0.0f, 10000.0f, 0.0f, 500.0f).fmt("%.0f").sec("Events")
         .tooltip("Extra particles emitted this frame. A route target, not a setting: route onsets\n"
                  "or the beat onto it for a pop on every hit."),
+    storedFloat("triggerBurst", "Burst per trigger", 0.0f, 0.0f, 20000.0f, 0.0f, 2000.0f).fmt("%.0f")
+        .tooltip("With the Trigger activation: particles thrown out on the frame each trigger lands\n"
+                 "(a beat, an onset, a drop, a marker). A puff of spores on the bar, a spray of\n"
+                 "sparks on an impact."),
     storedFloat("centerX", "World X", 0.0f, -10000.0f, 10000.0f, -500.0f, 500.0f).sec("Placement (World owner)"),
     storedFloat("centerY", "World Y", 2.0f, -10000.0f, 10000.0f, -100.0f, 200.0f),
     storedFloat("centerZ", "World Z", 0.0f, -10000.0f, 10000.0f, -500.0f, 500.0f),
@@ -178,6 +202,158 @@ void baseMagic(scene::ParticleSystem& s) {
     s.fogCoupling = 1.0f;
 }
 
+// ---- Wave 2 looks --------------------------------------------------------------------------------
+
+// Weather is carried by the camera (ADR-520): the box follows the view on every axis and wraps, so a
+// steady fall never thins out at the box's faces and a fly-through never outruns it.
+void cameraVolume(scene::ParticleSystem& s) {
+    s.shape = scene::EmitterShape::Box;
+    s.volumeFollow = glm::vec3(1.0f);
+    s.volumeWrap = true;
+}
+
+void baseSnow(scene::ParticleSystem& s) {
+    s.capacity = 16384;
+    cameraVolume(s);
+    s.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+    s.spread = 0.35f;
+    s.drag = 1.6f;
+    s.turbulenceScale = 0.45f;
+    s.turbulenceSpeed = 0.25f;
+    s.sizeEnd = -1.0f;
+    s.colorStart = glm::vec4(1.0f, 1.0f, 1.0f, 0.9f);
+    s.colorEnd = glm::vec4(1.0f, 1.0f, 1.0f, 0.9f);
+    s.opacityCurve.keys = {{0.0f, 0.0f}, {0.08f, 0.9f}, {0.9f, 0.9f}, {1.0f, 0.0f}};
+    s.blend = scene::ParticleBlend::Alpha;
+    s.sizeVariance = 0.7f;
+    s.sizeSkew = 2.2f; // many fine flakes, a few big soft ones
+    s.dragSizeBias = 0.6f;
+    s.softness = 0.6f;
+    s.fogCoupling = 1.0f;
+}
+
+void baseRain(scene::ParticleSystem& s) {
+    s.capacity = 32768;
+    cameraVolume(s);
+    s.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+    s.spread = 0.02f;
+    s.drag = 0.0f;
+    s.turbulenceScale = 0.3f;
+    s.turbulenceSpeed = 0.2f;
+    s.sizeEnd = -1.0f;
+    s.colorStart = glm::vec4(0.82f, 0.9f, 1.0f, 0.55f);
+    s.colorEnd = glm::vec4(0.82f, 0.9f, 1.0f, 0.55f);
+    s.blend = scene::ParticleBlend::Additive;
+    // Streaks: the billboard is one shutter's travel long, which is what reads as rain.
+    s.velocityStretch = 1.0f;
+    s.stretchMax = 0.9f;
+    s.stretchMin = 0.02f;
+    // Backlit drops blaze and frontlit ones vanish (Tatarchuk), which is most of rain's look.
+    s.scatterStrength = 1.4f;
+    s.scatterAnisotropy = 0.75f;
+    s.sizeVariance = 0.4f;
+    s.dragSizeBias = 0.3f;
+    s.softness = 0.2f;
+    s.fogCoupling = 1.0f;
+}
+
+void baseAsh(scene::ParticleSystem& s) {
+    s.capacity = 12288;
+    cameraVolume(s);
+    s.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+    s.spread = 0.6f;
+    s.drag = 1.8f;
+    s.turbulenceScale = 0.35f;
+    s.turbulenceSpeed = 0.2f;
+    s.sizeEnd = -1.0f;
+    s.colorStart = glm::vec4(0.62f, 0.6f, 0.58f, 0.85f);
+    s.colorEnd = glm::vec4(0.45f, 0.43f, 0.42f, 0.85f);
+    s.opacityCurve.keys = {{0.0f, 0.0f}, {0.1f, 0.85f}, {0.85f, 0.85f}, {1.0f, 0.0f}};
+    s.blend = scene::ParticleBlend::Alpha;
+    // Flakes, not dots: small tumbling cards.
+    s.shape2d = scene::ParticleShape::Leaf;
+    s.leafAspect = 0.75f;
+    s.tumbleRate = 1.6f;
+    s.twoSided = 0.5f;
+    s.sizeVariance = 0.6f;
+    s.sizeSkew = 1.8f;
+    s.dragSizeBias = 0.5f;
+    s.softness = 0.4f;
+    s.fogCoupling = 1.0f;
+}
+
+void baseLeaves(scene::ParticleSystem& s) {
+    s.capacity = 4096;
+    s.shape = scene::EmitterShape::Sphere;
+    s.direction = glm::vec3(0.0f, -1.0f, 0.0f);
+    s.spread = 0.8f;
+    s.drag = 1.4f;
+    s.turbulenceScale = 0.5f;
+    s.turbulenceSpeed = 0.35f;
+    s.sizeEnd = -1.0f;
+    // An autumn palette over life (a leaf does not change colour as it falls; the spread across the
+    // population comes from each particle's own position on this ramp at birth-time variance).
+    s.colorCurve.keys = {{0.0f, {0.95f, 0.55f, 0.12f}},
+                         {0.35f, {0.85f, 0.28f, 0.08f}},
+                         {0.7f, {0.75f, 0.62f, 0.15f}},
+                         {1.0f, {0.55f, 0.22f, 0.06f}}};
+    s.opacityCurve.keys = {{0.0f, 0.0f}, {0.05f, 1.0f}, {0.9f, 1.0f}, {1.0f, 0.0f}};
+    s.colorStart = glm::vec4(1.0f);
+    s.colorEnd = glm::vec4(1.0f);
+    s.blend = scene::ParticleBlend::Alpha;
+    s.shape2d = scene::ParticleShape::Leaf;
+    s.leafAspect = 0.42f;
+    s.tumbleRate = 2.4f;
+    s.twoSided = 0.45f;
+    s.sizeVariance = 0.45f;
+    s.dragSizeBias = 0.4f;
+    s.softness = 0.3f;
+    s.fogCoupling = 1.0f;
+}
+
+void baseSpores(scene::ParticleSystem& s) {
+    s.capacity = 8192;
+    s.shape = scene::EmitterShape::Sphere;
+    s.spread = 1.0f;
+    s.drag = 1.1f;
+    s.turbulenceScale = 0.7f;
+    s.turbulenceSpeed = 0.3f;
+    s.sizeEnd = 0.6f;
+    s.colorStart = glm::vec4(0.55f, 1.0f, 0.85f, 0.0f);
+    s.colorEnd = glm::vec4(0.35f, 0.75f, 1.0f, 0.0f);
+    s.opacityCurve.keys = {{0.0f, 0.0f}, {0.15f, 1.0f}, {0.8f, 0.8f}, {1.0f, 0.0f}};
+    s.blend = scene::ParticleBlend::Additive;
+    s.pulseSharpness = 1.5f; // a soft breathing glow, not a firefly's flash
+    s.sizeVariance = 0.5f;
+    s.sizeSkew = 1.6f;
+    s.softness = 0.4f;
+    s.fogCoupling = 1.0f;
+}
+
+void baseCosmicDust(scene::ParticleSystem& s) {
+    s.capacity = 32768;
+    s.shape = scene::EmitterShape::Disc;
+    s.direction = glm::vec3(0.0f, 1.0f, 0.0f);
+    s.spread = 1.0f;
+    s.gravity = glm::vec3(0.0f);
+    s.drag = 0.3f;
+    s.turbulenceScale = 0.25f;
+    s.turbulenceSpeed = 0.1f;
+    s.attractorStrength = 0.25f;
+    s.sizeEnd = -1.0f;
+    s.colorCurve.keys = {{0.0f, {0.55f, 0.65f, 1.0f}},
+                         {0.5f, {0.85f, 0.55f, 1.0f}},
+                         {1.0f, {1.0f, 0.75f, 0.6f}}};
+    s.opacityCurve.keys = {{0.0f, 0.0f}, {0.1f, 1.0f}, {0.9f, 1.0f}, {1.0f, 0.0f}};
+    s.colorStart = glm::vec4(1.0f);
+    s.colorEnd = glm::vec4(1.0f);
+    s.blend = scene::ParticleBlend::Additive;
+    s.sizeVariance = 0.9f;
+    s.sizeSkew = 3.0f; // a haze of faint grains and a few bright ones
+    s.softness = 0.3f;
+    s.fogCoupling = 0.6f;
+}
+
 // A stable 32-bit seed from the instance id, so two instances never share a stream and one instance
 // has the same stream in every run (FNV-1a).
 std::uint32_t seedOf(std::string_view id) {
@@ -191,21 +367,86 @@ std::uint32_t seedOf(std::string_view id) {
 // ---- styles: a look and its rows, together ---------------------------------------------------------
 
 struct Preset {
-    const char* name;
-    Look look;
-    float rate, brightness, size, radius, lifetime, speed, rise, turbulence, wind, orbit, pulseRate,
-        pulseDepth, pulseSync;
-    glm::vec3 color;
-    bool trail;
+    const char* name = "";
+    Look look = Look::Fireflies;
+    float rate = 60, brightness = 8, size = 0.06f, radius = 3, lifetime = 5, speed = 0.3f, rise = 0,
+          turbulence = 0.6f, wind = 0.2f, orbit = 0, pulseRate = 0, pulseDepth = 1, pulseSync = 0;
+    glm::vec3 color{1, 1, 1};
+    bool trail = false;
+    float centerY = 2.0f;  // World Y (an offset above the camera for the carried looks)
+    float triggerBurst = 0;
+    int triggerEveryN = 0; // > 0: a Trigger activation on every Nth beat
 };
 
 constexpr Preset kPresets[] = {
-    {"Meadow Fireflies", Look::Fireflies, 60, 8, 0.06f, 6, 6, 0.25f, 0, 0.6f, 0.2f, 0, 0.6f, 1, 0.2f, {1, 1, 1}, false},
-    {"Synchronous Swarm", Look::Fireflies, 90, 10, 0.05f, 4, 7, 0.2f, 0, 0.4f, 0.1f, 0, 0.8f, 1, 0.9f, {1, 1, 1}, false},
-    {"Campfire Embers", Look::Embers, 120, 9, 0.035f, 0.6f, 2.5f, 2.0f, 1.6f, 1.4f, 0.6f, 0, 0, 0, 0, {1, 1, 1}, false},
-    {"Forge Sparks", Look::Embers, 400, 14, 0.02f, 0.3f, 1.2f, 5.0f, -1.5f, 0.8f, 0.2f, 0, 0, 0, 0, {1, 1, 1}, false},
-    {"Fairy Dust", Look::Magic, 150, 7, 0.03f, 1.5f, 1.8f, 0.6f, 0.1f, 0.8f, 0, 2.5f, 3.0f, 0.6f, 0, {1, 1, 1}, true},
-    {"Arcane Swirl", Look::Magic, 260, 9, 0.025f, 2.5f, 2.2f, 1.0f, 0, 1.2f, 0, 5.0f, 0, 0, 0, {0.7f, 0.8f, 1.0f}, true},
+    // ---- Wave 1 ----
+    {.name = "Meadow Fireflies", .look = Look::Fireflies, .rate = 60, .brightness = 8, .size = 0.06f, .radius = 6,
+     .lifetime = 6, .speed = 0.25f, .turbulence = 0.6f, .wind = 0.2f, .pulseRate = 0.6f, .pulseSync = 0.2f},
+    {.name = "Synchronous Swarm", .look = Look::Fireflies, .rate = 90, .brightness = 10, .size = 0.05f, .radius = 4,
+     .lifetime = 7, .speed = 0.2f, .turbulence = 0.4f, .wind = 0.1f, .pulseRate = 0.8f, .pulseSync = 0.9f},
+    {.name = "Campfire Embers", .look = Look::Embers, .rate = 120, .brightness = 9, .size = 0.035f, .radius = 0.6f,
+     .lifetime = 2.5f, .speed = 2.0f, .rise = 1.6f, .turbulence = 1.4f, .wind = 0.6f, .pulseDepth = 0},
+    {.name = "Forge Sparks", .look = Look::Embers, .rate = 400, .brightness = 14, .size = 0.02f, .radius = 0.3f,
+     .lifetime = 1.2f, .speed = 5.0f, .rise = -1.5f, .turbulence = 0.8f, .wind = 0.2f, .pulseDepth = 0},
+    {.name = "Fairy Dust", .look = Look::Magic, .rate = 150, .brightness = 7, .size = 0.03f, .radius = 1.5f,
+     .lifetime = 1.8f, .speed = 0.6f, .rise = 0.1f, .turbulence = 0.8f, .wind = 0, .orbit = 2.5f, .pulseRate = 3.0f,
+     .pulseDepth = 0.6f, .trail = true},
+    {.name = "Arcane Swirl", .look = Look::Magic, .rate = 260, .brightness = 9, .size = 0.025f, .radius = 2.5f,
+     .lifetime = 2.2f, .speed = 1.0f, .turbulence = 1.2f, .wind = 0, .orbit = 5.0f, .pulseDepth = 0,
+     .color = {0.7f, 0.8f, 1.0f}, .trail = true},
+    // ---- Wave 2: the rest of the catalog's presets ----
+    {.name = "Glowmere Canopy", .look = Look::Fireflies, .rate = 70, .brightness = 9, .size = 0.05f, .radius = 8,
+     .lifetime = 7, .speed = 0.2f, .turbulence = 0.5f, .wind = 0.3f, .pulseRate = 0.45f, .pulseSync = 0.35f,
+     .color = {0.6f, 1.0f, 0.95f}},
+    {.name = "Burning Debris", .look = Look::Embers, .rate = 60, .brightness = 7, .size = 0.07f, .radius = 1.5f,
+     .lifetime = 4.0f, .speed = 1.2f, .rise = 0.8f, .turbulence = 1.8f, .wind = 0.9f, .pulseDepth = 0},
+    {.name = "Healing Motes", .look = Look::Magic, .rate = 90, .brightness = 6, .size = 0.035f, .radius = 1.2f,
+     .lifetime = 2.6f, .speed = 0.3f, .rise = 0.6f, .turbulence = 0.6f, .wind = 0, .orbit = 1.2f, .pulseRate = 1.2f,
+     .pulseDepth = 0.5f, .color = {0.55f, 1.0f, 0.55f}, .trail = true},
+    {.name = "Light Snow", .look = Look::Snow, .rate = 700, .brightness = 1.1f, .size = 0.022f, .radius = 14,
+     .lifetime = 14, .speed = 0.4f, .rise = -0.9f, .turbulence = 0.35f, .wind = 0.6f, .pulseDepth = 0, .centerY = 4},
+    {.name = "Blizzard", .look = Look::Snow, .rate = 4500, .brightness = 1.0f, .size = 0.018f, .radius = 12,
+     .lifetime = 8, .speed = 3.0f, .rise = -2.5f, .turbulence = 1.6f, .wind = 1.6f, .pulseDepth = 0, .centerY = 3},
+    {.name = "Magical Snow", .look = Look::Snow, .rate = 500, .brightness = 3.0f, .size = 0.025f, .radius = 12,
+     .lifetime = 16, .speed = 0.2f, .rise = -0.35f, .turbulence = 0.5f, .wind = 0.3f, .pulseRate = 0.5f,
+     .pulseDepth = 0.5f, .color = {0.75f, 0.85f, 1.0f}, .centerY = 4},
+    {.name = "Drizzle", .look = Look::Rain, .rate = 2500, .brightness = 0.9f, .size = 0.006f, .radius = 12,
+     .lifetime = 2.0f, .speed = 7.0f, .rise = -9.8f, .turbulence = 0.1f, .wind = 0.4f, .pulseDepth = 0, .centerY = 5},
+    {.name = "Storm", .look = Look::Rain, .rate = 12000, .brightness = 1.1f, .size = 0.008f, .radius = 12,
+     .lifetime = 1.4f, .speed = 12.0f, .rise = -9.8f, .turbulence = 0.3f, .wind = 1.5f, .pulseDepth = 0, .centerY = 6},
+    {.name = "Neon Rain", .look = Look::Rain, .rate = 5000, .brightness = 4.0f, .size = 0.007f, .radius = 12,
+     .lifetime = 1.8f, .speed = 9.0f, .rise = -9.8f, .turbulence = 0.1f, .wind = 0.3f, .pulseDepth = 0,
+     .color = {1.0f, 0.35f, 0.9f}, .centerY = 5},
+    {.name = "Volcanic Ashfall", .look = Look::Ash, .rate = 900, .brightness = 1.4f, .size = 0.03f, .radius = 12,
+     .lifetime = 14, .speed = 0.3f, .rise = -0.5f, .turbulence = 0.6f, .wind = 0.8f, .pulseDepth = 0,
+     .color = {0.9f, 0.88f, 0.86f}, .centerY = 4},
+    {.name = "Burned Forest", .look = Look::Ash, .rate = 350, .brightness = 1.1f, .size = 0.04f, .radius = 12,
+     .lifetime = 16, .speed = 0.15f, .rise = -0.3f, .turbulence = 0.4f, .wind = 0.5f, .pulseDepth = 0,
+     .color = {0.8f, 0.76f, 0.72f}, .centerY = 4},
+    {.name = "Autumn Leaves", .look = Look::Leaves, .rate = 25, .brightness = 1.0f, .size = 0.07f, .radius = 3,
+     .lifetime = 7, .speed = 0.3f, .rise = -0.7f, .turbulence = 0.5f, .wind = 1.0f, .pulseDepth = 0, .centerY = 4},
+    {.name = "Cherry Petals", .look = Look::Leaves, .rate = 60, .brightness = 1.1f, .size = 0.04f, .radius = 3,
+     .lifetime = 8, .speed = 0.25f, .rise = -0.4f, .turbulence = 0.7f, .wind = 1.2f, .pulseDepth = 0,
+     .color = {1.0f, 1.3f, 5.0f}, .centerY = 4},
+    {.name = "Glowmere Drift", .look = Look::Leaves, .rate = 30, .brightness = 3.0f, .size = 0.06f, .radius = 4,
+     .lifetime = 9, .speed = 0.2f, .rise = -0.4f, .turbulence = 0.6f, .wind = 0.8f, .pulseRate = 0.3f,
+     .pulseDepth = 0.4f, .color = {0.5f, 1.6f, 2.2f}, .centerY = 4},
+    {.name = "Mushroom Puff", .look = Look::Spores, .rate = 40, .brightness = 3.0f, .size = 0.03f, .radius = 0.8f,
+     .lifetime = 5, .speed = 0.3f, .rise = 0.15f, .turbulence = 0.9f, .wind = 0.4f, .pulseRate = 0.4f,
+     .pulseDepth = 0.5f, .centerY = 0.5f},
+    {.name = "Glowmere Spores", .look = Look::Spores, .rate = 120, .brightness = 4.0f, .size = 0.025f, .radius = 5,
+     .lifetime = 9, .speed = 0.15f, .rise = 0.08f, .turbulence = 1.4f, .wind = 0.5f, .pulseRate = 0.3f,
+     .pulseDepth = 0.6f, .color = {0.7f, 1.0f, 1.2f}},
+    {.name = "Spore Burst", .look = Look::Spores, .rate = 0, .brightness = 5.0f, .size = 0.03f, .radius = 0.6f,
+     .lifetime = 4, .speed = 1.4f, .rise = 0.2f, .turbulence = 1.2f, .wind = 0.4f, .pulseRate = 0.4f,
+     .pulseDepth = 0.4f, .centerY = 0.5f, .triggerBurst = 300, .triggerEveryN = 4},
+    {.name = "Nebula Drift", .look = Look::CosmicDust, .rate = 900, .brightness = 2.0f, .size = 0.02f, .radius = 20,
+     .lifetime = 20, .speed = 0.1f, .turbulence = 0.3f, .wind = 0, .orbit = 0.6f, .pulseDepth = 0},
+    {.name = "Hyperspace Dust", .look = Look::CosmicDust, .rate = 3000, .brightness = 3.0f, .size = 0.012f,
+     .radius = 15, .lifetime = 3, .speed = 6.0f, .turbulence = 0.1f, .wind = 0, .pulseDepth = 0,
+     .color = {0.8f, 0.9f, 1.2f}},
+    {.name = "Vortex Motes", .look = Look::CosmicDust, .rate = 1200, .brightness = 2.5f, .size = 0.02f, .radius = 10,
+     .lifetime = 14, .speed = 0.4f, .turbulence = 0.5f, .wind = 0, .orbit = 2.5f, .pulseDepth = 0},
 };
 
 void applyPreset(E& e, const Preset& p) {
@@ -226,20 +467,30 @@ void applyPreset(E& e, const Preset& p) {
     r.set(e, "pulseSync", p.pulseSync);
     r.setColor(e, "color", p.color);
     r.setBool(e, "trail", p.trail);
+    r.set(e, "centerY", p.centerY);
+    r.set(e, "triggerBurst", p.triggerBurst);
+    if (p.triggerEveryN > 0) {
+        e.activation = Activation::Trigger;
+        e.timing.trigger = Trigger{};
+        e.timing.trigger.source = TriggerSource::Beat;
+        e.timing.trigger.everyN = p.triggerEveryN;
+    } else if (e.activation == Activation::Trigger) {
+        e.activation = Activation::Always; // a preset is a complete look, including when it runs
+    }
     e.style = p.name;
 }
 
-void style0(E& e) { applyPreset(e, kPresets[0]); }
-void style1(E& e) { applyPreset(e, kPresets[1]); }
-void style2(E& e) { applyPreset(e, kPresets[2]); }
-void style3(E& e) { applyPreset(e, kPresets[3]); }
-void style4(E& e) { applyPreset(e, kPresets[4]); }
-void style5(E& e) { applyPreset(e, kPresets[5]); }
+template <std::size_t I>
+void stylePreset(E& e) {
+    applyPreset(e, kPresets[I]);
+}
 
-constexpr EffectStyle kStyles[] = {
-    {kPresets[0].name, style0}, {kPresets[1].name, style1}, {kPresets[2].name, style2},
-    {kPresets[3].name, style3}, {kPresets[4].name, style4}, {kPresets[5].name, style5},
-};
+template <std::size_t... I>
+constexpr std::array<EffectStyle, sizeof...(I)> makeStyles(std::index_sequence<I...>) {
+    return {EffectStyle{kPresets[I].name, &stylePreset<I>}...};
+}
+
+constexpr auto kStyles = makeStyles(std::make_index_sequence<std::size(kPresets)>{});
 
 // The swarm answers the music out of the box: its density breathes with the level, and a hit
 // throws a handful more into the air.
@@ -261,8 +512,8 @@ E make(std::string name) {
 
 Result<void> validate(const E& e) {
     const float look = rows().f(e, "look");
-    if (!(look >= 0.0f && look <= 2.0f)) {
-        return fail("effect '{}': look {} is not one of fireflies/embers/magic", e.id, look);
+    if (!(look >= 0.0f && look <= static_cast<float>(kLookCount - 1))) {
+        return fail("effect '{}': look {} is not one of the {} looks", e.id, look, kLookCount);
     }
     return {};
 }
@@ -274,11 +525,13 @@ EffectSchema buildSchema() {
     s.enumName = "ParticleEmitter";
     s.displayName = "Particle Emitter";
     s.description = "A particle system that rides its owner: fireflies that blink in loose synchrony, "
-                    "embers that rise and cool, magic motes that orbit and trail.";
+                    "embers that rise and cool, magic motes that orbit and trail, snow, rain and ash "
+                    "carried with the camera, tumbling leaves, drifting spores and cosmic dust. On a "
+                    "trigger it can throw out a burst.";
     s.performance = PerformanceClass::Low;
     s.primaryCost = CostCompute | CostFragment;
     s.addLabel = "Particle Emitter";
-    s.addTip = "Fireflies, embers or magic motes, attached to this owner.\n"
+    s.addTip = "Fireflies, embers, magic motes, weather, leaves, spores or dust, attached to this owner.\n"
                "Pick a look from the presets; every number is modulatable.";
     s.targets = targetBit(EffectTarget::Entity) | targetBit(EffectTarget::World);
     s.category = EffectCategory::Particles;
@@ -317,11 +570,17 @@ void describeParticleSystem(const EffectInstance& e, float envelope, scene::Part
         fresh.sizeCurve.keys = std::move(s.sizeCurve.keys);
         s = std::move(fresh);
     }
-    const int look = std::clamp(static_cast<int>(r.f(e, "look") + 0.5f), 0, 2);
+    const int look = std::clamp(static_cast<int>(r.f(e, "look") + 0.5f), 0, kLookCount - 1);
     switch (static_cast<Look>(look)) {
     case Look::Fireflies: baseFireflies(s); break;
     case Look::Embers: baseEmbers(s); break;
     case Look::Magic: baseMagic(s); break;
+    case Look::Snow: baseSnow(s); break;
+    case Look::Rain: baseRain(s); break;
+    case Look::Ash: baseAsh(s); break;
+    case Look::Leaves: baseLeaves(s); break;
+    case Look::Spores: baseSpores(s); break;
+    case Look::CosmicDust: baseCosmicDust(s); break;
     }
 
     const float lifetime = std::max(r.f(e, "life"), 0.1f);
@@ -362,6 +621,8 @@ void describeParticleSystem(const EffectInstance& e, float envelope, scene::Part
     s.enabled = e.enabled;
 }
 
+float triggerBurstOf(const EffectInstance& e) { return std::max(rows().f(e, "triggerBurst"), 0.0f); }
+
 std::size_t particleEmitterRecords(const EffectInstance& e, const EffectContext& ctx) {
     if (!e.enabled) {
         return 0;
@@ -372,8 +633,10 @@ std::size_t particleEmitterRecords(const EffectInstance& e, const EffectContext&
             return 0;
         }
     }
-    const auto window = resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots,
-                                                e.owner.kind != EffectTarget::Entity, e.owner.name);
+    const auto window = resolveActivationWindow(e.activation, e.timing, ctx, e.owner.kind != EffectTarget::Entity,
+                                                e.owner.name,
+                                                e.owner.kind == EffectTarget::Entity ? std::string_view(e.owner.name)
+                                                                                     : std::string_view());
     return window ? 1u : 0u;
 }
 

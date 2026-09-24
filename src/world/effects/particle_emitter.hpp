@@ -45,6 +45,10 @@ inline constexpr std::size_t kMaxEffectParticleSystems = 16;
 // the particles already in the air finish their lives instead of vanishing.
 void describeParticleSystem(const EffectInstance& effect, float envelope, scene::ParticleSystem& out);
 
+// Wave 2: the particles a Trigger-activated emitter throws out on each trigger's frame (its
+// `triggerBurst` row). Defined beside the rows.
+[[nodiscard]] float triggerBurstOf(const EffectInstance& effect);
+
 // ONE live instance's record count (0 or 1) -- the registry's `records` hook.
 [[nodiscard]] std::size_t particleEmitterRecords(const EffectInstance& effect, const EffectContext& context);
 

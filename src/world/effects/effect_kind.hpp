@@ -58,6 +58,9 @@ enum class EffectKind : std::uint8_t {
     Float = 16,  // a slow, never-repeating bob and wobble
     Shake = 17,  // smooth-noise jitter, continuous or settling after each activation
     Bounce = 18, // a squash-and-stretch hop, continuous or a recoil
+    // TRIGGER's DF users (catalog-distortion.md, catalog-motion.md).
+    Shockwave = 19,          // DF: an expanding refracting front released by an event
+    Ripple = 20,             // DF: a damped train of concentric waves in a membrane
     // FXL Wave 2 (the surface slice): per-entity clip, displacement and pattern lanes.
     Dissolve = 21,         // the owner burns away through noise, shadow and all
     Growth = 22,           // the owner grows in behind a glowing front
@@ -68,6 +71,7 @@ enum class EffectKind : std::uint8_t {
     Fresnel = 27,          // a view-angle rim of light
     RimLight = 28,         // a one-sided kicker rim, fixed in view space
     ColorCycling = 29,     // the owner's hue turns over time
+    VelocityDistortion = 30, // DF: a refracting wake along the owner's recent path
     MotionSmear = 31,      // the owner's trailing side stretches back along its path
     // Wave 2 (the lead's): the sky's star field, owned by an effect instead of skybox constants.
     Stars = 32, // a controllable star field: density, magnitudes, colour, twinkle, a galactic band
