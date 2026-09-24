@@ -7,7 +7,9 @@
 #                  "Needs local assets", NOT counted as a pass and NOT hidden, and it does not fail
 #                  the job. If it passes, the report says the entry is stale so it can be removed.
 #   exclude        The case is NOT run on CI (it would take its whole shard down with it). Every
-#                  exclusion is named in the run summary. Use only for a crash.
+#                  exclusion is named in the run summary. Use only for a crash. The name becomes a
+#                  Catch2 spec, so it may not contain a comma: use a unique prefix ending in `*`
+#                  instead. catch2_run.py refuses to run unless each one matches exactly one case.
 #
 # Every entry here is a gap in what CI proves. The assets are gitignored and are not published
 # anywhere (owner's decision; see the doc). Run these locally, where the assets exist:
@@ -17,7 +19,7 @@
 # Observed on runs 36060799310 and 36065418960 (2026-09-24; main 232a50d7 + CI files).
 
 # --- crashes without the asset: a test defect, reported to the owner; excluded so the shard lives
-exclude | sequence.get_state reports the music video, not the timeline | assets/audio/night-shift.wav absent: fails in Release, but ABORTS (SIGABRT) in the Debug sanitizer builds (TSan run 36060803359), taking its shard with it
+exclude | sequence.get_state reports the music video* | assets/audio/night-shift.wav absent: fails in Release, but ABORTS (SIGABRT) in the Debug sanitizer builds (TSan run 36060803359), taking its shard with it
 exclude | body compensation survives a scene save and reload | assets/aliens/alien-scout.glb absent -> 0 nodes -> nodes().front() on an empty vector, SIGSEGV (test_body_compensation.cpp:433)
 
 # --- assets/aliens/*.glb (the film's five aliens, the scout, the diver, the pilot)
