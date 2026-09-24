@@ -82,15 +82,18 @@ SkinningRenderer::SkinningRenderer(gpu::Context& context, gpu::ShaderLibrary& sh
 Result<void> SkinningRenderer::init(const wgpu::BindGroupLayout& frameLayout,
                                     const wgpu::BindGroupLayout& materialLayout,
                                     const wgpu::BindGroupLayout& iblLayout, const wgpu::Buffer& objectUniforms,
-                                    std::uint64_t objectSize, wgpu::TextureFormat colorFormat,
+                                    std::uint64_t objectSize, const wgpu::Buffer& entityFx,
+                                    std::uint64_t entityFxSize, wgpu::TextureFormat colorFormat,
                                     wgpu::TextureFormat depthFormat) {
     objectUniforms_ = objectUniforms;
     objectSize_ = objectSize;
+    entityFx_ = entityFx;
+    entityFxSize_ = entityFxSize;
     colorFormat_ = colorFormat;
     depthFormat_ = depthFormat;
     const auto& device = context_.device();
 
-    std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+    std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
     entries[0].binding = 0;
     entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
     entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -101,6 +104,11 @@ Result<void> SkinningRenderer::init(const wgpu::BindGroupLayout& frameLayout,
     entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
     entries[1].buffer.hasDynamicOffset = true;
     entries[1].buffer.minBindingSize = kMatrixBytes;
+    // ADR-703: the per-entity effect records, at the binding the static entity layout gives them.
+    entries[2].binding = 2;
+    entries[2].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+    entries[2].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+    entries[2].buffer.minBindingSize = 256;
     wgpu::BindGroupLayoutDescriptor layoutDesc{};
     layoutDesc.label = "skinned-object-layout";
     layoutDesc.entryCount = entries.size();
@@ -230,10 +238,10 @@ const wgpu::RenderPipeline& SkinningRenderer::litPipeline(bool blend, bool doubl
 }
 
 void SkinningRenderer::rebuildObjectGroup() {
-    if (!objectUniforms_ || !jointBuffer_) {
+    if (!objectUniforms_ || !jointBuffer_ || !entityFx_) {
         return;
     }
-    std::array<wgpu::BindGroupEntry, 2> entries{};
+    std::array<wgpu::BindGroupEntry, 3> entries{};
     entries[0].binding = 0;
     entries[0].buffer = objectUniforms_;
     entries[0].size = objectSize_;
@@ -242,6 +250,9 @@ void SkinningRenderer::rebuildObjectGroup() {
     // An explicit size, not WHOLE_SIZE: a dynamic offset is added to the bound range, so a
     // whole-buffer binding would run off the end the moment the offset was non-zero.
     entries[1].size = sliceBytes_;
+    entries[2].binding = 2;
+    entries[2].buffer = entityFx_;
+    entries[2].size = entityFxSize_;
     wgpu::BindGroupDescriptor groupDesc{};
     groupDesc.label = "skinned-object-bind-group";
     groupDesc.layout = objectLayout_;
@@ -250,12 +261,16 @@ void SkinningRenderer::rebuildObjectGroup() {
     objectGroup_ = context_.device().CreateBindGroup(&groupDesc);
 }
 
-void SkinningRenderer::setObjectBuffer(const wgpu::Buffer& objectUniforms, std::uint64_t objectSize) {
-    if (objectUniforms_.Get() == objectUniforms.Get() && objectSize_ == objectSize) {
+void SkinningRenderer::setObjectBuffer(const wgpu::Buffer& objectUniforms, std::uint64_t objectSize,
+                                       const wgpu::Buffer& entityFx, std::uint64_t entityFxSize) {
+    if (objectUniforms_.Get() == objectUniforms.Get() && objectSize_ == objectSize &&
+        entityFx_.Get() == entityFx.Get() && entityFxSize_ == entityFxSize) {
         return;
     }
     objectUniforms_ = objectUniforms;
     objectSize_ = objectSize;
+    entityFx_ = entityFx;
+    entityFxSize_ = entityFxSize;
     rebuildObjectGroup();
 }
 

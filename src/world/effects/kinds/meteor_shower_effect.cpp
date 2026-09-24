@@ -480,6 +480,9 @@ EffectSchema buildSchema() {
     s.key = "meteors";
     s.enumName = "MeteorShower";
     s.displayName = "Meteor Shower";
+    s.description = "A burst of meteors streaking across the sky from one radiant, each a short comet trail.";
+    s.performance = PerformanceClass::Medium;
+    s.primaryCost = CostFragment;
     s.addLabel = "Add meteor shower";
     s.addTip = "A handful of streaks thrown from one point in the sky, staggered so they\n"
                "arrive as a shower rather than together. Each one is a comet's trail, so\n"

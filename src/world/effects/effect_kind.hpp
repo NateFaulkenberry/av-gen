@@ -35,6 +35,17 @@ enum class EffectKind : std::uint8_t {
     // camera towards where it is going.
     GroundPulse,
     TravelBeam,
+    // ADR-703 (Effect Library, Wave 1) reserves the next values, written explicitly because the
+    // Wave 1 types land on separate branches and the number a type serialises under must not depend
+    // on merge order: Glow = 8, Pulse = 9, BloomSource = 10, Trail = 11, SpaceWarp = 12,
+    // ParticleEmitter = 13. Each is declared here by the change that registers its schema.
+    Glow = 8,        // FXL: the entity emits light, with an optional rim and spill light
+    Pulse = 9,       // FXL: the entity's light swells and falls, whole or as a travelling band
+    BloomSource = 10, // FXL: the entity blooms like a light without getting brighter
+    // A strip through the owner's recent path, RIBBON over HIST (Light Trail is a style of it).
+    Trail = 11,
+    SpaceWarp = 12, // DF: the view bending around its owner (distortion_frame.hpp)
+    ParticleEmitter = 13, // ADR-703: an effect-owned particle system riding its owner (EMIT)
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

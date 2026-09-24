@@ -402,6 +402,9 @@ EffectSchema buildSchema() {
     s.key = "comet";
     s.enumName = "Comet";
     s.displayName = "Bioluminescent Comet";
+    s.description = "A bright head crossing the sky on a world-space arc, with a halo, a wispy trail and shed fragments; lights the ground below it.";
+    s.performance = PerformanceClass::Medium;
+    s.primaryCost = CostFragment;
     s.addLabel = "Add comet";
     s.addTip = "A celestial object on a great-circle arc across the sky.\n"
                "It arrives as an event with an authored window, so it launches once;\n"

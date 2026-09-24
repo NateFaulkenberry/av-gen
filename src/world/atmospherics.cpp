@@ -516,8 +516,8 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const EffectInstance> effe
         const EffectInstance& e = effects[at];
         const EffectSchema* schema = effectSchema(e.kind);
         // ADR-702: one list holds every type. The surface waves are `resolveWaves`' to evaluate.
-        if (schema != nullptr && schema->resolve.bucket == EffectBucket::Surface) {
-            continue;
+        if (schema != nullptr && !isAtmosphericBucket(schema->resolve.bucket)) {
+            continue; // ADR-702/703: owned by another stage's builder
         }
         // Written for every instance this function owns, so the panel can say what happened to
         // each one rather than a count of what happened to some. Refined below as it resolves.
@@ -643,7 +643,11 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const EffectInstance> effe
                 break;
             }
             case EffectBucket::Surface:
-                break; // unreachable: skipped at the top, and `resolveWaves`' to evaluate
+            case EffectBucket::EntityLanes:
+            case EffectBucket::Ribbon:
+            case EffectBucket::Distortion:
+            case EffectBucket::Emitter:
+                break; // unreachable: skipped at the top; each has a builder of its own
             }
         }
         if (said != nullptr) {

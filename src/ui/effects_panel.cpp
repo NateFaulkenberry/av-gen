@@ -436,6 +436,10 @@ void EffectsSection::drawCardBody(app::Engine& engine, const world::EffectInstan
     if (badge.severity == BadgeSeverity::Warning) {
         ImGui::PushStyleColor(ImGuiCol_Text, kWarning);
         ImGui::TextWrapped("%s", badge.explanation);
+        // ADR-703: the builder's own sentence -- which budget, which part -- when it gave one.
+        if (const std::string_view why = engine.effectStatusReason(effect.id); !why.empty()) {
+            ImGui::TextWrapped("%.*s", static_cast<int>(why.size()), why.data());
+        }
         ImGui::PopStyleColor();
     }
 

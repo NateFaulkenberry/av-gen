@@ -99,6 +99,11 @@ StatusBadge effectStatusBadge(world::EffectStatus status) {
                 "Not drawn: its render stage's GPU capacity is full. Effects above it in the same "
                 "stage took every slot; disable one of them, or this one.",
                 BadgeSeverity::Warning};
+    case world::EffectStatus::Partial:
+        return {"partial",
+                "Drawn, but not all of it: one of its parts did not fit its budget, or its owner "
+                "cannot give it what it needs. The line below says which.",
+                BadgeSeverity::Warning};
     case world::EffectStatus::Orphaned:
         return {"orphaned",
                 "Not drawn: its owner is not in this scene (deleted or renamed). Remove it, or "

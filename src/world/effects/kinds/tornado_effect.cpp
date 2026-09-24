@@ -728,6 +728,9 @@ EffectSchema buildSchema() {
     s.key = "tornado";
     s.enumName = "Tornado";
     s.displayName = "Tornado";
+    s.description = "A rotating column of dust and condensate standing in the world, lit by the scene, read from the side.";
+    s.performance = PerformanceClass::High;
+    s.primaryCost = CostFragment | CostExtraPass;
     s.addLabel = "Add tornado";
     s.addTip = "A rotating column of dust and condensate standing in the world: a funnel with a\n"
                "debris skirt at its foot and a wall cloud at its head, read from the side.\n"

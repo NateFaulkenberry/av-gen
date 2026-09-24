@@ -291,7 +291,9 @@ TEST_CASE("every kind registers the leaf the panel's field row names",
         INFO("kind: " << world::effectKindName(kind));
         const world::EffectSchema* schema = world::effectSchema(kind);
         REQUIRE(schema != nullptr);
-        const bool samplesFields = schema->resolve.bucket != world::EffectBucket::Surface;
+        // ADR-703: every bucket with a builder of its own (surface waves, lanes, ribbons, DF,
+        // emitters) is outside the atmospheric resolver, and none of them is sampled.
+        const bool samplesFields = world::isAtmosphericBucket(schema->resolve.bucket);
         CHECK(world::sharedFieldApplies(*schema, *flowRow) == samplesFields);
         const conf::Report r = conf::checkLeavesExist(kind, leaves, "panel-flow-row");
         INFO(r.summary());

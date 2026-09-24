@@ -4,7 +4,7 @@
 //
 // Fields (ADR-025) reach this pass only through material programs (ADR-030): the Field op samples
 // the frame's FieldBlock, bound here at group 2 (the material group) because the entity group 1
-// holds nothing but the ObjectUniforms. procedural.wgsl and sdf_raymarch.wgsl bind their own copy
+// holds only the ObjectUniforms and (ADR-703) the per-entity effect records. procedural.wgsl and sdf_raymarch.wgsl bind their own copy
 // at group(1) @binding(3); each module declares `fieldBlock` exactly once.
 //
 // `fs_depth` is the depth-only entry the prepass and the shadow passes use: the same vertex stage,
@@ -25,9 +25,19 @@ fn proceduralRungTier() -> f32 { return 0.0; }
 
 @group(2) @binding(8) var<uniform> fieldBlock: FieldBlock;
 
+// ADR-703 (FXL): the per-entity effect records, indexed by `object.fxA.w`. Binding 2 of the entity
+// object layout (binding 1 is the skinned path's joint palette, pbr_skinned.wgsl), bound by every
+// pipeline that uses that layout -- SceneRenderer's, the skinned renderer's and the meshed SDFs'.
+@group(1) @binding(2) var<storage, read> entityFx: array<EntityFx>;
+
 @fragment
 fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
     let screenUv = in.clip.xy * frame.targetSize.zw;
+    // ADR-703: this draw's effect lanes, for `shadeSurface` (pbr_shade.wgsl). A uniform branch: an
+    // entity no lane effect touches has `fxA.z == 0`, reads no record, and leaves the lanes zero.
+    if (object.fxA.z != 0.0) {
+        setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
+    }
     let shaded = shadeSurface(in.worldPos, in.normal, in.uv, frontFacing, vec3<f32>(1.0), vec3<f32>(1.0),
                               materialInstanceZero(in.localPos), screenUv);
     // ADR-376: the tree's own light. Added to both the radiance and the emission target, because

@@ -93,3 +93,55 @@ fn voronoiF1(p: vec3<f32>, seed: u32) -> f32 {
     }
     return sqrt(best);
 }
+
+// ---- Effect Library (DF): an animated, divergence-free flow, cheap enough for a screen-space field --
+//
+// `curlNoise` above is the reference curl and costs six fBM vectors -- 432 hashes a call -- which is
+// a compute-pass price, not a per-fragment one over a quarter of the screen. The two functions below
+// are the per-fragment form: the value noise's gradient taken ANALYTICALLY (no finite differences),
+// and the flow built as the cross product of two such gradients, which is divergence-free by
+// identity (div(grad a x grad b) = 0), so it swirls rather than sources or sinks -- 32 hashes a call.
+// Additive: nothing above changed, and nothing above calls these.
+
+// Value noise (as `valueNoise`, same lattice and fade) with its analytic gradient: xyz = d/dp, w = value.
+fn valueNoiseGrad(p: vec3<f32>, seed: u32) -> vec4<f32> {
+    let c = floor(p);
+    let f = p - c;
+    let u = f * f * (3.0 - 2.0 * f);
+    let du = 6.0 * f * (1.0 - f);
+    let ci = vec3<i32>(c);
+    let n000 = hash01(ci, seed);
+    let n100 = hash01(ci + vec3<i32>(1, 0, 0), seed);
+    let n010 = hash01(ci + vec3<i32>(0, 1, 0), seed);
+    let n110 = hash01(ci + vec3<i32>(1, 1, 0), seed);
+    let n001 = hash01(ci + vec3<i32>(0, 0, 1), seed);
+    let n101 = hash01(ci + vec3<i32>(1, 0, 1), seed);
+    let n011 = hash01(ci + vec3<i32>(0, 1, 1), seed);
+    let n111 = hash01(ci + vec3<i32>(1, 1, 1), seed);
+    let k1 = n100 - n000;
+    let k2 = n010 - n000;
+    let k3 = n001 - n000;
+    let k4 = n000 - n100 - n010 + n110;
+    let k5 = n000 - n010 - n001 + n011;
+    let k6 = n000 - n100 - n001 + n101;
+    let k7 = -n000 + n100 + n010 - n110 + n001 - n101 - n011 + n111;
+    let value = n000 + k1 * u.x + k2 * u.y + k3 * u.z + k4 * u.x * u.y + k5 * u.y * u.z + k6 * u.z * u.x +
+                k7 * u.x * u.y * u.z;
+    let grad = du * vec3<f32>(k1 + k4 * u.y + k6 * u.z + k7 * u.y * u.z,
+                              k2 + k5 * u.z + k4 * u.x + k7 * u.z * u.x,
+                              k3 + k6 * u.x + k5 * u.y + k7 * u.x * u.y);
+    return vec4<f32>(grad, value);
+}
+
+// A divergence-free flow at `p`, animated by `t`: grad(a) x grad(b) for two decorrelated two-octave
+// value noises. The two potentials slide in DIFFERENT directions as `t` advances, so the field
+// evolves in place instead of translating as a whole -- temporally coherent (a smooth function of t)
+// without the crawl of a single scrolled texture. Magnitude is O(1); callers scale it.
+fn flowCurl(p: vec3<f32>, t: f32, seed: u32) -> vec3<f32> {
+    let da = vec3<f32>(0.31, 0.17, -0.23) * t;
+    let db = vec3<f32>(-0.19, 0.27, 0.13) * t;
+    let ga = valueNoiseGrad(p + da, seed).xyz + 0.5 * valueNoiseGrad(p * 2.03 + vec3<f32>(17.0) - da, seed).xyz;
+    let gb = valueNoiseGrad(p + vec3<f32>(31.7) + db, seed + 1u).xyz +
+             0.5 * valueNoiseGrad(p * 2.03 + vec3<f32>(47.3) - db, seed + 1u).xyz;
+    return cross(ga, gb);
+}
