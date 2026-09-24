@@ -1,4 +1,5 @@
-// ADR-500: the world-effect registry.
+// ADR-500: the effect registry -- since ADR-702 the registry of EVERY effect type, the surface
+// waves (Ground Pulse, Travel Beam) included.
 //
 // `tests/unit/test_effect_conformance.cpp` holds the family's contract -- default routes, the
 // round trip, ranges, dispatch, the kind name, the field subscription -- and now runs it over five
@@ -34,6 +35,17 @@ const world::EffectSchema& schemaFor(world::EffectKind kind) {
     const world::EffectSchema* s = world::effectSchema(kind);
     REQUIRE(s != nullptr);
     return *s;
+}
+
+// Where a row lives in an instance's document: `parameters/<jsonPath or leaf>`. A row whose
+// `jsonPath` starts with '/' names a BORROWED block (a meteor shower's arc is a `comet`, a fog
+// bank's medium a `vortex`), which since ADR-702 is also inside `parameters`.
+const nlohmann::json* rowJson(const nlohmann::json& doc, const world::EffectField& f) {
+    const std::string declared = f.jsonPath[0] != '\0' ? f.jsonPath : f.leaf;
+    const std::string pointer =
+        declared.front() == '/' ? "/parameters" + declared : "/parameters/" + declared;
+    const nlohmann::json::json_pointer ptr(pointer);
+    return doc.contains(ptr) ? &doc.at(ptr) : nullptr;
 }
 
 } // namespace
@@ -117,26 +129,32 @@ TEST_CASE("a registered path exists for every row, and for no row that is not th
     for (const world::EffectKind kind : world::kEffectKinds) {
         const world::EffectSchema& s = schemaFor(kind);
         REQUIRE(s.factory != nullptr);
-        const world::EffectInstance probe = s.factory("registry probe");
+        world::EffectInstance probe = s.factory("registry probe");
+        probe.id = "registry-probe"; // ADR-702: the prefix is the id's, never the display name's
         params::ParameterSet set;
         const world::EffectParameters registered =
             world::registerEffectParameters(set, std::span(&probe, 1));
-        const std::string prefix = world::effectParameterPrefix(probe.name);
+        const std::string prefix = world::effectParameterPrefix(probe.id);
+        REQUIRE(prefix == "fx/registry-probe/");
 
         // Every declared row produced a parameter...
         for (const world::EffectField& f : s.fields) {
             INFO(prefix + f.leaf);
             CHECK(set.find(prefix + f.leaf) != nullptr);
         }
+        // ...every shared row that APPLIES to this type did, and no shared row that does not
+        // (ADR-702: a surface wave registers no ground glow nothing would read)...
+        std::size_t shared = 0;
         for (const world::EffectField& f : world::sharedEffectFields()) {
             INFO(prefix + f.leaf);
-            CHECK(set.find(prefix + f.leaf) != nullptr);
+            const bool applies = world::sharedFieldApplies(s, f);
+            CHECK((set.find(prefix + f.leaf) != nullptr) == applies);
+            shared += applies ? 1u : 0u;
         }
         // ...and the cached pointers line up with the rows one-for-one, which is what
         // `copyParameters` walks positionally.
         REQUIRE(registered.effects.size() == 1);
-        CHECK(registered.effects.front().values.size() ==
-              s.fields.size() + world::sharedEffectFields().size());
+        CHECK(registered.effects.front().values.size() == s.fields.size() + shared);
 
         INFO("kind: " << world::effectKindName(kind));
         CHECK(set.find(prefix + "noSuchLeaf") == nullptr);
@@ -152,7 +170,8 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
     // asking -- did this number survive?
     for (const world::EffectKind kind : world::kEffectKinds) {
         const world::EffectSchema& s = schemaFor(kind);
-        world::EffectInstance e = s.factory("round trip");
+        world::EffectInstance e = world::makeEffect(kind, "round trip"); // the factory, with an id
+        REQUIRE(e.id == "round-trip");
 
         // A distinct value per row, varied by index so a serialiser that swapped two fields is
         // caught rather than agreeing with itself.
@@ -205,7 +224,8 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
                 // The file has to carry the NAME. Checking only the value back would pass just as
                 // well if the index were written, and the whole reason the name is there is the
                 // day a primitive is appended to the list.
-                CHECK(doc[s.key][f.leaf].is_string());
+                REQUIRE(rowJson(doc, f) != nullptr);
+                CHECK(rowJson(doc, f)->is_string());
                 break;
             }
         }
@@ -216,11 +236,11 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
         // saved file comes back as the factory's value, and this check names it. Deleting the key
         // here is the same event as a row being dropped from the serialiser.
         const world::EffectSchema& s = schemaFor(world::EffectKind::Vortex);
-        world::EffectInstance e = s.factory("deleted key");
+        world::EffectInstance e = world::makeEffect(world::EffectKind::Vortex, "deleted key");
         e.vortex.filaments = 3.5f;
         nlohmann::json doc = e.toJson();
-        REQUIRE(doc["vortex"].contains("filaments"));
-        doc["vortex"].erase("filaments");
+        REQUIRE(doc["parameters"].contains("filaments"));
+        doc["parameters"].erase("filaments");
         const auto back = world::EffectInstance::fromJson(doc);
         REQUIRE(back.has_value());
         CHECK(back->vortex.filaments != 3.5f);
@@ -231,10 +251,12 @@ TEST_CASE("a kind whose numbers live in the store keeps them apart from its neig
           "[world][atmospherics][registry]") {
     // The property that lets a kind be declared in its own file at all: it has no struct on the
     // shared header, so its numbers are keyed by `<kind>/<leaf>` in `EffectInstance::values`.
-    // Two kinds' `density` must not be one number, and an effect that changes kind must keep what
-    // the kind it left was holding -- which is why `EffectInstance` is not a variant.
+    // Two kinds' `density` must not be one number. (ADR-230/500 also asked that an effect which
+    // CHANGED kind keep what the kind it left was holding. ADR-702 fixed an instance's type --
+    // switching is removing one and adding another -- so that half is now the opposite promise: the
+    // file carries this type's numbers and no other's.)
     const world::EffectSchema& shower = schemaFor(world::EffectKind::MeteorShower);
-    world::EffectInstance e = shower.factory("store");
+    world::EffectInstance e = world::makeEffect(world::EffectKind::MeteorShower, "store");
 
     const world::EffectField* meteors = nullptr;
     for (const world::EffectField& f : shower.fields) {
@@ -251,19 +273,24 @@ TEST_CASE("a kind whose numbers live in the store keeps them apart from its neig
 
     SECTION("it survives the file") {
         const nlohmann::json doc = e.toJson();
-        REQUIRE(doc.contains("meteors"));
-        CHECK(doc["meteors"]["meteors"].get<float>() == 4.0f);
+        REQUIRE(doc["parameters"].contains("meteors"));
+        CHECK(doc["parameters"]["meteors"].get<float>() == 4.0f);
         const auto back = world::EffectInstance::fromJson(doc);
         REQUIRE(back.has_value());
         CHECK(world::fieldFloat(*meteors, shower, *back) == 4.0f);
     }
 
-    SECTION("changing kind does not throw the other kind's settings away") {
-        e.comet.appearance.coreIntensity = 33.0f;
-        world::applyEffectStyle(e, world::EffectKind::Aurora, world::effectStyleNames(
-                                                                      world::EffectKind::Aurora)[0]);
-        CHECK(e.kind == world::EffectKind::Aurora);
-        CHECK(e.values.getFloat("meteors/meteors", -1.0f) == 4.0f);
+    SECTION("the file carries this type's stored numbers and no other type's") {
+        // A fog bank's stored rows live under `fog/` in the same store; a shower's file must not
+        // carry them. The control is the shower's own row, which it must carry.
+        e.values.setFloat("fog/bankLength", 123.0f);
+        const nlohmann::json doc = e.toJson();
+        CHECK(doc["parameters"].contains("meteors"));
+        CHECK_FALSE(doc["parameters"].contains("bankLength"));
+        CHECK_FALSE(doc.contains("fog"));
+        const auto back = world::EffectInstance::fromJson(doc);
+        REQUIRE(back.has_value());
+        CHECK(back->values.getFloat("fog/bankLength", -1.0f) == -1.0f);
     }
 }
 
@@ -280,7 +307,7 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
         e.values.setFloat("meteors/meteors", 4.0f);
         e.values.setFloat("meteors/stagger", 0.0f); // all four in the air at once
 
-        world::AtmosphericContext ctx;
+        world::EffectContext ctx;
         ctx.seconds = 0.3;
         std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
         std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
@@ -314,7 +341,7 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
             e.timing = world::Timing{};
             e.values.setFloat("meteors/meteors", n);
             e.values.setFloat("meteors/stagger", 0.0f);
-            world::AtmosphericContext ctx;
+            world::EffectContext ctx;
             ctx.seconds = 0.3;
             std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
             std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
@@ -333,7 +360,7 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
         e.activation = world::Activation::Always;
         e.timing = world::Timing{};
         const auto resolveAt = [&](double t) {
-            world::AtmosphericContext ctx;
+            world::EffectContext ctx;
             ctx.seconds = t;
             world::AtmosphericFrame frame{};
             world::buildAtmosphericFrame(std::span(&e, 1), ctx, frame);
@@ -353,7 +380,7 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
             world::makeEffect(world::EffectKind::VolumetricFog, "bank");
         fog.activation = world::Activation::Always;
         fog.timing = world::Timing{};
-        world::AtmosphericContext ctx;
+        world::EffectContext ctx;
         ctx.seconds = 1.0;
         world::AtmosphericFrame frame{};
         world::buildAtmosphericFrame(std::span(&fog, 1), ctx, frame);
@@ -387,7 +414,7 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
             e.activation = world::Activation::Always;
             e.timing = world::Timing{};
         }
-        world::AtmosphericContext ctx;
+        world::EffectContext ctx;
         ctx.seconds = 1.0;
         std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
         std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
@@ -414,52 +441,85 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
 TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
           "[world][atmospherics][registry]") {
     // The claim the render hashes prove at the pixel level, asked here at the level where it is
-    // cheap to ask every build: a comet, an aurora and a vortex serialise to a document whose
-    // per-kind blocks for the new kinds are either absent or carry no values of their own.
+    // cheap to ask every build: a comet, an aurora and a vortex serialise to a document that carries
+    // none of the stored rows the fog bank and the meteor shower declared, and round-trip unchanged.
     //
-    // It matters because `toJson` writes EVERY kind's block. A kind whose rows are all absolute
-    // (they alias another kind's struct) writes an empty object, and a kind with stored rows writes
-    // its defaults -- neither of which changes what any existing kind loads as.
+    // ADR-500/563 recorded the opposite consequence here for a while: `toJson` wrote EVERY kind's
+    // block, so every effect of every kind carried the fog bank's fifteen stored defaults and the
+    // shower's six. ADR-702 writes only an instance's own type, so those numbers are now ABSENT
+    // from every other type's file -- and this case checks that by the names of the rows, taken
+    // from the two schemas rather than typed here.
+    std::vector<const world::EffectField*> foreign;
+    for (const world::EffectKind k : {world::EffectKind::VolumetricFog, world::EffectKind::MeteorShower}) {
+        for (const world::EffectField& f : schemaFor(k).fields) {
+            if (f.stored) {
+                foreign.push_back(&f);
+            }
+        }
+    }
+    // Counted from the code (`grep -c 'storedFloat("\\|storedChoice("'`): 15 fog + 6 shower.
+    REQUIRE(foreign.size() == 21);
+    const auto head = [](std::string_view path) {
+        return std::string(path.substr(0, path.find('/')));
+    };
     for (const world::EffectKind kind : {world::EffectKind::Comet,
                                              world::EffectKind::Aurora,
                                              world::EffectKind::Vortex}) {
+        const world::EffectSchema& own = schemaFor(kind);
         const world::EffectInstance e = world::makeEffect(kind, "unchanged");
         const nlohmann::json doc = e.toJson();
         const auto back = world::EffectInstance::fromJson(doc);
         INFO(doc.dump().substr(0, 400));
         REQUIRE(back.has_value());
         CHECK(back->kind == kind);
-        // ADR-563: the fog block is no longer EMPTY, and this assertion changing is the test
-        // reporting a real consequence of that change rather than breaking.
-        //
-        // It used to alias the vortex's struct entirely -- every row absolute -- so it wrote `{}`.
-        // §46 B gave a fog bank six shape controls of its own (`bankLength`, `bankRotation`,
-        // `edgeSoftness`, `groundHug`, `heightFalloff`, `domeShape`), and they live in
-        // `EffectValueStore` because `world::Vortex` is shared with the tornado. Stored rows
-        // serialise their defaults, exactly as the shower's six do.
-        //
-        // The consequence worth stating: **every effect of every kind now writes six more numbers
-        // in its `fog` block**, because `toJson` writes every kind's block. They are defaults, so
-        // nothing loads differently -- which is the property this case exists to check and still
-        // checks, one line down.
-        REQUIRE(doc.contains("fog"));
-        // Fifteen since ADR-575 added §26's `emissionHeight`. Counted with
-        // `grep -c '    storedFloat("'` (14) plus `grep -c 'storedChoice("'` (1), not read off
-        // the failure -- which is the third time that distinction has caught something. This number
-        // moving is the case doing its job rather than breaking: it is the only thing in the suite
-        // that notices a kind's stored rows changing what EVERY effect of every kind serialises,
-        // because `toJson` writes every kind's block.
-        //
-        // **Take the number from the code, not from the failure.** `grep -c '    storedFloat('`
-        // plus `grep -c 'storedChoice('` on `volumetric_fog_effect.cpp` is 9 + 1; a count derived
-        // that way is still an assertion, and a count copied out of the red output is a test that
-        // now agrees with whatever the code does. Third time this case has reported a true
-        // consequence, and both times it caught me it was because a row was added and the count
-        // was not re-derived.
-        CHECK(doc["fog"].size() == 15);
-        // The shower block holds only its six own numbers.
-        REQUIRE(doc.contains("meteors"));
-        CHECK(doc["meteors"].size() == 6);
+        CHECK(back->toJson() == doc);
+        CHECK_FALSE(doc.contains("fog"));
+        CHECK_FALSE(doc.contains("meteors"));
+        REQUIRE(doc.contains("parameters"));
+
+        // Every key in `parameters` is one this type's own declaration accounts for: the head of one
+        // of its rows' paths, its anchor block, or what its `writeExtra` writes.
+        std::set<std::string> accounted;
+        for (const world::EffectField& f : own.fields) {
+            std::string_view path = f.jsonPath[0] != '\0' ? f.jsonPath : f.leaf;
+            if (path.starts_with('/')) {
+                path.remove_prefix(1); // a borrowed block, inside `parameters` all the same
+            }
+            accounted.insert(head(path));
+        }
+        if (own.anchorJson != nullptr) {
+            std::string_view anchor(own.anchorJson);
+            if (anchor.starts_with('/')) {
+                anchor.remove_prefix(1);
+            }
+            accounted.insert(head(anchor));
+        }
+        if (own.writeExtra != nullptr) {
+            nlohmann::json extra = nlohmann::json::object();
+            own.writeExtra(e, extra);
+            for (const auto& [key, value] : extra.items()) {
+                accounted.insert(key);
+            }
+        }
+        for (const auto& [key, value] : doc["parameters"].items()) {
+            INFO(world::effectKindName(kind) << " writes parameters/" << key
+                                             << ", which none of its own rows declares");
+            CHECK(accounted.count(key) == 1);
+        }
+        // ...and, named, the two new types' stored rows are not among them (a stored row's leaf
+        // that happens to spell one of this type's own groups -- the fog's `shape` against the
+        // aurora's `shape` block -- is this type's group, and is skipped).
+        for (const world::EffectField* f : foreign) {
+            std::string_view path = f->jsonPath[0] != '\0' ? f->jsonPath : f->leaf;
+            if (path.starts_with('/')) {
+                path.remove_prefix(1);
+            }
+            if (accounted.count(head(path)) == 1) {
+                continue;
+            }
+            INFO(world::effectKindName(kind) << " carries another type's stored row '" << f->leaf << "'");
+            CHECK_FALSE(doc["parameters"].contains(f->leaf));
+        }
     }
 }
 
@@ -473,16 +533,18 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
     // also the case nothing else in this file covers, because every other probe comes from the
     // factory, which has run a preset.
     const nlohmann::json doc = nlohmann::json{
+        {"id", "authored-shower"},
+        {"type", "meteors"},
         {"name", "authored shower"},
+        {"owner", {{"kind", "world"}}},
         {"enabled", true},
-        {"kind", "meteors"},
         {"activation", "always"},
         {"timing", {{"delay", 0.0}, {"lifetime", 0.0}, {"fadeIn", 0.0}, {"fadeOut", 0.0},
                     {"windowStart", 0.0}, {"windowSeconds", 0.0}, {"repeatSeconds", 8.0}}},
         {"ground", {{"mode", "off"}}},
         {"flow", {{"field", ""}}},
-        {"meteors", {{"meteors", 6.0}, {"spread", 52.0}, {"stagger", 0.35},
-                     {"sizeVariation", 0.5}, {"radiantDrift", 8.0}, {"seed", 3.0}}}};
+        {"parameters", {{"meteors", 6.0}, {"spread", 52.0}, {"stagger", 0.35},
+                        {"sizeVariation", 0.5}, {"radiantDrift", 8.0}, {"seed", 3.0}}}};
 
     const auto loaded = world::EffectInstance::fromJson(doc);
     REQUIRE(loaded.has_value());
@@ -490,7 +552,7 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
     CHECK(loaded->values.getFloat("meteors/meteors", -1.0f) == 6.0f);
     CHECK(loaded->values.getFloat("meteors/stagger", -1.0f) == 0.35f);
 
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = 0.6;
     std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
     std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
@@ -517,7 +579,8 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
         // mid-flight for the first meteors and nothing at all for the last.
         nlohmann::json later = doc;
         later["timing"]["repeatSeconds"] = 6.0;
-        later["comet"] = nlohmann::json{
+        // ADR-702: the shower's borrowed `comet` block lives inside `parameters`.
+        later["parameters"]["comet"] = nlohmann::json{
             {"path", {{"anchor", "world"}, {"anchorPosition", {0.0, 0.0, 0.0}},
                       {"startAzimuth", -70.0}, {"startElevation", 34.0},
                       {"endAzimuth", 55.0}, {"endElevation", 9.0},
@@ -531,7 +594,7 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
         CHECK(e2->comet.appearance.coreIntensity == 40.0f);
 
         world::EffectInstance live2 = *e2;
-        world::AtmosphericContext ctx2;
+        world::EffectContext ctx2;
         ctx2.seconds = 6.8;
         world::AtmosphericFrame f2{};
         world::buildAtmosphericFrame(std::span(&live2, 1), ctx2, f2);

@@ -125,10 +125,11 @@ enum class FieldSource : std::uint8_t {
 // default subscription names it, the engine publishes it, and the panel offers it.
 inline constexpr std::string_view kWindField = "wind";
 
-// The name a vortex effect publishes its own field under. `atmos/<name>` deliberately matches the
+// The name a vortex effect publishes its own field under. `fx/<id>` deliberately matches the
 // prefix that effect's parameters register under (`world::effectParameterPrefix`), so the name
-// an artist sees in the Parameters panel and the name they subscribe to are the same string.
-[[nodiscard]] std::string vortexFieldName(std::string_view effectName);
+// an artist sees in the Parameters panel and the name they subscribe to are the same string --
+// and, keyed by the id (ADR-702), renaming the effect orphans no subscriber.
+[[nodiscard]] std::string vortexFieldName(std::string_view effectId);
 
 // One turn, for the phase arithmetic subscribers do with `FlowSample::phase`. Spelled here rather
 // than reached for out of `wind::kTau` or `vortex::kTau` so a subscriber need not include a

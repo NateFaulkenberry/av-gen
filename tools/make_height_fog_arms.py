@@ -28,20 +28,10 @@ from pathlib import Path
 
 # ADR-578: THE SCENE CARRIES A MEDIUM OF ITS OWN AND THESE ARMS DID NOT KNOW.
 #
-# `tree-of-life-floating-island.scene.json` declares a `Cosmic Vortex`, and a project's
-# `atmosphericEffects` list MERGES with the scene's rather than replacing it -- so every arm this
-# file has ever written rendered the vortex as well as whatever it placed. The generator's own
-# comments said otherwise.
-#
-# It was invisible until §39's "active volume count" reached the headless log (ADR-578): the first
-# arm run after that printed `media=2` where one had been placed, and the second number was the
-# scene's. Nothing else in the record would have said so.
-#
-# What it did and did not invalidate: the vortex was CONSTANT across every arm in a set, so a
-# difference between two arms is still the parameter that differs -- the comparisons stand. What
-# does not stand is any sentence claiming an arm contained one medium, or none. Those are corrected
-# in place, and the vortex is switched off by parameter below.
-DISABLE_SCENE_MEDIUM = {"atmos/Cosmic Vortex/enabled": False}
+# Before ADR-702 a project's `atmosphericEffects` MERGED with the scene's, so every arm rendered the
+# scene's own medium too, and it was switched off by a parameter here. ADR-702: a project's
+# `effects` array replaces the scene's list outright, so removing the medium from the project's
+# list removes it from the frame. See tools/make_fog_arms.py for the whole record.
 
 HERE = Path(__file__).resolve().parent.parent
 EX = HERE / "examples" / "treeisland"
@@ -89,11 +79,14 @@ def main() -> int:
     for name, params in ARMS.items():
         p = load_project()
         # The placed medium goes, so the only fog in the frame is the layer under test.
-        p["atmosphericEffects"] = [
-            e for e in p["atmosphericEffects"] if e.get("kind") not in ("vortex", "fog")
-        ]
+        p["effects"] = [e for e in p["effects"] if e.get("type") not in ("vortex", "tornado", "fog")]
+        # ADR-702: orders are contiguous per owner, and the loader refuses a stack that is not.
+        counters: dict = {}
+        for e in p["effects"]:
+            owner = (e["owner"]["kind"], e["owner"].get("name", ""))
+            e["order"] = counters.get(owner, 0)
+            counters[owner] = e["order"] + 1
         p["parameters"].update(BASE)
-        p["parameters"].update(DISABLE_SCENE_MEDIUM)  # ADR-578
         p["parameters"].update(params)
         p["render"]["width"] = WIDTH
         p["render"]["height"] = HEIGHT

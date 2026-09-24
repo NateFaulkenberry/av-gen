@@ -40,30 +40,43 @@ def main():
         return
 
     doc = json.load(open(SRC), object_pairs_hook=collections.OrderedDict)
-    beam = copy.deepcopy(next(e for e in doc['worldEffects'] if e['name'].startswith('Camera')))
-    pulse = copy.deepcopy(next(e for e in doc['worldEffects'] if e['name'].startswith('Hero')))
+    # ADR-702: one `effects` array. The travel beam is the World's; the hero pulse is now one Ground
+    # Pulse per hero, so the bench takes one of them and re-attaches it to the World with a node
+    # source -- ONE pulse, which is what ADR-208 measured.
+    beam = copy.deepcopy(next(e for e in doc['effects'] if e['type'] == 'travelBeam'))
+    pulse = copy.deepcopy(next(e for e in doc['effects'] if e['type'] == 'groundPulse'))
 
     beam['activation'] = 'window'
     beam['timing'] = {'delay': 0.0, 'lifetime': 0.0, 'fadeIn': 0.0, 'fadeOut': 0.0,
                       'windowStart': 0.0, 'windowSeconds': 600.0, 'repeatSeconds': 3.0}
-    beam['source'] = {'kind': 'camera', 'position': [0.0, 0.0, 0.0]}
-    beam.pop('target', None)
-    beam['propagation']['direction'] = 'cameraForward'
+    beam['parameters']['source'] = {'kind': 'camera', 'position': [0.0, 0.0, 0.0]}
+    beam['parameters'].pop('target', None)
+    beam['parameters']['propagation']['direction'] = 'cameraForward'
 
+    pulse['id'] = 'bench-pulse'
+    pulse['name'] = 'Bench Pulse'
+    pulse['owner'] = {'kind': 'world'}
     pulse['activation'] = 'window'
-    pulse['source'] = {'kind': 'node', 'name': 'elder-2-cap', 'groundOffset': 0.0}
+    pulse['parameters']['source'] = {'kind': 'node', 'name': 'elder-2-cap', 'groundOffset': 0.0}
     pulse['timing'] = {'delay': 0.0, 'lifetime': 0.0, 'fadeIn': 0.0, 'fadeOut': 0.0,
                        'windowStart': 0.0, 'windowSeconds': 600.0, 'repeatSeconds': 4.5}
 
-    effects = {'none': [], 'beam': [beam], 'pulse': [pulse], 'both': [beam, pulse]}
+    def stacked(*effects):
+        # Orders are contiguous per owner (validateEffects refuses anything else); all are the World's.
+        out = [copy.deepcopy(e) for e in effects]
+        for i, e in enumerate(out):
+            e['order'] = i
+        return out
+
+    effects = {'none': [], 'beam': stacked(beam), 'pulse': stacked(pulse), 'both': stacked(beam, pulse)}
     for arm in ARMS:
         out = collections.OrderedDict()
         for key, value in doc.items():
-            if key == 'worldEffects':
+            if key == 'effects':
                 continue
             out[key] = value
             if key == 'heroes' and effects[arm]:
-                out['worldEffects'] = effects[arm]
+                out['effects'] = effects[arm]
         out['name'] = 'fx-' + arm
         json.dump(out, open(path_for(arm), 'w'), indent=1)
         print('%s: %d effect(s)' % (os.path.basename(path_for(arm)), len(effects[arm])))

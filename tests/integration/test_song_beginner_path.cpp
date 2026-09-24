@@ -17,6 +17,8 @@
 #include "audio/audio_file.hpp"
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
+#include "world/atmospherics.hpp"
+#include "world/effects/effect_instance.hpp"
 #include "world/wave_effect.hpp"
 #include "song/from_analysis.hpp"
 
@@ -346,7 +348,7 @@ TEST_CASE("A travelling intent does produce a span the beam fires on",
     REQUIRE(spans.size() == 1);
     CHECK(spans.front().travel);
 
-    world::WorldEffect beam = world::cameraTravelBeam();
+    const world::EffectInstance beam = world::makeEffect(world::EffectKind::TravelBeam, "Travel Beam");
     CHECK(world::resolveActivationWindow(beam.activation, beam.timing, 2.0, spans).has_value());
     // And it does not fire where there is no travel, or the check above would pass on anything.
     app::Sequence held;

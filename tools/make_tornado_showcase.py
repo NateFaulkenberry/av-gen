@@ -59,13 +59,17 @@ OUT = HERE / "examples" / "labs"
 
 def arms(scene: dict) -> list[tuple[str, dict]]:
     out = []
-    for i, effect in enumerate(scene["atmosphericEffects"]):
+    # ADR-702: the one `effects` array; a tornado's own rows are under `parameters`.
+    tornadoes = [e for e in scene["effects"] if e.get("type") == "tornado"]
+    for effect in tornadoes:
         s = copy.deepcopy(scene)
         # One live tornado. The others stay in the file -- an arm that DELETES them would also be
-        # testing a different scene graph, and the point is to change one thing.
-        for j, e in enumerate(s["atmosphericEffects"]):
-            e["enabled"] = j == i
-        t = effect["tornado"]
+        # testing a different scene graph, and the point is to change one thing. Matched by id,
+        # which is what identifies an effect.
+        for e in s["effects"]:
+            if e.get("type") == "tornado":
+                e["enabled"] = e["id"] == effect["id"]
+        t = effect["parameters"]
         h = float(t["height"])
         base = t["base"]
         # The widest thing in the picture is the wall cloud, not the funnel.

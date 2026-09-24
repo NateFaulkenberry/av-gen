@@ -3967,7 +3967,7 @@ void Engine::publishFields() {
         //
         // Composing the field removes the copy rather than correcting it. There is nothing left
         // here to fall behind.
-        fieldBus_.publishVortex(world::fields::vortexFieldName(e.name), vortex::packVortex(e.vortex.field));
+        fieldBus_.publishVortex(world::fields::vortexFieldName(e.id), vortex::packVortex(e.vortex.field));
     }
 
     // The loud half. A subscription naming a field nobody publishes is this repository's signature

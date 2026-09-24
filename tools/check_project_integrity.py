@@ -3,15 +3,17 @@
 
 `refresh_scene_fingerprint.py` stamps; it never tells you a fingerprint has drifted, and it defaults
 to a single scene, so "1 fingerprint(s) refreshed" is compatible with three projects staying stale.
-And nothing at all checks that a `worldfx/<name>/...` parameter names an effect that exists -- the
-failure that once left 94 orphaned `atmos/*` parameters, and that a rename can recreate in one pass.
+And nothing at all checks that an `fx/<id>/...` parameter names an effect that exists -- the
+failure that once left 94 orphaned `atmos/*` parameters (ADR-702 folded `worldfx/<name>/` and
+`atmos/<name>/` into `fx/<id>/`, keyed by the effect's stable id, so a RENAME can no longer recreate
+it; a deletion, or an id edited by hand, still can).
 
 A **modulation route** can name the same missing effect, and it is the quieter half of the same
 defect: an orphaned parameter is refused once at load with its own line, while an orphaned route is
-one line among fifty and then simply never fires. `glowmere-valley-2-multicam` carries
+one line among fifty and then simply never fires. `glowmere-valley-2-multicam` once carried
 `beat.pulse -> atmos/Bioluminescent Comet/coreIntensity` against a project whose only atmospheric
-effect is called `Aurora`; it has been reporting "1 modulation route(s) could not be bound" on
-every load, headless and windowed, and nothing was watching.
+effect was called `Aurora`; it reported "1 modulation route(s) could not be bound" on every load,
+headless and windowed, and nothing was watching.
 
 Read-only. Exits non-zero if anything is wrong, so it can gate a commit.
 
@@ -37,24 +39,38 @@ def projects():
             yield path, doc
 
 
-# The two parameter groups whose path is `<group>/<effect name>/<property>`, and the document key
-# each group's effects are declared under. `nodes/...` is deliberately not here: it resolves against
-# scene node ids on a different path, and a removed node is a legitimate authored edit.
-GROUPS = {'worldfx': 'worldEffects', 'atmos': 'atmosphericEffects'}
+# ADR-702: the one parameter group whose path is `<group>/<effect id>/<property>`. `nodes/...` is
+# deliberately not checked: it resolves against scene node ids on a different path, and a removed
+# node is a legitimate authored edit.
+GROUP = 'fx'
 
 
-def effect_names(node, key, out):
-    """Every `<key>[].name` anywhere in a document. They are not always at the top level, and a
-    project that declares none may still inherit them from its scene."""
-    if isinstance(node, dict):
-        for entry in node.get(key) or []:
-            if isinstance(entry, dict) and entry.get('name'):
-                out.add(entry['name'])
-        for value in node.values():
-            effect_names(value, key, out)
-    elif isinstance(node, list):
-        for value in node:
-            effect_names(value, key, out)
+def effect_ids(effects, out):
+    """The ids of an `effects` array (ADR-702's canonical entries: `id` and `type`)."""
+    for entry in effects or []:
+        if isinstance(entry, dict) and entry.get('id') and entry.get('type'):
+            out.add(entry['id'])
+
+
+def effective_ids(path, doc):
+    """The effects a project actually runs with. ADR-702: a project's own `effects` array REPLACES
+    its scene's list, so when it has one only its ids count; otherwise the scene's -- inline, or
+    the referenced file."""
+    ids = set()
+    if 'effects' in doc:
+        effect_ids(doc['effects'], ids)
+        return ids
+    inline = doc.get('assets', {}).get('scene', {}).get('inline')
+    if isinstance(inline, dict):
+        effect_ids(inline.get('effects'), ids)
+        return ids
+    scene, _ = scene_path(path, doc)
+    if scene and os.path.exists(scene):
+        try:
+            effect_ids(json.load(open(scene)).get('effects'), ids)
+        except Exception:
+            pass
+    return ids
 
 
 def scene_path(path, doc):
@@ -72,37 +88,21 @@ def main():
             problems.append('%s: will not parse: %s' % (rel, doc))
             continue
 
-        # An effect's name is the prefix its parameters hang off, so renaming or deleting one
-        # orphans the other, and the loader then refuses every orphaned value as an unknown path.
+        # An effect's id is the prefix its parameters hang off, so deleting one orphans the other,
+        # and the loader then refuses every orphaned value as an unknown path.
         params = doc.get('parameters') or {}
-        counted = False
-        for group, key in sorted(GROUPS.items()):
-            prefixes = {k.split('/')[1] for k in params
-                        if k.startswith(group + '/') and k.count('/') >= 2}
-            if not prefixes:
-                continue
-            if not counted:
-                checked_fx += 1
-                counted = True
-            names = set()
-            effect_names(doc, key, names)
-            scene, _ = scene_path(path, doc)
-            if scene and os.path.exists(scene):
-                try:
-                    effect_names(json.load(open(scene)), key, names)
-                except Exception:
-                    pass
-            for orphan in sorted(prefixes - names):
-                n = sum(1 for k in params if k.startswith('%s/%s/' % (group, orphan)))
-                problems.append("%s: %d parameter(s) under '%s/%s/' name no effect"
-                                % (rel, n, group, orphan))
+        ids = effective_ids(path, doc)
+        prefixes = {k.split('/')[1] for k in params if k.startswith(GROUP + '/') and k.count('/') >= 2}
+        if prefixes:
+            checked_fx += 1
+        for orphan in sorted(prefixes - ids):
+            n = sum(1 for k in params if k.startswith('%s/%s/' % (GROUP, orphan)))
+            problems.append("%s: %d parameter(s) under '%s/%s/' name no effect" % (rel, n, GROUP, orphan))
 
         # The same question asked of the routes. A route's target is a parameter path, so an
         # effect that is not there fails in exactly the way an orphaned parameter does -- except
         # that `Modulator::bind` reports it once per load and then the route is silently inert for
-        # the rest of the session. Only the two effect groups are checked, for the reason GROUPS
-        # gives: a `nodes/...` target resolves against scene node ids and a removed node is an
-        # authored edit rather than a mistake.
+        # the rest of the session. Only the effect group is checked, for the reason GROUP gives.
         for route in doc.get('routes') or []:
             if not isinstance(route, dict):
                 continue
@@ -110,18 +110,9 @@ def main():
             if not isinstance(target, str) or target.count('/') < 2:
                 continue
             group, effect = target.split('/')[0], target.split('/')[1]
-            key = GROUPS.get(group)
-            if key is None:
+            if group != GROUP:
                 continue
-            names = set()
-            effect_names(doc, key, names)
-            scene, _ = scene_path(path, doc)
-            if scene and os.path.exists(scene):
-                try:
-                    effect_names(json.load(open(scene)), key, names)
-                except Exception:
-                    pass
-            if effect not in names:
+            if effect not in ids:
                 problems.append("%s: modulation route '%s -> %s' names no effect"
                                 % (rel, route.get('source', '?'), target))
 

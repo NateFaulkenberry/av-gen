@@ -379,9 +379,9 @@ void writeExtra(const EffectInstance& e, nlohmann::json& out) {
     out["sparkle"]["seed"] = e.comet.sparkle.seed;
 }
 
-void readExtra(EffectInstance& e, const nlohmann::json& in) {
+Result<void> readExtra(EffectInstance& e, const nlohmann::json& in) {
     if (!in.contains("sparkle") || !in.at("sparkle").is_object()) {
-        return;
+        return {};
     }
     const nlohmann::json& s = in.at("sparkle");
     if (s.contains("fadeDistance") && s.at("fadeDistance").is_number()) {
@@ -390,6 +390,7 @@ void readExtra(EffectInstance& e, const nlohmann::json& in) {
     if (s.contains("seed") && s.at("seed").is_number_unsigned()) {
         e.comet.sparkle.seed = s.at("seed").get<std::uint32_t>();
     }
+    return {};
 }
 
 Result<void> validate(const EffectInstance& e) { return e.comet.validate(); }

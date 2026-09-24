@@ -6,7 +6,9 @@
 // a path nobody walks -- and it is why "the fog bank does nothing" could ship past a full suite.
 //
 // The chain under test is the shipped one, end to end and with no copy of it here: the registry's
-// factory is what `world_effects_panel.cpp` calls on the button, and `buildAtmosphericFrame` is
+// ADR-702: the Add Effect menu ends in `world::addEffect` (effect_stack.hpp) inside
+// `Engine::editEffects` -- the registry's factory, fitted to the owner and given an id and a stack
+// position -- and `buildAtmosphericFrame` is
 // what the engine calls every frame. `VolumeRenderer::enabled(scene)` marches when `mediumCount > 0`,
 // and the march gates on lane 0's `w` -- the radius, where 0 means off (`core/vortex.hpp:46`).
 // So "visible" here means: a medium was seated, its gate is open, and it has optical depth.
@@ -17,25 +19,35 @@
 #include "core/vortex.hpp"
 #include "world/atmospherics.hpp"
 #include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_stack.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <span>
+#include <vector>
 
 using namespace avgen;
 
 namespace {
 
-// Exactly the call the Add button makes: `append(makeEffect(schema->kind, ...))`.
+// Exactly the call the Add Effect menu makes on the World's stack: `addEffect(list, owner, kind)`.
 world::EffectInstance addedFromPanel() {
     const world::EffectSchema* s = world::effectSchema(world::EffectKind::VolumetricFog);
     REQUIRE(s != nullptr);
     REQUIRE(s->factory != nullptr); // no factory means no button at all
-    return s->factory("Fog Bank");
+    // The menu only offers what the owner may take; a fog bank on the World must be one of them.
+    REQUIRE(world::effectAllowedOn(world::EffectKind::VolumetricFog, world::EffectTarget::World));
+    std::vector<world::EffectInstance> effects;
+    const auto id = world::addEffect(effects, world::EffectOwner::world(), world::EffectKind::VolumetricFog);
+    REQUIRE(id.has_value());
+    REQUIRE(effects.size() == 1);
+    REQUIRE(effects[0].id == *id);
+    REQUIRE(world::validateEffects(effects).has_value());
+    return effects[0];
 }
 
 world::AtmosphericFrame frameAt(const world::EffectInstance& e, double seconds) {
-    world::AtmosphericContext ctx;
+    world::EffectContext ctx;
     ctx.seconds = seconds;
     world::AtmosphericFrame f{};
     world::buildAtmosphericFrame(std::span(&e, 1), ctx, f);

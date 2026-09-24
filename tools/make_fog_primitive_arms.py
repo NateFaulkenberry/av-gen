@@ -30,20 +30,10 @@ from pathlib import Path
 
 # ADR-578: THE SCENE CARRIES A MEDIUM OF ITS OWN AND THESE ARMS DID NOT KNOW.
 #
-# `tree-of-life-floating-island.scene.json` declares a `Cosmic Vortex`, and a project's
-# `atmosphericEffects` list MERGES with the scene's rather than replacing it -- so every arm this
-# file has ever written rendered the vortex as well as whatever it placed. The generator's own
-# comments said otherwise.
-#
-# It was invisible until §39's "active volume count" reached the headless log (ADR-578): the first
-# arm run after that printed `media=2` where one had been placed, and the second number was the
-# scene's. Nothing else in the record would have said so.
-#
-# What it did and did not invalidate: the vortex was CONSTANT across every arm in a set, so a
-# difference between two arms is still the parameter that differs -- the comparisons stand. What
-# does not stand is any sentence claiming an arm contained one medium, or none. Those are corrected
-# in place, and the vortex is switched off by parameter below.
-DISABLE_SCENE_MEDIUM = {"atmos/Cosmic Vortex/enabled": False}
+# Before ADR-702 a project's `atmosphericEffects` MERGED with the scene's, so every arm rendered the
+# scene's own medium too, and it was switched off by a parameter here. ADR-702: a project's
+# `effects` array replaces the scene's list outright, so there is nothing to switch off. See
+# tools/make_fog_arms.py for the whole record.
 
 HERE = Path(__file__).resolve().parent.parent
 EX = HERE / "examples" / "treeisland"
@@ -121,12 +111,15 @@ def load_project() -> dict:
 
 
 def as_primitive(project: dict, shape: str) -> None:
-    for effect in project["atmosphericEffects"]:
-        if effect.get("kind") in ("vortex", "fog"):
-            effect["kind"] = "fog"
+    # ADR-702's canonical entry. A fog bank's medium rows alias the vortex payload and are read from
+    # the `vortex` block inside `parameters`, beside its own stored rows (FOG_ROWS, the shape).
+    for effect in project["effects"]:
+        if effect.get("type") in ("vortex", "tornado", "fog"):
+            effect["type"] = "fog"
+            effect["id"] = f"fog-{shape.lower()}"
             effect["name"] = f"Fog {shape}"
-            effect["vortex"] = dict(VOLUME)
-            effect["fog"] = dict(FOG_ROWS, shape=shape)
+            effect["parameters"] = dict(FOG_ROWS, shape=shape, vortex=dict(VOLUME))
+            effect.pop("ground", None)
             return
     raise SystemExit("no medium effect in the project to replace")
 
@@ -136,7 +129,6 @@ def main() -> int:
         p = load_project()
         as_primitive(p, shape)
         p["parameters"]["post/bloom/enabled"] = False
-        p["parameters"].update(DISABLE_SCENE_MEDIUM)  # ADR-578
         # 256 steps, deliberately. These are SHAPE arms, not cost arms: at the shipped 32 the
         # medium is UNDERSAMPLED along the ray and every primitive reads as the same speckled blob,
         # which is section 48's point made against my own diagnostic --

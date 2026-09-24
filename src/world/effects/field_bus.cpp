@@ -61,9 +61,9 @@ const char* fieldSourceName(FieldSource source) {
     return "unknown";
 }
 
-std::string vortexFieldName(std::string_view effectName) {
-    std::string out = "atmos/";
-    out.append(effectName);
+std::string vortexFieldName(std::string_view effectId) {
+    std::string out = "fx/";
+    out.append(effectId);
     return out;
 }
 
