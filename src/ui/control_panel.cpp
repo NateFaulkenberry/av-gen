@@ -30,6 +30,7 @@
 #include <implot.h>
 
 #include <algorithm>
+#include <optional>
 #include <string_view>
 #include <cmath>
 #include <cstdio>
@@ -3995,6 +3996,10 @@ void ControlPanel::drawCameras(app::Engine& engine) {
     const scene::ActiveCameraState active = engine.activeCamera();
     scene::CameraDirection direction = comp->cameraDirection();
     bool changed = false;
+    // Every write this panel makes to the camera collection is one command on the editor's history
+    // (ADR-752), labelled for what the person did. Before, none of them was undoable at all.
+    std::string editLabel;
+    std::optional<seq::Sequence> pendingPiece; // the "x" button's sequencer half, applied with it
 
     ImGui::Text("Live: %s (%s%s%s)", active.name.empty() ? "Main" : active.name.c_str(),
                 scene::activeCameraReasonName(active.reason),
@@ -4043,6 +4048,7 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         rig.fovDegrees = glm::degrees(live.effectiveFovY());
         selectedCamera_ = direction.addCamera(std::move(rig));
         changed = true;
+        editLabel = "Add camera";
     }
     ImGui::SameLine();
     ImGui::TextDisabled("(%zu in this scene)", direction.cameras.size());
@@ -4112,7 +4118,9 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                 if (ImGui::Button("Place here")) {
                     // The viewport's pose onto this camera's *base* values. A parameter, never the
                     // derived scene camera: ADR-218's rule, and the reason this does not evaporate
-                    // on the next frame.
+                    // on the next frame. Measured into one undoable command like the rest.
+                    app::EditCapture place;
+                    place.begin(engine);
                     const scene::Camera& live = comp->scene().camera;
                     const std::string prefix = rig.channelPrefix();
                     if (auto* p = engine.params().find(prefix + "position")) {
@@ -4125,9 +4133,11 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                         t->setBaseComponent(1, live.target.y);
                         t->setBaseComponent(2, live.target.z);
                     }
+                    editor.history().push(place.finish(engine, "Place " + rig.name));
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Delete")) {
+                    editLabel = "Delete " + rig.name;
                     direction.removeCamera(rig.id);
                     selectedCamera_ = scene::kMainCamera;
                     changed = true;
@@ -4136,13 +4146,23 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                     break;
                 }
                 float mm = rig.focalLength;
-                if (ImGui::SliderFloat("lens (0 = use fov)", &mm, 0.0f, 200.0f, "%.0f mm")) {
+                const bool lensMoved = ImGui::SliderFloat("lens (0 = use fov)", &mm, 0.0f, 200.0f, "%.0f mm");
+                if (ImGui::IsItemActivated()) {
+                    lensDrag_.begin(engine);
+                }
+                if (lensMoved) {
                     rig.focalLength = mm;
                     changed = true;
+                }
+                if (ImGui::IsItemDeactivated() && lensDrag_.open()) {
+                    // Pushed after this frame's install below has landed, by the block at the end.
+                    editLabel = "Change lens of " + rig.name;
                 }
             }
             if (ImGui::Checkbox("available to the Auto-director", &rig.autoDirectorEligible)) {
                 changed = true;
+                editLabel = rig.autoDirectorEligible ? "Offer " + rig.name + " to the Auto-director"
+                                                     : "Withhold " + rig.name + " from the Auto-director";
             }
             if (!rig.eventScenario.empty()) {
                 ImGui::TextDisabled("watches the '%s' scenario", rig.eventScenario.c_str());
@@ -4156,6 +4176,7 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                 shot.endSeconds = shot.startSeconds + 4.0;
                 direction.shots.push_back(shot);
                 changed = true;
+                editLabel = "Cut to " + rig.name;
             }
             ImGui::Unindent();
         }
@@ -4247,11 +4268,10 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                     return s.startSeconds < end - 1e-6 && s.endSeconds() > start + 1e-6;
                 });
                 if (piece.shots.size() != before) {
-                    if (auto ok = engine.setSequence(std::move(piece)); !ok) {
-                        cameraProblem_ = ok.error().message;
-                    }
+                    pendingPiece = std::move(piece); // installed below, inside the same command
                 }
                 changed = true;
+                editLabel = "Remove cut";
                 ImGui::PopID();
                 break;
             }
@@ -4259,13 +4279,31 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         }
     }
 
+    // A lens drag in progress installs every frame but records nothing until release: its capture
+    // opened on press. Anything else is measured around its own install, here.
+    const bool dragging = lensDrag_.open() && editLabel.empty();
+    app::EditCapture single;
+    app::EditCapture& capture = lensDrag_.open() ? lensDrag_ : single;
+    if (changed && !capture.open()) {
+        capture.begin(engine);
+    }
     if (changed) {
+        if (pendingPiece) {
+            if (auto ok = engine.setSequence(std::move(*pendingPiece)); !ok) {
+                cameraProblem_ = ok.error().message;
+            }
+        }
         // Refused whole if it cannot be evaluated, and the message is shown rather than swallowed.
         if (auto ok = engine.setCameraDirection(std::move(direction)); !ok) {
             cameraProblem_ = ok.error().message;
         } else {
             cameraProblem_.clear();
         }
+    }
+    if (capture.open() && !dragging && !editLabel.empty()) {
+        editor.history().push(capture.finish(engine, editLabel));
+    } else if (&capture == &single) {
+        single.cancel();
     }
     if (!cameraProblem_.empty()) {
         ImGui::TextUnformatted(cameraProblem_.c_str());
