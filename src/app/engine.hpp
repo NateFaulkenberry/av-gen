@@ -37,6 +37,7 @@
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_stack.hpp"
 #include "world/effects/history_bank.hpp"
+#include "world/effects/transform_frame.hpp"
 #include "scene/scene_controller.hpp"
 #include "seq/director.hpp"
 #include "seq/sequence.hpp"
@@ -898,7 +899,18 @@ private:
     std::uint32_t lastAtmosphericCount_ = 0;
     // ADR-702: the one evaluator. Applies the parameters to the live list, builds the one context,
     // and asks each render stage's builder for its contribution, walking `effectOrder_`.
-    void updateEffects();
+    //
+    // Wave 2 (rendering-architecture §3): called twice a frame, one evaluator with two call sites.
+    // `BeforeScene` runs ahead of the flatten and evaluates only the Geometry stage (XFORM offsets,
+    // which the Composition composes into its nodes); `AfterScene` runs every other stage against
+    // the flattened scene, as it always did. No instance is evaluated twice.
+    enum class EffectPhase : std::uint8_t { BeforeScene, AfterScene };
+    void updateEffects(EffectPhase phase);
+    // The one context builder, for both phases. `scene` is null before the flatten: a Geometry type
+    // may not read this frame's drawn transforms, which do not exist yet.
+    [[nodiscard]] world::EffectContext effectContext(const world::EffectSceneQuery* scene) const;
+    // Wave 2: the Geometry stage's frame (XFORM), read by the Composition's flatten.
+    world::TransformFrame transformFrame_;
     // Re-registers parameters and recomputes the order and the status table for `effects_`.
     void installEffects();
     // Which owners exist in this scene, for `EffectStatus::Orphaned`.
