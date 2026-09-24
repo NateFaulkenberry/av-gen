@@ -4,8 +4,8 @@
 // the rows with their ranges and artist labels, which of them the panel shows above the fold, the
 // saved file's shape, the clamps, the presets, the default audio routes, and how one authored
 // shower becomes six streaks in the sky each frame -- is here. Outside it, this effect cost four
-// lines in two files: the `AtmosphereKind::MeteorShower` enumerator, its entry in
-// `kAtmosphereKinds`, and a declaration plus a reference in `builtinSchemas()`. Before ADR-500 the
+// lines in two files: the `EffectKind::MeteorShower` enumerator, its entry in
+// `kEffectKinds`, and a declaration plus a reference in `builtinSchemas()`. Before ADR-500 the
 // same effect would have been about twenty edits across six files that every other agent also had
 // open, which is the reason seventy effects was unreachable.
 //
@@ -39,10 +39,10 @@
 // uses, aliased on purpose so the packer needs no change and the file format gains no second copy
 // of thirteen colours (the rows below say so with an absolute `/comet/...` JSON path). The
 // shower's own six numbers have no struct on the shared header, and adding one would be exactly the
-// edit ADR-500 exists to remove, so they live in `AtmosphericEffect::values` under `meteors/`. Both
+// edit ADR-500 exists to remove, so they live in `EffectInstance::values` under `meteors/`. Both
 // kinds of row are declared the same way here and nothing downstream knows which it got.
 
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <algorithm>
 #include <array>
@@ -56,7 +56,7 @@
 namespace avgen::world {
 namespace {
 
-using E = AtmosphericEffect;
+using E = EffectInstance;
 
 #define GET(expr) +[](const E& e) { return (expr); }
 #define SETF(lhs) +[](E& e, float v) { (lhs) = v; }
@@ -218,7 +218,7 @@ float signedHash(float seed, std::size_t index, std::uint32_t lane) {
     return unitHash(seed, index, lane) * 2.0f - 1.0f;
 }
 
-float storedOf(const AtmosphericEffect& e, const char* leaf, float fallback) {
+float storedOf(const EffectInstance& e, const char* leaf, float fallback) {
     std::string key = "meteors/";
     key.append(leaf);
     return e.values.getFloat(key, fallback);
@@ -231,7 +231,7 @@ constexpr std::array<std::string_view, 3> kStyleNames{"Perseid Night", "Glowmere
 // Every style writes every field it cares about, including turning things off -- the rule the
 // comet's presets state and for the same reason: a style that only sets what it wants leaves the
 // previous style's settings behind, and an artist reads that as the preset being broken.
-void applyStyle(AtmosphericEffect& e, std::string_view style) {
+void applyStyle(EffectInstance& e, std::string_view style) {
     CometAppearance& a = e.comet.appearance;
     CometPath& p = e.comet.path;
     Sparkle& s = e.comet.sparkle;
@@ -340,7 +340,7 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
         e.values.setFloat("meteors/radiantDrift", 0.0f);
     }
     e.values.setFloat("meteors/seed", 1.0f);
-    e.kind = AtmosphereKind::MeteorShower;
+    e.kind = EffectKind::MeteorShower;
     e.style = std::string(style);
 }
 
@@ -363,10 +363,10 @@ constexpr EffectRoute kRoutes[] = {
     {"audio.bass", "meteors", 2.0f, 80.0f, 600.0f},
 };
 
-AtmosphericEffect make(std::string name) {
-    AtmosphericEffect e;
+EffectInstance make(std::string name) {
+    EffectInstance e;
     e.name = std::move(name);
-    e.kind = AtmosphereKind::MeteorShower;
+    e.kind = EffectKind::MeteorShower;
     applyStyle(e, kStyleNames[0]);
     // A shower is scenery with a window, not a single event: it runs for a stretch of the song and
     // repeats within it, which is what `repeat` on the shared timing rows is for. The repeat is the
@@ -389,14 +389,14 @@ constexpr float kEps = 1e-5f;
 // with none of the excuse -- and it is what makes "the comet renders byte-identically" a property
 // rather than a hope: there is only one curve.
 
-std::size_t count(const AtmosphericEffect& e) {
+std::size_t count(const EffectInstance& e) {
     const float n = storedOf(e, "meteors", 5.0f);
     return static_cast<std::size_t>(std::clamp(n, 1.0f, kMaxMeteors) + 0.5f);
 }
 
 // One meteor. The authored track is the *radiant's* track; each meteor is that track rotated by its
 // own share of the spread, started at its own moment, and scaled to its own size.
-bool fill(const AtmosphericEffect& e, std::size_t index, const AtmosphericContext& ctx,
+bool fill(const EffectInstance& e, std::size_t index, const EffectContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
     const CometPath& p = e.comet.path;
@@ -472,11 +472,11 @@ bool fill(const AtmosphericEffect& e, std::size_t index, const AtmosphericContex
 
 // The streak is a comet, so the comet's refusals apply to it. `e.comet.validate()` is asked rather
 // than re-derived, which is the same reason the rows alias the same struct.
-Result<void> validate(const AtmosphericEffect& e) { return e.comet.validate(); }
+Result<void> validate(const EffectInstance& e) { return e.comet.validate(); }
 
 EffectSchema buildSchema() {
     EffectSchema s;
-    s.kind = AtmosphereKind::MeteorShower;
+    s.kind = EffectKind::MeteorShower;
     s.key = "meteors";
     s.enumName = "MeteorShower";
     s.displayName = "Meteor Shower";
@@ -491,12 +491,16 @@ EffectSchema buildSchema() {
     s.groundGlow = true;
     s.anchorSection = "Radiant";
     s.anchorJson = "/comet/path";
-    s.getAnchor = +[](const AtmosphericEffect& e) { return e.comet.path.anchor; };
-    s.setAnchor = +[](AtmosphericEffect& e, SkyAnchor a) { e.comet.path.anchor = a; };
-    s.getAnchorPosition = +[](const AtmosphericEffect& e) { return e.comet.path.anchorPosition; };
-    s.setAnchorPosition = +[](AtmosphericEffect& e, glm::vec3 v) { e.comet.path.anchorPosition = v; };
+    s.getAnchor = +[](const EffectInstance& e) { return e.comet.path.anchor; };
+    s.setAnchor = +[](EffectInstance& e, SkyAnchor a) { e.comet.path.anchor = a; };
+    s.getAnchorPosition = +[](const EffectInstance& e) { return e.comet.path.anchorPosition; };
+    s.setAnchorPosition = +[](EffectInstance& e, glm::vec3 v) { e.comet.path.anchorPosition = v; };
     s.factory = make;
     s.resolve.bucket = EffectBucket::Comet;
+    // ADR-702: attached to the World; evaluated at its bucket's stage.
+    s.targets = targetBit(EffectTarget::World);
+    s.category = EffectCategory::Sky;
+    s.stage = RenderStage::Sky;
     s.resolve.count = count;
     s.resolve.fill = fill;
     s.validate = validate;

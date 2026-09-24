@@ -10,7 +10,7 @@
 // quantities, and labelling them "opacity" and "glow" is how they got confused in the first place.
 
 #include "core/vortex.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <algorithm>
 #include <array>
@@ -20,7 +20,7 @@
 namespace avgen::world {
 namespace {
 
-using E = AtmosphericEffect;
+using E = EffectInstance;
 
 #define GET(expr) +[](const E& e) { return (expr); }
 #define SETF(lhs) +[](E& e, float v) { (lhs) = v; }
@@ -198,7 +198,7 @@ constexpr EffectField kFields[] = {
 constexpr std::array<std::string_view, 3> kStyleNames{"Cosmic Funnel", "Shallow Disc",
                                                       "Deep Maelstrom"};
 
-bool applyStyle(AtmosphericEffect& e, std::string_view style) {
+bool applyStyle(EffectInstance& e, std::string_view style) {
     Vortex& v = e.vortex;
     // Every style writes every field it touches, for the reason the comet's does: a style that
     // leaves the previous one's throat behind reads as the preset being broken.
@@ -314,10 +314,10 @@ constexpr EffectRoute kRoutes[] = {
     {"beat.pulse", "emission", 0.030f, 10.0f, 260.0f},
 };
 
-AtmosphericEffect make(std::string name) {
-    AtmosphericEffect e;
+EffectInstance make(std::string name) {
+    EffectInstance e;
     e.name = std::move(name);
-    e.kind = AtmosphereKind::Vortex;
+    e.kind = EffectKind::Vortex;
     e.style = std::string(kStyleNames[0]);
     applyStyle(e, kStyleNames[0]);
     // A vortex is scenery, not an event, and it has no ground pool of its own: ADR-379's spill is
@@ -334,7 +334,7 @@ AtmosphericEffect make(std::string name) {
 // samples -- so resolution is "is it live", and the payload travels unchanged. §68: its anchor is
 // its own centre, because the question "what is the air doing where this funnel stands" is asked at
 // the funnel.
-bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx,
+bool fill(const EffectInstance& e, std::size_t, const EffectContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
     r.anchor = e.vortex.field.center;
@@ -344,7 +344,7 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
     return true;
 }
 
-Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); }
+Result<void> validate(const EffectInstance& e) { return e.vortex.validate(); }
 
 // ADR-562: the authored numbers as the sixteen lanes the march reads.
 //
@@ -421,7 +421,7 @@ void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumS
 
 EffectSchema buildSchema() {
     EffectSchema s;
-    s.kind = AtmosphereKind::Vortex;
+    s.kind = EffectKind::Vortex;
     
     s.key = "vortex";
     s.enumName = "Vortex";
@@ -440,6 +440,10 @@ EffectSchema buildSchema() {
     s.groundGlow = false;
     s.factory = make;
     s.resolve.bucket = EffectBucket::Medium;
+    // ADR-702: attached to the World; evaluated at its bucket's stage.
+    s.targets = targetBit(EffectTarget::World);
+    s.category = EffectCategory::Atmosphere;
+    s.stage = RenderStage::Volumetric;
     s.resolve.pack = packMedium;
     s.resolve.fill = fill;
     s.validate = validate;

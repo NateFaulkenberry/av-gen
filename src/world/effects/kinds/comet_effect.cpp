@@ -20,7 +20,7 @@
 // the trajectory is a great-circle arc and not a chord, and `shaders/atmosphere_fx.wgsl` for the
 // integrator this resolves into.
 
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -35,7 +35,7 @@
 namespace avgen::world {
 namespace {
 
-using E = AtmosphericEffect;
+using E = EffectInstance;
 
 // The same accessor shape `atmospheric_params.cpp`'s tables used, so the port is a move rather than
 // a rewrite: `+[]` decays a captureless lambda to the function pointer the row holds.
@@ -152,7 +152,7 @@ constexpr std::array<std::string_view, 5> kStyleNames{"Bioluminescent Cyan", "Ra
                                                       "Emerald Teal", "Magenta Blue",
                                                       "Subtle Shooting Star"};
 
-bool applyStyle(AtmosphericEffect& e, std::string_view style) {
+bool applyStyle(EffectInstance& e, std::string_view style) {
     CometAppearance& a = e.comet.appearance;
     Sparkle& s = e.comet.sparkle;
     SkyRainbow& r = e.comet.rainbow;
@@ -273,7 +273,7 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
     } else {
         return false;
     }
-    e.kind = AtmosphereKind::Comet;
+    e.kind = EffectKind::Comet;
     e.style = std::string(style);
     return true;
 }
@@ -305,10 +305,10 @@ constexpr EffectRoute kRoutes[] = {
 
 // ---- the ready-made effect ------------------------------------------------------------------------
 
-AtmosphericEffect make(std::string name) {
-    AtmosphericEffect e;
+EffectInstance make(std::string name) {
+    EffectInstance e;
     e.name = std::move(name);
-    e.kind = AtmosphereKind::Comet;
+    e.kind = EffectKind::Comet;
     applyStyle(e, kStyleNames[0]);
     // A comet is an *event*: §3.5 wants one launch on a musical transition, not a permanent object.
     // A window is the activation a sequencer can move; `lifetime` 0 means "as long as the window",
@@ -326,7 +326,7 @@ AtmosphericEffect make(std::string name) {
 
 // ---- resolution ------------------------------------------------------------------------------------
 //
-// The arm that was `case AtmosphereKind::Comet:` in `resolveAtmosphericEffects`, unchanged: the same
+// The arm that was `case EffectKind::Comet:` in `resolveAtmosphericEffects`, unchanged: the same
 // expressions, in the same order, on the same members. `base` already carries the envelope, the
 // elapsed second and the effect pointer, which are the parts every kind shares.
 
@@ -338,7 +338,7 @@ constexpr float kEps = 1e-5f;
 // with none of the excuse -- and it is what makes "the comet renders byte-identically" a property
 // rather than a hope: there is only one curve.
 
-bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx,
+bool fill(const EffectInstance& e, std::size_t, const EffectContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
     const CometPath& p = e.comet.path;
@@ -374,12 +374,12 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
 // Two things in the whole family. A seed is a `uint32` and a fade distance is the range at which
 // sparkle stops aliasing -- neither is a thing to automate, and both must still round-trip. They are
 // here, in the comet's own file, rather than as a case in a shared serialiser.
-void writeExtra(const AtmosphericEffect& e, nlohmann::json& out) {
+void writeExtra(const EffectInstance& e, nlohmann::json& out) {
     out["sparkle"]["fadeDistance"] = e.comet.sparkle.fadeDistance;
     out["sparkle"]["seed"] = e.comet.sparkle.seed;
 }
 
-void readExtra(AtmosphericEffect& e, const nlohmann::json& in) {
+void readExtra(EffectInstance& e, const nlohmann::json& in) {
     if (!in.contains("sparkle") || !in.at("sparkle").is_object()) {
         return;
     }
@@ -392,11 +392,11 @@ void readExtra(AtmosphericEffect& e, const nlohmann::json& in) {
     }
 }
 
-Result<void> validate(const AtmosphericEffect& e) { return e.comet.validate(); }
+Result<void> validate(const EffectInstance& e) { return e.comet.validate(); }
 
 EffectSchema buildSchema() {
     EffectSchema s;
-    s.kind = AtmosphereKind::Comet;
+    s.kind = EffectKind::Comet;
     
     s.key = "comet";
     s.enumName = "Comet";
@@ -418,6 +418,10 @@ EffectSchema buildSchema() {
     s.setAnchorPosition = +[](E& e, glm::vec3 v) { e.comet.path.anchorPosition = v; };
     s.factory = make;
     s.resolve.bucket = EffectBucket::Comet;
+    // ADR-702: attached to the World; evaluated at its bucket's stage.
+    s.targets = targetBit(EffectTarget::World);
+    s.category = EffectCategory::Sky;
+    s.stage = RenderStage::Sky;
     s.resolve.count = nullptr; // exactly one
     s.resolve.fill = fill;
     s.writeExtra = writeExtra;

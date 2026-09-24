@@ -171,7 +171,7 @@ def camera_keys():
 def routes(effects):
     """The audio routes, in the engine's own default shapes.
 
-    Mirrors `world::defaultAtmosphericRoutes`. It is written out rather than called because a
+    Mirrors `world::defaultEffectRoutes`. It is written out rather than called because a
     project file needs the routes as data and the engine installs none of its own -- section 8 asks
     for the effects to be modulatable, and this is what makes the shipped example actually move.
     """

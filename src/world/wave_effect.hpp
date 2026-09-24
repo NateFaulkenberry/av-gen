@@ -1,8 +1,15 @@
 #pragma once
 
-// World effects (ADR-207): a spatial phenomenon propagating through the world.
+// Surface waves (ADR-207, ADR-702): a spatial phenomenon propagating through the world.
 //
-// A world effect has a **source**, a **propagation geometry**, a **motion**, an **appearance**, a
+// ADR-702: this is the PAYLOAD and the technique of two effect types, `GroundPulse` and
+// `TravelBeam` -- not a system. Until ADR-702 it was a separate `worldEffects` list with its own
+// registrar, serialiser and panel; now its instances are ordinary `EffectInstance`s in the one list,
+// attached to an owner, and their parameters, JSON and panel rows come from the registry like every
+// other type's. What is left here is what is genuinely the waves' own: the propagation model, the
+// endpoint resolution and the GPU record.
+//
+// A wave has a **source**, a **propagation geometry**, a **motion**, an **appearance**, a
 // **lifetime** and -- because every number in it is an ordinary parameter -- whatever modulation
 // somebody routes into it. That sentence is the whole model, and the two effects this file shipped
 // for are two settings of it: a beam that travels ahead of a camera on its way to the next hero, and
@@ -10,7 +17,7 @@
 //
 // Three decisions are load-bearing.
 //
-// **Resolution is a pure function of time.** `resolveWorldEffects` takes the authored set and a
+// **Resolution is a pure function of time.** `resolveWaves` takes the effect list and a
 // context -- the second on the transport clock, the camera's pose and velocity, where the nodes are,
 // which heroes exist, and the shot schedule the director baked -- and returns records ready for the
 // GPU. It reads no frame counter, no wall clock and no previous frame, which is what keeps an
@@ -19,8 +26,8 @@
 // difference; here it is a finite difference in timeline seconds over a fixed step, so it is the
 // same vector at 30 fps and at 120.
 //
-// **Nothing here iterates the scene.** At most `kMaxGpuWorldEffects` records reach the GPU and every
-// per-surface question is asked per fragment, in `shaders/world_effects.wgsl`, from data already
+// **Nothing here iterates the scene.** At most `kMaxGpuWaves` records reach the GPU and every
+// per-surface question is asked per fragment, in `shaders/wave_effects.wgsl`, from data already
 // resident in the frame block. A wave front therefore lands on the ground where the ground is and on
 // a leaf where the leaf is, with no projection, no bounds test and no per-object cost at all.
 //
@@ -30,6 +37,7 @@
 // mask and why this enum is short.
 
 #include "core/error.hpp"
+#include "world/effects/effect_timing.hpp"
 #include "world/hero.hpp"
 
 #include <glm/glm.hpp>
@@ -46,8 +54,9 @@ namespace avgen::world {
 
 // How many effects reach the GPU at once. Chosen the way `spatial::kMaxGpuFields` chose sixteen:
 // large enough that nothing real hits it, small enough that the per-fragment loop has a bound
-// anybody can reason about. The ninth active effect is dropped with a warning rather than silently.
-inline constexpr std::size_t kMaxGpuWorldEffects = 8;
+// anybody can reason about. The ninth active wave is dropped and its status says so (`EffectStatus::Dropped`), which the
+// Effects panel shows on its card.
+inline constexpr std::size_t kMaxGpuWaves = 8;
 
 // ---- propagation -------------------------------------------------------------------------------
 
@@ -71,6 +80,10 @@ enum class SourceKind : std::uint8_t {
     Hero,
     Camera,     // the active camera's eye
     FocusHero,  // whichever hero the shot schedule is spotlighting *now* -- no name, no wiring
+    // ADR-702: whatever the effect instance is ATTACHED to. An entity-owned pulse rides its owner
+    // (resolved as a hero of that name, else a node), a camera-owned one the camera; a World-owned
+    // effect has no position to lend and never activates with this source.
+    Owner,
 };
 [[nodiscard]] const char* sourceKindName(SourceKind k);
 [[nodiscard]] std::optional<SourceKind> sourceKindFromName(std::string_view name);
@@ -88,19 +101,6 @@ enum class DirectionMode : std::uint8_t {
 [[nodiscard]] const char* directionModeName(DirectionMode m);
 [[nodiscard]] std::optional<DirectionMode> directionModeFromName(std::string_view name);
 
-// When the effect exists at all. §15 of the brief: an effect that is permanently on is scenery, and
-// the two shipped effects are both *events* -- one belongs to a camera move, one to a held subject.
-enum class Activation : std::uint8_t {
-    // The window is open for the whole timeline. Note what that does and does not mean: the *front*
-    // still makes one pass from t = 0 and is then past its range, so a permanently-visible effect is
-    // one with a `repeatSeconds`, not one with `Always`.
-    Always,
-    Window,       // an authored [start, start + seconds) on the transport clock
-    CameraTravel, // while the director's cut says the camera is travelling between subjects
-    HeroFocus,    // while the director's cut is spotlighting this effect's source
-};
-[[nodiscard]] const char* activationName(Activation a);
-[[nodiscard]] std::optional<Activation> activationFromName(std::string_view name);
 
 // ---- the authored effect -----------------------------------------------------------------------
 
@@ -167,20 +167,6 @@ struct Appearance {
     [[nodiscard]] Result<void> validate() const;
 };
 
-// Procedural sparkle around the leading edge. Cells are static in world space and each cell's
-// brightness is a smooth function of how near the front is, so the pattern does not crawl when the
-// camera moves -- which is the failure mode §8 names. The distance fade is the anti-aliasing: a cell
-// smaller than a pixel is faded out rather than sampled.
-struct Sparkle {
-    bool enabled = false;
-    float density = 1.1f;     // cells per metre; coarse cells read as blobs, not as sparkle
-    float size = 0.22f;       // 0..1 of a cell
-    float intensity = 1.6f;
-    float speed = 0.6f;       // twinkle rate, in cycles per second, off the effect's own clock
-    float fadeDistance = 85.0f; // metres at which sparkle is gone, so it cannot alias at range
-    std::uint32_t seed = 1;
-    [[nodiscard]] Result<void> validate() const;
-};
 
 // How much of the effect a surface takes. See ADR-207's consequences: these are the classes the
 // shader can tell apart for free -- the procedural scatter against everything else, split by how
@@ -193,25 +179,10 @@ struct MaterialResponse {
     [[nodiscard]] Result<void> validate() const;
 };
 
-struct Timing {
-    double delay = 0.0;      // seconds after activation before the front starts
-    double lifetime = 0.0;   // seconds the effect lives; 0 = as long as its activation lasts
-    double fadeIn = 0.35;
-    double fadeOut = 0.9;
-    double windowStart = 0.0;    // Activation::Window
-    double windowSeconds = 6.0;  // Activation::Window
-    // Restart the front every this many seconds while the activation holds. 0 = one pass. What makes
-    // a hero pulse a *pulse* rather than a single expanding ring -- and what a beat route modulates
-    // when somebody wants one ring per bar.
-    double repeatSeconds = 0.0;
-    [[nodiscard]] Result<void> validate() const;
-};
-
-struct WorldEffect {
-    std::string name;
-    bool enabled = true;
-    std::string style;  // the preset it was made from, for the UI; changes nothing on its own
-
+// The payload of a surface-wave effect instance. Its identity, enable, owner, order, style,
+// activation and timing live on the instance (`world/effects/effect_instance.hpp`), shared with
+// every other type.
+struct WaveEffect {
     EffectEndpoint source;
     bool hasTarget = false;
     EffectEndpoint target;
@@ -220,116 +191,36 @@ struct WorldEffect {
     Appearance appearance;
     Sparkle sparkle;
     MaterialResponse response;
-    Activation activation = Activation::Always;
-    Timing timing;
 
     [[nodiscard]] Result<void> validate() const;
-    [[nodiscard]] nlohmann::json toJson() const;
-    [[nodiscard]] static Result<WorldEffect> fromJson(const nlohmann::json& j);
 };
 
-// Refuses duplicate names: a parameter path is `worldfx/<name>/...`, and two effects of one name is
-// two things writing one path.
-[[nodiscard]] Result<void> validateWorldEffects(std::span<const WorldEffect> effects);
+// The endpoint halves of the payload that are not parameters -- a kind and a NAME -- as JSON. The
+// numbers are registry rows and are walked by the registry like every other type's.
+[[nodiscard]] nlohmann::json waveEndpointToJson(const EffectEndpoint& e);
+[[nodiscard]] Result<EffectEndpoint> waveEndpointFromJson(const nlohmann::json& j);
 
 // ---- presets (§18) -----------------------------------------------------------------------------
 //
 // A style configures the underlying parameters and then gets out of the way; nothing reads `style`
-// at runtime. Named separately for beams and pulses because the two answer different questions --
+// at runtime. Separate lists for beams and pulses because the two answer different questions --
 // "what is travelling" against "what is spreading" -- and a single list would offer Water as a beam.
 
 [[nodiscard]] std::span<const std::string_view> beamStyleNames();
 [[nodiscard]] std::span<const std::string_view> pulseStyleNames();
-// Applies a style's appearance, sparkle and propagation shape to `effect`, leaving its name, source,
-// target, activation and timing alone. False when the name is not a style.
-bool applyBeamStyle(WorldEffect& effect, std::string_view style);
-bool applyPulseStyle(WorldEffect& effect, std::string_view style);
-
-// The two effects the brief is about, ready to drop into a scene: a camera travel beam and a hero
-// mushroom ground pulse. Exposed because "add the camera beam" should be one call from the UI and
-// one line in a test, not a page of field assignments that can drift from the shipped scene's.
-[[nodiscard]] WorldEffect cameraTravelBeam(std::string name = "Camera Travel Beam");
-[[nodiscard]] WorldEffect heroGroundPulse(std::string name = "Hero Pulse");
+// Applies a style's appearance, sparkle and propagation shape, leaving source, target and
+// propagation kind alone. False when the name is not a style.
+bool applyBeamStyle(WaveEffect& wave, std::string_view style);
+bool applyPulseStyle(WaveEffect& wave, std::string_view style);
 
 // ---- resolution --------------------------------------------------------------------------------
 
-// One span of the director's cut, flattened to what an effect needs to know. Baked from an
-// `app::Sequence` when the camera is directed (ADR-075) and empty otherwise, in which case
-// `CameraTravel` and `HeroFocus` effects simply never activate -- which is the honest answer for a
-// camera nobody is directing.
-struct ShotSpan {
-    double start = 0.0;
-    double end = 0.0;
-    bool travel = false;     // the camera is moving from one subject to another
-    // The camera has landed: this shot is not travelling and it is about something. Deliberately a
-    // geometric fact rather than the director's own `Spotlight::emphasis`, which is how much of the
-    // *film* a subject owns and is zero for a whole intro. An effect gated on "the camera is on this
-    // hero" wants the former; `emphasis` below is there for anything that wants the latter.
-    bool spotlight = false;
-    float emphasis = 0.0f;   // 0..1, the director's own weighting of this subject
-    std::string subject;     // who the shot is about
-    glm::vec3 subjectPosition{0.0f};
-    float subjectRadius = 1.0f;
-    std::string handoff;     // for a travel shot, who it is going to
-    glm::vec3 handoffPosition{0.0f};
-};
+struct EffectInstance;
+enum class EffectStatus : std::uint8_t;
 
-// The activation window an effect is inside at `seconds`, or nothing.
-//
-// Exported rather than kept private because ADR-230's atmospheric effects reuse `Activation` and
-// `Timing` outright, and two copies of the gating rule would be two places for "why did my effect
-// not fire" to have different answers.
-struct ActivationWindow {
-    double start = 0.0;
-    double end = 0.0;
-    const ShotSpan* span = nullptr;
-};
-
-// `followsFocus` is a source that rides whatever the cut is spotlighting (ADR-207's
-// `SourceKind::FocusHero`); `subject` names the one hero a `HeroFocus` effect fires for, empty
-// meaning any. Both are ignored by every activation except `HeroFocus`.
-[[nodiscard]] std::optional<ActivationWindow> resolveActivationWindow(
-    Activation activation, const Timing& timing, double seconds, std::span<const ShotSpan> shots,
-    bool followsFocus = true, std::string_view subject = {});
-
-// The ramp both effect families fade with: a smoothstep over `width` seconds, guarding the
-// degenerate width that would otherwise divide by zero and put a hard edge exactly where §7 of
-// ADR-207's brief forbids one.
-[[nodiscard]] float envelopeRamp(float x, float width);
-
-// Delay, fade-in, lifetime and fade-out multiplied together; 0 when the effect is not alive at
-// `local` seconds into its window. `windowLength` is the activation's own length, which is what a
-// `lifetime` of 0 means "as long as".
-[[nodiscard]] float timingEnvelope(const Timing& timing, double local, double windowLength);
-
-// Where the world's nodes are. An interface rather than a std::function so resolution allocates
-// nothing: the engine counts allocations per frame and a lambda capture in this path would show up.
-class WorldEffectScene {
-public:
-    virtual ~WorldEffectScene() = default;
-    // World position of the node named `name`, or false when there is no such node.
-    [[nodiscard]] virtual bool nodePosition(std::string_view name, glm::vec3& out) const = 0;
-    // The node's forward axis in world space, for DirectionMode::SourceForward. Optional: a scene
-    // that cannot answer returns false and the direction falls back to the next mode in the chain.
-    [[nodiscard]] virtual bool nodeForward(std::string_view name, glm::vec3& out) const { (void)name; (void)out; return false; }
-};
-
-struct WorldEffectContext {
-    double seconds = 0.0;             // the transport clock, and the only clock
-    glm::vec3 cameraPosition{0.0f};
-    glm::vec3 cameraTarget{0.0f, 0.0f, -1.0f};
-    glm::vec3 cameraForward{0.0f, 0.0f, -1.0f};
-    // Metres per second, as a finite difference **in timeline seconds**. See the header: taking it
-    // from the frame delta would make the beam point somewhere different at 30 fps than at 120.
-    glm::vec3 cameraVelocity{0.0f};
-    std::span<const ShotSpan> shots;
-    std::span<const HeroPoint> heroes;
-    const WorldEffectScene* scene = nullptr;
-};
-
-// Mirrors `WorldEffect` in shaders/world_effects.wgsl. 144 bytes; see ADR-207 for why it lives in
+// Mirrors `Wave` in shaders/wave_effects.wgsl. 144 bytes; see ADR-207 for why it lives in
 // FrameUniforms rather than in a buffer of its own.
-struct WorldEffectGpu {
+struct WaveGpu {
     glm::vec4 originKind{0.0f};   // xyz = origin (world), w = PropagationKind
     glm::vec4 axisFront{0.0f};    // xyz = unit axis (directional), w = how far the front has travelled
     glm::vec4 shape{0.0f};        // x = front width, y = trail length, z = range, w = falloff exponent
@@ -343,20 +234,20 @@ struct WorldEffectGpu {
                                   // w = twinkle phase
     glm::vec4 response{0.0f};     // x = ground, y = foliage, z = surface, w = emissive amplification
 };
-static_assert(sizeof(WorldEffectGpu) == 144);
+static_assert(sizeof(WaveGpu) == 144);
 
 // What one frame hands the renderer. A plain array so nothing allocates and so `scene::Scene` can
 // hold it by value the way it holds `post`.
-struct WorldEffectFrame {
+struct WaveFrame {
     std::uint32_t count = 0;
-    WorldEffectGpu effects[kMaxGpuWorldEffects]{};
+    WaveGpu effects[kMaxGpuWaves]{};
 };
 
 // The intermediate an effect resolves to, before packing. Exposed because every interesting
 // question -- did it activate, where did it end up pointing, how far has the front got -- is
 // answerable here without a GPU, which is what the tests ask.
-struct ResolvedEffect {
-    const WorldEffect* effect = nullptr;
+struct ResolvedWave {
+    const EffectInstance* effect = nullptr;
     glm::vec3 origin{0.0f};
     glm::vec3 axis{0.0f, 0.0f, -1.0f};
     float frontDistance = 0.0f; // metres the front has travelled since this pass started
@@ -365,17 +256,26 @@ struct ResolvedEffect {
     glm::vec3 color{0.0f};      // the colour actually used: the hero's accent when it had one
 };
 
-// Resolves every enabled effect. Returns how many were written; effects past `kMaxGpuWorldEffects`
-// active at once are dropped (the caller warns). An effect whose activation is closed resolves with
-// `envelope == 0` and is **not** written, so a scene full of dormant effects costs the GPU nothing.
-std::size_t resolveWorldEffects(std::span<const WorldEffect> effects, const WorldEffectContext& context,
-                                std::span<ResolvedEffect> out);
+// Resolves ONE wave-type instance. Nothing when it is not alive this frame: disabled, outside its
+// activation window, faded to zero, its front between passes, or a focus/owner source with nothing
+// to stand on. Pure: the same instance, context and second always give the same record.
+[[nodiscard]] std::optional<ResolvedWave> resolveWave(const EffectInstance& effect, const EffectContext& context);
+
+// Every wave-type instance in `effects` (instances of other types are skipped), walked in `order`
+// -- indices into `effects`, the evaluation order `effectEvaluationOrder` computes; empty means list
+// order. Returns how many were written. An instance that is alive once `out` is full is DROPPED,
+// and says so: when `status` is non-empty (indexed like `effects`) every wave-type instance's entry
+// is written -- Disabled, Dormant, Drawn or Dropped -- and no other entry is touched.
+std::size_t resolveWaves(std::span<const EffectInstance> effects, const EffectContext& context,
+                         std::span<ResolvedWave> out, std::span<const std::uint32_t> order = {},
+                         std::span<EffectStatus> status = {});
 
 // Packs a resolved effect for the GPU. Pure, so a test can read every lane.
-[[nodiscard]] WorldEffectGpu packWorldEffect(const ResolvedEffect& resolved);
+[[nodiscard]] WaveGpu packWave(const ResolvedWave& resolved);
 
 // Both steps, into the frame block the renderer reads.
-void buildWorldEffectFrame(std::span<const WorldEffect> effects, const WorldEffectContext& context,
-                           WorldEffectFrame& out);
+void buildWaveFrame(std::span<const EffectInstance> effects, const EffectContext& context, WaveFrame& out,
+                    std::span<const std::uint32_t> order = {}, std::span<EffectStatus> status = {});
 
 } // namespace avgen::world
+

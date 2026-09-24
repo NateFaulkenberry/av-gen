@@ -17,7 +17,7 @@
 #include "audio/audio_file.hpp"
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 #include "song/from_analysis.hpp"
 
 #include <catch2/catch_approx.hpp>

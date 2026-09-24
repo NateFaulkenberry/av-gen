@@ -1,4 +1,4 @@
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -13,11 +13,13 @@ namespace {
 
 using json = nlohmann::json;
 
+constexpr const char* kParametersKey = "parameters";
+
 // ---- the list ------------------------------------------------------------------------------------
 //
 // ADR-500. **These are the two lines outside its own file that a new effect costs in this file**,
 // and neither is a line anybody can forget quietly: `checkRegistry` requires a schema for every
-// enumerator in `kAtmosphereKinds`, and `tests/unit/test_effect_conformance.cpp` requires that
+// enumerator in `kEffectKinds`, and `tests/unit/test_effect_conformance.cpp` requires that
 // array to cover exactly the enumerators declared in `atmospherics.hpp` -- by name, in both
 // directions.
 //
@@ -37,6 +39,8 @@ const EffectSchema& vortexSchema();
 const EffectSchema& meteorShowerSchema();
 const EffectSchema& volumetricFogSchema();
 const EffectSchema& tornadoSchema();
+const EffectSchema& groundPulseSchema(); // ADR-702
+const EffectSchema& travelBeamSchema();  // ADR-702
 
 namespace {
 
@@ -48,6 +52,8 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &meteorShowerSchema(), //
         &volumetricFogSchema(),
         &tornadoSchema(),
+        &groundPulseSchema(),
+        &travelBeamSchema(),
     };
     return kSchemas;
 }
@@ -168,7 +174,11 @@ std::string jsonPathOf(const EffectSchema& schema, const EffectField& field) {
     if (declared.starts_with('/')) {
         return std::string(declared.substr(1));
     }
-    std::string path = schema.key;
+    // ADR-702: an instance writes ITS OWN type's rows only (a type never changes), under one
+    // `parameters` block rather than a block named after the type. The block used to be keyed by
+    // type because every instance wrote every type's payload, and the key was how a reader told
+    // them apart; with one payload per instance the key said the same thing as `type` twice.
+    std::string path = kParametersKey;
     path.push_back('/');
     path.append(declared.empty() ? std::string_view(field.leaf) : declared);
     return path;
@@ -229,7 +239,33 @@ void EffectValueStore::setBool(std::string_view key, bool value) {
 
 std::span<const EffectSchema* const> effectSchemas() { return builtinSchemas(); }
 
-const EffectSchema* effectSchema(AtmosphereKind kind) {
+const char* renderStageName(RenderStage s) {
+    switch (s) {
+    case RenderStage::Geometry: return "geometry";
+    case RenderStage::Material: return "material";
+    case RenderStage::Lighting: return "lighting";
+    case RenderStage::Sky: return "sky";
+    case RenderStage::Volumetric: return "volumetric";
+    case RenderStage::Particles: return "particles";
+    case RenderStage::ScreenSpace: return "screenSpace";
+    case RenderStage::PostProcess: return "postProcess";
+    }
+    return "sky";
+}
+
+const char* effectCategoryName(EffectCategory c) {
+    switch (c) {
+    case EffectCategory::Atmosphere: return "Atmosphere";
+    case EffectCategory::Sky: return "Sky";
+    case EffectCategory::Lighting: return "Lighting";
+    case EffectCategory::Distortion: return "Distortion";
+    case EffectCategory::Motion: return "Motion";
+    case EffectCategory::Particles: return "Particles";
+    }
+    return "Atmosphere";
+}
+
+const EffectSchema* effectSchema(EffectKind kind) {
     for (const EffectSchema* s : builtinSchemas()) {
         if (s->kind == kind) {
             return s;
@@ -247,7 +283,7 @@ const EffectSchema* effectSchema(std::string_view key) {
     return nullptr;
 }
 
-const EffectSchema* effectSchema(const AtmosphericEffect& effect) { return effectSchema(effect.kind); }
+const EffectSchema* effectSchema(const EffectInstance& effect) { return effectSchema(effect.kind); }
 
 // ---- one row ---------------------------------------------------------------------------------------
 
@@ -258,14 +294,14 @@ std::string storeKey(const EffectSchema& schema, const EffectField& field) {
     return key;
 }
 
-float fieldFloat(const EffectField& field, const EffectSchema& schema, const AtmosphericEffect& effect) {
+float fieldFloat(const EffectField& field, const EffectSchema& schema, const EffectInstance& effect) {
     if (field.stored) {
         return effect.values.getFloat(storeKey(schema, field), field.storedDefault);
     }
     return field.getFloat != nullptr ? field.getFloat(effect) : 0.0f;
 }
 
-void setFieldFloat(const EffectField& field, const EffectSchema& schema, AtmosphericEffect& effect, float v) {
+void setFieldFloat(const EffectField& field, const EffectSchema& schema, EffectInstance& effect, float v) {
     if (field.stored) {
         effect.values.setFloat(storeKey(schema, field), v);
         return;
@@ -275,14 +311,14 @@ void setFieldFloat(const EffectField& field, const EffectSchema& schema, Atmosph
     }
 }
 
-glm::vec3 fieldColor(const EffectField& field, const EffectSchema& schema, const AtmosphericEffect& effect) {
+glm::vec3 fieldColor(const EffectField& field, const EffectSchema& schema, const EffectInstance& effect) {
     if (field.stored) {
         return effect.values.getColor(storeKey(schema, field), field.storedColor);
     }
     return field.getColor != nullptr ? field.getColor(effect) : glm::vec3(0.0f);
 }
 
-void setFieldColor(const EffectField& field, const EffectSchema& schema, AtmosphericEffect& effect,
+void setFieldColor(const EffectField& field, const EffectSchema& schema, EffectInstance& effect,
                    glm::vec3 v) {
     if (field.stored) {
         effect.values.setColor(storeKey(schema, field), v);
@@ -293,14 +329,14 @@ void setFieldColor(const EffectField& field, const EffectSchema& schema, Atmosph
     }
 }
 
-bool fieldBool(const EffectField& field, const EffectSchema& schema, const AtmosphericEffect& effect) {
+bool fieldBool(const EffectField& field, const EffectSchema& schema, const EffectInstance& effect) {
     if (field.stored) {
         return effect.values.getBool(storeKey(schema, field), field.storedDefault >= 0.5f);
     }
     return field.getBool != nullptr && field.getBool(effect);
 }
 
-void setFieldBool(const EffectField& field, const EffectSchema& schema, AtmosphericEffect& effect, bool v) {
+void setFieldBool(const EffectField& field, const EffectSchema& schema, EffectInstance& effect, bool v) {
     if (field.stored) {
         effect.values.setBool(storeKey(schema, field), v);
         return;
@@ -314,7 +350,7 @@ void setFieldBool(const EffectField& field, const EffectSchema& schema, Atmosphe
 
 namespace {
 
-using E = AtmosphericEffect;
+using E = EffectInstance;
 
 #define GET(expr) +[](const E& e) { return (expr); }
 #define SETF(lhs) +[](E& e, float v) { (lhs) = v; }
@@ -324,7 +360,7 @@ using E = AtmosphericEffect;
 // is, so the same rows. They are registered for EVERY kind, including the kinds whose panel does not
 // offer the ground pool -- the set of paths a saved project may already name must not shrink.
 //
-// Their JSON is written by `AtmosphericEffect::toJson` beside the name and the kind, not through a
+// Their JSON is written by `EffectInstance::toJson` beside the name and the kind, not through a
 // schema block, because they are the effect's rather than the kind's. The `jsonPath` on each row is
 // what the reader and writer both use, so the two still cannot disagree.
 constexpr EffectField kShared[] = {
@@ -378,9 +414,16 @@ constexpr EffectField kShared[] = {
 
 std::span<const EffectField> sharedEffectFields() { return kShared; }
 
+bool sharedFieldApplies(const EffectSchema& schema, const EffectField& field) {
+    if (schema.resolve.bucket != EffectBucket::Surface) {
+        return true;
+    }
+    return std::string_view(field.jsonPath).starts_with("timing/");
+}
+
 // ---- sanitise --------------------------------------------------------------------------------------
 
-void sanitiseEffect(AtmosphericEffect& effect) {
+void sanitiseEffect(EffectInstance& effect) {
     // Every kind's clamps, not only the one this effect is. That is deliberate and it is what the
     // hand-written `sanitise` did: it floored the comet's `travelSeconds` whatever the effect's
     // kind, because the struct carries all the payloads and `validate` is asked of all of them.
@@ -419,14 +462,14 @@ void sanitiseEffect(AtmosphericEffect& effect) {
 
 // ---- JSON ------------------------------------------------------------------------------------------
 
-void effectPayloadToJson(const EffectSchema& schema, const AtmosphericEffect& effect, json& out) {
+void effectPayloadToJson(const EffectSchema& schema, const EffectInstance& effect, json& out) {
     if (!out.is_object()) {
         out = json::object();
     }
     // The kind's own block exists even when every row of it is absolute, so a reader can tell "this
     // kind wrote nothing here" from "this file predates the kind".
-    if (!out.contains(schema.key) || !out.at(schema.key).is_object()) {
-        out[schema.key] = json::object();
+    if (!out.contains(kParametersKey) || !out.at(kParametersKey).is_object()) {
+        out[kParametersKey] = json::object();
     }
     if (schema.anchorJson != nullptr && schema.getAnchor != nullptr) {
         const EffectField anchorRow = [&] {
@@ -454,12 +497,12 @@ void effectPayloadToJson(const EffectSchema& schema, const AtmosphericEffect& ef
         }
     }
     if (schema.writeExtra != nullptr) {
-        schema.writeExtra(effect, out[schema.key]);
+        schema.writeExtra(effect, out[kParametersKey]);
     }
 }
 
 Result<void> effectPayloadFromJson(const EffectSchema& schema, const json& document,
-                                   AtmosphericEffect& effect) {
+                                   EffectInstance& effect) {
     if (!document.is_object()) {
         return {};
     }
@@ -471,7 +514,7 @@ Result<void> effectPayloadFromJson(const EffectSchema& schema, const json& docum
         if (const json* a = readAt(document, base + "anchor"); a != nullptr && a->is_string()) {
             const auto anchor = skyAnchorFromName(a->get<std::string>());
             if (!anchor) {
-                return fail("atmospheric effect '{}': unknown anchor '{}'", effect.name,
+                return fail("effect '{}': unknown anchor '{}'", effect.name,
                             a->get<std::string>());
             }
             schema.setAnchor(effect, *anchor);
@@ -514,18 +557,18 @@ Result<void> effectPayloadFromJson(const EffectSchema& schema, const json& docum
             break;
         }
     }
-    if (schema.readExtra != nullptr && document.contains(schema.key)) {
-        schema.readExtra(effect, document.at(schema.key));
+    if (schema.readExtra != nullptr && document.contains(kParametersKey)) {
+        schema.readExtra(effect, document.at(kParametersKey));
     }
     return {};
 }
 
 // ---- validation --------------------------------------------------------------------------------------
 
-Result<void> validateEffectFields(const AtmosphericEffect& effect) {
+Result<void> validateEffectFields(const EffectInstance& effect) {
     const EffectSchema* schema = effectSchema(effect.kind);
     if (schema == nullptr) {
-        return fail("atmospheric effect '{}': kind {} has no registered schema", effect.name,
+        return fail("effect '{}': kind {} has no registered schema", effect.name,
                     static_cast<int>(effect.kind));
     }
     for (const EffectField& field : schema->fields) {
@@ -534,7 +577,7 @@ Result<void> validateEffectFields(const AtmosphericEffect& effect) {
         }
         const float v = fieldFloat(field, *schema, effect);
         if (!std::isfinite(v)) {
-            return fail("atmospheric effect '{}': {} is not finite", effect.name, field.leaf);
+            return fail("effect '{}': {} is not finite", effect.name, field.leaf);
         }
     }
     if (schema->validate != nullptr) {
@@ -554,17 +597,17 @@ std::vector<RegistryFinding> checkRegistry() {
     };
 
     // Every enumerator has exactly one schema. This is the check that makes the one line in
-    // `builtinSchemas` impossible to forget quietly: adding `AtmosphereKind::Whatever` and nothing
+    // `builtinSchemas` impossible to forget quietly: adding `EffectKind::Whatever` and nothing
     // else fails here, by the name the kind serialises under -- or, when the name is what is
     // missing too, by its enumerator value.
-    for (const AtmosphereKind kind : declaredAtmosphereKinds()) {
+    for (const EffectKind kind : declaredEffectKinds()) {
         std::size_t found = 0;
         for (const EffectSchema* s : builtinSchemas()) {
             found += (s->kind == kind) ? 1u : 0u;
         }
         if (found == 0) {
             say(std::string("kind ") + std::to_string(static_cast<int>(kind)), "schema",
-                "this enumerator of AtmosphereKind has no schema in builtinSchemas() -- it cannot "
+                "this enumerator of EffectKind has no schema in builtinSchemas() -- it cannot "
                 "be registered, saved, drawn or resolved");
         } else if (found > 1) {
             say(std::string("kind ") + std::to_string(static_cast<int>(kind)), "schema",
@@ -582,9 +625,9 @@ std::vector<RegistryFinding> checkRegistry() {
             say(subject, "key", "two kinds serialise under this key; a scene naming it loads as "
                                 "whichever comes first");
         } else {
-            const auto back = atmosphereKindFromName(schema->key);
+            const auto back = effectKindFromName(schema->key);
             if (!back.has_value() || *back != schema->kind) {
-                say(subject, "key", "the key does not round-trip through atmosphereKindFromName");
+                say(subject, "key", "the key does not round-trip through effectKindFromName");
             }
         }
         if (schema->displayName[0] == '\0') {
@@ -598,9 +641,43 @@ std::vector<RegistryFinding> checkRegistry() {
             say(subject, "factory", "no ready-made effect, so 'Add' and the conformance probe have "
                                     "nothing to make");
         }
-        if (schema->resolve.fill == nullptr) {
+        // The surface waves resolve through `resolveWave`, which is the wave technique's own
+        // evaluator rather than a per-record fill into a shared bucket; every other bucket needs one.
+        if (schema->resolve.fill == nullptr && schema->resolve.bucket != EffectBucket::Surface) {
             say(subject, "resolve", "no resolve, so an effect of this kind is counted as dropped and "
                                     "drawn by nobody");
+        }
+        // ---- ADR-702: what a type must declare to be attached to anything ----------------------
+        if (schema->targets == 0) {
+            say(subject, "targets", "supports no target, so the Add Effect menu offers it nowhere and "
+                                    "a file naming it can never load");
+        }
+        if ((schema->targets & ~static_cast<EffectTargetMask>((1u << kEffectTargetCount) - 1u)) != 0) {
+            say(subject, "targets", "names a target bit past the last EffectTarget");
+        }
+        // The stage is where the renderer evaluates the contribution, and the bucket is the integrator
+        // that does it. They are declared separately because a stage is a promise to the renderer and
+        // a bucket is an implementation -- and a pair that disagree is a type drawn by a pass that
+        // runs at the wrong point in the frame.
+        const RenderStage expected = [&] {
+            switch (schema->resolve.bucket) {
+            case EffectBucket::Comet:
+            case EffectBucket::Aurora: return RenderStage::Sky;
+            case EffectBucket::Medium: return RenderStage::Volumetric;
+            case EffectBucket::Surface: return RenderStage::Material;
+            }
+            return RenderStage::Sky;
+        }();
+        if (schema->stage != expected) {
+            say(subject, "stage", std::string("declares render stage '") + renderStageName(schema->stage) +
+                                      "' but its bucket is evaluated at '" + renderStageName(expected) + "'");
+        }
+        if ((schema->getSource == nullptr) != (schema->setSource == nullptr)) {
+            say(subject, "endpoint", "declares only one of getSource / setSource");
+        }
+        if ((schema->getTarget == nullptr) != (schema->setTarget == nullptr) ||
+            (schema->getTarget == nullptr) != (schema->hasTarget == nullptr)) {
+            say(subject, "endpoint", "declares only some of hasTarget / getTarget / setTarget");
         }
         if (schema->styles.empty()) {
             say(subject, "styles", "no style presets, so the panel's preset combo is empty");

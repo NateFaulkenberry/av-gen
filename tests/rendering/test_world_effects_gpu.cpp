@@ -17,7 +17,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>

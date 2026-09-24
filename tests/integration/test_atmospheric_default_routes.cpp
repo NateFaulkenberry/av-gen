@@ -1,7 +1,7 @@
 // The default audio routes, and the fact that until ADR-392 nothing called them.
 //
 // ADR-230's family states that audio reaches an effect as an ordinary modulation route and never as
-// a hook, and `engine.cpp` says in a comment that `defaultAtmosphericRoutes` "is what implements
+// a hook, and `engine.cpp` says in a comment that `defaultEffectRoutes` "is what implements
 // it". It implemented nothing: the function had no caller anywhere in `src/`, so adding an aurora
 // from the World Effects panel produced an aurora that answered nothing.
 //
@@ -11,9 +11,9 @@
 // does a route survive the save the render loads (ADR-350, ADR-264).
 
 #include "app/engine.hpp"
-#include "world/atmospheric_params.hpp"
+#include "world/effects/effect_params.hpp"
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_conformance.hpp"
+#include "world/effects/effect_conformance.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -52,13 +52,13 @@ std::vector<std::string> targetsUnder(app::Engine& engine, const std::string& pr
 
 TEST_CASE("adding an atmospheric effect attaches its default audio routes",
           "[integration][atmospherics][modulation]") {
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
-        const std::string name = std::string("Added ") + world::atmosphereKindName(kind);
-        INFO("kind: " << world::atmosphereKindName(kind));
+    for (const world::EffectKind kind : conf::kEffectKinds) {
+        const std::string name = std::string("Added ") + world::effectKindName(kind);
+        INFO("kind: " << world::effectKindName(kind));
 
         app::Engine engine(app::EngineMode::Offline);
         engine.newComposition();
-        const std::string prefix = world::atmosphericParameterPrefix(name);
+        const std::string prefix = world::effectParameterPrefix(name);
 
         // The control: before the effect exists, there is nothing to attach and nothing is
         // attached. Without this arm, "routes appeared" would not distinguish the wiring from a
@@ -91,27 +91,27 @@ TEST_CASE("each kind gets its own routes and not another kind's",
     // The defect this whole change came from, stated as an assertion: a vortex used to fall into
     // the comet's `else` arm. If it ever does again, its target set is a comet's.
     std::vector<std::vector<std::string>> leafSets;
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
+    for (const world::EffectKind kind : conf::kEffectKinds) {
         const std::string name = "Probe";
         app::Engine engine(app::EngineMode::Offline);
         engine.newComposition();
         REQUIRE(engine.setAtmosphericEffects({conf::probeEffect(kind, name)}).has_value());
         REQUIRE(engine.addDefaultAtmosphericRoutes(name) > 0);
 
-        const std::string prefix = world::atmosphericParameterPrefix(name);
+        const std::string prefix = world::effectParameterPrefix(name);
         std::vector<std::string> leaves;
         for (const std::string& t : targetsUnder(engine, prefix)) {
             leaves.push_back(t.substr(prefix.size()));
         }
-        INFO("kind: " << world::atmosphereKindName(kind));
+        INFO("kind: " << world::effectKindName(kind));
         CHECK_FALSE(leaves.empty());
         leafSets.push_back(std::move(leaves));
     }
     // Pairwise distinct: no two kinds are handed the same set of leaves.
     for (std::size_t i = 0; i < leafSets.size(); ++i) {
         for (std::size_t j = i + 1; j < leafSets.size(); ++j) {
-            INFO(world::atmosphereKindName(conf::kAtmosphereKinds[i])
-                 << " vs " << world::atmosphereKindName(conf::kAtmosphereKinds[j]));
+            INFO(world::effectKindName(conf::kEffectKinds[i])
+                 << " vs " << world::effectKindName(conf::kEffectKinds[j]));
             CHECK(leafSets[i] != leafSets[j]);
         }
     }
@@ -125,7 +125,7 @@ TEST_CASE("a default route survives the project the render loads",
     const fs::path dir = scratch("roundtrip");
     std::vector<std::string> before;
     const std::string name = "Sky";
-    const std::string prefix = world::atmosphericParameterPrefix(name);
+    const std::string prefix = world::effectParameterPrefix(name);
 
     {
         app::Engine session(app::EngineMode::Offline);

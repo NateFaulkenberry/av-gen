@@ -73,10 +73,10 @@ std::unique_ptr<gpu::Context> makeContext() {
 // An aurora with nothing subtle about it: `Always` so no cut has to be installed for it to fire,
 // and a curtain wall bright enough that a 192x108 frame cannot miss it. The point of the test is
 // where the effect goes, not how it looks.
-world::AtmosphericEffect loudAurora() {
-    world::AtmosphericEffect e;
+world::EffectInstance loudAurora() {
+    world::EffectInstance e;
     e.name = "Valley Aurora";
-    e.kind = world::AtmosphereKind::Aurora;
+    e.kind = world::EffectKind::Aurora;
     e.activation = world::Activation::Always;
     e.aurora.appearance.intensity = 6.0f;
     e.aurora.appearance.opacity = 1.0f;
@@ -113,7 +113,7 @@ std::uint64_t renderHash(rendering::SceneRenderer& renderer, const scene::Scene&
 // than one mutated three times: an engine that has already been updated at this second has a history
 // the others do not, and "the same world" has to mean the same number of updates too.
 std::unique_ptr<app::Engine> engineAt(const fs::path& scene, double seconds,
-                                      const std::vector<world::AtmosphericEffect>& effects) {
+                                      const std::vector<world::EffectInstance>& effects) {
     auto engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
     REQUIRE(engine->loadComposition(scene).has_value());
     if (!effects.empty()) {

@@ -21,8 +21,8 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "ui/ui_logic.hpp"
-#include "world/atmospheric_params.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_params.hpp"
+#include "world/effects/effect_registry.hpp"
 #include "world/atmospherics.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -148,7 +148,7 @@ TEST_CASE("the shipped project's vortex routes name parameters that exist",
     // the registry -- whatever kind is there, is it routed correctly -- is what makes it survive
     // the next replacement as well as this one.
     std::string mediumName;
-    world::AtmosphereKind mediumKind = world::AtmosphereKind::Vortex;
+    world::EffectKind mediumKind = world::EffectKind::Vortex;
     for (const auto& e : doc.value("atmosphericEffects", json::array())) {
         const std::string key = e.value("kind", std::string{});
         const world::EffectSchema* s = world::effectSchema(key);
@@ -164,9 +164,9 @@ TEST_CASE("the shipped project's vortex routes name parameters that exist",
     REQUIRE(schema != nullptr);
     REQUIRE(schema->factory != nullptr);
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{schema->factory(mediumName)};
-    world::registerAtmosphericParameters(params, effects);
-    const std::string prefix = world::atmosphericParameterPrefix(vortexName);
+    std::vector<world::EffectInstance> effects{schema->factory(mediumName)};
+    world::registerEffectParameters(params, effects);
+    const std::string prefix = world::effectParameterPrefix(vortexName);
 
     // Every route that is about the vortex must name a parameter that exists. A route whose target
     // does not resolve is dropped with a warning nobody reads: the picture keeps its funnel and the

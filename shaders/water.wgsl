@@ -26,10 +26,10 @@
 // ADR-207. Water is not shaded through pbr_shade.wgsl (see the header above for why), so it has to
 // take the world-effect term itself. It does, and the reason is one frame: Glowmere's elder stands
 // in a pool, and a ground ripple that stopped at the shoreline drew a hard straight edge across the
-// exact shot the effect exists for. `kProceduralDraw` is what worldEffectGain switches on and is
+// exact shot the effect exists for. `kProceduralDraw` is what waveGain switches on and is
 // declared by every module that includes the file.
 const kProceduralDraw: bool = false;
-#include "world_effects.wgsl"
+#include "wave_effects.wgsl"
 // ADR-230 §6. Water takes the sky's ground light for the same reason ADR-207 records for the world
 // effects: Glowmere's elder stands in a pool, and an aurora that lit the bank and stopped at the
 // waterline would draw a hard edge across the exact shot the effect exists for.
@@ -461,7 +461,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ADR-207: additive and pre-fog, as on every other surface. The surface normal is the water's
     // own, so a ripple crossing a pool reads as ground-facing and takes the same response weight the
     // bank beside it does -- which is what makes the crossing invisible.
-    let fx = worldEffectsAt(in.worldPos, n, glint + sparkle);
+    let fx = wavesAt(in.worldPos, n, glint + sparkle);
     // ADR-230 §6. Water's albedo is its own shaded colour rather than a base-colour texture, so the
     // wash is scaled by a constant instead: a pool is a dark mirror, and multiplying the sky's light
     // by an already-lit surface would double-count it.

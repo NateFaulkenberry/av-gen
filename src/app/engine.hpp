@@ -34,8 +34,8 @@
 #include "scene/orb_scene.hpp"
 #include "scene/camera.hpp"
 #include "scene/post_settings.hpp"
-#include "world/atmospheric_params.hpp"
-#include "world/effect_params.hpp"
+#include "world/effects/effect_params.hpp"
+#include "world/effects/effect_stack.hpp"
 #include "scene/scene_controller.hpp"
 #include "seq/director.hpp"
 #include "seq/sequence.hpp"
@@ -129,6 +129,9 @@ public:
     [[nodiscard]] Result<void> setCompositionJson(const nlohmann::json& document);
     [[nodiscard]] Result<void> saveComposition(const std::filesystem::path& path);
     [[nodiscard]] scene::Composition* composition() { return dynamic_cast<scene::Composition*>(controller_.get()); }
+    [[nodiscard]] const scene::Composition* composition() const {
+        return dynamic_cast<const scene::Composition*>(controller_.get());
+    }
     // Adds a node to the current composition (converting the orb/glTF controller into one first).
     [[nodiscard]] Result<scene::CompositionNode*> addNode(scene::CompositionNode node);
     void removeNode(const std::string& name);
@@ -454,47 +457,49 @@ public:
     [[nodiscard]] const PathTraceSettings& pathTraceSettings() const { return pathTrace_; }
 
     // ---- timeline (milestone 0.8) ----
-    // ---- world effects (ADR-207) ----------------------------------------------------------------
+    // ---- effects (ADR-702) -----------------------------------------------------------------------
     //
-    // The *live* set: the composition's authored effects with this frame's modulation applied. The
-    // panel edits these; `Composition::worldEffects()` is what a save writes.
-    [[nodiscard]] std::vector<world::WorldEffect>& worldEffects() { return worldEffects_; }
-    [[nodiscard]] const std::vector<world::WorldEffect>& worldEffects() const { return worldEffects_; }
-    [[nodiscard]] const world::WorldEffectParameters& worldEffectParameters() const { return worldEffectParams_; }
-    // Replaces the effect set: re-registers `worldfx/...` parameters and writes the set back to the
-    // composition so a save carries it. Refuses the whole set the way `Composition::setWorldEffects`
-    // does, and leaves everything as it was on a refusal.
-    [[nodiscard]] Result<void> setWorldEffects(std::vector<world::WorldEffect> effects);
-
-    // ---- atmospheric effects (ADR-230) -----------------------------------------------------------
+    // The scene's ONE effect list, every owner's: the *live* set, which is the composition's authored
+    // instances with this frame's modulation applied. `Composition::effects()` is what a save
+    // writes. There is no second list: ADR-207's `worldEffects` and ADR-230's `atmosphericEffects`
+    // were merged into this one by ADR-702, with one parameter group (`fx/<id>/...`), one
+    // serialiser and one evaluator.
+    [[nodiscard]] const std::vector<world::EffectInstance>& effects() const { return effects_; }
+    [[nodiscard]] const world::EffectParameters& effectParameters() const { return effectParams_; }
+    // Replaces the whole list: validates it, writes it to the composition so a save carries it, and
+    // re-registers the `fx/...` parameters (unbinding and rebinding the timeline and the routes
+    // around the change, because both hold pointers into the parameters that are about to go).
+    // Refuses the whole set the way `Composition::setEffects` does and leaves everything as it was.
     //
-    // The same three accessors on the same terms, for the sky family. Separate from the world
-    // effects all the way down -- separate list, separate parameter group, separate GPU block,
-    // separate draw -- because the only thing the two share is a lifecycle.
-    [[nodiscard]] std::vector<world::AtmosphericEffect>& atmosphericEffects() { return atmosphericEffects_; }
-    [[nodiscard]] const std::vector<world::AtmosphericEffect>& atmosphericEffects() const {
-        return atmosphericEffects_;
-    }
-    [[nodiscard]] const world::AtmosphericParameters& atmosphericParameters() const { return atmosphericParams_; }
-    // §68. The fields this scene publishes, as of the last `update()`. Read by the World Effects
-    // panel so the subscription combo offers names that exist rather than a free-text box in which
-    // a typo is indistinguishable from a field somebody has not made yet.
+    // The values registered are the ones in `effects` -- so a caller that means to keep what the
+    // sliders say now must capture them first. `editEffects` does that; prefer it.
+    [[nodiscard]] Result<void> setEffects(std::vector<world::EffectInstance> effects);
+    // The one mutation path for the editor (ADR-702): hands `edit` the authored list with every
+    // parameter's current BASE value captured into it, then installs the result with `setEffects`.
+    // Add, remove, duplicate, reorder, enable, change a structural field -- all of them are an
+    // `edit` over a list, which is what lets undo record one before/after pair for each.
+    [[nodiscard]] Result<void> editEffects(const std::function<Result<void>(std::vector<world::EffectInstance>&)>& edit);
+    // The authored list with the current base values captured -- what `editEffects` hands its edit,
+    // and what an undo snapshot records.
+    [[nodiscard]] std::vector<world::EffectInstance> capturedEffects() const;
+    // What happened to each instance on the last evaluated frame (indexed like `effects()`): drawn,
+    // dormant, disabled, dropped because its stage's GPU capacity was full, or orphaned because its
+    // owner is not in the scene. The Effects panel reads it; before ADR-702 the evaluator counted
+    // drops and nothing read the count.
+    [[nodiscard]] std::span<const world::EffectStatus> effectStatus() const { return effectStatus_; }
+    [[nodiscard]] world::EffectStatus effectStatus(std::string_view id) const;
+    // §68. The fields this scene publishes, as of the last `update()`. Read by the Effects panel so
+    // the subscription combo offers names that exist rather than a free-text box.
     [[nodiscard]] const world::fields::FieldBus& fieldBus() const { return fieldBus_; }
-    [[nodiscard]] Result<void> setAtmosphericEffects(std::vector<world::AtmosphericEffect> effects);
 
     // ADR-392. Attaches an effect's default audio routes and returns how many were added.
     //
     // Called when somebody **adds** an effect, which is a gesture, not a load. It deliberately is
-    // not inside `setAtmosphericEffects`: that call also runs when a project is opened, and a
-    // project whose author deleted every route must not grow them back each time it is loaded.
-    // Same shape as `addDefaultPostRoutes` -- and, like it, a no-op when something already
-    // automates this effect, so pressing the button twice does not stack two sets of routes.
-    //
-    // A route whose target does not resolve is skipped rather than written. The conformance test
-    // guarantees that never happens for a kind that is wired; this is the belt for the one that is
-    // not yet, because a dead route in somebody's saved project is the failure ADR-387 spent a day
-    // on and it must not be introduced by a button.
-    std::size_t addDefaultAtmosphericRoutes(std::string_view effectName);
+    // not inside `setEffects`: that call also runs when a project is opened, and a project whose
+    // author deleted every route must not grow them back each time it is loaded. A no-op when
+    // something already automates this effect, so pressing the button twice does not stack routes.
+    // A route whose target does not resolve is skipped rather than written.
+    std::size_t addDefaultEffectRoutes(std::string_view effectId);
 
     // The director's cut, flattened to what an effect needs for time gating (ADR-207): the film's
     // **focus schedule**. Installed by `app::installSequence` and replaced or removed only by an
@@ -842,16 +847,19 @@ private:
     std::set<std::string> sectionActionProblems_;
     void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
-    // ADR-207. `worldEffects_` is the live set (authored + modulated); `worldEffectParams_` owns the
-    // `worldfx/...` parameters; `shotSpans_` is the director's cut, for time gating.
-    std::vector<world::WorldEffect> worldEffects_;
-    world::WorldEffectParameters worldEffectParams_;
-    // ADR-230, on the same terms: the live set and the `atmos/...` parameters that own it.
-    std::vector<world::AtmosphericEffect> atmosphericEffects_;
+    // ADR-702. `effects_` is the live set (authored + modulated) of every owner's effects;
+    // `effectParams_` owns their `fx/<id>/...` parameters and is released wholesale;
+    // `effectOrder_` is the evaluation order (render stage, priority, stack position), recomputed
+    // only when the list changes so a frame allocates nothing; `effectStatus_` is the per-instance
+    // report the panel reads; `shotSpans_` is the director's cut, for time gating.
+    std::vector<world::EffectInstance> effects_;
+    world::EffectParameters effectParams_;
+    std::vector<std::uint32_t> effectOrder_;
+    std::vector<world::EffectStatus> effectStatus_;
     // ADR-562: the last reported dropped-media count, so the warning is once per change rather than
     // once per frame.
     std::uint32_t lastMediaDropped_ = 0;
-    world::AtmosphericParameters atmosphericParams_;
+    std::uint32_t lastEffectDropped_ = 0;
     // The aurora's spectrum, resolved each frame from the analysis frame every other consumer
     // reads. `kAuroraBands` entries; see `world/atmospherics.hpp` for why this one vector is not a
     // modulation route.
@@ -869,12 +877,17 @@ private:
     std::uint64_t sceneGeneration_ = 0; // ADR-582: see sceneGeneration()
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     SongPlan songPlan_;                 // ADR-249: the same, for Song Mode's authored intents
-    std::uint32_t lastWorldEffectCount_ = 0;
+    std::uint32_t lastWaveCount_ = 0;
     std::uint32_t lastAtmosphericCount_ = 0;
-    void updateWorldEffects();
-    void updateAtmosphericEffects();
+    // ADR-702: the one evaluator. Applies the parameters to the live list, builds the one context,
+    // and asks each render stage's builder for its contribution, walking `effectOrder_`.
+    void updateEffects();
+    // Re-registers parameters and recomputes the order and the status table for `effects_`.
+    void installEffects();
+    // Which owners exist in this scene, for `EffectStatus::Orphaned`.
+    [[nodiscard]] bool effectOwnerExists(const world::EffectOwner& owner) const;
     // §68. Fills `fieldBus_` with everything this scene publishes: the world's wind, and one field
-    // per live vortex effect. Called from `updateAtmosphericEffects` before the resolve.
+    // per live vortex effect. Called from `updateEffects` before the resolve.
     void publishFields();
     void updateAuroraSpectrum();
     [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;

@@ -126,7 +126,7 @@ enum class FieldSource : std::uint8_t {
 inline constexpr std::string_view kWindField = "wind";
 
 // The name a vortex effect publishes its own field under. `atmos/<name>` deliberately matches the
-// prefix that effect's parameters register under (`world::atmosphericParameterPrefix`), so the name
+// prefix that effect's parameters register under (`world::effectParameterPrefix`), so the name
 // an artist sees in the Parameters panel and the name they subscribe to are the same string.
 [[nodiscard]] std::string vortexFieldName(std::string_view effectName);
 

@@ -1,6 +1,6 @@
 #include "world/atmospherics.hpp"
 
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <glm/gtc/constants.hpp>
 #include <nlohmann/json.hpp>
@@ -81,7 +81,7 @@ float bowShape(float t) {
 // ADR-500: both directions read the registry, so they cannot disagree with each other and cannot
 // fall behind a kind. ADR-392 had to check that the round trip held, because the writer was a
 // switch and the reader an if-chain that a new kind could be left out of; there is now one list.
-const char* atmosphereKindName(AtmosphereKind k) {
+const char* effectKindName(EffectKind k) {
     const EffectSchema* schema = effectSchema(k);
     // A kind with no schema. It has no name to write, and the fallback is deliberately NOT a
     // neighbour's: writing "comet" for it would save a file that silently loads as a comet, which
@@ -89,7 +89,7 @@ const char* atmosphereKindName(AtmosphereKind k) {
     // the CPU suite, and a file that says "unknown" refuses to load rather than lying.
     return schema != nullptr ? schema->key : "unknown";
 }
-std::optional<AtmosphereKind> atmosphereKindFromName(std::string_view name) {
+std::optional<EffectKind> effectKindFromName(std::string_view name) {
     const EffectSchema* schema = effectSchema(name);
     if (schema == nullptr) {
         return std::nullopt;
@@ -300,232 +300,13 @@ Result<void> Tornado::validate() const {
 }
 
 
-Result<void> AtmosphericEffect::validate() const {
-    if (name.empty()) { return fail("an atmospheric effect needs a name"); }
-    if (name.find('/') != std::string::npos) {
-        // The name is half of a parameter path (`atmos/<name>/intensity`); a slash in it would
-        // silently invent a group nobody can address.
-        return fail("atmospheric effect '{}': a name may not contain '/'", name);
-    }
-    // Both payloads are validated whatever the kind. An effect keeps the settings of the kind it is
-    // not currently using -- that is why they are two members rather than a variant -- and a file
-    // that round-trips a broken one and only complains after somebody switches kind is worse than
-    // one that complains now.
-    if (auto ok = comet.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
-    if (auto ok = aurora.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
-    if (auto ok = vortex.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
-    if (auto ok = ground.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
-    if (auto ok = timing.validate(); !ok) { return fail("atmospheric effect '{}': {}", name, ok.error().message); }
-    // ADR-500: and the rows of whatever kind this is. For the three kinds ported to the registry
-    // that is a second look at what the three calls above already covered; for a kind whose numbers
-    // live in `values` rather than in a struct on this header it is the only look there is, and it
-    // is the reason a kind declared in its own file cannot skip validation by omission.
-    if (auto ok = validateEffectFields(*this); !ok) { return ok; }
-    return {};
-}
-
-Result<void> validateAtmosphericEffects(std::span<const AtmosphericEffect> effects) {
-    std::unordered_set<std::string> seen;
-    for (const AtmosphericEffect& e : effects) {
-        if (auto ok = e.validate(); !ok) {
-            return ok;
-        }
-        if (!seen.insert(e.name).second) {
-            return fail("two atmospheric effects are named '{}'; a name is half of a parameter path", e.name);
-        }
-    }
-    return {};
-}
-
-// ---- JSON --------------------------------------------------------------------------------------
-
-namespace {
-
-json timingToJson(const Timing& t) {
-    return json{{"delay", t.delay},           {"lifetime", t.lifetime},
-                {"fadeIn", t.fadeIn},         {"fadeOut", t.fadeOut},
-                {"windowStart", t.windowStart}, {"windowSeconds", t.windowSeconds},
-                {"repeatSeconds", t.repeatSeconds}};
-}
-Timing timingFromJson(const json& j) {
-    Timing t;
-    if (!j.is_object()) { return t; }
-    t.delay = readDouble(j, "delay", t.delay);
-    t.lifetime = readDouble(j, "lifetime", t.lifetime);
-    t.fadeIn = readDouble(j, "fadeIn", t.fadeIn);
-    t.fadeOut = readDouble(j, "fadeOut", t.fadeOut);
-    t.windowStart = readDouble(j, "windowStart", t.windowStart);
-    t.windowSeconds = readDouble(j, "windowSeconds", t.windowSeconds);
-    t.repeatSeconds = readDouble(j, "repeatSeconds", t.repeatSeconds);
-    return t;
-}
-
-// ADR-500. The shared rows -- lifecycle, ground illumination, the field subscription -- are the
-// effect's rather than a kind's, so they are written at the document root rather than inside a
-// kind's block. One helper pair, used by both directions, for the reason the rest of this ADR
-// exists: a reader and a writer that walk one list cannot drop a key from one of them.
-//
-// Timing rows are skipped: they register (so they are automatable, and the conformance round trip
-// still covers them) but their file representation is `timingToJson`'s `double`, and reading them
-// back as float would round every authored delay. What is avoided here is a change to the numbers,
-// not a check.
-bool sharedRowIsTiming(const EffectField& field) {
-    return std::string_view(field.jsonPath).starts_with("timing/");
-}
-
-// "ground/intensity" -> j["ground"]["intensity"]. One level, which is all a shared row needs.
-std::pair<std::string, std::string> sharedGroupKey(const EffectField& field) {
-    const std::string_view path(field.jsonPath);
-    const std::size_t slash = path.find('/');
-    if (slash == std::string_view::npos) {
-        return {std::string(path), std::string()};
-    }
-    return {std::string(path.substr(0, slash)), std::string(path.substr(slash + 1))};
-}
-
-void writeSharedField(const EffectField& field, const AtmosphericEffect& e, json& out) {
-    if (sharedRowIsTiming(field) || effectSchemas().empty()) {
-        return;
-    }
-    const EffectSchema& any = *effectSchemas().front();
-    const auto [group, key] = sharedGroupKey(field);
-    if (!out.contains(group) || !out.at(group).is_object()) {
-        out[group] = json::object();
-    }
-    switch (field.type) {
-    case FieldType::Float: out[group][key] = fieldFloat(field, any, e); break;
-    case FieldType::Color: out[group][key] = vec3ToJson(fieldColor(field, any, e)); break;
-    case FieldType::Bool: out[group][key] = fieldBool(field, any, e); break;
-    case FieldType::Choice: out[group][key] = std::string(field.choiceName(fieldFloat(field, any, e))); break;
-    }
-}
-
-void readSharedField(const EffectField& field, const json& in, AtmosphericEffect& e) {
-    if (sharedRowIsTiming(field) || effectSchemas().empty()) {
-        return;
-    }
-    const EffectSchema& any = *effectSchemas().front();
-    const auto [group, key] = sharedGroupKey(field);
-    if (!in.contains(group) || !in.at(group).is_object() || !in.at(group).contains(key)) {
-        return; // absent leaves the default
-    }
-    const json& v = in.at(group).at(key);
-    switch (field.type) {
-    case FieldType::Float:
-        if (v.is_number()) { setFieldFloat(field, any, e, v.get<float>()); }
-        break;
-    case FieldType::Color: setFieldColor(field, any, e, vec3FromJson(v, fieldColor(field, any, e))); break;
-    case FieldType::Bool:
-        if (v.is_boolean()) { setFieldBool(field, any, e, v.get<bool>()); }
-        break;
-    case FieldType::Choice:
-        if (v.is_string()) {
-            if (const int i = field.choiceIndex(v.get<std::string>()); i >= 0) {
-                setFieldFloat(field, any, e, static_cast<float>(i));
-            }
-        }
-        break;
-    }
-}
-
-} // namespace
-
-// ADR-500. Every per-kind block is derived from that kind's rows. What was two hundred lines of
-// key/member pairs in two directions -- the pair ADR-392 measured as the place a field is silently
-// dropped from BOTH and the document comparison still passes -- is now a loop, and a field that
-// exists as a row exists in the file or in neither direction for any kind at once.
-//
-// EVERY kind's block is written, not only this effect's. An effect keeps the settings of the kind
-// it is not currently using -- that is why the payloads are members rather than a variant -- and a
-// save that dropped them would throw away somebody's work the moment they tried a preset.
-json AtmosphericEffect::toJson() const {
-    json j;
-    j["name"] = name;
-    j["enabled"] = enabled;
-    if (!style.empty()) { j["style"] = style; }
-    j["kind"] = atmosphereKindName(kind);
-    j["activation"] = activationName(activation);
-    j["timing"] = timingToJson(timing);
-
-    // The mode is a word rather than a number, so it is not a row; the three numbers and the colour
-    // beside it are shared rows and come from the walk below.
-    j["ground"] = json{{"mode", groundGlowName(ground.mode)}};
-    // §68. Written unconditionally, both halves, even when the subscription is the default -- which
-    // is the one thing ADR-392's round-trip check is specifically shaped to catch the absence of.
-    // `toJson(fromJson(toJson(e))) == toJson(e)` passes perfectly when a key is missing from BOTH
-    // directions, because the reader leaves the struct's default in place and the writer omits it
-    // again; writing it always is what makes the field visible in the file an artist can read.
-    j["flow"] = json{{"field", flow.field}};
-
-    for (const EffectField& field : sharedEffectFields()) {
-        writeSharedField(field, *this, j);
-    }
-    for (const EffectSchema* schema : effectSchemas()) {
-        effectPayloadToJson(*schema, *this, j);
-    }
-    return j;
-}
-
-Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
-    if (!j.is_object()) {
-        return fail("an atmospheric effect must be an object");
-    }
-    AtmosphericEffect e;
-    e.name = readString(j, "name");
-    e.enabled = readBool(j, "enabled", true);
-    e.style = readString(j, "style");
-
-    if (j.contains("kind")) {
-        const auto kind = atmosphereKindFromName(readString(j, "kind"));
-        if (!kind) { return fail("atmospheric effect '{}': unknown kind '{}'", e.name, readString(j, "kind")); }
-        e.kind = *kind;
-    }
-    if (j.contains("activation")) {
-        const auto act = activationFromName(readString(j, "activation"));
-        if (!act) { return fail("atmospheric effect '{}': unknown activation '{}'", e.name, readString(j, "activation")); }
-        e.activation = *act;
-    }
-    if (j.contains("timing")) { e.timing = timingFromJson(j.at("timing")); }
-
-    if (j.contains("ground") && j.at("ground").is_object()) {
-        const json& g = j.at("ground");
-        if (g.contains("mode")) {
-            const auto mode = groundGlowFromName(readString(g, "mode"));
-            if (!mode) { return fail("atmospheric effect '{}': unknown ground glow '{}'", e.name, readString(g, "mode")); }
-            e.ground.mode = *mode;
-        }
-    }
-    // §68. An absent block leaves the default, which is the unsubscribed effect every file written
-    // before this existed describes. A name that this scene does not publish is NOT rejected here:
-    // the scene's fields are not known at the point an effect is parsed, and refusing would make a
-    // project unloadable because a vortex it names is disabled. It is reported at resolve instead,
-    // by `fields::FieldBus::unresolved`, where the answer is actually known.
-    if (j.contains("flow") && j.at("flow").is_object()) {
-        e.flow.field = readString(j.at("flow"), "field");
-    }
-
-    // ADR-500: the reader is the same walk as the writer, over the same rows, so the two cannot
-    // disagree about a key -- which is the property the old pair of two-hundred-line functions did
-    // not have, and which ADR-392 could only check for afterwards.
-    for (const EffectField& field : sharedEffectFields()) {
-        readSharedField(field, j, e);
-    }
-    for (const EffectSchema* schema : effectSchemas()) {
-        if (auto ok = effectPayloadFromJson(*schema, j, e); !ok) {
-            return std::unexpected(ok.error());
-        }
-    }
-
-    if (auto ok = e.validate(); !ok) {
-        return std::unexpected(ok.error());
-    }
-    return e;
-}
+// ADR-702: `EffectInstance::validate`, its JSON and the whole-list check moved to
+// `world/effects/effect_instance.cpp` and `effect_stack.cpp`: they are the instance's, not the sky's.
 
 // ---- presets and factories (ADR-500) -------------------------------------------------------------
 //
 // The five hand-written per-kind lists ADR-392 counted are gone from this file. A style's body and
-// a factory's body now live beside the rows they set, in `world_effects/effects/<kind>_effect.cpp`,
+// a factory's body now live beside the rows they set, in `world/effects/kinds/<kind>_effect.cpp`,
 // and what is left here is the lookup -- which is kind-agnostic, so the next kind gets presets and
 // an "Add" button without a line being written here.
 //
@@ -534,13 +315,13 @@ Result<AtmosphericEffect> AtmosphericEffect::fromJson(const json& j) {
 
 namespace {
 
-std::span<const std::string_view> styleNamesOf(AtmosphereKind kind) {
+std::span<const std::string_view> styleNamesOf(EffectKind kind) {
     // A `static` cache per kind rather than a rebuilt vector, because the callers are combos that
     // ask every frame and the answer is a compile-time constant. Built once, on first use.
     static std::vector<std::vector<std::string_view>> cache = [] {
-        std::vector<std::vector<std::string_view>> out(kAtmosphereKinds.size());
+        std::vector<std::vector<std::string_view>> out(kEffectKinds.size());
         for (const EffectSchema* schema : effectSchemas()) {
-            const std::size_t index = atmosphereKindIndex(schema->kind);
+            const std::size_t index = effectKindIndex(schema->kind);
             if (index >= out.size()) {
                 continue;
             }
@@ -550,7 +331,7 @@ std::span<const std::string_view> styleNamesOf(AtmosphereKind kind) {
         }
         return out;
     }();
-    const std::size_t index = atmosphereKindIndex(kind);
+    const std::size_t index = effectKindIndex(kind);
     if (index >= cache.size()) {
         return {};
     }
@@ -559,9 +340,9 @@ std::span<const std::string_view> styleNamesOf(AtmosphereKind kind) {
 
 } // namespace
 
-std::span<const std::string_view> effectStyleNames(AtmosphereKind kind) { return styleNamesOf(kind); }
+std::span<const std::string_view> effectStyleNames(EffectKind kind) { return styleNamesOf(kind); }
 
-bool applyEffectStyle(AtmosphericEffect& e, AtmosphereKind kind, std::string_view style) {
+bool applyEffectStyle(EffectInstance& e, EffectKind kind, std::string_view style) {
     const EffectSchema* schema = effectSchema(kind);
     if (schema == nullptr) {
         return false;
@@ -578,10 +359,10 @@ bool applyEffectStyle(AtmosphericEffect& e, AtmosphereKind kind, std::string_vie
     return false;
 }
 
-AtmosphericEffect makeAtmosphericEffect(AtmosphereKind kind, std::string name) {
+EffectInstance makeEffect(EffectKind kind, std::string name) {
     const EffectSchema* schema = effectSchema(kind);
     if (schema == nullptr || schema->factory == nullptr) {
-        AtmosphericEffect e;
+        EffectInstance e;
         e.name = std::move(name);
         e.kind = kind;
         return e;
@@ -589,28 +370,28 @@ AtmosphericEffect makeAtmosphericEffect(AtmosphereKind kind, std::string name) {
     return schema->factory(std::move(name));
 }
 
-std::span<const std::string_view> cometStyleNames() { return styleNamesOf(AtmosphereKind::Comet); }
-std::span<const std::string_view> auroraStyleNames() { return styleNamesOf(AtmosphereKind::Aurora); }
-std::span<const std::string_view> vortexStyleNames() { return styleNamesOf(AtmosphereKind::Vortex); }
+std::span<const std::string_view> cometStyleNames() { return styleNamesOf(EffectKind::Comet); }
+std::span<const std::string_view> auroraStyleNames() { return styleNamesOf(EffectKind::Aurora); }
+std::span<const std::string_view> vortexStyleNames() { return styleNamesOf(EffectKind::Vortex); }
 
-bool applyCometStyle(AtmosphericEffect& e, std::string_view style) {
-    return applyEffectStyle(e, AtmosphereKind::Comet, style);
+bool applyCometStyle(EffectInstance& e, std::string_view style) {
+    return applyEffectStyle(e, EffectKind::Comet, style);
 }
-bool applyAuroraStyle(AtmosphericEffect& e, std::string_view style) {
-    return applyEffectStyle(e, AtmosphereKind::Aurora, style);
+bool applyAuroraStyle(EffectInstance& e, std::string_view style) {
+    return applyEffectStyle(e, EffectKind::Aurora, style);
 }
-bool applyVortexStyle(AtmosphericEffect& e, std::string_view style) {
-    return applyEffectStyle(e, AtmosphereKind::Vortex, style);
+bool applyVortexStyle(EffectInstance& e, std::string_view style) {
+    return applyEffectStyle(e, EffectKind::Vortex, style);
 }
 
-AtmosphericEffect bioluminescentComet(std::string name) {
-    return makeAtmosphericEffect(AtmosphereKind::Comet, std::move(name));
+EffectInstance bioluminescentComet(std::string name) {
+    return makeEffect(EffectKind::Comet, std::move(name));
 }
-AtmosphericEffect glowmereAurora(std::string name) {
-    return makeAtmosphericEffect(AtmosphereKind::Aurora, std::move(name));
+EffectInstance glowmereAurora(std::string name) {
+    return makeEffect(EffectKind::Aurora, std::move(name));
 }
-AtmosphericEffect cosmicVortex(std::string name) {
-    return makeAtmosphericEffect(AtmosphereKind::Vortex, std::move(name));
+EffectInstance cosmicVortex(std::string name) {
+    return makeEffect(EffectKind::Vortex, std::move(name));
 }
 
 // ---- resolution --------------------------------------------------------------------------------
@@ -656,8 +437,8 @@ glm::vec3 cometPositionAt(const ResolvedAtmospheric& r, float arcLength) {
     return r.anchor + d * r.distance;
 }
 
-EffectFlow resolveEffectFlow(const AtmosphericEffect& effect, const glm::vec3& anchor,
-                             const AtmosphericContext& ctx) {
+EffectFlow resolveEffectFlow(const EffectInstance& effect, const glm::vec3& anchor,
+                             const EffectContext& ctx) {
     EffectFlow out;
     if (ctx.fieldBus == nullptr || !effect.flow.active()) {
         return out;
@@ -709,13 +490,32 @@ glm::vec3 flowLean(const fields::FlowSample& sample, float influence) {
     return (flat / len) * (std::min(len, 1.0f) * influence);
 }
 
-AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> effects,
-                                            const AtmosphericContext& ctx,
+AtmosphericCounts resolveAtmosphericEffects(std::span<const EffectInstance> effects,
+                                            const EffectContext& ctx,
                                             std::span<ResolvedAtmospheric> comets,
                                             std::span<ResolvedAtmospheric> auroras,
-                                            std::span<ResolvedAtmospheric> vortices) {
+                                            std::span<ResolvedAtmospheric> vortices,
+                                            std::span<const std::uint32_t> order,
+                                            std::span<EffectStatus> status) {
     AtmosphericCounts counts;
-    for (const AtmosphericEffect& e : effects) {
+    const std::size_t n = order.empty() ? effects.size() : order.size();
+    for (std::size_t walk = 0; walk < n; ++walk) {
+        const std::size_t at = order.empty() ? walk : order[walk];
+        if (at >= effects.size()) {
+            continue;
+        }
+        const EffectInstance& e = effects[at];
+        const EffectSchema* schema = effectSchema(e.kind);
+        // ADR-702: one list holds every type. The surface waves are `resolveWaves`' to evaluate.
+        if (schema != nullptr && schema->resolve.bucket == EffectBucket::Surface) {
+            continue;
+        }
+        // Written for every instance this function owns, so the panel can say what happened to
+        // each one rather than a count of what happened to some. Refined below as it resolves.
+        EffectStatus* said = at < status.size() ? &status[at] : nullptr;
+        if (said != nullptr) {
+            *said = e.enabled ? EffectStatus::Dormant : EffectStatus::Disabled;
+        }
         if (!e.enabled) {
             continue;
         }
@@ -761,11 +561,15 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
         //     declaration is counted in `dropped` and drawn by nobody, so it is reportable rather
         //     than silently attributed to a neighbour. `checkRegistry` has already named it in the
         //     CPU suite, which is where the news belongs.
-        const EffectSchema* schema = effectSchema(e.kind);
         if (schema == nullptr || schema->resolve.fill == nullptr) {
             ++counts.dropped;
+            if (said != nullptr) {
+                *said = EffectStatus::Dropped;
+            }
             continue;
         }
+        bool drew = false;
+        bool lost = false;
         // How many records this one effect contributes. One for everything ADR-230 shipped; a
         // meteor shower is the first kind for which it is more than one.
         const std::size_t records = schema->resolve.count != nullptr ? schema->resolve.count(e) : 1;
@@ -775,23 +579,27 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
             case EffectBucket::Comet: {
                 if (counts.comets >= comets.size()) {
                     ++counts.dropped;
+                    lost = true;
                     continue;
                 }
                 if (!schema->resolve.fill(e, index, ctx, base, r)) {
                     continue; // a degenerate arc, or a meteor that has not launched yet
                 }
                 comets[counts.comets++] = r;
+                drew = true;
                 break;
             }
             case EffectBucket::Aurora: {
                 if (counts.auroras >= auroras.size()) {
                     ++counts.dropped;
+                    lost = true;
                     continue;
                 }
                 if (!schema->resolve.fill(e, index, ctx, base, r)) {
                     continue;
                 }
                 auroras[counts.auroras++] = r;
+                drew = true;
                 break;
             }
             case EffectBucket::Medium: {
@@ -812,6 +620,7 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
                 // always were -- the original guarded the store separately for the same reason.
                 if (counts.vortices >= kMaxMedia) {
                     ++counts.dropped;
+                    lost = true;
                     continue;
                 }
                 if (!schema->resolve.fill(e, index, ctx, base, r)) {
@@ -821,9 +630,17 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> e
                     vortices[counts.vortices] = r;
                 }
                 ++counts.vortices;
+                drew = true;
                 break;
             }
+            case EffectBucket::Surface:
+                break; // unreachable: skipped at the top, and `resolveWaves`' to evaluate
             }
+        }
+        if (said != nullptr) {
+            // Any record lost is reported as a drop: a shower that drew four of its six trails is
+            // not what was authored, and "drawn" would hide exactly the case this report exists for.
+            *said = lost ? EffectStatus::Dropped : (drew ? EffectStatus::Drawn : EffectStatus::Dormant);
         }
     }
     return counts;
@@ -931,7 +748,7 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
 // `pack` and then write the tag by hand -- a second copy of the ordering rule that ADR-565's
 // sentinel exists to enforce. ADR-554's rule: a seam published from two places must be written by
 // both, so this one is published from one.
-void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot,
+void packMediumSlot(const EffectInstance& e, float envelope, MediumSlot& slot,
                     const MediumFlowInput& flow) {
     const EffectSchema* schema = effectSchema(e.kind);
     if (schema == nullptr || schema->resolve.pack == nullptr) {
@@ -952,11 +769,11 @@ void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot
     slot.lane[kMediumLanes - 1] = glm::vec4(kReserved);
     schema->resolve.pack(e, envelope, flow, slot);
     if (slot.lane[kMediumLanes - 1] != glm::vec4(kReserved)) {
-        static std::set<AtmosphereKind> warned;
+        static std::set<EffectKind> warned;
         if (warned.insert(e.kind).second) {
             log::warn("medium kind '{}' writes lane {} in its packer, which is reserved for the "
                       "kind tag: that value is discarded and the effect will look wrong",
-                      atmosphereKindName(e.kind), kMediumLanes - 1);
+                      effectKindName(e.kind), kMediumLanes - 1);
         }
     }
     slot.kind = static_cast<std::uint32_t>(e.kind);
@@ -975,12 +792,13 @@ void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot
 }
 
 
-void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const AtmosphericContext& ctx,
-                           AtmosphericFrame& out) {
+void buildAtmosphericFrame(std::span<const EffectInstance> effects, const EffectContext& ctx,
+                           AtmosphericFrame& out, std::span<const std::uint32_t> order,
+                           std::span<EffectStatus> status) {
     std::array<ResolvedAtmospheric, kMaxGpuComets> comets{};
     std::array<ResolvedAtmospheric, kMaxGpuAuroras> auroras{};
     std::array<ResolvedAtmospheric, kMaxMedia> vortices{};
-    const AtmosphericCounts counts = resolveAtmosphericEffects(effects, ctx, comets, auroras, vortices);
+    const AtmosphericCounts counts = resolveAtmosphericEffects(effects, ctx, comets, auroras, vortices, order, status);
 
     out.cometCount = static_cast<std::uint32_t>(counts.comets);
     out.auroraCount = static_cast<std::uint32_t>(counts.auroras);
@@ -995,6 +813,10 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
     //
     // What ADR-562 changes is the count: up to `kMaxMedia`, each through its own kind's `pack`.
     out.mediumCount = 0;
+    // Reset here: this is the frame's count, and it is accumulated below. Without the reset a frame
+    // block that is rebuilt in place (the engine's live scene is) carried every earlier frame's
+    // drops forward, so one drop made every later frame report one.
+    out.mediaDropped = 0;
     for (auto& slot : out.media) {
         slot = MediumSlot{};
     }
@@ -1054,7 +876,7 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
     out.ground = SkyGroundGpu{};
     glm::vec3 ambient(0.0f);
     for (std::size_t i = 0; i < counts.auroras; ++i) {
-        const AtmosphericEffect& e = *auroras[i].effect;
+        const EffectInstance& e = *auroras[i].effect;
         const float scale = groundGlowScale(e.ground.mode) * e.ground.intensity * auroras[i].envelope;
         if (scale > 0.0f) {
             ambient += e.ground.color * scale;
@@ -1062,7 +884,7 @@ void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const Atm
     }
     float brightest = 0.0f;
     for (std::size_t i = 0; i < counts.comets; ++i) {
-        const AtmosphericEffect& e = *comets[i].effect;
+        const EffectInstance& e = *comets[i].effect;
         const float scale = groundGlowScale(e.ground.mode) * e.ground.intensity * comets[i].envelope;
         if (scale <= 0.0f) {
             continue;

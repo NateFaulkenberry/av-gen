@@ -51,15 +51,16 @@
 // `world/effect_params.hpp` states and a second reaction system is a second thing to debug. The one
 // deliberate exception is the **spectrum vector**: a curtain whose shape is a frequency spectrum
 // needs sixteen numbers across the sky, and a scalar route cannot carry a vector. Those sixteen
-// bins ride in `AtmosphericContext::spectrum`, filled by the engine from the same
+// bins ride in `EffectContext::spectrum`, filled by the engine from the same
 // `analysis::AnalysisFrame` every other consumer reads, and are documented as the exception rather
 // than smuggled in as a second analyzer.
 
 #include "core/error.hpp"
 #include "core/tornado.hpp"
 #include "core/vortex.hpp"
-#include "world/effects.hpp"
-#include "world/world_effects/field_bus.hpp"
+#include "world/effects/effect_kind.hpp"
+#include "world/effects/effect_timing.hpp"
+#include "world/effects/field_bus.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -89,37 +90,8 @@ inline constexpr std::size_t kAuroraBands = 16;
 
 // ---- the kinds ---------------------------------------------------------------------------------
 
-enum class AtmosphereKind : std::uint8_t {
-    Comet,  // a bright head on a world-space curve, with a trail integrated along the view ray
-    Aurora, // curtains on vertical shells, rising from a world height, shaped by the spectrum
-    // ADR-387. A cosmic vortex is a sky phenomenon a scene AUTHORS, so it belongs in this family
-    // for the same reasons the other two do: instances with names, an enable, a table of parameters
-    // under `atmos/<name>/`, serialisation in `atmosphericEffects`, a row in the World Effects
-    // panel, and modulation, all for free. That it is drawn by the volumetric pass rather than by
-    // `atmosphere_fx.wgsl` is a rendering detail -- this family is about authoring, not about which
-    // pass rasterises the result.
-    Vortex,
-    // ADR-500. The two effects added to prove the registry: one file each, and the two lines this
-    // enumerator and `builtinSchemas()` are. Both reach the picture through an integrator the
-    // engine already has -- a shower is N records in the comet bucket, a fog bank is a placed
-    // volumetric medium with no swirl -- which is deliberately the easy half. A kind that needs a
-    // NEW integrator needs shader work, and that is the one part of an effect the registry does not
-    // and cannot move into a single C++ file.
-    MeteorShower,
-    VolumetricFog,
-    // ADR-580. A tornado: a rotating column of dust and condensate standing IN the world, read
-    // from the side. Deliberately NOT a variant of `Vortex`, which is a cyclone -- a thing you look
-    // DOWN at, whose whole macro structure (eye, eye wall, spiral rainbands) is a function of the
-    // horizontal plane at a height. There is no parameter of one that is a parameter of the other.
-    //
-    // It is the FIRST kind to reach the march through a different density function, which is what
-    // `MediumSlot::kind` exists to select and what ADR-562 built the lanes to carry.
-    Tornado,
-};
-// ADR-500: derived from the registry's schemas rather than written out here, so a kind whose name
-// does not round-trip is a named failure of `checkRegistry` instead of an if-chain that fell behind.
-[[nodiscard]] const char* atmosphereKindName(AtmosphereKind k);
-[[nodiscard]] std::optional<AtmosphereKind> atmosphereKindFromName(std::string_view name);
+// The effect kinds moved to `world/effects/effect_kind.hpp` (ADR-702): the enumeration names every
+// effect TYPE, not only the sky and medium ones this file implements.
 
 // What the effect is anchored to. A comet anchored to the World has honest parallax and can leave
 // frame; one anchored to the Camera keeps its place in the sky however far the camera travels,
@@ -409,7 +381,7 @@ struct Tornado {
 // this store instead.
 //
 // Keyed by `<kind key>/<leaf>`, which is what gives it the same property the three structs have and
-// the reason `AtmosphericEffect` is not a variant: an effect that changes kind keeps the settings of
+// the reason `EffectInstance` is not a variant: an effect that changes kind keeps the settings of
 // the kind it left, so switching to a preset and back does not throw work away.
 //
 // Vectors rather than a map because they are short -- a kind declares tens of rows, not thousands --
@@ -427,45 +399,10 @@ struct EffectValueStore {
     void setBool(std::string_view key, bool value);
 };
 
-struct AtmosphericEffect {
-    std::string name;
-    bool enabled = true;
-    std::string style; // the preset it was made from, for the UI; changes nothing on its own
+struct EffectInstance; // world/effects/effect_instance.hpp (ADR-702)
+enum class EffectStatus : std::uint8_t;
 
-    AtmosphereKind kind = AtmosphereKind::Comet;
-    Comet comet;
-    Aurora aurora;
-    Vortex vortex;
-    Tornado tornado; // ADR-580
 
-    GroundIllumination ground;
-    Activation activation = Activation::Always; // ADR-207's, unchanged
-    Timing timing;                              // ADR-207's, unchanged
-
-    // §68, one field many subscribers. Which spatial field this effect's motion answers to, and how
-    // much. Empty and 0 by default, so every scene written before this existed renders the frame it
-    // rendered before -- and `fields::FieldBus::unresolved` makes a name that resolves to nothing a
-    // reported problem rather than a still picture.
-    //
-    // The reason this is one member on the shared struct rather than three per-kind ones is the
-    // whole of ADR-387's argument: the question "what is the air doing where this effect is" has
-    // one answer, and a comet, an aurora and a funnel that each asked it privately are what this
-    // replaces. What each kind DOES with the answer is per-kind and lives in the resolver.
-    fields::Subscription flow;
-
-    // ADR-500. Where a kind declared in its own file keeps its numbers. Empty for the three kinds
-    // that predate the registry, so every scene written before it serialises byte for byte as it
-    // did -- the block is omitted entirely when there is nothing in it.
-    EffectValueStore values;
-
-    [[nodiscard]] Result<void> validate() const;
-    [[nodiscard]] nlohmann::json toJson() const;
-    [[nodiscard]] static Result<AtmosphericEffect> fromJson(const nlohmann::json& j);
-};
-
-// Refuses duplicate names, for the reason `validateWorldEffects` does: a name is half of a
-// parameter path.
-[[nodiscard]] Result<void> validateAtmosphericEffects(std::span<const AtmosphericEffect> effects);
 
 // ---- presets (§10) -----------------------------------------------------------------------------
 //
@@ -476,51 +413,32 @@ struct AtmosphericEffect {
 // ADR-500, and these three are the generic form the three per-kind accessors below now adapt:
 // every kind's presets and every kind's "Add" button come from its schema, so a new kind gets both
 // without a line being written in this file.
-[[nodiscard]] std::span<const std::string_view> effectStyleNames(AtmosphereKind kind);
+[[nodiscard]] std::span<const std::string_view> effectStyleNames(EffectKind kind);
 // False when the name is not a style of that kind -- which is what the UI relies on to leave the
 // preset combo where it was rather than silently doing nothing to the effect.
-bool applyEffectStyle(AtmosphericEffect& effect, AtmosphereKind kind, std::string_view style);
+bool applyEffectStyle(EffectInstance& effect, EffectKind kind, std::string_view style);
 // The ready-made effect the "Add" button makes and the conformance probe uses, for any kind.
-[[nodiscard]] AtmosphericEffect makeAtmosphericEffect(AtmosphereKind kind, std::string name);
+[[nodiscard]] EffectInstance makeEffect(EffectKind kind, std::string name);
 
 [[nodiscard]] std::span<const std::string_view> cometStyleNames();
 [[nodiscard]] std::span<const std::string_view> auroraStyleNames();
 [[nodiscard]] std::span<const std::string_view> vortexStyleNames();
 // Applies a style's appearance and shape, leaving name, activation, timing and ground illumination
 // alone. False when the name is not a style of that kind.
-bool applyCometStyle(AtmosphericEffect& effect, std::string_view style);
-bool applyAuroraStyle(AtmosphericEffect& effect, std::string_view style);
+bool applyCometStyle(EffectInstance& effect, std::string_view style);
+bool applyAuroraStyle(EffectInstance& effect, std::string_view style);
 // ADR-387. A vortex style leaves `center` alone: where the funnel is in the world is a placement
 // decision the scene made, and a preset that moved it would silently unanchor it from the island.
-bool applyVortexStyle(AtmosphericEffect& effect, std::string_view style);
+bool applyVortexStyle(EffectInstance& effect, std::string_view style);
 
 // Ready-made effects, so "add a comet" is one call from the UI and one line in a test rather than a
 // page of field assignments that can drift from the shipped scene's.
-[[nodiscard]] AtmosphericEffect bioluminescentComet(std::string name = "Bioluminescent Comet");
-[[nodiscard]] AtmosphericEffect glowmereAurora(std::string name = "Glowmere Aurora");
-[[nodiscard]] AtmosphericEffect cosmicVortex(std::string name = "Cosmic Vortex");
+[[nodiscard]] EffectInstance bioluminescentComet(std::string name = "Bioluminescent Comet");
+[[nodiscard]] EffectInstance glowmereAurora(std::string name = "Glowmere Aurora");
+[[nodiscard]] EffectInstance cosmicVortex(std::string name = "Cosmic Vortex");
 
 // ---- resolution --------------------------------------------------------------------------------
 
-// What an atmospheric effect needs to know about this frame. A superset of nothing: the shot spans
-// and the transport second come straight from ADR-207's context, because `Activation` is ADR-207's.
-struct AtmosphericContext {
-    double seconds = 0.0;          // the transport clock, and the only clock
-    glm::vec3 cameraPosition{0.0f};
-    std::span<const ShotSpan> shots;
-    // §4.2's exception, documented in this file's header: `kAuroraBands` normalised magnitudes,
-    // low to high. Empty is legal and means "no music" -- the curtain falls back to its flat base
-    // height, which is what an aurora should look like in silence.
-    std::span<const float> spectrum;
-    // §68. The scene's published fields. Null is legal and means "no field layer this frame": every
-    // subscription then resolves to nothing, which is the same picture as no subscription and is
-    // what every call site written before the bus existed gets.
-    //
-    // A raw pointer rather than a reference because the bus is rebuilt each frame by the engine and
-    // a context is a value that tests construct without one; a `span`-shaped borrow with no
-    // ownership, exactly as `shots` and `spectrum` are.
-    const fields::FieldBus* fieldBus = nullptr;
-};
 
 // ---- the geometry every sky kind shares ----------------------------------------------------------
 //
@@ -548,7 +466,7 @@ struct AtmosphericContext {
 // question -- did it activate, where is the head, how far has it flown -- is answerable here with
 // no GPU, which is what the tests ask.
 struct ResolvedAtmospheric {
-    const AtmosphericEffect* effect = nullptr;
+    const EffectInstance* effect = nullptr;
     glm::vec3 anchor{0.0f};
     float envelope = 0.0f;     // 0..1: delay, fade in, lifetime and fade out, multiplied together
     double elapsed = 0.0;      // seconds since this pass started, for the phase lanes
@@ -594,8 +512,8 @@ struct EffectFlow {
     float influence = 0.0f;
     [[nodiscard]] bool active() const { return influence != 0.0f; }
 };
-[[nodiscard]] EffectFlow resolveEffectFlow(const AtmosphericEffect& effect, const glm::vec3& anchor,
-                                           const AtmosphericContext& ctx);
+[[nodiscard]] EffectFlow resolveEffectFlow(const EffectInstance& effect, const glm::vec3& anchor,
+                                           const EffectContext& ctx);
 
 // The three numbers every kind derives from a flow. They are here, shared, rather than open-coded
 // in three packers, because "each effect has its own isolated wind handling" is the thing §68 is
@@ -705,7 +623,7 @@ inline constexpr std::size_t kMediumLanes = 16;
 // bug that makes this worth stating.
 struct MediumSlot {
     glm::vec4 lane[kMediumLanes]{};
-    std::uint32_t kind = 0; // AtmosphereKind, compared as a scalar
+    std::uint32_t kind = 0; // EffectKind, compared as a scalar
     std::uint32_t pad[3]{};
 };
 
@@ -765,7 +683,7 @@ struct MediumFlowInput {
 // check and the kind tag, in the one order that is correct. `buildAtmosphericFrame` calls it for
 // every seated medium; a test calls it to get exactly those bytes rather than a second copy of
 // the sequence (ADR-554).
-void packMediumSlot(const AtmosphericEffect& e, float envelope, MediumSlot& slot,
+void packMediumSlot(const EffectInstance& e, float envelope, MediumSlot& slot,
                     const MediumFlowInput& flow = {});
 
 // What one frame hands the renderer. A plain aggregate so nothing allocates and `scene::Scene` can
@@ -865,19 +783,26 @@ struct AtmosphericCounts {
 //
 // Defaulted, so every caller written before this compiles and behaves exactly as it did: an empty
 // span means the vortex is counted and not recorded, which is what used to happen.
-AtmosphericCounts resolveAtmosphericEffects(std::span<const AtmosphericEffect> effects,
-                                            const AtmosphericContext& context,
+AtmosphericCounts resolveAtmosphericEffects(std::span<const EffectInstance> effects,
+                                            const EffectContext& context,
                                             std::span<ResolvedAtmospheric> comets,
                                             std::span<ResolvedAtmospheric> auroras,
-                                            std::span<ResolvedAtmospheric> vortices = {});
+                                            std::span<ResolvedAtmospheric> vortices = {},
+                                            std::span<const std::uint32_t> order = {},
+                                            std::span<EffectStatus> status = {});
 
 // Packing, pure so a test can read every lane.
 [[nodiscard]] CometGpu packComet(const ResolvedAtmospheric& resolved);
 [[nodiscard]] AuroraGpu packAurora(const ResolvedAtmospheric& resolved, std::span<const float> spectrum);
 
 // Every step, into the frame block the renderer reads.
-void buildAtmosphericFrame(std::span<const AtmosphericEffect> effects, const AtmosphericContext& context,
-                           AtmosphericFrame& out);
+//
+// ADR-702: `effects` is the scene's ONE list, so instances of the surface-wave types are skipped here
+// (`resolveWaves` owns them). `order` and `status` are as `resolveWaves` documents them: the walk
+// order, and a per-instance report the Effects panel reads -- the reader `dropped` never had.
+void buildAtmosphericFrame(std::span<const EffectInstance> effects, const EffectContext& context,
+                           AtmosphericFrame& out, std::span<const std::uint32_t> order = {},
+                           std::span<EffectStatus> status = {});
 
 // Where a comet is at this instant, in world space. The shader computes the same curve from the
 // packed lanes; this is the CPU half, used for the ground track and by the tests that check a

@@ -13,7 +13,7 @@
 #include "assets/asset_registry.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
-#include "world/atmospheric_params.hpp"
+#include "world/effects/effect_params.hpp"
 #include "world/atmospherics.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -47,8 +47,8 @@ glm::vec3 skyDirection(float azimuthDegrees, float elevationDegrees) {
 // An ordinary crossing, of the shape a scene actually authors: a quarter-turn of azimuth, entering
 // high and leaving low, with no bow. Deliberately *not* a near-antipodal pair -- see the zenith case
 // below for why that is a different question.
-world::AtmosphericEffect plainComet(std::string name = "probe") {
-    world::AtmosphericEffect e = world::bioluminescentComet(std::move(name));
+world::EffectInstance plainComet(std::string name = "probe") {
+    world::EffectInstance e = world::bioluminescentComet(std::move(name));
     e.activation = world::Activation::Window;
     e.timing.windowStart = 0.0;
     e.timing.windowSeconds = 100.0;
@@ -79,10 +79,10 @@ world::AtmosphericContext contextAt(double seconds) {
 }
 
 // Resolve one effect and hand back the comet slot.
-std::optional<world::ResolvedAtmospheric> resolveComet(const world::AtmosphericEffect& e, double seconds) {
+std::optional<world::ResolvedAtmospheric> resolveComet(const world::EffectInstance& e, double seconds) {
     std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
     std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
-    const std::array<world::AtmosphericEffect, 1> set{e};
+    const std::array<world::EffectInstance, 1> set{e};
     const auto counts = world::resolveAtmosphericEffects(set, contextAt(seconds), comets, auroras);
     if (counts.comets == 0) {
         return std::nullopt;
@@ -93,17 +93,17 @@ std::optional<world::ResolvedAtmospheric> resolveComet(const world::AtmosphericE
 } // namespace
 
 TEST_CASE("an atmospheric effect round-trips through JSON", "[world][atmospherics][json]") {
-    world::AtmosphericEffect e = world::bioluminescentComet("Hero");
+    world::EffectInstance e = world::bioluminescentComet("Hero");
     e.comet.rainbow.enabled = true;
     e.comet.rainbow.scale = 2.25f;
     e.ground.mode = world::GroundGlow::Strong;
     e.ground.color = glm::vec3(0.2f, 0.7f, 0.9f);
     e.aurora.appearance.intensity = 4.5f; // the payload it is *not* using still round-trips
 
-    const auto back = world::AtmosphericEffect::fromJson(e.toJson());
+    const auto back = world::EffectInstance::fromJson(e.toJson());
     REQUIRE(back.has_value());
     CHECK(back->name == e.name);
-    CHECK(back->kind == world::AtmosphereKind::Comet);
+    CHECK(back->kind == world::EffectKind::Comet);
     CHECK(back->style == e.style);
     CHECK(back->comet.rainbow.enabled);
     CHECK_THAT(back->comet.rainbow.scale, WithinAbs(2.25f, 1e-5f));
@@ -118,11 +118,11 @@ TEST_CASE("an atmospheric effect round-trips through JSON", "[world][atmospheric
 TEST_CASE("an atmospheric effect keeps the defaults of everything the file omits",
           "[world][atmospherics][json]") {
     const nlohmann::json minimal = {{"name", "Sparse"}, {"kind", "aurora"}};
-    const auto e = world::AtmosphericEffect::fromJson(minimal);
+    const auto e = world::EffectInstance::fromJson(minimal);
     REQUIRE(e.has_value());
-    CHECK(e->kind == world::AtmosphereKind::Aurora);
+    CHECK(e->kind == world::EffectKind::Aurora);
     CHECK(e->enabled);
-    const world::AtmosphericEffect defaults;
+    const world::EffectInstance defaults;
     CHECK_THAT(e->aurora.shape.radius, WithinAbs(defaults.aurora.shape.radius, 1e-3f));
     CHECK_THAT(e->aurora.audio.bass, WithinAbs(defaults.aurora.audio.bass, 1e-5f));
     CHECK(e->ground.mode == world::GroundGlow::Off);
@@ -130,36 +130,36 @@ TEST_CASE("an atmospheric effect keeps the defaults of everything the file omits
 
 TEST_CASE("an invalid atmospheric effect is refused rather than clamped", "[world][atmospherics]") {
     SECTION("a name is half of a parameter path") {
-        world::AtmosphericEffect e = plainComet("bad/name");
+        world::EffectInstance e = plainComet("bad/name");
         CHECK_FALSE(e.validate().has_value());
     }
     SECTION("a comet that would not move") {
-        world::AtmosphericEffect e = plainComet();
+        world::EffectInstance e = plainComet();
         e.comet.path.endAzimuth = e.comet.path.startAzimuth;
         e.comet.path.endElevation = e.comet.path.startElevation;
         CHECK_FALSE(e.validate().has_value());
     }
     SECTION("an acceleration that would reverse the path") {
-        world::AtmosphericEffect e = plainComet();
+        world::EffectInstance e = plainComet();
         // Below -0.5 the reparameterisation stops being monotone: the comet would fly backwards
         // through the second half of its own crossing.
         e.comet.path.acceleration = -0.8f;
         CHECK_FALSE(e.validate().has_value());
     }
     SECTION("more curtains than the shader's loop bound") {
-        world::AtmosphericEffect e = world::glowmereAurora();
+        world::EffectInstance e = world::glowmereAurora();
         e.aurora.shape.curtainCount = 9.0f;
         CHECK_FALSE(e.validate().has_value());
     }
     SECTION("two effects may not share a name") {
-        const std::array<world::AtmosphericEffect, 2> both{plainComet("same"), plainComet("same")};
-        CHECK_FALSE(world::validateAtmosphericEffects(both).has_value());
+        const std::array<world::EffectInstance, 2> both{plainComet("same"), plainComet("same")};
+        CHECK_FALSE(world::validateEffects(both).has_value());
     }
 }
 
 TEST_CASE("a comet flies a great-circle arc, so its authored bearings mean what they say",
           "[world][atmospherics][trajectory]") {
-    const world::AtmosphericEffect e = plainComet();
+    const world::EffectInstance e = plainComet();
 
     const glm::vec3 d0 = skyDirection(30.0f, 30.0f);
     const glm::vec3 d1 = skyDirection(120.0f, 5.0f);
@@ -227,7 +227,7 @@ TEST_CASE("a comet flies a great-circle arc, so its authored bearings mean what 
         // apart in the same vertical plane have a great circle through the zenith, and the shortest
         // arc between them goes over the top. An author who wants a low crossing between opposite
         // horizons is asking for two comets, or for a shorter one.
-        world::AtmosphericEffect over = plainComet("over");
+        world::EffectInstance over = plainComet("over");
         over.comet.path.startAzimuth = 90.0f;
         over.comet.path.startElevation = 30.0f;
         over.comet.path.endAzimuth = 270.0f;
@@ -244,7 +244,7 @@ TEST_CASE("a comet flies a great-circle arc, so its authored bearings mean what 
 
 TEST_CASE("a comet's trajectory is a pure function of its parameters and the transport second",
           "[world][atmospherics][determinism]") {
-    const world::AtmosphericEffect e = plainComet();
+    const world::EffectInstance e = plainComet();
 
     // The same second, reached by two different routes. Nothing here integrates, so nothing here can
     // depend on how the clock got to 4.25 -- which is exactly what ADR-091 requires.
@@ -272,7 +272,7 @@ TEST_CASE("a comet's trajectory is a pure function of its parameters and the tra
     }
 
     SECTION("acceleration reparameterises without moving either end") {
-        world::AtmosphericEffect fast = e;
+        world::EffectInstance fast = e;
         fast.comet.path.acceleration = 3.0f;
         const auto slowEnd = resolveComet(e, 9.999);
         const auto fastEnd = resolveComet(fast, 9.999);
@@ -290,7 +290,7 @@ TEST_CASE("a comet's trajectory is a pure function of its parameters and the tra
 }
 
 TEST_CASE("activation and timing gate an atmospheric effect", "[world][atmospherics][timing]") {
-    world::AtmosphericEffect e = plainComet();
+    world::EffectInstance e = plainComet();
     e.timing.windowStart = 4.0;
     e.timing.windowSeconds = 6.0;
     e.timing.fadeIn = 1.0;
@@ -337,16 +337,16 @@ TEST_CASE("activation and timing gate an atmospheric effect", "[world][atmospher
 
 TEST_CASE("no more than the GPU limit of atmospheric effects is ever written",
           "[world][atmospherics][gpu]") {
-    std::vector<world::AtmosphericEffect> many;
+    std::vector<world::EffectInstance> many;
     for (std::size_t i = 0; i < world::kMaxGpuComets + 4; ++i) {
         many.push_back(plainComet("comet" + std::to_string(i)));
     }
     for (std::size_t i = 0; i < world::kMaxGpuAuroras + 3; ++i) {
-        world::AtmosphericEffect a = world::glowmereAurora("aurora" + std::to_string(i));
+        world::EffectInstance a = world::glowmereAurora("aurora" + std::to_string(i));
         a.timing.fadeIn = 0.0;
         many.push_back(a);
     }
-    REQUIRE(world::validateAtmosphericEffects(many).has_value());
+    REQUIRE(world::validateEffects(many).has_value());
 
     world::AtmosphericFrame frame;
     world::buildAtmosphericFrame(many, contextAt(2.0), frame);
@@ -357,7 +357,7 @@ TEST_CASE("no more than the GPU limit of atmospheric effects is ever written",
 
 TEST_CASE("packing puts every authored number in the lane the shader reads",
           "[world][atmospherics][gpu]") {
-    world::AtmosphericEffect e = plainComet();
+    world::EffectInstance e = plainComet();
     e.comet.appearance.coreColor = glm::vec3(0.25f, 0.5f, 0.75f);
     e.comet.appearance.coreIntensity = 8.0f;
     e.comet.appearance.headSize = 33.0f;
@@ -383,7 +383,7 @@ TEST_CASE("packing puts every authored number in the lane the shader reads",
     CHECK_THAT(g.rainbow.w, WithinAbs(0.0f, 0.0f));
 
     SECTION("a fade scales every radiance and nothing else") {
-        world::AtmosphericEffect fading = e;
+        world::EffectInstance fading = e;
         fading.timing.fadeIn = 4.0;
         const auto half = resolveComet(fading, 2.0); // halfway up a smoothstep: 0.5
         REQUIRE(half.has_value());
@@ -396,10 +396,10 @@ TEST_CASE("packing puts every authored number in the lane the shader reads",
 
 TEST_CASE("an aurora's spectrum reaches the packed record, and silence is neutral",
           "[world][atmospherics][gpu][audio]") {
-    const world::AtmosphericEffect e = world::glowmereAurora("sky");
+    const world::EffectInstance e = world::glowmereAurora("sky");
     std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
     std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
-    const std::array<world::AtmosphericEffect, 1> set{e};
+    const std::array<world::EffectInstance, 1> set{e};
 
     std::array<float, world::kAuroraBands> bands{};
     for (std::size_t i = 0; i < bands.size(); ++i) {
@@ -424,13 +424,13 @@ TEST_CASE("an aurora's spectrum reaches the packed record, and silence is neutra
 
 TEST_CASE("ground illumination sums the live effects and respects its three words",
           "[world][atmospherics][ground]") {
-    world::AtmosphericEffect aurora = world::glowmereAurora("sky");
+    world::EffectInstance aurora = world::glowmereAurora("sky");
     aurora.timing.fadeIn = 0.0;
     aurora.ground.mode = world::GroundGlow::Strong;
     aurora.ground.color = glm::vec3(0.0f, 1.0f, 0.0f);
     aurora.ground.intensity = 1.0f;
 
-    std::vector<world::AtmosphericEffect> set{aurora};
+    std::vector<world::EffectInstance> set{aurora};
     world::AtmosphericFrame frame;
     world::buildAtmosphericFrame(set, contextAt(5.0), frame);
     const float strong = frame.ground.ambient.g;
@@ -459,11 +459,11 @@ TEST_CASE("ground illumination sums the live effects and respects its three word
     }
 
     SECTION("a comet contributes a moving ground track") {
-        world::AtmosphericEffect comet = plainComet("low");
+        world::EffectInstance comet = plainComet("low");
         comet.ground.mode = world::GroundGlow::Strong;
         comet.ground.color = glm::vec3(1.0f, 0.0f, 0.0f);
         comet.ground.radius = 400.0f;
-        std::vector<world::AtmosphericEffect> two{comet};
+        std::vector<world::EffectInstance> two{comet};
         world::buildAtmosphericFrame(two, contextAt(2.0), frame);
         const glm::vec4 early = frame.ground.point;
         CHECK_THAT(early.w, WithinAbs(400.0f, 1e-3f));
@@ -476,7 +476,7 @@ TEST_CASE("ground illumination sums the live effects and respects its three word
 }
 
 TEST_CASE("a preset configures parameters and nothing else", "[world][atmospherics][presets]") {
-    world::AtmosphericEffect e = world::bioluminescentComet("Named");
+    world::EffectInstance e = world::bioluminescentComet("Named");
     e.activation = world::Activation::HeroFocus;
     e.timing.windowStart = 12.5;
     e.ground.mode = world::GroundGlow::Strong;
@@ -499,22 +499,22 @@ TEST_CASE("a preset configures parameters and nothing else", "[world][atmospheri
 
     SECTION("every shipped preset name applies and validates") {
         for (const std::string_view style : world::cometStyleNames()) {
-            world::AtmosphericEffect c = world::bioluminescentComet("c");
+            world::EffectInstance c = world::bioluminescentComet("c");
             CHECK(world::applyCometStyle(c, style));
             CHECK(c.validate().has_value());
-            CHECK(c.kind == world::AtmosphereKind::Comet);
+            CHECK(c.kind == world::EffectKind::Comet);
         }
         for (const std::string_view style : world::auroraStyleNames()) {
-            world::AtmosphericEffect a = world::glowmereAurora("a");
+            world::EffectInstance a = world::glowmereAurora("a");
             CHECK(world::applyAuroraStyle(a, style));
             CHECK(a.validate().has_value());
-            CHECK(a.kind == world::AtmosphereKind::Aurora);
+            CHECK(a.kind == world::EffectKind::Aurora);
         }
     }
 
     SECTION("the first two comet presets are visually distinct, as section 10 requires") {
-        world::AtmosphericEffect cyan = world::bioluminescentComet("a");
-        world::AtmosphericEffect rainbow = world::bioluminescentComet("b");
+        world::EffectInstance cyan = world::bioluminescentComet("a");
+        world::EffectInstance rainbow = world::bioluminescentComet("b");
         REQUIRE(world::applyCometStyle(cyan, "Bioluminescent Cyan"));
         REQUIRE(world::applyCometStyle(rainbow, "Rainbow Cosmic"));
         CHECK(cyan.comet.rainbow.enabled != rainbow.comet.rainbow.enabled);
@@ -522,7 +522,7 @@ TEST_CASE("a preset configures parameters and nothing else", "[world][atmospheri
     }
 
     SECTION("a name that is not a preset is refused rather than half-applied") {
-        world::AtmosphericEffect before = e;
+        world::EffectInstance before = e;
         CHECK_FALSE(world::applyCometStyle(e, "Not A Preset"));
         CHECK(e.style == before.style);
     }
@@ -531,9 +531,9 @@ TEST_CASE("a preset configures parameters and nothing else", "[world][atmospheri
 TEST_CASE("every meaningful atmospheric parameter is declared and modulatable",
           "[world][atmospherics][params]") {
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::bioluminescentComet("Comet"),
+    std::vector<world::EffectInstance> effects{world::bioluminescentComet("Comet"),
                                                   world::glowmereAurora("Sky")};
-    world::AtmosphericParameters registered = world::registerAtmosphericParameters(params, effects);
+    world::EffectParameters registered = world::registerEffectParameters(params, effects);
     REQUIRE(registered.effects.size() == 2);
 
     const auto require = [&](const char* path) {
@@ -580,16 +580,16 @@ TEST_CASE("every meaningful atmospheric parameter is declared and modulatable",
         core->setBaseComponent(0, 11.0f);
         core->setFinalComponent(0, 30.0f); // as a route would, this frame
 
-        world::applyAtmosphericParameters(registered, effects);
+        world::applyEffectParameters(registered, effects);
         CHECK_THAT(effects[0].comet.appearance.coreIntensity, WithinAbs(30.0f, 1e-4f));
 
         // ...and a save takes the base, because the finals carry this frame's beat on them.
-        world::captureAtmosphericParameters(registered, effects);
+        world::captureEffectParameters(registered, effects);
         CHECK_THAT(effects[0].comet.appearance.coreIntensity, WithinAbs(11.0f, 1e-4f));
     }
 
     SECTION("unregistering is exact") {
-        world::unregisterAtmosphericParameters(params, registered);
+        world::unregisterEffectParameters(params, registered);
         CHECK(params.find("atmos/Comet/coreIntensity") == nullptr);
         CHECK(params.find("atmos/Sky/intensity") == nullptr);
         CHECK(registered.effects.empty());
@@ -599,13 +599,13 @@ TEST_CASE("every meaningful atmospheric parameter is declared and modulatable",
 TEST_CASE("the default routes name real parameters and leave silence alone",
           "[world][atmospherics][params][audio]") {
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::glowmereAurora("Sky"),
+    std::vector<world::EffectInstance> effects{world::glowmereAurora("Sky"),
                                                   world::bioluminescentComet("Comet")};
-    world::registerAtmosphericParameters(params, effects);
+    world::registerEffectParameters(params, effects);
 
-    for (const auto kind : {world::AtmosphereKind::Aurora, world::AtmosphereKind::Comet}) {
-        const char* name = kind == world::AtmosphereKind::Aurora ? "Sky" : "Comet";
-        const auto routes = world::defaultAtmosphericRoutes(name, kind);
+    for (const auto kind : {world::EffectKind::Aurora, world::EffectKind::Comet}) {
+        const char* name = kind == world::EffectKind::Aurora ? "Sky" : "Comet";
+        const auto routes = world::defaultEffectRoutes(name, kind);
         CHECK_FALSE(routes.empty());
         for (const params::ModRoute& r : routes) {
             INFO(r.target);
@@ -641,7 +641,7 @@ TEST_CASE("atmospheric effects round-trip through a scene file",
         REQUIRE(comp);
         REQUIRE((*comp)->atmosphericEffects().size() == 2);
         CHECK((*comp)->atmosphericEffects()[0].name == "Comet");
-        CHECK((*comp)->atmosphericEffects()[1].kind == world::AtmosphereKind::Aurora);
+        CHECK((*comp)->atmosphericEffects()[1].kind == world::EffectKind::Aurora);
         const nlohmann::json written = (*comp)->toJson();
         REQUIRE(written.contains("atmosphericEffects"));
         CHECK(written["atmosphericEffects"] == doc["atmosphericEffects"]);
@@ -688,10 +688,10 @@ TEST_CASE("the shipped Glowmere Atmospherics scene declares what the demonstrati
     bool sparkle = false;
     bool ground = false;
     for (const nlohmann::json& j : doc.at("atmosphericEffects")) {
-        const auto e = world::AtmosphericEffect::fromJson(j);
+        const auto e = world::EffectInstance::fromJson(j);
         INFO(j.value("name", "?"));
         REQUIRE(e.has_value());
-        if (e->kind == world::AtmosphereKind::Comet) {
+        if (e->kind == world::EffectKind::Comet) {
             ++comets;
             rainbow = rainbow || e->comet.rainbow.enabled;
             sparkle = sparkle || e->comet.sparkle.enabled;
@@ -718,7 +718,7 @@ TEST_CASE("the shipped Glowmere Atmospherics scene declares what the demonstrati
 //
 // This is ADR-182's rule applied to a dispatch: a probe over the three kinds that exist proves
 // nothing about the fourth, because all three are named in the chain. The only probe that can fail
-// is one carrying a kind the chain does *not* name. `AtmosphereKind` has a fixed underlying type
+// is one carrying a kind the chain does *not* name. `EffectKind` has a fixed underlying type
 // (`std::uint8_t`), so a value no enumerator names is a well-defined value of the type rather than
 // undefined behaviour, and it is exactly the shape a forgotten `case` produces at runtime.
 //
@@ -727,22 +727,22 @@ TEST_CASE("the shipped Glowmere Atmospherics scene declares what the demonstrati
 // the resolve's vortex arm is compared against the vortex counter and agrees with itself.
 TEST_CASE("a kind the resolve dispatch does not name resolves as nothing, not as a vortex",
           "[world][atmospherics][dispatch]") {
-    auto resolveOne = [](world::AtmosphereKind kind) {
-        world::AtmosphericEffect e = world::cosmicVortex("probe");
+    auto resolveOne = [](world::EffectKind kind) {
+        world::EffectInstance e = world::cosmicVortex("probe");
         e.kind = kind;
         e.enabled = true;
         e.activation = world::Activation::Always;
         e.timing = world::Timing{};
         e.timing.fadeIn = 0.0;
         e.timing.fadeOut = 0.0;
-        const std::array<world::AtmosphericEffect, 1> set{e};
+        const std::array<world::EffectInstance, 1> set{e};
         std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
         std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
         return world::resolveAtmosphericEffects(set, contextAt(0.5), comets, auroras);
     };
 
     SECTION("the control: a real vortex still resolves as one vortex") {
-        const auto counts = resolveOne(world::AtmosphereKind::Vortex);
+        const auto counts = resolveOne(world::EffectKind::Vortex);
         CHECK(counts.vortices == 1);
         CHECK(counts.comets == 0);
         CHECK(counts.auroras == 0);
@@ -750,7 +750,7 @@ TEST_CASE("a kind the resolve dispatch does not name resolves as nothing, not as
     }
 
     SECTION("a kind no arm claims is not silently attributed to another kind") {
-        const auto counts = resolveOne(static_cast<world::AtmosphereKind>(0xF0));
+        const auto counts = resolveOne(static_cast<world::EffectKind>(0xF0));
         INFO("an unnamed kind resolved as " << counts.comets << " comet(s), " << counts.auroras
                                             << " aurora(s), " << counts.vortices << " vortex/vortices");
         CHECK(counts.vortices == 0);

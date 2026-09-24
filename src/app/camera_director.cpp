@@ -976,7 +976,7 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
     // ADR-207: the cut, flattened for world effects to time-gate against. Installed with the keys
     // rather than derived per frame, for the same reason the keys exist at all -- a shot schedule is
     // a fold over a whole track and the frame you are on cannot know it. Nothing here runs per
-    // frame; `resolveWorldEffects` does a linear scan of single digits of spans.
+    // frame; `resolveWaves` does a linear scan of single digits of spans.
     {
         std::vector<world::ShotSpan> spans = sequence.shotSpans();
         // At debug level, because "why is my world effect not firing" is otherwise unanswerable

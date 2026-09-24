@@ -44,7 +44,7 @@
 // the panel does not draw them, registration does not produce them, and a route cannot aim at them.
 
 #include "core/vortex.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -56,9 +56,9 @@
 namespace avgen::world {
 namespace {
 
-using E = AtmosphericEffect;
+using E = EffectInstance;
 
-float storedOf(const AtmosphericEffect& e, const char* leaf, float fallback) {
+float storedOf(const EffectInstance& e, const char* leaf, float fallback) {
     std::string key = "fog/";
     key.append(leaf);
     return e.values.getFloat(key, fallback);
@@ -132,7 +132,7 @@ constexpr EffectField kFields[] = {
     // all noise and detail at zero the system must still produce clean, coherent fog" is a claim an
     // artist has to be able to CHECK, and until this row existed they could not -- the vortex
     // declared `cloudNoise` and the fog bank did not, so every diagnostic arm in ADR-560 had to be
-    // hand-authored into JSON, where it round-trips only because `AtmosphericEffect::toJson` walks
+    // hand-authored into JSON, where it round-trips only because `EffectInstance::toJson` walks
     // every registered kind's rows and not just this one's.
     //
     // The JSON path is the vortex's own, so the two rows write one key and cannot disagree -- the
@@ -325,7 +325,7 @@ constexpr std::array<std::string_view, 10> kStyleNames{
 //
 // `center` is deliberately not written: where the bank is in the world is a placement decision the
 // scene made, and a preset that moved it would silently unanchor it (ADR-387's rule for vortices).
-void applyStyle(AtmosphericEffect& e, std::string_view style) {
+void applyStyle(EffectInstance& e, std::string_view style) {
     Vortex& v = e.vortex;
     const glm::vec3 keep = v.field.center;
     v = Vortex{};
@@ -336,11 +336,11 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
     // applied to an effect that was a vortex a moment ago must not leave a spiral and a throat
     // behind". That argument is right and `v = Vortex{}` only covers the struct. Since ADR-566 a
     // bank's shape, its drift, its density curve and its glow height live in
-    // `AtmosphericEffect::values`, and a preset applied after an artist set Shape to Box got a box.
+    // `EffectInstance::values`, and a preset applied after an artist set Shape to Box got a box.
     //
     // Reset from the SCHEMA's declared defaults rather than from a list here, so a row added
     // tomorrow is reset without anybody remembering to add it -- which is the failure this is.
-    if (const EffectSchema* schema = effectSchema(AtmosphereKind::VolumetricFog)) {
+    if (const EffectSchema* schema = effectSchema(EffectKind::VolumetricFog)) {
         for (const EffectField& f : schema->fields) {
             if (!f.stored) {
                 continue;
@@ -500,7 +500,7 @@ void applyStyle(AtmosphericEffect& e, std::string_view style) {
         v.colorDeep = {0.020f, 0.022f, 0.024f}; v.colorMid = {0.070f, 0.074f, 0.078f};
         v.colorAccent = {0.130f, 0.136f, 0.142f};
     }
-    e.kind = AtmosphereKind::VolumetricFog;
+    e.kind = EffectKind::VolumetricFog;
     e.style = std::string(style);
 }
 
@@ -537,10 +537,10 @@ constexpr EffectRoute kRoutes[] = {
     {"beat.pulse", "selfGlow", 0.020f, 12.0f, 300.0f},
 };
 
-AtmosphericEffect make(std::string name) {
-    AtmosphericEffect e;
+EffectInstance make(std::string name) {
+    EffectInstance e;
     e.name = std::move(name);
-    e.kind = AtmosphereKind::VolumetricFog;
+    e.kind = EffectKind::VolumetricFog;
     applyStyle(e, kStyleNames[0]);
     // Weather, not an event: it is there, and the music moves it.
     e.activation = Activation::Always;
@@ -569,7 +569,7 @@ AtmosphericEffect make(std::string name) {
 // A bank has no per-frame trajectory: it is a static field the march samples. Its anchor is its own
 // centre, so "what is the air doing where this bank stands" is asked at the bank -- which is what
 // lets a fog bank and a comet subscribe to one wind and agree without anybody matching two numbers.
-bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx,
+bool fill(const EffectInstance& e, std::size_t, const EffectContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
     r.anchor = e.vortex.field.center;
@@ -579,7 +579,7 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
     return true;
 }
 
-Result<void> validate(const AtmosphericEffect& e) { return e.vortex.validate(); }
+Result<void> validate(const EffectInstance& e) { return e.vortex.validate(); }
 
 // ADR-562: the authored numbers as the sixteen lanes the march reads.
 //
@@ -738,7 +738,7 @@ void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumS
 
 EffectSchema buildSchema() {
     EffectSchema s;
-    s.kind = AtmosphereKind::VolumetricFog;
+    s.kind = EffectKind::VolumetricFog;
     s.key = "fog";
     s.enumName = "VolumetricFog";
     s.displayName = "Volumetric Fog";
@@ -754,6 +754,10 @@ EffectSchema buildSchema() {
     s.groundGlow = false;
     s.factory = make;
     s.resolve.bucket = EffectBucket::Medium;
+    // ADR-702: attached to the World; evaluated at its bucket's stage.
+    s.targets = targetBit(EffectTarget::World);
+    s.category = EffectCategory::Atmosphere;
+    s.stage = RenderStage::Volumetric;
     s.resolve.pack = packMedium;
     s.resolve.fill = fill;
     s.validate = validate;

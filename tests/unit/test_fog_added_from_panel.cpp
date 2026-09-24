@@ -16,7 +16,7 @@
 
 #include "core/vortex.hpp"
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -26,15 +26,15 @@ using namespace avgen;
 
 namespace {
 
-// Exactly the call the Add button makes: `append(makeAtmosphericEffect(schema->kind, ...))`.
-world::AtmosphericEffect addedFromPanel() {
-    const world::EffectSchema* s = world::effectSchema(world::AtmosphereKind::VolumetricFog);
+// Exactly the call the Add button makes: `append(makeEffect(schema->kind, ...))`.
+world::EffectInstance addedFromPanel() {
+    const world::EffectSchema* s = world::effectSchema(world::EffectKind::VolumetricFog);
     REQUIRE(s != nullptr);
     REQUIRE(s->factory != nullptr); // no factory means no button at all
     return s->factory("Fog Bank");
 }
 
-world::AtmosphericFrame frameAt(const world::AtmosphericEffect& e, double seconds) {
+world::AtmosphericFrame frameAt(const world::EffectInstance& e, double seconds) {
     world::AtmosphericContext ctx;
     ctx.seconds = seconds;
     world::AtmosphericFrame f{};
@@ -45,7 +45,7 @@ world::AtmosphericFrame frameAt(const world::AtmosphericEffect& e, double second
 } // namespace
 
 TEST_CASE("a fog bank added from the panel is visible without touching anything", "[fog][panel]") {
-    const world::AtmosphericEffect e = addedFromPanel();
+    const world::EffectInstance e = addedFromPanel();
 
     // 1. The effect itself is live. An effect added switched off is a button that does nothing.
     CHECK(e.enabled);
@@ -78,7 +78,7 @@ TEST_CASE("a fog bank is visible at the moment it is added, not three seconds la
     // (`atmospherics.cpp:736`). The density at the end of the fade was always fine -- 1.14e-04 per
     // metre across a 1800 m bank is an optical depth around 0.4, a haze you can plainly see. The
     // defect was a three-second hole at frame 0, which is where a scene opens.
-    const world::AtmosphericEffect e = addedFromPanel();
+    const world::EffectInstance e = addedFromPanel();
 
     const world::AtmosphericFrame at0 = frameAt(e, 0.0);
     const world::AtmosphericFrame at3 = frameAt(e, 3.0);

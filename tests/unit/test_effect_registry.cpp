@@ -10,8 +10,8 @@
 // than by asserting that the well-formed thing is well formed.
 
 #include "params/parameter_set.hpp"
-#include "world/atmospheric_params.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_params.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
@@ -30,7 +30,7 @@ using namespace avgen;
 
 namespace {
 
-const world::EffectSchema& schemaFor(world::AtmosphereKind kind) {
+const world::EffectSchema& schemaFor(world::EffectKind kind) {
     const world::EffectSchema* s = world::effectSchema(kind);
     REQUIRE(s != nullptr);
     return *s;
@@ -50,9 +50,9 @@ TEST_CASE("the registry declares every kind completely", "[world][atmospherics][
     // ...and it is not empty, which is the failure a static self-registering constructor would have
     // produced in a release build and not in a debug one. `builtinSchemas()` is an explicit list
     // for exactly this reason.
-    CHECK(world::effectSchemas().size() == world::kAtmosphereKinds.size());
-    for (const world::AtmosphereKind kind : world::kAtmosphereKinds) {
-        INFO("kind index " << world::atmosphereKindIndex(kind));
+    CHECK(world::effectSchemas().size() == world::kEffectKinds.size());
+    for (const world::EffectKind kind : world::kEffectKinds) {
+        INFO("kind index " << world::effectKindIndex(kind));
         CHECK(world::effectSchema(kind) != nullptr);
     }
 }
@@ -62,19 +62,19 @@ TEST_CASE("a kind's serialised name round-trips and is its own", "[world][atmosp
     for (const world::EffectSchema* s : world::effectSchemas()) {
         INFO(s->key);
         CHECK(keys.insert(s->key).second);
-        const auto back = world::atmosphereKindFromName(s->key);
+        const auto back = world::effectKindFromName(s->key);
         REQUIRE(back.has_value());
         CHECK(*back == s->kind);
-        CHECK(std::string_view(world::atmosphereKindName(s->kind)) == s->key);
+        CHECK(std::string_view(world::effectKindName(s->kind)) == s->key);
     }
 
     SECTION("a name no kind uses is refused rather than defaulted") {
         // The property that stops a file loading as a neighbour. ADR-392 found the resolve doing
         // exactly that -- an unnamed kind fell into the vortex arm -- and a lenient reader here
         // would put the same defect in the file format.
-        CHECK_FALSE(world::atmosphereKindFromName("nosuchkind").has_value());
-        CHECK_FALSE(world::atmosphereKindFromName("").has_value());
-        CHECK_FALSE(world::atmosphereKindFromName("Comet").has_value()); // case matters in a file
+        CHECK_FALSE(world::effectKindFromName("nosuchkind").has_value());
+        CHECK_FALSE(world::effectKindFromName("").has_value());
+        CHECK_FALSE(world::effectKindFromName("Comet").has_value()); // case matters in a file
     }
 }
 
@@ -106,22 +106,22 @@ TEST_CASE("every row is complete, and an incomplete one is reported by name",
 
         world::EffectField wrongType;
         wrongType.type = world::FieldType::Color;
-        wrongType.getFloat = +[](const world::AtmosphericEffect&) { return 0.0f; };
-        wrongType.setFloat = +[](world::AtmosphericEffect&, float) {};
+        wrongType.getFloat = +[](const world::EffectInstance&) { return 0.0f; };
+        wrongType.setFloat = +[](world::EffectInstance&, float) {};
         CHECK_FALSE(wrongType.hasAccessors()); // float accessors on a colour row
     }
 }
 
 TEST_CASE("a registered path exists for every row, and for no row that is not there",
           "[world][atmospherics][registry][params]") {
-    for (const world::AtmosphereKind kind : world::kAtmosphereKinds) {
+    for (const world::EffectKind kind : world::kEffectKinds) {
         const world::EffectSchema& s = schemaFor(kind);
         REQUIRE(s.factory != nullptr);
-        const world::AtmosphericEffect probe = s.factory("registry probe");
+        const world::EffectInstance probe = s.factory("registry probe");
         params::ParameterSet set;
-        const world::AtmosphericParameters registered =
-            world::registerAtmosphericParameters(set, std::span(&probe, 1));
-        const std::string prefix = world::atmosphericParameterPrefix(probe.name);
+        const world::EffectParameters registered =
+            world::registerEffectParameters(set, std::span(&probe, 1));
+        const std::string prefix = world::effectParameterPrefix(probe.name);
 
         // Every declared row produced a parameter...
         for (const world::EffectField& f : s.fields) {
@@ -138,7 +138,7 @@ TEST_CASE("a registered path exists for every row, and for no row that is not th
         CHECK(registered.effects.front().values.size() ==
               s.fields.size() + world::sharedEffectFields().size());
 
-        INFO("kind: " << world::atmosphereKindName(kind));
+        INFO("kind: " << world::effectKindName(kind));
         CHECK(set.find(prefix + "noSuchLeaf") == nullptr);
     }
 }
@@ -150,9 +150,9 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
     // reader leaves the struct's default in place and the writer omits it again. Setting a distinct
     // value through the row and reading it back through the row asks the only question worth
     // asking -- did this number survive?
-    for (const world::AtmosphereKind kind : world::kAtmosphereKinds) {
+    for (const world::EffectKind kind : world::kEffectKinds) {
         const world::EffectSchema& s = schemaFor(kind);
-        world::AtmosphericEffect e = s.factory("round trip");
+        world::EffectInstance e = s.factory("round trip");
 
         // A distinct value per row, varied by index so a serialiser that swapped two fields is
         // caught rather than agreeing with itself.
@@ -183,8 +183,8 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
         }
 
         const nlohmann::json doc = e.toJson();
-        const auto back = world::AtmosphericEffect::fromJson(doc);
-        INFO("kind: " << world::atmosphereKindName(kind));
+        const auto back = world::EffectInstance::fromJson(doc);
+        INFO("kind: " << world::effectKindName(kind));
         REQUIRE(back.has_value());
         CHECK(back->kind == kind);
 
@@ -215,13 +215,13 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
         // ADR-182 again, and the thing the document comparison cannot see: a key deleted from the
         // saved file comes back as the factory's value, and this check names it. Deleting the key
         // here is the same event as a row being dropped from the serialiser.
-        const world::EffectSchema& s = schemaFor(world::AtmosphereKind::Vortex);
-        world::AtmosphericEffect e = s.factory("deleted key");
+        const world::EffectSchema& s = schemaFor(world::EffectKind::Vortex);
+        world::EffectInstance e = s.factory("deleted key");
         e.vortex.filaments = 3.5f;
         nlohmann::json doc = e.toJson();
         REQUIRE(doc["vortex"].contains("filaments"));
         doc["vortex"].erase("filaments");
-        const auto back = world::AtmosphericEffect::fromJson(doc);
+        const auto back = world::EffectInstance::fromJson(doc);
         REQUIRE(back.has_value());
         CHECK(back->vortex.filaments != 3.5f);
     }
@@ -230,11 +230,11 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
 TEST_CASE("a kind whose numbers live in the store keeps them apart from its neighbours",
           "[world][atmospherics][registry]") {
     // The property that lets a kind be declared in its own file at all: it has no struct on the
-    // shared header, so its numbers are keyed by `<kind>/<leaf>` in `AtmosphericEffect::values`.
+    // shared header, so its numbers are keyed by `<kind>/<leaf>` in `EffectInstance::values`.
     // Two kinds' `density` must not be one number, and an effect that changes kind must keep what
-    // the kind it left was holding -- which is why `AtmosphericEffect` is not a variant.
-    const world::EffectSchema& shower = schemaFor(world::AtmosphereKind::MeteorShower);
-    world::AtmosphericEffect e = shower.factory("store");
+    // the kind it left was holding -- which is why `EffectInstance` is not a variant.
+    const world::EffectSchema& shower = schemaFor(world::EffectKind::MeteorShower);
+    world::EffectInstance e = shower.factory("store");
 
     const world::EffectField* meteors = nullptr;
     for (const world::EffectField& f : shower.fields) {
@@ -253,16 +253,16 @@ TEST_CASE("a kind whose numbers live in the store keeps them apart from its neig
         const nlohmann::json doc = e.toJson();
         REQUIRE(doc.contains("meteors"));
         CHECK(doc["meteors"]["meteors"].get<float>() == 4.0f);
-        const auto back = world::AtmosphericEffect::fromJson(doc);
+        const auto back = world::EffectInstance::fromJson(doc);
         REQUIRE(back.has_value());
         CHECK(world::fieldFloat(*meteors, shower, *back) == 4.0f);
     }
 
     SECTION("changing kind does not throw the other kind's settings away") {
         e.comet.appearance.coreIntensity = 33.0f;
-        world::applyEffectStyle(e, world::AtmosphereKind::Aurora, world::effectStyleNames(
-                                                                      world::AtmosphereKind::Aurora)[0]);
-        CHECK(e.kind == world::AtmosphereKind::Aurora);
+        world::applyEffectStyle(e, world::EffectKind::Aurora, world::effectStyleNames(
+                                                                      world::EffectKind::Aurora)[0]);
+        CHECK(e.kind == world::EffectKind::Aurora);
         CHECK(e.values.getFloat("meteors/meteors", -1.0f) == 4.0f);
     }
 }
@@ -273,8 +273,8 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
     // are different claims. ADR-387's defect was a kind that was declared everywhere and resolved
     // as a neighbour.
     SECTION("the shower puts one record per meteor in the comet bucket") {
-        world::AtmosphericEffect e =
-            world::makeAtmosphericEffect(world::AtmosphereKind::MeteorShower, "shower");
+        world::EffectInstance e =
+            world::makeEffect(world::EffectKind::MeteorShower, "shower");
         e.activation = world::Activation::Always;
         e.timing = world::Timing{};
         e.values.setFloat("meteors/meteors", 4.0f);
@@ -308,8 +308,8 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
         // ADR-375: a control that does nothing teaches an artist the system is broken. This is the
         // half of that rule a test can check.
         for (const float n : {1.0f, 3.0f, 6.0f}) {
-            world::AtmosphericEffect e =
-                world::makeAtmosphericEffect(world::AtmosphereKind::MeteorShower, "shower");
+            world::EffectInstance e =
+                world::makeEffect(world::EffectKind::MeteorShower, "shower");
             e.activation = world::Activation::Always;
             e.timing = world::Timing{};
             e.values.setFloat("meteors/meteors", n);
@@ -328,8 +328,8 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
     SECTION("a shower is a pure function of the transport second") {
         // ADR-360's contract: two resolves of the same range may not differ from each other. The
         // arrangement is a hash of (seed, index), never a stream, for exactly this reason.
-        world::AtmosphericEffect e =
-            world::makeAtmosphericEffect(world::AtmosphereKind::MeteorShower, "shower");
+        world::EffectInstance e =
+            world::makeEffect(world::EffectKind::MeteorShower, "shower");
         e.activation = world::Activation::Always;
         e.timing = world::Timing{};
         const auto resolveAt = [&](double t) {
@@ -349,8 +349,8 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
     }
 
     SECTION("a fog bank takes the volumetric march's one medium slot") {
-        world::AtmosphericEffect fog =
-            world::makeAtmosphericEffect(world::AtmosphereKind::VolumetricFog, "bank");
+        world::EffectInstance fog =
+            world::makeEffect(world::EffectKind::VolumetricFog, "bank");
         fog.activation = world::Activation::Always;
         fog.timing = world::Timing{};
         world::AtmosphericContext ctx;
@@ -380,10 +380,10 @@ TEST_CASE("a meteor shower resolves as several streaks and a fog bank as one med
         // That is worth more than the assertion it replaces: **a test can hold a defect in place by
         // asserting it, and the name can describe the behaviour somebody intended rather than the
         // behaviour that exists.** Read a test's name as a claim to be checked, not as documentation.
-        std::array<world::AtmosphericEffect, 2> both{
-            world::makeAtmosphericEffect(world::AtmosphereKind::Vortex, "funnel"),
-            world::makeAtmosphericEffect(world::AtmosphereKind::VolumetricFog, "bank")};
-        for (world::AtmosphericEffect& e : both) {
+        std::array<world::EffectInstance, 2> both{
+            world::makeEffect(world::EffectKind::Vortex, "funnel"),
+            world::makeEffect(world::EffectKind::VolumetricFog, "bank")};
+        for (world::EffectInstance& e : both) {
             e.activation = world::Activation::Always;
             e.timing = world::Timing{};
         }
@@ -420,12 +420,12 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
     // It matters because `toJson` writes EVERY kind's block. A kind whose rows are all absolute
     // (they alias another kind's struct) writes an empty object, and a kind with stored rows writes
     // its defaults -- neither of which changes what any existing kind loads as.
-    for (const world::AtmosphereKind kind : {world::AtmosphereKind::Comet,
-                                             world::AtmosphereKind::Aurora,
-                                             world::AtmosphereKind::Vortex}) {
-        const world::AtmosphericEffect e = world::makeAtmosphericEffect(kind, "unchanged");
+    for (const world::EffectKind kind : {world::EffectKind::Comet,
+                                             world::EffectKind::Aurora,
+                                             world::EffectKind::Vortex}) {
+        const world::EffectInstance e = world::makeEffect(kind, "unchanged");
         const nlohmann::json doc = e.toJson();
-        const auto back = world::AtmosphericEffect::fromJson(doc);
+        const auto back = world::EffectInstance::fromJson(doc);
         INFO(doc.dump().substr(0, 400));
         REQUIRE(back.has_value());
         CHECK(back->kind == kind);
@@ -484,9 +484,9 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
         {"meteors", {{"meteors", 6.0}, {"spread", 52.0}, {"stagger", 0.35},
                      {"sizeVariation", 0.5}, {"radiantDrift", 8.0}, {"seed", 3.0}}}};
 
-    const auto loaded = world::AtmosphericEffect::fromJson(doc);
+    const auto loaded = world::EffectInstance::fromJson(doc);
     REQUIRE(loaded.has_value());
-    CHECK(loaded->kind == world::AtmosphereKind::MeteorShower);
+    CHECK(loaded->kind == world::EffectKind::MeteorShower);
     CHECK(loaded->values.getFloat("meteors/meteors", -1.0f) == 6.0f);
     CHECK(loaded->values.getFloat("meteors/stagger", -1.0f) == 0.35f);
 
@@ -494,7 +494,7 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
     ctx.seconds = 0.6;
     std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
     std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
-    world::AtmosphericEffect live = *loaded;
+    world::EffectInstance live = *loaded;
     const world::AtmosphericCounts counts =
         world::resolveAtmosphericEffects(std::span(&live, 1), ctx, comets, auroras);
     INFO("comets " << counts.comets << " dropped " << counts.dropped);
@@ -525,12 +525,12 @@ TEST_CASE("a shower authored in a file, with no comet block, still flies",
                       {"acceleration", 0.3}, {"curvature", 0.0}, {"arcLift", 180.0}}},
             {"appearance", {{"coreIntensity", 40.0}, {"headSize", 22.0}, {"tailLength", 1400.0},
                             {"tailWidth", 40.0}, {"tailIntensity", 16.0}}}};
-        const auto e2 = world::AtmosphericEffect::fromJson(later);
+        const auto e2 = world::EffectInstance::fromJson(later);
         REQUIRE(e2.has_value());
         CHECK(e2->comet.path.travelSeconds == 2.2f);
         CHECK(e2->comet.appearance.coreIntensity == 40.0f);
 
-        world::AtmosphericEffect live2 = *e2;
+        world::EffectInstance live2 = *e2;
         world::AtmosphericContext ctx2;
         ctx2.seconds = 6.8;
         world::AtmosphericFrame f2{};
@@ -609,14 +609,14 @@ TEST_CASE("no row is drawn under a section header the panel never emitted",
 TEST_CASE("a kind keeps the leaves its authored scenes and panels already name",
           "[world][atmospherics][registry]") {
     struct Expect {
-        world::AtmosphereKind kind;
+        world::EffectKind kind;
         std::vector<std::string> leaves;
     };
     const std::vector<Expect> promised{
         // ADR-461, Vortex 2.0 §7-§11: the eye, the bands, and the noise weight that §5's
         // diagnostic render turns off. `innerVoid` is the eye's radius and there is deliberately
         // no second `eyeRadius` beside it.
-        {world::AtmosphereKind::Vortex,
+        {world::EffectKind::Vortex,
          {"innerVoid", "eyeWallWidth", "eyeWallGain", "bandArms", "bandPitchDegrees", "bandDepth",
           "bandHarmonic", "cloudNoise", "smokeWarp", "smokeBillow", "detail"}},
     };
@@ -628,7 +628,7 @@ TEST_CASE("a kind keeps the leaves its authored scenes and panels already name",
             have.insert(std::string(f.leaf));
         }
         for (const std::string& leaf : want.leaves) {
-            INFO(std::string(world::atmosphereKindName(want.kind)) + " must declare '" + leaf + "'");
+            INFO(std::string(world::effectKindName(want.kind)) + " must declare '" + leaf + "'");
             CHECK(have.count(leaf) == 1);
         }
 
@@ -653,7 +653,7 @@ TEST_CASE("no panel page draws the same section heading twice", "[world][registr
     //
     // The check is per KIND and per PAGE, because a name reused across pages is correct -- each
     // page draws its own copy and an artist sees one of them.
-    for (const world::AtmosphereKind kind : world::kAtmosphereKinds) {
+    for (const world::EffectKind kind : world::kEffectKinds) {
         const world::EffectSchema* s = world::effectSchema(kind);
         if (s == nullptr) {
             continue;
@@ -666,7 +666,7 @@ TEST_CASE("no panel page draws the same section heading twice", "[world][registr
                     continue;
                 }
                 const std::string name = f.section;
-                INFO("kind " << world::atmosphereKindName(kind) << ", page "
+                INFO("kind " << world::effectKindName(kind) << ", page "
                      << static_cast<int>(page) << ", section '" << name << "' at row '" << f.leaf
                      << "'");
                 CHECK(std::find(seen.begin(), seen.end(), name) == seen.end());

@@ -16,9 +16,9 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "ui/editor_layout.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 #include "ui/world_effects_panel.hpp"
-#include "world/atmospheric_params.hpp"
+#include "world/effects/effect_params.hpp"
 #include "world/atmospherics.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -113,9 +113,9 @@ std::filesystem::path writeScene(const char* file, bool legacy) {
     return path;
 }
 
-const world::AtmosphericEffect* firstVortex(const std::vector<world::AtmosphericEffect>& effects) {
-    for (const world::AtmosphericEffect& e : effects) {
-        if (e.kind == world::AtmosphereKind::Vortex) {
+const world::EffectInstance* firstVortex(const std::vector<world::EffectInstance>& effects) {
+    for (const world::EffectInstance& e : effects) {
+        if (e.kind == world::EffectKind::Vortex) {
             return &e;
         }
     }
@@ -125,13 +125,13 @@ const world::AtmosphericEffect* firstVortex(const std::vector<world::Atmospheric
 } // namespace
 
 TEST_CASE("a vortex round-trips through JSON as an atmospheric effect", "[vortex][atmospherics]") {
-    world::AtmosphericEffect e = world::cosmicVortex("Funnel");
+    world::EffectInstance e = world::cosmicVortex("Funnel");
     e.vortex.field.center = {3.0f, -70.0f, -8.0f};
     e.vortex.spill = 4.25f;
 
-    const auto back = world::AtmosphericEffect::fromJson(e.toJson());
+    const auto back = world::EffectInstance::fromJson(e.toJson());
     REQUIRE(back.has_value());
-    CHECK(back->kind == world::AtmosphereKind::Vortex);
+    CHECK(back->kind == world::EffectKind::Vortex);
     CHECK(back->name == "Funnel");
     CHECK(back->vortex.field.center.z == Approx(-8.0f));
     CHECK(back->vortex.spill == Approx(4.25f));
@@ -140,9 +140,9 @@ TEST_CASE("a vortex round-trips through JSON as an atmospheric effect", "[vortex
 
     // THE CONTROL: an effect of another kind does not come back as a vortex, and a comet's payload
     // is not quietly overwritten by the vortex default that now sits beside it.
-    const auto comet = world::AtmosphericEffect::fromJson(world::bioluminescentComet("C").toJson());
+    const auto comet = world::EffectInstance::fromJson(world::bioluminescentComet("C").toJson());
     REQUIRE(comet.has_value());
-    CHECK(comet->kind == world::AtmosphereKind::Comet);
+    CHECK(comet->kind == world::EffectKind::Comet);
     CHECK_FALSE(comet->vortex.active());
     CHECK(comet->comet.appearance.coreIntensity > 0.0f);
 }
@@ -157,7 +157,7 @@ TEST_CASE("a scene authoring a vortex effect reaches the frame", "[vortex][atmos
     REQUIRE(loaded.has_value());
     (*loaded)->attach(params, modulator);
 
-    const world::AtmosphericEffect* e = firstVortex((*loaded)->atmosphericEffects());
+    const world::EffectInstance* e = firstVortex((*loaded)->atmosphericEffects());
     REQUIRE(e != nullptr);
     CHECK(e->name == "Cosmic Vortex");
     checkShippedValues(e->vortex);
@@ -174,7 +174,7 @@ TEST_CASE("a scene in the legacy environment.vortex form is migrated, values int
     REQUIRE(loaded.has_value());
     (*loaded)->attach(params, modulator);
 
-    const world::AtmosphericEffect* e = firstVortex((*loaded)->atmosphericEffects());
+    const world::EffectInstance* e = firstVortex((*loaded)->atmosphericEffects());
     REQUIRE(e != nullptr);
     CHECK(e->enabled);
     CHECK(e->activation == world::Activation::Always);
@@ -211,10 +211,10 @@ TEST_CASE("a legacy vortex that was switched off does not become an effect",
 TEST_CASE("every parameter the World Effects panel asks a vortex for exists",
           "[vortex][atmospherics][params][ui]") {
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex("Funnel")};
-    world::registerAtmosphericParameters(params, effects);
+    std::vector<world::EffectInstance> effects{world::cosmicVortex("Funnel")};
+    world::registerEffectParameters(params, effects);
 
-    const std::string prefix = world::atmosphericParameterPrefix("Funnel");
+    const std::string prefix = world::effectParameterPrefix("Funnel");
     const auto requireLeaf = [&](std::string_view leaf) {
         const std::string path = prefix + std::string(leaf);
         INFO(path);
@@ -225,7 +225,7 @@ TEST_CASE("every parameter the World Effects panel asks a vortex for exists",
     };
     // ADR-500: the vortex's rows are its schema's, which is also what the panel walks -- so this
     // asks the same question of the same data the panel asks (ADR-382).
-    const world::EffectSchema* schema = world::effectSchema(world::AtmosphereKind::Vortex);
+    const world::EffectSchema* schema = world::effectSchema(world::EffectKind::Vortex);
     REQUIRE(schema != nullptr);
     REQUIRE(schema->fields.size() > 10);
     for (const world::EffectField& f : schema->fields) {
@@ -238,7 +238,7 @@ TEST_CASE("every parameter the World Effects panel asks a vortex for exists",
     }
     // The beat route's target, computed the way the panel computes it rather than asserted as a
     // literal -- ADR-382's defect was in exactly that arithmetic.
-    CHECK(params.find(ui::atmosphericBeatTarget("Funnel", world::AtmosphereKind::Vortex)) != nullptr);
+    CHECK(params.find(ui::atmosphericBeatTarget("Funnel", world::EffectKind::Vortex)) != nullptr);
 
     // THE CONTROL: a leaf that does not exist is not found, so the loop above could have failed.
     CHECK(params.find(prefix + "sunsetAmount") == nullptr);
@@ -317,11 +317,11 @@ TEST_CASE("the shipped project drives the vortex through a path that exists",
     // that matters, because a retarget that names a leaf the new kind does not declare is a dead
     // route, and a dead route is a setting the picture does not keep.
     params::ParameterSet params;
-    const world::EffectSchema* tornado = world::effectSchema(world::AtmosphereKind::Tornado);
+    const world::EffectSchema* tornado = world::effectSchema(world::EffectKind::Tornado);
     REQUIRE(tornado != nullptr);
     REQUIRE(tornado->factory != nullptr);
-    std::vector<world::AtmosphericEffect> effects{tornado->factory("Cosmic Tornado")};
-    world::registerAtmosphericParameters(params, effects);
+    std::vector<world::EffectInstance> effects{tornado->factory("Cosmic Tornado")};
+    world::registerEffectParameters(params, effects);
     for (const std::string& target : vortexTargets) {
         INFO(target);
         CHECK(params.find(target) != nullptr);
@@ -338,16 +338,16 @@ TEST_CASE("the vortex's scene-light scattering is off by default and reachable",
     CHECK(world::Vortex{}.scattering == 0.0f);
     CHECK(world::cosmicVortex("V").vortex.scattering == 0.0f);
     for (const std::string_view style : world::vortexStyleNames()) {
-        world::AtmosphericEffect e = world::cosmicVortex("V");
+        world::EffectInstance e = world::cosmicVortex("V");
         REQUIRE(world::applyVortexStyle(e, style));
         INFO(style);
         CHECK(e.vortex.scattering == 0.0f);
     }
 
     // It round-trips, so a scene that turns it on keeps it turned on.
-    world::AtmosphericEffect e = world::cosmicVortex("V");
+    world::EffectInstance e = world::cosmicVortex("V");
     e.vortex.scattering = 0.42f;
-    const auto back = world::AtmosphericEffect::fromJson(e.toJson());
+    const auto back = world::EffectInstance::fromJson(e.toJson());
     REQUIRE(back.has_value());
     CHECK(back->vortex.scattering == Approx(0.42f));
 
@@ -356,8 +356,8 @@ TEST_CASE("the vortex's scene-light scattering is off by default and reachable",
     // 0..1, so 1.0 is the soft maximum; the hard maximum is higher because that is what a
     // modulation route clamps to.
     params::ParameterSet params;
-    std::vector<world::AtmosphericEffect> effects{world::cosmicVortex("V")};
-    world::registerAtmosphericParameters(params, effects);
+    std::vector<world::EffectInstance> effects{world::cosmicVortex("V")};
+    world::registerEffectParameters(params, effects);
     params::IParameter* p = params.find("atmos/V/scattering");
     REQUIRE(p != nullptr);
     CHECK(p->softMin(0) == Approx(0.0f));

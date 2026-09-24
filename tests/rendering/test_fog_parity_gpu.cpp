@@ -26,7 +26,7 @@
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -215,10 +215,10 @@ private:
 // An authored bank with every control off its default, so a lane the shader reads from the wrong
 // place cannot pass by both sides seeing the same number.
 world::MediumSlot shippedBank(float detail, int shape = 0, float heightInfluence = 0.0f) {
-    const world::EffectSchema* s = world::effectSchema(world::AtmosphereKind::VolumetricFog);
+    const world::EffectSchema* s = world::effectSchema(world::EffectKind::VolumetricFog);
     REQUIRE(s != nullptr);
     REQUIRE(s->resolve.pack != nullptr);
-    world::AtmosphericEffect e = s->factory("parity");
+    world::EffectInstance e = s->factory("parity");
     e.vortex.field.center = {12.0f, -40.0f, -7.0f};
     e.vortex.field.radius = 430.0f;
     e.vortex.field.thickness = 96.0f;

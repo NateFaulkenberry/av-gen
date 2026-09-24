@@ -653,7 +653,6 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Render", ImVec2(460, 420), [&] { drawRender(engine); });
     panel("Auto-director", ImVec2(440, 560), [&] { drawAutoDirector(engine); });
     panel("Cameras", ImVec2(420, 560), [&] { drawCameras(engine); });
-    panel("World Effects", ImVec2(460, 620), [&] { worldEffects.draw(engine); });
     panel("Environment", ImVec2(460, 620), [&] { ui::drawEnvironmentPanel(engine); });
     panel("Lights", ImVec2(460, 700),
           [&] { ui::drawLightsPanel(engine, editor.selection, editor.history()); });

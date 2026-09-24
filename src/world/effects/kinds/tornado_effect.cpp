@@ -47,7 +47,7 @@
 //     the first time anybody changed either. `Detail` and the three octave weights are the per-
 //     effect half of the same idea and they are on the panel.
 
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <algorithm>
 #include <array>
@@ -57,7 +57,7 @@
 namespace avgen::world {
 namespace {
 
-using E = AtmosphericEffect;
+using E = EffectInstance;
 
 #define GET(expr) +[](const E& e) { return (expr); }
 #define SETF(lhs) +[](E& e, float v) { (lhs) = v; }
@@ -373,7 +373,7 @@ void reset(Tornado& tn) {
     tn.field.base = keep;
 }
 
-bool applyStyle(AtmosphericEffect& e, std::string_view style) {
+bool applyStyle(EffectInstance& e, std::string_view style) {
     Tornado& tn = e.tornado;
     if (style == kStyleNames[0]) { // Classic Cone -- 800 m over 80 m at the ground, about 10:1
         reset(tn);
@@ -623,10 +623,10 @@ constexpr EffectRoute kRoutes[] = {
     {"beat.pulse", "emission", 0.080f, 12.0f, 300.0f},
 };
 
-AtmosphericEffect make(std::string name) {
-    AtmosphericEffect e;
+EffectInstance make(std::string name) {
+    EffectInstance e;
     e.name = std::move(name);
-    e.kind = AtmosphereKind::Tornado;
+    e.kind = EffectKind::Tornado;
     e.style = std::string(kStyleNames[0]);
     applyStyle(e, kStyleNames[0]);
     // Weather, not an event. A tornado that appears is a cut; one that gathers is a storm, so the
@@ -645,7 +645,7 @@ AtmosphericEffect make(std::string name) {
 // resolution is "is it live", and the payload travels unchanged. §68: its anchor is its own BASE,
 // because the question "what is the air doing where this storm stands" is asked at the ground
 // contact, which is also where a wind field is defined (ADR-055's wind is columnar).
-bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx,
+bool fill(const EffectInstance& e, std::size_t, const EffectContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
     r.anchor = e.tornado.field.base;
@@ -720,11 +720,11 @@ void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumS
     // lane 15 is NOT written here. It is the kind tag and `buildAtmosphericFrame` owns it.
 }
 
-Result<void> validate(const AtmosphericEffect& e) { return e.tornado.validate(); }
+Result<void> validate(const EffectInstance& e) { return e.tornado.validate(); }
 
 EffectSchema buildSchema() {
     EffectSchema s;
-    s.kind = AtmosphereKind::Tornado;
+    s.kind = EffectKind::Tornado;
     s.key = "tornado";
     s.enumName = "Tornado";
     s.displayName = "Tornado";
@@ -741,6 +741,10 @@ EffectSchema buildSchema() {
     s.groundGlow = false;
     s.factory = make;
     s.resolve.bucket = EffectBucket::Medium;
+    // ADR-702: attached to the World; evaluated at its bucket's stage.
+    s.targets = targetBit(EffectTarget::World);
+    s.category = EffectCategory::Atmosphere;
+    s.stage = RenderStage::Volumetric;
     s.resolve.fill = fill;
     s.resolve.pack = packMedium;
     s.validate = validate;

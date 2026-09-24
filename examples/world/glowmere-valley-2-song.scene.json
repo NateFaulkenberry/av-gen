@@ -21958,75 +21958,18 @@
       "strength": 6.0
     }
   },
-  "worldEffects": [
+  "effects": [
     {
-      "activation": "cameraTravel",
-      "appearance": {
-        "color": [
-          0.07000000029802322,
-          0.7799999713897705,
-          1.0
-        ],
-        "edgeColor": [
-          0.7200000286102295,
-          1.0,
-          0.9200000166893005
-        ],
-        "edgeIntensity": 3.200000047683716,
-        "intensity": 1.0,
-        "rainbow": false,
-        "rainbowBrightness": 1.0,
-        "rainbowSaturation": 0.8500000238418579,
-        "rainbowScale": 0.012000000104308128,
-        "rainbowSpeed": 0.3499999940395355,
-        "width": 1.0
+      "id": "camera-travel-beam",
+      "type": "travelBeam",
+      "name": "Camera Travel Beam",
+      "owner": {
+        "kind": "world"
       },
       "enabled": true,
-      "name": "Camera Travel Beam",
-      "propagation": {
-        "beamRadius": 0.0,
-        "direction": "blended",
-        "explicitDirection": [
-          0.0,
-          0.0,
-          -1.0
-        ],
-        "falloff": 2.200000047683716,
-        "forwardWeight": 1.0,
-        "frontWidth": 10.0,
-        "kind": "directional",
-        "range": 300.0,
-        "ringCount": 0.0,
-        "speed": 110.0,
-        "startOffset": 10.0,
-        "targetWeight": 1.2000000476837158,
-        "trailLength": 30.0,
-        "velocityWeight": 0.6000000238418579,
-        "verticalExtent": 40.0,
-        "verticalGrowth": 0.15000000596046448
-      },
-      "response": {
-        "emissive": 1.2000000476837158,
-        "foliage": 1.100000023841858,
-        "ground": 0.44999998807907104,
-        "surface": 0.699999988079071
-      },
-      "source": {
-        "kind": "camera"
-      },
-      "sparkle": {
-        "density": 1.100000023841858,
-        "enabled": true,
-        "fadeDistance": 85.0,
-        "intensity": 2.4000000953674316,
-        "seed": 1,
-        "size": 0.2199999988079071,
-        "speed": 0.6000000238418579
-      },
+      "order": 0,
       "style": "Bioluminescent",
-      "target": {
-        "kind": "focusHero"
-      },
+      "activation": "cameraTravel",
       "timing": {
         "delay": 0.15,
         "fadeIn": 0.5,
@@ -22035,73 +21978,85 @@
         "repeatSeconds": 2.6,
         "windowSeconds": 6.0,
         "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "blended",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 2.200000047683716,
+          "forwardWeight": 1.0,
+          "frontWidth": 10.0,
+          "kind": "directional",
+          "range": 300.0,
+          "ringCount": 0.0,
+          "speed": 110.0,
+          "startOffset": 10.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 30.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 40.0,
+          "verticalGrowth": 0.15000000596046448
+        },
+        "appearance": {
+          "color": [
+            0.07000000029802322,
+            0.7799999713897705,
+            1.0
+          ],
+          "edgeColor": [
+            0.7200000286102295,
+            1.0,
+            0.9200000166893005
+          ],
+          "edgeIntensity": 3.200000047683716,
+          "intensity": 1.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.100000023841858,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.4000000953674316,
+          "seed": 1,
+          "size": 0.2199999988079071,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2000000476837158,
+          "foliage": 1.100000023841858,
+          "ground": 0.44999998807907104,
+          "surface": 0.699999988079071
+        },
+        "source": {
+          "kind": "camera"
+        },
+        "target": {
+          "kind": "focusHero"
+        }
       }
     },
     {
-      "activation": "heroFocus",
-      "appearance": {
-        "color": [
-          0.1599999964237213,
-          0.9200000166893005,
-          0.6200000047683716
-        ],
-        "edgeColor": [
-          0.7799999713897705,
-          1.0,
-          0.8799999952316284
-        ],
-        "edgeIntensity": 9.0,
-        "intensity": 5.0,
-        "rainbow": false,
-        "rainbowBrightness": 1.0,
-        "rainbowSaturation": 0.8500000238418579,
-        "rainbowScale": 0.012000000104308128,
-        "rainbowSpeed": 0.3499999940395355,
-        "width": 1.0
+      "id": "visitor-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "visitor"
       },
       "enabled": true,
-      "name": "Hero Pulse",
-      "propagation": {
-        "beamRadius": 0.0,
-        "direction": "explicit",
-        "explicitDirection": [
-          0.0,
-          0.0,
-          -1.0
-        ],
-        "falloff": 1.5,
-        "forwardWeight": 1.0,
-        "frontWidth": 3.5,
-        "kind": "radial",
-        "range": 58.0,
-        "ringCount": 2.0,
-        "speed": 13.0,
-        "startOffset": 0.0,
-        "targetWeight": 1.2000000476837158,
-        "trailLength": 20.0,
-        "velocityWeight": 0.6000000238418579,
-        "verticalExtent": 9.0,
-        "verticalGrowth": 0.6499999761581421
-      },
-      "response": {
-        "emissive": 1.2999999523162842,
-        "foliage": 1.5,
-        "ground": 1.0,
-        "surface": 0.8999999761581421
-      },
-      "source": {
-        "kind": "focusHero"
-      },
-      "sparkle": {
-        "density": 1.399999976158142,
-        "enabled": true,
-        "fadeDistance": 85.0,
-        "intensity": 2.5999999046325684,
-        "seed": 2,
-        "size": 0.20000000298023224,
-        "speed": 0.6000000238418579
-      },
+      "order": 0,
       "style": "Bioluminescent",
+      "activation": "heroFocus",
       "timing": {
         "delay": 0.35,
         "fadeIn": 0.6,
@@ -22110,6 +22065,908 @@
         "repeatSeconds": 4.5,
         "windowSeconds": 6.0,
         "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "elder-2-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "elder-2-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "lantern-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "lantern-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "spire-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "spire-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "bloom-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "bloom-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "veil-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "veil-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "umbra-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "umbra-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "cairn-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "cairn-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "ridge-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "ridge-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "scree-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "scree-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
+      }
+    },
+    {
+      "id": "ember-cap-hero-pulse",
+      "type": "groundPulse",
+      "name": "Hero Pulse",
+      "owner": {
+        "kind": "entity",
+        "name": "ember-cap"
+      },
+      "enabled": true,
+      "order": 0,
+      "style": "Bioluminescent",
+      "activation": "heroFocus",
+      "timing": {
+        "delay": 0.35,
+        "fadeIn": 0.6,
+        "fadeOut": 1.2,
+        "lifetime": 0.0,
+        "repeatSeconds": 4.5,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "parameters": {
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.5,
+          "forwardWeight": 1.0,
+          "frontWidth": 3.5,
+          "kind": "radial",
+          "range": 58.0,
+          "ringCount": 2.0,
+          "speed": 13.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 20.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 9.0,
+          "verticalGrowth": 0.6499999761581421
+        },
+        "appearance": {
+          "color": [
+            0.1599999964237213,
+            0.9200000166893005,
+            0.6200000047683716
+          ],
+          "edgeColor": [
+            0.7799999713897705,
+            1.0,
+            0.8799999952316284
+          ],
+          "edgeIntensity": 9.0,
+          "intensity": 5.0,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.012000000104308128,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "sparkle": {
+          "density": 1.399999976158142,
+          "enabled": true,
+          "fadeDistance": 85.0,
+          "intensity": 2.5999999046325684,
+          "seed": 2,
+          "size": 0.20000000298023224,
+          "speed": 0.6000000238418579
+        },
+        "response": {
+          "emissive": 1.2999999523162842,
+          "foliage": 1.5,
+          "ground": 1.0,
+          "surface": 0.8999999761581421
+        },
+        "source": {
+          "kind": "owner"
+        }
       }
     }
   ]

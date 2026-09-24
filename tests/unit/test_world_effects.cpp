@@ -10,10 +10,10 @@
 #include "params/parameter_set.hpp"
 #include "params/modulation.hpp"
 #include "signals/signal_bus.hpp"
-#include "world/effect_params.hpp"
+#include "world/effects/effect_params.hpp"
 #include "scene/composition.hpp"
 #include "ui/world_effects_panel.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

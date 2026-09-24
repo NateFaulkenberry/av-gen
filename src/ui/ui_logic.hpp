@@ -1451,7 +1451,7 @@ inline constexpr scene::DeformerKind kDeformerKinds[] = {
 // `cometRows`, `cometAdvancedRows`, `auroraRows`, `auroraAdvancedRows`, `vortexRows`,
 // `vortexAdvancedRows`, `skyRainbowRows`, `skyGroundRows` and `atmosphericFlowRows` were here.
 // They are now `EffectSchema::fields` and `world::sharedEffectFields()`, declared beside the
-// parameter each row registers, in `src/world/world_effects/effects/<kind>_effect.cpp`.
+// parameter each row registers, in `src/world/effects/kinds/<kind>_effect.cpp`.
 //
 // That is the point of ADR-500 rather than a tidy-up. ADR-392 made these tables data so that a
 // test could walk them, which is what caught a leaf five characters wrong -- but it left the row

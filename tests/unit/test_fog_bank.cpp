@@ -1,7 +1,7 @@
 // The fog bank's field, as an artist reaches it (ADR-560, ADR-561).
 //
 // Every question here goes through the SHIPPED path and not through a copy of it: the registry's
-// own factory and styles produce the `AtmosphericEffect`, `vortex::packVortex` packs its `field` -- which is exactly the sequence `rendering::VolumeRenderer::update`
+// own factory and styles produce the `EffectInstance`, `vortex::packVortex` packs its `field` -- which is exactly the sequence `rendering::VolumeRenderer::update`
 // performs, and since ADR-561 it is literally the same three calls. That matters more here than
 // usual, because ADR-401 recorded the failure mode: a test can be green about a path nobody
 // renders. Before ADR-561 the conversion step existed only inside the renderer, so a test of this
@@ -26,7 +26,7 @@
 
 #include "core/vortex.hpp"
 #include "world/atmospherics.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -43,7 +43,7 @@ using namespace avgen;
 namespace {
 
 const world::EffectSchema& fogSchema() {
-    const world::EffectSchema* s = world::effectSchema(world::AtmosphereKind::VolumetricFog);
+    const world::EffectSchema* s = world::effectSchema(world::EffectKind::VolumetricFog);
     REQUIRE(s != nullptr);
     return *s;
 }
@@ -52,10 +52,10 @@ const world::EffectSchema& fogSchema() {
 // ADR-579 renamed the three styles to §37's vocabulary -- "Valley Mist" is "Valley Fog"
 // now. The `REQUIRE(it != s.styles.end())` below is what caught every call site, which is
 // why the helper looks the style up by name rather than taking an index.
-world::AtmosphericEffect fogBank(std::string_view style) {
+world::EffectInstance fogBank(std::string_view style) {
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.factory != nullptr);
-    world::AtmosphericEffect e = s.factory("bank");
+    world::EffectInstance e = s.factory("bank");
     const auto it = std::find_if(s.styles.begin(), s.styles.end(),
                                  [style](const world::EffectStyle& st) { return st.name == style; });
     REQUIRE(it != s.styles.end());
@@ -64,7 +64,7 @@ world::AtmosphericEffect fogBank(std::string_view style) {
     return e;
 }
 
-float storedOf(const world::AtmosphericEffect& e, std::string_view leaf) {
+float storedOf(const world::EffectInstance& e, std::string_view leaf) {
     for (const world::EffectField& f : fogSchema().fields) {
         if (std::string_view(f.leaf) == leaf) {
             return world::fieldFloat(f, fogSchema(), e);
@@ -78,11 +78,11 @@ float storedOf(const world::AtmosphericEffect& e, std::string_view leaf) {
 // not the vortex's. A probe that samples the pre-dispatch path goes on passing while asserting
 // about a field nothing calls for a fog bank -- it does not break, which is what makes it
 // dangerous. See the audit note at the top of this file.
-float fogSampleAt(const world::AtmosphericEffect& e, glm::vec3 offset) {
+float fogSampleAt(const world::EffectInstance& e, glm::vec3 offset) {
     world::MediumSlot slot{};
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.resolve.pack != nullptr);
-    world::AtmosphericEffect copy = e;
+    world::EffectInstance copy = e;
     world::packMediumSlot(copy, 1.0f, slot);
     return world::fogShapeAt(slot, e.vortex.field.center + offset);
 }
@@ -95,7 +95,7 @@ TEST_CASE("a fog bank is filled to its own axis", "[fog]") {
     // property of the field the march ACTUALLY evaluates, rather than of the one it used to.
     for (const world::EffectStyle& style : fogSchema().styles) {
         INFO("style: " << style.name);
-        world::AtmosphericEffect e = fogBank(style.name);
+        world::EffectInstance e = fogBank(style.name);
         // Detail OFF: the claim is about the ANALYTIC shape having no hole in it. With the macro
         // detail live the field varies by design, which is a different property and is asserted
         // by its own case below -- testing both at once would mean neither could fail cleanly.
@@ -142,7 +142,7 @@ TEST_CASE("a fog bank is filled to its own axis", "[fog]") {
 
 TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]") {
     const world::EffectSchema& s = fogSchema();
-    world::AtmosphericEffect e = fogBank("Valley Fog");
+    world::EffectInstance e = fogBank("Valley Fog");
 
     // The panel, registration and the route table all walk `s.fields`. A control that is not a row
     // here is a control that does not exist for this kind, whatever the struct carries (ADR-421).
@@ -170,7 +170,7 @@ TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]"
     // could not reach, and the tell was that nothing downstream disagreed.
     const world::EffectSchema& fs = fogSchema();
     REQUIRE(fs.resolve.pack != nullptr);
-    world::AtmosphericEffect probe = fogBank("Valley Fog");
+    world::EffectInstance probe = fogBank("Valley Fog");
     const float radius = probe.vortex.field.radius;
     world::MediumSlot slotOff{};
     world::MediumSlot slotOn{};
@@ -189,7 +189,7 @@ TEST_CASE("the fog bank's detail weight is reachable from its own rows", "[fog]"
 }
 
 TEST_CASE("a fog bank with its detail at zero still has a field with shape in it", "[fog]") {
-    world::AtmosphericEffect e = fogBank("Valley Fog");
+    world::EffectInstance e = fogBank("Valley Fog");
     e.vortex.field.cloudNoise = 0.0f;
     const float radius = e.vortex.field.radius;
     const float thickness = e.vortex.field.thickness;
@@ -223,7 +223,7 @@ TEST_CASE("a fog bank with its detail at zero still has a field with shape in it
     // point of the phase.
     //
     // Measured through the packed lanes and the same `fogShapeAt` the march runs, not a copy.
-    world::AtmosphericEffect shaped = fogBank("Valley Fog");
+    world::EffectInstance shaped = fogBank("Valley Fog");
     shaped.vortex.field.cloudNoise = 0.0f;
     shaped.values.setFloat("fog/bankLength", 2.5f); // a bank with a long axis
     world::MediumSlot slot{};
@@ -294,7 +294,7 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
     REQUIRE(s.resolve.pack != nullptr);
 
     const auto opticalDepth = [&](float radius) {
-        world::AtmosphericEffect e = fogBank("Valley Fog");
+        world::EffectInstance e = fogBank("Valley Fog");
         e.vortex.field.radius = radius;
         e.values.setFloat("fog/bankLength", 2.0f);
         world::MediumSlot slot{};
@@ -316,7 +316,7 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
 
     // The control: the authored number still CHANGES the depth, or the test above would pass on a
     // packer that ignored it entirely (ADR-182, and the shape ADR-460's reachability probe uses).
-    world::AtmosphericEffect a = fogBank("Valley Fog");
+    world::EffectInstance a = fogBank("Valley Fog");
     a.vortex.field.radius = 400.0f;
     world::MediumSlot lo{};
     world::MediumSlot hi{};
@@ -344,7 +344,7 @@ TEST_CASE("one fog density reads the same at any bank size", "[fog]") {
 TEST_CASE("the fog macro detail does not move the medium's mean", "[fog]") {
     const world::EffectSchema& s = fogSchema();
     REQUIRE(s.resolve.pack != nullptr);
-    world::AtmosphericEffect e = fogBank("Valley Fog");
+    world::EffectInstance e = fogBank("Valley Fog");
     e.vortex.field.cloudNoise = 1.0f;
     e.values.setFloat("fog/detailScale", 7.0f);
     world::MediumSlot slot{};
@@ -404,7 +404,7 @@ TEST_CASE("the fog macro detail does not move the medium's mean", "[fog]") {
 // everything but the base. That interaction is not visible in either control on its own.
 TEST_CASE("the presets, sampled", "[.][fog][presets]") {
     for (const world::EffectStyle& style : fogSchema().styles) {
-        world::AtmosphericEffect e = fogBank(style.name);
+        world::EffectInstance e = fogBank(style.name);
         e.vortex.field.cloudNoise = 0.0f;
         const float r = e.vortex.field.radius;
         const float th = e.vortex.field.thickness;

@@ -1,11 +1,11 @@
-#include "world/world_effects/effect_conformance.hpp"
+#include "world/effects/effect_conformance.hpp"
 
 #include "core/wind.hpp"
 
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
-#include "world/atmospheric_params.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_params.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -86,8 +86,8 @@ constexpr std::string_view kProbeName = "conformance probe";
 }
 
 
-void report(Report& out, AtmosphereKind kind, std::string_view rule, std::string detail) {
-    out.findings.push_back(Finding{atmosphereKindName(kind), std::string(rule), std::move(detail)});
+void report(Report& out, EffectKind kind, std::string_view rule, std::string detail) {
+    out.findings.push_back(Finding{effectKindName(kind), std::string(rule), std::move(detail)});
 }
 
 // A value inside the parameter's range that is not its default, varied by component index so two
@@ -157,25 +157,50 @@ std::string Report::summary() const {
     return out;
 }
 
-AtmosphericEffect probeEffect(AtmosphereKind kind, std::string name) {
+EffectInstance probeEffect(EffectKind kind, std::string name) {
     // ADR-500: the registry's factory, which is the same one the "Add" button calls. A switch here
     // would be one more per-kind list that a new kind has to be remembered into -- and this file's
     // whole job is to make forgetting loud, not to have something to forget.
-    return makeAtmosphericEffect(kind, std::move(name));
+    EffectInstance e = makeEffect(kind, std::move(name));
+    // ADR-702: an instance needs an id and an owner its type supports. The World when the type takes
+    // one, else the first target it does, named -- and a source that means "my owner" is pinned to
+    // a world position, so every check below can resolve the probe without a scene.
+    e.id = "conformance-probe";
+    if (const EffectSchema* schema = effectSchema(kind)) {
+        if ((schema->targets & targetBit(EffectTarget::World)) != 0) {
+            e.owner = EffectOwner::world();
+        } else {
+            for (std::size_t t = 0; t < kEffectTargetCount; ++t) {
+                if ((schema->targets & targetBit(static_cast<EffectTarget>(t))) != 0) {
+                    e.owner = EffectOwner{static_cast<EffectTarget>(t), "probe-owner"};
+                    break;
+                }
+            }
+        }
+        if (schema->getSource != nullptr && schema->setSource != nullptr) {
+            EffectEndpoint src = schema->getSource(e);
+            if (src.kind == SourceKind::Owner || src.kind == SourceKind::FocusHero) {
+                src.kind = SourceKind::World;
+                src.position = glm::vec3(0.0f);
+                schema->setSource(e, src);
+            }
+        }
+    }
+    return e;
 }
 
-std::vector<std::string> registeredPaths(const AtmosphericEffect& effect) {
+std::vector<std::string> registeredPaths(const EffectInstance& effect) {
     params::ParameterSet params;
-    const AtmosphericEffect one = effect;
-    AtmosphericParameters registered = registerAtmosphericParameters(params, std::span(&one, 1));
+    const EffectInstance one = effect;
+    EffectParameters registered = registerEffectParameters(params, std::span(&one, 1));
     // `registered.registered` is the registrar's own list of every path it wrote -- the same list
-    // `unregisterAtmosphericParameters` uses -- so this is what the engine believes it created,
+    // `unregisterEffectParameters` uses -- so this is what the engine believes it created,
     // not what a table says it should have.
     return registered.registered;
 }
 
-std::vector<std::string> registeredLeaves(const AtmosphericEffect& effect) {
-    const std::string prefix = atmosphericParameterPrefix(effect.name);
+std::vector<std::string> registeredLeaves(const EffectInstance& effect) {
+    const std::string prefix = effectParameterPrefix(effect.id);
     std::vector<std::string> leaves;
     for (const std::string& path : registeredPaths(effect)) {
         leaves.push_back(path.starts_with(prefix) ? path.substr(prefix.size()) : path);
@@ -183,12 +208,12 @@ std::vector<std::string> registeredLeaves(const AtmosphericEffect& effect) {
     return leaves;
 }
 
-Report checkLeavesExist(AtmosphereKind kind, std::span<const std::string_view> leaves, std::string_view rule) {
+Report checkLeavesExist(EffectKind kind, std::span<const std::string_view> leaves, std::string_view rule) {
     Report out;
-    const AtmosphericEffect probe = probeEffect(kind, std::string(kProbeName));
+    const EffectInstance probe = probeEffect(kind, std::string(kProbeName));
     params::ParameterSet params;
-    registerAtmosphericParameters(params, std::span(&probe, 1));
-    const std::string prefix = atmosphericParameterPrefix(probe.name);
+    registerEffectParameters(params, std::span(&probe, 1));
+    const std::string prefix = effectParameterPrefix(probe.id);
     for (const std::string_view leaf : leaves) {
         const std::string path = prefix + std::string(leaf);
         const params::IParameter* p = params.find(path);
@@ -201,32 +226,32 @@ Report checkLeavesExist(AtmosphereKind kind, std::span<const std::string_view> l
     return out;
 }
 
-Report checkAtmospheric(AtmosphereKind kind) {
+Report checkAtmospheric(EffectKind kind) {
     Report out;
-    const AtmosphericEffect probe = probeEffect(kind, std::string(kProbeName));
+    const EffectInstance probe = probeEffect(kind, std::string(kProbeName));
 
     // The probe has to be of the kind asked for, or every check below is about something else.
     if (probe.kind != kind) {
         report(out, kind, "probe-kind",
-               std::string("probeEffect returned a ") + atmosphereKindName(probe.kind));
+               std::string("probeEffect returned a ") + effectKindName(probe.kind));
         return out;
     }
 
     // 5. The name survives the file format. A kind whose name does not parse back is a scene that
     //    silently loads as a comet.
     {
-        const auto back = atmosphereKindFromName(atmosphereKindName(kind));
+        const auto back = effectKindFromName(effectKindName(kind));
         if (!back.has_value() || *back != kind) {
             report(out, kind, "kind-name",
-                   std::string("atmosphereKindFromName(\"") + atmosphereKindName(kind) + "\") does not "
-                   "return this kind -- atmosphereKindFromName is an if-chain, not a switch");
+                   std::string("effectKindFromName(\"") + effectKindName(kind) + "\") does not "
+                   "return this kind -- effectKindFromName is an if-chain, not a switch");
         }
     }
 
     params::ParameterSet params;
-    std::vector<AtmosphericEffect> effects{probe};
-    AtmosphericParameters registered = registerAtmosphericParameters(params, effects);
-    const std::string prefix = atmosphericParameterPrefix(probe.name);
+    std::vector<EffectInstance> effects{probe};
+    EffectParameters registered = registerEffectParameters(params, effects);
+    const std::string prefix = effectParameterPrefix(probe.id);
 
     if (registered.registered.empty()) {
         report(out, kind, "registration", "this kind registers no parameters at all");
@@ -263,7 +288,7 @@ Report checkAtmospheric(AtmosphereKind kind) {
     //    once" makes necessary: a route target is a string, a wrong one binds to nothing, logs one
     //    warning at load and is thereafter indistinguishable from an effect nobody automated.
     {
-        const std::vector<params::ModRoute> routes = defaultAtmosphericRoutes(probe.name, kind);
+        const std::vector<params::ModRoute> routes = defaultEffectRoutes(probe.id, kind);
         if (routes.empty()) {
             report(out, kind, "default-routes",
                    "this kind has no default audio routes, so a newly added one is silent");
@@ -302,10 +327,10 @@ Report checkAtmospheric(AtmosphereKind kind) {
                 p->setBaseComponent(c, distinctValue(*p, c, salt++));
             }
         }
-        captureAtmosphericParameters(registered, effects);
+        captureEffectParameters(registered, effects);
 
         const nlohmann::json first = effects.front().toJson();
-        const auto reloaded = AtmosphericEffect::fromJson(first);
+        const auto reloaded = EffectInstance::fromJson(first);
         if (!reloaded) {
             report(out, kind, "round-trip",
                    "a fully-populated effect of this kind does not load back: " +
@@ -324,8 +349,8 @@ Report checkAtmospheric(AtmosphereKind kind) {
             // asks the only question worth asking: did this number survive? A leaf the serialiser
             // never knew about comes back as the factory's value and is named here.
             params::ParameterSet after;
-            const AtmosphericEffect loaded = *reloaded;
-            AtmosphericParameters registeredAfter = registerAtmosphericParameters(after, std::span(&loaded, 1));
+            const EffectInstance loaded = *reloaded;
+            EffectParameters registeredAfter = registerEffectParameters(after, std::span(&loaded, 1));
             std::string lost;
             std::size_t lostCount = 0;
             for (const std::string& path : registered.registered) {
@@ -358,7 +383,7 @@ Report checkAtmospheric(AtmosphereKind kind) {
                        std::to_string(lostCount) + " component(s) did not survive save -> load; " +
                            "the first of them: " + lost);
             }
-            unregisterAtmosphericParameters(after, registeredAfter);
+            unregisterEffectParameters(after, registeredAfter);
         }
     }
 
@@ -373,19 +398,22 @@ Report checkAtmospheric(AtmosphereKind kind) {
     //    silently stopped being able to fail for a fourth kind. Hence the exhaustive switch here
     //    too, and a "no counter" arm for a kind that is resolved by nothing.
     {
-        AtmosphericEffect live = probe;
+        EffectInstance live = probe;
         live.enabled = true;
         live.activation = Activation::Always;
         live.timing = Timing{};
         live.timing.fadeIn = 0.0;
         live.timing.fadeOut = 0.0;
 
-        AtmosphericContext ctx;
+        EffectContext ctx;
         ctx.seconds = 0.5;
         std::array<ResolvedAtmospheric, kMaxGpuComets> comets{};
         std::array<ResolvedAtmospheric, kMaxGpuAuroras> auroras{};
         const AtmosphericCounts counts =
             resolveAtmosphericEffects(std::span(&live, 1), ctx, comets, auroras);
+        // ADR-702: the surface waves are the one bucket `resolveAtmosphericEffects` does not own.
+        std::array<ResolvedWave, kMaxGpuWaves> waves{};
+        const std::size_t waveCount = resolveWaves(std::span(&live, 1), ctx, waves);
 
         // ADR-500: the counter this kind's records land in comes from its own declaration, and
         // the switch is over `EffectBucket` -- exhaustive, no `default`, one arm per GPU payload
@@ -402,9 +430,10 @@ Report checkAtmospheric(AtmosphereKind kind) {
             case EffectBucket::Comet: mine = counts.comets; break;
             case EffectBucket::Aurora: mine = counts.auroras; break;
             case EffectBucket::Medium: mine = counts.vortices; break;
+            case EffectBucket::Surface: mine = waveCount; break;
             }
         }
-        const std::size_t total = counts.comets + counts.auroras + counts.vortices;
+        const std::size_t total = counts.comets + counts.auroras + counts.vortices + waveCount;
         // How many records one live effect of this kind is entitled to. One for everything ADR-230
         // shipped; a meteor shower declares more, and asserting "exactly one" would have made this
         // check fail on correct code -- which is the failure ADR-182 is about from the other side.
@@ -448,8 +477,22 @@ Report checkAtmospheric(AtmosphereKind kind) {
     //    ADR-182: it is shown able to fail. With `packAurora`'s two uses of the flow removed, it
     //    reports the aurora by name; with the whole of `resolveEffectFlow` stubbed to return {},
     //    it reports all three.
-    {
-        AtmosphericEffect live = probe;
+    // ADR-702: only for a type the evaluator samples a field for. A surface wave registers no
+    // `flowInfluence` (see `sharedFieldApplies`), so there is no row whose reach to check.
+    const bool subscribes = [&] {
+        const EffectSchema* schema = effectSchema(kind);
+        if (schema == nullptr) {
+            return false;
+        }
+        for (const EffectField& f : sharedEffectFields()) {
+            if (std::string_view(f.leaf) == "flowInfluence") {
+                return sharedFieldApplies(*schema, f);
+            }
+        }
+        return false;
+    }();
+    if (subscribes) {
+        EffectInstance live = probe;
         live.enabled = true;
         live.activation = Activation::Always;
         live.timing = Timing{};
@@ -466,7 +509,7 @@ Report checkAtmospheric(AtmosphereKind kind) {
         fields::FieldBus bus;
         bus.publishWind(std::string(fields::kWindField), wind::packWind(gale));
 
-        AtmosphericContext ctx;
+        EffectContext ctx;
         ctx.seconds = 0.5;
         ctx.cameraPosition = glm::vec3(120.0f, 40.0f, -260.0f); // off the origin, so `phase` is not 0
         ctx.fieldBus = &bus;
@@ -509,7 +552,7 @@ Report checkAtmospheric(AtmosphereKind kind) {
 
 Report checkAtmosphericFamily() {
     Report out;
-    for (const AtmosphereKind kind : kAtmosphereKinds) {
+    for (const EffectKind kind : kEffectKinds) {
         Report one = checkAtmospheric(kind);
         out.findings.insert(out.findings.end(), std::make_move_iterator(one.findings.begin()),
                             std::make_move_iterator(one.findings.end()));

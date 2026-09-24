@@ -13,7 +13,7 @@
 
 #include "app/engine.hpp"
 #include "world/atmospherics.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -39,10 +39,10 @@ fs::path scratch(const char* name) {
     return dir;
 }
 
-world::AtmosphericEffect aurora(std::string name) {
-    world::AtmosphericEffect e;
+world::EffectInstance aurora(std::string name) {
+    world::EffectInstance e;
     e.name = std::move(name);
-    e.kind = world::AtmosphereKind::Aurora;
+    e.kind = world::EffectKind::Aurora;
     e.activation = world::Activation::Always;
     return e;
 }
@@ -56,7 +56,7 @@ world::WorldEffect pulse(std::string name) {
     return e;
 }
 
-std::vector<std::string> namesOf(const std::vector<world::AtmosphericEffect>& effects) {
+std::vector<std::string> namesOf(const std::vector<world::EffectInstance>& effects) {
     std::vector<std::string> names;
     for (const auto& e : effects) names.push_back(e.name);
     return names;

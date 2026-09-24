@@ -1,4 +1,4 @@
-#include "world/world_effects/field_bus.hpp"
+#include "world/effects/field_bus.hpp"
 
 #include <algorithm>
 #include <string>

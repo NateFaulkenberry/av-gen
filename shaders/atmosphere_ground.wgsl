@@ -10,7 +10,7 @@
 //
 // Included by pbr_shade.wgsl (so entities, the procedural scatter, skinned characters and
 // raymarched SDFs all take it) and separately by water.wgsl, which shades through its own pipeline
-// -- exactly the split ADR-207 records for world effects, and for exactly the same reason.
+// -- exactly the split ADR-207 records for its surface waves, and for exactly the same reason.
 
 // ---- ground illumination (§6) ---------------------------------------------------------------------
 

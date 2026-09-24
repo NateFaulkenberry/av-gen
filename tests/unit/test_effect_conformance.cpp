@@ -3,7 +3,7 @@
 // ADR-387 established that ADR-230's family is a table-driven authoring interface and that adding
 // two `constexpr` tables buys registration, modulation, apply, capture and a panel row with no
 // bespoke code. That is true of three directions. Five more lists -- `toJson`, `fromJson`,
-// `sanitise`, the styles and `defaultAtmosphericRoutes` -- plus the panel's string literals are
+// `sanitise`, the styles and `defaultEffectRoutes` -- plus the panel's string literals are
 // still per-kind and hand-written, and none of them fails to compile when a kind is forgotten.
 //
 // So the family's contract is stated here as a check rather than as prose, and the check obtains
@@ -12,9 +12,9 @@
 
 #include "labs/case.hpp"
 #include "ui/world_effects_panel.hpp"
-#include "world/atmospheric_params.hpp"
-#include "world/world_effects/effect_conformance.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_params.hpp"
+#include "world/effects/effect_conformance.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -40,10 +40,10 @@ std::string lower(std::string s) {
     return s;
 }
 
-// The enumerators of `enum class AtmosphereKind`, read out of the header.
+// The enumerators of `enum class EffectKind`, read out of the header.
 //
 // This is the guard that actually holds, and it is worth saying why it is not a `static_assert`.
-// `conformance::atmosphereKindIndex` has an exhaustive switch with no `default`, so a new
+// `conformance::effectKindIndex` has an exhaustive switch with no `default`, so a new
 // enumerator is a `-Wswitch` diagnostic -- but `-Werror` is behind `AVGEN_WARNINGS_AS_ERRORS` and
 // off in this build, and a warning in a five-thousand-line build log is not a guard. The enum has
 // no reflection and no sentinel. Reading the declaration is the only thing left that fails by name,
@@ -57,7 +57,7 @@ std::vector<std::string> declaredKindNames() {
     buffer << in.rdbuf();
     const std::string text = buffer.str();
 
-    const std::size_t decl = text.find("enum class AtmosphereKind");
+    const std::size_t decl = text.find("enum class EffectKind");
     REQUIRE(decl != std::string::npos);
     const std::size_t open = text.find('{', decl);
     REQUIRE(open != std::string::npos);
@@ -67,7 +67,7 @@ std::vector<std::string> declaredKindNames() {
     // This was `text.find('}', open)`. ADR-580's `Tornado` carries a comment naming the files that
     // implement it -- `core/tornado.{hpp,cpp}` -- and that brace ended the enum three lines early,
     // so the header appeared to declare six kinds when it declares seven. The test then failed
-    // with "a schema claims AtmosphereKind::Tornado, which atmospherics.hpp does not declare",
+    // with "a schema claims EffectKind::Tornado, which atmospherics.hpp does not declare",
     // which is a true statement about what the parser saw and a badly misleading one about what
     // was wrong: the enumerator was there, correct, and two lines below where the scan stopped.
     //
@@ -138,7 +138,7 @@ TEST_CASE("the registry covers every kind the enum declares", "[world][atmospher
 
     // ADR-500 changed how the two sides are matched, and the change was bought by a failure.
     //
-    // ADR-392 lowercased the enumerator and compared it with `atmosphereKindName`. That worked for
+    // ADR-392 lowercased the enumerator and compared it with `effectKindName`. That worked for
     // three kinds because "Comet" lowercases to "comet" **by coincidence**: an enumerator's
     // spelling and a kind's file format are two different decisions, and the first kind for which
     // they differed -- `MeteorShower`, which serialises as "meteors" -- failed this test while
@@ -157,19 +157,19 @@ TEST_CASE("the registry covers every kind the enum declares", "[world][atmospher
     // Printed rather than counted, because the point of this failing is that it names the kind
     // somebody added and did not finish wiring.
     for (const std::string& n : fromHeader) {
-        INFO("AtmosphereKind::" << n << " is declared in atmospherics.hpp but no schema claims it -- "
+        INFO("EffectKind::" << n << " is declared in atmospherics.hpp but no schema claims it -- "
              "add a line to builtinSchemas() in effect_registry.cpp");
         CHECK(claimed.count(n) == 1);
     }
     for (const std::string& n : claimed) {
-        INFO("a schema claims AtmosphereKind::" << n << ", which atmospherics.hpp does not declare");
+        INFO("a schema claims EffectKind::" << n << ", which atmospherics.hpp does not declare");
         CHECK(fromHeader.count(n) == 1);
     }
     // ...and the array the exhaustive switches are indexed by, which is the third place a kind has
     // to appear and the one a `-Wswitch` warning nobody reads would otherwise be the only guard for.
-    INFO("kAtmosphereKinds has " << conf::kAtmosphereKinds.size() << " entries for "
+    INFO("kEffectKinds has " << conf::kEffectKinds.size() << " entries for "
          << declared.size() << " enumerators");
-    CHECK(conf::kAtmosphereKinds.size() == declared.size());
+    CHECK(conf::kEffectKinds.size() == declared.size());
 
     SECTION("the reader can fail") {
         // The control ADR-182 asks for: the parser is shown finding what is there, so an empty
@@ -196,9 +196,9 @@ TEST_CASE("the registry's own contract holds for every declared kind",
 
 TEST_CASE("every atmospheric kind conforms to the family's contract",
           "[world][atmospherics][conformance][params]") {
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
+    for (const world::EffectKind kind : conf::kEffectKinds) {
         const conf::Report r = conf::checkAtmospheric(kind);
-        INFO("kind: " << world::atmosphereKindName(kind));
+        INFO("kind: " << world::effectKindName(kind));
         INFO(r.summary());
         CHECK(r.clean());
     }
@@ -216,8 +216,8 @@ TEST_CASE("a leaf check reports a leaf that is not there, and passes one that is
           "[world][atmospherics][conformance]") {
     // ADR-182: the probe every panel row table is held to, shown failing. Without this, "the rows
     // are fine" and "the checker is inert" look identical.
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
-        INFO("kind: " << world::atmosphereKindName(kind));
+    for (const world::EffectKind kind : conf::kEffectKinds) {
+        INFO("kind: " << world::effectKindName(kind));
 
         static constexpr std::string_view kMissing[] = {"noSuchLeafOnAnyEffect"};
         const conf::Report bad = conf::checkLeavesExist(kind, kMissing, "control");
@@ -239,15 +239,15 @@ TEST_CASE("the beat-response target is a parameter of the kind it is chosen for"
     // `ui::atmosphericBeatTarget` is the one kind switch in the UI that is exhaustive and has no
     // `default`. It is checked here anyway, through the same mechanism as everything else, because
     // being right today is not the same as being checked -- ADR-385.
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
-        const world::AtmosphericEffect probe = conf::probeEffect(kind, "conformance probe");
+    for (const world::EffectKind kind : conf::kEffectKinds) {
+        const world::EffectInstance probe = conf::probeEffect(kind, "conformance probe");
         const std::string target = ui::atmosphericBeatTarget(probe.name, kind);
-        const std::string prefix = world::atmosphericParameterPrefix(probe.name);
+        const std::string prefix = world::effectParameterPrefix(probe.name);
         REQUIRE(target.starts_with(prefix));
 
         const std::string_view leaf(target.data() + prefix.size(), target.size() - prefix.size());
         const conf::Report r = conf::checkLeavesExist(kind, std::span(&leaf, 1), "beat-target");
-        INFO("kind: " << world::atmosphereKindName(kind) << ", target: " << target);
+        INFO("kind: " << world::effectKindName(kind) << ", target: " << target);
         INFO(r.summary());
         CHECK(r.clean());
     }
@@ -267,10 +267,10 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
     // if it is in the picture an artist must be able to find it and change it. Every path the
     // REGISTRAR writes must correspond to a row the panel will draw. A row marked `Hidden`, a row
     // with no label, or a shared row the panel forgets fails here, by path.
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
+    for (const world::EffectKind kind : conf::kEffectKinds) {
         const world::EffectSchema* schema = world::effectSchema(kind);
         REQUIRE(schema != nullptr);
-        const world::AtmosphericEffect probe = conf::probeEffect(kind, "conformance probe");
+        const world::EffectInstance probe = conf::probeEffect(kind, "conformance probe");
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
         REQUIRE(leaves.size() > 10);
 
@@ -285,7 +285,7 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
             for (const world::EffectField& f : world::sharedEffectFields()) {
                 if (leaf == f.leaf) { row = &f; }
             }
-            INFO("kind: " << world::atmosphereKindName(kind) << ", leaf: " << leaf);
+            INFO("kind: " << world::effectKindName(kind) << ", leaf: " << leaf);
             REQUIRE(row != nullptr);
             // A registered parameter with no label is one an artist cannot identify, and one on
             // the Hidden page is one they cannot reach. Both are ADR-375's defect.
@@ -299,7 +299,7 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
         // through, which is what shows the comparison above is not vacuous.
         const std::array<std::string_view, 2> bogus{"noSuchLeaf", "coreIntensity"};
         const conf::Report r =
-            conf::checkLeavesExist(world::AtmosphereKind::Comet, bogus, "panel-rows");
+            conf::checkLeavesExist(world::EffectKind::Comet, bogus, "panel-rows");
         CHECK_FALSE(r.clean());
         CHECK(r.findings.size() == 1); // the second one is real
     }
@@ -310,18 +310,18 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
         // lesson the other way round -- a control that draws and does nothing.
         const std::array<std::string_view, 5> rainbow{"rainbowSpeed", "rainbowScale", "rainbowHue",
                                                       "rainbowSaturation", "rainbowBrightness"};
-        for (const world::AtmosphereKind kind :
-             {world::AtmosphereKind::Vortex, world::AtmosphereKind::VolumetricFog}) {
+        for (const world::EffectKind kind :
+             {world::EffectKind::Vortex, world::EffectKind::VolumetricFog}) {
             const conf::Report r = conf::checkLeavesExist(kind, rainbow, "panel-rows");
-            INFO("kind: " << world::atmosphereKindName(kind));
+            INFO("kind: " << world::effectKindName(kind));
             CHECK_FALSE(r.clean());
             CHECK(r.findings.size() == rainbow.size());
         }
         // ...and the two sky kinds that DO declare it register all five.
-        for (const world::AtmosphereKind kind :
-             {world::AtmosphereKind::Comet, world::AtmosphereKind::Aurora}) {
+        for (const world::EffectKind kind :
+             {world::EffectKind::Comet, world::EffectKind::Aurora}) {
             const conf::Report r = conf::checkLeavesExist(kind, rainbow, "panel-rows");
-            INFO("kind: " << world::atmosphereKindName(kind) << "\n" << r.summary());
+            INFO("kind: " << world::effectKindName(kind) << "\n" << r.summary());
             CHECK(r.clean());
         }
     }
@@ -330,17 +330,17 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
 TEST_CASE("registered paths are read back from the registrar, not from the tables",
           "[world][atmospherics][conformance][params]") {
     // The property that makes the rest of this file mean anything: the path set comes from the
-    // call the engine makes. If `registerAtmosphericParameters` stopped writing a row, every check
+    // call the engine makes. If `registerEffectParameters` stopped writing a row, every check
     // above would notice, because none of them has a second source of truth to agree with.
-    for (const world::AtmosphereKind kind : conf::kAtmosphereKinds) {
-        const world::AtmosphericEffect probe = conf::probeEffect(kind, "conformance probe");
+    for (const world::EffectKind kind : conf::kEffectKinds) {
+        const world::EffectInstance probe = conf::probeEffect(kind, "conformance probe");
         const std::vector<std::string> paths = conf::registeredPaths(probe);
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
-        INFO("kind: " << world::atmosphereKindName(kind));
+        INFO("kind: " << world::effectKindName(kind));
         REQUIRE(paths.size() == leaves.size());
         REQUIRE(paths.size() > 20);
 
-        const std::string prefix = world::atmosphericParameterPrefix(probe.name);
+        const std::string prefix = world::effectParameterPrefix(probe.name);
         for (const std::string& p : paths) {
             INFO(p);
             CHECK(p.starts_with(prefix));

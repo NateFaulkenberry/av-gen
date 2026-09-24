@@ -9,7 +9,7 @@
 // spectrum. §4.2's per-band depths below are **depths on a signal that already exists**, not a
 // second analyzer -- each scales how much a band already in the frame block moves its feature.
 
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <array>
 #include <string>
@@ -18,7 +18,7 @@
 namespace avgen::world {
 namespace {
 
-using E = AtmosphericEffect;
+using E = EffectInstance;
 
 #define GET(expr) +[](const E& e) { return (expr); }
 #define SETF(lhs) +[](E& e, float v) { (lhs) = v; }
@@ -128,7 +128,7 @@ constexpr std::array<std::string_view, 5> kStyleNames{"Glowmere Bioluminescence"
                                                       "Violet Cosmic", "Rainbow Aurora",
                                                       "Subtle Night"};
 
-bool applyStyle(AtmosphericEffect& e, std::string_view style) {
+bool applyStyle(EffectInstance& e, std::string_view style) {
     AuroraAppearance& a = e.aurora.appearance;
     AuroraShape& s = e.aurora.shape;
     SkyRainbow& r = e.aurora.rainbow;
@@ -218,7 +218,7 @@ bool applyStyle(AtmosphericEffect& e, std::string_view style) {
     } else {
         return false;
     }
-    e.kind = AtmosphereKind::Aurora;
+    e.kind = EffectKind::Aurora;
     e.style = std::string(style);
     return true;
 }
@@ -246,10 +246,10 @@ constexpr EffectRoute kRoutes[] = {
     {"beat.pulse", "edgeBrightness", 1.1f, 10.0f, 260.0f},
 };
 
-AtmosphericEffect make(std::string name) {
-    AtmosphericEffect e;
+EffectInstance make(std::string name) {
+    EffectInstance e;
     e.name = std::move(name);
-    e.kind = AtmosphereKind::Aurora;
+    e.kind = EffectKind::Aurora;
     applyStyle(e, kStyleNames[0]);
     // An aurora is scenery that breathes rather than an event: it is on, and the music moves it.
     e.activation = Activation::Always;
@@ -264,7 +264,7 @@ AtmosphericEffect make(std::string name) {
 // An aurora has no per-frame trajectory: the shells are where they were authored, and the curtain's
 // motion is phase, computed in `packAurora` from the elapsed second. So the resolve is the anchor
 // and the field sample, and nothing else.
-bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx,
+bool fill(const EffectInstance& e, std::size_t, const EffectContext& ctx,
           const ResolvedAtmospheric& base, ResolvedAtmospheric& r) {
     r = base;
     const AuroraShape& s = e.aurora.shape;
@@ -275,11 +275,11 @@ bool fill(const AtmosphericEffect& e, std::size_t, const AtmosphericContext& ctx
     return true;
 }
 
-Result<void> validate(const AtmosphericEffect& e) { return e.aurora.validate(); }
+Result<void> validate(const EffectInstance& e) { return e.aurora.validate(); }
 
 EffectSchema buildSchema() {
     EffectSchema s;
-    s.kind = AtmosphereKind::Aurora;
+    s.kind = EffectKind::Aurora;
     
     s.key = "aurora";
     s.enumName = "Aurora";
@@ -300,6 +300,10 @@ EffectSchema buildSchema() {
     s.setAnchorPosition = +[](E& e, glm::vec3 v) { e.aurora.shape.anchorPosition = v; };
     s.factory = make;
     s.resolve.bucket = EffectBucket::Aurora;
+    // ADR-702: attached to the World; evaluated at its bucket's stage.
+    s.targets = targetBit(EffectTarget::World);
+    s.category = EffectCategory::Sky;
+    s.stage = RenderStage::Sky;
     s.resolve.fill = fill;
     s.validate = validate;
     return s;

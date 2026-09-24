@@ -1,7 +1,7 @@
-#include "world/atmospheric_params.hpp"
+#include "world/effects/effect_params.hpp"
 
 #include "params/parameter_set.hpp"
-#include "world/world_effects/effect_registry.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <algorithm>
 #include <vector>
@@ -10,7 +10,7 @@ namespace avgen::world {
 namespace {
 
 // ADR-500. This file used to hold the tables: four `constexpr FloatField[]`s, three `switch`es to
-// pick one, `sanitise` as a list of fifteen clamps, and `defaultAtmosphericRoutes` as a `switch`
+// pick one, `sanitise` as a list of fifteen clamps, and `defaultEffectRoutes` as a `switch`
 // with an arm per kind. All four are gone. Each effect declares its rows, its clamps and its routes
 // in its own file, and what is left here is the three loops -- register, apply, capture -- that
 // ADR-387 correctly identified as the part of the design that was already right.
@@ -77,27 +77,27 @@ params::ParamDesc<glm::vec3> col(std::string path, glm::vec3 def) {
 
 } // namespace
 
-std::string atmosphericParameterPrefix(std::string_view effectName) {
-    std::string prefix = "atmos/";
-    prefix.append(effectName);
+std::string effectParameterPrefix(std::string_view effectId) {
+    std::string prefix = "fx/";
+    prefix.append(effectId);
     prefix.push_back('/');
     return prefix;
 }
 
-const AtmosphericParams* AtmosphericParameters::find(std::string_view name) const {
-    for (const AtmosphericParams& p : effects) {
-        if (p.name == name) {
+const EffectParams* EffectParameters::find(std::string_view id) const {
+    for (const EffectParams& p : effects) {
+        if (p.id == id) {
             return &p;
         }
     }
     return nullptr;
 }
 
-AtmosphericParameters registerAtmosphericParameters(params::ParameterSet& params,
-                                                    std::span<const AtmosphericEffect> effects) {
-    AtmosphericParameters out;
+EffectParameters registerEffectParameters(params::ParameterSet& params,
+                                                    std::span<const EffectInstance> effects) {
+    EffectParameters out;
     out.effects.reserve(effects.size());
-    for (const AtmosphericEffect& e : effects) {
+    for (const EffectInstance& e : effects) {
         const EffectSchema* schema = effectSchema(e.kind);
         if (schema == nullptr) {
             // A kind with no schema. It registers nothing, so nothing about it is automatable --
@@ -105,15 +105,15 @@ AtmosphericParameters registerAtmosphericParameters(params::ParameterSet& params
             // belongs rather than in a frame nobody is watching.
             continue;
         }
-        const std::string base = atmosphericParameterPrefix(e.name);
+        const std::string base = effectParameterPrefix(e.id);
         const auto path = [&](const char* leaf) {
             std::string full = base + leaf;
             out.registered.push_back(full); // exact unregister, not a suffix table
             return full;
         };
 
-        AtmosphericParams p;
-        p.name = e.name;
+        EffectParams p;
+        p.id = e.id;
         p.kind = e.kind;
         p.enabled = &params.add(b(path("enabled"), e.enabled));
 
@@ -150,14 +150,16 @@ AtmosphericParameters registerAtmosphericParameters(params::ParameterSet& params
             addRow(field);
         }
         for (const EffectField& field : sharedEffectFields()) {
-            addRow(field);
+            if (sharedFieldApplies(*schema, field)) {
+                addRow(field);
+            }
         }
         out.effects.push_back(std::move(p));
     }
     return out;
 }
 
-void unregisterAtmosphericParameters(params::ParameterSet& params, AtmosphericParameters& registered) {
+void unregisterEffectParameters(params::ParameterSet& params, EffectParameters& registered) {
     for (const std::string& path : registered.registered) {
         params.remove(path);
     }
@@ -169,13 +171,18 @@ namespace {
 
 // One walk serving both directions, so the two cannot drift. `fromBase` picks what a save wants
 // (what somebody authored) over what the renderer wants (this frame's modulated finals).
-void copyParameters(const AtmosphericParameters& registered, std::vector<AtmosphericEffect>& effects,
+void copyParameters(const EffectParameters& registered, std::span<EffectInstance> effects,
                     bool fromBase) {
     const auto value = [fromBase](const params::IParameter* p, std::size_t component) {
         return fromBase ? p->baseComponent(component) : p->finalComponent(component);
     };
-    for (AtmosphericEffect& e : effects) {
-        const AtmosphericParams* p = registered.find(e.name);
+    for (std::size_t at = 0; at < effects.size(); ++at) {
+        EffectInstance& e = effects[at];
+        // Registered in list order, so the parameters of `effects[at]` are almost always at `at`;
+        // the search is for a list that changed shape since registration.
+        const EffectParams* p = at < registered.effects.size() && registered.effects[at].id == e.id
+                                    ? &registered.effects[at]
+                                    : registered.find(e.id);
         // Effects the registrar never saw are skipped rather than zeroed: a scene that added an
         // effect this frame has one the parameter table does not know about yet, and stamping
         // defaults onto it would erase what the file said.
@@ -210,7 +217,9 @@ void copyParameters(const AtmosphericParameters& registered, std::vector<Atmosph
             copyRow(field);
         }
         for (const EffectField& field : sharedEffectFields()) {
-            copyRow(field);
+            if (sharedFieldApplies(*schema, field)) {
+                copyRow(field);
+            }
         }
         if (!fromBase) {
             // Belt and braces before the values reach the resolver: a route can drive a final
@@ -224,16 +233,15 @@ void copyParameters(const AtmosphericParameters& registered, std::vector<Atmosph
 
 } // namespace
 
-void applyAtmosphericParameters(const AtmosphericParameters& registered, std::vector<AtmosphericEffect>& live) {
+void applyEffectParameters(const EffectParameters& registered, std::span<EffectInstance> live) {
     copyParameters(registered, live, false);
 }
 
-void captureAtmosphericParameters(const AtmosphericParameters& registered,
-                                  std::vector<AtmosphericEffect>& authored) {
+void captureEffectParameters(const EffectParameters& registered, std::span<EffectInstance> authored) {
     copyParameters(registered, authored, true);
 }
 
-std::vector<params::ModRoute> defaultAtmosphericRoutes(std::string_view effectName, AtmosphereKind kind) {
+std::vector<params::ModRoute> defaultEffectRoutes(std::string_view effectId, EffectKind kind) {
     // ADR-392's defect was that this function was `if aurora else comet`, so a vortex fell into the
     // comet arm and was handed three routes aimed at paths it does not register. Nothing failed: a
     // route naming an unregistered path binds to nothing, warns once at load, and is thereafter
@@ -248,7 +256,7 @@ std::vector<params::ModRoute> defaultAtmosphericRoutes(std::string_view effectNa
     if (schema == nullptr) {
         return routes;
     }
-    const std::string base = atmosphericParameterPrefix(effectName);
+    const std::string base = effectParameterPrefix(effectId);
     routes.reserve(schema->routes.size());
     for (const EffectRoute& r : schema->routes) {
         params::ModRoute route;

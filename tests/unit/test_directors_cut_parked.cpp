@@ -20,7 +20,7 @@
 #include "params/timeline.hpp"
 #include "scene/composition.hpp"
 #include "ui/ui_logic.hpp"
-#include "world/effects.hpp"
+#include "world/wave_effect.hpp"
 
 #include <nlohmann/json.hpp>
 

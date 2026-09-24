@@ -13,78 +13,33 @@
       "kind": "composition",
       "path": {
         "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "caa33c857220ca8f40a10655a9e5eb920311756482b95e072b4a6a8a590cf137",
-        "size": 13813
+        "sha256": "ab4bd7f85cee37577cf9d6a47820c63886a65268fe201abdcc75e6004d781d19",
+        "size": 13887
       }
     }
   },
-  "atmosphericEffects": [
+  "effects": [
     {
       "activation": "always",
-      "aurora": {
-        "appearance": {
-          "edgeBrightness": 2.4000000953674316,
-          "emission": 1.0,
-          "filaments": 0.8999999761581421,
-          "horizonGlow": 0.550000011920929,
-          "intensity": 2.5999999046325684,
-          "lowColor": [
-            0.15000000596046448,
-            1.0,
-            0.550000011920929
-          ],
-          "midColor": [
-            0.20000000298023224,
-            0.8500000238418579,
-            1.0
-          ],
-          "opacity": 0.8500000238418579,
-          "sparkle": 0.5,
-          "topColor": [
-            0.6499999761581421,
-            0.30000001192092896,
-            1.0
-          ]
-        },
-        "audio": {
-          "bass": 0.8500000238418579,
-          "beat": 0.3499999940395355,
-          "high": 0.699999988079071,
-          "lowMid": 0.550000011920929,
-          "mid": 0.44999998807907104,
-          "sensitivity": 1.0,
-          "spectrumShape": 0.75
-        },
-        "rainbow": {
-          "brightness": 1.0,
-          "enabled": false,
-          "hueOffset": 0.0,
-          "saturation": 0.8500000238418579,
-          "scale": 1.100000023841858,
-          "speed": 0.2199999988079071
-        },
-        "shape": {
-          "anchor": "camera",
-          "anchorPosition": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "baseHeight": -40.0,
-          "complexity": 26.0,
-          "curtainCount": 3.0,
-          "curtainHeight": 2600.0,
-          "driftSpeed": 0.12999999523162842,
-          "flowSpeed": 0.054999999701976776,
-          "layerSpacing": 0.3400000035762787,
-          "radius": 5200.0,
-          "turbulence": 0.44999998807907104,
-          "verticalSpeed": 0.07000000029802322,
-          "waveAmplitude": 0.30000001192092896,
-          "waveScale": 2.4000000953674316
-        }
+      "enabled": true,
+      "ground": {
+        "color": [
+          0.30000001192092896,
+          0.8500000238418579,
+          1.0
+        ],
+        "falloff": 2.0,
+        "intensity": 1.2200000286102295,
+        "mode": "subtle",
+        "radius": 220.0
       },
-      "comet": {
+      "id": "bioluminescent-comet",
+      "name": "Bioluminescent Comet",
+      "order": 0,
+      "owner": {
+        "kind": "world"
+      },
+      "parameters": {
         "appearance": {
           "coreColor": [
             0.550000011920929,
@@ -149,20 +104,6 @@
           "speed": 1.2999999523162842
         }
       },
-      "enabled": true,
-      "ground": {
-        "color": [
-          0.30000001192092896,
-          0.8500000238418579,
-          1.0
-        ],
-        "falloff": 2.0,
-        "intensity": 1.2200000286102295,
-        "mode": "subtle",
-        "radius": 220.0
-      },
-      "kind": "comet",
-      "name": "Bioluminescent Comet",
       "style": "Bioluminescent Cyan",
       "timing": {
         "delay": 0.0,
@@ -172,44 +113,36 @@
         "repeatSeconds": 0.0,
         "windowSeconds": 10.0,
         "windowStart": 4.0
-      }
+      },
+      "type": "comet"
     },
     {
-      "name": "Cosmic Vortex",
-      "enabled": true,
-      "kind": "vortex",
       "activation": "always",
-      "vortex": {
-        "cloudNoise": 0.0,
-"bandHarmonic": 0.5,
-"bandDepth": 0.75,
-"bandPitchDegrees": 15.0,
-"bandArms": 3.0,
-"eyeWallGain": 2.0,
-"eyeWallWidth": 0.1,
-"center": [
+      "enabled": true,
+      "id": "cosmic-vortex",
+      "name": "Cosmic Vortex",
+      "order": 1,
+      "owner": {
+        "kind": "world"
+      },
+      "parameters": {
+        "bandArms": 3.0,
+        "bandDepth": 0.75,
+        "bandHarmonic": 0.5,
+        "bandPitchDegrees": 15.0,
+        "breathAmount": 0.05,
+        "breathSpeed": 0.18,
+        "center": [
           0.0,
           -70.0,
           0.0
         ],
-        "radius": 200.0,
-        "funnelDepth": 1500.0,
-        "throat": 0.1,
-        "throatDensity": 0.55,
-        "thickness": 70.0,
-        "swirl": 6.5,
-        "rotationSpeed": 0.028,
-        "density": 0.0013,
-        "innerVoid": 0.2,
-        "contrast": 3.6,
-        "turbulence": 0.65,
-        "turbulenceScale": 2.4,
-        "breathAmount": 0.05,
-        "breathSpeed": 0.18,
-        "emission": 0.04,
-        "filaments": 2.2,
-        "cometResponse": 0.6,
-        "cometReach": 6.0,
+        "cloudNoise": 0.0,
+        "colorAccent": [
+          0.1,
+          0.34,
+          0.46
+        ],
         "colorDeep": [
           0.016,
           0.012,
@@ -220,12 +153,110 @@
           0.085,
           0.24
         ],
-        "colorAccent": [
-          0.1,
-          0.34,
-          0.46
-        ]
-      }
+        "cometReach": 6.0,
+        "cometResponse": 0.6,
+        "contrast": 3.6,
+        "density": 0.0013,
+        "emission": 0.04,
+        "eyeWallGain": 2.0,
+        "eyeWallWidth": 0.1,
+        "filaments": 2.2,
+        "funnelDepth": 1500.0,
+        "innerVoid": 0.2,
+        "radius": 200.0,
+        "rotationSpeed": 0.028,
+        "swirl": 6.5,
+        "thickness": 70.0,
+        "throat": 0.1,
+        "throatDensity": 0.55,
+        "turbulence": 0.65,
+        "turbulenceScale": 2.4
+      },
+      "type": "vortex"
+    },
+    {
+      "activation": "heroFocus",
+      "enabled": true,
+      "id": "floating-island-hero-mushroom-pulse",
+      "name": "Hero Mushroom Pulse",
+      "order": 0,
+      "owner": {
+        "kind": "entity",
+        "name": "floating-island"
+      },
+      "parameters": {
+        "appearance": {
+          "color": [
+            0.2199999988079071,
+            0.5799999833106995,
+            0.8600000143051147
+          ],
+          "edgeColor": [
+            0.8199999928474426,
+            0.9599999785423279,
+            1.0
+          ],
+          "edgeIntensity": 2.4000000953674316,
+          "intensity": 1.5,
+          "rainbow": false,
+          "rainbowBrightness": 1.0,
+          "rainbowSaturation": 0.8500000238418579,
+          "rainbowScale": 0.02500000037252903,
+          "rainbowSpeed": 0.3499999940395355,
+          "width": 1.0
+        },
+        "propagation": {
+          "beamRadius": 0.0,
+          "direction": "explicit",
+          "explicitDirection": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "falloff": 1.7000000476837158,
+          "forwardWeight": 1.0,
+          "frontWidth": 2.4000000953674316,
+          "kind": "radial",
+          "range": 46.0,
+          "ringCount": 3.0,
+          "speed": 11.0,
+          "startOffset": 0.0,
+          "targetWeight": 1.2000000476837158,
+          "trailLength": 16.0,
+          "velocityWeight": 0.6000000238418579,
+          "verticalExtent": 4.5,
+          "verticalGrowth": 0.30000001192092896
+        },
+        "response": {
+          "emissive": 0.8999999761581421,
+          "foliage": 1.350000023841858,
+          "ground": 0.8500000238418579,
+          "surface": 1.0
+        },
+        "source": {
+          "kind": "owner"
+        },
+        "sparkle": {
+          "density": 0.8999999761581421,
+          "enabled": false,
+          "fadeDistance": 85.0,
+          "intensity": 1.7999999523162842,
+          "seed": 1,
+          "size": 0.30000001192092896,
+          "speed": 0.6000000238418579
+        }
+      },
+      "style": "Water",
+      "timing": {
+        "delay": 0.3499999940395355,
+        "fadeIn": 0.6000000238418579,
+        "fadeOut": 1.2000000476837158,
+        "lifetime": 0.0,
+        "repeatSeconds": 2.0,
+        "windowSeconds": 6.0,
+        "windowStart": 0.0
+      },
+      "type": "groundPulse"
     }
   ],
   "control": {
@@ -275,69 +306,6 @@
     }
   ],
   "parameters": {
-    "atmos/Bioluminescent Comet/acceleration": 0.0,
-    "atmos/Bioluminescent Comet/arcLift": 37.0,
-    "atmos/Bioluminescent Comet/coreColor": [
-      0.550000011920929,
-      1.0,
-      1.0
-    ],
-    "atmos/Bioluminescent Comet/coreIntensity": 20.0,
-    "atmos/Bioluminescent Comet/curvature": 0.0,
-    "atmos/Bioluminescent Comet/delay": 0.0,
-    "atmos/Bioluminescent Comet/distance": 400.0,
-    "atmos/Bioluminescent Comet/enabled": true,
-    "atmos/Bioluminescent Comet/endAzimuth": -32.0,
-    "atmos/Bioluminescent Comet/endElevation": 9.0,
-    "atmos/Bioluminescent Comet/fadeIn": 0.5,
-    "atmos/Bioluminescent Comet/fadeOut": 0.7799999713897705,
-    "atmos/Bioluminescent Comet/flowSpeed": 0.3499999940395355,
-    "atmos/Bioluminescent Comet/groundColor": [
-      0.30000001192092896,
-      0.8500000238418579,
-      1.0
-    ],
-    "atmos/Bioluminescent Comet/groundFalloff": 2.0,
-    "atmos/Bioluminescent Comet/groundIntensity": 1.2200000286102295,
-    "atmos/Bioluminescent Comet/groundRadius": 220.0,
-    "atmos/Bioluminescent Comet/haloColor": [
-      0.1599999964237213,
-      0.7799999713897705,
-      1.0
-    ],
-    "atmos/Bioluminescent Comet/haloIntensity": 3.7899999618530273,
-    "atmos/Bioluminescent Comet/haloSize": 65.0,
-    "atmos/Bioluminescent Comet/headSize": 19.0,
-    "atmos/Bioluminescent Comet/lifetime": 0.0,
-    "atmos/Bioluminescent Comet/rainbow": true,
-    "atmos/Bioluminescent Comet/rainbowBrightness": 1.0,
-    "atmos/Bioluminescent Comet/rainbowHue": 0.0,
-    "atmos/Bioluminescent Comet/rainbowSaturation": 0.8500000238418579,
-    "atmos/Bioluminescent Comet/rainbowScale": 1.100000023841858,
-    "atmos/Bioluminescent Comet/rainbowSpeed": 0.2199999988079071,
-    "atmos/Bioluminescent Comet/repeat": 0.0,
-    "atmos/Bioluminescent Comet/sparkle": true,
-    "atmos/Bioluminescent Comet/sparkleDensity": 0.010999999940395355,
-    "atmos/Bioluminescent Comet/sparkleIntensity": 7.0,
-    "atmos/Bioluminescent Comet/sparkleSize": 0.10999999940395355,
-    "atmos/Bioluminescent Comet/sparkleSpeed": 1.2999999523162842,
-    "atmos/Bioluminescent Comet/speed": 1.0,
-    "atmos/Bioluminescent Comet/startAzimuth": -131.0,
-    "atmos/Bioluminescent Comet/startElevation": 10.0,
-    "atmos/Bioluminescent Comet/tailColor": [
-      0.41999998688697815,
-      0.3400000035762787,
-      1.0
-    ],
-    "atmos/Bioluminescent Comet/tailFalloff": 1.850000023841858,
-    "atmos/Bioluminescent Comet/tailIntensity": 5.0,
-    "atmos/Bioluminescent Comet/tailLength": 2000.0,
-    "atmos/Bioluminescent Comet/tailWidth": 38.0,
-    "atmos/Bioluminescent Comet/travelSeconds": 3.4000000953674316,
-    "atmos/Bioluminescent Comet/windowSeconds": 10.0,
-    "atmos/Bioluminescent Comet/windowStart": 4.0,
-    "atmos/Bioluminescent Comet/wispAmount": 62.0,
-    "atmos/Bioluminescent Comet/wispScale": 0.002199999988079071,
     "audio/inputGain": 1.0,
     "camera/distance": 1000.0,
     "camera/exposure/aperture": 5.599999904632568,
@@ -437,6 +405,111 @@
     ],
     "env/skyBloom": 0.0,
     "env/skybox": false,
+    "fx/bioluminescent-comet/acceleration": 0.0,
+    "fx/bioluminescent-comet/arcLift": 37.0,
+    "fx/bioluminescent-comet/coreColor": [
+      0.550000011920929,
+      1.0,
+      1.0
+    ],
+    "fx/bioluminescent-comet/coreIntensity": 20.0,
+    "fx/bioluminescent-comet/curvature": 0.0,
+    "fx/bioluminescent-comet/delay": 0.0,
+    "fx/bioluminescent-comet/distance": 400.0,
+    "fx/bioluminescent-comet/enabled": true,
+    "fx/bioluminescent-comet/endAzimuth": -32.0,
+    "fx/bioluminescent-comet/endElevation": 9.0,
+    "fx/bioluminescent-comet/fadeIn": 0.5,
+    "fx/bioluminescent-comet/fadeOut": 0.7799999713897705,
+    "fx/bioluminescent-comet/flowSpeed": 0.3499999940395355,
+    "fx/bioluminescent-comet/groundColor": [
+      0.30000001192092896,
+      0.8500000238418579,
+      1.0
+    ],
+    "fx/bioluminescent-comet/groundFalloff": 2.0,
+    "fx/bioluminescent-comet/groundIntensity": 1.2200000286102295,
+    "fx/bioluminescent-comet/groundRadius": 220.0,
+    "fx/bioluminescent-comet/haloColor": [
+      0.1599999964237213,
+      0.7799999713897705,
+      1.0
+    ],
+    "fx/bioluminescent-comet/haloIntensity": 3.7899999618530273,
+    "fx/bioluminescent-comet/haloSize": 65.0,
+    "fx/bioluminescent-comet/headSize": 19.0,
+    "fx/bioluminescent-comet/lifetime": 0.0,
+    "fx/bioluminescent-comet/rainbow": true,
+    "fx/bioluminescent-comet/rainbowBrightness": 1.0,
+    "fx/bioluminescent-comet/rainbowHue": 0.0,
+    "fx/bioluminescent-comet/rainbowSaturation": 0.8500000238418579,
+    "fx/bioluminescent-comet/rainbowScale": 1.100000023841858,
+    "fx/bioluminescent-comet/rainbowSpeed": 0.2199999988079071,
+    "fx/bioluminescent-comet/repeat": 0.0,
+    "fx/bioluminescent-comet/sparkle": true,
+    "fx/bioluminescent-comet/sparkleDensity": 0.010999999940395355,
+    "fx/bioluminescent-comet/sparkleIntensity": 7.0,
+    "fx/bioluminescent-comet/sparkleSize": 0.10999999940395355,
+    "fx/bioluminescent-comet/sparkleSpeed": 1.2999999523162842,
+    "fx/bioluminescent-comet/speed": 1.0,
+    "fx/bioluminescent-comet/startAzimuth": -131.0,
+    "fx/bioluminescent-comet/startElevation": 10.0,
+    "fx/bioluminescent-comet/tailColor": [
+      0.41999998688697815,
+      0.3400000035762787,
+      1.0
+    ],
+    "fx/bioluminescent-comet/tailFalloff": 1.850000023841858,
+    "fx/bioluminescent-comet/tailIntensity": 5.0,
+    "fx/bioluminescent-comet/tailLength": 2000.0,
+    "fx/bioluminescent-comet/tailWidth": 38.0,
+    "fx/bioluminescent-comet/travelSeconds": 3.4000000953674316,
+    "fx/bioluminescent-comet/windowSeconds": 10.0,
+    "fx/bioluminescent-comet/windowStart": 4.0,
+    "fx/bioluminescent-comet/wispAmount": 62.0,
+    "fx/bioluminescent-comet/wispScale": 0.002199999988079071,
+    "fx/floating-island-hero-mushroom-pulse/beamRadius": 0.0,
+    "fx/floating-island-hero-mushroom-pulse/color": [
+      0.2199999988079071,
+      0.5799999833106995,
+      0.8600000143051147
+    ],
+    "fx/floating-island-hero-mushroom-pulse/delay": 0.3499999940395355,
+    "fx/floating-island-hero-mushroom-pulse/edgeColor": [
+      0.8199999928474426,
+      0.9599999785423279,
+      1.0
+    ],
+    "fx/floating-island-hero-mushroom-pulse/edgeIntensity": 2.4000000953674316,
+    "fx/floating-island-hero-mushroom-pulse/enabled": false,
+    "fx/floating-island-hero-mushroom-pulse/fadeIn": 0.6000000238418579,
+    "fx/floating-island-hero-mushroom-pulse/fadeOut": 1.2000000476837158,
+    "fx/floating-island-hero-mushroom-pulse/falloff": 1.7000000476837158,
+    "fx/floating-island-hero-mushroom-pulse/frontWidth": 2.4000000953674316,
+    "fx/floating-island-hero-mushroom-pulse/intensity": 1.5,
+    "fx/floating-island-hero-mushroom-pulse/lifetime": 0.0,
+    "fx/floating-island-hero-mushroom-pulse/rainbow": true,
+    "fx/floating-island-hero-mushroom-pulse/rainbowBrightness": 1.0,
+    "fx/floating-island-hero-mushroom-pulse/rainbowSaturation": 0.8500000238418579,
+    "fx/floating-island-hero-mushroom-pulse/rainbowScale": 0.02500000037252903,
+    "fx/floating-island-hero-mushroom-pulse/rainbowSpeed": 0.3499999940395355,
+    "fx/floating-island-hero-mushroom-pulse/range": 46.0,
+    "fx/floating-island-hero-mushroom-pulse/repeat": 2.0,
+    "fx/floating-island-hero-mushroom-pulse/response/emissive": 0.8999999761581421,
+    "fx/floating-island-hero-mushroom-pulse/response/foliage": 1.350000023841858,
+    "fx/floating-island-hero-mushroom-pulse/response/ground": 0.8500000238418579,
+    "fx/floating-island-hero-mushroom-pulse/response/surface": 1.0,
+    "fx/floating-island-hero-mushroom-pulse/ringCount": 3.0,
+    "fx/floating-island-hero-mushroom-pulse/sparkle": true,
+    "fx/floating-island-hero-mushroom-pulse/sparkleDensity": 0.8999999761581421,
+    "fx/floating-island-hero-mushroom-pulse/sparkleIntensity": 1.7999999523162842,
+    "fx/floating-island-hero-mushroom-pulse/sparkleSize": 0.30000001192092896,
+    "fx/floating-island-hero-mushroom-pulse/sparkleSpeed": 0.6000000238418579,
+    "fx/floating-island-hero-mushroom-pulse/speed": 11.0,
+    "fx/floating-island-hero-mushroom-pulse/startOffset": 0.0,
+    "fx/floating-island-hero-mushroom-pulse/trailLength": 16.0,
+    "fx/floating-island-hero-mushroom-pulse/verticalExtent": 4.5,
+    "fx/floating-island-hero-mushroom-pulse/width": 1.0,
     "lights/celestial-key/angularSize": 1.8,
     "lights/celestial-key/azimuth": -50.0,
     "lights/celestial-key/color": [
@@ -1494,11 +1567,11 @@
     "scene/volumeAnisotropy": 0.30000001192092896,
     "scene/volumeDensity": 0.0,
     "scene/volumeEmission": 0.0,
+    "scene/volumeJitter": 0.0,
     "scene/volumeNoise": 0.0,
     "scene/volumeNoiseScale": 0.10000000149011612,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
     "scene/volumeScattering": 1.0,
-    "scene/volumeJitter": 0.0,
     "scene/volumeSteps": 32,
     "scene/windDirection": 0.0,
     "scene/windSpeed": 1.319000005722046,
@@ -1540,49 +1613,7 @@
     "sources/tilt-z/beatsPerCycle": 1.0,
     "sources/tilt-z/phase": 0.6000000238418579,
     "sources/tilt-z/pulseWidth": 0.5,
-    "sources/tilt-z/rate": 0.0066999997943639755,
-    "worldfx/Hero Mushroom Pulse/beamRadius": 0.0,
-    "worldfx/Hero Mushroom Pulse/color": [
-      0.2199999988079071,
-      0.5799999833106995,
-      0.8600000143051147
-    ],
-    "worldfx/Hero Mushroom Pulse/delay": 0.3499999940395355,
-    "worldfx/Hero Mushroom Pulse/edgeColor": [
-      0.8199999928474426,
-      0.9599999785423279,
-      1.0
-    ],
-    "worldfx/Hero Mushroom Pulse/edgeIntensity": 2.4000000953674316,
-    "worldfx/Hero Mushroom Pulse/enabled": false,
-    "worldfx/Hero Mushroom Pulse/fadeIn": 0.6000000238418579,
-    "worldfx/Hero Mushroom Pulse/fadeOut": 1.2000000476837158,
-    "worldfx/Hero Mushroom Pulse/falloff": 1.7000000476837158,
-    "worldfx/Hero Mushroom Pulse/frontWidth": 2.4000000953674316,
-    "worldfx/Hero Mushroom Pulse/intensity": 1.5,
-    "worldfx/Hero Mushroom Pulse/lifetime": 0.0,
-    "worldfx/Hero Mushroom Pulse/rainbow": true,
-    "worldfx/Hero Mushroom Pulse/rainbowBrightness": 1.0,
-    "worldfx/Hero Mushroom Pulse/rainbowSaturation": 0.8500000238418579,
-    "worldfx/Hero Mushroom Pulse/rainbowScale": 0.02500000037252903,
-    "worldfx/Hero Mushroom Pulse/rainbowSpeed": 0.3499999940395355,
-    "worldfx/Hero Mushroom Pulse/range": 46.0,
-    "worldfx/Hero Mushroom Pulse/repeat": 2.0,
-    "worldfx/Hero Mushroom Pulse/response/emissive": 0.8999999761581421,
-    "worldfx/Hero Mushroom Pulse/response/foliage": 1.350000023841858,
-    "worldfx/Hero Mushroom Pulse/response/ground": 0.8500000238418579,
-    "worldfx/Hero Mushroom Pulse/response/surface": 1.0,
-    "worldfx/Hero Mushroom Pulse/ringCount": 3.0,
-    "worldfx/Hero Mushroom Pulse/sparkle": true,
-    "worldfx/Hero Mushroom Pulse/sparkleDensity": 0.8999999761581421,
-    "worldfx/Hero Mushroom Pulse/sparkleIntensity": 1.7999999523162842,
-    "worldfx/Hero Mushroom Pulse/sparkleSize": 0.30000001192092896,
-    "worldfx/Hero Mushroom Pulse/sparkleSpeed": 0.6000000238418579,
-    "worldfx/Hero Mushroom Pulse/speed": 11.0,
-    "worldfx/Hero Mushroom Pulse/startOffset": 0.0,
-    "worldfx/Hero Mushroom Pulse/trailLength": 16.0,
-    "worldfx/Hero Mushroom Pulse/verticalExtent": 4.5,
-    "worldfx/Hero Mushroom Pulse/width": 1.0
+    "sources/tilt-z/rate": 0.0066999997943639755
   },
   "presets": [
     {
@@ -1918,7 +1949,7 @@
       "op": "add",
       "polarity": "unipolar",
       "source": "beat.pulse",
-      "target": "atmos/Bioluminescent Comet/coreIntensity"
+      "target": "fx/bioluminescent-comet/coreIntensity"
     },
     {
       "amount": 1.0,
@@ -1978,7 +2009,7 @@
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.bass",
-      "target": "atmos/Cosmic Vortex/breathAmount"
+      "target": "fx/cosmic-vortex/breathAmount"
     },
     {
       "amount": 0.0009,
@@ -2008,7 +2039,7 @@
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.bass",
-      "target": "atmos/Cosmic Vortex/density"
+      "target": "fx/cosmic-vortex/density"
     },
     {
       "amount": 0.22,
@@ -2038,7 +2069,7 @@
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.mid",
-      "target": "atmos/Cosmic Vortex/turbulence"
+      "target": "fx/cosmic-vortex/turbulence"
     },
     {
       "amount": 45.0,
@@ -2098,7 +2129,7 @@
       "op": "add",
       "polarity": "unipolar",
       "source": "audio.treble",
-      "target": "atmos/Cosmic Vortex/filaments"
+      "target": "fx/cosmic-vortex/filaments"
     },
     {
       "amount": 0.9,
@@ -2158,7 +2189,7 @@
       "op": "add",
       "polarity": "unipolar",
       "source": "state.progress",
-      "target": "atmos/Cosmic Vortex/emission"
+      "target": "fx/cosmic-vortex/emission"
     },
     {
       "amount": 30.0,
@@ -2460,82 +2491,5 @@
       }
     }
   ],
-  "version": 4,
-  "worldEffects": [
-    {
-      "activation": "heroFocus",
-      "appearance": {
-        "color": [
-          0.2199999988079071,
-          0.5799999833106995,
-          0.8600000143051147
-        ],
-        "edgeColor": [
-          0.8199999928474426,
-          0.9599999785423279,
-          1.0
-        ],
-        "edgeIntensity": 2.4000000953674316,
-        "intensity": 1.5,
-        "rainbow": false,
-        "rainbowBrightness": 1.0,
-        "rainbowSaturation": 0.8500000238418579,
-        "rainbowScale": 0.02500000037252903,
-        "rainbowSpeed": 0.3499999940395355,
-        "width": 1.0
-      },
-      "enabled": true,
-      "name": "Hero Mushroom Pulse",
-      "propagation": {
-        "beamRadius": 0.0,
-        "direction": "explicit",
-        "explicitDirection": [
-          0.0,
-          0.0,
-          -1.0
-        ],
-        "falloff": 1.7000000476837158,
-        "forwardWeight": 1.0,
-        "frontWidth": 2.4000000953674316,
-        "kind": "radial",
-        "range": 46.0,
-        "ringCount": 3.0,
-        "speed": 11.0,
-        "startOffset": 0.0,
-        "targetWeight": 1.2000000476837158,
-        "trailLength": 16.0,
-        "velocityWeight": 0.6000000238418579,
-        "verticalExtent": 4.5,
-        "verticalGrowth": 0.30000001192092896
-      },
-      "response": {
-        "emissive": 0.8999999761581421,
-        "foliage": 1.350000023841858,
-        "ground": 0.8500000238418579,
-        "surface": 1.0
-      },
-      "source": {
-        "kind": "focusHero"
-      },
-      "sparkle": {
-        "density": 0.8999999761581421,
-        "enabled": false,
-        "fadeDistance": 85.0,
-        "intensity": 1.7999999523162842,
-        "seed": 1,
-        "size": 0.30000001192092896,
-        "speed": 0.6000000238418579
-      },
-      "style": "Water",
-      "timing": {
-        "delay": 0.3499999940395355,
-        "fadeIn": 0.6000000238418579,
-        "fadeOut": 1.2000000476837158,
-        "lifetime": 0.0,
-        "repeatSeconds": 2.0,
-        "windowSeconds": 6.0,
-        "windowStart": 0.0
-      }
-    }
-  ]
+  "version": 4
 }
