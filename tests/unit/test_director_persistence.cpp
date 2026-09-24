@@ -66,6 +66,24 @@ seq::Sequence directorShapedSequence() {
     shot.in = seq::Transition{seq::TransitionKind::Cut, 0.0};
     piece.shots.push_back(shot);
 
+    // A second shot with hand-authored camera keys: what the compiler emits when no behaviour can
+    // express a move (spec §15 prefers behaviours, but keys are the fallback and must survive too).
+    seq::Shot keyed;
+    keyed.name = "rook-pass";
+    keyed.startSeconds = 95.0;
+    keyed.durationSeconds = 2.0;
+    keyed.camera.kind = seq::CameraKind::Keys;
+    seq::CameraKey k0;
+    k0.timeSeconds = 0.0;
+    k0.position = glm::vec3(2.0f, 1.0f, -3.0f);
+    k0.target = glm::vec3(0.0f, 1.0f, 0.0f);
+    seq::CameraKey k1 = k0;
+    k1.timeSeconds = 2.0;
+    k1.position = glm::vec3(4.0f, 4.0f, 5.0f);
+    keyed.camera.keys = {k0, k1};
+    keyed.in = seq::Transition{seq::TransitionKind::MatchCut, 0.0};
+    piece.shots.push_back(keyed);
+
     seq::Actor rook;
     rook.id = "rook";
     rook.keys.push_back(seq::ActorKey{90.0, glm::vec3(1.0f, 0.0f, 2.0f), std::nullopt, std::nullopt,

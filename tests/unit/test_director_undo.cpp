@@ -16,6 +16,7 @@
 #include "app/job_system.hpp"
 #include "params/serialization.hpp"
 #include "scene/camera_rig.hpp"
+#include "seq/events.hpp"
 #include "seq/sequence.hpp"
 #include "ui/ai_panel_logic.hpp"
 #include "ui/edit_history.hpp"
@@ -153,6 +154,8 @@ TEST_CASE("one captured operation across sequence, cameras, keys, routes and a b
     engine.newComposition();
     params::IParameter& gain = engine.params().add(
         params::ParamDesc<float>{.path = "test/gain", .defaultValue = 1.0f, .hardMin = 0.0f, .hardMax = 10.0f});
+    engine.params().add(
+        params::ParamDesc<float>{.path = "test/flash", .defaultValue = 0.0f, .hardMin = 0.0f, .hardMax = 10.0f});
     ui::EditHistory history;
     const Documents before = Documents::of(engine);
 
@@ -167,6 +170,28 @@ TEST_CASE("one captured operation across sequence, cameras, keys, routes and a b
         shot.durationSeconds = 5.0;
         piece.shots.push_back(shot);
         piece.markers.push_back(seq::Marker{92.55, "rook.jump_peak", seq::MarkerKind::Cue});
+        // An actor with keys and cues, and an event on the marker: the rest of what a compiled
+        // performance writes into the sequence, undone by the same record.
+        seq::Actor rook;
+        rook.id = "rook";
+        rook.keys.push_back(seq::ActorKey{90.0, glm::vec3(0.0f), std::nullopt, std::nullopt,
+                                          params::KeyInterp::Linear});
+        rook.keys.push_back(seq::ActorKey{95.0, glm::vec3(10.0f, 0.0f, 0.0f), std::nullopt, std::nullopt,
+                                          params::KeyInterp::Linear});
+        rook.clips.push_back(seq::ClipCue{90.0, "Running", 1.0f, -1.0f});
+        piece.actors.push_back(rook);
+        seq::SequenceEvent peak;
+        peak.id = "peak";
+        peak.when.kind = seq::TriggerKind::Cue;
+        peak.when.name = "rook.jump_peak";
+        peak.what.kind = seq::EventActionKind::SetParameter;
+        // A different parameter from the author's keys below, deliberately: `seq::install` owns
+        // every track on a target the sequence bakes to, and erases an author track sharing one on
+        // the next install. That is the engine's rule, not the history's, and the Director's
+        // compiler must respect it (baked cues own their targets).
+        peak.what.target = "test/flash";
+        peak.what.amount = glm::vec4(2.0f, 0.0f, 0.0f, 0.0f);
+        piece.events.push_back(peak);
         REQUIRE(engine.setSequence(piece).has_value());
 
         scene::CameraDirection direction = engine.composition()->cameraDirection();
@@ -203,6 +228,8 @@ TEST_CASE("one captured operation across sequence, cameras, keys, routes and a b
     CHECK(undone.ok());
     checkSame(Documents::of(engine), before);
     CHECK(engine.sequence().shots.empty());
+    CHECK(engine.sequence().actors.empty());
+    CHECK(engine.sequence().events.empty());
     CHECK(engine.composition()->cameraDirection().cameras.size() == 1);
 
     CHECK(history.redo(engine).ok());

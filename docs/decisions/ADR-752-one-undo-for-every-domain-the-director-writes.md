@@ -46,9 +46,18 @@ follow that pattern:
   written into its struct (`capturedCameraDirection`). A restored camera registers its channels
   from the struct, and `ParameterSet::add` keeps an existing base but seeds a new one from the
   struct, so without this a deleted camera that had been moved came back where it was created.
-- `applyEdit` order: automation, then cameras, then the sequence, then the rest. A camera being
-  restored must find its tracks already present, because `setCameraDirection` erases the tracks of
-  a camera that leaves.
+- `applyEdit` order: **the sequence, then automation, then cameras**, then the rest.
+  - The sequence goes first because the automation record holds the whole timeline, including the
+    tracks the sequence baked. Installing the side's sequence first re-bakes exactly those tracks
+    (a bake is pure) and sets the engine's owned targets to match, and then the timeline overwrite
+    restores every track in its captured order. In the other order, a redo duplicated every baked
+    track: the install erases only the targets the *outgoing* install owned. The redo arm of the
+    capture test found this once actors and events were added to it.
+  - Cameras go last because a camera being restored must find its tracks already present, and
+    `setCameraDirection` erases the tracks of a camera that leaves.
+- `seq::install` owns **every** track on a target the sequence bakes to, and erases an author track
+  that shares one on the next install. That is the engine's rule, not the history's. The Director's
+  compiler must therefore never put author keys on a parameter a baked cue drives.
 
 **One measurement of "what an operation changed": `app::EditCapture`.** `begin` snapshots every
 domain; `finish` diffs them and returns one `EditCommand`, already applied. It covers parameter

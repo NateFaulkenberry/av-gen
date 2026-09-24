@@ -189,32 +189,6 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         core::applyInjectedDelayForOpenInteraction();
     }
 
-    // The author's automation first (ADR-752), because the two records after it rebind onto it:
-    // `setCameraDirection` re-registers camera channels and rebinds, and a camera that comes back
-    // must find the tracks aimed at it already in the timeline. The copies carry whatever
-    // `IParameter*` was bound when they were captured, so they are unbound on arrival; the rebind at
-    // the end of this function (or the one inside `setCameraDirection`) binds them to live ones.
-    if (command.automation != nullptr) {
-        const AutomationChange& change = *command.automation;
-        engine.timeline() = forward ? change.after : change.before;
-        engine.timeline().unbind();
-        if (change.routesTouched) {
-            engine.modulator().routes() = forward ? change.routesAfter : change.routesBefore;
-        }
-        out.automationInstalled = 1;
-    }
-    // The camera collection (ADR-752). Before the sequence, whose bake may name a camera-track shot's
-    // time span but never a camera, and before the composition check below, because
-    // `setCameraDirection` needs a composition and says so in its own words.
-    if (command.cameras != nullptr) {
-        const CameraDirectionChange& change = *command.cameras;
-        if (auto r = engine.setCameraDirection(forward ? change.after : change.before); !r) {
-            out.problems.push_back(r.error().message);
-        } else {
-            out.cameraDirectionsInstalled = 1;
-        }
-    }
-
     // The sequencer's half, first and on its own terms. It is settled before the composition is
     // even looked for, because a sequence edit does not need one -- and because `setSequence`
     // bakes, which wants the scene as it will be rather than as it was.
@@ -233,6 +207,41 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
             out.timelinesInstalled = 1;
         }
     }
+
+    // The author's automation (ADR-752), AFTER the sequence. The record holds the whole timeline as
+    // it was captured, the tracks the sequence baked included -- so the sequence must already be the
+    // side being restored when it lands: `setSequence` above re-baked exactly those tracks (a bake
+    // is a pure function of the sequence) and set the engine's owned targets to match, and this
+    // overwrite puts every track back in its captured order. The other order duplicates them: the
+    // sequence's install erases only the targets the *outgoing* install owned, so it would append a
+    // second copy beside the ones this restored. Found by the redo arm of test_director_undo.cpp.
+    //
+    // Before the cameras: a camera that comes back must find the tracks aimed at it already here.
+    // The copies carry whatever `IParameter*` was bound when they were captured, so they are
+    // unbound on arrival; a later rebind (`setCameraDirection`'s, or the one this function ends
+    // with) binds them to live parameters.
+    if (command.automation != nullptr) {
+        const AutomationChange& change = *command.automation;
+        engine.timeline() = forward ? change.after : change.before;
+        engine.timeline().unbind();
+        if (change.routesTouched) {
+            engine.modulator().routes() = forward ? change.routesAfter : change.routesBefore;
+        }
+        out.automationInstalled = 1;
+    }
+
+    // The camera collection (ADR-752), last of the three: after the automation it needs present, and
+    // before the composition check below, because `setCameraDirection` needs a composition and says
+    // so in its own words. The sequence's bake names no camera, so nothing above depended on it.
+    if (command.cameras != nullptr) {
+        const CameraDirectionChange& change = *command.cameras;
+        if (auto r = engine.setCameraDirection(forward ? change.after : change.before); !r) {
+            out.problems.push_back(r.error().message);
+        } else {
+            out.cameraDirectionsInstalled = 1;
+        }
+    }
+
 
     // The authored lights, before the composition null-check below rejects the command, because a
     // light list needs a composition and says so in its own words.
