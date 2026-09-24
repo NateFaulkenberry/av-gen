@@ -143,7 +143,7 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         computeLayout_ = device.CreateBindGroupLayout(&desc);
     }
     {
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 6> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -160,6 +160,8 @@ Result<void> ParticleRenderer::init(wgpu::Buffer fieldBlock, wgpu::Buffer spline
         entries[4].visibility = wgpu::ShaderStage::Fragment;
         entries[4].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
         entries[4].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[5] = entries[4];
+        entries[5].binding = 12; // ADR-715: the terrain's baked height, read by the same fog coupling
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "particles-render-layout";
         desc.entryCount = entries.size();
@@ -369,14 +371,17 @@ void ParticleRenderer::ensurePool(std::size_t index, std::uint32_t capacity, std
 
 void ParticleRenderer::ensureRenderGroup(Pool& pool) {
     const wgpu::TextureView& depthView = frame_.linearDepth ? frame_.linearDepth : depthPlaceholderView_;
-    if (pool.renderGroup && pool.renderDepthView.Get() == depthView.Get()) {
+    // ADR-715: the placeholder is never read -- `terrain1.w` is 0 whenever this is bound.
+    const wgpu::TextureView& terrainView = frame_.terrainHeight ? frame_.terrainHeight : depthPlaceholderView_;
+    if (pool.renderGroup && pool.renderDepthView.Get() == depthView.Get() &&
+        pool.renderTerrainView.Get() == terrainView.Get()) {
         return;
     }
     const std::uint64_t listBytes = static_cast<std::uint64_t>(pool.capacity) * 4;
     const std::uint64_t historyBytes =
         pool.historyPoints > 0 ? static_cast<std::uint64_t>(pool.capacity) * pool.historyPoints * scene::kTrailBytesPerPoint
                                : 16;
-    std::array<wgpu::BindGroupEntry, 5> entries{};
+    std::array<wgpu::BindGroupEntry, 6> entries{};
     entries[0].binding = 0;
     entries[0].buffer = pool.uniforms;
     entries[0].size = sizeof(ParticleUniforms);
@@ -391,6 +396,8 @@ void ParticleRenderer::ensureRenderGroup(Pool& pool) {
     entries[3].size = historyBytes;
     entries[4].binding = 13;
     entries[4].textureView = depthView;
+    entries[5].binding = 12;
+    entries[5].textureView = terrainView;
     wgpu::BindGroupDescriptor rdesc{};
     rdesc.label = "particles-render-group";
     rdesc.layout = renderLayout_;
@@ -398,6 +405,7 @@ void ParticleRenderer::ensureRenderGroup(Pool& pool) {
     rdesc.entries = entries.data();
     pool.renderGroup = context_.device().CreateBindGroup(&rdesc);
     pool.renderDepthView = depthView;
+    pool.renderTerrainView = terrainView;
 }
 
 void ParticleRenderer::setFrameContext(const ParticleFrameContext& context) { frame_ = context; }
@@ -653,8 +661,12 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         u.fog = glm::vec4(frame_.fogDensity, frame_.fogHeight, frame_.fogHeightFalloff, frame_.fogAbsorption);
         u.fog2 = glm::vec4(frame_.fogMaxDistance, std::clamp(sys.fogCoupling, 0.0f, 1.0f),
                            std::max(0.0f, sys.volumeGlow), frame_.linearDepth ? 1.0f : 0.0f);
+        const bool ground = frame_.terrainHeight && frame_.terrainMap1.w > 0.5f;
         u.fog3 = glm::vec4(std::clamp(frame_.fogUpperDensity, 0.0f, 1.0f),
-                           std::clamp(frame_.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
+                           std::clamp(frame_.fogHeightCurve, 0.0f, 1.0f),
+                           ground ? std::clamp(frame_.fogGroundFollow, 0.0f, 1.0f) : 0.0f, 0.0f);
+        u.terrain0 = ground ? frame_.terrainMap0 : glm::vec4(0.0f);
+        u.terrain1 = ground ? frame_.terrainMap1 : glm::vec4(0.0f);
         // Lifetime curves (ADR-040): at most kMaxCurveKeys keys each; fewer than two disables the
         // curve in the shader and the linear ramp above is used instead.
         const auto keyCount = [](std::size_t n) {

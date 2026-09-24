@@ -368,8 +368,11 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     u.fogColor = glm::vec4(env.fogColor, 0.0f);
     // ADR-568 (§7): the height layer's shape. Clamped here, for the reason the surface path is --
     // both ends of both controls are meaningful and outside them the profile stops being one.
+    // ADR-715: z is the ground follow, 0 without a terrain -- the same rule `frame.fogShape.z`
+    // follows, so the march and the surface fog take the ground branch together or not at all.
     u.heightFog = glm::vec4(std::clamp(env.fogUpperDensity, 0.0f, 1.0f),
-                            std::clamp(env.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
+                            std::clamp(env.fogHeightCurve, 0.0f, 1.0f),
+                            scene.terrainGround.valid() ? std::clamp(env.fogGroundFollow, 0.0f, 1.0f) : 0.0f, 0.0f);
     // ADR-570 (§20/§22). The step count is NOT scaled by the quality tier's `volumeStepScale`, and
     // that is deliberate: ADR-035's rule lets a tier scale "sample counts, resolutions and history
     // lengths", and this is a sample count -- but it is also the difference between a fog bank

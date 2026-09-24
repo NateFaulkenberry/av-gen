@@ -83,7 +83,8 @@ struct VolumeUniforms {
     // lane that means something else. ADR-562 §9's finding is what that costs when it goes wrong,
     // and `VolumeUniforms` has no lane budget to defend -- it is not a packed per-kind block, it
     // is a uniform with a sizeof assertion, so a named lane is free and a reused one is not.
-    // x = fogUpperDensity, y = fogHeightCurve, zw = 0.
+    // x = fogUpperDensity, y = fogHeightCurve, z = fogGroundFollow (ADR-715; 0 without a terrain),
+    // w = 0. The terrain's height itself is read through the frame group, as the surface fog reads it.
     glm::vec4 heightFog;
     // ADR-570 (§20/§22): the shared self-shadow march. x = steps along the ray toward each light
     // (0 = off and the shader returns 1.0 from its first branch, so every existing frame is
