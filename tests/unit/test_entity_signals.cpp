@@ -28,6 +28,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -230,4 +231,61 @@ TEST_CASE("only what reads an owner's motion subscribes it: Glowmere's hero puls
     REQUIRE(engine.setEffects({pulse}).has_value()); // any rebind re-reads the routes
     CHECK(engine.historyBank().find("craft") < engine.historyBank().ringCount());
     CHECK(engine.signals().find("entity.craft.speed").has_value());
+}
+
+namespace {
+
+std::string historyDigest(const world::HistoryBank& bank) {
+    std::ostringstream o;
+    o << std::hexfloat;
+    for (std::size_t r = 0; r < bank.ringCount(); ++r) {
+        for (std::size_t i = 0; i < bank.sampleCount(r); ++i) {
+            const world::HistorySample& s = bank.sample(r, i);
+            o << s.t << ' ' << s.position.x << ',' << s.position.y << ',' << s.position.z << '\n';
+        }
+    }
+    return o.str();
+}
+
+// A lamp with no simulation at all, flown across the scene by a keyed position track: the other
+// way a node moves, and the one the seek replay does not replay (it applies no timeline).
+void installKeyedLamp(app::Engine& engine) {
+    REQUIRE(engine.setCompositionJson(nlohmann::json::parse(R"({ "format": "avgen-scene", "version": 1,
+        "name": "keyed", "nodes": [ { "kind": "orb", "name": "lamp", "position": [0, 5, 0] } ] })"))
+                .has_value());
+    world::EffectInstance trail = trailOn("lamp");
+    trail.id = "lamp-trail";
+    REQUIRE(engine.setEffects({trail}).has_value());
+    params::Track fly;
+    fly.target = "nodes/lamp/position";
+    fly.keys.push_back(params::Key{.time = 0.0, .value = {0.0f, 5.0f, 0.0f, 0.0f}});
+    fly.keys.push_back(params::Key{.time = 4.0, .value = {30.0f, 9.0f, -10.0f, 0.0f}});
+    fly.keys.push_back(params::Key{.time = 8.0, .value = {-20.0f, 6.0f, 25.0f, 0.0f}});
+    engine.timeline().addTrack(fly);
+    REQUIRE(engine.timeline().bind(engine.params()).has_value());
+}
+
+} // namespace
+
+TEST_CASE("a node flown by a timeline track records the same history played and scrubbed",
+          "[signals][hist][seek][determinism]") {
+    constexpr long long kTarget = 330; // 5.5 s
+    app::Engine played(app::EngineMode::Offline);
+    installKeyedLamp(played);
+    for (long long f = 0; f <= kTarget; ++f) {
+        frameAt(played, f);
+    }
+    app::Engine scrubbed(app::EngineMode::Offline);
+    installKeyedLamp(scrubbed);
+    frameAt(scrubbed, 0);
+    scrubbed.seekSeconds(static_cast<double>(kTarget) / 60.0);
+
+    // The control: the lamp is on the move (the track, not a simulation, is moving it).
+    glm::vec3 v(0.0f);
+    REQUIRE(played.historyBank().velocity("lamp", v));
+    CHECK(glm::length(v) > 5.0f);
+    CHECK(historyDigest(scrubbed.historyBank()) == historyDigest(played.historyBank()));
+    frameAt(played, kTarget + 1);
+    frameAt(scrubbed, kTarget + 1);
+    CHECK(signal(played, "entity.lamp.speed") == signal(scrubbed, "entity.lamp.speed"));
 }
