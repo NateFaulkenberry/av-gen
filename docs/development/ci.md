@@ -105,6 +105,12 @@ A same-repository pull request doesn't run CI a second time: its branch push alr
 GitHub shows those checks on the PR. Only a PR from a fork gets its own `pull_request` run, with
 read-only permissions and no secrets.
 
+**Branch protection caution.** A same-repository PR also gets a `pull_request` run, and all of its
+jobs are *skipped* (verified on PR #1). Those skipped checks carry the same names as the real
+ones, and GitHub treats a skipped required check as passing. So if required checks are ever
+configured, make sure they cannot be satisfied by the skipped `pull_request` run: for example,
+require the `Report` result, or drop same-repo PRs from the trigger.
+
 **Concurrency.** A new push to a branch cancels the in-flight run for that branch. On `main`,
 nothing is cancelled.
 
@@ -281,17 +287,81 @@ Why this runner:
 - When the image drops Xcode 26.6, the Toolchain step fails with a message listing what is
   available. Bump `XCODE_VERSION` and `DEVELOPER_DIR` in both workflow files together.
 
-## Timings
+## Timings (measured 2026-09-24)
 
-TBD
+| | Cold (no caches) | Warm (CPM hit, ccache hit) |
+|---|---|---|
+| CPM dependency download + configure | 80-112 s | 37-61 s |
+| Build, all targets (Release) | 983-1694 s (16-28 min; varies by VM) | 42-70 s (1236 of 1237 objects from ccache) |
+| Build job, end to end | 18-31 min | ~2-3 min |
+| CPU suite, 3 shards | 5m 36s - 6m 34s | same (tests are not cached) |
+| **Push → verdict, wall clock** | **~25-37 min** | **~9-10 min** (run 36066934636: 9m 06s) |
+| GPU job (informational, main/nightly) | ~15 min (853 s for `avgen_render_tests`) | same |
+| TSan build + 226-case subset | 25 min build + 27 min tests | n/a |
+
+Runs: cold [36060799310](https://github.com/NateFaulkenberry/av-gen/actions/runs/36060799310), warm
+[36066934636](https://github.com/NateFaulkenberry/av-gen/actions/runs/36066934636).
+
+For comparison, the whole CPU suite takes about 17 minutes as one process on the developer's Mac
+under its usual load. It takes about 6 minutes on the runner in three shards, and occupies no
+local CPU. This is not a claim that the runner is faster: the runner has 3 cores to the Mac's
+many, and the win comes from sharding and from the work being somewhere else. Nothing in the loop
+above needs the Mac.
+
+A change to a widely included header rebuilds most of the tree whatever ccache holds. Expect
+something between the two columns for those.
+
+**Minutes.** The repository is public, so standard GitHub-hosted runners, macOS included, cost
+nothing. They are limited only by concurrency (5 macOS jobs at a time on a free account). For
+reference, if it were private (macOS billed at 10× Linux):
+
+- a warm push run is ~10 macOS job-minutes, or ~100 billed minutes;
+- a cold run is ~40, or ~400 billed.
 
 ## Sanitizer exclusions
 
-TBD
+The ASan/UBSan job runs the same default CPU set as the per-push job, minus the same two
+documented crash exclusions (`tools/ci/hosted-runner-exceptions.txt`). `ASAN_EXCLUDE` in
+`sanitizers.yml` is empty.
+
+The brief expected the bit-exact golden trace tests to drift by 1 ULP under the -O0 sanitizer
+build. On a fresh clone they cannot run at all: all three stored-baseline comparisons need
+`assets/aliens`, and they skip or fail for lack of it:
+
+- `test_decision_extraction.cpp:141`, "…walks the same route to the bit";
+- `test_motion_matching_default_off.cpp:116`, the pre-wiring digest;
+- `test_visual_regression.cpp:177`, the posed alien baseline.
+
+So no exclusion was needed for them on CI, and none was invented. There is also no shared
+`[golden]`-style tag to exclude them by: `[golden]` in `test_motion_golden_scenarios.cpp` is a
+structural check. If they are ever run on an asset-carrying runner, exclude them by exact name
+here, with the reason.
+
+GPU tests are not run under ASan. Measured locally, that is about six cases an hour
+(docs/renderer-forensics-report.md), and the hosted GPU is not authoritative anyway.
 
 ## TSan subset
 
-TBD
+A full TSan sweep of the CPU suite has been running locally for over 15 hours, so it does not fit
+a hosted job's 6-hour limit. The job runs the tags whose cases start threads (`TSAN_SUBSET` in
+`sanitizers.yml`):
+
+`[jobs] [job] [motionthreads] [threading] [worldbuilder] [ring] [analysis] [motionlib] [ai] [transport]`
+
+That is 226 cases, which took 27 minutes on 3 shards (run 36060803359). Result:
+
+- **zero ThreadSanitizer reports.**
+- 12 assertion failures, all timing under TSan's slowdown or missing assets:
+  - `jobs.waitFor(id, 10s)` timing out in `test_world_builder`;
+  - `test_pathtrace_job` progress windows;
+  - the 100 µs transport ceiling;
+  - a Glowmere LOD case;
+  - an audio case.
+
+The TSan job therefore uses `--gate sanitizer`. **Only a race report, a crash, a timeout or an
+unexercised case fails it**, and assertion failures are listed but do not gate. The subset is
+labelled `SUBSET` in its summary. It is not whole-suite TSan coverage and must not be quoted as
+such.
 
 ## Security
 
@@ -300,6 +370,23 @@ TBD
 - Third-party actions are pinned to full commit SHAs, with the version in a comment.
 - `workflow_dispatch` inputs reach scripts only through `env:`, never interpolated into a script.
 - Fork PRs run with GitHub's read-only token.
+
+## Open decisions and follow-ups
+
+1. **Assets (owner's decision).** 1.4 GB locally under `assets/`. Nothing has been published.
+   The options, cheapest first:
+   - (a) accept the gap and keep running asset-bound tags locally;
+   - (b) a private, access-controlled asset bundle fetched with a read-only secret. This means a
+     secret, and it means the workflow must never run for forks;
+   - (c) a self-hosted Apple Silicon runner that already has the assets. This also fixes the GPU.
+2. **GPU.** Only a self-hosted runner on real Apple Silicon makes `avgen_render_tests`
+   authoritative remotely. Until then it is local.
+3. **Two test defects** exposed by the runner: `test_body_compensation.cpp:433` (segfault) and
+   the `test_ai_tools.cpp:780` abort. Each should SKIP or fail cleanly without its asset, after
+   which its exclusion can go.
+4. **Tests that write into `examples/world`** during a run (`test_glowmere_multicam*`,
+   `test_motion_matching_default_off`). They are harmless on CI but racy between concurrent
+   local agents.
 
 ## Files
 
