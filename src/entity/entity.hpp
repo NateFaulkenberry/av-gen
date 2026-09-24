@@ -340,6 +340,13 @@ struct DirectorMotion {
     // speed came from navigation or from a director.
     float speed = 0.0f;
     bool hasSpeed = false;
+    // A scripted performance (ADR-758) owns the body OUTRIGHT, which staging's motions do not claim:
+    //  * its position is re-asserted after the behaviours, so none that moves the body itself (an
+    //    `orbit` with simulation authority, `explore`'s airborne hop) can overwrite it on the step;
+    //  * its speed IS the body's speed, read by the gait unramped -- through ADR-620's acceleration
+    //    limit a run-in cut to at 6 m/s read as a walk for its first second.
+    // Off for staging, so a carried animal's legs still ramp and nothing staged changes.
+    bool performance = false;
 };
 
 // What answered a `socketTransform` call (ADR-274). Three outcomes, because the two that used to

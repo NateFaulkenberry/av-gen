@@ -444,6 +444,12 @@ struct BakeOptions {
     // bar counter but a sequence only carries the beats, so the fold back into bars is stated here
     // rather than assumed to be four everywhere.
     int beatsPerBar = 4;
+    // Nodes an entity drives (ADR-758). An actor on one of these is a scripted PERFORMANCE: the
+    // installer hands it to the entity as a director motion for its span, so the bake writes no
+    // position, rotation or scale track for it -- a track would be summed with the entity's own
+    // travel, and would pin the node for the whole film rather than the performance. Its clip cues
+    // and visibility are unaffected.
+    std::vector<std::string> performerNodes;
 };
 
 struct OverlayBinding {

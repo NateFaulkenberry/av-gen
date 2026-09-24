@@ -1,4 +1,5 @@
 #include "directing/compiler.hpp"
+#include "directing/performance.hpp"
 
 #include "app/cinematic.hpp"
 #include "seq/events.hpp"
@@ -23,6 +24,11 @@ namespace avgen::directing {
 const Place* SceneFacts::place(std::string_view id) const {
     const auto it = std::find_if(places.begin(), places.end(), [&](const Place& p) { return p.id == id; });
     return it == places.end() ? nullptr : &*it;
+}
+
+const CharacterMark* SceneFacts::character(std::string_view id) const {
+    const auto it = std::find_if(characters.begin(), characters.end(), [&](const CharacterMark& c) { return c.id == id; });
+    return it == characters.end() ? nullptr : &*it;
 }
 
 const std::vector<float>* SceneFacts::base(std::string_view path) const {
@@ -157,6 +163,14 @@ std::optional<nlohmann::json> contentOf(const ContentRef& ref, const Staging& st
         }
         break;
     case ContentDomain::SequenceActor:
+        for (const seq::Actor& a : sequence.actors) {
+            if (a.id == ref.id) {
+                seq::Sequence one;
+                one.actors.push_back(a);
+                return one.toJson().at("actors").at(0);
+            }
+        }
+        break;
     case ContentDomain::SequenceTrack:
     case ContentDomain::TimelineTrack: break;
     }
@@ -423,6 +437,32 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         }
     }
 
+    // ---- performances (ADR-758, ADR-759) --------------------------------------------------------------
+    std::map<std::string, double> eventTimes;
+    for (std::size_t i = 0; i < plan.performances.size(); ++i) {
+        const PlanPerformance& pp = plan.performances[i];
+        if (v.isBlocked(pp.key)) {
+            continue;
+        }
+        CompiledPerformance cp = compilePerformance(plan, i, facts, v.times);
+        std::erase_if(out.staged.sequence.actors, [&](const seq::Actor& a) { return a.id == cp.actor.id; });
+        out.staged.sequence.actors.push_back(cp.actor);
+        record(pp.key, ContentDomain::SequenceActor, cp.actor.id);
+        line(removedLine(pp.key), pp.key,
+             fmt::format("Performance {}: {}-{}, {} key(s) from its mark", cp.actor.id, clock(cp.from), clock(cp.to),
+                         cp.actor.keys.size()));
+        for (const std::string& s : cp.summary) {
+            line(removedLine(pp.key), pp.key, "  " + s);
+        }
+        for (const auto& [name, time] : cp.events) {
+            eventTimes[name] = time;
+            seq::Marker marker{time, name, seq::MarkerKind::Cue};
+            out.staged.sequence.markers.push_back(marker);
+            record(pp.key, ContentDomain::SequenceMarker, markerId(marker));
+            line(removedLine(pp.key), pp.key, fmt::format("Marker {} {} (computed)", name, clock(time)));
+        }
+    }
+
     // ---- markers -------------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.markers.size(); ++i) {
         const PlanMarker& pm = plan.markers[i];
@@ -441,10 +481,17 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
     // ---- parameter cues ------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.cues.size(); ++i) {
         const PlanCue& pc = plan.cues[i];
-        if (v.isBlocked(pc.key) || !pc.at) {
+        if (v.isBlocked(pc.key)) {
             continue;
         }
-        const double t = *v.times.at(fmt::format("/cues/{}/at", i));
+        double t = 0.0;
+        if (pc.at) {
+            t = *v.times.at(fmt::format("/cues/{}/at", i));
+        } else if (const auto e = eventTimes.find(pc.on); e != eventTimes.end()) {
+            t = e->second; // a plan event, at the time the compiler computed for it (spec §30)
+        } else {
+            continue;
+        }
         std::string parameter = pc.parameter;
         if (pc.effect) {
             const ResolvedEffect effect = resolveEffect(*pc.effect, plan, facts);

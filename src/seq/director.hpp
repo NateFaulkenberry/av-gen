@@ -31,7 +31,11 @@
 #include "core/error.hpp"
 #include "params/timeline.hpp"
 #include "seq/layers.hpp"
+#include "scene/composition.hpp"
 #include "seq/sequence.hpp"
+
+#include <functional>
+#include <optional>
 
 #include <span>
 #include <string>
@@ -82,6 +86,16 @@ void uninstall(params::Timeline& timeline, params::ParameterSet& params, LayerSi
 // Cheap enough to call unconditionally -- it is a handful of string comparisons per actor, and the
 // composition ignores a request identical to the one already in force.
 void applyAnimation(const Sequence& sequence, scene::Composition& composition, double seconds);
+
+// ADR-758: an actor that moves an entity's node, as the performance the composition applies to that
+// entity -- its span (first to last key or path time), and its pose at a time as a pure function of
+// the actor: position; speed from the path's own velocity, for the gait; heading from explicit
+// rotation keys where the actor has them, else from the direction of travel, else the last direction
+// it travelled in within the span. Nothing when the actor has no span (clips only, or one key).
+// `groundAt`, when the scene has terrain, gives the pose its height: a directed body is airborne to
+// its `ground` behaviour, so the performance itself must stand on the ground.
+[[nodiscard]] std::optional<scene::Composition::Performer> performerFor(
+    const Actor& actor, std::string entity, std::function<float(float x, float z)> groundAt = {});
 // ...including the clips a `PlayClip` event scheduled. Same guarantee: pure in `seconds`.
 void applyAnimation(const Sequence& sequence, std::span<const ScheduledClip> scheduled,
                     scene::Composition& composition, double seconds);

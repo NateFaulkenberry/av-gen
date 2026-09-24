@@ -282,6 +282,26 @@ Result<seq::InstallReport> Engine::installSequence() {
             };
         }
     }
+    // ADR-758: an actor on a node an entity drives is a scripted performance. It moves the ENTITY
+    // (a director motion for its span) instead of baking tracks onto the node, where they would be
+    // summed with the entity's own travel and pin the node for the whole film.
+    std::vector<scene::Composition::Performer> performers;
+    if (scene::Composition* comp = composition()) {
+        for (const seq::Actor& actor : sequence_.actors) {
+            const std::string node = actor.nodeName();
+            const auto desc = std::find_if(comp->entities().begin(), comp->entities().end(), [&](const entity::EntityDesc& d) {
+                return (d.node.empty() ? d.name : d.node) == node;
+            });
+            if (desc == comp->entities().end()) {
+                continue;
+            }
+            options.performerNodes.push_back(node);
+            if (auto performer = seq::performerFor(actor, desc->name, options.groundHeightAt)) {
+                performers.push_back(std::move(*performer));
+            }
+        }
+        comp->setPerformers(std::move(performers));
+    }
     auto report = seq::install(sequence_, timeline_, params_, sink, sequenceTargets_, options);
     if (!report) {
         // The install left the timeline consistent (old tracks gone) even when the bake failed, so
@@ -315,6 +335,9 @@ Result<seq::InstallReport> Engine::installSequence() {
 }
 
 void Engine::clearSequence() {
+    if (scene::Composition* comp = composition()) {
+        comp->setPerformers({}); // ADR-758: no sequence, no performances
+    }
     seq::CompositionLayerSink sink(layers_, &params_);
     seq::uninstall(timeline_, params_, sink, sequenceTargets_);
     sequenceTargets_.clear();

@@ -102,6 +102,18 @@ namespace avgen::app {
         }
         facts.parameterBases.emplace_back(std::string(p->path()), std::move(base));
     }
+    if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
+        for (const entity::EntityDesc& desc : comp->entities()) {
+            directing::CharacterMark mark;
+            mark.id = desc.name;
+            mark.node = desc.node.empty() ? desc.name : desc.node;
+            if (const params::IParameter* p = engine.params().find("nodes/" + mark.node + "/position");
+                p != nullptr && p->componentCount() == 3) {
+                mark.anchor = glm::vec3(p->baseComponent(0), p->baseComponent(1), p->baseComponent(2)); // the BASE
+            }
+            facts.characters.push_back(std::move(mark));
+        }
+    }
     const auto& owned = engine.sequenceTargets();
     for (const params::Track& track : engine.timeline().tracks()) {
         if (std::find(owned.begin(), owned.end(), track.target) == owned.end()) {

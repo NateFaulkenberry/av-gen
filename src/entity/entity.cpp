@@ -1930,7 +1930,9 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
             behavior->update(bc, entity.state_, entity.motion_);
         }
         directorAfter(entity);
-        limitSpeedToGait(entity.desc_.gait, speedBefore, stepDt, entity.state_.speed);
+        if (!(entity.director_.active && entity.director_.performance)) { // ADR-758
+            limitSpeedToGait(entity.desc_.gait, speedBefore, stepDt, entity.state_.speed);
+        }
         rescaleIntent(entity.state_);
         // The facing, canonicalised once after everything that steers has had its turn --
         // exactly where `update` does it. Without it a replayed yaw is the total a body has
@@ -2214,6 +2216,14 @@ void EntityWorld::directorBefore(Entity& entity) {
 void EntityWorld::directorAfter(Entity& entity) {
     // The director's *additive* half, after the behaviours rather than before them: a craft keeps
     // hovering, drifting and banking while it is being flown somewhere.
+    if (entity.director_.active && entity.director_.performance) {
+        // ADR-758: a performance owns the body outright -- whatever a behaviour wrote since
+        // `directorBefore`, the body is where the performance says.
+        entity.state_.travel = entity.director_.position - entity.state_.anchor;
+        if (entity.director_.hasYaw) {
+            entity.state_.yaw = entity.director_.yaw;
+        }
+    }
     if (entity.director_.active) {
         entity.motion_.rotation += entity.director_.rotation;
         if (entity.director_.hasSpeed) {
@@ -2520,7 +2530,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // before the arc, the velocity measurement and the gait, all three of which read the speed
         // and would otherwise read one that teleported. The arc's `arcHoldStill_` stop below stays
         // a hard stop on purpose: a body held by a beam is not decelerating, it is being held.
-        limitSpeedToGait(entity.desc_.gait, speedBefore, ctx.dt, entity.state_.speed);
+        if (!(entity.director_.active && entity.director_.performance)) { // ADR-758
+            limitSpeedToGait(entity.desc_.gait, speedBefore, ctx.dt, entity.state_.speed);
+        }
         rescaleIntent(entity.state_);
         // The body's facing, not the total it has turned. Canonicalised here, once, after everything
         // that steers has had its turn and before anything reads it -- the node's rotation, the

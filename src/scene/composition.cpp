@@ -2769,6 +2769,41 @@ void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
     entityWorld_.applySpatialGain(modulator.routes());
 }
 
+void Composition::setPerformers(std::vector<Performer> performers) {
+    performers_ = std::move(performers);
+}
+
+void Composition::applyPerformers(double now, double dt) {
+    for (const Performer& p : performers_) {
+        if (!p.pose) {
+            continue;
+        }
+        entity::Entity* e = entityWorld_.find(p.entity);
+        if (e == nullptr) {
+            continue;
+        }
+        if (now >= p.from && now < p.to) {
+            const PerformerPose pose = p.pose(now);
+            entity::DirectorMotion motion;
+            motion.active = true;
+            motion.position = pose.position;
+            if (pose.yawRadians) {
+                motion.yaw = *pose.yawRadians;
+                motion.hasYaw = true;
+            }
+            motion.speed = pose.speed;
+            motion.hasSpeed = true;
+            motion.performance = true;
+            e->setDirectorMotion(motion);
+        } else if (now >= p.to && now - dt < p.to) {
+            // The step the span ends on hands the body back -- where the performance left it, since
+            // `travel` still says so -- and nothing else. A pure function of (now, dt), so a replay
+            // that steps across the end releases on the same step a play does.
+            e->setDirectorMotion(entity::DirectorMotion{});
+        }
+    }
+}
+
 void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {
     if (entityWorld_.empty() || params_ == nullptr) {
         return;
@@ -2790,6 +2825,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         staging_.update(stageCtx);
         raiseDirectorBeats(time.renderTime);
     }
+    applyPerformers(time.renderTime, time.deltaTime); // ADR-758: after the director, before the step
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.
     observeCameraEvents(time.renderTime);
@@ -2970,6 +3006,9 @@ std::uint64_t Composition::replayInputKey() const {
     };
     mix(staging_.epoch());
     mix(stagingDesc_.empty() ? 0u : 1u);
+    for (const Performer& p : performers_) { // ADR-758: a changed performance is a different replay
+        mix(p.signature);
+    }
     mix(bits(rootAngle_));
     mix(bits(center_.x));
     mix(bits(center_.y));
@@ -2995,6 +3034,10 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     if (stagingDesc_.empty()) {
         entity::EntityWorld::SeekHooks hooks;
         hooks.inputKey = withHistoryKey(replayInputKey(), history);
+        if (!performers_.empty()) {
+            // ADR-758: the director-less replay still has the one director a sequence brings.
+            hooks.before = [this](double now, double dt) { applyPerformers(now, dt); };
+        }
         if (history != nullptr) {
             hooks.after = [&](double now, double) {
                 // The drawn transform a play's flattening would have used: finals rebuilt from the
@@ -3036,6 +3079,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         ctx.bus = nullptr;
         staging_.update(ctx);
         raiseDirectorBeats(now);
+        applyPerformers(now, dt); // ADR-758: the same point of the step a play applies them at
     };
     hooks.after = [&](double now, double) {
         // The offsets a play's entity pass writes, and the "flattening" the next step's director

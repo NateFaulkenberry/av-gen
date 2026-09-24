@@ -1,6 +1,7 @@
 #include "directing/validator.hpp"
 
 #include "directing/compiler.hpp"
+#include "directing/performance.hpp"
 #include "directing/text.hpp"
 #include "seq/events.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -301,6 +302,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
     // ---- the previous revision: hand edits are never overwritten ------------------------------------
     std::vector<std::string> ownShots;   // seq shots the previous revision made, still as made
     std::vector<std::string> ownMarkers; // "name@time"
+    std::vector<std::string> ownActors;
     if (const Plan* previous = facts.plan(plan.id); previous != nullptr) {
         for (const ContentRef& ref : previous->produced) {
             const auto now = contentOf(ref, facts.staged);
@@ -321,6 +323,8 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 ownShots.push_back(ref.id);
             } else if (ref.domain == ContentDomain::SequenceMarker) {
                 ownMarkers.push_back(ref.id);
+            } else if (ref.domain == ContentDomain::SequenceActor) {
+                ownActors.push_back(ref.id);
             }
         }
     }
@@ -541,11 +545,85 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 }
             }
         }
-        // Scripted performances compile in Slice 2. Reported last, so the findings above -- which a
-        // revision can act on -- come first.
-        Issue& issue = c.error(IssueCode::Unsupported, p.key, at,
-                               "character performances are not compiled yet; nothing will move");
-        issue.cause = "scripted performance compilation is Slice 2";
+        // What this build compiles (ADR-759). Reported after the capability and spatial findings,
+        // which a revision can act on.
+        if (p.mode != PerformanceMode::Scripted) {
+            c.error(IssueCode::Unsupported, p.key, at + "/mode",
+                    fmt::format("{} performances are not compiled yet (Slice 4); only scripted ones", performanceModeName(p.mode)));
+        }
+        for (std::size_t b = 0; b < p.beats.size(); ++b) {
+            const PerformanceBeat& beat = p.beats[b];
+            const std::string where = fmt::format("{}/beats/{}", at, b);
+            if (!beatCompilable(beat.action)) {
+                if (card->can(activityFor(beat.action)) || beat.action == "look_at") {
+                    Issue& issue = c.error(IssueCode::Unsupported, p.key, where + "/action",
+                                           fmt::format("'{}' is not compiled yet", beat.action));
+                    issue.cause = actionClearsTarget(beat.action) || beat.action == "land" || beat.action == "fall"
+                                      ? "airborne actions compile in Slice 3"
+                                      : "this build compiles run_to, walk_to, run_past, walk_past, run, walk, hold and look_at";
+                }
+                continue;
+            }
+            const bool needsTarget = beat.action.ends_with("_to") || beat.action.ends_with("_past");
+            if (needsTarget && beat.target.empty()) {
+                c.error(IssueCode::SchemaInvalid, p.key, where + "/target", fmt::format("'{}' needs a target", beat.action));
+            }
+            if (!beat.target.empty()) {
+                const SubjectKind tk = kindOf(beat.target);
+                if (tk == SubjectKind::Entity) {
+                    c.error(IssueCode::Unsupported, p.key, where + "/target",
+                            "a performance toward another character is not compiled: where a character is, is its "
+                            "simulation's, not a plan-time fact (ADR-758)");
+                } else if (tk != SubjectKind::Unresolved && facts.place(idOf(beat.target)) == nullptr) {
+                    c.error(IssueCode::SpatialInfeasible, p.key, where + "/target",
+                            fmt::format("'{}' has no known place to move toward", idOf(beat.target)));
+                }
+            }
+        }
+        const std::optional<double> start = performanceStart(plan, i, v.times);
+        if (!start) {
+            Issue& issue = c.error(IssueCode::SchemaInvalid, p.key, at,
+                                   "a performance needs a start: give its first beat a time, or a shot of the same subject");
+            issue.suggestions = {"\"at\" on the first beat", "a shot whose subject is the performer"};
+        } else {
+            // ADR-758: a performance takes the body at its first instant, from wherever the
+            // simulation had it. A cut hides that; anywhere else it is a visible jump.
+            bool atCut = false;
+            for (std::size_t s = 0; s < plan.shots.size(); ++s) {
+                const auto shotStart = v.times.at(fmt::format("/shots/{}/start", s));
+                atCut = atCut || (shotStart && std::abs(*shotStart - *start) < 1e-3);
+            }
+            for (const seq::Shot& shot : facts.staged.sequence.shots) {
+                atCut = atCut || std::abs(shot.startSeconds - *start) < 1e-3;
+            }
+            for (const scene::CameraShot& cut : facts.staged.cameras.shots) {
+                atCut = atCut || std::abs(cut.startSeconds - *start) < 1e-3;
+            }
+            if (!atCut) {
+                Issue& issue = c.warning(IssueCode::TimingConflict, p.key, at,
+                                         fmt::format("the performance starts at {:.3f}s, not at a cut: {} will visibly jump "
+                                                     "from where the simulation has them to the performance's mark",
+                                                     *start, card->subject));
+                issue.suggestions = {"start the performance with a shot of the performer"};
+            }
+        }
+        // One actor per character: another performance of the same subject in this plan, or an actor
+        // already on this character that this plan did not make, would fight for the body.
+        for (std::size_t o = 0; o < i; ++o) {
+            if (plan.performances[o].subject == p.subject) {
+                c.error(IssueCode::TimingConflict, p.key, at,
+                        fmt::format("{} already has a performance in this plan ('{}'); combine the beats",
+                                    card->subject, plan.performances[o].key));
+            }
+        }
+        for (const seq::Actor& actor : facts.staged.sequence.actors) {
+            const bool mine = std::find(ownActors.begin(), ownActors.end(), actor.id) != ownActors.end();
+            if (!mine && actor.id == card->subject) {
+                c.error(IssueCode::TimingConflict, p.key, at,
+                        fmt::format("the sequence already has an actor '{}' that this plan did not make", actor.id))
+                    .suggestions = {"remove that actor first", "revise the plan that made it"};
+            }
+        }
     }
 
     // ---- cues ---------------------------------------------------------------------------------------

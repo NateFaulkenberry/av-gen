@@ -24,12 +24,12 @@
         "beats": [
           {
             "action": "run_to",
-            "target": "umbra"
+            "target": "umbra",
+            "at": "2:03"
           },
           {
             "action": "jump",
             "target": "umbra",
-            "at": "2:05",
             "emits": "rook.jump_peak"
           }
         ]
@@ -47,9 +47,9 @@
   },
   "expect": {
     "errors": [
+      "BLOCKED",
       "SPATIAL_INFEASIBLE",
-      "UNSUPPORTED",
-      "BLOCKED"
+      "UNSUPPORTED"
     ],
     "blocked": [
       "jump",

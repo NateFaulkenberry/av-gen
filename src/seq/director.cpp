@@ -1,4 +1,7 @@
 #include "seq/director.hpp"
+#include <cmath>
+#include <numbers>
+#include <limits>
 
 #include "core/log.hpp"
 #include "scene/composition.hpp"
@@ -127,6 +130,90 @@ void applyAnimation(const Sequence& sequence, std::span<const ScheduledClip> sch
         (void)composition.setNodeAnimation(cue.node, cue.clip, cue.startSeconds, cue.blendSeconds,
                                            cue.speed, /*rebase=*/true);
     }
+}
+
+std::optional<scene::Composition::Performer> performerFor(const Actor& actor, std::string entity,
+                                                          std::function<float(float x, float z)> groundAt) {
+    double from = std::numeric_limits<double>::infinity();
+    double to = -std::numeric_limits<double>::infinity();
+    for (const ActorKey& k : actor.keys) {
+        from = std::min(from, k.timeSeconds);
+        to = std::max(to, k.timeSeconds);
+    }
+    if (actor.path.active) {
+        from = std::min(from, actor.path.startSeconds);
+        to = std::max(to, actor.path.endSeconds);
+    }
+    if (!(to > from)) {
+        return std::nullopt;
+    }
+    scene::Composition::Performer out;
+    out.entity = std::move(entity);
+    out.from = from;
+    out.to = to;
+    {
+        // The signature is the actor's own document: any edit to it is a different replay.
+        Sequence one;
+        one.actors.push_back(actor);
+        std::uint64_t h = 1469598103934665603ULL;
+        for (const char c : one.toJson().dump() + "|" + out.entity) {
+            h ^= static_cast<unsigned char>(c);
+            h *= 1099511628211ULL;
+        }
+        out.signature = h;
+    }
+    out.pose = [actor, from, to, groundAt](double t) {
+        constexpr double kH = 1.0 / 120.0;
+        const auto velocity = [&](double at) {
+            const double a = std::max(from, at - kH);
+            const double b = std::min(to, at + kH);
+            return b > a ? (actor.positionAt(b) - actor.positionAt(a)) / static_cast<float>(b - a) : glm::vec3(0.0f);
+        };
+        scene::Composition::PerformerPose pose;
+        pose.position = actor.positionAt(t);
+        if (groundAt) {
+            pose.position.y = groundAt(pose.position.x, pose.position.z);
+        }
+        const glm::vec3 v = velocity(t);
+        pose.speed = glm::length(glm::vec2(v.x, v.z));
+        constexpr float kRadians = std::numbers::pi_v<float> / 180.0f;
+        // Explicit headings win BETWEEN TWO CONSECUTIVE KEYS THAT BOTH STATE ONE -- a `look_at` is a
+        // pair of rotation keys, not a direction of travel. Elsewhere the body faces where it goes.
+        for (std::size_t i = 0; i + 1 < actor.keys.size(); ++i) {
+            const ActorKey& a = actor.keys[i];
+            const ActorKey& b = actor.keys[i + 1];
+            if (a.rotationDegrees && b.rotationDegrees && t >= a.timeSeconds && t <= b.timeSeconds) {
+                const double span = b.timeSeconds - a.timeSeconds;
+                const float w = span > 1e-9 ? static_cast<float>((t - a.timeSeconds) / span) : 0.0f;
+                pose.yawRadians = std::lerp(a.rotationDegrees->y, b.rotationDegrees->y, w) * kRadians;
+                return pose;
+            }
+        }
+        // The direction of travel, or the last one it travelled in (a performer who stops keeps
+        // facing where it was going), or the next one (a performance that opens standing still).
+        constexpr float kMoving = 0.05f;
+        const auto yawOf = [](const glm::vec3& d) { return std::atan2(d.x, d.z); };
+        if (pose.speed > kMoving) {
+            pose.yawRadians = yawOf(v);
+            return pose;
+        }
+        for (double s = t - (1.0 / 30.0); s >= from; s -= 1.0 / 30.0) {
+            const glm::vec3 back = velocity(s);
+            if (glm::length(glm::vec2(back.x, back.z)) > kMoving) {
+                pose.yawRadians = yawOf(back);
+                return pose;
+            }
+        }
+        for (double s = t + (1.0 / 30.0); s <= to; s += 1.0 / 30.0) {
+            const glm::vec3 ahead = velocity(s);
+            if (glm::length(glm::vec2(ahead.x, ahead.z)) > kMoving) {
+                pose.yawRadians = yawOf(ahead);
+                return pose;
+            }
+        }
+        return pose;
+    };
+    return out;
 }
 
 } // namespace avgen::seq
