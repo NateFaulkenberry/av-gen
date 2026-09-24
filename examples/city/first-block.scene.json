@@ -11,7 +11,7 @@
   "lightFromEnvironment": false,
   "background": [0.10, 0.12, 0.17],
   "fogColor": [0.42, 0.44, 0.50],
-  "volumeDensity": 0.00582788,
+  "volumeDensity": 0.00175,
   "volumeMaxDistance": 0.0,
   "fogHeight": 12.0,
   "fogHeightFalloff": 0.12,

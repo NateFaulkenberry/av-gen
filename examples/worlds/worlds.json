@@ -191,7 +191,7 @@
           0.2
         ],
         "scene/volumeDensity": [
-          0.02664
+          0.01199
         ],
         "scene/fogColor": [
           0.015,
@@ -269,7 +269,7 @@
           0.25
         ],
         "scene/volumeDensity": [
-          0.02331
+          0.01049
         ],
         "scene/fogColor": [
           0.02,
@@ -347,7 +347,7 @@
           0.4
         ],
         "scene/volumeDensity": [
-          0.0333
+          0.01499
         ],
         "scene/fogColor": [
           0.02,
@@ -425,7 +425,7 @@
           1.5
         ],
         "scene/volumeDensity": [
-          0.01332
+          0.005994
         ],
         "scene/fogColor": [
           0.03,

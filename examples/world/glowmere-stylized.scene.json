@@ -177,13 +177,13 @@
    0.011,
    0.024
   ],
-  "volumeDensity": 0.006,
+  "volumeDensity": 0.012,
   "volumeScattering": 0.5,
   "volumeAnisotropy": 0.12,
   "volumeNoise": 0.45,
   "volumeNoiseScale": 0.02,
   "volumeSteps": 12,
-  "volumeMaxDistance": 320.0,
+  "volumeMaxDistance": 40.0,
   "volumeAbsorption": 0.4,
   "sky": {
    "enabled": true,

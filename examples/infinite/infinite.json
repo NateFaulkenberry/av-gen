@@ -242,8 +242,8 @@
    "targets": [
     {
      "path": "scene/volumeDensity",
-     "min": 0.00018,
-     "max": 0.0016
+     "min": 0.00054,
+     "max": 0.0048
     }
    ]
   },

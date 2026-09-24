@@ -30,10 +30,10 @@
    0.016,
    0.017
   ],
-  "volumeDensity": 0.0016,
+  "volumeDensity": 0.0032,
   "fogHeight": 26.0,
   "fogHeightFalloff": 0.055,
-  "volumeScattering": 0.8,
+  "volumeScattering": 0.566,
   "volumeAbsorption": 0.9,
   "volumeAnisotropy": 0.62,
   "volumeNoise": 0.4,
@@ -41,7 +41,7 @@
   "volumeNoiseSpeed": 0.09,
   "volumeEmission": 0.25,
   "volumeSteps": 28,
-  "volumeMaxDistance": 260.0,
+  "volumeMaxDistance": 40.0,
   "volumeDensityField": "vent",
   "volumeColorField": "heat",
   "sky": {

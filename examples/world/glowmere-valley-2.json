@@ -13,7 +13,7 @@
                "kind": "composition",
                "path": {
                  "path": "glowmere-valley-2.scene.json",
-                 "sha256": "34551d49b2692730b0b5bc3c5e7483d61b9bd798317fc39fbe03fbc550bf9694",
+                 "sha256": "744c41ce705c7a1159a96918d31d2f9c6c017feb8775d027ef52270e9c13d96b",
                  "size": 232750
                }
              }
@@ -13098,11 +13098,11 @@
     "scene/stylized": true,
     "scene/volumeAbsorption": 0.4000000059604645,
     "scene/volumeAnisotropy": 0.11999999731779099,
-    "scene/volumeDensity": 0.006000000052154064,
+    "scene/volumeDensity": 0.009,
     "scene/volumeEmission": 0.0,
     "scene/volumeNoiseScale": 0.019999999552965164,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
-    "scene/volumeScattering": 0.5,
+    "scene/volumeScattering": 0.6,
     "scene/volumeSteps": 12,
     "scene/windDirection": 0.6200000047683716,
     "scene/windSpeed": 0.7400000095367432,
