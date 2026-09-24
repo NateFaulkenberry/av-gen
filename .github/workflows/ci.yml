@@ -111,7 +111,7 @@ jobs:
 
       - name: Configure and build
         env:
-          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss' }}; ccache restore ${{ steps.ccache.outputs.cache-matched-key != '' && 'hit' || 'miss' }}
+          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss (cold download)' }}
         run: tools/ci/build.sh release "$RESULTS/build"
 
       - name: Package test binaries

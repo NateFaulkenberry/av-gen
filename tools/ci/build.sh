@@ -18,6 +18,12 @@ shift 2
 mkdir -p "$OUT"
 
 LAUNCHER=()
+ccache_restored="no cache dir"
+if [ -n "${CCACHE_DIR:-}" ] && [ -d "$CCACHE_DIR" ] && [ -n "$(find "$CCACHE_DIR" -type f -print -quit 2>/dev/null)" ]; then
+    ccache_restored="restored $(du -sh "$CCACHE_DIR" | cut -f1)"
+elif [ -n "${CCACHE_DIR:-}" ]; then
+    ccache_restored="empty (cold)"
+fi
 if command -v ccache >/dev/null; then
     LAUNCHER=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
               -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache)
@@ -54,6 +60,7 @@ if [ ${#LAUNCHER[@]} -gt 0 ]; then
     ccache_line=$(ccache --print-stats 2>/dev/null | awk -F'\t' '
         $1=="direct_cache_hit"||$1=="preprocessed_cache_hit"{h+=$2}
         $1=="cache_miss"{m=$2} END{printf "%d hits / %d misses", h, m}')
+    ccache_line="$ccache_restored; $ccache_line"
 fi
 
 python3 - "$OUT/meta.json" <<PY

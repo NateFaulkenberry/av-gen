@@ -83,7 +83,7 @@ jobs:
           restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-asan-
       - name: Configure and build (preset asan = Debug + ASan + UBSan)
         env:
-          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss' }}; ccache restore ${{ steps.ccache.outputs.cache-matched-key != '' && 'hit' || 'miss' }}
+          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss (cold download)' }}
         run: tools/ci/build.sh asan "$RESULTS/build-asan"
       - name: Run avgen_tests under ASan/UBSan
         env:
@@ -141,7 +141,7 @@ jobs:
           restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-tsan-
       - name: Configure and build (preset tsan = Debug + TSan)
         env:
-          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss' }}; ccache restore ${{ steps.ccache.outputs.cache-matched-key != '' && 'hit' || 'miss' }}
+          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss (cold download)' }}
         run: tools/ci/build.sh tsan "$RESULTS/build-tsan"
       - name: Run the TSan subset
         env:
