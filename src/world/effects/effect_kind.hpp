@@ -48,10 +48,10 @@ enum class EffectKind : std::uint8_t {
     ParticleEmitter = 13, // ADR-703: an effect-owned particle system riding its owner (EMIT)
     // Wave 2 reserves, by slice (explicit values, as Wave 1 did):
     //   motion (XFORM):   Orbit = 14, Spiral = 15, Float = 16, Shake = 17, Bounce = 18
-    //   events (TRIGGER): Shockwave = 19, Ripple = 20
+    //   events (TRIGGER): Shockwave = 19, Ripple = 20, VelocityDistortion = 30
     //   surface (FXL 2):  Dissolve = 21, Growth = 22, Breathing = 23, OrganicPulsation = 24,
     //                     Bioluminescence = 25, PulsingVeins = 26, Fresnel = 27, RimLight = 28,
-    //                     ColorCycling = 29
+    //                     ColorCycling = 29, MotionSmear = 31
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not
