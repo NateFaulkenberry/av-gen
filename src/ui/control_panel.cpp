@@ -30,6 +30,7 @@
 #include <implot.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <string_view>
 #include <cmath>
 #include <cstdio>
@@ -1489,14 +1490,32 @@ void ControlPanel::drawAssetsWindow() {
 }
 
 void ControlPanel::drawWorldWindow(app::Engine& engine) {
+    // A capture hook, for photographing the Inspector headlessly (`--capture-ui`), which has no way
+    // to click an Overview row: `AVGEN_CAPTURE_WORLD_INSPECTOR` = `environment`, `camera` or
+    // `node:<name>` pins the World panel's selection to that, brings the Inspector tab to the front
+    // and scrolls it to the Effects section, every frame. Unset -- which is always, outside a capture -- it does nothing.
+    static const char* const pinned = std::getenv("AVGEN_CAPTURE_WORLD_INSPECTOR");
+    ImGuiTabItemFlags inspectorFlags = ImGuiTabItemFlags_None;
+    if (pinned != nullptr && pinned[0] != '\0') {
+        const std::string_view want(pinned);
+        if (want == "environment") {
+            world.selection = WorldSelection{WorldSelection::Kind::Environment, ""};
+        } else if (want == "camera") {
+            world.selection = WorldSelection{WorldSelection::Kind::Camera, ""};
+        } else if (want.starts_with("node:")) {
+            world.selection = WorldSelection{WorldSelection::Kind::Node, std::string(want.substr(5))};
+        }
+        inspectorFlags = ImGuiTabItemFlags_SetSelected;
+        world.scrollToEffects = true;
+    }
     world.drawLayerSelector();
     if (ImGui::BeginTabBar("world")) {
         if (ImGui::BeginTabItem("Overview")) {
             world.drawOverview(engine);
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Inspector")) {
-            world.drawInspector(engine);
+        if (ImGui::BeginTabItem("Inspector", nullptr, inspectorFlags)) {
+            world.drawInspector(engine, &editor.history());
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("States")) {
@@ -1583,7 +1602,7 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     }
     // Alphabetical, not registration order. This list is every modulatable parameter in the project
     // -- over three thousand on Glowmere Valley 2 -- and registration order is an implementation
-    // detail of who called `add` first, so a person hunting for `atmos/Cosmic Vortex/density` had no
+    // detail of who called `add` first, so a person hunting for `fx/cosmic-vortex/density` had no
     // way to predict where it sat. Sorted, the prefix groups everything that belongs together and
     // the combo's own type-ahead starts working, because ImGui matches against consecutive entries.
     //

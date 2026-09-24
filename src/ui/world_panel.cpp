@@ -5,6 +5,7 @@
 #include "ui/style.hpp"
 #include "params/preset.hpp"
 #include "scene/composition.hpp"
+#include "scene/temporal_settings.hpp"
 #include "stage/staging.hpp"
 #include "ui/world_editor.hpp"
 
@@ -20,6 +21,92 @@ namespace avgen::ui {
 
 // The same red every other panel uses for "this names something that is not there".
 constexpr ImVec4 kPanelWarning(1.0f, 0.45f, 0.35f, 1.0f);
+
+namespace {
+
+// ---- ADR-410: Frame echo --------------------------------------------------------------------------
+//
+// A scene-level post setting (`temporal/<effect>/...`), NOT an effect instance: ADR-702 made effects
+// things attached to owners, and a temporal pass over the finished image belongs to no owner. It
+// lived in the removed World Effects panel as its "Reality / Temporal / Digital" section; it is
+// drawn here, on the Environment selection, with the same rows and the same history disclosure.
+void drawFrameEcho(app::Engine& engine) {
+    ImGui::SeparatorText("Frame echo");
+    const std::string prefix = scene::temporalParameterPrefix(scene::TemporalEffectKind::FrameEcho);
+    if (ImGui::IsItemHovered()) {
+        // The limitation an author needs at the moment of choosing (ADR-410): a mosh or an echo
+        // over fog advecting with the surface behind it looks exactly like a bug.
+        tooltipUnformatted(
+            "Reaches back over previous frames, so a moving object leaves a trail of where it was.\n\n"
+            "Describes OPAQUE surfaces only. Fog, aurora and the vortex are composited after the\n"
+            "scene pass and carry no motion of their own, so an echo over them follows whatever\n"
+            "solid surface is behind them rather than the effect itself.");
+    }
+    const auto rowLabel = [](const char* label) {
+        const float start = ImGui::GetCursorPosX();
+        ImGui::TextUnformatted(label);
+        ImGui::SameLine(start + ImGui::CalcTextSize("Sparkle brightness  ").x + ImGui::GetStyle().ItemSpacing.x);
+        ImGui::SetNextItemWidth(-1.0f);
+    };
+    if (params::IParameter* on = engine.params().find(prefix + "enabled"); on != nullptr) {
+        bool v = on->baseComponent(0) >= 0.5f;
+        ImGui::PushID("echo-enabled");
+        if (ImGui::Checkbox("Enabled", &v)) {
+            on->setBaseComponent(0, v ? 1.0f : 0.0f);
+        }
+        ImGui::PopID();
+    }
+
+    // The disclosure ADR-410 turns on, phrased as what to DO: "settling, 3 of 8" says the picture
+    // is on its way; the stuck wording is kept for the case that genuinely is stuck.
+    const scene::TemporalHistoryReport& report = engine.temporalHistoryReport();
+    if (report.stalled) {
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "Temporal: cold - this is not the rendered picture");
+    } else if (report.settling()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "Temporal: settling - %u of %u frames",
+                           report.framesValid, report.framesNeeded);
+    } else if (report.framesNeeded > 0) {
+        ImGui::TextDisabled("Temporal: %u frames, %.1f MB at %ux%u", report.framesValid,
+                            static_cast<double>(report.bytes) / (1024.0 * 1024.0), report.width, report.height);
+    }
+
+    for (const EffectRow& r : temporalEchoRows()) {
+        if (!r.section.empty()) {
+            const std::string section(r.section);
+            ImGui::SeparatorText(section.c_str());
+        }
+        const std::string path = prefix + std::string(r.leaf);
+        params::IParameter* p = engine.params().find(path);
+        if (p == nullptr) {
+            continue;
+        }
+        const std::string label(r.label);
+        const std::string format = r.format.empty() ? std::string("%.2f") : std::string(r.format);
+        ImGui::PushID(path.c_str());
+        if (r.color) {
+            float rgb[3] = {p->baseComponent(0), p->baseComponent(1), p->baseComponent(2)};
+            rowLabel(label.c_str());
+            if (ImGui::ColorEdit3("##c", rgb, ImGuiColorEditFlags_Float)) {
+                for (std::size_t i = 0; i < 3; ++i) {
+                    p->setBaseComponent(i, rgb[i]);
+                }
+            }
+        } else {
+            float v = p->baseComponent(0);
+            rowLabel(label.c_str());
+            if (ImGui::SliderFloat("##v", &v, p->softMin(0), p->softMax(0), format.c_str(),
+                                   r.logarithmic ? ImGuiSliderFlags_Logarithmic : 0)) {
+                p->setBaseComponent(0, v);
+            }
+        }
+        if (!r.tip.empty() && ImGui::IsItemHovered()) {
+            tooltipUnformatted(std::string(r.tip).c_str());
+        }
+        ImGui::PopID();
+    }
+}
+
+} // namespace
 
 std::string WorldSelection::parameterPrefix() const {
     switch (kind) {
@@ -348,7 +435,7 @@ void WorldPanel::drawOverview(app::Engine& engine) {
     }
 }
 
-void WorldPanel::drawInspector(app::Engine& engine) {
+void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
     if (selection.kind == WorldSelection::Kind::None) {
         ImGui::TextDisabled("Select an object in the World overview.");
         return;
@@ -457,6 +544,28 @@ void WorldPanel::drawInspector(app::Engine& engine) {
             }
             ImGui::TreePop();
         }
+    }
+
+    // ADR-702: the selected owner's effect stack. The same section for every owner; which owner a
+    // selection is, is the only thing decided here. The other selection kinds (a procedural, a
+    // field, a spline...) are not effect owners, so they get no section rather than an empty one.
+    if (scrollToEffects) {
+        ImGui::SetScrollHereY(0.0f);
+        scrollToEffects = false;
+    }
+    switch (selection.kind) {
+    case WorldSelection::Kind::Environment:
+        effects_.draw(engine, world::EffectOwner::world(), history);
+        drawFrameEcho(engine);
+        break;
+    case WorldSelection::Kind::Node:
+        effects_.draw(engine, world::EffectOwner::entity(selection.name), history);
+        break;
+    case WorldSelection::Kind::Camera:
+        effects_.draw(engine, world::EffectOwner::camera(), history);
+        break;
+    default:
+        break;
     }
 
     ImGui::SeparatorText("Influences");
