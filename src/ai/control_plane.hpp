@@ -130,6 +130,10 @@ public:
     [[nodiscard]] std::shared_ptr<AgentTask> currentTask() const;
     [[nodiscard]] const std::vector<std::shared_ptr<AgentTask>>& history() const { return history_; }
     void cancelCurrentTask();
+    // The person's answer to a task in AwaitingApproval (ADR-757). Main thread only. False when the
+    // current task is not waiting for one.
+    bool approveCurrentTask();
+    bool rejectCurrentTask();
     void clearHistory();
 
     // ---- the frame loop's only obligation --------------------------------------------------------

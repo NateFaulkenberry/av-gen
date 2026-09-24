@@ -1,5 +1,7 @@
 #include "ai/orchestrator.hpp"
 
+#include "ai/director_tools.hpp"
+
 #include "app/engine.hpp"
 #include "core/log.hpp"
 
@@ -24,6 +26,9 @@ const char* taskStateName(TaskState state) {
     case TaskState::ExecutingTools: return "Working";
     case TaskState::Validating: return "Validating";
     case TaskState::RollingBack: return "Rolling back";
+    case TaskState::AwaitingApproval: return "Awaiting approval";
+    case TaskState::Committing: return "Committing";
+    case TaskState::Rejected: return "Rejected";
     case TaskState::Completed: return "Done";
     case TaskState::Failed: return "Failed";
     case TaskState::Cancelled: return "Cancelled";
@@ -33,7 +38,7 @@ const char* taskStateName(TaskState state) {
 
 bool taskStateIsTerminal(TaskState state) {
     return state == TaskState::Completed || state == TaskState::Failed ||
-           state == TaskState::Cancelled;
+           state == TaskState::Cancelled || state == TaskState::Rejected;
 }
 
 const char* activityKindName(ActivityKind kind) {
@@ -95,6 +100,21 @@ void AgentTask::append(Activity activity) {
     activities_.push_back(std::move(activity));
 }
 
+std::optional<ToolContext::Proposal> AgentTask::proposal() const {
+    const std::lock_guard lock(mutex_);
+    return proposal_;
+}
+
+void AgentTask::setProposal(ToolContext::Proposal proposal) {
+    const std::lock_guard lock(mutex_);
+    proposal_ = std::move(proposal);
+}
+
+void AgentTask::holdOutcome(TaskOutcome outcome) {
+    const std::lock_guard lock(mutex_);
+    outcome_ = std::move(outcome);
+}
+
 void AgentTask::finish(TaskOutcome outcome) {
     {
         const std::lock_guard lock(mutex_);
@@ -103,9 +123,10 @@ void AgentTask::finish(TaskOutcome outcome) {
     // The state is set last. A UI that sees a terminal state is entitled to assume the outcome is
     // already there, and the other order would make that assumption wrong on exactly the frames a
     // race is hardest to reproduce.
-    state_.store(outcome_.cancelled  ? TaskState::Cancelled
-                 : outcome_.success ? TaskState::Completed
-                                    : TaskState::Failed,
+    state_.store(outcome_.rejected    ? TaskState::Rejected
+                 : outcome_.cancelled ? TaskState::Cancelled
+                 : outcome_.success   ? TaskState::Completed
+                                      : TaskState::Failed,
                  std::memory_order_release);
 }
 
@@ -143,6 +164,9 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             // has to know it is running inside a transaction.
             for (const ChangeRecord& record : ctx.changes().records()) {
                 changes.note(record.target, record.detail, record.clamped);
+            }
+            if (ctx.proposal()) {
+                task.setProposal(*ctx.proposal());
             }
         },
         task.cancel());
@@ -445,7 +469,82 @@ void Orchestrator::run(AgentTask& task) {
               "{} in / {} out tokens",
               task.id(), outcome.toolCalls, outcome.iterations, outcome.changedTargets.size(),
               outcome.usage.inputTokens, outcome.usage.outputTokens);
+    if (const auto proposal = task.proposal()) {
+        // A plan is proposed: the task stops here, having changed nothing the plan describes, and
+        // waits for the person. The outcome so far is kept; the state is published LAST (release),
+        // so a reader that sees AwaitingApproval also sees the proposal and the outcome.
+        task.holdOutcome(outcome);
+        Activity a;
+        a.kind = ActivityKind::Plan;
+        a.title = "Proposed: " + proposal->planId;
+        a.detail = proposal->diff;
+        task.append(std::move(a));
+        task.setState(TaskState::AwaitingApproval);
+        return;
+    }
     task.finish(outcome);
+}
+
+bool Orchestrator::approve(AgentTask& task) {
+    if (task.state() != TaskState::AwaitingApproval) {
+        return false;
+    }
+    const std::optional<ToolContext::Proposal> proposal = task.proposal();
+    TaskOutcome outcome = task.outcome();
+    task.setState(TaskState::Committing);
+    // One transaction: the history sink makes the install one undo, labelled with the request; the
+    // snapshot underneath makes a failed commit leave nothing behind.
+    std::unique_ptr<Transaction> transaction;
+    if (sink_ != nullptr && sink_->available()) {
+        transaction = std::make_unique<Transaction>(*sink_, task.prompt());
+    }
+    auto committed = proposal ? commitProposal(*engine_, *proposal)
+                              : Result<CommitReport>(std::unexpected(Error{"there is no proposal to approve"}));
+    Activity a;
+    a.kind = committed ? ActivityKind::TransactionCommitted : ActivityKind::TransactionRolledBack;
+    if (!committed) {
+        if (transaction) {
+            transaction->rollback();
+            outcome.rolledBack = true;
+        }
+        outcome.success = false;
+        outcome.error = committed.error().message;
+        a.title = "Not applied";
+        a.detail = outcome.error;
+        a.success = false;
+        task.append(std::move(a));
+        task.finish(std::move(outcome));
+        return true;
+    }
+    if (transaction) {
+        transaction->commit();
+        outcome.editState = sink_->committedEditState();
+    }
+    outcome.success = true;
+    outcome.error.clear();
+    a.title = "Applied";
+    a.detail = fmt::format("plan '{}' revision {}: {} piece(s) of content, verified", committed->planId,
+                           committed->revision, committed->produced);
+    task.append(std::move(a));
+    task.finish(std::move(outcome));
+    return true;
+}
+
+bool Orchestrator::reject(AgentTask& task, std::string reason) {
+    if (task.state() != TaskState::AwaitingApproval) {
+        return false;
+    }
+    TaskOutcome outcome = task.outcome();
+    outcome.success = false;
+    outcome.rejected = true;
+    outcome.error = std::move(reason);
+    Activity a;
+    a.kind = ActivityKind::TaskFinished;
+    a.title = "Rejected";
+    a.detail = "nothing was changed";
+    task.append(std::move(a));
+    task.finish(std::move(outcome));
+    return true;
 }
 
 } // namespace avgen::ai

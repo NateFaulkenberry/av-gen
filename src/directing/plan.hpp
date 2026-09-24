@@ -244,6 +244,11 @@ struct PlanParse {
 // and the validator's. A document from a newer schema is refused with SCHEMA_VERSION_UNSUPPORTED.
 [[nodiscard]] PlanParse parsePlan(const nlohmann::json& document);
 
+// The Director Plan contract, as a document a model or a person can read: every field, its type and
+// meaning, and every vocabulary (camera moves, tiers, modes, subject kinds, content domains) taken from
+// the same name tables the parser reads -- so the contract cannot drift from what is accepted.
+[[nodiscard]] nlohmann::json planSchema();
+
 // A readable id from a title, unique against `taken`: "Rook / Umbra!" -> "rook-umbra", then
 // "rook-umbra-2". Never contains '/', so it can sit in a path.
 [[nodiscard]] std::string mintPlanId(std::string_view title, const std::vector<std::string>& taken);

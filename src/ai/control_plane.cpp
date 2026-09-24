@@ -1,5 +1,7 @@
 #include "ai/control_plane.hpp"
 
+#include "ai/director_tools.hpp"
+
 #include "ai/engine_tools.hpp"
 #include "app/engine.hpp"
 #include "app/job_system.hpp"
@@ -89,6 +91,7 @@ ControlPlane::ControlPlane(app::Engine& engine, app::JobSystem* jobs)
     : jobs_(jobs), credentials_(makeSystemCredentialStore()),
       orchestrator_(engine, tools_, queue_) {
     registerEngineTools(tools_);
+    registerDirectorTools(tools_);
     registerBuiltinProviders(providerRegistry_);
     settings_.reconcileWith(providerRegistry_);
     defaultSink_ = std::make_unique<SnapshotTransactionSink>(engine, snapshots_);
@@ -295,7 +298,24 @@ std::shared_ptr<AgentTask> ControlPlane::currentTask() const {
     return current_;
 }
 
+bool ControlPlane::approveCurrentTask() {
+    std::shared_ptr<AgentTask> task = currentTask();
+    return task != nullptr && orchestrator_.approve(*task);
+}
+
+bool ControlPlane::rejectCurrentTask() {
+    std::shared_ptr<AgentTask> task = currentTask();
+    return task != nullptr && orchestrator_.reject(*task);
+}
+
 void ControlPlane::cancelCurrentTask() {
+    // Cancelling a task that is waiting for approval is declining it: its loop has already ended,
+    // so a cancel token would reach nothing.
+    if (std::shared_ptr<AgentTask> task = currentTask();
+        task != nullptr && task->state() == TaskState::AwaitingApproval) {
+        (void)orchestrator_.reject(*task, "cancelled while awaiting approval");
+        return;
+    }
     const std::lock_guard lock(taskMutex_);
     if (current_ && !current_->finished()) {
         current_->requestCancel();

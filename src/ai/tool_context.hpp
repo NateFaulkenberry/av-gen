@@ -24,6 +24,7 @@
 #include <filesystem>
 #include <optional>
 #include <functional>
+#include <nlohmann/json.hpp>
 #include <memory>
 #include <string>
 #include <utility>
@@ -167,6 +168,18 @@ public:
     }
     [[nodiscard]] bool hasPerformanceSource() const { return static_cast<bool>(performance_); }
 
+    // A change proposed for approval (spec §19): the Director's `propose_plan` leaves its plan here
+    // rather than changing anything, and the orchestrator carries it to the task, which then waits
+    // in `AwaitingApproval`. One per call; a later proposal in the same task replaces an earlier one.
+    struct Proposal {
+        nlohmann::json plan;  // the plan document, as proposed
+        std::string planId;
+        std::string diff;     // the dry run's diff, exactly as the person will read it
+        nlohmann::json issues = nlohmann::json::array();
+    };
+    void propose(Proposal proposal) { proposal_ = std::move(proposal); }
+    [[nodiscard]] const std::optional<Proposal>& proposal() const { return proposal_; }
+
     [[nodiscard]] ChangeLog& changes() { return changes_; }
     [[nodiscard]] const ChangeLog& changes() const { return changes_; }
 
@@ -186,6 +199,7 @@ private:
     std::vector<std::filesystem::path> contentRoots_;
     PerformanceSource performance_;
     ChangeLog changes_;
+    std::optional<Proposal> proposal_;
 };
 
 } // namespace avgen::ai

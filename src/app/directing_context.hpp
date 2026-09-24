@@ -5,7 +5,6 @@
 // where a compiled plan becomes one undoable edit.
 
 #include "analysis/analysis_track.hpp"
-#include "app/edit_capture.hpp"
 #include "app/engine.hpp"
 #include "core/error.hpp"
 #include "directing/compiler.hpp"
@@ -14,8 +13,9 @@
 #include "directing/time_ref.hpp"
 #include "entity/entity.hpp"
 #include "scene/composition.hpp"
-#include "ui/edit_history.hpp"
 #include "world/hero.hpp"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <string>
@@ -111,25 +111,18 @@ namespace avgen::app {
     return facts;
 }
 
-// Installs a compilation as ONE command on the editor's history: the sequence, the camera collection
-// and the plan (inserted, or replacing its earlier revision) together, so one undo takes back the
-// content and its provenance at once (ADR-752, ADR-755). A refused install is undone before returning
-// and pushes nothing.
-[[nodiscard]] inline Result<void> applyCompilation(Engine& engine, ui::EditHistory& history,
-                                                   const directing::Compilation& compilation) {
-    EditCapture capture;
-    capture.begin(engine);
-    const auto undoAndFail = [&](std::string message) -> Result<void> {
-        ui::EditCommand partial = capture.finish(engine, "refused");
-        (void)ui::applyEdit(engine, partial, false);
-        return fail("{}", message);
-    };
+// Installs a compilation: the sequence, the camera collection and the effect list (each only as
+// needed), and the plan -- inserted, or replacing its earlier revision -- with its `produced`
+// fingerprints taken from the content AS INSTALLED. Records no history of its own: a caller wraps it
+// (`applyCompilation` in a capture; an AI task in its transaction, whose sink makes it one command).
+// Stops at the first refusal and says which; the caller owns the rollback.
+[[nodiscard]] inline Result<void> installCompilation(Engine& engine, const directing::Compilation& compilation) {
     if (auto r = engine.setSequence(compilation.staged.sequence); !r) {
-        return undoAndFail(r.error().message);
+        return fail("{}", r.error().message);
     }
     if (engine.composition() != nullptr) {
         if (auto r = engine.setCameraDirection(compilation.staged.cameras); !r) {
-            return undoAndFail(r.error().message);
+            return fail("{}", r.error().message);
         }
     }
     // The effect list only when it changed: `setEffects` re-registers every fx/ parameter, which is
@@ -143,7 +136,7 @@ namespace avgen::app {
     };
     if (effectsJson(compilation.staged.effects) != effectsJson(engine.capturedEffects())) {
         if (auto r = engine.setEffects(compilation.staged.effects); !r) {
-            return undoAndFail(r.error().message);
+            return fail("{}", r.error().message);
         }
     }
     // Fingerprints of the content AS INSTALLED, not as compiled. Installing is not the identity:
@@ -164,9 +157,29 @@ namespace avgen::app {
     } else {
         plans.push_back(std::move(stored));
     }
-    history.push(capture.finish(engine, "Director: " + (compilation.plan.title.empty() ? compilation.plan.id
-                                                                                         : compilation.plan.title)));
     return {};
+}
+
+// After an install: is what the plan says it produced actually there, exactly as recorded?
+// (Spec §19's ValidateCommittedState.) Empty when it is; otherwise one line per discrepancy.
+[[nodiscard]] inline std::vector<std::string> verifyInstalled(Engine& engine, const std::string& planId) {
+    std::vector<std::string> problems;
+    const auto& plans = engine.directingPlans();
+    const auto plan = std::find_if(plans.begin(), plans.end(), [&](const directing::Plan& p) { return p.id == planId; });
+    if (plan == plans.end()) {
+        problems.push_back(fmt::format("plan '{}' is not in the project", planId));
+        return problems;
+    }
+    const directing::Staging installed = sceneFactsFor(engine).staged;
+    for (const directing::ContentRef& ref : plan->produced) {
+        const auto content = directing::contentOf(ref, installed);
+        if (!content) {
+            problems.push_back(fmt::format("{} '{}' is missing", directing::contentDomainName(ref.domain), ref.id));
+        } else if (directing::fingerprint(*content) != ref.fingerprint) {
+            problems.push_back(fmt::format("{} '{}' is not as recorded", directing::contentDomainName(ref.domain), ref.id));
+        }
+    }
+    return problems;
 }
 
 } // namespace avgen::app

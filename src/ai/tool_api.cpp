@@ -119,6 +119,8 @@ nlohmann::json ToolAnnotations::toJson() const {
     j["undoable"] = undoable;
     j["supportsCancellation"] = supportsCancellation;
     j["supportsProgress"] = supportsProgress;
+    j["requiresApproval"] = requiresApproval;
+    j["deterministic"] = deterministic;
     return j;
 }
 

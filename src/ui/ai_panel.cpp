@@ -159,6 +159,23 @@ void AiPanel::drawConversation(app::Engine& engine) {
             ImGui::PopStyleColor();
         }
 
+        // The Director's approval gate (ADR-757). The proposal's diff is the Plan activity drawn
+        // above; the decision is the person's, and nothing has changed until they make it. Only the
+        // current task can be waiting: submitting is refused while one does.
+        if (state == TaskState::AwaitingApproval && task == plane->currentTask()) {
+            ImGui::Spacing();
+            if (ImGui::Button("Approve")) {
+                status_ = plane->approveCurrentTask() ? "applied" : "could not apply";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Reject")) {
+                (void)plane->rejectCurrentTask();
+                status_ = "rejected; nothing was changed";
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("nothing is changed until you approve");
+        }
+
         if (!running) {
             const avgen::ai::TaskOutcome outcome = task->outcome();
             if (!outcome.error.empty()) {

@@ -697,6 +697,47 @@ PlanParse parsePlan(const json& document) {
     return out;
 }
 
+json planSchema() {
+    const json time = {
+        {"oneOf", json::array({"a string: \"1:30\", \"90s\", \"bar 64 beat 3\", \"the second chorus\", \"end of the bridge\", \"chorus 2 + 1.5s\"",
+                               json{{"seconds", "number"}},
+                               json{{"bar", "integer >= 1"}, {"beat", "integer >= 1"}},
+                               json{{"section", "type, e.g. chorus"}, {"occurrence", "1-based; -1 = last"}, {"anchor", "start|end"}}})},
+        {"note", "never convert musical time to seconds yourself; write what was asked"}};
+    return {
+        {"schemaVersion", kPlanSchemaVersion},
+        {"required", {"schemaVersion", "id"}},
+        {"fields",
+         {{"id", "stable, readable, no '/'; reuse an existing plan's id to revise it"},
+          {"revision", "set by the engine"},
+          {"title", "string"},
+          {"tier", namesIn(kTiers)},
+          {"provenance", {{"author", "person|assistant|script"}, {"source", "string"}, {"request", "the request, verbatim"}}},
+          {"subjects", json::array({{{"alias", "how items name it"}, {"text", "as the request said it"}, {"hint", namesIn(kSubjectKinds)}}})},
+          {"shots", json::array({{{"key", "unique"}, {"name", "unique in the sequence"}, {"start", time}, {"durationSeconds", "> 0"},
+                                  {"subject", "alias"}, {"rig", "an existing camera's name, optional"},
+                                  {"transition", "cut|fadeIn|fadeOut|matchCut"}, {"locked", "bool: no event camera may take it"},
+                                  {"camera", json::array({{{"move", namesIn(kMoves)}, {"subject", "alias"}, {"at", time},
+                                                           {"heightMetres", "number"}, {"distanceMetres", "number"},
+                                                           {"degrees", "orbit"}, {"side", "left|right"}}})}}})},
+          {"markers", json::array({{{"key", "unique"}, {"name", "string"}, {"at", time}}})},
+          {"performances", json::array({{{"key", "unique"}, {"subject", "alias"}, {"mode", namesIn(kModes)},
+                                         {"beats", json::array({{{"action", "run_to|walk_to|run|walk|jump|land|fall|look_at|..."},
+                                                                 {"target", "alias"}, {"at", time}, {"seconds", "number"},
+                                                                 {"emits", "a plan event name, e.g. rook.jump_peak"},
+                                                                 {"clearanceMetres", "number"}}})}}})},
+          {"cues", json::array({{{"key", "unique"}, {"parameter", "a parameter path"},
+                                 {"effect", {{"owner", "alias or \"world\""}, {"type", "effect type"}, {"id", "optional"}}},
+                                 {"field", "the effect's field; omit to activate it"}, {"at", time}, {"on", "a plan event"},
+                                 {"until", time}, {"holdSeconds", "number"}, {"value", "number"}, {"rampSeconds", "number"}}})},
+          {"retimes", json::array({{{"key", "unique"}, {"performance", "key"}, {"from", time}, {"until", time}, {"factor", "> 0"}}})},
+          {"produced", "set by the engine; never write it"}}},
+        {"rules",
+         {"a cue names exactly one of parameter or effect, and starts either at a time or on a plan event",
+          "never ask for a capability the subject does not list; the validator refuses it and says what exists",
+          "a baked plan may not depend on directed or goal performances"}}};
+}
+
 std::string mintPlanId(std::string_view title, const std::vector<std::string>& taken) {
     std::string base;
     for (const std::string& w : text::words(title)) {

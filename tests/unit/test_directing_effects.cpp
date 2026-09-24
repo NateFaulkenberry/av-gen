@@ -2,6 +2,7 @@
 // cues, and effect undo and persistence (director-system-progress.md, the Slice 0 effect items
 // deferred until the refactor merged, and Slice 1's effect compilation).
 
+#include "app/directing_apply.hpp"
 #include "app/directing_context.hpp"
 #include "app/edit_capture.hpp"
 #include "app/engine.hpp"

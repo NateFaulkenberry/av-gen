@@ -1,6 +1,7 @@
 // Validate -> compile -> diff -> apply -> undo -> save -> reload, on the benchmark and on small
 // scenes (ADR-756, director-system-progress.md Slices 1.3-1.4; spec §18, §20, §21, §34, §56).
 
+#include "app/directing_apply.hpp"
 #include "app/directing_context.hpp"
 #include "app/engine.hpp"
 #include "directing/compiler.hpp"
