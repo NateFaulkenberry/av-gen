@@ -39,6 +39,9 @@ enum class EffectKind : std::uint8_t {
     // Wave 1 types land on separate branches and the number a type serialises under must not depend
     // on merge order: Glow = 8, Pulse = 9, BloomSource = 10, Trail = 11, SpaceWarp = 12,
     // ParticleEmitter = 13. Each is declared here by the change that registers its schema.
+    Glow = 8,        // FXL: the entity emits light, with an optional rim and spill light
+    Pulse = 9,       // FXL: the entity's light swells and falls, whole or as a travelling band
+    BloomSource = 10, // FXL: the entity blooms like a light without getting brighter
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

@@ -117,6 +117,19 @@ std::vector<std::string> declaredKindNames() {
             token.push_back(c);
             continue;
         }
+        // ADR-703: an explicit value (`Glow = 8,`, which the Wave 1 reservation requires) puts a
+        // space and an `=` after the name. The name is complete at the `=`; record it there, and
+        // let the value that follows be dropped by the not-a-letter rule below.
+        if (c == ' ' || c == '\t') {
+            continue;
+        }
+        if (c == '=') {
+            if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+                names.push_back(token);
+            }
+            token.clear();
+            continue;
+        }
         if (c == ',' || c == '\n') {
             // An enumerator is the token that ends a comma-or-newline-separated item, and an
             // explicit `= 3` would leave the number as the token -- which is why a token that does
@@ -247,7 +260,8 @@ TEST_CASE("a leaf check reports a leaf that is not there, and passes one that is
         const world::EffectSchema* schema = world::effectSchema(kind);
         REQUIRE(schema != nullptr);
         const conf::Report ground = conf::checkLeavesExist(kind, kGround, "ground");
-        CHECK(ground.clean() == (schema->resolve.bucket != world::EffectBucket::Surface));
+        // ADR-703: only the atmospheric buckets register the ground rows (`sharedFieldApplies`).
+        CHECK(ground.clean() == world::isAtmosphericBucket(schema->resolve.bucket));
     }
 }
 
@@ -288,7 +302,10 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
         REQUIRE(schema != nullptr);
         const world::EffectInstance probe = conf::probeEffect(kind, "conformance probe");
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
-        REQUIRE(leaves.size() > 10);
+        // Every row, plus `enabled` and the seven timing rows every type registers. ADR-703: a
+        // fixed "more than 10" stopped being true of the family when a one-row type (Bloom Source)
+        // arrived; this is the same guard -- the registrar produced a real set -- per type.
+        REQUIRE(leaves.size() >= schema->fields.size() + 8);
 
         for (const std::string& leaf : leaves) {
             if (leaf == "enabled") {
@@ -354,7 +371,9 @@ TEST_CASE("registered paths are read back from the registrar, not from the table
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
         INFO("kind: " << world::effectKindName(kind));
         REQUIRE(paths.size() == leaves.size());
-        REQUIRE(paths.size() > 20);
+        // Every row plus `enabled` and the seven timing rows (ADR-703: per type, not "more than 20",
+        // which a small lane type is not and need not be).
+        REQUIRE(paths.size() >= world::effectSchema(kind)->fields.size() + 8);
 
         // ADR-702: keyed by the instance's id, never its display name.
         const std::string prefix = world::effectParameterPrefix(probe.id);
@@ -391,6 +410,10 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Tornado, {EffectTarget::World}},
         {EffectKind::GroundPulse, {EffectTarget::Entity, EffectTarget::World}},
         {EffectKind::TravelBeam, {EffectTarget::World, EffectTarget::Camera}},
+        // ADR-703 (FXL). Pulse is Entity only: its Light-owner form needs LIGHTMOD's modulate half.
+        {EffectKind::Glow, {EffectTarget::Entity}},
+        {EffectKind::Pulse, {EffectTarget::Entity}},
+        {EffectKind::BloomSource, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -433,6 +456,9 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         case world::EffectBucket::Comet: return world::RenderStage::Sky;
         case world::EffectBucket::Aurora: return world::RenderStage::Sky;
         case world::EffectBucket::Medium: return world::RenderStage::Volumetric;
+        // ADR-703: per-entity lanes are read by the lit pass, like the surface term.
+        case world::EffectBucket::EntityLanes: return world::RenderStage::Material;
+        default: break;
         }
         return world::RenderStage::PostProcess; // unreachable for a real bucket, and wrong for all
     };
