@@ -2682,7 +2682,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // rather than trusted, because `applyFog` divides by the layer's falloff and a negative
     // `upper` would make the distance through the air shorter than the ray.
     frame.fogShape = glm::vec4(std::clamp(scene.environment.fogUpperDensity, 0.0f, 1.0f),
-                               std::clamp(scene.environment.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
+                               std::clamp(scene.environment.fogHeightCurve, 0.0f, 1.0f),
+                               std::clamp(scene.environment.horizonDensity, 0.0f, scene::kHorizonDensityMax), 0.0f);
     // ADR-058: the styled hemisphere, authorable because a scene that is lit mostly by its ambient
     // needs to say how dark the side facing away from the sky is allowed to get.
     frame.styledSky = glm::vec4(scene.environment.styledSkyAmbient,
@@ -3351,6 +3352,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particleFrame.fogHeightFalloff = scene.environment.fogHeightFalloff;
             particleFrame.fogUpperDensity = scene.environment.fogUpperDensity;
             particleFrame.fogHeightCurve = scene.environment.fogHeightCurve;
+            particleFrame.horizonDensity = scene.environment.horizonDensity;
             particleFrame.fogAbsorption = scene.environment.volumeAbsorption;
             particleFrame.fogMaxDistance = scene.environment.volumeMaxDistance;
         }

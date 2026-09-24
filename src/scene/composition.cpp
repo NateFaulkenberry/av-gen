@@ -58,7 +58,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve",
+    "fogUpperDensity", "fogHeightCurve", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -3812,6 +3812,12 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                              0.0f, 1.0f, 0.0f, 1.0f));
     fogHeightCurve_ = &params.add(floatDesc(prefix_ + "scene/fogHeightCurve", volumeSetting_.fogHeightCurve,
                                             0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-705 (§7's Horizon Density): the air grows denser with distance from the eye, read by the
+    // march, the surface pass and the particle estimate from this one number. An ordinary
+    // parameter, so audio, the timeline and presets drive it like any other. Soft range 0..2 is
+    // where it reads as distance; the hard 8 is `kHorizonDensityMax`.
+    horizonDensity_ = &params.add(floatDesc(prefix_ + "scene/horizonDensity", volumeSetting_.horizonDensity, 0.0f,
+                                            scene::kHorizonDensityMax, 0.0f, 2.0f));
     volumeScattering_ = &params.add(floatDesc(prefix_ + "scene/volumeScattering", volumeSetting_.volumeScattering,
                                               0.0f, 20.0f, 0.0f, 4.0f));
     volumeAbsorption_ = &params.add(floatDesc(prefix_ + "scene/volumeAbsorption", volumeSetting_.volumeAbsorption,
@@ -4770,6 +4776,7 @@ void Composition::detach() {
     fogHeightFalloff_ = nullptr;
     fogUpperDensity_ = nullptr;
     fogHeightCurve_ = nullptr;
+    horizonDensity_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -7404,6 +7411,7 @@ void Composition::applyParameters() {
         env.fogHeightFalloff = pick(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
         env.fogUpperDensity = pick(fogUpperDensity_, volumeSetting_.fogUpperDensity);
         env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
+        env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
         env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
         env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
         env.volumeAnisotropy = pick(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -8438,6 +8446,10 @@ nlohmann::json Composition::toJson() const {
             environment["fogHeightFalloff"] = base(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
             environment["fogUpperDensity"] = base(fogUpperDensity_, volumeSetting_.fogUpperDensity);
             environment["fogHeightCurve"] = base(fogHeightCurve_, volumeSetting_.fogHeightCurve);
+            // ADR-705: written only when set, so a file that never used it round-trips unchanged.
+            if (const float horizon = base(horizonDensity_, volumeSetting_.horizonDensity); horizon > 0.0f) {
+                environment["horizonDensity"] = horizon;
+            }
             environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
             environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
             environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -9428,6 +9440,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"fogHeightFalloff", &v.fogHeightFalloff},
                                       FloatKey{"fogUpperDensity", &v.fogUpperDensity},
                                       FloatKey{"fogHeightCurve", &v.fogHeightCurve},
+                                      FloatKey{"horizonDensity", &v.horizonDensity},
                                       FloatKey{"volumeShadowStrength", &v.volumeShadowStrength},
                                       FloatKey{"volumeScattering", &v.volumeScattering},
                                       FloatKey{"volumeAbsorption", &v.volumeAbsorption},

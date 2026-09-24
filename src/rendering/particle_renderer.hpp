@@ -59,7 +59,7 @@ struct ParticleUniforms {
     // ADR-568 (§7): the height layer's shape. Here because this pass estimates its own
     // transmittance through the SAME layer the march integrates (ADR-567), and a reader
     // left on the old model is a third atmosphere in the same frame.
-    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, 0, 0
+    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, horizonDensity (ADR-705), 0
     glm::vec4 leaf;       // ADR-370: shape (0 round, 1 leaf), tumble rate, aspect, two-sided depth
     // ADR-370: ADR-055's packed wind field, so `cs_simulate` can sample the same air the tree bends
     // in without the particle pipelines growing a frame bind group they have never had.
@@ -119,6 +119,7 @@ struct ParticleFrameContext {
     float fogHeightFalloff = 0.0f;
     float fogUpperDensity = 0.0f;   // ADR-568
     float fogHeightCurve = 0.0f;    // ADR-568
+    float horizonDensity = 0.0f;    // ADR-705: the march's distance factor, so this estimate agrees
     float fogAbsorption = 1.0f;
     float fogMaxDistance = 200.0f;
     // The ADR-035 R32F linear-depth target, resolved by the depth prepass. Null disables the fog

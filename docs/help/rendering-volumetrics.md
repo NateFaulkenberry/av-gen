@@ -8,7 +8,7 @@ tags: fog, volumetrics, god rays, scattering, haze, atmosphere
 keywords: how do i add fog; god rays; light shafts; atmosphere; volumetric; make the air glow
 related: rendering/lights, rendering/emission-and-bloom, performance/what-costs-what
 features: subsystem.rendering
-parameters: scene/volumeDensity, scene/volumeMaxDistance, scene/volumeAnisotropy, scene/volumeSteps
+parameters: scene/volumeDensity, scene/volumeMaxDistance, scene/horizonDensity, scene/volumeAnisotropy, scene/volumeSteps
 ---
 
 # Volumetrics and Fog
@@ -28,6 +28,14 @@ free.
 
 The old `scene/fogDensity` -- an exponential-squared fog with a density of its own, which agreed
 with the march at one distance and nowhere else -- was removed by ADR-705.
+
+## Horizon density
+
+`scene/horizonDensity` (0 – 8, default 0; the row is **Horizon density**) makes the air thicker
+with distance from the camera: at distance *s* it is `1 + horizonDensity × s / 1000` times as dense,
+so **1 doubles it a kilometre out**. It is the control for "near things crisp, the distance lost in
+haze" -- the look a plain density cannot give, because more density fogs the foreground too. Both
+the march and the surface fog read it, so the handover between them stays seamless.
 
 | Parameter | Default | Range | Meaning |
 |---|---|---|---|

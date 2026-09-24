@@ -1463,6 +1463,7 @@ private:
     // ADR-568 (§7): the layer's shape, beside the height and the falloff it shapes.
     params::Parameter<float>* fogUpperDensity_ = nullptr;
     params::Parameter<float>* fogHeightCurve_ = nullptr;
+    params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two

@@ -382,7 +382,8 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     // ADR-568 (§7): the height layer's shape. Clamped here, for the reason the surface path is --
     // both ends of both controls are meaningful and outside them the profile stops being one.
     u.heightFog = glm::vec4(std::clamp(env.fogUpperDensity, 0.0f, 1.0f),
-                            std::clamp(env.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
+                            std::clamp(env.fogHeightCurve, 0.0f, 1.0f),
+                            std::clamp(env.horizonDensity, 0.0f, scene::kHorizonDensityMax), 0.0f);
     // ADR-570 (§20/§22). The step count is NOT scaled by the quality tier's `volumeStepScale`, and
     // that is deliberate: ADR-035's rule lets a tier scale "sample counts, resolutions and history
     // lengths", and this is a sample count -- but it is also the difference between a fog bank

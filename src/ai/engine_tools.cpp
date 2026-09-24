@@ -2391,7 +2391,7 @@ constexpr const char* kEnvironmentPaths[] = {
     "env/sky/groundColor",  "env/sky/sunColor",     "env/sky/haze",
     "env/sky/sunIntensity", "env/sky/sunSize",      "env/sky/sunGlow",
     "env/sky/intensity",    "scene/brightness",     "scene/volumeDensity",
-    "scene/fogHeight",      "scene/fogHeightFalloff",
+    "scene/fogHeight",      "scene/fogHeightFalloff", "scene/horizonDensity",
     "scene/volumeScattering", "scene/keyLight",     "scene/windSpeed",
     "scene/windDirection",  "scene/stylized",
 };

@@ -505,7 +505,7 @@ struct Transmittances {
     float handover;  // the march carries the first 12 m and the surface pass the rest
 };
 
-Transmittances farBoxTransmittance(rendering::SceneRenderer& renderer, float extinction) {
+Transmittances farBoxTransmittance(rendering::SceneRenderer& renderer, float extinction, float horizon = 0.0f) {
     scene::Scene s = twoBoxScene();
     s.environment.fogColor = glm::vec3(0.0f);
     const float clear = luminanceAt(renderFloat(renderer, s), kFarX, kMidY);
@@ -514,6 +514,7 @@ Transmittances farBoxTransmittance(rendering::SceneRenderer& renderer, float ext
     s.environment.volumeScattering = 0.0f;
     s.environment.volumeSteps = 256; // the march's own quadrature error well under the tolerance
     s.environment.volumeJitter = 0.0f;
+    s.environment.horizonDensity = horizon;
     Transmittances t{};
     s.environment.volumeMaxDistance = 120.0f;
     t.marched = luminanceAt(renderFloat(renderer, s), kFarX, kMidY) / clear;
@@ -554,6 +555,81 @@ TEST_CASE("The surface fog and the march agree on the transmittance of the same 
         // exp(-sigma * 48.5) here instead -- 0.055 against 0.112 at 0.06.
         CHECK(t.handover == Catch::Approx(t.marched).epsilon(0.03));
     }
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-705, §7's Horizon Density, on the unified law. Three properties: off is off, to the bit; more
+// of it thickens the far air and barely the near; and it is still ONE law -- the march and the
+// surface pass read the same number and agree on what it does.
+TEST_CASE("Horizon Density at 0 renders exactly as the environment's default", "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    // Both passes live: the march carries the first 12 m and the surface pass the rest, so the
+    // zero has to be a no-op in both shaders, not only in the one that happens to see the box.
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.03f);
+    s.environment.volumeMaxDistance = 12.0f;
+    REQUIRE(s.environment.horizonDensity == 0.0f); // the default is off
+    const auto silent = renderFloat(*renderer, s);
+    s.environment.horizonDensity = 0.0f;
+    const auto spoken = renderFloat(*renderer, s);
+    // ...and a control that moved nothing when non-zero would pass the equality vacuously.
+    s.environment.horizonDensity = 1.0f;
+    const auto on = renderFloat(*renderer, s);
+    CHECK(gpu::hashImage(spoken) == gpu::hashImage(silent));
+    CHECK(gpu::hashImage(on) != gpu::hashImage(silent));
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Horizon Density thickens the far air monotonically and leaves the near air alone",
+          "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    s.environment.fogColor = glm::vec3(0.0f);
+    enableFog(s, 0.02f);
+    s.environment.volumeScattering = 0.0f;
+    s.environment.volumeMaxDistance = 12.0f; // near box marched, far box handed over
+    float lastFar = 2.0f;
+    float nearAtZero = 0.0f;
+    for (const float horizon : {0.0f, 2.0f, 4.0f, 8.0f}) {
+        s.environment.horizonDensity = horizon;
+        const auto image = renderFloat(*renderer, s);
+        const float farL = luminanceAt(image, kFarX, kMidY);
+        const float nearL = luminanceAt(image, kNearX, kMidY);
+        if (horizon == 0.0f) {
+            nearAtZero = nearL;
+        }
+        INFO("horizon " << horizon << ": near " << nearL << ", far " << farL);
+        CHECK(farL < lastFar); // strictly darker every step
+        // The near box is 4 m out, where the factor is 1 + 8 * 0.004 at most: a few percent.
+        CHECK(nearL == Catch::Approx(nearAtZero).epsilon(0.05));
+        lastFar = farL;
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Horizon Density is one law: the march and the surface fog agree on it", "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    // At 36.5 m a horizon of 8 makes the air up to 1.29x as dense: optical depth x(1 + 8 * 36.5 / 2000).
+    const float extinction = 0.03f;
+    const float horizon = 8.0f;
+    const Transmittances t = farBoxTransmittance(*renderer, extinction, horizon);
+    const Transmittances off = farBoxTransmittance(*renderer, extinction, 0.0f);
+    const float expected = std::exp(-extinction * 36.5f * (1.0f + horizon * 36.5f / 2000.0f));
+    INFO("marched " << t.marched << ", surface " << t.surface << ", handover " << t.handover
+                    << ", expected " << expected << ", without horizon " << off.marched);
+    // The control does something in each pass, or the agreement below is two zeros agreeing.
+    REQUIRE(t.marched < off.marched * 0.93f);
+    REQUIRE(t.surface < off.surface * 0.93f);
+    CHECK(t.surface == Catch::Approx(t.marched).epsilon(0.03));
+    CHECK(t.surface == Catch::Approx(expected).epsilon(0.03));
+    CHECK(t.handover == Catch::Approx(t.marched).epsilon(0.03));
     CHECK(ctx->errorCount() == 0);
 }
 

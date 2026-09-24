@@ -483,6 +483,10 @@ enum class SkyBackground : std::uint8_t {
     IblCube,      // sample whatever the IBL was built from -- a map's equirect or the sky's cube
 };
 
+// ADR-705: Horizon Density's hard range. 8 makes the air nine times as dense a kilometre out, well
+// past anything that still reads as distance rather than as a wall.
+inline constexpr float kHorizonDensityMax = 8.0f;
+
 struct Environment;
 [[nodiscard]] SkyBackground skyBackgroundFor(const Environment& env, bool haveIbl, bool iblFromSky);
 
@@ -611,6 +615,12 @@ struct Environment {
     // the air is does not read as one place.
     float fogUpperDensity = 0.0f;          // fraction of the layer's density left at any height
     float fogHeightCurve = 0.0f;           // 0 = exponential tail, 1 = a layer with a definite top
+    // ADR-705, the brief's §7 Horizon Density: extra extinction that grows with distance from the
+    // eye. The air at distance s is `1 + horizonDensity * s / 1000` times as dense as at the eye,
+    // so 1 doubles it a kilometre out. Applied by the march to every sample of the environment
+    // layer, by the surface pass in closed form past the march's reach and by the particle
+    // estimate, from this one number. 0 is off and is bit-identical to having no such control.
+    float horizonDensity = 0.0f;
     // ADR-570 (the fog brief's §20 and §22): the self-shadow march. At each march sample a short
     // secondary ray goes toward each light that lights the air, through the PLACED MEDIA's own
     // density, and that light's in-scatter is attenuated by the transmittance. It is what makes a

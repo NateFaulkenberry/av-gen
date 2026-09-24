@@ -141,7 +141,7 @@ struct FrameUniforms {
     // FrameUniforms; the sum in scene_renderer.hpp's static_assert catches these drifting apart.
     vortexGlow: vec4<f32>,          // xyz = mouth centre, w = mouth radius
     vortexGlowColor: vec4<f32>,     // rgb = radiance, w = intensity (0 = no vortex)
-    fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-705: z = horizonDensity, w = 0
 };
 
 struct ObjectUniforms {
@@ -493,6 +493,13 @@ fn treeEnergyAt(worldPos: vec3<f32>) -> vec3<f32> {
 // height layer along it -- the same flat-topped layer the march samples, through its closed-form
 // antiderivative (ADR-567) -- so a ridge standing clear of the mist is seen through the air that is
 // actually between it and the eye.
+//
+// ADR-705, the brief's §7 Horizon Density: `frame.fogShape.z` makes the air denser with distance
+// from the eye, `(1 + horizon * s / 1000)` at distance s -- 1 is twice as dense a kilometre out.
+// Its integral over the segment is exact for uniform air, `(1 + horizon * (s0 + d) / 2000)` times
+// the segment; under a height layer it is taken outside the layer's mean, which is exact for a
+// level ray and first-order otherwise. The march multiplies the same factor into every sample.
+// The branch keeps horizon 0 bit-identical to the law without it.
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     let extinction = frame.fogParams.w;
     if (extinction <= 0.0) {
@@ -531,7 +538,12 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         }
         travel = travel * mix(1.0, mean, amount);
     }
-    let f = exp(-extinction * travel);
+    var depth = extinction * travel;
+    let horizon = frame.fogShape.z;
+    if (horizon > 0.0) {
+        depth = depth * (1.0 + horizon * (start + dist) * 0.0005);
+    }
+    let f = exp(-depth);
     return mix(frame.fogParams.rgb, color, f);
 }
 

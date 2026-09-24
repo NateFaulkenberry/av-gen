@@ -138,6 +138,11 @@
       "default": 0.5,
       "targets": [
         {
+          "path": "scene/horizonDensity",
+          "min": 0.0,
+          "max": 2.0
+        },
+        {
           "path": "camera/lens/aperture",
           "min": 11.0,
           "max": 2.0

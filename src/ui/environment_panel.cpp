@@ -114,6 +114,9 @@ void drawEnvironmentPanel(app::Engine& engine) {
         // top, or a thin global haze that never quite clears.
         slider(engine, "scene/fogUpperDensity", "Upper density", "%.2f");
         slider(engine, "scene/fogHeightCurve", "Height curve", "%.2f");
+        // ADR-705, §7's last control: the air grows denser with distance from the eye (1 doubles it
+        // a kilometre out). One number, read by the march and the surface fog alike.
+        slider(engine, "scene/horizonDensity", "Horizon density", "%.2f");
         // ADR-570 (§20/§22). Named for what an artist is buying rather than for the algorithm:
         // what these do is make a bank light from a direction and cast a shaft, and "shadow steps"
         // is the number that costs frame time. Both are drawn because a control that exists and
