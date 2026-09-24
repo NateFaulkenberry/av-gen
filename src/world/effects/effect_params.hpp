@@ -32,6 +32,7 @@
 #include "world/effects/effect_instance.hpp"
 
 #include <span>
+#include <string_view>
 #include <string>
 #include <vector>
 
@@ -79,7 +80,45 @@ void applyEffectParameters(const EffectParameters& registered, std::span<EffectI
 // structural edit, so re-registration does not throw away every slider somebody moved.
 void captureEffectParameters(const EffectParameters& registered, std::span<EffectInstance> authored);
 
-// The type's default audio routes, aimed at this instance's paths.
+// The type's default audio routes, aimed at this instance's paths, with each SOURCE exactly as the
+// schema declares it -- an `owner.` source is left unresolved. What the conformance probe checks the
+// targets of; a caller that is going to install the routes wants the overload below.
 [[nodiscard]] std::vector<params::ModRoute> defaultEffectRoutes(std::string_view effectId, EffectKind kind);
+
+// ---- ADR-703: entity-derived signals and the `owner.` alias ----------------------------------------
+//
+// A preset cannot name its owner, because it is written before it is attached. So a schema's default
+// route may use the source prefix `owner.` (Trail's `owner.speed -> opacity`, Space Warp's
+// `owner.speed -> strength`), and it is resolved against the instance's owner when the routes are
+// ATTACHED:
+//
+//   Entity  `owner.speed` -> `entity.<owner name>.speed`
+//   Camera  `owner.speed` -> `camera.speed`
+//   World   refused, by name: the World has no position, so it has no speed
+//   Light   refused, by name: no `light.*` signals are published yet
+//
+// The routes are stored RESOLVED (they are ordinary authored routes from then on, saved with the
+// project like any other). Renaming the owner therefore has to move them, which is what
+// `renameEntitySignalSources` does and `Engine::renameEffectOwner` calls.
+//
+// The engine publishes these for every entity some effect or route subscribes to, before the routes
+// run, from the last completed simulation step (`Engine::publishEntitySignals`).
+
+inline constexpr std::string_view kOwnerSignalPrefix = "owner.";
+// The leaves `entity.<name>.` carries. Metres, metres per second, metres per second squared.
+inline constexpr std::string_view kEntitySignalLeaves[] = {"speed",        "velocity.x", "velocity.y",
+                                                           "velocity.z",   "acceleration", "cameraDistance"};
+// `entity.<name>.`.
+[[nodiscard]] std::string entitySignalPrefix(std::string_view entity);
+// What `owner.` means for this owner, or the refusal naming why it means nothing.
+[[nodiscard]] Result<std::string> ownerSignalPrefix(const EffectOwner& owner);
+// The type's default routes aimed at this instance's paths, `owner.` resolved against its owner. A
+// route the owner cannot resolve refuses the whole set, naming the route and the owner -- a route
+// that silently bound to nothing is the failure ADR-392 was about.
+[[nodiscard]] Result<std::vector<params::ModRoute>> defaultEffectRoutes(const EffectInstance& effect);
+// Re-points every route whose source is one of `entity.<from>.*` at `entity.<to>.*`. Returns how
+// many moved. An entity rename's half for routes (its half for effects is `renameEffectOwner`).
+std::size_t renameEntitySignalSources(std::vector<params::ModRoute>& routes, std::string_view from,
+                                      std::string_view to);
 
 } // namespace avgen::world

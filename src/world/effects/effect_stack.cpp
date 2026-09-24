@@ -1,5 +1,6 @@
 #include "world/effects/effect_stack.hpp"
 
+#include "world/effects/effect_params.hpp"
 #include "world/effects/effect_registry.hpp"
 
 #include <algorithm>
@@ -264,6 +265,15 @@ std::size_t renameEffectOwner(std::vector<EffectInstance>& effects, const Effect
         }
     }
     normaliseEffectOrder(effects);
+    return moved;
+}
+
+std::size_t renameEffectOwner(std::vector<EffectInstance>& effects, std::vector<params::ModRoute>& routes,
+                              const EffectOwner& from, const EffectOwner& to) {
+    const std::size_t moved = renameEffectOwner(effects, from, to);
+    if (from.kind == EffectTarget::Entity && to.kind == EffectTarget::Entity) {
+        renameEntitySignalSources(routes, from.name, to.name);
+    }
     return moved;
 }
 

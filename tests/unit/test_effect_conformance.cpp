@@ -100,6 +100,7 @@ std::vector<std::string> declaredKindNames() {
     std::vector<std::string> names;
     std::string token;
     bool inLineComment = false;
+    bool skipValue = false; // between an `=` and the comma that ends the enumerator
     for (std::size_t i = open + 1; i < close; ++i) {
         const char c = text[i];
         if (inLineComment) {
@@ -121,15 +122,32 @@ std::vector<std::string> declaredKindNames() {
             // An enumerator is the token that ends a comma-or-newline-separated item, and an
             // explicit `= 3` would leave the number as the token -- which is why a token that does
             // not start with a letter is dropped rather than recorded.
-            if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+            if (!skipValue && !token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
                 names.push_back(token);
             }
             token.clear();
+            skipValue = false;
             continue;
         }
-        token.clear(); // '=' and friends: whatever was accumulating is not an enumerator
+        if (c == ' ' || c == '\t') {
+            continue; // `Trail = 11`: the space before the `=` does not end the name
+        }
+        if (c == '=') {
+            // ADR-703's Wave 1 kinds carry EXPLICIT values (`Trail = 11`), so the name is the token
+            // before the `=`, and what follows up to the comma is its value, not an enumerator.
+            // Before this the space ended the token and the name was silently lost -- and the guard
+            // then reported "a schema claims EffectKind::Trail, which effect_kind.hpp does not
+            // declare" about a header that declared it.
+            if (!skipValue && !token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+                names.push_back(token);
+            }
+            token.clear();
+            skipValue = true;
+            continue;
+        }
+        token.clear(); // anything else: whatever was accumulating is not an enumerator
     }
-    if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+    if (!skipValue && !token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
         names.push_back(token);
     }
     return names;
@@ -247,7 +265,8 @@ TEST_CASE("a leaf check reports a leaf that is not there, and passes one that is
         const world::EffectSchema* schema = world::effectSchema(kind);
         REQUIRE(schema != nullptr);
         const conf::Report ground = conf::checkLeavesExist(kind, kGround, "ground");
-        CHECK(ground.clean() == (schema->resolve.bucket != world::EffectBucket::Surface));
+        // ADR-703: nor does a type with a builder of its own (a Trail lights nothing).
+        CHECK(ground.clean() == world::isAtmosphericBucket(schema->resolve.bucket));
     }
 }
 
@@ -391,6 +410,9 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Tornado, {EffectTarget::World}},
         {EffectKind::GroundPulse, {EffectTarget::Entity, EffectTarget::World}},
         {EffectKind::TravelBeam, {EffectTarget::World, EffectTarget::Camera}},
+        // ADR-703 (Wave 1): a strip through its owner's path -- an entity's. Light is designed for
+        // (a moving light's streak) and not built: no light has a transform history yet.
+        {EffectKind::Trail, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -433,6 +455,12 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         case world::EffectBucket::Comet: return world::RenderStage::Sky;
         case world::EffectBucket::Aurora: return world::RenderStage::Sky;
         case world::EffectBucket::Medium: return world::RenderStage::Volumetric;
+        // ADR-703's Wave 1 integrators: the lit pass's lanes, pass 1's blended section (strips and
+        // particles), and the distortion resolve over the finished image.
+        case world::EffectBucket::EntityLanes: return world::RenderStage::Material;
+        case world::EffectBucket::Ribbon: return world::RenderStage::Particles;
+        case world::EffectBucket::Distortion: return world::RenderStage::ScreenSpace;
+        case world::EffectBucket::Emitter: return world::RenderStage::Particles;
         }
         return world::RenderStage::PostProcess; // unreachable for a real bucket, and wrong for all
     };
@@ -446,7 +474,7 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
     }
     // The control: the family spans three stages, so the loop compared distinct answers rather
     // than one stage with itself.
-    CHECK(used.size() == 3);
+    CHECK(used.size() >= 3);
 
     SECTION("and the evaluator walks stages in frame order") {
         // One instance of every type, listed in REVERSE registry order; the evaluation order must
