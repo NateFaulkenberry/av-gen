@@ -1,7 +1,7 @@
 {
   "format": "avgen-scene", "version": 1, "name": "worlds",
   "camera": { "mode": 1, "position": [0, 6, 46], "target": [0, 18, -10], "fov": 66.0, "orbitSpeed": 0.0 },
-  "environment": { "intensity": 0.0, "fogDensity": 0.012, "fogColor": [0.02, 0.015, 0.03], "background": [0.008, 0.006, 0.012] },
+  "environment": { "intensity": 0.0, "volumeDensity": 0.0199813, "volumeMaxDistance": 0.0, "fogColor": [0.02, 0.015, 0.03], "background": [0.008, 0.006, 0.012] },
   "nodes": [
     { "name": "floor", "kind": "grid", "scale": [8, 1, 8] },
     { "name": "pillars", "kind": "procedural", "procedural": {

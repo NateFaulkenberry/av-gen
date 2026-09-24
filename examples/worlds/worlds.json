@@ -190,8 +190,8 @@
         "procedural/core/deform/1/amount": [
           0.2
         ],
-        "scene/fogDensity": [
-          0.016
+        "scene/volumeDensity": [
+          0.02664
         ],
         "scene/fogColor": [
           0.015,
@@ -268,8 +268,8 @@
         "procedural/core/deform/1/amount": [
           0.25
         ],
-        "scene/fogDensity": [
-          0.014
+        "scene/volumeDensity": [
+          0.02331
         ],
         "scene/fogColor": [
           0.02,
@@ -346,8 +346,8 @@
         "procedural/core/deform/1/amount": [
           0.4
         ],
-        "scene/fogDensity": [
-          0.02
+        "scene/volumeDensity": [
+          0.0333
         ],
         "scene/fogColor": [
           0.02,
@@ -424,8 +424,8 @@
         "procedural/core/deform/1/amount": [
           1.5
         ],
-        "scene/fogDensity": [
-          0.008
+        "scene/volumeDensity": [
+          0.01332
         ],
         "scene/fogColor": [
           0.03,

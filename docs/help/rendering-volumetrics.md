@@ -2,31 +2,32 @@
 id: rendering/volumetrics
 title: Volumetrics and Fog
 category: Rendering
-summary: Two unrelated fogs, the volumetric march, and how to make light visible in the air.
+summary: One fog, two ways of drawing it, and how to make light visible in the air.
 order: 55
 tags: fog, volumetrics, god rays, scattering, haze, atmosphere
 keywords: how do i add fog; god rays; light shafts; atmosphere; volumetric; make the air glow
 related: rendering/lights, rendering/emission-and-bloom, performance/what-costs-what
 features: subsystem.rendering
-parameters: scene/volumeDensity, scene/fogDensity, scene/volumeAnisotropy, scene/volumeSteps
+parameters: scene/volumeDensity, scene/volumeMaxDistance, scene/volumeAnisotropy, scene/volumeSteps
 ---
 
 # Volumetrics and Fog
 
-There are **two** fogs in AV Gen, and they are not the same thing.
+There is **one** fog in AV Gen: `scene/volumeDensity` (0 – 2, **default 0**), a participating
+medium whose extinction is `volumeDensity × volumeAbsorption` per metre. It is drawn two ways, and
+they are the same air under the same law (ADR-705):
 
-## Distance fog
+- **The volumetric march**, out to `scene/volumeMaxDistance`: light is scattered towards the camera
+  along every ray, and objects cast shadows through it.
+- **The surface fog**, beyond that distance: the same air integrated in closed form, fading
+  surfaces towards `scene/fogColor`. It is nearly free.
 
-`scene/fogDensity` (0 – 2, default 0) with `scene/fogColor` is an exponential-squared fog applied to
-**surfaces** in the lit pass. It tints things by distance. It is nearly free, it does not scatter
-light, and it does nothing to the empty air.
+Set `volumeMaxDistance` to **0** for distance fog with no march at all -- the whole ray is then the
+cheap closed form. **With `volumeDensity` at zero, nothing is allocated and no pass runs.** Off is
+free.
 
-## The volumetric march
-
-`scene/volumeDensity` (0 – 2, **default 0**) turns on a genuine participating medium: light is
-scattered towards the camera along every ray, and objects cast shadows through it.
-
-**With `volumeDensity` at zero, nothing is allocated and no pass runs.** Off is free.
+The old `scene/fogDensity` -- an exponential-squared fog with a density of its own, which agreed
+with the march at one distance and nowhere else -- was removed by ADR-705.
 
 | Parameter | Default | Range | Meaning |
 |---|---|---|---|

@@ -42,7 +42,7 @@ std::vector<float> flatten(const DayNightState& s) {
             s.groundColor.r,  s.groundColor.g,  s.groundColor.b,
             s.skyIntensity,   s.haze,           s.starBrightness,
             s.hdriIntensity,  s.hdriBlend,      s.glowScale,
-            s.fogDensity,     s.fogColor.r,     s.fogColor.g, s.fogColor.b};
+            s.volumeDensity,  s.fogColor.r,     s.fogColor.g, s.fogColor.b};
 }
 
 float maxDelta(const std::vector<float>& a, const std::vector<float>& b) {

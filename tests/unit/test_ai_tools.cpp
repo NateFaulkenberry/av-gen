@@ -500,17 +500,17 @@ TEST_CASE("environment.set applies several atmosphere values in one call", "[ai]
 
     const auto result = f.call(
         "environment.set",
-        json{{"values", json{{"scene/fogDensity", 0.12}, {"scene/brightness", 1.4}}}});
+        json{{"values", json{{"scene/volumeDensity", 0.12}, {"scene/brightness", 1.4}}}});
     REQUIRE(result.success);
     CHECK(result.value.at("applied").size() == 2);
-    const params::IParameter* fog = f.engine.params().find("scene/fogDensity");
+    const params::IParameter* fog = f.engine.params().find("scene/volumeDensity");
     REQUIRE(fog != nullptr);
     CHECK_THAT(static_cast<double>(fog->baseComponent(0)), WithinAbs(0.12, 1e-4));
 
     SECTION("a path this scene does not have is named, not ignored") {
         const auto mixed = f.call(
             "environment.set",
-            json{{"values", json{{"scene/fogDensity", 0.2}, {"env/sky/aurora", 1.0}}}});
+            json{{"values", json{{"scene/volumeDensity", 0.2}, {"env/sky/aurora", 1.0}}}});
         REQUIRE(mixed.success);
         CHECK(mixed.value.at("notFound").at(0) == "env/sky/aurora");
     }
@@ -732,7 +732,7 @@ TEST_CASE("A tool's one-line summary agrees with its structured result",
 
     const auto env = f.call(
         "environment.set",
-        json{{"values", json{{"scene/fogDensity", 0.2}, {"scene/brightness", 1.1}}}});
+        json{{"values", json{{"scene/volumeDensity", 0.2}, {"scene/brightness", 1.1}}}});
     REQUIRE(env.success);
     CHECK(env.value.at("applied").size() == 2);
     CHECK(env.summary.find("2 environment value") != std::string::npos);
@@ -1433,12 +1433,12 @@ TEST_CASE("A created node is inside the transaction that made it", "[ai][tools][
     REQUIRE(f.engine.composition()->findNode("regrettable") != nullptr);
     // ...and a parameter change alongside it, so the test proves the two halves roll back together
     // rather than one of them happening to work.
-    REQUIRE(f.call("parameter.set", json{{"path", "scene/fogDensity"}, {"value", 0.77}}).success);
+    REQUIRE(f.call("parameter.set", json{{"path", "scene/volumeDensity"}, {"value", 0.77}}).success);
 
     REQUIRE(store.restore(f.engine, id).has_value());
     CHECK(f.engine.composition()->findNode("regrettable") == nullptr);
     CHECK(f.engine.composition()->nodes().size() == before);
-    const auto* fog = f.engine.params().find("scene/fogDensity");
+    const auto* fog = f.engine.params().find("scene/volumeDensity");
     REQUIRE(fog != nullptr);
     CHECK(fog->baseComponent(0) < 0.7f); // back to whatever the scene said, not 0.77
 }

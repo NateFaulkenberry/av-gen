@@ -301,7 +301,8 @@ def look_tracks():
         # Fog cools and thickens: the far towers should read as far even after the sun has gone.
         track("scene/fogColor", [(0.0, [0.075, 0.070, 0.090]), (VERSE2, [0.035, 0.042, 0.075]),
                                  (CHORUS2, [0.020, 0.028, 0.058])]),
-        track("scene/fogDensity", [(0.0, 0.0016), (VERSE2, 0.0024), (CHORUS2, 0.0030)]),
+        # ADR-705: the one density (was the surface pass's own `fogDensity`, 0.0016 -> 0.0030).
+        track("scene/volumeDensity", [(0.0, 0.003), (VERSE2, 0.0045), (CHORUS2, 0.005625)]),
         track("scene/styledSkyAmbient", [(0.0, [0.013, 0.019, 0.040]), (VERSE2, [0.007, 0.010, 0.024]),
                                          (CHORUS2, [0.005, 0.007, 0.018])]),
         track("scene/styledGroundAmbient", [(0.0, [0.006, 0.0055, 0.005]), (CHORUS2, [0.003, 0.0027, 0.0025])]),
@@ -463,7 +464,6 @@ def project():
             "post/halation/enabled": True,
             "post/halation/intensity": 0.22,
             "post/halation/threshold": 2.4,
-            "scene/fogDensity": 0.0016,
             "scene/fogColor": [0.075, 0.070, 0.090],
         },
         "routes": routes(),

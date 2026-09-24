@@ -146,7 +146,7 @@ nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engin
                                           return p->group() == "lightrig";
                                       });
     present["sky"] = mutableEngine.params().find("env/sky/enabled") != nullptr;
-    present["fog"] = mutableEngine.params().find("scene/fogDensity") != nullptr;
+    present["fog"] = mutableEngine.params().find("scene/volumeDensity") != nullptr; // ADR-705: the one density
 
     nlohmann::json out;
     out["engine"] = "AV Gen";

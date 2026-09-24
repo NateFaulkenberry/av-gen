@@ -19,7 +19,6 @@
  },
  "environment": {
   "intensity": 0.0,
-  "fogDensity": 0.0075,
   "fogColor": [
    0.012,
    0.014,

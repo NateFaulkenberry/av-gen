@@ -52,7 +52,7 @@ constexpr std::string_view kSceneKeys[] = {
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
     "worldEvents"};
 constexpr std::string_view kEnvironmentKeys[] = {
-    "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
+    "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
     "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
     "proceduralSkyBackground",
@@ -3743,7 +3743,6 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     }
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
-    fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
     // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only
     // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
@@ -4763,7 +4762,6 @@ void Composition::detach() {
     skyIntensity_ = nullptr;
     stylized_ = nullptr;
     brightness_ = nullptr;
-    fogDensity_ = nullptr;
     fogColor_ = nullptr;
     styledSkyAmbient_ = nullptr;
     styledGroundAmbient_ = nullptr;
@@ -7352,7 +7350,6 @@ void Composition::applyParameters() {
     if (brightness_ != nullptr) {
         scene_.environment.brightness = brightness_->value();
     }
-    scene_.environment.fogDensity = fogDensity_ != nullptr ? fogDensity_->value() : fogDensitySetting_;
     scene_.environment.stylized = stylized_ != nullptr ? stylized_->value() : stylizedSetting_;
     if (addedKeyLight_ && !scene_.lights.empty() && keyLight_ != nullptr) {
         scene_.lights.back().intensity = defaultKeyLight().intensity * keyLight_->value();
@@ -7593,7 +7590,9 @@ void Composition::applyDayNight() {
     const DayNightState& s = dayNightState_;
     Environment& env = scene_.environment;
     env.environmentIntensity *= s.hdriIntensity;
-    env.fogDensity = s.fogDensity;
+    // ADR-705: the cycle drives the ONE density. It used to drive the surface pass's own
+    // exp-squared density, which no longer exists.
+    env.volumeDensity = s.volumeDensity;
     env.fogColor = s.fogColor;
     // ADR-049 splits these two and the distinction bites here: `Environment::skyIntensity` scales
     // the *visible background pass*, `SkySettings::intensity` scales the sky as an IBL source.
@@ -8317,7 +8316,7 @@ nlohmann::json Composition::toJson() const {
             writeFloatCurve("hdriIntensity", dn.hdriIntensity);
             writeFloatCurve("hdriBlend", dn.hdriBlend);
             writeFloatCurve("glowScale", dn.glowScale);
-            writeFloatCurve("fogDensity", dn.fogDensity);
+            writeFloatCurve("volumeDensity", dn.volumeDensity);
             writeFloatCurve("waterReflection", dn.waterReflection);
         }
         environment["dayNight"] = std::move(d);
@@ -8331,7 +8330,6 @@ nlohmann::json Composition::toJson() const {
     if (lightFromEnvironmentSetting_) {
         environment["lightFromEnvironment"] = true;
     }
-    environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
     {
         // ADR-358. Out here rather than in the volumetric block below, which is where it was
         // first written and where a test caught it: that block is guarded by the volume being ON,
@@ -9314,7 +9312,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             readFloatCurve("hdriIntensity", dn.hdriIntensity);
             readFloatCurve("hdriBlend", dn.hdriBlend);
             readFloatCurve("glowScale", dn.glowScale);
-            readFloatCurve("fogDensity", dn.fogDensity);
+            readFloatCurve("volumeDensity", dn.volumeDensity);
             readFloatCurve("waterReflection", dn.waterReflection);
             // Curves the scene did not override get the Tree of Life defaults, so `enabled: true`
             // on its own is a complete cycle rather than a black world. `fill` only writes into an
@@ -9348,11 +9346,6 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(intensity.error());
         }
         comp->envIntensitySetting_ = *intensity;
-        auto fog = readFloat(e, "fogDensity", comp->fogDensitySetting_);
-        if (!fog) {
-            return std::unexpected(fog.error());
-        }
-        comp->fogDensitySetting_ = *fog;
         if (e.contains("stylized")) {
             if (!e["stylized"].is_boolean()) {
                 return fail("'stylized' must be a boolean");

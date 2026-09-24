@@ -37,7 +37,7 @@
           "name": "environment.set",
           "arguments": {
             "values": {
-              "scene/fogDensity": 0.09,
+              "scene/volumeDensity": 0.1499,
               "scene/fogHeightFalloff": 0.06,
               "scene/brightness": 0.72,
               "scene/keyLight": 0.45

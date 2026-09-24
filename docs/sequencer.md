@@ -474,7 +474,7 @@ it *every frame*, and a modulation route pointed at one does the same however th
 
 Key those parameters with `Step` at the section boundaries instead. The dusk then arrives at a cut,
 which is where a cutter would have put it anyway, and everything that should move continuously --
-`scene/keyLight`, `scene/fogColor`, `scene/fogDensity`, `scene/styledSkyAmbient`, the practicals'
+`scene/keyLight`, `scene/fogColor`, `scene/volumeDensity` (was `scene/fogDensity`, ADR-705), `scene/styledSkyAmbient`, the practicals'
 `emissiveBoost` -- still does, because none of those are in the sky's hash. On the Night Shift project this is the
 difference between 8.7 and 63.3 frames per second over the whole piece at 1280x720 (364.0 s to
 49.7 s for 3,150 frames), and 8 sky rebuilds instead of 3,150.

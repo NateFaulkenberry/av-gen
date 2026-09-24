@@ -244,11 +244,6 @@
      "path": "scene/volumeDensity",
      "min": 0.00018,
      "max": 0.0016
-    },
-    {
-     "path": "scene/fogDensity",
-     "min": 0.0014,
-     "max": 0.0055
     }
    ]
   },

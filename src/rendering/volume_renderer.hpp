@@ -129,11 +129,17 @@ public:
                                     wgpu::Buffer particleGlow = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of volume.wgsl (keeps the old pipelines on failure)
 
-    // True when this scene wants volumetrics at all (volumeDensity > 0).
+    // True when this scene's air is marched at all: volumeDensity > 0 and, ADR-705, a march
+    // distance > 0 to carry it over.
     [[nodiscard]] static bool enabled(const scene::Environment& environment);
     // ADR-387: the vortex lives in the atmospheric effects now, so the whole-scene overload is
     // the one that answers correctly for a scene with a vortex and no fog.
     [[nodiscard]] static bool enabled(const scene::Scene& scene);
+    // ADR-705: the distance at which the surface fog takes the air over from the march -- how far
+    // the march carries it on a frame where it runs (`volumeMaxDistance`, clamped exactly as the
+    // march clamps it), and 0 where no march runs, so the surface pass integrates the whole ray.
+    // One number read by both sides of the handover, so a metre of air is counted exactly once.
+    [[nodiscard]] static float surfaceFogStart(const scene::Scene& scene, bool volumePassOn);
 
     // Per frame, before encode(): sizes the half-res target, resolves the density/colour field
     // names to slots and writes the uniforms. Does nothing (and clears the stats) when off.

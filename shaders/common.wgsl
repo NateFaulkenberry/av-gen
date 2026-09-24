@@ -78,9 +78,11 @@ struct FrameUniforms {
                                // the background instead of the flat colour; ADR-049: z = the
                                // visible sky's intensity, w = how much of it the bloom mask sees
     skySun: vec4<f32>,         // xyz = direction *towards* the sky's sun/moon, w = 1 when it has one
-    fogParams: vec4<f32>,      // rgb = fog colour, w = fog density (0 = off; exp2 fog by view distance)
+    fogParams: vec4<f32>,      // rgb = fog colour, w = the air's extinction per metre (ADR-705:
+                               // volumeDensity * volumeAbsorption, the march's own; 0 = off)
     fogHeight: vec4<f32>,      // ADR-058: x = mist layer top (m), y = falloff per metre above it,
-                               // z = how much of that layer the surface fog integrates, w = 0
+                               // z = how much of that layer the surface fog integrates,
+                               // w = ADR-705: how far the march carries the air (0 = it does not run)
     styledSky: vec4<f32>,      // ADR-058: rgb = styled ambient towards +Y, w = the AO floor
     styledGround: vec4<f32>,   // ADR-058: rgb = styled ambient towards -Y, w = 0
     audio: vec4<f32>,          // ADR-030 material inputs: rms, bass, mid, treble
@@ -471,39 +473,56 @@ fn treeEnergyAt(worldPos: vec3<f32>) -> vec3<f32> {
 // include of this file, and a second include would compile two copies into one module.
 #include "height_fog.wgsl"
 
-// Exponential-squared distance fog towards frame.fogParams.rgb; density 0 leaves the colour
-// untouched (the branch keeps the no-fog output bit-identical to the pre-fog shader).
+// ADR-705: the surface pass is the SAME air the march integrates, under the same law. Beer--Lambert
+// towards frame.fogParams.rgb, with the extinction the march uses -- `volumeDensity *
+// volumeAbsorption`, packed by the renderer -- so there is one law and one density (ADR-569's
+// option 2, the owner's ruling). Extinction 0 leaves the colour untouched.
 //
-// ADR-058: when frame.fogHeight.z is non-zero the geometric distance is first replaced by the
-// distance *through the mist*, integrating the same flat-topped layer the volumetric marches along
-// the view ray. Both endpoints inside the layer integrate to the ray's own length, so a scene that
-// keeps everything below the fog bank is unchanged to the last bit; what moves is the ridge line
-// and the canopy crowns standing out of it, which are now seen through the air that is actually
-// between them and the eye rather than through a uniform slab.
+// It used to be `exp(-(d * fogDensity)^2)` from a second, unrelated density. The two agreed at one
+// distance (median 79.3 m across the shipped scenes) and nowhere else; at 400 m in Glowmere they
+// disagreed 48x. ADR-705 has the census and the re-tuning that removing that cost.
+//
+// **Where the march stops, this starts.** `frame.fogHeight.w` is how far the volumetric march carries
+// the air on this frame (`volumeMaxDistance`), or 0 when no march runs. The march already
+// extinguishes every surface nearer than that -- it stops at the depth buffer -- so this pass
+// integrates only the segment BEYOND it. Each metre of air is then counted once: marched near the
+// eye, integrated in closed form past the march's reach, and the product of the two is the
+// transmittance of the whole ray. Counting the near segment here as well would square it.
+//
+// ADR-058: when frame.fogHeight.z is non-zero the segment's length is scaled by the mean of the
+// height layer along it -- the same flat-topped layer the march samples, through its closed-form
+// antiderivative (ADR-567) -- so a ridge standing clear of the mist is seen through the air that is
+// actually between it and the eye.
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
-    let density = frame.fogParams.w;
-    if (density <= 0.0) {
+    let extinction = frame.fogParams.w;
+    if (extinction <= 0.0) {
         return color;
     }
-    var travel = distance(frame.cameraPos.xyz, worldPos);
+    let dist = distance(frame.cameraPos.xyz, worldPos);
+    let start = frame.fogHeight.w;
+    if (dist <= start) {
+        return color; // the march has this whole ray
+    }
+    var travel = dist - start;
     let amount = frame.fogHeight.z;
     let falloff = frame.fogHeight.y;
     if (amount > 0.0 && falloff > 0.0) {
-        let y0 = frame.cameraPos.y - frame.fogHeight.x;
+        let yEye = frame.cameraPos.y - frame.fogHeight.x;
         let y1 = worldPos.y - frame.fogHeight.x;
+        // Where the segment starts: the point the march hands over at. `start` 0 is the eye itself,
+        // exactly -- `(y1 - yEye) * 0 / dist` is 0 and adds nothing.
+        let y0 = yEye + (y1 - yEye) * (start / dist);
         let rise = y1 - y0;
-        // The mean of the layer's density along the ray. The difference quotient is the whole
+        // The mean of the layer's density along the segment. The difference quotient is the whole
         // integral because the ray climbs at a constant rate: metres of mist per metre travelled.
         var mean = 1.0;
         let upper = frame.fogShape.x;
         let curve = frame.fogShape.y;
         if (max(y0, y1) > 0.0) {
             // Both endpoints below the layer's top puts the whole segment below it, so the mean is
-            // exactly one and this branch is skipped -- which is what keeps a scene that sits
-            // inside its own fog bank bit-identical when the integration is switched on. Leaving
-            // it to the quotient would give 1.0 only to within rounding, because the numerator and
-            // the denominator are the same subtraction written twice and the compiler is free to
-            // fuse one of them and not the other.
+            // exactly one and this branch is skipped. Leaving it to the quotient would give 1.0
+            // only to within rounding, because the numerator and the denominator are the same
+            // subtraction written twice and the compiler is free to fuse one and not the other.
             mean = fogHeightProfile(y0, falloff, upper, curve); // a level ray never leaves its altitude
             if (abs(rise) > 1e-3) {
                 mean = (fogHeightIntegral(y1, falloff, upper, curve) -
@@ -512,8 +531,7 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         }
         travel = travel * mix(1.0, mean, amount);
     }
-    let d = travel * density;
-    let f = exp(-d * d);
+    let f = exp(-extinction * travel);
     return mix(frame.fogParams.rgb, color, f);
 }
 

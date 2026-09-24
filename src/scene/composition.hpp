@@ -1455,7 +1455,6 @@ private:
     float cameraAngle_ = 0.0f;
     // Free camera (camera/mode = 1): explicit position/target parameters instead of the orbit.
     params::Parameter<int>* cameraMode_ = nullptr;
-    params::Parameter<float>* fogDensity_ = nullptr;
     // Volumetric atmosphere (ADR-032): scene/volume* next to scene/fog*.
     params::Parameter<float>* volumeDensity_ = nullptr;
     nlohmann::json postJson_;
@@ -1512,7 +1511,6 @@ private:
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
-    float fogDensitySetting_ = 0.0f;
     scene::Environment volumeSetting_; // the scene-file values behind the scene/volume* parameters
     wind::WindParams windSetting_;     // the scene-file values behind the scene/wind* parameters
     std::string volumeDensityFieldSetting_;

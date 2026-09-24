@@ -68,6 +68,9 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     // A scene that still carries them in its file is migrated on load -- see test_vortex_effect.cpp.
     CHECK_FALSE(registered(params, "scene/vortex/radius"));
     CHECK_FALSE(registered(params, "scene/vortex/emission"));
+    // ADR-705: one law, one density. The surface pass's own exp-squared density is gone, not
+    // aliased (ADR-441), so a route or a look still naming it resolves to nothing.
+    CHECK_FALSE(registered(params, "scene/fogDensity"));
 }
 
 TEST_CASE("Every path the Environment panel's wind section asks for exists",

@@ -544,10 +544,16 @@ struct Environment {
     // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
     // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
     SkySettings sky;
-    // Distance fog (exponential-squared by view distance) applied to lit/unlit surfaces after
-    // shading; the skybox is untouched. Default colour = the default background colour.
+    // The colour the air fades a surface towards, where the surface pass carries the air (ADR-705,
+    // below). The skybox is untouched. Default colour = the default background colour.
+    //
+    // ADR-705 (resolving ADR-569): there is no separate surface-fog density any more. The surfaces
+    // are fogged by THE SAME air the volumetric march integrates -- extinction `volumeDensity *
+    // volumeAbsorption`, the same height layer, the same Beer--Lambert law -- and the only split is
+    // WHERE each pass carries it: the march out to `volumeMaxDistance`, the surface pass in closed
+    // form beyond. `fogDensity`, the exp-squared density that used to sit here, is removed rather
+    // than aliased (ADR-441); ADR-705 lists what every scene that set it was re-tuned to.
     glm::vec3 fogColor{0.012f, 0.012f, 0.02f};
-    float fogDensity = 0.0f; // 0 = off; factor = exp(-(distance * density)^2)
     // ADR-058: how much of the volumetric's mist layer the *surface* fog sees. At 0 the distance
     // above is uniform, which is what it has always been; at 1 the view ray is integrated through
     // the same flat-topped layer the volumetric marches (uniform up to `fogHeight`, thinning by
@@ -654,6 +660,11 @@ struct Environment {
     // fog at only 12 steps moves by a mean of **0.024 luminance levels** with 44 of 921600 pixels
     // past two levels and no change in its row structure.
     float volumeJitter = 1.0f;
+    // ADR-705: how far the MARCH carries the air. Past it the surface pass integrates the same air
+    // in closed form, so this is a cost/fidelity split rather than where the fog ends: nearer
+    // than it the air is lit (in-scatter, shadows, local lights), beyond it it fades towards
+    // `fogColor`. 0 means no march at all -- the whole ray is integrated analytically, which is
+    // what a scene that only wants distance fog asks for, at none of the march's cost.
     float volumeMaxDistance = 200.0f;
     // ADR-387: the cosmic vortex used to live here, as a singleton on the environment. It is an
     // authored `world::EffectInstance` of kind `Vortex` now, for the reason the consolidation

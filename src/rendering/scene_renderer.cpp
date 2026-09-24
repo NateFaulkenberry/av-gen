@@ -2665,13 +2665,19 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.vortexGlowColor = glm::vec4(0.0f);
     }
     }
-    frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
+    // ADR-705: ONE law and ONE density. The surface pass's extinction is the march's own --
+    // `volumeDensity * volumeAbsorption`, the product `fs_march` turns density into extinction with
+    // -- and it is Beer--Lambert in both. There is no second density to set; `fogDensity` is gone.
+    frame.fogParams = glm::vec4(scene.environment.fogColor,
+                                std::max(scene.environment.volumeDensity, 0.0f) *
+                                    std::max(scene.environment.volumeAbsorption, 0.0f));
     // ADR-058: the surface fog borrows the volumetric's mist layer rather than declaring one of
     // its own, so the air a ray is drawn through and the air it is marched through are the same
     // air. Amount 0 (the default) leaves applyFog on its uniform-distance branch.
     frame.fogHeight = glm::vec4(scene.environment.fogHeight,
                                 std::max(scene.environment.fogHeightFalloff, 0.0f),
-                                std::clamp(scene.environment.fogHeightAmount, 0.0f, 1.0f), 0.0f);
+                                std::clamp(scene.environment.fogHeightAmount, 0.0f, 1.0f),
+                                VolumeRenderer::surfaceFogStart(scene, toggles_.volume));
     // ADR-568 (§7): the same two numbers the march and the particle estimate read. Clamped here
     // rather than trusted, because `applyFog` divides by the layer's falloff and a negative
     // `upper` would make the distance through the air shorter than the ray.

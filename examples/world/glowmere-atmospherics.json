@@ -13,8 +13,8 @@
                "kind": "composition",
                "path": {
                  "path": "glowmere-atmospherics.scene.json",
-                 "sha256": "6d80ecb4272f1cd6987d5c1b8da508e066de88dd96ad78e023dd3afe7080709a",
-                 "size": 245788
+                 "sha256": "9632c65a27fcb0f189ebf13b6915f29f5505ac2fd7f56ddc6f486546ef8a4ad4",
+                 "size": 245762
                }
              }
   },
@@ -9374,7 +9374,6 @@
       0.18000000715255737,
       0.3199999928474426
     ],
-    "scene/fogDensity": 0.005499999970197678,
     "scene/fogHeight": 4.0,
     "scene/fogHeightFalloff": 0.10000000149011612,
     "scene/gridIntensity": 0.6000000238418579,

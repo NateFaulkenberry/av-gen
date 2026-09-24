@@ -78,11 +78,24 @@ bool VolumeRenderer::enabled(const scene::Environment& environment) {
     // ADR-387: the vortex moved out of `Environment` and into the atmospheric effects, so this
     // overload can no longer see it. Kept for the fog-only callers; `enabled(scene)` below is the
     // one that knows about both.
-    return environment.volumeDensity > 0.0f;
+    //
+    // ADR-705: and it needs somewhere to march. `volumeMaxDistance` 0 is "the air has a density and
+    // no march carries it" -- the surface pass then integrates the whole ray in closed form, under
+    // the same law, which is what a scene that only ever wanted distance fog asks for. Without this
+    // gate such a scene would pay for a fullscreen march that stops after one centimetre.
+    return environment.volumeDensity > 0.0f && environment.volumeMaxDistance > 0.0f;
 }
 
 bool VolumeRenderer::enabled(const scene::Scene& scene) {
-    return scene.environment.volumeDensity > 0.0f || scene.atmospherics.mediumCount > 0;
+    return enabled(scene.environment) || scene.atmospherics.mediumCount > 0;
+}
+
+float VolumeRenderer::surfaceFogStart(const scene::Scene& scene, bool volumePassOn) {
+    if (!volumePassOn || !enabled(scene)) {
+        return 0.0f;
+    }
+    // The same clamp `update()` gives `params1.w`, so the two sides agree on the handover to the bit.
+    return std::max(scene.environment.volumeMaxDistance, 0.01f);
 }
 
 const gpu::RenderTarget& VolumeRenderer::target() const {

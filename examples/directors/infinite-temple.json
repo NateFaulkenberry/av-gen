@@ -101,11 +101,6 @@
       "default": 0.4,
       "targets": [
         {
-          "path": "scene/fogDensity",
-          "min": 0.001,
-          "max": 0.0055
-        },
-        {
           "path": "scene/brightness",
           "min": 1.0,
           "max": 0.55
@@ -143,11 +138,6 @@
       "default": 0.5,
       "targets": [
         {
-          "path": "scene/fogDensity",
-          "min": 0.001,
-          "max": 0.0048
-        },
-        {
           "path": "camera/lens/aperture",
           "min": 11.0,
           "max": 2.0
@@ -167,11 +157,6 @@
           "path": "scene/volumeScattering",
           "min": 0.6,
           "max": 1.8
-        },
-        {
-          "path": "scene/fogDensity",
-          "min": 0.0012,
-          "max": 0.005
         }
       ]
     },
