@@ -16,6 +16,7 @@
 #include "scene/particle_io.hpp"
 #include "scene/scatter_anchors.hpp"
 #include "scene/sky.hpp"
+#include "world/effects/effect_lights.hpp"
 #include "world/effects/effect_stack.hpp"
 #include "spatial/detail.hpp"
 
@@ -90,8 +91,12 @@ namespace {
 // Ecology lights are rebuilt every frame and identified by name, because the rig removes its own
 // lights by resizing from the back and the two sets must not be able to eat each other.
 constexpr std::string_view kEcologyLightPrefix = "ecology.glow.";
-// The clustered path takes 256 lights in total (kMaxSceneLights); leave room for the rig.
-constexpr std::size_t kMaxEcologyLights = 224;
+// The clustered path takes 256 lights in total (kMaxSceneLights); leave room for the rig. ADR-703:
+// and for LIGHTMOD's effect pool (a Glow's spill light), whose 16 slots are reserved here rather
+// than fought over -- ecology takes everything that is left, so a second allocator asking for "the
+// rest" would win or lose by where the camera stood. The pool is appended by the renderer after
+// these, so authored + ecology + effect lights still total 224 at most.
+constexpr std::size_t kMaxEcologyLights = 224 - world::kEffectLightBudget;
 constexpr int kMaxTerrainLodIndex = world::kMaxTerrainLods - 1;
 } // namespace
 
@@ -2925,9 +2930,27 @@ struct DirectorCheckpoint final : entity::HostCheckpoint {
     stage::Staging::Checkpoint staging;
     std::vector<stage::VisualPlacement> placed;
     std::vector<std::uint8_t> valid;
+    world::HistoryBank::Snapshot history; // ADR-703: empty when nothing subscribes to HIST
     std::size_t measured = 0;
     [[nodiscard]] std::size_t bytes() const override { return measured; }
 };
+
+// ADR-703: the host half of a checkpoint for a scene with no director -- the transform history and
+// nothing else, since without a director the replay has no other host state.
+struct HistoryCheckpoint final : entity::HostCheckpoint {
+    world::HistoryBank::Snapshot history;
+    [[nodiscard]] std::size_t bytes() const override { return history.bytes() + sizeof(HistoryCheckpoint); }
+};
+
+// The checkpoint key with HIST's inputs folded in: which nodes are recorded, how deep, and the
+// automation the replay re-applies. A new subscriber has no history in any checkpoint taken before
+// it, so the set must drop.
+std::uint64_t withHistoryKey(std::uint64_t key, const world::HistoryBank* bank) {
+    if (bank == nullptr || bank->empty()) {
+        return key; // exactly the key a scene with no HIST had
+    }
+    return key ^ (bank->key() + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2));
+}
 
 } // namespace
 
@@ -2962,9 +2985,36 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                                    entity::SeekBudget budget, double step) {
     staging_.reset(&entityWorld_, &params);
     seekPlacementLive_ = false;
+    // ADR-703: HIST is replayed with the simulation. Cleared first -- a replay from zero starts with
+    // no history, and a restore overwrites it -- then recorded after every replayed step and carried
+    // in every checkpoint. With nothing subscribed none of this runs and the hooks are unchanged.
+    world::HistoryBank* const history = historyBank_ != nullptr && !historyBank_->empty() ? historyBank_ : nullptr;
+    if (history != nullptr) {
+        history->clear();
+    }
     if (stagingDesc_.empty()) {
         entity::EntityWorld::SeekHooks hooks;
-        hooks.inputKey = replayInputKey();
+        hooks.inputKey = withHistoryKey(replayInputKey(), history);
+        if (history != nullptr) {
+            hooks.after = [&](double now, double) {
+                // The drawn transform a play's flattening would have used: finals rebuilt from the
+                // bases, every body's offsets written on, recorded, and the finals put back as the
+                // director-less replay keeps them (reset, never written) so the step after reads
+                // exactly what it read before HIST existed.
+                params.resetFinals();
+                entityWorld_.applyAllOffsets();
+                recordHistory(*history, now, history->automation());
+                params.resetFinals();
+            };
+            hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
+                auto c = std::make_shared<HistoryCheckpoint>();
+                c->history = history->snapshot();
+                return c;
+            };
+            hooks.restore = [&](const entity::HostCheckpoint& host) {
+                history->restore(static_cast<const HistoryCheckpoint&>(host).history);
+            };
+        }
         entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
         return;
     }
@@ -2987,11 +3037,15 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         staging_.update(ctx);
         raiseDirectorBeats(now);
     };
-    hooks.after = [&](double, double) {
+    hooks.after = [&](double now, double) {
         // The offsets a play's entity pass writes, and the "flattening" the next step's director
         // will ask about.
         entityWorld_.applyAllOffsets();
         placement.capture();
+        // ADR-703: the same finals the placement just read, so HIST records what a play draws.
+        if (history != nullptr) {
+            recordHistory(*history, now, history->automation());
+        }
     };
     hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
         auto c = std::make_shared<DirectorCheckpoint>();
@@ -2999,6 +3053,9 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         c->staging = staging_.checkpoint(params);
         c->placed = placement.placed();
         c->valid = placement.valid();
+        if (history != nullptr) {
+            c->history = history->snapshot();
+        }
         c->measured = static_cast<std::size_t>(core::allocCounters().bytes - before) + sizeof(DirectorCheckpoint);
         return c;
     };
@@ -3006,8 +3063,11 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         const auto& c = static_cast<const DirectorCheckpoint&>(host);
         staging_.restore(c.staging, params);
         placement.set(c.placed, c.valid);
+        if (history != nullptr) {
+            history->restore(c.history);
+        }
     };
-    hooks.inputKey = replayInputKey();
+    hooks.inputKey = withHistoryKey(replayInputKey(), history);
     entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
     seekPlaced_ = placement.placed();
     seekPlacedValid_ = placement.valid();
@@ -3143,6 +3203,71 @@ Result<void> Composition::setParent(const std::string& name, const std::string& 
     node->parent = parent;
     dirty_ = true;
     return {};
+}
+
+// ---- ADR-703: HIST ---------------------------------------------------------------------------------
+
+void Composition::recordHistory(world::HistoryBank& bank, double seconds,
+                                const world::HistoryAutomation* automation) const {
+    // The root fold `applyParameters` and `ReplayPlacement::capture` put every node through, with
+    // the same arithmetic, so a played sample and a replayed one are the same number.
+    const float rootScale = (rootScale_ != nullptr ? rootScale_->value() : 1.0f) +
+                            (rootImpulse_ != nullptr ? rootImpulse_->value() : 0.0f);
+    Transform root;
+    root.rotation = glm::angleAxis(rootAngle_, glm::vec3(0.0f, 1.0f, 0.0f));
+    root.scale = glm::vec3(rootScale);
+    root.position = center_ - root.rotation * (center_ * rootScale);
+    for (std::size_t ring = 0; ring < bank.ringCount(); ++ring) {
+        // The node's index, cached in the bank and checked by name: a replay is thirteen thousand
+        // steps and a name search of every node at each is not free.
+        std::size_t& slot = bank.hostSlot(ring);
+        if (slot >= nodes_.size() || nodes_[slot]->name != bank.ringNode(ring)) {
+            slot = nodes_.size();
+            for (std::size_t i = 0; i < nodes_.size(); ++i) {
+                if (nodes_[i]->name == bank.ringNode(ring)) {
+                    slot = i;
+                    break;
+                }
+            }
+        }
+        if (slot >= nodes_.size()) {
+            continue; // subscribed but not in this scene: an orphaned owner records nothing
+        }
+        const CompositionNode& node = *nodes_[slot];
+        const Transform local = automation != nullptr ? automatedWorldTransform(node, *automation, seconds)
+                                                      : nodeWorldTransform(node);
+        const Transform full = compose(root, local);
+        bank.record(ring, seconds, full.position, full.rotation, full.scale);
+    }
+}
+
+Transform Composition::automatedWorldTransform(const CompositionNode& node, const world::HistoryAutomation& automation,
+                                               double seconds) const {
+    const auto localOf = [&](const CompositionNode& n) {
+        Transform t = nodeTransform(n);
+        glm::vec3 delta(0.0f);
+        if (n.positionParam != nullptr && automation.transformDelta(*n.positionParam, seconds, delta)) {
+            t.position = n.positionParam->value() + delta;
+        }
+        if (n.rotationParam != nullptr && automation.transformDelta(*n.rotationParam, seconds, delta)) {
+            t.rotation = quatFromEulerDegrees(n.rotationParam->value() + delta);
+        }
+        if (n.scaleParam != nullptr && automation.transformDelta(*n.scaleParam, seconds, delta)) {
+            t.scale = n.scaleParam->value() + delta;
+        }
+        return t;
+    };
+    Transform world = localOf(node);
+    const CompositionNode* current = &node;
+    for (std::size_t guard = 0; !current->parent.empty() && guard < nodes_.size(); ++guard) {
+        const CompositionNode* parent = findNode(current->parent);
+        if (parent == nullptr || parent == &node) {
+            break;
+        }
+        world = compose(localOf(*parent), world);
+        current = parent;
+    }
+    return world;
 }
 
 Transform Composition::nodeWorldTransform(const CompositionNode& node) const {
@@ -3361,6 +3486,29 @@ bool Composition::nodeView(std::string_view node, world::NodeView& out) const {
                 out.boundsMin = glm::min(out.boundsMin, w);
                 out.boundsMax = glm::max(out.boundsMax, w);
             }
+        }
+    }
+    // A procedural node (a scatter layer, or one placed asset such as Glowmere's `visitor` saucer)
+    // draws through its own cloud rather than through entities, so the loop above saw nothing and an
+    // effect attached to it had no bounds to fit or to exclude. The procedural's memoised TIGHT pair,
+    // exactly as `nodeBounds` reads it (ADR-703: found by Space Warp bending its own saucer).
+    // ADR-703 (FXL): the procedural range, so a lane effect can address the draws that are this
+    // node -- the asset and each of its other material parts (`proceduralSubCount` follow it).
+    if (range.proceduralIndex >= 0 && static_cast<std::size_t>(range.proceduralIndex) < scene_.procedurals.size()) {
+        out.firstProcedural = static_cast<std::uint32_t>(range.proceduralIndex);
+        out.proceduralCount = static_cast<std::uint32_t>(std::min<std::size_t>(
+            range.proceduralSubCount + 1, scene_.procedurals.size() - out.firstProcedural));
+    }
+    if (!out.hasBounds && range.proceduralIndex >= 0) {
+        const auto first = static_cast<std::size_t>(range.proceduralIndex);
+        for (std::size_t p = first; p <= first + range.proceduralSubCount && p < scene_.procedurals.size(); ++p) {
+            const ProceduralGeometry& pg = scene_.procedurals[p];
+            if (!glm::all(glm::lessThanEqual(pg.tightMin, pg.tightMax)) || pg.tightMin == pg.tightMax) {
+                continue;
+            }
+            out.boundsMin = out.hasBounds ? glm::min(out.boundsMin, pg.tightMin) : pg.tightMin;
+            out.boundsMax = out.hasBounds ? glm::max(out.boundsMax, pg.tightMax) : pg.tightMax;
+            out.hasBounds = true;
         }
     }
     return true;

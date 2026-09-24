@@ -41,6 +41,11 @@ const EffectSchema& volumetricFogSchema();
 const EffectSchema& tornadoSchema();
 const EffectSchema& groundPulseSchema(); // ADR-702
 const EffectSchema& travelBeamSchema();  // ADR-702
+const EffectSchema& glowSchema();        // ADR-703 (FXL)
+const EffectSchema& pulseSchema();       // ADR-703 (FXL)
+const EffectSchema& bloomSourceSchema(); // ADR-703 (FXL)
+const EffectSchema& trailSchema();       // ADR-703 (Wave 1)
+const EffectSchema& spaceWarpSchema();   // ADR-703 (DF)
 const EffectSchema& particleEmitterSchema(); // ADR-703
 
 namespace {
@@ -55,6 +60,11 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &tornadoSchema(),
         &groundPulseSchema(),
         &travelBeamSchema(),
+        &glowSchema(),
+        &pulseSchema(),
+        &bloomSourceSchema(),
+        &trailSchema(),
+        &spaceWarpSchema(),
         &particleEmitterSchema(),
     };
     return kSchemas;

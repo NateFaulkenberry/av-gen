@@ -31,6 +31,10 @@
 #include <string_view>
 #include <vector>
 
+namespace avgen::params {
+struct ModRoute;
+}
+
 namespace avgen::world {
 
 // The indices of `owner`'s effects in `effects`, top of the stack first. Allocates; a UI and
@@ -96,6 +100,12 @@ std::size_t removeEffectsOf(std::vector<EffectInstance>& effects, const EffectOw
 // Re-points every effect owned by `from` at `to` (an entity was renamed). Returns how many moved.
 std::size_t renameEffectOwner(std::vector<EffectInstance>& effects, const EffectOwner& from,
                               const EffectOwner& to);
+// ADR-703: the same, and the routes with it. A route resolved from a default `owner.` source reads
+// `entity.<from>.speed`, which after the rename is a signal nobody publishes -- so every route whose
+// source is one of the renamed entity's signals is re-pointed at the new name (whatever it targets:
+// a hand-made route reading the entity's speed means the same body). Returns how many effects moved.
+std::size_t renameEffectOwner(std::vector<EffectInstance>& effects, std::vector<params::ModRoute>& routes,
+                              const EffectOwner& from, const EffectOwner& to);
 
 // Restores the storage invariant above: groups by owner in first-appearance order, stable-sorts each
 // group by its current `order`, then renumbers 0..n-1. Idempotent. Every mutator above ends with it.

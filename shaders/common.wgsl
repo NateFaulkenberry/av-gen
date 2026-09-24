@@ -175,6 +175,21 @@ struct ObjectUniforms {
                                // w = shimmer variation
     energyA: vec4<f32>,        // rgb = the pulse's near colour
     energyB: vec4<f32>,        // rgb = its far colour
+    // ADR-703 (FXL, world/effects/entity_fx.hpp): the per-entity effect lanes -- Glow, Pulse, Bloom
+    // Source. fxA.z is the gate: zero (every entity no lane effect touches) and pbr_shade.wgsl
+    // returns before any FXL work, so the draw is byte-identical to one from before these existed.
+    // The rest of an affected draw's state is its record in `entityFx` (pbr.wgsl), at index fxA.w.
+    fxA: vec4<f32>,            // x = emission gain, y = bloom share, z = flags, w = record index
+    fxB: vec4<f32>,            // rgb = tint on the material's own emission, w = 0
+};
+
+// ADR-703 (FXL): one owner's folded effect state, 16 lanes. Mirrors world::EntityFxRecord; the
+// lane meanings are listed beside `EntityFxLaneIndex` in world/effects/entity_fx.hpp. Declared here
+// so every module agrees on the shape; only pbr.wgsl binds the buffer (group 1 binding 2), because
+// only the entity and skinned pipelines lay it out -- procedural.wgsl and sdf_raymarch.wgsl have
+// group-1 layouts of their own and never see a lane.
+struct EntityFx {
+    lanes: array<vec4<f32>, 16>,
 };
 
 // The material tier this draw shades at (ADR-133; 0 full, 1 reduced lights, 2 flat). Uniform across
@@ -186,6 +201,10 @@ struct ObjectUniforms {
 // skinned joint count and every other lane is live -- and that adding one is the object-layout work
 // Phase E owns. Until then the tier is frame-global, which is exactly what an A/B arm needs and not
 // what importance-driven assignment needs.
+//
+// ADR-703 note for whoever does Phase E: two of the six padding vec4s after `energyB` are now
+// FXL's `fxA`/`fxB` (the struct is 448 of its 512-byte slot). Four remain, so ADR-135's `tiering`
+// lane still fits without growing the stride.
 fn materialTierOf() -> u32 {
     return u32(frame.materialTier.x + 0.5);
 }

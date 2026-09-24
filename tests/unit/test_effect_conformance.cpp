@@ -114,9 +114,10 @@ std::vector<std::string> declaredKindNames() {
             ++i;
             continue;
         }
-        // ADR-703: an enumerator may carry an explicit value (`ParticleEmitter = 13`); its NAME is
-        // the token before the '=', and the value up to the next ',' is skipped. Before this a
-        // valued enumerator was silently dropped -- the space before '=' cleared the token.
+        // ADR-703: an enumerator may carry an explicit value (`SpaceWarp = 12,`), which the Wave 1
+        // reservation requires so a type's number never depends on merge order. Its NAME is the
+        // token before the '=', and the value up to the next ',' is skipped. Before this, the space
+        // before the '=' cleared the token and every explicitly numbered kind was invisible here.
         if (skippingValue) {
             if (c == ',') {
                 skippingValue = false;
@@ -139,18 +140,16 @@ std::vector<std::string> declaredKindNames() {
             continue;
         }
         if (c == ',' || c == '\n') {
-            // An enumerator is the token that ends a comma-or-newline-separated item, and an
-            // explicit `= 3` would leave the number as the token -- which is why a token that does
-            // not start with a letter is dropped rather than recorded.
+            // An enumerator is the token that ends a comma-or-newline-separated item.
             if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
                 names.push_back(token);
             }
             token.clear();
             continue;
         }
-        token.clear(); // '=' and friends: whatever was accumulating is not an enumerator
+        token.clear(); // anything else: whatever was accumulating is not an enumerator
     }
-    if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+    if (!skippingValue && !token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
         names.push_back(token);
     }
     return names;
@@ -310,7 +309,10 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
         REQUIRE(schema != nullptr);
         const world::EffectInstance probe = conf::probeEffect(kind, "conformance probe");
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
-        REQUIRE(leaves.size() > 10);
+        // Every row, plus `enabled` and the seven timing rows every type registers. ADR-703: a
+        // fixed "more than 10" stopped being true of the family when a one-row type (Bloom Source)
+        // arrived; this is the same guard -- the registrar produced a real set -- per type.
+        REQUIRE(leaves.size() >= schema->fields.size() + 8);
 
         for (const std::string& leaf : leaves) {
             if (leaf == "enabled") {
@@ -376,7 +378,9 @@ TEST_CASE("registered paths are read back from the registrar, not from the table
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
         INFO("kind: " << world::effectKindName(kind));
         REQUIRE(paths.size() == leaves.size());
-        REQUIRE(paths.size() > 20);
+        // Every row plus `enabled` and the seven timing rows (ADR-703: per type, not "more than 20",
+        // which a small lane type is not and need not be).
+        REQUIRE(paths.size() >= world::effectSchema(kind)->fields.size() + 8);
 
         // ADR-702: keyed by the instance's id, never its display name.
         const std::string prefix = world::effectParameterPrefix(probe.id);
@@ -413,7 +417,13 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Tornado, {EffectTarget::World}},
         {EffectKind::GroundPulse, {EffectTarget::Entity, EffectTarget::World}},
         {EffectKind::TravelBeam, {EffectTarget::World, EffectTarget::Camera}},
+        // ADR-703 (FXL). Pulse is Entity only: its Light-owner form needs LIGHTMOD's modulate half.
+        {EffectKind::Glow, {EffectTarget::Entity}},
+        {EffectKind::Pulse, {EffectTarget::Entity}},
+        {EffectKind::BloomSource, {EffectTarget::Entity}},
+        {EffectKind::SpaceWarp, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703 (DF)
         {EffectKind::ParticleEmitter, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703
+        {EffectKind::Trail, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -456,9 +466,8 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         case world::EffectBucket::Comet: return world::RenderStage::Sky;
         case world::EffectBucket::Aurora: return world::RenderStage::Sky;
         case world::EffectBucket::Medium: return world::RenderStage::Volumetric;
-        // ADR-703: the Effect Library's integrators, from the same frame order -- material lanes in
-        // the lit pass, strips and emitters in the blended section beside particles, distortion
-        // after the volumetric composite.
+        // ADR-703's own-builder buckets: lanes in the lit pass, ribbons and emitters beside the
+        // particles, DF after the volumetric composite.
         case world::EffectBucket::EntityLanes: return world::RenderStage::Material;
         case world::EffectBucket::Ribbon: return world::RenderStage::Particles;
         case world::EffectBucket::Distortion: return world::RenderStage::ScreenSpace;
@@ -474,8 +483,8 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         CHECK(schema->stage == drawnAt(schema->resolve.bucket));
         used.insert(schema->stage);
     }
-    // The control: the family spans three stages, so the loop compared distinct answers rather
-    // than one stage with itself.
+    // The control: the family spans at least three stages, so the loop compared distinct answers
+    // rather than one stage with itself. (At least: each Wave 1 type adds its own.)
     CHECK(used.size() >= 3);
 
     SECTION("and the evaluator walks stages in frame order") {

@@ -111,6 +111,10 @@ struct ProceduralUniforms {
 // simulated and not to the size of the layer.
 @group(1) @binding(6) var<storage, read> plantSlots: array<u32>;
 @group(1) @binding(7) var<storage, read> plantBend: array<vec4<f32>>;
+// ADR-703 (FXL): the per-owner effect records -- the same records the entity path reads, in a copy
+// this renderer owns (procedural_renderer.cpp). Every instance of an object takes its owner's record
+// through the object slot's `fxA`, which is how a Glow on Glowmere's `visitor` saucer reaches it.
+@group(1) @binding(8) var<storage, read> entityFx: array<EntityFx>;
 
 const DEFORM_BEND: i32 = 0;
 const DEFORM_TWIST: i32 = 1;
@@ -505,6 +509,11 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     info.instanceColor = in.instColor;
     info.instanceEmissive = in.instEmissive;
     let screenUv = in.clip.xy * frame.targetSize.zw;
+    // ADR-703: this object's effect lanes; uniform per draw, and zero for every object no lane
+    // effect touches, which leaves `shadeSurface` exactly as it was.
+    if (object.fxA.z != 0.0) {
+        setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
+    }
     let shaded = shadeSurface(in.worldPos, in.normal, in.uv, frontFacing, in.instColor.rgb, emissiveMul, info,
                               screenUv);
     var out: SceneOut;
