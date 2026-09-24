@@ -552,7 +552,9 @@ struct EffectSchema {
     // than as rows because a seed is a `uint32` and a fade distance is not something to automate.
     // In the kind's own file, which is the point.
     void (*writeExtra)(const EffectInstance&, nlohmann::json&) = nullptr;
-    void (*readExtra)(EffectInstance&, const nlohmann::json&) = nullptr;
+    // Refuses (the file does not load) rather than skipping what it cannot read: a wave endpoint
+    // naming a hero with no name must not quietly become the default endpoint.
+    Result<void> (*readExtra)(EffectInstance&, const nlohmann::json&) = nullptr;
     // Kind-specific refusals beyond "every value is finite and inside its hard range", which the
     // registry checks for every kind without being told.
     Result<void> (*validate)(const EffectInstance&) = nullptr;

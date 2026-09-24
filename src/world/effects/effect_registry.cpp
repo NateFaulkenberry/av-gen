@@ -558,7 +558,9 @@ Result<void> effectPayloadFromJson(const EffectSchema& schema, const json& docum
         }
     }
     if (schema.readExtra != nullptr && document.contains(kParametersKey)) {
-        schema.readExtra(effect, document.at(kParametersKey));
+        if (auto ok = schema.readExtra(effect, document.at(kParametersKey)); !ok) {
+            return fail("effect '{}': {}", effect.name, ok.error().message);
+        }
     }
     return {};
 }

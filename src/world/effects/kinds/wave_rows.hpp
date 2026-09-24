@@ -156,19 +156,23 @@ inline void writeExtra(const E& e, nlohmann::json& block) {
     s["seed"] = w.sparkle.seed;
 }
 
-inline void readExtra(E& e, const nlohmann::json& block) {
+inline Result<void> readExtra(E& e, const nlohmann::json& block) {
     WaveEffect& w = e.wave;
     if (block.contains("source")) {
-        if (auto src = waveEndpointFromJson(block.at("source"))) {
-            w.source = *src;
+        auto src = waveEndpointFromJson(block.at("source"));
+        if (!src) {
+            return fail("source: {}", src.error().message);
         }
+        w.source = *src;
     }
     w.hasTarget = false;
     if (block.contains("target")) {
-        if (auto dst = waveEndpointFromJson(block.at("target"))) {
-            w.target = *dst;
-            w.hasTarget = true;
+        auto dst = waveEndpointFromJson(block.at("target"));
+        if (!dst) {
+            return fail("target: {}", dst.error().message);
         }
+        w.target = *dst;
+        w.hasTarget = true;
     }
     const auto num = [](const nlohmann::json& j, const char* k, float fallback) {
         return j.contains(k) && j.at(k).is_number() ? j.at(k).get<float>() : fallback;
@@ -192,6 +196,7 @@ inline void readExtra(E& e, const nlohmann::json& block) {
             w.sparkle.seed = s.at("seed").get<std::uint32_t>();
         }
     }
+    return {};
 }
 
 inline Result<void> validate(const E& e) { return e.wave.validate(); }
