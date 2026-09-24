@@ -292,6 +292,16 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
         rc = st["returncode"]
         where = x["open_case"]["name"] if x["open_case"] else None
         if st["timed_out"]:
+            # Catch2 handles our SIGTERM and closes the XML, recording the running case as a
+            # FatalErrorCondition "failure" with no expansion (docs/testing.md entry 4). That case
+            # is the one that was killed: attribute it to the timeout, not to the test.
+            killed = [f for f in failures if f["shard"] == i and any(
+                p["kind"] == "FatalErrorCondition" and "SIGTERM" in (p.get("message") or "")
+                for p in f["problems"])]
+            for f in killed:
+                failures.remove(f)
+                counts["failed"] -= 1
+            where = where or (killed[0]["name"] if killed else None)
             timeouts.append({"shard": i, "test": where, "seconds": st["seconds"], "tail": log["tail"]})
         elif rc < 0 or rc > 255 or (rc != 0 and not x["complete"]):
             fatal = next((p for c in x["cases"] for p in c["problems"]
@@ -523,7 +533,11 @@ def rel(path: str | None) -> str:
     if not path:
         return ""
     ws = os.environ.get("GITHUB_WORKSPACE", "")
-    return path[len(ws) + 1:] if ws and path.startswith(ws + "/") else path
+    if ws and path.startswith(ws + "/"):
+        return path[len(ws) + 1:]
+    while path.startswith("../"):   # a build-relative __FILE__ (e.g. from a ccache base_dir)
+        path = path[3:]
+    return path
 
 
 def oneline(s: str) -> str:
@@ -559,14 +573,18 @@ def print_console(r: dict, out: Path) -> None:
 
 def cmd_run(args) -> int:
     exceptions = load_exceptions(args.exceptions)
-    # Only exclusions that name a case which exists; a stale one is reported, not silently kept.
+    # Only exclusions that name exactly one case of this binary AND fall inside this selection.
+    # A stale one is reported, not silently kept.
     excluded = []
     for name in exceptions["exclude"]:
         n = list_case_count(args.binary, [f'"{name}"'])
-        if n == 1:
+        if n != 1:
+            if n:
+                print(f"::warning title=Ambiguous exclusion::'{name}' matches {n} cases in {args.binary}")
+            continue
+        terms = args.filter.split(",") if args.filter else [""]
+        if list_case_count(args.binary, [",".join(f'{t}"{name}"' for t in terms)]):
             excluded.append(name)
-        else:
-            print(f"::warning title=Stale exclusion::'{name}' matches {n} cases in {args.binary}")
     args.spec = build_spec(args.filter, excluded)
     base = list_case_count(args.binary, build_spec(args.filter, []))
     listed = list_case_count(args.binary, args.spec)

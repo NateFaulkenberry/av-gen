@@ -39,8 +39,9 @@ permissions:
 
 concurrency:
   # One live run per branch (or PR). A new push cancels the stale run, except on main, where every
-  # commit's result is kept.
-  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  # commit's result is kept. A dispatched run is its own group: a targeted `test_filter` request
+  # must not cancel the branch's full push run, nor be cancelled by the next push.
+  group: ci-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id) || github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -52,7 +53,10 @@ env:
   HOMEBREW_NO_AUTO_UPDATE: "1"
   HOMEBREW_NO_INSTALL_CLEANUP: "1"
   CCACHE_DIR: /Users/runner/ccache    # outside the checkout: test_repo_hygiene walks the tree
-  CCACHE_BASEDIR: ${{ github.workspace }}
+  # No CCACHE_BASEDIR, deliberately. It makes ccache rewrite source paths to relative ones, so
+  # __FILE__ becomes `../../tests/...`, and test_shader_format.cpp locates shaders/examples from
+  # __FILE__: the case quietly turned into a SKIP (run 36069406479). The workspace path is the
+  # same on every hosted run, so absolute paths cost no cache hits.
   CCACHE_COMPRESS: "1"
   CCACHE_MAXSIZE: 2G
   # Where catch2_run.py and build.sh write their results.

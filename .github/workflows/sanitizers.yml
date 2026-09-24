@@ -31,7 +31,10 @@ env:
   HOMEBREW_NO_AUTO_UPDATE: "1"
   HOMEBREW_NO_INSTALL_CLEANUP: "1"
   CCACHE_DIR: /Users/runner/ccache    # outside the checkout: test_repo_hygiene walks the tree
-  CCACHE_BASEDIR: ${{ github.workspace }}
+  # No CCACHE_BASEDIR, deliberately. It makes ccache rewrite source paths to relative ones, so
+  # __FILE__ becomes `../../tests/...`, and test_shader_format.cpp locates shaders/examples from
+  # __FILE__: the case quietly turned into a SKIP (run 36069406479). The workspace path is the
+  # same on every hosted run, so absolute paths cost no cache hits.
   CCACHE_COMPRESS: "1"
   CCACHE_MAXSIZE: 2G
   RESULTS: /Users/runner/ci-results   # absolute: upload-artifact rejects '..' in a path
