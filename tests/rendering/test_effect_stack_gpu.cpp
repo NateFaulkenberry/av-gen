@@ -385,3 +385,85 @@ TEST_CASE("World -> two fog banks: two placed media of one type are both marched
     CHECK(renderer.stats().volume.media == 2);
     requireCoexist(arms, "the left bank", "the right bank");
 }
+
+// ---- ADR-702 §21: the migrated Glowmere Valley 2 multicam, World -> Tornado + Aurora ---------------
+//
+// The acceptance the refactor was asked for, on the owner's own film rather than a fixture: the
+// migrated project already carries an aurora on the World (and a Ground Pulse on each of its 16
+// heroes); a tornado is added to the World the way the Effects panel adds one, and both have to be
+// drawn, each has to reach the frame while the other is on, and the hero pulse the cut is holding at
+// that second has to still fire. Nothing is written back to the project.
+TEST_CASE("Glowmere Valley 2 multicam: World -> Tornado + Aurora render together, and the hero pulse "
+          "still fires",
+          "[gpu][effects][acceptance][glowmere]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    constexpr double kSecond = 20.0; // the cut is holding a hero, its pulse is live (checked below)
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    const scene::Camera camera = sceneAt(engine, kSecond).camera;
+
+    // The migrated representation: the World has the aurora; heroes own their pulses.
+    const std::size_t auroraAt = world::findEffect(engine.effects(), "aurora");
+    REQUIRE(auroraAt < engine.effects().size());
+    REQUIRE(engine.effects()[auroraAt].owner.isWorld());
+    std::size_t heroPulses = 0;
+    for (const world::EffectInstance& e : engine.effects()) {
+        heroPulses += e.kind == world::EffectKind::GroundPulse && e.owner.kind == world::EffectTarget::Entity;
+    }
+    REQUIRE(heroPulses == 16);
+
+    // Add the tornado to the World's stack through the editor's own path.
+    std::string tornado;
+    REQUIRE(engine
+                .editEffects([&](std::vector<world::EffectInstance>& list) -> Result<void> {
+                    auto added = world::insertEffect(list, tornadoFacing(camera));
+                    if (!added) {
+                        return std::unexpected(added.error());
+                    }
+                    tornado = *added;
+                    return {};
+                })
+                .has_value());
+    REQUIRE(world::findEffect(engine.effects(), tornado) < engine.effects().size());
+
+    Arms arms;
+    setEnabled(engine, tornado, false);
+    setEnabled(engine, "aurora", false);
+    arms.none = render(renderer, sceneAt(engine, kSecond), kSecond);
+    setEnabled(engine, "aurora", true);
+    arms.a = render(renderer, sceneAt(engine, kSecond), kSecond);
+    setEnabled(engine, "aurora", false);
+    setEnabled(engine, tornado, true);
+    arms.b = render(renderer, sceneAt(engine, kSecond), kSecond);
+    setEnabled(engine, "aurora", true);
+    const scene::Scene& both = sceneAt(engine, kSecond);
+    arms.both = render(renderer, both, kSecond);
+
+    CHECK(engine.effectStatus("aurora") == world::EffectStatus::Drawn);
+    CHECK(engine.effectStatus(tornado) == world::EffectStatus::Drawn);
+    CHECK(both.atmospherics.auroraCount == 1);
+    CHECK(both.atmospherics.mediumCount == 1);
+    // The cut is on a hero at this second, and exactly that hero's pulse is the one live wave.
+    std::size_t drawnPulses = 0;
+    for (const world::EffectInstance& e : engine.effects()) {
+        if (e.kind == world::EffectKind::GroundPulse) {
+            drawnPulses += engine.effectStatus(e.id) == world::EffectStatus::Drawn;
+            CHECK(engine.effectStatus(e.id) != world::EffectStatus::Orphaned);
+        }
+    }
+    CHECK(drawnPulses == 1);
+    CHECK(both.waves.count >= 1);
+
+    requireCoexist(arms, "the aurora", "the tornado");
+
+    // Both animate: a second later the picture has moved, and both are still drawn.
+    const gpu::Image8 later = render(renderer, sceneAt(engine, kSecond + 1.0), kSecond + 1.0);
+    CHECK(engine.effectStatus("aurora") == world::EffectStatus::Drawn);
+    CHECK(engine.effectStatus(tornado) == world::EffectStatus::Drawn);
+    CHECK(differingPixels(arms.both, later) > kVisible);
+}
