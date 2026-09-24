@@ -2,7 +2,7 @@
 Last updated: 2026-09-24 16:30
 Current branch: `agent/director` (worktree `../av-gen-director`; main merged in at 423fdf2b and 6f0da410; main = 232a50d7)
 Current commit: f009638d (plus this record)
-Overall status: Slices 0 and 1 complete; Slice 2 core (handoff + scripted performances) implemented; coordinating the entity-side interface with the Motion lead
+Overall status: Slices 0 and 1 complete; Slice 2 compiler side complete (handoff mechanism moving to the Motion lead as M1); Slice 3 planned against M3-M5
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -34,8 +34,8 @@ What it cannot do yet is Slice 2–3 work: performances (Rook moving), time-vary
 |---|---|---:|---:|---|
 | 0 Foundations | Complete | 95% | 23 `[directing]` cases | Remaining: human UI edit paths other than Cameras still bypass history (out of Director scope) |
 | 1 Plan + Cameras | Complete | 95% | 26 `[directing]` cases + 10 golden plans | Remaining: the Director panel beyond Approve/Reject (spec §35 says do not overbuild); UI not verified |
-| 2 Scripted Performances | In progress | 70% | 14 cases + 1 golden | Handoff probe done and decided (ADR-758); run/walk to/past, hold, look_at compile (ADR-759). Entity-side mechanics to be confirmed with the Motion lead |
-| 3 Airborne + Events | Not started | 0% | 0 | |
+| 2 Scripted Performances | Compiler side complete | 90% | 14 cases + 1 golden | Handoff (ADR-758) moves to the Motion lead as M1; this branch drops its copy after M1 lands. Remaining: validator rule for non-zero `entrySeconds` once M1 adds it |
+| 3 Airborne + Events | Planned | 0% | 0 | Compile side planned against the Motion lead's M3 (clip semantics/events), M4 (jump arc), M5 (retime) |
 | 4 Autonomous Direction | Not started | 0% | 0 | |
 | 5 Verification + Scale | Started | 10% | golden plans, cost measurement | Golden plans and §37 measurements pulled forward |
 
@@ -50,8 +50,9 @@ with the Motion lead (`agent/motion`), who now owns motion mechanics in `src/ent
 - [x] Entity/actor handoff and restoration (performers on play and replay; handed back at the end pose)
 - [x] Character event markers (computed), cues on them
 - [x] Keyed chase camera: not needed. A follow rig on the performed node is deterministic (ADR-759)
-- [~] Hand the entity-side pieces (`DirectorMotion::performance`: re-assertion and unramped
-      speed) to the Motion lead's ownership, or have them confirm they stay
+- [x] Ownership of the entity-side pieces decided: the Motion lead takes them as M1, starting from this
+      implementation; this branch drops its copy after M1 lands on main (ADR-758 addendum)
+- [ ] When M1 adds `entrySeconds`: validator flags a non-zero entry blend as live-dependent
 - [ ] Full CPU and GPU suites on f009638d (targeted suites green so far)
 
 ### Acceptance criteria
@@ -263,6 +264,37 @@ undo, serialization or compilation will be built on them.
 3. Slice 3: time-varying camera behaviour state (`rise_over`, `pass`), one-shot clip semantics, the
    airborne compiler reusing `Airborne`, and performance-local retime.
 4. Consider fixing the bake's first-shot warning to respect the camera track (engine; small).
+
+## Slice 3 plan: the compile side, against the Motion lead's M3-M5
+
+The Motion lead owns the motion mechanics. The Director compiles onto them. These are the interfaces
+this side will use, and what it does with each:
+
+- **M3, clip semantics and events.** A per-rig table: activity, loop/once, length, events `takeoff`,
+  `peak`, `touchdown`, `plant.<joint>` in clip seconds. `ClipCue` gains `playback` (auto/loop/once)
+  and `then`.
+  - **Director use:** the capability card reads the table, so its `loops` field becomes truthful,
+    and it lists each clip's events.
+  - One-shot beats (`jump`, `land`) compile to `ClipCue{playback: once, then: <gait>}`.
+  - A beat's `emits` resolves to a clip event mapped to timeline seconds (cue time + event time /
+    speed), which is plan-time and baked (spec §30–§31).
+- **M4, the jump arc.** A pure function shared with `Airborne`: from, to, apex → trajectory; a
+  minimum apex to clear an obstacle; a landing check; a per-character jump capability in data.
+  - **Director use:** the validator's clearance check calls M4's minimum-apex function instead of its
+    own comparison, and the jump envelope on the card comes from M4's data.
+  - A `jump` beat compiles to actor keys sampled from the M4 trajectory, with a Jump/Fall/Land clip
+    sequence and `rook.jump_peak` at the arc's apex time.
+  - `clearanceMetres` feeds M4.
+- **M5, local retime of an actor.** `PlanRetime` compiles to M5's retime on the performance's actor
+  (stretched keys, clip speeds) over the window, plus the frame-echo cue as today. Global time warp
+  remains out of scope (spec §33).
+- **Camera (Director-owned, needs no motion work).** Time-varying behaviour state for `rise_over` and
+  `pass`: a chase rig whose `followOffset` is keyed over the shot, or a `CameraBehavior` with
+  `offsetStart`/`offsetEnd`. This needs a small scene-side extension, which will be proposed through
+  the coordinator before it is built.
+- **Benchmark target after M3/M4:** "Rook runs to Umbra, jumps (not over it: clearance fails), lands,
+  runs on", with the peak marker and the Umbra pulse at the computed peak. The backflip stays
+  `CAPABILITY_UNAVAILABLE` until an asset exists.
 
 ## Known issues found in Slice 2 (reported, not worked around)
 - **A seek on an engine that has never stepped a frame** lands differently from the same seek once it
