@@ -159,6 +159,13 @@ def sky_instance(e: dict, conv: Converted) -> dict:
         inst["flow"] = copy.deepcopy(e["flow"])
     # Only the instance's own type's block survives: every old entry carried every kind's payload.
     inst["parameters"] = copy.deepcopy(e.get(kind, {}))
+    # ...except the block a type's rows ALIAS. A meteor shower's streak rows are declared at
+    # `/comet/...` and a fog bank's medium rows at `/vortex/...` (root-relative `.json` paths in their
+    # kind files), so the registry reads them from that block at the document root, not from
+    # `parameters`. Dropping it loaded every shower and fog bank with struct defaults.
+    aliased = {"meteors": "comet", "fog": "vortex"}.get(kind)
+    if aliased and aliased in e:
+        inst[aliased] = copy.deepcopy(e[aliased])
     return inst
 
 
