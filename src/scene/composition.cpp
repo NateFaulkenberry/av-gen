@@ -3363,6 +3363,22 @@ bool Composition::nodeView(std::string_view node, world::NodeView& out) const {
             }
         }
     }
+    // A procedural node (a scatter layer, or one placed asset such as Glowmere's `visitor` saucer)
+    // draws through its own cloud rather than through entities, so the loop above saw nothing and an
+    // effect attached to it had no bounds to fit or to exclude. The procedural's memoised TIGHT pair,
+    // exactly as `nodeBounds` reads it (ADR-703: found by Space Warp bending its own saucer).
+    if (!out.hasBounds && range.proceduralIndex >= 0) {
+        const auto first = static_cast<std::size_t>(range.proceduralIndex);
+        for (std::size_t p = first; p <= first + range.proceduralSubCount && p < scene_.procedurals.size(); ++p) {
+            const ProceduralGeometry& pg = scene_.procedurals[p];
+            if (!glm::all(glm::lessThanEqual(pg.tightMin, pg.tightMax)) || pg.tightMin == pg.tightMax) {
+                continue;
+            }
+            out.boundsMin = out.hasBounds ? glm::min(out.boundsMin, pg.tightMin) : pg.tightMin;
+            out.boundsMax = out.hasBounds ? glm::max(out.boundsMax, pg.tightMax) : pg.tightMax;
+            out.hasBounds = true;
+        }
+    }
     return true;
 }
 

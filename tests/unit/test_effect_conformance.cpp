@@ -148,6 +148,15 @@ std::vector<std::string> declaredKindNames() {
             token.clear();
             continue;
         }
+        // ADR-703 reserves explicit values (`SpaceWarp = 12,`) so a type's number does not depend on
+        // merge order. The name before the `=` IS the enumerator, and the space before the `=` is not
+        // the end of one: clearing on it made every explicitly numbered kind invisible to this guard.
+        if (c == ' ' || c == '\t') {
+            continue;
+        }
+        if (c == '=' && !token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+            names.push_back(token);
+        }
         token.clear(); // '=' and friends: whatever was accumulating is not an enumerator
     }
     if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
@@ -413,6 +422,7 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Tornado, {EffectTarget::World}},
         {EffectKind::GroundPulse, {EffectTarget::Entity, EffectTarget::World}},
         {EffectKind::TravelBeam, {EffectTarget::World, EffectTarget::Camera}},
+        {EffectKind::SpaceWarp, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703 (DF)
         {EffectKind::ParticleEmitter, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
@@ -456,9 +466,8 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         case world::EffectBucket::Comet: return world::RenderStage::Sky;
         case world::EffectBucket::Aurora: return world::RenderStage::Sky;
         case world::EffectBucket::Medium: return world::RenderStage::Volumetric;
-        // ADR-703: the Effect Library's integrators, from the same frame order -- material lanes in
-        // the lit pass, strips and emitters in the blended section beside particles, distortion
-        // after the volumetric composite.
+        // ADR-703's own-builder buckets: lanes in the lit pass, ribbons and emitters beside the
+        // particles, DF after the volumetric composite.
         case world::EffectBucket::EntityLanes: return world::RenderStage::Material;
         case world::EffectBucket::Ribbon: return world::RenderStage::Particles;
         case world::EffectBucket::Distortion: return world::RenderStage::ScreenSpace;
@@ -474,8 +483,8 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         CHECK(schema->stage == drawnAt(schema->resolve.bucket));
         used.insert(schema->stage);
     }
-    // The control: the family spans three stages, so the loop compared distinct answers rather
-    // than one stage with itself.
+    // The control: the family spans at least three stages, so the loop compared distinct answers
+    // rather than one stage with itself. (At least: each Wave 1 type adds its own.)
     CHECK(used.size() >= 3);
 
     SECTION("and the evaluator walks stages in frame order") {

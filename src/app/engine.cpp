@@ -23,6 +23,7 @@
 #include "core/vortex.hpp"
 #include "core/wind.hpp"
 #include "params/serialization.hpp"
+#include "world/effects/distortion_frame.hpp"
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/particle_emitter.hpp"
@@ -4025,6 +4026,8 @@ void Engine::updateEffects() {
     if (effects_.empty()) {
         live.waves = world::WaveFrame{};
         live.atmospherics = world::AtmosphericFrame{};
+        live.distortion.count = 0; // ADR-703: DF's gate -- no producer, nothing touched
+        live.distortion.dropped = 0;
         // An emitter's system lives in the scene's particle list, so "no effects" has to take it
         // back out; the builder removes every `fx:` system whose instance is gone.
         world::buildParticleFrame({}, world::EffectContext{}, live.particles, {}, {}, {});
@@ -4065,6 +4068,9 @@ void Engine::updateEffects() {
     world::buildWaveFrame(effects_, ctx, live.waves, effectOrder_, effectStatus_);
     // RenderStage::Sky and RenderStage::Volumetric -- comets, auroras and placed media.
     world::buildAtmosphericFrame(effects_, ctx, live.atmospherics, effectOrder_, effectStatus_);
+    // RenderStage::ScreenSpace -- DF distortion proxies (Space Warp).
+    world::buildDistortionFrame(effects_, ctx, live.distortion, effectOrder_, effectStatus_,
+                                effectStatusReason_);
     // RenderStage::Particles -- effect-owned particle systems (EMIT, ADR-703).
     world::buildParticleFrame(effects_, ctx, live.particles, effectOrder_, effectStatus_, effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
@@ -4094,10 +4100,10 @@ void Engine::updateEffects() {
         lastEffectDropped_ = dropped;
         if (dropped > 0) {
             log::warn("{} effect(s) are active but not drawn: their render stage's GPU capacity is "
-                      "full (surface waves {}, comets {}, auroras {}, placed media {}). The Effects "
-                      "panel marks which.",
+                      "full (surface waves {}, comets {}, auroras {}, placed media {}, distortion "
+                      "proxies {}). The Effects panel marks which.",
                       dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
-                      world::kMaxMedia);
+                      world::kMaxMedia, world::kMaxDistortionProxies);
         }
     }
     lastMediaDropped_ = live.atmospherics.mediaDropped;

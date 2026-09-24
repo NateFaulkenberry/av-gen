@@ -199,7 +199,9 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
-      temporal_(std::make_unique<TemporalEffects>(context, shaders)), pool_(std::make_unique<gpu::TransientPool>(context)) {
+      temporal_(std::make_unique<TemporalEffects>(context, shaders)),
+      distortion_(std::make_unique<DistortionRenderer>(context, shaders)),
+      pool_(std::make_unique<gpu::TransientPool>(context)) {
 }
 
 SceneRenderer::~SceneRenderer() = default;
@@ -504,6 +506,10 @@ Result<void> SceneRenderer::init() {
     if (auto r = temporal_->init(); !r) {
         return r;
     }
+    // DF: the distortion passes read the frame block (group 0) and write HDR and emission.
+    if (auto r = distortion_->init(frameLayout_, kHdrFormat, kEmissionFormat); !r) {
+        return r;
+    }
     if (context_.errorCount() > 0) {
         return fail("renderer initialisation raised {} GPU error(s): {}", context_.errorCount(),
                     context_.lastError());
@@ -518,6 +524,7 @@ Result<void> SceneRenderer::init() {
     ao_->setTimeline(timeline_.get());
     shadowMask_->setTimeline(timeline_.get());
     postProcessor_->setTimeline(timeline_.get());
+    distortion_->setTimeline(timeline_.get());
     initialised_ = true;
     return {};
 }
@@ -1866,6 +1873,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = water_->reload(shaders_); !r) {
         keep("water.wgsl", r);
+    }
+    if (auto r = distortion_->reload(); !r) {
+        keep("distortion.wgsl", r);
     }
     ++engineReloads_;
     if (first) {
@@ -3834,6 +3844,26 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         rp.End();
         debug_->clear();
     }
+
+    // ---- DF: screen-space distortion (Effect Library Wave 1) ----
+    // After the volume composite and the debug pass, so fog, media and god rays bend with the scene;
+    // before post layers, temporal capture and the post chain, so bloom, DoF and grading see the bent
+    // image and the temporal ring captures it. The gate: a frame with no producer encodes nothing,
+    // acquires nothing and writes nothing -- byte-identical to a frame without DF. The gate is
+    // inside `encode` (it also resets the pass's stats, so a gate-held frame reports `encoded` false).
+    {
+        DistortionTargets df;
+        df.viewProj = frame.viewProj;
+        df.nearPlane = frame.clusterDepth.z;
+        df.width = hdr_.width();
+        df.height = hdr_.height();
+        df.hdr = hdr_.colorTexture();
+        df.hdrView = hdr_.colorView();
+        df.depthView = hdr_.depthView();
+        df.emissionView = emission_.view;
+        df.frameBindGroup = frameBindGroup_;
+        distortion_->encode(encoder, scene.distortion, df, *pool_);
+    }
     stage(cpu.volumeEncodeMs);
 
     // ---- post layers: HDR -> ping-pong HDR ----
@@ -4327,6 +4357,7 @@ void SceneRenderer::collectFrameTimings() {
     simulation_->collectTimings();
     ao_->collectTimings();
     shadowMask_->collectTimings();
+    distortion_->collectTimings();
 
     stats_.gpuFrameMs = timeline_->frameMs();
     stats_.gpuPasses = static_cast<std::uint32_t>(timeline_->passes().size());

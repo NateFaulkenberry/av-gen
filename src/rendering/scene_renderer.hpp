@@ -48,6 +48,7 @@
 #include "rendering/spline_buffers.hpp"
 #include "rendering/volume_renderer.hpp"
 #include "rendering/debug_draw.hpp"
+#include "rendering/distortion_renderer.hpp"
 #include "scene/rebuild_deferral.hpp"
 #include "scene/scene.hpp"
 #include "shaders/shader_layers.hpp"
@@ -702,6 +703,9 @@ public:
     // never blocks. renderFrame()/renderToImage() do it for you.
     void collectFrameTimings();
     [[nodiscard]] const gpu::RenderTarget& hdrTarget() const { return hdr_; }
+    // DF (Effect Library Wave 1): what the distortion passes did on the last frame -- whether the
+    // gate held (`encoded` false), how many proxies, the rects, and the two passes' GPU times.
+    [[nodiscard]] const DistortionStats& distortionStats() const { return distortion_->stats(); }
     [[nodiscard]] bool initialised() const { return initialised_; }
 
     // ADR-128: the object slot buffer grows to fit the frame rather than being a 256-slot ceiling.
@@ -837,6 +841,7 @@ private:
     // `resetTemporalHistory()` along with the AO history and the particle pools -- one hook for
     // every temporal consumer, never a second one.
     std::unique_ptr<TemporalEffects> temporal_;
+    std::unique_ptr<DistortionRenderer> distortion_; // DF: after the volume composite, before post
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};
     bool havePrevViewProj_ = false;

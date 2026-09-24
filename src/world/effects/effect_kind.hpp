@@ -39,6 +39,7 @@ enum class EffectKind : std::uint8_t {
     // Wave 1 types land on separate branches and the number a type serialises under must not depend
     // on merge order: Glow = 8, Pulse = 9, BloomSource = 10, Trail = 11, SpaceWarp = 12,
     // ParticleEmitter = 13. Each is declared here by the change that registers its schema.
+    SpaceWarp = 12, // DF: the view bending around its owner (distortion_frame.hpp)
     ParticleEmitter = 13, // ADR-703: an effect-owned particle system riding its owner (EMIT)
 };
 
