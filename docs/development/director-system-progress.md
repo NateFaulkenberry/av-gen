@@ -1,54 +1,69 @@
 # AV Gen Director System — Development Progress
-Last updated: 2026-09-24 13:10
+Last updated: 2026-09-24 13:20
 Current branch: `agent/director` (worktree `../av-gen-director`, branched from `main` at 13bc030f)
-Current commit: 8b498988
-Overall status: Slice 0 in progress (0.1 done, 0.2 next)
+Current commit: 8e0e1752
+Overall status: Slice 0 implemented except the effect domain (blocked on ADR-702 merging); full-suite verification in progress
 
 ## Executive status
-Slice 0.1 (repository audit) is complete. Every finding below was checked against main's code rather
-than taken from the feasibility report. It found three defects that sit squarely on the Director's
-path:
-1. **A camera or cut added to a by-reference scene was lost on every project save.** This is now
-   fixed (ADR-751), with a reusable round-trip gate.
-2. **The AI "Undo this task" button can never appear in the application.**
-3. **An AI task's sequence, keyframe, route, node and field edits are not undoable at all in the
-   app.** The history records its parameter diff and nothing else.
+Slice 0 (Foundations) is implemented and tested, with one domain deliberately deferred. The five
+parts:
 
-Slice 0.2 (unified undo) is designed and is next.
+- **0.1 audit:** complete.
+- **0.2 undo:** Director, AI and Cameras-panel edits are now one undo on the editor's own history.
+  - `EditCommand` covers the sequence, the camera collection and camera track, author timeline
+    keys, routes, parameters and added nodes.
+  - `app::EditCapture` is the one measurement of what an operation changed.
+  - "Undo this task" is Cmd+Z. Snapshots remain only for aborting a failed task.
+  - The AI transaction now runs on the main thread instead of the worker.
+- **0.3 persistence:** a reusable round-trip gate that runs a frame before saving. It found and
+  fixed a real defect: cameras and cuts were lost on every save of a by-reference project.
+- **0.4 preview:** rendering from the editor no longer saves the person's project. It reads a
+  scratch copy.
+- **0.5 capabilities:** a registry generated from engine data. Rook's card says run, walk, jump,
+  fall and land, and no backflip.
+
+The effect domain (undo, persistence, catalogue) waits for `agent/entity-effects` (ADR-702) to
+merge. `src/directing/` exists, holds the capability registry, and has a boundary test.
 
 ## Overall progress
 | Slice | Status | Progress | Tests | Notes |
 |---|---|---:|---:|---|
-| 0 Foundations | In progress | 20% | 6 | 0.1 done; 0.3 started (helper + camera fix); 0.2 designed |
-| 1 Plan + Cameras | Not started | 0% | 0 | Gated on Slice 0 |
+| 0 Foundations | Implemented; effects deferred | 80% | 18 `[directing]` cases | 0.1 100%, 0.2 85%, 0.3 60%, 0.4 75%, 0.5 75%; see below |
+| 1 Plan + Cameras | Not started | 0% | 0 | Next |
 | 2 Scripted Performances | Not started | 0% | 0 | |
 | 3 Airborne + Events | Not started | 0% | 0 | |
 | 4 Autonomous Direction | Not started | 0% | 0 | |
 | 5 Verification + Scale | Not started | 0% | 0 | |
 
+What the Slice 0 percentages leave out, honestly:
+- **0.2:** the effect-list record (blocked). Nodes an AI tool *deletes* cannot be restored by undo
+  (logged; abort still covers them). Human edit paths other than the Cameras panel still bypass the
+  history: sequencer drags and inspectors, timeline key drags, Routes tab, layers.
+- **0.3:** round trips for the Director Plan, effect references/windows and semantic metadata do not
+  exist yet, because those structures do not exist yet. They land with Slice 1, each with its test.
+- **0.4:** the Director preview itself (CompilePreview on a staging session) is Slice 1 work. The
+  render button and queue wiring is not verified in the running UI.
+- **0.5:** the effect catalogue (blocked on ADR-702).
+
 ## Current focus
 ### Task
-Slice 0.2: one undo mechanism that covers every domain the Director writes, for human, AI and
-Director edits alike.
+Close Slice 0: run both full suites, then report. Then Slice 1.1, the Director Plan schema.
 
 ### Subtasks
-- [ ] `EditCommand` gains `CameraDirectionChange` (whole collection) and `AutomationChange` (author
-      timeline tracks, keys and cues, plus modulation routes). The design is below.
-- [ ] One shared capture (`app::EditCapture`): snapshot the Director domains before an operation,
-      diff them after, and emit one `EditCommand`. It is used by the AI sink, by the Director's
-      apply, and by tests.
-- [ ] `EditHistoryTransactionSink` records every domain it can diff, not only parameters.
-- [ ] "Undo this task" undoes through `EditHistory`, and the panel's snapshot restore is removed.
-- [ ] The Cameras panel's add, delete and cut push history.
-- [ ] Regression tests (apply → undo → identical; redo → identical), each proven red.
+- [~] Full CPU suite (release) and full GPU suite
+- [ ] Measure `EntityWorld::seek` on the benchmark (ADR-700 claims 17.9 ms worst after the first)
+- [ ] Slice 1.1: Plan schema ADR, `directing::Plan` with versioned JSON, round-trip tests
 
-### Acceptance criteria
-- [ ] For each Director domain (sequence, camera direction, camera track, author timeline keys,
-      routes, events, actors, markers, overlays), apply → undo leaves the domain's JSON identical to
-      before, and redo leaves it identical to after.
-- [ ] An AI task that adds a shot, a marker, a keyframe and a camera is one Cmd+Z.
-- [ ] No code path restores a snapshot as "undo". Snapshots remain only as the abort mechanism of a
-      failed or cancelled task.
+### Acceptance criteria (Slice 0)
+- [x] Each Director domain (sequence incl. actors/events/markers, camera direction, camera track,
+      author timeline, routes, parameter bases) passes apply → undo → identical and redo → identical
+- [x] An AI task that adds a shot, a marker and a keyframe is one Cmd+Z (camera covered by the
+      capture test)
+- [x] No code path restores a snapshot as "undo"
+- [x] Director-shaped content survives save → reload after a frame (sequence, cameras)
+- [x] A render/preview does not write the person's project
+- [x] Capabilities are generated, not listed; `src/directing/` has no AI dependency
+- [!] Effect domain: blocked on ADR-702
 
 ## Completed work
 ### 0.1 Repository audit (2026-09-24), complete
@@ -117,73 +132,128 @@ and tool mutation path. I spot-checked its load-bearing claims.
 **Effects:** deferred. Main's `worldEffects`/`atmosphericEffects` are being deleted by ADR-702. No
 undo, serialization or compilation will be built on them.
 
-### 0.3 Persistence (started)
-- `tests/support/project_round_trip.hpp`: `saveAndReload` (≥ 1 frame, real `saveProject`, fresh
-  engine, a frame on the far side), `missingTopLevelKeys`, `differingPaths`, `ScratchDir`.
-- `tests/unit/test_director_persistence.cpp` (`[directing][persistence]`), 6 cases, all passing:
-  a Director-shaped sequence (behaviour-camera shot, actor with keys, path and cues, cue markers, a
-  cue-triggered event, a piece track); inline camera direction (control); by-reference camera
-  direction (**was red: 2 cameras / 1 shot → 1 / 0**); untouched project writes no key and leaves
-  the scene file alone; a deleted scene-file camera stays deleted; the benchmark project loads with
-  0 warnings and writes no `cameraDirection` after 2 frames.
-- Commit 8b498988.
+### 0.2 Unified undo (2026-09-24): 85%
+- `ui::AutomationChange` (whole timeline + routes) and `ui::CameraDirectionChange` (collection with
+  rig bases captured) in `EditCommand`; `applyEdit` order is sequence, then automation, then
+  cameras (see ADR-752 for why).
+- `ui::capturedCameraDirection`, `ui::editCameraDirection`.
+- `app::EditCapture` (src/app/edit_capture.*) measures parameters, sequence, cameras, automation,
+  added nodes and parent changes.
+- `EditHistoryTransactionSink` uses the capture. `TransactionSink::committedEditState` →
+  `TaskOutcome::editState` → `ui::taskUndoState` → the AI panel's undo calls `EditAction::Undo`.
+  The snapshot restore was removed from the panel.
+- The orchestrator opens, commits and rolls back on the main thread (it did all three on the worker
+  before). `Transaction::abandon` covers a stopped queue.
+- The Cameras panel (add, delete, lens drag, eligibility, cut, remove cut, place here) pushes one
+  command per gesture. Not verified in the running UI.
+- Defects found and fixed along the way:
+  - Captured timelines held dangling `IParameter*` after a camera delete (segfault in the first run).
+    They are now unbound at capture.
+  - A redo duplicated every baked sequence track. Fixed by restoring the sequence before the
+    automation.
+- Tests: `tests/unit/test_director_undo.cpp`, 5 cases. Proven red three ways: base capture, sequence
+  record, automation install. TSan: `[ai]` 83 cases and `[directing][undo]` 5 cases with 0 warnings.
+- Files: src/ui/edit_history.*, src/app/edit_capture.*, src/app/ai_edit_sink.*, src/ai/transaction.hpp,
+  src/ai/orchestrator.*, src/ui/ai_panel*, src/ui/control_panel.*, src/app/application.cpp.
+- Commits f142315a, af4c59f6, 8e0e1752. ADR-752.
+
+### 0.3 Persistence (2026-09-24): 60%
+- `tests/support/project_round_trip.hpp`: `saveAndReload` (at least one frame, real `saveProject`,
+  fresh engine, a frame on the far side), `missingTopLevelKeys`, `differingPaths`, `ScratchDir`,
+  `stepFrames`.
+- `tests/unit/test_director_persistence.cpp`, 6 cases:
+  - a Director-shaped sequence: behaviour-camera shot, keyed-camera shot with match cut, actor with
+    keys, path and clip cues, cue markers, cue-triggered event, piece track;
+  - camera direction, inline and by reference;
+  - an untouched project writes no key and leaves the scene file alone;
+  - a deleted camera stays deleted;
+  - the benchmark project loads with 0 warnings and adds no `cameraDirection` key.
+- **Defect fixed:** camera direction was lost on every by-reference project save (the sixth of
+  ADR-207's family). ADR-751, commit 8b498988.
+
+### 0.4 Preview isolation (2026-09-24): 75%
+- `Engine::writeProjectCopy` and `app::renderSourceFor`. The UI render and the render queue load a
+  scratch copy, and the output resolves beside the project.
+- The queue no longer requires a saved project.
+- Tests: `tests/unit/test_director_preview_isolation.cpp`, 2 cases. Proven red by making the copy
+  adopt the path.
+- ADR-753, commit afb21053. The path tracer still reads the last-saved file (it never wrote, but it
+  is inconsistent with the render).
+
+### 0.5 Capability registry (2026-09-24): 75%
+- `src/directing/capabilities.*`: `CapabilityRegistry`, `CharacterCard` (entity + loaded rig + jump
+  envelope with its source), `CameraCatalog`, `EventCatalog` (with tiers).
+- New `scene::allShotTransitions()`.
+- `capability.list` availability is now derived from its tools. It had called `entity` and `render`
+  unavailable while listing tools in both.
+- Tests: `tests/unit/test_directing_capabilities.cpp`, 5 cases, including the ADR-750 boundary scan.
+  Proven red for the card, the boundary and `capability.list`.
+- ADR-754, commit 3410dcac.
 
 ## Blocked work
-- Effect-domain undo, serialization and compilation: deferred until `agent/entity-effects`
-  (ADR-702) merges to main. That branch already adds `EffectChange` to `src/ui/edit_history.*`.
+- [!] Effect domain: `EffectChange` undo, effect persistence, the effect catalogue and effect cues.
+  Waiting for `agent/entity-effects` (ADR-702) to merge to main, then `agent/director` rebases.
+  Merge hazards are recorded under Known risks.
 
 ## Architectural decisions
-- ADR-750: the module is `src/directing/` (`avgen::directing`). It depends on no AI code.
+- ADR-750: the module is `src/directing/` (`avgen::directing`). It depends on no AI code, and a
+  test enforces that.
 - ADR-751: camera direction rides in the project (the sixth of ADR-207's family).
-- 0.2 design (to become an ADR with the implementation):
-  - Whole-domain before/after records, following `TimelineChange`/`LightChange`/`EffectChange`.
-    `CameraDirectionChange` captures rigs with their current parameter bases.
-    `AutomationChange` covers author timeline tracks, keys and cues, plus routes.
-  - One `app::EditCapture` builds a command from a before/after of every domain. The AI sink and the
-    Director apply both use it, so there is one definition of "what an operation changed".
-  - `applyEdit` order: automation (timeline/routes) → camera direction → sequence → lights →
-    composition records → rebind. A camera removal's erased tracks come back with the automation
-    record, so the camera is applied after it and `setCameraDirection` finds its tracks present.
-  - "Undo this task" undoes the history's command for that task (identified by the history
-    `stateId` it produced), and only when it is still the newest command. Otherwise it points to
-    Cmd+Z. The snapshot remains only for abort.
-  - Known limit: nodes an AI tool *deletes* are destroyed, so a diff cannot restore them.
-    `scene.delete_node` will detach and hand the node to the capture instead.
+- ADR-752: one undo for every domain the Director writes. Whole-domain records; `EditCapture`;
+  "Undo this task" is Cmd+Z; the transaction runs on the main thread.
+- ADR-753: a render or a preview reads a scratch copy, never the person's project.
+- ADR-754: capabilities are generated from engine data, never listed.
+- Finding that binds the Slice 1 compiler: `seq::install` owns every track on a parameter a
+  sequence bakes to, so compiled cues and author keys must never share a parameter.
+- Finding that binds Slice 1/2: `seq::Shot` (framing, in the sequence, saved in the project) and
+  `scene::CameraShot` (which camera is live, in the camera direction, saved with the scene or,
+  since ADR-751, the project) are independent, and nothing validates their correspondence. The
+  Cameras panel's "x" deletes both by overlap.
 
 ## Known risks
-- The effects refactor and this program both touch `src/ui/edit_history.*` (`applyEdit`, the
-  `EditCommand` fields). A three-way merge is likely when the effects branch lands. Adding fields in
-  a separate block from `effects` reduces that risk.
-- `EffectChange` and `AutomationChange` can both carry routes. If one command ever holds both,
-  the order of application decides which list wins. This needs a rule when effects merge.
+- **Merge with ADR-702.** Both branches edit `src/ui/edit_history.*`: `EditCommand` fields,
+  `empty()`, `touched()`, `applyEdit`'s composition-null check, and includes. Expect a small
+  three-way merge. After it, `EditCapture` must also capture the effect list, and route capture must
+  live in exactly one record: `EffectChange` also carries routes.
+- **ADR-702 also rewrites `Engine::projectDocument`'s** `worldEffects`/`atmosphericEffects` block,
+  next to ADR-751's `cameraDirection` block. This is a textual conflict, not a semantic one.
+- The AI sink's parameter diff can pick up engine-driven base writes made during a long task (the
+  per-frame writeback). This was pre-existing, and it is now visible in a bigger command.
 - Glowmere Valley 2 multicam's audio resolves outside the repository (`~/Desktop/Rebuild.mp3`).
-  It exists on this machine; the benchmark test is machine-specific.
-- Human edits that bypass history (sequence drags and inspectors, timeline key drags, routes, layers)
-  are wider than the Director's needs. 0.2 fixes the Director's paths and the Cameras panel. The
-  rest is listed above and is not in scope unless it blocks the Director.
+  The benchmark tests are machine-specific.
+- Human edits that bypass history (sequencer drags and inspectors, timeline key drags, routes,
+  layers) are outside the Director's needs and remain.
 
 ## Test status
-- Baseline (main, per brief): CPU 3,161 cases with 0 genuine failures (1 expected
-  `[!shouldfail]`); GPU 415 cases. Not yet re-run in this worktree.
-- `[directing][persistence]`: 6 cases, 48 assertions, all passing (release, 2026-09-24).
+- New: 18 `[directing]` cases (persistence 6, undo 5, preview 2, capabilities 5), all passing
+  (release). `[ai]` 84, `[edits]` 9, `[undo]` 8 and `[camera]` 124 pass. TSan: `[ai]` +
+  `[directing][undo]`, 0 warnings.
+- Full CPU suite: running (baseline on main: 3,161 cases, 1 expected `[!shouldfail]`).
+- Full GPU suite: not yet run.
 
 ## Recent changes
-- 2026-09-24: worktree created; 0.1 audit completed; round-trip helper; camera direction
-  persistence fix (8b498988); ADR-750, ADR-751.
+- 2026-09-24: 8b498988 camera direction persistence · 0a265b79 audit + ADR-750 · f142315a unified
+  undo · af4c59f6 Cameras panel undo · afb21053 render reads a scratch copy · 3410dcac capability
+  registry · 8e0e1752 redo ordering fix.
 
 ## Next tasks
-1. 0.2: `CameraDirectionChange` + `AutomationChange` in `EditCommand`, with `applyEdit` support
-   and apply/undo/redo tests.
-2. 0.2: `app::EditCapture`; AI sink on top of it; "Undo this task" through the history.
-3. 0.4: scratch-project preview (`Engine::writeProjectCopy`, which must not move the project path
-   or the dirty baseline), and `startRenderFromUi` stops saving the user's file.
-4. 0.5: capability registry audit and architecture.
+1. Finish the full CPU and GPU suites; report Slice 0.
+2. Measure `EntityWorld::seek` and `Composition::rebuild` on the benchmark (spec §37). ADR-700's
+   numbers have not been re-measured here.
+3. Slice 1.1: the Director Plan schema (ADR), `directing::Plan` JSON round trip, versioning.
+4. Slice 1.2: the resolver (subjects: entity / hero / node / camera; time: "1:30", bar, section
+   occurrence). "Umbra" is ambiguous between the hero `umbra-cap` and nodes `umbra-*`, and must
+   come back as AMBIGUOUS_REFERENCE.
+5. After ADR-702 merges: rebase, then the effect-domain undo, persistence and catalogue.
 
 ## Questions requiring human decision
-- **Rendering from the editor currently saves your project first**, silently, and clears the unsaved
-  state (application.cpp:2447). 0.4 will make the render read a scratch copy instead. Is there a
-  reason the render should keep writing the user's file? I assume not, and will proceed unless told
-  otherwise.
+- **Rendering from the editor used to save your project first.** It no longer does (ADR-753). If
+  there was a reason for that behaviour, say so. I found none in the code or the ADRs.
+- No product decisions are blocking Slice 0. Slice 1 questions (not blocking yet):
+  - Should Director Plans persist in the project, for refinement and provenance, or only their
+    compiled content? This is the feasibility report's open question 6.
+  - Does "the Umbra hero effect" mean ADR-702's per-hero Ground Pulse instance owned by
+    `umbra-cap`? I will assume so unless told otherwise.
 
 ---
 
@@ -201,35 +271,35 @@ Legend: [x] done · [~] in progress · [ ] not started · [!] blocked
 - [x] Audit timeline/key mutations
 - [x] Identify all persistent Director-targeted state
 ### 0.2 Unified undo
-- [ ] Extend EditCommand
-- [ ] Add camera direction change
+- [x] Extend EditCommand
+- [x] Add camera direction change
 - [!] Add world effect change (ADR-702 `EffectChange` exists on `agent/entity-effects`; adopt after merge)
-- [ ] Add timeline/key change where needed
-- [ ] Cover events
-- [ ] Cover actors
-- [ ] Update AI transaction sink
-- [ ] Remove duplicate snapshot undo
-- [ ] Add regression tests
+- [x] Add timeline/key change where needed
+- [x] Cover events
+- [x] Cover actors
+- [x] Update AI transaction sink
+- [x] Remove duplicate snapshot undo
+- [x] Add regression tests
 ### 0.3 Persistence
 - [x] Create round-trip helper (steps at least one frame before saving)
-- [ ] Audit Director-targeted serialization
-- [~] Add round-trip tests (sequence, camera direction)
-- [~] Identify existing serialization defects (camera direction found and fixed)
-- [ ] Fix defects encountered in touched domains
+- [x] Audit Director-targeted serialization
+- [~] Add round-trip tests (sequence, camera direction done; Plan/effects when they exist)
+- [x] Identify existing serialization defects (camera direction found and fixed)
+- [x] Fix defects encountered in touched domains
 ### 0.4 Preview isolation
 - [x] Audit preview/render save path
-- [ ] Design scratch-project rendering
-- [ ] Implement isolated preview
-- [ ] Add regression test
+- [x] Design scratch-project rendering
+- [~] Implement isolated preview (engine primitive + render path done; Director preview is Slice 1)
+- [x] Add regression test
 ### 0.5 Capability registry
-- [ ] Audit existing registries
-- [ ] Define generated registry architecture
-- [ ] Character capabilities
-- [ ] Camera capabilities
-- [ ] Effect capabilities
-- [ ] Event capabilities
-- [ ] Replace stale capability declarations
-- [ ] Add tests
+- [x] Audit existing registries
+- [x] Define generated registry architecture
+- [x] Character capabilities
+- [x] Camera capabilities
+- [!] Effect capabilities (blocked on ADR-702)
+- [x] Event capabilities
+- [x] Replace stale capability declarations
+- [x] Add tests
 
 ## Slice 1 — Director Plan v1
 - 1.1 Director Plan: [ ] schema · [ ] versioning · [ ] serialization · [ ] references · [ ] time
