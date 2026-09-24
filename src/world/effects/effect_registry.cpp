@@ -62,6 +62,7 @@ const EffectSchema& fresnelSchema();     // Wave 2 (FXL surface)
 const EffectSchema& rimLightSchema();    // Wave 2 (FXL surface)
 const EffectSchema& colorCyclingSchema(); // Wave 2 (FXL surface)
 const EffectSchema& motionSmearSchema(); // Wave 2 (FXL surface)
+const EffectSchema& starsSchema();       // Wave 2 (the sky's star field)
 
 namespace {
 
@@ -96,6 +97,7 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &rimLightSchema(),
         &colorCyclingSchema(),
         &motionSmearSchema(),
+        &starsSchema(),
     };
     return kSchemas;
 }
@@ -763,6 +765,7 @@ std::vector<RegistryFinding> checkRegistry() {
             case EffectBucket::Distortion: return RenderStage::ScreenSpace;
             case EffectBucket::Emitter: return RenderStage::Particles;
             case EffectBucket::Transform: return RenderStage::Geometry;
+            case EffectBucket::Starfield: return RenderStage::Sky;
             }
             return RenderStage::Sky;
         }();

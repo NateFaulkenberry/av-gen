@@ -30,6 +30,7 @@
 #include "world/effects/entity_fx.hpp"
 #include "world/effects/history_bank.hpp"
 #include "world/effects/ribbon_frame.hpp"
+#include "world/effects/star_field.hpp"
 #include "world/effects/transform_frame.hpp"
 
 #include <fmt/ranges.h>
@@ -4284,6 +4285,7 @@ void Engine::updateEffects(EffectPhase phase) {
         live.ribbons.vertices.clear(); // capacity kept: no allocation when a trail comes back
         live.ribbons.strips.clear();
         live.ribbons.dropped = 0;
+        live.stars = world::StarField{};
         return;
     }
     // The parameters were applied, and the status table sized and its reasons cleared, by the
@@ -4313,6 +4315,8 @@ void Engine::updateEffects(EffectPhase phase) {
     // RenderStage::Particles -- ADR-703's camera-facing strips (Trail), RIBBON over HIST.
     world::buildRibbonFrame(effects_, ctx, historyBank_, live.ribbons, effectOrder_, effectStatus_,
                             effectStatusReason_);
+    // RenderStage::Sky -- the star field (Stars, Wave 2), in place of the background's fixed stars.
+    world::buildStarField(effects_, ctx, live.stars, effectOrder_, effectStatus_, effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
     // builder said: "orphaned" is the actionable answer, "dormant" would send somebody looking at
     // its timing.

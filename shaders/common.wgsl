@@ -140,6 +140,11 @@ struct FrameUniforms {
     vortexGlow: vec4<f32>,          // xyz = mouth centre, w = mouth radius
     vortexGlowColor: vec4<f32>,     // rgb = radiance, w = intensity (0 = no vortex)
     fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    // Effect Library Wave 2: the Stars effect (world/effects/star_field.hpp). starsA.x = 0 keeps the
+    // background pass's own fixed field. Mirrors FrameUniforms in rendering/scene_renderer.hpp.
+    starsA: vec4<f32>,              // x = on, y = density, z = brightness, w = magnitude slope
+    starsB: vec4<f32>,              // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
+    starsC: vec4<f32>,              // x = band, y = band tilt, z = daylight hiding, w = seconds
 };
 
 struct ObjectUniforms {

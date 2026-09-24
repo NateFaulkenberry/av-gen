@@ -323,6 +323,11 @@ struct FrameUniforms {
     // pass's view of this structure is byte-identical and none of the `offsetof` assertions
     // below change. x = fogUpperDensity, y = fogHeightCurve, zw = 0.
     glm::vec4 fogShape{0.0f};
+    // Effect Library Wave 2: the Stars effect's field (world/effects/star_field.hpp), appended last.
+    // starsA.x = 0 is the background pass's own fixed field, exactly as before any Stars instance.
+    glm::vec4 starsA{0.0f}; // x = on, y = density, z = brightness (envelope folded in), w = magnitude slope
+    glm::vec4 starsB{0.0f}; // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
+    glm::vec4 starsC{0.0f}; // x = band, y = band tilt, z = daylight hiding, w = seconds (wrapped)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 surface waves. The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -332,7 +337,8 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::
                                        16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
                                        64 + // ADR-345: four vec4s of analytic sky
                                        32 + // ADR-379: two vec4s of vortex glow
-                                       16); // ADR-568: one vec4 of height-fog shape, appended last
+                                       16 + // ADR-568: one vec4 of height-fog shape
+                                       48); // Wave 2: three vec4s of star field, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
