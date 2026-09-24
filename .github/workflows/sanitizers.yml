@@ -35,6 +35,12 @@ env:
   CCACHE_COMPRESS: "1"
   CCACHE_MAXSIZE: 2G
   RESULTS: /Users/runner/ci-results   # absolute: upload-artifact rejects '..' in a path
+  # Cases excluded from the ASan run, with the reason for each in docs/development/ci.md
+  # ("Sanitizer exclusions"). Empty means the whole default CPU set runs.
+  ASAN_EXCLUDE: ""
+  # The TSan subset: every tag whose cases start threads (census in docs/development/ci.md).
+  # Tags only, OR-ed by the commas; the full suite does not fit a hosted job's 6 h under TSan.
+  TSAN_SUBSET: "[jobs],[job],[motionthreads],[threading],[worldbuilder],[ring],[analysis],[motionlib],[ai],[transport]"
 
 defaults:
   run:
