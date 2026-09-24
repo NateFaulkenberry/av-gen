@@ -126,6 +126,22 @@ float detail(const TornadoUniforms& v, float rr, float h, float angle, float env
     return std::lerp(1.0f, unit, bite);
 }
 
+// The condensation shell's cross-section (ADR-580 §5), as a function of a normalised distance `x`
+// from an axis: a Gaussian sheath peaking at `x = 1`, an interior fill that starts falling at
+// `coreRadius`, and an outer fade that begins past the sheath's crest. The funnel is this profile
+// around the funnel radius; the debris cloud is the SAME profile around its own radius (ADR-706),
+// so the field still has four named parts with one set of rules between them, not five.
+float sheath(const TornadoUniforms& v, float x) {
+    const float edgeSoft = std::max(v.t3.x, 1e-3f);
+    const float shellWidth = std::max(v.t2.x, 1e-3f);
+    const float d = (x - 1.0f) / shellWidth;
+    const float shell = std::exp(-d * d) * std::max(v.t2.y, 0.0f);
+    const float interior =
+        std::max(v.t2.w, 0.0f) * (1.0f - smoothstepf(std::clamp(v.t2.z, 0.0f, 1.0f), 1.0f, x));
+    const float outer = 1.0f - smoothstepf(1.0f + shellWidth, 1.0f + shellWidth + edgeSoft, x);
+    return (shell + interior) * outer;
+}
+
 Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float filterWidth) {
     Shape s;
     const float height = v.t0.w;
@@ -137,7 +153,8 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float filt
     s.heightT = h;
 
     const float skirtHeight = std::max(v.t4.y, 1e-3f);
-    if (h > 1.08f || h < -0.02f) {
+    const float footSoft = std::max(v.t3.w, 1e-3f);
+    if (h > 1.08f || h < -supportBelow(v)) {
         return s;
     }
 
@@ -146,8 +163,6 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float filt
     const glm::vec2 planar = glm::vec2(s.rel.x, s.rel.z) - s.axis;
     const float dist = glm::length(planar);
     const float radius = std::max(radiusAt(v, hc), 1e-3f);
-    const float rr = dist / radius;
-    s.radialT = rr;
 
     const float edgeSoft = std::max(v.t3.x, 1e-3f);
     const float shellWidth = std::max(v.t2.x, 1e-3f);
@@ -155,22 +170,22 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float filt
         std::max(v.t1.x * std::max(v.t4.x, 1.0f) * (1.0f + std::max(v.t4.w, 0.0f)), 1e-3f);
     const float cloudRadius = std::max(v.t1.z * std::max(v.t8.w, 1.0f), 1e-3f);
     if (dist > std::max(std::max(radius * (1.0f + shellWidth + edgeSoft), skirtRadius), cloudRadius)) {
+        s.radialT = dist / radius;
         return s;
     }
 
-    const float d = (rr - 1.0f) / shellWidth;
-    const float shell = std::exp(-d * d) * std::max(v.t2.y, 0.0f);
-    const float interior =
-        std::max(v.t2.w, 0.0f) * (1.0f - smoothstepf(std::clamp(v.t2.z, 0.0f, 1.0f), 1.0f, rr));
-    const float outer = 1.0f - smoothstepf(1.0f + shellWidth, 1.0f + shellWidth + edgeSoft, rr);
-    float funnel = (shell + interior) * outer;
+    // ADR-706: the funnel's lower end is a TIP, not a plane. `foot` still fades the density over
+    // `reach +- footSoft`, but the radius closes with it, so the silhouette rounds to a point
+    // instead of ending in a horizontal cut at full width.
+    const float reach = 1.0f - std::clamp(v.t3.z, 0.0f, 1.0f);
+    const float foot = smoothstepf(reach - footSoft, reach + footSoft, h);
+    const float tip = std::sqrt(foot);
+    const float rr = dist / std::max(radius * tip, 1e-3f);
+    s.radialT = dist / radius;
 
+    float funnel = sheath(v, rr);
     const float wallCloud = 1.0f + std::max(v.t3.y, 0.0f) * smoothstepf(0.55f, 1.0f, hc);
     const float cap = 1.0f - smoothstepf(1.0f, 1.06f, h);
-
-    const float reach = 1.0f - std::clamp(v.t3.z, 0.0f, 1.0f);
-    const float footSoft = std::max(v.t3.w, 1e-3f);
-    const float foot = smoothstepf(reach - footSoft, reach + footSoft, h);
     funnel = funnel * wallCloud * cap * foot;
 
     const float angle = std::atan2(planar.y, planar.x);
@@ -178,13 +193,27 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float filt
     const float suck = suction(v, rr, hc, angle, t);
     funnel = funnel * suck;
 
+    // ADR-706: the debris cloud. The same sheath cross-section as the funnel, around a radius that
+    // is a MOUND in height: widest at the ground (`skirtFlare`, a linear flare), with superelliptic
+    // shoulders that stay full and then round over, thinning as it rises the way lifted dust does,
+    // and a short rounded underside so a column standing on nothing does not end in a disc. See the
+    // shader for the two profiles that were rendered and rejected on the way here.
     float skirt = 0.0f;
-    if (h < skirtHeight && v.t4.z > 0.0f) {
-        const float sk = 1.0f - smoothstepf(0.0f, skirtHeight, std::max(h, 0.0f));
-        const float flare =
-            std::max(v.t1.x * std::max(v.t4.x, 1.0f) * (1.0f + std::max(v.t4.w, 0.0f) * sk), 1e-3f);
-        skirt = v.t4.z * (1.0f - smoothstepf(0.30f, 1.0f, dist / flare)) * sk * sk;
-        skirt = skirt * smoothstepf(-0.02f, 0.0f, h) * suck;
+    if (v.t4.z > 0.0f && h < skirtHeight) {
+        const float hd = h / skirtHeight;
+        const float rTop = v.t1.x * std::max(v.t4.x, 1.0f);
+        float rb = 0.0f;
+        if (hd >= 0.0f) {
+            const float hd2 = hd * hd;
+            const float shoulder = std::sqrt(std::sqrt(std::max(1.0f - hd2 * hd2, 0.0f)));
+            rb = rTop * (1.0f + std::max(v.t4.w, 0.0f) * (1.0f - hd)) * shoulder;
+        } else {
+            const float q = hd / kDebrisUnder;
+            rb = skirtRadius * std::sqrt(std::max(1.0f - q * q, 0.0f));
+        }
+        const float u = dist * (1.0f + shellWidth + edgeSoft) / std::max(rb, 1e-3f);
+        const float thin = 1.0f - smoothstepf(0.3f, 1.0f, std::max(hd, 0.0f));
+        skirt = v.t4.z * sheath(v, u) * thin * stripes(v, u, hc, angle, t) * suck;
     }
 
     float cloud = 0.0f;
@@ -202,11 +231,15 @@ Shape evaluate(const TornadoUniforms& v, const glm::vec3& p, float t, float filt
     }
     s.envelope = envelope;
     s.inside = true;
-    s.density = envelope * detail(v, rr, hc, angle, envelope, radius, t, filterWidth);
+    s.density = envelope * detail(v, s.radialT, hc, angle, envelope, radius, t, filterWidth);
     return s;
 }
 
 } // namespace
+
+float supportBelow(const TornadoUniforms& v) {
+    return std::max(0.02f, std::max(std::max(v.t3.w, 1e-3f), kDebrisUnder * std::max(v.t4.y, 1e-3f)));
+}
 
 TornadoUniforms packTornado(const TornadoField& f) {
     TornadoUniforms v;

@@ -226,3 +226,32 @@ TEST_CASE("the Tall Column is continuous from its cloud to its foot", "[gpu][tor
         fs::remove(moved);
     }
 }
+
+TEST_CASE("the debris cloud reaches the frame at the foot, and only there", "[gpu][tornado][structure]") {
+    // ADR-706. §39's panel A, whose storm authors Debris 0.8 and stands with its foot at the bottom
+    // of the frame: turning the debris off must change the foot and leave the column's upper half
+    // alone, because the mound is a term at the ground and nowhere else.
+    Rig rig(lab("tornado-modes-a-structure.scene.json"));
+    const std::string id = enabledTornado(rig.engine);
+    const gpu::Image8 with = rig.frame();
+    rig.set(id, "skirtDensity", 0.0f);
+    const gpu::Image8 without = rig.frame();
+
+    std::size_t foot = 0;
+    std::size_t upper = 0;
+    for (std::uint32_t y = 0; y < kHeight; ++y) {
+        for (std::uint32_t x = 0; x < kWidth; ++x) {
+            if (!visiblyDiffers(with, without, static_cast<std::size_t>(y) * kWidth + x)) {
+                continue;
+            }
+            if (y >= kHeight * 3 / 4) {
+                ++foot;
+            } else if (y < kHeight / 2) {
+                ++upper;
+            }
+        }
+    }
+    INFO("the debris moves " << foot << " px in the bottom quarter and " << upper << " px in the top half");
+    CHECK(foot > 150);
+    CHECK(upper == 0);
+}

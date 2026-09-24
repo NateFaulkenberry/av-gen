@@ -380,9 +380,11 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
         // The axis is a curve: the lean displaces the top and the wobble swings it, and both move
         // the whole column sideways within the bound rather than deforming it.
         let lateral = length(vec2<f32>(l7.x, l7.y)) + max(l7.z, 0.0);
-        // Vertically the field is compactly supported: `h > 1.08` and `h < -0.02` both return zero.
+        // Vertically the field is compactly supported: nothing above `h = 1.08`, and nothing below
+        // the funnel's tip or the debris cloud's rounded underside (ADR-706), which is the same
+        // `tornadoSupportBelow` the field itself early-outs on.
         return vec3<f32>(max(funnel, max(skirt, cloud)) + lateral,
-                         centre.y - radius * 0.02,
+                         centre.y - radius * tornadoSupportBelow(mediumTornadoUniforms(s)),
                          centre.y + radius * 1.08);
     }
 
