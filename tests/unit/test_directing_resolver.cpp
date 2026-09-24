@@ -261,7 +261,10 @@ TEST_CASE("subjects: Rook is the entity, Umbra is ambiguous, the Umbra hero is t
     CHECK(resolveSubject(index, "scene/fogDensity").identity.kind == SubjectKind::Parameter);
     CHECK(resolveSubject(index, "scene/fogDensty").status == SubjectResult::Status::Unknown);
     CHECK(resolveSubject(index, "the world").identity.kind == SubjectKind::World);
-    CHECK(resolveSubject(index, "Umbra's pulse", SubjectKind::Effect).status == SubjectResult::Status::Unsupported);
+    // Effects (ADR-702) answer only when an effect is asked for.
+    const SubjectResult pulse = resolveSubject(index, "Umbra's pulse", SubjectKind::Effect);
+    REQUIRE(pulse.status == SubjectResult::Status::Resolved);
+    CHECK(pulse.identity.id == "umbra-cap-hero-pulse");
 
     // Asked for a kind it is not: said, with what it is.
     const SubjectResult wrongKind = resolveSubject(index, "Tide", SubjectKind::Camera);

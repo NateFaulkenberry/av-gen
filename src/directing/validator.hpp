@@ -19,6 +19,10 @@
 #include "directing/resolver.hpp"
 #include "directing/scene_facts.hpp"
 
+#include "world/effects/effect_instance.hpp"
+#include "world/effects/effect_kind.hpp"
+
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -40,6 +44,18 @@ enum class CameraSupport : std::uint8_t {
 [[nodiscard]] std::string activityFor(std::string_view action);
 // Whether an action goes over its target (and so must clear it).
 [[nodiscard]] bool actionClearsTarget(std::string_view action);
+
+// A cue's effect reference, resolved against the staged effect list (ADR-702): the owner it names,
+// the type, and the instance -- empty when the owner has none of that type yet (a window cue then
+// makes one from the type's factory). `issue` is set when it cannot be resolved.
+struct ResolvedEffect {
+    world::EffectOwner owner;
+    world::EffectKind kind{};
+    std::string id;
+    std::optional<Issue> issue;
+};
+[[nodiscard]] ResolvedEffect resolveEffect(const EffectRef& ref, const Plan& plan, const SceneFacts& facts,
+                                           std::string_view location = {});
 
 struct Validation {
     std::vector<Issue> issues;

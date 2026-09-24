@@ -59,6 +59,10 @@ std::vector<const Issue*> issuesWith(const Validation& v, IssueCode code, std::s
     return out;
 }
 
+Staging staged(app::Engine& engine) {
+    return app::sceneFactsFor(engine).staged;
+}
+
 bool diffHas(const Compilation& c, char sign, std::string_view fragment) {
     return std::any_of(c.diff.begin(), c.diff.end(), [&](const DiffLine& d) {
         return d.sign == sign && d.text.find(fragment) != std::string::npos;
@@ -143,19 +147,22 @@ TEST_CASE("the Rook/Umbra benchmark: refused honestly, the feasible part built, 
     CHECK(v.isBlocked("umbra-pulse"));
     CHECK(v.isBlocked("flip-slowmo"));
     CHECK_FALSE(issuesWith(v, IssueCode::Blocked, "umbra-pulse").empty());
-    CHECK_FALSE(issuesWith(v, IssueCode::Unsupported, "umbra-pulse").empty()); // effects: after ADR-702
+    // "The Umbra hero effect" resolves (the owner's ruling: umbra-cap's Ground Pulse); it is blocked
+    // only by the peak it waits for.
+    CHECK(issuesWith(v, IssueCode::UnknownSubject, "umbra-pulse").empty());
+    CHECK(issuesWith(v, IssueCode::Unsupported, "umbra-pulse").empty());
 
     // 8-9: the feasible part: the shot, with a low-angle chase that follows Rook's node
     CHECK_FALSE(v.isBlocked("rook-umbra"));
-    REQUIRE(c.sequence.shotNamed("rook-umbra") != nullptr);
-    const scene::CameraRig* rig = c.cameras.findByName("rook-umbra");
+    REQUIRE(c.staged.sequence.shotNamed("rook-umbra") != nullptr);
+    const scene::CameraRig* rig = c.staged.cameras.findByName("rook-umbra");
     REQUIRE(rig != nullptr);
     CHECK(rig->followNode == "rook");
     CHECK(rig->followOffset.y == 0.4f);  // low angle
     CHECK(rig->followOffset.z == -3.0f); // the plan's 3 m
-    const auto cut = std::find_if(c.cameras.shots.begin(), c.cameras.shots.end(),
+    const auto cut = std::find_if(c.staged.cameras.shots.begin(), c.staged.cameras.shots.end(),
                                   [&](const scene::CameraShot& s) { return s.camera == rig->id; });
-    REQUIRE(cut != c.cameras.shots.end());
+    REQUIRE(cut != c.staged.cameras.shots.end());
     CHECK(cut->startSeconds == 90.0);
     CHECK(cut->endSeconds == 95.0);
     CHECK(cut->locked); // UFO Watch claims abductions; this moment is the plan's
@@ -176,8 +183,8 @@ TEST_CASE("the Rook/Umbra benchmark: refused honestly, the feasible part built, 
 
     // 17: deterministic -- same plan, same facts, same content, same bytes.
     const Compilation again = compilePlan(benchmarkPlan(), facts);
-    CHECK(again.sequence.toJson() == c.sequence.toJson());
-    CHECK(again.cameras.toJson() == c.cameras.toJson());
+    CHECK(again.staged.sequence.toJson() == c.staged.sequence.toJson());
+    CHECK(again.staged.cameras.toJson() == c.staged.cameras.toJson());
     CHECK(again.plan.toJson() == c.plan.toJson());
     CHECK(again.diff == c.diff);
 }
@@ -199,7 +206,7 @@ TEST_CASE("the benchmark applies as one undo, and survives a save after a frame 
     CHECK(stored.produced.size() == 3); // the seq shot, the rig, the camera-track shot
     for (const ContentRef& ref : stored.produced) {
         INFO(contentDomainName(ref.domain) << " " << ref.id);
-        const auto now = contentOf(ref, engine->sequence(), engine->composition()->cameraDirection());
+        const auto now = contentOf(ref, staged(*engine));
         REQUIRE(now);
         CHECK(fingerprint(*now) == ref.fingerprint); // installed exactly as compiled
     }
@@ -225,7 +232,7 @@ TEST_CASE("the benchmark applies as one undo, and survives a save after a frame 
     CHECK(back == stored);
     for (const ContentRef& ref : back.produced) {
         INFO(contentDomainName(ref.domain) << " " << ref.id);
-        const auto now = contentOf(ref, trip->reloaded->sequence(), trip->reloaded->composition()->cameraDirection());
+        const auto now = contentOf(ref, staged(*trip->reloaded));
         REQUIRE(now);
         CHECK(fingerprint(*now) == ref.fingerprint);
     }
@@ -235,7 +242,7 @@ TEST_CASE("the benchmark applies as one undo, and survives a save after a frame 
     const Compilation revised = compilePlan(benchmarkPlan(), app::sceneFactsFor(*trip->reloaded));
     CHECK(revised.plan.revision == 2);
     CHECK(issuesWith(revised.validation, IssueCode::HandEdited).empty());
-    CHECK(revised.sequence.toJson() == trip->reloaded->sequence().toJson());
+    CHECK(revised.staged.sequence.toJson() == trip->reloaded->sequence().toJson());
     CHECK(diffHas(revised, '~', "Shot \"rook-umbra\""));
 }
 
@@ -258,14 +265,14 @@ TEST_CASE("a revision never overwrites what the person edited by hand", "[direct
     CHECK(c.plan.revision == 2);
     CHECK_FALSE(issuesWith(c.validation, IssueCode::HandEdited, "est").empty());
     CHECK(c.validation.isBlocked("est"));
-    REQUIRE(c.sequence.shotNamed("establish") != nullptr);
-    CHECK(c.sequence.shotNamed("establish")->durationSeconds == 2.0); // the person's, untouched
+    REQUIRE(c.staged.sequence.shotNamed("establish") != nullptr);
+    CHECK(c.staged.sequence.shotNamed("establish")->durationSeconds == 2.0); // the person's, untouched
     // ...and the item is kept WHOLE: its camera cut stays with the shot the person kept.
-    CHECK(std::any_of(c.cameras.shots.begin(), c.cameras.shots.end(),
+    CHECK(std::any_of(c.staged.cameras.shots.begin(), c.staged.cameras.shots.end(),
                       [](const scene::CameraShot& cut) { return cut.label == "establish"; }));
     CHECK(issuesWith(c.validation, IssueCode::TimingConflict, "est").empty()); // not re-placed, so no collision
     // The marker was not touched by hand, so it moves: replaced, not duplicated.
-    CHECK(std::count_if(c.sequence.markers.begin(), c.sequence.markers.end(),
+    CHECK(std::count_if(c.staged.sequence.markers.begin(), c.staged.sequence.markers.end(),
                         [](const seq::Marker& m) { return m.name == "drop"; }) == 1);
     CHECK(diffHas(c, '~', "Marker drop 00:13.000"));
 }
@@ -277,17 +284,17 @@ TEST_CASE("framing, markers and parameter cues compile to editable native conten
     const Compilation c = compilePlan(planFrom(smallPlan()), app::sceneFactsFor(s.engine));
     INFO(c.diffText());
     CHECK_FALSE(c.validation.hasErrors());
-    const seq::Shot* shot = c.sequence.shotNamed("establish");
+    const seq::Shot* shot = c.staged.sequence.shotNamed("establish");
     REQUIRE(shot != nullptr);
     CHECK(shot->camera.kind == seq::CameraKind::Move); // a push-in, editable as a move
     CHECK(shot->camera.move.subject.name == "stone");
     CHECK(shot->camera.move.startDistance > shot->camera.move.endDistance);
-    REQUIRE(c.cameras.shots.size() == 1);
-    CHECK(c.cameras.shots[0].camera == scene::kMainCamera); // both shot types, written together
-    REQUIRE(c.sequence.events.size() == 1);
-    CHECK(c.sequence.events[0].what.target == "test/flash");
-    CHECK(seq::triggerIsScheduled(c.sequence.events[0].when.kind)); // deterministic tier
-    CHECK(seq::actionIsBaked(c.sequence.events[0].what.kind));
+    REQUIRE(c.staged.cameras.shots.size() == 1);
+    CHECK(c.staged.cameras.shots[0].camera == scene::kMainCamera); // both shot types, written together
+    REQUIRE(c.staged.sequence.events.size() == 1);
+    CHECK(c.staged.sequence.events[0].what.target == "test/flash");
+    CHECK(seq::triggerIsScheduled(c.staged.sequence.events[0].when.kind)); // deterministic tier
+    CHECK(seq::actionIsBaked(c.staged.sequence.events[0].what.kind));
     REQUIRE(app::applyCompilation(s.engine, history, c));
     for (const auto& w : s.engine.sequenceReport().warnings) {
         INFO(w);
@@ -338,7 +345,7 @@ TEST_CASE("spec §18's validation examples, each at its item", "[directing][vali
         existing.name = "someone-elses";
         existing.startSeconds = 11.0;
         existing.durationSeconds = 1.0;
-        crowded.sequence.shots.push_back(existing);
+        crowded.staged.sequence.shots.push_back(existing);
         Plan plan = planFrom(smallPlan());
         const Validation w = validatePlan(plan, crowded);
         const auto clash = issuesWith(w, IssueCode::TimingConflict, "est");
@@ -359,7 +366,7 @@ TEST_CASE("spec §18's validation examples, each at its item", "[directing][vali
         scene::CameraRig ufo;
         ufo.name = "UFO Watch";
         ufo.eventScenario = "abduction";
-        withEvents.cameras.addCamera(ufo);
+        withEvents.staged.cameras.addCamera(ufo);
         json doc = smallPlan();
         doc["shots"][0]["locked"] = false;
         Plan plan = planFrom(doc);

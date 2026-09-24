@@ -2,6 +2,10 @@
 
 #include "app/cinematic.hpp"
 #include "seq/events.hpp"
+#include "world/atmospherics.hpp"
+#include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_timing.hpp"
 
 #include <fmt/format.h>
 
@@ -77,7 +81,9 @@ nlohmann::json rigJson(const scene::CameraRig& rig) {
 }
 
 // Removes a content ref's content from the staging copies. True when something was removed.
-bool remove(const ContentRef& ref, seq::Sequence& sequence, scene::CameraDirection& cameras) {
+bool remove(const ContentRef& ref, Staging& staged) {
+    seq::Sequence& sequence = staged.sequence;
+    scene::CameraDirection& cameras = staged.cameras;
     switch (ref.domain) {
     case ContentDomain::SequenceShot:
         return std::erase_if(sequence.shots, [&](const seq::Shot& s) { return s.name == ref.id; }) > 0;
@@ -94,17 +100,18 @@ bool remove(const ContentRef& ref, seq::Sequence& sequence, scene::CameraDirecti
                                       [&](const scene::CameraRig& r) { return r.slug == ref.id; });
         return rig != cameras.cameras.end() && cameras.removeCamera(rig->id);
     }
+    case ContentDomain::EffectInstance: return world::removeEffect(staged.effects, ref.id);
     case ContentDomain::SequenceTrack:
-    case ContentDomain::TimelineTrack:
-    case ContentDomain::EffectInstance: return false; // not produced in Slice 1
+    case ContentDomain::TimelineTrack: return false; // not produced yet
     }
     return false;
 }
 
 } // namespace
 
-std::optional<nlohmann::json> contentOf(const ContentRef& ref, const seq::Sequence& sequence,
-                                        const scene::CameraDirection& cameras) {
+std::optional<nlohmann::json> contentOf(const ContentRef& ref, const Staging& staged) {
+    const seq::Sequence& sequence = staged.sequence;
+    const scene::CameraDirection& cameras = staged.cameras;
     switch (ref.domain) {
     case ContentDomain::SequenceShot:
         for (const seq::Shot& s : sequence.shots) {
@@ -141,10 +148,16 @@ std::optional<nlohmann::json> contentOf(const ContentRef& ref, const seq::Sequen
             }
         }
         break;
+    case ContentDomain::EffectInstance:
+        for (const world::EffectInstance& e : staged.effects) {
+            if (e.id == ref.id) {
+                return e.toJson();
+            }
+        }
+        break;
     case ContentDomain::SequenceActor:
     case ContentDomain::SequenceTrack:
-    case ContentDomain::TimelineTrack:
-    case ContentDomain::EffectInstance: break;
+    case ContentDomain::TimelineTrack: break;
     }
     return std::nullopt;
 }
@@ -247,8 +260,7 @@ std::string Compilation::diffText() const {
 Compilation compilePlan(Plan plan, const SceneFacts& facts) {
     Compilation out;
     out.validation = validatePlan(plan, facts);
-    out.sequence = facts.sequence;
-    out.cameras = facts.cameras;
+    out.staged = facts.staged;
     const Validation& v = out.validation;
     const auto line = [&](char sign, std::string item, std::string text) {
         out.diff.push_back(DiffLine{sign, std::move(item), std::move(text)});
@@ -267,19 +279,19 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         // they trimmed would leave half of what they kept.
         std::set<std::string> edited;
         for (const ContentRef& ref : previous->produced) {
-            const auto now = contentOf(ref, out.sequence, out.cameras);
+            const auto now = contentOf(ref, out.staged);
             if (now && !ref.fingerprint.empty() && fingerprint(*now) != ref.fingerprint) {
                 edited.insert(ref.item);
             }
         }
         for (const ContentRef& ref : previous->produced) {
             if (edited.contains(ref.item)) {
-                if (contentOf(ref, out.sequence, out.cameras)) {
+                if (contentOf(ref, out.staged)) {
                     plan.produced.push_back(ref); // still this plan's provenance, now the person's content
                 }
                 continue;
             }
-            if (remove(ref, out.sequence, out.cameras) &&
+            if (remove(ref, out.staged) &&
                 std::find(replacedItems.begin(), replacedItems.end(), ref.item) == replacedItems.end()) {
                 replacedItems.push_back(ref.item);
             }
@@ -330,7 +342,7 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         const bool lowAngle = std::any_of(ps.camera.begin(), ps.camera.end(),
                                           [](const CameraBeat& b) { return b.move == CameraMove::LowAngle; });
         if (!ps.rig.empty()) {
-            for (const scene::CameraRig& r : out.cameras.cameras) {
+            for (const scene::CameraRig& r : out.staged.cameras.cameras) {
                 if (r.name == ps.rig || r.slug == ps.rig) {
                     liveCamera = r.id;
                     cameraText = fmt::format("cut to camera '{}'", r.name);
@@ -352,9 +364,9 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                 }
                 if (support == CameraSupport::FollowRig) {
                     scene::CameraRig rig = followRig(ps.name, nodeOf(subject), beat.move, beat, lowAngle);
-                    const scene::CameraId id = out.cameras.addCamera(std::move(rig));
+                    const scene::CameraId id = out.staged.cameras.addCamera(std::move(rig));
                     liveCamera = id;
-                    const scene::CameraRig* added = out.cameras.find(id);
+                    const scene::CameraRig* added = out.staged.cameras.find(id);
                     record(ps.key, ContentDomain::CameraRig, added->slug);
                     line(removedLine(ps.key), ps.key,
                          fmt::format("Camera \"{}\": {}{} on {} (follows node '{}', {:.1f} m up, {:.1f} m behind)",
@@ -365,7 +377,7 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                 }
             }
         }
-        out.sequence.shots.push_back(shot);
+        out.staged.sequence.shots.push_back(shot);
         record(ps.key, ContentDomain::SequenceShot, shot.name);
         line(removedLine(ps.key), ps.key,
              fmt::format("Shot \"{}\" {}-{}; {}", shot.name, clock(start), clock(end), cameraText));
@@ -376,10 +388,10 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
             cut.endSeconds = end;
             cut.locked = ps.locked;
             cut.label = ps.name;
-            out.cameras.shots.push_back(cut);
-            record(ps.key, ContentDomain::CameraShot, cameraShotId(cut, out.cameras));
+            out.staged.cameras.shots.push_back(cut);
+            record(ps.key, ContentDomain::CameraShot, cameraShotId(cut, out.staged.cameras));
             line(removedLine(ps.key), ps.key,
-                 fmt::format("Camera track: {} live {}-{}{}", out.cameras.nameOf(cut.camera), clock(start), clock(end),
+                 fmt::format("Camera track: {} live {}-{}{}", out.staged.cameras.nameOf(cut.camera), clock(start), clock(end),
                              cut.locked ? ", locked" : ""));
         }
     }
@@ -392,20 +404,74 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         }
         const double t = *v.times.at(fmt::format("/markers/{}/at", i));
         seq::Marker marker{t, pm.name, seq::MarkerKind::Cue};
-        out.sequence.markers.push_back(marker);
+        out.staged.sequence.markers.push_back(marker);
         record(pm.key, ContentDomain::SequenceMarker, markerId(marker));
         line(removedLine(pm.key), pm.key, fmt::format("Marker {} {}", pm.name, clock(t)));
     }
-    std::stable_sort(out.sequence.markers.begin(), out.sequence.markers.end(),
+    std::stable_sort(out.staged.sequence.markers.begin(), out.staged.sequence.markers.end(),
                      [](const seq::Marker& a, const seq::Marker& b) { return a.timeSeconds < b.timeSeconds; });
 
     // ---- parameter cues ------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.cues.size(); ++i) {
         const PlanCue& pc = plan.cues[i];
-        if (v.isBlocked(pc.key) || pc.parameter.empty() || !pc.at) {
+        if (v.isBlocked(pc.key) || !pc.at) {
             continue;
         }
         const double t = *v.times.at(fmt::format("/cues/{}/at", i));
+        std::string parameter = pc.parameter;
+        if (pc.effect) {
+            const ResolvedEffect effect = resolveEffect(*pc.effect, plan, facts);
+            if (pc.field.empty()) {
+                // ---- activation: a window of its own, on a copy of the owner's instance ---------
+                // The owner's existing instance keeps its own activation (Umbra's pulse still fires
+                // when the cut spotlights Umbra); the plan adds a second instance of the same look,
+                // activated on the transport clock at exactly this time -- deterministic, and
+                // editable in the Effects section like any other instance (ADR-702 allows several
+                // of one type on one owner).
+                world::EffectInstance instance;
+                const world::EffectInstance* source = nullptr;
+                for (const world::EffectInstance& e : out.staged.effects) {
+                    if (e.id == effect.id) {
+                        source = &e;
+                    }
+                }
+                const world::EffectSchema* schema = world::effectSchema(effect.kind);
+                const std::string display = schema != nullptr ? schema->displayName : pc.effect->type;
+                instance = source != nullptr ? *source : world::makeEffect(effect.kind, display);
+                instance.owner = effect.owner;
+                instance.id = world::uniqueEffectId(out.staged.effects, plan.id + "-" + pc.key);
+                instance.name = fmt::format("{} ({})", source != nullptr ? source->name : display,
+                                            plan.title.empty() ? plan.id : plan.title);
+                instance.enabled = true;
+                instance.activation = world::Activation::Window;
+                double window = pc.holdSeconds;
+                if (pc.until) {
+                    window = *v.times.at(fmt::format("/cues/{}/until", i)) - t;
+                }
+                if (window <= 0.0) {
+                    window = instance.timing.windowSeconds; // the look's own length
+                }
+                instance.timing.windowStart = t;
+                instance.timing.windowSeconds = window;
+                world::adaptEffectToOwner(instance);
+                auto inserted = world::insertEffect(out.staged.effects, std::move(instance));
+                if (!inserted) {
+                    line('!', pc.key, fmt::format("{}: {}", issueCodeName(IssueCode::SchemaInvalid), inserted.error().message));
+                    continue;
+                }
+                record(pc.key, ContentDomain::EffectInstance, *inserted);
+                line(removedLine(pc.key), pc.key,
+                     fmt::format("Effect \"{}\" on {} {}: active {}-{}", display,
+                                 effect.owner.isWorld() ? std::string("the world") : effect.owner.name,
+                                 source != nullptr ? fmt::format("(a copy of '{}')", source->id) : std::string("(new, the type's defaults)"),
+                                 clock(t), clock(t + window)));
+                continue;
+            }
+            parameter = fmt::format("fx/{}/{}", effect.id, pc.field);
+        }
+        if (parameter.empty()) {
+            continue;
+        }
         double hold = pc.holdSeconds;
         if (pc.until) {
             hold = std::max(0.0, *v.times.at(fmt::format("/cues/{}/until", i)) - t - pc.rampSeconds);
@@ -415,21 +481,21 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         event.when.kind = seq::TriggerKind::Time;
         event.when.timeSeconds = t;
         event.what.kind = seq::EventActionKind::SetParameter;
-        event.what.target = pc.parameter;
+        event.what.target = parameter;
         // "Set it to 2 for a moment" is an Add of (2 - base): an Add's identity is 0, so the bake
         // knows what the value is before, and what it returns to after the hold. An absolute
         // Replace has neither -- the bake warns, and the value holds backwards from t = 0.
-        const std::vector<float>* base = facts.base(pc.parameter);
+        const std::vector<float>* base = facts.base(parameter);
         const float from = base != nullptr && !base->empty() ? base->front() : 0.0f;
         event.what.mode = params::TrackMode::Add;
         event.what.amount = glm::vec4(*pc.value - from, 0.0f, 0.0f, 0.0f);
         event.what.seconds = pc.rampSeconds;
         event.what.holdSeconds = hold;
-        out.sequence.events.push_back(event);
+        out.staged.sequence.events.push_back(event);
         record(pc.key, ContentDomain::SequenceEvent, event.id);
         line(removedLine(pc.key), pc.key,
-             fmt::format("Cue {} -> {:.3g} (from {:.3g}) at {}{}{}", pc.parameter, *pc.value,
-                         facts.base(pc.parameter) != nullptr ? facts.base(pc.parameter)->front() : 0.0f, clock(t),
+             fmt::format("Cue {} -> {:.3g} (from {:.3g}) at {}{}{}", parameter, *pc.value,
+                         facts.base(parameter) != nullptr ? facts.base(parameter)->front() : 0.0f, clock(t),
                          pc.rampSeconds > 0.0 ? fmt::format(", ramp {:.2f}s", pc.rampSeconds) : std::string(),
                          hold > 0.0 ? fmt::format(", back after {:.2f}s", hold) : std::string()));
     }
@@ -452,7 +518,7 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
 
     // ---- provenance: fingerprints of the content as compiled -----------------------------------------
     for (ContentRef& ref : produced) {
-        if (const auto content = contentOf(ref, out.sequence, out.cameras)) {
+        if (const auto content = contentOf(ref, out.staged)) {
             ref.fingerprint = fingerprint(*content);
         }
         plan.produced.push_back(std::move(ref));

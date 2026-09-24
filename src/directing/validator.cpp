@@ -3,6 +3,8 @@
 #include "directing/compiler.hpp"
 #include "directing/text.hpp"
 #include "seq/events.hpp"
+#include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_stack.hpp"
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -161,6 +163,92 @@ bool actionClearsTarget(std::string_view action) {
     return std::find(kOver.begin(), kOver.end(), action) != kOver.end();
 }
 
+// ---- effects -------------------------------------------------------------------------------------
+
+ResolvedEffect resolveEffect(const EffectRef& ref, const Plan& plan, const SceneFacts& facts, std::string_view location) {
+    ResolvedEffect out;
+    const auto fail = [&](IssueCode code, std::string message) -> Issue& {
+        Issue issue;
+        issue.code = code;
+        issue.location = std::string(location);
+        issue.subject = ref.id.empty() ? fmt::format("{} on {}", ref.type, ref.owner) : ref.id;
+        issue.message = std::move(message);
+        out.issue = std::move(issue);
+        return *out.issue;
+    };
+    // The owner: the world, or a subject with a place (ADR-702's Entity owner is "a hero, a
+    // composition node" -- a character's node is the node it drives).
+    if (ref.owner == "world") {
+        out.owner = world::EffectOwner::world();
+    } else {
+        const Subject* subject = plan.subject(ref.owner);
+        if (subject == nullptr || subject->kind == SubjectKind::Unresolved) {
+            fail(IssueCode::UnknownSubject, fmt::format("the effect's owner '{}' is not resolved", ref.owner));
+            return out;
+        }
+        std::string node = subject->id;
+        for (const SubjectIdentity& i : facts.subjects.identities()) {
+            if (i.kind == subject->kind && i.id == subject->id && !i.node.empty()) {
+                node = i.node;
+            }
+        }
+        if (subject->kind != SubjectKind::Hero && subject->kind != SubjectKind::Node && subject->kind != SubjectKind::Entity) {
+            fail(IssueCode::Unsupported, fmt::format("effects on a {} are not compiled yet; only the world, heroes, "
+                                                     "characters and nodes",
+                                                     subjectKindName(subject->kind)));
+            return out;
+        }
+        out.owner = world::EffectOwner::entity(node);
+    }
+    const auto kind = world::effectKindFromName(ref.type);
+    if (!kind) {
+        Issue& issue = fail(IssueCode::UnknownSubject, fmt::format("'{}' is not an effect type", ref.type));
+        std::vector<std::string> types;
+        for (const EffectTypeCapability& t : facts.capabilities.effects().types) {
+            types.push_back(t.type);
+        }
+        issue.suggestions = text::nearest(ref.type, types);
+        issue.details = {{"types", types}};
+        return out;
+    }
+    out.kind = *kind;
+    if (!world::effectAllowedOn(*kind, out.owner.kind)) {
+        Issue& issue = fail(IssueCode::CapabilityUnavailable,
+                            fmt::format("a {} cannot be attached to {}", ref.type,
+                                        out.owner.isWorld() ? std::string("the world") : "'" + out.owner.name + "'"));
+        if (const EffectTypeCapability* t = facts.capabilities.effects().type(ref.type)) {
+            issue.details = {{"owners", t->owners}};
+        }
+        return out;
+    }
+    std::vector<const world::EffectInstance*> matches;
+    for (const world::EffectInstance& e : facts.staged.effects) {
+        if (!ref.id.empty() ? e.id == ref.id : (e.owner == out.owner && e.kind == *kind)) {
+            matches.push_back(&e);
+        }
+    }
+    if (!ref.id.empty() && matches.empty()) {
+        fail(IssueCode::UnknownSubject, fmt::format("there is no effect '{}'", ref.id));
+        return out;
+    }
+    if (!ref.id.empty() && (matches.front()->kind != *kind || !(matches.front()->owner == out.owner))) {
+        fail(IssueCode::SchemaInvalid, fmt::format("effect '{}' is not a {} on {}", ref.id, ref.type, ref.owner));
+        return out;
+    }
+    if (matches.size() > 1) {
+        Issue& issue = fail(IssueCode::AmbiguousReference,
+                            fmt::format("{} has {} {} effects; name one by id", ref.owner, matches.size(), ref.type));
+        for (const world::EffectInstance* e : matches) {
+            issue.suggestions.push_back(e->id);
+        }
+        return out;
+    }
+    if (matches.size() == 1) {
+        out.id = matches.front()->id;
+    }
+    return out;
+}
+
 // ---- the validator ------------------------------------------------------------------------------
 
 Validation validatePlan(Plan& plan, const SceneFacts& facts) {
@@ -201,7 +289,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
     std::vector<std::string> ownMarkers; // "name@time"
     if (const Plan* previous = facts.plan(plan.id); previous != nullptr) {
         for (const ContentRef& ref : previous->produced) {
-            const auto now = contentOf(ref, facts.sequence, facts.cameras);
+            const auto now = contentOf(ref, facts.staged);
             if (!now) {
                 continue; // deleted by hand since: nothing to overwrite, nothing to protect
             }
@@ -224,7 +312,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
     }
 
     // ---- shots -------------------------------------------------------------------------------------
-    const bool eventCameras = std::any_of(facts.cameras.cameras.begin(), facts.cameras.cameras.end(),
+    const bool eventCameras = std::any_of(facts.staged.cameras.cameras.begin(), facts.staged.cameras.cameras.end(),
                                           [](const scene::CameraRig& r) { return !r.eventScenario.empty(); });
     std::vector<std::pair<double, double>> planned; // placed spans of shots already accepted, for overlap
     for (std::size_t i = 0; i < plan.shots.size(); ++i) {
@@ -241,14 +329,14 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                                 subjectKindName(kindOf(shot.subject))));
         }
         if (!shot.rig.empty()) {
-            const auto rig = std::find_if(facts.cameras.cameras.begin(), facts.cameras.cameras.end(), [&](const scene::CameraRig& r) {
+            const auto rig = std::find_if(facts.staged.cameras.cameras.begin(), facts.staged.cameras.cameras.end(), [&](const scene::CameraRig& r) {
                 return r.name == shot.rig || r.slug == shot.rig;
             });
-            if (rig == facts.cameras.cameras.end()) {
+            if (rig == facts.staged.cameras.cameras.end()) {
                 Issue& issue = c.error(IssueCode::UnknownSubject, shot.key, at + "/rig",
                                        fmt::format("there is no camera called '{}'", shot.rig));
                 std::vector<std::string> names;
-                for (const scene::CameraRig& r : facts.cameras.cameras) {
+                for (const scene::CameraRig& r : facts.staged.cameras.cameras) {
                     names.push_back(r.name);
                 }
                 issue.suggestions = text::nearest(shot.rig, names);
@@ -310,7 +398,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             c.error(IssueCode::TimeOutOfRange, shot.key, at + "/durationSeconds",
                     fmt::format("the shot ends at {:.3f}s, after the piece ({:.3f}s)", end, facts.music.durationSeconds));
         }
-        for (const seq::Shot& existing : facts.sequence.shots) {
+        for (const seq::Shot& existing : facts.staged.sequence.shots) {
             if (std::find(ownShots.begin(), ownShots.end(), existing.name) != ownShots.end()) {
                 continue; // this plan's own earlier revision: it is being replaced
             }
@@ -341,7 +429,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         if (eventCameras && !shot.locked && !v.isBlocked(shot.key)) {
             Issue& issue = c.warning(IssueCode::CameraConflict, shot.key, at + "/locked",
                                      "an event camera in this scene can take the frame during this shot");
-            for (const scene::CameraRig& r : facts.cameras.cameras) {
+            for (const scene::CameraRig& r : facts.staged.cameras.cameras) {
                 if (!r.eventScenario.empty()) {
                     issue.details["eventCameras"].push_back({{"camera", r.name}, {"scenario", r.eventScenario}});
                 }
@@ -353,7 +441,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
     // ---- markers -----------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.markers.size(); ++i) {
         const PlanMarker& m = plan.markers[i];
-        for (const seq::Marker& existing : facts.sequence.markers) {
+        for (const seq::Marker& existing : facts.staged.sequence.markers) {
             const std::string id = fmt::format("{}@{:.3f}", existing.name, existing.timeSeconds);
             if (existing.name == m.name && existing.kind == seq::MarkerKind::Cue &&
                 std::find(ownMarkers.begin(), ownMarkers.end(), id) == ownMarkers.end()) {
@@ -474,10 +562,39 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             }
         }
         if (cue.effect) {
-            Issue& issue = c.error(IssueCode::Unsupported, cue.key, at + "/effect",
-                                   fmt::format("effect cues are not compiled yet ('{}' on {})", cue.effect->type,
-                                               cue.effect->owner == "world" ? std::string("the world") : idOf(cue.effect->owner)));
-            issue.cause = "effect instances (ADR-702) are not on this build's main line yet";
+            ResolvedEffect effect = resolveEffect(*cue.effect, plan, facts, at + "/effect");
+            if (effect.issue) {
+                effect.issue->item = cue.key;
+                v.blocked.insert(cue.key);
+                v.issues.push_back(std::move(*effect.issue));
+            } else if (!cue.field.empty()) {
+                // Moving one of the instance's own numbers: a baked cue on fx/<id>/<leaf>.
+                const EffectTypeCapability* type = facts.capabilities.effects().type(cue.effect->type);
+                if (effect.id.empty()) {
+                    c.error(IssueCode::UnknownSubject, cue.key, at + "/field",
+                            fmt::format("there is no {} on {} whose '{}' could change", cue.effect->type,
+                                        cue.effect->owner, cue.field));
+                } else if (type != nullptr && std::find(type->fields.begin(), type->fields.end(), cue.field) == type->fields.end()) {
+                    Issue& issue = c.error(IssueCode::SchemaInvalid, cue.key, at + "/field",
+                                           fmt::format("a {} has no field '{}'", cue.effect->type, cue.field));
+                    issue.suggestions = text::nearest(cue.field, type->fields);
+                } else {
+                    const std::string path = fmt::format("fx/{}/{}", effect.id, cue.field);
+                    const std::vector<float>* base = facts.base(path);
+                    if (base == nullptr || base->size() != 1) {
+                        c.error(IssueCode::Unsupported, cue.key, at + "/field",
+                                fmt::format("'{}' is not a single number a cue can set", path));
+                    }
+                    if (!cue.value) {
+                        c.error(IssueCode::SchemaInvalid, cue.key, at + "/value", "an effect field cue needs a value");
+                    }
+                    if (std::find(facts.authorTrackTargets.begin(), facts.authorTrackTargets.end(), path) !=
+                        facts.authorTrackTargets.end()) {
+                        c.error(IssueCode::TimingConflict, cue.key, at + "/field",
+                                fmt::format("'{}' has keys of your own; a baked cue would erase them", path));
+                    }
+                }
+            }
         }
         if (!cue.on.empty()) {
             const PlanPerformance* source = nullptr;

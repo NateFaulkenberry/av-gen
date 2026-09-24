@@ -9,6 +9,10 @@
 #include "scene/composition.hpp"
 #include "seq/events.hpp"
 #include "seq/sequence.hpp"
+#include "world/effects/effect_instance.hpp"
+#include "world/effects/effect_kind.hpp"
+#include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_timing.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -255,6 +259,34 @@ CapabilityRegistry CapabilityRegistry::fromComposition(const scene::Composition&
         out.events_.actions.push_back(
             EventKindCapability{name, seq::actionIsBaked(*seq::eventActionKindFromName(name))});
     }
+    // Effects (ADR-702): the registry's types and the scene's instances.
+    for (const world::EffectSchema* schema : world::effectSchemas()) {
+        if (schema == nullptr) {
+            continue;
+        }
+        EffectTypeCapability t;
+        t.type = schema->key;
+        t.displayName = schema->displayName;
+        t.category = world::effectCategoryName(schema->category);
+        t.stage = world::renderStageName(schema->stage);
+        for (std::size_t k = 0; k < world::kEffectTargetCount; ++k) {
+            const auto target = static_cast<world::EffectTarget>(k);
+            if ((schema->targets & world::targetBit(target)) != 0) {
+                t.owners.emplace_back(world::effectTargetName(target));
+            }
+        }
+        for (const world::EffectField& field : schema->fields) {
+            if (field.page != world::FieldPage::Hidden) {
+                t.fields.emplace_back(field.leaf);
+            }
+        }
+        out.effects_.types.push_back(std::move(t));
+    }
+    for (const world::EffectInstance& e : composition.effects()) {
+        out.effects_.instances.push_back(EffectInstanceCapability{
+            e.id, world::effectKindName(e.kind), e.name, world::effectTargetName(e.owner.kind), e.owner.name,
+            world::activationName(e.activation), e.enabled});
+    }
     return out;
 }
 
@@ -262,6 +294,25 @@ CapabilityRegistry CapabilityRegistry::withCharacters(std::vector<CharacterCard>
     CapabilityRegistry out;
     out.characters_ = std::move(characters);
     return out;
+}
+
+const EffectTypeCapability* EffectCatalog::type(std::string_view key) const {
+    const auto it = std::find_if(types.begin(), types.end(), [&](const EffectTypeCapability& t) { return t.type == key; });
+    return it == types.end() ? nullptr : &*it;
+}
+
+nlohmann::json EffectCatalog::toJson() const {
+    nlohmann::json typesJson = nlohmann::json::array();
+    for (const EffectTypeCapability& t : types) {
+        typesJson.push_back({{"type", t.type}, {"displayName", t.displayName}, {"category", t.category},
+                             {"stage", t.stage}, {"owners", t.owners}, {"fields", t.fields}});
+    }
+    nlohmann::json instancesJson = nlohmann::json::array();
+    for (const EffectInstanceCapability& i : instances) {
+        instancesJson.push_back({{"id", i.id}, {"type", i.type}, {"name", i.name}, {"ownerKind", i.ownerKind},
+                                 {"owner", i.owner}, {"activation", i.activation}, {"enabled", i.enabled}});
+    }
+    return {{"types", std::move(typesJson)}, {"instances", std::move(instancesJson)}};
 }
 
 const CharacterCard* CapabilityRegistry::character(std::string_view subject) const {
@@ -275,7 +326,8 @@ nlohmann::json CapabilityRegistry::toJson() const {
     for (const CharacterCard& c : characters_) {
         chars.push_back(c.toJson());
     }
-    return {{"characters", std::move(chars)}, {"cameras", cameras_.toJson()}, {"events", events_.toJson()}};
+    return {{"characters", std::move(chars)}, {"cameras", cameras_.toJson()}, {"events", events_.toJson()},
+            {"effects", effects_.toJson()}};
 }
 
 } // namespace avgen::directing

@@ -19,8 +19,8 @@
 //      candidate listed; none is UNKNOWN_SUBJECT with the nearest names. The model may pick -- by
 //      writing the candidate's id -- but the resolver never does.
 //
-// Effects resolve once ADR-702's instance list is on main; until then an effect hint is UNSUPPORTED
-// rather than a guess.
+// Effect instances (ADR-702) are identities of kind Effect, by id, matched only when an effect is
+// asked for. A cue's `{owner, type}` reference resolves through `resolveEffect` (validator.hpp).
 
 #include "directing/issue.hpp"
 #include "directing/plan.hpp"

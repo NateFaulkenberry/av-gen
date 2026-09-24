@@ -4,6 +4,7 @@
 #include "entity/entity.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/composition.hpp"
+#include "world/effects/effect_instance.hpp"
 #include "world/hero.hpp"
 
 #include <fmt/format.h>
@@ -32,6 +33,9 @@ std::optional<SubjectKind> kindWord(const std::string& word) {
 }
 
 bool kindMatches(const SubjectIdentity& identity, SubjectKind hint) {
+    if (identity.kind == SubjectKind::Effect && hint != SubjectKind::Effect) {
+        return false;
+    }
     if (hint == SubjectKind::Unresolved) {
         return true;
     }
@@ -93,6 +97,11 @@ SubjectIndex SubjectIndex::fromComposition(const scene::Composition& composition
         }
         index.identities_.push_back(SubjectIdentity{SubjectKind::Node, node->name, node->name, node->name});
     }
+    // Effect instances (ADR-702), by id, answering to their panel name too. Only ever matched when
+    // an effect is asked for: "Umbra" must not also mean Umbra's pulse.
+    for (const world::EffectInstance& e : composition.effects()) {
+        index.identities_.push_back(SubjectIdentity{SubjectKind::Effect, e.id, e.name.empty() ? e.id : e.name, {}});
+    }
     for (const scene::CameraRig& rig : composition.cameraDirection().cameras) {
         const std::string slug = rig.slug.empty() ? text::fold(rig.name) : rig.slug;
         index.identities_.push_back(SubjectIdentity{SubjectKind::Camera, slug, rig.name.empty() ? slug : rig.name, {}});
@@ -124,13 +133,6 @@ SubjectResult resolveSubject(const SubjectIndex& index, std::string_view rawText
     if (hint == SubjectKind::World || text::lower(original) == "world" || text::lower(original) == "the world") {
         out.status = SubjectResult::Status::Resolved;
         out.identity = SubjectIdentity{SubjectKind::World, "world", "world", {}};
-        return out;
-    }
-    if (hint == SubjectKind::Effect) {
-        Issue& issue = fail(SubjectResult::Status::Unsupported, IssueCode::Unsupported,
-                            fmt::format("effects cannot be named yet: '{}'", original));
-        issue.cause = "effect instances (ADR-702) are not on this build's main line yet";
-        issue.suggestions = {"name the effect's owner and type in a cue's `effect` field instead"};
         return out;
     }
     if (original.find('/') != std::string::npos || hint == SubjectKind::Parameter) {

@@ -101,3 +101,21 @@ now pushes one command per gesture. A lens drag is one command, from press to re
 - Not verified in the running UI: the Cameras panel's pushes, and the AI panel's button. Both call
   code that is unit-tested (`editCameraDirection`, `EditCapture`, `taskUndoState`), but the draw
   code is not.
+
+## Addendum (2026-09-24, after ADR-702 merged)
+
+`EditCapture` now captures the effect list as an `EffectChange`. It decides on the authored list,
+so a slider move stays a `ParamChange`, and it records the captured list (bases included), which
+is what undo installs.
+
+**Routes live in exactly one record: `AutomationChange`.** A captured `EffectChange` never sets
+`routesTouched`; that flag stays the Effects panel's own, for "+ Add Effect".
+
+`applyEdit` order is sequence, plans, automation, cameras, lights, effects. `setEffects` ends with
+the rebind that binds tracks and routes aimed at `fx/<id>/`.
+
+Tested:
+- an operation adding an Aurora and a route is one command, with routes only in the automation
+  record;
+- undo restores `newComposition`'s six default routes exactly;
+- proven red by dropping the effect capture, and by setting `routesTouched` on the captured record.

@@ -46,8 +46,7 @@ struct DiffLine {
 struct Compilation {
     Plan plan;                       // resolved; revision and `produced` set as an apply would store it
     Validation validation;
-    seq::Sequence sequence;          // the staging copy, compiled into
-    scene::CameraDirection cameras;  // the staging copy, compiled into
+    Staging staged;                  // the staging copy, compiled into
     std::vector<DiffLine> diff;
     [[nodiscard]] bool changesAnything() const;
     // The diff as text, one line per entry: "+ Shot "rook-umbra" 01:30.000-01:35.000 ...".
@@ -59,8 +58,7 @@ struct Compilation {
 // ---- provenance: finding and fingerprinting native content --------------------------------------
 
 // The native content a `produced` entry names, as JSON, or nothing when it is gone.
-[[nodiscard]] std::optional<nlohmann::json> contentOf(const ContentRef& ref, const seq::Sequence& sequence,
-                                                      const scene::CameraDirection& cameras);
+[[nodiscard]] std::optional<nlohmann::json> contentOf(const ContentRef& ref, const Staging& staged);
 // A stable fingerprint of a document (FNV-1a 64 over its canonical dump).
 [[nodiscard]] std::string fingerprint(const nlohmann::json& content);
 

@@ -61,11 +61,12 @@ namespace avgen::app {
     directing::SceneFacts facts;
     facts.subjects = subjectIndexFor(engine);
     facts.music = musicalContextFor(engine);
-    facts.sequence = engine.sequence();
+    facts.staged.sequence = engine.sequence();
+    facts.staged.effects = engine.capturedEffects();
     facts.plans = engine.directingPlans();
     if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
         facts.capabilities = directing::CapabilityRegistry::fromComposition(*comp);
-        facts.cameras = comp->cameraDirection();
+        facts.staged.cameras = comp->cameraDirection();
         // Places are AUTHORED positions -- a hero's anchor, a node's base transform -- never a
         // simulation's current state, so validation and compilation are the same whenever they run.
         for (const world::HeroPoint& hero : comp->heroes()) {
@@ -88,7 +89,7 @@ namespace avgen::app {
                                                     comp->nodeWorldTransform(*node).position, 2.0f, 0.0f, 0.0f});
         }
     } else {
-        facts.cameras.ensureMainCamera();
+        facts.staged.cameras.ensureMainCamera();
     }
     facts.parameterBases.reserve(engine.params().size());
     for (const params::IParameter* p : engine.params().ordered()) {
@@ -123,21 +124,45 @@ namespace avgen::app {
         (void)ui::applyEdit(engine, partial, false);
         return fail("{}", message);
     };
-    if (auto r = engine.setSequence(compilation.sequence); !r) {
+    if (auto r = engine.setSequence(compilation.staged.sequence); !r) {
         return undoAndFail(r.error().message);
     }
     if (engine.composition() != nullptr) {
-        if (auto r = engine.setCameraDirection(compilation.cameras); !r) {
+        if (auto r = engine.setCameraDirection(compilation.staged.cameras); !r) {
             return undoAndFail(r.error().message);
+        }
+    }
+    // The effect list only when it changed: `setEffects` re-registers every fx/ parameter, which is
+    // not free and not needed for a plan that touched no effect.
+    const auto effectsJson = [](const std::vector<world::EffectInstance>& list) {
+        nlohmann::json out = nlohmann::json::array();
+        for (const world::EffectInstance& e : list) {
+            out.push_back(e.toJson());
+        }
+        return out;
+    };
+    if (effectsJson(compilation.staged.effects) != effectsJson(engine.capturedEffects())) {
+        if (auto r = engine.setEffects(compilation.staged.effects); !r) {
+            return undoAndFail(r.error().message);
+        }
+    }
+    // Fingerprints of the content AS INSTALLED, not as compiled. Installing is not the identity:
+    // an effect's window start becomes a float parameter (118.645 -> 118.64499...), and a fingerprint
+    // of the compiled value would read as a hand edit on the very next revision.
+    directing::Plan stored = compilation.plan;
+    const directing::Staging installed = sceneFactsFor(engine).staged;
+    for (directing::ContentRef& ref : stored.produced) {
+        if (const auto content = directing::contentOf(ref, installed)) {
+            ref.fingerprint = directing::fingerprint(*content);
         }
     }
     auto& plans = engine.directingPlans();
     const auto existing = std::find_if(plans.begin(), plans.end(),
-                                       [&](const directing::Plan& p) { return p.id == compilation.plan.id; });
+                                       [&](const directing::Plan& p) { return p.id == stored.id; });
     if (existing != plans.end()) {
-        *existing = compilation.plan;
+        *existing = std::move(stored);
     } else {
-        plans.push_back(compilation.plan);
+        plans.push_back(std::move(stored));
     }
     history.push(capture.finish(engine, "Director: " + (compilation.plan.title.empty() ? compilation.plan.id
                                                                                          : compilation.plan.title)));

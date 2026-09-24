@@ -19,8 +19,8 @@
 //   events       `seq::TriggerKind` and `seq::EventActionKind`, with the tier each belongs to taken
 //                from `triggerIsScheduled` / `actionIsBaked` -- the predicates the engine itself uses
 //
-// Effects are not here yet: they are being replaced by ADR-702's effect-instance model, and a
-// catalogue built on the old two lists would be deleted with them.
+//   effects      `world::effectSchemas()` (types, the owners each may attach to, their fields) and the
+//                composition's effect list (ADR-702's instances, by id and owner)
 //
 // Semantic activity names ("run", "jump", "land") are the interface; clip names are carried as
 // information and never as the thing a plan asks for (spec §10).
@@ -127,6 +127,32 @@ struct EventCatalog {
     [[nodiscard]] nlohmann::json toJson() const;
 };
 
+// The effect vocabulary (ADR-702): every type the registry declares, and every instance the scene
+// has. Read from `world::effectSchemas()` and the composition's one effect list -- never listed.
+struct EffectTypeCapability {
+    std::string type;                 // the serialised key: "groundPulse"
+    std::string displayName;          // "Ground Pulse"
+    std::string category;
+    std::string stage;                // where in the frame it is drawn
+    std::vector<std::string> owners;  // the owner kinds it may attach to: "world", "entity", ...
+    std::vector<std::string> fields;  // parameter leaves under fx/<id>/ ("intensity", ...)
+};
+struct EffectInstanceCapability {
+    std::string id;                   // "umbra-cap-hero-pulse": the fx/<id>/ prefix
+    std::string type;
+    std::string name;
+    std::string ownerKind;            // "world" | "entity" | "camera" | "light"
+    std::string owner;                // empty for the world
+    std::string activation;           // "always" | "window" | "cameraTravel" | "heroFocus"
+    bool enabled = true;
+};
+struct EffectCatalog {
+    std::vector<EffectTypeCapability> types;
+    std::vector<EffectInstanceCapability> instances;
+    [[nodiscard]] const EffectTypeCapability* type(std::string_view key) const;
+    [[nodiscard]] nlohmann::json toJson() const;
+};
+
 class CapabilityRegistry {
 public:
     // Reads everything from the composition as it is now (its entities, its loaded rigs, its
@@ -141,12 +167,14 @@ public:
     [[nodiscard]] const CharacterCard* character(std::string_view subject) const;
     [[nodiscard]] const CameraCatalog& cameras() const { return cameras_; }
     [[nodiscard]] const EventCatalog& events() const { return events_; }
+    [[nodiscard]] const EffectCatalog& effects() const { return effects_; }
     [[nodiscard]] nlohmann::json toJson() const;
 
 private:
     std::vector<CharacterCard> characters_;
     CameraCatalog cameras_;
     EventCatalog events_;
+    EffectCatalog effects_;
 };
 
 } // namespace avgen::directing

@@ -12,6 +12,7 @@
 #include "directing/time_ref.hpp"
 #include "scene/camera_rig.hpp"
 #include "seq/sequence.hpp"
+#include "world/effects/effect_instance.hpp"
 
 #include <glm/glm.hpp>
 
@@ -33,13 +34,20 @@ struct Place {
     float preferredCameraDistance = 0.0f;
 };
 
+// The content a plan compiles into: copies of the sequence, the camera collection and the effect
+// list. What `produced` refers to, and what an apply installs.
+struct Staging {
+    seq::Sequence sequence;
+    scene::CameraDirection cameras;
+    std::vector<world::EffectInstance> effects; // captured: every slider's base in the instance
+};
+
 struct SceneFacts {
     CapabilityRegistry capabilities;
     SubjectIndex subjects;
     MusicalContext music;
     std::vector<Place> places;
-    seq::Sequence sequence;           // staging copy
-    scene::CameraDirection cameras;   // staging copy
+    Staging staged;                   // copies of what exists now; a dry run compiles into these
     std::vector<Plan> plans;          // the project's plans, for revisions and provenance
     // Parameters the author has keys on (timeline tracks the sequence does not own). A baked cue
     // takes ownership of its parameter at install and would erase them (ADR-752's finding).

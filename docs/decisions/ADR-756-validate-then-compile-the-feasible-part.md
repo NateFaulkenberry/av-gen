@@ -109,3 +109,37 @@ The benchmark against spec §34, on Glowmere Valley 2 multicam:
 | 13: wait for approval | Slice 1.5 |
 
 Proven red: whole-item keeping, Add-mode cues, and blocked dependencies.
+
+## Addendum (2026-09-24): effect cues, after ADR-702 merged
+
+**Resolution.** A cue's `EffectRef {id?, owner, type}` resolves against the staged effect list
+(`resolveEffect`):
+- the owner is the world, or a subject's node (ADR-702's Entity owner);
+- the type must exist and be allowed on that owner, otherwise `CAPABILITY_UNAVAILABLE`, naming the
+  owners it allows;
+- several instances are `AMBIGUOUS_REFERENCE`;
+- none means "make one from the type's factory".
+
+Per the owner's ruling, "the Umbra hero effect" resolves to `umbra-cap-hero-pulse`.
+
+**Activation** (a cue with no `field`) compiles to a **second instance**: a copy of the owner's
+instance (or the type's defaults when there is none), activated in a `Window` on the transport
+clock at the cue's time for its hold. The owner's own instance keeps its activation, so Umbra's
+pulse still fires on hero focus. Reasons for this choice:
+- ADR-702 allows several instances of one type on one owner;
+- the transport clock makes the window deterministic;
+- the copy is editable in the Effects section like any other instance.
+
+The alternative, re-timing the existing instance, would have destroyed an authored behaviour.
+
+**A field cue** compiles to the same baked Add event as a parameter cue, on `fx/<id>/<leaf>`. The
+leaf must be one of the type's fields and a single number.
+
+**The effect list is part of the staging copy.** `Staging {sequence, cameras, effects}` is shared
+by `SceneFacts`, `Compilation` and `contentOf`, and `applyCompilation` installs the effects only
+when they changed.
+
+**Fingerprints are of content as installed.** Installing is not the identity: an effect's window
+start becomes a float parameter (118.645 s becomes 118.64499… s). A fingerprint of the compiled
+value made the reloaded project's next revision read the plan's own effect as a hand edit. This
+was caught by the effect round-trip test, and proven red by reverting it.

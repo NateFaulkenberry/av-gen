@@ -64,3 +64,13 @@ behaviour. Nothing in it is a list somebody maintains:
   `EffectSchema` type registry, keyed by instance id and owner.
 - The boundary test scans `src/directing/` for `#include "ai/` and for AI vendor names as whole
   words ("playable" contains "laya").
+
+## Addendum (2026-09-24, after ADR-702 merged)
+
+The registry now has an **effect catalogue**, read from `world::effectSchemas()`:
+- types: key, display name, category, render stage, the owner kinds each may attach to, and
+  non-hidden field leaves;
+- instances: the composition's one effect list, by id, owner and activation.
+
+On the benchmark: 16 types; `aurora` attaches only to the world; `groundPulse` attaches to
+entities; `umbra-cap-hero-pulse` is a `groundPulse` owned by `umbra-cap`, activated on `heroFocus`.
