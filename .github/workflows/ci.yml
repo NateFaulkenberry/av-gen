@@ -1,7 +1,10 @@
 # AV Gen CI: the authoritative full regression run. docs/development/ci.md explains every job.
 #
-#   push (any branch) ─▶ build (Release) ─┬─▶ cpu-tests  (avgen_tests, full default set, 3 shards)
-#                                         ├─▶ gpu-tests  (avgen_render_tests + headless smoke)
+#   push (any branch) ─▶ build (Release) ─┬─▶ cpu-tests  (avgen_tests, full default set, 3 shards)  GATES
+#                                         ├─▶ gpu-tests  (avgen_render_tests + headless smoke)    INFORMATIONAL,
+#                                         │              main / nightly / dispatch only: the hosted VM's
+#                                         │              paravirtual Metal device cannot compile the
+#                                         │              renderer's pipelines (docs/development/ci.md, GPU)
 #                                         └─▶ report     (the "# AV Gen CI" run summary)
 #
 # ASan/UBSan and TSan live in sanitizers.yml (too slow for every push; see the doc).
@@ -14,8 +17,14 @@ on:
     # test_material_program parses docs/procedural-materials.md). Put [skip ci] in a commit message
     # to skip a run you know is pointless.
   pull_request:
+  schedule:
+    - cron: "43 6 * * *"   # nightly full run on main, including the informational GPU job
   workflow_dispatch:
     inputs:
+      gpu:
+        description: "Also run the informational GPU job (hosted GPU is not authoritative)"
+        type: boolean
+        default: true
       test_filter:
         description: "Catch2 tag filter for BOTH binaries, e.g. [ai] (empty = the full suite). Tags only: a name with a comma splits into two specs."
         required: false
@@ -144,7 +153,8 @@ jobs:
         run: |
           chmod +x build/release/bin/*
           args=(--binary build/release/bin/avgen_tests --name cpu --label "CPU suite (avgen_tests)"
-                --out "$RESULTS/cpu" --shards 3 --timeout-min 100)
+                --out "$RESULTS/cpu" --shards 3 --timeout-min 100
+                --exceptions tools/ci/hosted-runner-exceptions.txt)
           [ -n "$RNG_SEED" ] && args+=(--seed "$RNG_SEED")
           [ -n "$TEST_FILTER" ] && args+=(--filter "$TEST_FILTER" --expected-label "FILTERED $TEST_FILTER: not the full suite")
           python3 tools/ci/catch2_run.py run "${args[@]}"
@@ -160,8 +170,11 @@ jobs:
           retention-days: 14
 
   gpu-tests:
-    name: GPU tests (avgen_render_tests)
+    name: GPU tests (informational)
     needs: build
+    # Not on branch pushes: 363 of 443 cases fail on the hosted VM's GPU for reasons unrelated to
+    # the change under test, so it would add ~15 minutes of wall time to every run for no verdict.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gpu)
     runs-on: macos-26
     timeout-minutes: 90
     steps:
@@ -179,7 +192,9 @@ jobs:
         run: |
           chmod +x build/release/bin/*
           args=(--binary build/release/bin/avgen_render_tests --name gpu --label "GPU suite (avgen_render_tests)"
-                --out "$RESULTS/gpu" --shards 1 --timeout-min 75)
+                --out "$RESULTS/gpu" --shards 1 --timeout-min 75 --report-only
+                --exceptions tools/ci/hosted-runner-exceptions.txt
+                --expected-label "INFORMATIONAL: hosted VM GPU (Apple Paravirtual device) is not authoritative")
           [ -n "$RNG_SEED" ] && args+=(--seed "$RNG_SEED")
           [ -n "$TEST_FILTER" ] && args+=(--filter "$TEST_FILTER" --expected-label "FILTERED $TEST_FILTER: not the full suite")
           python3 tools/ci/catch2_run.py run "${args[@]}"
@@ -195,9 +210,8 @@ jobs:
           if [ $rc -eq 0 ] && [ -s "$RESULTS/gpu/headless-smoke.png" ]; then
             echo "### Headless smoke (avgen --headless, 1 frame): PASS" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### Headless smoke (avgen --headless, 1 frame): FAIL (exit $rc)" >> "$GITHUB_STEP_SUMMARY"
-            echo "::error title=Headless smoke FAILED::avgen --headless exited $rc; see headless-smoke.log in test-results-gpu"
-            exit 1
+            echo "### Headless smoke (avgen --headless, 1 frame): FAIL (exit $rc), informational like the rest of this job" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Headless smoke failed (informational)::avgen --headless exited $rc; see headless-smoke.log in test-results-gpu"
           fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -235,7 +249,7 @@ jobs:
           cat > jobs.json <<EOF
           {"Build (Release)": "${{ needs.build.result }}",
            "CPU tests (avgen_tests, full)": "${{ needs.cpu-tests.result }}",
-           "GPU tests (avgen_render_tests)": "${{ needs.gpu-tests.result }}",
-           "ASan/UBSan": "not in this workflow: see the Sanitizers workflow (nightly, dispatch)"}
+           "GPU tests (informational, not gating)": "${{ needs.gpu-tests.result == 'skipped' && 'not run: branch push (runs on main, nightly and dispatch; hosted GPU is not authoritative)' || needs.gpu-tests.result }}",
+           "ASan/UBSan": "not in this workflow: Sanitizers workflow (nightly on main, or gh workflow run sanitizers.yml)"}
           EOF
           python3 tools/ci/catch2_run.py report --results-dir results --job-results jobs.json

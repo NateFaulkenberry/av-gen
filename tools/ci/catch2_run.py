@@ -62,6 +62,32 @@ def list_case_count(binary: str, filters: list[str]) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def load_exceptions(path: str) -> dict:
+    """tools/ci/hosted-runner-exceptions.txt: {'exclude': {name: reason}, 'needs-assets': {...}}."""
+    out = {"exclude": {}, "needs-assets": {}}
+    if not path:
+        return out
+    for raw in Path(path).read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        kind, name, reason = (part.strip() for part in line.split("|", 2))
+        if kind not in out:
+            raise SystemExit(f"{path}: unknown kind '{kind}' in: {raw}")
+        if "," in name or '"' in name:
+            raise SystemExit(f"{path}: '{name}' has a comma or quote; Catch2 would split it (testing.md 14)")
+        out[kind][name] = reason
+    return out
+
+
+def build_spec(user_filter: str, excluded: list[str]) -> list[str]:
+    """One Catch2 spec: the user's OR-ed tag terms, each AND-ed with every exclusion."""
+    neg = "".join(f'~"{n}"' for n in excluded)
+    if not user_filter:
+        return [neg] if neg else []
+    return [",".join(term + neg for term in user_filter.split(","))]
+
+
 def run_shards(args) -> list[dict]:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -69,7 +95,7 @@ def run_shards(args) -> list[dict]:
     for i in range(args.shards):
         tmp = out / f"tmp-{i}"
         tmp.mkdir(exist_ok=True)
-        cmd = [args.binary, *args.filter,
+        cmd = [args.binary, *args.spec,
                "--rng-seed", str(args.seed),
                "--reporter", f"console::out={out}/shard-{i}.console.txt::colour-mode=none",
                "--reporter", f"xml::out={out}/shard-{i}.xml",
@@ -220,12 +246,17 @@ def signal_name(rc: int) -> str:
 
 
 def summarise(name: str, binary: str, listed: int | None, shard_status: list[dict], out: Path,
-              label: str, seed: int, expected_label: str) -> dict:
+              label: str, seed: int, expected_label: str, exceptions: dict | None = None,
+              excluded: list[str] | None = None) -> dict:
+    exceptions = exceptions or {"exclude": {}, "needs-assets": {}}
+    known = exceptions["needs-assets"]
+    asset_failures, stale = [], []
     counts = Counter()
     failures, crashes, timeouts = [], [], []
     expected_failures, skip_reasons, slowest = [], Counter(), []
     san_reports = []
     cases_seen = 0
+    asset_failures_by_shard: dict[int, int] = {}
     for st in shard_status:
         i = st["index"]
         x = parse_xml(out / f"shard-{i}.xml")
@@ -233,7 +264,14 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
         for case in x["cases"]:
             cases_seen += 1
             slowest.append((case.get("seconds", 0.0), case["name"]))
-            if not case.get("success", False):
+            if not case.get("success", False) and case["name"] in known:
+                # Ran, failed, and is documented as needing gitignored assets: reported, never
+                # counted as passed, and does not fail the job.
+                counts["needs_assets"] += 1
+                asset_failures.append({"name": case["name"], "reason": known[case["name"]],
+                                       "file": case["file"], "line": case["line"]})
+                asset_failures_by_shard[i] = asset_failures_by_shard.get(i, 0) + 1
+            elif not case.get("success", False):
                 counts["failed"] += 1
                 failures.append({**case, "shard": i})
             elif case["problems"]:
@@ -247,6 +285,8 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
                     skip_reasons[normalise_skip(msg)] += 1
             else:
                 counts["passed"] += 1
+                if case["name"] in known:
+                    stale.append(case["name"])
         san_reports += [{**r, "shard": i} for r in log["sanitizer_reports"]]
         rc = st["returncode"]
         where = x["open_case"]["name"] if x["open_case"] else None
@@ -284,7 +324,8 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
                              "selection is a mistake, not a pass")
     ok = (counts["failed"] == 0 and not crashes and not timeouts and not san_reports
           and not disagreements and (unexercised is None or unexercised == 0)
-          and all(st["returncode"] == 0 for st in shard_status))
+          and all(st["returncode"] == 0 or shard_explained(st, asset_failures_by_shard.get(st["index"], 0))
+                  for st in shard_status))
     slowest.sort(reverse=True)
     result = {
         "name": name, "label": label, "binary": binary, "ok": ok, "rng_seed": seed,
@@ -299,10 +340,23 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
         "crashes": crashes, "timeouts": timeouts, "sanitizer_reports": san_reports[:20],
         "sanitizer_reports_total": len(san_reports), "disagreements": disagreements,
         "slowest": [{"seconds": round(s, 1), "name": n} for s, n in slowest[:10]],
+        "needs_assets": counts["needs_assets"], "needs_assets_failures": asset_failures,
+        "needs_assets_stale": stale,
+        "excluded": [{"name": n, "reason": exceptions["exclude"].get(n, "")} for n in (excluded or [])],
     }
     (out / "result.json").write_text(json.dumps(result, indent=2))
     (out / "summary.md").write_text(render_binary_md(result, level=2))
     return result
+
+
+def shard_explained(st: dict, known_failed: int) -> bool:
+    """A shard's non-zero exit is fully explained when Catch2 exits with exactly the number of
+    failed cases and every one of them is a documented needs-assets case. Anything else -- a
+    signal, a timeout, a different count -- is not explained."""
+    t = st.get("catch2_totals")
+    # Catch2 v3 exits 42 (TestFailureExitCode) when any assertion failed, whatever the count.
+    return (st["returncode"] == 42 and not st["timed_out"] and t is not None
+            and t["failures"] == known_failed and known_failed > 0)
 
 
 def normalise_skip(msg: str) -> str:
@@ -325,6 +379,12 @@ def md_escape(s: str) -> str:
 
 
 def verdict(r: dict) -> str:
+    if r.get("report_only"):
+        return "INFORMATIONAL (" + _verdict(r) + ", does not gate)"
+    return _verdict(r)
+
+
+def _verdict(r: dict) -> str:
     if r["ok"]:
         return "PASS"
     if r["sanitizer_reports_total"]:
@@ -341,11 +401,14 @@ def render_binary_md(r: dict, level: int = 2) -> str:
     L = [f"{h} {r['label']}: {verdict(r)}", ""]
     L.append(f"`{r['binary']}` · rng-seed `{r['rng_seed']}` · {len(r['shards'])} shard(s)")
     L.append("")
-    L.append("| Passed | Failed | Skipped | Expected failures | Ran / listed | Duration |")
-    L.append("|---:|---:|---:|---:|---:|---:|")
-    L.append(f"| {r['passed']} | {r['failed']} | {r['skipped']} | {r['expected_failures']} | "
-             f"{r['ran']} / {r['listed'] if r['listed'] is not None else '?'} | {fmt_seconds(r['seconds'])} |")
+    L.append("| Passed | Failed | Skipped | Failed: needs local assets | Expected failures | Excluded | Ran / listed | Duration |")
+    L.append("|---:|---:|---:|---:|---:|---:|---:|---:|")
+    L.append(f"| {r['passed']} | {r['failed']} | {r['skipped']} | {r.get('needs_assets', 0)} | {r['expected_failures']} | "
+             f"{len(r.get('excluded', []))} | {r['ran']} / {r['listed'] if r['listed'] is not None else '?'} | {fmt_seconds(r['seconds'])} |")
     L.append("")
+    if r.get("expected_label"):
+        L.append(f"**{r['expected_label']}**")
+        L.append("")
     if r["unexercised"]:
         L.append(f"**{r['unexercised']} listed cases never ran** (a crash, timeout or shard error "
                  f"stopped them). They are neither passed nor skipped.")
@@ -396,6 +459,21 @@ def render_binary_md(r: dict, level: int = 2) -> str:
         if r["failures_total"] > len(r["failures"]):
             rest = r["failure_names"][len(r["failures"]):]
             L.append(f"...and {len(rest)} more: " + ", ".join(f"`{n}`" for n in rest[:50]))
+        L.append("")
+    if r.get("needs_assets_failures"):
+        L.append(f"<details><summary><b>{len(r['needs_assets_failures'])} cases failed because gitignored "
+                 f"assets are absent on the runner</b> (tools/ci/hosted-runner-exceptions.txt). Not a pass: "
+                 f"CI proves nothing about them.</summary>\n")
+        for a in r["needs_assets_failures"]:
+            L.append(f"- `{md_escape(a['name'])}` ({md_escape(a['reason'])}) `{rel(a['file'])}:{a['line']}`")
+        L.append("\n</details>\n")
+    if r.get("needs_assets_stale"):
+        L.append("Listed as needs-assets but PASSED here (remove from the exceptions file): "
+                 + ", ".join(f"`{n}`" for n in r["needs_assets_stale"]))
+        L.append("")
+    if r.get("excluded"):
+        L.append("Excluded from this run (tools/ci/hosted-runner-exceptions.txt): "
+                 + "; ".join(f"`{e['name']}` ({md_escape(e['reason'])})" for e in r["excluded"]))
         L.append("")
     if r["expected_failures"]:
         L.append(f"Expected failures (`[!shouldfail]`/`[!mayfail]`, not failures): "
@@ -452,6 +530,7 @@ def print_console(r: dict, out: Path) -> None:
     """What lands in the Actions log (and so in `gh run view --log-failed`)."""
     print(f"\n===== {r['label']}: {verdict(r)} =====")
     print(f"passed {r['passed']}  failed {r['failed']}  skipped {r['skipped']}  "
+          f"needs-assets-failed {r.get('needs_assets', 0)}  excluded {len(r.get('excluded', []))}  "
           f"expected-failures {r['expected_failures']}  ran {r['ran']}/{r['listed']}  "
           f"{fmt_seconds(r['seconds'])}")
     for f in r["failures"]:
@@ -475,12 +554,30 @@ def print_console(r: dict, out: Path) -> None:
 
 
 def cmd_run(args) -> int:
-    args.filter = [args.filter] if args.filter else []
-    listed = list_case_count(args.binary, args.filter)
-    print(f"[catch2_run] {args.binary} lists {listed} cases for filter {args.filter or '(default set)'}")
+    exceptions = load_exceptions(args.exceptions)
+    # Only exclusions that name a case which exists; a stale one is reported, not silently kept.
+    excluded = []
+    for name in exceptions["exclude"]:
+        n = list_case_count(args.binary, [f'"{name}"'])
+        if n == 1:
+            excluded.append(name)
+        else:
+            print(f"::warning title=Stale exclusion::'{name}' matches {n} cases in {args.binary}")
+    args.spec = build_spec(args.filter, excluded)
+    base = list_case_count(args.binary, build_spec(args.filter, []))
+    listed = list_case_count(args.binary, args.spec)
+    print(f"[catch2_run] {args.binary}: {base} cases selected by {args.filter or '(default set)'}, "
+          f"{listed} after {len(excluded)} documented exclusion(s)")
+    if base is not None and listed is not None and base - listed != len(excluded):
+        # The selector could not report a miss (testing.md 14): refuse rather than under-measure.
+        print(f"::error title=Exclusion arithmetic::{base} - {len(excluded)} != {listed}; refusing to run")
+        return 2
     statuses = run_shards(args)
     r = summarise(args.name, args.binary, listed, statuses, Path(args.out), args.label, args.seed,
-                  args.expected_label)
+                  args.expected_label, exceptions, excluded)
+    r["report_only"] = args.report_only
+    (Path(args.out) / "result.json").write_text(json.dumps(r, indent=2))
+    (Path(args.out) / "summary.md").write_text(render_binary_md(r, level=2))
     print_console(r, Path(args.out))
     annotate(r)
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -519,17 +616,25 @@ def cmd_report(args) -> int:
     L.append("## Tests")
     L.append("")
     if results:
-        L.append("| Suite | Result | Passed | Failed | Skipped | Expected fail | Ran / listed | Duration |")
-        L.append("|---|---|---:|---:|---:|---:|---:|---:|")
+        L.append("| Suite | Result | Passed | Failed | Skipped | Failed: needs assets | Expected fail | Excluded | Ran / listed | Duration |")
+        L.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
         for r in results:
             label = r["label"] + (f" ({r['expected_label']})" if r.get("expected_label") else "")
             L.append(f"| {label} | **{verdict(r)}** | {r['passed']} | {r['failed']} | {r['skipped']} | "
-                     f"{r['expected_failures']} | {r['ran']} / {r['listed']} | {fmt_seconds(r['seconds'])} |")
+                     f"{r.get('needs_assets', 0)} | {r['expected_failures']} | {len(r.get('excluded', []))} | "
+                     f"{r['ran']} / {r['listed']} | {fmt_seconds(r['seconds'])} |")
         L.append("")
         for r in results:
             if r["skipped"]:
                 top = "; ".join(f"{n}× {reason}" for reason, n in r["skip_reasons"][:4])
                 L.append(f"- **{r['label']}: {r['skipped']} skipped** — {md_escape(top)}")
+            if r.get("needs_assets"):
+                L.append(f"- **{r['label']}: {r['needs_assets']} failed for lack of gitignored assets** "
+                         f"(documented; not a pass). Plus ~55 cases that pass without asserting when "
+                         f"assets/aliens is absent: see docs/development/ci.md, Coverage gaps.")
+            if r.get("report_only"):
+                L.append(f"- **{r['label']} is informational on hosted runners**: its result does not "
+                         f"gate the run. See docs/development/ci.md, GPU.")
         L.append("")
     else:
         L.append("No test results were produced (the build or an earlier step failed).")
@@ -580,6 +685,7 @@ def main() -> int:
                    help="ONE Catch2 test spec, e.g. '~[golden]'. Tags only: a name with a comma splits.")
     r.add_argument("--expected-label", default="", help="caveat shown beside the suite name")
     r.add_argument("--report-only", action="store_true")
+    r.add_argument("--exceptions", default="", help="tools/ci/hosted-runner-exceptions.txt")
     r.add_argument("--cwd", default="")
     rp = sub.add_parser("report")
     rp.add_argument("--results-dir", required=True)
