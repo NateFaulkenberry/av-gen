@@ -1094,7 +1094,7 @@ void addFieldNode(NodeRegistry& registry, const char* type, const char* label, s
 void registerFields(NodeRegistry& registry) {
     addFieldNode(registry, "fields/scalar", "Scalar Field",
                  {"constant", "linearGradient", "radial", "box", "sphere", "plane", "noise", "voronoi",
-                  "distance", "sdfDistance"},
+                  "distance"},
                  2, {}, "A scalar field named after the node.");
     addFieldNode(registry, "fields/vector", "Vector Field",
                  {"direction", "radialVector", "attractor", "repulsor", "vortex", "curlNoise", "spiral"}, 1,

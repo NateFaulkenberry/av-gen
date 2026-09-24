@@ -52,7 +52,6 @@ TEST_CASE("Field enum names round trip", "[spatial][fields]") {
         CHECK(fieldKindFromName(fieldKindName(kind)) == kind);
     }
     CHECK(fieldKindName(FieldKind::LinearGradient) == std::string("linearGradient"));
-    CHECK(fieldKindName(FieldKind::SdfDistance) == std::string("sdfDistance"));
     CHECK(fieldKindName(FieldKind::CurlNoise) == std::string("curlNoise"));
     CHECK(fieldKindName(FieldKind::WaveVector) == std::string("waveVector"));
     CHECK_FALSE(fieldKindFromName("Radial").has_value());
@@ -218,36 +217,20 @@ TEST_CASE("Scalar field kinds sample the documented shapes", "[spatial][fields]"
     CHECK(sampleScalar(dist, {2.0f, 0.0f, 1.0f}, 0.0) == 0.5f);
     CHECK(sampleScalar(dist, {9.0f, 0.0f, 1.0f}, 0.0) == 1.0f);
 
-    // ADR-576: this used to CERTIFY the silent zero -- `sampleScalar` returning 0 for a kind a
-    // scene could select, asserted as correct. The zero is still the value of the unbound arm and
-    // still defined, because a field built in code and never validated has to land somewhere; what
-    // changed is that no scene can reach it, and the case below is the one that says so.
-    FieldSpec sdf = make(FieldKind::SdfDistance);
-    sdf.reference = "blob";
-    CHECK(sampleScalar(sdf, p, 0.0) == 0.0f);
-    CHECK_FALSE(sdf.validate().has_value());
 }
 
-TEST_CASE("a declared kind that evaluates to nothing is refused, not answered with silence",
-          "[spatial][fields]") {
-    // ADR-576. `sdfDistance` is declared, documented, selectable, and returns 0 on the CPU and 0
-    // on the GPU. A density field using it gives the volumetric march a density of zero -- no fog
-    // at all -- and the author gets an empty sky with nothing to read. That is the same harm as an
-    // unreachable control: **the system answering a question with silence instead of an error.**
-    //
-    // Two things are asserted and the second is the one with teeth. Delete the branch in
-    // `FieldSpec::validate` and both fail.
+TEST_CASE("a file naming the removed sdfDistance kind is refused by name", "[spatial][fields]") {
+    // ADR-704 removed `SdfDistance` (ADR-576 had refused it at load; the owner ruled it out). A
+    // file that still names it must not load as some other kind: it is an unknown kind, and the
+    // message names the key so the author can find the field.
     const nlohmann::json doc{{"name", "blob"}, {"kind", "sdfDistance"}, {"reference", "rock"}};
     const auto loaded = spatial::FieldSpec::fromJson(doc);
     REQUIRE_FALSE(loaded.has_value());
-    // The message has to NAME the kind, or a scene author reading a log still does not know which
-    // of their fields to look at. A refusal nobody can act on is a quieter silence.
     INFO(loaded.error().message);
     CHECK(loaded.error().message.find("sdfDistance") != std::string::npos);
-    CHECK(loaded.error().message.find("blob") != std::string::npos);
+    CHECK_FALSE(spatial::fieldKindFromName("sdfDistance").has_value());
 
-    // THE CONTROL: a neighbouring kind with the same shape of spec still loads, so the refusal is
-    // aimed at the unimplemented kind and not at anything that happens to carry a `reference`.
+    // THE CONTROL: a neighbouring kind with the same shape of spec still loads.
     const nlohmann::json grid{{"name", "smoke"}, {"kind", "grid"}, {"reference", "sim"}};
     CHECK(spatial::FieldSpec::fromJson(grid).has_value());
 }
@@ -846,14 +829,9 @@ TEST_CASE("FieldSpec JSON round trip, structural hash and validation", "[spatial
     m.children = {"gust"};
     CHECK_FALSE(m.validate().has_value());
     m = f;
-    m.kind = FieldKind::SdfDistance;
+    m.kind = FieldKind::Grid;
     m.reference.clear();
-    CHECK_FALSE(m.validate().has_value());
-    // ADR-576: and WITH a reference too. This line used to pass because the reference was empty;
-    // the kind is refused outright now, and the difference matters -- the old assertion would go
-    // on passing if the refusal were removed and the reference check left behind.
-    m.reference = "rock";
-    CHECK_FALSE(m.validate().has_value());
+    CHECK_FALSE(m.validate().has_value()); // a grid field needs the name of its grid
     CHECK_FALSE(FieldSpec::fromJson(nlohmann::json{{"name", "x"}, {"kind", "nope"}}).has_value());
     CHECK_FALSE(FieldSpec::fromJson(nlohmann::json{{"name", "x"}, {"falloff", 3}}).has_value());
     CHECK_FALSE(FieldSpec::fromJson(nlohmann::json{{"name", "x"}, {"children", "a"}}).has_value());
