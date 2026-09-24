@@ -301,20 +301,35 @@ Result<std::string> ownerSignalPrefix(const EffectOwner& owner) {
 Result<std::vector<params::ModRoute>> defaultEffectRoutes(const EffectInstance& effect) {
     std::vector<params::ModRoute> routes = defaultEffectRoutes(effect.id, effect.kind);
     std::optional<Result<std::string>> prefix; // resolved once, and only if some route asks
+    std::vector<params::ModRoute> out;
+    out.reserve(routes.size());
+    std::size_t skipped = 0;
     for (params::ModRoute& r : routes) {
-        if (!r.source.starts_with(kOwnerSignalPrefix)) {
-            continue;
+        if (r.source.starts_with(kOwnerSignalPrefix)) {
+            if (!prefix.has_value()) {
+                prefix = ownerSignalPrefix(effect.owner);
+            }
+            if (!prefix->has_value()) {
+                // A DEFAULT that reads the owner's motion means nothing on an owner with no motion
+                // (a Space Warp placed on the World has no speed). It is left out, and the rest of
+                // the type's defaults still attach: refusing the whole set would leave a valid,
+                // menu-added effect silent and put a warning in front of somebody who did nothing
+                // wrong. An author who routes `owner.` by hand on such an owner is refused by the
+                // route binder like any other unknown source.
+                ++skipped;
+                continue;
+            }
+            r.source = **prefix + r.source.substr(kOwnerSignalPrefix.size());
         }
-        if (!prefix.has_value()) {
-            prefix = ownerSignalPrefix(effect.owner);
-        }
-        if (!prefix->has_value()) {
-            return fail("effect '{}': default route '{}' -> '{}' is refused: {}", effect.id, r.source,
-                        r.target, prefix->error().message);
-        }
-        r.source = **prefix + r.source.substr(kOwnerSignalPrefix.size());
+        out.push_back(std::move(r));
     }
-    return routes;
+    if (out.empty() && skipped > 0) {
+        // Every default this type has reads its owner, and this owner has nothing to read: say so,
+        // rather than returning an empty list that looks like a type with no defaults.
+        return fail("effect '{}': every default route reads `owner.`, and {}", effect.id,
+                    prefix->error().message);
+    }
+    return out;
 }
 
 std::size_t renameEntitySignalSources(std::vector<params::ModRoute>& routes, std::string_view from,

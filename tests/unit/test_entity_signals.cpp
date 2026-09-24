@@ -140,7 +140,7 @@ TEST_CASE("entity.<name>.speed at a late second is the same played and scrubbed"
     }
 }
 
-TEST_CASE("owner.speed resolves to the owner's signal, and a World owner refuses it by name",
+TEST_CASE("owner.speed resolves to the owner's signal, and a World owner leaves it out",
           "[signals][effects][modulation]") {
     world::EffectInstance entityOwned = trailOn("craft");
     auto routes = world::defaultEffectRoutes(entityOwned);
@@ -161,12 +161,26 @@ TEST_CASE("owner.speed resolves to the owner's signal, and a World owner refuses
     }
     CHECK(raw);
 
+    // A type that may be World-owned and whose defaults include `owner.` (Space Warp: owner.speed
+    // and beat.pulse onto strength): on the World the owner route is left out and the rest attach.
+    world::EffectInstance warp = world::makeEffect(world::EffectKind::SpaceWarp, "Warp");
+    warp.owner = world::EffectOwner::world();
+    const auto kept = world::defaultEffectRoutes(warp);
+    REQUIRE(kept.has_value());
+    REQUIRE_FALSE(kept->empty());
+    for (const params::ModRoute& r : *kept) {
+        CHECK_FALSE(r.source.starts_with("owner."));
+        CHECK_FALSE(r.source.starts_with("entity."));
+    }
+
+    // The same rule on the Trail's own defaults (owner.speed -> opacity, audio.treble ->
+    // intensity): its owner route is left out on an owner with no motion, the audio route stays.
     world::EffectInstance worldOwned = entityOwned;
     worldOwned.owner = world::EffectOwner::world();
-    const auto refused = world::defaultEffectRoutes(worldOwned);
-    REQUIRE_FALSE(refused.has_value());
-    CHECK_THAT(refused.error().message, ContainsSubstring("owner.speed"));
-    CHECK_THAT(refused.error().message, ContainsSubstring("World"));
+    const auto trailKept = world::defaultEffectRoutes(worldOwned);
+    REQUIRE(trailKept.has_value());
+    REQUIRE(trailKept->size() == 1);
+    CHECK(trailKept->front().source == "audio.treble");
 
     // A type whose routes never say `owner.` is unaffected by its owner being the World.
     world::EffectInstance aurora = world::makeEffect(world::EffectKind::Aurora, "Aurora");
