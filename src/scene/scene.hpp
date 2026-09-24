@@ -18,6 +18,7 @@
 #include "spatial/spline.hpp"
 #include "world/atmospherics.hpp"
 #include "world/wave_effect.hpp"
+#include "world/effects/ribbon_frame.hpp"
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
@@ -106,6 +107,9 @@ struct Scene {
     //                  RenderStage::Volumetric -- placed media (`atmospherics.media`), in the march
     world::WaveFrame waves;
     world::AtmosphericFrame atmospherics;
+    //   `ribbons`      RenderStage::Particles  -- ADR-703's camera-facing strips (a Trail), drawn in
+    //                  pass 1's blended section; empty means no draw at all
+    world::RibbonFrame ribbons;
     // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
     // scene with no LOD carries an empty vector, which is every scene that does not ask for it.
     // LOD0 is never in here; see MeshLodChain.
