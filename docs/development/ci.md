@@ -189,12 +189,25 @@ The missing packs:
 Tracked on the runner: `assets/farm`, `assets/imported/{alien,ufo}.gltf`, and the manifests. The
 suite behaves in four ways without the packs (census 2026-09-24):
 
-| Behaviour | Cases | What the summary shows |
+| Behaviour | Cases (run 36066934636) | What the summary shows |
 |---|---|---|
-| explicit `SKIP` | TBD | counted as skipped, grouped by reason under "Skipped cases by reason" |
-| early return that passes having asserted nothing | TBD | counted as **passed**; CI cannot tell. Listed below |
+| explicit `SKIP` | 149 of the CPU suite's skips; almost all are asset skips (e.g. 45× "the Glowmere alien is not present", 18× "glowmere-valley.wav is generated") | counted as skipped, grouped by reason under "Skipped cases by reason" |
+| early return that passes having asserted nothing | 55 (static census) | counted as **passed**; CI cannot tell. Listed below |
 | degraded scene, still asserts something | many | passed, with reduced meaning |
-| fails for lack of the asset | TBD | see below |
+| fails for lack of the asset | 29 | 28 run and are reported as **"Failed: needs local assets"** (not a pass and not gating); 1 is excluded because it segfaults |
+| crashes for lack of the asset | 2 | **excluded** by name; each is named in every summary |
+
+`tools/ci/hosted-runner-exceptions.txt` lists every case in the last three rows, with the asset it
+needs, taken from observed CI failures. A needs-assets case that starts passing is flagged as a
+stale entry. A new failure that is not on the list fails the job, as it should: add it to the
+list only with a run URL showing the asset is the cause.
+
+Two of these are **test defects the runner exposed**, left for the owner:
+
+- `test_body_compensation.cpp:433` calls `nodes().front()` on an empty composition when
+  `alien-scout.glb` is absent, and segfaults instead of failing or skipping.
+- "sequence.get_state reports the music video, not the timeline" (`test_ai_tools.cpp:780`) fails
+  in Release without `night-shift.wav`, and aborts (SIGABRT) in the Debug sanitizer builds.
 
 The pass-without-asserting group has 55 cases, all guarded on `assets/aliens/*.glb`:
 
@@ -210,7 +223,25 @@ The pass-without-asserting group has 55 cases, all guarded on `assets/aliens/*.g
 They WARN or SUCCEED and return. **A green CI run says nothing about those 55 cases.** Run them
 locally with the assets present.
 
-**GPU.** TBD
+**GPU. The hosted runner's GPU is not authoritative.** Verified on run 36060799310:
+
+- Dawn does get an adapter, "Apple Paravirtual device (apple, integrated) via Metal", with no
+  timestamp queries.
+- **363 of 443** `avgen_render_tests` cases fail anyway. `SceneRenderer::init()` fails because Metal
+  rejects compute pipelines (`Error creating pipeline state Compilation failed` for
+  `procedural-effectors`, `procedural-cull-classify` and others).
+- Several parity cases return zeros from the GPU (the fog shader `detail` is 0.0 where the CPU
+  says 0.82).
+- The headless smoke render times out in readback.
+
+This is the VM's paravirtualized Metal (MTLGPUFamilyMac2 only), not the change under test. So:
+
+- The GPU job is labelled **informational**. It never gates the run.
+- It runs on `main`, nightly and on dispatch, and its results are still uploaded and summarised.
+- A branch push shows it as "not run: branch push" in the Jobs table.
+
+**Every GPU verdict still has to come from a real Mac: run `avgen_render_tests` locally.** The
+fix is a self-hosted Apple Silicon runner (see follow-ups).
 
 **Hidden tests.** `[.perf]` and the other hidden tags are not run (see above).
 
