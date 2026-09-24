@@ -33,6 +33,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <cmath>
 #include <cstdlib>
@@ -507,4 +508,36 @@ TEST_CASE("Glowmere Valley 2 multicam: World -> Tornado + Aurora render together
     CHECK(engine.effectStatus("aurora") == world::EffectStatus::Drawn);
     CHECK(engine.effectStatus(tornado) == world::EffectStatus::Drawn);
     CHECK(differingPixels(arms.both, later) > kVisible);
+}
+
+// ADR-702's performance note, measured rather than assumed: the CPU cost of the one evaluator on the
+// migrated film (18 instances: an aurora, a travel beam, 16 hero pulses) against the same film with
+// no effects at all, over the same span of `Engine::update`s. Hidden (`[.perf]`): a wall-clock
+// number is evidence for a document, not a pass/fail gate (docs/testing.md). No GPU is used.
+TEST_CASE("PERF the effect evaluator's CPU cost on the Glowmere film", "[.perf][effects]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
+    const auto run = [&](bool withEffects) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(project).has_value());
+        if (!withEffects) {
+            REQUIRE(engine.setEffects({}).has_value());
+        }
+        engine.setViewport(kWidth, kHeight);
+        for (int i = 0; i < 30; ++i) { // warm up past load-time work
+            engine.update(FrameTime{60.0 + i / 60.0, 1.0 / 60.0, static_cast<std::uint64_t>(3600 + i)});
+        }
+        const auto start = std::chrono::steady_clock::now();
+        constexpr int kFrames = 600;
+        for (int i = 0; i < kFrames; ++i) {
+            const double t = 61.0 + i / 60.0;
+            engine.update(FrameTime{t, 1.0 / 60.0, static_cast<std::uint64_t>(t * 60.0)});
+        }
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+        return ms / kFrames;
+    };
+    const double without = run(false);
+    const double with = run(true);
+    WARN("Engine::update, Glowmere t=61..71 s: " << with << " ms/frame with 18 effects, " << without
+                                               << " ms/frame with none; difference " << (with - without)
+                                               << " ms/frame");
 }
