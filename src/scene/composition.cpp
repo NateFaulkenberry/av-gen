@@ -3492,6 +3492,13 @@ bool Composition::nodeView(std::string_view node, world::NodeView& out) const {
     // draws through its own cloud rather than through entities, so the loop above saw nothing and an
     // effect attached to it had no bounds to fit or to exclude. The procedural's memoised TIGHT pair,
     // exactly as `nodeBounds` reads it (ADR-703: found by Space Warp bending its own saucer).
+    // ADR-703 (FXL): the procedural range, so a lane effect can address the draws that are this
+    // node -- the asset and each of its other material parts (`proceduralSubCount` follow it).
+    if (range.proceduralIndex >= 0 && static_cast<std::size_t>(range.proceduralIndex) < scene_.procedurals.size()) {
+        out.firstProcedural = static_cast<std::uint32_t>(range.proceduralIndex);
+        out.proceduralCount = static_cast<std::uint32_t>(std::min<std::size_t>(
+            range.proceduralSubCount + 1, scene_.procedurals.size() - out.firstProcedural));
+    }
     if (!out.hasBounds && range.proceduralIndex >= 0) {
         const auto first = static_cast<std::size_t>(range.proceduralIndex);
         for (std::size_t p = first; p <= first + range.proceduralSubCount && p < scene_.procedurals.size(); ++p) {

@@ -339,6 +339,10 @@ struct ProceduralRenderer::Impl {
     wgpu::ComputePipeline cullTopPipeline;
     wgpu::ComputePipeline cullScatterPipeline;
     wgpu::Buffer objectUniforms;
+    // ADR-703 (FXL): this renderer's copy of the frame's per-owner effect records, bound at group 1
+    // binding 8 of every object group. Sized for the whole record budget (1 MiB) and never
+    // replaced, so the per-object groups cached across frames never go stale on its account.
+    wgpu::Buffer entityFx;
     wgpu::Buffer fieldBlock;
     wgpu::Buffer splineTable;
     wgpu::Buffer gridTable; // the simulated-grid table fields.wgsl binds at group 0 binding 15
@@ -445,12 +449,17 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         // Group 1: 0 = object uniforms (dynamic offset, 256-byte slots), 1 = instance records
         // (read-only storage), 2 = deformer/time block, 3 = field block, 4 = spline tables,
         // 5 = the LOD level's compacted visible list (ADR-029; inert when the object is not culled).
-        std::array<wgpu::BindGroupLayoutEntry, 8> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 9> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[0].buffer.hasDynamicOffset = true;
         entries[0].buffer.minBindingSize = sizeof(ObjectUniforms);
+        // ADR-703 (FXL): the per-owner effect records, read by `fs_proc` at `entityFx[fxA.w]`.
+        entries[8].binding = 8;
+        entries[8].visibility = wgpu::ShaderStage::Fragment;
+        entries[8].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[8].buffer.minBindingSize = sizeof(world::EntityFxRecord);
         entries[1].binding = 1;
         entries[1].visibility = wgpu::ShaderStage::Vertex;
         entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
@@ -570,6 +579,11 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
         desc.size = static_cast<std::uint64_t>(kMaxProceduralObjects) * kObjectStride;
         im.objectUniforms = device.CreateBuffer(&desc);
+        // A new buffer is zero-filled: record 0 is neutral without an upload.
+        desc.label = "procedural-entity-fx";
+        desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        desc.size = static_cast<std::uint64_t>(world::kMaxEntityFxRecords) * sizeof(world::EntityFxRecord);
+        im.entityFx = device.CreateBuffer(&desc);
     }
     {
         // The inert visible list bound to every uncalled object: never read (fieldInfo.w is 0).
@@ -964,10 +978,13 @@ void ProceduralRenderer::Impl::ensureObjectBuffers(ObjectState& state, std::uint
         // pass's doubled level axis writes (shaders/cull.wgsl `sliceOf`).
         auto drawGroup = [&](const wgpu::Buffer& records, std::uint64_t bytes, std::uint32_t level,
                              std::uint32_t listLevel, const char* label) {
-            std::array<wgpu::BindGroupEntry, 8> entries{};
+            std::array<wgpu::BindGroupEntry, 9> entries{};
             entries[0].binding = 0;
             entries[0].buffer = objectUniforms;
             entries[0].size = sizeof(ObjectUniforms);
+            entries[8].binding = 8;
+            entries[8].buffer = entityFx;
+            entries[8].size = entityFx.GetSize();
             entries[1].binding = 1;
             entries[1].buffer = records;
             entries[1].size = bytes;
@@ -1256,6 +1273,13 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
     im.cullItems.clear();
     im.cullUniformStaging.clear();
     im.passThisFrame = false;
+    // ADR-703 (FXL): the frame's effect records, before any object slot names one. Nothing is
+    // written on a frame with no lane effect: no object's `fxA` points into the buffer then.
+    if (!scene.entityFx.empty()) {
+        const std::size_t count = std::min<std::size_t>(scene.entityFx.records.size(), world::kMaxEntityFxRecords);
+        im.context.queue().WriteBuffer(im.entityFx, 0, scene.entityFx.records.data(),
+                                       count * sizeof(world::EntityFxRecord));
+    }
     im.cullPassThisFrame = false;
     if (!im.initialised) {
         return;
@@ -1908,6 +1932,14 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // whichever entity shared its index.
         obj.ids = glm::vec4(static_cast<float>(scene::packPickId(scene::PickSpace::Procedural, i)),
                             static_cast<float>(i + 1), 1.0f, 0.0f);
+        // ADR-703 (FXL): the owner's effect lanes. Every instance of this object -- and of each of
+        // the asset's other material parts, which the builder maps to the same record -- takes
+        // them; an object no lane effect touches keeps both zero, the shader's early-out.
+        if (const std::uint32_t record = scene.entityFx.recordForProcedural(i);
+            record != 0 && record < scene.entityFx.records.size()) {
+            obj.fxA = scene.entityFx.records[record].lanes[world::kFxLaneA];
+            obj.fxB = scene.entityFx.records[record].lanes[world::kFxLaneB];
+        }
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 

@@ -36,13 +36,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ADR-703: this draw's effect lanes, for `shadeSurface` (pbr_shade.wgsl). A uniform branch: an
     // entity no lane effect touches has `fxA.z == 0`, reads no record, and leaves the lanes zero.
     if (object.fxA.z != 0.0) {
-        let record = u32(object.fxA.w + 0.5);
-        entityFxLanes.a = object.fxA;
-        entityFxLanes.b = object.fxB;
-        entityFxLanes.add = entityFx[record].lanes[2];
-        entityFxLanes.rim = entityFx[record].lanes[3];
-        entityFxLanes.bandAxis = entityFx[record].lanes[4];
-        entityFxLanes.band = entityFx[record].lanes[5];
+        setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
     }
     let shaded = shadeSurface(in.worldPos, in.normal, in.uv, frontFacing, vec3<f32>(1.0), vec3<f32>(1.0),
                               materialInstanceZero(in.localPos), screenUv);
