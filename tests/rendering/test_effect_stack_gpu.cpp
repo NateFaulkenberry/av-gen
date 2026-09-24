@@ -15,6 +15,7 @@
 // assumption ADR-702 §11 names.
 
 #include "app/engine.hpp"
+#include "assets/image.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
@@ -33,6 +34,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -72,13 +75,24 @@ gpu::Image8 render(rendering::SceneRenderer& renderer, const scene::Scene& s, do
     return std::move(*img);
 }
 
+// Pixels that differ VISIBLY: summed over the three channels by more than 24 of 765.
+//
+// Not "any byte differs", and the reason is measured rather than assumed. Switching on the
+// volumetric march for ANY placed medium -- even one entirely behind the camera -- moves up to ~70% of
+// the frame by at most 7 of 255 per channel (mean 1.4), a whole-frame perturbation of the march and
+// its composite that has nothing to do with where the medium is. With an exact comparison the first
+// version of the Glowmere case below passed with a tornado that was not in shot at all: the counts
+// were that perturbation. A contribution a person can see clears this threshold by a wide margin;
+// the perturbation cannot reach it (3 channels x 7 = 21).
 std::size_t differingPixels(const gpu::Image8& a, const gpu::Image8& b) {
     REQUIRE(a.rgba.size() == b.rgba.size());
     std::size_t differ = 0;
     for (std::size_t i = 0; i + 3 < a.rgba.size(); i += 4) {
-        if (a.rgba[i] != b.rgba[i] || a.rgba[i + 1] != b.rgba[i + 1] || a.rgba[i + 2] != b.rgba[i + 2]) {
-            ++differ;
+        int sum = 0;
+        for (int c = 0; c < 3; ++c) {
+            sum += std::abs(static_cast<int>(a.rgba[i + c]) - static_cast<int>(b.rgba[i + c]));
         }
+        differ += sum > 24 ? 1u : 0u;
     }
     return differ;
 }
@@ -90,6 +104,24 @@ constexpr std::size_t kVisible = 40;
 struct Arms {
     gpu::Image8 none, a, b, both;
 };
+
+// Evidence for a person rather than an assertion: with `AVGEN_EFFECT_DUMP` set to a directory, each
+// arm of a four-arm comparison is written there as a PNG, so the pictures the numbers describe can be
+// looked at. Unset (the default, and in CI) it writes nothing.
+void dumpArms(const Arms& arms, const std::string& stem) {
+    const char* dir = std::getenv("AVGEN_EFFECT_DUMP");
+    if (dir == nullptr || dir[0] == '\0') {
+        return;
+    }
+    const auto one = [&](const gpu::Image8& image, const char* arm) {
+        const fs::path path = fs::path(dir) / (stem + "-" + arm + ".png");
+        static_cast<void>(assets::writePng(path, image.width, image.height, image.rgba));
+    };
+    one(arms.none, "none");
+    one(arms.a, "a");
+    one(arms.b, "b");
+    one(arms.both, "both");
+}
 
 // The four-arm requirement, with the numbers in the failure message.
 void requireCoexist(const Arms& arms, const char* nameA, const char* nameB) {
@@ -202,6 +234,7 @@ TEST_CASE("World -> Tornado + Aurora: both are drawn, and each reaches the frame
     CHECK(renderer.stats().auroras == 1);
     CHECK(renderer.stats().volume.media == 1);
 
+    dumpArms(arms, "tornado-aurora");
     requireCoexist(arms, "the aurora", "the tornado");
 
     SECTION("each responds to its own parameters while both are on") {
@@ -326,6 +359,7 @@ TEST_CASE("Two entities, a Ground Pulse each: two instances of one type both rea
     CHECK(status[1] == world::EffectStatus::Drawn);
     // Each ring stands on its own owner, not on a shared origin.
     arms.both = render(renderer, both, 2.5);
+    dumpArms(arms, "two-pulses");
     requireCoexist(arms, "ufo-a's pulse", "ufo-b's pulse");
 }
 
@@ -383,6 +417,7 @@ TEST_CASE("World -> two fog banks: two placed media of one type are both marched
     CHECK(engine.effectStatus(left) == world::EffectStatus::Drawn);
     CHECK(engine.effectStatus(rightId) == world::EffectStatus::Drawn);
     CHECK(renderer.stats().volume.media == 2);
+    dumpArms(arms, "two-fog-banks");
     requireCoexist(arms, "the left bank", "the right bank");
 }
 
@@ -402,7 +437,12 @@ TEST_CASE("Glowmere Valley 2 multicam: World -> Tornado + Aurora render together
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
 
-    constexpr double kSecond = 20.0; // the cut is holding a hero, its pulse is live (checked below)
+    // A second at which this film's camera actually shows sky, found by scanning the film in 6 s
+    // steps with the aurora on and off: at t=20 (where the first version of this case looked) the
+    // aurora moves ONE visible pixel, because the shot is a close-up of a mushroom cap, and the
+    // "coexistence" measured there was the march's whole-frame perturbation (see `differingPixels`).
+    // At t=62 the aurora alone moves ~5,200 of 20,736 pixels. The cut holds a hero here too.
+    constexpr double kSecond = 62.0;
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(project).has_value());
     const scene::Camera camera = sceneAt(engine, kSecond).camera;
@@ -459,6 +499,7 @@ TEST_CASE("Glowmere Valley 2 multicam: World -> Tornado + Aurora render together
     CHECK(drawnPulses == 1);
     CHECK(both.waves.count >= 1);
 
+    dumpArms(arms, "glowmere-tornado-aurora");
     requireCoexist(arms, "the aurora", "the tornado");
 
     // Both animate: a second later the picture has moved, and both are still drawn.
