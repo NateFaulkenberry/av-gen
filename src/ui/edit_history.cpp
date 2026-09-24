@@ -24,8 +24,10 @@ std::size_t EditCommand::touched() const {
                                         ? lights->after.size() - lights->before.size()
                                         : lights->before.size() - lights->after.size(),
                                     1);
+    // An effect edit is one thing to the person who made it -- "Add Aurora", "Move Ground Pulse up"
+    // -- whatever the size of the list it rewrote.
     return params.size() + parents.size() + heroes.size() + added.size() + removed.size() +
-           (timeline != nullptr ? 1 : 0) + lightsTouched;
+           (timeline != nullptr ? 1 : 0) + lightsTouched + (effects != nullptr ? 1 : 0);
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -157,11 +159,29 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         }
     }
 
+    // The effect list (ADR-702), also before the composition check: `Engine::setEffects` owns the
+    // list and writes it through to a composition when there is one, and re-registers the `fx/...`
+    // parameters -- so a ParamChange in the same command lands on the parameters this installed.
+    if (command.effects != nullptr) {
+        const EffectChange& change = *command.effects;
+        if (change.routesTouched) {
+            // Before the list, so the rebind `setEffects` ends with binds the routes that belong
+            // to the list it installs.
+            engine.modulator().routes() = forward ? change.routesAfter : change.routesBefore;
+        }
+        if (auto r = engine.setEffects(forward ? change.after : change.before); !r) {
+            out.problems.push_back(r.error().message);
+        } else {
+            out.effectListsInstalled = 1;
+        }
+    }
+
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
         // Not a failure when the command was the sequencer's: there was nothing here for a
         // composition to do.
-        if ((command.timeline == nullptr && command.lights == nullptr) || !command.params.empty() ||
+        if ((command.timeline == nullptr && command.lights == nullptr && command.effects == nullptr) ||
+            !command.params.empty() ||
             !command.added.empty() || !command.removed.empty() || !command.parents.empty() ||
             !command.heroes.empty()) {
             out.problems.push_back("there is no composition to edit");
