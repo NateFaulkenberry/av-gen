@@ -17,6 +17,7 @@
 #include "spatial/field.hpp"
 #include "spatial/spline.hpp"
 #include "world/atmospherics.hpp"
+#include "world/effects/entity_fx.hpp"
 #include "world/wave_effect.hpp"
 #include "scene/scene_types.hpp"
 
@@ -106,6 +107,9 @@ struct Scene {
     //                  RenderStage::Volumetric -- placed media (`atmospherics.media`), in the march
     world::WaveFrame waves;
     world::AtmosphericFrame atmospherics;
+    //   `entityFx`     RenderStage::Material   -- ADR-703's per-entity lanes (FXL): Glow, Pulse, Bloom
+    //                  Source; `entityFx.lights` is LIGHTMOD's pool (a Glow's spill light)
+    world::EntityFxFrame entityFx;
     // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
     // scene with no LOD carries an empty vector, which is every scene that does not ask for it.
     // LOD0 is never in here; see MeshLodChain.

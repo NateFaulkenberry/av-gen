@@ -29,6 +29,68 @@
 // draw, and a surface fragment has no use for them.
 #include "atmosphere_ground.wgsl"
 
+// ---- ADR-703: per-entity effect lanes (FXL) ------------------------------------------------------
+//
+// Glow, Pulse and Bloom Source reach a surface through these (world/effects/entity_fx.hpp). They are
+// a module-scope PRIVATE variable rather than a read of the `entityFx` buffer because only pbr.wgsl
+// (the entity and skinned pipelines) binds that buffer: procedural.wgsl and sdf_raymarch.wgsl include
+// this file with group-1 layouts of their own, and a function here that named the binding would put
+// it in their pipelines too. pbr.wgsl's `fs_main` fills this before calling `shadeSurface`; every
+// other includer leaves it zero, which is the gate's "off" -- so no includer needs a line for it.
+struct EntityFxLanes {
+    a: vec4<f32>,        // object.fxA: x = gain, y = bloom share, z = flags, w = record index
+    b: vec4<f32>,        // object.fxB: rgb = tint on the material's own emission
+    add: vec4<f32>,      // record lane 2: rgb = added radiance
+    rim: vec4<f32>,      // record lane 3: rgb = rim radiance at grazing, w = rim power
+    bandAxis: vec4<f32>, // record lane 4: u = dot(p, xyz) + w runs 0..1 across the owner
+    band: vec4<f32>,     // record lane 5: x = centre, y = half width, z = waveform, w = depth
+};
+var<private> entityFxLanes: EntityFxLanes;
+
+// One cycle of a pulse waveform, x in [0, 1): 0 at both ends, 1 at the crest. The GPU twin of
+// `world::pulseWave` (entity_fx.cpp); the numbering is `world::FxWaveform`'s and is append-only.
+fn fxWave(kind: u32, xIn: f32) -> f32 {
+    let x = fract(xIn);
+    if (kind == 1u) { // triangle
+        return 1.0 - abs(2.0 * x - 1.0);
+    }
+    if (kind == 2u) { // square, soft-edged, on for the middle half
+        return smoothstep(0.22, 0.28, x) * (1.0 - smoothstep(0.72, 0.78, x));
+    }
+    if (kind == 3u) { // saw, falling away softly at the end
+        return x * (1.0 - smoothstep(0.94, 1.0, x));
+    }
+    if (kind == 4u) { // heartbeat: lub-dub
+        let a = (x - 0.15) / 0.045;
+        let b = (x - 0.38) / 0.06;
+        return min(1.0, exp(-a * a) + 0.6 * exp(-b * b));
+    }
+    return 0.5 - 0.5 * cos(6.28318530718 * x); // sine
+}
+
+// The travelling band's multiplier at a world position: 1 - depth outside the band, rising to 1 at
+// its crest. The cross-section is one cycle of the pulse's waveform spread over the band's width.
+fn fxBandAt(worldPos: vec3<f32>) -> f32 {
+    let lanes = entityFxLanes;
+    let u = dot(worldPos, lanes.bandAxis.xyz) + lanes.bandAxis.w;
+    let x = (u - lanes.band.x) / max(2.0 * lanes.band.y, 1e-4) + 0.5;
+    var w = 0.0;
+    if (x > 0.0 && x < 1.0) {
+        w = fxWave(u32(lanes.band.z + 0.5), x);
+    }
+    return 1.0 - lanes.band.w + lanes.band.w * w;
+}
+
+// Bloom Source: the emission target is raised `share` of the way towards the surface's whole
+// (pre-fog) radiance, so selective bloom treats that much of it as light; the colour is untouched.
+fn fxBloomShare(result: ShadeResult, radiance: vec3<f32>) -> ShadeResult {
+    var out = result;
+    let share = clamp(entityFxLanes.a.y, 0.0, 1.0);
+    out.emission = out.emission + share * max(radiance - out.emission, vec3<f32>(0.0));
+    out.bloomWeight = max(out.bloomWeight, share);
+    return out;
+}
+
 // applyFog / fogHeightIntegral moved to common.wgsl in ADR-099: water.wgsl needs the same fog and
 // does not include this file, and two copies of a fog curve is how two surfaces end up in
 // different weather.
@@ -329,10 +391,35 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     }
     let alpha = select(1.0, baseColor.a, alphaMode > 1.5);
 
+    // ---- ADR-703: the entity's effect lanes (FXL) ----
+    //
+    // `fxFlags == 0` is every draw no lane effect touches, and the branch below is skipped whole --
+    // uniform per draw (ADR-118), since the lanes come from the object uniform. Inside it, the gain
+    // (times the travelling band, per fragment) scales the material's OWN emission through its
+    // intensity lane -- so its emissive texture and the built-in Fresnel rim below scale with it --
+    // and the added glow and rim are computed here and added after the texture, scaled by the same
+    // gain: emission = (own * tint + added + rim) * gain * band, all before fog.
+    let fxFlags = u32(entityFxLanes.a.z + 0.5);
+    var fxAdded = vec3<f32>(0.0);
+    if (fxFlags != 0u) {
+        var gain = max(entityFxLanes.a.x, 0.0);
+        if ((fxFlags & 4u) != 0u) {
+            gain = gain * fxBandAt(worldPos);
+        }
+        matEmissive = vec4<f32>(matEmissive.rgb * entityFxLanes.b.rgb, matEmissive.w * gain);
+        if ((fxFlags & 2u) != 0u) {
+            let facing = clamp(dot(n, v), 0.0, 1.0);
+            let rim = entityFxLanes.rim.rgb * pow(1.0 - facing, max(entityFxLanes.rim.w, 0.05));
+            fxAdded = (entityFxLanes.add.rgb + rim) * gain;
+        }
+    }
     let emissiveBase = matEmissive.rgb * emissiveMul;
     var emissive = emissiveBase * matEmissive.w;
     if (hasEmissive) {
         emissive = emissive * textureSample(emissiveTex, materialSampler, uv).rgb;
+    }
+    if (fxFlags != 0u) {
+        emissive = emissive + fxAdded;
     }
 
     if (object.flags.z > 0.5) { // unlit
@@ -343,6 +430,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         result.normal = n;
         result.emission = baseColor.rgb + emissive + fx.radiance;
         result.bloomWeight = max(result.bloomWeight, fx.bloom);
+        if ((fxFlags & 8u) != 0u) { // ADR-703: Bloom Source (an unlit surface's emission is already all of it)
+            result = fxBloomShare(result, baseColor.rgb + emissive + fx.radiance);
+        }
         result.flags = 2.0;
         return result;
     }
@@ -401,6 +491,10 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         result.roughness = roughness;
         result.emission = emissive + fx.radiance;
         result.bloomWeight = max(result.bloomWeight, fx.bloom);
+        if ((fxFlags & 8u) != 0u) { // ADR-703: Bloom Source -- the same sum the colour fogs, pre-fog
+            result = fxBloomShare(result, lighting.diffuse + lighting.specular + ambient + emissive + rim
+                                          + fx.radiance + skyLit);
+        }
         result.flags = select(1.0, 3.0, dot(result.emission, result.emission) > 1e-6);
         if (alphaMode > 1.5) {
             result.flags = result.flags + 4.0;
@@ -512,6 +606,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     result.roughness = roughness;
     result.emission = emissive + rim + fx.radiance;
     result.bloomWeight = max(result.bloomWeight, fx.bloom);
+    if ((fxFlags & 8u) != 0u) { // ADR-703: Bloom Source -- the same sum the colour fogs, pre-fog
+        result = fxBloomShare(result, direct + ambient + emissive + rim + fx.radiance + skyLit);
+    }
     result.flags = select(1.0, 3.0, dot(result.emission, result.emission) > 1e-6);
     if (alphaMode > 1.5) {
         result.flags = result.flags + 4.0;

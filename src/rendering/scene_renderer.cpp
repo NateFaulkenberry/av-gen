@@ -277,7 +277,29 @@ Result<void> SceneRenderer::init() {
         desc.entries = entries.data();
         frameLayout_ = device.CreateBindGroupLayout(&desc);
     }
-    objectLayout_ = uniformLayout("object-layout", sizeof(ObjectUniforms), true);
+    {
+        // Group 1 of the entity passes: 0 = this draw's ObjectUniforms slot (dynamic offset), and
+        // ADR-703's 2 = the per-entity effect records (FXL), read-only storage indexed by
+        // `object.fxA.w`. Binding 1 is left free because the skinned layout puts its joint palette
+        // there (skinning.cpp) and the two layouts must agree on every binding they share.
+        // Everything that draws with this layout -- water, the sky and atmosphere triangles, the
+        // overdraw count, meshed SDFs -- binds a group made from it; only pbr.wgsl reads binding 2.
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[0].buffer.hasDynamicOffset = true;
+        entries[0].buffer.minBindingSize = sizeof(ObjectUniforms);
+        entries[1].binding = 2;
+        entries[1].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+        entries[1].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[1].buffer.minBindingSize = sizeof(world::EntityFxRecord);
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.label = "object-layout";
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        objectLayout_ = device.CreateBindGroupLayout(&desc);
+    }
     {
         // 0 sampler, 1..5 the glTF textures, then ADR-030: 6 the material program block, 7 the
         // 16-byte select region naming this material's program, 8 the field block (only the entity
@@ -391,6 +413,8 @@ Result<void> SceneRenderer::init() {
     }
     // ADR-128: the object buffer and its bind group are made by the same routine that later grows
     // them, so the allocation path has exactly one implementation and the first one is not special.
+    // ADR-703: the effect-record buffer first, because the object group names both.
+    ensureEntityFxCapacity(1);
     ensureObjectCapacity(kInitialObjects);
 
     // ---- default textures ----
@@ -475,7 +499,9 @@ Result<void> SceneRenderer::init() {
     // ADR-086: the skinned variants of the lit and depth-only pipelines, and the joint buffer they
     // read. Same frame, material and IBL groups; only group 1 differs.
     if (auto r = skinning_->init(frameLayout_, materialLayout_, iblLayout_, objectUniforms_,
-                                 sizeof(ObjectUniforms), kHdrFormat, kDepthFormat);
+                                 sizeof(ObjectUniforms), entityFxBuffer_,
+                                 static_cast<std::uint64_t>(entityFxCapacity_) * sizeof(world::EntityFxRecord),
+                                 kHdrFormat, kDepthFormat);
         !r) {
         return r;
     }
@@ -2146,6 +2172,30 @@ const wgpu::BindGroup& SceneRenderer::materialBindGroup(const scene::Material& m
 void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const glm::mat4& view,
                                  float aspect, FrameUniforms& frame) {
     const std::uint32_t directional = orderLightsForShading(scene.lights, lightOrder_);
+    // ADR-703 (LIGHTMOD): the effect pool, after authored and ecology lights and before the froxel
+    // build. Point lights, unshadowed, from the 16 slots the ecology cap leaves for them
+    // (composition.cpp) -- so this appends into room that is reserved, and the `kMaxSceneLights`
+    // guard below is a backstop, not the budget. Converted into storage this renderer owns so
+    // `lightOrder_` can point at it without allocating.
+    {
+        const world::EffectLightFrame& pool = scene.entityFx.lights;
+        const std::uint32_t count = std::min<std::uint32_t>(pool.count, world::kEffectLightBudget);
+        for (std::uint32_t i = 0; i < count && lightOrder_.size() < kMaxSceneLights; ++i) {
+            const world::EffectLight& in = pool.lights[i];
+            scene::PunctualLight& out = effectLightScratch_[i];
+            out.type = scene::PunctualLight::Type::Point;
+            out.role = scene::PunctualLight::Role::Practical;
+            out.position = in.position;
+            out.color = in.color;
+            out.intensity = in.intensity;
+            out.range = std::max(in.range, 0.01f);
+            out.castsShadow = false;
+            out.contactShadow = false;
+            out.volumetricStrength = in.volumetric;
+            out.enabled = true;
+            lightOrder_.push_back(&out);
+        }
+    }
     const auto total = static_cast<std::uint32_t>(lightOrder_.size());
 
     // A radius that covers what the camera can see: the lit bounds when there are any, otherwise
@@ -2282,25 +2332,56 @@ void SceneRenderer::ensureObjectCapacity(std::uint32_t objects) {
     desc.size = static_cast<std::uint64_t>(capacity) * kObjectStride;
     objectUniforms_ = device.CreateBuffer(&desc);
 
-    // The binding stays `sizeof(ObjectUniforms)` wide whatever the buffer's size: a dynamic offset
-    // is added to the bound range, so a whole-buffer binding would run off the end on the first
-    // non-zero offset. This is the same reasoning skinning.cpp records for its palette slices.
-    wgpu::BindGroupEntry entry{};
-    entry.binding = 0;
-    entry.buffer = objectUniforms_;
-    entry.size = sizeof(ObjectUniforms);
+    rebuildObjectBindGroups();
+}
+
+// ADR-703 (FXL). The record buffer grows by doubling like the object buffer and never shrinks; a
+// new WebGPU buffer is zero-filled, so the neutral record 0 needs no upload.
+void SceneRenderer::ensureEntityFxCapacity(std::uint32_t records) {
+    records = std::min(std::max(records, 1u), world::kMaxEntityFxRecords);
+    if (entityFxBuffer_ && records <= entityFxCapacity_) {
+        return;
+    }
+    std::uint32_t capacity = std::max(entityFxCapacity_, 16u);
+    while (capacity < records) {
+        capacity = std::min(capacity * 2, world::kMaxEntityFxRecords);
+    }
+    entityFxCapacity_ = capacity;
+    wgpu::BufferDescriptor desc{};
+    desc.label = "entity-fx-records";
+    desc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+    desc.size = static_cast<std::uint64_t>(capacity) * sizeof(world::EntityFxRecord);
+    entityFxBuffer_ = context_.device().CreateBuffer(&desc);
+    if (objectUniforms_) {
+        rebuildObjectBindGroups();
+    }
+}
+
+void SceneRenderer::rebuildObjectBindGroups() {
+    // The object binding stays `sizeof(ObjectUniforms)` wide whatever the buffer's size: a dynamic
+    // offset is added to the bound range, so a whole-buffer binding would run off the end on the
+    // first non-zero offset. This is the same reasoning skinning.cpp records for its palette slices.
+    // The effect records are bound whole: they are indexed, not offset.
+    std::array<wgpu::BindGroupEntry, 2> entries{};
+    entries[0].binding = 0;
+    entries[0].buffer = objectUniforms_;
+    entries[0].size = sizeof(ObjectUniforms);
+    entries[1].binding = 2;
+    entries[1].buffer = entityFxBuffer_;
+    entries[1].size = static_cast<std::uint64_t>(entityFxCapacity_) * sizeof(world::EntityFxRecord);
     wgpu::BindGroupDescriptor groupDesc{};
     groupDesc.label = "object-bind-group";
     groupDesc.layout = objectLayout_;
-    groupDesc.entryCount = 1;
-    groupDesc.entries = &entry;
-    objectBindGroup_ = device.CreateBindGroup(&groupDesc);
+    groupDesc.entryCount = entries.size();
+    groupDesc.entries = entries.data();
+    objectBindGroup_ = context_.device().CreateBindGroup(&groupDesc);
 
-    // The skinned path binds the same slots from the same buffer (ADR-086), so its group 1 names
-    // this buffer too and goes stale the instant it is replaced. A skinned character rendering from
-    // a freed buffer is the exact bug this hand-off exists to prevent.
+    // The skinned path binds the same slots from the same buffers (ADR-086), so its group 1 names
+    // them too and goes stale the instant either is replaced. A skinned character rendering from a
+    // freed buffer is the exact bug this hand-off exists to prevent.
     if (skinning_) {
-        skinning_->setObjectBuffer(objectUniforms_, sizeof(ObjectUniforms));
+        skinning_->setObjectBuffer(objectUniforms_, sizeof(ObjectUniforms), entityFxBuffer_,
+                                   entries[1].size);
     }
 }
 
@@ -2381,6 +2462,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             drawableEntities += drawable(entity) ? 1u : 0u;
         }
         ensureObjectCapacity(drawableEntities);
+    }
+    // ADR-703 (FXL): this frame's per-entity effect records, before anything binds group 1. With no
+    // lane effect live the frame block is empty, nothing is uploaded, and every draw's lanes stay
+    // zero -- the shader's early-out -- so such a frame is the frame from before FXL existed.
+    if (!scene.entityFx.empty()) {
+        const auto count = static_cast<std::uint32_t>(
+            std::min<std::size_t>(scene.entityFx.records.size(), world::kMaxEntityFxRecords));
+        ensureEntityFxCapacity(count);
+        context_.queue().WriteBuffer(entityFxBuffer_, 0, scene.entityFx.records.data(),
+                                     static_cast<std::size_t>(count) * sizeof(world::EntityFxRecord));
     }
     uploadTextures(scene);
     // ADR-086: this frame's joint palettes. The renderer never *poses* anything -- the scene
@@ -3093,6 +3184,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             obj.energy3 = glm::vec4(e.shimmer, e.shimmerSpeed, e.shimmerScale, e.shimmerVariation);
             obj.energyA = glm::vec4(e.colorNear, 0.0f);
             obj.energyB = glm::vec4(e.colorFar, 0.0f);
+        }
+        // ADR-703 (FXL): the entity's effect lanes, copied from its owner's record -- the inline
+        // pair every draw reads, and the record index the shader follows for the rest. An entity no
+        // lane effect touches keeps both zero.
+        if (const std::uint32_t record = scene.entityFx.recordFor(thisEntity);
+            record != 0 && record < scene.entityFx.records.size() && record < entityFxCapacity_) {
+            obj.fxA = scene.entityFx.records[record].lanes[world::kFxLaneA];
+            obj.fxB = scene.entityFx.records[record].lanes[world::kFxLaneB];
         }
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
