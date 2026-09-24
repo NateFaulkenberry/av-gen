@@ -53,6 +53,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # schema `key` is what both wrote, and ADR-702 kept the keys.
 SKY_TYPES = {"comet", "aurora", "vortex", "meteors", "fog", "tornado"}
 GROUND_GLOW_TYPES = {"comet", "aurora", "meteors"}
+BORROWED_BLOCKS = {"meteors": ("comet",), "fog": ("vortex",)}
 
 
 def slug(text: str) -> str:
@@ -158,7 +159,14 @@ def sky_instance(e: dict, conv: Converted) -> dict:
     if "flow" in e:
         inst["flow"] = copy.deepcopy(e["flow"])
     # Only the instance's own type's block survives: every old entry carried every kind's payload.
-    inst["parameters"] = copy.deepcopy(e.get(kind, {}))
+    params = copy.deepcopy(e.get(kind, OrderedDict()))
+    # Rows a type declares with an ABSOLUTE json path (`/comet/...` for a meteor shower's arc,
+    # `/vortex/...` for a fog bank's medium) lived in another kind's root block; they now live inside
+    # `parameters` under the same block name (see `jsonPathOf` in effect_registry.cpp).
+    for block in BORROWED_BLOCKS.get(kind, ()):
+        if block in e:
+            params[block] = copy.deepcopy(e[block])
+    inst["parameters"] = params
     return inst
 
 

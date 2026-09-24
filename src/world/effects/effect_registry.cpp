@@ -172,7 +172,13 @@ const json* readAt(const json& root, std::string_view path) {
 std::string jsonPathOf(const EffectSchema& schema, const EffectField& field) {
     const std::string_view declared(field.jsonPath);
     if (declared.starts_with('/')) {
-        return std::string(declared.substr(1));
+        // A row that lives in ANOTHER payload's block -- a meteor shower's arc is a `Comet`, a fog
+        // bank's medium is a `Vortex` -- names that block absolutely. Before ADR-702 that meant the
+        // document root, beside the type's own block; with one payload per instance it means inside
+        // `parameters`, beside the type's own rows.
+        std::string path = kParametersKey;
+        path.append(declared);
+        return path;
     }
     // ADR-702: an instance writes ITS OWN type's rows only (a type never changes), under one
     // `parameters` block rather than a block named after the type. The block used to be keyed by
