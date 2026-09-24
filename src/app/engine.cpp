@@ -4253,13 +4253,11 @@ void Engine::updateEffects() {
         if (dropped > 0) {
             log::warn("{} effect(s) are active but not drawn: their render stage's GPU capacity is "
                       "full (surface waves {}, comets {}, auroras {}, placed media {}, distortion "
-                      "proxies {}). The Effects panel marks which.",
+                      "proxies {}, ribbon vertices {}, effect particle systems {}). The Effects panel "
+                      "marks which, and says why.",
                       dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
-                      world::kMaxMedia, world::kMaxDistortionProxies);
-                      "full (surface waves {}, comets {}, auroras {}, placed media {}, ribbon "
-                      "vertices {}). The Effects panel marks which.",
-                      dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
-                      world::kMaxMedia, world::kRibbonVertexBudget);
+                      world::kMaxMedia, world::kMaxDistortionProxies, world::kRibbonVertexBudget,
+                      world::kMaxEffectParticleSystems);
         }
     }
     lastMediaDropped_ = live.atmospherics.mediaDropped;
