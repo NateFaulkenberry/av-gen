@@ -2677,7 +2677,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.fogHeight = glm::vec4(scene.environment.fogHeight,
                                 std::max(scene.environment.fogHeightFalloff, 0.0f),
                                 std::clamp(scene.environment.fogHeightAmount, 0.0f, 1.0f),
-                                VolumeRenderer::surfaceFogStart(scene, toggles_.volume));
+                                VolumeRenderer::surfaceFogStart(scene));
     // ADR-568 (§7): the same two numbers the march and the particle estimate read. Clamped here
     // rather than trusted, because `applyFog` divides by the layer's falloff and a negative
     // `upper` would make the distance through the air shorter than the ray.

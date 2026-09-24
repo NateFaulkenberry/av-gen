@@ -90,8 +90,8 @@ bool VolumeRenderer::enabled(const scene::Scene& scene) {
     return enabled(scene.environment) || scene.atmospherics.mediumCount > 0;
 }
 
-float VolumeRenderer::surfaceFogStart(const scene::Scene& scene, bool volumePassOn) {
-    if (!volumePassOn || !enabled(scene)) {
+float VolumeRenderer::surfaceFogStart(const scene::Scene& scene) {
+    if (!enabled(scene)) {
         return 0.0f;
     }
     // The same clamp `update()` gives `params1.w`, so the two sides agree on the handover to the bit.
