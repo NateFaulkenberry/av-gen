@@ -72,5 +72,5 @@ The registry now has an **effect catalogue**, read from `world::effectSchemas()`
   non-hidden field leaves;
 - instances: the composition's one effect list, by id, owner and activation.
 
-On the benchmark: 16 types; `aurora` attaches only to the world; `groundPulse` attaches to
+On the benchmark: 8 types (the size of `kEffectKinds`, which the test asserts); `aurora` attaches only to the world; `groundPulse` attaches to
 entities; `umbra-cap-hero-pulse` is a `groundPulse` owned by `umbra-cap`, activated on `heroFocus`.
