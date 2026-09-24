@@ -51,15 +51,21 @@ public:
     // `objectUniforms` is the scene renderer's own object buffer: the skinned path binds exactly
     // the same ObjectUniforms, from the same slots, so a skinned entity and a static one describe
     // themselves identically.
+    // ADR-703: `entityFx` is the scene renderer's per-entity effect records (FXL), bound at binding
+    // 2 exactly as the static entity layout binds them, because the skinned pipeline runs the same
+    // `fs_main` and that fragment stage reads them.
     [[nodiscard]] Result<void> init(const wgpu::BindGroupLayout& frameLayout,
                                     const wgpu::BindGroupLayout& materialLayout,
                                     const wgpu::BindGroupLayout& iblLayout, const wgpu::Buffer& objectUniforms,
-                                    std::uint64_t objectSize, wgpu::TextureFormat colorFormat,
+                                    std::uint64_t objectSize, const wgpu::Buffer& entityFx,
+                                    std::uint64_t entityFxSize, wgpu::TextureFormat colorFormat,
                                     wgpu::TextureFormat depthFormat);
     // ADR-128: the scene renderer's object buffer grows with the frame, and when it is replaced
     // this group's binding 0 still names the old one. Called by whoever replaced it, so the skinned
-    // path cannot be left reading a buffer nobody is writing any more.
-    void setObjectBuffer(const wgpu::Buffer& objectUniforms, std::uint64_t objectSize);
+    // path cannot be left reading a buffer nobody is writing any more. ADR-703: the same for the
+    // effect-record buffer at binding 2.
+    void setObjectBuffer(const wgpu::Buffer& objectUniforms, std::uint64_t objectSize, const wgpu::Buffer& entityFx,
+                         std::uint64_t entityFxSize);
 
     // Recompiles pbr_skinned.wgsl and rebuilds the pipelines; the previous ones are kept on failure.
     [[nodiscard]] Result<void> reload();
@@ -107,6 +113,8 @@ private:
     wgpu::RenderPipeline depthOnly_;
     wgpu::Buffer objectUniforms_;
     std::uint64_t objectSize_ = 0;
+    wgpu::Buffer entityFx_;
+    std::uint64_t entityFxSize_ = 0;
     wgpu::Buffer jointBuffer_;
     wgpu::BindGroup objectGroup_;
     std::uint32_t sliceBytes_ = 0;

@@ -133,6 +133,11 @@ struct SdfRenderer::Impl {
     wgpu::Buffer fieldBlock;
     wgpu::BindGroup sdfGroup;
     wgpu::BindGroup meshGroup;
+    // ADR-703: the entity object layout's binding 2 (FXL's per-entity effect records). A meshed SDF
+    // is drawn with the entity lit pipelines, whose fragment stage declares it, but it never carries
+    // effect lanes (its `fxA` is zero, so the shader never reads the buffer) -- one neutral record
+    // satisfies the layout without coupling this renderer to the scene renderer's growing buffer.
+    wgpu::Buffer neutralEntityFx;
     gpu::FrameTimeline* timeline = nullptr;
     std::vector<std::uint8_t> objectStaging;
     std::vector<std::uint8_t> sdfStaging;
@@ -360,15 +365,25 @@ void SdfRenderer::Impl::rebuildGroups() {
         sdfGroup = device.CreateBindGroup(&desc);
     }
     if (!meshGroup) {
-        wgpu::BindGroupEntry entry{};
-        entry.binding = 0;
-        entry.buffer = objectUniforms;
-        entry.size = sizeof(ObjectUniforms);
+        if (!neutralEntityFx) {
+            wgpu::BufferDescriptor bufferDesc{};
+            bufferDesc.label = "sdf-neutral-entity-fx";
+            bufferDesc.size = 256; // one zero record (world::EntityFxRecord)
+            bufferDesc.usage = wgpu::BufferUsage::Storage;
+            neutralEntityFx = device.CreateBuffer(&bufferDesc);
+        }
+        std::array<wgpu::BindGroupEntry, 2> entries{};
+        entries[0].binding = 0;
+        entries[0].buffer = objectUniforms;
+        entries[0].size = sizeof(ObjectUniforms);
+        entries[1].binding = 2;
+        entries[1].buffer = neutralEntityFx;
+        entries[1].size = 256;
         wgpu::BindGroupDescriptor desc{};
         desc.label = "sdf-mesh-object-group";
         desc.layout = meshObjectLayout;
-        desc.entryCount = 1;
-        desc.entries = &entry;
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
         meshGroup = device.CreateBindGroup(&desc);
     }
 }

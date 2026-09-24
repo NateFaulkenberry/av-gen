@@ -106,6 +106,8 @@ struct ModRoute;
 
 namespace avgen::world {
 
+struct EntityLaneContribution; // world/effects/entity_fx.hpp (ADR-703, FXL)
+
 // ---- one row ------------------------------------------------------------------------------------
 
 // ADR-566: `Choice` is a row whose value is one of a short named list -- the fog bank's five
@@ -520,6 +522,12 @@ struct EffectResolve {
     // `checkRegistry` requires it for every non-atmospheric bucket except `Surface`, whose builder
     // (`resolveWave`) the probe calls directly.
     std::size_t (*records)(const EffectInstance&, const EffectContext&) = nullptr;
+    // ADR-703, `EffectBucket::EntityLanes` only (FXL, world/effects/entity_fx.hpp): this live
+    // instance's contribution to its owner's lanes -- a gain, a tint, added emission, a rim, a band,
+    // a spill-light request. The builder owns activation, the envelope, folding and the record; the
+    // type only says what it adds. `double` is the seconds since its activation window opened.
+    bool (*lanes)(const EffectInstance&, const EffectContext&, const NodeView&, double,
+                  EntityLaneContribution&) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.
@@ -613,7 +621,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 10> kEffectKinds{
+inline constexpr std::array<EffectKind, 12> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -622,6 +630,9 @@ inline constexpr std::array<EffectKind, 10> kEffectKinds{
     EffectKind::Tornado,       // ADR-580
     EffectKind::GroundPulse,   // ADR-702
     EffectKind::TravelBeam,    // ADR-702
+    EffectKind::Glow,          // ADR-703 (FXL)
+    EffectKind::Pulse,         // ADR-703 (FXL)
+    EffectKind::BloomSource,   // ADR-703 (FXL)
     EffectKind::SpaceWarp,     // ADR-703 (DF)
     EffectKind::ParticleEmitter, // ADR-703
 };

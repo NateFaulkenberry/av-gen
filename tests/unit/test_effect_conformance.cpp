@@ -138,6 +138,19 @@ std::vector<std::string> declaredKindNames() {
             token.push_back(c);
             continue;
         }
+        // ADR-703: an explicit value (`Glow = 8,`, which the Wave 1 reservation requires) puts a
+        // space and an `=` after the name. The name is complete at the `=`; record it there, and
+        // let the value that follows be dropped by the not-a-letter rule below.
+        if (c == ' ' || c == '\t') {
+            continue;
+        }
+        if (c == '=') {
+            if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+                names.push_back(token);
+            }
+            token.clear();
+            continue;
+        }
         if (c == ',' || c == '\n') {
             // An enumerator is the token that ends a comma-or-newline-separated item, and an
             // explicit `= 3` would leave the number as the token -- which is why a token that does
@@ -319,7 +332,10 @@ TEST_CASE("every parameter a kind registers is a row the panel can draw",
         REQUIRE(schema != nullptr);
         const world::EffectInstance probe = conf::probeEffect(kind, "conformance probe");
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
-        REQUIRE(leaves.size() > 10);
+        // Every row, plus `enabled` and the seven timing rows every type registers. ADR-703: a
+        // fixed "more than 10" stopped being true of the family when a one-row type (Bloom Source)
+        // arrived; this is the same guard -- the registrar produced a real set -- per type.
+        REQUIRE(leaves.size() >= schema->fields.size() + 8);
 
         for (const std::string& leaf : leaves) {
             if (leaf == "enabled") {
@@ -385,7 +401,9 @@ TEST_CASE("registered paths are read back from the registrar, not from the table
         const std::vector<std::string> leaves = conf::registeredLeaves(probe);
         INFO("kind: " << world::effectKindName(kind));
         REQUIRE(paths.size() == leaves.size());
-        REQUIRE(paths.size() > 20);
+        // Every row plus `enabled` and the seven timing rows (ADR-703: per type, not "more than 20",
+        // which a small lane type is not and need not be).
+        REQUIRE(paths.size() >= world::effectSchema(kind)->fields.size() + 8);
 
         // ADR-702: keyed by the instance's id, never its display name.
         const std::string prefix = world::effectParameterPrefix(probe.id);
@@ -422,6 +440,10 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Tornado, {EffectTarget::World}},
         {EffectKind::GroundPulse, {EffectTarget::Entity, EffectTarget::World}},
         {EffectKind::TravelBeam, {EffectTarget::World, EffectTarget::Camera}},
+        // ADR-703 (FXL). Pulse is Entity only: its Light-owner form needs LIGHTMOD's modulate half.
+        {EffectKind::Glow, {EffectTarget::Entity}},
+        {EffectKind::Pulse, {EffectTarget::Entity}},
+        {EffectKind::BloomSource, {EffectTarget::Entity}},
         {EffectKind::SpaceWarp, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703 (DF)
         {EffectKind::ParticleEmitter, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703
     };

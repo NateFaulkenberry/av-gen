@@ -752,6 +752,9 @@ const std::vector<Pairing>& pairings() {
          {{"wind", {"windDir", "windRegion", "windGust", "windTurb"}},
           {"skyGround", {"skyGroundAmbient", "skyGroundPoint", "skyGroundPointColor"}}}},
         {"ObjectUniforms", {"common.wgsl"}, "ObjectUniforms", {"rendering/scene_renderer.hpp"}, "ObjectUniforms", {}},
+        // ADR-703 (FXL): one owner's effect record, read by pbr.wgsl at `entityFx[fxA.w]`. The
+        // extent is `kEntityFxLanes`, scraped from the header rather than retyped here.
+        {"EntityFx", {"common.wgsl"}, "EntityFx", {"world/effects/entity_fx.hpp"}, "EntityFxRecord", {}},
         {"LightUniform", {"common.wgsl"}, "Light", {"rendering/scene_renderer.hpp"}, "LightUniform", {}},
         {"TonemapUniforms", {"tonemap.wgsl"}, "TonemapUniforms", {"rendering/scene_renderer.hpp"},
          "TonemapUniforms", {}},

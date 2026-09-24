@@ -18,6 +18,7 @@
 #include "spatial/spline.hpp"
 #include "world/atmospherics.hpp"
 #include "world/effects/distortion_frame.hpp"
+#include "world/effects/entity_fx.hpp"
 #include "world/wave_effect.hpp"
 #include "scene/scene_types.hpp"
 
@@ -110,6 +111,9 @@ struct Scene {
     //   `distortion`   RenderStage::ScreenSpace -- DF proxies (Space Warp), resolved after the
     //                  volumetric composite; `count == 0` touches nothing (ADR-703)
     world::DistortionFrame distortion;
+    //   `entityFx`     RenderStage::Material   -- ADR-703's per-entity lanes (FXL): Glow, Pulse, Bloom
+    //                  Source; `entityFx.lights` is LIGHTMOD's pool (a Glow's spill light)
+    world::EntityFxFrame entityFx;
     // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
     // scene with no LOD carries an empty vector, which is every scene that does not ask for it.
     // LOD0 is never in here; see MeshLodChain.

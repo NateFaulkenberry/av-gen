@@ -27,6 +27,7 @@
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/particle_emitter.hpp"
+#include "world/effects/entity_fx.hpp"
 
 #include <fmt/ranges.h>
 
@@ -4031,6 +4032,7 @@ void Engine::updateEffects() {
         // An emitter's system lives in the scene's particle list, so "no effects" has to take it
         // back out; the builder removes every `fx:` system whose instance is gone.
         world::buildParticleFrame({}, world::EffectContext{}, live.particles, {}, {}, {});
+        live.entityFx.clear();
         return;
     }
     world::applyEffectParameters(effectParams_, effects_);
@@ -4073,6 +4075,8 @@ void Engine::updateEffects() {
                                 effectStatusReason_);
     // RenderStage::Particles -- effect-owned particle systems (EMIT, ADR-703).
     world::buildParticleFrame(effects_, ctx, live.particles, effectOrder_, effectStatus_, effectStatusReason_);
+    // RenderStage::Material -- per-entity lanes (FXL), and the spill lights they request (LIGHTMOD).
+    world::buildEntityFxFrame(effects_, ctx, live.entityFx, effectOrder_, effectStatus_, effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
     // builder said: "orphaned" is the actionable answer, "dormant" would send somebody looking at
     // its timing.

@@ -383,8 +383,16 @@ struct ObjectUniforms {
     glm::vec4 energy3{0.0f};    // shimmer intensity, speed, scale, variation
     glm::vec4 energyA{0.0f};
     glm::vec4 energyB{0.0f};
+    // ADR-703 (FXL, world/effects/entity_fx.hpp): the per-entity effect lanes. These are the first
+    // two of the 96 padding bytes ADR-135 recorded as "no free lane" and left to the object-layout
+    // work it called Phase E; that work has not landed, and FXL is the consumer that needed them, so
+    // it takes them here and says so. Four vec4s of padding remain. Zero on every entity no lane
+    // effect touches: `fxA.z == 0` is the lit shader's uniform early-out, so such a draw is
+    // byte-identical to one from before these existed.
+    glm::vec4 fxA{0.0f}; // x = emission gain, y = bloom share, z = flags, w = record index in `entityFx`
+    glm::vec4 fxB{0.0f}; // rgb = tint on the material's own emission, w = 0
 };
-static_assert(sizeof(ObjectUniforms) == 416);
+static_assert(sizeof(ObjectUniforms) == 448);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -396,6 +404,9 @@ static_assert(offsetof(ObjectUniforms, ids) == 256);
 static_assert(offsetof(ObjectUniforms, windOrigin) == 272);
 static_assert(offsetof(ObjectUniforms, windShape) == 288);
 static_assert(offsetof(ObjectUniforms, windTune) == 304);
+static_assert(offsetof(ObjectUniforms, energyB) == 400);
+static_assert(offsetof(ObjectUniforms, fxA) == 416);
+static_assert(offsetof(ObjectUniforms, fxB) == 432);
 
 struct TonemapUniforms {
     float exposure;
@@ -956,6 +967,20 @@ private:
     // Grows the object slot buffer (and the staging mirror, and every bind group that names it) to
     // hold at least `objects` slots. Cheap and idempotent when it already does. ADR-128.
     void ensureObjectCapacity(std::uint32_t objects);
+    // ADR-703 (FXL): the per-entity effect records, group 1 binding 2 of every pipeline that uses the
+    // object layout (the entity passes, the skinned ones, meshed SDFs, water, the sky draws). Grows
+    // like the object buffer and never shrinks; record 0 is neutral. At least one record always
+    // exists, so the binding is valid on a frame with no lane effect at all.
+    wgpu::Buffer entityFxBuffer_;
+    std::uint32_t entityFxCapacity_ = 0; // records
+    void ensureEntityFxCapacity(std::uint32_t records);
+    // Makes the object bind group (and hands the skinned path its copy) from the current object and
+    // effect-record buffers. Called by both growth routines, so neither can leave the other's
+    // buffer bound stale.
+    void rebuildObjectBindGroups();
+    // ADR-703 (LIGHTMOD): this frame's effect pool lights as the light type `updateLights` orders,
+    // storage owned here so `lightOrder_` can point at it without allocating.
+    std::array<scene::PunctualLight, world::kEffectLightBudget> effectLightScratch_{};
     // Whether this entity can be drawn at all: visible, with a mesh that reached the GPU. It is a
     // member rather than a lambda inside render() because two places ask -- the entity loop, and
     // ensureObjectCapacity's count of how many slots the frame needs -- and a second copy of this

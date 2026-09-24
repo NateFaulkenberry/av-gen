@@ -16,6 +16,7 @@
 #include "scene/particle_io.hpp"
 #include "scene/scatter_anchors.hpp"
 #include "scene/sky.hpp"
+#include "world/effects/effect_lights.hpp"
 #include "world/effects/effect_stack.hpp"
 #include "spatial/detail.hpp"
 
@@ -90,8 +91,12 @@ namespace {
 // Ecology lights are rebuilt every frame and identified by name, because the rig removes its own
 // lights by resizing from the back and the two sets must not be able to eat each other.
 constexpr std::string_view kEcologyLightPrefix = "ecology.glow.";
-// The clustered path takes 256 lights in total (kMaxSceneLights); leave room for the rig.
-constexpr std::size_t kMaxEcologyLights = 224;
+// The clustered path takes 256 lights in total (kMaxSceneLights); leave room for the rig. ADR-703:
+// and for LIGHTMOD's effect pool (a Glow's spill light), whose 16 slots are reserved here rather
+// than fought over -- ecology takes everything that is left, so a second allocator asking for "the
+// rest" would win or lose by where the camera stood. The pool is appended by the renderer after
+// these, so authored + ecology + effect lights still total 224 at most.
+constexpr std::size_t kMaxEcologyLights = 224 - world::kEffectLightBudget;
 constexpr int kMaxTerrainLodIndex = world::kMaxTerrainLods - 1;
 } // namespace
 
