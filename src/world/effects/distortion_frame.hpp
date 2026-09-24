@@ -45,12 +45,15 @@ namespace avgen::world {
 // reason, lowest evaluation priority first (the order `effectOrder_` already sorts by).
 inline constexpr std::size_t kMaxDistortionProxies = 64;
 
-// The proxy's rasterised SHAPE: which geometry the offset pass draws to cover the field. Only the
-// ellipsoid is drawn today; the others are reserved so a Shockwave disc, a Portal quad and a
-// camera-wide field slot in without a layout change (the shader dispatches on this value).
+// The proxy's rasterised SHAPE: which geometry the offset pass draws to cover the field. The hull is
+// always the proxy mesh stretched along the three axes; the shape says how a fragment finds its
+// point in the field (the shader dispatches on this value).
 enum class DistortionShape : std::uint8_t {
-    Ellipsoid = 0,  // a closed ellipsoid: Space Warp, Bubble, Energy Shield
-    Disc = 1,       // reserved: a flat ring in a plane (Shockwave, Ripple)
+    Ellipsoid = 0,  // a closed ellipsoid, sampled at the view ray's closest approach to the centre:
+                    // Space Warp, Shockwave (a sphere), Velocity Distortion (a wake segment)
+    // Wave 2. A flat disc in the plane of axis0/axis1 (axis2 is its normal, and only as thick as the
+    // hull needs), sampled where the view ray PIERCES the plane: Ripple's membrane.
+    Disc = 1,
     Quad = 2,       // reserved: a camera-facing or placed quad (Portal, Reality Tear)
     FullScreen = 3, // reserved: a screen-covering triangle (Radial Distortion, Heat Shimmer)
 };
@@ -59,6 +62,10 @@ enum class DistortionShape : std::uint8_t {
 // lanes mean what the field says they mean. Only the warp field exists today.
 enum class DistortionField : std::uint8_t {
     Warp = 0, // radial pull + bow along motion + swirl + curl turbulence (Space Warp)
+    // Wave 2 (TRIGGER's first users). Lanes as `DistortionProxy` documents per field.
+    Shock = 1,  // a thin refracting band at a normalised radius: an expanding front (Shockwave)
+    Ripple = 2, // a damped train of concentric waves inside a front, in a disc's plane (Ripple)
+    Wake = 3,   // ripples across a tube segment of the owner's recent path (Velocity Distortion)
 };
 
 // One proxy, exactly as `shaders/distortion.wgsl` reads it (`DfProxy`, 144 bytes, nine vec4s).
@@ -89,6 +96,17 @@ struct DistortionProxy {
     // rgb = rim radiance (HDR, envelope folded in); w = inner radius (0..1): the field is zero inside
     // it, so an entity's own silhouette is not where the bend is strongest.
     glm::vec4 rim{0.0f};
+    //
+    // Wave 2 fields reuse the lanes; every field keeps `terms.x` as its weight and `terms.w` as its
+    // peak displacement in metres (so the renderer's copy-rect bound holds for all of them), and
+    // leaves `terms.y`/`terms.z`/`shape.z` zero:
+    //   Shock:  shape.x = the front's radius and shape.y its half-thickness, both over the proxy
+    //           radius; noise.y chroma; rim.rgb the leading edge's emission.
+    //   Ripple: shape.x = wave cycles across the radius, shape.y edge softness; motion.x = the
+    //           front's radius over the disc's, motion.y = radial decay (e-folds across the radius);
+    //           noise.x = the train's phase in cycles, noise.y chroma; rim.rgb crest emission.
+    //   Wake:   shape.x = ripple cycles across the tube's radius, shape.y edge softness;
+    //           noise.x = phase in cycles, noise.y chroma. axis0 runs along the path.
 };
 static_assert(sizeof(DistortionProxy) == 144, "DfProxy in shaders/distortion.wgsl is nine vec4s");
 
@@ -114,6 +132,10 @@ struct DistortionProducer {
     EffectKind kind{};
     DistortionProduceFn produce = nullptr;
     std::size_t maxProxies = 1; // the most one instance may write (sizes the scratch in `records`)
+    // Wave 2. How many seconds of the OWNER's recorded path this producer reads (HIST through
+    // `EffectSceneQuery::nodeDrawnPosition`); null for one that reads only the present. The engine
+    // subscribes the owner that deep (`appendEffectHistoryNeeds`).
+    float (*historySeconds)(const EffectInstance&) = nullptr;
 };
 
 // Every distortion producer the engine has, one row per type. See the header comment.
@@ -122,7 +144,8 @@ struct DistortionProducer {
 
 // The activation and timing gate every DF type shares: the envelope of `instance` at `ctx.seconds`,
 // or 0 when it is disabled, outside its activation window, or faded out. An entity owner is the
-// subject a `HeroFocus` activation fires for; a World owner follows whatever the cut holds.
+// subject a `HeroFocus` activation fires for; a World owner follows whatever the cut holds. A
+// `Trigger` activation's window opens at its latest event (`ctx.triggers`).
 [[nodiscard]] float distortionEnvelope(const EffectInstance& instance, const EffectContext& ctx);
 
 // ADR-703's `resolve.records` hook for every DF type: how many proxies ONE instance contributes in

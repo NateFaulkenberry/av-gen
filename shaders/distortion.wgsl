@@ -137,6 +137,13 @@ fn dfWarpProfile(r: f32, inner: f32, k: f32) -> f32 {
     return s * pow(max(1.0 - s * s, 0.0), kk) / max(peak, 1e-4);
 }
 
+// Wave 2. The Shock field's band across the normalised radius: a signed derivative-of-Gaussian around
+// the front, compression outside and rarefaction inside, peaking at +-1 one half-thickness either
+// side of it. `u` is (r - front) / halfThickness.
+fn dfShockBand(u: f32) -> f32 {
+    return u * exp(0.5 * (1.0 - u * u));
+}
+
 @fragment
 fn fs_offset(in: ProxyOut) -> OffsetOut {
     let p = proxies[in.index];
@@ -145,61 +152,147 @@ fn fs_offset(in: ProxyOut) -> OffsetOut {
     let cam = frame.cameraPos.xyz;
     let fwd = frame.cameraForward.xyz;
     let sceneZ = dfSceneDepth(texel);
-
-    // The lens plane, and the cheap rejection first: a scene surface nearer than the lens plane is
-    // not bent whatever the field does there -- the whole warp behind a wall costs one texel load.
-    let lensZ = dot(p.centre.xyz - cam, fwd) + p.centre.w;
+    let field = u32(p.axis1.w + 0.5);
+    let shape = u32(p.axis0.w + 0.5);
     let band = max(p.axis2.w, 1e-3);
-    let depthGate = smoothstep(lensZ, lensZ + band, sceneZ);
 
-    // The view ray and its closest approach to the centre, in the ellipsoid's unit-sphere frame.
-    // The semi-axes are orthogonal, so the inverse frame is the axes over their squared lengths.
     let farH = frame.invViewProj * vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
     let dir = normalize(farH.xyz / farH.w - cam);
-    let i0 = p.axis0.xyz / max(dot(p.axis0.xyz, p.axis0.xyz), 1e-8);
-    let i1 = p.axis1.xyz / max(dot(p.axis1.xyz, p.axis1.xyz), 1e-8);
-    let i2 = p.axis2.xyz / max(dot(p.axis2.xyz, p.axis2.xyz), 1e-8);
-    let oc = cam - p.centre.xyz;
-    let o = vec3<f32>(dot(oc, i0), dot(oc, i1), dot(oc, i2));
-    let v = vec3<f32>(dot(dir, i0), dot(dir, i1), dot(dir, i2));
     let near = max(frame.clusterDepth.z, 1e-3);
-    // Clamped in front of the camera: from inside a proxy the closest approach can be behind the eye,
-    // and a point behind the eye has no screen position to offset from.
-    let t = max(-dot(o, v) / max(dot(v, v), 1e-12), near * 4.0);
-    let bl = o + v * t;
-    let r = length(bl);
-    if (r >= 1.0) {
-        discard;
+
+    // ---- where this fragment samples the field ----
+    // An ellipsoid is sampled at the view ray's closest approach to its centre, in the ellipsoid's
+    // unit-sphere frame (the semi-axes are orthogonal, so the inverse frame is the axes over their
+    // squared lengths). A disc (Wave 2) is sampled where the ray pierces its plane.
+    var q = vec3<f32>(0.0);
+    var bl = vec3<f32>(0.0);
+    var r = 0.0;
+    var lensZ = 0.0;
+    if (shape == 1u) {
+        let nrm = normalize(p.axis2.xyz);
+        let denom = dot(dir, nrm);
+        if (abs(denom) < 1e-4) {
+            discard;
+        }
+        let tHit = dot(p.centre.xyz - cam, nrm) / denom;
+        if (tHit <= near) {
+            discard;
+        }
+        q = cam + dir * tHit;
+        let b0 = q - p.centre.xyz;
+        bl = vec3<f32>(dot(b0, p.axis0.xyz) / max(dot(p.axis0.xyz, p.axis0.xyz), 1e-8),
+                       dot(b0, p.axis1.xyz) / max(dot(p.axis1.xyz, p.axis1.xyz), 1e-8), 0.0);
+        r = length(bl.xy);
+        if (r >= 1.0) {
+            discard;
+        }
+        // A membrane's lens is the membrane itself where this ray meets it: what is behind the hit
+        // point bends, what is in front of it does not -- exact for a tilted membrane too.
+        lensZ = dot(q - cam, fwd) + p.centre.w;
+    } else {
+        let i0 = p.axis0.xyz / max(dot(p.axis0.xyz, p.axis0.xyz), 1e-8);
+        let i1 = p.axis1.xyz / max(dot(p.axis1.xyz, p.axis1.xyz), 1e-8);
+        let i2 = p.axis2.xyz / max(dot(p.axis2.xyz, p.axis2.xyz), 1e-8);
+        let oc = cam - p.centre.xyz;
+        let o = vec3<f32>(dot(oc, i0), dot(oc, i1), dot(oc, i2));
+        let v = vec3<f32>(dot(dir, i0), dot(dir, i1), dot(dir, i2));
+        // Clamped in front of the camera: from inside a proxy the closest approach can be behind the
+        // eye, and a point behind the eye has no screen position to offset from.
+        let t = max(-dot(o, v) / max(dot(v, v), 1e-12), near * 4.0);
+        bl = o + v * t;
+        r = length(bl);
+        if (r >= 1.0) {
+            discard;
+        }
+        q = cam + dir * t;
+        // The lens plane: the centre's depth plus the exclusion radius. A scene surface nearer than it
+        // is not bent whatever the field does there.
+        lensZ = dot(p.centre.xyz - cam, fwd) + p.centre.w;
     }
-    let q = cam + dir * t;
-
-    // Coverage: 1 inside, fading over the edge softness, so a field never ends on a hard ring.
-    let soft = max(p.shape.y, 1e-3);
-    let win = 1.0 - smoothstep(1.0 - soft, 1.0, r);
-    let f = dfWarpProfile(r, p.rim.w, p.shape.x) * win;
-
-    // The field, as a world displacement at q.
+    let depthGate = smoothstep(lensZ, lensZ + band, sceneZ);
     let b = q - p.centre.xyz;
     let bLen = length(b);
     let bn = select(vec3<f32>(0.0), b / bLen, bLen > 1e-5);
-    // The pull toward the centre is capped so a tap never crosses the inner radius: past it lies the
-    // owner (which the mask would refuse, leaving a hole to fall back across) or, for a warp at a
-    // point, the centre itself (which would fold the image over). Within the cap the lens is free.
-    let reach = 0.9 * bLen * (1.0 - p.rim.w / max(r, 1e-3));
-    let radial = -bn * min(p.terms.x * f * p.terms.w, max(reach, 0.0));
-    let bow = p.motion.xyz * (p.terms.y * dot(bn, p.motion.xyz) * p.motion.w);
-    let swirl = cross(dir, bn) * p.terms.z;
-    var turb = vec3<f32>(0.0);
-    if (p.shape.z > 0.0) {
-        let a0 = normalize(p.axis0.xyz);
-        let a1 = normalize(p.axis1.xyz);
-        let a2 = normalize(p.axis2.xyz);
-        let flow = flowCurl(bl * p.shape.w + vec3<f32>(p.noise.w), p.noise.x, 7u);
-        // Soft-limited to unit length: the flow's magnitude varies, the amount is the artist's.
-        let fl = flow / (1.0 + length(flow));
-        turb = (a0 * fl.x + a1 * fl.y + a2 * fl.z) * (2.0 * p.shape.z);
+
+    // ---- the field, as a world displacement d at q, its coverage `win` and its emission ----
+    var d = vec3<f32>(0.0);
+    var win = 1.0;
+    var glow = 0.0;
+    if (field == 1u) {
+        // Shock: a thin band at the front's radius.
+        let hw = max(p.shape.y, 1e-4);
+        let u = (r - p.shape.x) / hw;
+        win = 1.0 - smoothstep(0.9, 1.0, r);
+        // Nothing at the very centre: while the front is young its inner lobe reaches r = 0, where
+        // the radial direction is undefined and the band would pinch the image into a knot.
+        let core = smoothstep(0.0, 2.0 * hw, r);
+        d = bn * (dfShockBand(u) * p.terms.x * p.terms.w * win * core);
+        // The leading edge: a thin Gaussian just outside the front, where the compression is.
+        let e = (u - 0.5) / 0.35;
+        glow = exp(-e * e) * win;
+    } else if (field == 2u) {
+        // Ripple: a damped train inside the front, in the disc's plane along the radius.
+        let cycles = p.shape.x;
+        let front = p.motion.x;
+        let soft = max(p.shape.y, 1e-3);
+        win = 1.0 - smoothstep(1.0 - soft, 1.0, r);
+        // Nothing ahead of the front; the leading wavelength ramps in so the front has no hard edge.
+        let lead = 1.0 / max(cycles, 1e-3);
+        let behind = 1.0 - smoothstep(front - lead, front, r);
+        let s = sin(6.2831853 * (r * cycles - p.noise.x));
+        // Faded in over the first half-wavelength: at r = 0 the radial direction is undefined, and the
+        // innermost ring would pinch the image into a knot (as Shock's young front did).
+        let core = smoothstep(0.0, 0.5 * lead, r);
+        let a = s * exp(-r * p.motion.y) * behind * win * core;
+        let radial = normalize(p.axis0.xyz * bl.x / max(length(p.axis0.xyz), 1e-6) +
+                               p.axis1.xyz * bl.y / max(length(p.axis1.xyz), 1e-6) + vec3<f32>(1e-7));
+        d = radial * (a * p.terms.x * p.terms.w);
+        // Crests: the positive peaks, sharpened.
+        glow = pow(max(s, 0.0), 8.0) * exp(-r * p.motion.y) * behind * win;
+    } else if (field == 3u) {
+        // Wake: ripples across a tube segment, a cos^2 window along it so neighbours sum to one.
+        let rho = length(bl.yz);
+        let alongW = cos(1.5707963 * clamp(bl.x, -1.0, 1.0));
+        let along = alongW * alongW;
+        let soft = max(p.shape.y, 1e-3);
+        let skin = 1.0 - smoothstep(1.0 - soft, 1.0, rho);
+        win = along * skin;
+        let a1 = p.axis1.xyz / max(length(p.axis1.xyz), 1e-6);
+        let a2 = p.axis2.xyz / max(length(p.axis2.xyz), 1e-6);
+        let across = a1 * bl.y + a2 * bl.z;
+        let an = select(vec3<f32>(0.0), across / max(rho, 1e-5), rho > 1e-5);
+        // Zero on the axis (no fold there) and at the skin; a travelling ripple between.
+        let s = sin(6.2831853 * (p.shape.x * rho - p.noise.x));
+        let profile = rho * (1.0 - rho * rho);
+        d = an * (s * profile * 2.6 * p.terms.x * p.terms.w * win);
+    } else {
+        // Warp (Wave 1): coverage 1 inside, fading over the edge softness.
+        let soft = max(p.shape.y, 1e-3);
+        win = 1.0 - smoothstep(1.0 - soft, 1.0, r);
+        let f = dfWarpProfile(r, p.rim.w, p.shape.x) * win;
+        // The pull toward the centre is capped so a tap never crosses the inner radius: past it lies
+        // the owner (which the mask would refuse, leaving a hole to fall back across) or, for a warp
+        // at a point, the centre itself (which would fold the image over). Within the cap the lens is
+        // free.
+        let reach = 0.9 * bLen * (1.0 - p.rim.w / max(r, 1e-3));
+        let radial = -bn * min(p.terms.x * f * p.terms.w, max(reach, 0.0));
+        let bow = p.motion.xyz * (p.terms.y * dot(bn, p.motion.xyz) * p.motion.w);
+        let swirl = cross(dir, bn) * p.terms.z;
+        var turb = vec3<f32>(0.0);
+        if (p.shape.z > 0.0) {
+            let a0 = normalize(p.axis0.xyz);
+            let a1 = normalize(p.axis1.xyz);
+            let a2 = normalize(p.axis2.xyz);
+            let flow = flowCurl(bl * p.shape.w + vec3<f32>(p.noise.w), p.noise.x, 7u);
+            // Soft-limited to unit length: the flow's magnitude varies, the amount is the artist's.
+            let fl = flow / (1.0 + length(flow));
+            turb = (a0 * fl.x + a1 * fl.y + a2 * fl.z) * (2.0 * p.shape.z);
+        }
+        d = radial + (bow + swirl + turb) * (f * p.terms.w);
+        // The rim: a thin ring just inside the silhouette.
+        let rw = max(p.noise.z, 1e-3);
+        glow = exp(-pow((r - (1.0 - rw)) / (0.4 * rw), 2.0));
     }
-    let d = radial + (bow + swirl + turb) * (f * p.terms.w);
 
     var offset = (dfToUv(q + d) - dfToUv(q)) * depthGate;
     let len = length(offset);
@@ -207,13 +300,11 @@ fn fs_offset(in: ProxyOut) -> OffsetOut {
         offset = offset * (df.misc.x / len);
     }
 
-    // The rim: a thin ring just inside the silhouette, at the closest-approach point -- so it is
-    // hidden by whatever stands in front of that point, and only by that.
-    let rw = max(p.noise.z, 1e-3);
-    let ring = exp(-pow((r - (1.0 - rw)) / (0.4 * rw), 2.0));
+    // The emission sits at the sampled point -- so it is hidden by whatever stands in front of that
+    // point, and only by that.
     let qZ = dot(q - cam, fwd);
     let rimVis = smoothstep(qZ - 0.05 * band, qZ, sceneZ);
-    let rim = p.rim.rgb * (ring * rimVis);
+    let rim = p.rim.rgb * (glow * rimVis);
 
     var out: OffsetOut;
     out.offset = vec4<f32>(offset, win * lensZ, win);

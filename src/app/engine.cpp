@@ -4235,6 +4235,9 @@ world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene)
     }
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
+    // Wave 2 (TRIGGER): beats and onsets from the offline track, the sequence's markers, HIST.
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, phraseBars_, sectionPhrases_);
+    ctx.triggers = &triggerClock_;
     return ctx;
 }
 
@@ -4735,6 +4738,7 @@ void Engine::refreshHistorySubscriptions() {
             }
         }
     }
+    world::appendEffectHistoryNeeds(effects_, wanted); // Wave 2: Proximity triggers, a Shockwave's release point, a wake
     if (historyBank_.subscribe(wanted) || entitySignals_.size() != historyBank_.ringCount()) {
         // Signals of an entity nobody reads any more go quiet rather than holding their last value.
         for (const EntitySignalIds& old : entitySignals_) {

@@ -431,6 +431,11 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Float, {EffectTarget::Entity}},
         {EffectKind::Shake, {EffectTarget::Entity}},
         {EffectKind::Bounce, {EffectTarget::Entity}},
+        // Wave 2 (TRIGGER + DF). A front or a membrane can stand at a World point; a wake needs an
+        // owner that moves.
+        {EffectKind::Shockwave, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Ripple, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::VelocityDistortion, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {

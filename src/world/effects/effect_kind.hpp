@@ -58,6 +58,10 @@ enum class EffectKind : std::uint8_t {
     Float = 16,  // a slow, never-repeating bob and wobble
     Shake = 17,  // smooth-noise jitter, continuous or settling after each activation
     Bounce = 18, // a squash-and-stretch hop, continuous or a recoil
+    // TRIGGER's DF users (catalog-distortion.md, catalog-motion.md).
+    Shockwave = 19,          // DF: an expanding refracting front released by an event
+    Ripple = 20,             // DF: a damped train of concentric waves in a membrane
+    VelocityDistortion = 30, // DF: a refracting wake along the owner's recent path
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

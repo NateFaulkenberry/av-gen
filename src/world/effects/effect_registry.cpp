@@ -52,6 +52,9 @@ const EffectSchema& spiralSchema();      // Wave 2 (XFORM)
 const EffectSchema& floatSchema();       // Wave 2 (XFORM)
 const EffectSchema& shakeSchema();       // Wave 2 (XFORM)
 const EffectSchema& bounceSchema();      // Wave 2 (XFORM)
+const EffectSchema& shockwaveSchema();   // Wave 2 (TRIGGER + DF)
+const EffectSchema& rippleSchema();      // Wave 2 (TRIGGER + DF)
+const EffectSchema& velocityDistortionSchema(); // Wave 2 (DF over HIST)
 
 namespace {
 
@@ -76,6 +79,9 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &floatSchema(),
         &shakeSchema(),
         &bounceSchema(),
+        &shockwaveSchema(),
+        &rippleSchema(),
+        &velocityDistortionSchema(),
     };
     return kSchemas;
 }

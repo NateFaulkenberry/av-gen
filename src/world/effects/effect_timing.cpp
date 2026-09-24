@@ -32,6 +32,7 @@ const char* activationName(Activation a) {
     case Activation::Window: return "window";
     case Activation::CameraTravel: return "cameraTravel";
     case Activation::HeroFocus: return "heroFocus";
+    case Activation::Trigger: return "trigger";
     }
     return "always";
 }
@@ -40,6 +41,7 @@ std::optional<Activation> activationFromName(std::string_view name) {
     if (name == "window" || name == "time") { return Activation::Window; }
     if (name == "cameraTravel" || name == "travel" || name == "transition") { return Activation::CameraTravel; }
     if (name == "heroFocus" || name == "focus" || name == "spotlight") { return Activation::HeroFocus; }
+    if (name == "trigger") { return Activation::Trigger; }
     return std::nullopt;
 }
 
@@ -91,6 +93,11 @@ std::optional<ActivationWindow> resolveActivationWindow(Activation activation, c
                 return ActivationWindow{s.start, s.end, &s};
             }
         }
+        return std::nullopt;
+    case Activation::Trigger:
+        // Events are not visible from here: the overload that takes the context (effect_trigger.cpp)
+        // answers this activation. A caller still on this one reads a trigger-activated effect as
+        // "not active", which is dormant rather than wrong.
         return std::nullopt;
     }
     return std::nullopt;
