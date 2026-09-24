@@ -984,6 +984,18 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
 
     var accum = vec4<f32>(0.0);
     var weightSum = 0.0;
+    // ADR-709: whether all four texels are the march's "nothing here" -- no light, full
+    // transmittance. Then this pixel is left EXACTLY as the lit pass drew it.
+    //
+    // It was not, and that was the "whole-frame perturbation" ADR-702 recorded. The normalisation
+    // below divides `accum.a` by `weightSum`, which are the same four products summed in the same
+    // order, so in exact arithmetic the ratio is 1 -- but the Metal compiler computes `x / y` as
+    // `x * (1 / y)`, which comes back 0.99999994 for some `x`, and `hdr * 0.99999994` rounds to a
+    // different half-float in a fraction of pixels. On Glowmere Valley 2 with its environment fog
+    // off, a medium 2 km behind the camera moved 0.35% of the frame by one level (and 0.14% by up
+    // to three at t = 62). Most of what ADR-702 measured was not this at all -- it was its harness
+    // advancing the engine between arms; see ADR-709.
+    var untouched = true;
     for (var j = 0; j < 2; j = j + 1) {
         for (var i = 0; i < 2; i = i + 1) {
             let hx = clamp(bx + i, 0, maxX);
@@ -993,11 +1005,13 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
             let sourcePx = vec2<i32>(min(mapped.x, fullMaxX), min(mapped.y, fullMaxY));
             let theirDepth = linearDepth(textureLoad(sceneDepth, sourcePx, 0));
             let w = bilinear / (1.0 + 8.0 * abs(theirDepth - myDepth) / max(myDepth, 1e-3));
-            accum = accum + textureLoad(volumeTex, vec2<i32>(hx, hy), 0) * w;
+            let texel = textureLoad(volumeTex, vec2<i32>(hx, hy), 0);
+            untouched = untouched && all(texel == vec4<f32>(0.0, 0.0, 0.0, 1.0));
+            accum = accum + texel * w;
             weightSum = weightSum + w;
         }
     }
-    if (weightSum <= 1e-6) {
+    if (weightSum <= 1e-6 || untouched) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
     let result = accum / weightSum;

@@ -104,8 +104,9 @@ bool visiblyDiffers(const gpu::Image8& a, const gpu::Image8& b, std::size_t pixe
     for (int c = 0; c < 3; ++c) {
         sum += std::abs(static_cast<int>(a.rgba[pixel * 4 + c]) - static_cast<int>(b.rgba[pixel * 4 + c]));
     }
-    // 24 of 765, the threshold `test_effect_stack_gpu.cpp` measured: above the march's whole-frame
-    // perturbation (ADR-702), far below anything a person can see as a column.
+    // 24 of 765, the threshold `test_effect_stack_gpu.cpp` measured, far below anything a person can
+    // see as a column. (ADR-702 set it above a "whole-frame perturbation of the march"; ADR-709
+    // found that was mostly that file's harness and removed the march's small share of it.)
     return sum > 24;
 }
 
