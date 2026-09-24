@@ -36,6 +36,7 @@
 #include "scene/post_settings.hpp"
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/history_bank.hpp"
 #include "scene/scene_controller.hpp"
 #include "seq/director.hpp"
 #include "seq/sequence.hpp"
@@ -505,6 +506,17 @@ public:
     // A route whose target does not resolve is skipped rather than written.
     std::size_t addDefaultEffectRoutes(std::string_view effectId);
 
+    // ADR-703. An entity was renamed: every effect it owned moves to the new name (`renameEffectOwner`
+    // in effect_stack.hpp), and so does every route reading its `entity.<name>.*` signals -- which
+    // includes each default route resolved from an `owner.` source. Returns how many effects moved.
+    Result<std::size_t> renameEffectOwner(const world::EffectOwner& from, const world::EffectOwner& to);
+
+    // ADR-703: HIST, the transform history of every entity some effect or route subscribes to,
+    // recorded once per simulation step and carried in the ADR-700 checkpoint (see
+    // world/effects/history_bank.hpp). What `entity.<name>.*` signals, `EffectSceneQuery::nodeVelocity`
+    // and the Trail read.
+    [[nodiscard]] const world::HistoryBank& historyBank() const { return historyBank_; }
+
     // The director's cut, flattened to what an effect needs for time gating (ADR-207): the film's
     // **focus schedule**. Installed by `app::installSequence` and replaced or removed only by an
     // explicit re-bake or `app::discardDirectorsCut` (ADR-582). Taking the camera back does NOT
@@ -896,6 +908,26 @@ private:
     void publishFields();
     void updateAuroraSpectrum();
     [[nodiscard]] glm::vec3 cameraVelocityOnTimeline() const;
+    // ---- ADR-703: HIST and the entity-derived signals ---------------------------------------------
+    //
+    // `historyBank_` is owned here and recorded by the composition (after each played frame, and by
+    // the seek replay). `refreshHistorySubscriptions` decides who is recorded -- the entity owners
+    // of every type that reads its owner's motion, and every entity a route reads the signals of --
+    // and declares their `entity.<name>.*` signals; it runs from `rebind`, which follows every change
+    // to the effect list or the routes. `publishEntitySignals` writes them, before the routes run,
+    // from the last completed step.
+    world::HistoryBank historyBank_;
+    std::unique_ptr<world::HistoryAutomation> historyAutomation_;
+    const scene::Composition* historyComposition_ = nullptr;
+    struct EntitySignalIds {
+        std::size_t ring = 0;
+        std::array<signals::SignalId, 6> ids{}; // in `world::kEntitySignalLeaves` order
+    };
+    std::vector<EntitySignalIds> entitySignals_;
+    signals::SignalId cameraSpeedSignal_ = signals::kInvalidSignal;
+    void refreshHistorySubscriptions();
+    void publishEntitySignals();
+    void recordHistory();
     scene::PostParameters postParams_;
     // ADR-410. Registered beside the post parameters and applied beside them, because the failure
     // this repo keeps paying for is a system that is built, tested and unreachable: a parameter

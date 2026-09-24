@@ -198,6 +198,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       ao_(std::make_unique<AoRenderer>(context, shaders)),
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
+      ribbons_(std::make_unique<RibbonRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
       temporal_(std::make_unique<TemporalEffects>(context, shaders)),
       distortion_(std::make_unique<DistortionRenderer>(context, shaders)),
@@ -512,6 +513,10 @@ Result<void> SceneRenderer::init() {
     if (auto r = water_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, objectLayout_,
                               iblLayout_);
         !r) {
+        return r;
+    }
+    // ADR-703: RIBBON draws inside the scene pass with the scene's own frame group and nothing else.
+    if (auto r = ribbons_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_); !r) {
         return r;
     }
     if (auto r = debug_->init(kHdrFormat, kDepthFormat, frameLayout_); !r) {
@@ -1902,6 +1907,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = distortion_->reload(); !r) {
         keep("distortion.wgsl", r);
+    }
+    if (auto r = ribbons_->reload(shaders_); !r) {
+        keep("ribbon.wgsl", r);
     }
     ++engineReloads_;
     if (first) {
@@ -3901,6 +3909,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particles_->draw(rp, scene);
             stats_.drawCalls += particles_->stats().systems;
         }
+        // ADR-703: the camera-facing strips, beside the particles and before the blended meshes.
+        // Nothing at all -- no bind, no upload -- when the frame has no strip (the gate).
+        ribbons_->draw(rp, frameBindGroup_, scene.ribbons);
+        stats_.drawCalls += ribbons_->stats().draws;
         if (toggles_.particles && !blended.empty() && particles_->stats().systems > 0) {
             rp.SetBindGroup(0, frameBindGroup_); // the particle pass rebinds group 0 with its own layout
         }

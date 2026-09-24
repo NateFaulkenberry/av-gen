@@ -114,9 +114,10 @@ std::vector<std::string> declaredKindNames() {
             ++i;
             continue;
         }
-        // ADR-703: an enumerator may carry an explicit value (`ParticleEmitter = 13`); its NAME is
-        // the token before the '=', and the value up to the next ',' is skipped. Before this a
-        // valued enumerator was silently dropped -- the space before '=' cleared the token.
+        // ADR-703: an enumerator may carry an explicit value (`SpaceWarp = 12,`), which the Wave 1
+        // reservation requires so a type's number never depends on merge order. Its NAME is the
+        // token before the '=', and the value up to the next ',' is skipped. Before this, the space
+        // before the '=' cleared the token and every explicitly numbered kind was invisible here.
         if (skippingValue) {
             if (c == ',') {
                 skippingValue = false;
@@ -138,41 +139,17 @@ std::vector<std::string> declaredKindNames() {
             token.push_back(c);
             continue;
         }
-        // ADR-703: an explicit value (`Glow = 8,`, which the Wave 1 reservation requires) puts a
-        // space and an `=` after the name. The name is complete at the `=`; record it there, and
-        // let the value that follows be dropped by the not-a-letter rule below.
-        if (c == ' ' || c == '\t') {
-            continue;
-        }
-        if (c == '=') {
-            if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
-                names.push_back(token);
-            }
-            token.clear();
-            continue;
-        }
         if (c == ',' || c == '\n') {
-            // An enumerator is the token that ends a comma-or-newline-separated item, and an
-            // explicit `= 3` would leave the number as the token -- which is why a token that does
-            // not start with a letter is dropped rather than recorded.
+            // An enumerator is the token that ends a comma-or-newline-separated item.
             if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
                 names.push_back(token);
             }
             token.clear();
             continue;
         }
-        // ADR-703 reserves explicit values (`SpaceWarp = 12,`) so a type's number does not depend on
-        // merge order. The name before the `=` IS the enumerator, and the space before the `=` is not
-        // the end of one: clearing on it made every explicitly numbered kind invisible to this guard.
-        if (c == ' ' || c == '\t') {
-            continue;
-        }
-        if (c == '=' && !token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
-            names.push_back(token);
-        }
-        token.clear(); // '=' and friends: whatever was accumulating is not an enumerator
+        token.clear(); // anything else: whatever was accumulating is not an enumerator
     }
-    if (!token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
+    if (!skippingValue && !token.empty() && (std::isalpha(static_cast<unsigned char>(token.front())) != 0)) {
         names.push_back(token);
     }
     return names;
@@ -446,6 +423,7 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::BloomSource, {EffectTarget::Entity}},
         {EffectKind::SpaceWarp, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703 (DF)
         {EffectKind::ParticleEmitter, {EffectTarget::Entity, EffectTarget::World}}, // ADR-703
+        {EffectKind::Trail, {EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {

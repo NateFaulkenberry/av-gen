@@ -20,6 +20,7 @@
 #include "world/effects/distortion_frame.hpp"
 #include "world/effects/entity_fx.hpp"
 #include "world/wave_effect.hpp"
+#include "world/effects/ribbon_frame.hpp"
 #include "scene/scene_types.hpp"
 
 #include <cstdint>
@@ -114,6 +115,9 @@ struct Scene {
     //   `entityFx`     RenderStage::Material   -- ADR-703's per-entity lanes (FXL): Glow, Pulse, Bloom
     //                  Source; `entityFx.lights` is LIGHTMOD's pool (a Glow's spill light)
     world::EntityFxFrame entityFx;
+    //   `ribbons`      RenderStage::Particles  -- ADR-703's camera-facing strips (a Trail), drawn in
+    //                  pass 1's blended section; empty means no draw at all
+    world::RibbonFrame ribbons;
     // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
     // scene with no LOD carries an empty vector, which is every scene that does not ask for it.
     // LOD0 is never in here; see MeshLodChain.

@@ -4,6 +4,7 @@
 #include "world/effects/effect_registry.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <vector>
 
 namespace avgen::world {
@@ -272,6 +273,67 @@ std::vector<params::ModRoute> defaultEffectRoutes(std::string_view effectId, Eff
         routes.push_back(std::move(route));
     }
     return routes;
+}
+
+std::string entitySignalPrefix(std::string_view entity) {
+    std::string out = "entity.";
+    out.append(entity);
+    out.push_back('.');
+    return out;
+}
+
+Result<std::string> ownerSignalPrefix(const EffectOwner& owner) {
+    switch (owner.kind) {
+    case EffectTarget::Entity:
+        if (owner.name.empty()) {
+            return fail("an entity owner with no name has no signals");
+        }
+        return entitySignalPrefix(owner.name);
+    case EffectTarget::Camera: return std::string("camera.");
+    case EffectTarget::World:
+        return fail("the World has no position, so `owner.` means nothing on a World-owned effect");
+    case EffectTarget::Light:
+        return fail("light '{}' publishes no signals yet, so `owner.` cannot resolve on it", owner.name);
+    }
+    return fail("unknown owner kind");
+}
+
+Result<std::vector<params::ModRoute>> defaultEffectRoutes(const EffectInstance& effect) {
+    std::vector<params::ModRoute> routes = defaultEffectRoutes(effect.id, effect.kind);
+    std::optional<Result<std::string>> prefix; // resolved once, and only if some route asks
+    for (params::ModRoute& r : routes) {
+        if (!r.source.starts_with(kOwnerSignalPrefix)) {
+            continue;
+        }
+        if (!prefix.has_value()) {
+            prefix = ownerSignalPrefix(effect.owner);
+        }
+        if (!prefix->has_value()) {
+            return fail("effect '{}': default route '{}' -> '{}' is refused: {}", effect.id, r.source,
+                        r.target, prefix->error().message);
+        }
+        r.source = **prefix + r.source.substr(kOwnerSignalPrefix.size());
+    }
+    return routes;
+}
+
+std::size_t renameEntitySignalSources(std::vector<params::ModRoute>& routes, std::string_view from,
+                                      std::string_view to) {
+    if (from.empty() || to.empty() || from == to) {
+        return 0;
+    }
+    const std::string before = entitySignalPrefix(from);
+    const std::string after = entitySignalPrefix(to);
+    std::size_t moved = 0;
+    for (params::ModRoute& r : routes) {
+        if (r.source.starts_with(before)) {
+            r.source = after + r.source.substr(before.size());
+            // The id the source was bound to names the old signal; the next bind resolves the new.
+            r.sourceId = signals::kInvalidSignal;
+            ++moved;
+        }
+    }
+    return moved;
 }
 
 } // namespace avgen::world

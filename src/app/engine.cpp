@@ -28,6 +28,8 @@
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/particle_emitter.hpp"
 #include "world/effects/entity_fx.hpp"
+#include "world/effects/history_bank.hpp"
+#include "world/effects/ribbon_frame.hpp"
 
 #include <fmt/ranges.h>
 
@@ -38,6 +40,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cctype>
+#include <cstring>
 #include <chrono>
 
 namespace avgen::app {
@@ -455,8 +458,17 @@ std::size_t Engine::addDefaultEffectRoutes(std::string_view effectId) {
             return 0; // already automated; leave whatever somebody set up alone
         }
     }
+    // ADR-703: `owner.` sources resolved against the instance's owner. An owner that cannot give
+    // one of them a meaning (a World-owned type whose route reads its owner's speed) refuses the
+    // whole set by name rather than installing a route that binds to nothing.
+    auto resolved = world::defaultEffectRoutes(effects_[at]);
+    if (!resolved) {
+        log::warn("{}", resolved.error().message);
+        noteBindingProblem(resolved.error().message);
+        return 0;
+    }
     std::size_t added = 0;
-    for (params::ModRoute& r : world::defaultEffectRoutes(effectId, effects_[at].kind)) {
+    for (params::ModRoute& r : *resolved) {
         if (params_.find(r.target) == nullptr) {
             log::warn("default route for effect '{}' targets '{}', which is not a parameter; skipped",
                       effectId, r.target);
@@ -499,6 +511,9 @@ void Engine::addDefaultPostRoutes() {
 // ---- binding, effects and the parameter surface -----------------------------------------------
 
 void Engine::rebind() {
+    // ADR-703: before the bind, so an `entity.<name>.*` source a route names is a declared signal
+    // by the time the modulator resolves it.
+    refreshHistorySubscriptions();
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels must exist on the bus first
     }
@@ -623,6 +638,23 @@ bool Engine::effectOwnerExists(const world::EffectOwner& owner) const {
     }
     }
     return false;
+}
+
+Result<std::size_t> Engine::renameEffectOwner(const world::EffectOwner& from, const world::EffectOwner& to) {
+    // The routes are edited on a copy and only kept if the effect edit is, so a refused rename
+    // leaves both halves as they were.
+    std::vector<params::ModRoute> routes = modulator_.routes();
+    std::size_t moved = 0;
+    auto ok = editEffects([&](std::vector<world::EffectInstance>& list) -> Result<void> {
+        moved = world::renameEffectOwner(list, routes, from, to);
+        return {};
+    });
+    if (!ok) {
+        return std::unexpected(ok.error());
+    }
+    modulator_.routes() = std::move(routes);
+    rebind(); // the copies' parameter pointers predate the re-registration; bind refills them
+    return moved;
 }
 
 void Engine::detachSceneParameters() {
@@ -3216,6 +3248,11 @@ void Engine::seekSeconds(double seconds) {
             // (`AVGEN_SEEK_MODE=window`) and the whole-history replay (`=full`) stay reachable as
             // A/B arms out of one binary.
             static const entity::SeekMode seekMode = entity::SeekBudget::modeFromEnvironment();
+            // ADR-703: what the replay re-applies to HIST is part of what its checkpoints were
+            // taken under, so an edited transform track drops them.
+            if (historyAutomation_ != nullptr) {
+                historyBank_.setAutomationKey(historyAutomation_->key());
+            }
             composition->seekWithDirector(seconds, params_,
                                           entity::SeekBudget{.maxSeconds = 90.0,
                                                              .maxBodySteps = seekBodyStepBudget_,
@@ -3810,7 +3847,8 @@ namespace {
 // rather than a lambda so resolution allocates nothing: the engine counts allocations per frame.
 class CompositionEffectScene final : public world::EffectSceneQuery {
 public:
-    explicit CompositionEffectScene(const scene::Composition* comp) : comp_(comp) {}
+    CompositionEffectScene(const scene::Composition* comp, const world::HistoryBank* history)
+        : comp_(comp), history_(history) {}
 
     [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
         if (comp_ == nullptr) {
@@ -3841,8 +3879,112 @@ public:
         return comp_ != nullptr && comp_->nodeView(name, out);
     }
 
+    // ADR-703. From HIST: metres per second over the last simulation step (a backward difference of
+    // the node's drawn position over 1/60 s, interpolated when a play's frames are not on that
+    // grid). Deterministic under seek because the history is checkpointed and replayed (ADR-700).
+    // False when the node is not subscribed -- the engine subscribes the entity owner of every
+    // type in a Wave 1 bucket -- or has not been recorded yet.
+    [[nodiscard]] bool nodeVelocity(std::string_view name, glm::vec3& out) const override {
+        return history_ != nullptr && history_->velocity(name, out);
+    }
+
 private:
     const scene::Composition* comp_;
+    const world::HistoryBank* history_;
+};
+
+// ADR-703. The play's transform automation, for the seek replay to re-apply when it records HIST.
+//
+// A play applies the timeline to the parameter finals before the entities step and the scene
+// flattens, so a node keyed across the valley is drawn where its track puts it. The replay applies
+// no timeline (ADR-700 keys only what the simulation reads), so without this a scrubbed trail on a
+// keyed node would be drawn from the node's authored spot. This hands the replay the track's value
+// at each replayed instant, as a delta on the parameter's base -- for the recording only; nothing
+// here reaches the simulation. Seconds-based tracks only: a beat-keyed track's position depends on
+// the beat clock, which the replay does not have either.
+class TimelineTransformAutomation final : public world::HistoryAutomation {
+public:
+    explicit TimelineTransformAutomation(const params::Timeline& timeline) : timeline_(timeline) {}
+
+    [[nodiscard]] bool transformDelta(const params::IParameter& param, double seconds,
+                                      glm::vec3& delta) const override {
+        if (!timeline_.enabled) {
+            return false;
+        }
+        bool any = false;
+        delta = glm::vec3(0.0f);
+        const std::size_t count = std::min<std::size_t>(param.componentCount(), 3);
+        for (const params::Track& track : timeline_.tracks()) {
+            if (!track.enabled || track.param != &param || track.timeBase != params::TimeBase::Seconds) {
+                continue;
+            }
+            const params::KeyValue value = track.evaluate(seconds);
+            const auto apply = [&](std::size_t c, float v) {
+                const float base = param.baseComponent(c);
+                const float current = base + delta[static_cast<int>(c)];
+                float next = current;
+                switch (track.mode) {
+                case params::TrackMode::Replace: next = v; break;
+                case params::TrackMode::Add: next = current + v; break;
+                case params::TrackMode::Multiply: next = current * v; break;
+                }
+                delta[static_cast<int>(c)] = next - base;
+            };
+            if (track.component >= 0) {
+                if (static_cast<std::size_t>(track.component) < count) {
+                    apply(static_cast<std::size_t>(track.component), value[0]);
+                }
+            } else {
+                for (std::size_t c = 0; c < count; ++c) {
+                    apply(c, value[c]);
+                }
+            }
+            any = true;
+        }
+        return any;
+    }
+
+    // Every seconds-based track that could move a node, hashed, so an edited key drops the
+    // checkpoints the history was recorded under. Conservative: a track on any `.../position`,
+    // `rotation` or `scale` path counts whether or not a subscribed node reads it.
+    [[nodiscard]] std::uint64_t key() const override {
+        std::uint64_t h = 0x7472616e73ull;
+        const auto mix = [&h](std::uint64_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+        const auto bits = [](double d) {
+            std::uint64_t u = 0;
+            std::memcpy(&u, &d, sizeof u);
+            return u;
+        };
+        if (!timeline_.enabled) {
+            return h;
+        }
+        for (const params::Track& track : timeline_.tracks()) {
+            const std::string_view target = track.target;
+            if (!(target.ends_with("/position") || target.ends_with("/rotation") || target.ends_with("/scale"))) {
+                continue;
+            }
+            for (const char c : target) {
+                mix(static_cast<unsigned char>(c));
+            }
+            mix(static_cast<std::uint64_t>(track.enabled) | (static_cast<std::uint64_t>(track.mode) << 1) |
+                (static_cast<std::uint64_t>(track.timeBase) << 4) |
+                (static_cast<std::uint64_t>(track.component + 1) << 8));
+            mix(bits(track.loopLength));
+            for (const params::Key& key : track.keys) {
+                mix(bits(key.time));
+                mix(static_cast<std::uint64_t>(key.interp));
+                for (int c = 0; c < 4; ++c) {
+                    mix(bits(static_cast<double>(key.value[static_cast<std::size_t>(c)])));
+                    mix(bits(static_cast<double>(key.tangentIn[static_cast<std::size_t>(c)])));
+                    mix(bits(static_cast<double>(key.tangentOut[static_cast<std::size_t>(c)])));
+                }
+            }
+        }
+        return h;
+    }
+
+private:
+    const params::Timeline& timeline_;
 };
 
 } // namespace
@@ -4033,13 +4175,16 @@ void Engine::updateEffects() {
         // back out; the builder removes every `fx:` system whose instance is gone.
         world::buildParticleFrame({}, world::EffectContext{}, live.particles, {}, {}, {});
         live.entityFx.clear();
+        live.ribbons.vertices.clear(); // capacity kept: no allocation when a trail comes back
+        live.ribbons.strips.clear();
+        live.ribbons.dropped = 0;
         return;
     }
     world::applyEffectParameters(effectParams_, effects_);
     updateAuroraSpectrum();
     publishFields();
 
-    const CompositionEffectScene sceneAdapter(composition());
+    const CompositionEffectScene sceneAdapter(composition(), &historyBank_);
     world::EffectContext ctx;
     ctx.seconds = timelineClock_.seconds;
     ctx.cameraPosition = live.camera.position;
@@ -4077,6 +4222,9 @@ void Engine::updateEffects() {
     world::buildParticleFrame(effects_, ctx, live.particles, effectOrder_, effectStatus_, effectStatusReason_);
     // RenderStage::Material -- per-entity lanes (FXL), and the spill lights they request (LIGHTMOD).
     world::buildEntityFxFrame(effects_, ctx, live.entityFx, effectOrder_, effectStatus_, effectStatusReason_);
+    // RenderStage::Particles -- ADR-703's camera-facing strips (Trail), RIBBON over HIST.
+    world::buildRibbonFrame(effects_, ctx, historyBank_, live.ribbons, effectOrder_, effectStatus_,
+                            effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
     // builder said: "orphaned" is the actionable answer, "dormant" would send somebody looking at
     // its timing.
@@ -4108,6 +4256,10 @@ void Engine::updateEffects() {
                       "proxies {}). The Effects panel marks which.",
                       dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
                       world::kMaxMedia, world::kMaxDistortionProxies);
+                      "full (surface waves {}, comets {}, auroras {}, placed media {}, ribbon "
+                      "vertices {}). The Effects panel marks which.",
+                      dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
+                      world::kMaxMedia, world::kRibbonVertexBudget);
         }
     }
     lastMediaDropped_ = live.atmospherics.mediaDropped;
@@ -4319,6 +4471,9 @@ void Engine::update(const FrameTime& time) {
     // offline-exact (ADR-091). Before applyRoutes because a field's entire output is a gain on a
     // route's depth: run it after and every reaction in the scene is one frame behind its field.
     controller_->updateFields(time, bus_, modulator_);
+    // ADR-703 (rendering-architecture §3): the entity-derived signals, from the last completed step,
+    // before the routes that read them -- one step of latency, the same in a play and a scrub.
+    publishEntitySignals();
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
     // Autonomous behaviour, after the routes and before the scene reads the finals (ADR-088): a
     // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of
@@ -4346,6 +4501,9 @@ void Engine::update(const FrameTime& time) {
     stats_.allocsModulation = allocsNow() - allocMark;
     allocMark = allocsNow();
     controller_->update(time);
+    // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects
+    // read them -- so a Trail's head and its newest sample are the same instant.
+    recordHistory();
     probeStage(probe2::frame().updControllerMs); // TEMPORARY: phase 2
     stats_.allocsController = allocsNow() - allocMark;
     scene::applyPostParameters(postParams_, post_);
@@ -4434,6 +4592,132 @@ void Engine::update(const FrameTime& time) {
     const auto end = std::chrono::steady_clock::now();
     const double micros = std::chrono::duration<double, std::micro>(end - start).count();
     stats_.modulationMicros = stats_.modulationMicros * 0.9 + micros * 0.1;
+}
+
+// ---- ADR-703: HIST and the entity-derived signals -------------------------------------------------
+
+void Engine::refreshHistorySubscriptions() {
+    scene::Composition* comp = composition();
+    if (comp != historyComposition_) {
+        // Another scene: nothing recorded against the last one describes this one.
+        historyBank_.clear();
+        historyComposition_ = comp;
+    }
+    if (historyAutomation_ == nullptr) {
+        historyAutomation_ = std::make_unique<TimelineTransformAutomation>(timeline_);
+    }
+    historyBank_.setAutomation(historyAutomation_.get());
+    if (comp != nullptr) {
+        comp->setHistoryBank(&historyBank_);
+    }
+
+    // Who is recorded: the entity owner of every type that reads its owner's motion -- a type in
+    // one of the Wave 1 buckets (a Trail's path, a Space Warp's velocity, a Glow's distance) -- as
+    // deep as the deepest of them reads; and every entity a route names a signal of. The sky, the
+    // media and the surface waves read nothing of their owner's motion, so Glowmere's sixteen
+    // hero pulses subscribe nobody.
+    std::vector<world::HistorySubscription> wanted;
+    for (const world::EffectInstance& e : effects_) {
+        if (e.owner.kind != world::EffectTarget::Entity || e.owner.name.empty()) {
+            continue;
+        }
+        const world::EffectSchema* schema = world::effectSchema(e.kind);
+        if (schema == nullptr || world::isAtmosphericBucket(schema->resolve.bucket) ||
+            schema->resolve.bucket == world::EffectBucket::Surface) {
+            continue;
+        }
+        wanted.push_back(world::HistorySubscription{e.owner.name, world::ribbonHistorySeconds(e)});
+    }
+    constexpr std::string_view kEntity = "entity.";
+    for (const params::ModRoute& r : modulator_.routes()) {
+        const std::string_view src = r.source;
+        if (!src.starts_with(kEntity)) {
+            continue;
+        }
+        for (const std::string_view leaf : world::kEntitySignalLeaves) {
+            if (src.size() > kEntity.size() + leaf.size() + 1 && src.ends_with(leaf) &&
+                src[src.size() - leaf.size() - 1] == '.') {
+                wanted.push_back(world::HistorySubscription{
+                    std::string(src.substr(kEntity.size(), src.size() - kEntity.size() - leaf.size() - 1)), 0.0f});
+                break;
+            }
+        }
+    }
+    if (historyBank_.subscribe(wanted) || entitySignals_.size() != historyBank_.ringCount()) {
+        // Signals of an entity nobody reads any more go quiet rather than holding their last value.
+        for (const EntitySignalIds& old : entitySignals_) {
+            for (const signals::SignalId id : old.ids) {
+                bus_.set(id, 0.0f);
+            }
+        }
+        entitySignals_.clear();
+        for (std::size_t ring = 0; ring < historyBank_.ringCount(); ++ring) {
+            EntitySignalIds sig;
+            sig.ring = ring;
+            const std::string prefix = world::entitySignalPrefix(historyBank_.ringNode(ring));
+            // Declared with the ranges parameters-and-modulation.md gives them, so the panel's
+            // meters and a route's normalisation have something honest to read.
+            static constexpr std::array<std::pair<float, float>, 6> kRanges{
+                {{0.0f, 50.0f}, {-50.0f, 50.0f}, {-50.0f, 50.0f}, {-50.0f, 50.0f}, {0.0f, 100.0f}, {0.0f, 500.0f}}};
+            for (std::size_t k = 0; k < sig.ids.size(); ++k) {
+                sig.ids[k] = bus_.declare(prefix + std::string(world::kEntitySignalLeaves[k]), kRanges[k].first,
+                                          kRanges[k].second);
+            }
+            entitySignals_.push_back(sig);
+        }
+    }
+    if (cameraSpeedSignal_ == signals::kInvalidSignal) {
+        cameraSpeedSignal_ = bus_.declare("camera.speed", 0.0f, 50.0f);
+    }
+}
+
+void Engine::recordHistory() {
+    if (historyBank_.empty()) {
+        return;
+    }
+    if (const scene::Composition* comp = composition()) {
+        // The play's finals already carry the timeline, the routes and the entities' offsets: no
+        // automation to re-apply.
+        comp->recordHistory(historyBank_, timelineClock_.seconds);
+    }
+}
+
+void Engine::publishEntitySignals() {
+    if (cameraSpeedSignal_ != signals::kInvalidSignal) {
+        bus_.set(cameraSpeedSignal_, glm::length(cameraVelocityOnTimeline()));
+    }
+    if (entitySignals_.empty()) {
+        return;
+    }
+    // The camera at the instant of the step the entities are read at. A baked camera track is a
+    // pure function of time, so a scrub reads the same distance a play does; a camera nobody keyed
+    // is wherever it was last drawn.
+    const params::Track* cameraTrack = timeline_.findTrack("camera/position", -1);
+    const bool keyed = cameraTrack != nullptr && cameraTrack->enabled && !cameraTrack->keys.empty() &&
+                       cameraTrack->timeBase == params::TimeBase::Seconds;
+    const glm::vec3 drawnCamera = controller_ ? controller_->scene().camera.position : glm::vec3(0.0f);
+    for (const EntitySignalIds& sig : entitySignals_) {
+        glm::vec3 velocity(0.0f);
+        glm::vec3 acceleration(0.0f);
+        float cameraDistance = 0.0f;
+        if (sig.ring < historyBank_.ringCount() && historyBank_.sampleCount(sig.ring) > 0) {
+            static_cast<void>(historyBank_.velocity(sig.ring, velocity));
+            static_cast<void>(historyBank_.acceleration(sig.ring, acceleration));
+            const world::HistorySample& last = historyBank_.sample(sig.ring, historyBank_.sampleCount(sig.ring) - 1);
+            glm::vec3 camera = drawnCamera;
+            if (keyed) {
+                const params::KeyValue v = cameraTrack->evaluate(last.t);
+                camera = glm::vec3(v[0], v[1], v[2]);
+            }
+            cameraDistance = glm::length(last.position - camera);
+        }
+        bus_.set(sig.ids[0], glm::length(velocity));
+        bus_.set(sig.ids[1], velocity.x);
+        bus_.set(sig.ids[2], velocity.y);
+        bus_.set(sig.ids[3], velocity.z);
+        bus_.set(sig.ids[4], glm::length(acceleration));
+        bus_.set(sig.ids[5], cameraDistance);
+    }
 }
 
 params::ModRoute* Engine::routeForTarget(const std::string& path) {

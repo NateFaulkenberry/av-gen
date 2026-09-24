@@ -42,6 +42,8 @@ enum class EffectKind : std::uint8_t {
     Glow = 8,        // FXL: the entity emits light, with an optional rim and spill light
     Pulse = 9,       // FXL: the entity's light swells and falls, whole or as a travelling band
     BloomSource = 10, // FXL: the entity blooms like a light without getting brighter
+    // A strip through the owner's recent path, RIBBON over HIST (Light Trail is a style of it).
+    Trail = 11,
     SpaceWarp = 12, // DF: the view bending around its owner (distortion_frame.hpp)
     ParticleEmitter = 13, // ADR-703: an effect-owned particle system riding its owner (EMIT)
 };
