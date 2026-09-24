@@ -221,8 +221,22 @@ ResolvedEffect resolveEffect(const EffectRef& ref, const Plan& plan, const Scene
         }
         return out;
     }
+    // This plan's own earlier output is not a candidate: a revision replaces it. Without this, a
+    // revision of "pulse Umbra's hero effect" found its own previous windows beside Umbra's pulse and
+    // called the reference ambiguous (found by the golden plans' revision check).
+    std::vector<std::string> ownOutput;
+    if (const Plan* previous = facts.plan(plan.id); previous != nullptr) {
+        for (const ContentRef& ref : previous->produced) {
+            if (ref.domain == ContentDomain::EffectInstance) {
+                ownOutput.push_back(ref.id);
+            }
+        }
+    }
     std::vector<const world::EffectInstance*> matches;
     for (const world::EffectInstance& e : facts.staged.effects) {
+        if (std::find(ownOutput.begin(), ownOutput.end(), e.id) != ownOutput.end()) {
+            continue;
+        }
         if (!ref.id.empty() ? e.id == ref.id : (e.owner == out.owner && e.kind == *kind)) {
             matches.push_back(&e);
         }

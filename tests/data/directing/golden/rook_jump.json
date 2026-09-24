@@ -1,0 +1,63 @@
+{
+  "description": "Rook jumps over Umbra at 2:05; flash the lights at the peak.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "rook-jump",
+    "title": "Rook jumps over Umbra",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "rook",
+        "text": "Rook"
+      },
+      {
+        "alias": "umbra",
+        "text": "the Umbra hero mushroom",
+        "hint": "hero"
+      }
+    ],
+    "performances": [
+      {
+        "key": "jump",
+        "subject": "rook",
+        "mode": "scripted",
+        "beats": [
+          {
+            "action": "run_to",
+            "target": "umbra"
+          },
+          {
+            "action": "jump",
+            "target": "umbra",
+            "at": "2:05",
+            "emits": "rook.jump_peak"
+          }
+        ]
+      }
+    ],
+    "cues": [
+      {
+        "key": "flash",
+        "parameter": "scene/brightness",
+        "on": "rook.jump_peak",
+        "value": 1.6,
+        "holdSeconds": 0.3
+      }
+    ]
+  },
+  "expect": {
+    "errors": [
+      "SPATIAL_INFEASIBLE",
+      "UNSUPPORTED",
+      "BLOCKED"
+    ],
+    "blocked": [
+      "jump",
+      "flash"
+    ],
+    "produced": {},
+    "diff": [
+      "needs 5.75 m"
+    ]
+  }
+}

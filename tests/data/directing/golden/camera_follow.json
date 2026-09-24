@@ -1,0 +1,45 @@
+{
+  "description": "Follow Rook with a low camera from 1:10 to 1:20.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "rook-follow",
+    "title": "Follow Rook low",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "rook",
+        "text": "Rook"
+      }
+    ],
+    "shots": [
+      {
+        "key": "follow",
+        "name": "rook-follow",
+        "start": "1:10",
+        "durationSeconds": 10,
+        "subject": "rook",
+        "locked": true,
+        "camera": [
+          {
+            "move": "low_angle"
+          },
+          {
+            "move": "follow"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 1,
+      "camera.rig": 1,
+      "camera.shot": 1
+    },
+    "diff": [
+      "low-angle follow on rook"
+    ]
+  }
+}

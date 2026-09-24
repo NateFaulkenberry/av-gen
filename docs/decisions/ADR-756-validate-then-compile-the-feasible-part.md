@@ -143,3 +143,37 @@ when they changed.
 start becomes a float parameter (118.645 s becomes 118.64499… s). A fingerprint of the compiled
 value made the reloaded project's next revision read the plan's own effect as a hand edit. This
 was caught by the effect round-trip test, and proven red by reverting it.
+
+## Addendum (2026-09-24): revisions rebuild byte for byte — golden plans
+
+Spec §39's golden plans (`tests/data/directing/golden/*.json`, one harness) check each request end
+to end on the benchmark:
+1. exact error codes and blocked items;
+2. produced content by domain;
+3. diff lines;
+4. apply as one undo;
+5. save after a frame, then reload;
+6. the plan and every fingerprint intact;
+7. **a recompile on the reloaded project that rebuilds exactly what is there**;
+8. undo back to the start.
+
+Step 7 found three defects, each now fixed and proven red:
+
+- **A revision gave its own rig a new id.** `CameraDirection` mints ids monotonically, so
+  remove-then-add changed the camera. A revision now updates its previous rig in place; rigs it no
+  longer uses are removed.
+- **A revision's own output made its effect reference ambiguous.** The plan's previous windows
+  stood beside Umbra's pulse as candidates. A plan's own produced instances are no longer
+  candidates for its references.
+- **Compiled effect timing was not what the engine stores.** Window times are float parameters, so
+  the compiler now rounds them the same way; compiled content *is* installed content.
+  `normaliseEffectOrder` is applied to the staged list for the same reason.
+
+**Known false positive, not fixed here:** the sequencer's bake warns "shot 'X' is the first shot and
+inherits its camera, so nothing places the camera before it" for every Director shot that cuts to a
+rig. The bake judges the main camera and cannot see the camera track (ADR-245). The golden harness
+tolerates exactly that warning. A fix belongs in the bake (pass it the camera track's coverage),
+not in the Director.
+
+**Costs on the benchmark** (release, machine load ~70): building `SceneFacts` 1.7–3.9 ms,
+validate+compile about 1.2 ms, apply about 5 ms. There is no composition rebuild on any path.

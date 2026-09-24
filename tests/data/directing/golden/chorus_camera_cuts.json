@@ -1,0 +1,50 @@
+{
+  "description": "Cut to the Valley Wide camera at the start of the first three choruses.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "chorus-cuts",
+    "title": "Valley Wide on the choruses",
+    "tier": "baked",
+    "subjects": [],
+    "shots": [
+      {
+        "key": "c1",
+        "name": "chorus-1-wide",
+        "start": "chorus 1",
+        "durationSeconds": 4,
+        "rig": "Valley Wide",
+        "locked": true,
+        "transition": "cut"
+      },
+      {
+        "key": "c2",
+        "name": "chorus-2-wide",
+        "start": "chorus 2",
+        "durationSeconds": 4,
+        "rig": "Valley Wide",
+        "locked": true,
+        "transition": "cut"
+      },
+      {
+        "key": "c3",
+        "name": "chorus-3-wide",
+        "start": "chorus 3",
+        "durationSeconds": 4,
+        "rig": "Valley Wide",
+        "locked": true,
+        "transition": "cut"
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 3,
+      "camera.shot": 3
+    },
+    "diff": [
+      "cut to camera 'Valley Wide'"
+    ]
+  }
+}

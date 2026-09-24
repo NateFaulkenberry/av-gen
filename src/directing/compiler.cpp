@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <numbers>
 #include <set>
 
@@ -271,6 +272,7 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
 
     // ---- a revision: take the previous revision's content out, unless a person edited it ------------
     std::vector<std::string> replacedItems;
+    std::map<std::string, std::string> reusableRigs; // item -> slug of the rig its last revision made
     const Plan* previous = facts.plan(plan.id);
     if (previous != nullptr) {
         plan.revision = previous->revision + 1;
@@ -285,6 +287,17 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
             }
         }
         for (const ContentRef& ref : previous->produced) {
+            // A rig this plan made is kept for the item to reuse in place: `CameraDirection` mints
+            // ids monotonically, so removing and re-adding it would give the same rig a new id and
+            // make a revision that changed nothing look like it changed the cameras. Rigs the
+            // revision does not reuse are removed at the end.
+            if (ref.domain == ContentDomain::CameraRig && !edited.contains(ref.item)) {
+                reusableRigs.emplace(ref.item, ref.id);
+                if (std::find(replacedItems.begin(), replacedItems.end(), ref.item) == replacedItems.end()) {
+                    replacedItems.push_back(ref.item);
+                }
+                continue;
+            }
             if (edited.contains(ref.item)) {
                 if (contentOf(ref, out.staged)) {
                     plan.produced.push_back(ref); // still this plan's provenance, now the person's content
@@ -364,7 +377,21 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                 }
                 if (support == CameraSupport::FollowRig) {
                     scene::CameraRig rig = followRig(ps.name, nodeOf(subject), beat.move, beat, lowAngle);
-                    const scene::CameraId id = out.staged.cameras.addCamera(std::move(rig));
+                    scene::CameraId id = scene::kNoCamera;
+                    if (const auto reuse = reusableRigs.find(ps.key); reuse != reusableRigs.end()) {
+                        for (scene::CameraRig& existing : out.staged.cameras.cameras) {
+                            if (existing.slug == reuse->second) {
+                                rig.id = existing.id;     // the same camera, revised in place
+                                rig.slug = existing.slug;
+                                existing = rig;
+                                id = existing.id;
+                            }
+                        }
+                        reusableRigs.erase(reuse);
+                    }
+                    if (id == scene::kNoCamera) {
+                        id = out.staged.cameras.addCamera(std::move(rig));
+                    }
                     liveCamera = id;
                     const scene::CameraRig* added = out.staged.cameras.find(id);
                     record(ps.key, ContentDomain::CameraRig, added->slug);
@@ -451,8 +478,11 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                 if (window <= 0.0) {
                     window = instance.timing.windowSeconds; // the look's own length
                 }
-                instance.timing.windowStart = t;
-                instance.timing.windowSeconds = window;
+                // As the engine will hold them: an effect's timing is registered as float parameters,
+                // so the compiled value is rounded the same way here. Compiled content then IS the
+                // installed content, and a revision rebuilds it byte for byte.
+                instance.timing.windowStart = static_cast<double>(static_cast<float>(t));
+                instance.timing.windowSeconds = static_cast<double>(static_cast<float>(window));
                 world::adaptEffectToOwner(instance);
                 auto inserted = world::insertEffect(out.staged.effects, std::move(instance));
                 if (!inserted) {
@@ -499,6 +529,15 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                          pc.rampSeconds > 0.0 ? fmt::format(", ramp {:.2f}s", pc.rampSeconds) : std::string(),
                          hold > 0.0 ? fmt::format(", back after {:.2f}s", hold) : std::string()));
     }
+
+    // Rigs a previous revision made that this one no longer uses.
+    for (const auto& [item, slug] : reusableRigs) {
+        remove(ContentRef{item, ContentDomain::CameraRig, slug, {}}, out.staged);
+    }
+
+    // The effect list in the order the engine stores it (grouped by owner, stack order), so the staged
+    // copy IS what an install leaves behind -- not merely equivalent to it.
+    world::normaliseEffectOrder(out.staged.effects);
 
     // ---- content the previous revision made that this one does not ----------------------------------
     for (const std::string& item : replacedItems) {
