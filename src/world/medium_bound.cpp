@@ -3,15 +3,21 @@
 //
 // **Why it exists.** ADR-562 §4 gave every medium a ray interval -- a vertical cylinder the march
 // clips its steps to -- and that interval is a CLAIM: *every non-zero sample of this medium's
-// field lies inside this cylinder.* A bound that claims too much only costs field evaluations, and
-// costs nothing else at all, because the march's step positions do not depend on it: the same
-// `steps` over the same `maxDistance`, with the interval deciding only whether a step evaluates
-// the field or skips it. A bound that claims too LITTLE deletes part of the medium, and it deletes
-// it in the way that is hardest to see -- the bank is still there, still soft-edged, still the
-// right colour, just shorter than the number the artist typed.
+// field lies inside this cylinder.* A bound that claims too LITTLE deletes part of the medium, and
+// it deletes it in the way that is hardest to see -- the bank is still there, still soft-edged,
+// still the right colour, just shorter than the number the artist typed. A bound that claims too
+// much costs samples.
 //
-// That asymmetry is the design rule this file is built on: **when a bound is uncertain, be
-// generous.** The only currency it spends is samples that were going to be taken anyway.
+// **What "costs samples" means changed with ADR-710.** Until then the march's step positions did
+// not depend on the bound at all -- the same `steps` over the same `maxDistance`, with the interval
+// deciding only whether a step evaluated the field -- so a generous bound cost field evaluations and
+// nothing else. Since ADR-710 the march spends its steps INSIDE the intervals, so a bound twice as
+// deep as the medium spreads the same samples twice as thin through it: generosity now costs
+// sampling density, which is to say grain.
+//
+// The asymmetry still decides it: **when a bound is uncertain, be generous.** Grain is visible and
+// is fixed by tightening the bound once it is known; a deleted piece of medium is invisible and is
+// not. But a bound is no longer free to be lazy, and a tighter one is now worth measuring for.
 //
 // **Why it is a C++ file at all.** Until ADR-566 the claim lived only in WGSL, so the only thing
 // that could check it was a rendered frame -- and a rendered frame cannot tell you a bank is
@@ -30,7 +36,9 @@
 
 namespace avgen::world {
 
-MediumBound mediumBound(const MediumSlot& m) {
+namespace {
+
+MediumBound cylinderBound(const MediumSlot& m) {
     MediumBound b;
     const float radius = m.lane[0].w;
     if (radius <= 0.0f) {
@@ -63,15 +71,34 @@ MediumBound mediumBound(const MediumSlot& m) {
         // control values -- the largest is a provable bound, not an estimate.
         const float widest = std::max(m.lane[1].x, std::max(m.lane[1].y, m.lane[1].z));
         const float funnel = widest * (1.0f + std::max(m.lane[2].x, 0.0f) + std::max(m.lane[3].x, 0.0f));
-        const float skirt = m.lane[1].x * std::max(m.lane[4].x, 1.0f) * (1.0f + std::max(m.lane[4].w, 0.0f));
+        // The debris cloud only where it exists: the field's skirt term is gated on `skirtDensity`
+        // (lane 4.z), so with Debris at 0 -- the Tree of Life -- its flare is no reason to widen the
+        // bound. ADR-710: since the march spends its samples inside the bound, a 330 m flare with
+        // no density in it was a third of the hero's samples spent on empty air.
+        const float skirt = m.lane[4].z > 0.0f
+                                ? m.lane[1].x * std::max(m.lane[4].x, 1.0f) * (1.0f + std::max(m.lane[4].w, 0.0f))
+                                : 0.0f;
         const float cloud = m.lane[1].z * std::max(m.lane[8].w, 1.0f);
         // The axis is a curve: the lean displaces the top and the wobble swings it, and both move
         // the whole column sideways WITHIN the bound rather than deforming it. The lean is the
         // tornado's answer to the wind it subscribes to (§68) and it is applied by the packer, so
         // by the time a slot reaches here the bend is already in `lane[7]` and this covers it.
+        //
+        // ADR-710: the wobble's reach is SQRT 2 times its amount, not once. `axisAt` swings the axis
+        // by `(sin a, cos b) * amount` with two independent phases, a vector as long as 1.414 when
+        // both peak together. The bound said 1, and the generous single cylinder hid it; the
+        // column-and-cap bound is tight enough that the containment test found a wall-cloud sample
+        // outside it (0.008 at 411 m against a 410 m claim).
         const float lateral = std::sqrt(m.lane[7].x * m.lane[7].x + m.lane[7].y * m.lane[7].y) +
-                              std::max(m.lane[7].z, 0.0f);
-        b.radiusXZ = std::max(funnel, std::max(skirt, cloud)) + lateral;
+                              std::max(m.lane[7].z, 0.0f) * 1.41422f;
+        // ADR-710: the COLUMN and the CAP. The wall cloud is the widest term by far (the hero's is
+        // five top radii, 750 m, against a 250 m funnel) and it exists only above
+        // `h = 1 - cloudHeight` -- the field's own gate. A single cylinder at the cloud's radius made
+        // every ray through the funnel, 600 m below the cloud, cross 1.6 km of "medium", and the
+        // march spreads its steps over that. So the column carries the funnel and the debris, and
+        // the cap carries the cloud over the band it can occupy.
+        b.radiusXZ = std::max(funnel, skirt) + lateral;
+        b.capRadiusXZ = b.radiusXZ;
         // Vertically the field is compactly supported: nothing above `h = 1.08`, and nothing below
         // the funnel's tip or the debris cloud's rounded underside (ADR-706) -- asked of the field's
         // own `supportBelow`, which reads only lanes 3 and 4, so the bound and the early-out are
@@ -82,6 +109,12 @@ MediumBound mediumBound(const MediumSlot& m) {
         const float below = tornado::supportBelow(u);
         b.yTop = centre.y + height * 1.08f;
         b.yBot = centre.y - height * below;
+        b.capYBot = b.yBot;
+        if (m.lane[9].y > 0.0f && cloud + lateral > b.radiusXZ) {
+            const float cloudHeight = std::clamp(m.lane[9].x, 1e-3f, 1.0f);
+            b.capRadiusXZ = cloud + lateral;
+            b.capYBot = centre.y + height * (1.0f - cloudHeight);
+        }
         return b;
     }
 
@@ -136,6 +169,18 @@ MediumBound mediumBound(const MediumSlot& m) {
     const float half = (shape == FogShape::Sphere) ? radius : thickness;
     b.yTop = centre.y + half * 1.35f;
     b.yBot = centre.y - depth - half * 1.35f;
+    return b;
+}
+
+} // namespace
+
+MediumBound mediumBound(const MediumSlot& m) {
+    MediumBound b = cylinderBound(m);
+    // Every kind but the tornado is one cylinder, and its cap IS that cylinder (ADR-710).
+    if (b.capRadiusXZ < 0.0f) {
+        b.capRadiusXZ = b.radiusXZ;
+        b.capYBot = b.yBot;
+    }
     return b;
 }
 
