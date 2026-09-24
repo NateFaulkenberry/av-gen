@@ -75,6 +75,9 @@ EffectSchema buildSchema() {
     s.key = "groundPulse";
     s.enumName = "GroundPulse";
     s.displayName = "Ground Pulse";
+    s.description = "A ring spreading through the ground from where its owner stands; fires when the director's cut holds that owner.";
+    s.performance = PerformanceClass::VeryLow;
+    s.primaryCost = CostFragment;
     s.addLabel = "Ground Pulse";
     s.addTip = "A ring spreading through the ground from where its owner stands.\n"
                "On an entity: fires when the director's cut holds that entity.";

@@ -3327,6 +3327,45 @@ bool Composition::visualPlacement(std::string_view node, stage::VisualPlacement&
     return true;
 }
 
+bool Composition::nodeView(std::string_view node, world::NodeView& out) const {
+    const auto it = std::find_if(nodes_.begin(), nodes_.end(),
+                                 [&](const std::unique_ptr<CompositionNode>& n) { return n->name == node; });
+    if (it == nodes_.end()) {
+        return false;
+    }
+    const auto index = static_cast<std::size_t>(std::distance(nodes_.begin(), it));
+    if (dirty_ || index >= ranges_.size() || !ranges_[index].worldValid) {
+        return false; // nothing flattened: no drawn answer (see `visualPlacement`)
+    }
+    const NodeRange& range = ranges_[index];
+    out = world::NodeView{};
+    out.world = range.world.matrix();
+    out.firstEntity = static_cast<std::uint32_t>(range.firstEntity);
+    out.entityCount = static_cast<std::uint32_t>(range.entityCount);
+    for (std::size_t e = range.firstEntity;
+         e < range.firstEntity + range.entityCount && e < scene_.entities.size(); ++e) {
+        const Entity& entity = scene_.entities[e];
+        if (entity.mesh >= scene_.meshes.size()) {
+            continue;
+        }
+        const auto& [bmin, bmax] = scene_.meshBounds(entity.mesh);
+        for (int corner = 0; corner < 8; ++corner) {
+            const glm::vec3 p((corner & 1) ? bmax.x : bmin.x, (corner & 2) ? bmax.y : bmin.y,
+                              (corner & 4) ? bmax.z : bmin.z);
+            const glm::vec3 w = transformPoint(entity.transform, p);
+            if (!out.hasBounds) {
+                out.boundsMin = w;
+                out.boundsMax = w;
+                out.hasBounds = true;
+            } else {
+                out.boundsMin = glm::min(out.boundsMin, w);
+                out.boundsMax = glm::max(out.boundsMax, w);
+            }
+        }
+    }
+    return true;
+}
+
 WorldBounds Composition::nodeBounds(const std::string& name) {
     WorldBounds out;
     const auto it = std::find_if(nodes_.begin(), nodes_.end(),

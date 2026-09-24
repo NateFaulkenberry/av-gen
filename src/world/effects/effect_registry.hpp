@@ -401,7 +401,19 @@ enum class EffectBucket : std::uint8_t {
     // ADR-702: ADR-207's per-fragment wave term in the surface shader (shaders/wave_effects.wgsl),
     // evaluated in the lit pass on every opaque surface. A Ground Pulse or a Travel Beam.
     Surface,
+    // ---- ADR-703: the Effect Library's Wave 1 integrators ------------------------------------
+    // Each is built by its own builder into its own frame block, as `Surface` is; none of them is
+    // resolved by `resolveAtmosphericEffects`.
+    EntityLanes, // per-entity material lanes in the lit pass (FXL): Glow, Pulse, Bloom Source
+    Ribbon,      // camera-facing strips drawn in pass 1's blended section (RIBBON): Trail
+    Distortion,  // screen-space offsets resolved against a scene-colour copy (DF): Space Warp
+    Emitter,     // an effect-owned particle system (EMIT): Particle Emitter
 };
+
+// The three buckets `resolveAtmosphericEffects` owns. Everything else has a builder of its own.
+[[nodiscard]] constexpr bool isAtmosphericBucket(EffectBucket b) {
+    return b == EffectBucket::Comet || b == EffectBucket::Aurora || b == EffectBucket::Medium;
+}
 
 // ADR-702 §9. WHERE in the frame a type's contribution is evaluated. This is declared per type
 // rather than inferred from list order, because list order is an author's stacking decision and a
@@ -426,6 +438,21 @@ inline constexpr std::size_t kRenderStageCount = 8;
 // Where the Add Effect menu files a type. Presentation only; nothing at runtime reads it.
 enum class EffectCategory : std::uint8_t { Atmosphere, Sky, Lighting, Distortion, Motion, Particles };
 inline constexpr std::size_t kEffectCategoryCount = 6;
+
+// ADR-703 (research: docs/design/effect-library/performance-risks.md). How expensive a type is, and
+// where the cost lands. Declared so quality tiers, the panel and the AI catalogue can reason about
+// cost by rule rather than by name; `checkRegistry` requires both on every type.
+enum class PerformanceClass : std::uint8_t { Unset, VeryLow, Low, Medium, High, VeryHigh };
+[[nodiscard]] const char* performanceClassName(PerformanceClass c);
+enum PrimaryCost : std::uint8_t {
+    CostCpu = 1u << 0,
+    CostVertex = 1u << 1,
+    CostFragment = 1u << 2,
+    CostCompute = 1u << 3,
+    CostBandwidth = 1u << 4,
+    CostMemory = 1u << 5,
+    CostExtraPass = 1u << 6,
+};
 [[nodiscard]] const char* effectCategoryName(EffectCategory c);
 
 // How one authored effect becomes records in that bucket.
@@ -486,6 +513,13 @@ struct EffectResolve {
     // ADR first.
     void (*pack)(const EffectInstance&, float envelope, const MediumFlowInput& flow,
                  MediumSlot& out) = nullptr;
+    // ADR-703. For a bucket with a builder of its own (everything but Comet/Aurora/Medium): how
+    // many records ONE live instance contributes to its bucket in `context`, asked through the same
+    // code the builder runs. What the conformance probe's "resolves into its own bucket" check
+    // counts -- the check that would otherwise have nothing to ask for a builder it does not know.
+    // `checkRegistry` requires it for every non-atmospheric bucket except `Surface`, whose builder
+    // (`resolveWave`) the probe calls directly.
+    std::size_t (*records)(const EffectInstance&, const EffectContext&) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.
@@ -505,6 +539,11 @@ struct EffectSchema {
     // the coincidence was never it.
     const char* enumName = "";
     const char* displayName = ""; // "Comet"
+    // ADR-703. One paragraph an artist reads in the panel's help and the AI reads in its tool
+    // catalogue: what the effect IS, not how it is drawn.
+    const char* description = "";
+    PerformanceClass performance = PerformanceClass::Unset;
+    std::uint8_t primaryCost = 0; // PrimaryCost bits
     // ADR-702. Which owners this type may be attached to (a mask of `targetBit(EffectTarget::...)`),
     // what the Add Effect menu files it under, and where in the frame it is evaluated. Read by
     // `effectAllowedOn`, the menu and the evaluator -- never re-declared by any of them.

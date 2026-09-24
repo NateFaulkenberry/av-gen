@@ -120,6 +120,19 @@ struct ActivationWindow {
 
 // Where the world's nodes are. An interface rather than a std::function so resolution allocates
 // nothing: the engine counts allocations per frame and a lambda capture in this path would show up.
+// ADR-703. What an entity-owned effect can learn about the node it is attached to, as DRAWN this
+// frame (the last flattening -- not the parameter finals, which are reset at the top of a frame).
+// `firstEntity`/`entityCount` is the node's range in `scene::Scene::entities`, which is how a
+// material-lane effect (FXL) finds the draws to modify and a distortion finds the depth to exclude.
+struct NodeView {
+    glm::mat4 world{1.0f};          // the node's world matrix
+    glm::vec3 boundsMin{0.0f};      // world-space AABB of the node's drawn meshes...
+    glm::vec3 boundsMax{0.0f};
+    bool hasBounds = false;         // ...when it has any (a light or an empty node has none)
+    std::uint32_t firstEntity = 0;  // range in scene.entities
+    std::uint32_t entityCount = 0;
+};
+
 class EffectSceneQuery {
 public:
     virtual ~EffectSceneQuery() = default;
@@ -128,6 +141,12 @@ public:
     // The node's forward axis in world space, for DirectionMode::SourceForward. Optional: a scene
     // that cannot answer returns false and the direction falls back to the next mode in the chain.
     [[nodiscard]] virtual bool nodeForward(std::string_view name, glm::vec3& out) const { (void)name; (void)out; return false; }
+    // ADR-703. The drawn view of a node (see `NodeView`). Optional like `nodeForward`: false when
+    // there is no such node or nothing has been flattened yet.
+    [[nodiscard]] virtual bool nodeView(std::string_view name, NodeView& out) const { (void)name; (void)out; return false; }
+    // ADR-703. The node's velocity in metres per second, deterministic under seek (a function of the
+    // simulation steps, not of wall-clock frame deltas). Optional: false when unknown.
+    [[nodiscard]] virtual bool nodeVelocity(std::string_view name, glm::vec3& out) const { (void)name; (void)out; return false; }
 };
 
 // Everything an effect may read on a frame, for every type (ADR-702 merged ADR-207's and ADR-230's

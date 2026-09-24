@@ -117,6 +117,10 @@ enum class EffectStatus : std::uint8_t {
     Drawn,      // contributed records to the frame
     Dropped,    // active, but its render stage's GPU capacity was full: it drew nothing
     Orphaned,   // its owner does not exist in this scene (an entity that was deleted or renamed)
+    // ADR-703. Drew, but not all of it: a multi-part type lost one part to a full budget (a glow
+    // whose spill light did not fit) or its owner cannot give it everything (no bounds to fit a
+    // proxy to). `Engine::effectStatusReason` says which part and why.
+    Partial,
 };
 [[nodiscard]] const char* effectStatusName(EffectStatus s);
 

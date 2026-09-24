@@ -74,6 +74,9 @@ EffectSchema buildSchema() {
     s.key = "travelBeam";
     s.enumName = "TravelBeam";
     s.displayName = "Travel Beam";
+    s.description = "A front of light sweeping ahead of the camera towards the subject it is travelling to.";
+    s.performance = PerformanceClass::VeryLow;
+    s.primaryCost = CostFragment;
     s.addLabel = "Travel Beam";
     s.addTip = "A front that sweeps ahead of the camera towards the subject it is travelling to.\n"
                "Fires while the director's cut is moving between subjects.";

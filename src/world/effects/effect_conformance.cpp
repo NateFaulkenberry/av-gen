@@ -157,6 +157,31 @@ std::string Report::summary() const {
     return out;
 }
 
+// ADR-703. The world an entity-owned probe is attached to: every node exists, stands at the origin
+// with a 2 m box and one scene entity, and is moving at 5 m/s along +X -- so a type that asks its
+// owner for a view, bounds or a velocity gets an answer, and "resolves into its own bucket" is a
+// question about the type rather than about a scene the probe does not have.
+class ProbeScene final : public EffectSceneQuery {
+public:
+    [[nodiscard]] bool nodePosition(std::string_view, glm::vec3& out) const override {
+        out = glm::vec3(0.0f);
+        return true;
+    }
+    [[nodiscard]] bool nodeView(std::string_view, NodeView& out) const override {
+        out = NodeView{};
+        out.boundsMin = glm::vec3(-1.0f);
+        out.boundsMax = glm::vec3(1.0f);
+        out.hasBounds = true;
+        out.firstEntity = 0;
+        out.entityCount = 1;
+        return true;
+    }
+    [[nodiscard]] bool nodeVelocity(std::string_view, glm::vec3& out) const override {
+        out = glm::vec3(5.0f, 0.0f, 0.0f);
+        return true;
+    }
+};
+
 EffectInstance probeEffect(EffectKind kind, std::string name) {
     // ADR-500: the registry's factory, which is the same one the "Add" button calls. A switch here
     // would be one more per-kind list that a new kind has to be remembered into -- and this file's
@@ -407,6 +432,8 @@ Report checkAtmospheric(EffectKind kind) {
 
         EffectContext ctx;
         ctx.seconds = 0.5;
+        const ProbeScene probeScene;
+        ctx.scene = &probeScene;
         std::array<ResolvedAtmospheric, kMaxGpuComets> comets{};
         std::array<ResolvedAtmospheric, kMaxGpuAuroras> auroras{};
         const AtmosphericCounts counts =
@@ -431,9 +458,22 @@ Report checkAtmospheric(EffectKind kind) {
             case EffectBucket::Aurora: mine = counts.auroras; break;
             case EffectBucket::Medium: mine = counts.vortices; break;
             case EffectBucket::Surface: mine = waveCount; break;
+            // ADR-703: a bucket with a builder of its own answers through its `records` hook -- the
+            // same code its builder runs -- and puts nothing in the four buckets counted above.
+            case EffectBucket::EntityLanes:
+            case EffectBucket::Ribbon:
+            case EffectBucket::Distortion:
+            case EffectBucket::Emitter:
+                mine = schema->resolve.records != nullptr ? schema->resolve.records(live, ctx) : 0;
+                break;
             }
         }
-        const std::size_t total = counts.comets + counts.auroras + counts.vortices + waveCount;
+        const std::size_t own =
+            schema != nullptr && !isAtmosphericBucket(schema->resolve.bucket) &&
+                    schema->resolve.bucket != EffectBucket::Surface
+                ? mine
+                : 0;
+        const std::size_t total = counts.comets + counts.auroras + counts.vortices + waveCount + own;
         // How many records one live effect of this kind is entitled to. One for everything ADR-230
         // shipped; a meteor shower declares more, and asserting "exactly one" would have made this
         // check fail on correct code -- which is the failure ADR-182 is about from the other side.

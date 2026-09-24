@@ -426,6 +426,9 @@ EffectSchema buildSchema() {
     s.key = "vortex";
     s.enumName = "Vortex";
     s.displayName = "Cosmic Vortex";
+    s.description = "A cosmic cyclone seen from above: a luminous volumetric disc with an eye, an eye wall and spiral bands.";
+    s.performance = PerformanceClass::High;
+    s.primaryCost = CostFragment | CostExtraPass;
     s.addLabel = "Add vortex";
     s.addTip = "A turning funnel of luminous medium, drawn inside the volumetric march.\n"
                "It is placed in the world rather than on the sky dome, and it is the\n"

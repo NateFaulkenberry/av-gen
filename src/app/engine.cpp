@@ -24,6 +24,7 @@
 #include "core/wind.hpp"
 #include "params/serialization.hpp"
 #include "world/effects/effect_params.hpp"
+#include "world/effects/effect_registry.hpp"
 
 #include <fmt/ranges.h>
 
@@ -555,6 +556,7 @@ void Engine::installEffects() {
     }
     world::effectEvaluationOrder(effects_, effectOrder_);
     effectStatus_.assign(effects_.size(), world::EffectStatus::Dormant);
+    effectStatusReason_.assign(effects_.size(), std::string());
 }
 
 std::vector<world::EffectInstance> Engine::capturedEffects() const {
@@ -574,6 +576,11 @@ Result<void> Engine::editEffects(const std::function<Result<void>(std::vector<wo
         return ok;
     }
     return setEffects(std::move(next));
+}
+
+std::string_view Engine::effectStatusReason(std::string_view id) const {
+    const std::size_t at = world::findEffect(effects_, id);
+    return at < effectStatusReason_.size() ? std::string_view(effectStatusReason_[at]) : std::string_view();
 }
 
 world::EffectStatus Engine::effectStatus(std::string_view id) const {
@@ -3827,6 +3834,10 @@ public:
         return true;
     }
 
+    [[nodiscard]] bool nodeView(std::string_view name, world::NodeView& out) const override {
+        return comp_ != nullptr && comp_->nodeView(name, out);
+    }
+
 private:
     const scene::Composition* comp_;
 };
@@ -4038,6 +4049,14 @@ void Engine::updateEffects() {
     if (effectStatus_.size() != effects_.size()) {
         effectStatus_.assign(effects_.size(), world::EffectStatus::Dormant);
     }
+    if (effectStatusReason_.size() != effects_.size()) {
+        effectStatusReason_.assign(effects_.size(), std::string());
+    }
+    // Reasons are rewritten every frame; clearing keeps the strings' storage (no allocation once a
+    // reason has been said).
+    for (std::string& r : effectStatusReason_) {
+        r.clear();
+    }
     // RenderStage::Material -- the surface waves.
     world::buildWaveFrame(effects_, ctx, live.waves, effectOrder_, effectStatus_);
     // RenderStage::Sky and RenderStage::Volumetric -- comets, auroras and placed media.
@@ -4049,6 +4068,16 @@ void Engine::updateEffects() {
     for (std::size_t i = 0; i < effects_.size(); ++i) {
         if (effects_[i].owner.kind != world::EffectTarget::World && !effectOwnerExists(effects_[i].owner)) {
             effectStatus_[i] = world::EffectStatus::Orphaned;
+            effectStatusReason_[i] = fmt::format("{} '{}' is not in this scene.",
+                                                 world::effectTargetName(effects_[i].owner.kind),
+                                                 effects_[i].owner.name);
+        }
+        if (effectStatus_[i] == world::EffectStatus::Dropped && effectStatusReason_[i].empty()) {
+            // The generic sentence; a builder that knows more (which budget, how full) wrote its own.
+            if (const world::EffectSchema* schema = world::effectSchema(effects_[i].kind)) {
+                effectStatusReason_[i] = fmt::format("The {} stage's GPU capacity was full this frame.",
+                                                     world::renderStageName(schema->stage));
+            }
         }
         dropped += effectStatus_[i] == world::EffectStatus::Dropped ? 1u : 0u;
     }

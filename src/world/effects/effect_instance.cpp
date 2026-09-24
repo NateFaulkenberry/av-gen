@@ -145,6 +145,7 @@ const char* effectStatusName(EffectStatus s) {
     case EffectStatus::Drawn: return "drawn";
     case EffectStatus::Dropped: return "dropped";
     case EffectStatus::Orphaned: return "orphaned";
+    case EffectStatus::Partial: return "partial";
     }
     return "dormant";
 }
@@ -277,7 +278,7 @@ json EffectInstance::toJson() const {
         // colour beside it are shared rows and come from the walk below.
         j["ground"] = json{{"mode", groundGlowName(ground.mode)}};
     }
-    if (schema->resolve.bucket != EffectBucket::Surface) {
+    if (isAtmosphericBucket(schema->resolve.bucket)) {
         // §68. Written unconditionally, both halves, even when the subscription is the default: a
         // round trip passes perfectly when a key is missing from BOTH directions.
         j["flow"] = json{{"field", flow.field}};

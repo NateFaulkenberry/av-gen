@@ -618,6 +618,12 @@ public:
     // body by up to its own diagonal, which on a 3.6x farm animal is a metre of beam.
     [[nodiscard]] std::vector<glm::vec3> nodeCorners(const std::string& name);
 
+    // ADR-703. What an entity-owned effect needs of the node it is attached to, from the LAST
+    // FLATTENING (the rule `NodeRange::world` explains): its drawn world matrix, the world AABB of
+    // its drawn meshes, and its range in `scene().entities`. False when there is no such node or
+    // nothing has been flattened. Const and allocation-free: the effect evaluator asks it per frame.
+    [[nodiscard]] bool nodeView(std::string_view node, world::NodeView& out) const;
+
     // ---- what a node contributes to the picture (`stage::IVisualPlacement`) ----
     //
     // "Where is this node's contribution to the picture centred, and where is the node itself?"

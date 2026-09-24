@@ -488,6 +488,10 @@ public:
     // drops and nothing read the count.
     [[nodiscard]] std::span<const world::EffectStatus> effectStatus() const { return effectStatus_; }
     [[nodiscard]] world::EffectStatus effectStatus(std::string_view id) const;
+    // ADR-703. The sentence that goes with a Dropped / Partial / Orphaned status: which budget or
+    // which part, from the builder that decided. Empty for the other statuses. Builders that know
+    // more write it through `effectStatusReasons()`; the evaluator fills the generic ones.
+    [[nodiscard]] std::string_view effectStatusReason(std::string_view id) const;
     // §68. The fields this scene publishes, as of the last `update()`. Read by the Effects panel so
     // the subscription combo offers names that exist rather than a free-text box.
     [[nodiscard]] const world::fields::FieldBus& fieldBus() const { return fieldBus_; }
@@ -856,6 +860,7 @@ private:
     world::EffectParameters effectParams_;
     std::vector<std::uint32_t> effectOrder_;
     std::vector<world::EffectStatus> effectStatus_;
+    std::vector<std::string> effectStatusReason_; // ADR-703, parallel to effectStatus_
     // ADR-562: the last reported dropped-media count, so the warning is once per change rather than
     // once per frame.
     std::uint32_t lastMediaDropped_ = 0;
