@@ -1532,6 +1532,19 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     return doc;
 }
 
+Result<void> Engine::writeProjectCopy(const std::filesystem::path& path) {
+    const nlohmann::json doc = projectDocument(path);
+    std::ofstream out(path);
+    if (!out) {
+        return fail("cannot write '{}'", path.string());
+    }
+    out << doc.dump(2) << '\n';
+    if (!out) {
+        return fail("could not finish writing '{}'", path.string());
+    }
+    return {};
+}
+
 Result<void> Engine::saveProject(const std::filesystem::path& path) {
     nlohmann::json doc = projectDocument(path);
     std::ofstream out(path);

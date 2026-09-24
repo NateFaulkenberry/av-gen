@@ -149,6 +149,15 @@ public:
     // unsaved-changes comparison below is the *same function* the save is -- a second serialiser
     // written "to match" is the shape of defect this codebase keeps finding (ADR-440).
     [[nodiscard]] nlohmann::json projectDocument(const std::filesystem::path& path);
+    // Writes the document `saveProject` would write for `path` to `path`, WITHOUT adopting it: the
+    // session's project path, its unsaved-changes baseline and its dirty state are untouched.
+    //
+    // For anything that must read the session as it is now -- a render, a preview, the Director's
+    // dry run -- without saving over the person's file. A render used to do exactly that: it called
+    // `saveProject(projectPath())`, which wrote every unsaved edit into their project and cleared the
+    // "unsaved changes" prompt that would have let them decline (Director program 0.4). Relative
+    // asset paths are made relative to `path`, so the copy loads from wherever it is written.
+    [[nodiscard]] Result<void> writeProjectCopy(const std::filesystem::path& path);
     // Copies every asset the project names into `assetsDir` and writes `projectFile` with
     // references rewritten to point at the copies. Shared by `exportBundle` and Save As.
     [[nodiscard]] Result<void> bundleInto(const std::filesystem::path& projectFile,
