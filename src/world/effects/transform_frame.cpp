@@ -177,6 +177,52 @@ void buildTransformFrame(std::span<const EffectInstance> effects, const EffectCo
     }
 }
 
+bool transformOffsetAt(std::span<const EffectInstance> effects, std::span<const std::uint32_t> order,
+                       const EffectContext& ctx, std::string_view node, TransformOffset& out) {
+    out.translation = glm::vec3(0.0f);
+    out.localPosition = glm::vec3(0.0f);
+    out.localRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    out.localScale = glm::vec3(1.0f);
+    bool any = false;
+    const std::size_t n = order.empty() ? effects.size() : order.size();
+    for (std::size_t walk = 0; walk < n; ++walk) {
+        const std::size_t at = order.empty() ? walk : order[walk];
+        if (at >= effects.size()) {
+            continue;
+        }
+        const EffectInstance& e = effects[at];
+        if (e.owner.kind != EffectTarget::Entity || e.owner.name != node) {
+            continue;
+        }
+        const TransformProducer* producer = transformProducer(e.kind);
+        if (producer == nullptr) {
+            continue;
+        }
+        const TransformGate gate = transformGate(e, ctx);
+        TransformContribution c;
+        if (gate.envelope > 0.0f && producer->produce(e, ctx, gate.age, c) && finite(c.translation) &&
+            finite(c.rotation) && finite(c.scale) && finite(c.pivot)) {
+            composeTransformOffset(out, faded(c, gate.envelope));
+            any = true;
+        }
+    }
+    return any;
+}
+
+bool hasTransformProducer(std::span<const EffectInstance> effects, std::string_view node) {
+    for (const EffectInstance& e : effects) {
+        if (e.owner.kind == EffectTarget::Entity && e.owner.name == node && transformProducer(e.kind) != nullptr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+glm::vec3 drawnOrigin(const TransformOffset& offset, const glm::vec3& position, const glm::quat& rotation,
+                      const glm::vec3& scale) {
+    return offset.translation + position + rotation * (scale * offset.localPosition);
+}
+
 float transformSeed(std::string_view id, float authoredSeed) {
     std::uint32_t h = 2166136261u;
     for (const char ch : id) {

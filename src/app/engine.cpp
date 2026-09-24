@@ -3848,8 +3848,14 @@ namespace {
 // rather than a lambda so resolution allocates nothing: the engine counts allocations per frame.
 class CompositionEffectScene final : public world::EffectSceneQuery {
 public:
-    CompositionEffectScene(const scene::Composition* comp, const world::HistoryBank* history)
-        : comp_(comp), history_(history) {}
+    CompositionEffectScene(const scene::Composition* comp, const world::HistoryBank* history,
+                           std::span<const world::EffectInstance> effects = {},
+                           std::span<const std::uint32_t> order = {})
+        : comp_(comp), history_(history), effects_(effects), order_(order) {}
+
+    // The frame's context, for re-evaluating XFORM offsets at past instants. Set once the context
+    // (which points back at this adapter) exists.
+    void setContext(const world::EffectContext* ctx) { ctx_ = ctx; }
 
     [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
         if (comp_ == nullptr) {
@@ -3885,13 +3891,61 @@ public:
     // grid). Deterministic under seek because the history is checkpointed and replayed (ADR-700).
     // False when the node is not subscribed -- the engine subscribes the entity owner of every
     // type in a Wave 1 bucket -- or has not been recorded yet.
+    //
+    // Wave 2: an owner an XFORM type offsets is differenced over its DRAWN path instead (the history
+    // re-applied with the offset at each end), so an orbiting saucer's Space Warp stretches along the
+    // orbit. Every other owner keeps HIST's own difference, bit for bit.
     [[nodiscard]] bool nodeVelocity(std::string_view name, glm::vec3& out) const override {
-        return history_ != nullptr && history_->velocity(name, out);
+        if (history_ == nullptr) {
+            return false;
+        }
+        if (ctx_ == nullptr || !world::hasTransformProducer(effects_, name)) {
+            return history_->velocity(name, out);
+        }
+        const std::size_t ring = history_->find(name);
+        if (ring >= history_->ringCount() || history_->sampleCount(ring) == 0) {
+            return false;
+        }
+        const double t1 = history_->sample(ring, history_->sampleCount(ring) - 1).t;
+        const double t0 = t1 - world::HistoryBank::kGridStep;
+        glm::vec3 p0;
+        glm::vec3 p1;
+        if (!nodeDrawnPosition(name, t1, p1)) {
+            return false;
+        }
+        if (!nodeDrawnPosition(name, t0, p0)) {
+            out = glm::vec3(0.0f); // one sample: at rest, as HIST says
+            return true;
+        }
+        out = (p1 - p0) / static_cast<float>(world::HistoryBank::kGridStep);
+        return true;
+    }
+
+    [[nodiscard]] bool nodeDrawnPosition(std::string_view name, double t, glm::vec3& out) const override {
+        world::HistorySample s;
+        if (history_ == nullptr || !history_->sampleAt(name, t, s)) {
+            return false;
+        }
+        out = s.position;
+        if (ctx_ == nullptr || !world::hasTransformProducer(effects_, name)) {
+            return true;
+        }
+        world::EffectContext at = *ctx_;
+        at.seconds = t;
+        at.scene = nullptr; // a Geometry type never reads the drawn scene (rendering-architecture §3)
+        world::TransformOffset offset;
+        if (world::transformOffsetAt(effects_, order_, at, name, offset)) {
+            out = world::drawnOrigin(offset, s.position, s.rotation, s.scale);
+        }
+        return true;
     }
 
 private:
     const scene::Composition* comp_;
     const world::HistoryBank* history_;
+    std::span<const world::EffectInstance> effects_;
+    std::span<const std::uint32_t> order_;
+    const world::EffectContext* ctx_ = nullptr;
 };
 
 // ADR-703. The play's transform automation, for the seek replay to re-apply when it records HIST.
@@ -4237,8 +4291,9 @@ void Engine::updateEffects(EffectPhase phase) {
     updateAuroraSpectrum();
     publishFields();
 
-    const CompositionEffectScene sceneAdapter(composition(), &historyBank_);
+    CompositionEffectScene sceneAdapter(composition(), &historyBank_, effects_, effectOrder_);
     const world::EffectContext ctx = effectContext(&sceneAdapter);
+    sceneAdapter.setContext(&ctx);
     if (effectStatus_.size() != effects_.size() || effectStatusReason_.size() != effects_.size()) {
         // Only if the list changed between the phases, which nothing in `update` does.
         effectStatus_.assign(effects_.size(), world::EffectStatus::Dormant);

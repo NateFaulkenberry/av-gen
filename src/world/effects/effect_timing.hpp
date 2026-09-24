@@ -152,6 +152,13 @@ public:
     // ADR-703. The node's velocity in metres per second, deterministic under seek (a function of the
     // simulation steps, not of wall-clock frame deltas). Optional: false when unknown.
     [[nodiscard]] virtual bool nodeVelocity(std::string_view name, glm::vec3& out) const { (void)name; (void)out; return false; }
+    // Wave 2. Where the node's origin was DRAWN at an earlier instant `t`: HIST's sample there (which
+    // is the pre-offset, simulated path -- that is what keeps it exact under seek) with the node's
+    // XFORM offset re-applied as it was at `t`. What a Trail's body must follow so that it meets the
+    // head on an orbiting or bobbing owner. Optional: false when the node has no sample at `t`.
+    [[nodiscard]] virtual bool nodeDrawnPosition(std::string_view name, double t, glm::vec3& out) const {
+        (void)name; (void)t; (void)out; return false;
+    }
 };
 
 // Everything an effect may read on a frame, for every type (ADR-702 merged ADR-207's and ADR-230's
