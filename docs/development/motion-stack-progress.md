@@ -242,19 +242,17 @@ flight, and the body is at its highest at `peak`.
    beat in three Glowmere scenes. Keep them, lower them, or drop the beat hop?
 
 ## Test status
-At 60a9911a (M1–M5), release, with a second build doing no compile or link:
-- **CPU `avgen_tests`:** 3,267 cases. **One real failure**: `test_glowmere_valley_2.cpp:551`
-  asserts that a project records its scene's sha256, and M4 edited four Glowmere scenes. The four
-  projects' recorded hashes are refreshed; that case and `[glowmere]` (50 cases) now pass. The full
-  rerun at 8dca5467 is clean: **3,267 cases, exit 0**, with only the expected `[!shouldfail]`
-  and 16 skips.
-- **GPU `avgen_render_tests`:** 443 cases, one failure: `test_render_job.cpp:87`, a `loadProject`
-  inside the shadow-AOV case. It passes on rerun (`[aov]`, 3 cases). Its fixture deletes and
-  recreates a fixed shared folder, `$TMPDIR/avgen_render_job`, so a GPU suite running at the same
-  time in another worktree can remove it mid-case. This is a cross-agent race, not a code fault,
-  and it is recorded for the CI owner.
-- **New motion tests:** `[handoff]`, `[semantics]`, `[jump]`, `[airborne]` and `[retime]`, 45 cases
-  together. Every new check was broken and seen red before being restored.
+
+At db30311a (main e995e3b9 merged, with ADR-870), release build:
+- **CPU `avgen_tests`:** 3,357 cases, exit 0. One expected failure (`[!shouldfail]` in
+  `test_character_lab_slopes.cpp:187`); 16 skipped.
+- **GPU `avgen_render_tests`:** 444 cases, exit 0, 1 skip (NDI).
+- **The merged replay step, proved on the multicam film through `Engine`, exactly 0:**
+  - the ADR-800 and ADR-870 seek-parity cases, including audio and a checkpoint resume;
+  - the film's section directions and its audio together (`[motion][direction][adr870]`).
+- Dropping the directives from the replay step puts Rook 71 m from where the play put him.
+- `test_midi.cpp:327`: an earlier failure was caused by a virtual MIDI source held by another
+  process. It passed in this run.
 
 ## Log
 - 2026-09-25: ADR-824 (scheduled direction, release, runtime goals); ADR-825 (baked database loading);
