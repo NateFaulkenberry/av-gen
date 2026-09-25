@@ -21,6 +21,33 @@ glm::vec2 pixelCentreNdc(const PickView& view, glm::uvec2 pixel) {
     // of the frame.
     return glm::vec2(u * 2.0f - 1.0f, 1.0f - v * 2.0f);
 }
+
+// The texel of a `texture` that covers canvas `pixel`. The renderer draws its targets at the canvas
+// size times its render scale, and the adaptive scale changes that between frames, so the canvas
+// pixel a click arrived in is not a texel of the target: at 0.62 a click at (1140, 492) on a
+// 1280-wide canvas read outside a 796-wide target -- a WebGPU validation error and a failed pick --
+// and every click below scale 1 read the texel up and left of the one under the cursor. Mapped by
+// pixel centre, so the texel is the one whose area contains the centre of the canvas pixel.
+glm::uvec2 texelUnder(const PickView& view, glm::uvec2 pixel, glm::uvec2 texture) {
+    const auto axis = [](std::uint32_t p, std::uint32_t canvas, std::uint32_t target) {
+        const double t = (static_cast<double>(p) + 0.5) * static_cast<double>(target) /
+                         static_cast<double>(std::max(canvas, 1u));
+        return std::min(static_cast<std::uint32_t>(t), target - 1);
+    };
+    return {axis(pixel.x, view.size.x, texture.x), axis(pixel.y, view.size.y, texture.y)};
+}
+
+glm::uvec2 textureSize(const wgpu::Texture& texture) {
+    return {texture.GetWidth(), texture.GetHeight()};
+}
+
+// The world position of a surface at `linearDepth` under the centre of `texel` of a target sized
+// `target`. The same frame as the canvas, sampled on the target's own grid.
+glm::vec3 worldPositionAtTexel(const PickView& view, glm::uvec2 texel, glm::uvec2 target, float linearDepth) {
+    PickView onTarget = view;
+    onTarget.size = target;
+    return worldPositionAt(onTarget, texel, linearDepth);
+}
 } // namespace
 
 glm::vec3 rayThroughPixel(const PickView& view, glm::uvec2 pixel) {
@@ -65,6 +92,12 @@ Result<PickResult> pickAt(gpu::Context& context, const wgpu::Texture& ids,
     if (ids == nullptr || linearDepth == nullptr) {
         return fail("pick: the scene has not been rendered yet");
     }
+    const glm::uvec2 target = textureSize(linearDepth);
+    if (target != textureSize(ids) || target.x == 0 || target.y == 0) {
+        return fail("pick: the identifier target ({}x{}) and the depth target ({}x{}) disagree",
+                    ids.GetWidth(), ids.GetHeight(), target.x, target.y);
+    }
+    const glm::uvec2 texel = texelUnder(view, pixel, target);
 
     // Both texels in one submission and one wait.
     //
@@ -78,8 +111,8 @@ Result<PickResult> pickAt(gpu::Context& context, const wgpu::Texture& ids,
     // already happening, against a whole round trip saved on every click that hits something --
     // which is most of them, and the only ones anybody is waiting on.
     const gpu::TexelRequest requests[] = {
-        {.texture = &linearDepth, .x = pixel.x, .y = pixel.y},
-        {.texture = &ids, .x = pixel.x, .y = pixel.y},
+        {.texture = &linearDepth, .x = texel.x, .y = texel.y},
+        {.texture = &ids, .x = texel.x, .y = texel.y},
     };
     auto texels = gpu::readTexelsR32(context, requests);
     if (!texels) {
@@ -110,10 +143,21 @@ Result<glm::vec3> pickNormalAt(gpu::Context& context, const wgpu::Texture& linea
         return fail("pick normal: the scene has not been rendered yet");
     }
     step = std::max(step, 1u);
+    if (pixel.x >= view.size.x || pixel.y >= view.size.y) {
+        return fail("pick normal: ({}, {}) is outside the {}x{} canvas", pixel.x, pixel.y, view.size.x,
+                    view.size.y);
+    }
+    // Everything below is on the depth target's own grid, which the render scale can make smaller
+    // than the canvas (see `texelUnder`).
+    const glm::uvec2 target = textureSize(linearDepth);
+    if (target.x == 0 || target.y == 0) {
+        return fail("pick normal: the depth target has no size");
+    }
+    pixel = texelUnder(view, pixel, target);
     // Sampled toward the middle of the frame, so a click near an edge still has both neighbours
     // inside the target rather than failing or clamping onto itself.
-    const std::uint32_t maxX = view.size.x > 0 ? view.size.x - 1 : 0;
-    const std::uint32_t maxY = view.size.y > 0 ? view.size.y - 1 : 0;
+    const std::uint32_t maxX = target.x - 1;
+    const std::uint32_t maxY = target.y - 1;
     const std::uint32_t rightX = pixel.x + step <= maxX ? pixel.x + step : (pixel.x >= step ? pixel.x - step : pixel.x);
     const std::uint32_t downY = pixel.y + step <= maxY ? pixel.y + step : (pixel.y >= step ? pixel.y - step : pixel.y);
     if (rightX == pixel.x || downY == pixel.y) {
@@ -141,7 +185,7 @@ Result<glm::vec3> pickNormalAt(gpu::Context& context, const wgpu::Texture& linea
         if (!(depth < kPickFarDistance)) {
             return fail("pick normal: a neighbour is sky");
         }
-        points[i] = worldPositionAt(view, taps[i], depth);
+        points[i] = worldPositionAtTexel(view, taps[i], target, depth);
     }
 
     // The winding is chosen so the result points back toward the camera for a surface facing it.
