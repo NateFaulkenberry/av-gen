@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "../world/glowmere-valley-2-multicam.scene.json",
-        "sha256": "e1703f9891d4c2c3b562cb99048359af5f2d4c784c0415dc9b2f06ef2d57990e",
-        "size": 263720
+        "sha256": "d6646a4d0a0533352cee55c084c64ee4f45923e1b9c82e51ca4a4b0e74a6a71e",
+        "size": 264310
       }
     }
   },
@@ -1298,6 +1298,7 @@
         "size": 0.11999999731779099,
         "speed": 0.25,
         "trail": false,
+        "triggerBurst": 0.0,
         "turbulence": 0.6000000238418579,
         "wind": 0.20000000298023224
       },
@@ -3213,7 +3214,17 @@
       13.29407024383545,
       -22.947933197021484
     ],
+    "cameras/ufowatch/aimOffset": [
+      0.0,
+      -5.599999904632568,
+      0.0
+    ],
     "cameras/ufowatch/focalLength": 35.0,
+    "cameras/ufowatch/followOffset": [
+      24.799999237060547,
+      4.0,
+      24.799999237060547
+    ],
     "cameras/ufowatch/fov": 40.0,
     "cameras/ufowatch/lookAhead": 2.0,
     "cameras/ufowatch/position": [
@@ -3422,6 +3433,7 @@
     "entity/ember/decide/beam/weight": 1.5,
     "entity/ember/decide/company/weight": 0.5,
     "entity/ember/decide/dwellTicks": 3.0,
+    "entity/ember/decide/goal/weight": 5.0,
     "entity/ember/decide/hertz": 1.2000000476837158,
     "entity/ember/decide/idle/weight": 0.05000000074505806,
     "entity/ember/decide/margin": 0.05000000074505806,
@@ -3551,6 +3563,7 @@
     "entity/rook/decide/beam/weight": 1.5,
     "entity/rook/decide/company/weight": 0.5,
     "entity/rook/decide/dwellTicks": 3.0,
+    "entity/rook/decide/goal/weight": 5.0,
     "entity/rook/decide/hertz": 1.2000000476837158,
     "entity/rook/decide/idle/weight": 0.05000000074505806,
     "entity/rook/decide/margin": 0.05999999865889549,
@@ -3596,6 +3609,7 @@
     "entity/sage/decide/beam/weight": 1.5,
     "entity/sage/decide/company/weight": 0.5,
     "entity/sage/decide/dwellTicks": 4.0,
+    "entity/sage/decide/goal/weight": 5.0,
     "entity/sage/decide/graze/weight": 0.949999988079071,
     "entity/sage/decide/grove/pull": 0.18000000715255737,
     "entity/sage/decide/grove/weight": 0.41999998688697815,
@@ -3647,6 +3661,7 @@
     "entity/tide/decide/beam/weight": 1.5,
     "entity/tide/decide/company/weight": 0.5,
     "entity/tide/decide/dwellTicks": 4.0,
+    "entity/tide/decide/goal/weight": 5.0,
     "entity/tide/decide/hertz": 0.800000011920929,
     "entity/tide/decide/idle/weight": 0.05000000074505806,
     "entity/tide/decide/margin": 0.07999999821186066,
@@ -3692,6 +3707,7 @@
     "entity/vane/decide/beam/weight": 1.5,
     "entity/vane/decide/company/weight": 0.5,
     "entity/vane/decide/dwellTicks": 3.0,
+    "entity/vane/decide/goal/weight": 5.0,
     "entity/vane/decide/hertz": 1.0,
     "entity/vane/decide/idle/weight": 0.05000000074505806,
     "entity/vane/decide/margin": 0.07000000029802322,
@@ -4206,6 +4222,7 @@
     "fx/particle-emitter/size": 0.11999999731779099,
     "fx/particle-emitter/speed": 0.25,
     "fx/particle-emitter/trail": false,
+    "fx/particle-emitter/triggerBurst": 0.0,
     "fx/particle-emitter/turbulence": 0.6000000238418579,
     "fx/particle-emitter/wind": 0.20000000298023224,
     "fx/particle-emitter/windowSeconds": 6.0,
@@ -17150,13 +17167,15 @@
       0.18000000715255737,
       0.3199999928474426
     ],
-    "scene/fogDensity": 0.01899999938905239,
+    "scene/fogGroundFollow": 0.0,
     "scene/fogHeight": 4.0,
     "scene/fogHeightAmount": 1.0,
     "scene/fogHeightCurve": 0.0,
     "scene/fogHeightFalloff": 0.10000000149011612,
+    "scene/fogPooling": 0.0,
     "scene/fogUpperDensity": 0.0,
     "scene/gridIntensity": 0.6000000238418579,
+    "scene/horizonDensity": 0.0,
     "scene/keyLight": 1.0,
     "scene/shadowRange": 0.0,
     "scene/styledGroundAmbient": [
@@ -17172,11 +17191,11 @@
     "scene/stylized": true,
     "scene/volumeAbsorption": 0.4000000059604645,
     "scene/volumeAnisotropy": 0.11999999731779099,
-    "scene/volumeDensity": 0.0,
+    "scene/volumeDensity": 0.03954999893903732,
     "scene/volumeEmission": 0.0,
     "scene/volumeJitter": 1.0,
     "scene/volumeLocalLights": 1.0,
-    "scene/volumeMaxDistance": 320.0,
+    "scene/volumeMaxDistance": 0.0,
     "scene/volumeNoise": 0.44999998807907104,
     "scene/volumeNoiseScale": 0.019999999552965164,
     "scene/volumeNoiseSpeed": 0.10000000149011612,

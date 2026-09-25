@@ -16,7 +16,6 @@
   "skybox": false,
   "lightFromEnvironment": false,
   "intensity": 0.0,
-  "fogDensity": 0.0,
   "fogColor": [0.55, 0.62, 0.75],
   "volumeDensity": 0.02,
   "fogHeightAmount": 0.0,

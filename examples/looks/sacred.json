@@ -18,9 +18,6 @@
     "scene/brightness": [
       0.8
     ],
-    "scene/fogDensity": [
-      0.02
-    ],
     "scene/volumeDensity": [
       0.06
     ],

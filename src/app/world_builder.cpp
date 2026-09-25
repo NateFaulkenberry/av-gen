@@ -93,7 +93,6 @@ void applyEnvironment(Engine& engine, const world::EnvironmentPlan& env) {
     setFloat(engine, "env/sky/haze", env.haze);
     setFloat(engine, "scene/keyLight", env.keyLight);
     setVec3(engine, "scene/fogColor", env.fogColor);
-    setFloat(engine, "scene/fogDensity", env.fogDensity);
     setFloat(engine, "scene/fogHeight", env.fogHeight);
     setFloat(engine, "scene/fogHeightFalloff", env.fogHeightFalloff);
     setFloat(engine, "scene/volumeDensity", env.volumeDensity);

@@ -9,7 +9,7 @@
     "cues": [
       {
         "key": "fog",
-        "parameter": "scene/fogDensity",
+        "parameter": "scene/volumeDensity",
         "at": "the second chorus",
         "until": "end of the second chorus",
         "value": 0.08,
@@ -24,7 +24,7 @@
       "sequence.event": 1
     },
     "diff": [
-      "Cue scene/fogDensity -> 0.08"
+      "Cue scene/volumeDensity -> 0.08"
     ]
   }
 }

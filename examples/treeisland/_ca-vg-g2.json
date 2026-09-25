@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "_ca-vg-g2.scene.json",
-        "sha256": "ad4a393c4d1473322ed4eb547b3e8be36d9fb52df8a69d559505c310d6a36064",
-        "size": 14882
+        "sha256": "94a989fc4569917ce399327303479f89f4110cfb27611cca63929d7c40b6c2a9",
+        "size": 14859
       }
     }
   },
@@ -1478,7 +1478,6 @@
       0.006200000178068876,
       0.01850000023841858
     ],
-    "scene/fogDensity": 0.0,
     "scene/fogHeight": 0.0,
     "scene/fogHeightFalloff": 0.0,
     "scene/gridIntensity": 0.6000000238418579,

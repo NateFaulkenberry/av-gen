@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "_pre-defects.scene.json",
-        "sha256": "9c1758f815cb1681ce10f166f59164aaca6b7d14a2d57293ab25ede9657b8466",
-        "size": 248865
+        "sha256": "8e8967caeb94b9e39030664df4919b98edad6a22135d9730a41041a981a2b0c7",
+        "size": 248839
       }
     }
   },
@@ -15205,7 +15205,6 @@
       0.18000000715255737,
       0.3199999928474426
     ],
-    "scene/fogDensity": 0.01899999938905239,
     "scene/fogHeight": 4.0,
     "scene/fogHeightFalloff": 0.10000000149011612,
     "scene/gridIntensity": 0.6000000238418579,

@@ -383,9 +383,10 @@ std::optional<Window> activeWindow(const EffectInstance& e, const EffectContext&
     // A `FocusHero` source follows whatever the cut is on. Anything else fires for its OWN subject
     // only -- which for an entity-owned pulse is the entity it is attached to, and is what makes
     // sixteen per-hero pulses behave, together, exactly like ADR-207's one pulse that followed focus.
-    return resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots,
-                                   e.wave.source.kind == SourceKind::FocusHero,
-                                   endpointSubject(e, e.wave.source));
+    return resolveActivationWindow(e.activation, e.timing, ctx, e.wave.source.kind == SourceKind::FocusHero,
+                                   endpointSubject(e, e.wave.source),
+                                   e.owner.kind == EffectTarget::Entity ? std::string_view(e.owner.name)
+                                                                        : std::string_view());
 }
 
 const HeroPoint* findHero(std::span<const HeroPoint> heroes, std::string_view name) {

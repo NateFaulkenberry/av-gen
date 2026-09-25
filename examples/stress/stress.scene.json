@@ -19,7 +19,8 @@
   },
   "environment": {
     "intensity": 0.0,
-    "fogDensity": 0.004,
+    "volumeDensity": 0.00666044,
+    "volumeMaxDistance": 0.0,
     "background": [
       0.004,
       0.005,

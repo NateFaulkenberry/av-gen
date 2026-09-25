@@ -24,6 +24,11 @@ eventually be disbelieved for a reason that has nothing to do with its subject.
 The two laws, from ADR-569:
   surface   `Environment::fogDensity`, applied as exp(-(distance * density)^2) to lit surfaces
   march     `Environment::volumeDensity`, applied as Beer-Lambert through the volumetric raymarch
+
+**ADR-705 unified them** (ADR-569's option 2): `fogDensity` is gone and the surface pass is the
+march's own air under the march's own law, carried past `volumeMaxDistance`. After it, "both" and
+"surface only" should read 0 -- a non-zero count there is a scene still carrying the removed key --
+and the ADR-705 lines below say how the one law is split between the two passes.
 """
 
 import argparse
@@ -55,6 +60,7 @@ def main() -> int:
         files = [f for f in files if not f.name.startswith("_")]
 
     both = surface = march = neither = 0
+    analytic_only = marched = 0   # ADR-705: volumeDensity > 0 with and without a march to carry it
     march_only: list[str] = []
     for f in files:
         try:
@@ -67,6 +73,13 @@ def main() -> int:
             fa, fb = env.get("fogDensity"), env.get("volumeDensity")
             a = isinstance(fa, (int, float)) and fa > 0
             b = isinstance(fb, (int, float)) and fb > 0
+        vd = env.get("volumeDensity")
+        if isinstance(vd, (int, float)) and vd > 0:
+            md = env.get("volumeMaxDistance", 200.0)
+            if isinstance(md, (int, float)) and md <= 0:
+                analytic_only += 1
+            else:
+                marched += 1
         if a and b:
             both += 1
         elif a:
@@ -87,13 +100,15 @@ def main() -> int:
     print(f"  surface law only           {surface}")
     print(f"  march law only             {march}")
     print(f"  neither                    {neither}")
-    if march_only:
+    if march_only and len(march_only) <= 5:  # after ADR-705 every fogged scene is here
         print(f"  march-only scenes: {', '.join(sorted(march_only))}")
     # The migration cost ADR-569's option 2 is costed against: every scene whose SURFACE law is
     # live would need a new density chosen, and the surface-only ones have no volumetric number to
     # derive it from.
     print(f"  scenes whose surface law is live (option 2's migration): {both + surface}"
           f"  -- of which {surface} have no volumetric density to derive one from")
+    print(f"  ADR-705, one law: fogged scenes {analytic_only + marched} -- {marched} marched (then integrated "
+          f"past volumeMaxDistance), {analytic_only} integrated only (volumeMaxDistance 0)")
     return 0
 
 

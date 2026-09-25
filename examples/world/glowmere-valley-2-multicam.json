@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-valley-2-multicam.scene.json",
-        "sha256": "93ef42dfdca205434b64e49903e1e524f633059a81a4acb7691066572c8afe53",
-        "size": 264401
+        "sha256": "d4739e83dcdf27bcd6f7daca2a6403b5cf83e625af5b769fc33f3cfede2d0c5f",
+        "size": 264375
       }
     }
   },
@@ -16722,7 +16722,6 @@
       0.18000000715255737,
       0.3199999928474426
     ],
-    "scene/fogDensity": 0.01899999938905239,
     "scene/fogHeight": 4.0,
     "scene/fogHeightAmount": 1.0,
     "scene/fogHeightCurve": 0.0,
@@ -16744,11 +16743,11 @@
     "scene/stylized": true,
     "scene/volumeAbsorption": 0.4000000059604645,
     "scene/volumeAnisotropy": 0.11999999731779099,
-    "scene/volumeDensity": 0.0,
+    "scene/volumeDensity": 0.03955,
     "scene/volumeEmission": 0.0,
     "scene/volumeJitter": 1.0,
     "scene/volumeLocalLights": 1.0,
-    "scene/volumeMaxDistance": 320.0,
+    "scene/volumeMaxDistance": 0.0,
     "scene/volumeNoise": 0.44999998807907104,
     "scene/volumeNoiseScale": 0.019999999552965164,
     "scene/volumeNoiseSpeed": 0.10000000149011612,

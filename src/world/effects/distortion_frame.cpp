@@ -1,5 +1,7 @@
 #include "world/effects/distortion_frame.hpp"
 
+#include "world/effects/effect_trigger.hpp"
+
 #include <algorithm>
 #include <cmath>
 
@@ -9,14 +11,30 @@ namespace avgen::world {
 // own would be one more file to keep in step (the registry's own rule for `builtinSchemas`).
 std::size_t spaceWarpProxies(const EffectInstance& instance, const EffectContext& ctx, float envelope,
                              std::span<DistortionProxy> out);
+// Wave 2 (TRIGGER's DF users).
+std::size_t shockwaveProxies(const EffectInstance& instance, const EffectContext& ctx, float envelope,
+                             std::span<DistortionProxy> out);
+float shockwaveHistorySeconds(const EffectInstance& instance);
+std::size_t rippleProxies(const EffectInstance& instance, const EffectContext& ctx, float envelope,
+                          std::span<DistortionProxy> out);
+std::size_t velocityDistortionProxies(const EffectInstance& instance, const EffectContext& ctx, float envelope,
+                                      std::span<DistortionProxy> out);
+float velocityDistortionHistorySeconds(const EffectInstance& instance);
 
 namespace {
 
 // The largest `maxProxies` any producer declares; the scratch the records hook resolves into.
 constexpr std::size_t kMaxProxiesPerInstance = 8;
 
+// The most fronts one Shockwave or Ripple draws at once, and the segments of one wake.
+constexpr std::size_t kMaxFronts = 4;
+constexpr std::size_t kWakeSegments = 6;
+
 constexpr DistortionProducer kProducers[] = {
-    {EffectKind::SpaceWarp, &spaceWarpProxies, 1},
+    {EffectKind::SpaceWarp, &spaceWarpProxies, 1, nullptr},
+    {EffectKind::Shockwave, &shockwaveProxies, kMaxFronts, &shockwaveHistorySeconds},
+    {EffectKind::Ripple, &rippleProxies, kMaxFronts, nullptr},
+    {EffectKind::VelocityDistortion, &velocityDistortionProxies, kWakeSegments, &velocityDistortionHistorySeconds},
 };
 
 static_assert([] {
@@ -55,8 +73,10 @@ float distortionEnvelope(const EffectInstance& e, const EffectContext& ctx) {
     // An entity-owned warp fires for its OWN subject under `HeroFocus` (the per-hero pattern Ground
     // Pulse established); a World-owned one follows whatever the cut is holding.
     const bool world = e.owner.kind == EffectTarget::World;
-    const auto window = resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots, world,
-                                                world ? std::string_view{} : std::string_view(e.owner.name));
+    const auto window = resolveActivationWindow(e.activation, e.timing, ctx, world,
+                                                world ? std::string_view{} : std::string_view(e.owner.name),
+                                                e.owner.kind == EffectTarget::Entity ? std::string_view(e.owner.name)
+                                                                                     : std::string_view{});
     if (!window) {
         return 0.0f;
     }
@@ -105,6 +125,13 @@ void buildDistortionFrame(std::span<const EffectInstance> effects, const EffectC
         }
         EffectStatus said = e.enabled ? EffectStatus::Dormant : EffectStatus::Disabled;
         const float envelope = distortionEnvelope(e, ctx);
+        if (e.enabled && envelope <= 0.0f && at < reasons.size()) {
+            // Wave 2: a trigger-activated effect says what it is waiting for (a literal; no allocation
+            // once the reason has capacity).
+            if (const char* why = effectTriggerDormancy(e, ctx)) {
+                reasons[at].assign(why);
+            }
+        }
         if (envelope > 0.0f) {
             // Resolve into scratch first, so an instance that does not fit is counted as what it
             // would have drawn rather than as nothing -- the difference between Dropped and Dormant.

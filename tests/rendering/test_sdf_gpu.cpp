@@ -701,7 +701,9 @@ TEST_CASE("SDF raymarch shades with lights and fog like meshes", "[gpu][sdf]") {
     CHECK(distinct > 8);
     // Fog pulls the object towards the fog colour.
     s.environment.fogColor = {0.0f, 0.0f, 1.0f};
-    s.environment.fogDensity = 0.3f;
+    // ADR-705: the one density, surface pass only (no march). Was exp-squared `fogDensity` 0.3.
+    s.environment.volumeMaxDistance = 0.0f;
+    s.environment.volumeDensity = 0.6f;
     const auto foggy = renderWith(renderer, s, 0.5, 256, 256);
     long blueLit = 0, blueFog = 0;
     for (std::uint32_t y = 0; y < 256; ++y) {

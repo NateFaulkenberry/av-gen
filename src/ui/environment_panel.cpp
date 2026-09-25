@@ -114,6 +114,27 @@ void drawEnvironmentPanel(app::Engine& engine) {
         // top, or a thin global haze that never quite clears.
         slider(engine, "scene/fogUpperDensity", "Upper density", "%.2f");
         slider(engine, "scene/fogHeightCurve", "Height curve", "%.2f");
+        // ADR-715 (ADR-575 §18): the layer follows the terrain. Beside the other height-layer rows because it
+        // moves the same layer -- 0 is the flat plane at "Fog height", 1 measures that height from
+        // the ground under each point. Inert in a scene with no terrain, and the row says so.
+        slider(engine, "scene/fogGroundFollow", "Follow ground", "%.2f");
+        if (params::IParameter* p = engine.params().find("scene/fogGroundFollow");
+            p != nullptr && p->baseComponent(0) > 0.0f && !engine.scene().terrainGround.valid()) {
+            ImGui::TextColored(kMuted, "  this scene has no terrain: the layer stays flat");
+        }
+        // ADR-717: the layer pools in the basins -- deep in valleys, thin over ridges. Beside
+        // "Follow ground" because it moves the same reference: at 1 it replaces the follow.
+        slider(engine, "scene/fogPooling", "Pool in valleys", "%.2f");
+        if (params::IParameter* p = engine.params().find("scene/fogPooling"); p != nullptr && p->baseComponent(0) > 0.0f) {
+            if (!engine.scene().terrainGround.valid()) {
+                ImGui::TextColored(kMuted, "  this scene has no terrain: nothing to pool in");
+            } else if (p->baseComponent(0) >= 1.0f) {
+                ImGui::TextColored(kMuted, "  at 1 the layer is measured from the basins alone: Follow ground has no effect");
+            }
+        }
+        // ADR-705, §7's last control: the air grows denser with distance from the eye (1 doubles it
+        // a kilometre out). One number, read by the march and the surface fog alike.
+        slider(engine, "scene/horizonDensity", "Horizon density", "%.2f");
         // ADR-570 (§20/§22). Named for what an artist is buying rather than for the algorithm:
         // what these do is make a bank light from a direction and cast a shaft, and "shadow steps"
         // is the number that costs frame time. Both are drawn because a control that exists and
