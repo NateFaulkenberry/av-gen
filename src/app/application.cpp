@@ -5184,6 +5184,10 @@ int Application::runLive() {
               static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, renderer_->stats().triangles,
               renderer_->stats().drawCalls);
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
+    if (uiScript_.failedChecks() > 0) {
+        log::error("ui script: {} check(s) failed", uiScript_.failedChecks());
+        return 8;
+    }
     return context_->errorCount() == 0 ? 0 : 5;
 }
 

@@ -77,6 +77,11 @@ void DirectorPanel::refresh(app::Engine& engine, const std::shared_ptr<AgentTask
     if (id == cachedTask_ && state == cachedState_) {
         return;
     }
+    // While its own preview is installed, the proposal is shown as it was proposed. Re-compiling it
+    // against the project would compile it against itself: "revision 2", every line a replacement.
+    if (!previewTask_.empty() && id == previewTask_ && id == cachedTask_ && compiled_) {
+        return;
+    }
     cachedTask_ = id;
     cachedState_ = state;
     compiled_.reset();
@@ -204,20 +209,23 @@ void DirectorPanel::draw(app::Engine& engine) {
     const PanelActions actions = panelActions(ps);
     ImGui::Spacing();
     ImGui::Separator();
-    const auto button = [](const char* label, const Button& b) {
+    const auto button = [](const char* label, const Button& b, Rect& where) {
         ImGui::BeginDisabled(!b.enabled);
         const bool pressed = ImGui::Button(label);
         ImGui::EndDisabled();
+        const ImVec2 lo = ImGui::GetItemRectMin();
+        const ImVec2 hi = ImGui::GetItemRectMax();
+        where = Rect{lo.x, lo.y, hi.x - lo.x, hi.y - lo.y, true};
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !b.why.empty()) {
             ImGui::SetTooltip("%s", b.why.c_str());
         }
         return pressed;
     };
     if (ps.previewing) {
-        if (button("End preview", actions.endPreview)) {
+        if (button("End preview", actions.endPreview, buttons_.preview)) {
             status_ = endPreview(engine) ? "preview ended; nothing is changed" : status_;
         }
-    } else if (button("Preview", actions.preview) && edits != nullptr && compiled_) {
+    } else if (button("Preview", actions.preview, buttons_.preview) && edits != nullptr && compiled_) {
         if (app::applyCompilation(engine, edits->history(), *compiled_)) {
             previewTask_ = task->id();
             previewState_ = edits->history().stateId();
@@ -227,14 +235,14 @@ void DirectorPanel::draw(app::Engine& engine) {
         }
     }
     ImGui::SameLine();
-    if (button("Accept", actions.accept)) {
+    if (button("Accept", actions.accept, buttons_.accept)) {
         if (actions.revertPreviewFirst) {
             (void)endPreview(engine);
         }
         status_ = plane->approveCurrentTask() ? "applied as one undo" : "could not apply";
     }
     ImGui::SameLine();
-    if (button("Reject", actions.reject)) {
+    if (button("Reject", actions.reject, buttons_.reject)) {
         if (actions.revertPreviewFirst) {
             (void)endPreview(engine);
         }
