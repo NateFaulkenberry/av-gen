@@ -2780,6 +2780,34 @@ void Composition::setPerformers(std::vector<Performer> performers) {
     performers_ = std::move(performers);
 }
 
+void Composition::setDirectives(std::vector<Directive> directives) {
+    std::stable_sort(directives.begin(), directives.end(),
+                     [](const Directive& a, const Directive& b) { return a.timeSeconds < b.timeSeconds; });
+    directives_ = std::move(directives);
+}
+
+void Composition::applyDirectives(double now, double dt) {
+    // (now - dt, now]: each second belongs to exactly one step of a forward play or replay. A step
+    // with no duration (the first frame; the instant a seek lands on) owns only its own second, and
+    // re-applying the same order at the same second leaves the queue exactly as it was.
+    for (const Directive& d : directives_) {
+        if (d.timeSeconds > now) {
+            break;
+        }
+        const bool due = dt > 0.0 ? d.timeSeconds > now - dt : d.timeSeconds == now;
+        if (!due) {
+            continue;
+        }
+        if (d.release) {
+            (void)entityWorld_.release(d.entity, d.timeSeconds);
+        } else if (d.goal) {
+            (void)entityWorld_.setGoal(d.entity, d.goalSubject, d.goalAffordance, d.timeSeconds);
+        } else {
+            (void)entityWorld_.direct(d.entity, d.actions, d.timeSeconds);
+        }
+    }
+}
+
 void Composition::applyPerformers(double now, double dt) {
     for (const Performer& p : performers_) {
         if (!p.pose) {
@@ -2858,6 +2886,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         raiseDirectorBeats(time.renderTime);
     }
     applyPerformers(time.renderTime, time.deltaTime); // ADR-758: after the director, before the step
+    applyDirectives(time.renderTime, time.deltaTime); // ADR-824: the same point, on both paths
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.
     observeCameraEvents(time.renderTime);
@@ -3041,6 +3070,9 @@ std::uint64_t Composition::replayInputKey() const {
     for (const Performer& p : performers_) { // ADR-758: a changed performance is a different replay
         mix(p.signature);
     }
+    for (const Directive& d : directives_) { // ADR-824: likewise a changed schedule of orders
+        mix(d.signature);
+    }
     mix(bits(rootAngle_));
     mix(bits(center_.x));
     mix(bits(center_.y));
@@ -3066,9 +3098,12 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     if (stagingDesc_.empty()) {
         entity::EntityWorld::SeekHooks hooks;
         hooks.inputKey = withHistoryKey(replayInputKey(), history);
-        if (!performers_.empty()) {
-            // ADR-758: the director-less replay still has the one director a sequence brings.
-            hooks.before = [this](double now, double dt) { applyPerformers(now, dt); };
+        if (!performers_.empty() || !directives_.empty()) {
+            // ADR-758/824: the director-less replay still has the direction a sequence brings.
+            hooks.before = [this](double now, double dt) {
+                applyPerformers(now, dt);
+                applyDirectives(now, dt);
+            };
         }
         if (history != nullptr) {
             hooks.after = [&](double now, double) {
@@ -3112,6 +3147,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         staging_.update(ctx);
         raiseDirectorBeats(now);
         applyPerformers(now, dt); // ADR-758: the same point of the step a play applies them at
+        applyDirectives(now, dt); // ADR-824
     };
     hooks.after = [&](double now, double) {
         // The offsets a play's entity pass writes, and the "flattening" the next step's director

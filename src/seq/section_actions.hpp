@@ -78,7 +78,19 @@ struct SectionPerformanceSet {
 struct DirectedAction {
     std::string entity;
     entity::ActionDesc action;
+    // ADR-824: the verb `release` -- drop the Director tier rather than add to it. `action` unused.
+    bool release = false;
+    // ADR-824 (§35): the verb `goal`, argument "subject" or "subject.affordance" -- a runtime goal
+    // for the character's `goal` considerer (`entity::DirectorGoal`). `action` unused.
+    bool goal = false;
+    std::string goalSubject;
+    std::string goalAffordance;
 };
+// The two verbs that are not an `ActionKind`: they steer a body's own decisions, or hand it back,
+// instead of giving it an order.
+inline constexpr std::string_view kReleaseVerb = "release";
+inline constexpr std::string_view kGoalVerb = "goal";
+[[nodiscard]] bool isSectionVerb(std::string_view verb);
 
 // `{value, argument}` from a generated event becomes an `ActionDesc`.
 //

@@ -323,10 +323,15 @@ Result<seq::InstallReport> Engine::installSequence() {
         sequenceReport_ = seq::InstallReport{};
         sequenceEvents_.clear();
         firedEvents_.clear();
+        directedEvents_.clear();
+        if (scene::Composition* comp = composition()) {
+            comp->setDirectives({}); // ADR-824: nothing installed, nothing scheduled
+        }
         return report;
     }
     sequenceTargets_ = report->targets;
     sequenceReport_ = *report;
+    installDirectives(); // ADR-824
     // The dispatcher copies the events, so an editor may keep editing `sequence().events` between
     // installs without the running frame reading a reallocated vector.
     sequenceEvents_.setEvents(sequence_.events, sequenceReport_.events);
@@ -347,10 +352,58 @@ Result<seq::InstallReport> Engine::installSequence() {
     return report;
 }
 
+// ADR-824: every scheduled section action whose verb this engine knows and whose subject is an entity
+// here becomes a composition directive -- applied at its second on a play and in a seek's replay --
+// and leaves `applySectionActions`, which would otherwise give the same order again. Verbs a host
+// owns, and subjects nothing here is called, stay with `firedEvents()` exactly as before.
+void Engine::installDirectives() {
+    directedEvents_.clear();
+    scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return;
+    }
+    std::vector<scene::Composition::Directive> directives;
+    for (const seq::Firing& firing : sequenceReport_.events.dispatches) {
+        if (firing.eventIndex >= sequence_.events.size()) {
+            continue;
+        }
+        const seq::SequenceEvent& event = sequence_.events[firing.eventIndex];
+        if (event.what.kind != seq::EventActionKind::EntityAction) {
+            continue;
+        }
+        auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
+        if (!directed || comp->entityWorld().find(directed->entity) == nullptr) {
+            continue;
+        }
+        scene::Composition::Directive d;
+        d.timeSeconds = firing.timeSeconds;
+        d.entity = directed->entity;
+        d.release = directed->release;
+        d.goal = directed->goal;
+        d.goalSubject = directed->goalSubject;
+        d.goalAffordance = directed->goalAffordance;
+        if (!directed->release && !directed->goal) {
+            d.actions.push_back(directed->action);
+        }
+        std::uint64_t h = 1469598103934665603ULL;
+        for (const char c : fmt::format("{}|{}|{}|{}|{}", firing.timeSeconds, event.what.target, event.what.value,
+                                        event.what.argument, firing.eventIndex)) {
+            h ^= static_cast<unsigned char>(c);
+            h *= 1099511628211ULL;
+        }
+        d.signature = h;
+        directives.push_back(std::move(d));
+        directedEvents_.insert(firing.eventIndex);
+    }
+    comp->setDirectives(std::move(directives));
+}
+
 void Engine::clearSequence() {
     if (scene::Composition* comp = composition()) {
         comp->setPerformers({}); // ADR-758: no sequence, no performances
+        comp->setDirectives({}); // ADR-824: and no scheduled orders
     }
+    directedEvents_.clear();
     seq::CompositionLayerSink sink(layers_, &params_);
     seq::uninstall(timeline_, params_, sink, sequenceTargets_);
     sequenceTargets_.clear();
@@ -4348,6 +4401,9 @@ void Engine::applySectionActions() {
         if (event.what.kind != seq::EventActionKind::EntityAction) {
             continue;   // a Notify belongs to the host, exactly as before
         }
+        if (directedEvents_.contains(fired.eventIndex)) {
+            continue;   // ADR-824: the composition gives this order itself, at its second, on both paths
+        }
         auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
         if (!directed) {
             // Not necessarily a mistake. `section_performance.hpp` says the verb vocabulary belongs to
@@ -4366,8 +4422,13 @@ void Engine::applySectionActions() {
         // system is told the same thing either way -- what differs is that a restored firing is the
         // character being put back where the piece says it already is, so it must not queue behind
         // whatever it was doing before the jump.
-        if (!composition->entityWorld().direct(directed->entity, {directed->action},
-                                               timelineClock_.seconds)) {
+        auto& world = composition->entityWorld();
+        const double now = timelineClock_.seconds;
+        const bool found = directed->release ? world.release(directed->entity, now)
+                           : directed->goal  ? world.setGoal(directed->entity, directed->goalSubject,
+                                                             directed->goalAffordance, now)
+                                             : world.direct(directed->entity, {directed->action}, now);
+        if (!found) {
             if (sectionActionProblems_.insert(event.id).second) {
                 log::warn("section event '{}': nothing here is called '{}'", event.id,
                           directed->entity);

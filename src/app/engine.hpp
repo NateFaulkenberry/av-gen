@@ -861,6 +861,10 @@ private:
     // Event ids already complained about, so a table row that names a missing entity says so once
     // rather than sixty times a second.
     std::set<std::string> sectionActionProblems_;
+    // ADR-824: the sequence events the composition applies itself as directives (by event index), so
+    // `applySectionActions` does not give the same order a second time.
+    std::set<std::size_t> directedEvents_;
+    void installDirectives();
     void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
     // ADR-702. `effects_` is the live set (authored + modulated) of every owner's effects;

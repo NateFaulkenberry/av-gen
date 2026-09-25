@@ -1168,6 +1168,7 @@ void EntityWorld::reset() {
         // resets alongside this and re-issues whatever the scenario is doing at the new second.
         entity->director_ = DirectorMotion{};
         entity->performanceEntry_ = PerformanceEntry{}; // ADR-820: rebuilt by the replay
+        entity->directorGoal_ = DirectorGoal{};         // ADR-824: likewise
         entity->locomotion_ = LocomotionState{};
         // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
@@ -2118,6 +2119,29 @@ bool EntityWorld::direct(std::string_view entity, std::vector<ActionDesc> action
     // and carries on when this drains. That is ADR-091's "resumes rather than resets", and it is a
     // property of *which tier* the override goes on rather than of anything the caller must do.
     found->actions().override(std::move(actions), Authority::Director, now);
+    return true;
+}
+
+bool EntityWorld::release(std::string_view entity, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr) {
+        return false;
+    }
+    found->actions().cancel(Authority::Director, now);
+    found->directorGoal_ = DirectorGoal{}; // a hand-back returns the character's own wants too
+    return true;
+}
+
+bool EntityWorld::setGoal(std::string_view entity, std::string subject, std::string affordance, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr) {
+        return false;
+    }
+    if (subject.empty()) {
+        found->directorGoal_ = DirectorGoal{};
+        return true;
+    }
+    found->directorGoal_ = DirectorGoal{true, std::move(subject), std::move(affordance), now};
     return true;
 }
 

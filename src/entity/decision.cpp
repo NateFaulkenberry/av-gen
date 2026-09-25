@@ -1632,19 +1632,30 @@ void GoalConsiderer::collectParameterPaths(std::vector<std::string>& out) const 
 }
 
 void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {
-    if (ctx.world == nullptr || ctx.state == nullptr || subject_.empty() || !(weight() > 0.0f) ||
-        ctx.time < from_ || (until_ > 0.0 && ctx.time >= until_)) {
+    if (ctx.world == nullptr || ctx.state == nullptr || !(weight() > 0.0f)) {
+        return;
+    }
+    // ADR-824 (§35): a director's runtime goal fills this slot, and while it stands it replaces the
+    // authored subject, affordance and window -- open from the second it was given.
+    const Entity* selfBody = ctx.self < ctx.world->entities().size() ? ctx.world->entities()[ctx.self].get() : nullptr;
+    const DirectorGoal* directed =
+        selfBody != nullptr && selfBody->directorGoal().active ? &selfBody->directorGoal() : nullptr;
+    const std::string& goalSubject = directed != nullptr ? directed->subject : subject_;
+    const std::string& goalAffordance = directed != nullptr ? directed->affordance : affordance_;
+    const double goalFrom = directed != nullptr ? directed->since : from_;
+    const double goalUntil = directed != nullptr ? 0.0 : until_;
+    if (goalSubject.empty() || ctx.time < goalFrom || (goalUntil > 0.0 && ctx.time >= goalUntil)) {
         return;
     }
     glm::vec3 at{0.0f};
-    if (!ctx.world->pointOfInterest(subject_, at)) {
+    if (!ctx.world->pointOfInterest(goalSubject, at)) {
         return; // the named thing does not exist (any more): no option, and the trace says why not
     }
     // Which entity it is, if it is one, for identity and for its affordances.
     const Entity* body = nullptr;
     std::size_t index = 0;
     for (std::size_t i = 0; i < ctx.world->entities().size(); ++i) {
-        if (ctx.world->entities()[i]->name() == subject_) {
+        if (ctx.world->entities()[i]->name() == goalSubject) {
             body = ctx.world->entities()[i].get();
             index = i;
         }
@@ -1658,14 +1669,14 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
         // Done since the goal opened: the errand is over. Investigated before it opened does not
         // count -- a goal set at 32 s is a new request even if the body saw the thing at 10 s.
         if (const MemoryEntry* e = ctx.mind->memory != nullptr ? ctx.mind->memory->find(subject) : nullptr;
-            e != nullptr && e->investigatedAt >= from_) {
+            e != nullptr && e->investigatedAt >= goalFrom) {
             return;
         }
         novelty = 1.0f;
     }
     const InteractionDesc* verb = nullptr;
-    if (body != nullptr && !affordance_.empty()) {
-        verb = body->interaction(affordance_);
+    if (body != nullptr && !goalAffordance.empty()) {
+        verb = body->interaction(goalAffordance);
         const Entity* self = ctx.self < ctx.world->entities().size() ? ctx.world->entities()[ctx.self].get() : nullptr;
         if (verb != nullptr && (self == nullptr || !self->can(verb->required))) {
             verb = nullptr;
@@ -1692,7 +1703,7 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
         use.kind = ActionKind::Interact;
         use.name = name_;
         use.target.kind = TargetKind::Interaction;
-        use.target.name = subject_;
+        use.target.name = goalSubject;
         use.target.member = verb->name;
         actions_.push_back(use);
     } else if (dwell_ > 0.0) {

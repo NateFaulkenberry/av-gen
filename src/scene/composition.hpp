@@ -587,6 +587,27 @@ public:
         float entrySeconds = 0.0f;
     };
     void setPerformers(std::vector<Performer> performers);
+
+    // ---- scheduled directions (ADR-824) ----------------------------------------------------------
+    //
+    // A sequence event that hands an entity an order at a KNOWN second (`seq` tier 2: section
+    // actions, a Director's timed `direct`). Applied here, at the same point of the step as the
+    // performers, on a play and in both replay paths -- so a scrub reconstructs the orders a play
+    // gave, in order, instead of re-delivering only the latest one (ADR-093's "standing intent").
+    // A directive fires on the step whose (now - dt, now] contains its second; `signature` is mixed
+    // into the replay key, so a changed schedule drops stale checkpoints.
+    struct Directive {
+        double timeSeconds = 0.0;
+        std::string entity;
+        std::vector<entity::ActionDesc> actions; // given to the Director tier
+        bool release = false;                    // or: the Director tier is dropped
+        bool goal = false;                       // or: a runtime goal (ADR-824, §35)
+        std::string goalSubject;                 // empty with `goal`: the goal is cleared
+        std::string goalAffordance;
+        std::uint64_t signature = 0;
+    };
+    void setDirectives(std::vector<Directive> directives);
+    [[nodiscard]] const std::vector<Directive>& directives() const { return directives_; }
     [[nodiscard]] const std::vector<Performer>& performers() const { return performers_; }
     void updateFields(const FrameTime& time, signals::SignalBus& bus, params::Modulator& modulator) override;
     [[nodiscard]] const Scene& scene() const override { return scene_; }
@@ -1934,6 +1955,8 @@ private:
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
     std::vector<Performer> performers_;           // ADR-758: not authored here; the sequence's
     void applyPerformers(double now, double dt);
+    std::vector<Directive> directives_; // ADR-824, ascending by time
+    void applyDirectives(double now, double dt);
     std::vector<entity::EntityWorld::EventProfile> eventProfiles_; // Phase D §26: "worldEvents"
     // Phase D §26: the director's beats this update, raised as world events. Shared by
     // `updateBehaviour` and the replay in `seekWithDirector`.
