@@ -1,5 +1,6 @@
 #include "world/effects/distortion_frame.hpp"
 
+#include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_trigger.hpp"
 
 #include <algorithm>
@@ -59,6 +60,8 @@ constexpr const char* kBudgetFull =
     "Distortion proxy budget (64) full this frame; lower-priority distortions are dropped first.";
 constexpr const char* kBudgetPartial =
     "Distortion proxy budget (64) filled part-way through this effect's proxies.";
+constexpr const char* kBudgetSecondary =
+    "Its distortion is off or partial: the distortion proxy budget (64) is full this frame.";
 
 } // namespace
 
@@ -128,7 +131,22 @@ void buildDistortionFrame(std::span<const EffectInstance> effects, const EffectC
         const EffectInstance& e = effects[at];
         const DistortionProducer* producer = distortionProducer(e.kind);
         if (producer == nullptr || producer->produce == nullptr) {
-            continue; // not a DF type: another builder owns its status
+            // Not a DF type: another builder owns its status. Wave 3 (phase 2): it may still add
+            // proxies (`EffectResolve::distortion`), under this budget, leaving only a reason.
+            const EffectSchema* schema = e.enabled ? effectSchema(e.kind) : nullptr;
+            if (schema != nullptr && schema->resolve.distortion != nullptr) {
+                std::array<DistortionProxy, kMaxProxiesPerInstance> scratch{};
+                const std::size_t made = std::min(schema->resolve.distortion(e, ctx, scratch), scratch.size());
+                const std::size_t taken = std::min(made, kMaxDistortionProxies - out.count);
+                for (std::size_t i = 0; i < taken; ++i) {
+                    out.proxies[out.count++] = scratch[i];
+                }
+                out.dropped += static_cast<std::uint32_t>(made - taken);
+                if (taken < made && at < reasons.size()) {
+                    reasons[at].assign(kBudgetSecondary);
+                }
+            }
+            continue;
         }
         EffectStatus said = e.enabled ? EffectStatus::Dormant : EffectStatus::Disabled;
         const float envelope = distortionEnvelope(e, ctx);

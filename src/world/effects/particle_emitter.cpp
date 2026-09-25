@@ -19,6 +19,15 @@ bool isEmitter(const EffectInstance& e) {
     return schema != nullptr && schema->resolve.bucket == EffectBucket::Emitter;
 }
 
+// Wave 3 (phase 2): a type in another bucket with a secondary system (`EffectResolve::particles`).
+using SecondaryFn = bool (*)(const EffectInstance&, const EffectContext&, scene::ParticleSystem&);
+SecondaryFn secondaryOf(const EffectInstance& e) {
+    const EffectSchema* schema = effectSchema(e.kind);
+    return schema != nullptr && schema->resolve.bucket != EffectBucket::Emitter ? schema->resolve.particles : nullptr;
+}
+
+bool ownsSystem(const EffectInstance& e) { return isEmitter(e) || secondaryOf(e) != nullptr; }
+
 // The id a system's name carries, or empty when it is not an effect-owned system.
 std::string_view idOf(const scene::ParticleSystem& s) {
     const std::string_view name(s.name);
@@ -60,17 +69,59 @@ void buildParticleFrame(std::span<const EffectInstance> effects, const EffectCon
             return false; // the composition's own systems are never touched
         }
         const std::size_t at = findEffect(effects, id);
-        return at == effects.size() || !isEmitter(effects[at]);
+        return at == effects.size() || !ownsSystem(effects[at]);
     });
 
     std::size_t written = 0;
     const std::size_t n = order.empty() ? effects.size() : order.size();
     for (std::size_t walk = 0; walk < n; ++walk) {
         const std::size_t at = order.empty() ? walk : order[walk];
-        if (at >= effects.size() || !isEmitter(effects[at])) {
+        if (at >= effects.size() || !ownsSystem(effects[at])) {
             continue;
         }
         const EffectInstance& e = effects[at];
+        if (const SecondaryFn describe = secondaryOf(e)) {
+            // Wave 3 (phase 2): the system is the type's to describe; its status is its own builder's.
+            auto it = std::find_if(particles.begin(), particles.end(),
+                                   [&](const scene::ParticleSystem& s) { return idOf(s) == e.id; });
+            const auto refuse = [&] {
+                if (e.enabled && at < reasons.size()) {
+                    reasons[at] = fmt::format("Its particles are off: the effect particle-system budget ({}) "
+                                              "is full.",
+                                              kMaxEffectParticleSystems);
+                }
+            };
+            if (it == particles.end()) {
+                // Made only once it has something to emit, so a disabled or waiting instance adds no
+                // system to the frame (the gate).
+                static thread_local scene::ParticleSystem first;
+                if (!e.enabled || !describe(e, ctx, first)) {
+                    continue;
+                }
+                if (written >= kMaxEffectParticleSystems) {
+                    refuse();
+                    continue;
+                }
+                particles.push_back(first);
+                particles.back().name = particleSystemName(e.id);
+                particles.back().enabled = true;
+                ++written;
+                continue;
+            }
+            if (written >= kMaxEffectParticleSystems) {
+                it->enabled = false;
+                refuse();
+                continue;
+            }
+            const bool emitting = e.enabled && describe(e, ctx, *it);
+            it->enabled = true;
+            if (!emitting) {
+                it->spawnRate = 0.0f;
+                it->burst = 0.0f;
+            }
+            ++written;
+            continue;
+        }
         EffectStatus said = e.enabled ? EffectStatus::Dormant : EffectStatus::Disabled;
         std::string* why = at < reasons.size() ? &reasons[at] : nullptr;
 

@@ -104,10 +104,15 @@ class ParameterSet;
 struct ModRoute;
 } // namespace avgen::params
 
+namespace avgen::scene {
+struct ParticleSystem; // scene/particles.hpp (EMIT)
+} // namespace avgen::scene
+
 namespace avgen::world {
 
 struct EntityLaneContribution; // world/effects/entity_fx.hpp (ADR-703, FXL)
 struct EffectLight;            // world/effects/effect_lights.hpp (LIGHTMOD)
+struct DistortionProxy;        // world/effects/distortion_frame.hpp (DF)
 
 // ---- one row ------------------------------------------------------------------------------------
 
@@ -550,6 +555,20 @@ struct EffectResolve {
     // and its drops are one decision. False for "no light this frame". An instance whose light
     // loses finds the pool's reason in its reason slot when its own builder runs.
     bool (*light)(const EffectInstance&, const EffectContext&, EffectLight&) = nullptr;
+    // Wave 3 (phase 2). DF proxies an instance adds when its own contribution another builder draws
+    // -- a Portal's swirl, a Bubble's rim lensing, a Reality Tear's shear (the shells are SHELL). The DF
+    // builder walks these after its own producers' instances in evaluation order, under the same
+    // budget, and writes NO status for them: a shortfall leaves its reason in the slot, which the
+    // instance's own builder (running later) reports as Partial. Returns how many it wrote (at most
+    // `out.size()`, 8); must be a pure function of its arguments (ADR-091).
+    std::size_t (*distortion)(const EffectInstance&, const EffectContext&, std::span<DistortionProxy> out) = nullptr;
+    // Wave 3 (phase 2). A secondary EMIT system -- a Charge-Up's inward motes, a Portal's drawn-in
+    // sparks, a Bubble's droplets. The EMIT builder keeps one `fx:<id>` system per such instance, as it
+    // does for a Particle Emitter, and hands it here to be described IN PLACE each frame (the whole
+    // configuration, the placement, the rate and the burst). False: not emitting this frame (the
+    // builder zeroes the rate and burst, so what is in the air finishes). No status is written; a
+    // system the budget refuses leaves its reason in the slot, as `distortion` does.
+    bool (*particles)(const EffectInstance&, const EffectContext&, scene::ParticleSystem&) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.

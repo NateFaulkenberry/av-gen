@@ -5,7 +5,8 @@
 //
 // Pipelines inside the scene pass, drawn in its blended section beside the particles and the
 // ribbons: a shell is light laid over the world, depth-tested against it and never written into its
-// depth. ONE PIPELINE PER SHADING KIND (plasma, shield, barrier -- ADR-118), over:
+// depth (phase 2's Portal and Tear interiors excepted, which write it). ONE PIPELINE PER SHADING KIND
+// (plasma, shield, barrier; phase 2's beam, glare, ring, bubble, portal, tear -- ADR-118), over:
 //   - the canonical meshes, made once from `scene/mesh_generators` the first time a shell draws;
 //   - ONE storage buffer of `world::kMaxShells` records, uploaded with one `WriteBuffer`, and one
 //     of their side data (hits, revealer positions);
@@ -53,7 +54,7 @@ public:
     [[nodiscard]] Result<void> init(gpu::Context& context, gpu::ShaderLibrary& shaders,
                                     wgpu::TextureFormat hdrFormat, wgpu::TextureFormat depthFormat,
                                     const wgpu::BindGroupLayout& frameLayout, const wgpu::BindGroupLayout& iblLayout);
-    // Rebuilds every pipeline from a reloaded shell.wgsl; keeps the old ones on failure.
+    // Rebuilds every pipeline from a reloaded shell.wgsl / shell_fx.wgsl; keeps the old ones on failure.
     [[nodiscard]] Result<void> reload(gpu::ShaderLibrary& shaders);
 
     // Uploads `frame` and draws each batch into the open scene pass, binding group 0 to
