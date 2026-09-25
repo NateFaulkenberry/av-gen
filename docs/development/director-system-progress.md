@@ -41,7 +41,7 @@ Since then:
 | 1 Plan + Cameras | Complete | 95% | 26 `[directing]` cases + 10 golden plans | Remaining: the Director panel beyond Approve/Reject (spec §35 says do not overbuild); UI not verified |
 | 2 Scripted Performances | Complete | 100% | 16 cases + 1 golden | The handoff is M1 (merged from main; this branch's copy dropped). Non-zero `entrySeconds` is NON_DETERMINISTIC in a baked plan |
 | 3 Airborne + Events | Compile side complete | 85% | 5 `[directing][airborne]` cases + 2 goldens | ADR-761. Remaining: `fall`; acrobatics need assets; UI not verified |
-| 4 Autonomous Direction | Goal mode + recording built | 60% | 3 `[directing][goal]` cases | Goal -> `CharacterGoal`; live events heard; recording with played-back and scrub checks (0 m). Remaining: directed mode, event-driven proposals, runtime candidate shots, a Record button/tool |
+| 4 Autonomous Direction | Goal mode + recording built | 60% | 3 `[directing][goal]` cases | Goal -> `CharacterGoal`; live events heard; recording with played-back and scrub checks (0 m). Remaining: directed mode, event-driven proposals, runtime candidate shots. Record button and AI tool done (ADR-765) |
 | 5 Verification + Scale | Started | 30% | 11 golden plans, `[.perf][directing]` CPU + GPU + seek | Cost harness over the golden plans, and seek after ADR-800 |
 
 ## Current focus
@@ -275,6 +275,10 @@ undo, serialization or compilation will be built on them.
   exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-25: ADR-765, the owner's yes to both. The panel's **Record** button (48450b28;
+  `director-record` UI arm, 18 checks) and the assistant's `director.record_plan` through a host
+  hook (1071ff63; ScriptedProvider test). Both run off the main thread and end at the one approval
+  gate. Captures 07-11 in `15-director-panel/`.
 - 2026-09-25: OSC: evaluating engines open no live control (86d81b9a). Stills no longer block the
   editor: a cached scratch session simulated on its own thread (2ed68542). Merged main 9a37c9bb
   (7af0244f). Slice 4 goal compile (ce3a740e) and recording (see ADR-763's "Implemented").

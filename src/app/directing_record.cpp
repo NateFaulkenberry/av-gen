@@ -157,7 +157,7 @@ Result<RecordReport> recordFromCopy(const std::filesystem::path& copy, const dir
         recordedFrames = f;
         const double t = static_cast<double>(f) / 60.0;
         if (f % 60 == 0) {
-            say(fmt::format("recording: playing {:.0f} of {:.0f} s", t, end));
+            say(fmt::format("recording: played {:.0f} s (until the goals' events are heard, at most {:.0f} s)", t, end));
         }
         for (const seq::FiredEvent& fired : engine.firedEvents()) {
             const auto& events = engine.sequence().events;
