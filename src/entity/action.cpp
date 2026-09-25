@@ -413,6 +413,9 @@ void ActionQueue::emit(const ActionContext& ctx, const ActionDesc& action, Actio
     event.entity = ctx.self != nullptr ? ctx.self->name() : std::string{};
     event.action = action.name.empty() ? actionKindName(action.kind) : action.name;
     event.event = action.onComplete;
+    if (action.kind == ActionKind::Interact) {
+        event.interaction = action.target.name + "." + action.target.member;
+    }
     event.result = result;
     event.reason = reason;
     event.time = ctx.time;
