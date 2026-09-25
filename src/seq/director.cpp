@@ -296,7 +296,9 @@ std::optional<scene::Composition::Performer> performerFor(const Actor& actor, st
             pose.clipOwned = resolved.has_value() && !resolved->gait;
         }
         pose.position = actor.positionAt(t);
-        if (groundAt) {
+        // Standing on the terrain -- unless the actor says the body is in the air (ADR-822), where
+        // the height is the arc's and snapping it to the ground would turn a jump into a skid.
+        if (groundAt && !actor.airborneAt(t)) {
             pose.position.y = groundAt(pose.position.x, pose.position.z);
         }
         const glm::vec3 v = velocity(t);

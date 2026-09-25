@@ -27,6 +27,7 @@
 //     "reactions": [ { "signal": "audio.bass", "target": "parts/Lamp/emissiveGain", "depth": 3 } ]
 
 #include "core/rng.hpp"
+#include "entity/airborne.hpp"
 #include "entity/locomotion_plan.hpp"
 #include "entity/motion_chain.hpp"
 #include "entity/motion_controller.hpp"
@@ -195,6 +196,11 @@ struct EntityDesc {
     // inert" is a claim that can be measured rather than asserted -- see the rendered-hash
     // comparison in `docs/design/procedural-character-motion.md`.
     bool proceduralMotion = false;
+    // ADR-822: what this body can do off the ground -- its hop's apex and gravity, the farthest it
+    // will leap, how long it recovers, and the highest it CAN leap (`maxApex`, for a director's
+    // validator). One block per character, read by `explore`'s autonomous hops and by the Director's
+    // capability card alike, so the two cannot disagree about what the body is capable of.
+    JumpSettings jump{};
     // ADR-623. The matcher in front of the clip provider; see `MotionMatchingDesc`.
     MotionMatchingDesc motionMatching;
     // Phase B §8-§11. Start, stop, turn-in-place and strafe, on top of the gait's clip family.

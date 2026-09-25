@@ -3327,6 +3327,30 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
     if (j.contains("proceduralMotion") && j["proceduralMotion"].is_boolean()) {
         desc.proceduralMotion = j["proceduralMotion"].get<bool>();
     }
+    // ADR-822. Absent is the defaults; a malformed block is an error, since a character whose jump
+    // silently fell back to the defaults is one that cannot clear what its author said it could.
+    if (j.contains("jump")) {
+        const auto& jj = j["jump"];
+        if (!jj.is_object()) {
+            return fail("entity '{}': 'jump' must be an object", desc.name);
+        }
+        const auto num = [&](const char* key, float& out) {
+            if (const auto it = jj.find(key); it != jj.end() && it->is_number()) {
+                out = it->get<float>();
+            }
+        };
+        num("apex", desc.jump.apex);
+        num("maxApex", desc.jump.maxApex);
+        num("gravity", desc.jump.gravity);
+        num("maxDistance", desc.jump.maxDistance);
+        num("landSeconds", desc.jump.landSeconds);
+        num("maxSeconds", desc.jump.maxSeconds);
+        if (desc.jump.apex <= 0.0f || desc.jump.gravity <= 0.0f || desc.jump.maxDistance < 0.0f ||
+            (desc.jump.maxApex > 0.0f && desc.jump.maxApex < desc.jump.apex)) {
+            return fail("entity '{}': 'jump' needs apex > 0, gravity > 0, maxDistance >= 0 and maxApex >= apex",
+                        desc.name);
+        }
+    }
     // ADR-623. A malformed block is a load error, not a silent no-op: an author who wrote it meant
     // the matcher to run, and a character quietly left on its clips is the failure this project
     // keeps shipping.
@@ -3837,6 +3861,26 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     // the first time anyone saved -- the diff-noise failure ADR-225 already had to fix once.
     if (entity.proceduralMotion) {
         j["proceduralMotion"] = true;
+    }
+    // ADR-822: only the fields that differ from the defaults, so a scene that never authored a jump
+    // saves the bytes it had.
+    {
+        const JumpSettings d{};
+        nlohmann::json jj = nlohmann::json::object();
+        const auto put = [&](const char* key, float value, float fallback) {
+            if (value != fallback) {
+                jj[key] = value;
+            }
+        };
+        put("apex", entity.jump.apex, d.apex);
+        put("maxApex", entity.jump.maxApex, d.maxApex);
+        put("gravity", entity.jump.gravity, d.gravity);
+        put("maxDistance", entity.jump.maxDistance, d.maxDistance);
+        put("landSeconds", entity.jump.landSeconds, d.landSeconds);
+        put("maxSeconds", entity.jump.maxSeconds, d.maxSeconds);
+        if (!jj.empty()) {
+            j["jump"] = std::move(jj);
+        }
     }
     // ADR-623. Written only when on, for the reason above; and every field, including the ones at
     // their defaults, because a reader that fills a default the writer dropped is how a save

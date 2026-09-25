@@ -821,6 +821,15 @@ const ClipCue* Actor::clipAt(double seconds) const {
     return current;
 }
 
+bool Actor::airborneAt(double seconds) const {
+    for (const auto& [from, to] : airborne) {
+        if (seconds >= from && seconds <= to) {
+            return true;
+        }
+    }
+    return false;
+}
+
 double Actor::endSeconds() const {
     double end = 0.0;
     for (const auto& k : keys) {
@@ -1988,6 +1997,13 @@ json actorToJson(const Actor& a) {
     if (a.entrySeconds != 0.0f) {
         j["entrySeconds"] = a.entrySeconds; // ADR-820: absent means 0, the plan-safe default
     }
+    if (!a.airborne.empty()) {
+        json spans = json::array();
+        for (const auto& [from, to] : a.airborne) {
+            spans.push_back(json::array({from, to}));
+        }
+        j["airborne"] = std::move(spans); // ADR-822
+    }
     if (a.path.active) {
         j["path"] = json{{"spline", a.path.spline.toJson()},
                          {"start", a.path.startSeconds},
@@ -2062,6 +2078,18 @@ Result<Actor> actorFromJson(const json& j) {
                          [](const ClipCue& x, const ClipCue& y) { return x.timeSeconds < y.timeSeconds; });
     }
     a.entrySeconds = static_cast<float>(readNumber(j, "entrySeconds", 0.0));
+    if (const auto air = j.find("airborne"); air != j.end()) {
+        if (!air->is_array()) {
+            return fail("actor '{}': 'airborne' must be an array of [start, end] spans", a.id);
+        }
+        for (const auto& span : *air) {
+            if (!span.is_array() || span.size() != 2 || !span[0].is_number() || !span[1].is_number() ||
+                span[1].get<double>() < span[0].get<double>()) {
+                return fail("actor '{}': each airborne span is [start, end] with start <= end", a.id);
+            }
+            a.airborne.emplace_back(span[0].get<double>(), span[1].get<double>());
+        }
+    }
     if (a.entrySeconds < 0.0f) {
         return fail("actor '{}': 'entrySeconds' must not be negative", a.id);
     }

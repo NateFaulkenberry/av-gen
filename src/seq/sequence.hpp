@@ -415,6 +415,11 @@ struct Actor {
     // the authored mark on the span's first step -- the only form a baked plan may depend on, since
     // where a live character stands is not a plan-time fact. Ignored for a node no entity drives.
     float entrySeconds = 0.0f;
+    // ADR-822. Spans (timeline seconds) in which a performed body is OFF the ground: its height is
+    // the actor's own, not the terrain's. Everywhere else a performer stands on the terrain, which is
+    // what keeps a walk on a hillside -- and what would flatten a jump arc into a skid.
+    std::vector<std::pair<double, double>> airborne;
+    [[nodiscard]] bool airborneAt(double seconds) const;
 
     [[nodiscard]] const std::string& nodeName() const { return node.empty() ? id : node; }
     // Pure evaluation, used by the bake and by a camera that looks at this actor. The path wins

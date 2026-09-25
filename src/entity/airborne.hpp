@@ -27,6 +27,9 @@
 
 #include <glm/glm.hpp>
 
+#include <functional>
+#include <optional>
+
 namespace avgen::entity {
 
 class Navigator;
@@ -48,7 +51,61 @@ struct JumpSettings {
     // Ceiling on air time, as a guard rather than a control: a launch that somehow never finds
     // ground must not leave the character falling for ever.
     float maxSeconds = 3.0f;
+    // ADR-822: the highest this body can leap, above its take-off point. 0 means `apex` is also the
+    // limit -- the character jumps one way. A capability, read by whoever plans a jump for the body
+    // (a director's validator); an autonomous hop always uses `apex`.
+    float maxApex = 0.0f;
+    [[nodiscard]] float apexLimit() const { return maxApex > 0.0f ? maxApex : apex; }
 };
+
+// ---- the arc (ADR-822) --------------------------------------------------------------------------
+//
+// One pure function for every jump in the engine: an autonomous hop integrates it (`Airborne`), and
+// a director plans with it and bakes it into keys. Closed form, not stepped, so a play, a scrub and
+// a bake are the same curve to the last bit rather than three integrations that agree to a
+// tolerance.
+//
+// The body travels at a constant horizontal speed, so height is a parabola in the fraction `s` of
+// the way across: y(s) = y0 + d s + K s (1 - s), with d the landing's height over the take-off and K
+// the arc's curvature. Gravity turns that into time: T = sqrt(2 K / g). The apex h above the take-off
+// is (d + K)^2 / (4 K), so an apex and a landing fix K, and with gravity everything else.
+struct JumpArc {
+    glm::vec3 from{0.0f};
+    glm::vec3 to{0.0f};
+    float gravity = 18.0f;
+    float apex = 0.0f;       // above `from`
+    float curvature = 0.0f;  // K
+    float duration = 0.0f;   // T: take-off to landing on `to`
+    // Where the body is `t` seconds after take-off. Past `duration` the same parabola continues, so
+    // a body that finds no ground at `to` keeps falling along the curve it was on.
+    [[nodiscard]] glm::vec3 at(float t) const;
+    [[nodiscard]] glm::vec3 velocityAt(float t) const;
+    // Seconds after take-off at which the body is highest.
+    [[nodiscard]] float apexTime() const;
+    [[nodiscard]] float horizontalSpeed() const;
+};
+
+// The arc from `from` to `to` peaking `apex` above `from`. Nothing when it cannot exist: an apex
+// below the landing (a body cannot land higher than it rose), a non-positive gravity, or no
+// horizontal distance at all.
+[[nodiscard]] std::optional<JumpArc> planJump(glm::vec3 from, glm::vec3 to, float apex, float gravity);
+
+// The smallest apex above `from` at which the arc from `from` to `to` clears a round obstacle --
+// centre `centre` (x and z read), footprint radius `radius`, top at world height `top` -- by
+// `clearance`. The arc is concave, so it clears the whole footprint when it clears both edges of the
+// stretch of path the footprint covers. Nothing when the path does not cross the footprint.
+[[nodiscard]] std::optional<float> minimumApex(glm::vec3 from, glm::vec3 to, glm::vec3 centre, float radius,
+                                               float top, float clearance);
+
+// What the ground makes of an arc. `groundAt` answers terrain height at a world x, z.
+struct ArcCheck {
+    bool clear = true;           // nothing between take-off and landing is above the body
+    float firstContact = -1.0f;  // seconds after take-off the body first meets the ground, if not clear
+    float landingGround = 0.0f;  // the ground under `to`
+    float landingError = 0.0f;   // `to.y` minus that ground: > 0 lands in the air, < 0 underground
+};
+[[nodiscard]] ArcCheck checkArc(const JumpArc& arc, const std::function<float(float x, float z)>& groundAt,
+                                float sampleSeconds = 1.0f / 60.0f);
 
 // One body's airborne state.
 class Airborne {
@@ -82,11 +139,14 @@ public:
     // Seconds since launch, for a diagnostic.
     [[nodiscard]] double elapsed() const { return elapsed_; }
 
+    // The arc being flown, valid while `airborne()`.
+    [[nodiscard]] const JumpArc& arc() const { return arc_; }
+
 private:
     enum class Phase : std::uint8_t { Grounded, Rising, Falling, Landing };
     Phase phase_ = Phase::Grounded;
+    JumpArc arc_{};
     glm::vec3 position_{0.0f};
-    glm::vec3 velocity_{0.0f};
     double elapsed_ = 0.0;
     double landedFor_ = 0.0;
 };
