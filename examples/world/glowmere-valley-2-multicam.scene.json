@@ -10658,7 +10658,7 @@
   "worldEvents": [
     {
       "name": "abduction/beam",
-      "radius": 60.0,
+      "radius": 150.0,
       "magnitude": 1.0
     }
   ],
