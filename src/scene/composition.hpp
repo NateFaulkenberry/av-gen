@@ -543,6 +543,16 @@ struct AimFollow {
     double endSeconds = 0.0;
     std::string hero;            // names a hero in `Composition::heroes()`
     glm::vec3 heroAtCut{0.0f};   // where that hero stood when the shot was cut
+    // ADR-891: whether this shot's ends are cuts or joins. In an edited sequence every boundary is a
+    // cut, so the offset may start again from zero there: nobody sees the aim jump across a cut.
+    // A continuous take has no cuts. Its boundaries are joins, and dropping a walking hero's offset
+    // at one swings the aim through tens of degrees in one frame. That is an edit in all but name.
+    // A join hands the offset across over this many seconds instead. `joinIn` covers the shot's
+    // start, from the adjacent shot's offset or from zero. `joinOut` covers the time after its end,
+    // when no follow entry takes over, towards zero. 0 means a cut, which is every edited sequence
+    // and every project saved before this existed.
+    double joinInSeconds = 0.0;
+    double joinOutSeconds = 0.0;
 
     friend bool operator==(const AimFollow&, const AimFollow&) = default;
 };

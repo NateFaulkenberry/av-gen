@@ -788,7 +788,32 @@ Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoin
     }
     log::info("auto-director: {:.0f}s of audio folded into {} section(s)",
               structure->durationSeconds(), structure->sections.size());
-    return installSequence(engine, *sequence, settings);
+    auto installed = installSequence(engine, *sequence, settings);
+    if (!installed) {
+        return installed;
+    }
+    // ADR-891: Song Mode is the only mode whose output includes a camera track (ADR-249). Its
+    // `Directed` shots were left behind when the mode changed, so choosing Continuous shot after
+    // Song kept every camera cut Song had made -- locked, so they outranked even the event cameras
+    // -- over a take that no longer had anything to do with them. Everything the director owns
+    // goes, and every authored shot stays: the rule `installSongDirection` already follows.
+    if (scene::Composition* composition = engine.composition()) {
+        scene::CameraDirection cameras = composition->cameraDirection();
+        const std::size_t before = cameras.shots.size();
+        std::erase_if(cameras.shots, [](const scene::CameraShot& s) {
+            return s.origin == scene::CameraShot::Origin::Directed;
+        });
+        if (cameras.shots.size() != before) {
+            const std::size_t removed = before - cameras.shots.size();
+            if (auto ok = engine.setCameraDirection(std::move(cameras)); !ok) {
+                return std::unexpected(ok.error());
+            }
+            log::info("auto-director: {} Song Mode camera shot(s) removed; {} does not cut between "
+                      "cameras",
+                      removed, directorModeName(settings.mode));
+        }
+    }
+    return installed;
 }
 
 Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
@@ -958,16 +983,49 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
     // for another halfway through -- following the first through that swing would drag the very
     // thing the shot is trying to leave. A shot that is not about a subject does not follow one.
     if (scene::Composition* composition = engine.composition()) {
+        // ADR-891: in a continuous take a boundary the bake chained -- this shot starts exactly
+        // where the last one ended -- is a join, and the follow offset is handed across it rather
+        // than dropped. Dropping it swung the aim through up to 81 degrees in one frame on the
+        // multicam film: a cut in a mode whose whole promise is that it does not cut. A boundary
+        // the bake did not chain (the breakdown the continuous take deliberately cuts on) stays a
+        // cut, and an edited sequence has nothing but cuts.
+        const auto joinedAt = [&](std::size_t i) {
+            if (settings.mode != DirectorMode::ContinuousShot || i == 0 || i >= sequence.shots.size()) {
+                return false;
+            }
+            const Shot& before = sequence.shots[i - 1];
+            const Shot& after = sequence.shots[i];
+            return std::abs(before.endSeconds() - after.startSeconds) < 1e-6 &&
+                   glm::distance(before.cameraAt(1.0f), after.cameraAt(0.0f)) < 1e-3f;
+        };
+        // Long enough to read as a pan rather than a snap, and never more than half a shot.
+        constexpr double kJoinSeconds = 2.0;
+        const auto joinFor = [&](const Shot& shot) {
+            return std::min(kJoinSeconds, 0.5 * (shot.endSeconds() - shot.startSeconds));
+        };
+        const auto follows = [](const Shot& shot) {
+            return shot.lookMode() == LookMode::Subject && !shot.subject.name.empty();
+        };
         std::vector<scene::AimFollow> follow;
         follow.reserve(sequence.shots.size());
-        for (const Shot& shot : sequence.shots) {
-            if (shot.lookMode() != LookMode::Subject || shot.subject.name.empty()) {
+        for (std::size_t i = 0; i < sequence.shots.size(); ++i) {
+            const Shot& shot = sequence.shots[i];
+            if (!follows(shot)) {
                 continue;
             }
-            follow.push_back(scene::AimFollow{.startSeconds = shot.startSeconds,
-                                              .endSeconds = shot.endSeconds(),
-                                              .hero = shot.subject.name,
-                                              .heroAtCut = shot.subject.position});
+            scene::AimFollow entry{.startSeconds = shot.startSeconds,
+                                   .endSeconds = shot.endSeconds(),
+                                   .hero = shot.subject.name,
+                                   .heroAtCut = shot.subject.position};
+            if (joinedAt(i)) {
+                entry.joinInSeconds = joinFor(shot);
+            }
+            // Joined into a shot that follows nobody: this entry's offset is let go over the join.
+            // Joined into one that follows somebody, that entry's `joinIn` does the handing over.
+            if (joinedAt(i + 1) && !follows(sequence.shots[i + 1])) {
+                entry.joinOutSeconds = joinFor(sequence.shots[i + 1]);
+            }
+            follow.push_back(entry);
         }
         log::info("auto-director: {} of {} shot(s) hold a subject and will follow it",
                   follow.size(), sequence.shots.size());
