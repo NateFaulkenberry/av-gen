@@ -107,6 +107,7 @@ struct ModRoute;
 namespace avgen::world {
 
 struct EntityLaneContribution; // world/effects/entity_fx.hpp (ADR-703, FXL)
+struct EffectLight;            // world/effects/effect_lights.hpp (LIGHTMOD)
 
 // ---- one row ------------------------------------------------------------------------------------
 
@@ -530,12 +531,21 @@ struct EffectResolve {
     // `checkRegistry` requires it for every non-atmospheric bucket except `Surface`, whose builder
     // (`resolveWave`) the probe calls directly.
     std::size_t (*records)(const EffectInstance&, const EffectContext&) = nullptr;
-    // ADR-703, `EffectBucket::EntityLanes` only (FXL, world/effects/entity_fx.hpp): this live
-    // instance's contribution to its owner's lanes -- a gain, a tint, added emission, a rim, a band,
-    // a spill-light request. The builder owns activation, the envelope, folding and the record; the
+    // ADR-703, `EffectBucket::EntityLanes` (FXL, world/effects/entity_fx.hpp): this live instance's
+    // contribution to its owner's lanes -- a gain, a tint, added emission, a rim, a band, a
+    // spill-light request. The builder owns activation, the envelope, folding and the record; the
     // type only says what it adds. `double` is the seconds since its activation window opened.
+    // Wave 3: a type in ANOTHER bucket may declare it too, for a secondary surface term (Electric
+    // Field's crackle beside its RIBBON arcs); the FXL builder folds it like any lane and its own
+    // builder, which runs later, writes the final status (a lane refusal leaves its reason).
     bool (*lanes)(const EffectInstance&, const EffectContext&, const NodeView&, double,
                   EntityLaneContribution&) = nullptr;
+    // Wave 3. A light an instance asks LIGHTMOD's pool for when its own contribution is drawn by
+    // ANOTHER builder -- a Lightning's strike flash, a Discharge's burst (the bolts are RIBBON). The
+    // FXL builder gathers these with the Glow spills and ranks them together, so the pool's budget
+    // and its drops are one decision. False for "no light this frame". An instance whose light
+    // loses finds the pool's reason in its reason slot when its own builder runs.
+    bool (*light)(const EffectInstance&, const EffectContext&, EffectLight&) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.
@@ -629,7 +639,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 33> kEffectKinds{
+inline constexpr std::array<EffectKind, 37> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -663,6 +673,10 @@ inline constexpr std::array<EffectKind, 33> kEffectKinds{
     EffectKind::VelocityDistortion, // Wave 2 (DF over HIST)
     EffectKind::MotionSmear,   // Wave 2 (FXL surface)
     EffectKind::Stars,         // Wave 2 (the sky's star field)
+    EffectKind::Lightning,     // Wave 3 (BOLT + RIBBON + LIGHTMOD + TRIGGER)
+    EffectKind::Arc,           // Wave 3 (BOLT + RIBBON)
+    EffectKind::ElectricField, // Wave 3 (BOLT + RIBBON + FXL crackle)
+    EffectKind::Discharge,     // Wave 3 (BOLT + RIBBON + LIGHTMOD + TRIGGER)
 };
 
 // The kind's position in `kEffectKinds`, or `size()` for an enumerator that is not in it --

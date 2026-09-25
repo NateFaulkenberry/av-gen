@@ -450,6 +450,12 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::VelocityDistortion, {EffectTarget::Entity}},
         {EffectKind::Stars, {EffectTarget::World}}, // Wave 2: the sky has one star field
         {EffectKind::MotionSmear, {EffectTarget::Entity}},
+        // Wave 3 (BOLT): a strike, an arc and a discharge may belong to the World or to an entity; an
+        // electric field crawls over a surface, so it needs one.
+        {EffectKind::Lightning, {EffectTarget::World, EffectTarget::Entity}},
+        {EffectKind::Arc, {EffectTarget::World, EffectTarget::Entity}},
+        {EffectKind::ElectricField, {EffectTarget::Entity}},
+        {EffectKind::Discharge, {EffectTarget::World, EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -581,6 +587,7 @@ TEST_CASE("a type's endpoint accessors are complete and actually reach the insta
             CHECK(s->getTarget(*back).name == "rook");
         }
     }
-    // The control: the two surface waves declare endpoints, so the loop body ran.
-    CHECK(withEndpoints == 2);
+    // The control: the two surface waves and three bolt types (Lightning, Arc, Discharge) declare
+    // endpoints, so the loop body ran.
+    CHECK(withEndpoints == 5);
 }
