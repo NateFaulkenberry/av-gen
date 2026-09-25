@@ -121,6 +121,9 @@ enum class UiScriptArm : std::uint32_t {
     Viewpoint = 1u << 19,
     // Record, then Cancel recording while it runs: the recording stops and the proposal is untouched.
     DirectorCancel = 1u << 20,
+    // ADR-770: type a follow-up, press Modify, wait for the revision; then press Regenerate and wait
+    // again. Checks the waiting task is superseded each time and the plan keeps its id.
+    DirectorModify = 1u << 21,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -195,6 +198,7 @@ private:
     std::size_t viewpointFramesMoved_ = 0;
     float viewpointWorstDrift_ = 0.0f;
     void stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepDirectorModify(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t sliceShotsBefore_ = 0;

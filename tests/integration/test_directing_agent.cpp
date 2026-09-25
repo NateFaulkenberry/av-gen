@@ -450,7 +450,7 @@ TEST_CASE("Modify revises the waiting plan from a follow-up; Regenerate asks aga
     auto third = s.plane.regenerateCurrentTask();
     REQUIRE(third != nullptr);
     CHECK(second->state() == ai::TaskState::Rejected);
-    CHECK(third->prompt() == "hold the shot a little longer");
+    CHECK(third->prompt() == "establish the stone at 0:10 and mark 0:12.5"); // the chain's original request
     REQUIRE(s.runUntil(third, ai::TaskState::AwaitingApproval));
     REQUIRE(third->proposal());
 

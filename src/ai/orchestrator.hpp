@@ -150,6 +150,10 @@ public:
     // undo's label (that stays the person's own words).
     [[nodiscard]] const std::string& briefing() const { return briefing_; }
     void setBriefing(std::string briefing) { briefing_ = std::move(briefing); }
+    // The request a chain of Modifies started from: what Regenerate asks again. This task's own
+    // prompt unless it was a modification of another.
+    [[nodiscard]] const std::string& originalRequest() const { return original_.empty() ? prompt_ : original_; }
+    void setOriginalRequest(std::string original) { original_ = std::move(original); }
     // **Acquire**, to pair with the release stores in `finish` and `setState`. A terminal state is
     // a promise that the outcome, the activities and everything the provider recorded are already
     // written -- `finish`'s own comment says a UI "is entitled to assume the outcome is already
@@ -195,6 +199,7 @@ private:
     mutable std::mutex mutex_;
     std::vector<Activity> activities_;
     TaskOutcome outcome_;
+    std::string original_;
     std::string briefing_;
     std::optional<ToolContext::Proposal> proposal_;
     nlohmann::json observation_; // ADR-767: the last watch's observation, for the tools that follow it

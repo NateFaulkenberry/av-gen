@@ -333,13 +333,15 @@ std::shared_ptr<AgentTask> ControlPlane::modifyCurrentTask(std::string followUp)
         "This modifies the proposal waiting for approval. Revise that plan -- keep its id '{}' -- and "
         "propose it again with director.propose_plan; change only what the request above asks.\n"
         "The original request: {}\nThe waiting plan:\n{}",
-        proposal->planId, waiting->prompt(), proposal->plan.dump());
+        proposal->planId, waiting->originalRequest(), proposal->plan.dump());
+    const std::string original = waiting->originalRequest();
     if (!orchestrator_.reject(*waiting, "superseded: modified by \"" + followUp + "\"")) {
         return nullptr;
     }
     auto task = submit(std::move(followUp));
     if (task != nullptr) {
         task->setBriefing(briefing);
+        task->setOriginalRequest(original);
     }
     return task;
 }
@@ -349,7 +351,7 @@ std::shared_ptr<AgentTask> ControlPlane::regenerateCurrentTask() {
     if (waiting == nullptr || waiting->state() != TaskState::AwaitingApproval) {
         return nullptr;
     }
-    const std::string original = waiting->prompt();
+    const std::string original = waiting->originalRequest();
     const std::string declined = waiting->proposal() ? waiting->proposal()->planId : std::string();
     if (!orchestrator_.reject(*waiting, "superseded: regenerated")) {
         return nullptr;
