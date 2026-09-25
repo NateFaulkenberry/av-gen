@@ -161,7 +161,9 @@ bool sameBytes(const std::vector<T>& a, const std::vector<T>& b) {
 // Most of it is the entity distance cull (a play culls distant bodies, the replay never does; the
 // coordinator's finding) and the cull is off below, which takes the saucer to ~0.15 m. The rest is
 // under investigation outside this branch (probably audio-driven world events, which the replay
-// runs without a signal bus). Un-hide this when that lands. The Wave 1 chain's play = scrub proof is
+// runs without a signal bus). ADR-870 (seek replays audio signals and entity reactions) took it from
+// ~0.15 m to ~0.018 m (checked 2026-09-25 on the integration of main e995e3b9 and again on 9a37c9bb with Effect Library
+// Wave 2): closer, not exact, so still hidden. Un-hide this when it holds to the bit. The Wave 1 chain's play = scrub proof is
 // the next case, on an owner whose motion the Engine's seek reproduces exactly.
 TEST_CASE("the UFO stack at 150 s is the same played and scrubbed", "[.known-defect][adr700]") {
     REQUIRE(fs::exists(demoProject()));
