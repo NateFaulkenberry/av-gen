@@ -277,6 +277,8 @@ undo, serialization or compilation will be built on them.
 ## Recent changes
 - 2026-09-25: Director panel (4dcb8f1f, ADR-762): headless capture in
   `~/Desktop/av-gen-review/15-director-panel/`. Slice 4 proposal (ADR-763).
+- **Full suites at 3ca06731:** CPU 3,332 cases, exit 0 (1 expected shouldfail, 16 skips); GPU 444,
+  exit 0 (1 NDI skip).
 - 2026-09-25: merged agent/motion (d4854cb4), dropping this branch's copy of the handoff; merged
   main 9fa84413 (aa84e42d). Slice 3 on M2-M5 (ADR-761). `entrySeconds` validator rule.
 - **Full suites at ce92f3ba (Slice 3):** CPU 3,329 cases, exit 0 (1 expected shouldfail, 16
