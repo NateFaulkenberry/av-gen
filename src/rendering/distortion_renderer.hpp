@@ -8,7 +8,9 @@
 // post (bloom, DoF, grading) sees the bent image, and the temporal ring captures it:
 //
 //   1. OFFSET. Every proxy of the frame, instanced from one storage buffer (capacity
-//      `world::kMaxDistortionProxies`), into two transient RGBA16F targets with additive blending.
+//      `world::kMaxDistortionProxies`), into two transient RGBA16F targets and one R16F COVER target
+//      (Wave 3: the opacity of a black hole's horizon; zero for every other field) with additive
+//      blending.
 //      No depth attachment: each fragment reads the scene depth as a texture (read-only) and applies
 //      the lens-plane rule itself, which is exact and holds with the camera inside a proxy too.
 //   2. COPY. The HDR image into a transient scene copy -- only the region the resolve can sample,
@@ -24,6 +26,10 @@
 // that would leave the screen (or the copied region) is CLAMPED to its edge rather than read from
 // the environment cube: the visible sky here is not always the IBL (Glowmere's is a background
 // shader layer), and a cube sample would put a second, different sky at the frame's edge.
+// Gravitational Lens (Wave 3) keeps this rule rather than adding an environment tap: its remap is
+// bounded (every tap stays within 2 theta_E of its pixel, inside the lens's own disc), so a lens wholly
+// on screen never needs off-screen radiance, and a sky tap on screen already reads exactly the bent
+// ray's radiance whatever the sky is. Only a lens crossing the frame's edge is clamped there.
 
 #include "core/error.hpp"
 #include "world/effects/distortion_frame.hpp"
@@ -82,6 +88,7 @@ struct DistortionRects {
 class DistortionRenderer {
 public:
     static constexpr wgpu::TextureFormat kOffsetFormat = wgpu::TextureFormat::RGBA16Float;
+    static constexpr wgpu::TextureFormat kCoverFormat = wgpu::TextureFormat::R16Float;
     // The largest screen offset one pixel may take, in UV. A safety bound, not a look: the authored
     // fields stay far inside it, and it keeps a runaway route from sampling across the frame.
     static constexpr float kMaxOffsetUv = 0.2f;

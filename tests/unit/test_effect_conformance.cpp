@@ -456,6 +456,9 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::Arc, {EffectTarget::World, EffectTarget::Entity}},
         {EffectKind::ElectricField, {EffectTarget::Entity}},
         {EffectKind::Discharge, {EffectTarget::World, EffectTarget::Entity}},
+        // Wave 3 (DF): a hot column or a mass can stand at a World point or ride an entity.
+        {EffectKind::HeatShimmer, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::GravitationalLens, {EffectTarget::Entity, EffectTarget::World}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {

@@ -70,6 +70,8 @@ const EffectSchema& lightningSchema();   // Wave 3 (BOLT)
 const EffectSchema& arcSchema();         // Wave 3 (BOLT)
 const EffectSchema& electricFieldSchema(); // Wave 3 (BOLT + FXL)
 const EffectSchema& dischargeSchema();   // Wave 3 (BOLT)
+const EffectSchema& heatShimmerSchema(); // Wave 3 (DF)
+const EffectSchema& gravitationalLensSchema(); // Wave 3 (DF)
 
 namespace {
 
@@ -112,6 +114,8 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &arcSchema(),
         &electricFieldSchema(),
         &dischargeSchema(),
+        &heatShimmerSchema(),
+        &gravitationalLensSchema(),
     };
     return kSchemas;
 }

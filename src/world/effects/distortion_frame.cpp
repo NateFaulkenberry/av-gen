@@ -20,6 +20,11 @@ std::size_t rippleProxies(const EffectInstance& instance, const EffectContext& c
 std::size_t velocityDistortionProxies(const EffectInstance& instance, const EffectContext& ctx, float envelope,
                                       std::span<DistortionProxy> out);
 float velocityDistortionHistorySeconds(const EffectInstance& instance);
+// Wave 3 (the lens slice).
+std::size_t heatShimmerProxies(const EffectInstance& instance, const EffectContext& ctx, float envelope,
+                               std::span<DistortionProxy> out);
+std::size_t gravitationalLensProxies(const EffectInstance& instance, const EffectContext& ctx, float envelope,
+                                     std::span<DistortionProxy> out);
 
 namespace {
 
@@ -35,6 +40,8 @@ constexpr DistortionProducer kProducers[] = {
     {EffectKind::Shockwave, &shockwaveProxies, kMaxFronts, &shockwaveHistorySeconds},
     {EffectKind::Ripple, &rippleProxies, kMaxFronts, nullptr},
     {EffectKind::VelocityDistortion, &velocityDistortionProxies, kWakeSegments, &velocityDistortionHistorySeconds},
+    {EffectKind::HeatShimmer, &heatShimmerProxies, 1, nullptr},
+    {EffectKind::GravitationalLens, &gravitationalLensProxies, 1, nullptr},
 };
 
 static_assert([] {

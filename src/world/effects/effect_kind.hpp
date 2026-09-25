@@ -86,6 +86,9 @@ enum class EffectKind : std::uint8_t {
     Arc = 34,           // a continuous writhing arc between two things
     ElectricField = 35, // a crackling web over the owner's surface, and arcs hopping across it
     Discharge = 36,     // a triggered burst of bolts, sparks and a flash from the owner
+    // The lens slice (DF): Heat Shimmer's Cylinder/Shimmer and Gravitational Lens's Facing/Lens.
+    HeatShimmer = 41,       // DF: the view wobbling through a column of hot air
+    GravitationalLens = 42, // DF: background light bent around a mass, optionally a black hole
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not
