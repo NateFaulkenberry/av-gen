@@ -48,11 +48,15 @@ std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directi
     for (PlanItemRow& row : rows) {
         std::vector<std::string> errors;
         std::vector<std::string> warnings;
+        std::vector<std::string> notes; // Info: said, but it marks nothing (a locked shot keeping the frame)
         for (const directing::Issue& issue : validation.issues) {
             if (issue.item != row.key) {
                 continue;
             }
-            (issue.severity == directing::Severity::Error ? errors : warnings).push_back(issue.message);
+            (issue.severity == directing::Severity::Error     ? errors
+             : issue.severity == directing::Severity::Warning ? warnings
+                                                              : notes)
+                .push_back(issue.message);
         }
         if (validation.isBlocked(row.key) || !errors.empty()) {
             row.mark = ItemMark::Blocked;
@@ -61,6 +65,7 @@ std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directi
         }
         row.lines = std::move(errors);
         row.lines.insert(row.lines.end(), warnings.begin(), warnings.end());
+        row.lines.insert(row.lines.end(), notes.begin(), notes.end());
     }
     for (const directing::Issue& issue : validation.issues) {
         const bool owned = std::any_of(rows.begin(), rows.end(), [&](const PlanItemRow& r) { return r.key == issue.item; });

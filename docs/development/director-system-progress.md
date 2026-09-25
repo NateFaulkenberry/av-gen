@@ -41,7 +41,7 @@ Since then:
 | 1 Plan + Cameras | Complete | 95% | 26 `[directing]` cases + 10 golden plans | Remaining: the Director panel beyond Approve/Reject (spec §35 says do not overbuild); UI not verified |
 | 2 Scripted Performances | Complete | 100% | 16 cases + 1 golden | The handoff is M1 (merged from main; this branch's copy dropped). Non-zero `entrySeconds` is NON_DETERMINISTIC in a baked plan |
 | 3 Airborne + Events | Compile side complete | 85% | 5 `[directing][airborne]` cases + 2 goldens | ADR-761. Remaining: `fall`; acrobatics need assets; UI not verified |
-| 4 Autonomous Direction | Goal mode + recording built | 60% | 3 `[directing][goal]` cases | Goal -> `CharacterGoal`; live events heard; recording with played-back and scrub checks (0 m). Remaining: directed mode, event-driven proposals, runtime candidate shots. Record button and AI tool done (ADR-765) |
+| 4 Autonomous Direction | Complete (compile side) | 95% | goal, directed, events, record, agent cases | Goal (ADR-763), recording and its UI/AI (ADR-765), directed (ADR-766), event-driven plans (ADR-767), runtime shots and precedence (ADR-768). UI verified by 5 UI-script arms |
 | 5 Verification + Scale | Started | 30% | 11 golden plans, `[.perf][directing]` CPU + GPU + seek | Cost harness over the golden plans, and seek after ADR-800 |
 
 ## Current focus
@@ -275,6 +275,9 @@ undo, serialization or compilation will be built on them.
   exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-25: Slice 4 closed out. Cancel recording (c6a99677); directed mode (a359d5e7, ADR-766);
+  event-driven plans (6e61706f, ADR-767); runtime candidate shots with exact precedence (ADR-768).
+  Captures 12-14 in `15-director-panel/`.
 - 2026-09-25: ADR-765, the owner's yes to both. The panel's **Record** button (48450b28;
   `director-record` UI arm, 18 checks) and the assistant's `director.record_plan` through a host
   hook (1071ff63; ScriptedProvider test). Both run off the main thread and end at the one approval

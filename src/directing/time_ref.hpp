@@ -89,8 +89,10 @@ struct SectionRun {
 // One thing that happened in a watched play (ADR-767): a world event, when, and who raised it.
 struct ObservedEvent {
     std::string name;
-    std::string subject; // the entity that raised it, or empty
+    std::string subject; // the entity that raised it, or empty; for a camera span, its scenario
     double seconds = 0.0;
+    // ADR-768: > `seconds` for a span -- a runtime camera holding the frame ("camera/UFO Watch").
+    double endSeconds = 0.0;
     friend bool operator==(const ObservedEvent&, const ObservedEvent&) = default;
 };
 

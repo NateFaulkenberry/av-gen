@@ -433,6 +433,9 @@ json Plan::toJson() const {
             if (!e.subject.empty()) {
                 o["subject"] = e.subject;
             }
+            if (e.endSeconds > e.seconds) {
+                o["end"] = e.endSeconds;
+            }
             events.push_back(std::move(o));
         }
         j["observation"] = {{"events", std::move(events)}, {"until", observation->second}};
@@ -643,7 +646,7 @@ PlanParse parsePlan(const json& document) {
                 for (const json& e : *ev) {
                     if (e.is_object()) {
                         events.push_back(ObservedEvent{e.value("name", std::string()), e.value("subject", std::string()),
-                                                       e.value("seconds", 0.0)});
+                                                       e.value("seconds", 0.0), e.value("end", 0.0)});
                     }
                 }
             }

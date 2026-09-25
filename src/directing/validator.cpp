@@ -618,7 +618,34 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         } else if (!v.isBlocked(shot.key)) {
             planned.emplace_back(*start, end);
         }
-        if (eventCameras && !shot.locked && !v.isBlocked(shot.key)) {
+        // ADR-768: precedence between this authored shot and the runtime cameras. Watched, it is
+        // exact -- which camera, which scenario, which seconds; unwatched, it is the possibility.
+        const bool watchedThrough = plan.observation && end <= plan.observation->second + 1e-6;
+        if (watchedThrough && !v.isBlocked(shot.key)) {
+            for (const ObservedEvent& span : plan.observation->first) {
+                if (span.name.rfind("camera/", 0) != 0 || span.endSeconds <= span.seconds ||
+                    span.seconds >= end - 1e-6 || span.endSeconds <= *start + 1e-6) {
+                    continue;
+                }
+                const std::string camera = span.name.substr(7);
+                if (shot.locked) {
+                    Issue& issue = c.add(Severity::Info, IssueCode::CameraConflict, shot.key, at + "/locked",
+                                         fmt::format("locked: this shot keeps the frame from '{}' ({}, {:.2f}-{:.2f}s)",
+                                                     camera, span.subject, span.seconds, span.endSeconds));
+                    issue.details = {{"camera", camera}, {"scenario", span.subject}, {"from", span.seconds},
+                                     {"until", span.endSeconds}, {"winner", "authored"}};
+                } else {
+                    Issue& issue = c.warning(IssueCode::CameraConflict, shot.key, at + "/locked",
+                                             fmt::format("'{}' takes the frame {:.2f}-{:.2f}s during this shot (its "
+                                                         "scenario '{}' runs then, in the watched film)",
+                                                         camera, span.seconds, span.endSeconds, span.subject));
+                    issue.details = {{"camera", camera}, {"scenario", span.subject}, {"from", span.seconds},
+                                     {"until", span.endSeconds}, {"winner", "runtime"}};
+                    issue.suggestions = {"lock the shot (\"locked\": true) to keep the frame",
+                                         fmt::format("or adopt it: a shot on rig '{}' at those seconds", camera)};
+                }
+            }
+        } else if (eventCameras && !shot.locked && !v.isBlocked(shot.key)) {
             Issue& issue = c.warning(IssueCode::CameraConflict, shot.key, at + "/locked",
                                      "an event camera in this scene can take the frame during this shot");
             for (const scene::CameraRig& r : facts.staged.cameras.cameras) {

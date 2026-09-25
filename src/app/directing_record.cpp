@@ -480,6 +480,16 @@ Result<WatchReport> watchFromCopy(const std::filesystem::path& copy, double unti
     report.untilSeconds = untilSeconds;
     std::uint64_t lastSequence = 0;
     bool any = false;
+    // ADR-768: the runtime candidate shots -- every span a camera took the frame for a running
+    // scenario, as "camera/<its name>" with the scenario as its subject.
+    std::optional<directing::ObservedEvent> openCamera;
+    const auto closeCamera = [&](double t) {
+        if (openCamera) {
+            openCamera->endSeconds = t;
+            report.events.push_back(std::move(*openCamera));
+            openCamera.reset();
+        }
+    };
     const auto lastFrame = static_cast<std::uint64_t>(std::ceil(untilSeconds * 60.0));
     for (std::uint64_t f = 0; f <= lastFrame; ++f) {
         if (cancel != nullptr && cancel->load()) {
@@ -489,6 +499,16 @@ Result<WatchReport> watchFromCopy(const std::filesystem::path& copy, double unti
         if (progress && f % 60 == 0) {
             progress(fmt::format("watching: {:.0f} of {:.0f} s, {} event(s) so far", static_cast<double>(f) / 60.0,
                                  untilSeconds, report.events.size()));
+        }
+        const double now = static_cast<double>(f) / 60.0;
+        const scene::ActiveCameraState& active = engine.composition()->activeCamera();
+        const bool eventCamera = active.reason == scene::ActiveCameraReason::Event;
+        const std::string cameraName = "camera/" + active.name;
+        if (openCamera && (!eventCamera || openCamera->name != cameraName)) {
+            closeCamera(now);
+        }
+        if (eventCamera && !openCamera) {
+            openCamera = directing::ObservedEvent{cameraName, active.eventName, now, 0.0};
         }
         const entity::EntityWorld& world = engine.composition()->entityWorld();
         for (const entity::WorldEvent& e : world.worldEvents()) {
@@ -506,6 +526,9 @@ Result<WatchReport> watchFromCopy(const std::filesystem::path& copy, double unti
             report.events.push_back(std::move(o));
         }
     }
+    closeCamera(untilSeconds);
+    std::stable_sort(report.events.begin(), report.events.end(),
+                     [](const directing::ObservedEvent& a, const directing::ObservedEvent& b) { return a.seconds < b.seconds; });
     report.watchMs = since(start);
     log::info("director watch: {} event(s) in {:.0f} s of film, watched in {:.0f} ms", report.events.size(),
               untilSeconds, report.watchMs);
@@ -529,6 +552,9 @@ nlohmann::json observationJson(const WatchReport& report) {
         nlohmann::json o{{"name", e.name}, {"seconds", e.seconds}};
         if (!e.subject.empty()) {
             o["subject"] = e.subject;
+        }
+        if (e.endSeconds > e.seconds) {
+            o["end"] = e.endSeconds;
         }
         events.push_back(std::move(o));
     }
@@ -590,7 +616,17 @@ public:
         for (const auto& [k, n] : counts) {
             kinds[k] = n;
         }
+        // ADR-768: the runtime cameras' claims, as candidate shots a plan can adopt (rig + times) or
+        // must yield to (an unlocked shot over one loses the frame to it).
+        nlohmann::json candidates = nlohmann::json::array();
+        for (const directing::ObservedEvent& e : (*result_)->events) {
+            if (e.name.rfind("camera/", 0) == 0 && e.endSeconds > e.seconds) {
+                candidates.push_back({{"camera", e.name.substr(7)}, {"scenario", e.subject}, {"from", e.seconds},
+                                      {"until", e.endSeconds}});
+            }
+        }
         return nlohmann::json{{"observation", observationJson(**result_)}, {"kinds", std::move(kinds)},
+                              {"runtimeShots", std::move(candidates)},
                               {"conditions", "a play from zero, audio off, every body simulated"}};
     }
     void cancel() override { cancel_ = true; }

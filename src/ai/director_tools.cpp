@@ -106,7 +106,7 @@ void attachObservation(directing::Plan& plan, const ToolContext& ctx) {
     std::vector<directing::ObservedEvent> events;
     for (const json& e : ctx.observation().value("events", json::array())) {
         events.push_back(directing::ObservedEvent{e.value("name", std::string()), e.value("subject", std::string()),
-                                                  e.value("seconds", 0.0)});
+                                                  e.value("seconds", 0.0), e.value("end", 0.0)});
     }
     plan.observation = std::make_pair(std::move(events), ctx.observation().value("until", 0.0));
 }

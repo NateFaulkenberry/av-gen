@@ -159,3 +159,92 @@ TEST_CASE("the watched film is the played film: an event-driven marker lands on 
     INFO("watched " << beams[1].seconds << " s, played " << seen << " s");
     CHECK(seen == beams[1].seconds);
 }
+
+TEST_CASE("runtime candidate shots: watched, precedence is exact -- a locked shot keeps the frame, an unlocked one loses it",
+          "[directing][events][camera][benchmark]") {
+    // ADR-768. The watch records every span a runtime (event) camera held the frame. A plan can adopt
+    // one (a locked shot on its rig at its seconds), or keep the frame from it (lock), and the
+    // validator says exactly which will happen -- then the play agrees.
+    app::Engine live(app::EngineMode::Offline);
+    REQUIRE(live.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
+    const auto watched = app::watchWorldEvents(live, 100.0);
+    REQUIRE(watched.has_value());
+    const auto span = std::find_if(watched->events.begin(), watched->events.end(), [](const ObservedEvent& e) {
+        return e.name.rfind("camera/", 0) == 0 && e.endSeconds > e.seconds + 1.0;
+    });
+    REQUIRE(span != watched->events.end());
+    const std::string camera = span->name.substr(7);
+    INFO("runtime shot: '" << camera << "' for " << span->subject << " " << span->seconds << "-" << span->endSeconds << " s");
+
+    const auto planWith = [&](bool locked) {
+        json doc = json::parse(R"({"schemaVersion": 1, "id": "over-the-beam", "title": "Rook over the beam", "tier": "baked",
+            "subjects": [{"alias": "rook", "text": "Rook"}],
+            "shots": [{"key": "shot", "name": "rook-over-beam", "durationSeconds": 3, "subject": "rook",
+                       "camera": [{"move": "chase", "distanceMetres": 4}]}]})");
+        doc["shots"][0]["start"] = json{{"seconds", span->seconds + 0.5}};
+        doc["shots"][0]["locked"] = locked;
+        doc["observation"] = app::observationJson(*watched);
+        PlanParse parsed = parsePlan(doc);
+        REQUIRE(parsed.plan);
+        return compilePlan(*parsed.plan, app::sceneFactsFor(live));
+    };
+    const auto conflict = [](const Compilation& c) -> const Issue* {
+        for (const Issue& i : c.validation.issues) {
+            if (i.code == IssueCode::CameraConflict && i.item == "shot") {
+                return &i;
+            }
+        }
+        return nullptr;
+    };
+    const Compilation unlocked = planWith(false);
+    const Compilation locked = planWith(true);
+    REQUIRE(conflict(unlocked) != nullptr);
+    CHECK(conflict(unlocked)->severity == Severity::Warning);
+    CHECK(conflict(unlocked)->details["winner"] == "runtime");
+    CHECK(conflict(unlocked)->details["camera"] == camera);
+    REQUIRE(conflict(locked) != nullptr);
+    CHECK(conflict(locked)->severity == Severity::Info);
+    CHECK(conflict(locked)->details["winner"] == "authored");
+
+    // Played: who has the frame a second into the shot is what the validator said.
+    const auto whoHasTheFrame = [&](const Compilation& c) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
+        scene::DetailLimits limits = engine.detailLimits();
+        limits.entityDistanceCull = false;
+        engine.setDetailLimits(limits);
+        REQUIRE(engine.setAudioClips({}).has_value());
+        REQUIRE(app::installCompilation(engine, c));
+        const auto last = static_cast<std::uint64_t>(std::llround((span->seconds + 1.5) * 60.0));
+        for (std::uint64_t f = 0; f <= last; ++f) {
+            engine.update(FrameTime{static_cast<double>(f) / 60.0, f == 0 ? 0.0 : 1.0 / 60.0, f});
+        }
+        return engine.composition()->activeCamera();
+    };
+    const scene::ActiveCameraState lost = whoHasTheFrame(unlocked);
+    const scene::ActiveCameraState kept = whoHasTheFrame(locked);
+    INFO("unlocked: '" << lost.name << "' (" << scene::activeCameraReasonName(lost.reason) << "); locked: '" << kept.name
+                       << "' (" << scene::activeCameraReasonName(kept.reason) << ")");
+    CHECK(lost.reason == scene::ActiveCameraReason::Event);
+    CHECK(lost.name == camera);
+    CHECK(kept.reason == scene::ActiveCameraReason::Shot);
+    CHECK(kept.name == "rook-over-beam");
+
+    // Adopted: the runtime shot made authored -- a locked shot on its own rig, at its seconds.
+    json adopt = json::parse(R"({"schemaVersion": 1, "id": "adopt", "title": "Keep the beam shot", "tier": "baked",
+        "shots": [{"key": "shot", "name": "the-beam", "locked": true}]})");
+    adopt["shots"][0]["rig"] = camera;
+    adopt["shots"][0]["start"] = json{{"event", span->name}, {"occurrence", 1}};
+    adopt["shots"][0]["durationSeconds"] = span->endSeconds - span->seconds;
+    adopt["observation"] = app::observationJson(*watched);
+    PlanParse parsed = parsePlan(adopt);
+    REQUIRE(parsed.plan);
+    const Compilation adopted = compilePlan(*parsed.plan, app::sceneFactsFor(live));
+    INFO(adopted.diffText());
+    CHECK_FALSE(adopted.validation.hasErrors());
+    const auto cut = std::find_if(adopted.staged.cameras.shots.begin(), adopted.staged.cameras.shots.end(),
+                                  [&](const scene::CameraShot& s) { return s.startSeconds == span->seconds; });
+    REQUIRE(cut != adopted.staged.cameras.shots.end());
+    CHECK(adopted.staged.cameras.nameOf(cut->camera) == camera);
+    CHECK(cut->locked);
+}
