@@ -240,7 +240,8 @@ At 60a9911a (M1–M5), release, with a second build doing no compile or link:
 - **CPU `avgen_tests`:** 3,267 cases. **One real failure**: `test_glowmere_valley_2.cpp:551`
   asserts that a project records its scene's sha256, and M4 edited four Glowmere scenes. The four
   projects' recorded hashes are refreshed; that case and `[glowmere]` (50 cases) now pass. The full
-  rerun is recorded below.
+  rerun at 8dca5467 is clean: **3,267 cases, exit 0**, with only the expected `[!shouldfail]`
+  and 16 skips.
 - **GPU `avgen_render_tests`:** 443 cases, one failure: `test_render_job.cpp:87`, a `loadProject`
   inside the shadow-AOV case. It passes on rerun (`[aov]`, 3 cases). Its fixture deletes and
   recreates a fixed shared folder, `$TMPDIR/avgen_render_job`, so a GPU suite running at the same
