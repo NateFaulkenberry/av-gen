@@ -42,7 +42,7 @@ impose something checkable.
 | B Procedural (§1–67) | 54 | 2 | 0 | 11 | 54/56 | §39 and §66 are partial; see below |
 | C Matching (§1–95) | 81 | 0 | 1 | 13 | 52 / 25 / 5 | §37/39/40/76/81 done by ADR-825 (the product loads a baked database through the slot); §68 is partly live (`MotionDebug::matching`) and counted done-in-CLI as before; §94 waits on the owner. **§86 (the Phase D gate)**: the matcher runs on Glowmere as a review arm and is not yet in the film |
 | D Behaviour (§1–78 + demo) | 40 + demo | 26 | 2 | 10 | 44 / 16 / 8 | §35 done (ADR-824: runtime goals, `release`, scheduled direction replayed); §63/§66 as before |
-| ★ Glowmere review build (10) | 8 | 2 | 0 | – | 0 / 10 | done: 1–5, 8–10 (10's cost figures were taken under load); partial: 6 (the director reads scenario beats), 7 (no in-app inspector panel) |
+| ★ Glowmere review build (10) | 7 | 3 | 0 | – | 0 / 10 | done: 1–5, 8, 9; partial: 6 (the director reads scenario beats), 7 (no in-app inspector panel), 10 (the report exists; its cost figures were taken under load and are not reliable) |
 | E Learned motion (13 board rows) | 0 | 0 | 13 | – | 13 planned | gated; see recommendation |
 | F Advanced (9 tracks) | – | – | – | – | 9 gated | pieces exist in F7, F8 and F9; no track has been measured or classified |
 
