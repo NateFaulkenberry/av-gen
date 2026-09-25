@@ -2450,11 +2450,9 @@ void Application::serviceRenderPreview() {
 }
 
 void Application::serviceDirectorStills() {
-    if (!pendingStills_ || panel_ == nullptr || context_ == nullptr || shaders_ == nullptr) {
+    if (panel_ == nullptr || context_ == nullptr || shaders_ == nullptr) {
         return;
     }
-    auto [task, compilation] = std::move(*pendingStills_);
-    pendingStills_.reset();
     ui::DirectorPanel::Stills& view = panel_->director.stills;
     // One fixed atlas, created once and written in place (the render preview's rule, ADR-320: a new
     // texture per request would make ImGui cache a bind group per request).
@@ -2463,37 +2461,38 @@ void Application::serviceDirectorStills() {
     constexpr std::uint32_t kH = 144;
     constexpr std::uint32_t kColumns = kAtlas / kW;
     constexpr std::uint32_t kCapacity = kColumns * (kAtlas / kH);
-    const auto start = std::chrono::steady_clock::now();
-    auto report = renderShotStills(*context_, *shaders_, *engine_, compilation, kW, kH,
-                                   std::filesystem::temp_directory_path());
-    view.task = task;
-    view.byItem.clear();
-    if (!report) {
-        view.note = "stills: " + report.error().message;
-        log::warn("{}", view.note);
-        return;
+    if (!stillsSession_) {
+        stillsSession_ = std::make_unique<StillsSession>(*context_, *shaders_, std::filesystem::temp_directory_path());
     }
-    if (!stillsTexture_) {
-        wgpu::TextureDescriptor desc{};
-        desc.label = "director-stills";
-        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
-        desc.dimension = wgpu::TextureDimension::e2D;
-        desc.size = {kAtlas, kAtlas, 1};
-        desc.format = wgpu::TextureFormat::RGBA8Unorm;
-        stillsTexture_ = context_->device().CreateTexture(&desc);
+    const StillsSession::Progress p = stillsSession_->step();
+    if (!p.phase.empty() && p.phase != stillsPhase_) {
+        stillsPhase_ = p.phase;
+        log::info("director stills: {} ({} of {})", p.phase, p.done, p.total);
+    }
+    std::vector<ShotStill> fresh = stillsSession_->takeNew();
+    if (p.task.empty() || p.task != view.task) {
+        fresh.clear();
+    }
+    for (const ShotStill& s : fresh) {
+        if (stillsSlots_ >= kCapacity || s.image.width != kW || s.image.height != kH) {
+            continue;
+        }
         if (!stillsTexture_) {
-            view.note = "stills: cannot create the atlas texture";
-            return;
+            wgpu::TextureDescriptor desc{};
+            desc.label = "director-stills";
+            desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+            desc.dimension = wgpu::TextureDimension::e2D;
+            desc.size = {kAtlas, kAtlas, 1};
+            desc.format = wgpu::TextureFormat::RGBA8Unorm;
+            stillsTexture_ = context_->device().CreateTexture(&desc);
+            if (!stillsTexture_) {
+                view.note = "stills: cannot create the atlas texture";
+                break;
+            }
+            stillsView_ = stillsTexture_.CreateView();
         }
-        stillsView_ = stillsTexture_.CreateView();
-    }
-    std::uint32_t slot = 0;
-    for (const ShotStill& s : report->stills) {
-        if (slot >= kCapacity || s.image.width != kW || s.image.height != kH) {
-            break;
-        }
-        const std::uint32_t x = (slot % kColumns) * kW;
-        const std::uint32_t y = (slot / kColumns) * kH;
+        const std::uint32_t x = (stillsSlots_ % kColumns) * kW;
+        const std::uint32_t y = (stillsSlots_ / kColumns) * kH;
         wgpu::TexelCopyTextureInfo dst{};
         dst.texture = stillsTexture_;
         dst.origin = {x, y, 0};
@@ -2506,13 +2505,41 @@ void Application::serviceDirectorStills() {
         view.byItem[s.item] = ui::DirectorPanel::Still{static_cast<float>(x) / a, static_cast<float>(y) / a,
                                                        static_cast<float>(x + kW) / a, static_cast<float>(y + kH) / a,
                                                        s.seconds};
-        ++slot;
+        view.texture = reinterpret_cast<std::uint64_t>(stillsView_.Get());
+        view.width = static_cast<float>(kW);
+        view.height = static_cast<float>(kH);
+        ++stillsSlots_;
     }
-    view.texture = reinterpret_cast<std::uint64_t>(stillsView_.Get());
-    view.width = static_cast<float>(kW);
-    view.height = static_cast<float>(kH);
-    view.note = fmt::format("{} still(s) from a scratch copy in {:.1f} s; your project was not touched", slot,
-                            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+    if (p.task.empty() || p.task != view.task) {
+        // not this panel's current request
+    } else if (p.busy) {
+        view.note = fmt::format("stills: {} ({} of {} done); the editor stays live", p.phase, p.done, p.total);
+    } else if (p.failed) {
+        view.note = "stills: " + p.phase;
+    } else if (p.phase == "done") {
+        const std::string note = fmt::format("{} still(s) from a scratch copy in {:.1f} s ({:.0f} ms of it on the "
+                                             "editor's frames); your project was not touched",
+                                             p.done, stillsSession_->wallMs() / 1000.0, stillsSession_->mainThreadMs());
+        if (view.note != note) {
+            view.note = note;
+            log::info("director stills: {}", note);
+        }
+    }
+    // A new request only after this frame's results are collected, so a finished request's stills
+    // are never dropped by the next one; and the request is copied, not moved, until it is taken.
+    if (pendingStills_) {
+        // The cache key: the project's file, the composition it has, and its history state with the
+        // panel's own preview taken off -- any edit, undo, load or save-as moves it (ADR-764).
+        const std::string key = fmt::format("{}|{}|{}", engine_->projectPath().generic_string(),
+                                            static_cast<const void*>(engine_->composition()),
+                                            panel_->director.baseState());
+        if (stillsSession_->request(*engine_, key, pendingStills_->first, pendingStills_->second, kW, kH)) {
+            view.task = pendingStills_->first;
+            view.byItem.clear();
+            stillsSlots_ = 0;
+            pendingStills_.reset();
+        }
+    }
 }
 
 void Application::applyOutputsFromProject() {

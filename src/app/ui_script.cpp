@@ -1348,8 +1348,8 @@ void UiScript::stepDirector(Engine& engine, ui::ControlPanel& panel, platform::W
         check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval,
               "a proposal is waiting for approval before anything is pressed");
         check(plans() == 0, fmt::format("the project carries no plan yet ({})", plans()));
-        check(director.buttons().preview.valid && director.buttons().accept.valid,
-              "the panel drew its buttons");
+        check(director.buttons().preview.valid && director.buttons().accept.valid && director.buttons().reject.valid,
+              "the panel's buttons are drawn and in view");
         return;
     case 110:
         check(director.previewing(), "Preview put the panel into preview");
@@ -1423,6 +1423,11 @@ void UiScript::stepDirector(Engine& engine, ui::ControlPanel& panel, platform::W
     }
     press(director.buttons().preview, 80);
     press(accept ? director.buttons().accept : director.buttons().reject, 130);
+    // ADR-764: while the reject path's preview stands, press Stills again after the first stills
+    // (made by the preview) have had time to finish -- the second request must reuse the session.
+    if (!accept) {
+        press(director.buttons().stills, 240);
+    }
 }
 
 } // namespace avgen::app

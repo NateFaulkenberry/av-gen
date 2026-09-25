@@ -19,6 +19,11 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <chrono>
+#include <cstdio>
+#include <thread>
+#include <vector>
+#include <algorithm>
 
 using namespace avgen;
 namespace fs = std::filesystem;
@@ -96,4 +101,83 @@ TEST_CASE("a proposal's stills come from a scratch copy with it installed, and l
     CHECK(difference > 8.0);
     INFO("load " << report->loadMs << " ms, render " << report->renderMs << " ms");
     SUCCEED();
+}
+
+TEST_CASE("the stills session keeps the editor's frames short, reuses its scratch copy, and rebuilds it on a new key",
+          "[directing][stills]") {
+    log::init(log::Level::Warn);
+    auto ctx = gpu::Context::create(gpu::ContextDesc{});
+    if (!ctx) {
+        SKIP("no GPU adapter available");
+    }
+    gpu::ShaderLibrary shaders(**ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    app::Engine live(app::EngineMode::Offline);
+    REQUIRE(live.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
+    live.update(FrameTime{0.0, 0.0, 0});
+    const nlohmann::json golden =
+        testsupport::readJson(fs::path(AVGEN_SOURCE_DIR) / "tests/data/directing/golden/rook_run_past_umbra.json");
+    directing::PlanParse parsed = directing::parsePlan(golden.at("plan"));
+    REQUIRE(parsed.plan);
+    const directing::Compilation c = directing::compilePlan(*parsed.plan, app::sceneFactsFor(live));
+
+    app::StillsSession session(**ctx, shaders, fs::temp_directory_path());
+    // Runs a request to the end the way the editor does: one `step` per frame. Returns the longest
+    // single frame's worth of main-thread work, which is what the person feels.
+    const auto run = [&](const std::string& key, std::vector<app::ShotStill>& out) {
+        const auto t0 = std::chrono::steady_clock::now();
+        REQUIRE(session.request(live, key, "task", c, 256, 144));
+        double longest = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        CHECK_FALSE(session.request(live, key, "task", c, 256, 144)); // one at a time
+        for (int frame = 0; frame < 100000; ++frame) {
+            const auto f0 = std::chrono::steady_clock::now();
+            const app::StillsSession::Progress p = session.step();
+            longest = std::max(longest, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - f0).count());
+            for (auto& s : session.takeNew()) {
+                out.push_back(std::move(s));
+            }
+            REQUIRE_FALSE(p.failed);
+            if (!p.busy) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }
+        return longest;
+    };
+
+    std::vector<app::ShotStill> first;
+    const double firstLongest = run("project@1", first);
+    REQUIRE(first.size() == 1);
+    CHECK(session.loads() == 1);
+    const double firstWall = session.wallMs();
+    INFO("first: wall " << firstWall << " ms, main thread " << session.mainThreadMs() << " ms, longest frame "
+                        << firstLongest << " ms");
+
+    std::vector<app::ShotStill> again;
+    const double againLongest = run("project@1", again); // same key: the session is reused
+    REQUIRE(again.size() == 1);
+    CHECK(session.loads() == 1);
+    const double againWall = session.wallMs();
+    INFO("again: wall " << againWall << " ms, main thread " << session.mainThreadMs() << " ms, longest frame "
+                        << againLongest << " ms");
+    CHECK(againWall < firstWall);
+
+    std::vector<app::ShotStill> edited;
+    (void)run("project@2", edited); // an edit moved the key: rebuilt
+    CHECK(session.loads() == 2);
+    REQUIRE(edited.size() == 1);
+
+    // The same shot the synchronous path renders (the session is the same work, spread out). Not
+    // bit-identical: a reused session's renderer and particles carry history from its last frame
+    // (2.6 of 255 measured) -- which is an order of magnitude below the 31 that separates the
+    // proposal's shot from the project without it, the difference that matters here.
+    auto sync = app::renderShotStills(**ctx, shaders, live, c, 256, 144, fs::temp_directory_path());
+    REQUIRE(sync.has_value());
+    CHECK(meanAbsDifference(first[0].image, sync->stills[0].image) < 6.0);
+    CHECK(meanAbsDifference(again[0].image, sync->stills[0].image) < 6.0);
+    // Nothing the editor does per frame waits on the simulation: the scratch copy is written on the
+    // main thread, and the first frame rendered uploads the scratch scene's textures; after that each
+    // frame is one small render.
+    CHECK(againLongest < 250.0);
+    std::printf("stills session: first %.0f ms wall (longest editor frame %.0f ms), reused %.0f ms wall "
+                "(longest editor frame %.0f ms)\n", firstWall, firstLongest, againWall, againLongest);
 }

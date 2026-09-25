@@ -49,12 +49,15 @@ public:
     Stills stills;
     // The task whose proposal is being previewed or shown, for the host to match stills to it.
     [[nodiscard]] const std::string& shownTask() const { return cachedTask_; }
+    // The history state the project is in with this panel's own preview taken off: what a cache of
+    // the project (the stills' scratch session) is keyed on, so a preview does not invalidate it.
+    [[nodiscard]] std::uint64_t baseState() const;
 
     void draw(app::Engine& engine);
 
     // Where the buttons were drawn last frame, in window coordinates, for the `director-*` UI
     // script arms (ADR-762), which press them through the pointer like a hand would. `valid` is
-    // false until the panel has drawn them.
+    // false until the panel has drawn them, and whenever they are scrolled or clipped out of view.
     struct Rect {
         float x = 0.0f, y = 0.0f, w = 0.0f, h = 0.0f;
         bool valid = false;
@@ -84,6 +87,7 @@ private:
     // The preview edit: which proposal it is for, and the history state just after it was made.
     std::string previewTask_;
     std::uint64_t previewState_ = 0;
+    std::uint64_t previewBase_ = 0; // the history state just before the preview edit
     std::string status_;
     Buttons buttons_;
 };
