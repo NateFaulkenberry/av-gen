@@ -668,6 +668,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
                            std::clamp(frame_.horizonDensity, 0.0f, scene::kHorizonDensityMax));
         u.terrain0 = ground ? frame_.terrainMap0 : glm::vec4(0.0f);
         u.terrain1 = ground ? frame_.terrainMap1 : glm::vec4(0.0f);
+        u.fogPool = glm::vec4(ground ? std::clamp(frame_.fogPooling, 0.0f, 1.0f) : 0.0f, 0.0f, 0.0f, 0.0f);
         // Lifetime curves (ADR-040): at most kMaxCurveKeys keys each; fewer than two disables the
         // curve in the shader and the linear ramp above is used instead.
         const auto keyCount = [](std::size_t n) {

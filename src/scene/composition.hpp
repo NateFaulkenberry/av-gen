@@ -1498,6 +1498,7 @@ private:
     params::Parameter<float>* fogUpperDensity_ = nullptr;
     params::Parameter<float>* fogHeightCurve_ = nullptr;
     params::Parameter<float>* fogGroundFollow_ = nullptr; // ADR-715
+    params::Parameter<float>* fogPooling_ = nullptr;      // ADR-717
     params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the

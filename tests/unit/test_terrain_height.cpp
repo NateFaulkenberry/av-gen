@@ -315,3 +315,156 @@ TEST_CASE("fogGroundFollow survives the project document after a frame has run",
     CHECK(fresh.scene().environment.fogGroundFollow == 0.0f);
     fs::remove_all(dir);
 }
+
+// ---- ADR-717: the basin a pooling layer is measured from ----------------------------------------
+
+namespace {
+
+// The valley's mirror: a ridge along Z, its crest 60 m up at x = 0 and the map's edges at 0.
+world::WorldMap ridgeMap() {
+    world::WorldMap m = valleyMap();
+    auto image = std::make_shared<world::HeightImage>();
+    image->width = 3;
+    image->height = 1;
+    image->samples = {0.0f, 1.0f, 0.0f};
+    m.image = image;
+    m.prepare();
+    return m;
+}
+
+} // namespace
+
+TEST_CASE("the basin is the ground low-passed, baked beside it", "[terrain][height][fog]") {
+    SECTION("flat ground has a flat basin") {
+        world::WorldMap flat;
+        flat.size = glm::vec2(160.0f, 160.0f);
+        flat.baseHeight = 3.0f;
+        flat.prepare();
+        const world::TerrainHeightField f = world::bakeTerrainHeight(flat);
+        REQUIRE(f.pooled());
+        for (std::size_t k = 0; k < f.basin.size(); k += 37) {
+            CHECK(f.basin[k] == Approx(3.0f).margin(1e-5));
+        }
+    }
+    SECTION("a valley's basin stands above its floor, and a slope's is the slope") {
+        // At an explicit 24 m, so the kernel's 72 m reach fits between the fold and the map's edge.
+        world::TerrainHeightField f = world::bakeTerrainHeight(valleyMap());
+        REQUIRE(f.pooled());
+        constexpr float kSigma = 24.0f;
+        world::poolTerrainHeight(f, kSigma);
+        const auto placed = world::placeTerrainGround(std::make_shared<world::TerrainHeightField>(f), glm::vec3(0.0f),
+                                                      glm::vec3(1.0f), false);
+        // A Gaussian over |x| * k at the fold is k * sigma * sqrt(2 / pi) above the floor.
+        const float k = 60.0f / 320.0f;
+        const float lifted = k * kSigma * std::sqrt(2.0f / 3.14159265f);
+        CHECK(placed.basinAt(glm::vec2(0.0f, 0.0f)) == Approx(lifted).epsilon(0.02));
+        CHECK(placed.groundAt(glm::vec2(0.0f, 0.0f)) == Approx(0.0f).margin(1e-4));
+        // Far from the fold and from the edges the ground is linear under the kernel, so the
+        // basin IS the ground: a hillside is not a basin.
+        CHECK(placed.basinAt(glm::vec2(150.0f, 20.0f)) == Approx(valleyHeight(150.0f)).margin(1e-3));
+        CHECK(placed.basinAt(glm::vec2(-150.0f, -70.0f)) == Approx(valleyHeight(-150.0f)).margin(1e-3));
+    }
+    SECTION("the bake pools at the shipped basin width") {
+        const world::TerrainHeightField baked = world::bakeTerrainHeight(valleyMap());
+        world::TerrainHeightField again = baked;
+        world::poolTerrainHeight(again, world::kTerrainBasinSigma);
+        CHECK(again.basin == baked.basin);
+        world::poolTerrainHeight(again, 2.0f * world::kTerrainBasinSigma);
+        CHECK(again.basin != baked.basin); // the control: the width is not ignored
+    }
+    SECTION("a ridge's basin lies below its crest") {
+        const auto placed = world::placeTerrainGround(
+            std::make_shared<world::TerrainHeightField>(world::bakeTerrainHeight(ridgeMap())), glm::vec3(0.0f),
+            glm::vec3(1.0f), false);
+        CHECK(placed.groundAt(glm::vec2(0.0f)) == Approx(60.0f).margin(1e-3));
+        CHECK(placed.basinAt(glm::vec2(0.0f)) < 60.0f - 3.0f);
+    }
+    SECTION("the reference: pooling 0 is ADR-715's follow exactly, 1 is the basin") {
+        const auto placed = world::placeTerrainGround(
+            std::make_shared<world::TerrainHeightField>(world::bakeTerrainHeight(valleyMap())), glm::vec3(0.0f, 2.0f, 0.0f),
+            glm::vec3(1.0f), false);
+        for (const glm::vec2 p : {glm::vec2(0.0f), glm::vec2(33.0f, -12.0f), glm::vec2(-250.0f, 100.0f)}) {
+            CHECK(placed.referenceAt(p, 0.7f, 0.0f) == 0.7f * placed.groundAt(p));
+            CHECK(placed.referenceAt(p, 0.7f, 1.0f) == Approx(placed.basinAt(p)).margin(1e-5));
+            CHECK(placed.referenceAt(p, 0.0f, 0.5f) == Approx(0.5f * placed.basinAt(p)).margin(1e-5));
+        }
+        CHECK(placed.poolingLane(3.0f) == 1.0f);
+        CHECK(placed.poolingLane(0.25f) == 0.25f);
+    }
+    SECTION("a field that was never pooled has no basin to pool in") {
+        auto field = std::make_shared<world::TerrainHeightField>(world::bakeTerrainHeight(valleyMap()));
+        field->basin.clear();
+        const auto placed = world::placeTerrainGround(field, glm::vec3(0.0f), glm::vec3(1.0f), false);
+        CHECK(placed.valid());
+        CHECK_FALSE(placed.poolable());
+        CHECK(placed.poolingLane(1.0f) == 0.0f);
+        CHECK(world::TerrainGround{}.poolingLane(1.0f) == 0.0f);
+    }
+}
+
+TEST_CASE("fogPooling reaches the environment and round-trips the scene file", "[fog][environment][height][composition]") {
+    assets::AssetRegistry registry;
+    nlohmann::json doc = nlohmann::json::parse(kTerrainScene);
+    doc["environment"]["fogPooling"] = 0.4f;
+    auto comp = scene::Composition::fromJson(doc, registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(frameAt(0.0));
+    CHECK((*comp)->scene().environment.fogPooling == 0.4f);
+    CHECK((*comp)->scene().terrainGround.poolable()); // the bake carries its basin
+
+    params::IParameter* p = params.find("scene/fogPooling");
+    REQUIRE(p != nullptr);
+    CHECK(p->baseComponent(0) == 0.4f);
+    p->setBaseComponent(0, 3.0f);
+    CHECK(p->baseComponent(0) == 1.0f);
+    p->setBaseComponent(0, 0.7f);
+    params.resetFinals();
+    (*comp)->update(frameAt(0.1));
+    CHECK((*comp)->scene().environment.fogPooling == 0.7f);
+
+    const nlohmann::json j = (*comp)->toJson();
+    CHECK(j["environment"]["fogPooling"] == 0.7f);
+    auto again = scene::Composition::fromJson(j, registry);
+    REQUIRE(again.has_value());
+    CHECK((*again)->toJson() == j);
+
+    // THE CONTROL: a scene that never set it writes no key.
+    auto plain = scene::Composition::fromJson(nlohmann::json::parse(kTerrainScene), registry);
+    REQUIRE(plain.has_value());
+    CHECK_FALSE((*plain)->toJson()["environment"].contains("fogPooling"));
+}
+
+TEST_CASE("fogPooling survives the project document after a frame has run", "[integration][fog][environment][height]") {
+    const fs::path dir = scratch("pooling");
+    {
+        std::ofstream out(dir / "scene.json");
+        out << kTerrainScene;
+    }
+    app::Engine session(app::EngineMode::Offline);
+    REQUIRE(session.loadComposition(dir / "scene.json").has_value());
+    params::IParameter* p = session.params().find("scene/fogPooling");
+    REQUIRE(p != nullptr);
+    p->setBaseComponent(0, 0.65f);
+    session.update(frameAt(0.0));
+    session.update(frameAt(1.5));
+    CHECK(session.scene().environment.fogPooling == 0.65f);
+    REQUIRE(session.saveProject(dir / "once.json").has_value());
+
+    app::Engine render(app::EngineMode::Offline);
+    REQUIRE(render.loadProject(dir / "once.json").has_value());
+    render.update(frameAt(0.0));
+    render.update(frameAt(1.5));
+    REQUIRE(render.params().find("scene/fogPooling") != nullptr);
+    CHECK(render.params().find("scene/fogPooling")->baseComponent(0) == 0.65f);
+    CHECK(render.scene().environment.fogPooling == 0.65f);
+
+    // The control: the loaded engine would have said 0 had the project not carried it.
+    app::Engine fresh(app::EngineMode::Offline);
+    REQUIRE(fresh.loadComposition(dir / "scene.json").has_value());
+    fresh.update(frameAt(0.0));
+    CHECK(fresh.scene().environment.fogPooling == 0.0f);
+    fs::remove_all(dir);
+}

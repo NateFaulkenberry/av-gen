@@ -59,7 +59,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "horizonDensity",
+    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -4004,6 +4004,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // sample", and outside that the layer would be steeper than the terrain or tilted against it.
     fogGroundFollow_ = &params.add(floatDesc(prefix_ + "scene/fogGroundFollow", volumeSetting_.fogGroundFollow,
                                              0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-717: the layer pools in the basins -- its top measured from the low-passed ground. 0 is
+    // ADR-715's layer, 1 is the basin alone; hard-clamped because past 1 the top would be pushed
+    // BELOW the basin in valleys, which is the opposite of pooling.
+    fogPooling_ = &params.add(floatDesc(prefix_ + "scene/fogPooling", volumeSetting_.fogPooling, 0.0f, 1.0f, 0.0f,
+                                        1.0f));
     // ADR-705 (§7's Horizon Density): the air grows denser with distance from the eye, read by the
     // march, the surface pass and the particle estimate from this one number. An ordinary
     // parameter, so audio, the timeline and presets drive it like any other. Soft range 0..2 is
@@ -4972,6 +4977,7 @@ void Composition::detach() {
     fogUpperDensity_ = nullptr;
     fogHeightCurve_ = nullptr;
     fogGroundFollow_ = nullptr;
+    fogPooling_ = nullptr;
     horizonDensity_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
@@ -7640,6 +7646,7 @@ void Composition::applyParameters() {
         env.fogUpperDensity = pick(fogUpperDensity_, volumeSetting_.fogUpperDensity);
         env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
         env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
+        env.fogPooling = pick(fogPooling_, volumeSetting_.fogPooling);
         env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
         env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
         env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
@@ -8709,6 +8716,11 @@ nlohmann::json Composition::toJson() const {
         if (follow != 0.0f) {
             environment["fogGroundFollow"] = follow;
         }
+        // ADR-717, by the same rule: only when not 0.
+        const float pooling = fogPooling_ != nullptr ? fogPooling_->base() : volumeSetting_.fogPooling;
+        if (pooling != 0.0f) {
+            environment["fogPooling"] = pooling;
+        }
     }
     j["environment"] = std::move(environment);
     // ADR-278: the lights the scene authored, written back so a save cannot silently delete them --
@@ -9677,6 +9689,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"fogUpperDensity", &v.fogUpperDensity},
                                       FloatKey{"fogHeightCurve", &v.fogHeightCurve},
                                       FloatKey{"fogGroundFollow", &v.fogGroundFollow},
+                                      FloatKey{"fogPooling", &v.fogPooling},
                                       FloatKey{"horizonDensity", &v.horizonDensity},
                                       FloatKey{"volumeShadowStrength", &v.volumeShadowStrength},
                                       FloatKey{"volumeScattering", &v.volumeScattering},

@@ -94,9 +94,12 @@ struct ParticleUniforms {
     // chose for this camera (scene/scatter_anchors.hpp), xyz = centre, w = 1.
     glm::vec4 anchorInfo;
     glm::vec4 anchors[scene::kMaxScatterAnchors];
+    // ADR-717: x = fogPooling (0 without a terrain), yzw = 0 -- the lane `FrameUniforms::fogPool`
+    // carries, so this estimate pools where the march and the surface fog pool. Appended last.
+    glm::vec4 fogPool;
 };
 static_assert(sizeof(ParticleUniforms) == 128 + 16 * 41 + 32 * scene::kMaxFieldForces + 48 * scene::kMaxCurveKeys +
-                                              16 * scene::kMaxScatterAnchors);
+                                              16 * scene::kMaxScatterAnchors + 16);
 
 // Everything the draw needs that is not a per-system parameter (ADR-040). Set once per frame.
 struct ParticleFrameContext {
@@ -127,6 +130,7 @@ struct ParticleFrameContext {
     // ADR-715: the ground follow, already 0 when there is no terrain, and the terrain's baked
     // height with its placement. A null view binds a placeholder that is never read.
     float fogGroundFollow = 0.0f;
+    float fogPooling = 0.0f; // ADR-717, likewise 0 without a terrain
     glm::vec4 terrainMap0{0.0f};
     glm::vec4 terrainMap1{0.0f};
     wgpu::TextureView terrainHeight;

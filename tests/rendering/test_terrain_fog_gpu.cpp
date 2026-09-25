@@ -93,6 +93,7 @@ world::TerrainGround bakeOf(float (*height)(float, float)) {
             field->heights[j * 201u + i] = height(p.x, p.y);
         }
     }
+    world::poolTerrainHeight(*field); // ADR-717: the basin, as the bake makes it
     return world::placeTerrainGround(field, glm::vec3(0.0f), glm::vec3(1.0f), false);
 }
 
@@ -344,15 +345,22 @@ FogPair runApplyFog(gpu::Context& ctx, const rendering::FrameUniforms& frame, co
     wgpu::TextureDescriptor tdesc{};
     tdesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
     tdesc.size = {field.width, field.depth, 1};
-    tdesc.format = wgpu::TextureFormat::R32Float;
+    // The renderer's layout (ADR-717): r = the ground, g = the basin.
+    tdesc.format = wgpu::TextureFormat::RG32Float;
     wgpu::Texture texture = device.CreateTexture(&tdesc);
     wgpu::TexelCopyTextureInfo dst{};
     dst.texture = texture;
     wgpu::TexelCopyBufferLayout tl{};
-    tl.bytesPerRow = field.width * 4;
+    tl.bytesPerRow = field.width * 8;
     tl.rowsPerImage = field.depth;
     const wgpu::Extent3D extent = {field.width, field.depth, 1};
-    ctx.queue().WriteTexture(&dst, field.heights.data(), field.heights.size() * sizeof(float), &tl, &extent);
+    REQUIRE(field.pooled());
+    std::vector<float> texels(field.heights.size() * 2);
+    for (std::size_t k = 0; k < field.heights.size(); ++k) {
+        texels[k * 2] = field.heights[k];
+        texels[k * 2 + 1] = field.basin[k];
+    }
+    ctx.queue().WriteTexture(&dst, texels.data(), texels.size() * sizeof(float), &tl, &extent);
 
     std::array<wgpu::BindGroupLayoutEntry, 2> e0{};
     e0[0].binding = 0;
@@ -509,4 +517,84 @@ TEST_CASE("applyFog at fogGroundFollow 0 is applyFog before ADR-715, bit for bit
     }
     CHECK(compared == 4 * 24 * 24);
     CHECK(differed > static_cast<std::size_t>(compared) / 4);
+}
+
+// ---- ADR-717: pooling through the whole renderer ------------------------------------------------
+//
+// The maths is `test_height_fog_gpu.cpp`'s. This is the plumbing: the frame's `fogPool` lane reaches
+// the surface fog AND the march (which reads the frame lane rather than a copy of its own), a scene
+// without a terrain is unchanged at any pooling, and pooling 0 with follow on is the follow frame.
+//
+// **How it fails.** Leave `frame.fogPool` unset and the third case finds no movement in either
+// arm; have the march read `vol.heightFog.z` in place of the pool lane and its arm finds none;
+// forget `poolingLane`'s terrain gate and the no-terrain case is still held by the shader's own
+// `terrainMap1.w` gate (the ADR-715 lesson), so the second case checks the lane itself as well.
+
+TEST_CASE("without a terrain, fogPooling changes nothing", "[gpu][fog][volume][terrain][height]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = std::make_unique<rendering::SceneRenderer>(*ctx, shaders);
+    REQUIRE(renderer->init().has_value());
+
+    scene::Scene s = valleyScene(false);
+    const gpu::ImageF off = render(*renderer, s);
+    for (const float pooling : {0.5f, 1.0f}) {
+        s.environment.fogPooling = pooling;
+        INFO("pooling " << pooling);
+        CHECK(identical(off, render(*renderer, s)));
+        // And the lane the three readers get is 0, decided on the CPU as well as in the shader.
+        CHECK(s.terrainGround.poolingLane(pooling) == 0.0f);
+    }
+}
+
+TEST_CASE("fogPooling 0 is the ground-following frame, bit for bit", "[gpu][fog][volume][terrain][height]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = std::make_unique<rendering::SceneRenderer>(*ctx, shaders);
+    REQUIRE(renderer->init().has_value());
+
+    // Follow on, pooling 0, against the same scene with a terrain whose BASIN is nonsense and whose
+    // ground is the valley: at pooling 0 nothing may read the basin channel.
+    scene::Scene s = valleyScene(true);
+    s.environment.fogGroundFollow = 0.6f;
+    const gpu::ImageF a = render(*renderer, s);
+    scene::Scene odd = valleyScene(true);
+    odd.environment.fogGroundFollow = 0.6f;
+    auto field = std::make_shared<world::TerrainHeightField>(*odd.terrainGround.field);
+    for (std::size_t k = 0; k < field->basin.size(); ++k) {
+        field->basin[k] = 40.0f * std::sin(static_cast<float>(k) * 0.37f) + 17.0f;
+    }
+    field->hash = 99; // a different upload
+    odd.terrainGround.field = field;
+    CHECK(identical(a, render(*renderer, odd)));
+    // The control: at pooling 1 that basin is read, and the frame moves.
+    odd.environment.fogPooling = 1.0f;
+    CHECK(pixelsDiffering(a, render(*renderer, odd), 1.0f / 255.0f) > kSize * kSize / 10);
+}
+
+TEST_CASE("with a terrain, fogPooling moves the fog in both readers", "[gpu][fog][volume][terrain][height]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto renderer = std::make_unique<rendering::SceneRenderer>(*ctx, shaders);
+    REQUIRE(renderer->init().has_value());
+
+    struct Arm {
+        const char* name;
+        float marchReach;
+    };
+    for (const Arm arm : {Arm{"surface fog only", 0.0f}, Arm{"march only", 100000.0f}}) {
+        INFO(arm.name);
+        scene::Scene s = valleyScene(true);
+        s.environment.volumeMaxDistance = arm.marchReach;
+        const gpu::ImageF flat = render(*renderer, s);
+        s.environment.fogPooling = 1.0f;
+        const gpu::ImageF pooled = render(*renderer, s);
+        const std::size_t moved = pixelsDiffering(flat, pooled, 1.0f / 255.0f);
+        INFO("pixels moved by more than a level: " << moved << " mean " << meanLuminance(flat) << " -> "
+                                                   << meanLuminance(pooled));
+        // On a V valley the basin sits above the floor and on the walls (linear under the kernel)
+        // is the wall itself, so the layer deepens over the floor and climbs the walls: more fog.
+        CHECK(moved > kSize * kSize / 10);
+        CHECK(meanLuminance(pooled) > meanLuminance(flat));
+    }
 }
