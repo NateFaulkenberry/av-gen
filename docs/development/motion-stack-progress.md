@@ -7,8 +7,8 @@ engine side of the actor handoff). Not `src/directing/` or the AI layer.
 
 ## Status in one line
 
-The recount is done: the 21 Sep board was stale in both directions. **Nothing from the build list
-has been built yet.** The next work is the four capabilities the Director needs for its Slices 2–3.
+The recount is done. **M1–M3 are built**: the handoff, the clip semantics table, and one-shot and
+transition cue playback. M4 (jump arc) and M5 (retime) are next.
 
 ## How this was counted
 
@@ -137,44 +137,65 @@ impose something checkable.
 
 ## Current focus: what the Director needs first
 
-The Director compiles scripted performances to `seq::Actor` in the baked tier (feasibility report
-§5.4), so every item below is engine support for that path. Ordered by what unblocks Slice 2, then
-Slice 3.
+The Director compiles scripted performances to `seq::Actor` in the baked tier. Its Slice 3 plan on
+`agent/director` names the M3–M5 interfaces, and what is built below matches them.
 
-| # | Capability | Director slice | Status | Size |
+| # | Capability | Director slice | Status | Evidence |
 |---|---|---|---|---|
-| M1 | Entity ↔ actor handoff: an entity whose node an actor drives is held for the actor's span, with no double-add, the actor's clip cues winning over the gait, an entry blend from the simulated pose, and release in place. Scrub-exact. | 2 | not started | M |
-| M2 | Clip semantics derived from the existing analysis (`analyseClip`, `measureLoopClosure`, contacts and phase): activity, duration, loop/one-shot, grounded/airborne, root motion, horizontal speed, take-off/peak/touchdown, start/end pose, interruptibility | 3 | not started | M |
-| M3 | One-shot and transition playback on `ClipCue` (`playback: auto/loop/once`, `then`), plus clip events mapped to timeline seconds through a cue | 3 | not started | S–M |
-| M4 | Jump as a pure arc shared with `Airborne` (`planJump`, minimum apex to clear, landing check) and a per-character jump capability in data; map `Jump_running` | 3 | not started | M |
-| M5 | Local retime of an actor (stretch keys, path and cue times, scale cue speed) | 3 | not started | S |
+| M1 | Entity ↔ actor handoff | 2 | **done** | ADR-758 adopted from `agent/director` (f009638d) as the one mechanism; ADR-820 additions; `test_directing_handoff.cpp` (10, acceptance) + `test_motion_handoff.cpp` (4) |
+| M2 | Clip semantics table | 3 | **done** | ADR-821; `scene::clipSemantics`, `Composition::clipSemanticsFor`, `avgen_motion semantics [--json]`; `test_clip_semantics.cpp` |
+| M3 | One-shot/transition cue playback + clip events on the timeline | 3 | **done** | `ClipCue::{playback, then}`, `seq::resolveCue`, `seq::clipEventSeconds`; Rook plays `Jumping` once and is handed back to his gait on Glowmere |
+| M4 | Jump arc shared with `Airborne`, minimum apex, landing check, per-character jump capability in data, `Jump_running` mapped | 3 | next | — |
+| M5 | Local retime of an actor | 3 | not started | — |
 
-### Handoff design (proposed, for the Director to confirm)
-- **The input.** An actor whose node is bound to an entity holds that entity for the actor's span
-  (an explicit `[start, end]`, defaulting to the actor's own extent). The span is an **input** to
-  `EntityWorld`, read by play and replay alike. That is what makes it scrub-exact: ADR-700
-  checkpoints copy the whole `Entity`, and changing the spans bumps the input epoch.
-- **Inside the span:**
-  - The body's travel and yaw come from the actor's pure `positionAt` and `headingAt`, and its
-    speed from their derivative.
-  - The node's timeline delta is **not** added on top, which is today's double-add
-    (`applyNodeOffsets`, `fieldPosition`).
-  - The gait state machine yields the clip to the sequence's cues. Look and foot layers still run.
-  - The behaviours see `driven`, so wander and explore keep their state.
-- **Entry:** blend from wherever the simulation had the body over `entryBlend` seconds. This
-  answers the Director's open question: the performance starts from the simulated pose, and no
-  pause is needed.
-- **Release:** the body stays where the actor left it, the behaviours resume, and the decider
-  replans.
+### What M1 is (ADR-758 + ADR-820)
+- **Where the mechanism came from.** An actor on a node that an entity drives is a performer. The
+  bake skips its transform tracks. The composition applies the actor as a `DirectorMotion` on play
+  and in both replay paths. That motion owns the body outright, and the gait reads the path's
+  speed unramped. Height comes from the terrain, and every performance is grounded until M4. The
+  performer's signature is in the replay key.
+- **Added by ADR-820:**
+  - Under a performance, the action tier no longer names the clip. Measured before the fix: the
+    decider's `observe` held Rook's rig in `Idle` through a 6 m/s run.
+  - A performer's cues stop when its span ends.
+  - A cued clip owns the rig, and the gait yields.
+  - `Actor::entrySeconds` defaults to 0. A value above 0 blends from the simulated pose. The entry
+    point is entity state, so a scrub into the blend matches the play, whether it replays from
+    zero or restores a checkpoint.
+  - `headingAt`'s header now says degrees.
+- **Known, not fixed:** `positionAt` smoothsteps `Smooth` keys, while the baked track uses
+  Catmull-Rom.
+  - Performances are unaffected, because the Director compiles `Linear` keys.
+  - A camera aimed at a smoothly keyed non-performer is slightly off.
+
+### What M2/M3 measure on the scout (ADR-821)
+
+Every one of these clips passes the test's independent check: the feet are off the ground in the
+flight, and the body is at its highest at `peak`.
+
+| Clip | Loop | Ground | Events (clip s) |
+|---|---|---|---|
+| Jumping | yes (it closes) | leaves | takeoff 0.567, peak 0.767 (+0.42), touchdown 1.100 |
+| Jump_running | yes | leaves | takeoff 0.067, peak 0.367 (+0.76), touchdown 0.667 |
+| Landing | no | leaves | touchdown 0.267 (opens in the air) |
+| Fall_loop, Floating, Flying_jet | yes | airborne | none |
+| Crazy, the three deaths | no | grounded | plants/releases |
+
+## Review renders
+`~/Desktop/av-gen-review/12-motion-stack/` (fixture: `examples/labs/motion/`):
+- **`01-react-crazy-loop-vs-once.png`: the owner's decision 2.** It compares `Crazy` looping
+  (autonomous `react` today) with `Crazy` played once and held.
+- **`02-jumping-measured-events.png`:** the measured takeoff, peak and touchdown on the pose.
+  Checked by eye; they are right.
 
 ## Decisions needed (owner)
 1. **Rook's jump capability.** The Director's benchmark needs a 5.75 m apex; the default is 1.1 m.
    Should the per-character jump capability be data (a max apex per character), and what is
-   Rook's? Or is the Umbra leap refused? I will build the data seam either way.
-2. **One-shot semantics for autonomous characters.** Sequence cues will default to the measured
-   loop semantics (`Crazy`, `Landing` and the deaths do not close). Applying the same to the
-   entities' own clip maps changes what Glowmere's aliens look like (`react` = `Crazy` would hold
-   its last frame rather than repeat). My proposal: sequences now, entities after a review render.
+   Rook's? Or is the Umbra leap refused? The lead's ruling for now: build the per-character seam in
+   M4, keep Rook at the 1.1 m default, and invent no larger apex.
+2. **One-shot semantics for autonomous characters.** Sequence cues now use the measured
+   semantics. The aliens' own clips are unchanged, as the lead instructed. The review render is
+   `12-motion-stack/01-…png`. Should `react` hold `Crazy`'s last frame rather than repeat it?
 3. **Phase C gate (§86) and Phase B §66:** switching the matcher, and `proceduralMotion`, on for
    Glowmere is a visual call. Nothing downstream (the Director or E) has a product path until one
    of them is on.
@@ -182,8 +203,18 @@ Slice 3.
    whether it targets the multicam film, the only scene whose aliens are wired.
 
 ## Test status
-- Release build of this worktree at 232a50d7 succeeds (both test binaries link). No suite has been run on `agent/motion` yet: nothing but this record has changed from main.
+At a6228408 (M1–M3), release build, with a second `cmake --build` doing no compile or link:
+- **CPU `avgen_tests`:** 3,253 cases, exit 0. One expected failure, the `[!shouldfail]` at
+  `test_character_lab_slopes.cpp:187`. 16 skips: the hardware skips, plus the gitignored demo and
+  100STYLE packs.
+- **GPU `avgen_render_tests`:** 443 cases, exit 0. One skip (NDI).
+- **New tests:** `[handoff]` 14 cases, `[semantics]` 11. Every new check was broken and seen red
+  before being restored: 3 mechanisms for the handoff, 4 for the semantics.
+- **Selecting `[seek]` by tag also runs main's hidden `[.known-defect]`** "UFO stack at 150 s is
+  the same played and scrubbed", which fails as it does on main. It is not in the default suite.
 
 ## Log
+- 2026-09-24: M1 adopted from `agent/director` (ADR-758) with the ADR-820 additions; M2/M3
+  (ADR-821); clip-playback lab and two review sheets; both suites green.
 - 2026-09-24: worktree created from main 232a50d7; recount of B §39/§66, C, D, the review build, E
   and F against the specs and main's code.
