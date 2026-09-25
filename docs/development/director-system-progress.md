@@ -1,8 +1,8 @@
 # AV Gen Director System — Development Progress
 Last updated: 2026-09-24 16:30
 Current branch: `agent/director` (worktree `../av-gen-director`; main merged in at 423fdf2b and 6f0da410; main = 232a50d7)
-Current commit: 6bd98d5f (plus this record)
-Overall status: Slices 0 and 1 complete; Slice 2 compiler side complete (handoff mechanism moving to the Motion lead as M1); Slice 3 planned against M3-M5
+Current commit: 7ee369e3 (plus this record)
+Overall status: Slices 0 and 1 complete; Slice 2 compiler side complete (handoff moving to M1); rise_over/pass compiled (ADR-760); Slice 5 cost harness in; next: merge agent/motion (M1-M3) and build Slice 3 on it
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -26,8 +26,9 @@ The Rook/Umbra benchmark (spec §34) meets the requirements this build can meet:
 - the effect cues are blocked on the impossible flip;
 - it applies on approval as one undo, survives save/reload, and recompiles deterministically.
 
-What it cannot do yet is Slice 2–3 work: performances (Rook moving), time-varying camera moves
-(`rise_over`, `pass`), plan-time event markers and slow motion.
+Since then: performances compile (ADR-759), and the chase rises over Rook and passes him as keys on
+the follow rig's offset (ADR-760). What it cannot do yet is Slice 3 work: the jump arc, one-shot
+clips and clip events, and slow motion.
 
 ## Overall progress
 | Slice | Status | Progress | Tests | Notes |
@@ -37,7 +38,7 @@ What it cannot do yet is Slice 2–3 work: performances (Rook moving), time-vary
 | 2 Scripted Performances | Compiler side complete | 90% | 14 cases + 1 golden | Handoff (ADR-758) moves to the Motion lead as M1; this branch drops its copy after M1 lands. Remaining: validator rule for non-zero `entrySeconds` once M1 adds it |
 | 3 Airborne + Events | Planned | 0% | 0 | Compile side planned against the Motion lead's M3 (clip semantics/events), M4 (jump arc), M5 (retime) |
 | 4 Autonomous Direction | Not started | 0% | 0 | |
-| 5 Verification + Scale | Started | 10% | golden plans, cost measurement | Golden plans and §37 measurements pulled forward |
+| 5 Verification + Scale | Started | 25% | golden plans, `[.perf][directing]` CPU + GPU | Cost harness over the golden plans; seek measurement waits for ADR-800 |
 
 ## Current focus
 ### Task
@@ -250,11 +251,23 @@ undo, serialization or compilation will be built on them.
   it is not part of the default suite and not a regression.
 - The Director does not depend on "seek to T equals play to T" anywhere. Golden plans compare
   compiled content and fingerprints, and the round-trip steps one frame from zero.
-- Measured (spec §37, release, load ~70): `SceneFacts` 1.7–3.9 ms; validate+compile about 1.2 ms;
-  apply about 5 ms on the benchmark. No composition rebuild on any Director path. `EntityWorld::seek`
-  (ADR-700) has not been re-measured here.
+- **Costs (spec §37), `[.perf][directing]` on both binaries, release, minima of 3, 2026-09-24:**
+  - Per golden plan (CPU): facts 0.75–0.78 ms; parse ≤0.03 ms; compile ≤0.12 ms; apply 3.9–6.1 ms;
+    `seq::install` alone ≤0.06 ms; the next frame 2.1–2.3 ms (steady frame 2.26); undo ≤2.4 ms.
+  - No golden plan's apply re-flattens the composition or bumps `textureVersion` (asserted). A forced
+    `Composition::rebuild` frame costs 384 ms, which is what an apply would cost if it caused one.
+  - GPU, 640x360: a full `SceneRenderer::uploadTextures` re-upload is 53 textures, 942 ms (a 968 ms
+    frame against a 17.8 ms steady one). The frame after each golden apply uploads 0 textures.
+  - `EntityWorld::seek` not measured: it waits for ADR-800 on main.
+- **Full CPU suite at the ADR-760 state (before the last test fix):** 3,298 cases, 1 expected
+  shouldfail, 16 skips, 1 real failure. The failure was in my new revision test, which read a rig
+  pointer the revision had replaced. It is fixed, and `[directing]` now has 65 cases, all green.
+  The full suite has not been re-run since that fix. **Full GPU suite at 7ee369e3:** 444 cases,
+  exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-24: ADR-760 `rise_over` / `pass` (45498d03); cost harness `[.perf][directing]` (7ee369e3);
+  per-process test temp directory (f61ce286, also on `fix/test-tmpdir-per-process` as 3efe55e3).
 - 2026-09-24: Slice 2 core (f009638d): handoff probe → ADR-758; performance compiler → ADR-759.
 - 2026-09-24: merged main (ADR-702) at 423fdf2b; effects joined the Director (e7104b8d); Slice 1.5
   (ba21a9dc); golden plans (8935a24b).
@@ -291,10 +304,8 @@ this side will use, and what it does with each:
 - **M5, local retime of an actor.** `PlanRetime` compiles to M5's retime on the performance's actor
   (stretched keys, clip speeds) over the window, plus the frame-echo cue as today. Global time warp
   remains out of scope (spec §33).
-- **Camera (Director-owned, needs no motion work).** Time-varying behaviour state for `rise_over` and
-  `pass`: a chase rig whose `followOffset` is keyed over the shot, or a `CameraBehavior` with
-  `offsetStart`/`offsetEnd`. This needs a small scene-side extension, which will be proposed through
-  the coordinator before it is built.
+- **Camera: done (ADR-760).** `rise_over` / `pass` are keys on the chase rig's `followOffset`
+  channel. The change is scene-side only; no entity or motion code was touched.
 - **Benchmark target after M3/M4:** "Rook runs to Umbra, jumps (not over it: clearance fails), lands,
   runs on", with the peak marker and the Umbra pulse at the computed peak. The backflip stays
   `CAPABILITY_UNAVAILABLE` until an asset exists.
@@ -391,6 +402,6 @@ markers · [ ] keyed chase camera · [ ] character performance tests
 [ ] authored-vs-runtime precedence · [ ] replay validation
 
 ## Slice 5 — Verification and scale
-[ ] preview thumbnails · [ ] optional vision critique · [ ] Director benchmark harness ·
+[ ] preview thumbnails · [ ] optional vision critique · [x] Director benchmark harness (costs) ·
 [x] golden plans (10) · [~] performance benchmarks (Director costs measured) · [ ] seek optimization · [ ] MCP exposure ·
 [ ] external-agent integration tests
