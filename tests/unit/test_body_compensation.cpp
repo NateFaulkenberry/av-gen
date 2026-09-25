@@ -393,6 +393,11 @@ TEST_CASE("the alien's foot reaches ground its leg alone cannot, by lowering the
 #include <nlohmann/json.hpp>
 
 TEST_CASE("body compensation survives a scene save and reload", "[ik][compensation][scene]") {
+    // The scene below places the alien. Without the gitignored asset there is no node to read, and
+    // `nodes().front()` on the empty list crashed the whole binary on CI rather than skipping.
+    if (!fs::exists(alienPath())) {
+        SKIP("alien asset missing: " << alienPath().string());
+    }
     // Same hazard `test_foot_ik.cpp`'s round-trip arm exists for: a block with its own key set is
     // exactly the thing a shared writer turns into a file that will not load. Checking the JSON
     // alone would pass on a writer that emits keys the parser ignores, so the second *load* is the

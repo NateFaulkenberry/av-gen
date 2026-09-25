@@ -4949,10 +4949,11 @@ void Composition::unregisterParameters() {
         // Exactly what `attach` recorded registering. This was a list of twenty-seven path
         // strings, kept by hand beside a registrar that adds them one at a time, and it had fallen
         // sixty-four behind -- see `registeredPaths_`.
-        for (const std::string& path : registeredPaths_) {
-            params_->remove(path);
-        }
-        registeredPaths_.clear();
+        // The unregisters that read through cached parameter pointers go FIRST. The sweep of
+        // `registeredPaths_` below frees every parameter `attach` made -- particle, material-part
+        // and light parameters among them -- and a node's unregister afterwards read `p->path()`
+        // through a pointer to one it had just freed: the heap-use-after-free ASan found on CI in
+        // `removeNode` of a nested scene (test_composition.cpp's nested-removal sweep).
         if (!lightRigParams_.all.empty()) {
             unregisterLightRigParameters(*params_, lightRigParams_);
             lightRigParams_ = {};
@@ -4965,6 +4966,14 @@ void Composition::unregisterParameters() {
         for (auto& node : nodes_) {
             unregisterNodeParameters(*node);
         }
+        // Then exactly what `attach` recorded registering, which catches whatever the hand-kept
+        // lists above still miss. This was a list of twenty-seven path strings, kept by hand
+        // beside a registrar that adds them one at a time, and it had fallen sixty-four behind --
+        // see `registeredPaths_`. Removing a path already gone is a no-op.
+        for (const std::string& path : registeredPaths_) {
+            params_->remove(path);
+        }
+        registeredPaths_.clear();
     }
     detach();
 }
