@@ -426,7 +426,8 @@ enum class EffectBucket : std::uint8_t {
     Starfield,
     // ---- Wave 3 ---------------------------------------------------------------------------------
     // Analytic proxy shells drawn in pass 1's blended section beside the particles (SHELL,
-    // world/effects/shell_frame.hpp): Plasma, Energy Shield, Force Field.
+    // world/effects/shell_frame.hpp): Plasma, Energy Shield, Force Field; Charge-Up, Light Beam, Halo,
+    // Bubble, Portal, Reality Tear.
     Shell,
 };
 
@@ -662,7 +663,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 42> kEffectKinds{
+inline constexpr std::array<EffectKind, 48> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -703,8 +704,14 @@ inline constexpr std::array<EffectKind, 42> kEffectKinds{
     EffectKind::Plasma,        // Wave 3 (SHELL)
     EffectKind::EnergyShield,  // Wave 3 (SHELL + TRIGGER)
     EffectKind::ForceField,    // Wave 3 (SHELL)
+    EffectKind::ChargeUp,      // Wave 3 (SHELL + EMIT + LIGHTMOD + TRIGGER)
     EffectKind::HeatShimmer,   // Wave 3 (DF: Cylinder + Shimmer)
     EffectKind::GravitationalLens, // Wave 3 (DF: Facing + Lens)
+    EffectKind::LightBeam,     // Wave 3 (SHELL + LIGHTMOD)
+    EffectKind::Halo,          // Wave 3 (SHELL)
+    EffectKind::Bubble,        // Wave 3 (SHELL + DF + EMIT + TRIGGER)
+    EffectKind::Portal,        // Wave 3 (SHELL + DF + EMIT + LIGHTMOD)
+    EffectKind::RealityTear,   // Wave 3 (BOLT + SHELL + DF + EMIT)
 };
 
 // The kind's position in `kEffectKinds`, or `size()` for an enumerator that is not in it --

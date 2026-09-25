@@ -464,6 +464,15 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         // Wave 3 (DF): a hot column or a mass can stand at a World point or ride an entity.
         {EffectKind::HeatShimmer, {EffectTarget::Entity, EffectTarget::World}},
         {EffectKind::GravitationalLens, {EffectTarget::Entity, EffectTarget::World}},
+        // Wave 3 (SHELL phase 2). A beam and a halo belong to a light as much as to an entity or a
+        // point; a charge, a bubble, a portal and a tear to an entity or a point. A tear's Camera form
+        // (an FXPOST transition) is not built.
+        {EffectKind::ChargeUp, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::LightBeam, {EffectTarget::Light, EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Halo, {EffectTarget::Light, EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Bubble, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Portal, {EffectTarget::World, EffectTarget::Entity}},
+        {EffectKind::RealityTear, {EffectTarget::World, EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
