@@ -1552,6 +1552,7 @@ void Composition::installEntities() {
     bindings.reserve(nodes_.size());
     std::vector<std::pair<std::string, glm::vec3>> landmarks;
     std::vector<std::string> terrainLandmarks;
+    std::vector<std::pair<std::string, std::vector<std::string>>> landmarkTags; // ADR-833
     landmarks.reserve(nodes_.size() + heroes_.size());
     for (const auto& nodePtr : nodes_) {
         const CompositionNode& node = *nodePtr;
@@ -1578,6 +1579,9 @@ void Composition::installEntities() {
         const glm::vec3 forward = placed.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
         binding.facing = std::atan2(forward.x, forward.z);
         landmarks.emplace_back(node.name, binding.anchor);
+        if (std::vector<std::string> words = semanticTagsOf(node); !words.empty()) {
+            landmarkTags.emplace_back(node.name, std::move(words)); // ADR-833
+        }
         // Phase D §23: a terrain is the ground itself, not a place on it -- both aliens of the
         // autonomy demo opened by walking "to the ground". It stays in the landmark list (the
         // pre-Phase-D deciders and their golden traces read it) and is *tagged* "terrain", by what
@@ -1595,6 +1599,7 @@ void Composition::installEntities() {
     }
     entityWorld_.setBindings(std::move(bindings));
     entityWorld_.setTerrainLandmarks(std::move(terrainLandmarks));
+    entityWorld_.setLandmarkTags(std::move(landmarkTags));
     entityWorld_.setLandmarks(std::move(landmarks));
 
     // The ground an entity walks on is the ground the terrain was built from -- the same WorldMap
@@ -1711,6 +1716,21 @@ void Composition::installEntities() {
         }
         entityWorld_.recordProblems(problems);
     }
+}
+
+// ADR-833 (Phase D §25): the words a node contributes to the world's semantics. What the author
+// wrote, then what the node demonstrably is -- a generated procedural is named for its generator
+// ("mushroom"), which is a fact of the data rather than a guess from the node's name (§66). A
+// terrain is "terrain" already, by `setTerrainLandmarks`.
+std::vector<std::string> semanticTagsOf(const CompositionNode& node) {
+    std::vector<std::string> out = node.tags;
+    if (node.kind == NodeKind::Procedural) {
+        const std::string& generator = node.procedural.source.generated.generator;
+        if (!generator.empty() && std::find(out.begin(), out.end(), generator) == out.end()) {
+            out.push_back(generator);
+        }
+    }
+    return out;
 }
 
 std::vector<entity::InterestPoint> Composition::glowInterestPoints() const {
@@ -9260,6 +9280,9 @@ nlohmann::json Composition::toJson() const {
         if (node.locked) {
             n["locked"] = true;
         }
+        if (!node.tags.empty()) { // ADR-833: additive, written only when authored
+            n["tags"] = node.tags;
+        }
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
         // ADR-360. Written only when the node declares a wind body, so nothing else grows a key,
@@ -10580,6 +10603,18 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto scale = readVec<3>(item, "scale", node.transform.scale);
             auto visible = readBool(item, "visible", true);
             auto locked = readBool(item, "locked", false);
+            // ADR-833 (Phase D §25): the node's semantic words.
+            if (item.contains("tags")) {
+                if (!item.at("tags").is_array()) {
+                    return fail("node '{}': 'tags' must be an array of strings", node.name);
+                }
+                for (const auto& tag : item.at("tags")) {
+                    if (!tag.is_string() || tag.get<std::string>().empty()) {
+                        return fail("node '{}': 'tags' must be an array of non-empty strings", node.name);
+                    }
+                    node.tags.push_back(tag.get<std::string>());
+                }
+            }
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
             // ADR-370: which node's canopy a particle emitter is measured from.

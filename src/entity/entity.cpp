@@ -530,6 +530,7 @@ void EntityWorld::clear() {
     entities_.clear();
     bindings_.clear();
     landmarks_.clear();
+    landmarkTags_.clear();
     problems_.clear();
     registered_.clear();
     actionEvents_.clear();
@@ -653,6 +654,16 @@ void EntityWorld::refreshInterestPoints() {
         if (!point.name.empty()) {
             if (const Entity* named = find(point.name)) {
                 mask |= named->tagMask_;
+            }
+            // ADR-833: a landmark's own words. A linear pass: tens of tagged landmarks, run when
+            // the landmarks change rather than per frame.
+            for (const auto& [landmark, words] : landmarkTags_) {
+                if (landmark != point.name) {
+                    continue;
+                }
+                for (const std::string& word : words) {
+                    mask |= tags_.intern(word);
+                }
             }
         }
         point.tags |= mask;

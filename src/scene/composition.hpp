@@ -285,6 +285,10 @@ struct CompositionNode {
     // working, not an edit to the work. It is saved with the scene, because which things you had
     // put out of the way is worth keeping between sessions.
     bool locked = false;
+    // ADR-833 (Phase D §25): what this thing IS, in the world's semantic words ("ufo", "rock",
+    // "world_effect"), for the characters' perception. Authored as `"tags"`; a generated
+    // procedural adds its generator's name ("mushroom") by itself -- see `semanticTagsOf`.
+    std::vector<std::string> tags;
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
     // ADR-385. A whole-node opacity multiplier, for the same reason `emissiveBoost` and
@@ -496,6 +500,10 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
 };
+
+// ADR-833 (Phase D §25): the node's authored `tags` plus what it demonstrably is (a generated
+// procedural's generator name). Deduplicated, in that order.
+[[nodiscard]] std::vector<std::string> semanticTagsOf(const CompositionNode& node);
 
 // A copy of everything *authored* about a node -- exactly the fields the scene file writes -- with
 // every piece of runtime state left behind for `addNode` to rebuild: the loaded glTF asset, the
