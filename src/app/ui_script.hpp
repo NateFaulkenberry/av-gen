@@ -114,6 +114,8 @@ enum class UiScriptArm : std::uint32_t {
     // check one undo labelled with the request and the recorded actor installed; Cmd+Z at 1600 and
     // check it is all gone. Captures after 1450 show the recorded proposal, 1550 the accepted plan.
     DirectorRecord = 1u << 18,
+    // Record, then Cancel recording while it runs: the recording stops and the proposal is untouched.
+    DirectorCancel = 1u << 19,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -180,6 +182,7 @@ private:
     std::string directorSequenceBefore_;
     std::uint64_t recordedAt_ = 0; // the frame the recording replaced the proposal, 0 = not yet
     void stepDirectorRecord(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t sliceShotsBefore_ = 0;

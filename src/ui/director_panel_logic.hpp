@@ -86,6 +86,7 @@ struct PanelActions {
     Button accept;
     Button reject;
     Button record;     // bake the live performances by recording them (ADR-765)
+    Button cancelRecording; // stop a running recording; the proposal stays as it was
     bool revertPreviewFirst = false; // Accept/Reject undo the preview before acting
 };
 [[nodiscard]] PanelActions panelActions(const PanelState& state);

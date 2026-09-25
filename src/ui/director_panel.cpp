@@ -175,7 +175,9 @@ void DirectorPanel::draw(app::Engine& engine) {
     }
     // A finished recording becomes the proposal, approved like any other (ADR-765).
     if (auto done = recording_.take()) {
-        if (!*done) {
+        if (!*done && cancelledRecording_) {
+            status_ = "recording cancelled; the proposal is as it was";
+        } else if (!*done) {
             status_ = "recording failed: " + done->error().message;
         } else if (!task || task->id() != recordingTask_ || !awaiting) {
             status_ = "the recording finished, but the proposal it was for is no longer waiting";
@@ -213,7 +215,12 @@ void DirectorPanel::draw(app::Engine& engine) {
         ImGui::EndDisabled();
         const ImVec2 lo = ImGui::GetItemRectMin();
         const ImVec2 hi = ImGui::GetItemRectMax();
-        where = Rect{lo.x, lo.y, hi.x - lo.x, hi.y - lo.y, ImGui::IsItemVisible()};
+        // In view means WHOLLY inside the window: a button half past a narrow dock's edge is drawn
+        // (ImGui calls it visible) but its middle, where a click lands, is not there.
+        const ImVec2 wlo = ImGui::GetWindowPos();
+        const ImVec2 whi(wlo.x + ImGui::GetWindowSize().x, wlo.y + ImGui::GetWindowSize().y);
+        const bool inside = lo.x >= wlo.x && lo.y >= wlo.y && hi.x <= whi.x && hi.y <= whi.y;
+        where = Rect{lo.x, lo.y, hi.x - lo.x, hi.y - lo.y, ImGui::IsItemVisible() && inside};
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !b.why.empty()) {
             ImGui::SetTooltip("%s", b.why.c_str());
         }
@@ -252,13 +259,15 @@ void DirectorPanel::draw(app::Engine& engine) {
         (void)plane->rejectCurrentTask();
         status_ = "rejected; nothing was changed";
     }
-    ImGui::SameLine();
+    // The second row: what makes or shows something from the proposal, rather than decides it. Its
+    // own row, so a narrow docked panel does not push a button past the window's edge.
     if (button("Record", actions.record, buttons_.record) && compiled_) {
         if (actions.revertPreviewFirst) {
             (void)endPreview(engine); // record the proposal against the project, not against its preview
         }
         if (auto started = recording_.start(engine, *compiled_, app::RecordOptions{}); started) {
             recordingTask_ = task->id();
+            cancelledRecording_ = false;
             status_ = "recording...";
         } else {
             status_ = "cannot record: " + started.error().message;
@@ -266,7 +275,11 @@ void DirectorPanel::draw(app::Engine& engine) {
     }
     if (recording_.running()) {
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", recording_.phase().c_str());
+        if (button("Cancel recording", actions.cancelRecording, buttons_.cancelRecording)) {
+            recording_.cancel();
+            cancelledRecording_ = true;
+            status_ = "cancelling the recording...";
+        }
     }
     ImGui::SameLine();
     Button stillsButton;
@@ -274,6 +287,9 @@ void DirectorPanel::draw(app::Engine& engine) {
     stillsButton.why = "renders one small frame per proposed shot, at its middle, from a scratch copy";
     if (button("Stills", stillsButton, buttons_.stills) && compiled_) {
         onRequestStills(task->id(), *compiled_);
+    }
+    if (recording_.running()) {
+        ImGui::TextDisabled("%s", recording_.phase().c_str());
     }
     if (!stills.note.empty() && task && stills.task == task->id()) {
         ImGui::TextDisabled("%s", stills.note.c_str());

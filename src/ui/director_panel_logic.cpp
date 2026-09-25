@@ -154,6 +154,8 @@ PanelActions panelActions(const PanelState& state) {
                    : state.previewing && !state.previewIsNewest
                        ? "later edits were made after the preview: undo it from the history first"
                        : "plays a scratch copy from zero, keeps what the characters did, checks it, and proposes that";
+    a.cancelRecording.enabled = state.recording;
+    a.cancelRecording.why = state.recording ? "stops the recording; the proposal stays as it was" : "no recording is running";
     if (state.recording) {
         a.accept.enabled = false;
         a.accept.why = "wait for the recording";

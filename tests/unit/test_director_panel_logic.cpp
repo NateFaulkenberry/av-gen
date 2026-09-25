@@ -164,6 +164,8 @@ TEST_CASE("the Record button: only for a live proposal, and it holds Accept whil
     CHECK_FALSE(a.accept.enabled); // what would be accepted is about to change
     CHECK_FALSE(a.preview.enabled);
     CHECK(a.reject.enabled);       // declining is always possible
+    CHECK(a.cancelRecording.enabled);
+    CHECK_FALSE(panelActions(live).cancelRecording.enabled);
 
     PanelState stalePreview = live;
     stalePreview.previewing = true;
