@@ -25,6 +25,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -316,6 +317,55 @@ private:
 
 // ---- input ---------------------------------------------------------------------------------
 
+// Ordering between the thread that builds what a receive callback reads and CoreMIDI's receive
+// thread (ADR-880). CoreMIDI does order them -- a callback for a source only runs after
+// MIDIPortConnectSource -- but through its own server and threads, which neither the C++ memory
+// model nor ThreadSanitizer can see. So the program states the order itself:
+//
+// * Publication. Whatever a callback will read (a Connection, a port's gate) is fully built, and
+//   only then published by a release increment of this process-wide counter, before the port is
+//   created or the source connected. Every callback starts with an acquire load of it. Since the
+//   callback really does run after the connect, that load reads the increment or a later one (a
+//   release sequence of RMWs), so the construction happens-before the callback's first access.
+//   The counter has static storage and constant initialisation: nothing constructs it at run time.
+// * Retirement. `ReceiveGate` below counts the callbacks inside the input. close() disposes of
+//   the port, stops admitting callbacks, and waits for the count to reach zero with an
+//   acquire load that pairs with each callback's release decrement, so everything a callback did
+//   happens-before the input's connections, scratch and inbox are destroyed.
+constinit std::atomic<std::uint64_t> gReceivePublications{0};
+
+void publishForReceive() {
+    gReceivePublications.fetch_add(1, std::memory_order_release);
+}
+
+// Shared by an input and its port's receive block. The block owns a reference, so even a callback
+// CoreMIDI delivered after close() touches only the gate, never the (possibly destroyed) input.
+struct ReceiveGate {
+    std::atomic<bool> accepting{true};
+    std::atomic<int> inside{0};
+
+    // Receive thread. False when the input is closing; the caller must then touch nothing else.
+    // Dekker-style with close(): both sides use sequentially consistent operations, so either
+    // the callback sees `accepting == false`, or close() sees it inside and waits for it.
+    bool enter() {
+        inside.fetch_add(1, std::memory_order_seq_cst);
+        if (accepting.load(std::memory_order_seq_cst)) {
+            return true;
+        }
+        inside.fetch_sub(1, std::memory_order_release);
+        return false;
+    }
+    void leave() { inside.fetch_sub(1, std::memory_order_release); }
+
+    // Closing thread. Bounded: waits only for callbacks already inside, which never block.
+    void closeAndWait() {
+        accepting.store(false, std::memory_order_seq_cst);
+        while (inside.load(std::memory_order_acquire) != 0) {
+            std::this_thread::yield();
+        }
+    }
+};
+
 class CoreMidiInput final : public detail::MidiInputBackend {
 public:
     explicit CoreMidiInput(detail::MidiInbox& inbox)
@@ -328,11 +378,23 @@ public:
         if (host.client() == 0) {
             return fail("CoreMIDI client unavailable: {}", statusText(host.creationStatus()));
         }
+        // A fresh gate per port: a late callback from an earlier port can never pass a new gate.
+        gate_ = std::make_shared<ReceiveGate>();
+        publishForReceive();
+        std::shared_ptr<ReceiveGate> gate = gate_; // the block copies it and keeps it alive
         const OSStatus st = MIDIInputPortCreateWithProtocol(
             host.client(), CFSTR("avgen input"), kMIDIProtocol_1_0, &port_,
-            ^(const MIDIEventList* list, void* refCon) { receive(list, refCon); });
+            ^(const MIDIEventList* list, void* refCon) {
+                (void)gReceivePublications.load(std::memory_order_acquire);
+                if (!gate->enter()) {
+                    return;
+                }
+                receive(list, refCon);
+                gate->leave();
+            });
         if (st != noErr) {
             port_ = 0;
+            gate_.reset();
             return fail("cannot create CoreMIDI input port: {}", statusText(st));
         }
         filter_ = filter;
@@ -367,8 +429,14 @@ public:
             }
         }
         if (port_ != 0) {
-            MIDIPortDispose(port_); // no receive callbacks after this returns
+            MIDIPortDispose(port_);
             port_ = 0;
+        }
+        // CoreMIDI starts no callback after the dispose; this makes the ones that already ran
+        // happen-before the teardown below, and turns away any it delivers late.
+        if (gate_) {
+            gate_->closeAndWait();
+            gate_.reset();
         }
         const std::lock_guard lock(mutex_);
         connections_.clear();
@@ -412,10 +480,15 @@ public:
     }
 
 private:
+    // Built by the thread that connects it (open() or the hot-plug thread) and published before
+    // MIDIPortConnectSource; after that only the receive thread touches `parser` and the scratch,
+    // and the Connection outlives the port (graveyard, then close()).
     struct Connection {
         MIDIEndpointRef endpoint = 0;
         std::string name;
-        MidiParserState parser; // touched only by the receive thread
+        MidiParserState parser;
+        std::vector<std::uint8_t> bytes;   // receive-thread scratch: capacity is kept
+        std::vector<MidiMessage> parsed;   // receive-thread scratch: capacity is kept
     };
 
     bool connectIfMatching(MIDIEndpointRef endpoint) {
@@ -434,6 +507,9 @@ private:
         auto conn = std::make_unique<Connection>();
         conn->endpoint = endpoint;
         conn->name = name;
+        conn->bytes.reserve(64);
+        conn->parsed.reserve(16);
+        publishForReceive(); // the Connection is complete; only now may CoreMIDI see it
         const OSStatus st = MIDIPortConnectSource(port_, endpoint, conn.get());
         if (st != noErr) {
             log::warn("cannot connect MIDI source '{}': {}", name, statusText(st));
@@ -443,7 +519,7 @@ private:
         return true;
     }
 
-    // CoreMIDI receive thread.
+    // CoreMIDI receive thread, inside the gate.
     void receive(const MIDIEventList* list, void* refCon) {
         auto* conn = static_cast<Connection*>(refCon);
         if (conn == nullptr || list == nullptr) {
@@ -451,11 +527,14 @@ private:
         }
         const MIDIEventPacket* packet = &list->packet[0];
         for (UInt32 p = 0; p < list->numPackets; ++p) {
-            bytes_.clear();
-            umpPacketToBytes(packet, bytes_);
-            if (!bytes_.empty()) {
+            conn->bytes.clear();
+            umpPacketToBytes(packet, conn->bytes);
+            if (!conn->bytes.empty()) {
                 const std::uint64_t ts = packet->timeStamp != 0 ? hostTicksToNs(packet->timeStamp) : nowNs();
-                inbox_.receive(bytes_, conn->parser, ts, conn->name);
+                parseMidiBytes(conn->bytes, conn->parser, conn->parsed, ts, conn->name);
+                if (!conn->parsed.empty()) {
+                    inbox_.push(conn->parsed); // moves the messages out and clears `parsed`
+                }
             }
             packet = MIDIEventPacketNext(packet);
         }
@@ -469,7 +548,7 @@ private:
     mutable std::mutex mutex_;
     std::vector<std::unique_ptr<Connection>> connections_;
     std::vector<std::unique_ptr<Connection>> graveyard_;
-    std::vector<std::uint8_t> bytes_; // receive-thread scratch
+    std::shared_ptr<ReceiveGate> gate_; // the current port's; null while closed
 };
 
 void ClientHost::runLoopThread() {
