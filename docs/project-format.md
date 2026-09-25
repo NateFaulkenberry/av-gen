@@ -241,7 +241,10 @@ of `eventBeats`, or at all when that list is empty) the camera claims the frame,
 
 Resolution at any instant, highest first: a locked shot, then an event (highest `priority`, then
 lowest id), then the last shot containing the time, then `default`. `Engine::activeCamera()` reports
-which and why; the pose itself is `Scene::camera`, as it always was.
+which and why; the pose itself is `Scene::camera`, as it always was. The exception is a project
+whose cut is an Auto-director continuous take (the project's `cameraContinuousTake: true`, written
+by a Continuous shot bake): the take owns the frame and the main camera is live at every instant,
+with the shots and event cameras kept but ignored (ADR-892).
 
 `parent` names another node of the same file: the node's world transform is the parent's world
 transform times its own local one (authored rest values plus the `nodes/<name>/position`,

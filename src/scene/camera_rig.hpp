@@ -433,6 +433,12 @@ struct CameraDirection {
                                                     std::span<const CameraEventSpan> events,
                                                     double seconds);
 
+// ADR-892: who has the frame while the Auto-director's continuous take is in force -- the main
+// camera, unbounded, at every instant. A continuous take owns the frame outright, so no shot, locked
+// or not, and no event claims it; the shots and the event cameras are still in `direction` and
+// still resolve normally the moment the take is no longer the cut. Pure, like the resolver above.
+[[nodiscard]] ActiveCameraState continuousTakeCamera(const CameraDirection& direction);
+
 // ---- pose evaluation ---------------------------------------------------------------------------
 
 // Where a camera is and what it sees. The blendable part of a camera: everything a cross-fade has

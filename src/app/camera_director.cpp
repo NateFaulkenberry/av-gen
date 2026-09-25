@@ -139,6 +139,9 @@ std::size_t releaseDirectedCamera(Engine& engine, DirectorState& state) {
         // nudging a camera the viewport has just been handed back ("the camera fights me").
         parked.aimFollow = composition->aimFollow();
         composition->setAimFollow({});
+        // ADR-892: a parked take steers nothing, so it owns nothing. It comes back with Resume.
+        parked.continuousTake = composition->continuousTake();
+        composition->setContinuousTake(false);
         // ADR-249's directed camera shots, likewise: parked, and the person's own shots stay.
         scene::CameraDirection direction = composition->cameraDirection();
         std::vector<scene::CameraShot> directed;
@@ -224,6 +227,7 @@ Result<std::size_t> resumeDirectedCamera(Engine& engine, DirectorState& state) {
     }
     if (composition != nullptr) {
         composition->setAimFollow(std::move(restored.aimFollow));
+        composition->setContinuousTake(restored.continuousTake);
     }
     noteDirected(engine, state);
     log::info("auto-director: resumed the parked cut ({} camera track(s)), unchanged", count);
@@ -246,6 +250,7 @@ std::size_t discardDirectorsCut(Engine& engine, DirectorState& state) {
         if (scene::Composition* composition = engine.composition()) {
             removed += composition->aimFollow().size();
             composition->setAimFollow({});
+            composition->setContinuousTake(false); // ADR-892: no cut, so no take owns the frame
             scene::CameraDirection direction = composition->cameraDirection();
             const std::size_t shots = direction.shots.size();
             std::erase_if(direction.shots, [](const scene::CameraShot& s) {
@@ -1030,6 +1035,9 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
         log::info("auto-director: {} of {} shot(s) hold a subject and will follow it",
                   follow.size(), sequence.shots.size());
         composition->setAimFollow(std::move(follow));
+        // ADR-892: a continuous take owns the frame. Stored with the bake, so an Edited or Song
+        // bake clears it and the camera track cuts again exactly as ADR-245 says.
+        composition->setContinuousTake(settings.mode == DirectorMode::ContinuousShot);
     }
     // ADR-207: the cut, flattened for world effects to time-gate against. Installed with the keys
     // rather than derived per frame, for the same reason the keys exist at all -- a shot schedule is

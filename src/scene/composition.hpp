@@ -1079,6 +1079,19 @@ public:
     void setAimFollow(std::vector<AimFollow> shots);
     [[nodiscard]] const std::vector<AimFollow>& aimFollow() const { return aimFollow_; }
 
+    // ADR-892: the director's cut in force is a continuous take, and a continuous take owns the
+    // frame. While this is set the active camera is the main camera at every instant: authored
+    // shots and event cameras are ignored, not deleted, so directing again in Edited sequence or
+    // Song Mode brings ADR-245's precedence back exactly.
+    //
+    // Set by `app::installSequence` (true only in `ContinuousShot`), parked and restored with the
+    // rest of the director's cut, and saved beside `cameraAimFollow`. A stored fact about the bake
+    // rather than a reading of `AutoDirectorSettings::mode`, because that mode defaults to
+    // Continuous: every project that never directed, and every project cut before this existed,
+    // would otherwise lose its camera track. False is every such project, unchanged.
+    void setContinuousTake(bool on) { continuousTake_ = on; }
+    [[nodiscard]] bool continuousTake() const { return continuousTake_; }
+
     // Drops the aim-follow smoother's running state. What a seek needs, so that the seeked second
     // is a function of the second rather than of how the playhead got there. (This is all that is
     // left of `clearAimHoldState`: the hold it also cleared was retired with ADR-217.)
@@ -2005,6 +2018,7 @@ private:
     std::vector<std::optional<glm::vec3>> heroBaseAnchors_;
     std::vector<glm::vec3> heroBasePositions_;
     std::vector<AimFollow> aimFollow_;  // ADR-158; empty unless a director cut this camera
+    bool continuousTake_ = false;       // ADR-892; a continuous take owns the frame
     // One trail per node some rig chases. Empty -- and costing nothing -- until a rig asks for a
     // lag, which is what keeps every existing camera bit-identical.
     std::vector<FollowTrail> followTrails_;

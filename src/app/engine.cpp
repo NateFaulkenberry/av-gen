@@ -1378,6 +1378,9 @@ nlohmann::json parkedCutToJson(const ParkedDirectorsCut& cut) {
         shots.push_back(shot.toJson());
     }
     out["cameraShots"] = std::move(shots);
+    if (cut.continuousTake) {
+        out["continuousTake"] = true; // ADR-892; absent is every other cut, and every older file
+    }
     return out;
 }
 
@@ -1397,6 +1400,7 @@ Result<ParkedDirectorsCut> parkedCutFromJson(const nlohmann::json& doc,
     if (const auto follow = doc.find("aimFollow"); follow != doc.end()) {
         cut.aimFollow = aimFollowFromJson(*follow, "parkedDirector.aimFollow", warn);
     }
+    cut.continuousTake = doc.value("continuousTake", false); // ADR-892
     if (const auto shots = doc.find("cameraShots"); shots != doc.end()) {
         if (!shots->is_array()) {
             return fail("parkedDirector.cameraShots must be an array");
@@ -1498,6 +1502,13 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     // the file it had.
     if (const auto* comp = composition(); comp != nullptr && !comp->aimFollow().empty()) {
         doc["cameraAimFollow"] = aimFollowToJson(comp->aimFollow());
+    }
+    // ADR-892: the cut in force is a continuous take, which owns the frame. Beside the follow table
+    // for the same reason: an offline render loads the project, and a render whose authored camera
+    // track cut where the window did not would be a different film. Written only when true, so every
+    // other project keeps the document it had.
+    if (const auto* comp = composition(); comp != nullptr && comp->continuousTake()) {
+        doc["cameraContinuousTake"] = true;
     }
     // ADR-207: the other half of the same bake -- when the camera travels and when it holds, which
     // is what a world effect time-gates on. A sibling of `cameraAimFollow` for the identical reason,
@@ -2555,6 +2566,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             shots = aimFollowFromJson(*follow, "cameraAimFollow", warn);
         }
         comp->setAimFollow(std::move(shots));
+        // ADR-892. Cleared when absent, as the table is: a project without a continuous take must
+        // not inherit the last one's ownership of the frame.
+        const auto take = doc.find("cameraContinuousTake");
+        comp->setContinuousTake(take != doc.end() && take->is_boolean() && take->get<bool>());
         // ADR-217, and for exactly the reason the table above round-trips: an offline render reloads
         // the project before drawing it, so a hold that only existed in memory would make a rendered
         // file differ from the window that asked for it. It is derived rather than stored -- the
@@ -3239,10 +3254,13 @@ Result<void> Engine::installComposition(std::unique_ptr<scene::Composition> comp
     // and the cut came back with its keys and without the follow. A project load still replaces it
     // from the document afterwards, cleared when absent.
     std::vector<scene::AimFollow> keepFollow;
+    bool keepContinuousTake = false; // ADR-892: camera automation too, kept with the table
     if (const scene::Composition* was = this->composition()) {
         keepFollow = was->aimFollow();
+        keepContinuousTake = was->continuousTake();
     }
     comp->setAimFollow(std::move(keepFollow));
+    comp->setContinuousTake(keepContinuousTake);
     installController(std::move(comp));
     // Now the parameters exist. The project's own `parameters` block is applied at the end of the
     // project load and still overrides anything set here.

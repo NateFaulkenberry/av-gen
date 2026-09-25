@@ -4223,6 +4223,12 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         ImGui::TextUnformatted("Camera track");
         ImGui::TextDisabled("Which camera is live, and when. Not the sequencer's shot list:\n"
                             "a sequencer shot is the framing, a row here is the cut.");
+        // ADR-892. Said here because otherwise a track that is not being played looks broken.
+        if (comp->continuousTake()) {
+            ImGui::TextDisabled("Not playing: the Auto-director's continuous take owns the frame,\n"
+                                "so these cuts and the event cameras are ignored. Direct in Edited\n"
+                                "sequence or Song to cut on them again.");
+        }
         const std::vector<seq::Shot>& pieceShots = engine.sequence().shots;
         for (std::size_t i = 0; i < direction.shots.size(); ++i) {
             const scene::CameraShot& shot = direction.shots[i];
@@ -4583,7 +4589,10 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
             if (ImGui::IsItemHovered()) {
                 tooltip("One uninterrupted take. The camera travels through the world "
                                   "and around its subjects without editorial cuts: each move "
-                                  "begins where the last ended and at the speed it ended with.");
+                                  "begins where the last ended and at the speed it ended with.\n\n"
+                                  "The take owns the frame. Shots on the camera track and event "
+                                  "cameras do not cut it; they are kept, and cut again as soon as "
+                                  "you direct in Edited sequence or Song.");
             }
             if (ImGui::RadioButton("Edited sequence", &mode, 1)) {
                 s.mode = app::DirectorMode::EditedSequence;

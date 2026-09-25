@@ -12,9 +12,9 @@
 //      Song's `Directed` camera shots on the track, locked, so the film kept cutting between cameras
 //      on Song's schedule.
 //   3. The authored camera track (Valley Wide 0-7 s and 26-31 s) and the UFO Watch event camera,
-//      which takes the frame at each of the ten abductions. By ADR-245 those outrank the default
-//      camera in every director mode, and this test leaves them alone: it measures the director's
-//      own take, not the frames the scene's authored cameras claim.
+//      which takes the frame at each of the ten abductions. ADR-891 left ADR-245's precedence
+//      alone, so this test measures only the director's own take. ADR-892 (the owner's answer)
+//      then gave a continuous take the whole frame; `test_continuous_owns_frame.cpp` measures that.
 //
 // The measure: play the whole film at 30 fps. Across every pair of consecutive frames in which the
 // main camera (the Auto-director's) is live in both, not blending, and under the same claim, the
@@ -119,8 +119,9 @@ TEST_CASE("Continuous shot on the multicam film is one take: no Song cuts left, 
                               s.turnDegrees, s.jumpMetres);
     }
     INFO("frame pairs compared in the director's take: " << compared << "; snaps:" << listed);
-    // About half the film is the director's (3,168 of 6,788 frame pairs); the rest is claimed by the
-    // authored shots and UFO Watch. A measure over nothing would prove nothing.
+    // At ADR-891 about half the film was the director's (3,168 of 6,788 frame pairs), the rest
+    // claimed by the authored shots and UFO Watch; since ADR-892 it is all of it. A measure over
+    // nothing would prove nothing.
     CHECK(compared > 2500);
     CHECK(snaps.empty());
 }
