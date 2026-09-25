@@ -192,3 +192,27 @@ TEST_CASE("an Info finding is said on its row but marks nothing", "[directing][p
     REQUIRE(rows[0].lines.size() == 1);
     CHECK(rows[0].lines[0] == kept.message);
 }
+
+TEST_CASE("Modify needs a follow-up; Regenerate needs only a waiting proposal; neither while recording",
+          "[directing][panel]") {
+    PanelState waiting{true, true, true, false, false, false, false, false};
+    PanelActions a = panelActions(waiting);
+    CHECK_FALSE(a.modify.enabled);
+    CHECK(a.modify.why == "say what to change in the box first");
+    CHECK(a.regenerate.enabled);
+    waiting.followUp = true;
+    a = panelActions(waiting);
+    CHECK(a.modify.enabled);
+    PanelState recording = waiting;
+    recording.recording = true;
+    a = panelActions(recording);
+    CHECK_FALSE(a.modify.enabled);
+    CHECK_FALSE(a.regenerate.enabled);
+    const PanelActions none = panelActions(PanelState{});
+    CHECK_FALSE(none.modify.enabled);
+    CHECK_FALSE(none.regenerate.enabled);
+    // Even a proposal that builds nothing can be modified or regenerated: that is how it is fixed.
+    PanelState empty{true, true, false, false, false, false, false, true};
+    CHECK(panelActions(empty).modify.enabled);
+    CHECK(panelActions(empty).regenerate.enabled);
+}

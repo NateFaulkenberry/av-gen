@@ -73,7 +73,12 @@ public:
         Rect stills;
         Rect record;
         Rect cancelRecording;
+        Rect modify;
+        Rect regenerate;
     };
+    // The Modify box's text (ADR-770). Public so a UI script can type into it the way a value arm
+    // writes a parameter; the button is still pressed through the pointer.
+    std::string followUp;
     [[nodiscard]] const Buttons& buttons() const { return buttons_; }
     [[nodiscard]] bool previewing() const { return !previewTask_.empty(); }
     [[nodiscard]] const std::string& status() const { return status_; }

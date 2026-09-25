@@ -73,6 +73,7 @@ struct PanelState {
     bool previewIsNewest = false; // ...and nothing has been done or undone since
     bool liveToRecord = false;    // the proposal has live (goal) performances not yet recorded (ADR-765)
     bool recording = false;       // a recording is running
+    bool followUp = false;        // the Modify box has text in it (ADR-770)
 };
 
 struct Button {
@@ -87,6 +88,8 @@ struct PanelActions {
     Button reject;
     Button record;     // bake the live performances by recording them (ADR-765)
     Button cancelRecording; // stop a running recording; the proposal stays as it was
+    Button modify;     // revise the waiting plan from a follow-up request (ADR-770)
+    Button regenerate; // propose afresh from the original request (ADR-770)
     bool revertPreviewFirst = false; // Accept/Reject undo the preview before acting
 };
 [[nodiscard]] PanelActions panelActions(const PanelState& state);

@@ -314,7 +314,8 @@ void Orchestrator::run(AgentTask& task) {
     for (const Tool* tool : tools_->all()) {
         request.tools.push_back(&tool->definition);
     }
-    request.messages.push_back(Message::user(composeUserTurn(task.prompt(), ambient)));
+    request.messages.push_back(Message::user(composeUserTurn(
+        task.briefing().empty() ? task.prompt() : task.prompt() + "\n\n" + task.briefing(), ambient)));
 
     // The transaction opens lazily, on the first tool that says it mutates the project. An
     // inspection-only task should cost nothing, and a snapshot taken for one would be noise in the
