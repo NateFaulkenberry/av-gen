@@ -188,8 +188,25 @@ struct NodeView {
     std::uint32_t proceduralCount = 0;
 };
 
+// Wave 3 (phase 2). What a Light-owned effect can learn about its light, as the frame places it: an
+// authored light by its stable id (ADR-278), carried by its node when it rides one. A Light Beam
+// matches a spot's cone; a Halo stands at the light.
+struct LightView {
+    glm::vec3 position{0.0f};
+    glm::vec3 direction{0.0f, -1.0f, 0.0f}; // unit, the way the light travels
+    glm::vec3 color{1.0f};
+    float intensity = 0.0f;   // candela (point, spot); 0 while its node is hidden or it is disabled
+    float range = 0.0f;       // metres; 0 = unbounded
+    float outerCone = 0.0f;   // radians, half-angle; 0 for a light that is not a spot
+    float innerCone = 0.0f;
+    bool spot = false;
+    bool directional = false; // no position worth standing at
+};
+
 class EffectSceneQuery {
 public:
+    // Wave 3 (phase 2). The light an effect is attached to, by its id. Optional like `nodeView`.
+    [[nodiscard]] virtual bool lightView(std::string_view id, LightView& out) const { (void)id; (void)out; return false; }
     virtual ~EffectSceneQuery() = default;
     // World position of the node named `name`, or false when there is no such node.
     [[nodiscard]] virtual bool nodePosition(std::string_view name, glm::vec3& out) const = 0;

@@ -30,6 +30,7 @@
 #include "rendering/shadow_mask_renderer.hpp"
 #include "rendering/water_renderer.hpp"
 #include "rendering/ribbon_renderer.hpp"
+#include "rendering/shell_renderer.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/frame_overlay.hpp"
 #include "rendering/light_data.hpp"
@@ -505,6 +506,7 @@ public:
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
     // ADR-703: the camera-facing strips (Trail), and what they drew last frame.
     [[nodiscard]] const RibbonRenderer& ribbons() const { return *ribbons_; }
+    [[nodiscard]] const ShellRenderer& shells() const { return *shells_; }
     // ADR-360's bounded, opt-in particle warm-up, in frames (capped at
     // ParticleRenderer::kMaxWarmUpFrames). 0 -- the default -- keeps the seek behaviour this
     // renderer has always had: pools are emptied and the field refills over one lifetime. Set it
@@ -873,6 +875,7 @@ private:
     std::unique_ptr<ShadowMaskRenderer> shadowMask_; // ADR-087
     std::unique_ptr<WaterRenderer> water_;           // ADR-099
     std::unique_ptr<RibbonRenderer> ribbons_;        // ADR-703 (Wave 1): RIBBON, pass 1's blended section
+    std::unique_ptr<ShellRenderer> shells_;          // Wave 3: SHELL, pass 1's blended section
     std::unique_ptr<PostProcessor> postProcessor_;
     // ADR-410. Runs between the scene pass and the post chain: captures the clean scene radiance
     // into a bounded ring and applies whatever temporal effects the scene authored. Reset by

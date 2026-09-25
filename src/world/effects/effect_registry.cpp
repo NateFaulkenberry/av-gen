@@ -66,6 +66,21 @@ const EffectSchema& colorCyclingSchema(); // Wave 2 (FXL surface)
 const EffectSchema& velocityDistortionSchema(); // Wave 2 (DF over HIST)
 const EffectSchema& motionSmearSchema(); // Wave 2 (FXL surface)
 const EffectSchema& starsSchema();       // Wave 2 (the sky's star field)
+const EffectSchema& lightningSchema();   // Wave 3 (BOLT)
+const EffectSchema& arcSchema();         // Wave 3 (BOLT)
+const EffectSchema& electricFieldSchema(); // Wave 3 (BOLT + FXL)
+const EffectSchema& dischargeSchema();   // Wave 3 (BOLT)
+const EffectSchema& plasmaSchema();      // Wave 3 (SHELL)
+const EffectSchema& energyShieldSchema(); // Wave 3 (SHELL + TRIGGER)
+const EffectSchema& forceFieldSchema();  // Wave 3 (SHELL)
+const EffectSchema& chargeUpSchema();    // Wave 3 (SHELL phase 2)
+const EffectSchema& heatShimmerSchema(); // Wave 3 (DF)
+const EffectSchema& gravitationalLensSchema(); // Wave 3 (DF)
+const EffectSchema& lightBeamSchema();   // Wave 3 (SHELL phase 2)
+const EffectSchema& haloSchema();        // Wave 3 (SHELL phase 2)
+const EffectSchema& bubbleSchema();      // Wave 3 (SHELL phase 2)
+const EffectSchema& portalSchema();      // Wave 3 (SHELL phase 2)
+const EffectSchema& realityTearSchema(); // Wave 3 (SHELL phase 2)
 
 namespace {
 
@@ -104,6 +119,21 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &velocityDistortionSchema(),
         &motionSmearSchema(),
         &starsSchema(),
+        &lightningSchema(),
+        &arcSchema(),
+        &electricFieldSchema(),
+        &dischargeSchema(),
+        &plasmaSchema(),
+        &energyShieldSchema(),
+        &forceFieldSchema(),
+        &chargeUpSchema(),
+        &heatShimmerSchema(),
+        &gravitationalLensSchema(),
+        &lightBeamSchema(),
+        &haloSchema(),
+        &bubbleSchema(),
+        &portalSchema(),
+        &realityTearSchema(),
     };
     return kSchemas;
 }
@@ -772,6 +802,7 @@ std::vector<RegistryFinding> checkRegistry() {
             case EffectBucket::Emitter: return RenderStage::Particles;
             case EffectBucket::Transform: return RenderStage::Geometry;
             case EffectBucket::Starfield: return RenderStage::Sky;
+            case EffectBucket::Shell: return RenderStage::Particles;
             }
             return RenderStage::Sky;
         }();

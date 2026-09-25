@@ -75,6 +75,32 @@ enum class EffectKind : std::uint8_t {
     MotionSmear = 31,      // the owner's trailing side stretches back along its path
     // Wave 2 (the lead's): the sky's star field, owned by an effect instead of skybox constants.
     Stars = 32, // a controllable star field: density, magnitudes, colour, twinkle, a galactic band
+    // Wave 3 reserves, by slice (explicit values, as Waves 1 and 2 did):
+    //   bolt (BOLT):         Lightning = 33, Arc = 34, ElectricField = 35, Discharge = 36
+    //   shell (SHELL):       Plasma = 37, EnergyShield = 38, ForceField = 39
+    //   lens (DF):           HeatShimmer = 41, GravitationalLens = 42
+    //   shell 2 (phase 2):   ChargeUp = 40, LightBeam = 43, Halo = 44, Bubble = 45, Portal = 46,
+    //                        RealityTear = 47
+    // BOLT (bolt_path.hpp): seeded fractal paths drawn through RIBBON.
+    Lightning = 33,     // a triggered strike: leader, return stroke, restrikes, afterglow, a flash
+    Arc = 34,           // a continuous writhing arc between two things
+    ElectricField = 35, // a crackling web over the owner's surface, and arcs hopping across it
+    Discharge = 36,     // a triggered burst of bolts, sparks and a flash from the owner
+    // SHELL (world/effects/shell_frame.hpp): analytic proxy shells drawn beside the particles.
+    Plasma = 37,       // a boiling orb of emission, marched inside a sphere, with a core light
+    EnergyShield = 38, // a shell round its owner: rim, cells, rings from each hit, a ground line
+    ForceField = 39,   // a placed barrier -- wall, box, cylinder, dome -- revealed by what comes near
+    // Shell 2 (phase 2): SHELL's other users.
+    ChargeUp = 40, // energy gathered into the owner over a charge time, held, released in a flare
+    // The lens slice (DF): Heat Shimmer's Cylinder/Shimmer and Gravitational Lens's Facing/Lens.
+    HeatShimmer = 41,       // DF: the view wobbling through a column of hot air
+    GravitationalLens = 42, // DF: background light bent around a mass, optionally a black hole
+    // Shell 2 (phase 2), continued.
+    LightBeam = 43,   // a visible cone of lit air from a spot light, an entity or a placed point
+    Halo = 44,        // glare and a ring round a bright source, or a ring above the owner's head
+    Bubble = 45,      // a thin-film sphere: interference colour, reflection, rim lensing, a triggered pop
+    Portal = 46,      // an opening with a swirling rim and an interior with depth (no Remote View)
+    RealityTear = 47, // a jagged crack in space: white-hot edges, a void inside, the image sheared apart
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

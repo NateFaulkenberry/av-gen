@@ -138,4 +138,98 @@ MeshData makePlane(float halfExtent, int divisions) {
     return mesh;
 }
 
+MeshData makeQuad(float halfExtent) {
+    MeshData mesh;
+    mesh.vertices = {Vertex{{-halfExtent, -halfExtent, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+                     Vertex{{halfExtent, -halfExtent, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                     Vertex{{halfExtent, halfExtent, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+                     Vertex{{-halfExtent, halfExtent, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}};
+    mesh.indices = {0, 1, 2, 0, 2, 3}; // counter-clockwise when viewed from +Z
+    return mesh;
+}
+
+namespace {
+
+// The ring of `segments` + 1 points (the seam duplicated, so uv.x runs 0..1) at height y.
+void appendRing(MeshData& mesh, float radius, float y, int segments, const glm::vec3& normalTilt, float v) {
+    for (int i = 0; i <= segments; ++i) {
+        const float u = static_cast<float>(i) / static_cast<float>(segments);
+        const float a = u * glm::two_pi<float>();
+        const glm::vec3 radial(std::cos(a), 0.0f, std::sin(a));
+        const glm::vec3 normal = glm::normalize(radial * normalTilt.x + glm::vec3(0.0f, normalTilt.y, 0.0f));
+        mesh.vertices.push_back(Vertex{radial * radius + glm::vec3(0.0f, y, 0.0f), normal, {u, v}});
+    }
+}
+
+// A cap at height y facing `up` (+1 or -1): a fan round a centre vertex.
+void appendCap(MeshData& mesh, float radius, float y, int segments, float up) {
+    const auto centre = static_cast<std::uint32_t>(mesh.vertices.size());
+    mesh.vertices.push_back(Vertex{{0.0f, y, 0.0f}, {0.0f, up, 0.0f}, {0.5f, 0.5f}});
+    for (int i = 0; i <= segments; ++i) {
+        const float a = static_cast<float>(i) / static_cast<float>(segments) * glm::two_pi<float>();
+        const glm::vec3 radial(std::cos(a), 0.0f, std::sin(a));
+        mesh.vertices.push_back(Vertex{radial * radius + glm::vec3(0.0f, y, 0.0f), {0.0f, up, 0.0f},
+                                       {0.5f + 0.5f * radial.x, 0.5f + 0.5f * radial.z}});
+    }
+    for (int i = 0; i < segments; ++i) {
+        const std::uint32_t a = centre + 1 + static_cast<std::uint32_t>(i);
+        // Counter-clockwise seen from the side the cap faces. The ring runs +X towards +Z, which is
+        // clockwise seen from +Y.
+        if (up > 0.0f) {
+            mesh.indices.insert(mesh.indices.end(), {centre, a + 1, a});
+        } else {
+            mesh.indices.insert(mesh.indices.end(), {centre, a, a + 1});
+        }
+    }
+}
+
+// Quads between two rings of `segments` + 1 points starting at `lower` and `upper`, facing outward.
+void joinRings(MeshData& mesh, std::uint32_t lower, std::uint32_t upper, int segments) {
+    for (int i = 0; i < segments; ++i) {
+        const std::uint32_t a = lower + static_cast<std::uint32_t>(i);
+        const std::uint32_t b = upper + static_cast<std::uint32_t>(i);
+        mesh.indices.insert(mesh.indices.end(), {a, b, a + 1, a + 1, b, b + 1});
+    }
+}
+
+} // namespace
+
+MeshData makeDisc(float radius, int segments) {
+    segments = std::max(segments, 3);
+    MeshData mesh;
+    appendCap(mesh, radius, 0.0f, segments, 1.0f);
+    return mesh;
+}
+
+MeshData makeCylinder(float radius, float halfHeight, int segments, bool capped) {
+    segments = std::max(segments, 3);
+    MeshData mesh;
+    const glm::vec3 flat(1.0f, 0.0f, 0.0f);
+    appendRing(mesh, radius, -halfHeight, segments, flat, 1.0f);
+    appendRing(mesh, radius, halfHeight, segments, flat, 0.0f);
+    joinRings(mesh, 0, static_cast<std::uint32_t>(segments + 1), segments);
+    if (capped) {
+        appendCap(mesh, radius, halfHeight, segments, 1.0f);
+        appendCap(mesh, radius, -halfHeight, segments, -1.0f);
+    }
+    return mesh;
+}
+
+MeshData makeCone(float radius, float halfHeight, int segments, bool capped) {
+    segments = std::max(segments, 3);
+    MeshData mesh;
+    // The slant normal: perpendicular to the side line from the base rim to the apex.
+    const float height = 2.0f * halfHeight;
+    const glm::vec3 slant(height, radius, 0.0f);
+    appendRing(mesh, radius, -halfHeight, segments, slant, 1.0f);
+    // The apex is a ring of coincident points, one per segment, each carrying its segment's normal,
+    // so the side shades smoothly round instead of pinching to one normal at the tip.
+    appendRing(mesh, 0.0f, halfHeight, segments, slant, 0.0f);
+    joinRings(mesh, 0, static_cast<std::uint32_t>(segments + 1), segments);
+    if (capped) {
+        appendCap(mesh, radius, -halfHeight, segments, -1.0f);
+    }
+    return mesh;
+}
+
 } // namespace avgen::scene
