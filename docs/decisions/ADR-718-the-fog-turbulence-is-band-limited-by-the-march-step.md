@@ -182,3 +182,11 @@ from a copy.
 - **The shadow march** passes its own step (`towards * dt`). With `volumeShadowSteps` at 4, a
   turbulent bank's shadow sees a smoother flow than the camera does. That is the right trade for a
   shadow, but it has not been looked at, because no review arm has shadow steps on.
+
+## Owner ruling (2026-09-25)
+
+- **At the default 32 march steps, a very turbulent bank reads as plain.** With turbulence 1.0 at
+  scale 6, the band-limit removes detail finer than 32 steps can resolve, and the bank draws as a
+  plain shape. The detail returns at 256 steps. The owner accepted this. The slider is not capped
+  at low step counts, even though that makes it a control over nothing at 32 steps (ADR-421's
+  risk), accepted knowingly.
