@@ -16,6 +16,69 @@ subsystems with no users and "built but unreachable" features are its signature 
 
 ---
 
+## Status (2026-09-25): Waves 1–3 shipped; the library is paused here
+
+The owner has paused the Effect Library after Wave 3; the effort moves to the motion stack and then the
+Director. This section is where to pick up.
+
+### What shipped
+
+| Wave | ADR | Primitives | Types (kind number) |
+|---|---|---|---|
+| — | 702 | the instance model: owners, stacks, render stages, one evaluator | Aurora, Comet, Meteor Shower, Volumetric Fog, Vortex, Tornado (0–5), Ground Pulse (6), Travel Beam (7) |
+| 1 | 703 | SIGNALS + `owner.` routes, HIST, FXL (emission, rim, pulse), LIGHTMOD pool (16), RIBBON, DF, EMIT | Glow 8, Pulse 9, Bloom Source 10, Trail 11, Space Warp 12, Particle Emitter 13 |
+| 2 | 716 | two-phase evaluator + XFORM, TRIGGER, FXL clip / displace / pattern in every pass, Worley F2, DF Disc / Shock / Ripple / Wake | Orbit 14, Spiral 15, Float 16, Shake 17, Bounce 18, Shockwave 19, Ripple 20, Dissolve 21, Growth 22, Breathing 23, Organic Pulsation 24, Bioluminescence 25, Pulsing Veins 26, Fresnel 27, Rim Light 28, Color Cycling 29, Velocity Distortion 30, Motion Smear 31, Stars 32; 20 more Particle Emitter presets |
+| 3 | 719 | BOLT, SHELL (9 shading kinds), DF Facing / Cylinder / Shimmer / Lens | Lightning 33, Arc 34, Electric Field 35, Discharge 36, Plasma 37, Energy Shield 38, Force Field 39, Charge-Up 40, Heat Shimmer 41, Gravitational Lens 42, Light Beam 43, Halo 44, Bubble 45, Portal 46, Reality Tear 47 |
+
+Kind numbers are explicit and append-only (`src/world/effects/effect_kind.hpp`); the next free kind is 48.
+Every primitive is byte-identical with no instance, proven against the pre-change binary.
+
+### What is left
+
+| Wave | Primitives | Effects |
+|---|---|---|
+| **4** | FXPOST (H1 before bloom, H2 display-referred), REDRAW | Radial Distortion, Scanlines, Pixelation, Dithering, Toon Edges, Chromatic Aberration (glitch + spectral lens), God Rays (Screen), Heat Haze (and Heat Shimmer's Ground Haze), Aura, Afterimage (Geometry), Hologram, Energy Shield (Contour) |
+| **5** | TEMPORAL (history ids, stride, warm-up), MEDIUM shadowed march, LOCALTIME | Echo / Smear / Ghosting (`temporalFilter`, FrameEcho migrated), Freeze-Frame, Reverse, Time-Warp Distortion, Afterimage (Image), Time Dilation, Delayed Motion, God Rays (Volumetric), Volumetric Beam (occluded) |
+| **6** | migrations (ADR-441, no shims) and heavy geometry | Wind Response (ADR-360 lanes → effect), Sway, tree energy → Pulsing Veins, Camera Shake → Shake, Tendrils (instanced tube), Portal Remote View |
+
+Also outstanding, from the waves that shipped:
+- **SIGNALS: effect-published signals** (`fx.<id>.age/phase/charge/release`). Charge-Up's `chargeUpCharge()` is the pure function a publisher would call.
+- **LIGHTMOD's modulate half.** Pulse on a Light owner, and a spot-shaped Light Beam pool light.
+- **REDRAW** (Wave 4). It unblocks Energy Shield's Contour mode and Aura (Hull).
+- **XFORM on Light and Camera owners**, and Orbit about another entity.
+- **A panel editor for triggers.** Activation `trigger` has no dedicated UI yet.
+
+### Look notes and gaps the owner has not ruled on
+
+Each is recorded in its wave's ADR ("Findings not fixed here"):
+- **Wave 3 (ADR-719):**
+  - Light Beam reads as haze, not a crisp beam;
+  - the blue Plasma close-up has subtle strands;
+  - Heat Shimmer's Campfire is subtle;
+  - Gravitational Lens's Einstein ring is faint on a smooth sky, and its horizon darkens fog in front of it;
+  - Reality Tear's Crystal Crack shear barely shows;
+  - Discharge sparks are ribbon streaks, not EMIT;
+  - Electric Field's arcs sit on the owner's bounds, not its mesh;
+  - bolt LOD depends on the camera.
+- **Wave 2 (ADR-716):**
+  - the alpha-mask `discard` in `pbr_shade` precedes texture samples. It is defined by the WGSL spec and has never been seen to fail, so it is recorded, not moved.
+- **Resolved by the owner:**
+  - Energy Blast and Explosion thinned to filaments;
+  - a dissolving owner's inside shaded;
+  - the Tree of Life's `state.progress` routes are the approved look (ADR-712).
+- **Seek:** the UFO-stack film's play = scrub case is still hidden (`[.known-defect][adr700]`). ADR-870 narrowed it to about 0.018 m, not exact. Un-hide it when it holds to the bit.
+
+### Where to pick up
+
+1. Read ADR-702 → 703 → 716 → 719 in order. Then read `shared-infrastructure.md`'s FXPOST and REDRAW sections for Wave 4.
+2. Run each wave the same way:
+   - reserve kind numbers per slice in `effect_kind.hpp`;
+   - give each slice a file set it owns;
+   - add a new bucket's arms to the registry stage map, `isAtmosphericBucket`'s callers, and the conformance maps;
+   - require a byte-identical gate against the pre-change binary;
+   - render and look at on/off sheets of every type in a real scene (the Glowmere film, the UFO stack), not only a fixture.
+3. The review sheets for Waves 1–3 are in `~/Desktop/av-gen-review/5-effect-library-wave1`, `10-effect-library-wave2` and `16-effect-library-wave3`.
+
 ## Wave 1: the concrete plan
 
 Wave 1 is ten work packages. Each fits in one agent worktree and one branch
