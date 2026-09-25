@@ -541,8 +541,31 @@ float WorldMap::heightUncached(glm::vec2 p) const {
     // air, which is exactly how a river ends up rendering as disconnected puddles. So water features
     // record the bed they want and pull the terrain down to it, weighted by their falloff so the
     // banks still blend out.
-    float cutTarget = std::numeric_limits<float>::max();
-    float cutWeight = 0.0f;
+    //
+    // ADR-830: **each water feature cuts with its own weight**, and the terrain takes the deepest of
+    // the cuts. This used to keep one target and one weight for all of them -- the lowest target,
+    // the largest weight -- and those two come from different features wherever two waters overlap.
+    // A pool's bank reaching into a river's shoulder at weight 0+ handed its low bed to the river's
+    // weight of 0.6 in one step: an 0.88 m cliff in the terrain along the line where the pool's
+    // influence begins, which Ember walked up at 17 s in the multicam film (feet 0.40 m in one
+    // frame). Each cut is continuous in its own weight, and a min of continuous cuts is continuous.
+    struct Cut {
+        float target;
+        float weight;
+    };
+    constexpr std::size_t kMaxCuts = 16;
+    std::array<Cut, kMaxCuts> cuts{};
+    std::size_t cutCount = 0;
+    const auto addCut = [&](float target, float weight) {
+        if (cutCount < kMaxCuts) {
+            cuts[cutCount++] = Cut{target, weight};
+            return;
+        }
+        // Past sixteen waters overlapping one point (none does in any scene here), the last slot
+        // absorbs the rest the old way rather than dropping a cut.
+        cuts[kMaxCuts - 1].target = std::min(cuts[kMaxCuts - 1].target, target);
+        cuts[kMaxCuts - 1].weight = std::max(cuts[kMaxCuts - 1].weight, weight);
+    };
     for (const Feature& f : features) {
         if (!f.reaches(p)) {
             continue; // exactly equivalent to a zero weight, and it costs one compare
@@ -559,13 +582,11 @@ float WorldMap::heightUncached(glm::vec2 p) const {
             // The path level is the water surface; the bed is `amplitude` below it. The cut is
             // applied with weight w at the end, so the channel centre is guaranteed under the water
             // line along the whole course while the banks blend out continuously.
-            cutTarget = std::min(cutTarget, hit.level - f.amplitude);
-            cutWeight = std::max(cutWeight, w);
+            addCut(hit.level - f.amplitude, w);
             break;
         case FeatureKind::Flat:
             if (f.water) {
-                cutTarget = std::min(cutTarget, hit.level);
-                cutWeight = std::max(cutWeight, w);
+                addCut(hit.level, w);
             }
             break;
         }
@@ -589,8 +610,12 @@ float WorldMap::heightUncached(glm::vec2 p) const {
 
     float h = baseHeight + base * roughness + raise;
     h = glm::mix(h, flattenTarget, glm::clamp(flattenWeight, 0.0f, 1.0f));
-    if (cutWeight > 0.0f) {
-        h = glm::mix(h, std::min(h, cutTarget), cutWeight);
+    if (cutCount > 0) {
+        float cut = h;
+        for (std::size_t i = 0; i < cutCount; ++i) {
+            cut = std::min(cut, glm::mix(h, std::min(h, cuts[i].target), cuts[i].weight));
+        }
+        h = cut;
     }
     return h;
 }

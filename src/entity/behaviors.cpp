@@ -613,7 +613,13 @@ private:
 //
 // Costs nothing and does nothing where `state.radius` is 0, which is every body in this
 // repository that does not ask for it.
-void separateFromCrowd(const BehaviorContext& ctx, EntityState& state, float speed, float dt) {
+//
+// ADR-831: `stepping` is the fraction of a stride the body is taking this frame -- 1 for `ground`
+// and for a walk, the mover's facing alignment while it pivots. A body does not walk backwards out
+// of an overlap: the push used to run at its 1 m/s floor through a turn in place, and Rook slid
+// 0.26 m backwards past Tide across an `Idle_turn` with his feet still.
+void separateFromCrowd(const BehaviorContext& ctx, EntityState& state, float speed, float dt,
+                       float stepping = 1.0f) {
     if (ctx.world == nullptr || state.radius <= 0.0f || dt <= 0.0f) {
         return;
     }
@@ -627,8 +633,17 @@ void separateFromCrowd(const BehaviorContext& ctx, EntityState& state, float spe
     constexpr float kSeparationSeconds = 0.5f;
     const float apartSpeed = std::min(distance / kSeparationSeconds, std::max(speed, 1.0f));
     const float limit = std::min(distance, apartSpeed * dt);
-    state.travel.x += apart.x / distance * limit;
-    state.travel.z += apart.y / distance * limit;
+    glm::vec2 push = apart / distance * limit;
+    // ADR-831: the part of the push that would carry the body backwards waits for the body to be
+    // stepping. Sideways and forwards it still makes room at once -- two bodies must not stand in
+    // each other (§11) -- but a pivot is not a moonwalk.
+    const glm::vec2 facing(std::sin(state.yaw), std::cos(state.yaw));
+    const float along = glm::dot(push, facing);
+    if (along < 0.0f) {
+        push -= facing * (along * (1.0f - std::clamp(stepping, 0.0f, 1.0f)));
+    }
+    state.travel.x += push.x;
+    state.travel.z += push.y;
 }
 
 class Wander final : public CheckpointedBehavior<Wander> {
@@ -1683,7 +1698,7 @@ private:
 
         // Other characters. The arithmetic is `separateFromCrowd` above, which this used to hold
         // inline; it is shared with `ground` so that a `decide` character is a body too.
-        separateFromCrowd(ctx, state, speed, dt);
+        separateFromCrowd(ctx, state, speed, dt, alignment);
 
         // Whatever the steering did not prevent, the field corrects. This is the guarantee rather
         // than the effort: a body may not end a frame inside a solid, however it got there --

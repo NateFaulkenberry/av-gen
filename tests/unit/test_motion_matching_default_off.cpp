@@ -34,8 +34,11 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// Recorded by running this trace on f8fe1b4b, the commit before the wiring; see ADR-623.
-constexpr std::uint64_t kPreWiringDigest = 0x5599cff790bc8a34ull;
+// Recorded by running this trace on f8fe1b4b, the commit before the wiring; see ADR-623. Re-pinned
+// once, by ADR-830, which changed the Glowmere terrain itself (overlapping waters cut continuously):
+// the world moved under the trace, not the matcher, and the control arm below still shows the key
+// changes it. The old value was 0x5599cff790bc8a34.
+constexpr std::uint64_t kPreWiringDigest = 0xd53e94d7c2073392ull;
 
 fs::path glowmere() {
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";
