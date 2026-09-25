@@ -7,8 +7,8 @@ engine side of the actor handoff). Not `src/directing/` or the AI layer.
 
 ## Status in one line
 
-The recount is done. **M1–M3 are built**: the handoff, the clip semantics table, and one-shot and
-transition cue playback. M4 (jump arc) and M5 (retime) are next.
+The recount is done. **M1–M5 are built**, which is everything the Director's Slices 2–3 asked of
+the motion engine. Next: the remaining C and D work, ordered below.
 
 ## How this was counted
 
@@ -145,8 +145,21 @@ The Director compiles scripted performances to `seq::Actor` in the baked tier. I
 | M1 | Entity ↔ actor handoff | 2 | **done** | ADR-758 adopted from `agent/director` (f009638d) as the one mechanism; ADR-820 additions; `test_directing_handoff.cpp` (10, acceptance) + `test_motion_handoff.cpp` (4) |
 | M2 | Clip semantics table | 3 | **done** | ADR-821; `scene::clipSemantics`, `Composition::clipSemanticsFor`, `avgen_motion semantics [--json]`; `test_clip_semantics.cpp` |
 | M3 | One-shot/transition cue playback + clip events on the timeline | 3 | **done** | `ClipCue::{playback, then}`, `seq::resolveCue`, `seq::clipEventSeconds`; Rook plays `Jumping` once and is handed back to his gait on Glowmere |
-| M4 | Jump arc shared with `Airborne`, minimum apex, landing check, per-character jump capability in data, `Jump_running` mapped | 3 | next | — |
-| M5 | Local retime of an actor | 3 | not started | — |
+| M4 | Jump arc shared with `Airborne`, minimum apex, landing check, per-character jump capability in data, `Jump_running` mapped | 3 | **done** | ADR-822; `planJump`/`minimumApex`/`checkArc`, `EntityDesc::jump`, actor `airborne` spans, `seq/jump.hpp`; `test_jump_arc.cpp` |
+| M5 | Local retime of an actor | 3 | **done** | ADR-823; `seq::retimeActor`, `ClipCue::offsetSeconds`, `Actor::timeWarps`; `test_actor_retime.cpp` |
+
+### Found while building M4: every autonomous hop was a skid
+
+`explore` re-grounded the body on every step of a hop, and ADR-194's tests counted `Jump` frames
+without measuring height.
+
+| Body | Authored hop | Peak before the fix | Peak after |
+|---|---|---|---|
+| Ember | 2.6 m on the beat | 0.39 m | 2.73 m |
+| Vane | 2.6 m on the beat | 0.09 m | 3.00 m |
+
+This is a film change in `glowmere-valley-2`, `-song` and `-atmospherics`, but not in the multicam
+film. It is flagged for the owner in `12-motion-stack/03-…png`.
 
 ### What M1 is (ADR-758 + ADR-820)
 - **Where the mechanism came from.** An actor on a node that an entity drives is a performer. The
@@ -181,12 +194,30 @@ flight, and the body is at its highest at `peak`.
 | Fall_loop, Floating, Flying_jet | yes | airborne | none |
 | Crazy, the three deaths | no | grounded | plants/releases |
 
+## Remaining C and D work, in value order (next)
+1. **D, Director-facing:**
+   - Replay timeline `direct()` commands in a seek, and put them in the checkpoint key. Without
+     this, a Director command issued over time is not scrub-exact.
+   - Add a world-level release/cancel.
+   - Add §35 runtime goal targeting: a `goal` considerer subject injected per character.
+2. **C §37/39/40/76/81:** the product loads baked `.motiondb` files through `MotionDatabaseSlot`.
+   Today it extracts features synchronously at composition build.
+3. **D §25/§66/§69:** semantic tags for Glowmere's props and effects (mushrooms, trees, rocks,
+   UFO).
+4. **D §26:** the missing world-event producers (spawn/remove, area enter/exit, effect start/end).
+5. **D §36:** optional cinematic signals (`isInShot`, `screenImportance`) as inputs.
+6. **B §39:** local avoidance emits `intent.steering`.
+7. **C §68, D §40/§48:** a live matcher debug view and a character inspector.
+8. Re-take the §50–55 and D §44 timings on a quiet machine.
+
 ## Review renders
 `~/Desktop/av-gen-review/12-motion-stack/` (fixture: `examples/labs/motion/`):
 - **`01-react-crazy-loop-vs-once.png`: the owner's decision 2.** It compares `Crazy` looping
   (autonomous `react` today) with `Crazy` played once and held.
 - **`02-jumping-measured-events.png`:** the measured takeoff, peak and touchdown on the pose.
   Checked by eye; they are right.
+- **`03-ember-vane-beat-hops-before-after.png`: a new decision.** Keep the now-real 2.6 m beat hop,
+  lower it, or drop it?
 
 ## Decisions needed (owner)
 1. **Rook's jump capability.** The Director's benchmark needs a 5.75 m apex; the default is 1.1 m.
@@ -201,19 +232,25 @@ flight, and the body is at its highest at `peak`.
    of them is on.
 4. **The Glowmere review build exists only on the board.** Please confirm its scope, including
    whether it targets the multicam film, the only scene whose aliens are wired.
+5. **Ember's and Vane's beat hops** (ADR-822) now leave the ground as authored, 2.6 m on every
+   beat in three Glowmere scenes. Keep them, lower them, or drop the beat hop?
 
 ## Test status
-At a6228408 (M1–M3), release build, with a second `cmake --build` doing no compile or link:
-- **CPU `avgen_tests`:** 3,253 cases, exit 0. One expected failure, the `[!shouldfail]` at
-  `test_character_lab_slopes.cpp:187`. 16 skips: the hardware skips, plus the gitignored demo and
-  100STYLE packs.
-- **GPU `avgen_render_tests`:** 443 cases, exit 0. One skip (NDI).
-- **New tests:** `[handoff]` 14 cases, `[semantics]` 11. Every new check was broken and seen red
-  before being restored: 3 mechanisms for the handoff, 4 for the semantics.
-- **Selecting `[seek]` by tag also runs main's hidden `[.known-defect]`** "UFO stack at 150 s is
-  the same played and scrubbed", which fails as it does on main. It is not in the default suite.
+At 60a9911a (M1–M5), release, with a second build doing no compile or link:
+- **CPU `avgen_tests`:** 3,267 cases. **One real failure**: `test_glowmere_valley_2.cpp:551`
+  asserts that a project records its scene's sha256, and M4 edited four Glowmere scenes. The four
+  projects' recorded hashes are refreshed; that case and `[glowmere]` (50 cases) now pass. The full
+  rerun is recorded below.
+- **GPU `avgen_render_tests`:** 443 cases, one failure: `test_render_job.cpp:87`, a `loadProject`
+  inside the shadow-AOV case. It passes on rerun (`[aov]`, 3 cases). Its fixture deletes and
+  recreates a fixed shared folder, `$TMPDIR/avgen_render_job`, so a GPU suite running at the same
+  time in another worktree can remove it mid-case. This is a cross-agent race, not a code fault,
+  and it is recorded for the CI owner.
+- **New motion tests:** `[handoff]`, `[semantics]`, `[jump]`, `[airborne]` and `[retime]`, 45 cases
+  together. Every new check was broken and seen red before being restored.
 
 ## Log
+- 2026-09-24: M4 (ADR-822, including the hop-skid fix) and M5 (ADR-823).
 - 2026-09-24: M1 adopted from `agent/director` (ADR-758) with the ADR-820 additions; M2/M3
   (ADR-821); clip-playback lab and two review sheets; both suites green.
 - 2026-09-24: worktree created from main 232a50d7; recount of B §39/§66, C, D, the review build, E
