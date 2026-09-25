@@ -1,0 +1,55 @@
+{
+  "description": "Keep UFO Watch's shot of the first abduction as an authored, locked shot (a runtime shot adopted, ADR-768).",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "adopt",
+    "title": "Keep the beam shot",
+    "tier": "baked",
+    "shots": [
+      {
+        "key": "shot",
+        "name": "the-beam",
+        "rig": "UFO Watch",
+        "start": {
+          "event": "camera/UFO Watch",
+          "occurrence": 1
+        },
+        "durationSeconds": 6.0667,
+        "locked": true
+      }
+    ],
+    "observation": {
+      "events": [
+        {
+          "name": "abduction/beam",
+          "subject": "visitor",
+          "seconds": 7.85
+        },
+        {
+          "name": "camera/UFO Watch",
+          "subject": "abduction",
+          "seconds": 13.5,
+          "end": 19.5667
+        },
+        {
+          "name": "abduction/beam",
+          "subject": "visitor",
+          "seconds": 24.95
+        }
+      ],
+      "until": 30
+    }
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 1,
+      "camera.shot": 1
+    },
+    "diff": [
+      "Shot \"the-beam\" 00:13.500-00:19.567; cut to camera 'UFO Watch'",
+      "Camera track: UFO Watch live 00:13.500-00:19.567, locked"
+    ]
+  }
+}

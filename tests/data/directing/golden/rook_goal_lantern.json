@@ -1,0 +1,48 @@
+{
+  "description": "Have Rook wander to the Lantern at 0:05 and say when he arrives (a live goal, ADR-763).",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "rook-wanders",
+    "title": "Rook wanders to the Lantern",
+    "tier": "goal",
+    "subjects": [
+      {
+        "alias": "rook",
+        "text": "Rook"
+      },
+      {
+        "alias": "lantern",
+        "text": "the Lantern hero",
+        "hint": "hero"
+      }
+    ],
+    "performances": [
+      {
+        "key": "wander",
+        "subject": "rook",
+        "mode": "goal",
+        "beats": [
+          {
+            "action": "go_to",
+            "target": "lantern",
+            "at": {
+              "seconds": 5
+            },
+            "emits": "rook.reaches_lantern"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.event": 2
+    },
+    "diff": [
+      "Goal for rook at 00:05.000: go_to lantern-cap -- live",
+      "Live event rook.reaches_lantern when rook reports goal.arrived"
+    ]
+  }
+}
