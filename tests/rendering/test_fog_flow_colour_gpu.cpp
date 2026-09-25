@@ -282,3 +282,59 @@ TEST_CASE("the distance colour tints the far side of a volume more than the near
     CHECK(farShift / farN > nearShift / nearN + 0.02);
     CHECK(nearShift / nearN > 0.0);
 }
+
+TEST_CASE("a flow finer than the march's step does not reach the frame", "[gpu][fog][flow][bandlimit]") {
+    // ADR-718, in the PICTURE. The parity case proves the shader band-limits against the step it is
+    // handed; only a render proves the march HANDS it the step -- a `mediumShape` that passed a zero
+    // step would point-sample the flow and every CPU and parity test would still pass.
+    //
+    // Scale 20 on a 100 m sphere is a first octave of 5 m. At 32 steps the march spaces its samples
+    // about 10 m apart through this volume -- two cycles a step -- so the flow is dropped and the
+    // frame is the calm sphere's. At 256 steps the same flow is a quarter cycle a step, and it is
+    // back: the band follows the step, not the scale. Break `mediumShape`'s step (a zero vector) and
+    // the 32-step frame is the full turbulent one.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+
+    const auto scene = [](float turbulence, int steps) {
+        scene::Scene s = glowScene([=](world::EffectInstance& e) {
+            e.values.setFloat("fog/turbulence", turbulence);
+            e.values.setFloat("fog/turbulenceScale", 20.0f);
+        });
+        s.environment.volumeSteps = steps;
+        return s;
+    };
+    // The mean absolute luminance difference over the pixels the calm sphere lights, relative to
+    // their mean luminance.
+    const auto differs = [&](int steps) {
+        const gpu::ImageF calm = shot(renderer, scene(0.0f, steps));
+        const std::uint32_t marched = renderer.stats().volume.steps;
+        const gpu::ImageF wild = shot(renderer, scene(0.7f, steps));
+        double diff = 0.0;
+        double lum = 0.0;
+        int lit = 0;
+        for (std::uint32_t y = 0; y < kSize; ++y) {
+            for (std::uint32_t x = 0; x < kSize; ++x) {
+                const float lc = luminance(calm.pixel(x, y));
+                if (lc < 1e-3f) {
+                    continue;
+                }
+                diff += std::abs(luminance(wild.pixel(x, y)) - lc);
+                lum += lc;
+                ++lit;
+            }
+        }
+        INFO("steps " << steps << " (marched " << marched << "): " << lit << " lit pixels");
+        REQUIRE(lit > 2000);
+        return diff / lum;
+    };
+    const double coarse = differs(32);
+    const double fine = differs(256);
+    INFO("relative luminance change from the flow: 32 steps " << coarse << ", 256 steps " << fine);
+    // Measured 0.0095 at 32 steps (grazing rays through the bound's rim have short steps and keep
+    // some flow) and 0.091 at 256. With the march passing a zero step, 32 steps measures 0.11.
+    CHECK(coarse < 0.03);
+    CHECK(fine > 0.05);
+}

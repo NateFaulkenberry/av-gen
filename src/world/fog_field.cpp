@@ -107,26 +107,54 @@ glm::vec3 fogSemiAxes(const MediumSlot& m) {
 }
 
 // TURBULENCE (and §16's curl): the world displacement, at most `amount` of each semi-axis.
-glm::vec3 fogTurbulence(const MediumSlot& m, const glm::vec3& p, float t) {
+// ADR-718: band-limited against `step`, octave by octave (`fogTurbulenceBand`).
+glm::vec3 fogTurbulence(const MediumSlot& m, const glm::vec3& p, float t, const glm::vec3& step) {
     const float amount = std::clamp(m.lane[7].y, 0.0f, 1.0f);
     if (amount <= 0.0f) {
         return glm::vec3(0.0f);
     }
     const float scale = std::max(m.lane[7].w, 0.05f);
     const float rate = std::max(m.lane[6].w, 0.0f);
-    const glm::vec3 rest = fogStructureFrame(m, p, t) - glm::vec3(m.lane[2]) * t - glm::vec3(m.lane[0]);
-    const float c = m.lane[13].z;
-    const float s = m.lane[13].w;
-    const glm::vec3 semi = fogSemiAxes(m);
-    const glm::vec3 local((rest.x * c + rest.z * s) / semi.x, rest.y / semi.y,
-                          (-rest.x * s + rest.z * c) / semi.z);
-    glm::vec3 n = noise::flowCurl(local * scale, t * rate, 53u) * kFogTurbulenceGain;
+    const glm::vec3 local = fogFlowLocal(m, p, t);
+    const glm::vec2 band = fogTurbulenceBand(m, t, step);
+    glm::vec3 n = noise::flowCurlBanded(local * scale, t * rate, 53u, band.x, band.y) * kFogTurbulenceGain;
     const float len = glm::length(n);
     if (len > 1.0f) {
         n = n / len;
     }
+    const glm::vec3 semi = fogSemiAxes(m);
     const glm::vec3 d = n * amount * semi;
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
     return glm::vec3(d.x * c - d.z * s, d.y, d.x * s + d.z * c);
+}
+
+glm::vec3 fogFlowLocal(const MediumSlot& m, const glm::vec3& p, float t) {
+    const glm::vec3 rest = fogStructureFrame(m, p, t) - glm::vec3(m.lane[2]) * t - glm::vec3(m.lane[0]);
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
+    const glm::vec3 semi = fogSemiAxes(m);
+    return glm::vec3((rest.x * c + rest.z * s) / semi.x, rest.y / semi.y, (-rest.x * s + rest.z * c) / semi.z);
+}
+
+// ADR-718: the band-limit -- the transliteration of `fogTurbulenceBand` in `shaders/fog.wgsl`.
+glm::vec2 fogTurbulenceBand(const MediumSlot& m, float t, const glm::vec3& step) {
+    if (step.x == 0.0f && step.y == 0.0f && step.z == 0.0f) {
+        return glm::vec2(1.0f);
+    }
+    glm::vec3 v = step;
+    const float omega = m.lane[1].z;
+    if (omega != 0.0f) {
+        const float a = -omega * t;
+        v = glm::vec3(v.x * std::cos(a) - v.z * std::sin(a), v.y, v.x * std::sin(a) + v.z * std::cos(a));
+    }
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
+    const glm::vec3 semi = fogSemiAxes(m);
+    const glm::vec3 dl((v.x * c + v.z * s) / semi.x, v.y / semi.y, (-v.x * s + v.z * c) / semi.z);
+    const float cycles = glm::length(dl) * std::max(m.lane[7].w, 0.05f);
+    return glm::vec2(1.0f - smoothstepf(kFogBandFull, kFogBandZero, cycles),
+                     1.0f - smoothstepf(kFogBandFull, kFogBandZero, cycles * 2.03f));
 }
 
 float fogTurbulenceReach(const MediumSlot& m) {
@@ -260,7 +288,7 @@ float fogEmissionHeight(const MediumSlot& m, float relY) {
     return 1.0f + (fogVerticalProfile(m, relY) - 1.0f) * amount;
 }
 
-float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
+float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t, const glm::vec3& step) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;
     }
@@ -277,7 +305,7 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
         if (reach0 > 1.35f + turbulence * fogTurbulenceReach(m) / std::min(swell, 1.0f)) {
             return 0.0f;
         }
-        q = p + fogTurbulence(m, p, t);
+        q = p + fogTurbulence(m, p, t, step);
     }
     return fogShapeFrom(m, q, fogSwellOffset(m, q - glm::vec3(m.lane[0]), swell), t);
 }

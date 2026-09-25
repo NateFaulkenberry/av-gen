@@ -289,9 +289,14 @@ fn mediumCometResponse(s: u32) -> f32 {
 }
 
 // The dispatch the kind tag exists for.
-fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
+//
+// ADR-718: `step` is the march's step AT THIS SAMPLE -- the ray's direction times the schedule's
+// spacing there -- which the fog's turbulence band-limits itself against (`fogTurbulenceBand`). A
+// zero step is a point sample. The vortex and the tornado keep `vortexFilterWidth()`, the authored
+// `maxDistance / steps`, exactly as ADR-710 left them.
+fn mediumShape(s: u32, p: vec3<f32>, t: f32, step: vec3<f32>) -> f32 {
     if (mediumKind(s) == kMediumKindFog) {
-        return fogShapeAt(mediumFogUniforms(s), p, t);
+        return fogShapeAt(mediumFogUniforms(s), p, t, step);
     }
     if (mediumKind(s) == kMediumKindTornado) {
         return tornadoDensityAt(mediumTornadoUniforms(s), p, t, vortexFilterWidth());
@@ -627,7 +632,7 @@ fn volumeTotalDensityAt(p: vec3<f32>, t: f32) -> f32 {
     var total = volumeDensityAt(p);
     let count = u32(vol.mediaInfo.x);
     for (var s = 0u; s < count; s = s + 1u) {
-        total = total + mediumShape(s, p, t) * mediumDensityCoeff(s);
+        total = total + mediumShape(s, p, t, vec3<f32>(0.0)) * mediumDensityCoeff(s);
     }
     return total;
 }
@@ -758,7 +763,7 @@ fn mediumSelfShadow(p: vec3<f32>, towards: vec3<f32>, t: f32) -> f32 {
             // accessor that already existed for exactly this and this is now its third call site.
             for (var k = 0; k < steps; k = k + 1) {
                 let x = p + towards * (iv.x + (f32(k) + 0.5) * dt);
-                let shape = mediumShape(s, x, t);
+                let shape = mediumShape(s, x, t, towards * dt);
                 if (shape > 0.0) {
                     tau = tau + shape * extinctionPerShape * dt;
                 }
@@ -1029,7 +1034,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
             if (t < slotMin[s] || t > slotMax[s]) {
                 continue;
             }
-            let shape = mediumShape(s, p, vol.noiseParams.w);
+            let shape = mediumShape(s, p, vol.noiseParams.w, direction * segmentStep);
             if (shape <= 0.0) {
                 continue;
             }

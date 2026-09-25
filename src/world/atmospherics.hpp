@@ -632,7 +632,10 @@ struct MediumSlot {
 // ADR-563: the fog bank's field, evaluated on the CPU from the same packed lanes the march reads.
 // The transliteration of `shaders/fog.wgsl` -- see `world/fog_field.cpp` for why it takes a slot
 // rather than a struct of its own.
-[[nodiscard]] float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t = 0.0f);
+// ADR-718: `step` is the march's step at `p` (direction times spacing), which the turbulence
+// band-limits itself against; the zero default is a point sample, the unfiltered field.
+[[nodiscard]] float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t = 0.0f,
+                               const glm::vec3& step = glm::vec3(0.0f));
 [[nodiscard]] float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t);
 [[nodiscard]] float fogEllipticalRadius(const MediumSlot& m, const glm::vec3& rel);
 [[nodiscard]] float fogVerticalProfile(const MediumSlot& m, float relY);
@@ -663,7 +666,15 @@ inline constexpr float kFogTurbulenceGain = 1.3f;
 [[nodiscard]] float fogSwell(const MediumSlot& m, float t);
 [[nodiscard]] glm::vec3 fogSwellOffset(const MediumSlot& m, const glm::vec3& rel, float swell);
 [[nodiscard]] glm::vec3 fogSemiAxes(const MediumSlot& m);
-[[nodiscard]] glm::vec3 fogTurbulence(const MediumSlot& m, const glm::vec3& p, float t);
+[[nodiscard]] glm::vec3 fogTurbulence(const MediumSlot& m, const glm::vec3& p, float t,
+                                      const glm::vec3& step = glm::vec3(0.0f));
+// ADR-718: the flow's own coordinates at `p` (rest frame, yawed, in semi-axes), and the two octave
+// weights a march step of `step` can carry (independent of position: the map is affine): 1 up to half a cycle per step, 0 from one cycle per
+// step. (1, 1) for a zero step. `kFogBandFull`/`kFogBandZero` must equal the WGSL constants.
+inline constexpr float kFogBandFull = 0.5f;
+inline constexpr float kFogBandZero = 1.0f;
+[[nodiscard]] glm::vec3 fogFlowLocal(const MediumSlot& m, const glm::vec3& p, float t);
+[[nodiscard]] glm::vec2 fogTurbulenceBand(const MediumSlot& m, float t, const glm::vec3& step);
 [[nodiscard]] float fogTurbulenceReach(const MediumSlot& m);
 // The field at the (possibly displaced) point `q` with primitive-frame offset `rel`: the pre-ADR-713
 // body of `fogShapeAt`, which calls it on both of its paths.

@@ -231,27 +231,84 @@ const kFogTurbulenceGain: f32 = 1.3;
 // displacement is at most `amount` of each semi-axis, and `mediumBoundOf` grows by exactly that.
 // §17's rule holds: this moves density that exists, it cannot make any where the primitive has none
 // within `amount` of a semi-axis.
-fn fogTurbulence(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> vec3<f32> {
+fn fogTurbulence(f: FogUniformsWgsl, p: vec3<f32>, t: f32, step: vec3<f32>) -> vec3<f32> {
     let amount = clamp(f.f3.y, 0.0, 1.0);
     if (amount <= 0.0) {
         return vec3<f32>(0.0);
     }
     let scale = max(f.f3.w, 0.05);
     let rate = max(f.f6.w, 0.0);
-    let rest = fogStructureFrame(f, p, t) - f.f5.xyz * t - f.f0.xyz;
-    let c = f.f1.z;
-    let s = f.f1.w;
-    let semi = fogSemiAxes(f);
-    let local = vec3<f32>((rest.x * c + rest.z * s) / semi.x, rest.y / semi.y,
-                          (-rest.x * s + rest.z * c) / semi.z);
-    var n = flowCurl(local * scale, t * rate, 53u) * kFogTurbulenceGain;
+    let local = fogFlowLocal(f, p, t);
+    // ADR-718: each octave weighted by how well `step` can carry it. (1, 1) -- a point sample, or
+    // a step that resolves both -- is `flowCurl` itself, through `flowCurlBanded`'s own branch.
+    let band = fogTurbulenceBand(f, t, step);
+    var n = flowCurlBanded(local * scale, t * rate, 53u, band.x, band.y) * kFogTurbulenceGain;
     let len = length(n);
     if (len > 1.0) {
         n = n / len;
     }
+    let semi = fogSemiAxes(f);
     let d = n * amount * semi;
     // Back from the bank's frame to the world's.
+    let c = f.f1.z;
+    let s = f.f1.w;
     return vec3<f32>(d.x * c - d.z * s, d.y, d.x * s + d.z * c);
+}
+
+// The point `p` in the flow's own coordinates: the structure's rest frame (drift and swirl
+// removed), yawed into the primitive's axes and measured in its semi-axes. `flowCurl` is sampled at
+// this times the turbulence scale, so one unit here is one lattice cell of the flow's first octave.
+fn fogFlowLocal(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> vec3<f32> {
+    let rest = fogStructureFrame(f, p, t) - f.f5.xyz * t - f.f0.xyz;
+    let c = f.f1.z;
+    let s = f.f1.w;
+    let semi = fogSemiAxes(f);
+    return vec3<f32>((rest.x * c + rest.z * s) / semi.x, rest.y / semi.y,
+                     (-rest.x * s + rest.z * c) / semi.z);
+}
+
+// ADR-718: THE BAND-LIMIT. The flow has two octaves, one lattice cell and 1/2.03 of one in
+// `fogFlowLocal`'s units, and the march samples it once per `step` (the ray's direction times the
+// schedule's spacing there). An octave with more cycles per step than the march can carry is not
+// structure, it is grain: at turbulence 0.7 and scale 4 its second octave put 0.085 of grain at
+// matched luminance on the review ellipsoid at 32 steps, 3.4x the tornado hero's.
+//
+// The cycles per step are measured ALONG THE STEP -- the flow's coordinates are anisotropic (a
+// bank's vertical semi-axis is a tenth of its horizontal ones), and a horizontal ray through a flat
+// bank crosses the vertical frequency not at all. `fogFlowLocal` is affine, so
+// `local(p + step) - local(p)` is its linear part applied to the step -- the swirl's rotation, the
+// yaw and the division by the semi-axes, with the drift and the centre cancelled -- and the cycles
+// per step are that length times the scale. It does not depend on `p` at all. Each octave keeps its full weight up to the
+// Nyquist rate, half a cycle per step, and fades to 0 at one cycle per step, where every sample
+// lands on the same phase and the octave is pure alias -- `vortexOctaveWeight`'s rule (ADR-389)
+// with a hard floor. Measured against two stricter windows in ADR-718: fading from a quarter cycle
+// moved turbulence 0.7 at scale 1.5, which this window leaves alone. The octaves fade; the scale
+// never moves, because a scale that depended on the step would move the whole pattern with every
+// ray's spacing.
+//
+// A pure function of position, time and the step (ADR-091). A zero step is a point sample and
+// returns (1, 1): the CPU bound, the tests and anything else that asks where the fog IS.
+const kFogBandFull: f32 = 0.5;
+const kFogBandZero: f32 = 1.0;
+
+fn fogTurbulenceBand(f: FogUniformsWgsl, t: f32, step: vec3<f32>) -> vec2<f32> {
+    if (step.x == 0.0 && step.y == 0.0 && step.z == 0.0) {
+        return vec2<f32>(1.0);
+    }
+    var v = step;
+    let omega = f.f7.z;
+    if (omega != 0.0) {
+        // `fogStructureFrame`'s rotation, without its centre.
+        let a = -omega * t;
+        v = vec3<f32>(v.x * cos(a) - v.z * sin(a), v.y, v.x * sin(a) + v.z * cos(a));
+    }
+    let c = f.f1.z;
+    let s = f.f1.w;
+    let semi = fogSemiAxes(f);
+    let dl = vec3<f32>((v.x * c + v.z * s) / semi.x, v.y / semi.y, (-v.x * s + v.z * c) / semi.z);
+    let cycles = length(dl) * max(f.f3.w, 0.05);
+    return vec2<f32>(1.0 - smoothstep(kFogBandFull, kFogBandZero, cycles),
+                     1.0 - smoothstep(kFogBandFull, kFogBandZero, cycles * 2.03));
 }
 
 // How far, in the primitive's normalised distance, a displacement of `amount` semi-axes can move
@@ -488,7 +545,7 @@ fn fogTintedColour(f: FogUniformsWgsl, base: vec3<f32>, relY: f32, cameraDistanc
 
 // The bank, analytic and complete. Zero outside, and compactly so, which is the property ADR-374
 // measured the march's cost against and ADR-562's ray interval depends on.
-fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
+fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32, step: vec3<f32>) -> f32 {
     if (f.f0.w <= 0.0) {
         return 0.0;
     }
@@ -510,7 +567,7 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
         if (reach0 > 1.35 + turbulence * fogTurbulenceReach(f) / min(swell, 1.0)) {
             return 0.0;
         }
-        q = p + fogTurbulence(f, p, t);
+        q = p + fogTurbulence(f, p, t, step);
     }
     return fogShapeFrom(f, q, fogSwellOffset(f, q - f.f0.xyz, swell), t);
 }

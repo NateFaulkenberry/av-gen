@@ -40,6 +40,10 @@ struct U3 {
 //                    by identity, animated by `t`
 [[nodiscard]] glm::vec4 valueNoiseGrad(const glm::vec3& p, std::uint32_t seed);
 [[nodiscard]] glm::vec3 flowCurl(const glm::vec3& p, float t, std::uint32_t seed);
+// ADR-718: `flowCurl` with each octave weighted (w0 the first, w1 the second), the twin of
+// `flowCurlBanded` in `shaders/noise.wgsl`. Divergence-free for any constant weights; at (1, 1) it
+// returns `flowCurl` itself, by a branch.
+[[nodiscard]] glm::vec3 flowCurlBanded(const glm::vec3& p, float t, std::uint32_t seed, float w0, float w1);
 
 // A smooth signed field in [-1, 1] for "which region of the world is this", used where a setting
 // means "how far this swings across the map". Raw fbm3 bunches around 0.5, so feeding it straight
