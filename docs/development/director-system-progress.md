@@ -278,6 +278,7 @@ undo, serialization or compilation will be built on them.
 - 2026-09-25: panel buttons verified in a running session (610828d4; `director-reject` /
   `director-accept` UI script arms, 32 checks, exit 8 on failure). Preview stills from a scratch
   copy (ADR-764), shown on each shot row.
+- **Full suites at 232d6b51:** CPU 3,332 cases, exit 0 (1 expected shouldfail); GPU 445, exit 0.
 - 2026-09-25: Director panel (4dcb8f1f, ADR-762): headless capture in
   `~/Desktop/av-gen-review/15-director-panel/`. Slice 4 proposal (ADR-763).
 - **Full suites at 3ca06731:** CPU 3,332 cases, exit 0 (1 expected shouldfail, 16 skips); GPU 444,
