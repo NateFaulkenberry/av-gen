@@ -101,6 +101,18 @@ is the state to resume from. It supersedes the status lines further down where t
   path with a computed clearance. Recommended: a place derived from the chosen instance, so the
   validator's `minimumApex` / `checkArc` check it the same way as Umbra.
 
+### Verification at the handoff head (df5e5b89)
+- **Full suites:** CPU 3,464 cases, exit 0 (1 expected shouldfail, 19 skips); GPU 492, exit 0
+  (1 skip).
+- **Director UI arms:** reject 14, accept 18, record 18, cancel 8 and modify 12 checks, all pass.
+- **`viewpoint` (ADR-890, main's arm): fails here, 3 of 3 runs, for an environmental reason.** The
+  persisted app settings (`settings.json`, rewritten 17:09) have the canvas in
+  `outputPreview` mode, so the canvas is a 960x540 preview. The arm's Option-drag then never moves
+  the editor viewpoint. The same arm passed at 15:58 on this branch's ADR-890 merge, with a
+  2068x1326 workspace canvas. None of the code since touches the viewport; it is the Director panel
+  and the Modify arm. The arm should set its canvas mode itself. That is the camera-fix owner's
+  call, and this handoff leaves it to them.
+
 ### How to resume
 1. The worktree is `../av-gen-director`, branch `agent/director`. Build `build/release`: reconfigure
    CMake after adding files. There are two test binaries, and GPU tests run under
