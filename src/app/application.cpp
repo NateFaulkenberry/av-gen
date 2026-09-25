@@ -973,7 +973,11 @@ int Application::runAiTask() {
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::duration<double>(ai_->settings().limits.maxSeconds + 30.0);
     std::size_t reported = 0;
-    while (!task->finished()) {
+    // A Director proposal waits for the person (ADR-757) and is not a terminal state: a batch run
+    // stops there and hands the proposal to the session -- the Director panel shows it, and
+    // `--capture-ui` photographs it -- rather than waiting out the deadline and cancelling it.
+    const auto waiting = [&] { return task->state() == ai::TaskState::AwaitingApproval; };
+    while (!task->finished() && !waiting()) {
         ai_->pump();
         const std::vector<ai::Activity> activities = task->activities();
         for (std::size_t i = reported; i < activities.size(); ++i) {
@@ -993,6 +997,10 @@ int Application::runAiTask() {
         std::this_thread::sleep_for(std::chrono::milliseconds{2});
     }
     ai_->pump();
+    if (waiting()) {
+        log::info("ai: a plan is proposed and waiting for approval; nothing has been changed");
+        return 0;
+    }
     const ai::TaskOutcome outcome = task->outcome();
     for (const std::string& target : outcome.changedTargets) {
         log::info("ai: changed {}", target);
@@ -1356,6 +1364,8 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->preview.panY = 0.0f;
         panel_->ai.plane = ai_.get();
         panel_->ai.edits = &edits_;
+        panel_->director.plane = ai_.get();
+        panel_->director.edits = &edits_;
         panel_->settings.plane = ai_.get();
         panel_->settings.settings = &settings_;
         panel_->settings.onAppearanceChanged = [this](app::AppearanceTheme theme) {
