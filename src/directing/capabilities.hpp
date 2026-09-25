@@ -27,7 +27,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "scene/clip_semantics.hpp"
+
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -50,22 +53,29 @@ struct ActivityCapability {
     std::string clip;         // the asset clip it maps to, for information
     bool available = false;   // the clip exists on the character's loaded rig
     float seconds = 0.0f;     // the clip's playable length, 0 when unavailable
-    // Whether the rig plays it as a loop. Reported as the engine has it -- today every state the
-    // rig builds loops (`SkinnedRig::addDefaultStates`), which is exactly why a one-shot stunt needs
-    // Slice 3's one-shot semantics before it can be authored.
+    // Whether the clip is a loop, as MEASURED (ADR-821: its end joins its start), not as the rig's
+    // default state happens to play it -- both of the scout's jump clips measure as loops, which is
+    // why a compiled stunt says `playback: once` rather than trusting this. Falls back to the rig
+    // state's flag when the rig has no semantics.
     bool loops = true;
+    // What the clip is, measured (ADR-821): flight, peak, touchdown, foot plants. Absent when the
+    // clip is unavailable or the rig has no skeleton to measure. A jump's clip cue is fitted to its
+    // arc from these (`seq::jumpClipCue`).
+    std::optional<scene::ClipSemantics> semantics;
 };
 
 // The body's jump envelope, for a planned (baked) jump. A scripted performance computes its own arc
 // with `Airborne`'s arithmetic from these numbers, so a character with no autonomous jump can still
 // be given one -- but only up to what the numbers allow, which is what the validator checks.
 struct JumpEnvelope {
-    float apex = 0.0f;        // metres above take-off
+    float apex = 0.0f;        // metres above take-off: the hop it does unprompted
+    float maxApex = 0.0f;     // the highest it CAN leap (ADR-822 `apexLimit()`): what a plan may ask
     float gravity = 0.0f;     // m/s^2
     float maxDistance = 0.0f; // metres
-    // "explore" when read from the entity's `explore` behaviour, "default" when the entity authors
-    // none and `entity::JumpSettings` defaults apply. Said out loud because the defaults are not a
-    // property anybody chose for this character.
+    float landSeconds = 0.0f; // the recovery after touchdown
+    // "jump" when the entity authors a `jump` block (ADR-822), "default" when it authors none and
+    // `entity::JumpSettings` defaults apply. Said out loud because the defaults are not a property
+    // anybody chose for this character.
     std::string source;
 };
 

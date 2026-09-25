@@ -16,6 +16,7 @@
 
 #include <glm/glm.hpp>
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -42,11 +43,26 @@ struct Staging {
     std::vector<world::EffectInstance> effects; // captured: every slider's base in the instance
 };
 
+// A character's authored mark: where the scene file put it (its node's BASE position), never where
+// its simulation has taken it. The only character position a plan may use (ADR-758): a performance's
+// stage mark is placed from this and from places, so it is the same whenever it is compiled.
+struct CharacterMark {
+    std::string id;   // the entity
+    std::string node; // the node it drives
+    glm::vec3 anchor{0.0f};
+};
+
 struct SceneFacts {
     CapabilityRegistry capabilities;
+    // The ground's height at a world x, z: the terrain's surface (water included, as the performer
+    // stands on it). Authored geometry, so a plan-time fact. Null when the scene has no terrain; a
+    // jump then cannot be checked or compiled, and says so. Holds a copy of the terrain query, so it
+    // is valid only while the composition it came from is.
+    std::function<float(float x, float z)> groundAt;
     SubjectIndex subjects;
     MusicalContext music;
     std::vector<Place> places;
+    std::vector<CharacterMark> characters;
     Staging staged;                   // copies of what exists now; a dry run compiles into these
     std::vector<Plan> plans;          // the project's plans, for revisions and provenance
     // Parameters the author has keys on (timeline tracks the sequence does not own). A baked cue
@@ -59,6 +75,7 @@ struct SceneFacts {
     [[nodiscard]] const std::vector<float>* base(std::string_view path) const;
 
     [[nodiscard]] const Place* place(std::string_view id) const;
+    [[nodiscard]] const CharacterMark* character(std::string_view id) const;
     [[nodiscard]] bool hasParameter(std::string_view path) const;
     [[nodiscard]] const Plan* plan(std::string_view id) const;
 };

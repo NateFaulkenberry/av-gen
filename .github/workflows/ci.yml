@@ -1,0 +1,259 @@
+# AV Gen CI: the authoritative full regression run. docs/development/ci.md explains every job.
+#
+#   push (any branch) ─▶ build (Release) ─┬─▶ cpu-tests  (avgen_tests, full default set, 3 shards)  GATES
+#                                         ├─▶ gpu-tests  (avgen_render_tests + headless smoke)    INFORMATIONAL,
+#                                         │              main / nightly / dispatch only: the hosted VM's
+#                                         │              paravirtual Metal device cannot compile the
+#                                         │              renderer's pipelines (docs/development/ci.md, GPU)
+#                                         └─▶ report     (the "# AV Gen CI" run summary)
+#
+# ASan/UBSan and TSan live in sanitizers.yml (too slow for every push; see the doc).
+name: CI
+
+on:
+  push:
+    # No path filter on purpose: docs/ is a test INPUT (test_repo_hygiene reads
+    # docs/decisions/README.md and docs/dependencies.md, test_help reads docs/help, and
+    # test_material_program parses docs/procedural-materials.md). Put [skip ci] in a commit message
+    # to skip a run you know is pointless.
+  pull_request:
+  schedule:
+    - cron: "43 6 * * *"   # nightly full run on main, including the informational GPU job
+  workflow_dispatch:
+    inputs:
+      gpu:
+        description: "Also run the informational GPU job (hosted GPU is not authoritative)"
+        type: boolean
+        default: true
+      test_filter:
+        description: "Catch2 tag filter for BOTH binaries, e.g. [ai] (empty = the full suite). Tags only: a name with a comma splits into two specs."
+        required: false
+        default: ""
+      rng_seed:
+        description: "Catch2 --rng-seed, to replay a run's order (empty = random; every run prints its seed)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  # One live run per branch (or PR). A new push cancels the stale run, except on main, where every
+  # commit's result is kept. A dispatched run is its own group: a targeted `test_filter` request
+  # must not cancel the branch's full push run, nor be cancelled by the next push.
+  group: ci-${{ github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id) || github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  # Pinned explicitly, not left to the image default, so a runner image update cannot silently
+  # change the compiler. When the image drops this Xcode the build step says so; bump it here and
+  # in the cache keys below together.
+  XCODE_VERSION: "26.6"
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  CCACHE_DIR: /Users/runner/ccache    # outside the checkout: test_repo_hygiene walks the tree
+  # No CCACHE_BASEDIR, deliberately. It makes ccache rewrite source paths to relative ones, so
+  # __FILE__ becomes `../../tests/...`, and test_shader_format.cpp locates shaders/examples from
+  # __FILE__: the case quietly turned into a SKIP (run 36069406479). The workspace path is the
+  # same on every hosted run, so absolute paths cost no cache hits.
+  CCACHE_COMPRESS: "1"
+  CCACHE_MAXSIZE: 2G
+  # Where catch2_run.py and build.sh write their results.
+  RESULTS: /Users/runner/ci-results   # absolute: upload-artifact rejects '..' in a path
+
+defaults:
+  run:
+    # bash, not the default `sh -e`: GitHub then adds -o pipefail, so a piped command cannot hide a
+    # failure (docs/testing.md entry 31).
+    shell: bash
+
+jobs:
+  build:
+    name: Build (Release)
+    # Same-repository PRs already ran on their branch push; the PR shows those checks. Only a fork's
+    # PR needs a pull_request run of its own. (Forks get read-only permissions and no secrets.)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain
+        run: |
+          if [ ! -d "$DEVELOPER_DIR" ]; then
+            echo "::error title=Pinned Xcode missing::$DEVELOPER_DIR is not on this runner image. Available: $(ls /Applications | grep Xcode | tr '\n' ' '). Update XCODE_VERSION/DEVELOPER_DIR in .github/workflows/*.yml."
+            exit 1
+          fi
+          brew install ccache >/dev/null
+          sw_vers; uname -m; xcodebuild -version; clang --version | head -1; cmake --version | head -1
+          echo "ninja $(ninja --version)"; ccache --version | head -1
+          echo "CLANG_VERSION=$(clang --version | head -1 | sed 's/[^0-9.]//g')" >> "$GITHUB_ENV"
+
+      # Dependency SOURCES (CPM). Keyed on everything that decides what CPM fetches, with NO
+      # restore-keys fallback: cmake/Dependencies.cmake says CPM's cache key covers a patch's path
+      # but not its content, so restoring an older cache after a patch change could build stale
+      # patched sources. A miss costs one download (a few minutes); a stale hit costs correctness.
+      - name: Restore dependency cache (CPM)
+        id: cpm
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cpm
+          key: cpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/CPM.cmake', 'cmake/patches/**') }}
+
+      # Compiler cache. ccache is content-addressed (compiler, flags, preprocessed input), so an
+      # older cache can only produce misses, never a stale object: restore-keys are safe here.
+      - name: Restore compiler cache (ccache)
+        id: ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-release-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-release-
+
+      - name: Configure and build
+        env:
+          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss (cold download)' }}
+        run: tools/ci/build.sh release "$RESULTS/build"
+
+      - name: Package test binaries
+        run: |
+          mkdir -p "$RESULTS/bin"
+          cp build/release/tests/avgen_tests build/release/tests/avgen_render_tests build/release/src/avgen "$RESULTS/bin/"
+          ls -la "$RESULTS/bin"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bin-release
+          path: ${{ env.RESULTS }}/bin
+          retention-days: 1
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: build-logs
+          path: ${{ env.RESULTS }}/build
+          retention-days: 7
+
+  cpu-tests:
+    name: CPU tests (avgen_tests, full)
+    needs: build
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bin-release
+          path: build/release/bin
+      - name: Run avgen_tests
+        env:
+          TEST_FILTER: ${{ inputs.test_filter }}
+          RNG_SEED: ${{ inputs.rng_seed }}
+        run: |
+          chmod +x build/release/bin/*
+          args=(--binary build/release/bin/avgen_tests --name cpu --label "CPU suite (avgen_tests)"
+                --out "$RESULTS/cpu" --shards 3 --timeout-min 100
+                --exceptions tools/ci/hosted-runner-exceptions.txt)
+          [ -n "$RNG_SEED" ] && args+=(--seed "$RNG_SEED")
+          [ -n "$TEST_FILTER" ] && args+=(--filter "$TEST_FILTER" --expected-label "FILTERED $TEST_FILTER: not the full suite")
+          python3 tools/ci/catch2_run.py run "${args[@]}"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: test-results-cpu
+          path: |
+            ${{ env.RESULTS }}/cpu/*.json
+            ${{ env.RESULTS }}/cpu/*.md
+            ${{ env.RESULTS }}/cpu/*.xml
+            ${{ env.RESULTS }}/cpu/*.log
+          retention-days: 14
+
+  gpu-tests:
+    name: GPU tests (informational)
+    needs: build
+    # Not on branch pushes: 363 of 443 cases fail on the hosted VM's GPU for reasons unrelated to
+    # the change under test, so it would add ~15 minutes of wall time to every run for no verdict.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.gpu)
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bin-release
+          path: build/release/bin
+      - name: Run avgen_render_tests
+        env:
+          TEST_FILTER: ${{ inputs.test_filter }}
+          RNG_SEED: ${{ inputs.rng_seed }}
+        run: |
+          chmod +x build/release/bin/*
+          args=(--binary build/release/bin/avgen_render_tests --name gpu --label "GPU suite (avgen_render_tests)"
+                --out "$RESULTS/gpu" --shards 1 --timeout-min 75 --report-only
+                --exceptions tools/ci/hosted-runner-exceptions.txt
+                --expected-label "INFORMATIONAL: hosted VM GPU (Apple Paravirtual device) is not authoritative")
+          [ -n "$RNG_SEED" ] && args+=(--seed "$RNG_SEED")
+          [ -n "$TEST_FILTER" ] && args+=(--filter "$TEST_FILTER" --expected-label "FILTERED $TEST_FILTER: not the full suite")
+          python3 tools/ci/catch2_run.py run "${args[@]}"
+      - name: Headless binary smoke test
+        if: always()
+        # The same command tests/CMakeLists.txt registers as gpu.the-binary-renders-a-frame-headless.
+        run: |
+          set +e
+          build/release/bin/avgen --headless --example Hyperspace --frames 1 --fps 30 --size 320x180 \
+              --capture "$RESULTS/gpu/headless-smoke.png" > "$RESULTS/gpu/headless-smoke.log" 2>&1
+          rc=$?
+          tail -30 "$RESULTS/gpu/headless-smoke.log"
+          if [ $rc -eq 0 ] && [ -s "$RESULTS/gpu/headless-smoke.png" ]; then
+            echo "### Headless smoke (avgen --headless, 1 frame): PASS" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Headless smoke (avgen --headless, 1 frame): FAIL (exit $rc), informational like the rest of this job" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Headless smoke failed (informational)::avgen --headless exited $rc; see headless-smoke.log in test-results-gpu"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: test-results-gpu
+          path: |
+            ${{ env.RESULTS }}/gpu/*.json
+            ${{ env.RESULTS }}/gpu/*.md
+            ${{ env.RESULTS }}/gpu/*.xml
+            ${{ env.RESULTS }}/gpu/*.log
+            ${{ env.RESULTS }}/gpu/*.png
+          retention-days: 14
+
+  report:
+    name: Report
+    needs: [build, cpu-tests, gpu-tests]
+    if: always() && needs.build.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/ci
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: test-results-*
+          path: results
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: build-logs
+          path: results
+      - name: Write the run summary
+        run: |
+          cat > jobs.json <<EOF
+          {"Build (Release)": "${{ needs.build.result }}",
+           "CPU tests (avgen_tests, full)": "${{ needs.cpu-tests.result }}",
+           "GPU tests (informational, not gating)": "${{ needs.gpu-tests.result == 'skipped' && 'not run: branch push (runs on main, nightly and dispatch; hosted GPU is not authoritative)' || needs.gpu-tests.result }}",
+           "ASan/UBSan": "not in this workflow: Sanitizers workflow (nightly on main, or gh workflow run sanitizers.yml)"}
+          EOF
+          python3 tools/ci/catch2_run.py report --results-dir results --job-results jobs.json

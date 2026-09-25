@@ -83,3 +83,7 @@ The replay passes a null signal bus, so audio-driven world events (`audio.beat`,
 the analysis track is a pure function of time, so the replay *could* rebuild the bus at each step.
 That is a larger change, to the replay's inputs and the checkpoint key, and it is a separate
 decision. The hidden case `[.known-defect][adr800]` in the test file records it.
+
+**Closed by ADR-870** (2026-09-25), which also found that cause 2 was only half the bus: the
+entities' own `reactions` are routes (ADR-088), and "modulation routes" above were ruled out with the
+project's routes removed, not the entities'. The case is no longer hidden.

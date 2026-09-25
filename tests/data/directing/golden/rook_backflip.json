@@ -122,7 +122,6 @@
     "errors": [
       "CAPABILITY_UNAVAILABLE",
       "SPATIAL_INFEASIBLE",
-      "UNSUPPORTED",
       "BLOCKED"
     ],
     "blocked": [

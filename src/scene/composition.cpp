@@ -3098,15 +3098,23 @@ struct DirectorCheckpoint final : entity::HostCheckpoint {
     std::vector<stage::VisualPlacement> placed;
     std::vector<std::uint8_t> valid;
     world::HistoryBank::Snapshot history; // ADR-703: empty when nothing subscribes to HIST
+    std::shared_ptr<const entity::HostCheckpoint> signals; // ADR-870: null when the replay has no bus
+    std::vector<params::ProcessorChain::State> reactions;  // ADR-870: the reaction routes' envelopes
     std::size_t measured = 0;
     [[nodiscard]] std::size_t bytes() const override { return measured; }
 };
 
 // ADR-703: the host half of a checkpoint for a scene with no director -- the transform history and
 // nothing else, since without a director the replay has no other host state.
+// ADR-870: and the replayed signal pipeline's state, when there is one.
 struct HistoryCheckpoint final : entity::HostCheckpoint {
     world::HistoryBank::Snapshot history;
-    [[nodiscard]] std::size_t bytes() const override { return history.bytes() + sizeof(HistoryCheckpoint); }
+    std::shared_ptr<const entity::HostCheckpoint> signals;
+    std::vector<params::ProcessorChain::State> reactions;
+    [[nodiscard]] std::size_t bytes() const override {
+        return history.bytes() + sizeof(HistoryCheckpoint) + (signals != nullptr ? signals->bytes() : 0) +
+               reactions.size() * sizeof(params::ProcessorChain::State);
+    }
 };
 
 // The checkpoint key with HIST's inputs folded in: which nodes are recorded, how deep, and the
@@ -3117,6 +3125,74 @@ std::uint64_t withHistoryKey(std::uint64_t key, const world::HistoryBank* bank) 
         return key; // exactly the key a scene with no HIST had
     }
     return key ^ (bank->key() + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2));
+}
+
+// ADR-870: an entity's `reactions` are modulation routes (ADR-088), and a play applies them to the
+// finals before the director and the bodies read them -- the saucer's height rides `audio.bass`,
+// and the aliens that watch it see it there. A replay with a bus applies them too; these are they.
+bool isReaction(const params::ModRoute& route) { return route.fromEntity; }
+
+// Their envelopes are history, so they ride in the checkpoint, in route order.
+std::vector<params::ProcessorChain::State> reactionStates(const params::Modulator& modulator) {
+    std::vector<params::ProcessorChain::State> out;
+    for (const params::ModRoute& route : modulator.routes()) {
+        if (isReaction(route)) {
+            out.push_back(route.state);
+        }
+    }
+    return out;
+}
+
+void restoreReactionStates(params::Modulator& modulator, const std::vector<params::ProcessorChain::State>& states) {
+    std::size_t i = 0;
+    for (params::ModRoute& route : modulator.routes()) {
+        if (isReaction(route) && i < states.size()) {
+            route.state = states[i++];
+        }
+    }
+}
+
+// The replayed signals' inputs and the reaction routes' definitions, folded in the same way. No
+// source leaves the key exactly as it was, so a scene with no audio keeps the checkpoints it had.
+std::uint64_t withSignalKey(std::uint64_t key, const entity::ReplaySignalSource* signals,
+                            const params::Modulator* reactions) {
+    if (signals == nullptr) {
+        return key;
+    }
+    std::uint64_t h = signals->inputKey();
+    const auto mix = [&h](std::uint64_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+    const auto bits = [](float f) {
+        std::uint32_t u = 0;
+        std::memcpy(&u, &f, sizeof u);
+        return static_cast<std::uint64_t>(u);
+    };
+    if (reactions != nullptr) {
+        mix(bits(reactions->masterGain));
+        for (const params::ModRoute& r : reactions->routes()) {
+            if (!isReaction(r)) {
+                continue;
+            }
+            mix(std::hash<std::string>{}(r.source));
+            mix(std::hash<std::string>{}(r.target));
+            mix(static_cast<std::uint64_t>(r.component + 1));
+            mix(bits(r.amount));
+            mix(static_cast<std::uint64_t>(r.op));
+            mix(static_cast<std::uint64_t>(r.polarity));
+            mix(r.enabled ? 1u : 0u);
+            mix(bits(r.spatialGain));
+            const params::ProcessorChain& c = r.chain;
+            for (const float f : {c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
+                                  c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
+                                  c.remapInMax, c.remapOutMin, c.remapOutMax}) {
+                mix(bits(f));
+            }
+            mix(static_cast<std::uint64_t>(c.curve));
+            mix(static_cast<std::uint64_t>(c.threshold));
+            mix(static_cast<std::uint64_t>(c.envelope));
+            mix((c.clampEnabled ? 1u : 0u) | (c.remapEnabled ? 2u : 0u));
+        }
+    }
+    return key ^ (h + 0x7f4a7c159e3779b9ull + (key << 6) + (key >> 2));
 }
 
 } // namespace
@@ -3159,9 +3235,25 @@ std::uint64_t Composition::replayInputKey() const {
 }
 
 void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
-                                   entity::SeekBudget budget, double step) {
+                                   entity::SeekBudget budget, double step,
+                                   entity::ReplaySignalSource* signals) {
     staging_.reset(&entityWorld_, &params);
     seekPlacementLive_ = false;
+    // ADR-870: the replay's bus. Reset to a play's frame-zero state here -- a replay from zero starts
+    // there, and a checkpoint restore overwrites it -- and rebuilt at the top of every step.
+    const signals::SignalBus* const bus = signals != nullptr ? &signals->bus() : nullptr;
+    if (signals != nullptr) {
+        signals->reset();
+    }
+    // ADR-870: the entity reaction routes, replayed on that bus. Their envelopes start where the
+    // host's seek left them -- `Engine::seekSeconds` resets the modulator's state first -- and end
+    // where the replay leaves them, which is where the next played frame continues from.
+    params::Modulator* const reactions = bus != nullptr ? modulator_ : nullptr;
+    const auto applyReactions = [&](double dt) {
+        if (reactions != nullptr) {
+            reactions->applyRoutesWhere(*bus, params, dt, &isReaction);
+        }
+    };
     // ADR-703: HIST is replayed with the simulation. Cleared first -- a replay from zero starts with
     // no history, and a restore overwrites it -- then recorded after every replayed step and carried
     // in every checkpoint. With nothing subscribed none of this runs and the hooks are unchanged.
@@ -3171,10 +3263,19 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     }
     if (stagingDesc_.empty()) {
         entity::EntityWorld::SeekHooks hooks;
-        hooks.inputKey = withHistoryKey(replayInputKey(), history);
-        if (!performers_.empty() || !directives_.empty()) {
+        hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
+        if (!performers_.empty() || !directives_.empty() || signals != nullptr) {
             // ADR-758/824: the director-less replay still has the direction a sequence brings.
-            hooks.before = [this](double now, double dt) {
+            // ADR-870: and the frame's bus, built first, as `Engine::update` builds it first, and
+            // the reactions on finals rebuilt from the bases, as its routes are. The order is a
+            // play frame's: bus, routes, then the direction `updateBehaviour` applies (performers,
+            // then scheduled orders), then the entity step.
+            hooks.before = [&, signals](double now, double dt) {
+                if (signals != nullptr) {
+                    signals->build(now, dt);
+                    params.resetFinals();
+                    applyReactions(dt);
+                }
                 applyPerformers(now, dt);
                 applyDirectives(now, dt);
             };
@@ -3190,16 +3291,35 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                 recordHistory(*history, now, history->automation());
                 params.resetFinals();
             };
+        }
+        if (history != nullptr || signals != nullptr) {
             hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
                 auto c = std::make_shared<HistoryCheckpoint>();
-                c->history = history->snapshot();
+                if (history != nullptr) {
+                    c->history = history->snapshot();
+                }
+                if (signals != nullptr) {
+                    c->signals = signals->capture();
+                }
+                if (reactions != nullptr) {
+                    c->reactions = reactionStates(*reactions);
+                }
                 return c;
             };
             hooks.restore = [&](const entity::HostCheckpoint& host) {
-                history->restore(static_cast<const HistoryCheckpoint&>(host).history);
+                const auto& c = static_cast<const HistoryCheckpoint&>(host);
+                if (history != nullptr) {
+                    history->restore(c.history);
+                }
+                if (signals != nullptr && c.signals != nullptr) {
+                    signals->restore(*c.signals);
+                }
+                if (reactions != nullptr) {
+                    restoreReactionStates(*reactions, c.reactions);
+                }
             };
         }
-        entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
+        entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
         return;
     }
     ReplayPlacement placement(*this);
@@ -3207,17 +3327,22 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     placement.invalidate(); // the play's first frame has no flattening to ask
     entity::EntityWorld::SeekHooks hooks;
     hooks.before = [&](double now, double dt) {
-        // A play frame's top: finals rebuilt from bases, then the director (ADR-209), then the
-        // entities. Routes and reactions are not replayed -- a scrub has no signal history, the
-        // limit every seek in this engine already has.
+        // A play frame's top: the frame's signals (ADR-870, when the host's pipeline is
+        // deterministic), finals rebuilt from bases, then the director (ADR-209), then the
+        // entities. Modulation routes are still not replayed: the finals stay unmodulated, and the
+        // director and the bodies read the bus directly.
+        if (signals != nullptr) {
+            signals->build(now, dt);
+        }
         params.resetFinals();
+        applyReactions(dt); // ADR-870: the entity reactions, where a play's routes land
         stage::StageContext ctx;
         ctx.time = now;
         ctx.dt = dt;
         ctx.world = &entityWorld_;
         ctx.params = &params;
         ctx.visuals = &placement;
-        ctx.bus = nullptr;
+        ctx.bus = bus;
         staging_.update(ctx);
         raiseDirectorBeats(now);
         applyPerformers(now, dt); // ADR-758: the same point of the step a play applies them at
@@ -3242,6 +3367,12 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         if (history != nullptr) {
             c->history = history->snapshot();
         }
+        if (signals != nullptr) {
+            c->signals = signals->capture();
+        }
+        if (reactions != nullptr) {
+            c->reactions = reactionStates(*reactions);
+        }
         c->measured = static_cast<std::size_t>(core::allocCounters().bytes - before) + sizeof(DirectorCheckpoint);
         return c;
     };
@@ -3252,9 +3383,15 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         if (history != nullptr) {
             history->restore(c.history);
         }
+        if (signals != nullptr && c.signals != nullptr) {
+            signals->restore(*c.signals);
+        }
+        if (reactions != nullptr) {
+            restoreReactionStates(*reactions, c.reactions);
+        }
     };
-    hooks.inputKey = withHistoryKey(replayInputKey(), history);
-    entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
+    hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
+    entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
     seekPlaced_ = placement.placed();
     seekPlacedValid_ = placement.valid();
     seekPlacementLive_ = true;
@@ -5048,10 +5185,11 @@ void Composition::unregisterParameters() {
         // Exactly what `attach` recorded registering. This was a list of twenty-seven path
         // strings, kept by hand beside a registrar that adds them one at a time, and it had fallen
         // sixty-four behind -- see `registeredPaths_`.
-        for (const std::string& path : registeredPaths_) {
-            params_->remove(path);
-        }
-        registeredPaths_.clear();
+        // The unregisters that read through cached parameter pointers go FIRST. The sweep of
+        // `registeredPaths_` below frees every parameter `attach` made -- particle, material-part
+        // and light parameters among them -- and a node's unregister afterwards read `p->path()`
+        // through a pointer to one it had just freed: the heap-use-after-free ASan found on CI in
+        // `removeNode` of a nested scene (test_composition.cpp's nested-removal sweep).
         if (!lightRigParams_.all.empty()) {
             unregisterLightRigParameters(*params_, lightRigParams_);
             lightRigParams_ = {};
@@ -5064,6 +5202,14 @@ void Composition::unregisterParameters() {
         for (auto& node : nodes_) {
             unregisterNodeParameters(*node);
         }
+        // Then exactly what `attach` recorded registering, which catches whatever the hand-kept
+        // lists above still miss. This was a list of twenty-seven path strings, kept by hand
+        // beside a registrar that adds them one at a time, and it had fallen sixty-four behind --
+        // see `registeredPaths_`. Removing a path already gone is a no-op.
+        for (const std::string& path : registeredPaths_) {
+            params_->remove(path);
+        }
+        registeredPaths_.clear();
     }
     detach();
 }
@@ -6942,6 +7088,14 @@ void Composition::registerCameraChannels(params::ParameterSet& params, float rea
         ch.lookAhead = &params.add(floatDesc(p + "lookAhead", rig.lookAhead, -100.0f, 100.0f, 0.0f, 10.0f));
         ch.splineOffset =
             &params.add(vec3Desc(p + "splineOffset", rig.splineOffset, -1e3f, 1e3f, -5.0f, 5.0f));
+        // ADR-760: what makes "chase low, rise over him, pass ahead" one editable camera -- a follow
+        // rig whose offset is keyed over the shot -- rather than forty-eight opaque camera keys.
+        if (!rig.followNode.empty()) {
+            ch.followOffset = &params.add(vec3Desc(p + "followOffset", rig.followOffset, -1e3f, 1e3f, -20.0f, 20.0f));
+        }
+        if (!rig.aimNode.empty()) {
+            ch.aimOffset = &params.add(vec3Desc(p + "aimOffset", rig.aimOffset, -1e3f, 1e3f, -10.0f, 10.0f));
+        }
         cameraChannels_.push_back(ch);
     }
 }
@@ -7042,8 +7196,9 @@ CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const Camer
             }
             // World axes by default, which is every rig that existed before this; the subject's own
             // frame when asked, which is what makes "behind" mean behind.
-            const glm::vec3 offset =
-                rig.followLocal ? at.rotation * rig.followOffset : rig.followOffset;
+            const glm::vec3 authored =
+                channels != nullptr && channels->followOffset != nullptr ? channels->followOffset->value() : rig.followOffset;
+            const glm::vec3 offset = rig.followLocal ? at.rotation * authored : authored;
             pose.position = at.position + offset;
 
             // The whole of camera collision: keep the eye above the surface. Applied after the
@@ -7067,7 +7222,8 @@ CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const Camer
     }
     if (!rig.aimNode.empty()) {
         if (const CompositionNode* node = findNode(rig.aimNode); node != nullptr) {
-            pose.target = nodeWorldTransform(*node).position + rig.aimOffset;
+            pose.target = nodeWorldTransform(*node).position +
+                          (channels != nullptr && channels->aimOffset != nullptr ? channels->aimOffset->value() : rig.aimOffset);
         }
     }
     ensureDistinctAim(pose);

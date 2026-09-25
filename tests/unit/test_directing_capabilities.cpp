@@ -75,15 +75,22 @@ TEST_CASE("Rook's card is what his entity and his loaded rig say, and has no bac
     CHECK(run->clip == "Running");
     CHECK_THAT(run->seconds, WithinAbs(0.70, 0.005));
     CHECK(run->kind == directing::ActivityKind::Ground);
-    // Reported as the engine has it: every state the rig builds loops today (Slice 3's problem).
+    // Measured (ADR-821, ADR-761): the scout's jump clip loops -- its end joins its start -- which is
+    // why a compiled jump plays it `once` rather than trusting this flag.
     CHECK(rook->activity("jump")->loops);
 
-    // The clips nothing maps: present on the rig, unreachable by name. `Jump_running` used to be the
-    // one a running jump would want and could not reach; ADR-822 (the motion stack's M4) mapped it as
-    // the activity `jumpRunning` in the Glowmere scenes, so it is reachable by name now.
+    // `Jump_running` was the clip nothing mapped until ADR-822 mapped it as `jumpRunning` on all five
+    // aliens. The card follows the scene file: mapped, available, and so not in `unmappedClips`.
+    const directing::ActivityCapability* jumpRunning = rook->activity("jumpRunning");
+    REQUIRE(jumpRunning != nullptr);
+    CHECK(jumpRunning->clip == "Jump_running");
+    CHECK(jumpRunning->available);
+    // Custom, not Airborne: `jumpRunning` is a clip-map name, not an `entity::Activity`, and the kind
+    // is the engine's classification, not a guess from the name. So the airborne set checked above
+    // -- what the backflip refusal offers instead ("Available airborne actions: fall, jump, land")
+    // -- is unchanged, which is the intent: a plan says "jump", and the compiler picks the clip.
+    CHECK(jumpRunning->kind == directing::ActivityKind::Custom);
     CHECK_FALSE(contains(rook->unmappedClips, "Jump_running"));
-    REQUIRE(rook->activity("jumpRunning") != nullptr);
-    CHECK(rook->activity("jumpRunning")->clip == "Jump_running");
     CHECK_FALSE(contains(rook->unmappedClips, "Running"));
 
     // His jump envelope is the engine's default, and says so: Rook has no `explore` behaviour.

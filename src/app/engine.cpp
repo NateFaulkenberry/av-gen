@@ -45,6 +45,185 @@
 
 namespace avgen::app {
 
+namespace {
+
+// ADR-870: the deterministic signals, declared first on every bus that carries them and always in
+// this order, so the engine's bus and a seek replay's bus give each the same id -- which is what
+// lets the replay's `MusicRuntime` (it holds its ids) and its values be handed back to the engine.
+void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, Engine::TimeSignals& time,
+                         MusicRuntime& music) {
+    audio = signals::AudioSignals::declare(bus);
+    time.seconds = bus.declare("time.seconds", 0.0f, 3600.0f);
+    time.progress = bus.declare("time.progress");
+    time.playing = bus.declare("time.playing");
+    time.beatPhase = bus.declare("beat.phase");
+    time.beatPulse = bus.declare("beat.pulse", 0.0f, 1.0f, true);
+    time.beatCount = bus.declare("beat.count", 0.0f, 100000.0f);
+    time.bpm = bus.declare("beat.bpm", 0.0f, 300.0f);
+    time.barPhase = bus.declare("beat.bar");
+    time.phrasePhase = bus.declare("beat.phrase");
+    time.phraseCount = bus.declare("beat.phraseCount", 0.0f, 100000.0f);
+    time.phrasePulse = bus.declare("beat.phrasePulse", 0.0f, 1.0f, true);
+    time.sectionPhase = bus.declare("beat.section");
+    time.sectionCount = bus.declare("beat.sectionCount", 0.0f, 100000.0f);
+    music.declare(bus); // music.beat ... music.impact (ADR-073)
+}
+
+} // namespace
+
+// ---- ADR-870: the signal bus a seek replays -------------------------------------------------
+//
+// A play builds its bus once per frame in `Engine::update`: the offline analysis frames up to the
+// frame's instant, the beat clock, the music classifier. Offline, with an analysed track, all of it
+// is a pure function of the frame sequence, so a replay stepping the same instants on its own copy
+// of the pipeline sees the bus the play saw. This is that copy: its own `SignalClock` and its own
+// bus, driven by the engine's own `consumeAnalysis` and `advanceClock`.
+//
+// Not replayed, and not on this bus: control sources and OSC/MIDI (`sources_`, `controlHub_`), the
+// scene states (`state.*`) and the entity-derived signals -- the first two are not functions of
+// time, the last is the entity world's own output. The replay's bodies read them as absent, as
+// every replay before this read everything.
+class Engine::ReplaySignals final : public entity::ReplaySignalSource {
+public:
+    explicit ReplaySignals(const Engine& engine) : engine_(engine) {
+        signals::AudioSignals audio;
+        Engine::TimeSignals time;
+        declareFrameSignals(zeroBus_, audio, time, zero_.music);
+        bus_ = zeroBus_;
+    }
+
+    // What this seek's frames read that the pipeline does not carry, fixed for the seek.
+    void begin(bool playing, double duration) {
+        playing_ = playing;
+        duration_ = duration;
+    }
+
+    [[nodiscard]] const signals::SignalBus& bus() const override { return bus_; }
+
+    void reset() override {
+        state_ = zero_;
+        bus_ = zeroBus_;
+        started_ = false;
+        exact_ = true;
+        lastBuilt_ = -1.0;
+    }
+
+    void build(double now, double dt) override {
+        if (!started_) {
+            // A replay that did not begin at zero (the window, `SeekMode::Window`) consumed the
+            // whole track in its first frame: not the pipeline a play had.
+            started_ = true;
+            exact_ = now == 0.0;
+        }
+        bus_.clearEvents(); // the end of the previous frame, where `Engine::update` clears them
+        const FrameTime time{now, dt, 0};
+        const bool fresh = engine_.consumeAnalysis(state_, bus_, now);
+        ClockInputs in;
+        in.bpm = engine_.resolvedTempo(state_, false).second;
+        in.position = now; // the offline transport sits at the frame's instant
+        in.duration = duration_;
+        in.playing = playing_;
+        engine_.advanceClock(state_, bus_, time, fresh, in);
+        lastBuilt_ = now;
+    }
+
+    struct Checkpoint final : entity::HostCheckpoint {
+        SignalClock clock;
+        std::vector<float> values; // the bus: continuous values persist between analysis frames
+        std::size_t measured = 0;
+        [[nodiscard]] std::size_t bytes() const override { return measured; }
+    };
+
+    [[nodiscard]] std::shared_ptr<const entity::HostCheckpoint> capture() const override {
+        auto c = std::make_shared<Checkpoint>();
+        c->clock = state_;
+        c->values.resize(bus_.size());
+        for (std::size_t i = 0; i < bus_.size(); ++i) {
+            c->values[i] = bus_.value(static_cast<signals::SignalId>(i));
+        }
+        c->measured = sizeof(Checkpoint) + c->values.size() * sizeof(float) +
+                      (c->clock.latest.magnitude.size() + c->clock.latest.spectrum.size()) * sizeof(float);
+        return c;
+    }
+
+    void restore(const entity::HostCheckpoint& checkpoint) override {
+        const auto& c = static_cast<const Checkpoint&>(checkpoint);
+        state_ = c.clock;
+        for (std::size_t i = 0; i < c.values.size() && i < bus_.size(); ++i) {
+            bus_.set(static_cast<signals::SignalId>(i), c.values[i]);
+        }
+        started_ = true;
+        exact_ = true; // only an exact replay records checkpoints
+    }
+
+    [[nodiscard]] std::uint64_t inputKey() const override { return engine_.replaySignalKey(playing_); }
+
+    // Whether the pipeline now stands where a play from zero stands after its frame at `target`.
+    [[nodiscard]] bool exactAt(double target) const {
+        return started_ && exact_ && std::abs(lastBuilt_ - target) <= 1e-9;
+    }
+
+    // Without an entity replay to ride on (no composition, or a replay that was not exact): the
+    // pipeline alone, on the grid `EntityWorld::seekExact` steps -- k / 60, dt = 0 at zero, and one
+    // short step to a target between two instants.
+    void runTo(double target) {
+        reset();
+        constexpr double kRate = 60.0;
+        const double exactSteps = std::max(target, 0.0) * kRate;
+        auto last = static_cast<std::uint64_t>(std::llround(exactSteps));
+        const bool onGrid = std::abs(exactSteps - static_cast<double>(last)) <= 1e-6;
+        if (!onGrid) {
+            last = static_cast<std::uint64_t>(std::floor(exactSteps));
+        }
+        for (std::uint64_t k = 0; k <= last; ++k) {
+            build(static_cast<double>(k) / kRate, k == 0 ? 0.0 : 1.0 / kRate);
+        }
+        if (!onGrid) {
+            build(target, target - static_cast<double>(last) / kRate);
+        }
+        lastBuilt_ = target;
+    }
+
+    [[nodiscard]] const SignalClock& state() const { return state_; }
+
+private:
+    const Engine& engine_;
+    SignalClock zero_;
+    signals::SignalBus zeroBus_;
+    SignalClock state_;
+    signals::SignalBus bus_;
+    bool playing_ = false;
+    double duration_ = 0.0;
+    bool started_ = false;
+    bool exact_ = true;
+    double lastBuilt_ = -1.0;
+};
+
+bool Engine::seekReplaysSignals() const {
+    return mode_ == EngineMode::Offline && track_ && !track_->empty();
+}
+
+std::uint64_t Engine::replaySignalKey(bool playing) const {
+    std::uint64_t h = 0x51a7c0ffee5eedull;
+    const auto mix = [&h](std::uint64_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+    const auto bits = [](double d) {
+        std::uint64_t u = 0;
+        std::memcpy(&u, &d, sizeof u);
+        return u;
+    };
+    mix(audioRevision_); // bumped by every install of audio, which is every new track
+    mix(track_ ? track_->frames().size() : 0u);
+    mix(tempoOverride_.available ? 1u : 0u);
+    mix(bits(tempoOverride_.available ? tempoOverride_.bpm : 0.0));
+    mix(embeddedTempo_.available ? 1u : 0u);
+    mix(bits(embeddedTempo_.available ? embeddedTempo_.bpm : 0.0));
+    mix(bits(durationSeconds()));
+    mix(static_cast<std::uint64_t>(phraseBars_));
+    mix(static_cast<std::uint64_t>(sectionPhrases_));
+    mix(playing ? 1u : 0u);
+    return h;
+}
+
 const char* tempoSourceName(TempoSource source) {
     return source == TempoSource::MidiClock ? "midi" : "analysis";
 }
@@ -67,21 +246,8 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
     organism::registerMushroomGenerator();
     scene::registerTreeGenerator();
     ensureControlSource();
-    audioSignals_ = signals::AudioSignals::declare(bus_);
-    timeSignals_.seconds = bus_.declare("time.seconds", 0.0f, 3600.0f);
-    timeSignals_.progress = bus_.declare("time.progress");
-    timeSignals_.playing = bus_.declare("time.playing");
-    timeSignals_.beatPhase = bus_.declare("beat.phase");
-    timeSignals_.beatPulse = bus_.declare("beat.pulse", 0.0f, 1.0f, true);
-    timeSignals_.beatCount = bus_.declare("beat.count", 0.0f, 100000.0f);
-    timeSignals_.bpm = bus_.declare("beat.bpm", 0.0f, 300.0f);
-    timeSignals_.barPhase = bus_.declare("beat.bar");
-    timeSignals_.phrasePhase = bus_.declare("beat.phrase");
-    timeSignals_.phraseCount = bus_.declare("beat.phraseCount", 0.0f, 100000.0f);
-    timeSignals_.phrasePulse = bus_.declare("beat.phrasePulse", 0.0f, 1.0f, true);
-    timeSignals_.sectionPhase = bus_.declare("beat.section");
-    timeSignals_.sectionCount = bus_.declare("beat.sectionCount", 0.0f, 100000.0f);
-    music_.declare(bus_); // music.beat ... music.impact (ADR-073)
+    // First on the bus, and in the one order a seek replay's bus also uses (ADR-870).
+    declareFrameSignals(bus_, audioSignals_, timeSignals_, clock_.music);
     stateProgressSignal_ = bus_.declare("state.progress");
     stateIndexSignal_ = bus_.declare("state.index", 0.0f, 64.0f);
     sources_.attach(bus_, params_);
@@ -118,8 +284,8 @@ void Engine::setTempoSource(TempoSource source) {
     }
     tempoSource_ = source;
     // Re-sync the extrapolated beat clock from whichever source is now in charge.
-    beatClockPhase_ = 0.0;
-    lastAnalysisBeatCount_ = 0;
+    clock_.beatPhase = 0.0;
+    clock_.lastAnalysisBeatCount = 0;
     log::info("tempo source: {}", tempoSourceName(source));
 }
 
@@ -3221,8 +3387,8 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
         // outranking the analyzer for whatever was loaded next. The override is NOT cleared here:
         // that belongs to the project, not to the audio.
         embeddedTempo_ = {};
-        offlineFrameCursor_ = 0;
-        hasFrame_ = false;
+        clock_.analysisCursor = 0;
+        clock_.hasFrame = false;
         ++audioRevision_;
         refreshTransport();
         return {};
@@ -3271,13 +3437,13 @@ Result<void> Engine::installAudio(std::shared_ptr<const audio::AudioFile> file) 
     }
     track_ = std::make_shared<analysis::AnalysisTrack>(
         analysis::AnalysisTrack::analyze(*file, analyzerConfig_, beatConfig));
-    offlineFrameCursor_ = 0;
+    clock_.analysisCursor = 0;
     log::info("analyzed {:.2f} s of audio: {} frames", file->durationSeconds(), track_->frames().size());
     audioFile_ = std::move(file);
     ++audioRevision_;
     modulator_.resetState();
-    music_.reset();
-    hasFrame_ = false;
+    clock_.music.reset();
+    clock_.hasFrame = false;
     // The piece just got a length, or a different one. Refreshed here rather than left to the next
     // frame so that everything which asks the engine how long the project is between loading and
     // rendering -- the AI tools, a script, a render job built before the first tick -- gets the
@@ -3412,20 +3578,34 @@ void Engine::seekSeconds(double seconds) {
     if (player_) {
         player_->seekSeconds(target);
     }
-    if (track_) {
+    // ADR-870: offline, with an analysed track, the signal pipeline is replayed to the target with
+    // the entities and the live one continues from the replay's state -- the state a play from zero
+    // has there. Otherwise (live, or no audio) it is reset, as it always was.
+    const bool replaySignals = seekReplaysSignals();
+    if (track_ && !replaySignals) {
         // The offline analysis cursor walks forward through the frames, so a backwards seek has to
         // rewind it or every frame between here and where it had got to is skipped. Rewound rather
         // than reset to zero: a forward seek keeps its place.
-        offlineFrameCursor_ = 0;
+        clock_.analysisCursor = 0;
     }
     seconds = target;
     modulator_.resetState();
     sources_.reset();
-    // A seek discontinuity in the energy history reads as a drop; the detector must not carry
-    // the old piece across it.
-    music_.reset();
-    beatClockPhase_ = 0.0;
-    lastAnalysisBeatCount_ = 0;
+    if (!replaySignals) {
+        // A seek discontinuity in the energy history reads as a drop; the detector must not carry
+        // the old piece across it.
+        clock_.music.reset();
+        clock_.beatPhase = 0.0;
+        clock_.lastAnalysisBeatCount = 0;
+    }
+    ReplaySignals* signalReplay = nullptr;
+    if (replaySignals) {
+        if (!replaySignals_) {
+            replaySignals_ = std::make_unique<ReplaySignals>(*this);
+        }
+        replaySignals_->begin(isPlaying(), durationSeconds());
+        signalReplay = replaySignals_.get();
+    }
     cueState_ = {};   // cues re-sync from the new position on the next frame
     cueApplied_ = false;
     // ADR-398. `PostSettings::exposureReset` has documented itself as "(scene change, timeline
@@ -3487,7 +3667,7 @@ void Engine::seekSeconds(double seconds) {
                                           entity::SeekBudget{.maxSeconds = 90.0,
                                                              .maxBodySteps = seekBodyStepBudget_,
                                                              .mode = seekMode},
-                                          1.0 / 60.0);
+                                          1.0 / 60.0, signalReplay);
         }
         // Skinning has its own "a frame ago", and a seek makes that sentence false: the joints were
         // not anywhere a frame ago. Left alone, the first frame after every scrub carries joint
@@ -3497,6 +3677,26 @@ void Engine::seekSeconds(double seconds) {
         for (scene::SkinnedRig& rig : composition->scene().rigs) {
             rig.reseedAfterDiscontinuity();
         }
+    }
+    // ADR-870: the live pipeline continues from where a play from zero stands after its frame at
+    // the target -- the replay's state when that replay was exact, the pipeline run alone when it
+    // was not (no composition, or the window). The bus's continuous values come with it; its
+    // events do not, since a play clears them at the end of every frame.
+    if (signalReplay != nullptr) {
+        if (!signalReplay->exactAt(seconds)) {
+            signalReplay->runTo(seconds);
+        }
+        clock_ = signalReplay->state();
+        const signals::SignalBus& replayed = signalReplay->bus();
+        for (std::size_t i = 0; i < replayed.size() && i < bus_.size(); ++i) {
+            const auto id = static_cast<signals::SignalId>(i);
+            if (replayed.info(id).isEvent) {
+                bus_.setEvent(id, false);
+            } else {
+                bus_.set(id, replayed.value(id));
+            }
+        }
+        stats_.analysisFrames = clock_.analysisCursor;
     }
     // A live event belongs to the moment it happened and the moment is gone; the scheduled tier is
     // rebased rather than cleared, so the next frame restores the standing intents at the new
@@ -3578,6 +3778,10 @@ double Engine::audioDurationSeconds() const { return audioFile_ ? audioFile_->du
 double Engine::durationSeconds() const { return transport_.durationSeconds(); }
 
 std::pair<audio::TempoProvenance, double> Engine::resolvedTempo() const {
+    return resolvedTempo(clock_, midiClockActive_);
+}
+
+std::pair<audio::TempoProvenance, double> Engine::resolvedTempo(const SignalClock& clock, bool midiActive) const {
     // The precedence chain, and the only copy of it. Highest first; each arm returns immediately,
     // so a lower source can never overwrite a higher one. That is the whole point -- an import
     // must not silently replace a tempo the artist typed, and making it structural beats making it
@@ -3585,7 +3789,7 @@ std::pair<audio::TempoProvenance, double> Engine::resolvedTempo() const {
     if (tempoOverride_.available) {
         return {audio::TempoProvenance::UserOverride, tempoOverride_.bpm};
     }
-    if (midiClockActive_) {
+    if (midiActive) {
         if (const double bpm = controlHub_.midiClock().bpm(); bpm > 0.0) {
             return {audio::TempoProvenance::ExternalClock, bpm};
         }
@@ -3593,8 +3797,8 @@ std::pair<audio::TempoProvenance, double> Engine::resolvedTempo() const {
     if (embeddedTempo_.available) {
         return {audio::TempoProvenance::EmbeddedMetadata, embeddedTempo_.bpm};
     }
-    if (hasFrame_ && latest_.tempoBpm > 0.0f) {
-        return {audio::TempoProvenance::Detected, static_cast<double>(latest_.tempoBpm)};
+    if (clock.hasFrame && clock.latest.tempoBpm > 0.0f) {
+        return {audio::TempoProvenance::Detected, static_cast<double>(clock.latest.tempoBpm)};
     }
     return {audio::TempoProvenance::None, 0.0};
 }
@@ -3615,7 +3819,7 @@ audio::AudioTempo Engine::tempo() const {
         return audio::AudioTempo{.available = true,
                                  .bpm = bpm,
                                  .source = source,
-                                 .confidence = static_cast<double>(latest_.tempoConfidence)};
+                                 .confidence = static_cast<double>(clock_.latest.tempoConfidence)};
     case audio::TempoProvenance::None:
         break;
     }
@@ -3828,11 +4032,11 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     input_ = std::move(input);
     audioFile_.reset();
     audioPath_.clear();
-    music_.reset();
-    hasFrame_ = false;
-    beatClockPhase_ = 0.0;
-    beatClockCount_ = 0;
-    lastAnalysisBeatCount_ = 0;
+    clock_.music.reset();
+    clock_.hasFrame = false;
+    clock_.beatPhase = 0.0;
+    clock_.beatCount = 0;
+    clock_.lastAnalysisBeatCount = 0;
     log::info("live audio input '{}' at {} Hz", input_->deviceName(), input_->sampleRate());
     return {};
 }
@@ -3843,8 +4047,8 @@ void Engine::stopAudioInput() {
     }
     runner_.reset();
     input_.reset();
-    music_.reset();
-    hasFrame_ = false;
+    clock_.music.reset();
+    clock_.hasFrame = false;
     audioSignals_.publishSilence(bus_);
 }
 
@@ -3885,79 +4089,145 @@ FrameTime Engine::tick(FrameClock& clock) {
     return time;
 }
 
-void Engine::publishFrame(const analysis::AnalysisFrame& frame) {
-    latest_ = frame;
-    hasFrame_ = true;
-    audioSignals_.publish(bus_, frame);
+void Engine::publishFrame(SignalClock& clock, signals::SignalBus& bus, const analysis::AnalysisFrame& frame) const {
+    clock.latest = frame;
+    clock.hasFrame = true;
+    audioSignals_.publish(bus, frame);
     // Live, this is every analysis frame the render thread sees. Offline it is the last of the
     // batch update() already walked, which consume() recognises by frame index and ignores.
-    music_.consume(frame, phraseBars_, sectionPhrases_);
+    clock.music.consume(frame, phraseBars_, sectionPhrases_);
+}
+
+bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double renderTime) const {
+    if (!track_ || track_->empty()) {
+        audioSignals_.publishSilence(bus);
+        return false;
+    }
+    // Consume every analysis frame whose centre lies at or before renderTime so onsets that
+    // fall between two render frames are not lost at low frame rates.
+    const auto& frames = track_->frames();
+    bool onset = false;
+    float onsetStrength = 0.0f;
+    std::size_t cursor = clock.analysisCursor;
+    while (cursor < frames.size() && frames[cursor].timeSeconds <= renderTime) {
+        if (frames[cursor].onset) {
+            onset = true;
+            onsetStrength = std::max(onsetStrength, frames[cursor].onsetStrength);
+        }
+        // The classifier is fed here rather than from publishFrame() below, which only ever
+        // sees the last frame of the batch: at 30 fps that is one analysis frame in three, and
+        // a detector that samples the music at the frame rate is a detector whose answers
+        // depend on the frame rate (ADR-073).
+        clock.music.consume(frames[cursor], phraseBars_, sectionPhrases_);
+        ++cursor;
+    }
+    if (cursor > clock.analysisCursor) {
+        // Assigned rather than copied into a temporary, so a replay's thousands of frames reuse the
+        // spectrum's capacity instead of allocating it each time (ADR-870).
+        clock.latest = frames[cursor - 1];
+        clock.latest.onset = onset;
+        if (onset) {
+            clock.latest.onsetStrength = onsetStrength;
+        }
+        clock.hasFrame = true;
+        audioSignals_.publish(bus, clock.latest);
+        clock.music.consume(clock.latest, phraseBars_, sectionPhrases_); // a repeat: ignored by index
+        clock.analysisCursor = cursor;
+        return true;
+    }
+    if (clock.hasFrame) {
+        // No new analysis this render frame: keep continuous values, drop the event pulse.
+        bus.setEvent(audioSignals_.onset, false);
+    } else {
+        audioSignals_.publishSilence(bus);
+    }
+    return false;
+}
+
+bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const FrameTime& time,
+                          bool newAnalysisFrame, const ClockInputs& in) const {
+    double bpm = in.bpm;
+    bool pulse = false;
+    if (in.midi) {
+        // The MIDI clock owns the beat clock: phase and count come straight from the tracker
+        // (already extrapolated to this frame by the hub).
+        clock.beatPhase = in.midiPhase;
+        clock.beatCount = in.midiCount;
+        pulse = in.midiPulse;
+    } else if (bpm > 0.0) {
+        // Advance the per-frame beat clock; re-sync to the analyzer whenever it reports a beat.
+        clock.beatPhase += time.deltaTime * bpm / 60.0;
+        if (newAnalysisFrame && clock.latest.beatCount != clock.lastAnalysisBeatCount) {
+            clock.beatPhase = static_cast<double>(clock.latest.beatPhase);
+            clock.beatCount = clock.latest.beatCount;
+            clock.lastAnalysisBeatCount = clock.latest.beatCount;
+            pulse = true;
+        } else if (clock.beatPhase >= 1.0) {
+            clock.beatPhase -= 1.0;
+            ++clock.beatCount;
+            pulse = true;
+        }
+    } else {
+        clock.beatPhase = 0.0;
+    }
+    const double duration = in.duration;
+    bus.set(timeSignals_.seconds, static_cast<float>(time.renderTime));
+    bus.set(timeSignals_.progress, duration > 0.0 ? static_cast<float>(std::clamp(in.position / duration, 0.0, 1.0)) : 0.0f);
+    bus.set(timeSignals_.playing, in.playing ? 1.0f : 0.0f);
+    bus.set(timeSignals_.beatPhase, static_cast<float>(clock.beatPhase));
+    bus.setEvent(timeSignals_.beatPulse, pulse, 1.0f);
+    bus.set(timeSignals_.beatCount, static_cast<float>(clock.beatCount));
+    bus.set(timeSignals_.bpm, static_cast<float>(bpm));
+    bus.set(timeSignals_.barPhase, static_cast<float>((clock.beatCount % 4 + clock.beatPhase) / 4.0));
+    {
+        // Phrases and sections from the beat clock: continuous phases plus an event at each phrase
+        // boundary, so a state machine can escalate over musical structure rather than per beat.
+        const double beatsPerBar = 4.0;
+        const double beats = static_cast<double>(clock.beatCount) + clock.beatPhase;
+        const double bars = beats / beatsPerBar;
+        const double phrases = bars / static_cast<double>(phraseBars_);
+        const double sections = phrases / static_cast<double>(sectionPhrases_);
+        const auto phraseIndex = static_cast<std::uint32_t>(phrases < 0.0 ? 0.0 : phrases);
+        bus.set(timeSignals_.phrasePhase, static_cast<float>(phrases - std::floor(phrases)));
+        bus.set(timeSignals_.phraseCount, static_cast<float>(phraseIndex));
+        bus.setEvent(timeSignals_.phrasePulse, phraseIndex != clock.lastPhraseIndex, 1.0f);
+        clock.lastPhraseIndex = phraseIndex;
+        bus.set(timeSignals_.sectionPhase, static_cast<float>(sections - std::floor(sections)));
+        bus.set(timeSignals_.sectionCount, static_cast<float>(static_cast<std::uint32_t>(sections < 0.0 ? 0.0 : sections)));
+    }
+    // The classifier's events, after the clock as they always were. Unconditional: no audio
+    // consumed means every music.* signal is false.
+    clock.music.publish(bus);
+    return pulse;
 }
 
 void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     const auto& midiClock = controlHub_.midiClock();
     midiClockActive_ = tempoSource_ == TempoSource::MidiClock && midiClock.running() && midiClock.hasTempo();
     // The same resolution the transport readout uses, so the picture and the display cannot be
-    // driven by different numbers (ADR-394). The *phase* below still comes from the analyzer even
+    // driven by different numbers (ADR-394). The *phase* still comes from the analyzer even
     // when the bpm came from a tag, because a BPM tag has no phase in it.
-    double bpm = resolvedTempo().second;
-    bool pulse = false;
+    ClockInputs in;
+    in.bpm = resolvedTempo().second;
     if (midiClockActive_) {
-        // The MIDI clock owns the beat clock: phase and count come straight from the tracker
-        // (already extrapolated to this frame by the hub).
-        bpm = midiClock.bpm();
-        beatClockPhase_ = midiClock.beatPhase();
-        beatClockCount_ = midiClock.beatCount();
-        pulse = midiClock.beatEvent();
-    } else if (bpm > 0.0) {
-        // Advance the per-frame beat clock; re-sync to the analyzer whenever it reports a beat.
-        beatClockPhase_ += time.deltaTime * bpm / 60.0;
-        if (newAnalysisFrame && latest_.beatCount != lastAnalysisBeatCount_) {
-            beatClockPhase_ = static_cast<double>(latest_.beatPhase);
-            beatClockCount_ = latest_.beatCount;
-            lastAnalysisBeatCount_ = latest_.beatCount;
-            pulse = true;
-        } else if (beatClockPhase_ >= 1.0) {
-            beatClockPhase_ -= 1.0;
-            ++beatClockCount_;
-            pulse = true;
-        }
-    } else {
-        beatClockPhase_ = 0.0;
+        in.midi = true;
+        in.bpm = midiClock.bpm();
+        in.midiPhase = midiClock.beatPhase();
+        in.midiCount = midiClock.beatCount();
+        in.midiPulse = midiClock.beatEvent();
     }
-    const double duration = durationSeconds();
-    bus_.set(timeSignals_.seconds, static_cast<float>(time.renderTime));
-    bus_.set(timeSignals_.progress, duration > 0.0 ? static_cast<float>(std::clamp(positionSeconds() / duration, 0.0, 1.0)) : 0.0f);
-    bus_.set(timeSignals_.playing, isPlaying() ? 1.0f : 0.0f);
-    bus_.set(timeSignals_.beatPhase, static_cast<float>(beatClockPhase_));
-    bus_.setEvent(timeSignals_.beatPulse, pulse, 1.0f);
-    bus_.set(timeSignals_.beatCount, static_cast<float>(beatClockCount_));
-    bus_.set(timeSignals_.bpm, static_cast<float>(bpm));
-    bus_.set(timeSignals_.barPhase, static_cast<float>((beatClockCount_ % 4 + beatClockPhase_) / 4.0));
-    {
-        // Phrases and sections from the beat clock: continuous phases plus an event at each phrase
-        // boundary, so a state machine can escalate over musical structure rather than per beat.
-        const double beatsPerBar = 4.0;
-        const double beats = static_cast<double>(beatClockCount_) + beatClockPhase_;
-        const double bars = beats / beatsPerBar;
-        const double phrases = bars / static_cast<double>(phraseBars_);
-        const double sections = phrases / static_cast<double>(sectionPhrases_);
-        const auto phraseIndex = static_cast<std::uint32_t>(phrases < 0.0 ? 0.0 : phrases);
-        bus_.set(timeSignals_.phrasePhase, static_cast<float>(phrases - std::floor(phrases)));
-        bus_.set(timeSignals_.phraseCount, static_cast<float>(phraseIndex));
-        bus_.setEvent(timeSignals_.phrasePulse, phraseIndex != lastPhraseIndex_, 1.0f);
-        lastPhraseIndex_ = phraseIndex;
-        bus_.set(timeSignals_.sectionPhase, static_cast<float>(sections - std::floor(sections)));
-        bus_.set(timeSignals_.sectionCount, static_cast<float>(static_cast<std::uint32_t>(sections < 0.0 ? 0.0 : sections)));
-    }
+    in.position = positionSeconds();
+    in.duration = durationSeconds();
+    in.playing = isPlaying();
+    const bool pulse = advanceClock(clock_, bus_, time, newAnalysisFrame, in);
 
     sourceContext_.time = time;
-    sourceContext_.audioPosition = positionSeconds();
-    sourceContext_.audioDuration = duration;
-    sourceContext_.playing = isPlaying();
-    sourceContext_.beatPhase = static_cast<float>(beatClockPhase_);
-    sourceContext_.beatCount = beatClockCount_;
-    sourceContext_.tempoBpm = static_cast<float>(bpm);
+    sourceContext_.audioPosition = in.position;
+    sourceContext_.audioDuration = in.duration;
+    sourceContext_.playing = in.playing;
+    sourceContext_.beatPhase = static_cast<float>(clock_.beatPhase);
+    sourceContext_.beatCount = clock_.beatCount;
+    sourceContext_.tempoBpm = static_cast<float>(in.bpm);
     sourceContext_.beatEvent = pulse;
 }
 
@@ -4030,7 +4300,7 @@ void Engine::updateTimelineClock(const FrameTime& time) {
     // the wav however long the sequence was.
     static_cast<void>(time);
     timelineClock_.seconds = transport_.positionSeconds();
-    timelineClock_.beats = static_cast<double>(beatClockCount_) + beatClockPhase_;
+    timelineClock_.beats = static_cast<double>(clock_.beatCount) + clock_.beatPhase;
 }
 
 void Engine::applyCues() {
@@ -4257,7 +4527,7 @@ glm::vec3 Engine::cameraVelocityOnTimeline() const {
 // `latestFrame()` -- the same frame the signal bus, the material inputs and the camera director all
 // read, published by the same code in both modes.
 //
-// That is what keeps it deterministic. Offline, `latest_` is `frames[cursor - 1]` of a precomputed
+// That is what keeps it deterministic. Offline, `clock_.latest` is `frames[cursor - 1]` of a precomputed
 // `AnalysisTrack`, a pure function of the render time; live, it is the runner's newest. Neither
 // integrates state here, and nothing below reads a frame counter.
 //
@@ -4265,7 +4535,7 @@ glm::vec3 Engine::cameraVelocityOnTimeline() const {
 // them above 6 kHz, where a curtain has nothing to show.
 void Engine::updateAuroraSpectrum() {
     auroraSpectrum_.fill(0.5f); // the neutral value: an ordinary curtain when there is no music
-    const analysis::AnalysisFrame& f = latest_;
+    const analysis::AnalysisFrame& f = clock_.latest;
     if (f.magnitude.empty()) {
         return;
     }
@@ -4601,52 +4871,25 @@ void Engine::update(const FrameTime& time) {
     if (mode_ == EngineMode::Live) {
         if (runner_ && runner_->acquire()) {
             newFrame = true;
-            publishFrame(runner_->latest());
+            publishFrame(clock_, bus_, runner_->latest());
             stats_.analysisHopMicros = runner_->averageHopMicros();
             stats_.analysisFrames = runner_->framesProduced();
-        } else if (hasFrame_) {
+        } else if (clock_.hasFrame) {
             // No new analysis this render frame: keep continuous values, drop the event pulse.
             bus_.setEvent(audioSignals_.onset, false);
         } else {
             audioSignals_.publishSilence(bus_);
         }
     } else if (track_ && !track_->empty()) {
-        // Consume every analysis frame whose centre lies at or before renderTime so onsets that
-        // fall between two render frames are not lost at low frame rates.
-        const auto& frames = track_->frames();
-        bool onset = false;
-        float onsetStrength = 0.0f;
-        std::size_t cursor = offlineFrameCursor_;
-        const std::size_t probeCursorStart = cursor; // TEMPORARY: phase 2
-        std::optional<probe2::Add> probeCatchup(std::in_place, probe2::frame().analysisCatchupMs);
-        while (cursor < frames.size() && frames[cursor].timeSeconds <= time.renderTime) {
-            if (frames[cursor].onset) {
-                onset = true;
-                onsetStrength = std::max(onsetStrength, frames[cursor].onsetStrength);
-            }
-            // The classifier is fed here rather than from publishFrame() below, which only ever
-            // sees the last frame of the batch: at 30 fps that is one analysis frame in three, and
-            // a detector that samples the music at the frame rate is a detector whose answers
-            // depend on the frame rate (ADR-073).
-            music_.consume(frames[cursor], phraseBars_, sectionPhrases_);
-            ++cursor;
+        // ADR-870: the same function a seek's replay runs, on the live clock and bus.
+        const std::size_t probeCursorStart = clock_.analysisCursor; // TEMPORARY: phase 2
+        {
+            const probe2::Add probeCatchup(probe2::frame().analysisCatchupMs); // TEMPORARY: phase 2
+            newFrame = consumeAnalysis(clock_, bus_, time.renderTime);
         }
-        probeCatchup.reset(); // TEMPORARY: phase 2 -- stop the clock before the publish below
-        probe2::frame().analysisFramesConsumed += cursor - probeCursorStart;
-        if (cursor > offlineFrameCursor_) {
-            analysis::AnalysisFrame frame = frames[cursor - 1];
-            frame.onset = onset;
-            if (onset) {
-                frame.onsetStrength = onsetStrength;
-            }
-            publishFrame(frame);
-            newFrame = true;
-            offlineFrameCursor_ = cursor;
-            stats_.analysisFrames = cursor;
-        } else if (hasFrame_) {
-            bus_.setEvent(audioSignals_.onset, false);
-        } else {
-            audioSignals_.publishSilence(bus_);
+        probe2::frame().analysisFramesConsumed += clock_.analysisCursor - probeCursorStart;
+        if (newFrame) {
+            stats_.analysisFrames = clock_.analysisCursor;
         }
     } else {
         audioSignals_.publishSilence(bus_);
@@ -4673,8 +4916,7 @@ void Engine::update(const FrameTime& time) {
     probeStage(probe2::frame().updControlMs); // TEMPORARY: phase 2
     stats_.allocsControl = allocsNow() - allocMark;
     allocMark = allocsNow();
-    updateTimeSignals(time, newFrame);
-    music_.publish(bus_); // unconditional: no audio consumed means every music.* signal is false
+    updateTimeSignals(time, newFrame); // and music.*, unconditionally (ADR-073)
     updateTimelineClock(time);
     applyCues();
     {
@@ -4795,17 +5037,17 @@ void Engine::update(const FrameTime& time) {
     updateEffects();
     {
         shaders::StdUniforms base;
-        const auto& f = latest_;
-        base.audio[0] = hasFrame_ ? f.rms : 0.0f;
-        base.audio[1] = hasFrame_ ? f.bands[0] : 0.0f;
-        base.audio[2] = hasFrame_ ? f.bands[2] : 0.0f;
-        base.audio[3] = hasFrame_ ? f.bands[4] : 0.0f;
-        base.audio2[0] = hasFrame_ ? f.bands[1] : 0.0f;
-        base.audio2[1] = hasFrame_ ? f.bands[3] : 0.0f;
-        base.audio2[2] = hasFrame_ ? std::min(1.0f, f.onsetStrength / 2.0f) : 0.0f;
-        base.audio2[3] = static_cast<float>(beatClockPhase_);
+        const auto& f = clock_.latest;
+        base.audio[0] = clock_.hasFrame ? f.rms : 0.0f;
+        base.audio[1] = clock_.hasFrame ? f.bands[0] : 0.0f;
+        base.audio[2] = clock_.hasFrame ? f.bands[2] : 0.0f;
+        base.audio[3] = clock_.hasFrame ? f.bands[4] : 0.0f;
+        base.audio2[0] = clock_.hasFrame ? f.bands[1] : 0.0f;
+        base.audio2[1] = clock_.hasFrame ? f.bands[3] : 0.0f;
+        base.audio2[2] = clock_.hasFrame ? std::min(1.0f, f.onsetStrength / 2.0f) : 0.0f;
+        base.audio2[3] = static_cast<float>(clock_.beatPhase);
         base.beat[0] = sourceContext_.tempoBpm;
-        base.beat[1] = static_cast<float>(beatClockCount_);
+        base.beat[1] = static_cast<float>(clock_.beatCount);
         base.beat[2] = bus_.value(timeSignals_.barPhase);
         base.beat[3] = bus_.value(timeSignals_.progress);
         shaderLayers_.update(time, base);

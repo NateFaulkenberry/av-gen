@@ -1,5 +1,5 @@
 {
-  "description": "Rook jumps over Umbra at 2:05; flash the lights at the peak.",
+  "description": "Rook jumps over Umbra at 2:05; flash the lights at the peak. The owner's acceptance case (spec \u00a757): infeasible, 5.75 m of clearance against Rook's 1.1 m highest jump.",
   "plan": {
     "schemaVersion": 1,
     "id": "rook-jump",
@@ -24,12 +24,12 @@
         "beats": [
           {
             "action": "run_to",
-            "target": "umbra"
+            "target": "umbra",
+            "at": "2:03"
           },
           {
             "action": "jump",
             "target": "umbra",
-            "at": "2:05",
             "emits": "rook.jump_peak"
           }
         ]
@@ -47,9 +47,8 @@
   },
   "expect": {
     "errors": [
-      "SPATIAL_INFEASIBLE",
-      "UNSUPPORTED",
-      "BLOCKED"
+      "BLOCKED",
+      "SPATIAL_INFEASIBLE"
     ],
     "blocked": [
       "jump",
@@ -57,6 +56,7 @@
     ],
     "produced": {},
     "diff": [
+      "highest jump peaks 1.10 m up",
       "needs 5.75 m"
     ]
   }

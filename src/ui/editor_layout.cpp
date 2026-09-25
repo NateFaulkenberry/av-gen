@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 20> kPanels{{
+constexpr std::array<EditorPanel, 21> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -78,6 +78,10 @@ constexpr std::array<EditorPanel, 20> kPanels{{
      "the documentation: categories, search, shortcuts and contextual topics"},
     {"AI", "AI Assistant", DockRegion::Right, false,
      "ask for changes in words; the assistant inspects the project and makes them"},
+    // Spec §35, ADR-762: the Director's proposal as a plan -- items marked, changes grouped, and the
+    // person's decision. The AI panel keeps the conversation; this is the view of what it proposed.
+    {"Director", "Director", DockRegion::Right, false,
+     "a proposed plan: what can and cannot be done, what it would change, and Preview / Accept / Reject"},
     {"Settings", "Settings", DockRegion::Right, false,
      "application settings: rendering, AI providers and credentials"},
     // The Dear ImGui widget gallery used to be listed here. Removed at the owner's request: it is a

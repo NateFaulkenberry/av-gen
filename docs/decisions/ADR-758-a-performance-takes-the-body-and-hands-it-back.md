@@ -119,3 +119,22 @@ at plan time.
 - **Found in passing:** `seq::Actor::headingAt` returns **degrees**, while its header says radians.
   `performerFor` computes its own radians and does not use it; the comment is left for the
   sequencer's owner.
+
+## Addendum (2026-09-24): ownership and the entry blend (coordinator's rulings)
+
+- **The mechanism moves to the Motion lead as its M1.** The entity, scene and seq parts of this ADR
+  (`DirectorMotion::performance`, the composition's performers, the bake skip, `seq::performerFor`)
+  are cherry-picked into `agent/motion`, and `tests/unit/test_directing_handoff.cpp` becomes M1's
+  acceptance suite.
+  - **Merge order:** M1 lands on main first. `agent/director` is then rebased onto it and drops its
+    copy. There is one mechanism, never two.
+  - **Done 2026-09-25:** `agent/motion` (M1-M5) was merged into `agent/director`, and this branch's
+    copy was dropped in favour of the Motion lead's version (ADR-820-823 build on it).
+- **Entry blend.** M1 adds a per-actor `entrySeconds`. The default, 0, means the body is taken at
+  the authored mark instantly; the Director uses 0 at cuts. A non-zero blend starts from wherever
+  the simulation had the body, which is not a plan-time fact. The Director's validator must
+  therefore flag it as live-dependent in a baked plan. This check is added when the field exists on
+  main.
+- **Also accepted into M1:** the gait takes the clip from the path speed, unramped, when no clip cue
+  is active; and the height comes from the terrain while grounded.
+- `seq::Actor::headingAt`'s degrees-versus-radians mismatch is passed to the Motion lead.

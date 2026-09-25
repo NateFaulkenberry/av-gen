@@ -24,22 +24,49 @@
         "beats": [
           {
             "action": "run_past",
-            "target": "umbra"
+            "target": "umbra",
+            "emits": "rook.passes_umbra"
+          },
+          {
+            "action": "run",
+            "seconds": 1.0
+          }
+        ]
+      }
+    ],
+    "shots": [
+      {
+        "key": "run-shot",
+        "name": "rook-runs-past",
+        "start": "1:30",
+        "durationSeconds": 5,
+        "subject": "rook",
+        "locked": true,
+        "camera": [
+          {
+            "move": "low_angle"
+          },
+          {
+            "move": "follow"
           }
         ]
       }
     ]
   },
   "expect": {
-    "errors": [
-      "UNSUPPORTED"
-    ],
-    "blocked": [
-      "run"
-    ],
-    "produced": {},
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 1,
+      "camera.rig": 1,
+      "camera.shot": 1,
+      "sequence.actor": 1,
+      "sequence.marker": 1
+    },
     "diff": [
-      "UNSUPPORTED: character performances are not compiled yet"
+      "Performance rook",
+      "rook runs past umbra-cap, keeping it",
+      "Marker rook.passes_umbra"
     ]
   }
 }

@@ -748,8 +748,13 @@ public:
     // ADR-700: and it does it from the nearest simulation checkpoint rather than from a reset, so
     // it is exact at any time rather than inside ninety seconds. The composition's half of a
     // checkpoint is the director (whole), the bases it wrote, and `ReplayPlacement`.
+    //
+    // ADR-870: `signals`, when given, is the host's deterministic signal pipeline. The replay builds
+    // its bus at every step before the director, hands that bus to the director and the entities
+    // exactly as a play frame does, and carries the pipeline's state in every checkpoint. Null --
+    // live mode, or no audio -- replays with no bus, as before.
     void seekWithDirector(double seconds, params::ParameterSet& params, entity::SeekBudget budget,
-                          double step = 1.0 / 60.0);
+                          double step = 1.0 / 60.0, entity::ReplaySignalSource* signals = nullptr);
 
     // ---- ADR-703: HIST, the transform history entity effects read -----------------------------
     //
@@ -1660,6 +1665,11 @@ private:
         params::Parameter<float>* splineT = nullptr;
         params::Parameter<float>* lookAhead = nullptr;
         params::Parameter<glm::vec3>* splineOffset = nullptr;
+        // ADR-760: a follow rig's offset and an aim rig's offset, as keyable channels -- registered
+        // only for a rig that follows or aims at a node, so every other rig and every project
+        // written before this keeps exactly the parameters it had. Null otherwise.
+        params::Parameter<glm::vec3>* followOffset = nullptr;
+        params::Parameter<glm::vec3>* aimOffset = nullptr;
     };
     std::vector<CameraChannels> cameraChannels_;
     ActiveCameraState activeCamera_;
