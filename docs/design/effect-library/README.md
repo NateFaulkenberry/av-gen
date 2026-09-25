@@ -20,6 +20,8 @@ are presets of systems the engine already has. See [shared-infrastructure.md](sh
 
 ## Documents
 
+- [STATUS.md](STATUS.md) -- where the library stands (paused after Wave 3) and how to resume.
+
 | Document | Phase | Contents |
 |---|---|---|
 | **README.md** (this page) | 1 | Index, engine audit and references |

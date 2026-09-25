@@ -18,8 +18,9 @@ subsystems with no users and "built but unreachable" features are its signature 
 
 ## Status (2026-09-25): Waves 1–3 shipped; the library is paused here
 
-The owner has paused the Effect Library after Wave 3; the effort moves to the motion stack and then the
-Director. This section is where to pick up.
+The owner has paused all work after Wave 3, to switch to a project build-out on the current stack. This section
+is where to pick up; `STATUS.md` beside it is the one-page version. **Nothing is partly built:** every Wave 3
+slice finished and merged, and there is no WIP branch.
 
 ### What shipped
 
