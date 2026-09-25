@@ -129,7 +129,11 @@ the commit message.
   - `--preset asan`, which is Debug + `-fsanitize=address,undefined` on engine targets and tools,
     built once;
   - the CPU suite runs in a matrix: everything except `[stage]` in 3 shards on one runner, and
-    the 66 `[stage]` simulation cases in 12 shards over four runners. Nothing is left out.
+    the 66 `[stage]` simulation cases in 18 shards over six runners. Nothing is left out.
+  - It gates on sanitizer reports, crashes, timeouts and unexercised cases (`--gate sanitizer`).
+    Assertion failures under Debug+ASan are listed, not gated. In run 36087867052 all 11 of them
+    were `[performance]` wall-clock ceilings and 10 s job waits that an -O0 instrumented build
+    cannot meet, plus asset cases. Test correctness is gated by the Release CI run.
   - ASan halts at its first report. UBSan reports every site and carries on, but any
     `runtime error:` line fails the job.
   - Each report appears in the summary as `SANITIZER FAILURE`, with its type, first frame and a
@@ -338,7 +342,20 @@ cases before its shards stopped (4.8 h):
   Debug+ASan, and were 97% of the measured time;
 - each shard was also stopped early by an ASan report (below), which halts the process.
 
-**Findings of that run, reported to the owner, not fixed here** (product code):
+**Split run 36087867052** (build 33 min):
+
+- the four `[stage]` parts ran all 66 cases with **no sanitizer reports**, in 1.3 to 5.0 h per
+  part. The heaviest part was close to the 6 h limit, so it is now 6 parts;
+- the `main` part took 3.9 h and ran 2,426 of 3,166 cases, then stopped on a second ASan report
+  (below). TSan's subset was clean again.
+
+**Findings, reported to the owner and not fixed here** (they need product or test changes):
+
+- `stack-use-after-scope` in "packing puts every authored number in the lane the shader reads"
+  (`tests/unit/test_wave_effects.cpp:592`). `resolveWaves(std::array{e}, …, out)` stores a pointer
+  into the temporary `std::array` in `out[0].effect`, and `world::packWave(out[0])` on the next line
+  reads it after the temporary has died (`src/world/wave_effect.cpp:661`). The test is at fault as
+  written, and the API makes the mistake easy.
 
 - `heap-use-after-free` in `Composition::unregisterNodeParameters`
   (`src/scene/composition.cpp:4818`). A parameter is freed by `ParameterSet::remove` via

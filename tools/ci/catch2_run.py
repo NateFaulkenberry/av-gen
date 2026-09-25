@@ -231,12 +231,19 @@ def scan_log(path: Path) -> dict:
                 rtype, where = m.group(2), m.group(1)
             else:
                 rtype, where = m.group(1).strip(), ""
+                # The first frame in project code (avgen:: or a test body), else the first frame
+                # outside the sanitizer runtime and the standard library.
+                frames = []
                 for follow in lines[n + 1:n + 40]:
                     fm = re.search(r"#\d+ 0x[0-9a-f]+ in (.+)$", follow)
-                    if fm and "sanitizer_common" not in follow and "asan_" not in follow \
-                            and "tsan_" not in follow and "interceptor" not in follow:
-                        where = fm.group(1).strip()
+                    if fm:
+                        frames.append(fm.group(1).strip())
+                    elif frames:
                         break
+                runtime = ("sanitizer_common", "asan_", "tsan_", "ubsan_", "interceptor", "std::__1::")
+                project = [f for f in frames if "avgen::" in f or "CATCH2_INTERNAL_TEST" in f]
+                other = [f for f in frames if not any(k in f for k in runtime)]
+                where = (project or other or frames or [""])[0]
             excerpt = "\n".join(lines[n:n + 30])
             reports.append({"sanitizer": kind, "type": rtype, "where": where,
                             "line_in_log": n + 1, "excerpt": excerpt})
@@ -616,8 +623,8 @@ def cmd_run(args) -> int:
         # TSan: the job exists to find races. Assertion failures under a 5-15x slowdown are mostly
         # wall-clock waits and ceilings that do not hold; they are listed, loudly, but only a
         # sanitizer report, a crash, a timeout or an unexercised case decides the verdict.
-        r["ok"] = (not r["sanitizer_reports_total"] and not r["crashes"] and not r["timeouts"]
-                   and not r["unexercised"] and r["listed"])
+        r["ok"] = bool(not r["sanitizer_reports_total"] and not r["crashes"] and not r["timeouts"]
+                       and not r["unexercised"] and r["listed"])
     (Path(args.out) / "result.json").write_text(json.dumps(r, indent=2))
     (Path(args.out) / "summary.md").write_text(render_binary_md(r, level=2))
     print_console(r, Path(args.out))

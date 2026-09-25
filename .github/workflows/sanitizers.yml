@@ -93,8 +93,9 @@ jobs:
     # Debug -O0 + ASan is slow in a very uneven way (run 36060803359): the median case took 4 ms,
     # while the 66 `[stage]` simulation cases take up to 2 h EACH and were 97% of the time. So
     # the suite is split in two, and nothing is left out:
-    #   main       : everything except [stage], 3 shards on one runner
-    #   stage-0..3 : the [stage] cases, 12 shards over 4 runners
+    #   main       : everything except [stage], 3 shards on one runner (~3.9 h)
+    #   stage-0..5 : the [stage] cases, 18 shards over 6 runners. With 12 shards over 4, the
+    #                heaviest part took 5.0 h of the 6 h limit (run 36087867052).
     name: ASan/UBSan tests (${{ matrix.part }})
     needs: asan-build
     runs-on: macos-26
@@ -104,11 +105,17 @@ jobs:
       matrix:
         include:
           - { part: main,    filter: "~[stage]", total: 3,  first: 0 }
-          - { part: stage-0, filter: "[stage]",  total: 12, first: 0 }
-          - { part: stage-1, filter: "[stage]",  total: 12, first: 3 }
-          - { part: stage-2, filter: "[stage]",  total: 12, first: 6 }
-          - { part: stage-3, filter: "[stage]",  total: 12, first: 9 }
+          - { part: stage-0, filter: "[stage]",  total: 18, first: 0 }
+          - { part: stage-1, filter: "[stage]",  total: 18, first: 3 }
+          - { part: stage-2, filter: "[stage]",  total: 18, first: 6 }
+          - { part: stage-3, filter: "[stage]",  total: 18, first: 9 }
+          - { part: stage-4, filter: "[stage]",  total: 18, first: 12 }
+          - { part: stage-5, filter: "[stage]",  total: 18, first: 15 }
     env:
+      # Gate: --gate sanitizer. Only a sanitizer report, a crash, a timeout or an unexercised case
+      # fails this job. Assertion failures under Debug+ASan are listed, not gated: in run
+      # 36087867052 they were all wall-clock ceilings ([performance]) and 10 s job waits that an
+      # -O0 instrumented build cannot meet. Test correctness is gated by the Release CI run.
       # ASan halts on its first report (a fatal heap-buffer-overflow cannot be continued past even
       # with halt_on_error=0); the cases after it in that shard are reported as never run. UBSan
       # reports every distinct site and carries on; catch2_run.py fails the job on any
@@ -141,7 +148,7 @@ jobs:
           python3 tools/ci/catch2_run.py run --binary build/asan/tests/avgen_tests --name "asan-$PART" \
               --label "ASan/UBSan: $PART" --out "$RESULTS/asan-$PART" --shards 3 \
               --shard-total "$SHARD_TOTAL" --shard-first "$SHARD_FIRST" --seed "$seed" \
-              --timeout-min 330 --exceptions tools/ci/hosted-runner-exceptions.txt \
+              --timeout-min 330 --exceptions tools/ci/hosted-runner-exceptions.txt --gate sanitizer \
               --filter "$filter" --expected-label "selection: $filter"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
@@ -177,7 +184,7 @@ jobs:
         run: |
           cat > jobs.json <<EOF
           {"ASan/UBSan build": "${{ needs.asan-build.result }}",
-           "ASan/UBSan tests (main + 4 stage parts)": "${{ needs.asan-tests.result }}",
+           "ASan/UBSan tests (main + 6 stage parts)": "${{ needs.asan-tests.result }}",
            "TSan (concurrency subset)": "${{ needs.tsan.result }}"}
           EOF
           python3 tools/ci/catch2_run.py report --results-dir results --job-results jobs.json
