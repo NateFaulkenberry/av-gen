@@ -199,6 +199,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       shadowMask_(std::make_unique<ShadowMaskRenderer>(context, shaders)),
       water_(std::make_unique<WaterRenderer>()),
       ribbons_(std::make_unique<RibbonRenderer>()),
+      shells_(std::make_unique<ShellRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
       temporal_(std::make_unique<TemporalEffects>(context, shaders)),
       distortion_(std::make_unique<DistortionRenderer>(context, shaders)),
@@ -519,6 +520,11 @@ Result<void> SceneRenderer::init() {
     }
     // ADR-703: RIBBON draws inside the scene pass with the scene's own frame group and nothing else.
     if (auto r = ribbons_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_); !r) {
+        return r;
+    }
+    // Wave 3: SHELL draws inside the scene pass too, with the frame group, a group of its own and the
+    // IBL group (a shield's sheen).
+    if (auto r = shells_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, iblLayout_); !r) {
         return r;
     }
     if (auto r = debug_->init(kHdrFormat, kDepthFormat, frameLayout_); !r) {
@@ -1938,6 +1944,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     }
     if (auto r = ribbons_->reload(shaders_); !r) {
         keep("ribbon.wgsl", r);
+    }
+    if (auto r = shells_->reload(shaders_); !r) {
+        keep("shell.wgsl", r);
     }
     ++engineReloads_;
     if (first) {
@@ -4035,6 +4044,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // Nothing at all -- no bind, no upload -- when the frame has no strip (the gate).
         ribbons_->draw(rp, frameBindGroup_, scene.ribbons);
         stats_.drawCalls += ribbons_->stats().draws;
+        // Wave 3: the analytic proxy shells, beside the ribbons. They read the linear depth through
+        // the frame group only when the prepass resolved it this frame. Nothing at all -- no bind, no
+        // upload -- when the frame has no shell (the gate); group 2 is rebound by every lit draw after.
+        shells_->draw(rp, frameBindGroup_, iblBindGroup_, scene.shells, needsDepthPrepass);
+        stats_.drawCalls += shells_->stats().draws;
         if (toggles_.particles && !blended.empty() && particles_->stats().systems > 0) {
             rp.SetBindGroup(0, frameBindGroup_); // the particle pass rebinds group 0 with its own layout
         }

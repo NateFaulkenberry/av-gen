@@ -649,6 +649,7 @@ AtmosphericCounts resolveAtmosphericEffects(std::span<const EffectInstance> effe
             case EffectBucket::Emitter:
             case EffectBucket::Transform:
             case EffectBucket::Starfield:
+            case EffectBucket::Shell:
                 break; // unreachable: skipped at the top; each has a builder of its own
             }
         }

@@ -418,6 +418,10 @@ enum class EffectBucket : std::uint8_t {
     // The sky's star field (world/effects/star_field.hpp): one per frame, drawn by the background
     // pass in place of its fixed stars. Stars.
     Starfield,
+    // ---- Wave 3 ---------------------------------------------------------------------------------
+    // Analytic proxy shells drawn in pass 1's blended section beside the particles (SHELL,
+    // world/effects/shell_frame.hpp): Plasma, Energy Shield, Force Field.
+    Shell,
 };
 
 // The three buckets `resolveAtmosphericEffects` owns. Everything else has a builder of its own.

@@ -772,6 +772,7 @@ std::vector<RegistryFinding> checkRegistry() {
             case EffectBucket::Emitter: return RenderStage::Particles;
             case EffectBucket::Transform: return RenderStage::Geometry;
             case EffectBucket::Starfield: return RenderStage::Sky;
+            case EffectBucket::Shell: return RenderStage::Particles;
             }
             return RenderStage::Sky;
         }();

@@ -22,6 +22,7 @@
 #include "world/terrain_height.hpp"
 #include "world/wave_effect.hpp"
 #include "world/effects/ribbon_frame.hpp"
+#include "world/effects/shell_frame.hpp"
 #include "world/effects/star_field.hpp"
 #include "scene/scene_types.hpp"
 
@@ -129,6 +130,10 @@ struct Scene {
     //   `stars`        RenderStage::Sky        -- Wave 2's star field (Stars), read by the background
     //                  pass in place of its fixed stars; `on == false` is the fixed field.
     world::StarField stars;
+    //   `shells`       RenderStage::Particles  -- Wave 3's analytic proxy shells (Plasma, Energy Shield,
+    //                  Force Field), drawn in pass 1's blended section; empty means no draw at all.
+    //                  A plasma's core light is in `entityFx.lights`, LIGHTMOD's one pool.
+    world::ShellFrame shells;
     // ADR-351: coarser rungs for the meshes that have them, by MeshId. Sparse and unordered -- a
     // scene with no LOD carries an empty vector, which is every scene that does not ask for it.
     // LOD0 is never in here; see MeshLodChain.
