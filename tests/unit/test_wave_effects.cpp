@@ -32,6 +32,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <span>
 
 using namespace avgen;
 using Catch::Matchers::WithinAbs;
@@ -278,7 +279,7 @@ TEST_CASE("a source resolves to the thing it names, never to a coordinate", "[wo
         e.wave.propagation.direction = world::DirectionMode::Explicit;
         REQUIRE(e.validate());
         const auto ctx = contextAt(1.0, spans, heroes, scene);
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(out[0].origin.x, WithinAbs(10.0f, 1e-4f));
         CHECK_THAT(out[0].origin.z, WithinAbs(-4.0f, 1e-4f));
     }
@@ -291,7 +292,7 @@ TEST_CASE("a source resolves to the thing it names, never to a coordinate", "[wo
         e.wave.source.position = glm::vec3(7.0f, 0.0f, 7.0f);
         e.wave.propagation.direction = world::DirectionMode::Explicit;
         const auto ctx = contextAt(1.0, spans, heroes, scene);
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(out[0].origin.x, WithinAbs(7.0f, 1e-4f));
     }
 
@@ -302,7 +303,7 @@ TEST_CASE("a source resolves to the thing it names, never to a coordinate", "[wo
         e.wave.appearance.color = glm::vec3(1.0f); // "no opinion"
         e.wave.propagation.direction = world::DirectionMode::Explicit;
         const auto ctx = contextAt(1.0, spans, heroes, scene);
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(out[0].color.g, WithinAbs(0.9f, 1e-4f));
     }
 
@@ -315,7 +316,7 @@ TEST_CASE("a source resolves to the thing it names, never to a coordinate", "[wo
         e.timing.delay = 0.0;
         e.timing.fadeIn = 0.0;
         const auto ctx = contextAt(1.0, spans, heroes, scene);
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(out[0].origin.y, WithinAbs(0.0f, 1e-4f)); // hero at y=5, offset 5
     }
 
@@ -324,7 +325,7 @@ TEST_CASE("a source resolves to the thing it names, never to a coordinate", "[wo
         e.timing.delay = 0.0;
         e.timing.fadeIn = 0.0;
         const auto ctx = contextAt(4.0, spans, heroes, scene);
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(out[0].origin.x, WithinAbs(0.0f, 1e-4f)); // the elder, not the lantern
     }
 }
@@ -342,7 +343,7 @@ TEST_CASE("a direction is derived, not authored", "[world][effects][direction]")
         e.wave.propagation.direction = world::DirectionMode::CameraToTarget;
         e.timing.delay = 0.0;
         e.timing.fadeIn = 0.0;
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         // Camera at (0, 20, 60), lantern at (100, 2, 0): the axis must lead with +x.
         CHECK(out[0].axis.x > 0.7f);
     }
@@ -352,7 +353,7 @@ TEST_CASE("a direction is derived, not authored", "[world][effects][direction]")
         e.wave.propagation.direction = world::DirectionMode::CameraVelocity;
         e.timing.delay = 0.0;
         e.timing.fadeIn = 0.0;
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(out[0].axis.z, WithinAbs(-1.0f, 1e-4f));
     }
 
@@ -361,7 +362,7 @@ TEST_CASE("a direction is derived, not authored", "[world][effects][direction]")
         e.timing.delay = 0.0;
         e.timing.fadeIn = 0.0;
         REQUIRE(e.wave.propagation.direction == world::DirectionMode::Blended);
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         const glm::vec3 axis = out[0].axis;
         CHECK_THAT(glm::length(axis), WithinAbs(1.0f, 1e-4f));
         CHECK(axis.x > 0.0f);  // the destination pulls it sideways
@@ -376,7 +377,7 @@ TEST_CASE("a direction is derived, not authored", "[world][effects][direction]")
         e.wave.propagation.direction = world::DirectionMode::SourceForward;
         e.timing.fadeIn = 0.0;
         e.timing.repeatSeconds = 1.0; // Always makes one pass; a standing effect repeats
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(out[0].axis.x, WithinAbs(1.0f, 1e-4f));
     }
 
@@ -387,7 +388,7 @@ TEST_CASE("a direction is derived, not authored", "[world][effects][direction]")
         e.wave.propagation.direction = world::DirectionMode::SourceForward; // a world source has no forward
         e.timing.fadeIn = 0.0;
         e.timing.repeatSeconds = 1.0;
-        REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
         CHECK_THAT(glm::length(out[0].axis), WithinAbs(1.0f, 1e-4f));
     }
 }
@@ -431,7 +432,7 @@ TEST_CASE("activation is gated on the cut, not on a timer", "[world][effects][ac
         world::EffectInstance off = pulse;
         off.enabled = false;
         const auto ctx = contextAt(4.0, spans, heroes, scene);
-        CHECK(world::resolveWaves(std::array{off}, ctx, out) == 0);
+        CHECK(world::resolveWaves(std::span<const world::EffectInstance>(&off, 1), ctx, out) == 0);
     }
     SECTION("an authored window activates on the transport clock alone") {
         world::EffectInstance w = wave("w");
@@ -441,9 +442,9 @@ TEST_CASE("activation is gated on the cut, not on a timer", "[world][effects][ac
         w.timing.fadeIn = 0.0;
         w.timing.fadeOut = 0.0;
         w.wave.propagation.direction = world::DirectionMode::Explicit;
-        CHECK(world::resolveWaves(std::array{w}, contextAt(29.9, spans, heroes, scene), out) == 0);
-        CHECK(world::resolveWaves(std::array{w}, contextAt(31.0, spans, heroes, scene), out) == 1);
-        CHECK(world::resolveWaves(std::array{w}, contextAt(34.1, spans, heroes, scene), out) == 0);
+        CHECK(world::resolveWaves(std::span<const world::EffectInstance>(&w, 1), contextAt(29.9, spans, heroes, scene), out) == 0);
+        CHECK(world::resolveWaves(std::span<const world::EffectInstance>(&w, 1), contextAt(31.0, spans, heroes, scene), out) == 1);
+        CHECK(world::resolveWaves(std::span<const world::EffectInstance>(&w, 1), contextAt(34.1, spans, heroes, scene), out) == 0);
     }
 }
 
@@ -512,12 +513,12 @@ TEST_CASE("timing shapes the effect inside its activation", "[world][effects][ti
     pulse.timing.lifetime = 0.0; // as long as the hold
 
     SECTION("the delay holds it off") {
-        CHECK(world::resolveWaves(std::array{pulse}, contextAt(0.5, spans, heroes, scene), out) == 0);
+        CHECK(world::resolveWaves(std::span<const world::EffectInstance>(&pulse, 1), contextAt(0.5, spans, heroes, scene), out) == 0);
     }
     SECTION("the fade in ramps rather than switching") {
-        REQUIRE(world::resolveWaves(std::array{pulse}, contextAt(2.0, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&pulse, 1), contextAt(2.0, spans, heroes, scene), out) == 1);
         const float early = out[0].envelope;
-        REQUIRE(world::resolveWaves(std::array{pulse}, contextAt(3.0, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&pulse, 1), contextAt(3.0, spans, heroes, scene), out) == 1);
         CHECK(out[0].envelope > early);
         CHECK(early > 0.0f);
         CHECK(early < 1.0f);
@@ -528,22 +529,22 @@ TEST_CASE("timing shapes the effect inside its activation", "[world][effects][ti
         // question with the same number (ADR-182).
         world::EffectInstance slow = pulse;
         slow.wave.propagation.speed = 1.0f;
-        REQUIRE(world::resolveWaves(std::array{slow}, contextAt(9.5, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&slow, 1), contextAt(9.5, spans, heroes, scene), out) == 1);
         CHECK(out[0].envelope < 0.5f);
     }
     SECTION("the front advances at the stated speed") {
-        REQUIRE(world::resolveWaves(std::array{pulse}, contextAt(3.0, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&pulse, 1), contextAt(3.0, spans, heroes, scene), out) == 1);
         const float a = out[0].frontDistance;
-        REQUIRE(world::resolveWaves(std::array{pulse}, contextAt(4.0, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&pulse, 1), contextAt(4.0, spans, heroes, scene), out) == 1);
         CHECK_THAT(out[0].frontDistance - a, WithinRel(pulse.wave.propagation.speed, 1e-4f));
     }
     SECTION("a repeat restarts the front, so a scrub lands the same ring") {
         world::EffectInstance repeating = pulse;
         repeating.timing.repeatSeconds = 2.0;
-        REQUIRE(world::resolveWaves(std::array{repeating}, contextAt(2.5, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&repeating, 1), contextAt(2.5, spans, heroes, scene), out) == 1);
         const float first = out[0].frontDistance;
         // 2 s later is the same point in the next ring: the same front distance, to the bit.
-        REQUIRE(world::resolveWaves(std::array{repeating}, contextAt(4.5, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&repeating, 1), contextAt(4.5, spans, heroes, scene), out) == 1);
         CHECK_THAT(out[0].frontDistance, WithinAbs(first, 1e-4f));
     }
 }
@@ -589,7 +590,7 @@ TEST_CASE("packing puts every authored number in the lane the shader reads", "[w
     e.wave.appearance.width = 2.0f;
     e.wave.sparkle.enabled = true;
     e.wave.sparkle.fadeDistance = 64.0f;
-    REQUIRE(world::resolveWaves(std::array{e}, contextAt(2.0, spans, heroes, scene), out) == 1);
+    REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), contextAt(2.0, spans, heroes, scene), out) == 1);
     const world::WaveGpu g = world::packWave(out[0]);
 
     CHECK_THAT(g.originKind.w, WithinAbs(1.0f, 1e-6f)); // RadialWave
@@ -608,13 +609,13 @@ TEST_CASE("packing puts every authored number in the lane the shader reads", "[w
     SECTION("sparkle off is a zero density, so the shader's guard is the off switch") {
         world::EffectInstance quiet = e;
         quiet.wave.sparkle.enabled = false;
-        REQUIRE(world::resolveWaves(std::array{quiet}, contextAt(2.0, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&quiet, 1), contextAt(2.0, spans, heroes, scene), out) == 1);
         CHECK_THAT(world::packWave(out[0]).sparkle.x, WithinAbs(0.0f, 1e-9f));
     }
     SECTION("rainbow is a flag the shader branches on, not a colour list") {
         world::EffectInstance bow = e;
         bow.wave.appearance.rainbow = true;
-        REQUIRE(world::resolveWaves(std::array{bow}, contextAt(2.0, spans, heroes, scene), out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&bow, 1), contextAt(2.0, spans, heroes, scene), out) == 1);
         CHECK_THAT(world::packWave(out[0]).edge.w, WithinAbs(1.0f, 1e-9f));
     }
 }
@@ -819,13 +820,13 @@ TEST_CASE("a hero source resolves to the object the hero is, not to the middle o
     ctx.seconds = 0.5;
     ctx.heroes = heroes;
     ctx.scene = &scene;
-    REQUIRE(world::resolveWaves(std::array{e}, ctx, out) == 1);
+    REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), ctx, out) == 1);
     CHECK_THAT(out[0].origin.y, WithinAbs(1.0f, 1e-4f));
 
     SECTION("and falls back to the hero's own position when the scene has no such node") {
         world::EffectContext bare = ctx;
         bare.scene = nullptr;
-        REQUIRE(world::resolveWaves(std::array{e}, bare, out) == 1);
+        REQUIRE(world::resolveWaves(std::span<const world::EffectInstance>(&e, 1), bare, out) == 1);
         CHECK_THAT(out[0].origin.y, WithinAbs(5.0f, 1e-4f));
     }
 }
