@@ -114,6 +114,8 @@ public:
     [[nodiscard]] TransactionSink& transactionSink() const { return *activeSink_; }
 
     void setPerformanceSource(PerformanceSource source);
+    // ADR-765: the host's recorder, for `director.record_plan`. Unset: the tool says it is unavailable.
+    void setRecordingHook(RecordingHook hook);
     // Where projects live, for the project life-cycle tools.
     void setProjectsRoot(std::filesystem::path root);
     // Directories the assistant may read content from.
@@ -134,6 +136,10 @@ public:
     // current task is not waiting for one.
     bool approveCurrentTask();
     bool rejectCurrentTask();
+    // ADR-765: replaces the waiting proposal with another -- a recording of it -- so the person
+    // approves or rejects what will actually be installed, through the same gate. Only while the
+    // current task is waiting; `note` is shown in its activity.
+    bool reviseCurrentProposal(ToolContext::Proposal proposal, std::string note);
     void clearHistory();
 
     // ---- the frame loop's only obligation --------------------------------------------------------

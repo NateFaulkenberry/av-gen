@@ -11,6 +11,7 @@
 #include "ui/world_edit.hpp"
 #include "ui/sequence_panel.hpp"
 #include "ai/control_plane.hpp"
+#include "directing/plan.hpp"
 #include "app/edit_system.hpp"
 #include "core/log.hpp"
 #include "params/parameter.hpp"
@@ -36,7 +37,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 18> kArms{{
+constexpr std::array<ArmName, 19> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -55,6 +56,7 @@ constexpr std::array<ArmName, 18> kArms{{
     {"slice", UiScriptArm::Slice},
     {"director-reject", UiScriptArm::DirectorReject},
     {"director-accept", UiScriptArm::DirectorAccept},
+    {"director-record", UiScriptArm::DirectorRecord},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -322,6 +324,9 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
     }
     if (has(arms_, UiScriptArm::Slice)) {
         stepSlice(engine, *panel, window, frame);
+    }
+    if (panel != nullptr && has(arms_, UiScriptArm::DirectorRecord)) {
+        stepDirectorRecord(engine, *panel, window, frame);
     }
     if (panel != nullptr && (has(arms_, UiScriptArm::DirectorReject) || has(arms_, UiScriptArm::DirectorAccept))) {
         stepDirector(engine, *panel, window, frame, has(arms_, UiScriptArm::DirectorAccept));
@@ -1427,6 +1432,111 @@ void UiScript::stepDirector(Engine& engine, ui::ControlPanel& panel, platform::W
     // (made by the preview) have had time to finish -- the second request must reuse the session.
     if (!accept) {
         press(director.buttons().stills, 240);
+    }
+}
+
+void UiScript::stepDirectorRecord(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                                  std::uint64_t frame) {
+    ui::DirectorPanel& director = panel.director;
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Director"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Director");
+        return;
+    }
+    if (director.plane == nullptr || director.edits == nullptr) {
+        if (frame == 60) {
+            check(false, "the Director panel has no control plane or history; THIS ARM TESTED NOTHING");
+        }
+        return;
+    }
+    ui::EditHistory& history = director.edits->history();
+    const auto task = director.plane->currentTask();
+    const auto proposalPlan = [&]() -> nlohmann::json {
+        const auto p = task ? task->proposal() : std::nullopt;
+        return p ? p->plan : nlohmann::json();
+    };
+    const auto press = [&](const ui::DirectorPanel::Rect& r, std::uint64_t start) {
+        if (!r.valid) {
+            return;
+        }
+        if (frame >= start && frame < start + 6) {
+            warpAndMove(window, r.cx(), r.cy());
+        } else if (frame == start + 6) {
+            pushButton(window, r.cx(), r.cy(), true);
+        } else if (frame == start + 8) {
+            pushButton(window, r.cx(), r.cy(), false);
+        }
+    };
+    if (frame == 60) {
+        directorUndoBefore_ = history.undoSize();
+        directorSequenceBefore_ = engine.sequence().toJson().dump();
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval, "a goal proposal is waiting");
+        check(proposalPlan().value("tier", std::string()) == "goal", "the proposal is live (tier goal)");
+        check(director.buttons().record.valid, "the Record button is drawn and in view");
+        return;
+    }
+    press(director.buttons().record, 80);
+    if (frame == 120) {
+        check(director.recording(), "Record started a recording, off the editor's frames");
+    }
+    if (recordedAt_ == 0 && frame > 120 && !director.recording() && director.status().rfind("recorded", 0) == 0) {
+        recordedAt_ = frame;
+        const nlohmann::json plan = proposalPlan();
+        editLog_.push_back(fmt::format("director: the recording replaced the proposal at frame {}", frame));
+        check(plan.value("tier", std::string()) == "baked", "the revised proposal is baked");
+        const bool recorded = plan.contains("performances") && !plan["performances"].empty() &&
+                              plan["performances"][0].contains("recording");
+        check(recorded, "its performance carries the recording");
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval,
+              "the recording waits for approval like any proposal");
+        check(history.undoSize() == directorUndoBefore_, "recording changed nothing in the project");
+        check(engine.sequence().toJson().dump() == directorSequenceBefore_, "the sequence is as it was");
+    }
+    if (frame == 1490) {
+        check(recordedAt_ != 0 && recordedAt_ < 1490, fmt::format("the recording finished before frame 1490 ({})", recordedAt_));
+    }
+    press(director.buttons().accept, 1500);
+    if (frame == 1560) {
+        check(history.undoSize() == directorUndoBefore_ + 1,
+              fmt::format("Accept made exactly one undo ({} -> {})", directorUndoBefore_, history.undoSize()));
+        check(task != nullptr && history.undoLabel() == task->prompt(), "the undo is labelled with the request");
+        const auto& plans = engine.directingPlans();
+        check(plans.size() == 1 && !plans.empty() && plans[0].tier == directing::Tier::Baked &&
+                  !plans[0].performances.empty() && plans[0].performances[0].recording.has_value(),
+              "the installed plan is the recorded, baked one");
+        const auto& seq = engine.sequence();
+        check(std::any_of(seq.actors.begin(), seq.actors.end(), [](const seq::Actor& a) { return a.id == "rook"; }),
+              "Rook's recorded actor is installed");
+        check(std::none_of(seq.events.begin(), seq.events.end(),
+                           [](const seq::SequenceEvent& e) { return e.what.kind == seq::EventActionKind::CharacterGoal; }),
+              "no live goal was installed");
+    }
+    if (frame >= 1600 && frame <= 1603) {
+        SDL_SetModState(SDL_KMOD_GUI);
+        if (frame == 1602) {
+            SDL_Event e{};
+            e.type = SDL_EVENT_KEY_DOWN;
+            e.key.timestamp = SDL_GetTicksNS();
+            e.key.windowID = window.id();
+            e.key.key = SDLK_Z;
+            e.key.scancode = SDL_SCANCODE_Z;
+            e.key.mod = SDL_KMOD_GUI;
+            e.key.down = true;
+            SDL_PushEvent(&e);
+            e.type = SDL_EVENT_KEY_UP;
+            e.key.down = false;
+            SDL_PushEvent(&e);
+        }
+    }
+    if (frame == 1606) {
+        SDL_SetModState(SDL_KMOD_NONE);
+    }
+    if (frame == 1640) {
+        check(history.undoSize() == directorUndoBefore_, "Cmd+Z took it back");
+        check(engine.directingPlans().empty(), "the plan is gone with it");
+        check(engine.sequence().toJson().dump() == directorSequenceBefore_, "the sequence is as it was");
     }
 }
 

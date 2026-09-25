@@ -144,3 +144,29 @@ TEST_CASE("the panel's buttons: what is live, and why not", "[directing][panel]"
         CHECK(a.accept.enabled);
     }
 }
+
+TEST_CASE("the Record button: only for a live proposal, and it holds Accept while it runs", "[directing][panel]") {
+    PanelState live{true, true, true, false, false, true, false};
+    PanelActions a = panelActions(live);
+    CHECK(a.record.enabled);
+    CHECK(a.accept.enabled);
+
+    PanelState baked = live;
+    baked.liveToRecord = false;
+    a = panelActions(baked);
+    CHECK_FALSE(a.record.enabled);
+    CHECK(a.record.why == "nothing live to record: every performance is already baked");
+
+    PanelState running = live;
+    running.recording = true;
+    a = panelActions(running);
+    CHECK_FALSE(a.record.enabled);
+    CHECK_FALSE(a.accept.enabled); // what would be accepted is about to change
+    CHECK_FALSE(a.preview.enabled);
+    CHECK(a.reject.enabled);       // declining is always possible
+
+    PanelState stalePreview = live;
+    stalePreview.previewing = true;
+    stalePreview.previewIsNewest = false;
+    CHECK_FALSE(panelActions(stalePreview).record.enabled);
+}

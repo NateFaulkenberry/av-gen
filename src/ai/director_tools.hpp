@@ -19,6 +19,7 @@
 
 #include "ai/tool_api.hpp"
 #include "ai/tool_context.hpp"
+#include "directing/plan.hpp"
 #include "core/error.hpp"
 
 #include <cstddef>
@@ -43,5 +44,10 @@ struct CommitReport {
 // approved, install, and verify the installed content against the plan's fingerprints. Any failure
 // is returned for the caller to roll back.
 [[nodiscard]] Result<CommitReport> commitProposal(app::Engine& engine, const ToolContext::Proposal& proposal);
+
+// The proposal a plan makes against the project as it is now: its document, id, dry-run diff and
+// findings -- what `director.propose_plan` puts in front of the person, and what a recording's
+// result is re-proposed as (ADR-765). Fails when nothing in it can be built.
+[[nodiscard]] Result<ToolContext::Proposal> proposalFor(app::Engine& engine, const directing::Plan& plan);
 
 } // namespace avgen::ai

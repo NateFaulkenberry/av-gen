@@ -18,6 +18,7 @@
 #include <map>
 #include <numbers>
 #include <system_error>
+#include <utility>
 #include <unistd.h>
 
 namespace avgen::app {
@@ -31,20 +32,12 @@ void frame(Engine& engine, std::uint64_t f) {
     engine.update(FrameTime{static_cast<double>(f) / 60.0, f == 0 ? 0.0 : 1.0 / 60.0, f});
 }
 
-// A scratch engine loaded from a copy of `live`, set up the way a recording and its check must be:
-// no live control, no audio, every body simulated.
-Result<std::unique_ptr<Engine>> scratchOf(Engine& live, const std::filesystem::path& dir, std::string_view tag) {
-    static std::uint64_t serial = 0;
-    const RenderSource source = renderSourceFor(live.projectPath(), dir, tag, ++serial, static_cast<long long>(::getpid()));
-    if (auto r = live.writeProjectCopy(source.scratch); !r) {
-        return fail("record: cannot write the scratch copy: {}", r.error().message);
-    }
+// A scratch engine loaded from the recording's copy, set up the way a recording and its check must
+// be: no live control, no audio, every body simulated. Worker-safe: it touches nothing but the file.
+Result<std::unique_ptr<Engine>> loadCopy(const std::filesystem::path& copy) {
     auto engine = std::make_unique<Engine>(EngineMode::Offline);
     engine->setLiveControl(false);
-    auto loaded = engine->loadProject(source.scratch);
-    std::error_code ec;
-    std::filesystem::remove(source.scratch, ec);
-    if (!loaded) {
+    if (auto loaded = engine->loadProject(copy); !loaded) {
         return fail("record: the scratch copy does not load: {}", loaded.error().message);
     }
     scene::DetailLimits limits = engine->detailLimits();
@@ -67,16 +60,49 @@ struct Window {
 
 } // namespace
 
+Result<std::filesystem::path> writeRecordingCopy(Engine& live, const std::filesystem::path& scratchDir) {
+    static std::uint64_t serial = 0;
+    const std::filesystem::path dir = scratchDir.empty() ? std::filesystem::temp_directory_path() : scratchDir;
+    const RenderSource source = renderSourceFor(live.projectPath(), dir, "director_record", ++serial,
+                                                static_cast<long long>(::getpid()));
+    if (auto r = live.writeProjectCopy(source.scratch); !r) {
+        return fail("record: cannot write the scratch copy: {}", r.error().message);
+    }
+    return source.scratch;
+}
+
 Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compilation& compilation,
                                             const RecordOptions& options) {
+    auto copy = writeRecordingCopy(live, options.scratchDir);
+    if (!copy) {
+        return std::unexpected(copy.error());
+    }
+    auto report = recordFromCopy(*copy, compilation, options);
+    std::error_code ec;
+    std::filesystem::remove(*copy, ec);
+    return report;
+}
+
+Result<RecordReport> recordFromCopy(const std::filesystem::path& copy, const directing::Compilation& compilation,
+                                    const RecordOptions& options, const RecordProgress& progress) {
     using namespace directing;
     RecordReport report;
     report.plan = compilation.plan;
-    const std::filesystem::path dir = options.scratchDir.empty() ? std::filesystem::temp_directory_path() : options.scratchDir;
+    const auto say = [&](const std::string& phase) {
+        if (progress) {
+            progress(phase);
+        }
+    };
+    const auto cancelled = [&] { return options.cancel != nullptr && options.cancel->load(); };
 
-    // ---- what to record ----------------------------------------------------------------------------
+    // ---- what to record: facts from the copy, which is the project as it was when asked ------------
+    say("loading a scratch copy of the project");
+    auto scratch = loadCopy(copy);
+    if (!scratch) {
+        return std::unexpected(scratch.error());
+    }
     std::vector<Window> windows;
-    const SceneFacts facts = sceneFactsFor(live);
+    const SceneFacts facts = sceneFactsFor(**scratch);
     for (std::size_t i = 0; i < compilation.plan.performances.size(); ++i) {
         const PlanPerformance& p = compilation.plan.performances[i];
         if (p.mode != PerformanceMode::Goal || p.recording || compilation.validation.isBlocked(p.key)) {
@@ -105,10 +131,6 @@ Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compi
 
     // ---- play it, from zero, and keep what happened -------------------------------------------------
     auto start = std::chrono::steady_clock::now();
-    auto scratch = scratchOf(live, dir, "director_record");
-    if (!scratch) {
-        return std::unexpected(scratch.error());
-    }
     Engine& engine = **scratch;
     if (auto r = installCompilation(engine, compilation); !r) {
         return fail("record: the plan does not install on the scratch copy: {}", r.error().message);
@@ -126,9 +148,17 @@ Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compi
         end = std::max(end, w.until);
     }
     const auto lastFrame = static_cast<std::uint64_t>(std::ceil(end * 60.0));
+    std::uint64_t recordedFrames = 0;
     for (std::uint64_t f = 0; f <= lastFrame; ++f) {
+        if (cancelled()) {
+            return fail("record: cancelled");
+        }
         frame(engine, f);
+        recordedFrames = f;
         const double t = static_cast<double>(f) / 60.0;
+        if (f % 60 == 0) {
+            say(fmt::format("recording: played {:.0f} s (until the goals' events are heard, at most {:.0f} s)", t, end));
+        }
         for (const seq::FiredEvent& fired : engine.firedEvents()) {
             const auto& events = engine.sequence().events;
             if (fired.eventIndex >= events.size() || events[fired.eventIndex].what.kind != seq::EventActionKind::Notify) {
@@ -256,7 +286,8 @@ Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compi
 
     // ---- the check: play the recording back, and scrub into it --------------------------------------
     start = std::chrono::steady_clock::now();
-    auto check = scratchOf(live, dir, "director_record_check");
+    say("checking: playing the recording back");
+    auto check = loadCopy(copy);
     if (!check) {
         return std::unexpected(check.error());
     }
@@ -281,7 +312,10 @@ Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compi
         }
         return out;
     };
-    for (std::uint64_t f = 0; f <= lastFrame; ++f) {
+    for (std::uint64_t f = 0; f <= recordedFrames; ++f) {
+        if (cancelled()) {
+            return fail("record: cancelled");
+        }
         frame(**check, f);
         const double t = static_cast<double>(f) / 60.0;
         for (std::size_t k = 0; k < windows.size(); ++k) {
@@ -303,7 +337,8 @@ Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compi
         }
     }
     for (const auto& [f, played] : playedAt) {
-        auto scrub = scratchOf(live, dir, "director_record_scrub");
+        say("checking: a scrub into the recording");
+        auto scrub = loadCopy(copy);
         if (!scrub) {
             return std::unexpected(scrub.error());
         }
@@ -320,6 +355,7 @@ Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compi
         }
     }
     report.checkMs = since(start);
+    say("done");
     for (std::size_t k = 0; k < windows.size(); ++k) {
         report.plan.performances[windows[k].performance].recording->replayWorstMetres = report.replayWorstMetres;
     }
@@ -327,6 +363,104 @@ Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compi
               "{:.4f} m from the play ({:.0f} ms)",
               windows.size(), report.recordMs, report.replayWorstMetres, report.scrubWorstMetres, report.checkMs);
     return report;
+}
+
+RecordingJob::~RecordingJob() {
+    cancel();
+    finish();
+}
+
+void RecordingJob::finish() {
+    if (thread_.joinable()) {
+        thread_.join();
+    }
+    if (!copy_.empty()) {
+        std::error_code ec;
+        std::filesystem::remove(copy_, ec);
+        copy_.clear();
+    }
+}
+
+Result<void> RecordingJob::start(Engine& live, directing::Compilation compilation, RecordOptions options) {
+    if (running()) {
+        return fail("a recording is already running");
+    }
+    finish();
+    auto copy = writeRecordingCopy(live, options.scratchDir);
+    if (!copy) {
+        return std::unexpected(copy.error());
+    }
+    copy_ = *copy;
+    cancel_ = false;
+    done_ = false;
+    {
+        std::lock_guard lock(mutex_);
+        result_.reset();
+        phase_ = "starting";
+    }
+    options.cancel = &cancel_;
+    thread_ = std::thread([this, compilation = std::move(compilation), options = std::move(options)] {
+        auto r = recordFromCopy(copy_, compilation, options, [this](const std::string& phase) {
+            std::lock_guard lock(mutex_);
+            phase_ = phase;
+        });
+        {
+            std::lock_guard lock(mutex_);
+            result_ = std::move(r);
+        }
+        done_ = true;
+    });
+    return {};
+}
+
+bool RecordingJob::running() const { return thread_.joinable() && !done_.load(); }
+
+std::string RecordingJob::phase() const {
+    std::lock_guard lock(mutex_);
+    return phase_;
+}
+
+std::optional<Result<RecordReport>> RecordingJob::take() {
+    if (!done_.load()) {
+        return std::nullopt;
+    }
+    finish();
+    std::lock_guard lock(mutex_);
+    return std::exchange(result_, std::nullopt);
+}
+
+void RecordingJob::cancel() { cancel_ = true; }
+
+namespace {
+
+class JobHandle final : public ai::RecordingHandle {
+public:
+    [[nodiscard]] bool done() const override { return job.finished(); }
+    [[nodiscard]] std::string phase() const override { return job.phase(); }
+    [[nodiscard]] Result<directing::Plan> take() override {
+        auto r = job.take();
+        if (!r) {
+            return fail("the recording has not finished");
+        }
+        if (!*r) {
+            return std::unexpected(r->error());
+        }
+        return (*r)->plan;
+    }
+    void cancel() override { job.cancel(); }
+    RecordingJob job;
+};
+
+} // namespace
+
+ai::RecordingHook makeRecordingHook(RecordOptions options) {
+    return [options](Engine& engine, const directing::Compilation& c) -> Result<std::shared_ptr<ai::RecordingHandle>> {
+        auto handle = std::make_shared<JobHandle>();
+        if (auto r = handle->job.start(engine, c, options); !r) {
+            return std::unexpected(r.error());
+        }
+        return handle;
+    };
 }
 
 } // namespace avgen::app

@@ -144,6 +144,22 @@ PanelActions panelActions(const PanelState& state) {
                                                : "later edits were made: undo the preview from the history";
 
     a.revertPreviewFirst = state.previewing && state.previewIsNewest;
+
+    // Record: turns the waiting proposal into its recording, which is then approved like any other.
+    // While it runs, nothing that would change the proposal under it is offered.
+    a.record.enabled = live && state.liveToRecord && !state.recording && (!state.previewing || state.previewIsNewest);
+    a.record.why = !live                  ? none
+                   : state.recording      ? "recording..."
+                   : !state.liveToRecord  ? "nothing live to record: every performance is already baked"
+                   : state.previewing && !state.previewIsNewest
+                       ? "later edits were made after the preview: undo it from the history first"
+                       : "plays a scratch copy from zero, keeps what the characters did, checks it, and proposes that";
+    if (state.recording) {
+        a.accept.enabled = false;
+        a.accept.why = "wait for the recording";
+        a.preview.enabled = false;
+        a.preview.why = "wait for the recording";
+    }
     return a;
 }
 

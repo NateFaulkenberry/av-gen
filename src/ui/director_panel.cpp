@@ -1,6 +1,7 @@
 #include "ui/director_panel.hpp"
 
 #include "ai/control_plane.hpp"
+#include "ai/director_tools.hpp"
 #include "app/directing_apply.hpp"
 #include "app/directing_context.hpp"
 #include "app/edit_system.hpp"
@@ -9,6 +10,7 @@
 #include "ui/director_panel_logic.hpp"
 
 #include <imgui.h>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <string>
@@ -74,14 +76,17 @@ std::shared_ptr<AgentTask> directorTask(const avgen::ai::ControlPlane& plane) {
 void DirectorPanel::refresh(app::Engine& engine, const std::shared_ptr<AgentTask>& task) {
     const std::uint64_t state = edits != nullptr ? edits->history().stateId() : 0;
     const std::string id = task ? task->id() : std::string();
-    if (id == cachedTask_ && state == cachedState_) {
+    const auto proposalNow = task ? task->proposal() : std::nullopt;
+    const std::string diffNow = proposalNow ? proposalNow->diff : std::string();
+    if (id == cachedTask_ && state == cachedState_ && diffNow == cachedDiff_) {
         return;
     }
     // While its own preview is installed, the proposal is shown as it was proposed. Re-compiling it
     // against the project would compile it against itself: "revision 2", every line a replacement.
-    if (!previewTask_.empty() && id == previewTask_ && id == cachedTask_ && compiled_) {
+    if (!previewTask_.empty() && id == previewTask_ && id == cachedTask_ && compiled_ && diffNow == cachedDiff_) {
         return;
     }
+    cachedDiff_ = diffNow;
     cachedTask_ = id;
     cachedState_ = state;
     compiled_.reset();
@@ -168,8 +173,33 @@ void DirectorPanel::draw(app::Engine& engine) {
     if (!previewTask_.empty() && task && previewTask_ != task->id()) {
         (void)endPreview(engine); // the proposal it previewed is gone
     }
+    // A finished recording becomes the proposal, approved like any other (ADR-765).
+    if (auto done = recording_.take()) {
+        if (!*done) {
+            status_ = "recording failed: " + done->error().message;
+        } else if (!task || task->id() != recordingTask_ || !awaiting) {
+            status_ = "the recording finished, but the proposal it was for is no longer waiting";
+        } else if (auto revised = ai::proposalFor(engine, (*done)->plan); !revised) {
+            status_ = "the recording cannot be proposed: " + revised.error().message;
+        } else {
+            const std::string note = fmt::format(
+                "Recorded: {}. Played back {:.4f} m from the recording; a scrub landed {:.4f} m from the play.",
+                (*done)->notes.empty() ? std::string("the live performances") : (*done)->notes.front(),
+                (*done)->replayWorstMetres, (*done)->scrubWorstMetres);
+            status_ = plane->reviseCurrentProposal(std::move(*revised), note) ? "recorded: the proposal is now the recording"
+                                                                              : "the proposal could not be revised";
+        }
+    }
+    const bool liveToRecord =
+        compiled_ && std::any_of(compiled_->plan.performances.begin(), compiled_->plan.performances.end(),
+                                 [&](const directing::PlanPerformance& p) {
+                                     return p.mode != directing::PerformanceMode::Scripted && !p.recording &&
+                                            !compiled_->validation.isBlocked(p.key);
+                                 });
     PanelState ps;
     ps.proposal = proposal.has_value() && compiled_.has_value();
+    ps.liveToRecord = liveToRecord;
+    ps.recording = recording_.running();
     ps.awaiting = awaiting;
     ps.changesAnything = compiled_ && compiled_->changesAnything();
     ps.previewing = !previewTask_.empty();
@@ -221,6 +251,22 @@ void DirectorPanel::draw(app::Engine& engine) {
         }
         (void)plane->rejectCurrentTask();
         status_ = "rejected; nothing was changed";
+    }
+    ImGui::SameLine();
+    if (button("Record", actions.record, buttons_.record) && compiled_) {
+        if (actions.revertPreviewFirst) {
+            (void)endPreview(engine); // record the proposal against the project, not against its preview
+        }
+        if (auto started = recording_.start(engine, *compiled_, app::RecordOptions{}); started) {
+            recordingTask_ = task->id();
+            status_ = "recording...";
+        } else {
+            status_ = "cannot record: " + started.error().message;
+        }
+    }
+    if (recording_.running()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", recording_.phase().c_str());
     }
     ImGui::SameLine();
     Button stillsButton;
