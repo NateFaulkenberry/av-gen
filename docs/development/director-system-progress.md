@@ -278,6 +278,9 @@ undo, serialization or compilation will be built on them.
 - 2026-09-25: OSC: evaluating engines open no live control (86d81b9a). Stills no longer block the
   editor: a cached scratch session simulated on its own thread (2ed68542). Merged main 9a37c9bb
   (7af0244f). Slice 4 goal compile (ce3a740e) and recording (see ADR-763's "Implemented").
+- 2026-09-25: merged main 6cf46868 (effects integration, ADR-705 `scene/volumeDensity`, Wave 2) at
+  e661e6da. **Full suites there:** CPU 3,444 cases, exit 0 (1 expected shouldfail, 19 skips); GPU
+  490, exit 0 (1 skip).
 - 2026-09-25: panel buttons verified in a running session (610828d4; `director-reject` /
   `director-accept` UI script arms, 32 checks, exit 8 on failure). Preview stills from a scratch
   copy (ADR-764), shown on each shot row.
