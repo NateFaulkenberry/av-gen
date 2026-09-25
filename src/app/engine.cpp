@@ -1319,10 +1319,18 @@ void visitSceneFileAssets(const std::filesystem::path& sceneFile,
 nlohmann::json aimFollowToJson(std::span<const scene::AimFollow> follow) {
     nlohmann::json shots = nlohmann::json::array();
     for (const scene::AimFollow& shot : follow) {
-        shots.push_back(nlohmann::json{{"start", shot.startSeconds},
-                                       {"end", shot.endSeconds},
-                                       {"hero", shot.hero},
-                                       {"heroAtCut", {shot.heroAtCut.x, shot.heroAtCut.y, shot.heroAtCut.z}}});
+        nlohmann::json entry{{"start", shot.startSeconds},
+                             {"end", shot.endSeconds},
+                             {"hero", shot.hero},
+                             {"heroAtCut", {shot.heroAtCut.x, shot.heroAtCut.y, shot.heroAtCut.z}}};
+        // ADR-891: written only for a continuous take, so an edited cut's document is unchanged.
+        if (shot.joinInSeconds > 0.0) {
+            entry["joinIn"] = shot.joinInSeconds;
+        }
+        if (shot.joinOutSeconds > 0.0) {
+            entry["joinOut"] = shot.joinOutSeconds;
+        }
+        shots.push_back(std::move(entry));
     }
     return shots;
 }
@@ -1345,6 +1353,8 @@ std::vector<scene::AimFollow> aimFollowFromJson(const nlohmann::json& array, con
         shot.hero = entry.value("hero", std::string{});
         const auto& at = entry["heroAtCut"];
         shot.heroAtCut = glm::vec3(at[0].get<float>(), at[1].get<float>(), at[2].get<float>());
+        shot.joinInSeconds = std::max(entry.value("joinIn", 0.0), 0.0);
+        shot.joinOutSeconds = std::max(entry.value("joinOut", 0.0), 0.0);
         if (shot.hero.empty() || !(shot.endSeconds > shot.startSeconds)) {
             warn(fmt::format("{}: a shot with no hero or no duration was skipped", key));
             continue;

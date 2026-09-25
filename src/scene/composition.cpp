@@ -24,6 +24,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <optional>
 #include <array>
 #include <cstdlib>
 #include <cstring>
@@ -1413,52 +1414,96 @@ void Composition::applyDirectedAim() {
             break;
         }
     }
+    // How far a shot's hero has walked since the cut. A hero that was unstarred or renamed since
+    // the cut leaves the shot the aim it was baked with, which is the last place that hero was known
+    // to be -- a stale table is inert.
+    const auto walkedSinceCut = [&](const AimFollow& shot) -> std::optional<glm::vec3> {
+        const auto hero = std::find_if(heroes_.begin(), heroes_.end(),
+                                       [&](const world::HeroPoint& h) { return h.name == shot.hero; });
+        if (hero == heroes_.end()) {
+            return std::nullopt;
+        }
+        return hero->position - shot.heroAtCut;
+    };
+    const auto ease = [](double u) {
+        u = std::clamp(u, 0.0, 1.0);
+        return static_cast<float>(u * u * (3.0 - (2.0 * u)));
+    };
+    // ADR-891: a continuous take's boundaries are joins, not cuts. Across one, the offset is handed
+    // from the outgoing shot's to the incoming one's over the join, rather than dropped. Both ends
+    // are read from where the heroes are *now*, so this stays a function of the playhead and the
+    // world: a scrub lands on the same aim a play does, with no memory of the frame before.
+    std::optional<glm::vec3> raw;
+    bool joining = false;
+    if (active != nullptr) {
+        raw = walkedSinceCut(*active);
+        const double into = currentTime_ - active->startSeconds;
+        if (active->joinInSeconds > 0.0 && into < active->joinInSeconds) {
+            glm::vec3 from(0.0f);
+            for (const AimFollow& shot : aimFollow_) {
+                if (&shot != active && std::abs(shot.endSeconds - active->startSeconds) < 1e-6) {
+                    from = walkedSinceCut(shot).value_or(glm::vec3(0.0f));
+                    break;
+                }
+            }
+            raw = glm::mix(from, raw.value_or(glm::vec3(0.0f)), ease(into / active->joinInSeconds));
+            joining = true;
+        }
+    } else {
+        // Between follow entries: a shot that aims down its move rather than at a subject. After
+        // a join, the last subject's offset is let go over the join rather than in one frame.
+        for (const AimFollow& shot : aimFollow_) {
+            const double after = currentTime_ - shot.endSeconds;
+            if (shot.joinOutSeconds > 0.0 && after >= 0.0 && after < shot.joinOutSeconds) {
+                if (const auto walked = walkedSinceCut(shot)) {
+                    raw = *walked * (1.0f - ease(after / shot.joinOutSeconds));
+                    joining = true;
+                }
+                break;
+            }
+        }
+    }
     if (active != aimFollowLast_) {
         // A cut. The delta is zero by definition at the start of a shot -- the hero is at
         // `heroAtCut` -- so the filter starts from zero rather than from the last shot's offset,
-        // which would open the new shot pointing at where the previous hero had got to.
-        aimFollowSmoothed_ = glm::vec3(0.0f);
-        aimFollowPrimed_ = false;
+        // which would open the new shot pointing at where the previous hero had got to. A join is
+        // not a cut, and the filter carries straight across it.
+        if (!joining) {
+            aimFollowSmoothed_ = glm::vec3(0.0f);
+            aimFollowPrimed_ = false;
+        }
         aimFollowLast_ = active;
     }
-    if (active != nullptr) {
-        const auto hero =
-            std::find_if(heroes_.begin(), heroes_.end(),
-                         [&](const world::HeroPoint& h) { return h.name == active->hero; });
-        // A hero that was unstarred or renamed since the cut leaves the shot the aim it was baked
-        // with, which is the last place that hero was known to be -- a stale table is inert.
-        if (hero != heroes_.end()) {
-            const glm::vec3 raw = hero->position - active->heroAtCut;
-            glm::vec3 delta = raw;
-            if (aimFollowSmoothingMs_ > 1e-3f) {
-                // ADR-245. Framed in seconds of the *timeline* rather than of the wall clock, so an
-                // offline render and live playback filter identically -- the same rule every other
-                // smoother in this file follows.
-                const double dt = std::max(currentTime_ - aimFollowPrevTime_, 0.0);
-                if (!aimFollowPrimed_) {
-                    // The first frame of a shot has no previous sample to move away from, and the
-                    // honest starting value is the delta itself: at a cut that is zero, and after a
-                    // seek it is wherever the hero actually is. Starting at zero instead would make
-                    // the camera crawl to its subject over the filter's constant, every seek.
-                    aimFollowSmoothed_ = raw;
-                    aimFollowPrimed_ = true;
-                } else if (dt > 0.0) {
-                    const double tau = static_cast<double>(aimFollowSmoothingMs_) / 1000.0;
-                    const auto rate = static_cast<float>(1.0 - std::exp(-dt / std::max(tau, 1e-6)));
-                    aimFollowSmoothed_ += (raw - aimFollowSmoothed_) * rate;
-                }
-                delta = aimFollowSmoothed_;
+    if (raw.has_value()) {
+        glm::vec3 delta = *raw;
+        if (aimFollowSmoothingMs_ > 1e-3f) {
+            // ADR-245. Framed in seconds of the *timeline* rather than of the wall clock, so an
+            // offline render and live playback filter identically -- the same rule every other
+            // smoother in this file follows.
+            const double dt = std::max(currentTime_ - aimFollowPrevTime_, 0.0);
+            if (!aimFollowPrimed_) {
+                // The first frame of a shot has no previous sample to move away from, and the
+                // honest starting value is the delta itself: at a cut that is zero, and after a
+                // seek it is wherever the hero actually is. Starting at zero instead would make
+                // the camera crawl to its subject over the filter's constant, every seek.
+                aimFollowSmoothed_ = *raw;
+                aimFollowPrimed_ = true;
+            } else if (dt > 0.0) {
+                const double tau = static_cast<double>(aimFollowSmoothingMs_) / 1000.0;
+                const auto rate = static_cast<float>(1.0 - std::exp(-dt / std::max(tau, 1e-6)));
+                aimFollowSmoothed_ += (*raw - aimFollowSmoothed_) * rate;
             }
-            // ADR-890: the nudge belongs to the film's main camera, so it lands only on a frame
-            // that *is* the film's. This runs after `applyViewportView` (it has to: the hero has
-            // only just moved), which put the editor's viewpoint or a looked-through rig on screen
-            // if the person asked for one -- and adding the hero's walk to that is the director
-            // steering a camera it does not own: "I have control of the camera and it is still
-            // moved by the director". The smoother above keeps running either way, so going back
-            // to the film mid-shot lands on the filtered offset rather than restarting it.
-            if (!viewportOwnsFrame_) {
-                scene_.camera.target += delta;
-            }
+            delta = aimFollowSmoothed_;
+        }
+        // ADR-890: the nudge belongs to the film's main camera, so it lands only on a frame
+        // that *is* the film's. This runs after `applyViewportView` (it has to: the hero has
+        // only just moved), which put the editor's viewpoint or a looked-through rig on screen
+        // if the person asked for one -- and adding the hero's walk to that is the director
+        // steering a camera it does not own: "I have control of the camera and it is still
+        // moved by the director". The smoother above keeps running either way, so going back
+        // to the film mid-shot lands on the filtered offset rather than restarting it.
+        if (!viewportOwnsFrame_) {
+            scene_.camera.target += delta;
         }
     }
     aimFollowPrevTime_ = currentTime_;
