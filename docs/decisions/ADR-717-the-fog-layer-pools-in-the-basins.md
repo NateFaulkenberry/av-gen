@@ -243,3 +243,20 @@ turns the method into "fog lies only in low ground". See Consequences.
   narrower would want a different σ. Such a world does not exist yet, and at that point σ becomes a
   terrain-node setting that is part of the bake key. It should not be a fog parameter, because
   changing it means a re-bake.
+
+## Owner rulings (2026-09-25)
+
+- **Pooling ships as it is.** On test ground it gathers fog in the valleys and clears it off the
+  ridges (17.5 m of air per column in the valleys against 0.5 m on the ridges). On Glowmere it reads
+  only as a faint haze on a hillside. The blur gathers fog in any hollow, not only in closed basins.
+  The owner accepted that. Fog that fills only closed basins (fill-to-spill) is not built.
+- **The surface fog integral stays at eight chords, and its error is recorded, not fixed.** The
+  surface pass integrates the fog layer along a ray with ADR-715's eight chords. On grazing rays
+  over rough ground, that integral can be **up to 40% off** the reference. Sixteen chords fix it,
+  but they also change every frame that uses ground follow, by a small amount. The owner declined
+  that change for now.
+  - **Where it shows:** low cameras skimming rough terrain with `fogGroundFollow` or pooling on.
+  - **The remedy:** raise the chord count in `applyFog`'s ground term to 16, then re-baseline the
+    affected scenes' hashes.
+  - **How to see it:** compare the eight-chord integral against the reference integral for a grazing
+    ray on a rough height field. The error ratio is the number to watch.

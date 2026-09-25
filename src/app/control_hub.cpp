@@ -26,7 +26,19 @@ void ControlHub::setMap(control::ControlMap map) {
     applyIo();
 }
 
+void ControlHub::setLiveIo(bool enabled) {
+    liveIo_ = enabled;
+    applyIo();
+}
+
 void ControlHub::applyIo() {
+    if (!liveIo_) {
+        closeAll();
+        oscError_.clear();
+        midiError_.clear();
+        feedbackError_.clear();
+        return;
+    }
     // OSC
     if (map_.oscEnabled) {
         if (!osc_.isOpen() || osc_.port() != map_.oscPort) {

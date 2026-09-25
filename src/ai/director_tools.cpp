@@ -76,6 +76,41 @@ std::optional<directing::Plan> readPlan(const json& args, json& report) {
     return std::move(*parsed.plan);
 }
 
+// ADR-767: a plan that places items on events and carries no observation of its own is given the
+// one this task's watch returned -- so the model writes {"event": "abduction/beam"} and never copies
+// times, or an observation, by hand.
+bool usesEvents(const json& j) {
+    if (j.is_object()) {
+        if (j.contains("event") && j["event"].is_string()) {
+            return true;
+        }
+        for (const auto& [k, v] : j.items()) {
+            if (usesEvents(v)) {
+                return true;
+            }
+        }
+    } else if (j.is_array()) {
+        for (const json& v : j) {
+            if (usesEvents(v)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void attachObservation(directing::Plan& plan, const ToolContext& ctx) {
+    if (plan.observation || !ctx.observation().is_object() || !usesEvents(plan.toJson())) {
+        return;
+    }
+    std::vector<directing::ObservedEvent> events;
+    for (const json& e : ctx.observation().value("events", json::array())) {
+        events.push_back(directing::ObservedEvent{e.value("name", std::string()), e.value("subject", std::string()),
+                                                  e.value("seconds", 0.0), e.value("end", 0.0)});
+    }
+    plan.observation = std::make_pair(std::move(events), ctx.observation().value("until", 0.0));
+}
+
 json diffJson(const directing::Compilation& c) {
     json out = json::array();
     for (const directing::DiffLine& d : c.diff) {
@@ -234,6 +269,7 @@ void registerDirectorTools(ToolRegistry& registry) {
             if (!plan) {
                 return ToolResult::ok(out, "the plan is not well formed");
             }
+            attachObservation(*plan, ctx);
             const directing::Validation v = directing::validatePlan(*plan, app::sceneFactsFor(ctx.engine()));
             out["accepted"] = true;
             out["issues"] = issuesJson(v.issues);
@@ -246,6 +282,72 @@ void registerDirectorTools(ToolRegistry& registry) {
     proposes.idempotent = false;
     proposes.requiresApproval = true;
     proposes.deterministic = true;
+
+    // ADR-765: the assistant may ASK for a recording; the host does it, and the person approves the
+    // result. Nothing is applied by this tool.
+    ToolAnnotations records = proposes;
+    records.deterministic = false; // what the characters do while recorded is theirs
+    add(registry, "director.record_plan", "Record a plan's live performances",
+        "Bake a plan whose performances are live (mode goal): play the project from zero on a scratch "
+        "copy, keep what each character actually did and when its events happened, check the recording "
+        "plays back and scrubs exactly, and put the RECORDED plan in front of the person for approval. "
+        "Nothing is applied until they approve. Takes seconds; use it when the person wants a live "
+        "performance fixed, or wants cues on its events (which only a recording can time).",
+        schema::object({{"plan", planArgument()}}, {"plan"}), records,
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            json out;
+            std::optional<directing::Plan> plan = readPlan(args, out);
+            if (!plan) {
+                return ToolResult::ok(out, "the plan is not well formed; nothing recorded");
+            }
+            attachObservation(*plan, ctx);
+            if (!ctx.recordingHook()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "recording is not available in this session (the host installed no recorder)");
+            }
+            const directing::Compilation c = directing::compilePlan(*plan, app::sceneFactsFor(ctx.engine()));
+            const bool live = std::any_of(c.plan.performances.begin(), c.plan.performances.end(),
+                                          [&](const directing::PlanPerformance& p) {
+                                              return p.mode != directing::PerformanceMode::Scripted && !p.recording &&
+                                                     !c.validation.isBlocked(p.key);
+                                          });
+            if (!live) {
+                out["issues"] = issuesJson(c.validation.issues);
+                return ToolResult::ok(out, "nothing live to record: every performance is scripted, recorded or blocked");
+            }
+            auto handle = ctx.recordingHook()(ctx.engine(), c);
+            if (!handle) {
+                return ToolResult::failure(ToolErrorCode::Internal, "the recording did not start: " + handle.error().message);
+            }
+            ctx.deferProposal(std::move(*handle));
+            out["recording"] = true;
+            return ToolResult::ok(out, "recording started");
+        });
+
+    // ADR-767: what happens in the film on its own -- the characters' completions, the scenarios'
+    // beats -- found by watching it, so a plan can put things ON them: {"event": "abduction/beam"}.
+    add(registry, "director.watch_events", "Watch the film for what happens in it",
+        "Play the project from zero on a scratch copy (audio off, nothing changed) and list every world "
+        "event it raises -- a scenario's beat, a character's named completion, a goal's arrival -- with "
+        "its time and who raised it. Then propose a plan whose times are {\"event\": name, \"subject\": "
+        "who, \"occurrence\": n}: the observation is attached to it for you. Takes seconds.",
+        schema::object({{"untilSeconds", {{"type", "number"}, {"description", "how far to watch; default: the whole piece, at most 240 s"}}}},
+                       {}),
+        inspect(), [](const json& args, ToolContext& ctx) -> ToolResult {
+            if (!ctx.watchHook()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "watching is not available in this session (the host installed no watcher)");
+            }
+            const double duration = app::musicalContextFor(ctx.engine()).durationSeconds;
+            double until = args.value("untilSeconds", duration > 0.0 ? duration : 120.0);
+            until = std::clamp(until, 1.0, 240.0);
+            auto handle = ctx.watchHook()(ctx.engine(), until);
+            if (!handle) {
+                return ToolResult::failure(ToolErrorCode::Internal, "the watch did not start: " + handle.error().message);
+            }
+            ctx.deferResult(std::move(*handle));
+            return ToolResult::ok(json{{"watching", true}, {"untilSeconds", until}}, "watching");
+        });
     add(registry, "director.propose_plan", "Propose a Director Plan",
         "Compile a plan against the scene WITHOUT changing it, and put the result in front of the person: "
         "what will be added or replaced, and every finding. Nothing is applied until they approve; the "
@@ -259,6 +361,7 @@ void registerDirectorTools(ToolRegistry& registry) {
             if (!plan) {
                 return ToolResult::ok(out, "the plan is not well formed; nothing proposed");
             }
+            attachObservation(*plan, ctx);
             const directing::Compilation c = directing::compilePlan(*plan, app::sceneFactsFor(ctx.engine()));
             out["accepted"] = true;
             out["planId"] = c.plan.id;
@@ -270,11 +373,26 @@ void registerDirectorTools(ToolRegistry& registry) {
             if (!c.changesAnything()) {
                 return ToolResult::ok(out, "nothing in this plan can be built; nothing proposed");
             }
-            ctx.propose(ToolContext::Proposal{args.at("plan"), c.plan.id, c.diffText(), out["issues"]});
+            json document = args.at("plan");
+            if (plan->observation && !document.contains("observation")) {
+                document["observation"] = plan->toJson()["observation"]; // what its times were placed by
+            }
+            ctx.propose(ToolContext::Proposal{std::move(document), c.plan.id, c.diffText(), out["issues"]});
             return ToolResult::ok(out, fmt::format("proposed '{}' ({} change(s)); awaiting approval", c.plan.id,
                                                    std::count_if(c.diff.begin(), c.diff.end(),
                                                                  [](const directing::DiffLine& d) { return d.sign != '!'; })));
         });
+}
+
+Result<ToolContext::Proposal> proposalFor(app::Engine& engine, const directing::Plan& plan) {
+    directing::Plan clean = plan;
+    clean.produced.clear(); // provenance is the compiler's to write, on the project it installs into
+    const directing::Compilation c = directing::compilePlan(clean, app::sceneFactsFor(engine));
+    if (!c.changesAnything()) {
+        return fail("nothing in this plan can be built");
+    }
+    json issues = issuesJson(c.validation.issues);
+    return ToolContext::Proposal{clean.toJson(), c.plan.id, c.diffText(), std::move(issues)};
 }
 
 Result<CommitReport> commitProposal(app::Engine& engine, const ToolContext::Proposal& proposal) {

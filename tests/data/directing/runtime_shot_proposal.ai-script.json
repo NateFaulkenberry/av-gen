@@ -1,0 +1,62 @@
+{
+  "turns": [
+    {
+      "text": "Watching the first 25 s to see what the cameras do on their own.",
+      "toolCalls": [
+        {
+          "id": "w1",
+          "name": "director.watch_events",
+          "arguments": {
+            "untilSeconds": 25
+          }
+        }
+      ]
+    },
+    {
+      "text": "UFO Watch takes the frame for the first abduction. Proposing Rook's chase there, unlocked, so you can see what would win.",
+      "toolCalls": [
+        {
+          "id": "p1",
+          "name": "director.propose_plan",
+          "arguments": {
+            "plan": {
+              "schemaVersion": 1,
+              "id": "over-the-beam",
+              "title": "Rook during the first abduction",
+              "tier": "baked",
+              "subjects": [
+                {
+                  "alias": "rook",
+                  "text": "Rook"
+                }
+              ],
+              "shots": [
+                {
+                  "key": "shot",
+                  "name": "rook-over-beam",
+                  "start": {
+                    "event": "camera/UFO Watch",
+                    "occurrence": 1,
+                    "offsetSeconds": 0.5
+                  },
+                  "durationSeconds": 3,
+                  "subject": "rook",
+                  "locked": false,
+                  "camera": [
+                    {
+                      "move": "chase",
+                      "distanceMetres": 4
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "text": "Lock it to keep the frame, or adopt UFO Watch's shot instead."
+    }
+  ]
+}

@@ -48,11 +48,15 @@ std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directi
     for (PlanItemRow& row : rows) {
         std::vector<std::string> errors;
         std::vector<std::string> warnings;
+        std::vector<std::string> notes; // Info: said, but it marks nothing (a locked shot keeping the frame)
         for (const directing::Issue& issue : validation.issues) {
             if (issue.item != row.key) {
                 continue;
             }
-            (issue.severity == directing::Severity::Error ? errors : warnings).push_back(issue.message);
+            (issue.severity == directing::Severity::Error     ? errors
+             : issue.severity == directing::Severity::Warning ? warnings
+                                                              : notes)
+                .push_back(issue.message);
         }
         if (validation.isBlocked(row.key) || !errors.empty()) {
             row.mark = ItemMark::Blocked;
@@ -61,6 +65,7 @@ std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directi
         }
         row.lines = std::move(errors);
         row.lines.insert(row.lines.end(), warnings.begin(), warnings.end());
+        row.lines.insert(row.lines.end(), notes.begin(), notes.end());
     }
     for (const directing::Issue& issue : validation.issues) {
         const bool owned = std::any_of(rows.begin(), rows.end(), [&](const PlanItemRow& r) { return r.key == issue.item; });
@@ -144,6 +149,24 @@ PanelActions panelActions(const PanelState& state) {
                                                : "later edits were made: undo the preview from the history";
 
     a.revertPreviewFirst = state.previewing && state.previewIsNewest;
+
+    // Record: turns the waiting proposal into its recording, which is then approved like any other.
+    // While it runs, nothing that would change the proposal under it is offered.
+    a.record.enabled = live && state.liveToRecord && !state.recording && (!state.previewing || state.previewIsNewest);
+    a.record.why = !live                  ? none
+                   : state.recording      ? "recording..."
+                   : !state.liveToRecord  ? "nothing live to record: every performance is already baked"
+                   : state.previewing && !state.previewIsNewest
+                       ? "later edits were made after the preview: undo it from the history first"
+                       : "plays a scratch copy from zero, keeps what the characters did, checks it, and proposes that";
+    a.cancelRecording.enabled = state.recording;
+    a.cancelRecording.why = state.recording ? "stops the recording; the proposal stays as it was" : "no recording is running";
+    if (state.recording) {
+        a.accept.enabled = false;
+        a.accept.why = "wait for the recording";
+        a.preview.enabled = false;
+        a.preview.why = "wait for the recording";
+    }
     return a;
 }
 

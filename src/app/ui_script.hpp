@@ -101,6 +101,26 @@ enum class UiScriptArm : std::uint32_t {
     // to the strip's hit test to `performSlice`. It reports the shot count before and after, so the
     // run either says the piece gained a shot or says it did not.
     Slice = 1u << 15,
+    // ADR-762: the Director panel's buttons, pressed through the pointer against a proposal that is
+    // waiting (run with `--ai-script`): Preview then Reject, or Preview then Accept then Cmd+Z. After
+    // each step the arm checks the project -- the preview edit is there and then gone, Accept makes
+    // exactly one undo labelled with the request, undo restores the plan list -- and a failed check
+    // makes the run exit non-zero. The same frames every run, so `--capture-ui-frame` can photograph
+    // the panel after any step.
+    DirectorReject = 1u << 16,
+    DirectorAccept = 1u << 17,
+    // ADR-765: Record, against a waiting GOAL proposal (run with a goal `--ai-script`): press Record,
+    // wait for the recording to replace the proposal, check it is baked; then Accept at frame 1500,
+    // check one undo labelled with the request and the recorded actor installed; Cmd+Z at 1600 and
+    // check it is all gone. Captures after 1450 show the recorded proposal, 1550 the accepted plan.
+    DirectorRecord = 1u << 18,
+    // ADR-890: take the canvas's editor viewpoint and hold it. Chooses the editor viewpoint the way
+    // the toolbar does, Option-drags the canvas, lets go, then plays across the film's cuts and
+    // seeks, and checks on every frame that what is on screen is still exactly the pose the drag
+    // left -- naming the frame, the second and the film's camera the first time it is not.
+    Viewpoint = 1u << 19,
+    // Record, then Cancel recording while it runs: the recording stops and the proposal is untouched.
+    DirectorCancel = 1u << 20,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -143,6 +163,8 @@ public:
     // out to have been slow, which is how "changing a property costs 14 ms" becomes the name of the
     // property. Empty on a frame that wrote nothing.
     [[nodiscard]] const std::vector<std::string>& lastWrites() const { return lastWrites_; }
+    // Checks an arm made that did not hold (the director arms'). The host exits non-zero on any.
+    [[nodiscard]] int failedChecks() const { return failedChecks_; }
 
 private:
     void stepEdit(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
@@ -156,6 +178,23 @@ private:
     void stepStar(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame);
     void stepClick(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepDrag(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepDirector(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame,
+                      bool accept);
+    void check(bool ok, const std::string& what);
+    int failedChecks_ = 0;
+    std::size_t directorUndoBefore_ = 0;
+    std::uint64_t directorStateBefore_ = 0;
+    std::string directorSequenceBefore_;
+    std::uint64_t recordedAt_ = 0; // the frame the recording replaced the proposal, 0 = not yet
+    void stepDirectorRecord(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepViewpoint(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    bool viewpointHeld_ = false;         // the drag is over and the pose below is the person's
+    glm::vec3 viewpointEye_{0.0f};
+    glm::vec3 viewpointTarget_{0.0f};
+    std::size_t viewpointFramesHeld_ = 0;
+    std::size_t viewpointFramesMoved_ = 0;
+    float viewpointWorstDrift_ = 0.0f;
+    void stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t sliceShotsBefore_ = 0;

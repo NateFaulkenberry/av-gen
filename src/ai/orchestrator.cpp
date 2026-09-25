@@ -1,12 +1,15 @@
 #include "ai/orchestrator.hpp"
 
 #include "ai/director_tools.hpp"
+#include "directing/compiler.hpp"
 
 #include "app/engine.hpp"
 #include "core/log.hpp"
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <thread>
 
 namespace avgen::ai {
 namespace {
@@ -105,6 +108,16 @@ std::optional<ToolContext::Proposal> AgentTask::proposal() const {
     return proposal_;
 }
 
+nlohmann::json AgentTask::observation() const {
+    const std::lock_guard lock(mutex_);
+    return observation_;
+}
+
+void AgentTask::setObservation(nlohmann::json observation) {
+    const std::lock_guard lock(mutex_);
+    observation_ = std::move(observation);
+}
+
 void AgentTask::setProposal(ToolContext::Proposal proposal) {
     const std::lock_guard lock(mutex_);
     proposal_ = std::move(proposal);
@@ -138,6 +151,8 @@ Orchestrator::Orchestrator(app::Engine& engine, const ToolRegistry& tools, MainT
 ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& task,
                                             ChangeLog& changes) {
     ToolResult result;
+    std::shared_ptr<RecordingHandle> deferred;
+    std::shared_ptr<DeferredResult> answer;
     const bool ran = queue_->run(
         [&] {
             ToolContext ctx(*engine_);
@@ -151,6 +166,13 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             if (performance_) {
                 ctx.setPerformanceSource(performance_);
             }
+            if (recordingHook_) {
+                ctx.setRecordingHook(recordingHook_);
+            }
+            if (watchHook_) {
+                ctx.setWatchHook(watchHook_);
+            }
+            ctx.setObservation(task.observation());
             ctx.onProgress = [&task, &call](float fraction, const std::string& note) {
                 Activity a;
                 a.kind = ActivityKind::ToolProgress;
@@ -168,6 +190,8 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             if (ctx.proposal()) {
                 task.setProposal(*ctx.proposal());
             }
+            deferred = ctx.deferredProposal();
+            answer = ctx.deferredResult();
         },
         task.cancel());
     if (!ran) {
@@ -175,6 +199,67 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
                                    fmt::format("'{}' did not run: the task was cancelled or the "
                                                "application did not service it in time",
                                                call.name));
+    }
+    if (answer) {
+        // ADR-767: the tool started work that answers (a watch). Waited for here, off the main thread.
+        std::string last;
+        while (!answer->done()) {
+            if (task.cancel().cancelled()) {
+                answer->cancel();
+            }
+            if (const std::string phase = answer->phase(); phase != last) {
+                last = phase;
+                Activity a;
+                a.kind = ActivityKind::ToolProgress;
+                a.title = call.name;
+                a.detail = phase;
+                task.append(std::move(a));
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        }
+        auto value = answer->take();
+        if (!value) {
+            return ToolResult::failure(ToolErrorCode::Internal, value.error().message);
+        }
+        if (value->contains("observation")) {
+            task.setObservation((*value)["observation"]);
+        }
+        const std::size_t count = value->contains("observation") ? (*value)["observation"]["events"].size() : 0;
+        return ToolResult::ok(*value, fmt::format("{} event(s) observed", count));
+    }
+    if (deferred) {
+        // ADR-765: the tool started a recording. Waited for HERE, on the task's worker thread, so
+        // the main thread keeps pumping frames; its phases are the tool's progress.
+        std::string last;
+        while (!deferred->done()) {
+            if (task.cancel().cancelled()) {
+                deferred->cancel();
+            }
+            if (const std::string phase = deferred->phase(); phase != last) {
+                last = phase;
+                Activity a;
+                a.kind = ActivityKind::ToolProgress;
+                a.title = call.name;
+                a.detail = phase;
+                task.append(std::move(a));
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        }
+        auto plan = deferred->take();
+        if (!plan) {
+            return ToolResult::failure(ToolErrorCode::Internal, "recording failed: " + plan.error().message);
+        }
+        std::optional<Result<ToolContext::Proposal>> proposed;
+        (void)queue_->run([&] { proposed = proposalFor(*engine_, *plan); }, CancelToken{});
+        if (!proposed || !*proposed) {
+            return ToolResult::failure(ToolErrorCode::Internal,
+                                       proposed ? "the recording cannot be proposed: " + proposed->error().message
+                                                : std::string("the recording could not be proposed"));
+        }
+        task.setProposal(**proposed);
+        nlohmann::json out{{"recorded", true}, {"planId", (*proposed)->planId}, {"tier", plan->toJson()["tier"]},
+                           {"diff", (*proposed)->diff}};
+        return ToolResult::ok(out, fmt::format("recorded '{}'; proposed for approval", (*proposed)->planId));
     }
     return result;
 }

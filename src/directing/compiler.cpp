@@ -520,7 +520,112 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         if (v.isBlocked(pp.key)) {
             continue;
         }
-        CompiledPerformance cp = compilePerformance(plan, i, facts, v.times);
+        if (pp.mode == PerformanceMode::Goal && !pp.recording) {
+            // ---- a goal (ADR-763 on ADR-828): one CharacterGoal event per beat, live ----------------
+            const Subject* who = plan.subject(pp.subject);
+            for (std::size_t b = 0; b < pp.beats.size(); ++b) {
+                const PerformanceBeat& beat = pp.beats[b];
+                const GoalVerb* verb = goalVerb(beat.action);
+                const double t = *goalBeatTime(plan, i, b, v.times);
+                const Subject* target = plan.subject(beat.target);
+                seq::SequenceEvent goal;
+                goal.id = fmt::format("{}.{}.goal{}", plan.id, pp.key, b);
+                goal.when.kind = seq::TriggerKind::Time;
+                goal.when.timeSeconds = t;
+                goal.what.kind = seq::EventActionKind::CharacterGoal;
+                goal.what.target = who->id;
+                goal.what.value = target->id;
+                goal.what.argument = std::string(verb->affordance);
+                goal.what.seconds = beat.seconds.value_or(0.0);
+                goal.what.goal.intent = std::string(verb->intent);
+                out.staged.sequence.events.push_back(goal);
+                record(pp.key, ContentDomain::SequenceEvent, goal.id);
+                line(removedLine(pp.key), pp.key,
+                     fmt::format("Goal for {} at {}: {} {}{} -- live: how and when {} gets there is the character's",
+                                 who->id, clock(t), beat.action, target->id,
+                                 goal.what.seconds > 0.0 ? fmt::format(" (stands {:.1f}s)", goal.what.seconds) : std::string(),
+                                 who->id));
+                if (!beat.emits.empty()) {
+                    // The live event, named where the sequence can hear it: a host (or a recording)
+                    // sees it fire; nothing is baked on it (ADR-763).
+                    seq::SequenceEvent heard;
+                    heard.id = fmt::format("{}.{}.{}", plan.id, pp.key, beat.emits);
+                    heard.when.kind = seq::TriggerKind::ActionComplete;
+                    heard.when.name = goalEventName(beat.moment);
+                    heard.when.subject = who->id;
+                    heard.when.fromSeconds = t;
+                    heard.when.repeat = 1;
+                    heard.what.kind = seq::EventActionKind::Notify;
+                    heard.what.target = beat.emits;
+                    out.staged.sequence.events.push_back(heard);
+                    record(pp.key, ContentDomain::SequenceEvent, heard.id);
+                    line(removedLine(pp.key), pp.key,
+                         fmt::format("Live event {} when {} reports {} (after {})", beat.emits, who->id,
+                                     goalEventName(beat.moment), clock(t)));
+                }
+            }
+            continue;
+        }
+        if (pp.mode == PerformanceMode::Directed && !pp.recording) {
+            // ---- directed (ADR-766 on ADR-824): one scheduled EntityAction per order, live -----------
+            const Subject* who = plan.subject(pp.subject);
+            const CharacterCard* card = facts.capabilities.character(who->id);
+            for (std::size_t b = 0; b < pp.beats.size(); ++b) {
+                const PerformanceBeat& beat = pp.beats[b];
+                const auto verb = directedBeat(beat.action, *card);
+                const double t = *goalBeatTime(plan, i, b, v.times);
+                const Subject* target = beat.target.empty() ? nullptr : plan.subject(beat.target);
+                seq::SequenceEvent order;
+                order.id = fmt::format("{}.{}.order{}", plan.id, pp.key, b);
+                order.when.kind = seq::TriggerKind::Time;
+                order.when.timeSeconds = t;
+                order.what.kind = seq::EventActionKind::EntityAction;
+                order.what.target = who->id;
+                order.what.value = verb->seqVerb;
+                if (verb->verb == DirectedVerb::Pose) {
+                    order.what.argument = beat.action; // the activity
+                } else if (verb->verb == DirectedVerb::Interact) {
+                    order.what.argument = beat.target; // "prop.verb", as written
+                } else if (target != nullptr) {
+                    order.what.argument = target->id;
+                }
+                out.staged.sequence.events.push_back(order);
+                record(pp.key, ContentDomain::SequenceEvent, order.id);
+                line(removedLine(pp.key), pp.key,
+                     fmt::format("Order for {} at {}: {}{}{} -- live: carried out by {} its own way", who->id, clock(t),
+                                 beat.action, order.what.argument.empty() || verb->verb == DirectedVerb::Pose ? "" : " ",
+                                 verb->verb == DirectedVerb::Pose ? std::string() : order.what.argument, who->id));
+                if (!beat.emits.empty() && verb->verb == DirectedVerb::GoTo) {
+                    seq::SequenceEvent heard;
+                    heard.id = fmt::format("{}.{}.{}", plan.id, pp.key, beat.emits);
+                    heard.when.kind = seq::TriggerKind::ActionComplete;
+                    heard.when.name = goalEventName(beat.moment);
+                    heard.when.subject = who->id;
+                    heard.when.fromSeconds = t;
+                    heard.when.repeat = 1;
+                    heard.what.kind = seq::EventActionKind::Notify;
+                    heard.what.target = beat.emits;
+                    out.staged.sequence.events.push_back(heard);
+                    record(pp.key, ContentDomain::SequenceEvent, heard.id);
+                    line(removedLine(pp.key), pp.key,
+                         fmt::format("Live event {} when {} reports {} (after {})", beat.emits, who->id,
+                                     goalEventName(beat.moment), clock(t)));
+                }
+            }
+            continue;
+        }
+        CompiledPerformance cp;
+        if (pp.recording) {
+            // ---- recorded (ADR-763): the recording IS the actor --------------------------------------
+            cp.actor = *recordedActor(*pp.recording);
+            cp.events = pp.recording->events;
+            cp.from = cp.actor.keys.empty() ? 0.0 : cp.actor.keys.front().timeSeconds;
+            cp.to = cp.actor.keys.empty() ? 0.0 : cp.actor.keys.back().timeSeconds;
+            cp.summary.push_back(fmt::format("recorded from a {} performance; replayed {:.3f} m from the recording",
+                                             pp.recording->fromMode, pp.recording->replayWorstMetres));
+        } else {
+            cp = compilePerformance(plan, i, facts, v.times);
+        }
         // ADR-823: slow motion on this performance -- its actor reparameterised over each window,
         // in time order. The plan events it raises move with it, so cues on them stay on the moment.
         std::vector<std::pair<std::size_t, double>> windows;
@@ -554,8 +659,8 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         out.staged.sequence.actors.push_back(cp.actor);
         record(pp.key, ContentDomain::SequenceActor, cp.actor.id);
         line(removedLine(pp.key), pp.key,
-             fmt::format("Performance {}: {}-{}, {} key(s) from its mark", cp.actor.id, clock(cp.from), clock(cp.to),
-                         cp.actor.keys.size()));
+             fmt::format("Performance {}: {}-{}, {} key(s) {}", cp.actor.id, clock(cp.from), clock(cp.to),
+                         cp.actor.keys.size(), pp.recording ? "as recorded" : "from its mark"));
         for (const std::string& s : cp.summary) {
             line(removedLine(pp.key), pp.key, "  " + s);
         }
@@ -567,7 +672,8 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
             seq::Marker marker{time, name, seq::MarkerKind::Cue};
             out.staged.sequence.markers.push_back(marker);
             record(pp.key, ContentDomain::SequenceMarker, markerId(marker));
-            line(removedLine(pp.key), pp.key, fmt::format("Marker {} {} (computed)", name, clock(time)));
+            line(removedLine(pp.key), pp.key,
+                 fmt::format("Marker {} {} ({})", name, clock(time), pp.recording ? "as recorded" : "computed"));
         }
     }
 

@@ -15,6 +15,7 @@
 #include "scene/composition.hpp"
 #include "seq/events.hpp"
 #include "seq/sequence.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -41,6 +42,7 @@ bool contains(const std::vector<std::string>& list, std::string_view item) {
 
 TEST_CASE("Rook's card is what his entity and his loaded rig say, and has no backflip",
           "[directing][capabilities][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json";
     auto loaded = engine.loadProject(project);

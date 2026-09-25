@@ -59,6 +59,10 @@ struct SceneFacts {
     // jump then cannot be checked or compiled, and says so. Holds a copy of the terrain query, so it
     // is valid only while the composition it came from is.
     std::function<float(float x, float z)> groundAt;
+    // Whether a walker can get from one ground point to another (the entity world's own path
+    // provider: what a goal's walk will ask). Nothing when it cannot say yet (a planner still
+    // working) or the scene has no navigation.
+    std::function<std::optional<bool>(glm::vec2 from, glm::vec2 to)> walkable;
     SubjectIndex subjects;
     MusicalContext music;
     std::vector<Place> places;

@@ -14,6 +14,7 @@
 #include "app/engine.hpp"
 #include "directing/compiler.hpp"
 #include "directing/plan.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 #include "ui/edit_history.hpp"
 
@@ -45,6 +46,7 @@ json stagedJson(const Staging& s) {
 
 TEST_CASE("golden Director plans compile, apply, round-trip and recompile exactly as recorded",
           "[directing][golden][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "tests/data/directing/golden";
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(dir)) {
@@ -53,7 +55,7 @@ TEST_CASE("golden Director plans compile, apply, round-trip and recompile exactl
         }
     }
     std::sort(files.begin(), files.end());
-    REQUIRE(files.size() >= 10);
+    REQUIRE(files.size() >= 15);
 
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
@@ -120,9 +122,14 @@ TEST_CASE("golden Director plans compile, apply, round-trip and recompile exactl
         // inherits its camera has nothing placing the MAIN camera, but a Director shot that cuts to
         // a rig on the camera track does not use the main camera (ADR-245) -- the bake cannot see
         // the camera track. Recorded in the progress record's known issues.
+        // And one expected statement, only for a live plan (ADR-763/766): its goals and orders act on
+        // the live system and are forwarded rather than baked -- which is what "live" means.
+        const bool live = parsed.plan->tier != Tier::Baked;
         std::vector<std::string> unexpected;
         for (const std::string& w : trip->warnings) {
-            if (w.find("is the first shot and inherits its camera") == std::string::npos) {
+            const bool inherits = w.find("is the first shot and inherits its camera") != std::string::npos;
+            const bool forwarded = live && w.find("act on a live system and cannot be baked") != std::string::npos;
+            if (!inherits && !forwarded) {
                 unexpected.push_back(w);
             }
         }

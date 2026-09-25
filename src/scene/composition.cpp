@@ -1450,7 +1450,16 @@ void Composition::applyDirectedAim() {
                 }
                 delta = aimFollowSmoothed_;
             }
-            scene_.camera.target += delta;
+            // ADR-890: the nudge belongs to the film's main camera, so it lands only on a frame
+            // that *is* the film's. This runs after `applyViewportView` (it has to: the hero has
+            // only just moved), which put the editor's viewpoint or a looked-through rig on screen
+            // if the person asked for one -- and adding the hero's walk to that is the director
+            // steering a camera it does not own: "I have control of the camera and it is still
+            // moved by the director". The smoother above keeps running either way, so going back
+            // to the film mid-shot lands on the filtered offset rather than restarting it.
+            if (!viewportOwnsFrame_) {
+                scene_.camera.target += delta;
+            }
         }
     }
     aimFollowPrevTime_ = currentTime_;
@@ -8837,10 +8846,12 @@ void Composition::setViewportView(ViewportView view) {
 }
 
 void Composition::applyViewportView(float mainFovDegrees) {
+    viewportOwnsFrame_ = false;
     if (viewportView_.showsFilm()) {
         return; // every render, and every frame of every project that has not asked for anything
     }
     if (viewportView_.mode == ViewportCamera::Editor) {
+        viewportOwnsFrame_ = true;
         if (!editorCameraSeeded_) {
             // **Seeded from the film, once.** Switching to the editor viewpoint must not teleport
             // you: the first frame under it is the frame you were already looking at, and only then
@@ -8894,6 +8905,7 @@ void Composition::applyViewportView(float mainFovDegrees) {
     }
     CameraPose pose = evaluateAuthoredCamera(*rig, channels);
     ensureDistinctAim(pose);
+    viewportOwnsFrame_ = true;
     scene_.camera.position = pose.position;
     scene_.camera.target = pose.target;
     scene_.camera.fovYRadians = glm::radians(pose.fovDegrees);

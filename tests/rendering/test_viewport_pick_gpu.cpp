@@ -266,3 +266,46 @@ TEST_CASE("A pick says which numbering its id belongs to", "[viewport][pick]") {
     // And it is not the bare index it used to be, or nothing has changed where it counts.
     CHECK(hit->objectId != 0u);
 }
+
+// The adaptive render scale draws the targets smaller than the canvas, and a click arrives in canvas
+// pixels. Reading the canvas pixel as a texel read outside the target on the right and bottom of the
+// frame -- the owner's "Texture copy range touches outside of [Texture aux-linear-depth]" on the
+// Glowmere film, where the scale had dropped to about 0.62 -- and, everywhere else, read the texel
+// up and left of the one under the cursor.
+TEST_CASE("A pick at a reduced render scale reads the texel under the cursor", "[viewport][pick][scale]") {
+    auto context = makeContext();
+    gpu::ShaderLibrary shaders(*context, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*context, shaders);
+    REQUIRE(renderer.init().has_value());
+    rendering::QualitySettings q = renderer.qualitySettings();
+    q.renderScale = 0.5f;
+    renderer.setQualitySettings(q);
+
+    const scene::Scene s = oneBoxScene();
+    renderOnce(renderer, s);
+    // Subject: the targets really are smaller than the canvas the click is in.
+    REQUIRE(renderer.linearDepthTexture().GetWidth() < kWidth);
+    const app::PickView view = viewFor(s);
+
+    // The centre of the canvas is the centre of the box's near face. As a texel of a half-size
+    // target it is off the right edge, so the old read failed here outright.
+    auto centre = app::pickAt(*context, renderer.identifierTexture(), renderer.linearDepthTexture(), view,
+                              glm::uvec2(kWidth / 2, kHeight / 2));
+    REQUIRE(centre.has_value());
+    REQUIRE(centre->hit);
+    CHECK_THAT(centre->position.z, Catch::Matchers::WithinAbs(1.0, 0.05));
+    CHECK_THAT(centre->position.x, Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(centre->position.y, Catch::Matchers::WithinAbs(0.0, 0.05));
+
+    // Near the right edge of the canvas there is only sky. Not an error, and not the box that the
+    // old mapping (texel = canvas pixel, clamped) would have landed on nearer the middle.
+    auto edge = app::pickAt(*context, renderer.identifierTexture(), renderer.linearDepthTexture(), view,
+                            glm::uvec2(kWidth - 5, kHeight / 2));
+    REQUIRE(edge.has_value());
+    CHECK_FALSE(edge->hit);
+
+    // And the normal estimate works on the same grid: the box's near face points back at the camera.
+    auto normal = app::pickNormalAt(*context, renderer.linearDepthTexture(), view, glm::uvec2(kWidth / 2, kHeight / 2));
+    REQUIRE(normal.has_value());
+    CHECK_THAT(normal->z, Catch::Matchers::WithinAbs(1.0, 0.05));
+}

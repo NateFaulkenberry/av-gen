@@ -47,5 +47,19 @@ headless capture of the benchmark proposal. The proposal came from a scripted pr
 
 - Every decision the panel makes can be tested: the marks, the grouping, the context and the
   buttons. Making the preview-revert rule ignore "newest" turns a test red.
-- Not verified in a running session: pressing Preview, Accept or Reject. The capture shows the
-  waiting state only.
+- **Verified in a running session (2026-09-25).** The UI script arms `director-reject` and
+  `director-accept` press the buttons through the pointer (real SDL events), and send Cmd+Z as a
+  key event to the application's own shortcut handler. After each step they check the project.
+  - **Preview:** one edit, labelled "Director: ...", with the plan installed and the task still
+    waiting.
+  - **Reject:** the history, the plan list and the sequence are exactly as before, and the task is
+    rejected.
+  - **Accept:** exactly one undo, labelled with the request, and revision 1 installed.
+  - **Cmd+Z:** everything back.
+
+  A failed check makes the run exit 8; withholding the key event gives three FAILs and exit 8.
+  The captures after each step are in `15-director-panel/`: `01-proposal-waiting` to
+  `04-after-cmd-z`.
+- **Found by the first capture:** while previewing, the panel re-compiled the proposal against the
+  project that now contained it, and showed "revision 2" with every line a replacement. The panel
+  now keeps the proposal's own dry run while its preview is installed.

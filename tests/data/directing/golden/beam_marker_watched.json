@@ -1,0 +1,81 @@
+{
+  "description": "Mark the second time the saucer beams, and cut to it a second before (event-driven, ADR-767; the observation is carried).",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "beams",
+    "title": "The second beam",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "visitor",
+        "text": "the visitor"
+      }
+    ],
+    "markers": [
+      {
+        "key": "beam2",
+        "name": "second beam",
+        "at": {
+          "event": "abduction/beam",
+          "subject": "visitor",
+          "occurrence": 2
+        }
+      }
+    ],
+    "shots": [
+      {
+        "key": "shot",
+        "name": "the-beam",
+        "start": {
+          "event": "abduction/beam",
+          "occurrence": 2,
+          "offsetSeconds": -1
+        },
+        "durationSeconds": 4,
+        "subject": "visitor",
+        "locked": true,
+        "camera": [
+          {
+            "move": "follow"
+          }
+        ]
+      }
+    ],
+    "observation": {
+      "events": [
+        {
+          "name": "abduction/beam",
+          "subject": "visitor",
+          "seconds": 7.85
+        },
+        {
+          "name": "camera/UFO Watch",
+          "subject": "abduction",
+          "seconds": 13.5,
+          "end": 19.5667
+        },
+        {
+          "name": "abduction/beam",
+          "subject": "visitor",
+          "seconds": 24.95
+        }
+      ],
+      "until": 30
+    }
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 1,
+      "camera.rig": 1,
+      "camera.shot": 1,
+      "sequence.marker": 1
+    },
+    "diff": [
+      "Marker second beam 00:24.950",
+      "Shot \"the-beam\" 00:23.950-00:27.950",
+      "NON_DETERMINISTIC: 'abduction/beam' was timed by watching the film"
+    ]
+  }
+}

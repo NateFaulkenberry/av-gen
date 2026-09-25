@@ -30,6 +30,11 @@
 #include <utility>
 #include <vector>
 
+namespace avgen::directing {
+struct Compilation;
+struct Plan;
+} // namespace avgen::directing
+
 namespace avgen::app {
 class Engine;
 } // namespace avgen::app
@@ -87,6 +92,37 @@ struct PerformanceSnapshot {
 using PerformanceSource = std::function<PerformanceSnapshot()>;
 
 // ---- what a tool changed --------------------------------------------------------------------------
+
+// ADR-765: recording a live performance, requested by the assistant and done by the HOST. The
+// recorder is application code (it loads scratch copies of the project on a thread of its own), so
+// the core library sees only this seam: the host installs a hook that starts a recording and hands
+// back a handle to watch. The recording's result is proposed like any plan -- the person approves.
+class RecordingHandle {
+public:
+    virtual ~RecordingHandle() = default;
+    [[nodiscard]] virtual bool done() const = 0;
+    [[nodiscard]] virtual std::string phase() const = 0;
+    // The recorded plan, once, after `done()`; or why there is none.
+    [[nodiscard]] virtual Result<directing::Plan> take() = 0;
+    virtual void cancel() = 0;
+};
+// ADR-767: the same seam for work that ANSWERS rather than proposes -- watching the film for what
+// happens in it. The orchestrator waits for it off the main thread and returns its JSON as the
+// tool's result.
+class DeferredResult {
+public:
+    virtual ~DeferredResult() = default;
+    [[nodiscard]] virtual bool done() const = 0;
+    [[nodiscard]] virtual std::string phase() const = 0;
+    [[nodiscard]] virtual Result<nlohmann::json> take() = 0;
+    virtual void cancel() = 0;
+};
+// Main thread: starts watching a play of the engine's project from zero to `untilSeconds`.
+using WatchHook = std::function<Result<std::shared_ptr<DeferredResult>>(app::Engine&, double untilSeconds)>;
+
+// Main thread: starts recording `compilation`'s live performances against the engine's project.
+using RecordingHook =
+    std::function<Result<std::shared_ptr<RecordingHandle>>(app::Engine&, const directing::Compilation&)>;
 
 struct ChangeRecord {
     std::string target;   // parameter path, track target, route target, ...
@@ -163,6 +199,25 @@ public:
     }
 
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
+
+    // ADR-765. Null when the host records nothing (a headless session with no recorder installed).
+    void setRecordingHook(RecordingHook hook) { recordingHook_ = std::move(hook); }
+    [[nodiscard]] const RecordingHook& recordingHook() const { return recordingHook_; }
+    // A tool that started a recording hands it back here; the orchestrator waits for it OFF the main
+    // thread and proposes its result, so the editor keeps drawing for the seconds it takes.
+    void deferProposal(std::shared_ptr<RecordingHandle> handle) { deferred_ = std::move(handle); }
+    [[nodiscard]] const std::shared_ptr<RecordingHandle>& deferredProposal() const { return deferred_; }
+
+    // ADR-767: watching the film. The hook is the host's; a tool that started a watch hands the
+    // handle back here and the orchestrator returns its answer.
+    void setWatchHook(WatchHook hook) { watchHook_ = std::move(hook); }
+    [[nodiscard]] const WatchHook& watchHook() const { return watchHook_; }
+    void deferResult(std::shared_ptr<DeferredResult> handle) { deferredResult_ = std::move(handle); }
+    [[nodiscard]] const std::shared_ptr<DeferredResult>& deferredResult() const { return deferredResult_; }
+    // The last observation this task's watch returned (its `observation` object), attached to a plan
+    // that places items on events and carries none of its own.
+    void setObservation(nlohmann::json observation) { observation_ = std::move(observation); }
+    [[nodiscard]] const nlohmann::json& observation() const { return observation_; }
     [[nodiscard]] PerformanceSnapshot performance() const {
         return performance_ ? performance_() : PerformanceSnapshot{};
     }
@@ -198,6 +253,11 @@ private:
     std::filesystem::path projectsRoot_;
     std::vector<std::filesystem::path> contentRoots_;
     PerformanceSource performance_;
+    RecordingHook recordingHook_;
+    std::shared_ptr<RecordingHandle> deferred_;
+    WatchHook watchHook_;
+    std::shared_ptr<DeferredResult> deferredResult_;
+    nlohmann::json observation_;
     ChangeLog changes_;
     std::optional<Proposal> proposal_;
 };

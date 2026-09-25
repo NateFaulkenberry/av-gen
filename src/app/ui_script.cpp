@@ -10,6 +10,9 @@
 #include "ui/world_probe.hpp"
 #include "ui/world_edit.hpp"
 #include "ui/sequence_panel.hpp"
+#include "ai/control_plane.hpp"
+#include "directing/plan.hpp"
+#include "app/edit_system.hpp"
 #include "core/log.hpp"
 #include "params/parameter.hpp"
 #include "scene/composition.hpp"
@@ -34,7 +37,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 16> kArms{{
+constexpr std::array<ArmName, 21> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -51,6 +54,11 @@ constexpr std::array<ArmName, 16> kArms{{
     {"drag", UiScriptArm::Drag},
     {"slicemenu", UiScriptArm::SliceMenu},
     {"slice", UiScriptArm::Slice},
+    {"director-reject", UiScriptArm::DirectorReject},
+    {"director-accept", UiScriptArm::DirectorAccept},
+    {"director-record", UiScriptArm::DirectorRecord},
+    {"viewpoint", UiScriptArm::Viewpoint},
+    {"director-cancel", UiScriptArm::DirectorCancel},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -318,6 +326,18 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
     }
     if (has(arms_, UiScriptArm::Slice)) {
         stepSlice(engine, *panel, window, frame);
+    }
+    if (panel != nullptr && has(arms_, UiScriptArm::DirectorCancel)) {
+        stepDirectorCancel(engine, *panel, window, frame);
+    }
+    if (panel != nullptr && has(arms_, UiScriptArm::DirectorRecord)) {
+        stepDirectorRecord(engine, *panel, window, frame);
+    }
+    if (has(arms_, UiScriptArm::Viewpoint)) {
+        stepViewpoint(engine, *panel, window, frame);
+    }
+    if (panel != nullptr && (has(arms_, UiScriptArm::DirectorReject) || has(arms_, UiScriptArm::DirectorAccept))) {
+        stepDirector(engine, *panel, window, frame, has(arms_, UiScriptArm::DirectorAccept));
     }
     if (has(arms_, UiScriptArm::Strip)) {
         stepStrip(engine, *panel, window, frame);
@@ -1284,6 +1304,400 @@ void UiScript::stepDrag(Engine& engine, ui::ControlPanel& panel, platform::Windo
                 editLog_.emplace_back("drag: the playhead did not move -- THIS ARM MEASURED NOTHING");
             }
         }
+    }
+}
+
+} // namespace avgen::app
+
+namespace avgen::app {
+
+// ADR-890. The schedule, in frames:
+//   20      choose the editor viewpoint, as the canvas toolbar's button does
+//   30-70   Option-drag the canvas (an orbit), released at 70
+//   72      remember the pose the drag left, and press Play
+//   73-     every frame: the frame on screen must be that pose, exactly -- through the cuts
+//   400     seek to the middle of the film, and keep checking
+// Runs as long as `--frames` allows; the verdict is logged every 120 frames and at every failure.
+void UiScript::stepViewpoint(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                             std::uint64_t frame) {
+    const float w = static_cast<float>(window.pixelWidth()) / std::max(window.pixelScale(), 1e-3f);
+    const float h = static_cast<float>(window.pixelHeight()) / std::max(window.pixelScale(), 1e-3f);
+    const scene::Composition* comp = engine.composition();
+    if (comp == nullptr) {
+        return;
+    }
+    if (frame == 20 && panel.onViewportView) {
+        panel.onViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
+    }
+    const float x = w * (0.5f + 0.1f * static_cast<float>(frame >= 30 ? frame - 30 : 0) / 40.0f);
+    const float y = h * 0.45f;
+    if (frame == 29) {
+        viewpointEye_ = comp->editorCamera().position; // the seed, to prove the drag moved it
+        return;
+    }
+    if (frame == 28) {
+        warpAndMove(window, x, y); // the press must land on the canvas, not where the mouse sits
+    }
+    if (frame == 30) {
+        SDL_SetModState(SDL_KMOD_LALT);
+        pushButton(window, x, y, true);
+        return;
+    }
+    if (frame > 30 && frame < 70) {
+        warpAndMove(window, x, y);
+        return;
+    }
+    if (frame == 70) {
+        pushButton(window, x, y, false);
+        SDL_SetModState(SDL_KMOD_NONE);
+        return;
+    }
+    if (frame == 72) {
+        check(glm::length(comp->editorCamera().position - viewpointEye_) > 1e-3f,
+              "viewpoint: the drag moved the editor viewpoint");
+        viewpointEye_ = comp->editorCamera().position;
+        viewpointTarget_ = comp->editorCamera().target;
+        viewpointHeld_ = true;
+        check(comp->editorCameraSeeded() && comp->viewportView().mode == scene::ViewportCamera::Editor,
+              "viewpoint: the canvas is on the editor viewpoint after the drag");
+        log::info("ui-script viewpoint: holding eye ({:.3f}, {:.3f}, {:.3f}) aim ({:.3f}, {:.3f}, {:.3f}) "
+                  "at {:.2f} s; playing",
+                  viewpointEye_.x, viewpointEye_.y, viewpointEye_.z, viewpointTarget_.x, viewpointTarget_.y,
+                  viewpointTarget_.z, engine.transport().positionSeconds());
+        static_cast<void>(engine.play());
+        return;
+    }
+    if (frame == 400) {
+        const double duration = engine.durationSeconds() > 0.0 ? engine.durationSeconds() : 60.0;
+        engine.seekSeconds(duration * 0.5);
+        log::info("ui-script viewpoint: seeked to {:.2f} s", duration * 0.5);
+    }
+    if (!viewpointHeld_ || frame < 74) {
+        return;
+    }
+    // What the last update put on screen. The step runs before this frame's update, so this is the
+    // frame the person is looking at now.
+    const scene::Camera& shown = engine.scene().camera;
+    const float drift = std::max(glm::length(shown.position - viewpointEye_),
+                                 glm::length(shown.target - viewpointTarget_));
+    const bool poseKept = comp->editorCamera().position == viewpointEye_ &&
+                          comp->editorCamera().target == viewpointTarget_;
+    if (drift > 1e-4f || !poseKept) {
+        if (viewpointFramesMoved_ == 0) {
+            check(false, fmt::format("viewpoint: the frame left the editor's pose at frame {} ({:.2f} s): "
+                                     "drift {:.3f} m, editor pose {}, film on '{}' ({}), view mode {}",
+                                     frame, engine.transport().positionSeconds(), drift, poseKept ? "kept" : "CHANGED",
+                                     comp->activeCamera().name,
+                                     scene::activeCameraReasonName(comp->activeCamera().reason),
+                                     static_cast<int>(comp->viewportView().mode)));
+            log::warn("ui-script viewpoint: frame {} at {:.2f} s -- shown aim ({:.3f}, {:.3f}, {:.3f}) vs "
+                      "held ({:.3f}, {:.3f}, {:.3f}); film camera '{}'",
+                      frame, engine.transport().positionSeconds(), shown.target.x, shown.target.y, shown.target.z,
+                      viewpointTarget_.x, viewpointTarget_.y, viewpointTarget_.z, comp->activeCamera().name);
+        }
+        ++viewpointFramesMoved_;
+        viewpointWorstDrift_ = std::max(viewpointWorstDrift_, drift);
+    } else {
+        ++viewpointFramesHeld_;
+    }
+    if (frame % 120 == 0) {
+        log::info("ui-script viewpoint: frame {} at {:.2f} s -- held {} frame(s), moved {} (worst {:.3f} m); "
+                  "film on '{}'",
+                  frame, engine.transport().positionSeconds(), viewpointFramesHeld_, viewpointFramesMoved_, viewpointWorstDrift_,
+                  comp->activeCamera().name);
+    }
+}
+
+void UiScript::check(bool ok, const std::string& what) {
+    editLog_.push_back(fmt::format("director: {} {}", ok ? "PASS" : "FAIL", what));
+    failedChecks_ += ok ? 0 : 1;
+}
+
+// ADR-762. The schedule, in frames (the capture frame for "after step N" is the next checkpoint):
+//   4-5    open and raise the Director panel
+//   60     record the state before anything is pressed (the proposal is waiting)
+//   80-88  press Preview                                  -> checked at 110
+//   130-138 press Reject (or Accept)                       -> checked at 160
+//   180-186 Cmd+Z (accept path only)                       -> checked at 210
+void UiScript::stepDirector(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame,
+                            bool accept) {
+    ui::DirectorPanel& director = panel.director;
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Director"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Director");
+        return;
+    }
+    if (director.plane == nullptr || director.edits == nullptr) {
+        if (frame == 60) {
+            check(false, "the Director panel has no control plane or history; THIS ARM TESTED NOTHING");
+        }
+        return;
+    }
+    ui::EditHistory& history = director.edits->history();
+    const auto task = director.plane->currentTask();
+    const auto press = [&](const ui::DirectorPanel::Rect& r, std::uint64_t start) {
+        if (!r.valid) {
+            return;
+        }
+        if (frame >= start && frame < start + 6) {
+            warpAndMove(window, r.cx(), r.cy()); // parked first: see `warpAndMove`
+        } else if (frame == start + 6) {
+            pushButton(window, r.cx(), r.cy(), true);
+        } else if (frame == start + 8) {
+            pushButton(window, r.cx(), r.cy(), false);
+        }
+    };
+    const auto plans = [&] { return engine.directingPlans().size(); };
+    switch (frame) {
+    case 60:
+        directorUndoBefore_ = history.undoSize();
+        directorStateBefore_ = history.stateId();
+        directorSequenceBefore_ = engine.sequence().toJson().dump();
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval,
+              "a proposal is waiting for approval before anything is pressed");
+        check(plans() == 0, fmt::format("the project carries no plan yet ({})", plans()));
+        check(director.buttons().preview.valid && director.buttons().accept.valid && director.buttons().reject.valid,
+              "the panel's buttons are drawn and in view");
+        return;
+    case 110:
+        check(director.previewing(), "Preview put the panel into preview");
+        check(history.undoSize() == directorUndoBefore_ + 1, fmt::format("the preview is one edit ({} -> {})",
+                                                                         directorUndoBefore_, history.undoSize()));
+        check(history.undoLabel().rfind("Director: ", 0) == 0,
+              fmt::format("the preview edit is labelled as one: \"{}\"", history.undoLabel()));
+        check(plans() == 1, fmt::format("the previewed plan is installed ({})", plans()));
+        check(engine.sequence().toJson().dump() != directorSequenceBefore_, "the preview changed the sequence");
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval,
+              "the proposal is still waiting while it is previewed");
+        return;
+    case 160:
+        check(!director.previewing(), "the preview ended");
+        if (!accept) {
+            check(history.undoSize() == directorUndoBefore_, fmt::format("Reject left the history as it was ({} -> {})",
+                                                                         directorUndoBefore_, history.undoSize()));
+            check(plans() == 0, fmt::format("Reject left no plan ({})", plans()));
+            check(engine.sequence().toJson().dump() == directorSequenceBefore_, "Reject left the sequence as it was");
+            check(task != nullptr && task->state() == ai::TaskState::Rejected, "the task is rejected");
+        } else {
+            check(history.undoSize() == directorUndoBefore_ + 1,
+                  fmt::format("Accept made exactly one undo ({} -> {})", directorUndoBefore_, history.undoSize()));
+            check(task != nullptr && history.undoLabel() == task->prompt(),
+                  fmt::format("the undo is labelled with the request: \"{}\"", history.undoLabel()));
+            check(plans() == 1 && engine.directingPlans()[0].revision == 1,
+                  fmt::format("the plan is installed once, as revision 1 ({})", plans()));
+            check(engine.sequence().toJson().dump() != directorSequenceBefore_, "Accept changed the sequence");
+            check(task != nullptr && task->state() == ai::TaskState::Completed, "the task is completed");
+        }
+        return;
+    case 180:
+    case 181:
+    case 182:
+    case 183:
+        if (accept) {
+            // Cmd+Z as the keyboard sends it: a key event with the command modifier, into the
+            // application's own shortcut handler (`handleEditorShortcut` reads `SDL_GetModState`).
+            SDL_SetModState(SDL_KMOD_GUI);
+        }
+        if (accept && frame == 182) {
+            SDL_Event e{};
+            e.type = SDL_EVENT_KEY_DOWN;
+            e.key.timestamp = SDL_GetTicksNS();
+            e.key.windowID = window.id();
+            e.key.key = SDLK_Z;
+            e.key.scancode = SDL_SCANCODE_Z;
+            e.key.mod = SDL_KMOD_GUI;
+            e.key.down = true;
+            SDL_PushEvent(&e);
+            e.type = SDL_EVENT_KEY_UP;
+            e.key.down = false;
+            SDL_PushEvent(&e);
+        }
+        return;
+    case 186:
+        if (accept) {
+            SDL_SetModState(SDL_KMOD_NONE);
+        }
+        return;
+    case 210:
+        if (accept) {
+            check(history.undoSize() == directorUndoBefore_,
+                  fmt::format("Cmd+Z took the one undo back ({} -> {})", directorUndoBefore_, history.undoSize()));
+            check(plans() == 0, fmt::format("the plan is gone with it ({})", plans()));
+            check(engine.sequence().toJson().dump() == directorSequenceBefore_, "the sequence is as it was");
+        }
+        return;
+    default:
+        break;
+    }
+    press(director.buttons().preview, 80);
+    press(accept ? director.buttons().accept : director.buttons().reject, 130);
+    // ADR-764: while the reject path's preview stands, press Stills again after the first stills
+    // (made by the preview) have had time to finish -- the second request must reuse the session.
+    if (!accept) {
+        press(director.buttons().stills, 240);
+    }
+}
+
+void UiScript::stepDirectorRecord(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                                  std::uint64_t frame) {
+    ui::DirectorPanel& director = panel.director;
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Director"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Director");
+        return;
+    }
+    if (director.plane == nullptr || director.edits == nullptr) {
+        if (frame == 60) {
+            check(false, "the Director panel has no control plane or history; THIS ARM TESTED NOTHING");
+        }
+        return;
+    }
+    ui::EditHistory& history = director.edits->history();
+    const auto task = director.plane->currentTask();
+    const auto proposalPlan = [&]() -> nlohmann::json {
+        const auto p = task ? task->proposal() : std::nullopt;
+        return p ? p->plan : nlohmann::json();
+    };
+    const auto press = [&](const ui::DirectorPanel::Rect& r, std::uint64_t start) {
+        if (!r.valid) {
+            return;
+        }
+        if (frame >= start && frame < start + 6) {
+            warpAndMove(window, r.cx(), r.cy());
+        } else if (frame == start + 6) {
+            pushButton(window, r.cx(), r.cy(), true);
+        } else if (frame == start + 8) {
+            pushButton(window, r.cx(), r.cy(), false);
+        }
+    };
+    if (frame == 60) {
+        directorUndoBefore_ = history.undoSize();
+        directorSequenceBefore_ = engine.sequence().toJson().dump();
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval, "a goal proposal is waiting");
+        check(proposalPlan().value("tier", std::string()) == "goal", "the proposal is live (tier goal)");
+        check(director.buttons().record.valid, "the Record button is drawn and in view");
+        return;
+    }
+    press(director.buttons().record, 80);
+    if (frame == 120) {
+        check(director.recording(), "Record started a recording, off the editor's frames");
+    }
+    if (recordedAt_ == 0 && frame > 120 && !director.recording() && director.status().rfind("recorded", 0) == 0) {
+        recordedAt_ = frame;
+        const nlohmann::json plan = proposalPlan();
+        editLog_.push_back(fmt::format("director: the recording replaced the proposal at frame {}", frame));
+        check(plan.value("tier", std::string()) == "baked", "the revised proposal is baked");
+        const bool recorded = plan.contains("performances") && !plan["performances"].empty() &&
+                              plan["performances"][0].contains("recording");
+        check(recorded, "its performance carries the recording");
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval,
+              "the recording waits for approval like any proposal");
+        check(history.undoSize() == directorUndoBefore_, "recording changed nothing in the project");
+        check(engine.sequence().toJson().dump() == directorSequenceBefore_, "the sequence is as it was");
+    }
+    if (frame == 1490) {
+        check(recordedAt_ != 0 && recordedAt_ < 1490, fmt::format("the recording finished before frame 1490 ({})", recordedAt_));
+    }
+    press(director.buttons().accept, 1500);
+    if (frame == 1560) {
+        check(history.undoSize() == directorUndoBefore_ + 1,
+              fmt::format("Accept made exactly one undo ({} -> {})", directorUndoBefore_, history.undoSize()));
+        check(task != nullptr && history.undoLabel() == task->prompt(), "the undo is labelled with the request");
+        const auto& plans = engine.directingPlans();
+        check(plans.size() == 1 && !plans.empty() && plans[0].tier == directing::Tier::Baked &&
+                  !plans[0].performances.empty() && plans[0].performances[0].recording.has_value(),
+              "the installed plan is the recorded, baked one");
+        const auto& seq = engine.sequence();
+        check(std::any_of(seq.actors.begin(), seq.actors.end(), [](const seq::Actor& a) { return a.id == "rook"; }),
+              "Rook's recorded actor is installed");
+        check(std::none_of(seq.events.begin(), seq.events.end(),
+                           [](const seq::SequenceEvent& e) { return e.what.kind == seq::EventActionKind::CharacterGoal; }),
+              "no live goal was installed");
+    }
+    if (frame >= 1600 && frame <= 1603) {
+        SDL_SetModState(SDL_KMOD_GUI);
+        if (frame == 1602) {
+            SDL_Event e{};
+            e.type = SDL_EVENT_KEY_DOWN;
+            e.key.timestamp = SDL_GetTicksNS();
+            e.key.windowID = window.id();
+            e.key.key = SDLK_Z;
+            e.key.scancode = SDL_SCANCODE_Z;
+            e.key.mod = SDL_KMOD_GUI;
+            e.key.down = true;
+            SDL_PushEvent(&e);
+            e.type = SDL_EVENT_KEY_UP;
+            e.key.down = false;
+            SDL_PushEvent(&e);
+        }
+    }
+    if (frame == 1606) {
+        SDL_SetModState(SDL_KMOD_NONE);
+    }
+    if (frame == 1640) {
+        check(history.undoSize() == directorUndoBefore_, "Cmd+Z took it back");
+        check(engine.directingPlans().empty(), "the plan is gone with it");
+        check(engine.sequence().toJson().dump() == directorSequenceBefore_, "the sequence is as it was");
+    }
+}
+
+void UiScript::stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                                  std::uint64_t frame) {
+    ui::DirectorPanel& director = panel.director;
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Director"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Director");
+        return;
+    }
+    if (director.plane == nullptr || director.edits == nullptr) {
+        if (frame == 60) {
+            check(false, "the Director panel has no control plane or history; THIS ARM TESTED NOTHING");
+        }
+        return;
+    }
+    const auto task = director.plane->currentTask();
+    const auto press = [&](const ui::DirectorPanel::Rect& r, std::uint64_t start) {
+        if (!r.valid) {
+            return;
+        }
+        if (frame >= start && frame < start + 6) {
+            warpAndMove(window, r.cx(), r.cy());
+        } else if (frame == start + 6) {
+            pushButton(window, r.cx(), r.cy(), true);
+        } else if (frame == start + 8) {
+            pushButton(window, r.cx(), r.cy(), false);
+        }
+    };
+    const auto tier = [&] {
+        const auto p = task ? task->proposal() : std::nullopt;
+        return p ? p->plan.value("tier", std::string()) : std::string();
+    };
+    if (frame == 60) {
+        directorUndoBefore_ = director.edits->history().undoSize();
+        directorSequenceBefore_ = engine.sequence().toJson().dump();
+        check(tier() == "goal", "a live proposal is waiting");
+    }
+    press(director.buttons().record, 80);
+    if (frame == 110) {
+        check(director.recording(), "the recording is running");
+        check(director.buttons().cancelRecording.valid, "Cancel recording is drawn and in view");
+    }
+    press(director.buttons().cancelRecording, 120);
+    if (frame == 400) {
+        check(!director.recording(), "the recording stopped");
+        check(director.status() == "recording cancelled; the proposal is as it was",
+              fmt::format("the panel says it was cancelled: \"{}\"", director.status()));
+        check(tier() == "goal", "the proposal is still the live one");
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval, "it is still waiting");
+        check(director.edits->history().undoSize() == directorUndoBefore_ &&
+                  engine.sequence().toJson().dump() == directorSequenceBefore_,
+              "nothing in the project changed");
     }
 }
 

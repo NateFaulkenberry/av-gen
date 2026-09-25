@@ -42,6 +42,8 @@ target_sources(avgen_tests PRIVATE
     # Viewport camera gestures are vector arithmetic over an eye and a target (ADR-068).
     "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
+    # ADR-763: recording a live performance into a baked one, on scratch copies.
+    "${CMAKE_SOURCE_DIR}/src/app/directing_record.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
     # The editor shell's panel registry and layout file (ADR-076). Deliberately ImGui-free so it
@@ -165,7 +167,9 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/output_manager.cpp"
-        "${CMAKE_SOURCE_DIR}/src/app/output_manager_gpu.cpp")
+        "${CMAKE_SOURCE_DIR}/src/app/output_manager_gpu.cpp"
+        # ADR-764: a proposed plan's preview stills, rendered from a scratch copy.
+        "${CMAKE_SOURCE_DIR}/src/app/director_stills.cpp")
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     # Output windows need the platform layer (SDL); the window smoke test enumerates displays.
     target_link_libraries(avgen_render_tests PRIVATE avgen_gpu avgen_platform Catch2::Catch2WithMain)

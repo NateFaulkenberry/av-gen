@@ -40,6 +40,8 @@
 #include "support/project_round_trip.hpp"
 #include "ui/edit_history.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <fmt/format.h>
@@ -75,6 +77,7 @@ struct Minimum {
 } // namespace
 
 TEST_CASE("the Director's costs on the golden plans", "[.perf][directing]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "tests/data/directing/golden";
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(dir)) {
@@ -166,6 +169,7 @@ TEST_CASE("the Director's costs on the golden plans", "[.perf][directing]") {
 
 TEST_CASE("what a preview seek costs on the benchmark, with and without a Director plan applied",
           "[.perf][directing][seek]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // Spec §37's last item, measured now that ADR-800 is on main. As the coordinator asked: the
     // entity distance cull lifted (every body simulated, as an offline render has it) and no audio
     // (audio-reactive divergence, cause 2, is still open). One fresh engine per target, so the first
@@ -204,4 +208,32 @@ TEST_CASE("what a preview seek costs on the benchmark, with and without a Direct
         }
     }
     fmt::print("\n");
+}
+
+#include "app/directing_record.hpp"
+
+TEST_CASE("what the live paths cost: watching the film and recording a goal", "[.perf][directing][live]") {
+    // Slice 5 (§37) for Slice 4's paths. Each is seconds of scratch play off the editor's frames
+    // (ADR-765/767); what matters is how it scales with the film watched, and that a recording's own
+    // checks cost roughly twice its play (a playback and a scrub). Printed; nothing is asserted about
+    // milliseconds on a shared machine.
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
+    app::Engine live(app::EngineMode::Offline);
+    REQUIRE(live.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
+    fmt::print("\nLive-path costs on Glowmere Valley 2 multicam (scratch play, audio off, cull lifted)\n");
+    for (const double until : {30.0, 60.0, 120.0}) {
+        auto w = app::watchWorldEvents(live, until);
+        REQUIRE(w.has_value());
+        fmt::print("  watch {:>4.0f} s of film: {:>6.0f} ms ({:.2f}x real time), {} event(s)\n", until, w->watchMs,
+                   w->watchMs / (until * 1000.0), w->events.size());
+    }
+    const nlohmann::json golden =
+        testsupport::readJson(fs::path(AVGEN_SOURCE_DIR) / "tests/data/directing/golden/rook_goal_lantern.json");
+    PlanParse parsed = parsePlan(golden.at("plan"));
+    REQUIRE(parsed.plan);
+    const Compilation c = compilePlan(*parsed.plan, app::sceneFactsFor(live));
+    auto r = app::recordLivePerformances(live, c, app::RecordOptions{});
+    REQUIRE(r.has_value());
+    fmt::print("  record rook_goal_lantern: play {:.0f} ms, checks {:.0f} ms; played back {:.4f} m, scrubbed {:.4f} m\n\n",
+               r->recordMs, r->checkMs, r->replayWorstMetres, r->scrubWorstMetres);
 }

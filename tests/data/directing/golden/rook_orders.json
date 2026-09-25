@@ -1,0 +1,59 @@
+{
+  "description": "At 0:20 Rook turns to Vane, at 0:22 reacts, at 0:26 is left to himself (directed, ADR-766).",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "rook-told",
+    "title": "Rook is told what to do",
+    "tier": "directed",
+    "subjects": [
+      {
+        "alias": "rook",
+        "text": "Rook"
+      },
+      {
+        "alias": "vane",
+        "text": "Vane"
+      }
+    ],
+    "performances": [
+      {
+        "key": "orders",
+        "subject": "rook",
+        "mode": "directed",
+        "beats": [
+          {
+            "action": "face",
+            "target": "vane",
+            "at": {
+              "seconds": 20
+            }
+          },
+          {
+            "action": "react",
+            "at": {
+              "seconds": 22
+            }
+          },
+          {
+            "action": "release",
+            "at": {
+              "seconds": 26
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.event": 3
+    },
+    "diff": [
+      "Order for rook at 00:20.000: face vane",
+      "Order for rook at 00:22.000: react",
+      "Order for rook at 00:26.000: release"
+    ]
+  }
+}

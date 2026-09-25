@@ -123,6 +123,9 @@ void ControlPlane::setContentRoots(std::vector<std::filesystem::path> roots) {
     orchestrator_.setContentRoots(std::move(roots));
 }
 
+void ControlPlane::setRecordingHook(RecordingHook hook) { orchestrator_.setRecordingHook(std::move(hook)); }
+void ControlPlane::setWatchHook(WatchHook hook) { orchestrator_.setWatchHook(std::move(hook)); }
+
 void ControlPlane::setPerformanceSource(PerformanceSource source) {
     orchestrator_.setPerformanceSource(std::move(source));
 }
@@ -301,6 +304,20 @@ std::shared_ptr<AgentTask> ControlPlane::currentTask() const {
 bool ControlPlane::approveCurrentTask() {
     std::shared_ptr<AgentTask> task = currentTask();
     return task != nullptr && orchestrator_.approve(*task);
+}
+
+bool ControlPlane::reviseCurrentProposal(ToolContext::Proposal proposal, std::string note) {
+    std::shared_ptr<AgentTask> task = currentTask();
+    if (task == nullptr || task->state() != TaskState::AwaitingApproval) {
+        return false;
+    }
+    Activity a;
+    a.kind = ActivityKind::Plan;
+    a.title = "Revised proposal";
+    a.detail = note + "\n" + proposal.diff;
+    task->setProposal(std::move(proposal));
+    task->append(std::move(a));
+    return true;
 }
 
 bool ControlPlane::rejectCurrentTask() {

@@ -95,6 +95,9 @@ struct CharacterCard {
     // True when the node has a loaded rig. False means the card came from the description alone and
     // no clip is `available`, which the validator must treat as "cannot perform", not "unknown".
     bool rigLoaded = false;
+    // ADR-828 / ADR-763: the character's decider has a `goal` considerer, the slot a goal-mode
+    // performance fills. Without one a `CharacterGoal` event would be given to nothing.
+    bool goalSlot = false;
 
     // The activity by semantic name, or null.
     [[nodiscard]] const ActivityCapability* activity(std::string_view name) const;

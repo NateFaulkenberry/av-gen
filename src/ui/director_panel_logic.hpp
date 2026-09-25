@@ -71,6 +71,8 @@ struct PanelState {
     bool changesAnything = false; // the proposal's dry run would change the project
     bool previewing = false;      // a preview edit was made for this proposal
     bool previewIsNewest = false; // ...and nothing has been done or undone since
+    bool liveToRecord = false;    // the proposal has live (goal) performances not yet recorded (ADR-765)
+    bool recording = false;       // a recording is running
 };
 
 struct Button {
@@ -83,6 +85,8 @@ struct PanelActions {
     Button endPreview; // take the preview out again
     Button accept;
     Button reject;
+    Button record;     // bake the live performances by recording them (ADR-765)
+    Button cancelRecording; // stop a running recording; the proposal stays as it was
     bool revertPreviewFirst = false; // Accept/Reject undo the preview before acting
 };
 [[nodiscard]] PanelActions panelActions(const PanelState& state);

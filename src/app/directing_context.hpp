@@ -66,6 +66,16 @@ namespace avgen::app {
     facts.plans = engine.directingPlans();
     if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
         facts.capabilities = directing::CapabilityRegistry::fromComposition(*comp);
+        // What a goal's walk will ask: the entity world's path provider, straight from the character.
+        facts.walkable = [comp](glm::vec2 from, glm::vec2 to) -> std::optional<bool> {
+            std::vector<glm::vec2> route;
+            switch (comp->entityWorld().pathProvider().route(from, to, route)) {
+            case entity::RouteStatus::Ready: return true;
+            case entity::RouteStatus::Unreachable: return false;
+            case entity::RouteStatus::Pending: return std::nullopt;
+            }
+            return std::nullopt;
+        };
         // The same ground a performer stands on (Engine::setSequence's `groundHeightAt`).
         if (const world::TerrainQuery ground = comp->terrainQuery(); ground.valid()) {
             facts.groundAt = [ground](float x, float z) { return ground.surfaceAt(glm::vec2(x, z)); };

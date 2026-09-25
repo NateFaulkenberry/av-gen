@@ -5,10 +5,14 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <thread>
+
+#include <unistd.h>
 #include <vector>
 
 using namespace avgen;
@@ -27,6 +31,12 @@ std::vector<MidiMessage> parse(const Bytes& bytes, MidiParserState& state, const
 std::vector<MidiMessage> parse(const Bytes& bytes) {
     MidiParserState state;
     return parse(bytes, state);
+}
+
+// Virtual sources are system-wide, and several avgen_tests processes (other worktrees, CI) may run
+// the device cases at once. A per-process name keeps one process from connecting to another's.
+std::string testSourceName(const char* base) {
+    return std::string(base) + "-" + std::to_string(::getpid());
 }
 
 void sleepMs(int ms) {
@@ -293,7 +303,7 @@ TEST_CASE("MidiInput open reports missing backend or missing filter match", "[co
     if (!hasMidiBackend()) {
         CHECK(r.error().message.find("no MIDI backend") != std::string::npos);
         MidiVirtualSource source;
-        CHECK_FALSE(source.open("avgen-test-source").has_value());
+        CHECK_FALSE(source.open(testSourceName("avgen-test-source")).has_value());
         CHECK_FALSE(source.isOpen());
     }
 }
@@ -302,8 +312,9 @@ TEST_CASE("MidiInput receives from a virtual source through the OS", "[control][
     if (!hasMidiBackend()) {
         SKIP("no MIDI backend on this platform");
     }
+    const std::string name = testSourceName("avgen-test-source");
     MidiVirtualSource source;
-    auto created = source.open("avgen-test-source");
+    auto created = source.open(name);
     if (!created) {
         SKIP("cannot create a virtual MIDI source here: " << created.error().message);
     }
@@ -312,7 +323,7 @@ TEST_CASE("MidiInput receives from a virtual source through the OS", "[control][
     // The new source is listed and flagged as virtual.
     bool listed = false;
     for (const auto& d : listMidiInputs()) {
-        if (d.name == "avgen-test-source") {
+        if (d.name == name) {
             listed = true;
             CHECK(d.virtualSource);
         }
@@ -320,12 +331,12 @@ TEST_CASE("MidiInput receives from a virtual source through the OS", "[control][
     CHECK(listed);
 
     MidiInput input;
-    auto opened = input.open("avgen-test-source");
+    auto opened = input.open(name);
     REQUIRE(opened.has_value());
     CHECK(input.isOpen());
     const auto connected = input.connectedSources();
     REQUIRE(connected.size() == 1);
-    CHECK(connected[0] == "avgen-test-source");
+    CHECK(connected[0] == name);
 
     // CC 7 = 100 on MIDI channel 3 (index 2), a note on, and a sysex that must be dropped.
     const Bytes payload = {0xB2, 7, 100, 0x90, 60, 101, 0xF0, 0x7E, 0x01, 0xF7};
@@ -343,15 +354,15 @@ TEST_CASE("MidiInput receives from a virtual source through the OS", "[control][
     CHECK(got[0].channel == 2);
     CHECK(got[0].data1 == 7);
     CHECK(got[0].data2 == 100);
-    CHECK(got[0].source == "avgen-test-source");
+    CHECK(got[0].source == name);
     CHECK(got[0].timestampNs > 0);
     CHECK(got[1].kind == MidiKind::NoteOn);
     CHECK(got[1].channel == 0);
     CHECK(got[1].data1 == 60);
     CHECK(got[1].data2 == 101);
-    CHECK(got[1].source == "avgen-test-source");
+    CHECK(got[1].source == name);
     CHECK(input.stats().messages == 2);
-    CHECK(input.stats().lastSource == "avgen-test-source");
+    CHECK(input.stats().lastSource == name);
 
     input.close();
     CHECK_FALSE(input.isOpen());
@@ -371,15 +382,16 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     CHECK(input.isOpen());
     const auto before = input.connectedSources().size();
 
+    const std::string name = testSourceName("avgen-test-hotplug");
     MidiVirtualSource source;
-    auto created = source.open("avgen-test-hotplug");
+    auto created = source.open(name);
     if (!created) {
         SKIP("cannot create a virtual MIDI source here: " << created.error().message);
     }
     bool connected = false;
     for (int i = 0; i < 400 && !connected; ++i) {
-        for (const auto& name : input.connectedSources()) {
-            connected = connected || name == "avgen-test-hotplug";
+        for (const auto& connectedName : input.connectedSources()) {
+            connected = connected || connectedName == name;
         }
         if (!connected) {
             sleepMs(5);
@@ -392,12 +404,12 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     std::vector<MidiMessage> got;
     for (int i = 0; i < 400; ++i) {
         input.drain(got);
-        if (std::any_of(got.begin(), got.end(), [](const MidiMessage& m) { return m.source == "avgen-test-hotplug"; })) {
+        if (std::any_of(got.begin(), got.end(), [&](const MidiMessage& m) { return m.source == name; })) {
             break;
         }
         sleepMs(5);
     }
-    auto it = std::find_if(got.begin(), got.end(), [](const MidiMessage& m) { return m.source == "avgen-test-hotplug"; });
+    auto it = std::find_if(got.begin(), got.end(), [&](const MidiMessage& m) { return m.source == name; });
     REQUIRE(it != got.end());
     CHECK(it->kind == MidiKind::PitchBend);
     CHECK(it->channel == 1);
@@ -408,12 +420,78 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     bool gone = false;
     for (int i = 0; i < 400 && !gone; ++i) {
         gone = true;
-        for (const auto& name : input.connectedSources()) {
-            gone = gone && name != "avgen-test-hotplug";
+        for (const auto& connectedName : input.connectedSources()) {
+            gone = gone && connectedName != name;
         }
         if (!gone) {
             sleepMs(5);
         }
     }
     CHECK(gone);
+}
+
+// ADR-880: the CoreMIDI receive thread and the thread that opens, drains and destroys the input
+// must be ordered by something the program itself owns. A sender keeps a virtual source busy
+// while the main thread repeatedly connects an input (the connection is built here and first
+// parsed into on CoreMIDI's thread), drains it, and destroys it with packets still in flight.
+// Under ThreadSanitizer this reported the parser-state and inbox races before ADR-880.
+TEST_CASE("MidiInput survives open, drain and destroy while a source is streaming",
+          "[control][midi][device][adr880]") {
+    if (!hasMidiBackend()) {
+        SKIP("no MIDI backend on this platform");
+    }
+    const std::string name = testSourceName("avgen-test-churn");
+    MidiVirtualSource source;
+    auto created = source.open(name);
+    if (!created) {
+        SKIP("cannot create a virtual MIDI source here: " << created.error().message);
+    }
+    // The sender stops and joins on every exit from the test, a failed REQUIRE included.
+    struct Sender {
+        MidiVirtualSource& source;
+        std::atomic<bool> stop{false};
+        std::thread thread;
+        explicit Sender(MidiVirtualSource& s) : source(s) {
+            thread = std::thread([this] {
+                std::uint8_t value = 0;
+                while (!stop.load(std::memory_order_relaxed)) {
+                    (void)source.send(Bytes{0xB0, 7, value, 0x90, 60, 100});
+                    value = static_cast<std::uint8_t>((value + 1) & 0x7F);
+                    std::this_thread::sleep_for(std::chrono::microseconds(200));
+                }
+            });
+        }
+        ~Sender() {
+            stop.store(true, std::memory_order_relaxed);
+            thread.join();
+        }
+    };
+    std::optional<Sender> sender;
+    sender.emplace(source);
+
+    int received = 0;
+    for (int round = 0; round < 12; ++round) {
+        MidiInput input;
+        if (round % 3 == 2) {
+            // Wildcard: the connection is also built by the hot-plug path on the client thread
+            // for any source that appears, and every current source is connected here.
+            REQUIRE(input.open("*").has_value());
+        } else {
+            REQUIRE(input.open(name).has_value());
+        }
+        std::vector<MidiMessage> got;
+        for (int i = 0; i < 400 && got.empty(); ++i) {
+            input.drain(got);
+            if (got.empty()) {
+                sleepMs(2);
+            }
+        }
+        received += got.empty() ? 0 : 1;
+        if (round % 2 == 1) {
+            input.close(); // explicit close, then destruction
+        }
+        // Destroyed with the sender still streaming.
+    }
+    sender.reset();
+    CHECK(received == 12);
 }
