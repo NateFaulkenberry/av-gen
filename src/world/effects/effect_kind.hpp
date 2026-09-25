@@ -81,6 +81,9 @@ enum class EffectKind : std::uint8_t {
     //   lens (DF):           HeatShimmer = 41, GravitationalLens = 42
     //   shell 2 (phase 2):   ChargeUp = 40, LightBeam = 43, Halo = 44, Bubble = 45, Portal = 46,
     //                        RealityTear = 47
+    // The lens slice (DF): Heat Shimmer's Cylinder/Shimmer and Gravitational Lens's Facing/Lens.
+    HeatShimmer = 41,       // DF: the view wobbling through a column of hot air
+    GravitationalLens = 42, // DF: background light bent around a mass, optionally a black hole
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

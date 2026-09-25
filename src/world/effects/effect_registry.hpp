@@ -629,7 +629,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 33> kEffectKinds{
+inline constexpr std::array<EffectKind, 35> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -663,6 +663,8 @@ inline constexpr std::array<EffectKind, 33> kEffectKinds{
     EffectKind::VelocityDistortion, // Wave 2 (DF over HIST)
     EffectKind::MotionSmear,   // Wave 2 (FXL surface)
     EffectKind::Stars,         // Wave 2 (the sky's star field)
+    EffectKind::HeatShimmer,   // Wave 3 (DF: Cylinder + Shimmer)
+    EffectKind::GravitationalLens, // Wave 3 (DF: Facing + Lens)
 };
 
 // The kind's position in `kEffectKinds`, or `size()` for an enumerator that is not in it --

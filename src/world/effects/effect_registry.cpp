@@ -66,6 +66,8 @@ const EffectSchema& colorCyclingSchema(); // Wave 2 (FXL surface)
 const EffectSchema& velocityDistortionSchema(); // Wave 2 (DF over HIST)
 const EffectSchema& motionSmearSchema(); // Wave 2 (FXL surface)
 const EffectSchema& starsSchema();       // Wave 2 (the sky's star field)
+const EffectSchema& heatShimmerSchema(); // Wave 3 (DF)
+const EffectSchema& gravitationalLensSchema(); // Wave 3 (DF)
 
 namespace {
 
@@ -104,6 +106,8 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &velocityDistortionSchema(),
         &motionSmearSchema(),
         &starsSchema(),
+        &heatShimmerSchema(),
+        &gravitationalLensSchema(),
     };
     return kSchemas;
 }
