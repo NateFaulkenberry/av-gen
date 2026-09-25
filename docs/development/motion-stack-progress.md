@@ -1,6 +1,6 @@
 # Motion Stack Build Board: progress
 
-Last updated: 2026-09-24
+Last updated: 2026-09-25
 Branch: `agent/motion` (worktree `../av-gen-motion`, from main 232a50d7)
 Owner of: motion engine capabilities (`src/entity/`, `src/scene/` motion, clips, rigs, and the
 engine side of the actor handoff). Not `src/directing/` or the AI layer.
@@ -14,7 +14,18 @@ M1–M5 are merged into main (9fa84413). Since then:
 - the Glowmere review build on the multicam film (ADR-826, ADR-827,
   `docs/reports/glowmere-review-build.md`).
 
-Next: the remaining D items (§26's other producers, §25/§69 semantic tags, §36) and B §39.
+Since the review:
+- the owner's two foot bugs, fixed at the cause:
+  - ADR-829: Rook's legs at the 3 s turn were the stride warp on a turn clip;
+  - ADR-830: Ember's jump on the bank was a cliff in the terrain;
+  - ADR-831: a knock-on of ADR-830, where the crowd pushed a pivoting body backwards;
+- D §26's interaction and volume producers (ADR-832);
+- D §25/§66/§69 semantic tags on props and effects (ADR-833);
+- D §36 cinematic signals (ADR-834);
+- B §39's steering seam fed by the crowd (ADR-835).
+
+Next: C §68 and D §40/§48 (a live matcher view and a character inspector), and §26's remaining
+kinds (spawn and remove, world-effect start and end).
 
 ## How this was counted
 
@@ -41,9 +52,9 @@ impose something checkable.
 |---|---:|---:|---:|---:|---|---|
 | 0 Research | 5 | 0 | 0 | 0 | done | |
 | A Foundation | 17 | 0 | 2 | – | done | not re-audited this round; the board's own data had 2 rows planned under a "done" phase |
-| B Procedural (§1–67) | 54 | 2 | 0 | 11 | 54/56 | §39 and §66 are partial; see below |
+| B Procedural (§1–67) | 55 | 1 | 0 | 11 | 54/56 | §39 done (ADR-835: crowd separation feeds `intent.steering`); §66 is partial; see below |
 | C Matching (§1–95) | 81 | 0 | 1 | 13 | 52 / 25 / 5 | §37/39/40/76/81 done by ADR-825 (the product loads a baked database through the slot); §68 is partly live (`MotionDebug::matching`) and counted done-in-CLI as before; §94 waits on the owner. **§86 (the Phase D gate)**: the matcher runs on Glowmere as a review arm and is not yet in the film |
-| D Behaviour (§1–78 + demo) | 40 + demo | 26 | 2 | 10 | 44 / 16 / 8 | §35 done (ADR-824/828: runtime and scheduled `CharacterGoal`s, `release`, scheduled direction replayed); §26 still partial -- `ActionComplete` now has a producer (ADR-828), but InteractionComplete, VolumeEnter/Exit, spawn/remove and effect start/end do not |
+| D Behaviour (§1–78 + demo) | 40 + demo | 26 | 2 | 10 | 44 / 16 / 8 | §35 done (ADR-824/828: runtime and scheduled `CharacterGoal`s, `release`, scheduled direction replayed); §26 still partial -- `ActionComplete` (ADR-828), `InteractionComplete` and `VolumeEnter/Exit` (ADR-832) have producers; spawn/remove and effect start/end do not. §25 done (ADR-833). §36 done (ADR-834) |
 | ★ Glowmere review build (10) | 7 | 3 | 0 | – | 0 / 10 | done: 1–5, 8, 9; partial: 6 (the director reads scenario beats), 7 (no in-app inspector panel), 10 (the report exists; its cost figures were taken under load and are not reliable) |
 | E Learned motion (13 board rows) | 0 | 0 | 13 | – | 13 planned | gated; see recommendation |
 | F Advanced (9 tracks) | – | – | – | – | 9 gated | pieces exist in F7, F8 and F9; no track has been measured or classified |
@@ -87,15 +98,15 @@ impose something checkable.
   - §75 final report: `docs/reports/autonomous-character-phase-d-report.md`.
 - **Landed, still partial:** §66. All five aliens run the awareness layer, but **only in
   `glowmere-valley-2-multicam.scene.json`**. `glowmere-valley-2` and `-song` are not wired. Props
-  and effects carry no semantic tags.
+  and effects carry semantic tags since ADR-833.
 - **Downgraded from done:**
   - §24: no relationship labels and no follow.
-  - §25: no semantic categories.
-  - §26: none of the spec's event kinds has a producer.
+  - §25: no semantic categories. (Done again since: ADR-833.)
+  - §26: none of the spec's event kinds has a producer. (Since: ADR-828 and ADR-832.)
   - §32: live play culls and coarsens by camera distance.
   - §62: interactive play uses wall-clock dt.
 - **Not started:**
-  - §36 camera/cinematic signals (`isInShot`, `screenImportance` and the rest);
+  - §36 camera/cinematic signals. (Done since: ADR-834.)
   - §45 threading investigation.
 - **Partial, and matters to the Director:** §35.
   - What exists: verbs, never clips, and a keyframeable `goal` considerer.
@@ -255,6 +266,9 @@ At db30311a (main e995e3b9 merged, with ADR-870), release build:
   process. It passed in this run.
 
 ## Log
+- 2026-09-25: ADR-829 (Rook's turn: stride warp), ADR-830 (Ember's bank: terrain cliff), ADR-831
+  (crowd push while pivoting), ADR-832 (interaction and volume triggers), ADR-833 (semantic tags),
+  ADR-834 (cinematic signals), ADR-835 (steering fed). Review files 09 and 12-14.
 - 2026-09-25: ADR-824 (scheduled direction, release, runtime goals); ADR-825 (baked database loading);
   ADR-826/827 (analyzer, review build); ADR-828 (CharacterGoal, character events, clip readout).
 - 2026-09-24: M4 (ADR-822, including the hop-skid fix) and M5 (ADR-823).
