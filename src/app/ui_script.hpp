@@ -114,6 +114,11 @@ enum class UiScriptArm : std::uint32_t {
     // check one undo labelled with the request and the recorded actor installed; Cmd+Z at 1600 and
     // check it is all gone. Captures after 1450 show the recorded proposal, 1550 the accepted plan.
     DirectorRecord = 1u << 18,
+    // ADR-890: take the canvas's editor viewpoint and hold it. Chooses the editor viewpoint the way
+    // the toolbar does, Option-drags the canvas, lets go, then plays across the film's cuts and
+    // seeks, and checks on every frame that what is on screen is still exactly the pose the drag
+    // left -- naming the frame, the second and the film's camera the first time it is not.
+    Viewpoint = 1u << 19,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -180,6 +185,13 @@ private:
     std::string directorSequenceBefore_;
     std::uint64_t recordedAt_ = 0; // the frame the recording replaced the proposal, 0 = not yet
     void stepDirectorRecord(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepViewpoint(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    bool viewpointHeld_ = false;         // the drag is over and the pose below is the person's
+    glm::vec3 viewpointEye_{0.0f};
+    glm::vec3 viewpointTarget_{0.0f};
+    std::size_t viewpointFramesHeld_ = 0;
+    std::size_t viewpointFramesMoved_ = 0;
+    float viewpointWorstDrift_ = 0.0f;
 
     std::vector<std::string> editLog_;
     std::size_t sliceShotsBefore_ = 0;

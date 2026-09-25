@@ -70,7 +70,7 @@ features: subsystem.cli
 | `--disable <list>` | switch phases off: `shadows`, `ao`, `volume`, `post`, `shadowmask` |
 | `--canvas-scale <f>` | render at this fraction of the canvas's pixels, 0.25 to 1 |
 | `--stress <seed>` | apply random slider-like actions every frame |
-| `--ui-script <arms>` | drive the editor repeatably: `hover`, `sliders`, `panels`, `select`, `scrub`, `camera`, `tabs`, or `idle` or `all` |
+| `--ui-script <arms>` | drive the editor repeatably: `hover`, `sliders`, `panels`, `select`, `scrub`, `camera`, `tabs`, `viewpoint` (take the editor viewpoint, drag, play and seek; fails if anything but the drag moves the frame), or `idle` or `all` |
 | `--frames <n>` | exit after n frames |
 | `--log <level>` | `trace`, `debug`, `info`, `warn`, `error` |
 

@@ -3182,7 +3182,27 @@ Result<void> Engine::setCompositionJson(const nlohmann::json& document) {
     if (!comp) {
         return std::unexpected(comp.error());
     }
-    return installComposition(std::move(*comp));
+    // ADR-890: the editor's viewpoint is the person's, not the document's (ADR-391), so a document
+    // put back in its own place -- an assistant task rolled back or aborted, a snapshot restored --
+    // must not take it away. Left behind, the new composition re-seeds it from the film's camera
+    // on the next frame, and the canvas jumps to wherever the director had the film: the same
+    // "the director moved my camera" report by another road. A project *load* goes through
+    // `loadComposition` and does not carry it, because a viewpoint in one world means nothing in
+    // another.
+    std::optional<scene::CameraPose> keepViewpoint;
+    if (const scene::Composition* was = composition(); was != nullptr && was->editorCameraSeeded()) {
+        keepViewpoint = was->editorCamera();
+    }
+    const scene::ViewportView keepView =
+        composition() != nullptr ? composition()->viewportView() : scene::ViewportView{};
+    auto installed = installComposition(std::move(*comp));
+    if (scene::Composition* now = composition(); now != nullptr) {
+        now->setViewportView(keepView);
+        if (keepViewpoint) {
+            now->setEditorCamera(*keepViewpoint);
+        }
+    }
+    return installed;
 }
 
 Result<void> Engine::installComposition(std::unique_ptr<scene::Composition> composition) {
