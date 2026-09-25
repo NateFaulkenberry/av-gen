@@ -5,6 +5,7 @@
 
 #include "app/directing_apply.hpp"
 #include "app/directing_context.hpp"
+#include "app/directing_record.hpp"
 #include "app/engine.hpp"
 #include "directing/compiler.hpp"
 #include "directing/plan.hpp"
@@ -207,4 +208,66 @@ TEST_CASE("a goal, played: Rook heads for the Lantern, says when he gets there, 
     const glm::vec3 b = scrubbed.composition()->entityWorld().find("rook")->visualPosition();
     INFO("scrub to " << probe << " s: " << glm::length(a - b) << " m from the play");
     CHECK(glm::length(a - b) == 0.0f);
+}
+
+TEST_CASE("a goal is baked by recording it: a scripted actor, its event at the recorded time, replayed exactly",
+          "[directing][goal][record][benchmark]") {
+    // ADR-763's only route from live to baked. The recording is played back on its own scratch copy
+    // and must put the body on every key, and a scrub into it must land where that play did.
+    app::Engine live(app::EngineMode::Offline);
+    load(live);
+    json doc = goalPlan();
+    doc["cues"] = json::array({json{{"key", "flash"}, {"parameter", "scene/brightness"}, {"on", "rook.reaches_lantern"},
+                                    {"value", 1.3}, {"rampSeconds", 0.05}, {"holdSeconds", 0.3}}});
+    const Compilation c = compilePlan(planFrom(doc), app::sceneFactsFor(live));
+    INFO(c.diffText());
+    CHECK(c.validation.isBlocked("flash")); // live: waits for the recording
+    CHECK_FALSE(c.validation.isBlocked("wander"));
+    const std::string before = live.sequence().toJson().dump();
+
+    app::RecordOptions options;
+    options.maxSeconds = 20.0;
+    auto report = app::recordLivePerformances(live, c, options);
+    REQUIRE(report.has_value());
+    for (const std::string& n : report->notes) {
+        UNSCOPED_INFO(n);
+    }
+    INFO("recorded in " << report->recordMs << " ms; check " << report->checkMs << " ms; played back "
+                        << report->replayWorstMetres << " m, scrubbed " << report->scrubWorstMetres << " m");
+    CHECK(live.sequence().toJson().dump() == before); // the person's project: untouched
+
+    const Plan& recorded = report->plan;
+    CHECK(recorded.tier == Tier::Baked); // every live performance is recorded
+    const PlanPerformance& wander = recorded.performances[0];
+    REQUIRE(wander.recording.has_value());
+    REQUIRE(wander.recording->events.size() == 1);
+    CHECK(wander.recording->events[0].first == "rook.reaches_lantern");
+    const double arrival = wander.recording->events[0].second;
+    CHECK(arrival > 5.0);
+    CHECK(report->replayWorstMetres < 0.01);  // the body is on the recording
+    CHECK(report->scrubWorstMetres == 0.0);   // and a scrub lands where the play did
+
+    // The plan survives its own document, and compiles baked: the actor, a marker at the recorded
+    // arrival, and the cue on it -- no longer blocked.
+    const Plan reread = planFrom(recorded.toJson());
+    CHECK(reread.performances[0].recording == wander.recording);
+    Plan fresh = reread;
+    fresh.produced.clear();
+    const Compilation baked = compilePlan(fresh, app::sceneFactsFor(live));
+    INFO(baked.diffText());
+    CHECK_FALSE(baked.validation.hasErrors());
+    const auto actor = std::find_if(baked.staged.sequence.actors.begin(), baked.staged.sequence.actors.end(),
+                                    [](const seq::Actor& a) { return a.id == "rook"; });
+    REQUIRE(actor != baked.staged.sequence.actors.end());
+    const auto marker = std::find_if(baked.staged.sequence.markers.begin(), baked.staged.sequence.markers.end(),
+                                     [](const seq::Marker& m) { return m.name == "rook.reaches_lantern"; });
+    REQUIRE(marker != baked.staged.sequence.markers.end());
+    CHECK(marker->timeSeconds == arrival);
+    const auto flash = std::find_if(baked.staged.sequence.events.begin(), baked.staged.sequence.events.end(),
+                                    [](const seq::SequenceEvent& e) { return e.id == "rook-wanders.flash"; });
+    REQUIRE(flash != baked.staged.sequence.events.end());
+    CHECK(flash->when.kind == seq::TriggerKind::Time);
+    CHECK(flash->when.timeSeconds == arrival);
+    CHECK(std::none_of(baked.staged.sequence.events.begin(), baked.staged.sequence.events.end(),
+                       [](const seq::SequenceEvent& e) { return e.what.kind == seq::EventActionKind::CharacterGoal; }));
 }

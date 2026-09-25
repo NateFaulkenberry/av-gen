@@ -42,6 +42,8 @@ target_sources(avgen_tests PRIVATE
     # Viewport camera gestures are vector arithmetic over an eye and a target (ADR-068).
     "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
+    # ADR-763: recording a live performance into a baked one, on scratch copies.
+    "${CMAKE_SOURCE_DIR}/src/app/directing_record.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
     # The editor shell's panel registry and layout file (ADR-076). Deliberately ImGui-free so it

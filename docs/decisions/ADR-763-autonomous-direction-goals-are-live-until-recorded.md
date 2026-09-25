@@ -1,7 +1,7 @@
 # ADR-763: Autonomous direction — a goal is live until it is recorded
 
-**Status:** Proposed (Slice 4 research; the interface is requested from the Motion lead through the
-coordinator, and nothing has been built yet)
+**Status:** Accepted. The goal compiler and recording are built on the Motion lead's ADR-824/828;
+directed mode and event-driven proposals are not.
 **Date:** 2026-09-25
 **Related:**
 - ADR-091 and ADR-098 (the determinism tiers);
@@ -88,3 +88,46 @@ coordinator, and nothing has been built yet)
   it, and bake it by recording. It is never labelled reproducible before it is.
 - Recording costs a play from zero. On the benchmark that is about 1–1.6 s of simulation per
   minute of film (§37's seek numbers), so recording runs as a job, not on a click.
+
+## Implemented (2026-09-25)
+
+The Motion lead built the engine side as ADR-824 and ADR-828.
+
+- **Goal compile (ce3a740e):**
+  - `go_to` and `inspect` beats each become one `CharacterGoal` event. Each beat's `emits` becomes a
+    named live listener: `ActionComplete` on `goal.arrived` or `goal.done`, for that character,
+    after the goal's second.
+  - The validator:
+    - refuses a goal in a baked plan;
+    - needs a goal slot on the card (`goalSlot`);
+    - warns when the entity world's own path provider finds no walking route from the character's
+      mark to the place (what made a goal to Umbra do nothing);
+    - refuses a cue on a live event, or slow motion on a goal, until the performance is recorded.
+  - A goal and another performance of the same character are a `TIMING_CONFLICT`.
+  - **Played:** Rook, told at 5 s to go to the Lantern, reports arrival at 14.4 s, 3.9 m from it.
+    On his own he was 19.4 m away at that moment.
+- **Recording (`app::recordLivePerformances`, `src/app/directing_record.*`):**
+  - It plays a scratch copy from zero, with no live control, no audio and the cull lifted. It keeps
+    the body every frame (Linear keys every 0.1 s, yaw unwrapped), its clip changes (clip cues from
+    `Composition::clipReadout`), any airborne span, and the times its events were heard.
+  - Each live performance gains a `recording`, and the plan becomes baked once every live
+    performance is recorded. A recorded performance compiles verbatim as a performer. Its events
+    become markers at their recorded times, and cues on them bake there.
+  - It then checks itself on fresh scratch copies:
+    - the recorded plan played back must put the body on every key;
+    - a scrub into the recording must land where the play did, for every entity.
+  - **Measured (benchmark, one 10.4 s goal):**
+
+    | Step | Time | Result |
+    |---|---|---|
+    | Recording | 5.0 s | 106 keys, 2 clip cues, the arrival at its time |
+    | Checks | 9.5 s | played back 0.0000 m from the recording; scrubbed 0.0000 m from the play |
+
+    Removing the scrub copy's install turns the scrub check red, and not hearing the events turns
+    the event check red.
+- **Not done:**
+  - directed mode (Director-tier action lists);
+  - event-driven proposals and runtime candidate shots;
+  - a way to start recording from the panel or an AI tool. The AI layer is in the core library
+    and the recorder is an application source, so a tool needs a host hook. Recording is reachable
+    from code and tests only.
