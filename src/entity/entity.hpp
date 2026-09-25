@@ -121,6 +121,11 @@ struct MotionMatchingDesc {
     // not, the body falls back to its clip provider and the log says why.
     std::string pack;
     std::string packResolved;
+    // ADR-825 (C §37/§39): a database baked offline from `pack` (`avgen_motion build-db`), loaded
+    // off the render thread and published by atomic swap instead of extracted at composition build.
+    // Needs `pack`. As authored and as resolved, like the pack.
+    std::string database;
+    std::string databaseResolved;
     // §14: which clips the matcher may use, as name prefixes ("Walking" admits `Walking_crouch` and
     // `Walking~turn+1.40`). Empty admits every clip. The scout's pack has no authored tags, so an
     // action clip like `Button_push` otherwise serves as an idle; this is the authoring surface

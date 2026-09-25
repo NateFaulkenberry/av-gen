@@ -1764,6 +1764,8 @@ private:
         // keeps it alive for as long as this provider points into it.
         entity::MatchMotionProvider matchProvider_;
         std::shared_ptr<const MotionAsset> matchAsset_;
+        // ADR-825: the slot this body's baked database arrives through, or null (built in memory).
+        const MotionDatabaseSlot* matchSlot_ = nullptr;
         entity::MotionChain chain_;
         bool chainBuilt_ = false;
         RigId chainRig_ = kInvalidRig;
@@ -1795,6 +1797,20 @@ private:
     // ADR-623/ADR-650: one motion database per (skeleton, feature config), shared by every body
     // that matches on it. Built on first use from the rig's own clips.
     std::map<std::string, std::shared_ptr<const MotionAsset>> matchAssets_;
+    // ADR-825: one slot per baked (pack, database), loading off-thread and publishing by atomic swap.
+    std::map<std::string, std::unique_ptr<MotionDatabaseSlot>> motionSlots_;
+    bool blockingMotionLoads_ = false;
+    [[nodiscard]] MotionDatabaseSlot* motionSlotFor(const entity::MotionMatchingDesc& m);
+
+public:
+    // ADR-825: wait for every requested database before returning from a request -- what an offline
+    // render or a headless run sets, so its frames never depend on how long a load took. A live
+    // session leaves it off: the body plays its clips until the matcher's database arrives.
+    void setBlockingMotionLoads(bool blocking) { blockingMotionLoads_ = blocking; }
+    // The slots this composition has asked for, by (pack|database), for a status line and for tests.
+    [[nodiscard]] std::vector<std::pair<std::string, MotionLoadStatus>> motionLoadStatus() const;
+
+private:
     [[nodiscard]] std::shared_ptr<const MotionAsset> matchAssetFor(const SkinnedRig& rig,
                                                                    const entity::MotionMatchingDesc& m,
                                                                    const std::string& who);
@@ -1817,6 +1833,10 @@ public:
         bool posedByProvider = false;  // ...and it actually happened, this frame
         entity::MotionStatus status = entity::MotionStatus::NoContent;
         int provider = -1;             // which one answered, as a chain index
+        // ADR-825 / C §68: a matcher is in this body's chain (its database built or arrived), and
+        // what it holds. Index 0 alone cannot say: with no matcher, index 0 IS the clip provider.
+        bool matching = false;
+        std::size_t databaseSamples = 0;
         std::uint32_t fellThrough = 0; // how many declined before it
         std::uint32_t generation = 0;  // the memory's, so "it never ran" is visible
         float localTime = 0.0f;

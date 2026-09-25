@@ -126,6 +126,11 @@ void Engine::setTempoSource(TempoSource source) {
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
     ++sceneGeneration_;
+    // ADR-825: an offline engine waits for a baked motion database rather than rendering the frames
+    // a load happened to take with the body on its clips. A live one does not wait.
+    if (auto* comp = dynamic_cast<scene::Composition*>(controller_.get()); comp != nullptr) {
+        comp->setBlockingMotionLoads(mode_ == EngineMode::Offline);
+    }
     // Live only. An expensive procedural regeneration is allowed to wait for the slider driving it
     // to stop moving, rather than taking the frame away from the editor on every frame of a drag
     // (see Composition::setInteractiveRebuildBudget). Offline never sets it, because the deferral

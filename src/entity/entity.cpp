@@ -3519,6 +3519,19 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
             desc.motionMatching.packResolved =
                 (authored.is_absolute() ? authored : (baseDir / authored)).lexically_normal().string();
         }
+        if (m.contains("database")) {
+            if (!m["database"].is_string() || m["database"].get<std::string>().empty()) {
+                return fail("entity '{}': 'motionMatching.database' must be a path", desc.name);
+            }
+            if (desc.motionMatching.pack.empty()) {
+                return fail("entity '{}': 'motionMatching.database' needs the 'pack' it was built from",
+                            desc.name);
+            }
+            desc.motionMatching.database = m["database"].get<std::string>();
+            const std::filesystem::path authored(desc.motionMatching.database);
+            desc.motionMatching.databaseResolved =
+                (authored.is_absolute() ? authored : (baseDir / authored)).lexically_normal().string();
+        }
         desc.motionMatching.enabled = true;
         desc.proceduralMotion = true;
     }
@@ -3926,6 +3939,9 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
         m["trajectory"] = entity.motionMatching.trajectory;
         if (!entity.motionMatching.pack.empty()) {
             m["pack"] = entity.motionMatching.pack; // as authored, so a save moves with its scene
+            if (!entity.motionMatching.database.empty()) {
+                m["database"] = entity.motionMatching.database; // ADR-825
+            }
         }
         if (!entity.motionMatching.clips.empty()) {
             m["clips"] = entity.motionMatching.clips;

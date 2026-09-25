@@ -1958,9 +1958,13 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
     // When the database could not be built, the chain is the clip provider alone and the log says
     // so: falling back is the designed behaviour, and doing it silently is not.
     matchAsset_.reset();
+    matchSlot_ = nullptr;
     matchProvider_.setDatabase(nullptr);
     matchProvider_.setClips(nullptr);
     if (entity_.desc().motionMatching.enabled) {
+        if (!entity_.desc().motionMatching.databaseResolved.empty()) {
+            matchSlot_ = owner_.motionSlotFor(entity_.desc().motionMatching); // ADR-825
+        }
         matchAsset_ = owner_.matchAssetFor(rig, entity_.desc().motionMatching, entity_.desc().name);
         if (matchAsset_ != nullptr) {
             matchProvider_.setDatabase(&matchAsset_->db);
@@ -2031,15 +2035,53 @@ void Composition::AnimationSink::prepareChain() {
     if (id >= owner_.scene_.rigs.size() || !owner_.scene_.rigs[id].skeleton.valid()) {
         return;
     }
+    // ADR-825: a baked database that has arrived (or been hot-swapped) since the chain was built.
+    if (chainBuilt_ && matchSlot_ != nullptr && matchSlot_->current() != matchAsset_) {
+        chainBuilt_ = false;
+    }
     if (!chainBuilt_ || chainRig_ != id) {
         buildChain(owner_.scene_.rigs[id]);
         chainRig_ = id;
     }
 }
 
+MotionDatabaseSlot* Composition::motionSlotFor(const entity::MotionMatchingDesc& m) {
+    const std::string key = m.packResolved + "|" + m.databaseResolved;
+    auto it = motionSlots_.find(key);
+    if (it == motionSlots_.end()) {
+        it = motionSlots_.emplace(key, std::make_unique<MotionDatabaseSlot>()).first;
+        it->second->requestLoad(m.packResolved, m.databaseResolved);
+        if (blockingMotionLoads_) {
+            (void)it->second->waitIdle(std::chrono::seconds(120));
+        }
+    }
+    return it->second.get();
+}
+
+std::vector<std::pair<std::string, MotionLoadStatus>> Composition::motionLoadStatus() const {
+    std::vector<std::pair<std::string, MotionLoadStatus>> out;
+    for (const auto& [key, slot] : motionSlots_) {
+        out.emplace_back(key, slot->status());
+    }
+    return out;
+}
+
 std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& rig,
                                                               const entity::MotionMatchingDesc& m,
                                                               const std::string& who) {
+    // ADR-825: a baked database is loaded, not built. What the slot has published now -- null
+    // while it loads, or when it failed (the slot keeps the reason, and the body stays on its
+    // clip provider) -- and the sink rebuilds its chain when that changes.
+    if (!m.databaseResolved.empty()) {
+        MotionDatabaseSlot* slot = motionSlotFor(m);
+        std::shared_ptr<const MotionAsset> asset = slot->current();
+        if (asset != nullptr && asset->pack.skeletonDigest != skeletonDigest(rig.skeleton)) {
+            log::warn("entity '{}': baked database '{}' was built for another skeleton; the body stays "
+                      "on its clip provider", who, m.database);
+            return nullptr;
+        }
+        return asset;
+    }
     // The key is everything the database is a function of: the skeleton, and the config.
     std::string key = skeletonDigest(rig.skeleton) + "|p" + m.packResolved + "|j";
     for (const std::string& j : m.joints) {
@@ -2156,6 +2198,10 @@ Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
         const entity::Entity* live = entityWorld_.find(sink->entityName());
         out.found = true;
         out.posedByProvider = sink->posedByProvider();
+        if (const entity::MatchMotionProvider* m = sink->matcher(); m != nullptr) {
+            out.matching = true;
+            out.databaseSamples = m->database() != nullptr ? m->database()->sampleCount() : 0;
+        }
         if (const CompositionNode* n = findNode(std::string(node));
             n != nullptr && !n->rigs.empty() && n->rigs.front() < scene_.rigs.size()) {
             const SkinnedRig& rig = scene_.rigs[n->rigs.front()];
@@ -3083,6 +3129,10 @@ std::uint64_t Composition::replayInputKey() const {
     }
     for (const Directive& d : directives_) { // ADR-824: likewise a changed schedule of orders
         mix(d.signature);
+    }
+    for (const auto& [key, slot] : motionSlots_) { // ADR-825: a newly published database is new input
+        mix(slot->status().publishes);
+        mix(slot->current() != nullptr ? 1u : 0u);
     }
     mix(bits(rootAngle_));
     mix(bits(center_.x));
