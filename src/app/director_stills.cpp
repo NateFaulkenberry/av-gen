@@ -7,6 +7,10 @@
 #include "core/time.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/composition.hpp"
+#include "entity/entity.hpp"
+#include "world/hero.hpp"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <chrono>
@@ -29,6 +33,87 @@ static std::string clockText(double seconds) {
     const auto minutes = static_cast<int>(s / 60.0);
     return fmt::format("{:02d}:{:06.3f}", minutes, s - (minutes * 60.0));
 }
+
+Framing frameSubject(const glm::mat4& view, const glm::mat4& projection, glm::vec3 eye, glm::vec3 point, float height,
+                     const std::string& subject) {
+    Framing f;
+    f.known = true;
+    f.distance = glm::length(point - eye);
+    const glm::vec4 clip = projection * view * glm::vec4(point, 1.0f);
+    if (clip.w <= 1e-4f) {
+        f.note = subject + " is behind the camera";
+        return f;
+    }
+    f.x = clip.x / clip.w;
+    f.y = clip.y / clip.w;
+    constexpr float kMargin = 0.95f; // a subject on the frame's very edge is not "in the shot"
+    f.inFrame = std::abs(f.x) <= kMargin && std::abs(f.y) <= kMargin;
+    if (!f.inFrame) {
+        f.note = fmt::format("{} is outside the frame ({} {})", subject,
+                             std::abs(f.x) > kMargin ? (f.x < 0.0f ? "left" : "right") : "",
+                             std::abs(f.y) > kMargin ? (f.y < 0.0f ? "below" : "above") : "");
+        return f;
+    }
+    // How big it reads: the span from its feet to its head, in the frame's height.
+    const glm::vec4 top = projection * view * glm::vec4(point + glm::vec3(0.0f, height * 0.5f, 0.0f), 1.0f);
+    const glm::vec4 bottom = projection * view * glm::vec4(point - glm::vec3(0.0f, height * 0.5f, 0.0f), 1.0f);
+    if (top.w > 1e-4f && bottom.w > 1e-4f) {
+        f.heightFraction = std::abs((top.y / top.w) - (bottom.y / bottom.w)) * 0.5f;
+    }
+    if (f.heightFraction < kReadableFraction) {
+        f.note = fmt::format("{} is {:.0f} m away, {:.1f}% of the frame's height: too small to read", subject, f.distance,
+                             f.heightFraction * 100.0f);
+    }
+    return f;
+}
+
+namespace {
+
+// Where the subject is at this instant, as the film sees it, and how tall it stands: a character's
+// body (centred a metre up, two metres tall), or a place's anchor (a hero at half its height).
+std::optional<std::pair<glm::vec3, float>> subjectPoint(Engine& engine, const std::string& id) {
+    const entity::EntityWorld& world = engine.composition()->entityWorld();
+    if (const entity::Entity* body = world.find(id); body != nullptr) {
+        return std::make_pair(body->visualPosition() + glm::vec3(0.0f, 1.0f, 0.0f), 2.0f);
+    }
+    glm::vec3 at{0.0f};
+    if (world.pointOfInterest(id, at)) {
+        float height = 2.0f;
+        for (const world::HeroPoint& hero : engine.composition()->heroes()) {
+            if (hero.name == id && hero.height > 0.0f) {
+                height = hero.height;
+            }
+        }
+        return std::make_pair(at, height);
+    }
+    return std::nullopt;
+}
+
+std::string subjectOf(const directing::Compilation& c, const std::string& item) {
+    for (const directing::PlanShot& ps : c.plan.shots) {
+        if (ps.key == item) {
+            if (const directing::Subject* s = c.plan.subject(ps.subject); s != nullptr) {
+                return s->id;
+            }
+        }
+    }
+    return {};
+}
+
+Framing critique(Engine& engine, const std::string& subject, std::uint32_t width, std::uint32_t height) {
+    if (subject.empty()) {
+        return {};
+    }
+    const auto point = subjectPoint(engine, subject);
+    if (!point) {
+        return {};
+    }
+    const scene::Camera& cam = engine.composition()->scene().camera;
+    const float aspect = static_cast<float>(width) / static_cast<float>(std::max<std::uint32_t>(height, 1));
+    return frameSubject(cam.view(), cam.projection(aspect), cam.position, point->first, point->second, subject);
+}
+
+} // namespace
 
 std::vector<std::pair<std::string, const seq::Shot*>> proposedShots(const directing::Compilation& c) {
     std::vector<std::pair<std::string, const seq::Shot*>> out;
@@ -87,7 +172,9 @@ Result<ShotStillsReport> renderShotStills(gpu::Context& context, gpu::ShaderLibr
         if (!image) {
             return fail("stills: rendering '{}': {}", shot->name, image.error().message);
         }
-        report.stills.push_back(ShotStill{item, shot->name, mid, std::move(*image)});
+        const std::string subject = subjectOf(compilation, item);
+        report.stills.push_back(
+            ShotStill{item, shot->name, mid, std::move(*image), subject, critique(scratch, subject, width, height)});
     }
     report.renderMs = since(start);
     log::info("director stills: {} shot(s) at {}x{}: scratch session {:.0f} ms, seeks and frames {:.0f} ms",
@@ -262,7 +349,9 @@ StillsSession::Progress StillsSession::step() {
         auto image = renderer_->renderToImage(scratch_->composition()->scene(), t, width_, height_);
         lock.lock();
         if (image) {
-            fresh_.push_back(ShotStill{shots_[i].first, shots_[i].second->name, mid, std::move(*image)});
+            const std::string subject = subjectOf(compilation_, shots_[i].first);
+            fresh_.push_back(ShotStill{shots_[i].first, shots_[i].second->name, mid, std::move(*image), subject,
+                                       critique(*scratch_, subject, width_, height_)});
             ++done_;
             stage_ = Stage::Rendered;
         } else {

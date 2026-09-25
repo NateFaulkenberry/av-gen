@@ -2476,6 +2476,11 @@ void Application::serviceDirectorStills() {
         fresh.clear();
     }
     for (const ShotStill& s : fresh) {
+        if (s.framing.known) {
+            log::info("director stills: '{}' at {:.3f}s: {} at ({:.2f}, {:.2f}), {:.1f} m{}", s.shot, s.seconds, s.subject,
+                      s.framing.x, s.framing.y, s.framing.distance,
+                      s.framing.note.empty() ? std::string() : " -- " + s.framing.note);
+        }
         if (stillsSlots_ >= kCapacity || s.image.width != kW || s.image.height != kH) {
             continue;
         }
@@ -2506,7 +2511,7 @@ void Application::serviceDirectorStills() {
         const float a = static_cast<float>(kAtlas);
         view.byItem[s.item] = ui::DirectorPanel::Still{static_cast<float>(x) / a, static_cast<float>(y) / a,
                                                        static_cast<float>(x + kW) / a, static_cast<float>(y + kH) / a,
-                                                       s.seconds};
+                                                       s.seconds, s.framing.known ? s.framing.note : std::string()};
         view.texture = reinterpret_cast<std::uint64_t>(stillsView_.Get());
         view.width = static_cast<float>(kW);
         view.height = static_cast<float>(kH);

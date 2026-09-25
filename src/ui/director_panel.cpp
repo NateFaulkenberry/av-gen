@@ -321,6 +321,12 @@ void DirectorPanel::draw(app::Engine& engine) {
                                  ImVec2(s->second.u0, s->second.v0), ImVec2(s->second.u1, s->second.v1));
                     ImGui::SameLine();
                     ImGui::TextDisabled("at %s", clockText(s->second.seconds).c_str());
+                    if (!s->second.framing.empty()) {
+                        // Under the still, wrapped: a narrow dock must not squeeze it into a column.
+                        ImGui::PushStyleColor(ImGuiCol_Text, kWarn);
+                        ImGui::TextWrapped("! %s", s->second.framing.c_str());
+                        ImGui::PopStyleColor();
+                    }
                     ImGui::Unindent(ImGui::GetTextLineHeight() + 6.0f);
                 }
             }

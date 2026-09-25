@@ -441,6 +441,6 @@ markers · [ ] keyed chase camera · [ ] character performance tests
 [ ] authored-vs-runtime precedence · [ ] replay validation
 
 ## Slice 5 — Verification and scale
-[x] preview thumbnails (ADR-764) · [ ] optional vision critique · [x] Director benchmark harness (costs) ·
+[x] preview thumbnails (ADR-764) · [x] framing critique (ADR-769; a model's vision critique stays optional) · [x] Director benchmark harness (costs) ·
 [x] golden plans (10) · [~] performance benchmarks (Director costs measured) · [ ] seek optimization · [ ] MCP exposure ·
 [ ] external-agent integration tests
