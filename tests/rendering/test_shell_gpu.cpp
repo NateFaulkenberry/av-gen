@@ -310,39 +310,48 @@ TEST_CASE("a plasma orb is depth-tested against the world and writes emission",
     const scene::Scene bare = stage();
     scene::Scene lit = stage();
     REQUIRE(buildShells(lit, {orb}, 2.0)[0] == world::EffectStatus::Drawn);
-    const gpu::Image8 off = render(renderer, bare, 2.0);
-    const gpu::Image8 on = render(renderer, lit, 2.0);
-    dump(off, "shell-plasma-occlusion-off");
-    dump(on, "shell-plasma-occlusion-on");
-    std::size_t hidden = 0;
-    std::size_t open = 0;
-    for (std::uint32_t y = 0; y < kHeight; ++y) {
-        for (std::uint32_t x = 0; x < kWidth; ++x) {
-            if (!pixelDiffers(off, on, x, y)) {
-                continue;
-            }
-            // Clear of the wall's edge by the bloom's reach: the orb's halo is screen-space light
-            // and rightly spills a few pixels over the edge; what must not show is the orb itself.
-            if (x < kWidth / 2 - 24) {
-                ++hidden;
-            } else if (x > kWidth / 2 + 3) {
-                ++open;
+    // Twice: with the prepass, where the march is also clamped to the scene's depth, and without it,
+    // where the depth test alone must hide the orb behind the wall.
+    const rendering::QualitySettings full = renderer.qualitySettings();
+    for (const bool prepass : {true, false}) {
+        INFO((prepass ? "with" : "without") << " the depth prepass");
+        renderer.setQualitySettings(prepass ? full : withoutPrepass(full));
+        const gpu::Image8 off = render(renderer, bare, 2.0);
+        const gpu::Image8 on = render(renderer, lit, 2.0);
+        CHECK(renderer.shells().stats().linearDepth == prepass);
+        dump(off, std::string("shell-plasma-occlusion-off") + (prepass ? "" : "-noprepass"));
+        dump(on, std::string("shell-plasma-occlusion-on") + (prepass ? "" : "-noprepass"));
+        std::size_t hidden = 0;
+        std::size_t open = 0;
+        for (std::uint32_t y = 0; y < kHeight; ++y) {
+            for (std::uint32_t x = 0; x < kWidth; ++x) {
+                if (!pixelDiffers(off, on, x, y)) {
+                    continue;
+                }
+                // Clear of the wall's edge by the bloom's reach: the orb's halo is screen-space
+                // light and rightly spills a few pixels over the edge; what must not show is the
+                // orb itself.
+                if (x < kWidth / 2 - 24) {
+                    ++hidden;
+                } else if (x > kWidth / 2 + 3) {
+                    ++open;
+                }
             }
         }
-    }
-    INFO("changed px behind the wall (24 px clear of its edge) " << hidden << ", in the open " << open);
-    CHECK(open > 400); // the control: the orb's right half is there
-    CHECK(hidden == 0);
+        INFO("changed px behind the wall (24 px clear of its edge) " << hidden << ", in the open " << open);
+        CHECK(open > 400); // the control: the orb's right half is there
+        CHECK(hidden == 0);
 
-    auto emission = gpu::readTextureF16(*ctx, renderer.emissionTexture(), kWidth, kHeight);
-    REQUIRE(emission.has_value());
-    float right = 0.0f;
-    for (std::uint32_t x = kWidth / 2 + 4; x < kWidth; ++x) {
-        const float* p = emission->pixel(x, kHeight / 2);
-        right += p[0] + p[1] + p[2];
+        auto emission = gpu::readTextureF16(*ctx, renderer.emissionTexture(), kWidth, kHeight);
+        REQUIRE(emission.has_value());
+        float right = 0.0f;
+        for (std::uint32_t x = kWidth / 2 + 4; x < kWidth; ++x) {
+            const float* p = emission->pixel(x, kHeight / 2);
+            right += p[0] + p[1] + p[2];
+        }
+        INFO("emission along the orb's row, right of the wall: " << right);
+        CHECK(right > 50.0f);
     }
-    INFO("emission along the orb's row, right of the wall: " << right);
-    CHECK(right > 50.0f);
 }
 
 TEST_CASE("the shell capacity on the GPU: 131 walls draw 128 shells in one instanced draw",
