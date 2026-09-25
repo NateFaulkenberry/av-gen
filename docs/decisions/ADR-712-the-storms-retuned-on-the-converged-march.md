@@ -26,3 +26,14 @@ Grain at matched luminance (`PROBE the march's grain at matched luminance`, t = 
 ## Owner's eye
 
 The composition change (a lower, shorter storm whose wall cloud now sits upper right, still cut by the right edge at t = 6); how much cyan the palette wants (0.006 and 0.008 in effect were both rendered); and the dust devil, now translucent and sandy.
+
+## The day project's `state.progress` routes are intentional (owner, 2026-09-25)
+
+`tree-of-life-floating-island.json` routes `state.progress` into `post/grade/hueShift` (amount 1.0, radians),
+`fx/cosmic-tornado/emission` (0.006), `particles/tree-motes/spawnRate` (30) and `scene/windSpeed` (0.25).
+`state.progress` is 1.0 except during a cue transition, so these act as near-constant offsets -- and that is
+the look. In particular the hue route rotates every hue by about 57 degrees, and the owner-approved green
+world of the day hero IS that rotation: without it the world renders blue, the tree teal and the rock tan
+(`~/Desktop/av-gen-review/11-tornado-art-direction/10-hue-route-removed.png`). An audit removed the hue route
+on 2026-09-25; the owner ruled to put it back exactly as it was. **Do not remove or "fix" these routes as
+dead or defective modulation.** Re-tune them only with the owner, looking at the frame.
