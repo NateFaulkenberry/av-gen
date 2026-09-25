@@ -25,7 +25,7 @@ Director. This section is where to pick up.
 
 | Wave | ADR | Primitives | Types (kind number) |
 |---|---|---|---|
-| — | 702 | the instance model: owners, stacks, render stages, one evaluator | Aurora, Comet, Meteor Shower, Volumetric Fog, Vortex, Tornado (0–5), Ground Pulse (6), Travel Beam (7) |
+| — | 702 | the instance model: owners, stacks, render stages, one evaluator | Comet 0, Aurora 1, Vortex 2, Meteor Shower 3, Volumetric Fog 4, Tornado 5, Ground Pulse 6, Travel Beam 7 |
 | 1 | 703 | SIGNALS + `owner.` routes, HIST, FXL (emission, rim, pulse), LIGHTMOD pool (16), RIBBON, DF, EMIT | Glow 8, Pulse 9, Bloom Source 10, Trail 11, Space Warp 12, Particle Emitter 13 |
 | 2 | 716 | two-phase evaluator + XFORM, TRIGGER, FXL clip / displace / pattern in every pass, Worley F2, DF Disc / Shock / Ripple / Wake | Orbit 14, Spiral 15, Float 16, Shake 17, Bounce 18, Shockwave 19, Ripple 20, Dissolve 21, Growth 22, Breathing 23, Organic Pulsation 24, Bioluminescence 25, Pulsing Veins 26, Fresnel 27, Rim Light 28, Color Cycling 29, Velocity Distortion 30, Motion Smear 31, Stars 32; 20 more Particle Emitter presets |
 | 3 | 719 | BOLT, SHELL (9 shading kinds), DF Facing / Cylinder / Shimmer / Lens | Lightning 33, Arc 34, Electric Field 35, Discharge 36, Plasma 37, Energy Shield 38, Force Field 39, Charge-Up 40, Heat Shimmer 41, Gravitational Lens 42, Light Beam 43, Halo 44, Bubble 45, Portal 46, Reality Tear 47 |
