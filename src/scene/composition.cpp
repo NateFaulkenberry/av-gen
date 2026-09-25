@@ -29,6 +29,7 @@
 #include <cstring>
 #include <chrono>
 #include <cmath>
+#include <numbers>
 #include <fstream>
 #include <limits>
 #include <map>
@@ -1889,6 +1890,12 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     if (want.empty()) {
         return; // this entity declared no clips: it drives a craft or a prop, not a character
     }
+    // ADR-820: a performance's clip cue owns the state machine for its span. Pushing the gait's
+    // clip here and letting the sequencer overwrite it later in the frame re-pushed the node's
+    // animation every frame; yielding leaves exactly one writer.
+    if (state.clipOwned) {
+        return;
+    }
     // Unconditional every frame: the player treats a request for the state it is already in as a
     // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
@@ -2769,6 +2776,66 @@ void Composition::updateFields(const FrameTime& time, signals::SignalBus& bus,
     entityWorld_.applySpatialGain(modulator.routes());
 }
 
+void Composition::setPerformers(std::vector<Performer> performers) {
+    performers_ = std::move(performers);
+}
+
+void Composition::applyPerformers(double now, double dt) {
+    for (const Performer& p : performers_) {
+        if (!p.pose) {
+            continue;
+        }
+        entity::Entity* e = entityWorld_.find(p.entity);
+        if (e == nullptr) {
+            continue;
+        }
+        if (now >= p.from && now < p.to) {
+            const PerformerPose pose = p.pose(now);
+            entity::DirectorMotion motion;
+            motion.active = true;
+            motion.position = pose.position;
+            if (pose.yawRadians) {
+                motion.yaw = *pose.yawRadians;
+                motion.hasYaw = true;
+            }
+            // ADR-820: an entry blend, from where the simulation had the body on the span's first
+            // step to the authored performance. Captured into entity state (so a checkpoint carries
+            // it) the first time a step lands inside the span; smoothstep, so the hand-over starts
+            // and ends without a velocity step.
+            if (p.entrySeconds > 0.0f) {
+                entity::PerformanceEntry entry = e->performanceEntry();
+                if (!entry.active) {
+                    entry.active = true;
+                    entry.position = e->state().position();
+                    entry.yaw = e->state().yaw;
+                    e->setPerformanceEntry(entry);
+                }
+                const float x = std::clamp(static_cast<float>((now - p.from) / p.entrySeconds), 0.0f, 1.0f);
+                const float w = x * x * (3.0f - 2.0f * x);
+                if (w < 1.0f) {
+                    motion.position = glm::mix(entry.position, pose.position, w);
+                    const float target = motion.hasYaw ? motion.yaw : entry.yaw;
+                    const float delta = std::remainder(target - entry.yaw, 2.0f * std::numbers::pi_v<float>);
+                    motion.yaw = entry.yaw + delta * w;
+                    motion.hasYaw = true;
+                }
+            }
+            motion.speed = pose.speed;
+            motion.hasSpeed = true;
+            motion.performance = true;
+            motion.clipOwned = pose.clipOwned;
+            motion.timeScale = pose.timeScale;
+            e->setDirectorMotion(motion);
+        } else if (now >= p.to && now - dt < p.to) {
+            // The step the span ends on hands the body back -- where the performance left it, since
+            // `travel` still says so -- and nothing else. A pure function of (now, dt), so a replay
+            // that steps across the end releases on the same step a play does.
+            e->setDirectorMotion(entity::DirectorMotion{});
+            e->setPerformanceEntry(entity::PerformanceEntry{});
+        }
+    }
+}
+
 void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) {
     if (entityWorld_.empty() || params_ == nullptr) {
         return;
@@ -2801,6 +2868,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
             raiseDirectorBeats(time.renderTime);
         }
     }
+    applyPerformers(time.renderTime, time.deltaTime); // ADR-758: after the director, before the step
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.
     observeCameraEvents(time.renderTime);
@@ -2981,6 +3049,9 @@ std::uint64_t Composition::replayInputKey() const {
     };
     mix(staging_.epoch());
     mix(stagingDesc_.empty() ? 0u : 1u);
+    for (const Performer& p : performers_) { // ADR-758: a changed performance is a different replay
+        mix(p.signature);
+    }
     mix(bits(rootAngle_));
     mix(bits(center_.x));
     mix(bits(center_.y));
@@ -3006,6 +3077,10 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     if (stagingDesc_.empty()) {
         entity::EntityWorld::SeekHooks hooks;
         hooks.inputKey = withHistoryKey(replayInputKey(), history);
+        if (!performers_.empty()) {
+            // ADR-758: the director-less replay still has the one director a sequence brings.
+            hooks.before = [this](double now, double dt) { applyPerformers(now, dt); };
+        }
         if (history != nullptr) {
             hooks.after = [&](double now, double) {
                 // The drawn transform a play's flattening would have used: finals rebuilt from the
@@ -3047,6 +3122,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         ctx.bus = nullptr;
         staging_.update(ctx);
         raiseDirectorBeats(now);
+        applyPerformers(now, dt); // ADR-758: the same point of the step a play applies them at
     };
     hooks.after = [&](double now, double) {
         // The offsets a play's entity pass writes, and the "flattening" the next step's director
@@ -6670,6 +6746,7 @@ void Composition::updateCharacters(const FrameTime& time) {
                 // setSpeed rebases to keep local clip time continuous; called at the phase origin
                 // the elapsed time is zero, so the origin survives.
                 rig.player.setSpeed(node.animation.speed, node.animationAppliedAt);
+                rig.player.setLooping(node.animationLoop); // ADR-821: a cue's once, or the state's own
                 applied = true;
             }
         }
@@ -6681,8 +6758,21 @@ void Composition::updateCharacters(const FrameTime& time) {
     rigStats_ = updateRigs(scene_, time);
 }
 
+const ClipSemanticsTable* Composition::clipSemanticsFor(const std::string& nodeName) const {
+    const CompositionNode* node = findNode(nodeName);
+    if (node == nullptr) {
+        return nullptr;
+    }
+    for (const RigId id : node->rigs) {
+        if (id < scene_.rigs.size()) {
+            return scene_.rigs[id].semantics();
+        }
+    }
+    return nullptr;
+}
+
 bool Composition::setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
-                                   float blend, float speed, bool rebase) {
+                                   float blend, float speed, bool rebase, std::optional<bool> loop) {
     CompositionNode* node = findNode(nodeName);
     if (node == nullptr) {
         return false;
@@ -6691,9 +6781,10 @@ bool Composition::setNodeAnimation(const std::string& nodeName, const std::strin
     // with the same rate is already in force and re-pushing it would restart the cross-fade.
     if (node->animationPushed && node->animation.state == state && node->animationApplied == state &&
         node->animationAppliedAt == now && node->animation.blend == blend &&
-        node->animation.speed == speed && node->animationRebase == rebase) {
+        node->animation.speed == speed && node->animationRebase == rebase && node->animationLoop == loop) {
         return true;
     }
+    node->animationLoop = loop;
     node->animation.state = state;
     node->animation.blend = blend;
     node->animation.speed = speed;

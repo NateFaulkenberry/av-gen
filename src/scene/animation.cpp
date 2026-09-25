@@ -250,6 +250,7 @@ bool AnimationPlayer::play(std::string_view name, double now, float blendSeconds
     current_.state = index;
     current_.start = now;
     current_.speed = states_[static_cast<std::size_t>(index)].speed;
+    current_.loop = -1; // ADR-821: a new play starts from the state's own looping
     blendStart_ = now;
     blendDuration_ = previous_.state < 0 ? 0.0f : std::max(0.0f, blendSeconds);
     return true;
@@ -348,7 +349,7 @@ bool AnimationPlayer::finished(const std::vector<AnimationClip>& clips, double n
         return false;
     }
     const AnimationState& state = states_[static_cast<std::size_t>(current_.state)];
-    if (state.loop) {
+    if (looping(current_)) {
         return false;
     }
     // Against the clip's playable length, not its last key time: a one-shot whose keys start at
@@ -371,7 +372,18 @@ float AnimationPlayer::localTime(const Playing& playing, const std::vector<Anima
     const float start = clip != nullptr ? clip->start : 0.0f;
     const float length = clip != nullptr ? clip->length() : 0.0f;
     const auto raw = static_cast<float>((now - playing.start) * static_cast<double>(playing.speed));
-    return start + (state.loop ? wrapTime(raw, length) : std::clamp(raw, 0.0f, length));
+    return start + (looping(playing) ? wrapTime(raw, length) : std::clamp(raw, 0.0f, length));
+}
+
+bool AnimationPlayer::looping(const Playing& playing) const {
+    if (playing.loop >= 0) {
+        return playing.loop != 0;
+    }
+    return playing.state >= 0 && states_[static_cast<std::size_t>(playing.state)].loop;
+}
+
+void AnimationPlayer::setLooping(std::optional<bool> loop) {
+    current_.loop = loop ? static_cast<std::int8_t>(*loop ? 1 : 0) : std::int8_t{-1};
 }
 
 void AnimationPlayer::sampleInto(const Playing& playing, const std::vector<AnimationClip>& clips,

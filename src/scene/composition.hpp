@@ -58,6 +58,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -376,6 +377,10 @@ struct CompositionNode {
     double animationAppliedAt = 0.0; // the timeline second the request was made (kept across rebuilds)
     bool animationPushed = false;  // cleared by a rebuild: push the same request at the same second
     bool animationRebase = false;  // ADR-089: force the phase origin, even re-entering the same state
+    // ADR-821: the request's looping, when it said (a sequencer cue's `playback`); unset keeps the
+    // state's own, which is what every behaviour's request does -- so a character's autonomous clips
+    // loop exactly as before and only a cue that asks is played once.
+    std::optional<bool> animationLoop;
 
     std::unique_ptr<class Composition> child;              // Scene (nested)
     params::Parameter<glm::vec3>* positionParam = nullptr;
@@ -551,6 +556,38 @@ public:
     [[nodiscard]] std::string name() const override { return name_; }
     void update(const FrameTime& time) override;
     void updateBehaviour(const FrameTime& time, const signals::SignalBus& bus) override;
+
+    // ---- scripted performances (ADR-758) -------------------------------------------------------
+    //
+    // A performance takes an entity's body for a span: each step inside it, the entity's director
+    // motion is set from `pose(t)` -- a pure function of time -- so its behaviours yield keeping
+    // their state (ADR-210's `driven`), and at the span's end it is released where the performance
+    // left it and carries on from there. Applied after the staging director on BOTH a play and a
+    // seek's replay, at the same point of the step, so a scrub lands where a play does as far as the
+    // performance is concerned; `signature` is mixed into the replay key, so a changed performance
+    // drops stale checkpoints.
+    struct PerformerPose {
+        glm::vec3 position{0.0f};
+        std::optional<float> yawRadians; // unset: the body keeps the heading it has
+        float speed = 0.0f;              // metres per second, for the gait
+        // ADR-820: the actor names a clip at this instant, so the sequencer owns the rig and the
+        // gait yields it. False: the gait picks the clip from `speed`, as for any body.
+        bool clipOwned = false;
+        // ADR-823: the actor's local time rate here (1 outside any retime window).
+        float timeScale = 1.0f;
+    };
+    struct Performer {
+        std::string entity;
+        double from = 0.0;
+        double to = 0.0;
+        std::function<PerformerPose(double)> pose;
+        std::uint64_t signature = 0;
+        // ADR-820: 0 takes the body at the authored mark; > 0 blends onto the performance from
+        // where the simulation had the body when the span began, over this many seconds.
+        float entrySeconds = 0.0f;
+    };
+    void setPerformers(std::vector<Performer> performers);
+    [[nodiscard]] const std::vector<Performer>& performers() const { return performers_; }
     void updateFields(const FrameTime& time, signals::SignalBus& bus, params::Modulator& modulator) override;
     [[nodiscard]] const Scene& scene() const override { return scene_; }
     [[nodiscard]] Scene& scene() override { return scene_; }
@@ -597,8 +634,12 @@ public:
     // cues the same walk at 0:12 and again at 1:04 and means two different phases -- and a scrub
     // backwards means the earlier one again. Idempotent either way: a request identical to the one
     // already in force returns immediately, so calling it per frame costs a string compare.
+    // ADR-821: what the first rig on `nodeName` measures its clips as, computed on first request and
+    // shared across every node instancing the same asset. Null for a node with no rig.
+    [[nodiscard]] const ClipSemanticsTable* clipSemanticsFor(const std::string& nodeName) const;
     bool setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
-                          float blend = -1.0f, float speed = 1.0f, bool rebase = false);
+                          float blend = -1.0f, float speed = 1.0f, bool rebase = false,
+                          std::optional<bool> loop = std::nullopt);
     // What the last update() spent on posing, and how many rigs it skipped.
     [[nodiscard]] const RigStats& rigStats() const { return rigStats_; }
 
@@ -1891,6 +1932,8 @@ private:
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
+    std::vector<Performer> performers_;           // ADR-758: not authored here; the sequence's
+    void applyPerformers(double now, double dt);
     std::vector<entity::EntityWorld::EventProfile> eventProfiles_; // Phase D §26: "worldEvents"
     // Phase D §26: the director's beats this update, raised as world events. Shared by
     // `updateBehaviour` and the replay in `seekWithDirector`.

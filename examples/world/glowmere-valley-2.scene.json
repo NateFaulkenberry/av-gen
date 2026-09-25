@@ -8239,7 +8239,8 @@
         "react": "Crazy",
         "jump": "Jumping",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "jumpRunning": "Jump_running"
       },
       "behaviors": [
         {
@@ -8324,7 +8325,8 @@
         "react": "Take_from_floor",
         "jump": "Jumping",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "jumpRunning": "Jump_running"
       },
       "behaviors": [
         {
@@ -8410,7 +8412,8 @@
         "react": "Fight_idle",
         "jump": "Jumping",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "jumpRunning": "Jump_running"
       },
       "behaviors": [
         {
@@ -8511,7 +8514,8 @@
         "react": "Crazy",
         "jump": "Jumping",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "jumpRunning": "Jump_running"
       },
       "behaviors": [
         {
@@ -8542,9 +8546,7 @@
           "waterAffinity": 0.9,
           "vistaAffinity": 0.8,
           "jumpRange": 7.0,
-          "jumpApex": 2.6,
-          "jumpSignal": "audio.beat",
-          "landSeconds": 0.35
+          "jumpSignal": "audio.beat"
         },
         {
           "kind": "liveliness",
@@ -8590,7 +8592,12 @@
             "envelopeHoldMs": 1400.0
           }
         }
-      ]
+      ],
+      "jump": {
+        "apex": 2.6,
+        "landSeconds": 0.35,
+        "maxDistance": 7.0
+      }
     },
     {
       "name": "vane",
@@ -8621,7 +8628,8 @@
         "react": "Crazy",
         "jump": "Jumping",
         "fall": "Fall_loop",
-        "land": "Landing"
+        "land": "Landing",
+        "jumpRunning": "Jump_running"
       },
       "behaviors": [
         {
@@ -8652,9 +8660,7 @@
           "waterAffinity": 0.9,
           "vistaAffinity": 0.8,
           "jumpRange": 7.0,
-          "jumpApex": 2.6,
-          "jumpSignal": "audio.beat",
-          "landSeconds": 0.35
+          "jumpSignal": "audio.beat"
         },
         {
           "kind": "liveliness",
@@ -8700,7 +8706,12 @@
             "envelopeHoldMs": 1400.0
           }
         }
-      ]
+      ],
+      "jump": {
+        "apex": 2.6,
+        "landSeconds": 0.35,
+        "maxDistance": 7.0
+      }
     },
     {
       "behaviors": [

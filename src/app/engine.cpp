@@ -282,7 +282,40 @@ Result<seq::InstallReport> Engine::installSequence() {
             };
         }
     }
+    // ADR-758: an actor on a node an entity drives is a scripted performance. It moves the ENTITY
+    // (a director motion for its span) instead of baking tracks onto the node, where they would be
+    // summed with the entity's own travel and pin the node for the whole film.
+    // Which entity each performer actor holds, found before the bake (which must skip their tracks)
+    // and turned into performers after it (ADR-820: the clip schedule the install resolves decides
+    // where the sequencer owns the rig).
+    std::vector<std::pair<const seq::Actor*, std::string>> performing;
+    if (scene::Composition* comp = composition()) {
+        for (const seq::Actor& actor : sequence_.actors) {
+            const std::string node = actor.nodeName();
+            const auto desc = std::find_if(comp->entities().begin(), comp->entities().end(), [&](const entity::EntityDesc& d) {
+                return (d.node.empty() ? d.name : d.node) == node;
+            });
+            if (desc == comp->entities().end()) {
+                continue;
+            }
+            options.performerNodes.push_back(node);
+            performing.emplace_back(&actor, desc->name);
+        }
+    }
     auto report = seq::install(sequence_, timeline_, params_, sink, sequenceTargets_, options);
+    if (scene::Composition* comp = composition()) {
+        std::vector<scene::Composition::Performer> performers;
+        if (report) {
+            for (const auto& [actor, entityName] : performing) {
+                if (auto performer = seq::performerFor(*actor, entityName, options.groundHeightAt,
+                                                       report->events.clips,
+                                                       seq::clipLookupFor(*comp, actor->nodeName()))) {
+                    performers.push_back(std::move(*performer));
+                }
+            }
+        }
+        comp->setPerformers(std::move(performers));
+    }
     if (!report) {
         // The install left the timeline consistent (old tracks gone) even when the bake failed, so
         // forget the targets: there is nothing left for the next install to erase.
@@ -315,6 +348,9 @@ Result<seq::InstallReport> Engine::installSequence() {
 }
 
 void Engine::clearSequence() {
+    if (scene::Composition* comp = composition()) {
+        comp->setPerformers({}); // ADR-758: no sequence, no performances
+    }
     seq::CompositionLayerSink sink(layers_, &params_);
     seq::uninstall(timeline_, params_, sink, sequenceTargets_);
     sequenceTargets_.clear();
