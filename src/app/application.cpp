@@ -36,6 +36,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "rendering/debug_visualizer.hpp"
 #include "app/world_builder.hpp"
+#include "app/director_stills.hpp"
 #include "ui/control_panel.hpp"
 
 #include <imgui.h>
@@ -1366,6 +1367,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->ai.edits = &edits_;
         panel_->director.plane = ai_.get();
         panel_->director.edits = &edits_;
+        panel_->director.onRequestStills = [this](const std::string& task, const directing::Compilation& c) {
+            pendingStills_.emplace(task, c); // rendered between frames, never inside the UI pass
+            panel_->director.stills.note = "rendering stills...";
+            panel_->director.stills.task = task;
+        };
         panel_->settings.plane = ai_.get();
         panel_->settings.settings = &settings_;
         panel_->settings.onAppearanceChanged = [this](app::AppearanceTheme theme) {
@@ -2441,6 +2447,72 @@ void Application::serviceRenderPreview() {
     view.hash = f.hash;
     view.linearSource = f.linearSource;
     view.dropped = job_->previewDropped();
+}
+
+void Application::serviceDirectorStills() {
+    if (!pendingStills_ || panel_ == nullptr || context_ == nullptr || shaders_ == nullptr) {
+        return;
+    }
+    auto [task, compilation] = std::move(*pendingStills_);
+    pendingStills_.reset();
+    ui::DirectorPanel::Stills& view = panel_->director.stills;
+    // One fixed atlas, created once and written in place (the render preview's rule, ADR-320: a new
+    // texture per request would make ImGui cache a bind group per request).
+    constexpr std::uint32_t kAtlas = 1024;
+    constexpr std::uint32_t kW = 256;
+    constexpr std::uint32_t kH = 144;
+    constexpr std::uint32_t kColumns = kAtlas / kW;
+    constexpr std::uint32_t kCapacity = kColumns * (kAtlas / kH);
+    const auto start = std::chrono::steady_clock::now();
+    auto report = renderShotStills(*context_, *shaders_, *engine_, compilation, kW, kH,
+                                   std::filesystem::temp_directory_path());
+    view.task = task;
+    view.byItem.clear();
+    if (!report) {
+        view.note = "stills: " + report.error().message;
+        log::warn("{}", view.note);
+        return;
+    }
+    if (!stillsTexture_) {
+        wgpu::TextureDescriptor desc{};
+        desc.label = "director-stills";
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {kAtlas, kAtlas, 1};
+        desc.format = wgpu::TextureFormat::RGBA8Unorm;
+        stillsTexture_ = context_->device().CreateTexture(&desc);
+        if (!stillsTexture_) {
+            view.note = "stills: cannot create the atlas texture";
+            return;
+        }
+        stillsView_ = stillsTexture_.CreateView();
+    }
+    std::uint32_t slot = 0;
+    for (const ShotStill& s : report->stills) {
+        if (slot >= kCapacity || s.image.width != kW || s.image.height != kH) {
+            break;
+        }
+        const std::uint32_t x = (slot % kColumns) * kW;
+        const std::uint32_t y = (slot / kColumns) * kH;
+        wgpu::TexelCopyTextureInfo dst{};
+        dst.texture = stillsTexture_;
+        dst.origin = {x, y, 0};
+        wgpu::TexelCopyBufferLayout layout{};
+        layout.bytesPerRow = kW * 4;
+        layout.rowsPerImage = kH;
+        const wgpu::Extent3D extent{kW, kH, 1};
+        context_->queue().WriteTexture(&dst, s.image.rgba.data(), s.image.rgba.size(), &layout, &extent);
+        const float a = static_cast<float>(kAtlas);
+        view.byItem[s.item] = ui::DirectorPanel::Still{static_cast<float>(x) / a, static_cast<float>(y) / a,
+                                                       static_cast<float>(x + kW) / a, static_cast<float>(y + kH) / a,
+                                                       s.seconds};
+        ++slot;
+    }
+    view.texture = reinterpret_cast<std::uint64_t>(stillsView_.Get());
+    view.width = static_cast<float>(kW);
+    view.height = static_cast<float>(kH);
+    view.note = fmt::format("{} still(s) from a scratch copy in {:.1f} s; your project was not touched", slot,
+                            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
 }
 
 void Application::applyOutputsFromProject() {
@@ -4650,6 +4722,7 @@ int Application::runLive() {
         // job, so without this the panel would still be saying "live" about the last frame of a
         // render that ended, failed or was cancelled several minutes ago.
         serviceRenderPreview();
+        serviceDirectorStills();
         // Input diagnostics (AVGEN_UI_SELFTEST=1): logs what ImGui and SDL each see of the
         // pointer, plus the raw event counts, so "the UI does not react to clicks" can be traced
         // to the event routing rather than the widgets.

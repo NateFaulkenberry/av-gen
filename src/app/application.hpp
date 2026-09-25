@@ -48,6 +48,7 @@
 #include <deque>
 #include <memory>
 #include <optional>
+#include "directing/compiler.hpp"
 #include <map>
 #include <string>
 #include <utility>
@@ -405,6 +406,8 @@ private:
     // toggle is off -- which is the default, and which is why a render with the panel closed is
     // the same render it always was.
     void serviceRenderPreview();
+    // ADR-764: the Director panel's preview stills, rendered from a scratch copy between frames.
+    void serviceDirectorStills();
     rendering::DebugViewOptions cliDebug_{}; // `--debug-draw`, for the windowless path
     void applyOutputsFromProject();
     void storeOutputsToProject();
@@ -468,6 +471,9 @@ private:
     // any output shape can produce fits in one corner of this and the panel is given the uv.
     wgpu::Texture renderPreviewTexture_;
     wgpu::TextureView renderPreviewView_;
+    std::optional<std::pair<std::string, directing::Compilation>> pendingStills_;
+    wgpu::Texture stillsTexture_;
+    wgpu::TextureView stillsView_;
     RenderJob::FramePreview renderPreviewFrame_;
     std::uint64_t renderPreviewJobId_ = 0; // which job the panel's frame came from (never an address)
     std::unique_ptr<rendering::OutputMapper> mapper_;

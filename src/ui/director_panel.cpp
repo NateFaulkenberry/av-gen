@@ -167,6 +167,16 @@ void DirectorPanel::draw(app::Engine& engine) {
             markIcon(row.mark);
             ImGui::TextWrapped("%s %s%s%s", row.kind.c_str(), row.key.c_str(), row.label.empty() ? "" : "  -  ",
                                row.label.c_str());
+            if (stills.texture != 0 && task && stills.task == task->id()) {
+                if (const auto s = stills.byItem.find(row.key); s != stills.byItem.end()) {
+                    ImGui::Indent(ImGui::GetTextLineHeight() + 6.0f);
+                    ImGui::Image(static_cast<ImTextureID>(stills.texture), ImVec2(stills.width, stills.height),
+                                 ImVec2(s->second.u0, s->second.v0), ImVec2(s->second.u1, s->second.v1));
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("at %s", clockText(s->second.seconds).c_str());
+                    ImGui::Unindent(ImGui::GetTextLineHeight() + 6.0f);
+                }
+            }
             ImGui::Indent(ImGui::GetTextLineHeight() + 6.0f);
             for (const std::string& line : row.lines) {
                 ImGui::PushStyleColor(ImGuiCol_Text, row.mark == ItemMark::Blocked ? kBlocked : kWarn);
@@ -229,6 +239,9 @@ void DirectorPanel::draw(app::Engine& engine) {
         if (app::applyCompilation(engine, edits->history(), *compiled_)) {
             previewTask_ = task->id();
             previewState_ = edits->history().stateId();
+            if (onRequestStills && stills.task != task->id()) {
+                onRequestStills(task->id(), *compiled_); // a preview made is a moment to see the shots
+            }
             status_ = "previewing: play the timeline to watch it; End preview, Accept or Reject ends it";
         } else {
             status_ = "the preview could not be installed";
@@ -248,6 +261,16 @@ void DirectorPanel::draw(app::Engine& engine) {
         }
         (void)plane->rejectCurrentTask();
         status_ = "rejected; nothing was changed";
+    }
+    ImGui::SameLine();
+    Button stillsButton;
+    stillsButton.enabled = compiled_.has_value() && compiled_->changesAnything() && static_cast<bool>(onRequestStills);
+    stillsButton.why = "renders one small frame per proposed shot, at its middle, from a scratch copy";
+    if (button("Stills", stillsButton, buttons_.stills) && compiled_) {
+        onRequestStills(task->id(), *compiled_);
+    }
+    if (!stills.note.empty() && task && stills.task == task->id()) {
+        ImGui::TextDisabled("%s", stills.note.c_str());
     }
     if (!status_.empty()) {
         ImGui::TextDisabled("%s", status_.c_str());

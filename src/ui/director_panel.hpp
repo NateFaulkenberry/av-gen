@@ -8,6 +8,8 @@
 #include "directing/compiler.hpp"
 
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -29,6 +31,25 @@ public:
     avgen::ai::ControlPlane* plane = nullptr;
     app::EditSystem* edits = nullptr;
 
+    // Preview stills (spec §55, ADR-764). The panel asks; the host renders them from a scratch copy
+    // outside the ImGui frame and hands back one texture with a region per shot item. The request
+    // carries the dry run the panel is showing, so what is rendered is what is listed.
+    std::function<void(const std::string& task, const directing::Compilation&)> onRequestStills;
+    struct Still {
+        float u0 = 0.0f, v0 = 0.0f, u1 = 0.0f, v1 = 0.0f;
+        double seconds = 0.0;
+    };
+    struct Stills {
+        std::string task;               // the proposal they are for
+        std::uint64_t texture = 0;      // ImTextureID; 0 = none
+        float width = 0.0f, height = 0.0f; // one still's size in the panel
+        std::map<std::string, Still> byItem;
+        std::string note;               // "rendered 1 still in 4.2 s", or why not
+    };
+    Stills stills;
+    // The task whose proposal is being previewed or shown, for the host to match stills to it.
+    [[nodiscard]] const std::string& shownTask() const { return cachedTask_; }
+
     void draw(app::Engine& engine);
 
     // Where the buttons were drawn last frame, in window coordinates, for the `director-*` UI
@@ -44,6 +65,7 @@ public:
         Rect preview; // "Preview", or "End preview" while previewing
         Rect accept;
         Rect reject;
+        Rect stills;
     };
     [[nodiscard]] const Buttons& buttons() const { return buttons_; }
     [[nodiscard]] bool previewing() const { return !previewTask_.empty(); }

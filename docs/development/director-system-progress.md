@@ -275,6 +275,9 @@ undo, serialization or compilation will be built on them.
   exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-25: panel buttons verified in a running session (610828d4; `director-reject` /
+  `director-accept` UI script arms, 32 checks, exit 8 on failure). Preview stills from a scratch
+  copy (ADR-764), shown on each shot row.
 - 2026-09-25: Director panel (4dcb8f1f, ADR-762): headless capture in
   `~/Desktop/av-gen-review/15-director-panel/`. Slice 4 proposal (ADR-763).
 - **Full suites at 3ca06731:** CPU 3,332 cases, exit 0 (1 expected shouldfail, 16 skips); GPU 444,
@@ -419,6 +422,6 @@ markers · [ ] keyed chase camera · [ ] character performance tests
 [ ] authored-vs-runtime precedence · [ ] replay validation
 
 ## Slice 5 — Verification and scale
-[ ] preview thumbnails · [ ] optional vision critique · [x] Director benchmark harness (costs) ·
+[x] preview thumbnails (ADR-764) · [ ] optional vision critique · [x] Director benchmark harness (costs) ·
 [x] golden plans (10) · [~] performance benchmarks (Director costs measured) · [ ] seek optimization · [ ] MCP exposure ·
 [ ] external-agent integration tests
