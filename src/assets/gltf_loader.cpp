@@ -15,6 +15,7 @@
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
 #include <limits>
+#include <memory>
 #include <map>
 #include <numbers>
 #include <set>
@@ -236,6 +237,9 @@ private:
         importClips();
         for (scene::SkinnedRig& rig : local_.rigs) {
             rig.addDefaultStates();
+            // ADR-821: one cache per loaded rig, so every node instancing this asset shares the one
+            // measurement, taken when first asked for.
+            rig.semanticsCache = std::make_shared<scene::ClipSemanticsCache>();
         }
     }
 
