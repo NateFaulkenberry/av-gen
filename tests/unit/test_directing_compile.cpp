@@ -10,6 +10,7 @@
 #include "entity/entity.hpp"
 #include "scene/camera_rig.hpp"
 #include "support/gltf_fixture.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 #include "ui/edit_history.hpp"
 #include "world/hero.hpp"
@@ -113,6 +114,7 @@ json smallPlan() {
 
 TEST_CASE("the Rook/Umbra benchmark: refused honestly, the feasible part built, nothing substituted",
           "[directing][compile][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);
     const json sequenceBefore = engine->sequence().toJson();

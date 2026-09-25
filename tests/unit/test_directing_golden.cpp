@@ -14,6 +14,7 @@
 #include "app/engine.hpp"
 #include "directing/compiler.hpp"
 #include "directing/plan.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 #include "ui/edit_history.hpp"
 
@@ -45,6 +46,7 @@ json stagedJson(const Staging& s) {
 
 TEST_CASE("golden Director plans compile, apply, round-trip and recompile exactly as recorded",
           "[directing][golden][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "tests/data/directing/golden";
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(dir)) {

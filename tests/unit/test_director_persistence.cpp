@@ -26,6 +26,7 @@
 #include "seq/events.hpp"
 #include "seq/sequence.hpp"
 #include "support/gltf_fixture.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -279,6 +280,7 @@ TEST_CASE("deleting a camera the scene file declares stays deleted after a save"
 
 TEST_CASE("the Rook/Umbra benchmark project loads cleanly and a save adds no camera direction",
           "[directing][persistence][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // Glowmere Valley 2 multicam is the Director's benchmark scene. Its audio resolves outside the
     // repository (`assets.audio.path` is relative to the user's Desktop), so this also says out
     // loud when a machine cannot run the benchmark rather than letting it half-load.

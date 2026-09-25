@@ -14,8 +14,9 @@
 #include "entity/entity.hpp"
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
-#include "world/terrain_query.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
+#include "world/terrain_query.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -134,6 +135,7 @@ TEST_CASE("a performance owns even an orbiting body; a staging motion still does
 
 TEST_CASE("on the benchmark, a DirectorMotion holds Rook exactly, and he resumes from where he was put",
           "[directing][handoff][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // Rook's behaviours (decide, lookAt, liveliness, ground) yield to `driven`. Held for a second at
     // a stage mark, he is drawn there -- on the ground: `ground` still decides the height -- and
     // after release his decider carries on from THAT place rather than snapping back.
@@ -167,6 +169,7 @@ TEST_CASE("on the benchmark, a DirectorMotion holds Rook exactly, and he resumes
 }
 
 TEST_CASE("on the benchmark, an actor's clip cue wins Rook's rig", "[directing][handoff][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // What drives Rook's rig while an actor's clip cue is active: `seq::applyAnimation` runs after the
     // behaviours every frame, so the cue wins the rig (engine.cpp, Engine::update).
     app::Engine engine(app::EngineMode::Offline);

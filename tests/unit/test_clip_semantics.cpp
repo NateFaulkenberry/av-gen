@@ -16,6 +16,7 @@
 #include "scene/composition.hpp"
 #include "seq/director.hpp"
 #include "seq/sequence.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -315,6 +316,7 @@ TEST_CASE("the player plays a looping state once for one request and loops it fo
 
 TEST_CASE("on the benchmark, a stunt cue plays once on Rook and hands him back to his gait",
           "[motion][semantics][handoff][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
     const entity::Entity* rook = engine.composition()->entityWorld().find("rook");
