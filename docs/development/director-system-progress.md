@@ -277,6 +277,8 @@ undo, serialization or compilation will be built on them.
 ## Recent changes
 - 2026-09-25: merged agent/motion (d4854cb4), dropping this branch's copy of the handoff; merged
   main 9fa84413 (aa84e42d). Slice 3 on M2-M5 (ADR-761). `entrySeconds` validator rule.
+- **Full suites at ce92f3ba (Slice 3):** CPU 3,329 cases, exit 0 (1 expected shouldfail, 16
+  hardware skips); GPU 444 cases, exit 0 (1 NDI skip).
 - 2026-09-24: ADR-760 `rise_over` / `pass` (45498d03); cost harness `[.perf][directing]` (7ee369e3);
   per-process test temp directory (f61ce286, also on `fix/test-tmpdir-per-process` as 3efe55e3).
 - 2026-09-24: Slice 2 core (f009638d): handoff probe → ADR-758; performance compiler → ADR-759.
