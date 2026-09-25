@@ -268,3 +268,142 @@ TEST_CASE("a runtime goal sends a character on its own errand, and a scrub lands
         CHECK_FALSE(used);
     }
 }
+TEST_CASE("on the multicam film, a scrub replays the section directions a play gave", "[motion][direction][glowmere][seek]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
+    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb")) {
+        SKIP("Glowmere assets are not present");
+    }
+    struct Film {
+        app::Engine engine{app::EngineMode::Offline};
+        signals::SignalBus bus; // no audio on either path: the lead's cause (2) is not this test's subject
+        long long frame = 0;
+        Film(const fs::path& p, bool generate) {
+            REQUIRE(engine.loadProject(p).has_value());
+            engine.composition()->scene().detailLimits.entityDistanceCull = false; // cause (1), likewise
+            if (!generate) {
+                return;
+            }
+            // The film authors performer RULES; the events are generated from them, as the Sequence
+            // panel's "Generate performer actions" does on import.
+            seq::Sequence piece = engine.sequence();
+            REQUIRE_FALSE(piece.sectionPerformance.empty());
+            seq::GenerationOptions options;
+            options.table = seq::tableFrom(piece.sectionPerformance);
+            const seq::GeneratedDirection generated = seq::generatePerformanceEvents(piece.structure, options);
+            piece.events.insert(piece.events.end(), generated.events.begin(), generated.events.end());
+            REQUIRE(engine.setSequence(piece).has_value());
+        }
+        void tick() {
+            FrameTime time;
+            time.renderTime = static_cast<double>(frame) / 60.0;
+            time.deltaTime = frame == 0 ? 0.0 : 1.0 / 60.0;
+            time.frameIndex = static_cast<std::uint64_t>(frame);
+            engine.params().resetFinals();
+            engine.composition()->updateBehaviour(time, bus);
+            engine.composition()->update(time);
+            ++frame;
+        }
+    };
+    // How far each body lands from the play, when scrubbed to `target`.
+    const auto gaps = [&](bool generate, double target) {
+        Film played(project, generate);
+        while (played.frame <= static_cast<long long>(std::llround(target * 60.0))) {
+            played.tick();
+        }
+        played.tick();
+        Film scrubbed(project, generate);
+        scrubbed.tick();
+        scrubbed.engine.composition()->seekWithDirector(
+            target, scrubbed.engine.params(),
+            entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = entity::SeekBudget::kEditorBodySteps,
+                               .mode = entity::SeekMode::Checkpointed},
+            1.0 / 60.0);
+        scrubbed.frame = static_cast<long long>(std::llround(target * 60.0)) + 1;
+        scrubbed.tick();
+        std::map<std::string, float> out;
+        for (const auto& e : played.engine.composition()->entityWorld().entities()) {
+            const entity::Entity* other = scrubbed.engine.composition()->entityWorld().find(e->name());
+            REQUIRE(other != nullptr);
+            out[e->name()] = glm::length(e->visualPosition() - other->visualPosition());
+        }
+        return std::pair{out, played.engine.composition()->directives()};
+    };
+    Film probe(project, true);
+    const auto directives = probe.engine.composition()->directives();
+    REQUIRE(directives.size() >= 3);
+    const double target = directives[2].timeSeconds + 5.0; // after three of the film's directions
+    std::set<std::string> directed;
+    for (const auto& d : directives) {
+        if (d.timeSeconds <= target) {
+            directed.insert(d.entity);
+        }
+    }
+    const auto [withDirections, unused] = gaps(true, target);
+    const auto [withoutDirections, unused2] = gaps(false, target);
+    // The directions are installed and given: every directed alien's Director tier was filled.
+    REQUIRE_FALSE(directed.empty());
+    // **The film is not scrub-exact without them.** Measured on the project-loaded composition at
+    // this second, after ADR-800: farm animals up to 3.5 cm and the saucer 3 mm apart, with no
+    // direction in the piece at all (see the hidden case below, for the seek's owner). So the claim
+    // this film can carry is that the directions add no divergence of their own: the worst gap is
+    // the film's own worst gap. Per body the existing divergence moves around as the aliens react
+    // to one another, which is why this is a bound on the whole and not a per-body identity. The
+    // exact per-body claim is carried by the scenes above, which are exact without directions.
+    float worstWith = 0.0f;
+    float worstWithout = 0.0f;
+    for (const auto& [name, gap] : withDirections) {
+        worstWith = std::max(worstWith, gap);
+        worstWithout = std::max(worstWithout, withoutDirections.at(name));
+    }
+    INFO("worst gap " << worstWith << " m with the directions, " << worstWithout << " m without");
+    CHECK(worstWith <= worstWithout + 1e-4f);
+}
+
+// For the seek's owner: the project-loaded multicam film, with no sequence direction and no motion
+// change in it, does not scrub exactly on the composition harness (cull off, no audio). The scene-only
+// Film harness of test_glowmere_scrub.cpp does. Measured 2026-09-25 after ADR-800 at ~50.3 s: cow-3
+// 3.5 cm, bull-10 1.6 cm, sage 2.5 cm, the visitor 3 mm.
+TEST_CASE("the project-loaded multicam film scrubs exactly on the composition harness",
+          "[.known-defect][glowmere][seek]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
+    struct Film {
+        app::Engine engine{app::EngineMode::Offline};
+        signals::SignalBus bus;
+        long long frame = 0;
+        explicit Film(const fs::path& p) {
+            REQUIRE(engine.loadProject(p).has_value());
+            engine.composition()->scene().detailLimits.entityDistanceCull = false;
+        }
+        void tick() {
+            FrameTime time;
+            time.renderTime = static_cast<double>(frame) / 60.0;
+            time.deltaTime = frame == 0 ? 0.0 : 1.0 / 60.0;
+            time.frameIndex = static_cast<std::uint64_t>(frame);
+            engine.params().resetFinals();
+            engine.composition()->updateBehaviour(time, bus);
+            engine.composition()->update(time);
+            ++frame;
+        }
+    };
+    constexpr double kTarget = 50.0;
+    Film played(project);
+    while (played.frame <= static_cast<long long>(kTarget * 60.0)) {
+        played.tick();
+    }
+    played.tick();
+    Film scrubbed(project);
+    scrubbed.tick();
+    scrubbed.engine.composition()->seekWithDirector(
+        kTarget, scrubbed.engine.params(),
+        entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = entity::SeekBudget::kEditorBodySteps,
+                           .mode = entity::SeekMode::Checkpointed},
+        1.0 / 60.0);
+    scrubbed.frame = static_cast<long long>(kTarget * 60.0) + 1;
+    scrubbed.tick();
+    for (const auto& e : played.engine.composition()->entityWorld().entities()) {
+        const float gap = glm::length(e->visualPosition() -
+                                      scrubbed.engine.composition()->entityWorld().find(e->name())->visualPosition());
+        INFO(e->name() << " " << gap << " m");
+        CHECK(gap < 1e-4f);
+    }
+}
