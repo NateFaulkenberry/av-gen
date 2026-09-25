@@ -278,6 +278,9 @@ undo, serialization or compilation will be built on them.
 - 2026-09-25: Slice 4 closed out. Cancel recording (c6a99677); directed mode (a359d5e7, ADR-766);
   event-driven plans (6e61706f, ADR-767); runtime candidate shots with exact precedence (ADR-768).
   Captures 12-14 in `15-director-panel/`.
+- **Full suites at 97e16fec (Slice 4 close, main c64fc251 merged):** CPU 3,459 cases, exit 0 (1
+  expected shouldfail, 19 skips); GPU 491, exit 0 (1 skip). All four director UI arms pass (14, 18,
+  18, 8 checks).
 - 2026-09-25: ADR-765, the owner's yes to both. The panel's **Record** button (48450b28;
   `director-record` UI arm, 18 checks) and the assistant's `director.record_plan` through a host
   hook (1071ff63; ScriptedProvider test). Both run off the main thread and end at the one approval
