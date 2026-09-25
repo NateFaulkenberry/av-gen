@@ -2466,7 +2466,29 @@ void Composition::AnimationSink::driveLayers(const entity::LocomotionState& stat
                 // (`strideRatio`, `Gait::footSlip`), and **where it is in the arc of a movement**
                 // (`phaseStride`, §8's ramp in and §9's brake out). A start at a quarter speed
                 // wants both, and picking one would make the other invisible.
-                layer.strideRatio = motion_.strideRatio * motion_.phaseStride;
+                //
+                // ADR-829: and only while the body is STEPPING. `footSlip` already answers 1 for
+                // standing, turning and observing, but `phaseStride` -- §8's start ramp -- did not
+                // ask: the instant Rook began to move out of a turn-in-place, the ramp's 0.35 was
+                // applied to `Idle_turn`, an in-place clip with both feet planted, and changed the
+                // pose in one frame. A step can only be shortened while one is being taken.
+                const bool stepping =
+                    state.activity == entity::Activity::Walk || state.activity == entity::Activity::Run;
+                float ratio = stepping ? motion_.strideRatio * motion_.phaseStride : 1.0f;
+                // And faded in with the stepping clip itself: the warp is a statement about a step,
+                // so it may only be as present in the pose as the stepping clip is. On the frame the
+                // gait first asks for a walk the player has not switched yet (the request is pushed
+                // when the rigs are posed), so the weight is 0; after that it is the cross-fade's.
+                // Without this the warp arrived whole on a pose still made of the turn it was
+                // leaving, and each foot moved 0.15 model units in one posed frame.
+                if (stepping && ratio != 1.0f) {
+                    const SkinnedRig& rig = owner_.scene_.rigs[id];
+                    const std::string& clip = entity_.clipFor(state.activity);
+                    const float present =
+                        rig.player.currentState() == clip ? rig.player.blendWeight(state.time) : 0.0f;
+                    ratio = 1.0f + ((ratio - 1.0f) * present);
+                }
+                layer.strideRatio = ratio;
                 layer.bodySlope = motion_.environment.slope;
             }
             if (layer.kind == PoseLayerKind::Secondary) {
