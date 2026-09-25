@@ -19,7 +19,10 @@
 #include "rendering/distortion_renderer.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/mesh_generators.hpp"
+#include "scene/composition.hpp"
 #include "scene/scene.hpp"
+#include "world/atmospherics.hpp"
+#include "world/terrain_query.hpp"
 #include "world/effects/distortion_frame.hpp"
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -602,4 +605,219 @@ TEST_CASE("Heat Shimmer and Gravitational Lens through the engine: evaluated, dr
     CHECK(renderer.distortionStats().encoded);
     CHECK(renderer.distortionStats().proxies == 2);
     dump(on, "engine-on");
+}
+
+// ---- the owner's scenes, for a person to look at ---------------------------------------------------
+//
+// Hidden: they load whole projects and assert only that the effect was drawn. Run with
+// AVGEN_EFFECT_DUMP=<dir>; AVGEN_LENS_SECOND overrides the second rendered.
+
+namespace {
+
+constexpr std::uint32_t kShowW = 960;
+constexpr std::uint32_t kShowH = 540;
+
+double envOr(const char* name, double fallback) {
+    const char* v = std::getenv(name);
+    return v != nullptr && v[0] != '\0' ? std::atof(v) : fallback;
+}
+
+const scene::Scene& showAt(app::Engine& engine, double seconds) {
+    engine.setViewport(kShowW, kShowH);
+    engine.update(FrameTime{seconds, 1.0 / 60.0, static_cast<std::uint64_t>(seconds * 60.0)});
+    return engine.scene();
+}
+
+void enable(app::Engine& engine, const std::string& id, bool on) {
+    auto* p = engine.params().find(world::effectParameterPrefix(id) + "enabled");
+    REQUIRE(p != nullptr);
+    p->setBaseComponent(0, on ? 1.0f : 0.0f);
+}
+
+std::string addEffect(app::Engine& engine, world::EffectInstance e) {
+    std::string id;
+    REQUIRE(engine
+                .editEffects([&](std::vector<world::EffectInstance>& list) -> Result<void> {
+                    auto added = world::insertEffect(list, std::move(e));
+                    if (!added) {
+                        return std::unexpected(added.error());
+                    }
+                    id = *added;
+                    return {};
+                })
+                .has_value());
+    return id;
+}
+
+// A lens in the sky ahead of the camera: `lift` of the way from the view axis to straight up, `dist`
+// metres out, sized so its Einstein radius subtends a fixed share of the frame.
+world::EffectInstance skyLens(const scene::Camera& cam, const char* style, float dist, float lift, float side,
+                              float size) {
+    const glm::vec3 fwd = glm::normalize(cam.target - cam.position);
+    const glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0.0f, 1.0f, 0.0f)));
+    const glm::vec3 dir = glm::normalize(fwd + glm::vec3(0.0f, lift, 0.0f) + right * side);
+    const glm::vec3 at = cam.position + dir * dist;
+    world::EffectInstance e = world::makeEffect(world::EffectKind::GravitationalLens, style);
+    REQUIRE(world::applyEffectStyle(e, world::EffectKind::GravitationalLens, style));
+    e.values.setFloat("gravLens/offsetX", at.x);
+    e.values.setFloat("gravLens/offsetY", at.y);
+    e.values.setFloat("gravLens/offsetZ", at.z);
+    e.values.setFloat("gravLens/einsteinRadius", dist * size);
+    return e;
+}
+
+struct Framing {
+    double second;
+    float dist, lift, side, size;
+};
+
+void showLens(const fs::path& project, Framing f, const std::string& stem) {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    initialise(renderer);
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    const double t = envOr("AVGEN_LENS_SECOND", f.second);
+    const scene::Camera cam = showAt(engine, t).camera;
+    const float dist = static_cast<float>(envOr("AVGEN_LENS_DIST", f.dist));
+    const float lift = static_cast<float>(envOr("AVGEN_LENS_LIFT", f.lift));
+    const float side = static_cast<float>(envOr("AVGEN_LENS_SIDE", f.side));
+    const float size = static_cast<float>(envOr("AVGEN_LENS_SIZE", f.size));
+    const std::string hole = addEffect(engine, skyLens(cam, "Black Hole", dist, lift, side, size));
+    const std::string ring = addEffect(engine, skyLens(cam, "Einstein Ring", dist, lift, side, size));
+    enable(engine, hole, false);
+    enable(engine, ring, false);
+    dump(render(renderer, showAt(engine, t), t, kShowW, kShowH), stem + "-off");
+    enable(engine, hole, true);
+    const gpu::Image8 on = render(renderer, showAt(engine, t), t, kShowW, kShowH);
+    CHECK(engine.effectStatus(hole) == world::EffectStatus::Drawn);
+    CHECK(renderer.distortionStats().encoded);
+    dump(on, stem + "-black-hole");
+    enable(engine, hole, false);
+    enable(engine, ring, true);
+    dump(render(renderer, showAt(engine, t), t, kShowW, kShowH), stem + "-einstein-ring");
+    CHECK(engine.effectStatus(ring) == world::EffectStatus::Drawn);
+    CHECK(ctx->errorCount() == 0);
+}
+
+} // namespace
+
+TEST_CASE("VISUAL Glowmere: a gravitational lens in the night sky", "[.visual][lens]") {
+    // In the night sky over the valley, 400 m out.
+    showLens(fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json",
+             {90.0, 400.0f, 0.28f, 0.15f, 0.07f}, "glowmere-sky");
+}
+
+TEST_CASE("VISUAL Glowmere: a gravitational lens in front of the hillside", "[.visual][lens]") {
+    // 90 m out, in front of a forested ridge: the trees behind it are drawn into rings.
+    showLens(fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json",
+             {90.0, 90.0f, 0.1f, 0.0f, 0.08f}, "glowmere-hillside");
+}
+
+TEST_CASE("VISUAL Tree of Life island: a gravitational lens in its sky", "[.visual][lens]") {
+    showLens(fs::path(AVGEN_SOURCE_DIR) / "examples" / "treeisland" / "tree-of-life-floating-island-night.json",
+             {10.0, 400.0f, 0.14f, 0.32f, 0.08f}, "treeisland-sky");
+}
+
+TEST_CASE("VISUAL Glowmere: heat shimmer over a campfire", "[.visual][shimmer]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    initialise(renderer);
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json")
+                .has_value());
+    const double t = envOr("AVGEN_LENS_SECOND", 75.0);
+    const scene::Camera cam = showAt(engine, t).camera;
+    REQUIRE(engine.composition() != nullptr);
+    const glm::vec3 fwd = glm::normalize(cam.target - cam.position);
+    const glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0.0f, 1.0f, 0.0f)));
+    // Where the view (lowered by AVGEN_FIRE_DROP of the way to straight down) meets the ground: the
+    // fire stands in the middle of the picture whatever the shot is.
+    const float drop = static_cast<float>(envOr("AVGEN_FIRE_DROP", 0.0));
+    const float side = static_cast<float>(envOr("AVGEN_FIRE_SIDE", 0.2));
+    const glm::vec3 ray = glm::normalize(fwd + glm::vec3(0.0f, -drop, 0.0f) + right * side);
+    const world::TerrainQuery ground = engine.composition()->terrainQuery();
+    glm::vec3 base = cam.position;
+    for (float s = 1.0f; s < 600.0f; s += 0.25f) {
+        const glm::vec3 q = cam.position + ray * s;
+        const glm::vec3 g = ground.groundPoint(glm::vec2(q.x, q.z));
+        if (q.y <= g.y) {
+            base = g;
+            break;
+        }
+    }
+    INFO("camera " << cam.position.x << "," << cam.position.y << "," << cam.position.z << " fire at " << base.x << ","
+                   << base.y << "," << base.z);
+
+    world::EffectInstance heat = world::makeEffect(world::EffectKind::HeatShimmer, "Campfire");
+    REQUIRE(world::applyEffectStyle(heat, world::EffectKind::HeatShimmer, "Campfire"));
+    heat.values.setFloat("heatShimmer/offsetX", base.x);
+    heat.values.setFloat("heatShimmer/offsetY", base.y);
+    heat.values.setFloat("heatShimmer/offsetZ", base.z);
+    const float boost = static_cast<float>(envOr("AVGEN_FIRE_STRENGTH", 0.0));
+    if (boost > 0.0f) {
+        heat.values.setFloat("heatShimmer/strength", boost);
+    }
+    const std::string heatId = addEffect(engine, heat);
+
+    // A person's-eye view of the fire: the film's camera looks down on the valley from 20-odd metres,
+    // where a column of hot air is seen end-on. The same evaluated scene, re-aimed from 1.7 m up and
+    // AVGEN_FIRE_VIEW metres back along the film camera's bearing (the proxies are world-space, so
+    // they need no re-evaluation), and the off arm is that scene with its distortion block emptied --
+    // an exact pair, nothing else differs.
+    const float back = static_cast<float>(envOr("AVGEN_FIRE_VIEW", 14.0));
+    const auto eyeLevel = [&](double at) {
+        scene::Scene s = showAt(engine, at);
+        // From whichever of 16 bearings has the lowest ground `back` metres out (a fire in a dip seen
+        // from the uphill side is seen from above, against the ground), at eye height over the higher
+        // of that ground and the fire's, looking level at the fire: the hot air stands against the
+        // valley beyond it.
+        glm::vec3 eye = base;
+        float lowest = 1e30f;
+        for (int k = 0; k < 16; ++k) {
+            const float a = 6.2831853f * static_cast<float>(k) / 16.0f;
+            const glm::vec3 e = base + glm::vec3(std::cos(a), 0.0f, std::sin(a)) * back;
+            const float g = ground.groundPoint(glm::vec2(e.x, e.z)).y;
+            if (g < lowest) {
+                lowest = g;
+                eye = e;
+            }
+        }
+        const float eyeY = std::max(lowest, base.y) + 1.7f;
+        s.camera.position = glm::vec3(eye.x, eyeY, eye.z);
+        s.camera.target = glm::vec3(base.x, eyeY - 0.3f, base.z);
+        // The fire itself, so there is something to stand the hot air over: a squat emissive flame
+        // and the warm light it throws.
+        const scene::MeshId flame = s.addMesh(scene::makeIcosphere(0.3f, 2));
+        scene::Entity& f = s.addEntity("fire", flame);
+        f.transform.position = base + glm::vec3(0.0f, 0.35f, 0.0f);
+        f.transform.scale = glm::vec3(1.0f, 1.7f, 1.0f);
+        f.material.baseColor = glm::vec3(1.0f, 0.45f, 0.1f);
+        f.material.emissiveColor = glm::vec3(1.0f, 0.42f, 0.08f);
+        f.material.emissiveIntensity = 12.0f;
+        scene::PunctualLight glow;
+        glow.type = scene::PunctualLight::Type::Point;
+        glow.position = base + glm::vec3(0.0f, 0.8f, 0.0f);
+        glow.color = glm::vec3(1.0f, 0.55f, 0.2f);
+        glow.intensity = 120.0f;
+        glow.range = 10.0f;
+        s.addLight(glow);
+        return s;
+    };
+    scene::Scene hot = eyeLevel(t);
+    CHECK(engine.effectStatus(heatId) == world::EffectStatus::Drawn);
+    REQUIRE(hot.distortion.count == 1);
+    const gpu::Image8 on = render(renderer, hot, t, kShowW, kShowH);
+    CHECK(renderer.distortionStats().encoded);
+    scene::Scene cold = hot;
+    cold.distortion.count = 0;
+    dump(render(renderer, cold, t, kShowW, kShowH), "glowmere-campfire-off");
+    dump(on, "glowmere-campfire-on");
+    for (int k = 1; k <= 3; ++k) {
+        const double tk = t + k / 30.0;
+        dump(render(renderer, eyeLevel(tk), tk, kShowW, kShowH), "glowmere-campfire-on-f" + std::to_string(k));
+    }
+    CHECK(ctx->errorCount() == 0);
 }
