@@ -152,9 +152,10 @@ constexpr EffectField kFields[] = {
                  "funnel condenses to the ground, and this is the control that animates it."),
     floatField("skirtDensity", "Debris", 0.0f, 6.0f, 0.0f, 2.5f, GET(e.tornado.field.skirtDensity),
                SETF(e.tornado.field.skirtDensity)).main()
-        .tooltip("The cloud of dust and debris thrown up where the column meets the ground.\n"
-                 "Reach for this before anything else if the tornado is not reading: a funnel\n"
-                 "without a skirt reads as a cloud, not as a tornado."),
+        .tooltip("The cloud of dust and debris thrown up where the column meets the ground: a\n"
+                 "rounded, banded mound around the foot that turns with the funnel. Reach for this\n"
+                 "first if a grounded tornado is not reading. Leave it at 0 for a column that stands\n"
+                 "on nothing -- it says 'this is tearing up the ground'."),
     floatField("skirtWidth", "Debris width", 1.0f, 12.0f, 1.0f, 5.0f, GET(e.tornado.field.skirtWidth),
                SETF(e.tornado.field.skirtWidth)).fmt("%.2f x").main()
         .tooltip("Multiples of the ground radius. Real debris clouds run 1.5 to 3 times the\n"
@@ -164,8 +165,9 @@ constexpr EffectField kFields[] = {
         .tooltip("As a fraction of the total height. 5 to 15 per cent is what photographs show."),
     floatField("skirtFlare", "Debris flare", 0.0f, 4.0f, 0.0f, 2.0f, GET(e.tornado.field.skirtFlare),
                SETF(e.tornado.field.skirtFlare)).main()
-        .tooltip("How much the skirt widens DOWNWARD -- the opposite sense to the funnel's taper,\n"
-                 "which is what produces the hourglass read where the two meet."),
+        .tooltip("How much wider the debris mound is at the ground than at its shoulders -- the\n"
+                 "opposite sense to the funnel's taper, which is what produces the hourglass read\n"
+                 "where the two meet."),
 
     // ---- Rotation. §21's striations, which are what make a STILL frame read as turning.
     floatField("stripeCount", "Striations", 0.0f, 32.0f, 0.0f, 12.0f,
@@ -323,8 +325,9 @@ constexpr EffectField kFields[] = {
                  "subscription drives: a storm column answers weather by bending, not by sliding."),
     floatField("footSoft", "Foot softness", 0.001f, 0.5f, 0.005f, 0.2f,
                GET(e.tornado.field.footSoft), SETF(e.tornado.field.footSoft)).sec("Shape")
-        .tooltip("How abruptly the funnel ends where Touchdown cuts it. Small gives a cleanly\n"
-                 "severed tip; large fades the funnel out over a stretch of its height."),
+        .tooltip("How long the funnel's tip is where Touchdown ends it, as a fraction of the height.\n"
+                 "The radius closes and the density fades over this span, so the funnel ends in a\n"
+                 "rounded point rather than a cut; small is a blunt end, large a long taper."),
     floatField("circulation", "Circulation", 0.0f, 100000.0f, 0.0f, 5000.0f,
                GET(e.tornado.field.circulation), SETF(e.tornado.field.circulation))
         .fmt("%.0f m2/s").log().sec("Flow (advanced)")

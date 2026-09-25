@@ -59,6 +59,151 @@ float fogVerticalProfile(const MediumSlot& m, float relY) {
     return thin + (lid - thin) * blend;
 }
 
+// ---- ADR-713 (§16): the flow controls, transliterated from `shaders/fog.wgsl` ---------------------
+//
+// Same lanes, same expressions, same order. Each is the identity at its default by a branch, so a
+// bank that does not use them evaluates what it evaluated before ADR-713.
+
+// SWIRL: where in the structure's rest frame (before the drift) the world point `p` is. Rigid, at
+// lane 1.z radians a second, about the bank's own vertical axis.
+glm::vec3 fogStructureFrame(const MediumSlot& m, const glm::vec3& p, float t) {
+    const float omega = m.lane[1].z;
+    if (omega == 0.0f) {
+        return p;
+    }
+    const float a = -omega * t;
+    const float c = std::cos(a);
+    const float s = std::sin(a);
+    const glm::vec3 centre(m.lane[0]);
+    const glm::vec3 rel = p - centre;
+    return centre + glm::vec3(rel.x * c - rel.z * s, rel.y, rel.x * s + rel.z * c);
+}
+
+// SWELL: `1 + amount * sin(rate * t)`, the factor the horizontal offset is divided by.
+float fogSwell(const MediumSlot& m, float t) {
+    const float amount = std::clamp(m.lane[3].x, 0.0f, 0.9f);
+    if (amount <= 0.0f) {
+        return 1.0f;
+    }
+    return 1.0f + amount * std::sin(t * m.lane[3].y);
+}
+
+glm::vec3 fogSwellOffset(const MediumSlot& m, const glm::vec3& rel, float swell) {
+    if (swell == 1.0f) {
+        return rel;
+    }
+    if (fogShapeKindOf(m) == FogShape::Sphere) {
+        return rel / swell;
+    }
+    return glm::vec3(rel.x / swell, rel.y, rel.z / swell);
+}
+
+glm::vec3 fogSemiAxes(const MediumSlot& m) {
+    const float radius = std::max(m.lane[0].w, 1e-3f);
+    if (fogShapeKindOf(m) == FogShape::Sphere) {
+        return glm::vec3(radius);
+    }
+    return glm::vec3(radius * std::max(m.lane[13].y, 0.05f), std::max(m.lane[13].x, 1e-3f), radius);
+}
+
+// TURBULENCE (and §16's curl): the world displacement, at most `amount` of each semi-axis.
+// ADR-718: band-limited against `step`, octave by octave (`fogTurbulenceBand`).
+glm::vec3 fogTurbulence(const MediumSlot& m, const glm::vec3& p, float t, const glm::vec3& step) {
+    const float amount = std::clamp(m.lane[7].y, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return glm::vec3(0.0f);
+    }
+    const float scale = std::max(m.lane[7].w, 0.05f);
+    const float rate = std::max(m.lane[6].w, 0.0f);
+    const glm::vec3 local = fogFlowLocal(m, p, t);
+    const glm::vec2 band = fogTurbulenceBand(m, t, step);
+    glm::vec3 n = noise::flowCurlBanded(local * scale, t * rate, 53u, band.x, band.y) * kFogTurbulenceGain;
+    const float len = glm::length(n);
+    if (len > 1.0f) {
+        n = n / len;
+    }
+    const glm::vec3 semi = fogSemiAxes(m);
+    const glm::vec3 d = n * amount * semi;
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
+    return glm::vec3(d.x * c - d.z * s, d.y, d.x * s + d.z * c);
+}
+
+glm::vec3 fogFlowLocal(const MediumSlot& m, const glm::vec3& p, float t) {
+    const glm::vec3 rest = fogStructureFrame(m, p, t) - glm::vec3(m.lane[2]) * t - glm::vec3(m.lane[0]);
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
+    const glm::vec3 semi = fogSemiAxes(m);
+    return glm::vec3((rest.x * c + rest.z * s) / semi.x, rest.y / semi.y, (-rest.x * s + rest.z * c) / semi.z);
+}
+
+// ADR-718: the band-limit -- the transliteration of `fogTurbulenceBand` in `shaders/fog.wgsl`.
+glm::vec2 fogTurbulenceBand(const MediumSlot& m, float t, const glm::vec3& step) {
+    if (step.x == 0.0f && step.y == 0.0f && step.z == 0.0f) {
+        return glm::vec2(1.0f);
+    }
+    glm::vec3 v = step;
+    const float omega = m.lane[1].z;
+    if (omega != 0.0f) {
+        const float a = -omega * t;
+        v = glm::vec3(v.x * std::cos(a) - v.z * std::sin(a), v.y, v.x * std::sin(a) + v.z * std::cos(a));
+    }
+    const float c = m.lane[13].z;
+    const float s = m.lane[13].w;
+    const glm::vec3 semi = fogSemiAxes(m);
+    const glm::vec3 dl((v.x * c + v.z * s) / semi.x, v.y / semi.y, (-v.x * s + v.z * c) / semi.z);
+    const float cycles = glm::length(dl) * std::max(m.lane[7].w, 0.05f);
+    return glm::vec2(1.0f - smoothstepf(kFogBandFull, kFogBandZero, cycles),
+                     1.0f - smoothstepf(kFogBandFull, kFogBandZero, cycles * 2.03f));
+}
+
+float fogTurbulenceReach(const MediumSlot& m) {
+    if (fogShapeKindOf(m) == FogShape::Capsule) {
+        return std::max(m.lane[13].y, 1.0f);
+    }
+    return 1.0f;
+}
+
+// ---- ADR-714 (§25): height and distance colour, luminance-preserving -------------------------
+
+float fogLuminance(const glm::vec3& c) {
+    return c.r * 0.2126f + c.g * 0.7152f + c.b * 0.0722f;
+}
+
+glm::vec3 fogHueMix(const glm::vec3& base, const glm::vec3& tint, float w) {
+    const float lt = fogLuminance(tint);
+    if (w <= 0.0f || lt <= 1e-4f) {
+        return base;
+    }
+    const glm::vec3 target = tint * (fogLuminance(base) / lt);
+    return base + (target - base) * w;
+}
+
+float fogHeightColourWeight(const MediumSlot& m, float relY) {
+    const float amount = std::clamp(m.lane[5].w, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return 0.0f;
+    }
+    const float thickness = std::max(m.lane[13].x, 1e-3f);
+    const float bias = std::clamp(m.lane[14].y, 0.0f, 1.0f);
+    const float base = -thickness + 2.0f * thickness * bias;
+    return amount * smoothstepf(0.0f, 2.0f, (relY - base) / thickness);
+}
+
+float fogDistanceColourWeight(const MediumSlot& m, float cameraDistance) {
+    const float amount = std::clamp(m.lane[8].w, 0.0f, 1.0f);
+    if (amount <= 0.0f) {
+        return 0.0f;
+    }
+    return amount * (1.0f - std::exp(-std::max(cameraDistance, 0.0f) / std::max(m.lane[2].w, 1.0f)));
+}
+
+glm::vec3 fogTintedColour(const MediumSlot& m, const glm::vec3& base, float relY, float cameraDistance) {
+    const glm::vec3 height(m.lane[9].w, m.lane[10].w, m.lane[11].w);
+    const glm::vec3 c = fogHueMix(base, height, fogHeightColourWeight(m, relY));
+    return fogHueMix(c, glm::vec3(m.lane[8]), fogDistanceColourWeight(m, cameraDistance));
+}
+
 // §13/§14's macro detail. Identity at zero and mean-preserving by construction -- the
 // transliteration of `fogMacroDetail` in `shaders/fog.wgsl`, same expressions, same order.
 float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t) {
@@ -70,7 +215,8 @@ float fogMacroDetail(const MediumSlot& m, const glm::vec3& p, float t) {
     // ADR-571 (§15/§16): an ADVECTION. `detail(p + v*dt, t + dt) == detail(p, t)` exactly, which
     // is what makes the structure move through the world rather than regenerate in place.
     const glm::vec3 velocity(m.lane[2]);
-    const float n = noise::fbm3((p - velocity * t) * scale, 41u);
+    // ADR-713: through the swirl, which is `p` itself at swirl 0.
+    const float n = noise::fbm3((fogStructureFrame(m, p, t) - velocity * t) * scale, 41u);
     return 1.0f + amount * (n * 2.0f - 1.0f);
 }
 
@@ -142,11 +288,29 @@ float fogEmissionHeight(const MediumSlot& m, float relY) {
     return 1.0f + (fogVerticalProfile(m, relY) - 1.0f) * amount;
 }
 
-float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
+float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t, const glm::vec3& step) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;
     }
-    const glm::vec3 rel = p - glm::vec3(m.lane[0]);
+    // ADR-713: swell and turbulence -- the default on its own branch, as `shaders/fog.wgsl` has it
+    // (there it is load-bearing for byte identity; here it keeps the twin the same shape).
+    const float swell = fogSwell(m, t);
+    const float turbulence = std::clamp(m.lane[7].y, 0.0f, 1.0f);
+    if (swell == 1.0f && turbulence <= 0.0f) {
+        return fogShapeFrom(m, p, p - glm::vec3(m.lane[0]), t);
+    }
+    glm::vec3 q = p;
+    if (turbulence > 0.0f) {
+        const float reach0 = fogPrimitiveDistance(m, fogSwellOffset(m, p - glm::vec3(m.lane[0]), swell));
+        if (reach0 > 1.35f + turbulence * fogTurbulenceReach(m) / std::min(swell, 1.0f)) {
+            return 0.0f;
+        }
+        q = p + fogTurbulence(m, p, t, step);
+    }
+    return fogShapeFrom(m, q, fogSwellOffset(m, q - glm::vec3(m.lane[0]), swell), t);
+}
+
+float fogShapeFrom(const MediumSlot& m, const glm::vec3& q, const glm::vec3& rel, float t) {
     const float rr = fogPrimitiveDistance(m, rel);
     if (rr > 1.35f) {
         return 0.0f;
@@ -161,7 +325,7 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
         const float influence = std::clamp(m.lane[12].z, 0.0f, 1.0f);
         profile = 1.0f + (profile - 1.0f) * influence;
     }
-    return fogDensityRemap(m, std::max(rim * profile * fogMacroDetail(m, p, t), 0.0f));
+    return fogDensityRemap(m, std::max(rim * profile * fogMacroDetail(m, q, t), 0.0f));
 }
 
 } // namespace avgen::world

@@ -252,8 +252,13 @@ TEST_CASE("the march's jitter is animated grain, and this is how much", "[gpu][v
     // **These units are scene-linear float, not 0-255 levels**, and the first version of this
     // assertion used a 0.05 threshold carried over from an 8-bit habit. It failed against working
     // code, which is the cheapest possible way to be reminded what `renderToImageFloat` returns.
-    CHECK(jittered.meanSd > 1e-6);
-    CHECK(jittered.movedFraction > 0.10);
+    //
+    // ADR-710 cut it again, by an order: with the steps spent inside the medium rather than across
+    // the whole ray, the same case measures 1.24e-6 and 7% of pixels moved (from 1.4e-5 and more
+    // than 10%). The claim is unchanged -- the grain is real and it is here -- so the thresholds
+    // moved down with the measurement rather than the claim changing.
+    CHECK(jittered.meanSd > 1e-7);
+    CHECK(jittered.movedFraction > 0.01);
 }
 
 

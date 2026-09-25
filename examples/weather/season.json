@@ -233,10 +233,10 @@
      "op": "replace"
     },
     {
-     "path": "scene/fogDensity",
+     "path": "scene/volumeDensity",
      "component": -1,
-     "min": 0.0022,
-     "max": 0.0075,
+     "min": 0.0045,
+     "max": 0.01534,
      "op": "replace"
     },
     {

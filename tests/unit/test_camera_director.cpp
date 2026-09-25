@@ -193,7 +193,7 @@ TEST_CASE("Installing replaces the camera's tracks and leaves everything else al
 
     // Somebody's own automation of something that is not the camera.
     params::Track other;
-    other.target = "scene/fogDensity";
+    other.target = "scene/volumeDensity";
     other.addKey(params::Key{0.0, {0.01f, 0.0f, 0.0f, 0.0f}});
     other.addKey(params::Key{30.0, {0.03f, 0.0f, 0.0f, 0.0f}});
     engine.timeline().addTrack(other);
@@ -212,7 +212,7 @@ TEST_CASE("Installing replaces the camera's tracks and leaves everything else al
     const auto& tracks = engine.timeline().tracks();
     // The fog automation survives: directing the camera is not a reason to discard somebody's work.
     const auto fog = std::find_if(tracks.begin(), tracks.end(), [](const params::Track& t) {
-        return t.target == "scene/fogDensity";
+        return t.target == "scene/volumeDensity";
     });
     REQUIRE(fog != tracks.end());
     CHECK(fog->keys.size() == 2);

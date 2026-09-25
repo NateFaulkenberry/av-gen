@@ -740,7 +740,7 @@ TEST_CASE("what a sequence costs", "[.][seqcost]") {
     }
     for (int i = 0; i < 21; ++i) {
         params::Track t;
-        t.target = "scene/fogDensity";
+        t.target = "scene/volumeDensity";
         for (int k = 0; k < 6; ++k) {
             t.addKey(params::Key{.time = k * 20.0, .value = {0.002f, 0.0f, 0.0f, 0.0f}});
         }

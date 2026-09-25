@@ -221,6 +221,7 @@ void Scene::clear() {
     procedurals.clear();
     rigs.clear();
     waters.clear();
+    terrainGround = world::TerrainGround{};
     ++meshVersion;
     ++textureVersion;
     // Emptied and about to be refilled: a different scene in the same object, and anything keyed

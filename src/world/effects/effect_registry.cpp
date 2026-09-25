@@ -47,6 +47,25 @@ const EffectSchema& bloomSourceSchema(); // ADR-703 (FXL)
 const EffectSchema& trailSchema();       // ADR-703 (Wave 1)
 const EffectSchema& spaceWarpSchema();   // ADR-703 (DF)
 const EffectSchema& particleEmitterSchema(); // ADR-703
+const EffectSchema& orbitSchema();       // Wave 2 (XFORM)
+const EffectSchema& spiralSchema();      // Wave 2 (XFORM)
+const EffectSchema& floatSchema();       // Wave 2 (XFORM)
+const EffectSchema& shakeSchema();       // Wave 2 (XFORM)
+const EffectSchema& bounceSchema();      // Wave 2 (XFORM)
+const EffectSchema& shockwaveSchema();   // Wave 2 (TRIGGER + DF)
+const EffectSchema& rippleSchema();      // Wave 2 (TRIGGER + DF)
+const EffectSchema& dissolveSchema();    // Wave 2 (FXL surface)
+const EffectSchema& growthSchema();      // Wave 2 (FXL surface)
+const EffectSchema& breathingSchema();   // Wave 2 (FXL surface)
+const EffectSchema& organicPulsationSchema(); // Wave 2 (FXL surface)
+const EffectSchema& bioluminescenceSchema();  // Wave 2 (FXL surface)
+const EffectSchema& pulsingVeinsSchema(); // Wave 2 (FXL surface)
+const EffectSchema& fresnelSchema();     // Wave 2 (FXL surface)
+const EffectSchema& rimLightSchema();    // Wave 2 (FXL surface)
+const EffectSchema& colorCyclingSchema(); // Wave 2 (FXL surface)
+const EffectSchema& velocityDistortionSchema(); // Wave 2 (DF over HIST)
+const EffectSchema& motionSmearSchema(); // Wave 2 (FXL surface)
+const EffectSchema& starsSchema();       // Wave 2 (the sky's star field)
 
 namespace {
 
@@ -66,6 +85,25 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &trailSchema(),
         &spaceWarpSchema(),
         &particleEmitterSchema(),
+        &orbitSchema(),
+        &spiralSchema(),
+        &floatSchema(),
+        &shakeSchema(),
+        &bounceSchema(),
+        &shockwaveSchema(),
+        &rippleSchema(),
+        &dissolveSchema(),
+        &growthSchema(),
+        &breathingSchema(),
+        &organicPulsationSchema(),
+        &bioluminescenceSchema(),
+        &pulsingVeinsSchema(),
+        &fresnelSchema(),
+        &rimLightSchema(),
+        &colorCyclingSchema(),
+        &velocityDistortionSchema(),
+        &motionSmearSchema(),
+        &starsSchema(),
     };
     return kSchemas;
 }
@@ -732,6 +770,8 @@ std::vector<RegistryFinding> checkRegistry() {
             case EffectBucket::Ribbon: return RenderStage::Particles;
             case EffectBucket::Distortion: return RenderStage::ScreenSpace;
             case EffectBucket::Emitter: return RenderStage::Particles;
+            case EffectBucket::Transform: return RenderStage::Geometry;
+            case EffectBucket::Starfield: return RenderStage::Sky;
             }
             return RenderStage::Sky;
         }();

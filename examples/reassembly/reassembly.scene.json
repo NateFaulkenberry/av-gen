@@ -19,7 +19,6 @@
  },
  "environment": {
   "intensity": 0.0,
-  "fogDensity": 0.0075,
   "fogColor": [
    0.012,
    0.014,
@@ -30,8 +29,8 @@
    0.005,
    0.008
   ],
-  "volumeDensity": 0.0016,
-  "volumeScattering": 0.8,
+  "volumeDensity": 0.0048,
+  "volumeScattering": 0.462,
   "volumeAnisotropy": 0.45,
   "volumeNoise": 0.5,
   "volumeNoiseScale": 0.08,
@@ -39,7 +38,7 @@
   "volumeAbsorption": 0.8,
   "fogHeight": 2.0,
   "fogHeightFalloff": 0.22,
-  "volumeMaxDistance": 110.0,
+  "volumeMaxDistance": 15.0,
   "sky": {
    "zenithColor": [
     0.014,

@@ -163,7 +163,6 @@ Evaluation (the WGSL transliterates this order):
 | `noise` | scalar | `fbm3(q * frequency + tau * (1, 0.7, 1.3), seed)` |
 | `voronoi` | scalar | `saturate(voronoiF1(q * frequency + tau * (1, 0.7, 1.3), seed))` |
 | `distance` | scalar | `saturate(|q - point| / radius)` |
-| `sdfDistance` | scalar | 0 on the CPU (bound to an SDF by `reference` later, ADR-027) |
 | `wave` | scalar | `amplitude * envelope(s) * shape(k s)`, see below |
 | `direction` | vector | `n` |
 | `radialVector` | vector | `normalize(q - point)` |
@@ -232,7 +231,7 @@ Every field is written (defaults fill missing ones on read):
 
 `validate()` requires a name, non-zero scale, `0 <= inner <= outer`, `radius`, `length`,
 `wavelength` > 0, `softness`, `frequency`, `waveWidth` >= 0, at most 4 non-empty compound
-children that are not the field itself, and a `reference` for `sdfDistance`.
+children that are not the field itself, and a `reference` (the grid's name) for `grid`.
 
 ## Effectors (`spatial::Effector`)
 

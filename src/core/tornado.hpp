@@ -104,14 +104,17 @@ struct TornadoField {
     // only the skirt marks the circulation at the surface -- which is the order real tornadoes do
     // it in, the references being blunt that debris swirls appear before the funnel reaches ground.
     float touchdown = 1.0f;
+    // ADR-706: the length of the funnel's TIP. The radius closes (as a square root, so the end is
+    // rounded) and the density fades over `reach +- footSoft`; the funnel no longer ends in a plane.
     float footSoft = 0.04f;
 
-    // ---- the debris skirt --------------------------------------------------------------------------
+    // ---- the debris cloud ---------------------------------------------------------------------------
     //
     // The strongest read cue after the silhouette, and structure rather than decoration. The
     // references put it at 1.5x to 3x the funnel's ground width over 5-15% of the height, flaring
     // DOWNWARD against the funnel's taper -- which is what produces the hourglass read where the
-    // two meet.
+    // two meet. ADR-706: it is the funnel's own sheath cross-section around a rounded MOUND, with a
+    // short underside below the contact; the field names stay `skirt*` because they are saved.
     float skirtWidth = 2.2f;   // multiples of `radiusBottom`
     float skirtHeight = 0.10f; // as a fraction of the total height
     float skirtDensity = 0.8f;
@@ -217,6 +220,17 @@ struct TornadoUniforms {
 static_assert(sizeof(TornadoUniforms) == 208);
 
 [[nodiscard]] TornadoUniforms packTornado(const TornadoField& field);
+
+// ADR-706: how far below the ground contact the debris cloud's rounded underside reaches, as a
+// fraction of `skirtHeight`. A column standing on nothing -- the Tree of Life's -- would otherwise
+// end in a disc; one standing on terrain loses nothing, because the ground hides it.
+inline constexpr float kDebrisUnder = 0.3f;
+
+// How far below `h = 0` the field has support, in heights: the funnel's tip reaches `-footSoft` at
+// most and the debris underside `-kDebrisUnder * skirtHeight`, with the 0.02 floor the field always
+// had. The field early-outs on it, and `world::mediumBound` and the shader's `mediumBoundOf` bound
+// the march with it, so the three cannot disagree about where the storm ends.
+[[nodiscard]] float supportBelow(const TornadoUniforms& v);
 
 // ---- what the medium is doing at a point ------------------------------------------------------------
 

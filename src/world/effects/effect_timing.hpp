@@ -25,6 +25,9 @@ class FieldBus;
 
 namespace avgen::world {
 
+class TriggerClock; // effect_trigger.hpp (Wave 2, TRIGGER)
+struct EffectContext;
+
 // When the effect exists at all. §15 of the brief: an effect that is permanently on is scenery, and
 // the two shipped effects are both *events* -- one belongs to a camera move, one to a held subject.
 enum class Activation : std::uint8_t {
@@ -35,6 +38,12 @@ enum class Activation : std::uint8_t {
     Window,       // an authored [start, start + seconds) on the transport clock
     CameraTravel, // while the director's cut says the camera is travelling between subjects
     HeroFocus,    // while the director's cut is spotlighting this effect's source
+    // Wave 2 (TRIGGER, shared-infrastructure.md). From the most recent EVENT at or before the
+    // transport second -- a beat, an onset, a musical event, a timeline marker, a schedule, or the
+    // owner coming within reach of another entity -- for `Timing::lifetime` seconds (0: until the
+    // next one). Which event is `Timing::trigger`. The events come from one pure function,
+    // `TriggerClock::lastTriggers`, so a scrub to second N lands where a play to N does.
+    Trigger,
 };
 [[nodiscard]] const char* activationName(Activation a);
 [[nodiscard]] std::optional<Activation> activationFromName(std::string_view name);
@@ -54,6 +63,36 @@ struct Sparkle {
     [[nodiscard]] Result<void> validate() const;
 };
 
+// What a `Trigger` activation fires on (shared-infrastructure.md "TRIGGER"). Plain data: the times
+// themselves come from `TriggerClock` (effect_trigger.hpp), which searches the offline analysis
+// track, the sequence's markers, the schedule or the recorded history BACKWARD from the transport
+// second. Nothing here, and nothing in a consumer, keeps state: `age = t - t0` is recomputed every
+// frame from the answer.
+enum class TriggerSource : std::uint8_t {
+    Beat,           // every `everyN`th beat of the offline beat tracker, starting at beat `offset`
+    Onset,          // a peak-picked onset whose strength is at least `threshold`
+    MusicEvent,     // a musical event (`drop`, `impact`, `build`, `downbeat`, ...) by `name`
+    TimelineMarker, // a marker of the sequence (a cue, a section label, a beat marker) by `name`
+    Repeat,         // `phase`, `phase + period`, `phase + 2 period`, ... on the transport clock
+    Proximity,      // the owner coming within `radius` metres of the entity `entity` (HIST-recorded)
+};
+[[nodiscard]] const char* triggerSourceName(TriggerSource s);
+[[nodiscard]] std::optional<TriggerSource> triggerSourceFromName(std::string_view name);
+
+struct Trigger {
+    TriggerSource source = TriggerSource::Beat;
+    int everyN = 1;          // Beat: fire on every Nth beat...
+    int offset = 0;          // ...counting from this beat index (0 = the first tracked beat)
+    float threshold = 1.0f;  // Onset: the onset strength (flux over its adaptive threshold) to reach
+    std::string name;        // MusicEvent: the event's name; TimelineMarker: the marker's name
+    double period = 2.0;     // Repeat: seconds between firings
+    double phase = 0.0;      // Repeat: the first firing
+    std::string entity;      // Proximity: the other entity
+    float radius = 5.0f;     // Proximity: metres between the two node origins that counts as "near"
+    [[nodiscard]] Result<void> validate() const;
+    [[nodiscard]] bool operator==(const Trigger&) const = default;
+};
+
 struct Timing {
     double delay = 0.0;      // seconds after activation before the front starts
     double lifetime = 0.0;   // seconds the effect lives; 0 = as long as its activation lasts
@@ -65,6 +104,9 @@ struct Timing {
     // a hero pulse a *pulse* rather than a single expanding ring -- and what a beat route modulates
     // when somebody wants one ring per bar.
     double repeatSeconds = 0.0;
+    // Activation::Trigger only: what fires it. Serialised as the instance's `trigger` block, and only
+    // when the activation is Trigger (effect_instance.cpp).
+    Trigger trigger;
     [[nodiscard]] Result<void> validate() const;
 };
 
@@ -107,6 +149,14 @@ struct ActivationWindow {
 [[nodiscard]] std::optional<ActivationWindow> resolveActivationWindow(
     Activation activation, const Timing& timing, double seconds, std::span<const ShotSpan> shots,
     bool followsFocus = true, std::string_view subject = {});
+
+// The same, for every activation INCLUDING `Trigger`, which needs the context's trigger clock: the
+// window of a trigger is [t0, t0 + lifetime) for the latest event t0 <= ctx.seconds (unbounded when
+// the lifetime is 0). The overload above cannot see events, and answers "not active" for a Trigger
+// activation. `owner` is the owner's node name, which a `Proximity` trigger measures from.
+[[nodiscard]] std::optional<ActivationWindow> resolveActivationWindow(
+    Activation activation, const Timing& timing, const EffectContext& ctx, bool followsFocus,
+    std::string_view subject, std::string_view owner);
 
 // The ramp both effect families fade with: a smoothstep over `width` seconds, guarding the
 // degenerate width that would otherwise divide by zero and put a hard edge exactly where §7 of
@@ -152,6 +202,13 @@ public:
     // ADR-703. The node's velocity in metres per second, deterministic under seek (a function of the
     // simulation steps, not of wall-clock frame deltas). Optional: false when unknown.
     [[nodiscard]] virtual bool nodeVelocity(std::string_view name, glm::vec3& out) const { (void)name; (void)out; return false; }
+    // Wave 2. Where the node's origin was DRAWN at an earlier instant `t`: HIST's sample there (which
+    // is the pre-offset, simulated path -- that is what keeps it exact under seek) with the node's
+    // XFORM offset re-applied as it was at `t`. What a Trail's body must follow so that it meets the
+    // head on an orbiting or bobbing owner. Optional: false when the node has no sample at `t`.
+    [[nodiscard]] virtual bool nodeDrawnPosition(std::string_view name, double t, glm::vec3& out) const {
+        (void)name; (void)t; (void)out; return false;
+    }
 };
 
 // Everything an effect may read on a frame, for every type (ADR-702 merged ADR-207's and ADR-230's
@@ -174,6 +231,10 @@ struct EffectContext {
     // every other consumer reads.
     std::span<const float> spectrum;
     const fields::FieldBus* fieldBus = nullptr; // ADR-420 §68
+    // Wave 2 (TRIGGER). The event times every type may ask for, through one pure function
+    // (`TriggerClock::lastTriggers`). Null when the host has none, in which case a Trigger-activated
+    // effect is dormant -- the honest answer for a context nobody bound events to.
+    const TriggerClock* triggers = nullptr;
 };
 
 } // namespace avgen::world

@@ -45,8 +45,10 @@
 #include "world/ecology.hpp"
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/history_bank.hpp"
+#include "world/effects/transform_frame.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
+#include "world/terrain_height.hpp"
 #include "world/terrain_query.hpp"
 
 #include <glm/glm.hpp>
@@ -440,6 +442,12 @@ struct CompositionNode {
         // whenever a node is added. They are rebased on reuse.
         std::vector<world::TerrainChunk> chunks;
         std::vector<MeshData> meshes; // in the order buildTerrain emitted them
+        // ADR-715 (ADR-575 §18): the terrain's height on a 2 m grid, baked on the same cache miss
+        // that builds the meshes and never otherwise -- the terrain is static, so a ground-following
+        // fog costs one bake per terrain edit and nothing per frame. Local to the node; placed in
+        // the world by `Scene::terrainGround`. Shared, so reuse is a pointer copy and the renderer
+        // can tell by its hash that nothing moved.
+        std::shared_ptr<const world::TerrainHeightField> height;
         [[nodiscard]] bool usable(std::uint64_t want) const {
             return hash != 0 && hash == want && !meshes.empty();
         }
@@ -448,6 +456,7 @@ struct CompositionNode {
     // Said once per node, not once per rebuild: a terrain flattens every frame and a warning on
     // every frame is a warning nobody reads.
     bool terrainGroundWarned = false;
+    bool terrainHeightWarned = false; // ADR-715: rotated, or a second terrain; said once
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
     // Terrain (ADR-099): the water bodies derived from this node's map, built at rebuild. The
     // surface mesh's flow lanes come from it, and so does every floating thing on it.
@@ -770,6 +779,19 @@ public:
     // `automation` re-applies the play's transform automation, for the replay, which has none.
     void recordHistory(world::HistoryBank& bank, double seconds,
                        const world::HistoryAutomation* automation = nullptr) const;
+
+    // ---- Effect Library Wave 2: XFORM, the render-transform offsets --------------------------
+    //
+    // The frame is the engine's, built by the Geometry-stage builder BEFORE `update` (rendering-
+    // architecture §3). The flatten composes each named node's offset into that node's transform
+    // while it walks the nodes, so its children, lights, emitters, meshes, its drawn view
+    // (`nodeView`, `visualPlacement`) and `prevModel` all include it. `nodeWorldTransform` does NOT:
+    // it is the simulation's, the camera rigs' and HIST's answer, and the offset is visual-only.
+    // Null, or a frame with no live offset, is the flatten exactly as it was before XFORM existed.
+    void setEffectOffsets(const world::TransformFrame* frame) { effectOffsets_ = frame; }
+    // The node's world transform as the flatten DRAWS it: `nodeWorldTransform` with every offset on
+    // the node and its ancestors composed in. Equal to `nodeWorldTransform` when none applies.
+    [[nodiscard]] Transform nodeDrawnWorldTransform(const CompositionNode& node) const;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
@@ -1564,7 +1586,6 @@ private:
     float cameraAngle_ = 0.0f;
     // Free camera (camera/mode = 1): explicit position/target parameters instead of the orbit.
     params::Parameter<int>* cameraMode_ = nullptr;
-    params::Parameter<float>* fogDensity_ = nullptr;
     // Volumetric atmosphere (ADR-032): scene/volume* next to scene/fog*.
     params::Parameter<float>* volumeDensity_ = nullptr;
     nlohmann::json postJson_;
@@ -1573,6 +1594,9 @@ private:
     // ADR-568 (§7): the layer's shape, beside the height and the falloff it shapes.
     params::Parameter<float>* fogUpperDensity_ = nullptr;
     params::Parameter<float>* fogHeightCurve_ = nullptr;
+    params::Parameter<float>* fogGroundFollow_ = nullptr; // ADR-715
+    params::Parameter<float>* fogPooling_ = nullptr;      // ADR-717
+    params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
@@ -1621,7 +1645,6 @@ private:
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
-    float fogDensitySetting_ = 0.0f;
     scene::Environment volumeSetting_; // the scene-file values behind the scene/volume* parameters
     wind::WindParams windSetting_;     // the scene-file values behind the scene/wind* parameters
     std::string volumeDensityFieldSetting_;
@@ -2039,6 +2062,9 @@ private:
     // after its last step, which is the flattening the play would have had. Found by checking the
     // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
     world::HistoryBank* historyBank_ = nullptr; // ADR-703: the engine's; see `setHistoryBank`
+    const world::TransformFrame* effectOffsets_ = nullptr; // Wave 2 (XFORM): the engine's; see `setEffectOffsets`
+    // A node's own transform with its XFORM offset composed in (identity when it has none).
+    [[nodiscard]] Transform nodeDrawnTransform(const CompositionNode& node) const;
     std::vector<stage::VisualPlacement> seekPlaced_;
     std::vector<std::uint8_t> seekPlacedValid_;
     bool seekPlacementLive_ = false;

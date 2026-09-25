@@ -9,6 +9,7 @@
 //   fbm3Vec     three decorrelated channels (offsets 31.7 / 67.3), each in [-1, 1)
 //   curlNoise   curl of the fbm3Vec potential by central differences (eps 0.01), divergence-free
 //   voronoiF1   distance to the nearest jittered cell point (Worley F1)
+//   worleyF1F2  F1, F2 (the second-nearest) and a hash of the nearest cell; F2 - F1 is the cell edges
 //
 // Included by procedural.wgsl (deformers) and fields.wgsl (field kinds); include this file only
 // once per module (fields.wgsl already includes it).
@@ -94,6 +95,39 @@ fn voronoiF1(p: vec3<f32>, seed: u32) -> f32 {
     return sqrt(best);
 }
 
+// Worley F1 and F2 together, and a hash in [0, 1) of the nearest cell (Effect Library Wave 2: cell
+// patterns and vein networks). The same lattice and jitter as `voronoiF1`, so x is exactly its F1; y
+// is the distance to the second-nearest point, so y >= x everywhere and y - x falls to 0 on the
+// boundary between two cells -- the edges a vein network or a cell wall is drawn on. The CPU twin
+// is `world::worleyF1F2` (entity_fx.cpp). 27 cells, as F1: a jitter in [0, 1) keeps both nearest
+// points inside the 3x3x3 neighbourhood of the cell the point is in.
+fn worleyF1F2(p: vec3<f32>, seed: u32) -> vec3<f32> {
+    let c = floor(p);
+    let f = p - c;
+    let ci = vec3<i32>(c);
+    var best = 8.0;
+    var second = 8.0;
+    var nearest = 0.0;
+    for (var z = -1; z <= 1; z = z + 1) {
+        for (var y = -1; y <= 1; y = y + 1) {
+            for (var x = -1; x <= 1; x = x + 1) {
+                let cell = ci + vec3<i32>(x, y, z);
+                let jitter = vec3<f32>(hash01(cell, seed), hash01(cell, seed + 1u), hash01(cell, seed + 2u));
+                let d = vec3<f32>(f32(x), f32(y), f32(z)) + jitter - f;
+                let dd = dot(d, d);
+                if (dd < best) {
+                    second = best;
+                    best = dd;
+                    nearest = hash01(cell, seed + 3u);
+                } else if (dd < second) {
+                    second = dd;
+                }
+            }
+        }
+    }
+    return vec3<f32>(sqrt(best), sqrt(second), nearest);
+}
+
 // ---- Effect Library (DF): an animated, divergence-free flow, cheap enough for a screen-space field --
 //
 // `curlNoise` above is the reference curl and costs six fBM vectors -- 432 hashes a call -- which is
@@ -143,5 +177,31 @@ fn flowCurl(p: vec3<f32>, t: f32, seed: u32) -> vec3<f32> {
     let ga = valueNoiseGrad(p + da, seed).xyz + 0.5 * valueNoiseGrad(p * 2.03 + vec3<f32>(17.0) - da, seed).xyz;
     let gb = valueNoiseGrad(p + vec3<f32>(31.7) + db, seed + 1u).xyz +
              0.5 * valueNoiseGrad(p * 2.03 + vec3<f32>(47.3) - db, seed + 1u).xyz;
+    return cross(ga, gb);
+}
+
+// ADR-718: `flowCurl` with each of its two octaves weighted, for a caller that has to band-limit the
+// flow against its own sample spacing (the fog's turbulence, against the march's step). The weights
+// multiply each potential's octave BEFORE the cross product, so the result is still grad(a') x
+// grad(b') for the weighted potentials a' = w0 a0 + 0.5 w1 a1 -- divergence-free for any constant
+// weights, which is the property the fog's bound proof leans on. At (1, 1) it IS `flowCurl`, by a
+// branch rather than by arithmetic (ADR-714: "+ 0" is not the identity to a compiler); an octave
+// at weight 0 is not evaluated.
+fn flowCurlBanded(p: vec3<f32>, t: f32, seed: u32, w0: f32, w1: f32) -> vec3<f32> {
+    if (w0 >= 1.0 && w1 >= 1.0) {
+        return flowCurl(p, t, seed);
+    }
+    let da = vec3<f32>(0.31, 0.17, -0.23) * t;
+    let db = vec3<f32>(-0.19, 0.27, 0.13) * t;
+    var ga = vec3<f32>(0.0);
+    var gb = vec3<f32>(0.0);
+    if (w0 > 0.0) {
+        ga = w0 * valueNoiseGrad(p + da, seed).xyz;
+        gb = w0 * valueNoiseGrad(p + vec3<f32>(31.7) + db, seed + 1u).xyz;
+    }
+    if (w1 > 0.0) {
+        ga = ga + (0.5 * w1) * valueNoiseGrad(p * 2.03 + vec3<f32>(17.0) - da, seed).xyz;
+        gb = gb + (0.5 * w1) * valueNoiseGrad(p * 2.03 + vec3<f32>(47.3) - db, seed + 1u).xyz;
+    }
     return cross(ga, gb);
 }

@@ -89,7 +89,6 @@
     "intensity": 1.0,
     "skyIntensity": 1.0,
     "skyBloom": 0.0,
-    "fogDensity": 0.0,
     "shadowRange": 420.0,
     "sky": {
       "enabled": true,

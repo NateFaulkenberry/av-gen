@@ -115,7 +115,6 @@ struct TreeLook {
     // through it; the fog's own colour is what decides that, and a warm haze under a cyan canopy
     // fights the palette everywhere the two meet.
     glm::vec3 fogColor{0.006f, 0.016f, 0.034f};
-    float fogDensity = 0.0075f;
     float volumeDensity = 0.024f;
     // The mist sits low and thick enough to swallow the far trees' feet, which is what turns a row
     // of silhouettes into distance rather than a row of silhouettes.

@@ -57,7 +57,6 @@ ArtDirectionProfile emberwaste() {
     p.emission.beacon = 2.4f;
     p.emission.brightest = 3.2f;
     p.atmosphere.fogColor = glm::vec3(0.32f, 0.24f, 0.18f);
-    p.atmosphere.fogDensity = 0.0090f;
     p.atmosphere.fogHeight = 9.0f;
     p.atmosphere.fogHeightFalloff = 0.06f;
     p.atmosphere.skyZenith = glm::vec3(0.10f, 0.13f, 0.22f);
@@ -108,7 +107,6 @@ ArtDirectionProfile palefen() {
     p.emission.beacon = 0.9f;
     p.emission.brightest = 1.2f;
     p.atmosphere.fogColor = glm::vec3(0.42f, 0.45f, 0.47f);
-    p.atmosphere.fogDensity = 0.016f;
     p.atmosphere.fogHeight = 3.0f;
     p.atmosphere.fogHeightFalloff = 0.16f;
     p.atmosphere.skyZenith = glm::vec3(0.30f, 0.33f, 0.36f);

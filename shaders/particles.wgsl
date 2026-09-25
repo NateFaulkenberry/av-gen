@@ -112,7 +112,9 @@ struct Params {
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
     fog: vec4<f32>,         // volume density, fog height, height falloff, absorption
     fog2: vec4<f32>,        // volume max distance, fog coupling 0..1, glow strength, linear depth 1/0
-    fog3: vec4<f32>,        // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    fog3: vec4<f32>,        // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow; ADR-705: w = horizonDensity
+    terrain0: vec4<f32>,    // ADR-715: the terrain height's placement, as FrameUniforms::terrainMap0
+    terrain1: vec4<f32>,    // ADR-715: ... and terrainMap1 (w = 1 when there is a terrain)
     // ADR-370: leaf cards. x = shape (0 round, 1 leaf), y = tumble rate (rad/s), z = leaf aspect
     // (length over width), w = two-sided shading depth. All zero is the round dot this always was.
     leaf: vec4<f32>,
@@ -146,6 +148,9 @@ struct Params {
     // Scatter-anchored clusters: x = anchors in the table, y = 1 when the system is anchored.
     anchorInfo: vec4<f32>,
     anchors: array<vec4<f32>, 64>,    // crown centres chosen on the CPU for this camera, w = 1
+    // ADR-717: x = fogPooling (0 without a terrain), yzw = 0. Appended last, mirroring
+    // ParticleUniforms; its static_assert counts it.
+    fogPool: vec4<f32>,
 };
 
 struct DrawArgs {
@@ -189,6 +194,9 @@ struct Counters {
 @group(0) @binding(5) var<storage, read> historyRead: array<vec4<f32>>;
 // The R32F view distance of the opaque scene (ADR-035); 1e7 where nothing was drawn.
 @group(0) @binding(13) var linearDepthTex: texture_2d<f32>;
+// ADR-715: the terrain's baked height, for a fog layer that follows the ground. A placeholder that
+// is never read when `params.terrain1.w` is 0.
+@group(0) @binding(12) var terrainHeightTex: texture_2d<f32>;
 
 // ---- hashing / noise ----------------------------------------------------------------------
 
@@ -1047,7 +1055,20 @@ fn fogTransmittance(origin: vec3<f32>, dir: vec3<f32>, dist: f32) -> f32 {
         // a third statement of the model, written out here -- the shape ADR-562 §9 names: every
         // reader of a shared model is a call site to audit, and a reader that restates it is one
         // edit away from being a different atmosphere in the same frame.
-        sum += fogHeightProfile(y - params.fog.y, params.fog.z, params.fog3.x, params.fog3.y);
+        var profile = fogHeightProfile(y - params.fog.y, params.fog.z, params.fog3.x, params.fog3.y);
+        if ((params.fog3.z > 0.0 || params.fogPool.x > 0.0) && params.terrain1.w > 0.5) {
+            // ADR-715: the same ground-following term the march evaluates, per sample -- and
+            // ADR-717's pooling, from the same lane value the frame carries.
+            let p = origin + dir * t;
+            profile = fogGroundProfileAt(terrainHeightTex, params.terrain0, params.terrain1, p, params.fog.y,
+                                         params.fog3.z, params.fogPool.x, params.fog.z, params.fog3.x, params.fog3.y);
+        }
+        // ADR-705: Horizon Density, the factor the march multiplies into the same air. Without it
+        // this estimate would be a different atmosphere from the one it is correcting for.
+        if (params.fog3.w > 0.0) {
+            profile = profile * (1.0 + params.fog3.w * t * 0.001);
+        }
+        sum += profile;
     }
     return exp(-density * params.fog.w * (sum * 0.25) * dist);
 }

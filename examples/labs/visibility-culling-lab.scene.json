@@ -25,7 +25,6 @@
   ],
   "skyIntensity": 0.35,
   "lightFromEnvironment": true,
-  "fogDensity": 0.0,
   "volumeDensity": 0.0
  },
  "lights": [
