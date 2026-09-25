@@ -1132,6 +1132,9 @@ void Entity::advanceMotion(double time, float dt) {
     } else {
         request.desiredVelocity = heading * state_.speed;
         request.desiredFacing = heading;
+        // ADR-835: a correction is published whichever form the behaviour's own intent took --
+        // crowd separation writes it on a body whose behaviour only ever wrote the polar pair.
+        request.steering = state_.intent.steering;
     }
     request.desiredTurnRate = state_.turnRate;
     request.bodyFacing = state_.facing();

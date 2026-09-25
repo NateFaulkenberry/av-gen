@@ -644,6 +644,11 @@ void separateFromCrowd(const BehaviorContext& ctx, EntityState& state, float spe
     }
     state.travel.x += push.x;
     state.travel.z += push.y;
+    // ADR-835 (Phase B §39): the correction is also published as what it is -- a velocity the body
+    // was given on top of the one it asked for -- so the motion tier, which is handed
+    // `desiredVelocity + steering`, sees the body moving the way it actually moves rather than
+    // walking straight while the crowd slides it sideways.
+    state.intent.steering += glm::vec3(push.x, 0.0f, push.y) / dt;
 }
 
 class Wander final : public CheckpointedBehavior<Wander> {
