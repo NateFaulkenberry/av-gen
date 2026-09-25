@@ -1632,19 +1632,40 @@ void GoalConsiderer::collectParameterPaths(std::vector<std::string>& out) const 
 }
 
 void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {
-    if (ctx.world == nullptr || ctx.state == nullptr || subject_.empty() || !(weight() > 0.0f) ||
-        ctx.time < from_ || (until_ > 0.0 && ctx.time >= until_)) {
+    if (ctx.world == nullptr || ctx.state == nullptr || !(weight() > 0.0f)) {
+        return;
+    }
+    // ADR-824 (§35): a director's runtime goal fills this slot, and while it stands it replaces the
+    // authored subject, affordance and window -- open from the second it was given.
+    const Entity* selfBody = ctx.self < ctx.world->entities().size() ? ctx.world->entities()[ctx.self].get() : nullptr;
+    const DirectorGoal* directed =
+        selfBody != nullptr && selfBody->directorGoal().active ? &selfBody->directorGoal() : nullptr;
+    const std::string& goalSubject = directed != nullptr ? directed->subject : subject_;
+    const std::string& goalAffordance = directed != nullptr ? directed->affordance : affordance_;
+    const double goalFrom = directed != nullptr ? directed->since : from_;
+    const double goalUntil = directed != nullptr ? directed->until : until_;
+    // ADR-828: how, when the runtime goal says; the authored considerer's values otherwise.
+    const float goalApproach = directed != nullptr && directed->approach >= 0.0f ? directed->approach : approach_;
+    const double goalDwell =
+        directed != nullptr && directed->dwell >= 0.0f ? static_cast<double>(directed->dwell) : dwell_;
+    const std::string& goalActivity =
+        directed != nullptr && !directed->activity.empty() ? directed->activity : activity_;
+    IntentType goalIntent = intent_;
+    if (directed != nullptr && !directed->intent.empty()) {
+        (void)intentTypeFromName(directed->intent, goalIntent);
+    }
+    if (goalSubject.empty() || ctx.time < goalFrom || (goalUntil > 0.0 && ctx.time >= goalUntil)) {
         return;
     }
     glm::vec3 at{0.0f};
-    if (!ctx.world->pointOfInterest(subject_, at)) {
+    if (!ctx.world->pointOfInterest(goalSubject, at)) {
         return; // the named thing does not exist (any more): no option, and the trace says why not
     }
     // Which entity it is, if it is one, for identity and for its affordances.
     const Entity* body = nullptr;
     std::size_t index = 0;
     for (std::size_t i = 0; i < ctx.world->entities().size(); ++i) {
-        if (ctx.world->entities()[i]->name() == subject_) {
+        if (ctx.world->entities()[i]->name() == goalSubject) {
             body = ctx.world->entities()[i].get();
             index = i;
         }
@@ -1658,20 +1679,20 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
         // Done since the goal opened: the errand is over. Investigated before it opened does not
         // count -- a goal set at 32 s is a new request even if the body saw the thing at 10 s.
         if (const MemoryEntry* e = ctx.mind->memory != nullptr ? ctx.mind->memory->find(subject) : nullptr;
-            e != nullptr && e->investigatedAt >= from_) {
+            e != nullptr && e->investigatedAt >= goalFrom) {
             return;
         }
         novelty = 1.0f;
     }
     const InteractionDesc* verb = nullptr;
-    if (body != nullptr && !affordance_.empty()) {
-        verb = body->interaction(affordance_);
+    if (body != nullptr && !goalAffordance.empty()) {
+        verb = body->interaction(goalAffordance);
         const Entity* self = ctx.self < ctx.world->entities().size() ? ctx.world->entities()[ctx.self].get() : nullptr;
         if (verb != nullptr && (self == nullptr || !self->can(verb->required))) {
             verb = nullptr;
         }
     }
-    const float approach = verb != nullptr ? std::min(approach_, verb->range * 0.6f) : approach_;
+    const float approach = verb != nullptr ? std::min(goalApproach, verb->range * 0.6f) : goalApproach;
     actions_.clear();
     ActionDesc walk;
     walk.kind = ActionKind::Move;
@@ -1680,6 +1701,10 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
     walk.target.point = standOff(ctx.state->position(), at, approach);
     walk.tolerance = std::max(approach * 0.4f, 0.3f);
     walk.arrival = kArrival;
+    // ADR-828: the errand says when it arrives and when it is over, as named completions -- which
+    // `EntityWorld` raises as world events on a play and in the replay alike, and the host posts as
+    // `<entity>.goal.arrived` / `<entity>.goal.done` to the sequence's live triggers.
+    walk.onComplete = "goal.arrived";
     actions_.push_back(walk);
     ActionDesc face;
     face.kind = ActionKind::Face;
@@ -1692,22 +1717,25 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
         use.kind = ActionKind::Interact;
         use.name = name_;
         use.target.kind = TargetKind::Interaction;
-        use.target.name = subject_;
+        use.target.name = goalSubject;
         use.target.member = verb->name;
         actions_.push_back(use);
-    } else if (dwell_ > 0.0) {
+    } else if (goalDwell > 0.0) {
         ActionDesc attend;
         attend.kind = ActionKind::Pose;
         attend.name = name_;
-        attend.activity = activity_;
-        attend.duration = dwell_;
+        attend.activity = goalActivity;
+        attend.duration = goalDwell;
         attend.target.kind = TargetKind::Point;
         attend.target.point = at;
         actions_.push_back(attend);
     }
+    if (actions_.size() > 1) {
+        actions_.back().onComplete = "goal.done";
+    }
     out.push_back(Option{name_, weight() * novelty, std::span<const ActionDesc>(actions_), Authority::Routine});
     Option& o = out.back();
-    o.intent = verb != nullptr ? IntentType::Interact : intent_;
+    o.intent = verb != nullptr ? IntentType::Interact : goalIntent;
     o.subject = subject;
     o.target = at;
     o.hasTarget = true;

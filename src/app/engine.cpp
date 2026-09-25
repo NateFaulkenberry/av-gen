@@ -292,6 +292,11 @@ void Engine::setTempoSource(TempoSource source) {
 void Engine::installController(std::unique_ptr<scene::SceneController> controller) {
     controller_ = std::move(controller);
     ++sceneGeneration_;
+    // ADR-825: an offline engine waits for a baked motion database rather than rendering the frames
+    // a load happened to take with the body on its clips. A live one does not wait.
+    if (auto* comp = dynamic_cast<scene::Composition*>(controller_.get()); comp != nullptr) {
+        comp->setBlockingMotionLoads(mode_ == EngineMode::Offline);
+    }
     // Live only. An expensive procedural regeneration is allowed to wait for the slider driving it
     // to stop moving, rather than taking the frame away from the editor on every frame of a drag
     // (see Composition::setInteractiveRebuildBudget). Offline never sets it, because the deferral
@@ -489,10 +494,15 @@ Result<seq::InstallReport> Engine::installSequence() {
         sequenceReport_ = seq::InstallReport{};
         sequenceEvents_.clear();
         firedEvents_.clear();
+        directedEvents_.clear();
+        if (scene::Composition* comp = composition()) {
+            comp->setDirectives({}); // ADR-824: nothing installed, nothing scheduled
+        }
         return report;
     }
     sequenceTargets_ = report->targets;
     sequenceReport_ = *report;
+    installDirectives(); // ADR-824
     // The dispatcher copies the events, so an editor may keep editing `sequence().events` between
     // installs without the running frame reading a reallocated vector.
     sequenceEvents_.setEvents(sequence_.events, sequenceReport_.events);
@@ -513,10 +523,95 @@ Result<seq::InstallReport> Engine::installSequence() {
     return report;
 }
 
+// ADR-824: every scheduled section action whose verb this engine knows and whose subject is an entity
+// here becomes a composition directive -- applied at its second on a play and in a seek's replay --
+// and leaves `applySectionActions`, which would otherwise give the same order again. Verbs a host
+// owns, and subjects nothing here is called, stay with `firedEvents()` exactly as before.
+void Engine::installDirectives() {
+    directedEvents_.clear();
+    scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return;
+    }
+    std::vector<scene::Composition::Directive> directives;
+    for (const seq::Firing& firing : sequenceReport_.events.dispatches) {
+        if (firing.eventIndex >= sequence_.events.size()) {
+            continue;
+        }
+        const seq::SequenceEvent& event = sequence_.events[firing.eventIndex];
+        scene::Composition::Directive d;
+        d.timeSeconds = firing.timeSeconds;
+        if (event.what.kind == seq::EventActionKind::CharacterGoal) {
+            // ADR-828 (F7): a goal for the character's `goal` considerer, from this second.
+            if (event.what.target.empty() || comp->entityWorld().find(event.what.target) == nullptr) {
+                continue;
+            }
+            d.entity = event.what.target;
+            d.goal = true;
+            d.goalSpec.subject = event.what.value;
+            d.goalSpec.affordance = event.what.argument;
+            d.goalSpec.until = event.what.seconds;
+            d.goalSpec.intent = event.what.goal.intent;
+            d.goalSpec.activity = event.what.goal.activity;
+            d.goalSpec.approach = event.what.goal.approach;
+            d.goalSpec.dwell = event.what.goal.dwell;
+        } else if (event.what.kind == seq::EventActionKind::EntityAction) {
+            auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
+            if (!directed || comp->entityWorld().find(directed->entity) == nullptr) {
+                continue;
+            }
+            d.entity = directed->entity;
+            d.release = directed->release;
+            d.goal = directed->goal;
+            d.goalSpec.subject = directed->goalSubject;
+            d.goalSpec.affordance = directed->goalAffordance;
+            if (!directed->release && !directed->goal) {
+                d.actions.push_back(directed->action);
+            }
+        } else {
+            continue;
+        }
+        std::uint64_t h = 1469598103934665603ULL;
+        for (const char c : event.toJson().dump() + fmt::format("|{}|{}", firing.timeSeconds, firing.eventIndex)) {
+            h ^= static_cast<unsigned char>(c);
+            h *= 1099511628211ULL;
+        }
+        d.signature = h;
+        directives.push_back(std::move(d));
+        directedEvents_.insert(firing.eventIndex);
+    }
+    comp->setDirectives(std::move(directives));
+}
+
+// ADR-828 (Phase D §26): a character's named completions -- an action's `onComplete`, a goal's
+// `goal.arrived` and `goal.done` -- posted to the sequence's live triggers as `ActionComplete`, the
+// event's name as the trigger's name and the entity as its subject. So "when Rook arrives" is a
+// sequence event `{when: actionComplete, name: "goal.arrived", subject: "rook"}`, and the Director's
+// `rook.goal.arrived` is that pair. Nothing posted before this: `ActionComplete` had no producer.
+//
+// Posted from the step's own record (`EntityWorld::actionEvents`), at the simulation second the
+// action completed. The step raises the same events in a seek's replay (as world events), so a
+// recording that samples a play and a replay of the same film sees the same names at the same times;
+// the dispatcher itself follows ADR-098 on a seek (a live event is not re-fired by a scrub).
+void Engine::postCharacterEvents() {
+    const scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return;
+    }
+    for (const entity::ActionEvent& e : comp->entityWorld().actionEvents()) {
+        if (e.event.empty() || e.result != entity::ActionResult::Completed) {
+            continue;
+        }
+        sequenceEvents_.post(seq::TriggerSignal{seq::TriggerKind::ActionComplete, e.event, e.entity, e.time});
+    }
+}
+
 void Engine::clearSequence() {
     if (scene::Composition* comp = composition()) {
         comp->setPerformers({}); // ADR-758: no sequence, no performances
+        comp->setDirectives({}); // ADR-824: and no scheduled orders
     }
+    directedEvents_.clear();
     seq::CompositionLayerSink sink(layers_, &params_);
     seq::uninstall(timeline_, params_, sink, sequenceTargets_);
     sequenceTargets_.clear();
@@ -4717,6 +4812,9 @@ void Engine::applySectionActions() {
         if (event.what.kind != seq::EventActionKind::EntityAction) {
             continue;   // a Notify belongs to the host, exactly as before
         }
+        if (directedEvents_.contains(fired.eventIndex)) {
+            continue;   // ADR-824: the composition gives this order itself, at its second, on both paths
+        }
         auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
         if (!directed) {
             // Not necessarily a mistake. `section_performance.hpp` says the verb vocabulary belongs to
@@ -4735,8 +4833,13 @@ void Engine::applySectionActions() {
         // system is told the same thing either way -- what differs is that a restored firing is the
         // character being put back where the piece says it already is, so it must not queue behind
         // whatever it was doing before the jump.
-        if (!composition->entityWorld().direct(directed->entity, {directed->action},
-                                               timelineClock_.seconds)) {
+        auto& world = composition->entityWorld();
+        const double now = timelineClock_.seconds;
+        const bool found = directed->release ? world.release(directed->entity, now)
+                           : directed->goal  ? world.setGoal(directed->entity, directed->goalSubject,
+                                                             directed->goalAffordance, now)
+                                             : world.direct(directed->entity, {directed->action}, now);
+        if (!found) {
             if (sectionActionProblems_.insert(event.id).second) {
                 log::warn("section event '{}': nothing here is called '{}'", event.id,
                           directed->entity);
@@ -4854,6 +4957,7 @@ void Engine::update(const FrameTime& time) {
     // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of
     // whatever the routes wrote, so a route and a behaviour compose on one property.
     controller_->updateBehaviour(time, bus_);
+    postCharacterEvents(); // ADR-828: this step's named completions, before the dispatcher drains
     if (viewportHeight_ > 0) {
         if (auto* comp = composition()) {
             comp->setViewport(viewportWidth_, viewportHeight_);

@@ -29,7 +29,7 @@ constexpr std::array<std::pair<TriggerKind, const char*>, 12> kTriggerKinds{{
     {TriggerKind::VolumeExit, "volumeExit"},
 }};
 
-constexpr std::array<std::pair<EventActionKind, const char*>, 7> kActionKinds{{
+constexpr std::array<std::pair<EventActionKind, const char*>, 8> kActionKinds{{
     {EventActionKind::SetParameter, "setParameter"},
     {EventActionKind::CameraShake, "cameraShake"},
     {EventActionKind::PlayClip, "playClip"},
@@ -37,6 +37,7 @@ constexpr std::array<std::pair<EventActionKind, const char*>, 7> kActionKinds{{
     {EventActionKind::SceneTransition, "sceneTransition"},
     {EventActionKind::EntityAction, "entityAction"},
     {EventActionKind::Notify, "notify"},
+    {EventActionKind::CharacterGoal, "characterGoal"},
 }};
 
 template <typename E, std::size_t N>
@@ -160,6 +161,7 @@ bool actionIsBaked(EventActionKind kind) {
         return true;
     case EventActionKind::EntityAction:
     case EventActionKind::Notify:
+    case EventActionKind::CharacterGoal:
         return false;
     }
     return false;
@@ -240,6 +242,22 @@ json EventAction::toJson() const {
     }
     j["interp"] = params::keyInterpName(interp);
     j["mode"] = params::trackModeName(mode);
+    if (kind == EventActionKind::CharacterGoal) {
+        json g = json::object();
+        if (!goal.intent.empty()) {
+            g["intent"] = goal.intent;
+        }
+        if (!goal.activity.empty()) {
+            g["activity"] = goal.activity;
+        }
+        if (goal.approach >= 0.0f) {
+            g["approach"] = goal.approach;
+        }
+        if (goal.dwell >= 0.0f) {
+            g["dwell"] = goal.dwell;
+        }
+        j["goal"] = std::move(g);
+    }
     return j;
 }
 
@@ -263,6 +281,12 @@ EventAction EventAction::fromJson(const json& j) {
     }
     if (auto mode = params::trackModeFromName(readString(j, "mode"))) {
         a.mode = *mode;
+    }
+    if (const auto g = j.find("goal"); g != j.end() && g->is_object()) {
+        a.goal.intent = readString(*g, "intent");
+        a.goal.activity = readString(*g, "activity");
+        a.goal.approach = static_cast<float>(readNumber(*g, "approach", -1.0));
+        a.goal.dwell = static_cast<float>(readNumber(*g, "dwell", -1.0));
     }
     return a;
 }

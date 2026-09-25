@@ -1896,11 +1896,21 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     if (state.clipOwned) {
         return;
     }
+    // ADR-827, the owner's ruling (2026-09-25): an autonomous body plays its clips as they measure
+    // (ADR-821) -- one that does not close plays once and holds its last frame. `react` on `Crazy`
+    // ends in its crouch instead of starting the fit again; `Landing` ends standing. Every clip whose
+    // end joins its start loops exactly as before. Unmeasured (no rig table): the state's default.
+    std::optional<bool> loop;
+    if (const ClipSemanticsTable* table = owner_.clipSemanticsFor(node_)) {
+        if (const ClipSemantics* clip = table->find(want)) {
+            loop = clip->loops;
+        }
+    }
     // Unconditional every frame: the player treats a request for the state it is already in as a
     // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
     // reproducible (ADR-086).
-    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate);
+    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate, /*rebase=*/false, loop);
 }
 
 // ADR-300. The other four fields.
@@ -1958,9 +1968,13 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
     // When the database could not be built, the chain is the clip provider alone and the log says
     // so: falling back is the designed behaviour, and doing it silently is not.
     matchAsset_.reset();
+    matchSlot_ = nullptr;
     matchProvider_.setDatabase(nullptr);
     matchProvider_.setClips(nullptr);
     if (entity_.desc().motionMatching.enabled) {
+        if (!entity_.desc().motionMatching.databaseResolved.empty()) {
+            matchSlot_ = owner_.motionSlotFor(entity_.desc().motionMatching); // ADR-825
+        }
         matchAsset_ = owner_.matchAssetFor(rig, entity_.desc().motionMatching, entity_.desc().name);
         if (matchAsset_ != nullptr) {
             matchProvider_.setDatabase(&matchAsset_->db);
@@ -2031,15 +2045,53 @@ void Composition::AnimationSink::prepareChain() {
     if (id >= owner_.scene_.rigs.size() || !owner_.scene_.rigs[id].skeleton.valid()) {
         return;
     }
+    // ADR-825: a baked database that has arrived (or been hot-swapped) since the chain was built.
+    if (chainBuilt_ && matchSlot_ != nullptr && matchSlot_->current() != matchAsset_) {
+        chainBuilt_ = false;
+    }
     if (!chainBuilt_ || chainRig_ != id) {
         buildChain(owner_.scene_.rigs[id]);
         chainRig_ = id;
     }
 }
 
+MotionDatabaseSlot* Composition::motionSlotFor(const entity::MotionMatchingDesc& m) {
+    const std::string key = m.packResolved + "|" + m.databaseResolved;
+    auto it = motionSlots_.find(key);
+    if (it == motionSlots_.end()) {
+        it = motionSlots_.emplace(key, std::make_unique<MotionDatabaseSlot>()).first;
+        it->second->requestLoad(m.packResolved, m.databaseResolved);
+        if (blockingMotionLoads_) {
+            (void)it->second->waitIdle(std::chrono::seconds(120));
+        }
+    }
+    return it->second.get();
+}
+
+std::vector<std::pair<std::string, MotionLoadStatus>> Composition::motionLoadStatus() const {
+    std::vector<std::pair<std::string, MotionLoadStatus>> out;
+    for (const auto& [key, slot] : motionSlots_) {
+        out.emplace_back(key, slot->status());
+    }
+    return out;
+}
+
 std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& rig,
                                                               const entity::MotionMatchingDesc& m,
                                                               const std::string& who) {
+    // ADR-825: a baked database is loaded, not built. What the slot has published now -- null
+    // while it loads, or when it failed (the slot keeps the reason, and the body stays on its
+    // clip provider) -- and the sink rebuilds its chain when that changes.
+    if (!m.databaseResolved.empty()) {
+        MotionDatabaseSlot* slot = motionSlotFor(m);
+        std::shared_ptr<const MotionAsset> asset = slot->current();
+        if (asset != nullptr && asset->pack.skeletonDigest != skeletonDigest(rig.skeleton)) {
+            log::warn("entity '{}': baked database '{}' was built for another skeleton; the body stays "
+                      "on its clip provider", who, m.database);
+            return nullptr;
+        }
+        return asset;
+    }
     // The key is everything the database is a function of: the skeleton, and the config.
     std::string key = skeletonDigest(rig.skeleton) + "|p" + m.packResolved + "|j";
     for (const std::string& j : m.joints) {
@@ -2156,6 +2208,10 @@ Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
         const entity::Entity* live = entityWorld_.find(sink->entityName());
         out.found = true;
         out.posedByProvider = sink->posedByProvider();
+        if (const entity::MatchMotionProvider* m = sink->matcher(); m != nullptr) {
+            out.matching = true;
+            out.databaseSamples = m->database() != nullptr ? m->database()->sampleCount() : 0;
+        }
         if (const CompositionNode* n = findNode(std::string(node));
             n != nullptr && !n->rigs.empty() && n->rigs.front() < scene_.rigs.size()) {
             const SkinnedRig& rig = scene_.rigs[n->rigs.front()];
@@ -2780,6 +2836,37 @@ void Composition::setPerformers(std::vector<Performer> performers) {
     performers_ = std::move(performers);
 }
 
+void Composition::setDirectives(std::vector<Directive> directives) {
+    std::stable_sort(directives.begin(), directives.end(),
+                     [](const Directive& a, const Directive& b) { return a.timeSeconds < b.timeSeconds; });
+    directives_ = std::move(directives);
+}
+
+void Composition::applyDirectives(double now, double dt) {
+    // (now - dt, now]: each second belongs to exactly one step of a forward play or replay. A step
+    // with no duration (the first frame; the instant a seek lands on) owns only its own second, and
+    // re-applying the same order at the same second leaves the queue exactly as it was.
+    for (const Directive& d : directives_) {
+        if (d.timeSeconds > now) {
+            break;
+        }
+        const bool due = dt > 0.0 ? d.timeSeconds > now - dt : d.timeSeconds == now;
+        if (!due) {
+            continue;
+        }
+        if (d.release) {
+            (void)entityWorld_.release(d.entity, d.timeSeconds);
+        } else if (d.goal) {
+            entity::DirectorGoal g = d.goalSpec;
+            g.since = d.timeSeconds;
+            g.until = d.goalSpec.until > 0.0 ? d.timeSeconds + d.goalSpec.until : 0.0;
+            (void)entityWorld_.setGoal(d.entity, std::move(g));
+        } else {
+            (void)entityWorld_.direct(d.entity, d.actions, d.timeSeconds);
+        }
+    }
+}
+
 void Composition::applyPerformers(double now, double dt) {
     for (const Performer& p : performers_) {
         if (!p.pose) {
@@ -2869,6 +2956,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         }
     }
     applyPerformers(time.renderTime, time.deltaTime); // ADR-758: after the director, before the step
+    applyDirectives(time.renderTime, time.deltaTime); // ADR-824: the same point, on both paths
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.
     observeCameraEvents(time.renderTime);
@@ -3128,6 +3216,13 @@ std::uint64_t Composition::replayInputKey() const {
     for (const Performer& p : performers_) { // ADR-758: a changed performance is a different replay
         mix(p.signature);
     }
+    for (const Directive& d : directives_) { // ADR-824: likewise a changed schedule of orders
+        mix(d.signature);
+    }
+    for (const auto& [key, slot] : motionSlots_) { // ADR-825: a newly published database is new input
+        mix(slot->status().publishes);
+        mix(slot->current() != nullptr ? 1u : 0u);
+    }
     mix(bits(rootAngle_));
     mix(bits(center_.x));
     mix(bits(center_.y));
@@ -3169,19 +3264,20 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     if (stagingDesc_.empty()) {
         entity::EntityWorld::SeekHooks hooks;
         hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
-        if (!performers_.empty() || signals != nullptr) {
-            // ADR-758: the director-less replay still has the one director a sequence brings.
+        if (!performers_.empty() || !directives_.empty() || signals != nullptr) {
+            // ADR-758/824: the director-less replay still has the direction a sequence brings.
             // ADR-870: and the frame's bus, built first, as `Engine::update` builds it first, and
-            // the reactions on finals rebuilt from the bases, as its routes are.
+            // the reactions on finals rebuilt from the bases, as its routes are. The order is a
+            // play frame's: bus, routes, then the direction `updateBehaviour` applies (performers,
+            // then scheduled orders), then the entity step.
             hooks.before = [&, signals](double now, double dt) {
                 if (signals != nullptr) {
                     signals->build(now, dt);
                     params.resetFinals();
                     applyReactions(dt);
                 }
-                if (!performers_.empty()) {
-                    applyPerformers(now, dt);
-                }
+                applyPerformers(now, dt);
+                applyDirectives(now, dt);
             };
         }
         if (history != nullptr) {
@@ -3250,6 +3346,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         staging_.update(ctx);
         raiseDirectorBeats(now);
         applyPerformers(now, dt); // ADR-758: the same point of the step a play applies them at
+        applyDirectives(now, dt); // ADR-824
     };
     hooks.after = [&](double now, double) {
         // The offsets a play's entity pass writes, and the "flattening" the next step's director
@@ -6904,6 +7001,30 @@ void Composition::updateCharacters(const FrameTime& time) {
         node.animationPushed = true; // whether or not it landed: do not warn again every frame
     }
     rigStats_ = updateRigs(scene_, time);
+}
+
+Composition::ClipReadout Composition::clipReadout(const std::string& nodeName, double now) const {
+    ClipReadout out;
+    const CompositionNode* node = findNode(nodeName);
+    if (node == nullptr || node->rigs.empty() || node->rigs.front() >= scene_.rigs.size()) {
+        return out;
+    }
+    const SkinnedRig& rig = scene_.rigs[node->rigs.front()];
+    if (!rig.player.active()) {
+        return out;
+    }
+    out.found = true;
+    out.state = std::string(rig.player.currentState());
+    const int index = rig.player.currentStateIndex();
+    const auto& state = rig.player.states()[static_cast<std::size_t>(index)];
+    const float clipStart = state.clip < rig.clips.size() ? rig.clips[state.clip].start : 0.0f;
+    out.clipSeconds = rig.player.stateTime(rig.clips, now) - clipStart;
+    out.speed = rig.player.currentSpeed();
+    out.startSeconds = rig.player.currentStart();
+    out.loops = rig.player.currentLooping();
+    out.finished = rig.player.finished(rig.clips, now);
+    out.fadingFrom = std::string(rig.player.fadingState());
+    return out;
 }
 
 const ClipSemanticsTable* Composition::clipSemanticsFor(const std::string& nodeName) const {

@@ -1168,6 +1168,7 @@ void EntityWorld::reset() {
         // resets alongside this and re-issues whatever the scenario is doing at the new second.
         entity->director_ = DirectorMotion{};
         entity->performanceEntry_ = PerformanceEntry{}; // ADR-820: rebuilt by the replay
+        entity->directorGoal_ = DirectorGoal{};         // ADR-824: likewise
         entity->locomotion_ = LocomotionState{};
         // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
@@ -2123,6 +2124,39 @@ bool EntityWorld::direct(std::string_view entity, std::vector<ActionDesc> action
     // and carries on when this drains. That is ADR-091's "resumes rather than resets", and it is a
     // property of *which tier* the override goes on rather than of anything the caller must do.
     found->actions().override(std::move(actions), Authority::Director, now);
+    return true;
+}
+
+bool EntityWorld::release(std::string_view entity, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr) {
+        return false;
+    }
+    found->actions().cancel(Authority::Director, now);
+    found->directorGoal_ = DirectorGoal{}; // a hand-back returns the character's own wants too
+    return true;
+}
+
+bool EntityWorld::setGoal(std::string_view entity, DirectorGoal goal) {
+    Entity* found = find(entity);
+    if (found == nullptr) {
+        return false;
+    }
+    goal.active = !goal.subject.empty();
+    found->directorGoal_ = goal.active ? std::move(goal) : DirectorGoal{};
+    return true;
+}
+
+bool EntityWorld::setGoal(std::string_view entity, std::string subject, std::string affordance, double now) {
+    Entity* found = find(entity);
+    if (found == nullptr) {
+        return false;
+    }
+    if (subject.empty()) {
+        found->directorGoal_ = DirectorGoal{};
+        return true;
+    }
+    found->directorGoal_ = DirectorGoal{true, std::move(subject), std::move(affordance), now};
     return true;
 }
 
@@ -3500,6 +3534,19 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
             desc.motionMatching.packResolved =
                 (authored.is_absolute() ? authored : (baseDir / authored)).lexically_normal().string();
         }
+        if (m.contains("database")) {
+            if (!m["database"].is_string() || m["database"].get<std::string>().empty()) {
+                return fail("entity '{}': 'motionMatching.database' must be a path", desc.name);
+            }
+            if (desc.motionMatching.pack.empty()) {
+                return fail("entity '{}': 'motionMatching.database' needs the 'pack' it was built from",
+                            desc.name);
+            }
+            desc.motionMatching.database = m["database"].get<std::string>();
+            const std::filesystem::path authored(desc.motionMatching.database);
+            desc.motionMatching.databaseResolved =
+                (authored.is_absolute() ? authored : (baseDir / authored)).lexically_normal().string();
+        }
         desc.motionMatching.enabled = true;
         desc.proceduralMotion = true;
     }
@@ -3907,6 +3954,9 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
         m["trajectory"] = entity.motionMatching.trajectory;
         if (!entity.motionMatching.pack.empty()) {
             m["pack"] = entity.motionMatching.pack; // as authored, so a save moves with its scene
+            if (!entity.motionMatching.database.empty()) {
+                m["database"] = entity.motionMatching.database; // ADR-825
+            }
         }
         if (!entity.motionMatching.clips.empty()) {
             m["clips"] = entity.motionMatching.clips;

@@ -138,7 +138,9 @@ TEST_CASE("camera and event catalogues are the engine's own name tables and tier
     // against the predicates directly, so a tier change in seq/events.cpp moves this too.
     const directing::EventCatalog& events = registry.events();
     CHECK(events.triggers.size() == 12);
-    CHECK(events.actions.size() == 7);
+    CHECK(events.actions.size() == 8); // ADR-828 added `characterGoal`, the Director's Slice 4 request
+    CHECK(std::any_of(events.actions.begin(), events.actions.end(),
+                      [](const directing::EventKindCapability& a) { return a.name == "characterGoal"; }));
     for (const directing::EventKindCapability& t : events.triggers) {
         INFO(t.name);
         CHECK(t.deterministic == seq::triggerIsScheduled(*seq::triggerKindFromName(t.name)));
