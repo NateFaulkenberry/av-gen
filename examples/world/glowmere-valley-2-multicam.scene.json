@@ -9087,6 +9087,7 @@
           "observe": "Idle",
           "react": "Crazy",
           "jump": "Jumping",
+          "jumpRunning": "Jump_running",
           "fall": "Fall_loop",
           "land": "Landing"
         },
@@ -9248,6 +9249,7 @@
           "observe": "Idle",
           "react": "Take_from_floor",
           "jump": "Jumping",
+          "jumpRunning": "Jump_running",
           "fall": "Fall_loop",
           "land": "Landing"
         },
@@ -9410,6 +9412,7 @@
           "observe": "Idle",
           "react": "Fight_idle",
           "jump": "Jumping",
+          "jumpRunning": "Jump_running",
           "fall": "Fall_loop",
           "land": "Landing"
         },
@@ -9589,6 +9592,7 @@
           "observe": "Idle",
           "react": "Crazy",
           "jump": "Jumping",
+          "jumpRunning": "Jump_running",
           "fall": "Fall_loop",
           "land": "Landing"
         },
@@ -9771,6 +9775,7 @@
           "observe": "Idle",
           "react": "Crazy",
           "jump": "Jumping",
+          "jumpRunning": "Jump_running",
           "fall": "Fall_loop",
           "land": "Landing"
         },

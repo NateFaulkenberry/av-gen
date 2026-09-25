@@ -1,0 +1,116 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "clip-playback-lab",
+  "camera": {
+    "mode": 1,
+    "position": [
+      3.2,
+      2.6,
+      7.6
+    ],
+    "target": [
+      0.0,
+      1.55,
+      0.0
+    ],
+    "fov": 38.0,
+    "orbitSpeed": 0.0
+  },
+  "lightRig": "../../lightrigs/bioluminescent.rig.json",
+  "environment": {
+    "stylized": true,
+    "intensity": 0.3,
+    "skyIntensity": 0.5,
+    "background": [
+      0.02,
+      0.03,
+      0.05
+    ],
+    "fogColor": [
+      0.02,
+      0.038,
+      0.07
+    ],
+    "fogDensity": 0.0,
+    "fogHeight": 16.0,
+    "fogHeightFalloff": 0.05
+  },
+  "heroes": [],
+  "nodes": [
+    {
+      "name": "ground",
+      "kind": "terrain",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "world": {
+        "name": "clip-playback-flat",
+        "seed": 20260924,
+        "size": [
+          80.0,
+          80.0
+        ],
+        "baseHeight": 0.0,
+        "erosion": 0.0,
+        "seaLevel": -100.0,
+        "layers": [],
+        "features": []
+      },
+      "terrain": {
+        "chunkSize": 40.0,
+        "resolution": 24,
+        "lodLevels": 2,
+        "lodDistance": 70.0,
+        "viewDistance": 120.0,
+        "skirtDepth": 1.2
+      },
+      "material": {
+        "baseColor": [
+          0.05,
+          0.09,
+          0.08
+        ],
+        "roughness": 0.9,
+        "metallic": 0.0,
+        "emissiveIntensity": 0.0
+      }
+    },
+    {
+      "name": "scout",
+      "kind": "gltf",
+      "asset": "../../../assets/aliens/alien-scout.glb",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        20.0,
+        0.0
+      ],
+      "scale": [
+        1.94,
+        1.94,
+        1.94
+      ],
+      "animation": {
+        "state": "Idle",
+        "blend": 0.25,
+        "updateHz": 0.0,
+        "cullDistance": 0.0
+      }
+    }
+  ],
+  "entities": [],
+  "post": {
+    "tonemap": 1,
+    "bloomEnabled": true,
+    "bloomIntensity": 0.05,
+    "bloomThreshold": 1.05,
+    "bloomKnee": 0.6
+  }
+}

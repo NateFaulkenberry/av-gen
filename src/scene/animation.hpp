@@ -17,6 +17,7 @@
 // `play(state, now)`; everything below that is arithmetic.
 
 #include "core/time.hpp"
+#include "scene/clip_semantics.hpp"
 #include "scene/motion_analysis.hpp"
 #include "scene/pose_layers.hpp"
 #include "scene/root_motion.hpp"
@@ -25,6 +26,8 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -179,6 +182,10 @@ public:
     bool play(std::string_view name, double now, float blendSeconds, const PhaseMatch& match);
     // Restarts the current state's clock at `now` (a one-shot played again).
     void restart(double now);
+    // ADR-821: whether the current play loops -- `std::nullopt` for the state's own default. Holds
+    // until the next state change; `play()` of a different state starts from the default again.
+    void setLooping(std::optional<bool> loop);
+    [[nodiscard]] bool currentLooping() const { return looping(current_); }
     // Changes the current state's rate without a jump: the clock is rebased so the local clip time
     // is continuous across the change.
     void setSpeed(float speed, double now);
@@ -217,7 +224,12 @@ private:
         int state = -1;
         double start = 0.0; // timeline second this state was entered
         float speed = 1.0f;
+        // ADR-821: this play's looping, when the request said (a sequencer cue with `playback`);
+        // -1 means the state's own `loop`. Per play, not per state, so one clip can be a loop for a
+        // behaviour and a one-shot for a cue on the same rig.
+        std::int8_t loop = -1;
     };
+    [[nodiscard]] bool looping(const Playing& playing) const;
     [[nodiscard]] float localTime(const Playing& playing, const std::vector<AnimationClip>& clips,
                                   double now) const;
     // The pose offset an inertialized transition decays away: what the outgoing state was doing at
@@ -250,6 +262,13 @@ struct SkinnedRig {
     Skeleton skeleton;
     std::vector<AnimationClip> clips;
     AnimationPlayer player;
+    // ADR-821: what each clip IS -- loop or one-shot, flight and peak, plants -- measured on first
+    // request and shared by every copy of this rig (rigs are copied per node; the clips are not
+    // edited after load). Set by the asset loader; null on a rig built by hand, which answers null.
+    std::shared_ptr<ClipSemanticsCache> semanticsCache;
+    [[nodiscard]] const ClipSemanticsTable* semantics() const {
+        return semanticsCache ? &semanticsCache->get(skeleton, clips) : nullptr;
+    }
 
     // ---- pose rate -------------------------------------------------------------------------
     // Re-posing costs joints x instances of CPU, every frame, for characters that may be forty

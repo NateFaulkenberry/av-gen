@@ -64,6 +64,9 @@ enum class LocomotionPhase : std::uint8_t {
 
 struct LocomotionState {
     Activity activity = Activity::Idle;
+    // ADR-820: an authored performance names the clip at this instant, so the sequencer owns the
+    // rig's state machine and the gait's choice is not pushed. Layers (look, feet) still run.
+    bool clipOwned = false;
     // The timeline second this decision was made at, never a wall clock. The animation layer
     // stores *when* a state was entered rather than how long it has run, so passing the render
     // time is what makes a scrubbed or offline frame reproduce exactly (ADR-086).

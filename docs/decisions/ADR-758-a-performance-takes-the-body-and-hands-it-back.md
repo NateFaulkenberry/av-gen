@@ -128,8 +128,8 @@ at plan time.
   acceptance suite.
   - **Merge order:** M1 lands on main first. `agent/director` is then rebased onto it and drops its
     copy. There is one mechanism, never two.
-  - **Until then:** this branch keeps its copy so the compiler is not blocked. It must not be merged
-    into main while it carries the copy.
+  - **Done 2026-09-25:** `agent/motion` (M1-M5) was merged into `agent/director`, and this branch's
+    copy was dropped in favour of the Motion lead's version (ADR-820-823 build on it).
 - **Entry blend.** M1 adds a per-actor `entrySeconds`. The default, 0, means the body is taken at
   the authored mark instantly; the Director uses 0 at cuts. A non-zero blend starts from wherever
   the simulation had the body, which is not a plan-time fact. The Director's validator must

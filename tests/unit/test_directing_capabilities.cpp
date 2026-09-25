@@ -78,9 +78,9 @@ TEST_CASE("Rook's card is what his entity and his loaded rig say, and has no bac
     // Reported as the engine has it: every state the rig builds loops today (Slice 3's problem).
     CHECK(rook->activity("jump")->loops);
 
-    // The clips nothing maps: present on the rig, unreachable by name. `Jump_running` is the one a
-    // running jump would want, and it is here rather than invented.
-    CHECK(contains(rook->unmappedClips, "Jump_running"));
+    // The clips nothing maps are present on the rig but unreachable by name. `Jump_running` was one
+    // until ADR-822 mapped it as `jumpRunning`; the card follows the engine rather than a list.
+    CHECK_FALSE(contains(rook->unmappedClips, "Jump_running"));
     CHECK_FALSE(contains(rook->unmappedClips, "Running"));
 
     // His jump envelope is the engine's default, and says so: Rook has no `explore` behaviour.

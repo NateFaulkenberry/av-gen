@@ -1167,6 +1167,7 @@ void EntityWorld::reset() {
         // up a beam would make a scrubbed frame depend on how the playhead got there. `stage::Staging`
         // resets alongside this and re-issues whatever the scenario is doing at the new second.
         entity->director_ = DirectorMotion{};
+        entity->performanceEntry_ = PerformanceEntry{}; // ADR-820: rebuilt by the replay
         entity->locomotion_ = LocomotionState{};
         // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
@@ -1897,7 +1898,9 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
             // are also world events a replayed character may hear -- and a replay that did not
             // re-raise them would be a scrub in which the mushroom never bloomed.
             raiseActionEvents(seekEvents_, 0, entityIndex, now);
-            if (entity.locomotion_.action != out.activity) {
+            // ADR-820: a performance owns the body's clip too -- its own cue, or the gait on its
+            // path. A decider's Routine action ("observe") must not name the clip under it.
+            if (!performing(entity) && entity.locomotion_.action != out.activity) {
                 entity.locomotion_.action.assign(out.activity);
             }
         }
@@ -1973,6 +1976,9 @@ void EntityWorld::publishSeek(double target, double dt, bool replayedNothing) {
         }
         entity.locomotion_.playbackRate =
             Gait::playbackRate(entity.desc_.gait, entity.locomotion_.activity, entity.state_.speed);
+        if (performing(entity)) {
+            entity.locomotion_.playbackRate *= entity.director_.timeScale; // ADR-823, as `update` does
+        }
         entity.locomotion_.blend = entity.desc_.gait.blend;
         entity.locomotion_.time = target;
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
@@ -2198,6 +2204,10 @@ void EntityWorld::applyAllOffsets() {
     }
 }
 
+bool EntityWorld::performing(const Entity& entity) {
+    return entity.director_.active && entity.director_.performance;
+}
+
 void EntityWorld::directorBefore(Entity& entity) {
     // A director says where a body *is*. Written as `travel` rather than as an offset so that
     // `position()`, the crowd field, the fields pass and every query that reads an entity's
@@ -2214,6 +2224,10 @@ void EntityWorld::directorBefore(Entity& entity) {
 }
 
 void EntityWorld::directorAfter(Entity& entity) {
+    // ADR-820: whether the sequencer owns the rig this step. Written on every step, both paths, so
+    // it can never latch past the cue or the span that raised it.
+    entity.locomotion_.clipOwned =
+        entity.director_.active && entity.director_.performance && entity.director_.clipOwned;
     // The director's *additive* half, after the behaviours rather than before them: a craft keeps
     // hovering, drifting and banking while it is being flown somewhere.
     if (entity.director_.active && entity.director_.performance) {
@@ -2227,7 +2241,9 @@ void EntityWorld::directorAfter(Entity& entity) {
     if (entity.director_.active) {
         entity.motion_.rotation += entity.director_.rotation;
         if (entity.director_.hasSpeed) {
-            entity.state_.speed = entity.director_.speed;
+            entity.state_.speed = entity.director_.performance && entity.director_.timeScale > 0.0f
+                                      ? entity.director_.speed / entity.director_.timeScale // ADR-823
+                                      : entity.director_.speed;
         }
     }
 }
@@ -2595,6 +2611,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                                 entity.state_.turnRate, dt);
         entity.locomotion_.activity = gait;
         entity.locomotion_.playbackRate = Gait::playbackRate(entity.desc_.gait, gait, entity.state_.speed);
+        if (performing(entity)) {
+            entity.locomotion_.playbackRate *= entity.director_.timeScale; // ADR-823: slowed, not swapped
+        }
         // The feet against the ground they are crossing. Two numbers authored by different people
         // in different files -- a behaviour's travel speed and a gait's stride speed -- with
         // nothing comparing them until now; the only symptom is an animation that looks wrong in a
@@ -2616,7 +2635,12 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         }
         entity.locomotion_.blend = entity.desc_.gait.blend;
         // What an action asked to be played, if it asked for anything. Assigned rather than
-        // rebuilt so a steady state reuses the string's capacity.
+        // rebuilt so a steady state reuses the string's capacity. ADR-820: not under a
+        // performance, which owns the clip (its cue, or the gait on its path) -- measured on
+        // Rook: the decider's `observe` held the rig in Idle through a 6 m/s run.
+        if (performing(entity)) {
+            intentActivity.clear();
+        }
         if (entity.locomotion_.action != intentActivity) {
             entity.locomotion_.action.assign(intentActivity);
         }
@@ -3311,6 +3335,30 @@ Result<EntityDesc> entityFromJson(const nlohmann::json& j, const std::filesystem
     if (j.contains("proceduralMotion") && j["proceduralMotion"].is_boolean()) {
         desc.proceduralMotion = j["proceduralMotion"].get<bool>();
     }
+    // ADR-822. Absent is the defaults; a malformed block is an error, since a character whose jump
+    // silently fell back to the defaults is one that cannot clear what its author said it could.
+    if (j.contains("jump")) {
+        const auto& jj = j["jump"];
+        if (!jj.is_object()) {
+            return fail("entity '{}': 'jump' must be an object", desc.name);
+        }
+        const auto num = [&](const char* key, float& out) {
+            if (const auto it = jj.find(key); it != jj.end() && it->is_number()) {
+                out = it->get<float>();
+            }
+        };
+        num("apex", desc.jump.apex);
+        num("maxApex", desc.jump.maxApex);
+        num("gravity", desc.jump.gravity);
+        num("maxDistance", desc.jump.maxDistance);
+        num("landSeconds", desc.jump.landSeconds);
+        num("maxSeconds", desc.jump.maxSeconds);
+        if (desc.jump.apex <= 0.0f || desc.jump.gravity <= 0.0f || desc.jump.maxDistance < 0.0f ||
+            (desc.jump.maxApex > 0.0f && desc.jump.maxApex < desc.jump.apex)) {
+            return fail("entity '{}': 'jump' needs apex > 0, gravity > 0, maxDistance >= 0 and maxApex >= apex",
+                        desc.name);
+        }
+    }
     // ADR-623. A malformed block is a load error, not a silent no-op: an author who wrote it meant
     // the matcher to run, and a character quietly left on its clips is the failure this project
     // keeps shipping.
@@ -3821,6 +3869,26 @@ nlohmann::json entityToJson(const EntityDesc& entity) {
     // the first time anyone saved -- the diff-noise failure ADR-225 already had to fix once.
     if (entity.proceduralMotion) {
         j["proceduralMotion"] = true;
+    }
+    // ADR-822: only the fields that differ from the defaults, so a scene that never authored a jump
+    // saves the bytes it had.
+    {
+        const JumpSettings d{};
+        nlohmann::json jj = nlohmann::json::object();
+        const auto put = [&](const char* key, float value, float fallback) {
+            if (value != fallback) {
+                jj[key] = value;
+            }
+        };
+        put("apex", entity.jump.apex, d.apex);
+        put("maxApex", entity.jump.maxApex, d.maxApex);
+        put("gravity", entity.jump.gravity, d.gravity);
+        put("maxDistance", entity.jump.maxDistance, d.maxDistance);
+        put("landSeconds", entity.jump.landSeconds, d.landSeconds);
+        put("maxSeconds", entity.jump.maxSeconds, d.maxSeconds);
+        if (!jj.empty()) {
+            j["jump"] = std::move(jj);
+        }
     }
     // ADR-623. Written only when on, for the reason above; and every field, including the ones at
     // their defaults, because a reader that fills a default the writer dropped is how a save

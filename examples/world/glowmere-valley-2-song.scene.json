@@ -483,7 +483,8 @@
         "react": "Crazy",
         "run": "Running",
         "turn": "Idle_turn",
-        "walk": "Walking"
+        "walk": "Walking",
+        "jumpRunning": "Jump_running"
       },
       "coarseInterval": 0.10000000149011612,
       "cullDistance": 340.0,
@@ -591,7 +592,8 @@
         "react": "Take_from_floor",
         "run": "Running",
         "turn": "Idle_turn",
-        "walk": "Walking"
+        "walk": "Walking",
+        "jumpRunning": "Jump_running"
       },
       "coarseInterval": 0.10000000149011612,
       "cullDistance": 340.0,
@@ -713,7 +715,8 @@
         "react": "Fight_idle",
         "run": "Running",
         "turn": "Idle_turn",
-        "walk": "Walking"
+        "walk": "Walking",
+        "jumpRunning": "Jump_running"
       },
       "coarseInterval": 0.10000000149011612,
       "cullDistance": 340.0,
@@ -779,11 +782,9 @@
           "headroom": 9.0,
           "idleMax": 2.0,
           "idleMin": 0.5,
-          "jumpApex": 2.6,
           "jumpRange": 7.0,
           "jumpSignal": "audio.beat",
           "kind": "explore",
-          "landSeconds": 0.35,
           "landmarkAffinity": 1.0,
           "maxRange": 220.0,
           "minRange": 18.0,
@@ -824,7 +825,8 @@
         "react": "Crazy",
         "run": "Running",
         "turn": "Idle_turn",
-        "walk": "Walking"
+        "walk": "Walking",
+        "jumpRunning": "Jump_running"
       },
       "coarseInterval": 0.10000000149011612,
       "cullDistance": 340.0,
@@ -933,7 +935,12 @@
           "target": "explore/runChance"
         }
       ],
-      "seed": 16180339
+      "seed": 16180339,
+      "jump": {
+        "apex": 2.6,
+        "landSeconds": 0.35,
+        "maxDistance": 7.0
+      }
     },
     {
       "behaviors": [
@@ -946,11 +953,9 @@
           "headroom": 9.0,
           "idleMax": 2.0,
           "idleMin": 0.5,
-          "jumpApex": 2.6,
           "jumpRange": 7.0,
           "jumpSignal": "audio.beat",
           "kind": "explore",
-          "landSeconds": 0.35,
           "landmarkAffinity": 1.0,
           "maxRange": 220.0,
           "minRange": 18.0,
@@ -991,7 +996,8 @@
         "react": "Crazy",
         "run": "Running",
         "turn": "Idle_turn",
-        "walk": "Walking"
+        "walk": "Walking",
+        "jumpRunning": "Jump_running"
       },
       "coarseInterval": 0.10000000149011612,
       "cullDistance": 340.0,
@@ -1100,7 +1106,12 @@
           "target": "explore/runChance"
         }
       ],
-      "seed": 8814473
+      "seed": 8814473,
+      "jump": {
+        "apex": 2.6,
+        "landSeconds": 0.35,
+        "maxDistance": 7.0
+      }
     },
     {
       "behaviors": [

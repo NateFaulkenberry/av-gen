@@ -271,4 +271,11 @@ inline constexpr float kLoopClosureSteps = 1.0f;
 [[nodiscard]] LoopClosure measureLoopClosure(const Skeleton& skeleton, const AnimationClip& clip,
                                              float rate);
 
+// The body's own scale: the height of the rest pose, lowest joint to highest. What every threshold
+// here is a fraction of, so one rule holds for a 1.66 m alien and a 0.11 m chick.
+[[nodiscard]] float skeletonRestHeight(const Skeleton& skeleton);
+// The joint whose track says where the body went: the lowest-indexed joint this clip gives a
+// translation channel to (ADR-337), or the root when it gives none.
+[[nodiscard]] int clipTravelJoint(const Skeleton& skeleton, const AnimationClip& clip);
+
 } // namespace avgen::scene

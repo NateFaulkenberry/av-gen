@@ -1154,9 +1154,8 @@ public:
         // case 6 is the before-arm and case 14's explorer is the after; moving `Explore` across is
         // an owner's decision, not a refactor's.
         goals_.setSource(InterestConsiderer::Source::Omniscient);
-        jump_.gravity = readFloat(s, "jumpGravity", 18.0f);
-        jump_.apex = readFloat(s, "jumpApex", 1.1f);
-        jump_.landSeconds = readFloat(s, "landSeconds", 0.3f);
+        // ADR-822: the hop's shape is the CHARACTER's (`EntityDesc::jump`), read each step in
+        // `stepWalk`; only how far this behaviour chooses to leap (`jumpRange`) is its own.
         jump_.maxDistance = jumpRangeDefault_;
     }
 
@@ -1297,6 +1296,16 @@ public:
             if (!step(ctx, state, motion)) {
                 break;
             }
+        }
+        // ADR-822: a body in the air is not grounded. This used to run on every step, flight
+        // included, and `applyGrounding` assigns the height outright -- so every hop since ADR-194
+        // was a skid: the arc's height written, then overwritten with the terrain's on the same
+        // step. Measured: a 2.6 m hop (Glowmere's Ember and Vane on the beat) peaked at 0.00. The
+        // tests counted `Jump` frames, which the skid had plenty of, and never asked how high.
+        if (air_.airborne()) {
+            state.airborne = true;
+            state.hasGroundPlane = false;
+            return;
         }
         applyGrounding(ctx, state, motion, state.speed);
     }
@@ -1493,6 +1502,14 @@ private:
         sinceRepath_ += dt;
         const glm::vec3 here = state.position();
         const glm::vec2 flat(here.x, here.z);
+        // ADR-822: the body's jump capability, from its one authored block. `maxDistance` stays this
+        // behaviour's reach (set below, capped by the capability), so it is kept across the copy.
+        if (ctx.world != nullptr && ctx.self < ctx.world->entities().size()) {
+            const float reach = jump_.maxDistance;
+            jump_ = ctx.world->entities()[ctx.self]->desc().jump;
+            jumpCap_ = jump_.maxDistance;
+            jump_.maxDistance = std::min(reach, jumpCap_);
+        }
 
         // ADR-194. A hop in progress owns the body: the arc is the movement, so nothing below --
         // steering, separation, the penetration resolve, the ground follower -- may touch it until
@@ -1617,13 +1634,13 @@ private:
             const bool rising = now > 0.5f && jumpArmed_ <= 0.5f;
             jumpArmed_ = now;
             if (rising) {
-                const float distance = std::min(jumpReach, std::max(travelSpeed, speed) * 0.55f);
+                const float distance = std::min(std::min(jumpReach, jumpCap_), std::max(travelSpeed, speed) * 0.55f);
                 const glm::vec2 landing = flat + heading * distance;
                 const NavSample beyond = navigator->sample(landing);
                 // Only onto ground it can stand on. A hop that lands in a lake is worse than no
                 // hop, and the navigator already knows the difference.
                 if (beyond.navigable) {
-                    jump_.maxDistance = jumpReach;
+                    jump_.maxDistance = std::min(jumpReach, jumpCap_);
                     const glm::vec3 target(landing.x, beyond.ground, landing.y);
                     if (air_.launch(here, target, jump_)) {
                         state.speed = travelSpeed;
@@ -1638,7 +1655,7 @@ private:
             alignment > 0.8f && !air_.active()) {
             // The arc's reach follows the live parameter, so a signal raising `jumpRange` mid-scene
             // raises how far the body will actually commit to rather than only how far it looks.
-            jump_.maxDistance = jumpReach;
+            jump_.maxDistance = std::min(jumpReach, jumpCap_);
             const float probe = std::max(state.radius, 0.5f) + travelSpeed * 0.25f;
             const glm::vec2 ahead = flat + heading * probe;
             if (!navigator->sample(ahead).navigable) {
@@ -1978,6 +1995,7 @@ private:
     // which is a property of the body rather than of the moment.
     Airborne air_;
     JumpSettings jump_;
+    float jumpCap_ = 1e9f; // ADR-822: the character's own farthest leap, which `jumpRange` may not exceed
     // ADR-194: the signal that makes this body hop, or empty for one that only jumps at gaps. This
     // is what makes a character a modulation target rather than only an obstacle-avoider -- a beat
     // is a reason to jump, and the engine already delivers beats to behaviours.

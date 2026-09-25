@@ -27,6 +27,7 @@
 //     "reactions": [ { "signal": "audio.bass", "target": "parts/Lamp/emissiveGain", "depth": 3 } ]
 
 #include "core/rng.hpp"
+#include "entity/airborne.hpp"
 #include "entity/locomotion_plan.hpp"
 #include "entity/motion_chain.hpp"
 #include "entity/motion_controller.hpp"
@@ -195,6 +196,11 @@ struct EntityDesc {
     // inert" is a claim that can be measured rather than asserted -- see the rendered-hash
     // comparison in `docs/design/procedural-character-motion.md`.
     bool proceduralMotion = false;
+    // ADR-822: what this body can do off the ground -- its hop's apex and gravity, the farthest it
+    // will leap, how long it recovers, and the highest it CAN leap (`maxApex`, for a director's
+    // validator). One block per character, read by `explore`'s autonomous hops and by the Director's
+    // capability card alike, so the two cannot disagree about what the body is capable of.
+    JumpSettings jump{};
     // ADR-623. The matcher in front of the clip provider; see `MotionMatchingDesc`.
     MotionMatchingDesc motionMatching;
     // Phase B §8-§11. Start, stop, turn-in-place and strafe, on top of the gait's clip family.
@@ -347,6 +353,22 @@ struct DirectorMotion {
     //    limit a run-in cut to at 6 m/s read as a walk for its first second.
     // Off for staging, so a carried animal's legs still ramp and nothing staged changes.
     bool performance = false;
+    // ADR-820, performances only: the actor names a clip now, so the gait must not push its own.
+    bool clipOwned = false;
+    // ADR-823, performances only: the actor is in a local slow-motion (or fast-motion) window at
+    // this rate. `speed` is the path's speed ON THE TIMELINE; the gait chooses its clip from
+    // `speed / timeScale` -- the speed the performance was authored at -- and plays it at
+    // `timeScale`, so a slowed run stays a run, slowed, rather than becoming a walk.
+    float timeScale = 1.0f;
+};
+
+// ADR-820: where a body was when a performance with an entry blend took it -- the point the blend
+// starts from. Entity state, so a checkpoint carries it and a seek into the blend lands where a
+// play does.
+struct PerformanceEntry {
+    bool active = false;
+    glm::vec3 position{0.0f};
+    float yaw = 0.0f;
 };
 
 // What answered a `socketTransform` call (ADR-274). Three outcomes, because the two that used to
@@ -539,6 +561,9 @@ public:
     void setDirectorMotion(const DirectorMotion& motion) { director_ = motion; }
     void clearDirectorMotion() { director_ = DirectorMotion{}; }
     [[nodiscard]] const DirectorMotion& directorMotion() const { return director_; }
+    // ADR-820: set by the composition's performers when a blended entry begins, cleared at release.
+    void setPerformanceEntry(const PerformanceEntry& entry) { performanceEntry_ = entry; }
+    [[nodiscard]] const PerformanceEntry& performanceEntry() const { return performanceEntry_; }
 
     // A named number this entity declared. `setProperty` refuses a name the entity did not
     // declare rather than inventing one, because a property invented at runtime is a property no
@@ -608,6 +633,7 @@ private:
     bool hasLastVelocity_ = false;
     MotionOffset motion_{};
     DirectorMotion director_{};
+    PerformanceEntry performanceEntry_{}; // ADR-820
     LocomotionState locomotion_{};
     BehaviorList behaviors_;
 
@@ -1297,6 +1323,8 @@ private:
     static void applyNodeOffsets(Entity& entity);
     // The Director tier's two halves (ADR-210), shared by `update` and `seek`.
     static void directorBefore(Entity& entity);
+    // ADR-758/820: a scripted performance holds this body now.
+    [[nodiscard]] static bool performing(const Entity& entity);
     static void directorAfter(Entity& entity);
     static void rescaleIntent(EntityState& state);
     // Rebuilds `bodyGrid_` and `bodyPoints_` from where every entity's simulation stands now, and

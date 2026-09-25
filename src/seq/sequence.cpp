@@ -724,6 +724,30 @@ ShotCamera cameraFromPreset(CameraPreset preset, const app::FocalTarget& subject
     return cam;
 }
 
+// ---- clip playback (ADR-821) --------------------------------------------------------------------
+
+const char* clipPlaybackName(ClipPlayback playback) {
+    switch (playback) {
+    case ClipPlayback::Auto: return "auto";
+    case ClipPlayback::Loop: return "loop";
+    case ClipPlayback::Once: return "once";
+    }
+    return "auto";
+}
+
+bool clipPlaybackFromName(std::string_view name, ClipPlayback& out) {
+    if (name == "auto") {
+        out = ClipPlayback::Auto;
+    } else if (name == "loop") {
+        out = ClipPlayback::Loop;
+    } else if (name == "once") {
+        out = ClipPlayback::Once;
+    } else {
+        return false;
+    }
+    return true;
+}
+
 // ---- actor evaluation -------------------------------------------------------------------------
 
 glm::vec3 Actor::positionAt(double seconds) const {
@@ -795,6 +819,24 @@ const ClipCue* Actor::clipAt(double seconds) const {
         }
     }
     return current;
+}
+
+float Actor::timeScaleAt(double seconds) const {
+    for (const TimeWarp& w : timeWarps) {
+        if (seconds >= w.startSeconds && seconds < w.endSeconds) {
+            return w.rate;
+        }
+    }
+    return 1.0f;
+}
+
+bool Actor::airborneAt(double seconds) const {
+    for (const auto& [from, to] : airborne) {
+        if (seconds >= from && seconds <= to) {
+            return true;
+        }
+    }
+    return false;
 }
 
 double Actor::endSeconds() const {
@@ -1222,7 +1264,10 @@ std::vector<AnimationCue> Sequence::animationAt(double seconds) const {
                                    .clip = cue->clip,
                                    .startSeconds = cue->timeSeconds,
                                    .speed = cue->speed,
-                                   .blendSeconds = cue->blendSeconds});
+                                   .blendSeconds = cue->blendSeconds,
+                                   .playback = cue->playback,
+                                   .then = cue->then,
+                                   .offsetSeconds = cue->offsetSeconds});
     }
     return out;
 }
@@ -1946,6 +1991,15 @@ json actorToJson(const Actor& a) {
         if (c.blendSeconds >= 0.0f) {
             e["blend"] = c.blendSeconds;
         }
+        if (c.playback != ClipPlayback::Auto) { // ADR-821: absent is Auto
+            e["playback"] = clipPlaybackName(c.playback);
+        }
+        if (!c.then.empty()) {
+            e["then"] = c.then;
+        }
+        if (c.offsetSeconds != 0.0f) {
+            e["offset"] = c.offsetSeconds; // ADR-823
+        }
         clips.push_back(std::move(e));
     }
     json j{{"id", a.id},
@@ -1953,6 +2007,23 @@ json actorToJson(const Actor& a) {
            {"visible", a.visible},
            {"keys", std::move(keys)},
            {"clips", std::move(clips)}};
+    if (a.entrySeconds != 0.0f) {
+        j["entrySeconds"] = a.entrySeconds; // ADR-820: absent means 0, the plan-safe default
+    }
+    if (!a.timeWarps.empty()) {
+        json warps = json::array();
+        for (const Actor::TimeWarp& w : a.timeWarps) {
+            warps.push_back(json{{"start", w.startSeconds}, {"end", w.endSeconds}, {"rate", w.rate}});
+        }
+        j["timeWarps"] = std::move(warps); // ADR-823
+    }
+    if (!a.airborne.empty()) {
+        json spans = json::array();
+        for (const auto& [from, to] : a.airborne) {
+            spans.push_back(json::array({from, to}));
+        }
+        j["airborne"] = std::move(spans); // ADR-822
+    }
     if (a.path.active) {
         j["path"] = json{{"spline", a.path.spline.toJson()},
                          {"start", a.path.startSeconds},
@@ -2015,10 +2086,48 @@ Result<Actor> actorFromJson(const json& j) {
             c.clip = readString(e, "clip");
             c.speed = static_cast<float>(readNumber(e, "speed", 1.0));
             c.blendSeconds = static_cast<float>(readNumber(e, "blend", -1.0));
+            if (const auto pb = e.find("playback"); pb != e.end()) {
+                if (!pb->is_string() || !clipPlaybackFromName(pb->get<std::string>(), c.playback)) {
+                    return fail("actor '{}': clip cue playback must be \"auto\", \"loop\" or \"once\"", a.id);
+                }
+            }
+            c.then = readString(e, "then");
+            c.offsetSeconds = static_cast<float>(readNumber(e, "offset", 0.0));
             a.clips.push_back(c);
         }
         std::stable_sort(a.clips.begin(), a.clips.end(),
                          [](const ClipCue& x, const ClipCue& y) { return x.timeSeconds < y.timeSeconds; });
+    }
+    a.entrySeconds = static_cast<float>(readNumber(j, "entrySeconds", 0.0));
+    if (const auto warps = j.find("timeWarps"); warps != j.end()) {
+        if (!warps->is_array()) {
+            return fail("actor '{}': 'timeWarps' must be an array", a.id);
+        }
+        for (const auto& w : *warps) {
+            Actor::TimeWarp warp;
+            warp.startSeconds = readNumber(w, "start", 0.0);
+            warp.endSeconds = readNumber(w, "end", 0.0);
+            warp.rate = static_cast<float>(readNumber(w, "rate", 1.0));
+            if (warp.endSeconds < warp.startSeconds || warp.rate <= 0.0f) {
+                return fail("actor '{}': a time warp needs start <= end and rate > 0", a.id);
+            }
+            a.timeWarps.push_back(warp);
+        }
+    }
+    if (const auto air = j.find("airborne"); air != j.end()) {
+        if (!air->is_array()) {
+            return fail("actor '{}': 'airborne' must be an array of [start, end] spans", a.id);
+        }
+        for (const auto& span : *air) {
+            if (!span.is_array() || span.size() != 2 || !span[0].is_number() || !span[1].is_number() ||
+                span[1].get<double>() < span[0].get<double>()) {
+                return fail("actor '{}': each airborne span is [start, end] with start <= end", a.id);
+            }
+            a.airborne.emplace_back(span[0].get<double>(), span[1].get<double>());
+        }
+    }
+    if (a.entrySeconds < 0.0f) {
+        return fail("actor '{}': 'entrySeconds' must not be negative", a.id);
     }
     if (const auto p = j.find("path"); p != j.end()) {
         if (!p->is_object()) {

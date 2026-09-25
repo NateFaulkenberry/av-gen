@@ -679,4 +679,12 @@ LoopClosure measureLoopClosure(const Skeleton& skeleton, const AnimationClip& cl
     return out;
 }
 
+float skeletonRestHeight(const Skeleton& skeleton) {
+    return restHeightOf(skeleton);
+}
+
+int clipTravelJoint(const Skeleton& skeleton, const AnimationClip& clip) {
+    return travelJointOf(skeleton, clip);
+}
+
 } // namespace avgen::scene

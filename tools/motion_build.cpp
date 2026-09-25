@@ -22,6 +22,7 @@
 
 #include "assets/bvh_loader.hpp"
 #include "assets/gltf_loader.hpp"
+#include "scene/clip_semantics.hpp"
 #include "scene/motion_analysis.hpp"
 #include "scene/motion_database.hpp"
 #include "scene/motion_database_io.hpp"
@@ -40,6 +41,7 @@
 
 #include <random>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <algorithm>
 #include <chrono>
@@ -268,6 +270,44 @@ int cmdInspect(const Args& args) {
                            scene::humanoidRoleName(scene::roleForJointName(joint.name)));
             }
         }
+    }
+    return 0;
+}
+
+// ADR-821: what each clip IS, as the engine measures it -- the table a director reads.
+int cmdSemantics(const Args& args) {
+    if (args.positional.empty()) {
+        return usage();
+    }
+    auto source = loadSource(args.positional.front(), std::stof(args.option("scale", "1.0")));
+    if (!source) {
+        fmt::print(stderr, "{}\n", source.error().message);
+        return 1;
+    }
+    const scene::ClipSemanticsTable table = scene::clipSemantics(source->skeleton, source->clips);
+    if (args.has("json")) {
+        fmt::print("{}\n", scene::clipSemanticsJson(table).dump(2));
+        return 0;
+    }
+    fmt::print("feet: {}   ground datum {:.3f}   rest height {:.3f}\n", fmt::join(table.feet, ", "),
+               table.groundDatum, table.restHeight);
+    for (const std::string& w : table.warnings) {
+        fmt::print("warning: {}\n", w);
+    }
+    fmt::print("{:<22} {:>6} {:>5} {:>6} {:>9} {:>6} {:>6} {:>13} {:>7}  events\n", "clip", "len", "loop",
+               "gap", "ground", "supp", "speed", "flight", "peakH");
+    for (const scene::ClipSemantics& c : table.clips) {
+        std::string events;
+        for (const scene::ClipEvent& e : c.events) {
+            if (args.has("contacts") || e.name.rfind("plant.", 0) != 0 && e.name.rfind("release.", 0) != 0) {
+                events += fmt::format(" {}@{:.3f}", e.name, e.seconds);
+            }
+        }
+        const std::string flight =
+            c.ground == scene::ClipGround::Grounded ? std::string("-") : fmt::format("{:.3f}-{:.3f}", c.flightStart, c.flightEnd);
+        fmt::print("{:<22} {:6.3f} {:>5} {:6.2f} {:>9} {:6.2f} {:6.3f} {:>13} {:7.3f} {}\n", c.clip, c.length,
+                   c.loops ? "yes" : "no", c.loopGapSteps, scene::clipGroundName(c.ground), c.supportedFraction,
+                   c.groundSpeed, flight, c.peakHeight, events);
     }
     return 0;
 }
@@ -1823,6 +1863,9 @@ int main(int argc, char** argv) {
     }
     if (args.command == "analyse" || args.command == "analyze") {
         return cmdAnalyse(args);
+    }
+    if (args.command == "semantics") {
+        return cmdSemantics(args);
     }
     if (args.command == "retarget") {
         return cmdRetarget(args);
