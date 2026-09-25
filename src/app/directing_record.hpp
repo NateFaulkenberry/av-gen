@@ -18,8 +18,14 @@
 #include "core/error.hpp"
 #include "directing/compiler.hpp"
 
+#include <atomic>
+#include <mutex>
+#include <optional>
 #include <filesystem>
+#include <functional>
+#include <future>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace avgen::app {
@@ -31,7 +37,9 @@ struct RecordOptions {
     double maxSeconds = 40.0;     // the longest a goal is recorded for, from when it is given
     double keyEverySeconds = 0.1; // the recording's key spacing (Linear keys; the body is exact on them)
     std::filesystem::path scratchDir;
+    const std::atomic<bool>* cancel = nullptr; // polled every frame of every play
 };
+using RecordProgress = std::function<void(const std::string& phase)>;
 
 struct RecordReport {
     directing::Plan plan;             // the input plan with its live performances recorded
@@ -43,7 +51,43 @@ struct RecordReport {
 };
 
 // `compilation` must be a live-tier compilation whose goal performances compiled (not blocked).
+// Synchronous: writes the copy, records, checks.
 [[nodiscard]] Result<RecordReport> recordLivePerformances(Engine& live, const directing::Compilation& compilation,
                                                           const RecordOptions& options);
+
+// The two halves, for running it off the editor's frames: the copy is written on the main thread
+// (it reads the live engine), and everything else touches only that file and the scratch engines it
+// loads, so it can run on a thread of its own.
+[[nodiscard]] Result<std::filesystem::path> writeRecordingCopy(Engine& live, const std::filesystem::path& scratchDir);
+[[nodiscard]] Result<RecordReport> recordFromCopy(const std::filesystem::path& copy,
+                                                  const directing::Compilation& compilation,
+                                                  const RecordOptions& options, const RecordProgress& progress = {});
+
+// A recording on a thread of its own: `start` on the main thread, then poll. The copy is deleted when
+// the recording is done or the job is destroyed (which cancels it and waits).
+class RecordingJob {
+public:
+    RecordingJob() = default;
+    ~RecordingJob();
+    RecordingJob(const RecordingJob&) = delete;
+    RecordingJob& operator=(const RecordingJob&) = delete;
+
+    [[nodiscard]] Result<void> start(Engine& live, directing::Compilation compilation, RecordOptions options);
+    [[nodiscard]] bool running() const;
+    [[nodiscard]] std::string phase() const;
+    // The result once, when it is ready; nothing while running (or after it was taken).
+    [[nodiscard]] std::optional<Result<RecordReport>> take();
+    void cancel();
+
+private:
+    void finish();
+    std::thread thread_;
+    std::atomic<bool> cancel_{false};
+    std::atomic<bool> done_{false};
+    mutable std::mutex mutex_;
+    std::string phase_;
+    std::optional<Result<RecordReport>> result_;
+    std::filesystem::path copy_;
+};
 
 } // namespace avgen::app
