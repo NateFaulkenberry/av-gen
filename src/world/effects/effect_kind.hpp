@@ -81,6 +81,10 @@ enum class EffectKind : std::uint8_t {
     //   lens (DF):           HeatShimmer = 41, GravitationalLens = 42
     //   shell 2 (phase 2):   ChargeUp = 40, LightBeam = 43, Halo = 44, Bubble = 45, Portal = 46,
     //                        RealityTear = 47
+    // SHELL (world/effects/shell_frame.hpp): analytic proxy shells drawn beside the particles.
+    Plasma = 37,       // a boiling orb of emission, marched inside a sphere, with a core light
+    EnergyShield = 38, // a shell round its owner: rim, cells, rings from each hit, a ground line
+    ForceField = 39,   // a placed barrier -- wall, box, cylinder, dome -- revealed by what comes near
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

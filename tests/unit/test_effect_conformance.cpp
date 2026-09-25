@@ -450,6 +450,11 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::VelocityDistortion, {EffectTarget::Entity}},
         {EffectKind::Stars, {EffectTarget::World}}, // Wave 2: the sky has one star field
         {EffectKind::MotionSmear, {EffectTarget::Entity}},
+        // Wave 3 (SHELL). An orb and a shield ride an entity or stand placed in the world; a barrier
+        // is placed first and may be projected from an entity.
+        {EffectKind::Plasma, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::EnergyShield, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::ForceField, {EffectTarget::World, EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -501,6 +506,8 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         // Wave 2: XFORM offsets are composed by the flatten, before any pass draws.
         case world::EffectBucket::Transform: return world::RenderStage::Geometry;
         case world::EffectBucket::Starfield: return world::RenderStage::Sky;
+        // Wave 3: shells draw in pass 1's blended section, beside the particles and ribbons.
+        case world::EffectBucket::Shell: return world::RenderStage::Particles;
         }
         return world::RenderStage::PostProcess; // unreachable for a real bucket, and wrong for all
     };

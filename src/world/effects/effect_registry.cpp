@@ -66,6 +66,9 @@ const EffectSchema& colorCyclingSchema(); // Wave 2 (FXL surface)
 const EffectSchema& velocityDistortionSchema(); // Wave 2 (DF over HIST)
 const EffectSchema& motionSmearSchema(); // Wave 2 (FXL surface)
 const EffectSchema& starsSchema();       // Wave 2 (the sky's star field)
+const EffectSchema& plasmaSchema();      // Wave 3 (SHELL)
+const EffectSchema& energyShieldSchema(); // Wave 3 (SHELL + TRIGGER)
+const EffectSchema& forceFieldSchema();  // Wave 3 (SHELL)
 
 namespace {
 
@@ -104,6 +107,9 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &velocityDistortionSchema(),
         &motionSmearSchema(),
         &starsSchema(),
+        &plasmaSchema(),
+        &energyShieldSchema(),
+        &forceFieldSchema(),
     };
     return kSchemas;
 }
