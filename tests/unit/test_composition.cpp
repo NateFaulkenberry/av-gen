@@ -1229,6 +1229,30 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     CHECK((*again)->toJson() == j);
 }
 
+// ADR-705: `volumeMaxDistance` 0 is "no march; the surface pass carries the whole ray". It must
+// survive the PARAMETER, not only the scene struct: a hard minimum of 0.01 clamped it to a 1 cm march
+// that paid for the whole volume pass, in every surface-only scene loaded through a project.
+TEST_CASE("volumeMaxDistance 0 survives its parameter, so a surface-only scene runs no march",
+          "[scene][composition][fog][environment]") {
+    Fixture fx;
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "surface-only",
+      "environment": { "volumeDensity": 0.04, "volumeMaxDistance": 0.0 }
+    })";
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->scene().environment.volumeMaxDistance == 0.0f);
+    params::IParameter* p = params.find("scene/volumeMaxDistance");
+    REQUIRE(p != nullptr);
+    p->setBaseComponent(0, 0.0f); // as a project's parameter block sets it
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->scene().environment.volumeMaxDistance == 0.0f);
+}
+
 // ADR-705, §7's Horizon Density. The four things "a scene parameter" means in this engine, each asked
 // separately because each has failed alone before (ADR-561/565/571): the scene file reaches the
 // environment, a modulation route reaches it, the scene serialiser writes the BASE back, and the

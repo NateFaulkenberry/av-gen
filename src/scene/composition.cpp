@@ -4056,9 +4056,12 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // ADR-573: the same, for how far the march goes. Thirty-two shipped scenes set it and none of
     // them could have done so from the editor. The hard maximum is generous because a scene whose
     // subject is kilometres of air legitimately wants one; the soft range is where a frame budget
-    // survives.
+    // survives. The hard minimum is 0, not a centimetre: ADR-705 made 0 mean "no march, the surface
+    // pass carries the whole ray", and a floor of 0.01 turned every such scene loaded through its
+    // parameter into a fullscreen march that stops after one centimetre -- the cost the gate in
+    // `VolumeRenderer::enabled` exists to avoid.
     volumeMaxDistance_ = &params.add(floatDesc(prefix_ + "scene/volumeMaxDistance",
-                                               volumeSetting_.volumeMaxDistance, 0.01f, 20000.0f,
+                                               volumeSetting_.volumeMaxDistance, 0.0f, 20000.0f,
                                                10.0f, 4000.0f));
     // ADR-574: ADR-058's coupling -- how much of the volumetric's mist layer the SURFACE fog
     // integrates. It had no parameter, on a recorded reason that turned out to be false about the
