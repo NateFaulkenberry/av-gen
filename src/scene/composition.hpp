@@ -1978,6 +1978,9 @@ private:
     std::vector<stage::VisualPlacement> seekPlaced_;
     std::vector<std::uint8_t> seekPlacedValid_;
     bool seekPlacementLive_ = false;
+    // ADR-800: the instant the last seek landed on, until a frame arrives at any other instant. A
+    // frame *at* it does not run the director again. -1 = no seek outstanding.
+    double seekLandedSeconds_ = -1.0;
     stage::StagingDesc stagingDesc_;              // ADR-209: authored, round-tripped as "staging"
     stage::Staging staging_;
     std::vector<entity::FieldDesc> fieldDescs_;   // ADR-097: authored, round-tripped as "fields"
