@@ -10,6 +10,8 @@
 #include "ui/world_probe.hpp"
 #include "ui/world_edit.hpp"
 #include "ui/sequence_panel.hpp"
+#include "ai/control_plane.hpp"
+#include "app/edit_system.hpp"
 #include "core/log.hpp"
 #include "params/parameter.hpp"
 #include "scene/composition.hpp"
@@ -34,7 +36,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 16> kArms{{
+constexpr std::array<ArmName, 18> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -51,6 +53,8 @@ constexpr std::array<ArmName, 16> kArms{{
     {"drag", UiScriptArm::Drag},
     {"slicemenu", UiScriptArm::SliceMenu},
     {"slice", UiScriptArm::Slice},
+    {"director-reject", UiScriptArm::DirectorReject},
+    {"director-accept", UiScriptArm::DirectorAccept},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -318,6 +322,9 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
     }
     if (has(arms_, UiScriptArm::Slice)) {
         stepSlice(engine, *panel, window, frame);
+    }
+    if (panel != nullptr && (has(arms_, UiScriptArm::DirectorReject) || has(arms_, UiScriptArm::DirectorAccept))) {
+        stepDirector(engine, *panel, window, frame, has(arms_, UiScriptArm::DirectorAccept));
     }
     if (has(arms_, UiScriptArm::Strip)) {
         stepStrip(engine, *panel, window, frame);
@@ -1284,6 +1291,142 @@ void UiScript::stepDrag(Engine& engine, ui::ControlPanel& panel, platform::Windo
                 editLog_.emplace_back("drag: the playhead did not move -- THIS ARM MEASURED NOTHING");
             }
         }
+    }
+}
+
+} // namespace avgen::app
+
+namespace avgen::app {
+
+void UiScript::check(bool ok, const std::string& what) {
+    editLog_.push_back(fmt::format("director: {} {}", ok ? "PASS" : "FAIL", what));
+    failedChecks_ += ok ? 0 : 1;
+}
+
+// ADR-762. The schedule, in frames (the capture frame for "after step N" is the next checkpoint):
+//   4-5    open and raise the Director panel
+//   60     record the state before anything is pressed (the proposal is waiting)
+//   80-88  press Preview                                  -> checked at 110
+//   130-138 press Reject (or Accept)                       -> checked at 160
+//   180-186 Cmd+Z (accept path only)                       -> checked at 210
+void UiScript::stepDirector(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame,
+                            bool accept) {
+    ui::DirectorPanel& director = panel.director;
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Director"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Director");
+        return;
+    }
+    if (director.plane == nullptr || director.edits == nullptr) {
+        if (frame == 60) {
+            check(false, "the Director panel has no control plane or history; THIS ARM TESTED NOTHING");
+        }
+        return;
+    }
+    ui::EditHistory& history = director.edits->history();
+    const auto task = director.plane->currentTask();
+    const auto press = [&](const ui::DirectorPanel::Rect& r, std::uint64_t start) {
+        if (!r.valid) {
+            return;
+        }
+        if (frame >= start && frame < start + 6) {
+            warpAndMove(window, r.cx(), r.cy()); // parked first: see `warpAndMove`
+        } else if (frame == start + 6) {
+            pushButton(window, r.cx(), r.cy(), true);
+        } else if (frame == start + 8) {
+            pushButton(window, r.cx(), r.cy(), false);
+        }
+    };
+    const auto plans = [&] { return engine.directingPlans().size(); };
+    switch (frame) {
+    case 60:
+        directorUndoBefore_ = history.undoSize();
+        directorStateBefore_ = history.stateId();
+        directorSequenceBefore_ = engine.sequence().toJson().dump();
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval,
+              "a proposal is waiting for approval before anything is pressed");
+        check(plans() == 0, fmt::format("the project carries no plan yet ({})", plans()));
+        check(director.buttons().preview.valid && director.buttons().accept.valid && director.buttons().reject.valid,
+              "the panel's buttons are drawn and in view");
+        return;
+    case 110:
+        check(director.previewing(), "Preview put the panel into preview");
+        check(history.undoSize() == directorUndoBefore_ + 1, fmt::format("the preview is one edit ({} -> {})",
+                                                                         directorUndoBefore_, history.undoSize()));
+        check(history.undoLabel().rfind("Director: ", 0) == 0,
+              fmt::format("the preview edit is labelled as one: \"{}\"", history.undoLabel()));
+        check(plans() == 1, fmt::format("the previewed plan is installed ({})", plans()));
+        check(engine.sequence().toJson().dump() != directorSequenceBefore_, "the preview changed the sequence");
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval,
+              "the proposal is still waiting while it is previewed");
+        return;
+    case 160:
+        check(!director.previewing(), "the preview ended");
+        if (!accept) {
+            check(history.undoSize() == directorUndoBefore_, fmt::format("Reject left the history as it was ({} -> {})",
+                                                                         directorUndoBefore_, history.undoSize()));
+            check(plans() == 0, fmt::format("Reject left no plan ({})", plans()));
+            check(engine.sequence().toJson().dump() == directorSequenceBefore_, "Reject left the sequence as it was");
+            check(task != nullptr && task->state() == ai::TaskState::Rejected, "the task is rejected");
+        } else {
+            check(history.undoSize() == directorUndoBefore_ + 1,
+                  fmt::format("Accept made exactly one undo ({} -> {})", directorUndoBefore_, history.undoSize()));
+            check(task != nullptr && history.undoLabel() == task->prompt(),
+                  fmt::format("the undo is labelled with the request: \"{}\"", history.undoLabel()));
+            check(plans() == 1 && engine.directingPlans()[0].revision == 1,
+                  fmt::format("the plan is installed once, as revision 1 ({})", plans()));
+            check(engine.sequence().toJson().dump() != directorSequenceBefore_, "Accept changed the sequence");
+            check(task != nullptr && task->state() == ai::TaskState::Completed, "the task is completed");
+        }
+        return;
+    case 180:
+    case 181:
+    case 182:
+    case 183:
+        if (accept) {
+            // Cmd+Z as the keyboard sends it: a key event with the command modifier, into the
+            // application's own shortcut handler (`handleEditorShortcut` reads `SDL_GetModState`).
+            SDL_SetModState(SDL_KMOD_GUI);
+        }
+        if (accept && frame == 182) {
+            SDL_Event e{};
+            e.type = SDL_EVENT_KEY_DOWN;
+            e.key.timestamp = SDL_GetTicksNS();
+            e.key.windowID = window.id();
+            e.key.key = SDLK_Z;
+            e.key.scancode = SDL_SCANCODE_Z;
+            e.key.mod = SDL_KMOD_GUI;
+            e.key.down = true;
+            SDL_PushEvent(&e);
+            e.type = SDL_EVENT_KEY_UP;
+            e.key.down = false;
+            SDL_PushEvent(&e);
+        }
+        return;
+    case 186:
+        if (accept) {
+            SDL_SetModState(SDL_KMOD_NONE);
+        }
+        return;
+    case 210:
+        if (accept) {
+            check(history.undoSize() == directorUndoBefore_,
+                  fmt::format("Cmd+Z took the one undo back ({} -> {})", directorUndoBefore_, history.undoSize()));
+            check(plans() == 0, fmt::format("the plan is gone with it ({})", plans()));
+            check(engine.sequence().toJson().dump() == directorSequenceBefore_, "the sequence is as it was");
+        }
+        return;
+    default:
+        break;
+    }
+    press(director.buttons().preview, 80);
+    press(accept ? director.buttons().accept : director.buttons().reject, 130);
+    // ADR-764: while the reject path's preview stands, press Stills again after the first stills
+    // (made by the preview) have had time to finish -- the second request must reuse the session.
+    if (!accept) {
+        press(director.buttons().stills, 240);
     }
 }
 

@@ -77,6 +77,35 @@ struct CompiledPerformance {
 // (the default) or `touchdown`. Other beats have one moment and ignore it.
 inline constexpr std::string_view kJumpMoments[] = {"takeoff", "peak", "touchdown"};
 
+// ---- goal mode (ADR-763 on the Motion lead's ADR-828) --------------------------------------------
+//
+// A goal performance tells a character WHAT it wants and leaves HOW to the character: each beat
+// compiles to one `CharacterGoal` sequence event that fills the character's `goal` considerer at the
+// beat's time. Live, by construction -- where the body goes and when it arrives is the simulation's --
+// so it compiles only in a plan whose tier says live, and is baked only by recording it.
+struct GoalVerb {
+    std::string_view action;     // the plan's word
+    std::string_view intent;     // `entity::IntentType` name
+    std::string_view affordance; // the verb used on the subject when it offers it; empty = none
+};
+inline constexpr GoalVerb kGoalVerbs[] = {
+    {"go_to", "investigate", ""},       // walk there and attend (the considerer's activity)
+    {"inspect", "interact", "inspect"}, // walk there and use the subject's "inspect" when offered
+};
+[[nodiscard]] const GoalVerb* goalVerb(std::string_view action);
+// The two moments a goal beat's `emits` can name, and the character event each one is.
+inline constexpr std::string_view kGoalMoments[] = {"arrived", "done"};
+// A goal beat's live event: `{name: "goal.arrived", subject: "rook"}` (ADR-828).
+[[nodiscard]] std::string goalEventName(std::string_view moment);
+// When each goal beat is given, in timeline seconds (its own `at`; the first may use the
+// performance's start). Nothing for a beat that has neither.
+[[nodiscard]] std::optional<double> goalBeatTime(const Plan& plan, std::size_t performance, std::size_t beat,
+                                                 const PlanTimes& times);
+
+// A recorded performance's actor, parsed from the plan (ADR-763). Nothing when it does not parse.
+[[nodiscard]] std::optional<seq::Actor> recordedActor(const PerformanceRecording& recording);
+[[nodiscard]] nlohmann::json actorDocument(const seq::Actor& actor);
+
 // Metres above an obstacle a jump over it must pass, when the plan does not say.
 inline constexpr float kDefaultJumpClearance = 0.25f;
 

@@ -42,6 +42,12 @@ public:
     // setMap; call after editing the map's port/filter/feedback fields from the UI).
     void applyIo();
     void closeAll();
+    // Whether this hub may open live sources at all: the OSC receiver, the feedback sender and MIDI.
+    // False for an engine that only evaluates a project -- a render, a trace, the Director's scratch
+    // copy -- which must neither take the editor's port nor be driven by what arrives on it. The
+    // map is kept (it is saved with the project); only the sockets stay shut.
+    void setLiveIo(bool enabled);
+    [[nodiscard]] bool liveIo() const { return liveIo_; }
 
     // Per-frame: drains both inboxes and applies them to the engine, advances the MIDI clock to
     // the frame time and pushes parameter feedback. Returns the number of messages applied.
@@ -107,6 +113,7 @@ private:
     control::OscSender reply_;         // per-sender replies (opened on demand)
     std::string replyTarget_;
     std::string oscError_;
+    bool liveIo_ = true;
     std::string midiError_;
     std::vector<control::OscMessage> oscScratch_;
     std::vector<control::MidiMessage> midiScratch_;

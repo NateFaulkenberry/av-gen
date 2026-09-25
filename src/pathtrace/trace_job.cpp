@@ -157,6 +157,7 @@ Result<void> TraceJob::execute() {
     // Offline mode, which is GPU-free: the path tracer needs no device, so a trace runs on a
     // machine with no working GPU and never contends for one.
     app::Engine engine(app::EngineMode::Offline);
+    engine.setLiveControl(false); // a trace listens to nothing live, and never takes the editor's port
     if (!engine.loadProject(request_.project)) {
         return failWith(Error{fmt::format("could not load project '{}'", request_.project.string())});
     }

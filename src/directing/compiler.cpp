@@ -520,7 +520,64 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         if (v.isBlocked(pp.key)) {
             continue;
         }
-        CompiledPerformance cp = compilePerformance(plan, i, facts, v.times);
+        if (pp.mode == PerformanceMode::Goal && !pp.recording) {
+            // ---- a goal (ADR-763 on ADR-828): one CharacterGoal event per beat, live ----------------
+            const Subject* who = plan.subject(pp.subject);
+            for (std::size_t b = 0; b < pp.beats.size(); ++b) {
+                const PerformanceBeat& beat = pp.beats[b];
+                const GoalVerb* verb = goalVerb(beat.action);
+                const double t = *goalBeatTime(plan, i, b, v.times);
+                const Subject* target = plan.subject(beat.target);
+                seq::SequenceEvent goal;
+                goal.id = fmt::format("{}.{}.goal{}", plan.id, pp.key, b);
+                goal.when.kind = seq::TriggerKind::Time;
+                goal.when.timeSeconds = t;
+                goal.what.kind = seq::EventActionKind::CharacterGoal;
+                goal.what.target = who->id;
+                goal.what.value = target->id;
+                goal.what.argument = std::string(verb->affordance);
+                goal.what.seconds = beat.seconds.value_or(0.0);
+                goal.what.goal.intent = std::string(verb->intent);
+                out.staged.sequence.events.push_back(goal);
+                record(pp.key, ContentDomain::SequenceEvent, goal.id);
+                line(removedLine(pp.key), pp.key,
+                     fmt::format("Goal for {} at {}: {} {}{} -- live: how and when {} gets there is the character's",
+                                 who->id, clock(t), beat.action, target->id,
+                                 goal.what.seconds > 0.0 ? fmt::format(" (stands {:.1f}s)", goal.what.seconds) : std::string(),
+                                 who->id));
+                if (!beat.emits.empty()) {
+                    // The live event, named where the sequence can hear it: a host (or a recording)
+                    // sees it fire; nothing is baked on it (ADR-763).
+                    seq::SequenceEvent heard;
+                    heard.id = fmt::format("{}.{}.{}", plan.id, pp.key, beat.emits);
+                    heard.when.kind = seq::TriggerKind::ActionComplete;
+                    heard.when.name = goalEventName(beat.moment);
+                    heard.when.subject = who->id;
+                    heard.when.fromSeconds = t;
+                    heard.when.repeat = 1;
+                    heard.what.kind = seq::EventActionKind::Notify;
+                    heard.what.target = beat.emits;
+                    out.staged.sequence.events.push_back(heard);
+                    record(pp.key, ContentDomain::SequenceEvent, heard.id);
+                    line(removedLine(pp.key), pp.key,
+                         fmt::format("Live event {} when {} reports {} (after {})", beat.emits, who->id,
+                                     goalEventName(beat.moment), clock(t)));
+                }
+            }
+            continue;
+        }
+        CompiledPerformance cp;
+        if (pp.recording) {
+            // ---- recorded (ADR-763): the recording IS the actor --------------------------------------
+            cp.actor = *recordedActor(*pp.recording);
+            cp.events = pp.recording->events;
+            cp.from = cp.actor.keys.empty() ? 0.0 : cp.actor.keys.front().timeSeconds;
+            cp.to = cp.actor.keys.empty() ? 0.0 : cp.actor.keys.back().timeSeconds;
+            cp.summary.push_back(fmt::format("recorded from a {} performance; replayed {:.3f} m from the recording",
+                                             pp.recording->fromMode, pp.recording->replayWorstMetres));
+        } else {
+            cp = compilePerformance(plan, i, facts, v.times);
+        }
         // ADR-823: slow motion on this performance -- its actor reparameterised over each window,
         // in time order. The plan events it raises move with it, so cues on them stay on the moment.
         std::vector<std::pair<std::size_t, double>> windows;

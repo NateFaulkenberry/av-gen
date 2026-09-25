@@ -2,7 +2,7 @@
 Last updated: 2026-09-25
 Current branch: `agent/director` (worktree `../av-gen-director`; agent/motion merged at d4854cb4, main 9fa84413 at aa84e42d)
 Current commit: see Recent changes
-Overall status: Slices 0-2 complete; Slice 3 compile side complete (ADR-761); Director panel (ADR-762); Slice 4 researched and proposed (ADR-763), interface requested from the Motion lead; Slice 5 cost harness incl. seek
+Overall status: Slices 0-2 complete; Slice 3 compile side complete (ADR-761); Director panel verified in a running session (ADR-762) with preview stills (ADR-764); Slice 4 goal compile and recording built (ADR-763 on ADR-824/828); Slice 5 cost harness incl. seek
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -41,7 +41,7 @@ Since then:
 | 1 Plan + Cameras | Complete | 95% | 26 `[directing]` cases + 10 golden plans | Remaining: the Director panel beyond Approve/Reject (spec §35 says do not overbuild); UI not verified |
 | 2 Scripted Performances | Complete | 100% | 16 cases + 1 golden | The handoff is M1 (merged from main; this branch's copy dropped). Non-zero `entrySeconds` is NON_DETERMINISTIC in a baked plan |
 | 3 Airborne + Events | Compile side complete | 85% | 5 `[directing][airborne]` cases + 2 goldens | ADR-761. Remaining: `fall`; acrobatics need assets; UI not verified |
-| 4 Autonomous Direction | Researched | 10% | 0 | ADR-763 proposed: goal -> F7 `CharacterGoal`; live until recorded; interface requested (goal event, semantic events, clip readout, checkpointed considerer) |
+| 4 Autonomous Direction | Goal mode + recording built | 60% | 3 `[directing][goal]` cases | Goal -> `CharacterGoal`; live events heard; recording with played-back and scrub checks (0 m). Remaining: directed mode, event-driven proposals, runtime candidate shots, a Record button/tool |
 | 5 Verification + Scale | Started | 30% | 11 golden plans, `[.perf][directing]` CPU + GPU + seek | Cost harness over the golden plans, and seek after ADR-800 |
 
 ## Current focus
@@ -275,6 +275,16 @@ undo, serialization or compilation will be built on them.
   exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-25: OSC: evaluating engines open no live control (86d81b9a). Stills no longer block the
+  editor: a cached scratch session simulated on its own thread (2ed68542). Merged main 9a37c9bb
+  (7af0244f). Slice 4 goal compile (ce3a740e) and recording (see ADR-763's "Implemented").
+- 2026-09-25: merged main 6cf46868 (effects integration, ADR-705 `scene/volumeDensity`, Wave 2) at
+  e661e6da. **Full suites there:** CPU 3,444 cases, exit 0 (1 expected shouldfail, 19 skips); GPU
+  490, exit 0 (1 skip).
+- 2026-09-25: panel buttons verified in a running session (610828d4; `director-reject` /
+  `director-accept` UI script arms, 32 checks, exit 8 on failure). Preview stills from a scratch
+  copy (ADR-764), shown on each shot row.
+- **Full suites at 232d6b51:** CPU 3,332 cases, exit 0 (1 expected shouldfail); GPU 445, exit 0.
 - 2026-09-25: Director panel (4dcb8f1f, ADR-762): headless capture in
   `~/Desktop/av-gen-review/15-director-panel/`. Slice 4 proposal (ADR-763).
 - **Full suites at 3ca06731:** CPU 3,332 cases, exit 0 (1 expected shouldfail, 16 skips); GPU 444,
@@ -419,6 +429,6 @@ markers · [ ] keyed chase camera · [ ] character performance tests
 [ ] authored-vs-runtime precedence · [ ] replay validation
 
 ## Slice 5 — Verification and scale
-[ ] preview thumbnails · [ ] optional vision critique · [x] Director benchmark harness (costs) ·
+[x] preview thumbnails (ADR-764) · [ ] optional vision critique · [x] Director benchmark harness (costs) ·
 [x] golden plans (10) · [~] performance benchmarks (Director costs measured) · [ ] seek optimization · [ ] MCP exposure ·
 [ ] external-agent integration tests

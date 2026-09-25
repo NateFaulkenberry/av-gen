@@ -77,6 +77,11 @@ void DirectorPanel::refresh(app::Engine& engine, const std::shared_ptr<AgentTask
     if (id == cachedTask_ && state == cachedState_) {
         return;
     }
+    // While its own preview is installed, the proposal is shown as it was proposed. Re-compiling it
+    // against the project would compile it against itself: "revision 2", every line a replacement.
+    if (!previewTask_.empty() && id == previewTask_ && id == cachedTask_ && compiled_) {
+        return;
+    }
     cachedTask_ = id;
     cachedState_ = state;
     compiled_.reset();
@@ -92,6 +97,15 @@ void DirectorPanel::refresh(app::Engine& engine, const std::shared_ptr<AgentTask
     }
     // The same dry run the approval re-checks: against the project as it is now.
     compiled_ = directing::compilePlan(*parsed.plan, app::sceneFactsFor(engine));
+}
+
+std::uint64_t DirectorPanel::baseState() const {
+    if (edits == nullptr) {
+        return 0;
+    }
+    const bool newestIsPreview =
+        !previewTask_.empty() && edits->history().canUndo() && edits->history().stateId() == previewState_;
+    return newestIsPreview ? previewBase_ : edits->history().stateId();
 }
 
 bool DirectorPanel::endPreview(app::Engine& engine) {
@@ -148,6 +162,82 @@ void DirectorPanel::draw(app::Engine& engine) {
         ImGui::EndTable();
     }
 
+    // The decision first, under the request it answers: a long plan must not push the buttons out of
+    // the window, where neither a person nor the UI script can reach them.
+    // ---- the decision ----------------------------------------------------------------------------
+    if (!previewTask_.empty() && task && previewTask_ != task->id()) {
+        (void)endPreview(engine); // the proposal it previewed is gone
+    }
+    PanelState ps;
+    ps.proposal = proposal.has_value() && compiled_.has_value();
+    ps.awaiting = awaiting;
+    ps.changesAnything = compiled_ && compiled_->changesAnything();
+    ps.previewing = !previewTask_.empty();
+    ps.previewIsNewest = ps.previewing && edits != nullptr && edits->history().canUndo() &&
+                         edits->history().stateId() == previewState_;
+    const PanelActions actions = panelActions(ps);
+    ImGui::Separator();
+    const auto button = [](const char* label, const Button& b, Rect& where) {
+        ImGui::BeginDisabled(!b.enabled);
+        const bool pressed = ImGui::Button(label);
+        ImGui::EndDisabled();
+        const ImVec2 lo = ImGui::GetItemRectMin();
+        const ImVec2 hi = ImGui::GetItemRectMax();
+        where = Rect{lo.x, lo.y, hi.x - lo.x, hi.y - lo.y, ImGui::IsItemVisible()};
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !b.why.empty()) {
+            ImGui::SetTooltip("%s", b.why.c_str());
+        }
+        return pressed;
+    };
+    if (ps.previewing) {
+        if (button("End preview", actions.endPreview, buttons_.preview)) {
+            status_ = endPreview(engine) ? "preview ended; nothing is changed" : status_;
+        }
+    } else if (button("Preview", actions.preview, buttons_.preview) && edits != nullptr && compiled_) {
+        const std::uint64_t before = edits->history().stateId();
+        if (app::applyCompilation(engine, edits->history(), *compiled_)) {
+            previewBase_ = before;
+            previewTask_ = task->id();
+            previewState_ = edits->history().stateId();
+            if (onRequestStills && stills.task != task->id()) {
+                onRequestStills(task->id(), *compiled_); // a preview made is a moment to see the shots
+            }
+            status_ = "previewing: play the timeline to watch it; End preview, Accept or Reject ends it";
+        } else {
+            status_ = "the preview could not be installed";
+        }
+    }
+    ImGui::SameLine();
+    if (button("Accept", actions.accept, buttons_.accept)) {
+        if (actions.revertPreviewFirst) {
+            (void)endPreview(engine);
+        }
+        status_ = plane->approveCurrentTask() ? "applied as one undo" : "could not apply";
+    }
+    ImGui::SameLine();
+    if (button("Reject", actions.reject, buttons_.reject)) {
+        if (actions.revertPreviewFirst) {
+            (void)endPreview(engine);
+        }
+        (void)plane->rejectCurrentTask();
+        status_ = "rejected; nothing was changed";
+    }
+    ImGui::SameLine();
+    Button stillsButton;
+    stillsButton.enabled = compiled_.has_value() && compiled_->changesAnything() && static_cast<bool>(onRequestStills);
+    stillsButton.why = "renders one small frame per proposed shot, at its middle, from a scratch copy";
+    if (button("Stills", stillsButton, buttons_.stills) && compiled_) {
+        onRequestStills(task->id(), *compiled_);
+    }
+    if (!stills.note.empty() && task && stills.task == task->id()) {
+        ImGui::TextDisabled("%s", stills.note.c_str());
+    }
+    if (!status_.empty()) {
+        ImGui::TextDisabled("%s", status_.c_str());
+    } else if (awaiting) {
+        ImGui::TextDisabled("nothing is changed until you accept");
+    }
+
     // ---- the plan --------------------------------------------------------------------------------
     if (!compileError_.empty()) {
         ImGui::TextColored(kBlocked, "%s", compileError_.c_str());
@@ -162,6 +252,16 @@ void DirectorPanel::draw(app::Engine& engine) {
             markIcon(row.mark);
             ImGui::TextWrapped("%s %s%s%s", row.kind.c_str(), row.key.c_str(), row.label.empty() ? "" : "  -  ",
                                row.label.c_str());
+            if (stills.texture != 0 && task && stills.task == task->id()) {
+                if (const auto s = stills.byItem.find(row.key); s != stills.byItem.end()) {
+                    ImGui::Indent(ImGui::GetTextLineHeight() + 6.0f);
+                    ImGui::Image(static_cast<ImTextureID>(stills.texture), ImVec2(stills.width, stills.height),
+                                 ImVec2(s->second.u0, s->second.v0), ImVec2(s->second.u1, s->second.v1));
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("at %s", clockText(s->second.seconds).c_str());
+                    ImGui::Unindent(ImGui::GetTextLineHeight() + 6.0f);
+                }
+            }
             ImGui::Indent(ImGui::GetTextLineHeight() + 6.0f);
             for (const std::string& line : row.lines) {
                 ImGui::PushStyleColor(ImGuiCol_Text, row.mark == ItemMark::Blocked ? kBlocked : kWarn);
@@ -188,63 +288,6 @@ void DirectorPanel::draw(app::Engine& engine) {
     } else if (task && !proposal) {
         ImGui::Spacing();
         ImGui::TextDisabled("This request proposed no plan.");
-    }
-
-    // ---- the decision ----------------------------------------------------------------------------
-    if (!previewTask_.empty() && task && previewTask_ != task->id()) {
-        (void)endPreview(engine); // the proposal it previewed is gone
-    }
-    PanelState ps;
-    ps.proposal = proposal.has_value() && compiled_.has_value();
-    ps.awaiting = awaiting;
-    ps.changesAnything = compiled_ && compiled_->changesAnything();
-    ps.previewing = !previewTask_.empty();
-    ps.previewIsNewest = ps.previewing && edits != nullptr && edits->history().canUndo() &&
-                         edits->history().stateId() == previewState_;
-    const PanelActions actions = panelActions(ps);
-    ImGui::Spacing();
-    ImGui::Separator();
-    const auto button = [](const char* label, const Button& b) {
-        ImGui::BeginDisabled(!b.enabled);
-        const bool pressed = ImGui::Button(label);
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !b.why.empty()) {
-            ImGui::SetTooltip("%s", b.why.c_str());
-        }
-        return pressed;
-    };
-    if (ps.previewing) {
-        if (button("End preview", actions.endPreview)) {
-            status_ = endPreview(engine) ? "preview ended; nothing is changed" : status_;
-        }
-    } else if (button("Preview", actions.preview) && edits != nullptr && compiled_) {
-        if (app::applyCompilation(engine, edits->history(), *compiled_)) {
-            previewTask_ = task->id();
-            previewState_ = edits->history().stateId();
-            status_ = "previewing: play the timeline to watch it; End preview, Accept or Reject ends it";
-        } else {
-            status_ = "the preview could not be installed";
-        }
-    }
-    ImGui::SameLine();
-    if (button("Accept", actions.accept)) {
-        if (actions.revertPreviewFirst) {
-            (void)endPreview(engine);
-        }
-        status_ = plane->approveCurrentTask() ? "applied as one undo" : "could not apply";
-    }
-    ImGui::SameLine();
-    if (button("Reject", actions.reject)) {
-        if (actions.revertPreviewFirst) {
-            (void)endPreview(engine);
-        }
-        (void)plane->rejectCurrentTask();
-        status_ = "rejected; nothing was changed";
-    }
-    if (!status_.empty()) {
-        ImGui::TextDisabled("%s", status_.c_str());
-    } else if (awaiting) {
-        ImGui::TextDisabled("nothing is changed until you accept");
     }
 
     // ---- what the project already carries --------------------------------------------------------

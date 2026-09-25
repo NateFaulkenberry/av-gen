@@ -285,4 +285,41 @@ CompiledPerformance compilePerformance(const Plan& plan, std::size_t index, cons
     return out;
 }
 
+const GoalVerb* goalVerb(std::string_view action) {
+    for (const GoalVerb& v : kGoalVerbs) {
+        if (v.action == action) {
+            return &v;
+        }
+    }
+    return nullptr;
+}
+
+std::string goalEventName(std::string_view moment) {
+    return "goal." + std::string(moment.empty() ? std::string_view("arrived") : moment);
+}
+
+std::optional<double> goalBeatTime(const Plan& plan, std::size_t performance, std::size_t beat, const PlanTimes& times) {
+    const PerformanceBeat& b = plan.performances[performance].beats[beat];
+    if (b.at) {
+        return times.at(fmt::format("/performances/{}/beats/{}/at", performance, beat));
+    }
+    return beat == 0 ? performanceStart(plan, performance, times) : std::nullopt;
+}
+
+std::optional<seq::Actor> recordedActor(const PerformanceRecording& recording) {
+    nlohmann::json doc = seq::Sequence{}.toJson();
+    doc["actors"] = nlohmann::json::array({recording.actor});
+    auto parsed = seq::Sequence::fromJson(doc);
+    if (!parsed || parsed->actors.size() != 1) {
+        return std::nullopt;
+    }
+    return parsed->actors.front();
+}
+
+nlohmann::json actorDocument(const seq::Actor& actor) {
+    seq::Sequence s;
+    s.actors = {actor};
+    return s.toJson().at("actors").at(0);
+}
+
 } // namespace avgen::directing

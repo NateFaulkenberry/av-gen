@@ -42,6 +42,80 @@ struct Collector {
     }
 };
 
+// ADR-763: a goal performance. Everything a goal can be checked for before it runs -- the rest is
+// the character's, which is the point of a goal.
+template <typename KindOf, typename IdOf>
+void validateGoalPerformance(Collector& c, const Plan& plan, std::size_t i, const CharacterCard& card,
+                             const SceneFacts& facts, const PlanTimes& times, const KindOf& kindOf, const IdOf& idOf) {
+    const PlanPerformance& p = plan.performances[i];
+    const std::string at = fmt::format("/performances/{}", i);
+    if (!card.goalSlot) {
+        Issue& issue = c.error(IssueCode::CapabilityUnavailable, p.key, at + "/subject",
+                               fmt::format("{}'s decider has no goal considerer, so a goal given to it would do "
+                                           "nothing",
+                                           card.subject));
+        issue.subject = card.subject;
+        issue.suggestions = {fmt::format("add a goal considerer (an empty slot) to {}'s decide behaviour", card.subject),
+                             "use a scripted performance"};
+    }
+    if (p.beats.empty()) {
+        c.error(IssueCode::SchemaInvalid, p.key, at + "/beats", "a goal performance needs at least one goal");
+    }
+    for (std::size_t b = 0; b < p.beats.size(); ++b) {
+        const PerformanceBeat& beat = p.beats[b];
+        const std::string where = fmt::format("{}/beats/{}", at, b);
+        if (goalVerb(beat.action) == nullptr) {
+            std::vector<std::string> verbs;
+            for (const GoalVerb& v : kGoalVerbs) {
+                verbs.emplace_back(v.action);
+            }
+            Issue& issue = c.error(IssueCode::Unsupported, p.key, where + "/action",
+                                   fmt::format("'{}' is not a goal; a goal performance compiles {}", beat.action,
+                                               fmt::join(verbs, ", ")));
+            issue.suggestions = text::nearest(beat.action, verbs);
+            continue;
+        }
+        if (beat.target.empty()) {
+            c.error(IssueCode::SchemaInvalid, p.key, where + "/target", fmt::format("'{}' needs a target", beat.action));
+        } else if (idOf(beat.target) == card.subject) {
+            c.error(IssueCode::SchemaInvalid, p.key, where + "/target", "a character's goal cannot be itself");
+        } else if (const SubjectKind k = kindOf(beat.target);
+                   k != SubjectKind::Unresolved && k != SubjectKind::Entity && facts.place(idOf(beat.target)) == nullptr) {
+            c.error(IssueCode::SpatialInfeasible, p.key, where + "/target",
+                    fmt::format("'{}' is not a place or a character a goal can lead to", idOf(beat.target)));
+        } else if (const Place* place = facts.place(idOf(beat.target)); place != nullptr && facts.walkable) {
+            // Asked the way the goal's walk will ask it: from the character's authored mark to a
+            // point beside the place. A warning, not a refusal -- where the character is when the
+            // goal is given is live -- but "no route" is what makes a goal do nothing at all.
+            if (const CharacterMark* mark = facts.character(card.subject); mark != nullptr) {
+                const glm::vec2 from(mark->anchor.x, mark->anchor.z);
+                const glm::vec2 to(place->position.x, place->position.z);
+                const glm::vec2 d = glm::length(to - from) > 1e-3f ? glm::normalize(to - from) : glm::vec2(0.0f, 1.0f);
+                if (facts.walkable(from, to - (d * (place->radius + 2.0f))) == std::optional<bool>(false)) {
+                    Issue& issue = c.warning(IssueCode::SpatialInfeasible, p.key, where + "/target",
+                                             fmt::format("there is no walking route from {}'s mark to '{}': the goal "
+                                                         "may never be reached",
+                                                         card.subject, place->id));
+                    issue.suggestions = {"choose a place on the same ground as the character", "use a scripted performance"};
+                }
+            }
+        }
+        if (!beat.moment.empty() &&
+            std::find(std::begin(kGoalMoments), std::end(kGoalMoments), beat.moment) == std::end(kGoalMoments)) {
+            c.error(IssueCode::SchemaInvalid, p.key, where + "/moment",
+                    fmt::format("a goal's 'moment' is 'arrived' or 'done', not '{}'", beat.moment));
+        }
+        if (!goalBeatTime(plan, i, b, times)) {
+            Issue& issue = c.error(IssueCode::SchemaInvalid, p.key, where + "/at",
+                                   b == 0 ? "a goal performance needs a start: give its first goal a time, or a shot of "
+                                            "the same subject"
+                                          : "each goal after the first needs its own time: when the last one ends is "
+                                            "the character's to decide, not a plan-time fact");
+            issue.suggestions = {"\"at\" on the goal"};
+        }
+    }
+}
+
 // "/shots/2/start" -> the key of shots[2]. How a time or subject issue finds the item it blocks.
 std::string itemAt(const Plan& plan, std::string_view location) {
     const auto index = [&](std::string_view prefix) -> std::optional<std::size_t> {
@@ -489,7 +563,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
     for (std::size_t i = 0; i < plan.performances.size(); ++i) {
         const PlanPerformance& p = plan.performances[i];
         const std::string at = fmt::format("/performances/{}", i);
-        if (plan.tier == Tier::Baked && p.mode != PerformanceMode::Scripted) {
+        if (plan.tier == Tier::Baked && p.mode != PerformanceMode::Scripted && !p.recording) {
             Issue& issue = c.error(IssueCode::NonDeterministic, p.key, at + "/mode",
                                    fmt::format("a {} performance is live: it would not render the same way twice, and "
                                                "this plan is baked",
@@ -518,6 +592,30 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         const CharacterCard* card = facts.capabilities.character(idOf(p.subject));
         if (card == nullptr) {
             continue; // unresolved: already reported and blocked
+        }
+        if (p.recording) {
+            // ADR-763: a recorded performance compiles verbatim from its recording (a scripted actor),
+            // whatever mode it was recorded from. Its only check: it is for this character.
+            const auto actor = recordedActor(*p.recording);
+            if (!actor) {
+                c.error(IssueCode::SchemaInvalid, p.key, at + "/recording", "the recording's actor does not parse");
+            } else if (actor->id != card->subject) {
+                c.error(IssueCode::SchemaInvalid, p.key, at + "/recording",
+                        fmt::format("the recording is of '{}', not '{}'", actor->id, card->subject));
+            }
+            continue;
+        }
+        if (p.mode == PerformanceMode::Goal) {
+            validateGoalPerformance(c, plan, i, *card, facts, v.times, kindOf, idOf);
+            for (std::size_t o = 0; o < i; ++o) {
+                if (plan.performances[o].subject == p.subject) {
+                    c.error(IssueCode::TimingConflict, p.key, at,
+                            fmt::format("performance '{}' already directs {}; a goal and another performance would "
+                                        "fight for the body, and the performer would win silently",
+                                        plan.performances[o].key, card->subject));
+                }
+            }
+            continue;
         }
         std::vector<std::size_t> clearedStatically; // jump beats already refused on height alone
         for (std::size_t b = 0; b < p.beats.size(); ++b) {
@@ -802,12 +900,20 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 }
                 issue.suggestions = text::nearest(cue.on, events);
             } else {
-                if (source->mode != PerformanceMode::Scripted) {
+                if (source->mode != PerformanceMode::Scripted && !source->recording) {
                     c.add(plan.tier == Tier::Baked ? Severity::Error : Severity::Warning, IssueCode::NonDeterministic,
                           cue.key, at + "/on",
                           fmt::format("'{}' comes from a {} performance, so its time is only known live; a rendered "
                                       "effect on it would not reproduce",
                                       cue.on, performanceModeName(source->mode)));
+                    // ADR-763: a change on a live event has nothing to apply it -- the engine bakes a
+                    // parameter cue into keys at a known time, and a live trigger has none. Recording
+                    // the performance gives it one.
+                    Issue& issue = c.error(IssueCode::Unsupported, cue.key, at + "/on",
+                                           fmt::format("a cue on the live event '{}' takes effect only once the "
+                                                       "performance is recorded",
+                                                       cue.on));
+                    issue.suggestions = {"record the performance: its events then have times, and the cue bakes on them"};
                 }
                 if (v.isBlocked(source->key)) {
                     Issue& issue = c.error(IssueCode::Blocked, cue.key, at + "/on",
@@ -871,6 +977,14 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             continue;
         }
         const std::size_t index = static_cast<std::size_t>(p - plan.performances.data());
+        if (p->mode == PerformanceMode::Goal && !p->recording) {
+            Issue& issue = c.error(IssueCode::Unsupported, r.key, at + "/performance",
+                                   fmt::format("slowing '{}' needs its motion to be known, and a goal's is live until "
+                                               "it is recorded",
+                                               p->key));
+            issue.suggestions = {"record the performance first"};
+            continue;
+        }
         if (performanceStart(plan, index, v.times)) {
             const CompiledPerformance probe = compilePerformance(plan, index, facts, v.times);
             if (*until <= probe.from || *from >= probe.to) {
