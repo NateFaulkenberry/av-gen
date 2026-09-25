@@ -199,6 +199,75 @@ TEST_CASE("the march's bound contains the field it clips", "[fog][bound]") {
     }
 }
 
+// ---- ADR-713: the flow grows the support, and the bound must grow with it -------------------------
+//
+// Turbulence displaces the whole field by up to `amount` of each semi-axis, and swell scales the
+// horizontal extent (and the sphere's vertical) by up to `1 + amount`. Both are claims the bound
+// has to carry, and both are functions of t, so the containment is checked at several instants --
+// including the swell's peak, where the field is widest.
+//
+// **How it fails.** Drop `turbulence * max(semi.x, semi.z)` from `radiusXZ` in both twins and the
+// strongly turbulent cases report dense samples outside the claimed radius; drop the sphere's
+// `* breath` from `half` and the swelling sphere fails at its peak.
+TEST_CASE("the march's bound contains a turbulent and swelling field", "[fog][bound][flow]") {
+    // Each case twice: swelling alone, and swelling under strong turbulence -- because the
+    // turbulence's margin is wide enough to hide a bound that forgot the swell (found that way:
+    // the sphere's vertical swell passed the combined case with the swell removed from the bound).
+    for (const Case& c : kCases) for (const float turbulence : {0.0f, 0.9f}) {
+        INFO("case: " << c.name << ", turbulence " << turbulence);
+        world::EffectInstance e = bankFor(c);
+        setRow(e, "turbulence", turbulence); // 0.9 is near the top of the row's range
+        setRow(e, "turbulenceScale", 1.2f);
+        setRow(e, "turbulenceSpeed", 0.5f);
+        setRow(e, "swell", 0.3f);
+        setRow(e, "swellSpeed", 0.5f);
+        setRow(e, "swirl", 0.04f);
+        const world::MediumSlot slot = slotOf(e);
+        const world::MediumBound bound = world::mediumBound(slot);
+        const glm::vec3 centre = e.vortex.field.center;
+        const float radius = e.vortex.field.radius;
+        const float thickness = e.vortex.field.thickness;
+        const float spanXZ = radius * std::max(c.bankLength, 1.0f) * 3.2f + 400.0f;
+        const float vertical =
+            (c.shape == 0) ? thickness * std::clamp(4.6f / c.heightFalloff, 3.0f, 40.0f) * 1.6f + 200.0f
+                           : std::max(radius, thickness) * 3.0f;
+        const float yLo = centre.y - thickness * 4.0f - radius * 1.5f - 200.0f;
+        const float yHi = centre.y + vertical + 200.0f;
+        constexpr int kN = 30;
+        float worstOutside = 0.0f;
+        int dense = 0;
+        const float peak = 3.14159265f * 0.5f / 0.5f; // swell at its widest
+        for (const float t : {0.0f, peak, 11.0f}) {
+            for (int ix = 0; ix <= kN; ++ix) {
+                for (int iy = 0; iy <= kN; ++iy) {
+                    for (int iz = 0; iz <= kN; ++iz) {
+                        const glm::vec3 p(centre.x - spanXZ + 2.0f * spanXZ * float(ix) / float(kN),
+                                          yLo + (yHi - yLo) * float(iy) / float(kN),
+                                          centre.z - spanXZ + 2.0f * spanXZ * float(iz) / float(kN));
+                        const float d = world::fogShapeAt(slot, p, t);
+                        if (d <= 0.0f) {
+                            continue;
+                        }
+                        ++dense;
+                        const float r = std::hypot(p.x - centre.x, p.z - centre.z);
+                        if (r > bound.radiusXZ || p.y < bound.yBot || p.y > bound.yTop) {
+                            worstOutside = std::max(worstOutside, d);
+                        }
+                    }
+                }
+            }
+        }
+        INFO("densest sample outside the bound " << worstOutside << "; bound r=" << bound.radiusXZ
+             << " y=[" << bound.yBot << ", " << bound.yTop << "]");
+        CHECK(dense > 50); // the control: the grid found the medium (94 for the sphere, the least)
+        if (c.shape == 0) {
+            CHECK(worstOutside <= 0.012f);
+        } else {
+            CHECK(worstOutside == 0.0f);
+        }
+    }
+}
+
 // ---- the tornado arm (ADR-580, ADR-706) ----------------------------------------------------------
 //
 // ADR-566's transliteration carried the tornado's arm, and nothing sampled it: this file's cases are

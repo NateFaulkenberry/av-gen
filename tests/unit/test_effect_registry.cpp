@@ -457,8 +457,10 @@ TEST_CASE("the two new kinds cost nothing to the scenes that do not use them",
             }
         }
     }
-    // Counted from the code (`grep -c 'storedFloat("\\|storedChoice("'`): 15 fog + 6 shower.
-    REQUIRE(foreign.size() == 21);
+    // Counted from the code (`grep -c '    storedFloat("\\|storedChoice("\\|storedColor("'`):
+    // 23 fog + 6 shower. ADR-713/714 added eight to the fog: turbulence, its scale and rate, and the
+    // height and distance colours with their amounts and the distance range.
+    REQUIRE(foreign.size() == 29);
     const auto head = [](std::string_view path) {
         return std::string(path.substr(0, path.find('/')));
     };

@@ -89,6 +89,47 @@ glm::vec3 curlNoise(const glm::vec3& p, std::uint32_t seed, float epsilon) {
            inv;
 }
 
+glm::vec4 valueNoiseGrad(const glm::vec3& p, std::uint32_t seed) {
+    const glm::vec3 c(std::floor(p.x), std::floor(p.y), std::floor(p.z));
+    const glm::vec3 f = p - c;
+    const glm::vec3 u = f * f * (3.0f - 2.0f * f);
+    const glm::vec3 du = 6.0f * f * (1.0f - f);
+    const auto ix = static_cast<std::int32_t>(c.x);
+    const auto iy = static_cast<std::int32_t>(c.y);
+    const auto iz = static_cast<std::int32_t>(c.z);
+    const float n000 = hash01(ix, iy, iz, seed);
+    const float n100 = hash01(ix + 1, iy, iz, seed);
+    const float n010 = hash01(ix, iy + 1, iz, seed);
+    const float n110 = hash01(ix + 1, iy + 1, iz, seed);
+    const float n001 = hash01(ix, iy, iz + 1, seed);
+    const float n101 = hash01(ix + 1, iy, iz + 1, seed);
+    const float n011 = hash01(ix, iy + 1, iz + 1, seed);
+    const float n111 = hash01(ix + 1, iy + 1, iz + 1, seed);
+    const float k1 = n100 - n000;
+    const float k2 = n010 - n000;
+    const float k3 = n001 - n000;
+    const float k4 = n000 - n100 - n010 + n110;
+    const float k5 = n000 - n010 - n001 + n011;
+    const float k6 = n000 - n100 - n001 + n101;
+    const float k7 = -n000 + n100 + n010 - n110 + n001 - n101 - n011 + n111;
+    const float value = n000 + k1 * u.x + k2 * u.y + k3 * u.z + k4 * u.x * u.y + k5 * u.y * u.z +
+                        k6 * u.z * u.x + k7 * u.x * u.y * u.z;
+    const glm::vec3 grad = du * glm::vec3(k1 + k4 * u.y + k6 * u.z + k7 * u.y * u.z,
+                                          k2 + k5 * u.z + k4 * u.x + k7 * u.z * u.x,
+                                          k3 + k6 * u.x + k5 * u.y + k7 * u.x * u.y);
+    return glm::vec4(grad, value);
+}
+
+glm::vec3 flowCurl(const glm::vec3& p, float t, std::uint32_t seed) {
+    const glm::vec3 da = glm::vec3(0.31f, 0.17f, -0.23f) * t;
+    const glm::vec3 db = glm::vec3(-0.19f, 0.27f, 0.13f) * t;
+    const glm::vec3 ga = glm::vec3(valueNoiseGrad(p + da, seed)) +
+                         0.5f * glm::vec3(valueNoiseGrad(p * 2.03f + glm::vec3(17.0f) - da, seed));
+    const glm::vec3 gb = glm::vec3(valueNoiseGrad(p + glm::vec3(31.7f) + db, seed + 1u)) +
+                         0.5f * glm::vec3(valueNoiseGrad(p * 2.03f + glm::vec3(47.3f) - db, seed + 1u));
+    return glm::cross(ga, gb);
+}
+
 float voronoiF1(const glm::vec3& p, std::uint32_t seed) {
     const glm::vec3 c(std::floor(p.x), std::floor(p.y), std::floor(p.z));
     const glm::vec3 f = p - c;

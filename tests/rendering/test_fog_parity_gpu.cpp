@@ -55,18 +55,18 @@ std::unique_ptr<gpu::Context> makeContext() {
     return std::move(*ctx);
 }
 
-// The kernel reads the same four lanes `mediumFogUniforms` hands the field in the march, in the
-// same order, so this cannot pass by assembling them differently from the renderer.
+// The kernel reads the same lanes `mediumFogUniforms` hands the field in the march, in the same
+// order, so this cannot pass by assembling them differently from the renderer.
+//
+// ADR-713/714: the harness now takes the WHOLE slot and assembles the struct exactly as
+// `mediumFogUniforms` does. It used to take the seven lanes by name, which was right until the
+// struct grew -- and a harness that hands the field a lane list of its own is a second copy of the
+// assembly that can drift from the first.
 constexpr const char* kKernel = R"(
 struct Args {
-    f0: vec4<f32>,
-    f1: vec4<f32>,
-    f2: vec4<f32>,
-    f3: vec4<f32>,
-    f4: vec4<f32>,
-    f5: vec4<f32>,
-    f6: vec4<f32>,
-    time: vec4<f32>,
+    lanes: array<vec4<f32>, 16>,
+    time: vec4<f32>,   // x = t, yzw = the camera position the distance colour measures from
+    base: vec4<f32>,   // rgb = the depth colour the tint is applied to
 };
 @group(0) @binding(0) var<uniform> args: Args;
 @group(0) @binding(1) var<storage, read> samples: array<vec4<f32>>;
@@ -76,7 +76,9 @@ struct Args {
 fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
     if (i >= arrayLength(&samples)) { return; }
-    let f = FogUniformsWgsl(args.f0, args.f1, args.f2, args.f3, args.f4, args.f5, args.f6);
+    let l = args.lanes;
+    let f = FogUniformsWgsl(l[0], l[13], l[14], l[7], l[12], l[2], l[6], l[1], l[3], l[5], l[8], l[9],
+                            l[10], l[11]);
     let p = samples[i].xyz;
     let t = args.time.x;
     let rel = p - f.f0.xyz;
@@ -86,9 +88,16 @@ fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     // ADR-575: TWO vec4s per sample now. The emission's height influence is a term the march
     // evaluates on the GPU, and a parity harness that does not read it is a pair with a gap --
     // which was found by breaking the shader and watching this test pass.
-    results[i * 2u] = vec4<f32>(fogShapeAt(f, p, t), fogPrimitiveDistance(f, rel),
+    results[i * 4u] = vec4<f32>(fogShapeAt(f, p, t), fogPrimitiveDistance(f, rel),
                                 fogVerticalProfile(f, rel.y), fogMacroDetail(f, p, t));
-    results[i * 2u + 1u] = vec4<f32>(fogEmissionHeight(f, rel.y), 0.0, 0.0, 0.0);
+    // ADR-713/714: FOUR vec4s per sample. ADR-575's lesson, applied before rather than after: every
+    // term the march evaluates is a quantity this harness reads, or the pair has a gap.
+    let camDist = distance(p, args.time.yzw);
+    results[i * 4u + 1u] = vec4<f32>(fogEmissionHeight(f, rel.y), fogSwell(f, t),
+                                     fogHeightColourWeight(f, rel.y), fogDistanceColourWeight(f, camDist));
+    results[i * 4u + 2u] = vec4<f32>(fogTurbulence(f, p, t), 0.0);
+    results[i * 4u + 3u] = vec4<f32>(fogTintedColour(f, args.base.rgb, rel.y, camDist),
+                                     fogStructureFrame(f, p, t).x);
 }
 )";
 
@@ -98,7 +107,19 @@ struct Gpu {
     float vertical = 0.0f;
     float detail = 0.0f;
     float emissionHeight = 0.0f; // ADR-575 (§26)
+    // ADR-713 (§16)
+    float swell = 0.0f;
+    glm::vec3 turbulence{0.0f};
+    float structureX = 0.0f;
+    // ADR-714 (§25)
+    float heightWeight = 0.0f;
+    float distanceWeight = 0.0f;
+    glm::vec3 tinted{0.0f};
 };
+
+// The camera the distance colour is measured from, and the base colour the tint is applied to.
+const glm::vec3 kCamera(-900.0f, 60.0f, 350.0f);
+const glm::vec3 kBase(0.09f, 0.21f, 0.17f);
 
 class Harness {
 public:
@@ -144,9 +165,15 @@ public:
         // The four lanes the march hands the field, by value, so this harness has no list to fall
         // behind — the same property the vortex harness gets from passing its uniform block whole.
         struct Args {
-            glm::vec4 f0, f1, f2, f3, f4, f5, f6, time;
-        } args{m.lane[0],  m.lane[13], m.lane[14], m.lane[7], m.lane[12], m.lane[2], m.lane[6],
-               glm::vec4(time, 0.0f, 0.0f, 0.0f)};
+            glm::vec4 lanes[16];
+            glm::vec4 time;
+            glm::vec4 base;
+        } args{};
+        for (int l = 0; l < 16; ++l) {
+            args.lanes[l] = m.lane[l];
+        }
+        args.time = glm::vec4(time, kCamera);
+        args.base = glm::vec4(kBase, 0.0f);
         wgpu::BufferDescriptor adesc{};
         adesc.size = sizeof(Args);
         adesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
@@ -165,7 +192,7 @@ public:
         ctx_.queue().WriteBuffer(samples, 0, padded.data(), sdesc.size);
 
         wgpu::BufferDescriptor rdesc{};
-        rdesc.size = padded.size() * sizeof(glm::vec4) * 2; // ADR-575: two vec4s per sample
+        rdesc.size = padded.size() * sizeof(glm::vec4) * 4; // ADR-713/714: four vec4s per sample
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer results = device.CreateBuffer(&rdesc);
 
@@ -195,12 +222,24 @@ public:
         ctx_.queue().Submit(1, &commands);
         auto bytes = gpu::readBuffer(ctx_, results, 0, rdesc.size);
         REQUIRE(bytes.has_value());
-        std::vector<glm::vec4> raw(padded.size() * 2);
+        std::vector<glm::vec4> raw(padded.size() * 4);
         std::memcpy(raw.data(), bytes->data(), rdesc.size);
         std::vector<Gpu> out(padded.size());
         for (std::size_t i = 0; i < padded.size(); ++i) {
-            out[i] = Gpu{raw[i * 2].x, raw[i * 2].y, raw[i * 2].z, raw[i * 2].w,
-                         raw[i * 2 + 1].x};
+            const glm::vec4* r = &raw[i * 4];
+            Gpu g;
+            g.shape = r[0].x;
+            g.distance = r[0].y;
+            g.vertical = r[0].z;
+            g.detail = r[0].w;
+            g.emissionHeight = r[1].x;
+            g.swell = r[1].y;
+            g.heightWeight = r[1].z;
+            g.distanceWeight = r[1].w;
+            g.turbulence = glm::vec3(r[2]);
+            g.tinted = glm::vec3(r[3]);
+            g.structureX = r[3].w;
+            out[i] = g;
         }
         return out;
     }
@@ -361,5 +400,72 @@ TEST_CASE("the fog shader agrees about all six primitives", "[gpu][fog][parity][
         // not a formality.
         INFO("samples inside this primitive: " << inside);
         CHECK(inside > 20);
+    }
+}
+
+TEST_CASE("the fog shader agrees about the flow and the colour", "[gpu][fog][parity][flow][colour]") {
+    // ADR-713 (§16) and ADR-714 (§25). Every new term is compared as its OWN quantity -- the swell,
+    // the turbulence displacement, the swirl's rest frame, both colour weights and the tinted colour
+    // -- and through the whole field, on three primitives: the Bank (horizontal-only swell), the
+    // Sphere (swells in every direction, isotropic semi-axes) and the Capsule (the one whose
+    // turbulence reach is not 1). A parity case that compared only `fogShapeAt` could pass with a
+    // turbulence that both sides got equally wrong in a way the field happened to hide.
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    const std::vector<glm::vec3> pts = positions();
+    for (const int shape : {0, 1, 4}) {
+        INFO("shape index " << shape);
+        world::MediumSlot slot = shippedBank(0.6f, shape, 0.4f);
+        // Every flow and colour control off its default, directly in the lanes the packer fills,
+        // so this is a test of the pair rather than of the packer (the packer has its own).
+        slot.lane[1].z = 0.043f;                            // swirl, rad/s
+        slot.lane[3].x = 0.21f;                             // swell amount
+        slot.lane[3].y = 0.37f;                             // swell rate
+        slot.lane[7].y = 0.33f;                             // turbulence amount
+        slot.lane[7].w = 2.2f;                              // turbulence scale
+        slot.lane[6].w = 0.6f;                              // turbulence rate
+        slot.lane[5].w = 0.8f;                              // height colour amount
+        slot.lane[9].w = 0.9f;                              // height colour r
+        slot.lane[10].w = 0.3f;                             //               g
+        slot.lane[11].w = 0.1f;                             //               b
+        slot.lane[8] = glm::vec4(0.1f, 0.2f, 0.7f, 0.65f); // distance colour + amount
+        slot.lane[2].w = 750.0f;                            // distance colour range
+        int inside = 0;
+        int displaced = 0;
+        int tinted = 0;
+        for (const float t : {0.0f, 7.5f, 53.0f}) {
+            const std::vector<Gpu> gpu = harness.run(slot, t, pts);
+            REQUIRE(gpu.size() == pts.size());
+            for (std::size_t i = 0; i < pts.size(); ++i) {
+                const glm::vec3 rel = pts[i] - glm::vec3(slot.lane[0]);
+                const float camDist = glm::distance(pts[i], kCamera);
+                INFO("t=" << t << " p=(" << pts[i].x << ", " << pts[i].y << ", " << pts[i].z << ")");
+                const float cpuShape = world::fogShapeAt(slot, pts[i], t);
+                CHECK(gpu[i].shape == Approx(cpuShape).margin(2e-3));
+                CHECK(gpu[i].swell == Approx(world::fogSwell(slot, t)).margin(1e-5));
+                CHECK(gpu[i].structureX == Approx(world::fogStructureFrame(slot, pts[i], t).x).margin(2e-2));
+                const glm::vec3 d = world::fogTurbulence(slot, pts[i], t);
+                // Metres, on semi-axes of hundreds of metres: 0.05 m is a relative 1e-4.
+                CHECK(gpu[i].turbulence.x == Approx(d.x).margin(0.05));
+                CHECK(gpu[i].turbulence.y == Approx(d.y).margin(0.05));
+                CHECK(gpu[i].turbulence.z == Approx(d.z).margin(0.05));
+                CHECK(gpu[i].heightWeight == Approx(world::fogHeightColourWeight(slot, rel.y)).margin(1e-4));
+                CHECK(gpu[i].distanceWeight ==
+                      Approx(world::fogDistanceColourWeight(slot, camDist)).margin(1e-4));
+                const glm::vec3 c = world::fogTintedColour(slot, kBase, rel.y, camDist);
+                CHECK(gpu[i].tinted.r == Approx(c.r).margin(1e-4));
+                CHECK(gpu[i].tinted.g == Approx(c.g).margin(1e-4));
+                CHECK(gpu[i].tinted.b == Approx(c.b).margin(1e-4));
+                inside += cpuShape > 1e-4f ? 1 : 0;
+                displaced += glm::length(d) > 1.0f ? 1 : 0;
+                tinted += glm::length(c - kBase) > 1e-3f ? 1 : 0;
+            }
+        }
+        // The controls: the samples reached the bank, the turbulence moved them by metres, and the
+        // tint changed the colour -- a parity over three zeroes is no parity at all (ADR-182).
+        INFO("inside " << inside << " displaced " << displaced << " tinted " << tinted);
+        CHECK(inside > 20);
+        CHECK(displaced > 100);
+        CHECK(tinted > 100);
     }
 }

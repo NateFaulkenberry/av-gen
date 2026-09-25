@@ -232,9 +232,14 @@ fn mediumKind(s: u32) -> u32 {
 // map, two readings of it, which is what keeps a fog bank a different authoring surface onto one
 // primitive rather than a second primitive (ADR-500's argument, still standing).
 fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
+    // ADR-713/714: and lanes 1, 3, 5, 8, 9, 10 and 11, in the order `shaders/fog.wgsl` names them
+    // f7..f13. Lane 4 is the one lane a fog slot leaves alone: the debug view reads its `.y` as a
+    // throat for every kind.
     return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u),
                            mediaLane(s, 7u), mediaLane(s, 12u), mediaLane(s, 2u),
-                           mediaLane(s, 6u));
+                           mediaLane(s, 6u), mediaLane(s, 1u), mediaLane(s, 3u),
+                           mediaLane(s, 5u), mediaLane(s, 8u), mediaLane(s, 9u),
+                           mediaLane(s, 10u), mediaLane(s, 11u));
 }
 
 // ADR-580's tornado: the first kind whose field is a DIFFERENT function rather than a different
@@ -331,6 +336,9 @@ fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
     if (mediumKind(s) == kMediumKindFog) {
         let f = mediumFogUniforms(s);
         height = fogEmissionHeight(f, p.y - f.f0.y);
+        // ADR-714 (§25): the height and distance colours, by the same per-kind arm and for the same
+        // reason. Luminance-preserving, so they move hue and never the brightness the density set.
+        c = fogTintedColour(f, c, p.y - f.f0.y, distance(p, frame.cameraPos.xyz));
     }
     return c * (shape * l3.z * height);
 }
@@ -411,7 +419,13 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
     if (shape == kFogShapeSphere) {
         reach = 1.0;
     }
-    let rr = radius * breath * reach * 1.35;
+    // ADR-713: the turbulence displaces a sample by at most `amount` of each semi-axis
+    // (`fogTurbulence` clamps the flow to length 1), so the support grows by exactly that --
+    // horizontally by the longer of the two horizontal semi-axes, vertically by the vertical one.
+    let turbulence = clamp(mediaLane(s, 7u).y, 0.0, 1.0);
+    let semi = fogSemiAxes(f);
+    let rr = radius * breath * reach * 1.35 + turbulence * max(semi.x, semi.z);
+    let grow = turbulence * semi.y;
 
     if (shape == kFogShapeBank) {
         // Solve `exp(-h * falloff) = 0.01`: 1% of the column left outside, which is below what a
@@ -422,16 +436,18 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
         let base = -thickness + 2.0 * thickness * bias;
         let hTop = clamp(4.6 / falloff, 3.0, 40.0);
         return vec3<f32>(rr,
-                         centre.y + base - depth - thickness * 1.5,
-                         centre.y + base + thickness * hTop);
+                         centre.y + base - depth - thickness * 1.5 - grow,
+                         centre.y + base + thickness * hTop + grow);
     }
     // A closed primitive ends where its own surface ends, and the height influence can only make
     // it thinner.
     var half = thickness;
     if (shape == kFogShapeSphere) {
-        half = radius;
+        // ADR-713: the sphere swells in every direction (`fogSwellOffset`), so its vertical reach
+        // carries the swell the horizontal always has.
+        half = radius * breath;
     }
-    return vec3<f32>(rr, centre.y - depth - half * 1.35, centre.y + half * 1.35);
+    return vec3<f32>(rr, centre.y - depth - half * 1.35 - grow, centre.y + half * 1.35 + grow);
 }
 
 // ADR-710: the bound's CAP -- (capRadiusXZ, capYBot) -- a wider cylinder from `capYBot` up to the

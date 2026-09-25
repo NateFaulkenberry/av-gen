@@ -138,7 +138,13 @@ MediumBound cylinderBound(const MediumSlot& m) {
     // it is the one whose bound must not carry it. Every other shape reaches `radius * along`
     // along the long axis and `radius` across it, hence the max with 1.
     const float reach = (shape == FogShape::Sphere) ? 1.0f : std::max(along, 1.0f);
-    b.radiusXZ = radius * breath * reach * 1.35f;
+    // ADR-713: the turbulence displaces a sample by at most `amount` of each semi-axis (the flow is
+    // clamped to length 1 in `fogTurbulence`), so the support grows by exactly that: horizontally by
+    // the longer horizontal semi-axis, vertically by the vertical one. Zero at amount 0.
+    const float turbulence = std::clamp(m.lane[7].y, 0.0f, 1.0f);
+    const glm::vec3 semi = fogSemiAxes(m);
+    const float grow = turbulence * semi.y;
+    b.radiusXZ = radius * breath * reach * 1.35f + turbulence * std::max(semi.x, semi.z);
 
     if (shape == FogShape::Bank) {
         // A bank has no vertical semi-axis: `rim` is horizontal and the VERTICAL PROFILE is the
@@ -157,18 +163,19 @@ MediumBound cylinderBound(const MediumSlot& m) {
         const float bias = std::clamp(m.lane[14].y, 0.0f, 1.0f);
         const float base = -thickness + 2.0f * thickness * bias;
         const float hTop = std::clamp(4.6f / falloff, 3.0f, 40.0f);
-        b.yTop = centre.y + base + thickness * hTop;
+        b.yTop = centre.y + base + thickness * hTop + grow;
         // Below the densest layer the profile is `exp(-(3h)^2)`, which is 1e-9 by h = -1.5.
-        b.yBot = centre.y + base - depth - thickness * 1.5f;
+        b.yBot = centre.y + base - depth - thickness * 1.5f - grow;
         return b;
     }
 
     // A closed primitive ends where its own surface ends, and the profile can only make it
     // thinner -- `mix(1, profile, influence)` is at most 1 and never widens the support. The
     // sphere is normalised by `radius`; the other four by `thickness`.
-    const float half = (shape == FogShape::Sphere) ? radius : thickness;
-    b.yTop = centre.y + half * 1.35f;
-    b.yBot = centre.y - depth - half * 1.35f;
+    // ADR-713: the sphere swells in every direction, so its vertical carries the swell too.
+    const float half = (shape == FogShape::Sphere) ? radius * breath : thickness;
+    b.yTop = centre.y + half * 1.35f + grow;
+    b.yBot = centre.y - depth - half * 1.35f - grow;
     return b;
 }
 

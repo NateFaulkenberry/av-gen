@@ -31,6 +31,16 @@ struct U3 {
 [[nodiscard]] glm::vec3 curlNoise(const glm::vec3& p, std::uint32_t seed, float epsilon = 0.01f);
 [[nodiscard]] float voronoiF1(const glm::vec3& p, std::uint32_t seed);
 
+// ADR-713: the CPU twins of `valueNoiseGrad` and `flowCurl` in `shaders/noise.wgsl`, which the
+// Effect Library added GPU-only. The fog's turbulence displaces its field by `flowCurl`, and a fog
+// field only the GPU can evaluate is a field nothing can test (ADR-565), so the pair is completed
+// here: same lattice, same expressions, same order.
+//   valueNoiseGrad : value noise with its analytic gradient, xyz = d/dp, w = the value
+//   flowCurl       : grad(a) x grad(b) of two decorrelated two-octave value noises -- divergence-free
+//                    by identity, animated by `t`
+[[nodiscard]] glm::vec4 valueNoiseGrad(const glm::vec3& p, std::uint32_t seed);
+[[nodiscard]] glm::vec3 flowCurl(const glm::vec3& p, float t, std::uint32_t seed);
+
 // A smooth signed field in [-1, 1] for "which region of the world is this", used where a setting
 // means "how far this swings across the map". Raw fbm3 bunches around 0.5, so feeding it straight
 // in delivers about a third of the swing the caller asked for; this stretches it about the

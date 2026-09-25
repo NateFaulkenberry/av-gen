@@ -655,6 +655,26 @@ inline constexpr int kFogShapeCount = 6;
 // 1 at the primitive's surface, less inside, and the field is zero past 1.35 for every shape.
 [[nodiscard]] float fogPrimitiveDistance(const MediumSlot& m, const glm::vec3& rel);
 
+// ADR-713 (§16): the flow controls. Each is a pure function of the transport second and the lanes,
+// and the identity at its default. `kFogTurbulenceGain` must equal the constant of the same name in
+// `shaders/fog.wgsl`; the parity test would see a disagreement as a displacement mismatch.
+inline constexpr float kFogTurbulenceGain = 1.3f;
+[[nodiscard]] glm::vec3 fogStructureFrame(const MediumSlot& m, const glm::vec3& p, float t); // swirl
+[[nodiscard]] float fogSwell(const MediumSlot& m, float t);
+[[nodiscard]] glm::vec3 fogSwellOffset(const MediumSlot& m, const glm::vec3& rel, float swell);
+[[nodiscard]] glm::vec3 fogSemiAxes(const MediumSlot& m);
+[[nodiscard]] glm::vec3 fogTurbulence(const MediumSlot& m, const glm::vec3& p, float t);
+[[nodiscard]] float fogTurbulenceReach(const MediumSlot& m);
+
+// ADR-714 (§25): height and distance colour. Luminance-preserving by construction: the tint moves
+// hue and saturation and leaves the luminance the density hierarchy set exactly where it was.
+[[nodiscard]] float fogLuminance(const glm::vec3& c);
+[[nodiscard]] glm::vec3 fogHueMix(const glm::vec3& base, const glm::vec3& tint, float w);
+[[nodiscard]] float fogHeightColourWeight(const MediumSlot& m, float relY);
+[[nodiscard]] float fogDistanceColourWeight(const MediumSlot& m, float cameraDistance);
+[[nodiscard]] glm::vec3 fogTintedColour(const MediumSlot& m, const glm::vec3& base, float relY,
+                                        float cameraDistance);
+
 // ADR-566: the claim `shaders/volume.wgsl` clips a ray to -- a vertical cylinder that must contain
 // every non-zero sample of this slot's field. `radiusXZ < 0` means the slot is off. See
 // `world/medium_bound.cpp` for why a bound is allowed to be generous and never allowed to be
