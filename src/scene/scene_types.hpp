@@ -624,6 +624,12 @@ struct Environment {
     // reader of the layer applies it (the march, the surface integral, the particle estimate), and
     // a scene with no terrain is unchanged at any value.
     float fogGroundFollow = 0.0f;
+    // ADR-717: the layer POOLS. Its top is measured from `mix(follow * ground, basin, fogPooling)`,
+    // where `basin` is the terrain low-passed over `world::kTerrainBasinSigma` metres -- above the
+    // floor in a valley, below the crest on a ridge -- so at 1 the layer's surface lies nearly flat
+    // across each basin and the fog is deep in valleys and thin over ridges. 0 is ADR-715's layer
+    // bit for bit; a scene with no terrain is unchanged at any value.
+    float fogPooling = 0.0f;
     // ADR-705, the brief's §7 Horizon Density: extra extinction that grows with distance from the
     // eye. The air at distance s is `1 + horizonDensity * s / 1000` times as dense as at the eye,
     // so 1 doubles it a kilometre out. Applied by the march to every sample of the environment

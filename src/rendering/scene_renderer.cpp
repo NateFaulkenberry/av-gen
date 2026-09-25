@@ -2151,7 +2151,10 @@ void SceneRenderer::uploadTerrainHeight(const scene::Scene& scene) {
     desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
     desc.dimension = wgpu::TextureDimension::e2D;
     desc.size = {field.width, field.depth, 1};
-    desc.format = wgpu::TextureFormat::R32Float;
+    // ADR-717: two channels -- r = the ground, g = the low-passed basin a pooling layer is measured
+    // from. A field without a basin (never baked, only hand-built) repeats the ground in g; its
+    // pooling lane is 0 (`TerrainGround::poolingLane`), so nothing reads that channel.
+    desc.format = wgpu::TextureFormat::RG32Float;
     gpu::GpuTexture uploaded;
     uploaded.texture = device.CreateTexture(&desc);
     uploaded.view = uploaded.texture.CreateView();
@@ -2161,11 +2164,16 @@ void SceneRenderer::uploadTerrainHeight(const scene::Scene& scene) {
     wgpu::TexelCopyTextureInfo destination{};
     destination.texture = uploaded.texture;
     wgpu::TexelCopyBufferLayout layout{};
-    layout.bytesPerRow = field.width * 4;
+    layout.bytesPerRow = field.width * 8;
     layout.rowsPerImage = field.depth;
     const wgpu::Extent3D size = {field.width, field.depth, 1};
-    context_.queue().WriteTexture(&destination, field.heights.data(), field.heights.size() * sizeof(float), &layout,
-                                  &size);
+    std::vector<float> texels(field.heights.size() * 2);
+    const bool pooled = field.pooled();
+    for (std::size_t k = 0; k < field.heights.size(); ++k) {
+        texels[k * 2] = field.heights[k];
+        texels[k * 2 + 1] = pooled ? field.basin[k] : field.heights[k];
+    }
+    context_.queue().WriteTexture(&destination, texels.data(), texels.size() * sizeof(float), &layout, &size);
     terrainHeight_ = std::move(uploaded);
     terrainHeightHash_ = field.hash;
     terrainHeightField_ = ground.field.get();
@@ -2868,6 +2876,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                std::clamp(scene.environment.horizonDensity, 0.0f, scene::kHorizonDensityMax));
     frame.terrainMap0 = scene.terrainGround.map0();
     frame.terrainMap1 = scene.terrainGround.map1();
+    // ADR-717: x is the pooling, 0 -- ADR-715's branch, its frame to the bit -- whenever there is no
+    // basin to pool in. The march reads this same lane.
+    frame.fogPool = glm::vec4(scene.terrainGround.poolingLane(scene.environment.fogPooling), 0.0f, 0.0f, 0.0f);
     // ADR-058: the styled hemisphere, authorable because a scene that is lit mostly by its ambient
     // needs to say how dark the side facing away from the sky is allowed to get.
     frame.styledSky = glm::vec4(scene.environment.styledSkyAmbient,
@@ -3545,6 +3556,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particleFrame.fogUpperDensity = scene.environment.fogUpperDensity;
             particleFrame.fogHeightCurve = scene.environment.fogHeightCurve;
             particleFrame.fogGroundFollow = scene.terrainGround.valid() ? scene.environment.fogGroundFollow : 0.0f;
+            particleFrame.fogPooling = scene.terrainGround.poolingLane(scene.environment.fogPooling); // ADR-717
             particleFrame.terrainMap0 = scene.terrainGround.map0();
             particleFrame.terrainMap1 = scene.terrainGround.map1();
             particleFrame.terrainHeight = terrainHeight_.valid() ? terrainHeight_.view : nullptr;

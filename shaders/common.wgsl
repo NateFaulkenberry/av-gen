@@ -147,6 +147,11 @@ struct FrameUniforms {
     // catches the two drifting apart.
     terrainMap0: vec4<f32>,         // world origin xz, 1 / spacing xz
     terrainMap1: vec4<f32>,         // height scale, height offset, fade metres, 1 when there is a terrain
+    // ADR-717: the layer pools in the basins. x = fogPooling (0 without a terrain), yzw = 0.
+    // Appended last, mirroring FrameUniforms; the static_assert's sum catches the two drifting apart.
+    // MERGE NOTE: Effect Library Wave 2 appends starsA/B/C here too -- keep both, in either order,
+    // as long as this file and scene_renderer.hpp agree.
+    fogPool: vec4<f32>,
 };
 
 struct ObjectUniforms {
@@ -250,7 +255,8 @@ fn materialTierLocalLights(tier: u32) -> u32 {
 
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;
-// ADR-715: the terrain's baked height (R32F, vertex-aligned grid, read by texel fetch through
+// ADR-715: the terrain's baked height (RG32F since ADR-717: r = the ground, g = the low-passed basin;
+// vertex-aligned grid, read by texel fetch through
 // `terrainGroundAt` in height_fog.wgsl). A 1x1 placeholder in a scene with no terrain, where
 // `frame.terrainMap1.w` is 0 and nothing reads it. Read by the two frame-bound readers of the
 // height layer: the surface fog below and the volumetric march.
@@ -555,7 +561,8 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         let upper = frame.fogShape.x;
         let curve = frame.fogShape.y;
         let follow = frame.fogShape.z;
-        if (follow > 0.0 && frame.terrainMap1.w > 0.5) {
+        let pooling = frame.fogPool.x; // ADR-717
+        if ((follow > 0.0 || pooling > 0.0) && frame.terrainMap1.w > 0.5) {
             // ADR-715: the layer's top follows the ground, and the ray is integrated piecewise
             // against it -- `fogGroundMean` says how, and why it agrees with the march. Only with a
             // terrain bound: without one the flat branch below is the frame there always was, to
@@ -564,7 +571,7 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
             // (ADR-705) to the surface, not from the eye -- the march already carried the near part.
             let segStart = mix(frame.cameraPos.xyz, worldPos, start / dist);
             mean = fogGroundMean(terrainHeightTex, frame.terrainMap0, frame.terrainMap1, segStart,
-                                 worldPos, frame.fogHeight.x, follow, falloff, upper, curve);
+                                 worldPos, frame.fogHeight.x, follow, pooling, falloff, upper, curve);
         } else if (max(y0, y1) > 0.0) {
             // Both endpoints below the layer's top puts the whole segment below it, so the mean is
             // exactly one and this branch is skipped. Leaving it to the quotient would give 1.0

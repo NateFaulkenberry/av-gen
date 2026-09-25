@@ -42,6 +42,7 @@
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -376,24 +377,61 @@ fn cs_ground(@builtin(global_invocation_id) gid: vec3<u32>) {
     let b = gcases[i * 3u + 2u].x;
     let upper = gcases[i * 3u + 2u].y;
     let curve = gcases[i * 3u + 2u].z;
+    let pooling = gcases[i * 3u + 2u].w; // ADR-717
     let len = length(e - a);
 
     // What the SURFACE pass multiplies the ray's length by (applyFog's follow branch).
-    let closed = fogGroundMean(heights, gargs.map0, gargs.map1, a, e, top, follow, b, upper, curve) * len;
+    let closed = fogGroundMean(heights, gargs.map0, gargs.map1, a, e, top, follow, pooling, b, upper, curve) * len;
     // What the MARCH accumulates: its own per-sample term, integrated finely.
     let slices = 4096;
     let h = len / f32(slices);
     var sum = 0.0;
     for (var k = 0; k < slices; k = k + 1) {
         let p = mix(a, e, (f32(k) + 0.5) / f32(slices));
-        sum = sum + fogGroundProfileAt(heights, gargs.map0, gargs.map1, p, top, follow, b, upper, curve) * h;
+        sum = sum + fogGroundProfileAt(heights, gargs.map0, gargs.map1, p, top, follow, pooling, b, upper, curve) * h;
     }
-    gresults[i * 2u] = vec4<f32>(closed, sum,
+    gresults[i * 3u] = vec4<f32>(closed, sum,
                                  terrainGroundAt(heights, gargs.map0, gargs.map1, a.xz),
                                  terrainGroundAt(heights, gargs.map0, gargs.map1, e.xz));
-    gresults[i * 2u + 1u] = vec4<f32>(fogGroundProfileAt(heights, gargs.map0, gargs.map1, a, top, follow, b, upper, curve),
-                                      fogGroundProfileAt(heights, gargs.map0, gargs.map1, e, top, follow, b, upper, curve),
-                                      0.0, 0.0);
+    gresults[i * 3u + 1u] = vec4<f32>(fogGroundProfileAt(heights, gargs.map0, gargs.map1, a, top, follow, pooling, b, upper, curve),
+                                      fogGroundProfileAt(heights, gargs.map0, gargs.map1, e, top, follow, pooling, b, upper, curve),
+                                      terrainGroundPairAt(heights, gargs.map0, gargs.map1, a.xz).y,
+                                      terrainGroundPairAt(heights, gargs.map0, gargs.map1, e.xz).y);
+    // ADR-717's bit-identity arm: the surface pass and the march's term as ADR-715 wrote them.
+    gresults[i * 3u + 2u] = vec4<f32>(fogGroundMeanAdr715(heights, gargs.map0, gargs.map1, a, e, top, follow, b, upper, curve) * len,
+                                      fogGroundProfileAtAdr715(heights, gargs.map0, gargs.map1, a, top, follow, b, upper, curve),
+                                      fogGroundProfileAtAdr715(heights, gargs.map0, gargs.map1, e, top, follow, b, upper, curve),
+                                      0.0);
+}
+
+// ---- ADR-715's two functions, verbatim, before ADR-717 generalised their reference ------------
+fn fogLayerAltitudeAdr715(y: f32, top: f32, follow: f32, ground: f32) -> f32 {
+    return y - (top + follow * ground);
+}
+fn fogGroundProfileAtAdr715(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, p: vec3<f32>, top: f32,
+                            follow: f32, b: f32, upper: f32, curve: f32) -> f32 {
+    let ground = terrainGroundAt(tex, map0, map1, p.xz);
+    return fogHeightProfile(fogLayerAltitudeAdr715(p.y, top, follow, ground), b, upper, curve);
+}
+fn fogGroundMeanAdr715(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, a: vec3<f32>, e: vec3<f32>,
+                       top: f32, follow: f32, b: f32, upper: f32, curve: f32) -> f32 {
+    var sum = 0.0;
+    var d0 = fogLayerAltitudeAdr715(a.y, top, follow, terrainGroundAt(tex, map0, map1, a.xz));
+    for (var k = 1; k <= kFogGroundSegments; k = k + 1) {
+        let p1 = mix(a, e, f32(k) / f32(kFogGroundSegments));
+        let d1 = fogLayerAltitudeAdr715(p1.y, top, follow, terrainGroundAt(tex, map0, map1, p1.xz));
+        var mean = 1.0;
+        if (max(d0, d1) > 0.0) {
+            mean = fogHeightProfile(d0, b, upper, curve);
+            let rise = d1 - d0;
+            if (abs(rise) > 1e-3) {
+                mean = (fogHeightIntegral(d1, b, upper, curve) - fogHeightIntegral(d0, b, upper, curve)) / rise;
+            }
+        }
+        sum = sum + mean;
+        d0 = d1;
+    }
+    return sum / f32(kFogGroundSegments);
 }
 )";
 
@@ -405,6 +443,7 @@ struct GroundCase {
     float falloff = 0.1f;
     float upper = 0.0f;
     float curve = 0.0f;
+    float pooling = 0.0f; // ADR-717
 };
 
 struct GroundRow {
@@ -414,6 +453,12 @@ struct GroundRow {
     float groundE = 0.0f;
     float profileA = 0.0f;
     float profileE = 0.0f;
+    float basinA = 0.0f; // ADR-717: the low-passed ground, as the shader reads it
+    float basinE = 0.0f;
+    // ADR-715's functions, restated: the bit-identity arm at pooling 0.
+    float closed715 = 0.0f;
+    float profileA715 = 0.0f;
+    float profileE715 = 0.0f;
 };
 
 std::vector<GroundRow> runGround(gpu::Context& ctx, const world::TerrainGround& ground,
@@ -423,7 +468,7 @@ std::vector<GroundRow> runGround(gpu::Context& ctx, const world::TerrainGround& 
     for (const GroundCase& c : list) {
         cases.emplace_back(c.a, c.top);
         cases.emplace_back(c.e, c.follow);
-        cases.emplace_back(c.falloff, c.upper, c.curve, 0.0f);
+        cases.emplace_back(c.falloff, c.upper, c.curve, c.pooling);
     }
     gpu::ShaderLibrary shaders(ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
     auto src = shaders.loadSource("height_fog.wgsl");
@@ -436,15 +481,22 @@ std::vector<GroundRow> runGround(gpu::Context& ctx, const world::TerrainGround& 
     wgpu::TextureDescriptor tdesc{};
     tdesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
     tdesc.size = {field.width, field.depth, 1};
-    tdesc.format = wgpu::TextureFormat::R32Float;
+    // The renderer's layout (ADR-717): r = the ground, g = the basin.
+    tdesc.format = wgpu::TextureFormat::RG32Float;
     wgpu::Texture texture = device.CreateTexture(&tdesc);
     wgpu::TexelCopyTextureInfo dst{};
     dst.texture = texture;
     wgpu::TexelCopyBufferLayout tl{};
-    tl.bytesPerRow = field.width * 4;
+    tl.bytesPerRow = field.width * 8;
     tl.rowsPerImage = field.depth;
     const wgpu::Extent3D extent = {field.width, field.depth, 1};
-    ctx.queue().WriteTexture(&dst, field.heights.data(), field.heights.size() * sizeof(float), &tl, &extent);
+    REQUIRE(field.pooled());
+    std::vector<float> texels(field.heights.size() * 2);
+    for (std::size_t k = 0; k < field.heights.size(); ++k) {
+        texels[k * 2] = field.heights[k];
+        texels[k * 2 + 1] = field.basin[k];
+    }
+    ctx.queue().WriteTexture(&dst, texels.data(), texels.size() * sizeof(float), &tl, &extent);
 
     std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
     entries[0].binding = 0;
@@ -487,7 +539,7 @@ std::vector<GroundRow> runGround(gpu::Context& ctx, const world::TerrainGround& 
     wgpu::Buffer in = device.CreateBuffer(&sdesc);
     ctx.queue().WriteBuffer(in, 0, cases.data(), sdesc.size);
     wgpu::BufferDescriptor rdesc{};
-    rdesc.size = list.size() * 2 * sizeof(glm::vec4);
+    rdesc.size = list.size() * 3 * sizeof(glm::vec4);
     rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
     wgpu::Buffer out = device.CreateBuffer(&rdesc);
 
@@ -519,29 +571,36 @@ std::vector<GroundRow> runGround(gpu::Context& ctx, const world::TerrainGround& 
     ctx.queue().Submit(1, &commands);
     auto bytes = gpu::readBuffer(ctx, out, 0, rdesc.size);
     REQUIRE(bytes.has_value());
-    std::vector<glm::vec4> raw(list.size() * 2);
+    std::vector<glm::vec4> raw(list.size() * 3);
     std::memcpy(raw.data(), bytes->data(), rdesc.size);
     std::vector<GroundRow> rows(list.size());
     for (std::size_t i = 0; i < list.size(); ++i) {
-        rows[i] = GroundRow{raw[i * 2].x, raw[i * 2].y, raw[i * 2].z, raw[i * 2].w, raw[i * 2 + 1].x, raw[i * 2 + 1].y};
+        const glm::vec4& r0 = raw[i * 3];
+        const glm::vec4& r1 = raw[i * 3 + 1];
+        const glm::vec4& r2 = raw[i * 3 + 2];
+        rows[i] = GroundRow{r0.x, r0.y, r0.z, r0.w, r1.x, r1.y, r1.z, r1.w, r2.x, r2.y, r2.z};
     }
     return rows;
 }
 
 // A height field over [-200, 200]^2 at 2 m from any function of (x, z), placed with a translation.
-world::TerrainGround groundFrom(float (*height)(float, float), glm::vec3 translation) {
+// ADR-717: `half` widens the square, so a test can keep its rays more than the basin kernel's reach
+// (3 sigma, 72 m) from the edge, where the repeated edge samples bend an affine ground's basin.
+world::TerrainGround groundFrom(float (*height)(float, float), glm::vec3 translation, float half = 200.0f) {
     auto field = std::make_shared<world::TerrainHeightField>();
-    field->origin = glm::vec2(-200.0f);
+    const auto n = static_cast<std::uint32_t>(half) + 1; // 2 m spacing over [-half, half]
+    field->origin = glm::vec2(-half);
     field->spacing = 2.0f;
-    field->width = field->depth = 201;
+    field->width = field->depth = n;
     field->hash = 1;
-    field->heights.resize(201u * 201u);
-    for (std::uint32_t j = 0; j < 201; ++j) {
-        for (std::uint32_t i = 0; i < 201; ++i) {
+    field->heights.resize(static_cast<std::size_t>(n) * n);
+    for (std::uint32_t j = 0; j < n; ++j) {
+        for (std::uint32_t i = 0; i < n; ++i) {
             const glm::vec2 p = field->origin + glm::vec2(static_cast<float>(i), static_cast<float>(j)) * 2.0f;
-            field->heights[j * 201u + i] = height(p.x, p.y);
+            field->heights[static_cast<std::size_t>(j) * n + i] = height(p.x, p.y);
         }
     }
+    world::poolTerrainHeight(*field); // ADR-717: the basin, as the bake makes it
     return world::placeTerrainGround(field, translation, glm::vec3(1.0f), false);
 }
 
@@ -658,4 +717,212 @@ TEST_CASE("with the layer on a valley floor, the surface fog's chords stay close
     // The control: the fold is real, so the two are NOT identical here -- if they were, this case
     // would be measuring an affine ground by mistake.
     CHECK(worst > 1e-4f);
+}
+
+// ---- ADR-717: the layer pools in the basins -----------------------------------------------------
+//
+// `fogPooling` measures the layer's top from `mix(follow * ground, basin, pooling)`, where the
+// basin is the bake low-passed (`world::poolTerrainHeight`, the texture's second channel). Three
+// claims, each checked from the shipped WGSL:
+//
+//   1. **0 is ADR-715, bit for bit.** ADR-717 routed ADR-715's reference through a new function;
+//      at pooling 0 that function must BE the old arithmetic, not equal to it within rounding, or
+//      every ground-following scene moves by an ULP. ADR-715's two functions are restated in the
+//      kernel above and compared by memcmp.
+//   2. **The readers agree, and about the right layer.** The surface pass's chords against the
+//      march's per-sample term, on terrains whose basin is curved, bounded as ADR-715 bounds its
+//      valley; the basin read against its CPU twin; the profile against a CPU restatement at the
+//      altitude `TerrainGround::referenceAt` names -- because, as ADR-715 found, two readers that
+//      share a wrong function go on agreeing.
+//   3. **It pools.** Columns of air over valley floors and ridge crests on ridged ground that also
+//      climbs, so one valley sits HIGHER than one ridge: pooled, every valley holds more fog than
+//      every ridge; flat, that high valley holds less than that low ridge (the control -- the flat
+//      plane cannot do this); followed, every column holds the same (ADR-715's blanket).
+//
+// **How it fails.** Read `.x` for the basin in `terrainGroundPairAt` and claim 3 fails (pooling
+// becomes follow's blanket) as does the basin parity in 2; drop `pooling` from the mix and claim 2's
+// CPU restatement fails; take the pair branch at pooling 0 and claim 1 fails.
+
+namespace {
+
+// Ridges 100 m apart on ground that climbs 0.25 m per metre: valleys at x = -50 and 50, ridges at
+// x = -100, 0 and 100 -- and the valley at 50 (-2.5 m) is above the ridge at -100 (-10 m).
+float ridged(float x, float /*z*/) { return 0.25f * x + 15.0f * std::cos(x * 6.2831853f / 100.0f); }
+// Rolling ground with no axis to line up with, for the agreement sweep.
+float rolling(float x, float z) {
+    return 9.0f * std::sin(x * 0.041f) * std::cos(z * 0.033f) + 6.0f * std::sin((x + z) * 0.023f);
+}
+
+} // namespace
+
+TEST_CASE("at fogPooling 0 the ground-following layer is ADR-715's, bit for bit", "[gpu][fog][height][terrain]") {
+    auto ctx = makeContext();
+    const world::TerrainGround ground = groundFrom(&slope, glm::vec3(10.0f, 1.0f, -20.0f));
+    std::vector<GroundCase> cases = groundCases(); // every one at pooling 0
+    const std::vector<GroundRow> rows = runGround(*ctx, ground, cases);
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        INFO("case " << i << " closed=" << rows[i].closed << " adr715=" << rows[i].closed715);
+        REQUIRE(std::memcmp(&rows[i].closed, &rows[i].closed715, sizeof(float)) == 0);
+        REQUIRE(std::memcmp(&rows[i].profileA, &rows[i].profileA715, sizeof(float)) == 0);
+        REQUIRE(std::memcmp(&rows[i].profileE, &rows[i].profileE715, sizeof(float)) == 0);
+    }
+    // The control: at pooling 0.5 the shipped functions measure from a different layer, so the
+    // comparison above could see a difference if there were one.
+    for (GroundCase& c : cases) {
+        c.pooling = 0.5f;
+    }
+    const std::vector<GroundRow> half = runGround(*ctx, ground, cases);
+    std::size_t differ = 0;
+    for (const GroundRow& r : half) {
+        differ += std::memcmp(&r.closed, &r.closed715, sizeof(float)) != 0 ? 1 : 0;
+    }
+    CHECK(differ > half.size() / 2);
+}
+
+TEST_CASE("with the layer pooled on affine ground, the surface fog integrates what the march marches",
+          "[gpu][fog][height][terrain]") {
+    // ADR-715's exactness claim, for the pooled reference. The basin of an affine ground is that
+    // ground (a normalised kernel over a plane is the plane), so away from the field's edge the
+    // pooled reference is affine along every ray and the surface pass's chords are exact. The field
+    // is widened to +-400 m so every ray stays well over 72 m inside it.
+    auto ctx = makeContext();
+    const world::TerrainGround ground = groundFrom(&slope, glm::vec3(10.0f, 1.0f, -20.0f), 400.0f);
+    std::vector<GroundCase> cases;
+    for (GroundCase c : groundCases()) {
+        for (const float pooling : {0.5f, 1.0f}) {
+            c.pooling = pooling;
+            cases.push_back(c);
+        }
+    }
+    const std::vector<GroundRow> rows = runGround(*ctx, ground, cases);
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        const GroundCase& c = cases[i];
+        const glm::vec2 a(c.a.x, c.a.z);
+        INFO("case " << i << " pooling=" << c.pooling << " follow=" << c.follow << " closed=" << rows[i].closed
+                     << " numeric=" << rows[i].numeric);
+        // The basin the readers share IS the bake's basin, as the CPU twin reads it -- and on a plane
+        // it is the plane.
+        CHECK(rows[i].basinA == Approx(ground.basinAt(a)).margin(1e-3));
+        CHECK(rows[i].basinE == Approx(ground.basinAt(glm::vec2(c.e.x, c.e.z))).margin(1e-3));
+        CHECK(ground.basinAt(a) == Approx(ground.groundAt(a)).margin(1e-3));
+        // ...and the layer they share is the one the control describes, at the altitude
+        // `referenceAt` names -- the check two readers sharing a wrong function cannot pass.
+        const float want = profileOnCpu(c.a.y - (c.top + ground.referenceAt(a, c.follow, c.pooling)), c.falloff,
+                                        c.upper, c.curve);
+        CHECK(rows[i].profileA == Approx(want).margin(1e-4));
+        CHECK(rows[i].closed == Approx(rows[i].numeric).margin(0.02));
+    }
+}
+
+TEST_CASE("with the layer pooled, the surface fog's chords on curved ground are measured",
+          "[gpu][fog][height][terrain]") {
+    // ADR-715 bounds its chords on its valley fold at 5%, and that bound holds pooled. Rougher ground
+    // is measured beside the follow arm on the same rays, because the gap there is ADR-715's chord
+    // rule (eight pieces of a 260-280 m ray, so 33-35 m chords against 100-150 m features) and not
+    // something pooling introduced: following that ground already misses by 13-17%. The worst cases
+    // are rays that GRAZE the layer's top, where a chord's sagitta of a metre is a large fraction of
+    // the air the ray sees. ADR-717 records these numbers; the regression bound is the measured
+    // worst with a margin.
+    auto ctx = makeContext();
+    struct Arm {
+        const char* name;
+        float follow, pooling;
+    };
+    const std::array<Arm, 4> arms{Arm{"follow 1", 1.0f, 0.0f}, Arm{"pooling 0.5", 0.0f, 0.5f},
+                                  Arm{"pooling 1", 0.0f, 1.0f}, Arm{"follow 1 + pooling 0.5", 1.0f, 0.5f}};
+    struct Terrain {
+        const char* name;
+        float (*height)(float, float);
+        float bound; // the pooled arms' regression bound, relative to the air
+    };
+    for (const Terrain t : {Terrain{"valley", &valley, 0.05f}, Terrain{"ridged", &ridged, 0.15f},
+                            Terrain{"rolling", &rolling, 0.5f}}) {
+        const world::TerrainGround ground = groundFrom(t.height, glm::vec3(0.0f));
+        std::array<float, 4> worst{};
+        std::array<float, 4> worstMetres{};
+        for (std::size_t k = 0; k < arms.size(); ++k) {
+            const Arm& arm = arms[k];
+            std::vector<GroundCase> cases;
+            for (const float b : {0.05f, 0.3f}) {
+                for (const float o : {0.0f, 7.1f, 17.9f}) {
+                    cases.push_back(GroundCase{{-140.0f + o, 30.0f, 10.0f}, {140.0f + o, 12.0f, -30.0f}, 4.0f,
+                                               arm.follow, b, 0.0f, 0.0f, arm.pooling});
+                    cases.push_back(GroundCase{{-60.0f - o, 40.0f, -120.0f}, {70.0f - o, -5.0f, 110.0f}, 4.0f,
+                                               arm.follow, b, 0.2f, 0.75f, arm.pooling});
+                    cases.push_back(GroundCase{{-130.0f, 2.0f + o, 0.0f}, {130.0f, 2.0f + o, 5.0f}, -2.0f, arm.follow,
+                                               b, 0.0f, 1.0f, arm.pooling});
+                }
+            }
+            const std::vector<GroundRow> rows = runGround(*ctx, ground, cases);
+            for (std::size_t i = 0; i < rows.size(); ++i) {
+                const float err = std::abs(rows[i].closed - rows[i].numeric);
+                worst[k] = std::max(worst[k], err / std::max(rows[i].numeric, 1.0f));
+                worstMetres[k] = std::max(worstMetres[k], err);
+            }
+        }
+        WARN(t.name << ": worst gap, surface pass vs march (fraction of the air / metres of air) -- follow 1 "
+                    << worst[0] << " / " << worstMetres[0] << ", pooling 0.5 " << worst[1] << " / " << worstMetres[1]
+                    << ", pooling 1 " << worst[2] << " / " << worstMetres[2] << ", follow 1 + pooling 0.5 "
+                    << worst[3] << " / " << worstMetres[3]);
+        for (std::size_t k = 1; k < arms.size(); ++k) {
+            INFO(t.name << " / " << arms[k].name);
+            CHECK(worst[k] < t.bound);
+        }
+        CHECK(worst[2] > 1e-5f); // a curved reference: the chords are an approximation here, not exact
+    }
+}
+
+TEST_CASE("a pooled layer is deep in the valleys and thin over the ridges", "[gpu][fog][height][terrain]") {
+    auto ctx = makeContext();
+    const world::TerrainGround ground = groundFrom(&ridged, glm::vec3(0.0f));
+    const std::array<float, 2> valleys{-50.0f, 50.0f};
+    const std::array<float, 3> ridges{-100.0f, 0.0f, 100.0f};
+    // A vertical column from just above the ground to 80 m above it: the march's integral of its own
+    // term is the metres of full-density air standing on that spot.
+    const auto columns = [&](float follow, float pooling) {
+        std::vector<GroundCase> cases;
+        for (const float x : valleys) {
+            const float g = ground.groundAt(glm::vec2(x, 0.0f));
+            cases.push_back(GroundCase{{x, g + 0.05f, 0.0f}, {x, g + 80.0f, 0.0f}, 4.0f, follow, 0.3f, 0.0f, 0.0f,
+                                       pooling});
+        }
+        for (const float x : ridges) {
+            const float g = ground.groundAt(glm::vec2(x, 0.0f));
+            cases.push_back(GroundCase{{x, g + 0.05f, 0.0f}, {x, g + 80.0f, 0.0f}, 4.0f, follow, 0.3f, 0.0f, 0.0f,
+                                       pooling});
+        }
+        std::vector<float> air;
+        for (const GroundRow& r : runGround(*ctx, ground, cases)) {
+            air.push_back(r.numeric);
+        }
+        return air; // valleys -50, 50, then ridges -100, 0, 100
+    };
+    const std::vector<float> flat = columns(0.0f, 0.0f);
+    const std::vector<float> follows = columns(1.0f, 0.0f);
+    const std::vector<float> pooled = columns(0.0f, 1.0f);
+    const std::vector<float> half = columns(0.0f, 0.5f);
+    const auto say = [](const char* name, const std::vector<float>& v) {
+        WARN(name << ": valley -50 " << v[0] << " m, valley 50 " << v[1] << " m | ridge -100 " << v[2] << " m, ridge 0 "
+                  << v[3] << " m, ridge 100 " << v[4] << " m");
+    };
+    say("flat", flat);
+    say("follow 1", follows);
+    say("pooling 0.5", half);
+    say("pooling 1", pooled);
+
+    // Pooled: every valley holds more air than every ridge, by a wide margin.
+    const float leastValley = std::min(pooled[0], pooled[1]);
+    const float mostRidge = std::max({pooled[2], pooled[3], pooled[4]});
+    CHECK(leastValley > 3.0f * mostRidge);
+    // Including the HIGH valley against the LOW ridge -- which is what the flat plane cannot do:
+    // there the valley at 50 m sits above the plane and the ridge at -100 m below it.
+    CHECK(pooled[1] > 3.0f * pooled[2]);
+    CHECK(flat[1] < flat[2]);
+    // ADR-715's blanket: following, every spot holds the same column.
+    for (const float v : follows) {
+        CHECK(v == Approx(follows[0]).epsilon(0.01));
+    }
+    // Half-pooled sits between: the high valley gains on the flat plane, the low ridge loses.
+    CHECK(half[1] > flat[1]);
+    CHECK(half[2] < flat[2]);
 }

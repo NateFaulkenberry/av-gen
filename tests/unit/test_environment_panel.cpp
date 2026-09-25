@@ -54,6 +54,8 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
                              "scene/fogUpperDensity", "scene/fogHeightCurve",
                              // ADR-715: the layer follows the terrain, drawn beside them.
                              "scene/fogGroundFollow",
+                             // ADR-717: pooling, beside it.
+                             "scene/fogPooling",
                              // ADR-705 (§7's Horizon Density), on the unified law.
                              "scene/horizonDensity",
                              // ADR-570 (§20/§22): the self-shadow march's two controls.

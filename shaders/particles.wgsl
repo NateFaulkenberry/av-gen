@@ -148,6 +148,9 @@ struct Params {
     // Scatter-anchored clusters: x = anchors in the table, y = 1 when the system is anchored.
     anchorInfo: vec4<f32>,
     anchors: array<vec4<f32>, 64>,    // crown centres chosen on the CPU for this camera, w = 1
+    // ADR-717: x = fogPooling (0 without a terrain), yzw = 0. Appended last, mirroring
+    // ParticleUniforms; its static_assert counts it.
+    fogPool: vec4<f32>,
 };
 
 struct DrawArgs {
@@ -1053,11 +1056,12 @@ fn fogTransmittance(origin: vec3<f32>, dir: vec3<f32>, dist: f32) -> f32 {
         // reader of a shared model is a call site to audit, and a reader that restates it is one
         // edit away from being a different atmosphere in the same frame.
         var profile = fogHeightProfile(y - params.fog.y, params.fog.z, params.fog3.x, params.fog3.y);
-        if (params.fog3.z > 0.0 && params.terrain1.w > 0.5) {
-            // ADR-715: the same ground-following term the march evaluates, per sample.
+        if ((params.fog3.z > 0.0 || params.fogPool.x > 0.0) && params.terrain1.w > 0.5) {
+            // ADR-715: the same ground-following term the march evaluates, per sample -- and
+            // ADR-717's pooling, from the same lane value the frame carries.
             let p = origin + dir * t;
             profile = fogGroundProfileAt(terrainHeightTex, params.terrain0, params.terrain1, p, params.fog.y,
-                                         params.fog3.z, params.fog.z, params.fog3.x, params.fog3.y);
+                                         params.fog3.z, params.fogPool.x, params.fog.z, params.fog3.x, params.fog3.y);
         }
         // ADR-705: Horizon Density, the factor the march multiplies into the same air. Without it
         // this estimate would be a different atmosphere from the one it is correcting for.

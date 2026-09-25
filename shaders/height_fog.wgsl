@@ -118,19 +118,69 @@ fn terrainGroundAt(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, xz: v
     return (h * map1.x + map1.y) * keep;
 }
 
-// A point's altitude relative to the layer's top once the top follows the ground. Only ever called
-// with `follow > 0`; the flat branch stays each reader's own `y - top`.
-fn fogLayerAltitude(y: f32, top: f32, follow: f32, ground: f32) -> f32 {
-    return y - (top + follow * ground);
+// ---- ADR-717: the layer pools in the basins -------------------------------------------------
+//
+// `fogPooling` measures the layer's top from a LOW-PASSED ground instead: the bake's second
+// channel (`.g`) is the heights under a Gaussian of `world::kTerrainBasinSigma` metres. In a valley
+// that basin level is above the floor, on a ridge below the crest, so the layer's surface lies
+// nearly flat across each basin and the fog is deep in the valleys and thin over the ridges --
+// the thing ADR-715 found `follow` could not do. The reference height is
+//
+//     mix(follow * ground, basin, pooling)
+//
+// so 0 is ADR-715's layer exactly (every reader keeps ADR-715's branch there, bit for bit) and 1
+// is measured from the basin alone, whatever `follow` is. ADR-717 says why follow stays.
+
+// The ground AND the basin at world XZ from the same four texel loads, placed and faded as
+// `terrainGroundAt` places and fades the ground. The CPU twins are `TerrainGround::groundAt` and
+// `TerrainGround::basinAt`. Only reached with `pooling > 0`.
+fn terrainGroundPairAt(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, xz: vec2<f32>) -> vec2<f32> {
+    if (map1.w < 0.5) {
+        return vec2<f32>(0.0);
+    }
+    let dims = textureDimensions(tex);
+    let last = vec2<f32>(f32(dims.x - 1u), f32(dims.y - 1u));
+    let g = (xz - map0.xy) * map0.zw;
+    let c = clamp(g, vec2<f32>(0.0), last);
+    let i0 = min(floor(c), last - vec2<f32>(1.0));
+    let f = c - i0;
+    let ij = vec2<i32>(i0);
+    let h00 = textureLoad(tex, ij, 0).rg;
+    let h10 = textureLoad(tex, ij + vec2<i32>(1, 0), 0).rg;
+    let h01 = textureLoad(tex, ij + vec2<i32>(0, 1), 0).rg;
+    let h11 = textureLoad(tex, ij + vec2<i32>(1, 1), 0).rg;
+    let h = mix(mix(h00, h10, f.x), mix(h01, h11, f.x), f.y);
+    let outside = length((g - c) / map0.zw);
+    let keep = 1.0 - clamp(outside / map1.z, 0.0, 1.0);
+    return (h * map1.x + map1.y) * keep;
+}
+
+// The height the layer's top is measured from, at world XZ. At `pooling` 0 it is ADR-715's
+// `follow * ground`, computed by ADR-715's own reader, so the follow branch is the arithmetic it
+// was. The CPU twin is `TerrainGround::referenceAt`.
+fn fogGroundReference(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, xz: vec2<f32>, follow: f32,
+                      pooling: f32) -> f32 {
+    if (pooling <= 0.0) {
+        return follow * terrainGroundAt(tex, map0, map1, xz);
+    }
+    let gb = terrainGroundPairAt(tex, map0, map1, xz);
+    return mix(follow * gb.x, gb.y, pooling);
+}
+
+// A point's altitude relative to the layer's top once the top follows the ground (or pools, ADR-717).
+// Only ever called with `follow > 0` or `pooling > 0`; the flat branch stays each reader's own `y - top`.
+// ADR-717: `reference` is `fogGroundReference`'s -- `follow * ground` until pooling moves it.
+fn fogLayerAltitude(y: f32, top: f32, reference: f32) -> f32 {
+    return y - (top + reference);
 }
 
 // THE MARCH's height term with the layer on the ground (and the particle estimate's): the profile
 // at this sample's altitude above the followed top. Exactly per sample -- the march already pays
 // for a density evaluation here, and four texel loads are small beside its noise.
 fn fogGroundProfileAt(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, p: vec3<f32>, top: f32,
-                      follow: f32, b: f32, upper: f32, curve: f32) -> f32 {
-    let ground = terrainGroundAt(tex, map0, map1, p.xz);
-    return fogHeightProfile(fogLayerAltitude(p.y, top, follow, ground), b, upper, curve);
+                      follow: f32, pooling: f32, b: f32, upper: f32, curve: f32) -> f32 {
+    let reference = fogGroundReference(tex, map0, map1, p.xz, follow, pooling);
+    return fogHeightProfile(fogLayerAltitude(p.y, top, reference), b, upper, curve);
 }
 
 // How many pieces the surface pass cuts a ray into (ADR-715). See `fogGroundMean`. Measured on a
@@ -156,12 +206,12 @@ const kFogGroundSegments: i32 = 8;
 // Each piece keeps the flat pass's two guards: wholly inside the layer is exactly 1, and a piece
 // that does not climb takes the profile at its start.
 fn fogGroundMean(tex: texture_2d<f32>, map0: vec4<f32>, map1: vec4<f32>, a: vec3<f32>, e: vec3<f32>,
-                 top: f32, follow: f32, b: f32, upper: f32, curve: f32) -> f32 {
+                 top: f32, follow: f32, pooling: f32, b: f32, upper: f32, curve: f32) -> f32 {
     var sum = 0.0;
-    var d0 = fogLayerAltitude(a.y, top, follow, terrainGroundAt(tex, map0, map1, a.xz));
+    var d0 = fogLayerAltitude(a.y, top, fogGroundReference(tex, map0, map1, a.xz, follow, pooling));
     for (var k = 1; k <= kFogGroundSegments; k = k + 1) {
         let p1 = mix(a, e, f32(k) / f32(kFogGroundSegments));
-        let d1 = fogLayerAltitude(p1.y, top, follow, terrainGroundAt(tex, map0, map1, p1.xz));
+        let d1 = fogLayerAltitude(p1.y, top, fogGroundReference(tex, map0, map1, p1.xz, follow, pooling));
         var mean = 1.0;
         if (max(d0, d1) > 0.0) {
             mean = fogHeightProfile(d0, b, upper, curve);

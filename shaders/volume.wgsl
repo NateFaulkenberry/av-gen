@@ -602,9 +602,13 @@ fn volumeDensityAt(p: vec3<f32>) -> f32 {
     // ADR-715: the layer's top follows the ground. The texture and its placement are the frame's
     // (group 0, common.wgsl) -- the same two the surface fog reads, so the two readers cannot be
     // handed different terrains. At follow 0 the line above is the whole of it, bit for bit.
-    if (vol.heightFog.z > 0.0 && frame.terrainMap1.w > 0.5) {
+    // ADR-717: pooling is read from the FRAME's lane (`frame.fogPool.x`), the very number the
+    // surface fog reads, rather than copied into VolumeUniforms -- one lane, so the two readers
+    // cannot be handed different pooling.
+    if ((vol.heightFog.z > 0.0 || frame.fogPool.x > 0.0) && frame.terrainMap1.w > 0.5) {
         heightTerm = fogGroundProfileAt(terrainHeightTex, frame.terrainMap0, frame.terrainMap1, p, vol.params0.y,
-                                        vol.heightFog.z, vol.params0.z, vol.heightFog.x, vol.heightFog.y);
+                                        vol.heightFog.z, frame.fogPool.x, vol.params0.z, vol.heightFog.x,
+                                        vol.heightFog.y);
     }
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);

@@ -122,6 +122,16 @@ void drawEnvironmentPanel(app::Engine& engine) {
             p != nullptr && p->baseComponent(0) > 0.0f && !engine.scene().terrainGround.valid()) {
             ImGui::TextColored(kMuted, "  this scene has no terrain: the layer stays flat");
         }
+        // ADR-717: the layer pools in the basins -- deep in valleys, thin over ridges. Beside
+        // "Follow ground" because it moves the same reference: at 1 it replaces the follow.
+        slider(engine, "scene/fogPooling", "Pool in valleys", "%.2f");
+        if (params::IParameter* p = engine.params().find("scene/fogPooling"); p != nullptr && p->baseComponent(0) > 0.0f) {
+            if (!engine.scene().terrainGround.valid()) {
+                ImGui::TextColored(kMuted, "  this scene has no terrain: nothing to pool in");
+            } else if (p->baseComponent(0) >= 1.0f) {
+                ImGui::TextColored(kMuted, "  at 1 the layer is measured from the basins alone: Follow ground has no effect");
+            }
+        }
         // ADR-705, §7's last control: the air grows denser with distance from the eye (1 doubles it
         // a kilometre out). One number, read by the march and the surface fog alike.
         slider(engine, "scene/horizonDensity", "Horizon density", "%.2f");
