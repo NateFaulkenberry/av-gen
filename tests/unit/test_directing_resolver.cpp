@@ -258,8 +258,11 @@ TEST_CASE("subjects: Rook is the entity, Umbra is ambiguous, the Umbra hero is t
         CHECK(cam.identity.id == cameras->id);
     }
 
-    CHECK(resolveSubject(index, "scene/fogDensity").identity.kind == SubjectKind::Parameter);
-    CHECK(resolveSubject(index, "scene/fogDensty").status == SubjectResult::Status::Unknown);
+    // ADR-705: the one fog density. `scene/fogDensity` was removed outright (no alias, ADR-441), so a
+    // plan naming it is an unknown parameter, not a silent fallback.
+    CHECK(resolveSubject(index, "scene/volumeDensity").identity.kind == SubjectKind::Parameter);
+    CHECK(resolveSubject(index, "scene/volumeDensty").status == SubjectResult::Status::Unknown);
+    CHECK(resolveSubject(index, "scene/fogDensity").status == SubjectResult::Status::Unknown);
     CHECK(resolveSubject(index, "the world").identity.kind == SubjectKind::World);
     // Effects (ADR-702) answer only when an effect is asked for.
     const SubjectResult pulse = resolveSubject(index, "Umbra's pulse", SubjectKind::Effect);
