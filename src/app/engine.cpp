@@ -5150,6 +5150,12 @@ void Engine::update(const FrameTime& time) {
         // post/motionBlur/amount stays exactly as authored.
     }
     controller_->scene().post = post_;
+    // ADR-834 (Phase D §36): where each character sits in the finished frame, published after the
+    // camera and its lens are final. Read by routes and reactions from the next frame, like every
+    // other bus signal; never read by the simulation's own step.
+    if (auto* comp = composition()) {
+        comp->publishCinematicSignals(bus_);
+    }
     // Without this line every temporal parameter resolves, round-trips and reaches nothing --
     // ADR-039's selective bloom and ADR-035's identifier mask were both shipped missing exactly
     // this assignment, and both were invisible because the feature simply never ran.
