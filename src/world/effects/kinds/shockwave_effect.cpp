@@ -125,8 +125,10 @@ Trigger onsets(float threshold) {
 // The catalog's four presets. Each is a complete look including what fires it, so applying one never
 // depends on what the instance held before.
 const Look kLooks[] = {
-    // Emissive leading edge, a hot orange; released on strong onsets.
-    {"Explosion", 1.3f, 22.0f, 1.3f, 1.8f, Ease::OutCubic, {1.0f, 0.55f, 0.22f}, 2.5f, 0.12f, 0.8f, onsets(1.6f)},
+    // Emissive leading edge, a hot orange; released on strong onsets. Thinned as Energy Blast was (the
+    // owner's ruling): at 1.8 m and an edge of 2.5 it read as a wide orange band across the UFO film;
+    // at 0.5 m and 1.2 it is a fiery filament, with the strength raised so the bend behind it still reads.
+    {"Explosion", 1.5f, 22.0f, 1.3f, 0.5f, Ease::OutCubic, {1.0f, 0.55f, 0.22f}, 1.2f, 0.08f, 0.8f, onsets(1.6f)},
     // Refraction only, fast and linear: a sound barrier giving way.
     {"Sonic Boom", 1.1f, 30.0f, 0.9f, 1.2f, Ease::Linear, {1.0f, 1.0f, 1.0f}, 0.0f, 0.06f, 0.5f, beats(4)},
     // A cyan energy front: a thin glowing line with a clear bend behind it. The band is thin (0.4 m)
