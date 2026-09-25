@@ -359,6 +359,7 @@ TEST_CASE("on the benchmark, a stunt cue plays once on Rook and hands him back t
 
 TEST_CASE("an autonomous react plays Crazy once and holds its crouch (the owner's ruling)",
           "[motion][semantics][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
     const scene::CompositionNode* node = engine.composition()->findNode("rook");
