@@ -2,6 +2,7 @@
 
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_trigger.hpp"
 
 #include <fmt/format.h>
 
@@ -29,8 +30,9 @@ std::string_view idOf(const scene::ParticleSystem& s) {
 // its own owner, as a Ground Pulse does.
 float envelopeOf(const EffectInstance& e, const EffectContext& ctx) {
     const bool followsFocus = e.owner.kind != EffectTarget::Entity;
-    const auto window =
-        resolveActivationWindow(e.activation, e.timing, ctx.seconds, ctx.shots, followsFocus, e.owner.name);
+    const auto window = resolveActivationWindow(
+        e.activation, e.timing, ctx, followsFocus, e.owner.name,
+        e.owner.kind == EffectTarget::Entity ? std::string_view(e.owner.name) : std::string_view());
     if (!window) {
         return 0.0f;
     }
@@ -101,7 +103,15 @@ void buildParticleFrame(std::span<const EffectInstance> effects, const EffectCon
             }
             const float envelope = e.enabled && placed ? envelopeOf(e, ctx) : 0.0f;
             describeParticleSystem(e, envelope, *it);
+            // Wave 2 (TRIGGER): a burst on the frame a trigger lands. The edge is the frame's own
+            // interval (`TriggerClock::edgeStart`), so a scrub never fires a backlog of them.
+            if (e.enabled && placed && effectTriggerEdge(e, ctx)) {
+                it->burst += triggerBurstOf(e);
+            }
             if (entityOwned) {
+                // The camera-carried looks are weather over the World; on an entity they are a local
+                // cloud around it, so the box does not also follow the camera.
+                it->volumeFollow = glm::vec3(0.0f);
                 if (placed) {
                     // Ride the owner: born in a region around the centre of what is drawn, pulled
                     // towards it, and launched along the owner's own axes (a tilted craft sheds its
@@ -122,6 +132,10 @@ void buildParticleFrame(std::span<const EffectInstance> effects, const EffectCon
             ++written;
             if (e.enabled && placed && envelope > 0.0f) {
                 said = EffectStatus::Drawn;
+            } else if (e.enabled && placed && why != nullptr) {
+                if (const char* waiting = effectTriggerDormancy(e, ctx)) {
+                    why->assign(waiting);
+                }
             }
         }
         if (at < status.size()) {

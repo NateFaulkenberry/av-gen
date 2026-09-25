@@ -149,9 +149,12 @@ struct FrameUniforms {
     terrainMap1: vec4<f32>,         // height scale, height offset, fade metres, 1 when there is a terrain
     // ADR-717: the layer pools in the basins. x = fogPooling (0 without a terrain), yzw = 0.
     // Appended last, mirroring FrameUniforms; the static_assert's sum catches the two drifting apart.
-    // MERGE NOTE: Effect Library Wave 2 appends starsA/B/C here too -- keep both, in either order,
-    // as long as this file and scene_renderer.hpp agree.
     fogPool: vec4<f32>,
+    // Effect Library Wave 2: the Stars effect (world/effects/star_field.hpp). starsA.x = 0 keeps the
+    // background pass's own fixed field. Mirrors FrameUniforms in rendering/scene_renderer.hpp.
+    starsA: vec4<f32>,              // x = on, y = density, z = brightness, w = magnitude slope
+    starsB: vec4<f32>,              // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
+    starsC: vec4<f32>,              // x = band, y = band tilt, z = daylight hiding, w = seconds
 };
 
 struct ObjectUniforms {
@@ -392,22 +395,35 @@ fn meshWindOffset(worldPos: vec3<f32>, t: f32) -> vec3<f32> {
     return disp;
 }
 
-@vertex
-fn vs_main(in: VertexIn) -> VertexOut {
+// The mesh vertex stage in three parts, so an entry point that moves the vertex further (pbr.wgsl's
+// `vs_entity`, for the Effect Library's per-entity displacement) runs exactly this arithmetic and
+// only adds to it: where the vertex is now, where it was last frame, and the output from the two.
+fn meshWorld(in: VertexIn) -> vec4<f32> {
+    let world = object.model * vec4<f32>(in.position, 1.0);
+    return vec4<f32>(world.xyz + meshWindOffset(world.xyz, frame.params.x), world.w);
+}
+
+// The velocity target needs where this vertex was, which for a swaying mesh is not where the
+// previous model matrix alone puts it (ADR-035).
+fn meshPrevWorld(in: VertexIn) -> vec4<f32> {
+    let prevWorld = object.prevModel * vec4<f32>(in.position, 1.0);
+    return vec4<f32>(prevWorld.xyz + meshWindOffset(prevWorld.xyz, object.windTune.w), prevWorld.w);
+}
+
+fn meshVertexOut(in: VertexIn, world: vec4<f32>, prevWorld: vec4<f32>) -> VertexOut {
     var out: VertexOut;
-    var world = object.model * vec4<f32>(in.position, 1.0);
-    world = vec4<f32>(world.xyz + meshWindOffset(world.xyz, frame.params.x), world.w);
     out.clip = frame.viewProj * world;
     out.worldPos = world.xyz;
     out.normal = normalize((object.normalMatrix * vec4<f32>(in.normal, 0.0)).xyz);
     out.uv = in.uv;
     out.localPos = in.position;
-    // The velocity target needs where this vertex was, which for a swaying mesh is not where the
-    // previous model matrix alone puts it (ADR-035).
-    let prevWorld = object.prevModel * vec4<f32>(in.position, 1.0);
-    let prevMoved = prevWorld.xyz + meshWindOffset(prevWorld.xyz, object.windTune.w);
-    out.prevClip = frame.prevViewProj * vec4<f32>(prevMoved, prevWorld.w);
+    out.prevClip = frame.prevViewProj * prevWorld;
     return out;
+}
+
+@vertex
+fn vs_main(in: VertexIn) -> VertexOut {
+    return meshVertexOut(in, meshWorld(in), meshPrevWorld(in));
 }
 
 // Rotates a world direction into the environment map's frame (rotation about +Y).

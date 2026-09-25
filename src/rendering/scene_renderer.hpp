@@ -331,9 +331,13 @@ struct FrameUniforms {
     glm::vec4 terrainMap1{0.0f}; // height scale, height offset, fade metres, 1 when there is a terrain
     // ADR-717: x = fogPooling, forced to 0 when the scene has no terrain; yzw = 0. The march reads
     // this lane too (volume.wgsl), so the surface fog and the march cannot be handed different
-    // pooling. Appended last. MERGE NOTE: Effect Library Wave 2 appends starsA/B/C here as well --
-    // keep both, in the same order here and in common.wgsl, and add both terms to the sum below.
+    // pooling. Appended after the terrain lanes.
     glm::vec4 fogPool{0.0f};
+    // Effect Library Wave 2: the Stars effect's field (world/effects/star_field.hpp), appended last.
+    // starsA.x = 0 is the background pass's own fixed field, exactly as before any Stars instance.
+    glm::vec4 starsA{0.0f}; // x = on, y = density, z = brightness (envelope folded in), w = magnitude slope
+    glm::vec4 starsB{0.0f}; // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
+    glm::vec4 starsC{0.0f}; // x = band, y = band tilt, z = daylight hiding, w = seconds (wrapped)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 surface waves. The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -345,7 +349,8 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::
                                        32 + // ADR-379: two vec4s of vortex glow
                                        16 + // ADR-568: one vec4 of height-fog shape
                                        32 + // ADR-715: two vec4s of terrain height placement
-                                       16); // ADR-717: one vec4 of fog pooling, appended last
+                                       16 + // ADR-717: one vec4 of fog pooling
+                                       48); // Wave 2: three vec4s of star field, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);

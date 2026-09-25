@@ -1,6 +1,7 @@
 #include "world/effects/effect_instance.hpp"
 
 #include "world/effects/effect_registry.hpp"
+#include "world/effects/effect_trigger.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -230,6 +231,18 @@ Result<void> EffectInstance::validate() const {
     if (auto ok = wave.validate(); !ok) { return fail("effect '{}': {}", who, ok.error().message); }
     if (auto ok = ground.validate(); !ok) { return fail("effect '{}': {}", who, ok.error().message); }
     if (auto ok = timing.validate(); !ok) { return fail("effect '{}': {}", who, ok.error().message); }
+    // Wave 2 (TRIGGER). Only the trigger an instance fires on is checked: a Window effect carrying a
+    // default trigger it never reads is not a broken file.
+    if (activation == Activation::Trigger) {
+        if (auto ok = timing.trigger.validate(); !ok) {
+            return fail("effect '{}': {}", who, ok.error().message);
+        }
+        if (timing.trigger.source == TriggerSource::Proximity && owner.kind != EffectTarget::Entity) {
+            return fail("effect '{}': a proximity trigger measures from its owner, and only an entity "
+                        "owner has a position to measure from",
+                        who);
+        }
+    }
     // ADR-702: an `Owner` source means "wherever I am attached", and the World is attached to no
     // place. Refused rather than left dormant, because a pulse that can never fire is a card in the
     // panel that silently does nothing.
@@ -268,6 +281,11 @@ json EffectInstance::toJson() const {
     if (!style.empty()) { j["style"] = style; }
     j["activation"] = activationName(activation);
     j["timing"] = timingToJson(timing);
+    // Wave 2: what a Trigger activation fires on. Written exactly when it is read: the key's
+    // presence is the activation's, so a file never carries a trigger nothing fires on.
+    if (activation == Activation::Trigger) {
+        j["trigger"] = triggerToJson(timing.trigger);
+    }
 
     const EffectSchema* schema = effectSchema(kind);
     if (schema == nullptr) {
@@ -336,6 +354,21 @@ Result<EffectInstance> EffectInstance::fromJson(const json& j) {
     }
     if (j.contains("timing")) {
         e.timing = timingFromJson(j.at("timing"));
+    }
+    if (e.activation == Activation::Trigger) {
+        // ADR-441: a trigger activation with no `trigger` block, or one naming a source this build
+        // does not have, is refused by name rather than defaulted to "every beat".
+        if (!j.contains("trigger")) {
+            return fail("effect '{}': activation 'trigger' needs a 'trigger' block", who);
+        }
+        auto trigger = triggerFromJson(j.at("trigger"));
+        if (!trigger) {
+            return fail("effect '{}': {}", who, trigger.error().message);
+        }
+        e.timing.trigger = std::move(*trigger);
+    } else if (j.contains("trigger")) {
+        return fail("effect '{}': a 'trigger' block with activation '{}' (only 'trigger' reads one)", who,
+                    activationName(e.activation));
     }
     if (j.contains("ground") && j.at("ground").is_object()) {
         const json& g = j.at("ground");

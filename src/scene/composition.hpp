@@ -45,6 +45,7 @@
 #include "world/ecology.hpp"
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/history_bank.hpp"
+#include "world/effects/transform_frame.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
 #include "world/terrain_height.hpp"
@@ -778,6 +779,19 @@ public:
     // `automation` re-applies the play's transform automation, for the replay, which has none.
     void recordHistory(world::HistoryBank& bank, double seconds,
                        const world::HistoryAutomation* automation = nullptr) const;
+
+    // ---- Effect Library Wave 2: XFORM, the render-transform offsets --------------------------
+    //
+    // The frame is the engine's, built by the Geometry-stage builder BEFORE `update` (rendering-
+    // architecture §3). The flatten composes each named node's offset into that node's transform
+    // while it walks the nodes, so its children, lights, emitters, meshes, its drawn view
+    // (`nodeView`, `visualPlacement`) and `prevModel` all include it. `nodeWorldTransform` does NOT:
+    // it is the simulation's, the camera rigs' and HIST's answer, and the offset is visual-only.
+    // Null, or a frame with no live offset, is the flatten exactly as it was before XFORM existed.
+    void setEffectOffsets(const world::TransformFrame* frame) { effectOffsets_ = frame; }
+    // The node's world transform as the flatten DRAWS it: `nodeWorldTransform` with every offset on
+    // the node and its ancestors composed in. Equal to `nodeWorldTransform` when none applies.
+    [[nodiscard]] Transform nodeDrawnWorldTransform(const CompositionNode& node) const;
     [[nodiscard]] const std::vector<std::unique_ptr<CompositionNode>>& nodes() const { return nodes_; }
     // ---- composition (ADR-038) ----
     // What the frame is about: focal points, depth layers and exclusion regions. Its fields are
@@ -2048,6 +2062,9 @@ private:
     // after its last step, which is the flattening the play would have had. Found by checking the
     // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
     world::HistoryBank* historyBank_ = nullptr; // ADR-703: the engine's; see `setHistoryBank`
+    const world::TransformFrame* effectOffsets_ = nullptr; // Wave 2 (XFORM): the engine's; see `setEffectOffsets`
+    // A node's own transform with its XFORM offset composed in (identity when it has none).
+    [[nodiscard]] Transform nodeDrawnTransform(const CompositionNode& node) const;
     std::vector<stage::VisualPlacement> seekPlaced_;
     std::vector<std::uint8_t> seekPlacedValid_;
     bool seekPlacementLive_ = false;
