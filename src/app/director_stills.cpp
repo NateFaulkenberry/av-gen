@@ -50,6 +50,7 @@ Result<ShotStillsReport> renderShotStills(gpu::Context& context, gpu::ShaderLibr
         return fail("stills: cannot write the scratch copy: {}", r.error().message);
     }
     Engine scratch(EngineMode::Offline);
+    scratch.setLiveControl(false); // the editor holds the OSC port; a scratch copy listens to nothing
     auto loaded = scratch.loadProject(source.scratch);
     std::error_code ec;
     std::filesystem::remove(source.scratch, ec);

@@ -5350,6 +5350,7 @@ Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesys
                                                               RenderSettings settings,
                                                               const std::filesystem::path& outputBase) {
     auto offline = std::make_unique<Engine>(EngineMode::Offline);
+    offline->setLiveControl(false); // a render is a pure function of its file, not of the OSC port
     if (auto r = offline->loadProject(projectFile); !r) {
         return std::unexpected(r.error());
     }

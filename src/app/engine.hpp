@@ -170,6 +170,10 @@ public:
     // Restores the assets first (a missing one is a warning, see projectWarnings()), then the
     // rest. Fails only when the document itself is invalid.
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
+    // Whether this engine may open live control sources (OSC, MIDI) when a project's control map
+    // asks for them. Set false BEFORE loading, on an engine that only evaluates a project -- a render,
+    // a trace, a Director scratch copy -- so it neither binds the editor's OSC port nor reacts to it.
+    void setLiveControl(bool enabled) { controlHub_.setLiveIo(enabled); }
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
 
