@@ -1,0 +1,45 @@
+{
+  "description": "At 1:30, Rook runs past Umbra.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "rook-run-past",
+    "title": "Rook runs past Umbra",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "rook",
+        "text": "Rook"
+      },
+      {
+        "alias": "umbra",
+        "text": "the Umbra hero mushroom",
+        "hint": "hero"
+      }
+    ],
+    "performances": [
+      {
+        "key": "run",
+        "subject": "rook",
+        "mode": "scripted",
+        "beats": [
+          {
+            "action": "run_past",
+            "target": "umbra"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "errors": [
+      "UNSUPPORTED"
+    ],
+    "blocked": [
+      "run"
+    ],
+    "produced": {},
+    "diff": [
+      "UNSUPPORTED: character performances are not compiled yet"
+    ]
+  }
+}

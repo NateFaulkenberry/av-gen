@@ -1,0 +1,30 @@
+{
+  "description": "Make the fog thicker during the second chorus.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "chorus-fog",
+    "title": "Fog in the second chorus",
+    "tier": "baked",
+    "subjects": [],
+    "cues": [
+      {
+        "key": "fog",
+        "parameter": "scene/fogDensity",
+        "at": "the second chorus",
+        "until": "end of the second chorus",
+        "value": 0.08,
+        "rampSeconds": 1.0
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.event": 1
+    },
+    "diff": [
+      "Cue scene/fogDensity -> 0.08"
+    ]
+  }
+}

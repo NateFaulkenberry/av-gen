@@ -1,0 +1,27 @@
+{
+  "description": "Add a marker called 'drop' at 1:30.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "drop-marker",
+    "title": "Drop marker",
+    "tier": "baked",
+    "subjects": [],
+    "markers": [
+      {
+        "key": "drop",
+        "name": "drop",
+        "at": "1:30"
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.marker": 1
+    },
+    "diff": [
+      "+ Marker drop 01:30.000"
+    ]
+  }
+}

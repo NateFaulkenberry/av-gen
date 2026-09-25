@@ -1,5 +1,7 @@
 #include "ai/orchestrator.hpp"
 
+#include "ai/director_tools.hpp"
+
 #include "app/engine.hpp"
 #include "core/log.hpp"
 
@@ -24,6 +26,9 @@ const char* taskStateName(TaskState state) {
     case TaskState::ExecutingTools: return "Working";
     case TaskState::Validating: return "Validating";
     case TaskState::RollingBack: return "Rolling back";
+    case TaskState::AwaitingApproval: return "Awaiting approval";
+    case TaskState::Committing: return "Committing";
+    case TaskState::Rejected: return "Rejected";
     case TaskState::Completed: return "Done";
     case TaskState::Failed: return "Failed";
     case TaskState::Cancelled: return "Cancelled";
@@ -33,7 +38,7 @@ const char* taskStateName(TaskState state) {
 
 bool taskStateIsTerminal(TaskState state) {
     return state == TaskState::Completed || state == TaskState::Failed ||
-           state == TaskState::Cancelled;
+           state == TaskState::Cancelled || state == TaskState::Rejected;
 }
 
 const char* activityKindName(ActivityKind kind) {
@@ -95,6 +100,21 @@ void AgentTask::append(Activity activity) {
     activities_.push_back(std::move(activity));
 }
 
+std::optional<ToolContext::Proposal> AgentTask::proposal() const {
+    const std::lock_guard lock(mutex_);
+    return proposal_;
+}
+
+void AgentTask::setProposal(ToolContext::Proposal proposal) {
+    const std::lock_guard lock(mutex_);
+    proposal_ = std::move(proposal);
+}
+
+void AgentTask::holdOutcome(TaskOutcome outcome) {
+    const std::lock_guard lock(mutex_);
+    outcome_ = std::move(outcome);
+}
+
 void AgentTask::finish(TaskOutcome outcome) {
     {
         const std::lock_guard lock(mutex_);
@@ -103,9 +123,10 @@ void AgentTask::finish(TaskOutcome outcome) {
     // The state is set last. A UI that sees a terminal state is entitled to assume the outcome is
     // already there, and the other order would make that assumption wrong on exactly the frames a
     // race is hardest to reproduce.
-    state_.store(outcome_.cancelled  ? TaskState::Cancelled
-                 : outcome_.success ? TaskState::Completed
-                                    : TaskState::Failed,
+    state_.store(outcome_.rejected    ? TaskState::Rejected
+                 : outcome_.cancelled ? TaskState::Cancelled
+                 : outcome_.success   ? TaskState::Completed
+                                      : TaskState::Failed,
                  std::memory_order_release);
 }
 
@@ -143,6 +164,9 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             // has to know it is running inside a transaction.
             for (const ChangeRecord& record : ctx.changes().records()) {
                 changes.note(record.target, record.detail, record.clamped);
+            }
+            if (ctx.proposal()) {
+                task.setProposal(*ctx.proposal());
             }
         },
         task.cancel());
@@ -218,15 +242,49 @@ void Orchestrator::run(AgentTask& task) {
             return;
         }
         // Captured before the sink opens, so the diff is measured against the same instant the
-        // rollback point is.
-        (void)queue_->run([&] { before = SnapshotStore::captureDocument(*engine_); },
-                          task.cancel());
-        transaction = std::make_unique<Transaction>(*sink_, task.prompt());
+        // rollback point is -- and both on the thread that pumps. The sink reads the whole engine
+        // (a snapshot; since ADR-752 every domain `EditCapture` measures), and a sink opened from
+        // this worker would read it while the frame loop writes it.
+        (void)queue_->run(
+            [&] {
+                before = SnapshotStore::captureDocument(*engine_);
+                transaction = std::make_unique<Transaction>(*sink_, task.prompt());
+            },
+            task.cancel());
+        if (!transaction) {
+            return; // cancelled or the queue shut down before it opened; no tool will run either
+        }
         Activity a;
         a.kind = ActivityKind::TransactionOpened;
         a.title = "Rollback point taken";
         a.detail = std::string(sink_->kind());
         task.append(std::move(a));
+    };
+
+    // Commit or roll back on the pumping thread, for the reason the open is there. A FRESH cancel
+    // token, deliberately: a cancelled task is exactly the one whose rollback must still run, and
+    // the task's own token would make the queue refuse it. If the queue is already shut down the
+    // application is tearing the engine down; touching it from here would be the race this exists
+    // to prevent, so the transaction is abandoned instead and says so.
+    const auto closeOnMainThread = [&](bool commit) {
+        if (!transaction || !transaction->open()) {
+            return;
+        }
+        const bool ran = queue_->run(
+            [&] {
+                if (commit) {
+                    transaction->commit();
+                    outcome.editState = sink_->committedEditState();
+                } else {
+                    transaction->rollback();
+                }
+            },
+            CancelToken{});
+        if (!ran) {
+            log::warn("ai: {} could not {} its transaction: the application stopped servicing it",
+                      task.id(), commit ? "commit" : "roll back");
+            transaction->abandon();
+        }
     };
 
     std::string finalText;
@@ -255,7 +313,7 @@ void Orchestrator::run(AgentTask& task) {
         if (!response) {
             task.setState(TaskState::RollingBack);
             if (transaction) {
-                transaction->rollback();
+                closeOnMainThread(false);
                 outcome.rolledBack = true;
                 Activity a;
                 a.kind = ActivityKind::TransactionRolledBack;
@@ -360,7 +418,7 @@ void Orchestrator::run(AgentTask& task) {
     if (task.cancel().cancelled()) {
         task.setState(TaskState::RollingBack);
         if (transaction) {
-            transaction->rollback();
+            closeOnMainThread(false);
             outcome.rolledBack = true;
             Activity a;
             a.kind = ActivityKind::TransactionRolledBack;
@@ -387,7 +445,7 @@ void Orchestrator::run(AgentTask& task) {
         if (auto* snapshotSink = dynamic_cast<SnapshotTransactionSink*>(sink_)) {
             outcome.snapshotId = snapshotSink->openSnapshotId();
         }
-        transaction->commit();
+        closeOnMainThread(true);
         Activity a;
         a.kind = ActivityKind::TransactionCommitted;
         a.title = "Committed";
@@ -411,7 +469,82 @@ void Orchestrator::run(AgentTask& task) {
               "{} in / {} out tokens",
               task.id(), outcome.toolCalls, outcome.iterations, outcome.changedTargets.size(),
               outcome.usage.inputTokens, outcome.usage.outputTokens);
+    if (const auto proposal = task.proposal()) {
+        // A plan is proposed: the task stops here, having changed nothing the plan describes, and
+        // waits for the person. The outcome so far is kept; the state is published LAST (release),
+        // so a reader that sees AwaitingApproval also sees the proposal and the outcome.
+        task.holdOutcome(outcome);
+        Activity a;
+        a.kind = ActivityKind::Plan;
+        a.title = "Proposed: " + proposal->planId;
+        a.detail = proposal->diff;
+        task.append(std::move(a));
+        task.setState(TaskState::AwaitingApproval);
+        return;
+    }
     task.finish(outcome);
+}
+
+bool Orchestrator::approve(AgentTask& task) {
+    if (task.state() != TaskState::AwaitingApproval) {
+        return false;
+    }
+    const std::optional<ToolContext::Proposal> proposal = task.proposal();
+    TaskOutcome outcome = task.outcome();
+    task.setState(TaskState::Committing);
+    // One transaction: the history sink makes the install one undo, labelled with the request; the
+    // snapshot underneath makes a failed commit leave nothing behind.
+    std::unique_ptr<Transaction> transaction;
+    if (sink_ != nullptr && sink_->available()) {
+        transaction = std::make_unique<Transaction>(*sink_, task.prompt());
+    }
+    auto committed = proposal ? commitProposal(*engine_, *proposal)
+                              : Result<CommitReport>(std::unexpected(Error{"there is no proposal to approve"}));
+    Activity a;
+    a.kind = committed ? ActivityKind::TransactionCommitted : ActivityKind::TransactionRolledBack;
+    if (!committed) {
+        if (transaction) {
+            transaction->rollback();
+            outcome.rolledBack = true;
+        }
+        outcome.success = false;
+        outcome.error = committed.error().message;
+        a.title = "Not applied";
+        a.detail = outcome.error;
+        a.success = false;
+        task.append(std::move(a));
+        task.finish(std::move(outcome));
+        return true;
+    }
+    if (transaction) {
+        transaction->commit();
+        outcome.editState = sink_->committedEditState();
+    }
+    outcome.success = true;
+    outcome.error.clear();
+    a.title = "Applied";
+    a.detail = fmt::format("plan '{}' revision {}: {} piece(s) of content, verified", committed->planId,
+                           committed->revision, committed->produced);
+    task.append(std::move(a));
+    task.finish(std::move(outcome));
+    return true;
+}
+
+bool Orchestrator::reject(AgentTask& task, std::string reason) {
+    if (task.state() != TaskState::AwaitingApproval) {
+        return false;
+    }
+    TaskOutcome outcome = task.outcome();
+    outcome.success = false;
+    outcome.rejected = true;
+    outcome.error = std::move(reason);
+    Activity a;
+    a.kind = ActivityKind::TaskFinished;
+    a.title = "Rejected";
+    a.detail = "nothing was changed";
+    task.append(std::move(a));
+    task.finish(std::move(outcome));
+    return true;
 }
 
 } // namespace avgen::ai

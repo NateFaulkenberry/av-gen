@@ -1258,6 +1258,18 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     if (!songPlan_.empty()) {
         doc["songPlan"] = songPlan_.toJson();
     }
+    // ADR-755: the Director Plans this project's content came from, as its provenance. Written only
+    // when there is one, so a project that never used the Director is byte-for-byte what it was.
+    if (!directingPlans_.empty() || !unreadableDirectingPlans_.empty()) {
+        nlohmann::json plans = nlohmann::json::array();
+        for (const directing::Plan& plan : directingPlans_) {
+            plans.push_back(plan.toJson());
+        }
+        for (const nlohmann::json& raw : unreadableDirectingPlans_) {
+            plans.push_back(raw);
+        }
+        doc["directingPlans"] = std::move(plans);
+    }
     // ADR-158: which hero each directed shot was cut for, beside the tracks it accompanies.
     //
     // A sibling of `timeline` rather than part of the scene, because that is what it belongs to: the
@@ -1451,6 +1463,38 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         if (nlohmann::json lights = scene::authoredLightsAgainst(comp->authoredLightsRestJson(), sceneDoc);
             !lights.is_null()) {
             doc["lights"] = std::move(lights);
+        }
+        // The camera collection and the camera track, and this is the same defect a **sixth** time
+        // (ADR-751). `Engine::setCameraDirection` -- the Cameras panel's "+ Camera", "Delete" and
+        // "Cut to this camera", and every camera the Director compiles -- writes the composition;
+        // the composition is saved by reference; so a camera or a cut lived in the window and in no
+        // document a render reads. Measured before this: 2 cameras and 1 shot in the session, 1 and
+        // 0 after a save and a reload (`test_director_persistence.cpp`).
+        //
+        // The whole collection, in `lights`' family rather than ADR-330's difference-by-name: a
+        // rig's placement, aim node and lens are not parameters, so the project owes what the rigs
+        // *are*, not only which exist. **Authored shots only.** `Directed` shots are Song Mode's
+        // (ADR-249) and are regenerated at load from `autoDirector` and `songPlan`, which the
+        // project already saves; writing them would photograph the run and make every directed
+        // project look edited. Compared after a round trip through the same parser, so an untouched
+        // project writes nothing and stays byte-stable.
+        const auto authoredOnly = [](scene::CameraDirection direction) {
+            std::erase_if(direction.shots, [](const scene::CameraShot& shot) {
+                return shot.origin == scene::CameraShot::Origin::Directed;
+            });
+            return direction.toJson();
+        };
+        nlohmann::json fileCameras;
+        if (!sceneDoc.is_object() || !sceneDoc.contains("cameraDirection")) {
+            scene::CameraDirection none;
+            none.ensureMainCamera();
+            fileCameras = authoredOnly(std::move(none));
+        } else if (auto parsed = scene::CameraDirection::fromJson(sceneDoc["cameraDirection"]); parsed) {
+            parsed->ensureMainCamera();
+            fileCameras = authoredOnly(std::move(*parsed));
+        }
+        if (nlohmann::json liveCameras = authoredOnly(comp->cameraDirection()); liveCameras != fileCameras) {
+            doc["cameraDirection"] = std::move(liveCameras);
         }
     }
     if (!states_.empty()) {
@@ -1658,6 +1702,19 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     assets["scene"] = std::move(sceneRef);
     doc["assets"] = std::move(assets);
     return doc;
+}
+
+Result<void> Engine::writeProjectCopy(const std::filesystem::path& path) {
+    const nlohmann::json doc = projectDocument(path);
+    std::ofstream out(path);
+    if (!out) {
+        return fail("cannot write '{}'", path.string());
+    }
+    out << doc.dump(2) << '\n';
+    if (!out) {
+        return fail("could not finish writing '{}'", path.string());
+    }
+    return {};
 }
 
 Result<void> Engine::saveProject(const std::filesystem::path& path) {
@@ -2085,6 +2142,26 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
     }
+    // The session's cameras and authored camera track (ADR-751, the sixth of ADR-207's family; see
+    // the save). **Before `params::loadProject`**, for the lights' reason: `setCameraDirection` is
+    // what registers `cameras/<slug>/...`, and a rig's position and aim arrive in `parameters`.
+    // Song Mode's `Directed` shots are not in the key -- they are regenerated -- so any the scene
+    // file carries are kept rather than replaced.
+    if (const auto entry = doc.find("cameraDirection"); entry != doc.end() && entry->is_object()) {
+        auto direction = scene::CameraDirection::fromJson(*entry);
+        if (!direction) {
+            warn("cameraDirection: " + direction.error().message);
+        } else if (auto* comp = composition(); comp != nullptr) {
+            for (const scene::CameraShot& shot : comp->cameraDirection().shots) {
+                if (shot.origin == scene::CameraShot::Origin::Directed) {
+                    direction->shots.push_back(shot);
+                }
+            }
+            if (auto ok = comp->setCameraDirection(std::move(*direction)); !ok) {
+                warn("cameraDirection: " + ok.error().message);
+            }
+        }
+    }
     // ADR-702: the session's effects -- every owner's, one list -- over the ones its scene authors.
     // After the heroes, because an effect can be attached to one. The pre-ADR-702 keys are named
     // rather than read (ADR-441: every tracked project was converted in the repository).
@@ -2222,6 +2299,26 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // ADR-249. Cleared when absent for the same reason the settings are reset: a project with no
     // plan must not inherit the last one's, or Song Mode would direct this piece to another one's
     // sections.
+    // ADR-755. Cleared when absent, like the song plan: a project must not inherit another's
+    // provenance. A plan this build cannot read is a warning and is kept verbatim, because dropping
+    // it here would make the next save delete it -- the defect family this program exists to avoid.
+    directingPlans_.clear();
+    unreadableDirectingPlans_.clear();
+    if (const auto plans = doc.find("directingPlans"); plans != doc.end() && plans->is_array()) {
+        for (std::size_t i = 0; i < plans->size(); ++i) {
+            directing::PlanParse parsed = directing::parsePlan((*plans)[i]);
+            if (parsed.plan) {
+                directingPlans_.push_back(std::move(*parsed.plan));
+                continue;
+            }
+            unreadableDirectingPlans_.push_back((*plans)[i]);
+            const auto firstError = std::find_if(parsed.issues.begin(), parsed.issues.end(), [](const directing::Issue& issue) {
+                return issue.severity == directing::Severity::Error;
+            });
+            warn(fmt::format("directingPlans[{}]: kept but not read: {}", i,
+                             firstError != parsed.issues.end() ? firstError->message : std::string("unreadable")));
+        }
+    }
     songPlan_ = SongPlan{};
     if (const auto plan = doc.find("songPlan"); plan != doc.end()) {
         auto parsed = songPlanFromJson(*plan);
@@ -2449,6 +2546,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
 }
 
 void Engine::newProject() {
+    directingPlans_.clear();
+    unreadableDirectingPlans_.clear();
     sequence_ = seq::Sequence{};
     sequenceTargets_.clear();
     sequenceReport_ = seq::InstallReport{};

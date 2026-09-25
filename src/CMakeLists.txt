@@ -6,7 +6,7 @@
 # shared line. Everything in it is names, paths and plain data -- no device, no renderer -- so the
 # CPU suite can check it.
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
-    core/*.cpp labs/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp stage/*.cpp search/*.cpp organism/*.cpp
+    core/*.cpp labs/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp stage/*.cpp search/*.cpp organism/*.cpp directing/*.cpp
     control/*.cpp comp/*.cpp seq/*.cpp song/*.cpp help/*.cpp pathtrace/*.cpp)
 # The cinematic shot vocabulary (ADR-062) is pure geometry and JSON, and the sequencer (ADR-089)
 # holds an app::Shot by value in every shot it bakes. It lives in app/ for history's sake; it

@@ -2882,8 +2882,19 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         // The flattened scene, so a step may ask where a node is *drawn* rather than only where the
         // entity arithmetic says it is. One frame old by construction -- see `visualPlacement`.
         stageCtx.visuals = this;
-        staging_.update(stageCtx);
-        raiseDirectorBeats(time.renderTime);
+        // ADR-800: a frame at the instant a seek has just landed on is that instant again, not the
+        // next one. The seek's replay already ran the director there -- `loadProject` seeks to zero
+        // and its first frame is at zero; a render seeks to its start and its first frame is at
+        // the start -- and a second pass at the same instant is one more decision than a play
+        // makes. On the Glowmere film it entered the saucer's second beat at t = 0 instead of
+        // t = 1/60, and every beat after it stayed a frame early: 0.34 m of saucer at 150 s. The
+        // director writes parameter *bases*, so skipping it loses nothing the finals reset.
+        const bool repeat = time.renderTime == seekLandedSeconds_;
+        if (!repeat) {
+            seekLandedSeconds_ = -1.0; // the playhead has left the instant; a later return is a new frame
+            staging_.update(stageCtx);
+            raiseDirectorBeats(time.renderTime);
+        }
     }
     applyPerformers(time.renderTime, time.deltaTime); // ADR-758: after the director, before the step
     applyDirectives(time.renderTime, time.deltaTime); // ADR-824: the same point, on both paths
@@ -3184,6 +3195,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     seekPlaced_ = placement.placed();
     seekPlacedValid_ = placement.valid();
     seekPlacementLive_ = true;
+    seekLandedSeconds_ = seconds;
 }
 
 Result<void> Composition::addMaterialProgram(MaterialProgram program) {

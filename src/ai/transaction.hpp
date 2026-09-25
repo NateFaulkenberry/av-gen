@@ -129,6 +129,11 @@ public:
     [[nodiscard]] virtual bool available() const = 0;
     // What the user is told this transaction is backed by.
     [[nodiscard]] virtual std::string_view kind() const = 0;
+    // The editor-history state the last `commit` produced, or 0 when this sink records no history
+    // or the commit pushed nothing (ADR-752). An opaque token: the AI layer never interprets it, it
+    // only hands it to the host, which undoes the task through its history when that state is
+    // still current. This is how "Undo this task" stops being a second undo mechanism.
+    [[nodiscard]] virtual std::uint64_t committedEditState() const { return 0; }
 };
 
 // The default: one snapshot at begin, restored on abort, kept on commit.
@@ -162,6 +167,9 @@ public:
 
     void commit();
     void rollback();
+    // Closes without telling the sink anything. Only for a host that can no longer service the
+    // sink safely (the frame loop has stopped); the project is left as the task left it.
+    void abandon() { open_ = false; }
     [[nodiscard]] bool open() const { return open_; }
     [[nodiscard]] const std::string& label() const { return label_; }
 

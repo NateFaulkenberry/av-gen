@@ -58,19 +58,28 @@ class Engine;
 
 namespace avgen::ai {
 
-// addendum §15's states, minus WaitingForApproval: this pass has no destructive operation that
-// needs a confirmation gate, and a state nothing can enter is a state that will be wrong when
-// something finally does.
+// addendum §15's states, and the Director's approval gate (spec §19, ADR-757):
+//
+//   Preparing -> WaitingForModel <-> ExecutingTools -> Validating -> Completed
+//                                                    \-> AwaitingApproval -> Committing -> Completed
+//                                                                        \-> Rejected
+//
+// A task whose model proposed a plan (`director.propose_plan`) does not finish: it waits, having
+// changed nothing, until the person approves -- the commit then runs on the main thread in one
+// transaction and is verified -- or rejects, which changes nothing at all.
 enum class TaskState : std::uint8_t {
     Idle,
-    Preparing,      // gathering context
+    Preparing,        // gathering context
     WaitingForModel,
     ExecutingTools,
-    Validating,     // reading back what changed
+    Validating,       // reading back what changed
     RollingBack,
+    AwaitingApproval, // a plan is proposed; nothing has changed; the person decides
+    Committing,       // approved: installing and verifying, on the main thread
     Completed,
     Failed,
     Cancelled,
+    Rejected,         // the person said no; the project is as it was
 };
 [[nodiscard]] const char* taskStateName(TaskState state);
 [[nodiscard]] bool taskStateIsTerminal(TaskState state);
@@ -120,6 +129,10 @@ struct TaskOutcome {
     int toolCalls = 0;
     int iterations = 0;
     std::string snapshotId; // the rollback point, empty when nothing was mutated
+    bool rejected = false;  // the proposal was declined
+    // The editor-history state this task's commit produced, 0 when it pushed none (ADR-752). The
+    // host undoes the task through its history with it; the AI layer never interprets it.
+    std::uint64_t editState = 0;
     std::vector<std::string> changedTargets;
 };
 
@@ -156,10 +169,17 @@ public:
     [[nodiscard]] int toolCallsSoFar() const { return toolCalls_.load(std::memory_order_relaxed); }
     void countToolCall() { toolCalls_.fetch_add(1, std::memory_order_relaxed); }
 
+    // The plan this task proposed, waiting for approval; empty when it proposed none.
+    [[nodiscard]] std::optional<ToolContext::Proposal> proposal() const;
+
     // Worker side.
     void setState(TaskState state);
     void append(Activity activity);
     void finish(TaskOutcome outcome);
+    void setProposal(ToolContext::Proposal proposal);
+    // The model phase's outcome, kept while the task waits for approval: `finish` would publish a
+    // terminal state, which a waiting task is not.
+    void holdOutcome(TaskOutcome outcome);
 
 private:
     std::string id_;
@@ -170,6 +190,7 @@ private:
     mutable std::mutex mutex_;
     std::vector<Activity> activities_;
     TaskOutcome outcome_;
+    std::optional<ToolContext::Proposal> proposal_;
     std::chrono::steady_clock::time_point started_ = std::chrono::steady_clock::now();
 };
 
@@ -191,9 +212,20 @@ public:
     void setModel(std::string model) { model_ = std::move(model); }
     void setTemperature(double temperature) { temperature_ = temperature; }
 
-    // Runs a whole task to completion on the calling thread. **Worker threads only** -- it blocks
-    // on the network and on the main-thread queue. `task` is written throughout so a UI can watch.
+    // Runs a whole task on the calling thread, to completion or to `AwaitingApproval`. **Worker
+    // threads only** -- it blocks on the network and on the main-thread queue. `task` is written
+    // throughout so a UI can watch.
     void run(AgentTask& task);
+
+    // The person's decision on a task in `AwaitingApproval`. **Main thread only**: approving
+    // installs the plan's content, which is the engine's to change. Approving re-compiles the plan
+    // against the project as it is NOW and refuses if the result differs from what was shown (the
+    // project changed underneath the proposal); otherwise it installs it inside one transaction --
+    // one undo, through the history sink -- and verifies the installed content against the plan's
+    // fingerprints before committing. Anything short of that rolls back. Rejecting changes nothing.
+    // False when the task is not awaiting approval.
+    bool approve(AgentTask& task);
+    bool reject(AgentTask& task, std::string reason = "rejected");
 
 private:
     [[nodiscard]] ToolResult invokeOnMainThread(const ToolCall& call, AgentTask& task,
