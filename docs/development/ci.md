@@ -126,13 +126,19 @@ the commit message.
 ### `Sanitizers` (`.github/workflows/sanitizers.yml`): nightly on main, and dispatch
 
 - **ASan/UBSan:**
-  - `--preset asan`, which is Debug + `-fsanitize=address,undefined` on engine targets and tools;
-  - runs over the CPU suite in 3 shards.
+  - `--preset asan`, which is Debug + `-fsanitize=address,undefined` on engine targets and tools,
+    built once;
+  - the CPU suite runs in a matrix: everything except `[stage]` in 3 shards on one runner, and
+    the 66 `[stage]` simulation cases in 12 shards over four runners. Nothing is left out.
   - ASan halts at its first report. UBSan reports every site and carries on, but any
     `runtime error:` line fails the job.
   - Each report appears in the summary as `SANITIZER FAILURE`, with its type, first frame and a
     stack excerpt.
 - **TSan:** `--preset tsan` over the concurrency subset (below). Runs weekly (Sunday) and on dispatch.
+- **Capacity:** a sanitizer run uses up to 5 macOS jobs at once (4 `[stage]` parts plus `main` or
+  TSan). That is the whole free-account macOS concurrency, so push CI queues behind it. That is why
+  it runs at night (07:17 UTC), and why a dispatch during working hours will delay everyone's
+  pushes.
 
 ## What the categories mean
 
@@ -320,9 +326,30 @@ reference, if it were private (macOS billed at 10× Linux):
 
 ## Sanitizer exclusions
 
-The ASan/UBSan job runs the same default CPU set as the per-push job, minus the same two
-documented crash exclusions (`tools/ci/hosted-runner-exceptions.txt`). `ASAN_EXCLUDE` in
-`sanitizers.yml` is empty.
+The ASan/UBSan jobs run the same default CPU set as the per-push job, minus the same two
+documented crash exclusions (`tools/ci/hosted-runner-exceptions.txt`). There is no
+sanitizer-specific exclusion.
+
+**Why it is split, measured on run 36060803359.** A single 3-shard ASan job ran only 847 of 3,233
+cases before its shards stopped (4.8 h):
+
+- the median case took 4 ms;
+- the 66 `[stage]` cases (abduction, beam and farm simulations) take up to 2 h **each** under
+  Debug+ASan, and were 97% of the measured time;
+- each shard was also stopped early by an ASan report (below), which halts the process.
+
+**Findings of that run, reported to the owner, not fixed here** (product code):
+
+- `heap-use-after-free` in `Composition::unregisterNodeParameters`
+  (`src/scene/composition.cpp:4818`). A parameter is freed by `ParameterSet::remove` via
+  `unregisterParameters` (4865, called at 4842) while the particle-parameter walk still reads its
+  name. It is reached from `Composition::removeNode` in "Composition nests scene files and flattens
+  them with prefixed parameters" (`tests/unit/test_composition.cpp:868`). Until it is fixed, the
+  nightly ASan main part reports it, and the cases after it in that shard show as never run.
+- UBSan null dereference in `test_body_compensation.cpp:437`, the same missing-asset defect that
+  segfaults in Release (now excluded).
+- Debug-only `assert` in `json.hpp:2174` from the music-video `get_state` case without its audio
+  (now excluded).
 
 The brief expected the bit-exact golden trace tests to drift by 1 ULP under the -O0 sanitizer
 build. On a fresh clone they cannot run at all: all three stored-baseline comparisons need
