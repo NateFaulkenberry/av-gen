@@ -1,0 +1,55 @@
+{
+  "turns": [
+    {
+      "text": "Two shots of Rook: one on UFO Watch's camera, one chasing him.",
+      "toolCalls": [
+        {
+          "id": "p1",
+          "name": "director.propose_plan",
+          "arguments": {
+            "plan": {
+              "schemaVersion": 1,
+              "id": "rook-in-ufo-watch",
+              "title": "Rook, seen from UFO Watch",
+              "tier": "baked",
+              "subjects": [
+                {
+                  "alias": "rook",
+                  "text": "Rook"
+                }
+              ],
+              "shots": [
+                {
+                  "key": "wrong",
+                  "name": "rook-from-ufo-watch",
+                  "rig": "UFO Watch",
+                  "start": "0:14",
+                  "durationSeconds": 3,
+                  "subject": "rook",
+                  "locked": true
+                },
+                {
+                  "key": "right",
+                  "name": "rook-chase",
+                  "start": "0:20",
+                  "durationSeconds": 3,
+                  "subject": "rook",
+                  "locked": true,
+                  "camera": [
+                    {
+                      "move": "chase",
+                      "distanceMetres": 4
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "text": "Preview to see them."
+    }
+  ]
+}

@@ -39,6 +39,7 @@ public:
     struct Still {
         float u0 = 0.0f, v0 = 0.0f, u1 = 0.0f, v1 = 0.0f;
         double seconds = 0.0;
+        std::string framing; // ADR-769: what is wrong with the frame, or "" (the subject is in it)
     };
     struct Stills {
         std::string task;               // the proposal they are for

@@ -81,6 +81,12 @@ TEST_CASE("a proposal's stills come from a scratch copy with it installed, and l
     CHECK(still.seconds == 92.5); // 1:30 + 5 s / 2
     CHECK(still.image.width == kW);
     CHECK(still.image.height == kH);
+    // ADR-769: the frame's own critique -- Rook, the shot's subject, is in it.
+    CHECK(still.subject == "rook");
+    REQUIRE(still.framing.known);
+    INFO("rook at (" << still.framing.x << ", " << still.framing.y << "), " << still.framing.distance << " m");
+    CHECK(still.framing.inFrame);
+    CHECK(still.framing.note.empty());
 
     // The person's project: not a byte of it changed, and it was not saved.
     CHECK(live.sequence().toJson().dump() == sequenceBefore);
@@ -184,4 +190,31 @@ TEST_CASE("the stills session keeps the editor's frames short, reuses its scratc
     CHECK(againLongest < 250.0);
     std::printf("stills session: first %.0f ms wall (longest editor frame %.0f ms), reused %.0f ms wall "
                 "(longest editor frame %.0f ms)\n", firstWall, firstLongest, againWall, againLongest);
+}
+
+TEST_CASE("a still's framing critique: in front and inside is in frame; behind or outside is said", "[directing][stills]") {
+    // Pure arithmetic over the film camera's matrices (ADR-769), so it needs no device.
+    scene::Camera cam;
+    cam.position = glm::vec3(0.0f, 1.0f, 0.0f);
+    cam.target = glm::vec3(0.0f, 1.0f, -10.0f);
+    const float aspect = 16.0f / 9.0f;
+    const auto check = [&](glm::vec3 p) {
+        return app::frameSubject(cam.view(), cam.projection(aspect), cam.position, p, 2.0f, "rook");
+    };
+    const app::Framing ahead = check(glm::vec3(0.0f, 1.0f, -5.0f));
+    CHECK(ahead.inFrame);
+    CHECK(std::abs(ahead.x) < 1e-3f);
+    CHECK(ahead.distance == 5.0f);
+    const app::Framing behind = check(glm::vec3(0.0f, 1.0f, 5.0f));
+    CHECK_FALSE(behind.inFrame);
+    CHECK(behind.note == "rook is behind the camera");
+    const app::Framing wide = check(glm::vec3(50.0f, 1.0f, -5.0f));
+    CHECK_FALSE(wide.inFrame);
+    CHECK(wide.note.find("outside the frame (right") != std::string::npos);
+    const app::Framing far = check(glm::vec3(0.0f, 1.0f, -150.0f)); // in frame, a speck
+    CHECK(far.inFrame);
+    CHECK(far.heightFraction < app::kReadableFraction);
+    CHECK(far.note.find("too small to read") != std::string::npos);
+    CHECK(ahead.heightFraction > 0.2f);
+    CHECK(ahead.note.empty());
 }

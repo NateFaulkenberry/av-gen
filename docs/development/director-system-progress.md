@@ -34,6 +34,85 @@ Since then:
 - Per the owner, the Umbra leap stays refused: 5.75 m needed against Rook's 1.1 m highest jump,
   with "a character with a larger jump" or "a different path" offered instead.
 
+## What finishing means (written 2026-09-25, before the finishing focus)
+
+The Director is finished when every line below is either done and checked or explicitly ruled out by
+the owner. Each line says what "done" is, how it is checked, and what it waits on.
+
+### A. Open items in Slices 4 and 5
+
+| # | Item | Done when | Check | Depends on |
+|---|---|---|---|---|
+| A1 | Watch control in the panel (event-driven plans today come only from the assistant) | A person can watch the film from the panel and propose on an event without the AI | A UI arm that watches and proposes, with a capture | nothing |
+| A2 | Directed orders raise events (today only `go_to` does) | `face`/`approach`/`pose`/`interact` can name an `onComplete` a cue waits on | A played test: a cue on an order's completion fires at it | Motion: `actionFromEvent` setting `onComplete` (seq/section_actions, Motion lead's) |
+| A3 | Live triggers with no producer: `InteractionComplete`, `VolumeEnter`/`VolumeExit` | A goal's interaction and a region entry are events a plan can name | A played test per trigger | Motion (ADR-828 lists them as not done) |
+| A4 | Occlusion in the still critique (ADR-769) | A subject hidden behind scenery is flagged | The UFO Watch still of Rook (behind a cap) flagged as hidden | A depth readback from the stills renderer (Director side) |
+| A5 | First-still hitch: about 1 s of texture upload on the main thread (ADR-764) | No editor frame over 100 ms from a stills request | `--profile-csv` frame max during a request | Renderer: upload off the main thread, or shared uploads (renderer owner) |
+| A6 | Seek cost (cold seek 0.6-1.6 s at 30-90 s) | The engine's own targets | `[.perf][directing][seek]` | Engine (ADR-700/800 lineage); not Director work |
+| A7 | Recording/watch scratch load (about 3 s per run) | Reuse a loaded scratch session across record/watch/stills | `[.perf][directing][live]` | nothing |
+| A8 | Spec 35's Modify / Regenerate buttons (the coordinator ruled them out for the minimal panel) | Owner decides | - | Owner |
+| A9 | Spec 36: persistent Director sessions ("lower the camera" revises the last plan) | A follow-up request is resolved against the plan it refers to, with no id given | A ScriptedProvider test: a revision request without an id | Plan identity is done (ADR-755); conversation linkage is not |
+| A10 | Continuous-shot regression fix (`fix/continuous-shot`, camera director) | ADR-768's precedence checks still agree with the play after it lands | Re-run `[directing][events][camera]` and the four director UI arms | That branch landing on main |
+
+### B. The definition of done (spec 56), per feature
+
+Every feature runs: semantic input → typed plan → validation → deterministic compilation → preview →
+approval → transaction → undo → save → reload → verification. For each feature, the check that
+proves the pipeline:
+
+| Feature | Pipeline check (all present today) |
+|---|---|
+| Shots and cameras, incl. rise_over/pass | Golden plans + benchmark compile/apply/round-trip; `director-accept` arm |
+| Scripted performances, jumps, landings, retime | Golden plans; played tests; recording-free (baked by construction) |
+| Effects and cues | Golden plans (`effect_on_downbeat`, `fog_during_chorus`) |
+| Goals and directed orders | Golden plans (live tier); played + scrub tests; recording bakes them (0.0000 m) |
+| Recording (panel and assistant) | `director-record` / `director-cancel` arms; ScriptedProvider test |
+| Event-driven plans and runtime shots | Golden plans with carried observation; played agreement tests; ScriptedProvider watch→propose |
+| Preview stills and framing critique | GPU tests (project untouched, still differs from the unproposed frame, framing) |
+
+The same plan and the same project always compile to the same result. The golden test checks this
+for all 15 plans.
+
+### C. The full-system acceptance request (spec 57)
+
+> "At 1:30 in the song, create a 5-second shot that cuts to Rook as he runs and jumps into the air and
+> performs a backflip over the Umbra hero mushroom. Use a low-angle chase, come up over Rook as he
+> performs the backflip, and continue forward past him. Use a slow-motion frame-drag effect during
+> the shot and activate the Umbra hero effect when Rook reaches the peak of the backflip."
+
+- **Before backflip support: DONE.** The Director names "rook does not have a backflip capability"
+  and "highest jump peaks 1.10 m … needs 5.75 m", fabricates nothing, and builds the feasible part:
+  the shot, the low-angle chase, rise_over and pass. Checked by the benchmark compile test, the
+  `rook_backflip` golden, the agent test and the `director-accept` arm.
+- **After backflip support.** Each step of the spec's list, and what it waits on:
+
+| Step | State | Waits on |
+|---|---|---|
+| Resolve Rook, Umbra, 1:30; inspect capabilities | Done | - |
+| Plan the performance (run_to, jump, backflip, land, run) | Done except `backflip` | A backflip clip on Rook (owner: acquire, not generate; §58 rules out generated backflip motion) |
+| Validate clearance | Done (maxApex from the jump data block) | Owner: a jumper with maxApex ≥ 5.75 m, or a different obstacle. Rook stays 1.1 m by ruling |
+| Compile the performance | Done for jump/land; backflip = a once-cued airborne clip fitted like `jumpClipCue` | The backflip clip's measured semantics (M2 measures any clip) |
+| Compile the camera (low-angle chase, rise over, pass) | Done (ADR-760) | - |
+| Peak event and the Umbra hero effect on it | Done (a jump's `peak` moment; ADR-761) | The backflip's own `peak` event from its clip semantics |
+| Slow-motion frame-drag during the shot | Done (retime ADR-823/761 + frame-echo cue) | - |
+| Preview, diff, approval, commit, undo, save, reload, verify | Done | - |
+
+  **The acceptance run itself**, once a backflip exists: the canonical request through a scripted
+  provider, then approve, play, save/reload and undo. Checks:
+  - the body clears Umbra (checkArc clear);
+  - the peak marker coincides with the arc's apex;
+  - the effect fires at the peak;
+  - the camera is behind, then over, then ahead;
+  - one undo restores everything.
+
+### D. What waits on motion work still in progress
+
+- A2 and A3: `onComplete` for section orders; InteractionComplete and VolumeEnter producers.
+- C: the backflip clip and a jumper able to clear 5.75 m. These are asset and owner decisions,
+  carried out on the motion side (the jump block, M2 clip semantics).
+- A10: the Continuous-shot fix, in the camera director (`fix/continuous-shot`).
+- Everything else is the Director's alone.
+
 ## Overall progress
 | Slice | Status | Progress | Tests | Notes |
 |---|---|---:|---:|---|
@@ -42,7 +121,7 @@ Since then:
 | 2 Scripted Performances | Complete | 100% | 16 cases + 1 golden | The handoff is M1 (merged from main; this branch's copy dropped). Non-zero `entrySeconds` is NON_DETERMINISTIC in a baked plan |
 | 3 Airborne + Events | Compile side complete | 85% | 5 `[directing][airborne]` cases + 2 goldens | ADR-761. Remaining: `fall`; acrobatics need assets; UI not verified |
 | 4 Autonomous Direction | Complete (compile side) | 95% | goal, directed, events, record, agent cases | Goal (ADR-763), recording and its UI/AI (ADR-765), directed (ADR-766), event-driven plans (ADR-767), runtime shots and precedence (ADR-768). UI verified by 5 UI-script arms |
-| 5 Verification + Scale | Started | 30% | 11 golden plans, `[.perf][directing]` CPU + GPU + seek | Cost harness over the golden plans, and seek after ADR-800 |
+| 5 Verification + Scale | Complete (Director side) | 90% | 15 golden plans, `[.perf][directing]` CPU + GPU + seek + live | Stills (ADR-764) with framing critique (ADR-769); live-path costs; seek optimisation is the engine's (ADR-800 lineage); MCP/external agents excluded per spec §58 |
 
 ## Current focus
 ### Task
@@ -275,6 +354,11 @@ undo, serialization or compilation will be built on them.
   exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-25: Slice 5 close (Director side). Four Slice 4 goldens (15 total), live-path perf, the
+  recording's scrub check on the played engine (8.8 -> 5.7 s), stills in film order, and the framing
+  critique (ADR-769). Merged main c341f372/cd3aff52 (ADR-890). **Full suites at c341f372:** CPU
+  3,462 cases, exit 0 (1 expected shouldfail, 19 skips); GPU 492, exit 0. UI arms: reject 14,
+  accept 18, record 18, cancel 8, viewpoint 2 -- all pass. "What finishing means" written above.
 - 2026-09-25: Slice 4 closed out. Cancel recording (c6a99677); directed mode (a359d5e7, ADR-766);
   event-driven plans (6e61706f, ADR-767); runtime candidate shots with exact precedence (ADR-768).
   Captures 12-14 in `15-director-panel/`.
@@ -441,6 +525,8 @@ markers · [ ] keyed chase camera · [ ] character performance tests
 [ ] authored-vs-runtime precedence · [ ] replay validation
 
 ## Slice 5 — Verification and scale
-[x] preview thumbnails (ADR-764) · [ ] optional vision critique · [x] Director benchmark harness (costs) ·
-[x] golden plans (10) · [~] performance benchmarks (Director costs measured) · [ ] seek optimization · [ ] MCP exposure ·
-[ ] external-agent integration tests
+[x] preview thumbnails (ADR-764) · [x] framing critique (ADR-769; a model's vision critique stays optional) · [x] Director benchmark harness (costs) ·
+[x] golden plans (15, incl. goal, orders, event-driven, adopted runtime shot) · [x] performance benchmarks (Director,
+seek, live paths: watch and record) · [n/a] seek optimization (the engine's: ADR-700/800; the Director's own seeks are
+cut -- stills reuse a cached session in film order, a recording's scrub check seeks the engine that played) ·
+[excluded] MCP exposure · [excluded] external-agent integration tests (spec §58)

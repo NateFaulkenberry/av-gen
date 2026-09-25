@@ -338,19 +338,14 @@ Result<RecordReport> recordFromCopy(const std::filesystem::path& copy, const dir
             }
         }
     }
+    // The scrub: back into the recording on the engine that just played it -- what a person does
+    // with the playhead -- rather than on a fresh load (3 s each on the benchmark, for the same
+    // answer: a seek replays from its checkpoints either way, ADR-700/800).
     for (const auto& [f, played] : playedAt) {
         say("checking: a scrub into the recording");
-        auto scrub = loadCopy(copy);
-        if (!scrub) {
-            return std::unexpected(scrub.error());
-        }
-        if (auto r = installCompilation(**scrub, baked); !r) {
-            return fail("record: the recorded plan does not install for the scrub: {}", r.error().message);
-        }
-        frame(**scrub, 0);
-        (*scrub)->seekSeconds(static_cast<double>(f - 1) / 60.0);
-        frame(**scrub, f);
-        for (const auto& [name, position] : drawn(**scrub)) {
+        (*check)->seekSeconds(static_cast<double>(f - 1) / 60.0);
+        frame(**check, f);
+        for (const auto& [name, position] : drawn(**check)) {
             if (const auto it = played.find(name); it != played.end()) {
                 report.scrubWorstMetres = std::max(report.scrubWorstMetres, static_cast<double>(glm::length(position - it->second)));
             }
