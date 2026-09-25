@@ -145,3 +145,29 @@ fn flowCurl(p: vec3<f32>, t: f32, seed: u32) -> vec3<f32> {
              0.5 * valueNoiseGrad(p * 2.03 + vec3<f32>(47.3) - db, seed + 1u).xyz;
     return cross(ga, gb);
 }
+
+// ADR-718: `flowCurl` with each of its two octaves weighted, for a caller that has to band-limit the
+// flow against its own sample spacing (the fog's turbulence, against the march's step). The weights
+// multiply each potential's octave BEFORE the cross product, so the result is still grad(a') x
+// grad(b') for the weighted potentials a' = w0 a0 + 0.5 w1 a1 -- divergence-free for any constant
+// weights, which is the property the fog's bound proof leans on. At (1, 1) it IS `flowCurl`, by a
+// branch rather than by arithmetic (ADR-714: "+ 0" is not the identity to a compiler); an octave
+// at weight 0 is not evaluated.
+fn flowCurlBanded(p: vec3<f32>, t: f32, seed: u32, w0: f32, w1: f32) -> vec3<f32> {
+    if (w0 >= 1.0 && w1 >= 1.0) {
+        return flowCurl(p, t, seed);
+    }
+    let da = vec3<f32>(0.31, 0.17, -0.23) * t;
+    let db = vec3<f32>(-0.19, 0.27, 0.13) * t;
+    var ga = vec3<f32>(0.0);
+    var gb = vec3<f32>(0.0);
+    if (w0 > 0.0) {
+        ga = w0 * valueNoiseGrad(p + da, seed).xyz;
+        gb = w0 * valueNoiseGrad(p + vec3<f32>(31.7) + db, seed + 1u).xyz;
+    }
+    if (w1 > 0.0) {
+        ga = ga + (0.5 * w1) * valueNoiseGrad(p * 2.03 + vec3<f32>(17.0) - da, seed).xyz;
+        gb = gb + (0.5 * w1) * valueNoiseGrad(p * 2.03 + vec3<f32>(47.3) - db, seed + 1u).xyz;
+    }
+    return cross(ga, gb);
+}

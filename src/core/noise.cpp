@@ -130,6 +130,25 @@ glm::vec3 flowCurl(const glm::vec3& p, float t, std::uint32_t seed) {
     return glm::cross(ga, gb);
 }
 
+glm::vec3 flowCurlBanded(const glm::vec3& p, float t, std::uint32_t seed, float w0, float w1) {
+    if (w0 >= 1.0f && w1 >= 1.0f) {
+        return flowCurl(p, t, seed);
+    }
+    const glm::vec3 da = glm::vec3(0.31f, 0.17f, -0.23f) * t;
+    const glm::vec3 db = glm::vec3(-0.19f, 0.27f, 0.13f) * t;
+    glm::vec3 ga(0.0f);
+    glm::vec3 gb(0.0f);
+    if (w0 > 0.0f) {
+        ga = w0 * glm::vec3(valueNoiseGrad(p + da, seed));
+        gb = w0 * glm::vec3(valueNoiseGrad(p + glm::vec3(31.7f) + db, seed + 1u));
+    }
+    if (w1 > 0.0f) {
+        ga = ga + (0.5f * w1) * glm::vec3(valueNoiseGrad(p * 2.03f + glm::vec3(17.0f) - da, seed));
+        gb = gb + (0.5f * w1) * glm::vec3(valueNoiseGrad(p * 2.03f + glm::vec3(47.3f) - db, seed + 1u));
+    }
+    return glm::cross(ga, gb);
+}
+
 float voronoiF1(const glm::vec3& p, std::uint32_t seed) {
     const glm::vec3 c(std::floor(p.x), std::floor(p.y), std::floor(p.z));
     const glm::vec3 f = p - c;

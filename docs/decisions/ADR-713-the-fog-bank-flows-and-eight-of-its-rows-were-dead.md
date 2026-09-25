@@ -159,7 +159,8 @@ At scale 4 that structure is finer than the march's spacing, and the grain is 3.
 0.025 from ADR-710. The row's soft range stops at 4. A band-limit like `vortexFilterWidth` (drop the
 flow's second octave when its wavelength is under two steps) is the fix if the owner wants that end
 of the range. It is not built here, because it would be a second change to the field in the same
-edit.
+edit. **ADR-718 builds it:** each flow octave fades against the march's step, measured along the
+ray. The moderate arms above are unchanged, and 0.7 at scale 4 falls to 0.040.
 
 **Byte identity at the defaults** is in ADR-714's "Evidence", which covers both ADRs' shader changes.
 

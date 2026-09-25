@@ -67,6 +67,7 @@ struct Args {
     lanes: array<vec4<f32>, 16>,
     time: vec4<f32>,   // x = t, yzw = the camera position the distance colour measures from
     base: vec4<f32>,   // rgb = the depth colour the tint is applied to
+    step: vec4<f32>,   // xyz = the march step the turbulence band-limits against (ADR-718); 0 = point
 };
 @group(0) @binding(0) var<uniform> args: Args;
 @group(0) @binding(1) var<storage, read> samples: array<vec4<f32>>;
@@ -88,16 +89,19 @@ fn cs_sample(@builtin(global_invocation_id) gid: vec3<u32>) {
     // ADR-575: TWO vec4s per sample now. The emission's height influence is a term the march
     // evaluates on the GPU, and a parity harness that does not read it is a pair with a gap --
     // which was found by breaking the shader and watching this test pass.
-    results[i * 4u] = vec4<f32>(fogShapeAt(f, p, t), fogPrimitiveDistance(f, rel),
+    let step = args.step.xyz;
+    results[i * 5u] = vec4<f32>(fogShapeAt(f, p, t, step), fogPrimitiveDistance(f, rel),
                                 fogVerticalProfile(f, rel.y), fogMacroDetail(f, p, t));
     // ADR-713/714: FOUR vec4s per sample. ADR-575's lesson, applied before rather than after: every
     // term the march evaluates is a quantity this harness reads, or the pair has a gap.
     let camDist = distance(p, args.time.yzw);
-    results[i * 4u + 1u] = vec4<f32>(fogEmissionHeight(f, rel.y), fogSwell(f, t),
+    results[i * 5u + 1u] = vec4<f32>(fogEmissionHeight(f, rel.y), fogSwell(f, t),
                                      fogHeightColourWeight(f, rel.y), fogDistanceColourWeight(f, camDist));
-    results[i * 4u + 2u] = vec4<f32>(fogTurbulence(f, p, t), 0.0);
-    results[i * 4u + 3u] = vec4<f32>(fogTintedColour(f, args.base.rgb, rel.y, camDist),
+    results[i * 5u + 2u] = vec4<f32>(fogTurbulence(f, p, t, step), 0.0);
+    results[i * 5u + 3u] = vec4<f32>(fogTintedColour(f, args.base.rgb, rel.y, camDist),
                                      fogStructureFrame(f, p, t).x);
+    // ADR-718: FIVE vec4s. The band-limit's two octave weights, as their own quantity.
+    results[i * 5u + 4u] = vec4<f32>(fogTurbulenceBand(f, t, step), 0.0, 0.0);
 }
 )";
 
@@ -115,6 +119,8 @@ struct Gpu {
     float heightWeight = 0.0f;
     float distanceWeight = 0.0f;
     glm::vec3 tinted{0.0f};
+    // ADR-718
+    glm::vec2 band{0.0f};
 };
 
 // The camera the distance colour is measured from, and the base colour the tint is applied to.
@@ -160,7 +166,8 @@ public:
     }
 
     std::vector<Gpu> run(const world::MediumSlot& m, float time,
-                         const std::vector<glm::vec3>& positions) {
+                         const std::vector<glm::vec3>& positions,
+                         const glm::vec3& step = glm::vec3(0.0f)) {
         const auto& device = ctx_.device();
         // The four lanes the march hands the field, by value, so this harness has no list to fall
         // behind — the same property the vortex harness gets from passing its uniform block whole.
@@ -168,12 +175,14 @@ public:
             glm::vec4 lanes[16];
             glm::vec4 time;
             glm::vec4 base;
+            glm::vec4 step;
         } args{};
         for (int l = 0; l < 16; ++l) {
             args.lanes[l] = m.lane[l];
         }
         args.time = glm::vec4(time, kCamera);
         args.base = glm::vec4(kBase, 0.0f);
+        args.step = glm::vec4(step, 0.0f);
         wgpu::BufferDescriptor adesc{};
         adesc.size = sizeof(Args);
         adesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
@@ -192,7 +201,7 @@ public:
         ctx_.queue().WriteBuffer(samples, 0, padded.data(), sdesc.size);
 
         wgpu::BufferDescriptor rdesc{};
-        rdesc.size = padded.size() * sizeof(glm::vec4) * 4; // ADR-713/714: four vec4s per sample
+        rdesc.size = padded.size() * sizeof(glm::vec4) * 5; // ADR-713/714/718: five vec4s per sample
         rdesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
         wgpu::Buffer results = device.CreateBuffer(&rdesc);
 
@@ -222,11 +231,11 @@ public:
         ctx_.queue().Submit(1, &commands);
         auto bytes = gpu::readBuffer(ctx_, results, 0, rdesc.size);
         REQUIRE(bytes.has_value());
-        std::vector<glm::vec4> raw(padded.size() * 4);
+        std::vector<glm::vec4> raw(padded.size() * 5);
         std::memcpy(raw.data(), bytes->data(), rdesc.size);
         std::vector<Gpu> out(padded.size());
         for (std::size_t i = 0; i < padded.size(); ++i) {
-            const glm::vec4* r = &raw[i * 4];
+            const glm::vec4* r = &raw[i * 5];
             Gpu g;
             g.shape = r[0].x;
             g.distance = r[0].y;
@@ -239,6 +248,7 @@ public:
             g.turbulence = glm::vec3(r[2]);
             g.tinted = glm::vec3(r[3]);
             g.structureX = r[3].w;
+            g.band = glm::vec2(r[4]);
             out[i] = g;
         }
         return out;
@@ -467,5 +477,59 @@ TEST_CASE("the fog shader agrees about the flow and the colour", "[gpu][fog][par
         CHECK(inside > 20);
         CHECK(displaced > 100);
         CHECK(tinted > 100);
+    }
+}
+
+TEST_CASE("the fog shader agrees about the turbulence's band-limit", "[gpu][fog][parity][flow][bandlimit]") {
+    // ADR-718. The march hands the field its step, and the turbulence fades each flow octave the
+    // step cannot carry. That is a new input and a new term, so both are compared as their own
+    // quantities -- the two octave weights -- and through the displacement and the whole field, at
+    // three step vectors. A zero step is the point sample the three cases above use.
+    auto ctx = makeContext();
+    Harness harness(*ctx);
+    const std::vector<glm::vec3> pts = positions();
+    for (const int shape : {0, 1, 4}) {
+        INFO("shape index " << shape);
+        world::MediumSlot slot = shippedBank(0.6f, shape, 0.4f);
+        slot.lane[1].z = 0.043f; // swirl: the band is measured in the swirled frame
+        slot.lane[7].y = 0.7f;   // turbulence amount
+        slot.lane[7].w = 4.0f;   // turbulence scale: high enough that some steps cannot carry it
+        slot.lane[6].w = 0.6f;   // turbulence rate
+        int partial = 0;         // an octave between its two ends
+        int silenced = 0;        // the first octave gone
+        int kept = 0;            // both octaves whole
+        int displaced = 0;
+        // A step the flow is coarse against, one that puts an octave between Nyquist and one cycle a
+        // step, and one past it. Oblique, so the swirl's rotation and the yaw both reach the measure.
+        for (const glm::vec3 step : {glm::vec3(0.5f, -0.3f, 0.2f), glm::vec3(0.0f, -9.0f, 30.0f),
+                                     glm::vec3(300.0f, 40.0f, 300.0f)}) {
+            for (const float t : {0.0f, 7.5f}) {
+                const std::vector<Gpu> gpu = harness.run(slot, t, pts, step);
+                REQUIRE(gpu.size() == pts.size());
+                for (std::size_t i = 0; i < pts.size(); ++i) {
+                    INFO("t=" << t << " step=(" << step.x << ", " << step.y << ", " << step.z << ") p=("
+                              << pts[i].x << ", " << pts[i].y << ", " << pts[i].z << ")");
+                    const glm::vec2 band = world::fogTurbulenceBand(slot, t, step);
+                    CHECK(gpu[i].band.x == Approx(band.x).margin(1e-4));
+                    CHECK(gpu[i].band.y == Approx(band.y).margin(1e-4));
+                    const glm::vec3 d = world::fogTurbulence(slot, pts[i], t, step);
+                    CHECK(gpu[i].turbulence.x == Approx(d.x).margin(0.05));
+                    CHECK(gpu[i].turbulence.y == Approx(d.y).margin(0.05));
+                    CHECK(gpu[i].turbulence.z == Approx(d.z).margin(0.05));
+                    CHECK(gpu[i].shape == Approx(world::fogShapeAt(slot, pts[i], t, step)).margin(2e-3));
+                    partial += (band.x > 0.0f && band.x < 1.0f) || (band.y > 0.0f && band.y < 1.0f) ? 1 : 0;
+                    silenced += band.x == 0.0f ? 1 : 0;
+                    kept += band.x == 1.0f && band.y == 1.0f ? 1 : 0;
+                    displaced += glm::length(d) > 1.0f ? 1 : 0;
+                }
+            }
+        }
+        // The controls: the three steps put the octaves at all three places a weight can be, and
+        // the flow that survived still moved samples by metres.
+        INFO("partial " << partial << " silenced " << silenced << " kept " << kept << " displaced " << displaced);
+        CHECK(partial > 20);
+        CHECK(silenced > 20);
+        CHECK(kept > 20);
+        CHECK(displaced > 100);
     }
 }

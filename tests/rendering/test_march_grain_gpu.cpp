@@ -191,6 +191,8 @@ TEST_CASE("PROBE the march's grain at matched luminance", "[.probe][volume][grai
         {"ff-turb-0.35-32", "examples/treeisland/_ff-turb-035-32.json", true, 6.0, -1, 0.0f},
         {"ff-turb-0.7-32", "examples/treeisland/_ff-turb-070-32.json", true, 6.0, -1, 0.0f},
         {"ff-turb-0.7-s4-32", "examples/treeisland/_ff-turb-070-s4-32.json", true, 6.0, -1, 0.0f},
+        // ADR-718: one arm past the row's soft range, for the band-limit's before and after.
+        {"ff-turb-1.0-s6-32", "examples/treeisland/_ff-turb-100-s6-32.json", true, 6.0, -1, 0.0f},
         {"ff-swirl-32", "examples/treeisland/_ff-swirl-32.json", true, 6.0, -1, 0.0f},
         {"ff-swell-32", "examples/treeisland/_ff-swell-32.json", true, 6.0, -1, 0.0f},
         {"ff-colour-base-32", "examples/treeisland/_ff-colour-base-32.json", true, 6.0, -1, 0.0f},
