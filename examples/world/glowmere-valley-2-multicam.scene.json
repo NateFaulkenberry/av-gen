@@ -9403,7 +9403,8 @@
           "moveEnter": 0.651,
           "moveExit": 0.3255,
           "accel": 3.472,
-          "decel": 4.774
+          "decel": 4.774,
+          "minDwell": 0.6
         },
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
@@ -9521,10 +9522,11 @@
               "ember"
             ],
             "observeChance": 0.55,
-            "minDwell": 1.2,
-            "maxDwell": 3.4,
+            "minDwell": 3.0,
+            "maxDwell": 6.0,
             "alertThreshold": 0.3,
-            "reactionDecay": 1.2
+            "reactionDecay": 1.2,
+            "reactionCooldown": 15.0
           },
           {
             "kind": "liveliness",
