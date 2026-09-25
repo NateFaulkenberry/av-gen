@@ -15,6 +15,7 @@
 #include "core/time.hpp"
 #include "entity/entity.hpp"
 #include "scene/composition.hpp"
+#include "scene/detail_limits.hpp"
 #include "seq/events.hpp"
 #include "seq/section_actions.hpp"
 #include "seq/section_performance.hpp"
@@ -373,4 +374,57 @@ TEST_CASE("an Engine seek into an order does not give it again, and lands where 
     CHECK(cancelled == 0);
     CHECK(scrubbed.walker().actions().authority() == entity::Authority::Director);
     CHECK(glm::length(played.walker().visualPosition() - scrubbed.walker().visualPosition()) == 0.0f);
+}
+
+// ADR-824 with ADR-870: the film's section directions AND its audio, through `Engine`, the path a
+// person's scrub takes. Each replayed step builds the frame's bus and reactions and then gives the
+// scheduled orders, in a play frame's order; if either half were missing -- or the order wrong -- a
+// directed body would land elsewhere. Exactly 0, as the ADR-800/870 cases hold.
+TEST_CASE("through the Engine, with audio, a scrub of the film's section directions lands where the play did",
+          "[motion][direction][glowmere][seek][adr870]") {
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
+    if (!fs::exists(fs::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb")) {
+        SKIP("Glowmere assets are not present");
+    }
+    const auto load = [&](app::Engine& engine) {
+        REQUIRE(engine.loadProject(project).has_value());
+        scene::DetailLimits limits = engine.detailLimits();
+        limits.entityDistanceCull = false;
+        engine.setDetailLimits(limits);
+        seq::Sequence piece = engine.sequence();
+        seq::GenerationOptions options;
+        options.table = seq::tableFrom(piece.sectionPerformance);
+        const seq::GeneratedDirection generated = seq::generatePerformanceEvents(piece.structure, options);
+        piece.events.insert(piece.events.end(), generated.events.begin(), generated.events.end());
+        REQUIRE(engine.setSequence(piece).has_value());
+    };
+    const auto frameAt = [](app::Engine& engine, long long f) {
+        engine.update(FrameTime{static_cast<double>(f) / 60.0, f == 0 ? 0.0 : 1.0 / 60.0, static_cast<std::uint64_t>(f)});
+    };
+    app::Engine played(app::EngineMode::Offline);
+    load(played);
+    const auto& directives = played.composition()->directives();
+    REQUIRE(directives.size() >= 3);
+    // On the frame grid, after three directions.
+    const auto target = static_cast<long long>(std::llround((directives[2].timeSeconds + 5.0) * 60.0));
+    for (long long f = 0; f <= target + 1; ++f) {
+        frameAt(played, f);
+    }
+    app::Engine scrubbed(app::EngineMode::Offline);
+    load(scrubbed);
+    scrubbed.seekSeconds(static_cast<double>(target) / 60.0);
+    frameAt(scrubbed, target + 1);
+    float worst = 0.0f;
+    std::string who;
+    for (const auto& e : played.composition()->entityWorld().entities()) {
+        const float d = glm::length(e->visualPosition() -
+                                    scrubbed.composition()->entityWorld().find(e->name())->visualPosition());
+        if (d > worst) {
+            worst = d;
+            who = e->name();
+        }
+    }
+    INFO(directives.size() << " directives; at " << static_cast<double>(target) / 60.0 << " s the worst is " << who
+                           << " at " << worst << " m");
+    CHECK(worst == 0.0f);
 }
