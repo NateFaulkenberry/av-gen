@@ -352,3 +352,25 @@ TEST_CASE("on the multicam film, a scrub replays the section directions a play g
         CHECK(withoutDirections.at(name) < 1e-4f); // and the film is exact without them too
     }
 }
+
+TEST_CASE("an Engine seek into an order does not give it again, and lands where the play did",
+          "[motion][direction][seek]") {
+    // ADR-098 says a restored firing must not be treated as news. ADR-824 goes further for the orders
+    // this engine applies itself: the replay gives them at their seconds, so the host's restored
+    // firing is not delivered at all. Measured through `Engine`, the path a person's scrub takes.
+    Harness played;
+    for (long long f = 0; f <= 60 * 3 + 31; ++f) {
+        played.engine.update(FrameTime{static_cast<double>(f) / 60.0, f == 0 ? 0.0 : 1.0 / 60.0, static_cast<std::uint64_t>(f)});
+    }
+    Harness scrubbed;
+    int cancelled = 0;
+    scrubbed.comp().entityWorld().setActionListener([&](const entity::ActionEvent& e) {
+        cancelled += e.result == entity::ActionResult::Cancelled ? 1 : 0;
+    });
+    scrubbed.engine.update(FrameTime{0.0, 0.0, 0});
+    scrubbed.engine.seekSeconds(3.5);
+    scrubbed.engine.update(FrameTime{3.5 + 1.0 / 60.0, 1.0 / 60.0, 211});
+    CHECK(cancelled == 0);
+    CHECK(scrubbed.walker().actions().authority() == entity::Authority::Director);
+    CHECK(glm::length(played.walker().visualPosition() - scrubbed.walker().visualPosition()) == 0.0f);
+}

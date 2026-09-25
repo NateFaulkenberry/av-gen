@@ -887,6 +887,7 @@ private:
     // `applySectionActions` does not give the same order a second time.
     std::set<std::size_t> directedEvents_;
     void installDirectives();
+    void postCharacterEvents(); // ADR-828
     void removeLayerParameters(); // drops "layers/*" from params_ (before a reload or a delete)
     scene::PostSettings post_;
     // ADR-702. `effects_` is the live set (authored + modulated) of every owner's effects;

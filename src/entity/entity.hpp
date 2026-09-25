@@ -378,6 +378,13 @@ struct DirectorGoal {
     std::string subject;    // an entity or a landmark
     std::string affordance; // the verb to use when offered and capable; empty: observe it
     double since = 0.0;     // when it was given: the "done it since" test counts from here
+    // ADR-828 (F7 `CharacterGoal`): when it lapses (0 = until replaced or released), and how the
+    // character goes about it. Empty or negative: the goal considerer's own authored value.
+    double until = 0.0;
+    std::string intent;
+    std::string activity;
+    float approach = -1.0f;
+    float dwell = -1.0f;
 };
 
 // ADR-820: where a body was when a performance with an entry blend took it -- the point the blend
@@ -904,6 +911,8 @@ public:
     // ADR-824 (§35): gives `entity` a runtime goal (see `DirectorGoal`), replacing any earlier one.
     // An empty subject clears it. False for an unknown entity.
     bool setGoal(std::string_view entity, std::string subject, std::string affordance, double now);
+    // ADR-828: the whole goal, as a `CharacterGoal` event states it. `goal.since` is taken as given.
+    bool setGoal(std::string_view entity, DirectorGoal goal);
     // ---- trigger volumes and music influence fields (ADR-097) --------------------------------
 
     // Replaces the field set. Call *before* registerParameters(): a field's strength, scale, inner

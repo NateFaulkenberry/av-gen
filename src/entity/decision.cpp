@@ -1643,7 +1643,17 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
     const std::string& goalSubject = directed != nullptr ? directed->subject : subject_;
     const std::string& goalAffordance = directed != nullptr ? directed->affordance : affordance_;
     const double goalFrom = directed != nullptr ? directed->since : from_;
-    const double goalUntil = directed != nullptr ? 0.0 : until_;
+    const double goalUntil = directed != nullptr ? directed->until : until_;
+    // ADR-828: how, when the runtime goal says; the authored considerer's values otherwise.
+    const float goalApproach = directed != nullptr && directed->approach >= 0.0f ? directed->approach : approach_;
+    const double goalDwell =
+        directed != nullptr && directed->dwell >= 0.0f ? static_cast<double>(directed->dwell) : dwell_;
+    const std::string& goalActivity =
+        directed != nullptr && !directed->activity.empty() ? directed->activity : activity_;
+    IntentType goalIntent = intent_;
+    if (directed != nullptr && !directed->intent.empty()) {
+        (void)intentTypeFromName(directed->intent, goalIntent);
+    }
     if (goalSubject.empty() || ctx.time < goalFrom || (goalUntil > 0.0 && ctx.time >= goalUntil)) {
         return;
     }
@@ -1682,7 +1692,7 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
             verb = nullptr;
         }
     }
-    const float approach = verb != nullptr ? std::min(approach_, verb->range * 0.6f) : approach_;
+    const float approach = verb != nullptr ? std::min(goalApproach, verb->range * 0.6f) : goalApproach;
     actions_.clear();
     ActionDesc walk;
     walk.kind = ActionKind::Move;
@@ -1691,6 +1701,10 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
     walk.target.point = standOff(ctx.state->position(), at, approach);
     walk.tolerance = std::max(approach * 0.4f, 0.3f);
     walk.arrival = kArrival;
+    // ADR-828: the errand says when it arrives and when it is over, as named completions -- which
+    // `EntityWorld` raises as world events on a play and in the replay alike, and the host posts as
+    // `<entity>.goal.arrived` / `<entity>.goal.done` to the sequence's live triggers.
+    walk.onComplete = "goal.arrived";
     actions_.push_back(walk);
     ActionDesc face;
     face.kind = ActionKind::Face;
@@ -1706,19 +1720,22 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
         use.target.name = goalSubject;
         use.target.member = verb->name;
         actions_.push_back(use);
-    } else if (dwell_ > 0.0) {
+    } else if (goalDwell > 0.0) {
         ActionDesc attend;
         attend.kind = ActionKind::Pose;
         attend.name = name_;
-        attend.activity = activity_;
-        attend.duration = dwell_;
+        attend.activity = goalActivity;
+        attend.duration = goalDwell;
         attend.target.kind = TargetKind::Point;
         attend.target.point = at;
         actions_.push_back(attend);
     }
+    if (actions_.size() > 1) {
+        actions_.back().onComplete = "goal.done";
+    }
     out.push_back(Option{name_, weight() * novelty, std::span<const ActionDesc>(actions_), Authority::Routine});
     Option& o = out.back();
-    o.intent = verb != nullptr ? IntentType::Interact : intent_;
+    o.intent = verb != nullptr ? IntentType::Interact : goalIntent;
     o.subject = subject;
     o.target = at;
     o.hasTarget = true;

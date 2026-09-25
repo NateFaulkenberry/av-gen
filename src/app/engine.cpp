@@ -373,26 +373,40 @@ void Engine::installDirectives() {
             continue;
         }
         const seq::SequenceEvent& event = sequence_.events[firing.eventIndex];
-        if (event.what.kind != seq::EventActionKind::EntityAction) {
-            continue;
-        }
-        auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
-        if (!directed || comp->entityWorld().find(directed->entity) == nullptr) {
-            continue;
-        }
         scene::Composition::Directive d;
         d.timeSeconds = firing.timeSeconds;
-        d.entity = directed->entity;
-        d.release = directed->release;
-        d.goal = directed->goal;
-        d.goalSubject = directed->goalSubject;
-        d.goalAffordance = directed->goalAffordance;
-        if (!directed->release && !directed->goal) {
-            d.actions.push_back(directed->action);
+        if (event.what.kind == seq::EventActionKind::CharacterGoal) {
+            // ADR-828 (F7): a goal for the character's `goal` considerer, from this second.
+            if (event.what.target.empty() || comp->entityWorld().find(event.what.target) == nullptr) {
+                continue;
+            }
+            d.entity = event.what.target;
+            d.goal = true;
+            d.goalSpec.subject = event.what.value;
+            d.goalSpec.affordance = event.what.argument;
+            d.goalSpec.until = event.what.seconds;
+            d.goalSpec.intent = event.what.goal.intent;
+            d.goalSpec.activity = event.what.goal.activity;
+            d.goalSpec.approach = event.what.goal.approach;
+            d.goalSpec.dwell = event.what.goal.dwell;
+        } else if (event.what.kind == seq::EventActionKind::EntityAction) {
+            auto directed = seq::actionFromEvent(event.what.target, event.what.value, event.what.argument);
+            if (!directed || comp->entityWorld().find(directed->entity) == nullptr) {
+                continue;
+            }
+            d.entity = directed->entity;
+            d.release = directed->release;
+            d.goal = directed->goal;
+            d.goalSpec.subject = directed->goalSubject;
+            d.goalSpec.affordance = directed->goalAffordance;
+            if (!directed->release && !directed->goal) {
+                d.actions.push_back(directed->action);
+            }
+        } else {
+            continue;
         }
         std::uint64_t h = 1469598103934665603ULL;
-        for (const char c : fmt::format("{}|{}|{}|{}|{}", firing.timeSeconds, event.what.target, event.what.value,
-                                        event.what.argument, firing.eventIndex)) {
+        for (const char c : event.toJson().dump() + fmt::format("|{}|{}", firing.timeSeconds, firing.eventIndex)) {
             h ^= static_cast<unsigned char>(c);
             h *= 1099511628211ULL;
         }
@@ -401,6 +415,29 @@ void Engine::installDirectives() {
         directedEvents_.insert(firing.eventIndex);
     }
     comp->setDirectives(std::move(directives));
+}
+
+// ADR-828 (Phase D §26): a character's named completions -- an action's `onComplete`, a goal's
+// `goal.arrived` and `goal.done` -- posted to the sequence's live triggers as `ActionComplete`, the
+// event's name as the trigger's name and the entity as its subject. So "when Rook arrives" is a
+// sequence event `{when: actionComplete, name: "goal.arrived", subject: "rook"}`, and the Director's
+// `rook.goal.arrived` is that pair. Nothing posted before this: `ActionComplete` had no producer.
+//
+// Posted from the step's own record (`EntityWorld::actionEvents`), at the simulation second the
+// action completed. The step raises the same events in a seek's replay (as world events), so a
+// recording that samples a play and a replay of the same film sees the same names at the same times;
+// the dispatcher itself follows ADR-098 on a seek (a live event is not re-fired by a scrub).
+void Engine::postCharacterEvents() {
+    const scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return;
+    }
+    for (const entity::ActionEvent& e : comp->entityWorld().actionEvents()) {
+        if (e.event.empty() || e.result != entity::ActionResult::Completed) {
+            continue;
+        }
+        sequenceEvents_.post(seq::TriggerSignal{seq::TriggerKind::ActionComplete, e.event, e.entity, e.time});
+    }
 }
 
 void Engine::clearSequence() {
@@ -4678,6 +4715,7 @@ void Engine::update(const FrameTime& time) {
     // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of
     // whatever the routes wrote, so a route and a behaviour compose on one property.
     controller_->updateBehaviour(time, bus_);
+    postCharacterEvents(); // ADR-828: this step's named completions, before the dispatcher drains
     if (viewportHeight_ > 0) {
         if (auto* comp = composition()) {
             comp->setViewport(viewportWidth_, viewportHeight_);

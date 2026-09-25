@@ -2132,6 +2132,16 @@ bool EntityWorld::release(std::string_view entity, double now) {
     return true;
 }
 
+bool EntityWorld::setGoal(std::string_view entity, DirectorGoal goal) {
+    Entity* found = find(entity);
+    if (found == nullptr) {
+        return false;
+    }
+    goal.active = !goal.subject.empty();
+    found->directorGoal_ = goal.active ? std::move(goal) : DirectorGoal{};
+    return true;
+}
+
 bool EntityWorld::setGoal(std::string_view entity, std::string subject, std::string affordance, double now) {
     Entity* found = find(entity);
     if (found == nullptr) {

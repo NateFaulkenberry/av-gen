@@ -601,9 +601,10 @@ public:
         std::string entity;
         std::vector<entity::ActionDesc> actions; // given to the Director tier
         bool release = false;                    // or: the Director tier is dropped
-        bool goal = false;                       // or: a runtime goal (ADR-824, §35)
-        std::string goalSubject;                 // empty with `goal`: the goal is cleared
-        std::string goalAffordance;
+        bool goal = false;                       // or: a runtime goal (ADR-824, §35; ADR-828 F7)
+        // The goal, `since` and `until` relative: `since` is filled with `timeSeconds` when it is
+        // given, and `until` > 0 is a duration from then. An empty subject clears the goal.
+        entity::DirectorGoal goalSpec;
         std::uint64_t signature = 0;
     };
     void setDirectives(std::vector<Directive> directives);
@@ -655,6 +656,21 @@ public:
     // cues the same walk at 0:12 and again at 1:04 and means two different phases -- and a scrub
     // backwards means the earlier one again. Idempotent either way: a request identical to the one
     // already in force returns immediately, so calling it per frame costs a string compare.
+    // ADR-828: what the first rig on `nodeName` is playing at `now` -- read-only, for a recording that
+    // turns a live run into clip cues (the Director's "Record"). `clipSeconds` is the clip's own
+    // local time from its first frame (wrapped for a loop, clamped for a one-shot); `speed` is clip
+    // seconds per timeline second; `startSeconds` is the phase origin a cue would reproduce it with.
+    struct ClipReadout {
+        bool found = false;
+        std::string state;
+        float clipSeconds = 0.0f;
+        float speed = 1.0f;
+        double startSeconds = 0.0;
+        bool loops = true;
+        bool finished = false;
+        std::string fadingFrom; // the state a cross-fade is leaving, or empty once it has settled
+    };
+    [[nodiscard]] ClipReadout clipReadout(const std::string& nodeName, double now) const;
     // ADR-821: what the first rig on `nodeName` measures its clips as, computed on first request and
     // shared across every node instancing the same asset. Null for a node with no rig.
     [[nodiscard]] const ClipSemanticsTable* clipSemanticsFor(const std::string& nodeName) const;

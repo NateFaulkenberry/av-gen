@@ -2857,7 +2857,10 @@ void Composition::applyDirectives(double now, double dt) {
         if (d.release) {
             (void)entityWorld_.release(d.entity, d.timeSeconds);
         } else if (d.goal) {
-            (void)entityWorld_.setGoal(d.entity, d.goalSubject, d.goalAffordance, d.timeSeconds);
+            entity::DirectorGoal g = d.goalSpec;
+            g.since = d.timeSeconds;
+            g.until = d.goalSpec.until > 0.0 ? d.timeSeconds + d.goalSpec.until : 0.0;
+            (void)entityWorld_.setGoal(d.entity, std::move(g));
         } else {
             (void)entityWorld_.direct(d.entity, d.actions, d.timeSeconds);
         }
@@ -6852,6 +6855,30 @@ void Composition::updateCharacters(const FrameTime& time) {
         node.animationPushed = true; // whether or not it landed: do not warn again every frame
     }
     rigStats_ = updateRigs(scene_, time);
+}
+
+Composition::ClipReadout Composition::clipReadout(const std::string& nodeName, double now) const {
+    ClipReadout out;
+    const CompositionNode* node = findNode(nodeName);
+    if (node == nullptr || node->rigs.empty() || node->rigs.front() >= scene_.rigs.size()) {
+        return out;
+    }
+    const SkinnedRig& rig = scene_.rigs[node->rigs.front()];
+    if (!rig.player.active()) {
+        return out;
+    }
+    out.found = true;
+    out.state = std::string(rig.player.currentState());
+    const int index = rig.player.currentStateIndex();
+    const auto& state = rig.player.states()[static_cast<std::size_t>(index)];
+    const float clipStart = state.clip < rig.clips.size() ? rig.clips[state.clip].start : 0.0f;
+    out.clipSeconds = rig.player.stateTime(rig.clips, now) - clipStart;
+    out.speed = rig.player.currentSpeed();
+    out.startSeconds = rig.player.currentStart();
+    out.loops = rig.player.currentLooping();
+    out.finished = rig.player.finished(rig.clips, now);
+    out.fadingFrom = std::string(rig.player.fadingState());
+    return out;
 }
 
 const ClipSemanticsTable* Composition::clipSemanticsFor(const std::string& nodeName) const {

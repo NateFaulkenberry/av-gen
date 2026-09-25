@@ -148,6 +148,11 @@ enum class EventActionKind : std::uint8_t {
     SceneTransition, // BAKED. target = slot id, value = transition kind, seconds = duration
     EntityAction,    // SCHEDULED/LIVE. target = entity, value = verb, argument = the verb's object
     Notify,          // SCHEDULED/LIVE. target = a name the host knows; the fourth-wall selection
+    // SCHEDULED/LIVE (ADR-828, Phase F7). A goal for a character's `goal` considerer: target =
+    // entity, value = subject (a place or an entity), argument = affordance (optional), seconds = how
+    // long it stands (0 = until replaced or released), `goal` = intent, activity, approach, dwell.
+    // The character decides the how; this says what it wants, from this second.
+    CharacterGoal,
 };
 [[nodiscard]] const char* eventActionKindName(EventActionKind kind);
 [[nodiscard]] std::optional<EventActionKind> eventActionKindFromName(std::string_view name);
@@ -181,6 +186,15 @@ struct EventAction {
     // returning to the identity needs no knowledge of what was there before -- so an impulse
     // ("flash the lamp for a beat") is two keys and is correct under any scrub.
     params::TrackMode mode = params::TrackMode::Replace;
+    // ADR-828, `CharacterGoal` only: how the character goes about it. Empty or negative: the goal
+    // considerer's own authored value.
+    struct GoalSpec {
+        std::string intent;   // an `entity::IntentType` name ("investigate", "interact", ...)
+        std::string activity; // what it does on arrival when there is no affordance ("observe")
+        float approach = -1.0f; // stand-off, metres
+        float dwell = -1.0f;    // seconds it attends on arrival
+    };
+    GoalSpec goal;
 
     [[nodiscard]] nlohmann::json toJson() const;
     [[nodiscard]] static EventAction fromJson(const nlohmann::json& j);

@@ -481,6 +481,7 @@ void bakeEventFirings(const Sequence& sequence, const EventSchedule& schedule,
         }
         case EventActionKind::EntityAction:
         case EventActionKind::Notify:
+        case EventActionKind::CharacterGoal:
             // Not baked, and not reached: `resolveEvents` puts these in `dispatches`. Listed so the
             // switch stays exhaustive and a new action kind cannot be added without deciding.
             break;
