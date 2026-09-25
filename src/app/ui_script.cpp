@@ -37,7 +37,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 20> kArms{{
+constexpr std::array<ArmName, 21> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -57,6 +57,7 @@ constexpr std::array<ArmName, 20> kArms{{
     {"director-reject", UiScriptArm::DirectorReject},
     {"director-accept", UiScriptArm::DirectorAccept},
     {"director-record", UiScriptArm::DirectorRecord},
+    {"viewpoint", UiScriptArm::Viewpoint},
     {"director-cancel", UiScriptArm::DirectorCancel},
 }};
 
@@ -331,6 +332,9 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
     }
     if (panel != nullptr && has(arms_, UiScriptArm::DirectorRecord)) {
         stepDirectorRecord(engine, *panel, window, frame);
+    }
+    if (has(arms_, UiScriptArm::Viewpoint)) {
+        stepViewpoint(engine, *panel, window, frame);
     }
     if (panel != nullptr && (has(arms_, UiScriptArm::DirectorReject) || has(arms_, UiScriptArm::DirectorAccept))) {
         stepDirector(engine, *panel, window, frame, has(arms_, UiScriptArm::DirectorAccept));
@@ -1306,6 +1310,103 @@ void UiScript::stepDrag(Engine& engine, ui::ControlPanel& panel, platform::Windo
 } // namespace avgen::app
 
 namespace avgen::app {
+
+// ADR-890. The schedule, in frames:
+//   20      choose the editor viewpoint, as the canvas toolbar's button does
+//   30-70   Option-drag the canvas (an orbit), released at 70
+//   72      remember the pose the drag left, and press Play
+//   73-     every frame: the frame on screen must be that pose, exactly -- through the cuts
+//   400     seek to the middle of the film, and keep checking
+// Runs as long as `--frames` allows; the verdict is logged every 120 frames and at every failure.
+void UiScript::stepViewpoint(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                             std::uint64_t frame) {
+    const float w = static_cast<float>(window.pixelWidth()) / std::max(window.pixelScale(), 1e-3f);
+    const float h = static_cast<float>(window.pixelHeight()) / std::max(window.pixelScale(), 1e-3f);
+    const scene::Composition* comp = engine.composition();
+    if (comp == nullptr) {
+        return;
+    }
+    if (frame == 20 && panel.onViewportView) {
+        panel.onViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
+    }
+    const float x = w * (0.5f + 0.1f * static_cast<float>(frame >= 30 ? frame - 30 : 0) / 40.0f);
+    const float y = h * 0.45f;
+    if (frame == 29) {
+        viewpointEye_ = comp->editorCamera().position; // the seed, to prove the drag moved it
+        return;
+    }
+    if (frame == 28) {
+        warpAndMove(window, x, y); // the press must land on the canvas, not where the mouse sits
+    }
+    if (frame == 30) {
+        SDL_SetModState(SDL_KMOD_LALT);
+        pushButton(window, x, y, true);
+        return;
+    }
+    if (frame > 30 && frame < 70) {
+        warpAndMove(window, x, y);
+        return;
+    }
+    if (frame == 70) {
+        pushButton(window, x, y, false);
+        SDL_SetModState(SDL_KMOD_NONE);
+        return;
+    }
+    if (frame == 72) {
+        check(glm::length(comp->editorCamera().position - viewpointEye_) > 1e-3f,
+              "viewpoint: the drag moved the editor viewpoint");
+        viewpointEye_ = comp->editorCamera().position;
+        viewpointTarget_ = comp->editorCamera().target;
+        viewpointHeld_ = true;
+        check(comp->editorCameraSeeded() && comp->viewportView().mode == scene::ViewportCamera::Editor,
+              "viewpoint: the canvas is on the editor viewpoint after the drag");
+        log::info("ui-script viewpoint: holding eye ({:.3f}, {:.3f}, {:.3f}) aim ({:.3f}, {:.3f}, {:.3f}) "
+                  "at {:.2f} s; playing",
+                  viewpointEye_.x, viewpointEye_.y, viewpointEye_.z, viewpointTarget_.x, viewpointTarget_.y,
+                  viewpointTarget_.z, engine.transport().positionSeconds());
+        static_cast<void>(engine.play());
+        return;
+    }
+    if (frame == 400) {
+        const double duration = engine.durationSeconds() > 0.0 ? engine.durationSeconds() : 60.0;
+        engine.seekSeconds(duration * 0.5);
+        log::info("ui-script viewpoint: seeked to {:.2f} s", duration * 0.5);
+    }
+    if (!viewpointHeld_ || frame < 74) {
+        return;
+    }
+    // What the last update put on screen. The step runs before this frame's update, so this is the
+    // frame the person is looking at now.
+    const scene::Camera& shown = engine.scene().camera;
+    const float drift = std::max(glm::length(shown.position - viewpointEye_),
+                                 glm::length(shown.target - viewpointTarget_));
+    const bool poseKept = comp->editorCamera().position == viewpointEye_ &&
+                          comp->editorCamera().target == viewpointTarget_;
+    if (drift > 1e-4f || !poseKept) {
+        if (viewpointFramesMoved_ == 0) {
+            check(false, fmt::format("viewpoint: the frame left the editor's pose at frame {} ({:.2f} s): "
+                                     "drift {:.3f} m, editor pose {}, film on '{}' ({}), view mode {}",
+                                     frame, engine.transport().positionSeconds(), drift, poseKept ? "kept" : "CHANGED",
+                                     comp->activeCamera().name,
+                                     scene::activeCameraReasonName(comp->activeCamera().reason),
+                                     static_cast<int>(comp->viewportView().mode)));
+            log::warn("ui-script viewpoint: frame {} at {:.2f} s -- shown aim ({:.3f}, {:.3f}, {:.3f}) vs "
+                      "held ({:.3f}, {:.3f}, {:.3f}); film camera '{}'",
+                      frame, engine.transport().positionSeconds(), shown.target.x, shown.target.y, shown.target.z,
+                      viewpointTarget_.x, viewpointTarget_.y, viewpointTarget_.z, comp->activeCamera().name);
+        }
+        ++viewpointFramesMoved_;
+        viewpointWorstDrift_ = std::max(viewpointWorstDrift_, drift);
+    } else {
+        ++viewpointFramesHeld_;
+    }
+    if (frame % 120 == 0) {
+        log::info("ui-script viewpoint: frame {} at {:.2f} s -- held {} frame(s), moved {} (worst {:.3f} m); "
+                  "film on '{}'",
+                  frame, engine.transport().positionSeconds(), viewpointFramesHeld_, viewpointFramesMoved_, viewpointWorstDrift_,
+                  comp->activeCamera().name);
+    }
+}
 
 void UiScript::check(bool ok, const std::string& what) {
     editLog_.push_back(fmt::format("director: {} {}", ok ? "PASS" : "FAIL", what));

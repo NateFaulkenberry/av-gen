@@ -1700,6 +1700,11 @@ private:
     ViewportView viewportView_;
     CameraPose editorCamera_;
     bool editorCameraSeeded_ = false;
+    // ADR-890. Set by `applyViewportView` on every frame: true when the pose on screen is one the
+    // film does not own (the editor's viewpoint, or an authored rig looked through). Anything that
+    // adjusts the *film's* camera after `applyViewportView` has run -- `applyDirectedAim` is the one
+    // such thing -- asks this first, or it moves a frame that is somebody else's.
+    bool viewportOwnsFrame_ = false;
     // What the director has seen happen, as spans. A scenario's run is live state (ADR-210: it is
     // started by `autoStart` or by a signal edge, not by a second on the timeline), so the only
     // honest span for one is "it began when this composition first saw it begin". An entry whose
