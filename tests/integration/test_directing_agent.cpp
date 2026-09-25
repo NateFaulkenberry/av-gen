@@ -17,6 +17,8 @@
 #include "support/project_round_trip.hpp"
 #include "world/hero.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
@@ -302,6 +304,7 @@ TEST_CASE("the Director tools declare themselves honestly", "[directing][agent][
 
 TEST_CASE("the assistant asks for a recording; the host records, and the person approves the recorded plan",
           "[directing][agent][record]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // ADR-765: `director.record_plan` goes through the host's hook and the approval gate. The
     // ScriptedProvider stands in for the model; every tool and the recorder are real.
     Session s;
@@ -358,6 +361,7 @@ TEST_CASE("the assistant asks for a recording; the host records, and the person 
 
 TEST_CASE("event-driven: the assistant watches the film, proposes on what happens in it, and the person approves",
           "[directing][agent][events]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // ADR-767. The model never copies a time: it watches, then writes {"event": ...}; the tool
     // attaches the observation it got, and the plan's times are placed from that.
     Session s;

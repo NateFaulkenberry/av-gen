@@ -12,6 +12,8 @@
 #include "scene/composition.hpp"
 #include "ui/edit_history.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -66,6 +68,7 @@ void frame(app::Engine& engine, std::uint64_t f) {
 } // namespace
 
 TEST_CASE("a directed performance compiles to scheduled orders, only in a live plan", "[directing][directed]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     load(engine);
     const SceneFacts facts = app::sceneFactsFor(engine);
@@ -108,6 +111,7 @@ TEST_CASE("a directed performance compiles to scheduled orders, only in a live p
 
 TEST_CASE("orders, played: Rook turns to Vane and reacts; a scrub lands where the play did; a recording bakes it",
           "[directing][directed][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine played(app::EngineMode::Offline);
     load(played);
     const Compilation c = compilePlan(planFrom(directedPlan()), app::sceneFactsFor(played));
@@ -127,6 +131,8 @@ TEST_CASE("orders, played: Rook turns to Vane and reacts; a scrub lands where th
     float facingError = 1e9f;
     scene::Composition::ClipReadout at8;
     scene::Composition::ClipReadout idleAt23;
+    double reactFrom = -1.0;
+    double idleReactFrom = -1.0;
     const auto facing = [](const entity::Entity& a, const entity::Entity& b) {
         const glm::vec3 p = a.state().position();
         const glm::vec3 q = b.state().position();
@@ -139,22 +145,31 @@ TEST_CASE("orders, played: Rook turns to Vane and reacts; a scrub lands where th
             facingError = std::min(facingError, facing(*rook, *tide));
             idleFacingError = std::min(idleFacingError, facing(*idleRook, *idleVane));
         }
+        // When the rig starts playing the react clip after the face order: the first frame it says so.
+        // (Not `startSeconds`, which is the clip's phase origin and moves with the clip's speed.)
+        const double now = static_cast<double>(f) / 60.0;
+        if (f > 20 * 60 && reactFrom < 0.0 && played.composition()->clipReadout("rook", now).state == "Crazy") {
+            reactFrom = now;
+        }
+        if (f > 20 * 60 && idleReactFrom < 0.0 && idle.composition()->clipReadout("rook", now).state == "Crazy") {
+            idleReactFrom = now;
+        }
         if (f == 23 * 60) {
             at8 = played.composition()->clipReadout("rook", 23.0); // the rig's own account of what it plays
             idleAt23 = idle.composition()->clipReadout("rook", 23.0);
         }
     }
     INFO("closest to facing Vane between the orders " << facingError << " rad (on his own " << idleFacingError
-                                           << "); at 23 s the rig plays '" << at8.state << "' since " << at8.startSeconds
-                                           << " s (on his own '" << idleAt23.state << "' since " << idleAt23.startSeconds
-                                           << " s)");
+                                           << "); the rig starts Crazy at " << reactFrom << " s (on his own at "
+                                           << idleReactFrom << " s); at 23 s it plays '" << at8.state
+                                           << "' (on his own '" << idleAt23.state << "')");
     CHECK(facingError < 0.2f);
     CHECK(idleFacingError > 0.5f);      // ...which he would not have done on his own
-    CHECK(at8.state == "Crazy");        // Rook's react clip (the card maps react -> Crazy)
-    CHECK(at8.startSeconds >= 22.0);    // ...from the order's second
-    CHECK(at8.startSeconds < 22.2);
-    const bool idleReactsThen = idleAt23.state == "Crazy" && idleAt23.startSeconds >= 22.0 && idleAt23.startSeconds < 22.2;
-    CHECK_FALSE(idleReactsThen); // on his own he is not reacting from that second
+    CHECK(at8.state == "Crazy");   // Rook's react clip (the card maps react -> Crazy)
+    CHECK(reactFrom >= 22.0);      // ...from the order's second
+    CHECK(reactFrom < 22.1);
+    const bool idleReactsThen = idleReactFrom >= 22.0 && idleReactFrom < 22.1;
+    CHECK_FALSE(idleReactsThen);   // on his own he does not start reacting then
 
     // A scrub to 24 s lands where the play did (ADR-824: orders applied inside the simulation).
     app::Engine scrubbed(app::EngineMode::Offline);

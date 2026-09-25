@@ -55,6 +55,10 @@
   - Recording bakes the performance: 121 keys and 8 clip cues. It plays back 0.0000 m from the
     recording, and a scrub lands 0.0000 m from the play.
 - **Proven red:** moving the orders 30 s later fails the facing and react checks.
+- **After merging main c64fc251 (ADR-829–831):** the rig's clip phase origin (`startSeconds`) moves
+  with the clip's speed, so the react check now takes the first frame at which the rig reports
+  `Crazy`: exactly 22.000 s, the react order's second. Facing Vane is now 0.004 rad (1.05 rad on his
+  own).
 - **Found while testing:** at 5–7 s Rook already faces Tide and plays `Crazy` on his own ("react now
   holds"). The first version of this test passed on that autonomy alone. The test now proves the
   effect by comparing against the unordered world.

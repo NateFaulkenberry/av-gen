@@ -12,6 +12,8 @@
 #include "scene/composition.hpp"
 
 #include <catch2/catch_approx.hpp>
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -99,6 +101,7 @@ TEST_CASE("an event time is placed by the watched film, never guessed", "[direct
 }
 
 TEST_CASE("the watched film is the played film: an event-driven marker lands on the event", "[directing][events][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine live(app::EngineMode::Offline);
     REQUIRE(live.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
     const auto first = app::watchWorldEvents(live, 30.0);
@@ -162,6 +165,7 @@ TEST_CASE("the watched film is the played film: an event-driven marker lands on 
 
 TEST_CASE("runtime candidate shots: watched, precedence is exact -- a locked shot keeps the frame, an unlocked one loses it",
           "[directing][events][camera][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // ADR-768. The watch records every span a runtime (event) camera held the frame. A plan can adopt
     // one (a locked shot on its rig at its seconds), or keep the frame from it (lock), and the
     // validator says exactly which will happen -- then the play agrees.

@@ -13,6 +13,8 @@
 #include "scene/composition.hpp"
 #include "ui/edit_history.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -63,6 +65,7 @@ void frame(app::Engine& engine, std::uint64_t f) {
 } // namespace
 
 TEST_CASE("a goal compiles to a CharacterGoal event, only in a live plan", "[directing][goal]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     load(engine);
     const SceneFacts facts = app::sceneFactsFor(engine);
@@ -141,6 +144,7 @@ TEST_CASE("a goal compiles to a CharacterGoal event, only in a live plan", "[dir
 
 TEST_CASE("a goal, played: Rook heads for the Lantern, says when he gets there, and a scrub lands where the play did",
           "[directing][goal][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine played(app::EngineMode::Offline);
     load(played);
     const Compilation c = compilePlan(planFrom(goalPlan()), app::sceneFactsFor(played));
@@ -212,6 +216,7 @@ TEST_CASE("a goal, played: Rook heads for the Lantern, says when he gets there, 
 
 TEST_CASE("a goal is baked by recording it: a scripted actor, its event at the recorded time, replayed exactly",
           "[directing][goal][record][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // ADR-763's only route from live to baked. The recording is played back on its own scratch copy
     // and must put the body on every key, and a scrub into it must land where that play did.
     app::Engine live(app::EngineMode::Offline);
