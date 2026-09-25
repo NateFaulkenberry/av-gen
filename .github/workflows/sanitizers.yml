@@ -1,0 +1,246 @@
+# Sanitizer runs: ASan+UBSan over the CPU suite, and TSan over the concurrency-heavy subset.
+# Too slow for every push (numbers in docs/development/ci.md), so they run nightly on main and on
+# demand:   gh workflow run sanitizers.yml --ref <branch> -f sanitizer=asan
+name: Sanitizers
+
+on:
+  schedule:
+    - cron: "17 7 * * *"      # nightly, ASan/UBSan (and TSan on Sundays), against main
+  workflow_dispatch:
+    inputs:
+      sanitizer:
+        description: "Which sanitizer build to run"
+        type: choice
+        options: [asan, tsan, both]
+        default: asan
+      test_filter:
+        description: "Override the Catch2 tag filter (empty = the documented default for that sanitizer)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sanitizers-${{ github.ref }}-${{ inputs.sanitizer || 'nightly' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  XCODE_VERSION: "26.6"
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  HOMEBREW_NO_INSTALL_CLEANUP: "1"
+  CCACHE_DIR: /Users/runner/ccache    # outside the checkout: test_repo_hygiene walks the tree
+  # No CCACHE_BASEDIR, deliberately. It makes ccache rewrite source paths to relative ones, so
+  # __FILE__ becomes `../../tests/...`, and test_shader_format.cpp locates shaders/examples from
+  # __FILE__: the case quietly turned into a SKIP (run 36069406479). The workspace path is the
+  # same on every hosted run, so absolute paths cost no cache hits.
+  CCACHE_COMPRESS: "1"
+  CCACHE_MAXSIZE: 2G
+  RESULTS: /Users/runner/ci-results   # absolute: upload-artifact rejects '..' in a path
+  # The TSan subset: every tag whose cases start threads (census in docs/development/ci.md).
+  # Tags only, OR-ed by the commas; the full suite does not fit a hosted job's 6 h under TSan.
+  TSAN_SUBSET: "[jobs],[job],[motionthreads],[threading],[worldbuilder],[ring],[analysis],[motionlib],[ai],[transport]"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  asan-build:
+    name: ASan/UBSan build
+    if: github.event_name == 'schedule' || inputs.sanitizer == 'asan' || inputs.sanitizer == 'both'
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: |
+          [ -d "$DEVELOPER_DIR" ] || { echo "::error title=Pinned Xcode missing::$DEVELOPER_DIR"; exit 1; }
+          brew install ccache >/dev/null
+          xcodebuild -version; clang --version | head -1
+      - name: Restore dependency cache (CPM)
+        id: cpm
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cpm
+          key: cpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/CPM.cmake', 'cmake/patches/**') }}
+      - name: Restore compiler cache (ccache)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-asan-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-asan-
+      - name: Configure and build (preset asan = Debug + ASan + UBSan)
+        env:
+          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss (cold download)' }}
+        run: tools/ci/build.sh asan "$RESULTS/build-asan"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bin-asan
+          path: build/asan/tests/avgen_tests
+          retention-days: 1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: build-logs-asan
+          path: ${{ env.RESULTS }}/build-asan
+          retention-days: 7
+
+  asan-tests:
+    # Debug -O0 + ASan is slow in a very uneven way (run 36060803359): the median case took 4 ms,
+    # while the 66 `[stage]` simulation cases take up to 2 h EACH and were 97% of the time. So
+    # the suite is split in two, and nothing is left out:
+    #   main       : everything except [stage], 3 shards on one runner (~3.9 h)
+    #   stage-0..5 : the [stage] cases, 18 shards over 6 runners. With 12 shards over 4, the
+    #                heaviest part took 5.0 h of the 6 h limit (run 36087867052).
+    name: ASan/UBSan tests (${{ matrix.part }})
+    needs: asan-build
+    runs-on: macos-26
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { part: main,    filter: "~[stage]", total: 3,  first: 0 }
+          - { part: stage-0, filter: "[stage]",  total: 18, first: 0 }
+          - { part: stage-1, filter: "[stage]",  total: 18, first: 3 }
+          - { part: stage-2, filter: "[stage]",  total: 18, first: 6 }
+          - { part: stage-3, filter: "[stage]",  total: 18, first: 9 }
+          - { part: stage-4, filter: "[stage]",  total: 18, first: 12 }
+          - { part: stage-5, filter: "[stage]",  total: 18, first: 15 }
+    env:
+      # Gate: --gate sanitizer. Only a sanitizer report, a crash, a timeout or an unexercised case
+      # fails this job. Assertion failures under Debug+ASan are listed, not gated: in run
+      # 36087867052 they were all wall-clock ceilings ([performance]) and 10 s job waits that an
+      # -O0 instrumented build cannot meet. Test correctness is gated by the Release CI run.
+      # ASan halts on its first report (a fatal heap-buffer-overflow cannot be continued past even
+      # with halt_on_error=0); the cases after it in that shard are reported as never run. UBSan
+      # reports every distinct site and carries on; catch2_run.py fails the job on any
+      # `runtime error:` line. detect_leaks: LeakSanitizer is unsupported by Apple clang on macOS.
+      ASAN_OPTIONS: detect_leaks=0:halt_on_error=1:abort_on_error=0:print_summary=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=0:report_error_type=1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bin-asan
+          path: build/asan/tests
+      - name: Run avgen_tests under ASan/UBSan
+        env:
+          TEST_FILTER: ${{ inputs.test_filter }}
+          PART_FILTER: ${{ matrix.filter }}
+          SHARD_TOTAL: ${{ matrix.total }}
+          SHARD_FIRST: ${{ matrix.first }}
+          PART: ${{ matrix.part }}
+        run: |
+          chmod +x build/asan/tests/avgen_tests
+          if [ -n "$TEST_FILTER" ] && [ "$PART" != main ]; then
+            echo "A test_filter dispatch runs on the 'main' part only."; exit 0
+          fi
+          filter="${TEST_FILTER:-$PART_FILTER}"
+          # One seed for the whole matrix, so the 12 [stage] shards partition the same order.
+          seed=$(( GITHUB_RUN_ID % 2147483647 ))
+          python3 tools/ci/catch2_run.py run --binary build/asan/tests/avgen_tests --name "asan-$PART" \
+              --label "ASan/UBSan: $PART" --out "$RESULTS/asan-$PART" --shards 3 \
+              --shard-total "$SHARD_TOTAL" --shard-first "$SHARD_FIRST" --seed "$seed" \
+              --timeout-min 330 --exceptions tools/ci/hosted-runner-exceptions.txt --gate sanitizer \
+              --filter "$filter" --expected-label "selection: $filter"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: sanitizer-logs-asan-${{ matrix.part }}
+          path: |
+            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.json
+            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.md
+            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.xml
+            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.log
+          retention-days: 14
+
+  report:
+    name: Report
+    needs: [asan-build, asan-tests, tsan]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/ci
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: sanitizer-logs-*
+          path: results
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: build-logs-*
+          path: results
+      - name: Write the run summary
+        run: |
+          cat > jobs.json <<EOF
+          {"ASan/UBSan build": "${{ needs.asan-build.result }}",
+           "ASan/UBSan tests (main + 6 stage parts)": "${{ needs.asan-tests.result }}",
+           "TSan (concurrency subset)": "${{ needs.tsan.result }}"}
+          EOF
+          python3 tools/ci/catch2_run.py report --results-dir results --job-results jobs.json
+
+  tsan:
+    name: TSan (concurrency subset)
+    if: (github.event_name == 'schedule' && github.event.schedule == '17 7 * * 0') || inputs.sanitizer == 'tsan' || inputs.sanitizer == 'both'
+    runs-on: macos-26
+    timeout-minutes: 350
+    env:
+      # TSan keeps going after a report and exits 66 at the end if it reported anything;
+      # catch2_run.py also fails the job on any `WARNING: ThreadSanitizer` line.
+      TSAN_OPTIONS: halt_on_error=0:second_deadlock_stack=1:history_size=4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: |
+          [ -d "$DEVELOPER_DIR" ] || { echo "::error title=Pinned Xcode missing::$DEVELOPER_DIR"; exit 1; }
+          brew install ccache >/dev/null
+          xcodebuild -version; clang --version | head -1
+      - name: Restore dependency cache (CPM)
+        id: cpm
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/cpm
+          key: cpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/CPM.cmake', 'cmake/patches/**') }}
+      - name: Restore compiler cache (ccache)
+        id: ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-tsan-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-tsan-
+      - name: Configure and build (preset tsan = Debug + TSan)
+        env:
+          CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss (cold download)' }}
+        run: tools/ci/build.sh tsan "$RESULTS/build-tsan"
+      - name: Run the TSan subset
+        env:
+          TEST_FILTER: ${{ inputs.test_filter }}
+        run: |
+          filter="${TEST_FILTER:-$TSAN_SUBSET}"
+          python3 tools/ci/catch2_run.py run --binary build/tsan/tests/avgen_tests --name tsan \
+              --label "TSan subset" --out "$RESULTS/tsan" --shards 3 --timeout-min 300 \
+              --exceptions tools/ci/hosted-runner-exceptions.txt --gate sanitizer \
+              --filter "$filter" --expected-label "SUBSET $filter: not the full suite"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: sanitizer-logs-tsan
+          path: |
+            ${{ env.RESULTS }}/tsan/*.json
+            ${{ env.RESULTS }}/tsan/*.md
+            ${{ env.RESULTS }}/tsan/*.xml
+            ${{ env.RESULTS }}/tsan/*.log
+            ${{ env.RESULTS }}/build-tsan
+          retention-days: 14

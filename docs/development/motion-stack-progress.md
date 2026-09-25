@@ -7,8 +7,14 @@ engine side of the actor handoff). Not `src/directing/` or the AI layer.
 
 ## Status in one line
 
-The recount is done. **M1–M5 are built**, which is everything the Director's Slices 2–3 asked of
-the motion engine. Next: the remaining C and D work, ordered below.
+M1–M5 are merged into main (9fa84413). Since then:
+- the Director-facing D items (ADR-824);
+- the Director's Slice 4 interface, items 1–5 (ADR-828);
+- C's loading path (ADR-825);
+- the Glowmere review build on the multicam film (ADR-826, ADR-827,
+  `docs/reports/glowmere-review-build.md`).
+
+Next: the remaining D items (§26's other producers, §25/§69 semantic tags, §36) and B §39.
 
 ## How this was counted
 
@@ -36,9 +42,9 @@ impose something checkable.
 | 0 Research | 5 | 0 | 0 | 0 | done | |
 | A Foundation | 17 | 0 | 2 | – | done | not re-audited this round; the board's own data had 2 rows planned under a "done" phase |
 | B Procedural (§1–67) | 54 | 2 | 0 | 11 | 54/56 | §39 and §66 are partial; see below |
-| C Matching (§1–95) | 76 | 5 | 1 | 13 | 52 / 25 / 5 | the gates §85 and §86 are **not met in the product** |
-| D Behaviour (§1–78 + demo) | 39 + demo | 27 | 2 | 10 | 44 / 16 / 8 | §63 scrub and §66 Glowmere landed; five "done" rows downgraded |
-| ★ Glowmere review build (10) | 2 | 5 | 3 | – | 0 / 10 | specified only on the board; no spec text exists |
+| C Matching (§1–95) | 81 | 0 | 1 | 13 | 52 / 25 / 5 | §37/39/40/76/81 done by ADR-825 (the product loads a baked database through the slot); §68 is partly live (`MotionDebug::matching`) and counted done-in-CLI as before; §94 waits on the owner. **§86 (the Phase D gate)**: the matcher runs on Glowmere as a review arm and is not yet in the film |
+| D Behaviour (§1–78 + demo) | 40 + demo | 26 | 2 | 10 | 44 / 16 / 8 | §35 done (ADR-824/828: runtime and scheduled `CharacterGoal`s, `release`, scheduled direction replayed); §26 still partial -- `ActionComplete` now has a producer (ADR-828), but InteractionComplete, VolumeEnter/Exit, spawn/remove and effect start/end do not |
+| ★ Glowmere review build (10) | 7 | 3 | 0 | – | 0 / 10 | done: 1–5, 8, 9; partial: 6 (the director reads scenario beats), 7 (no in-app inspector panel), 10 (the report exists; its cost figures were taken under load and are not reliable) |
 | E Learned motion (13 board rows) | 0 | 0 | 13 | – | 13 planned | gated; see recommendation |
 | F Advanced (9 tracks) | – | – | – | – | 9 gated | pieces exist in F7, F8 and F9; no track has been measured or classified |
 
@@ -236,21 +242,21 @@ flight, and the body is at its highest at `peak`.
    beat in three Glowmere scenes. Keep them, lower them, or drop the beat hop?
 
 ## Test status
-At 60a9911a (M1–M5), release, with a second build doing no compile or link:
-- **CPU `avgen_tests`:** 3,267 cases. **One real failure**: `test_glowmere_valley_2.cpp:551`
-  asserts that a project records its scene's sha256, and M4 edited four Glowmere scenes. The four
-  projects' recorded hashes are refreshed; that case and `[glowmere]` (50 cases) now pass. The full
-  rerun at 8dca5467 is clean: **3,267 cases, exit 0**, with only the expected `[!shouldfail]`
-  and 16 skips.
-- **GPU `avgen_render_tests`:** 443 cases, one failure: `test_render_job.cpp:87`, a `loadProject`
-  inside the shadow-AOV case. It passes on rerun (`[aov]`, 3 cases). Its fixture deletes and
-  recreates a fixed shared folder, `$TMPDIR/avgen_render_job`, so a GPU suite running at the same
-  time in another worktree can remove it mid-case. This is a cross-agent race, not a code fault,
-  and it is recorded for the CI owner.
-- **New motion tests:** `[handoff]`, `[semantics]`, `[jump]`, `[airborne]` and `[retime]`, 45 cases
-  together. Every new check was broken and seen red before being restored.
+
+At db30311a (main e995e3b9 merged, with ADR-870), release build:
+- **CPU `avgen_tests`:** 3,357 cases, exit 0. One expected failure (`[!shouldfail]` in
+  `test_character_lab_slopes.cpp:187`); 16 skipped.
+- **GPU `avgen_render_tests`:** 444 cases, exit 0, 1 skip (NDI).
+- **The merged replay step, proved on the multicam film through `Engine`, exactly 0:**
+  - the ADR-800 and ADR-870 seek-parity cases, including audio and a checkpoint resume;
+  - the film's section directions and its audio together (`[motion][direction][adr870]`).
+- Dropping the directives from the replay step puts Rook 71 m from where the play put him.
+- `test_midi.cpp:327`: an earlier failure was caused by a virtual MIDI source held by another
+  process. It passed in this run.
 
 ## Log
+- 2026-09-25: ADR-824 (scheduled direction, release, runtime goals); ADR-825 (baked database loading);
+  ADR-826/827 (analyzer, review build); ADR-828 (CharacterGoal, character events, clip readout).
 - 2026-09-24: M4 (ADR-822, including the hop-skid fix) and M5 (ADR-823).
 - 2026-09-24: M1 adopted from `agent/director` (ADR-758) with the ADR-820 additions; M2/M3
   (ADR-821); clip-playback lab and two review sheets; both suites green.

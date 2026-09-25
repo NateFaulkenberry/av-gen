@@ -1,0 +1,61 @@
+# Test cases that cannot pass on a GitHub-hosted runner, and why. Read by tools/ci/catch2_run.py.
+# docs/development/ci.md ("Coverage gaps") is the explanation; this file is the list.
+#
+# Format:  <kind> | <exact TEST_CASE name> | <reason>
+#
+#   needs-assets   The case RUNS on CI. If it fails, the failure is reported under
+#                  "Needs local assets", NOT counted as a pass and NOT hidden, and it does not fail
+#                  the job. If it passes, the report says the entry is stale so it can be removed.
+#   exclude        The case is NOT run on CI (it would take its whole shard down with it). Every
+#                  exclusion is named in the run summary. Use only for a crash. The name becomes a
+#                  Catch2 spec, so it may not contain a comma: use a unique prefix ending in `*`
+#                  instead. catch2_run.py refuses to run unless each one matches exactly one case.
+#
+# Every entry here is a gap in what CI proves. The assets are gitignored and are not published
+# anywhere (owner's decision; see the doc). Run these locally, where the assets exist:
+#   ./build/release/tests/avgen_tests "[aliens]"   (etc. -- by tag, never by name)
+# Entries were taken from observed CI failures, not predicted; add one only with a run URL.
+#
+# Observed on runs 36060799310 and 36065418960 (2026-09-24; main 232a50d7 + CI files).
+
+# --- crashes without the asset: a test defect, reported to the owner; excluded so the shard lives
+exclude | sequence.get_state reports the music video* | assets/audio/night-shift.wav absent: fails in Release, but ABORTS (SIGABRT) in the Debug sanitizer builds (TSan run 36060803359), taking its shard with it
+exclude | body compensation survives a scene save and reload | assets/aliens/alien-scout.glb absent -> 0 nodes -> nodes().front() on an empty vector, SIGSEGV (test_body_compensation.cpp:433)
+
+# --- assets/aliens/*.glb (the film's five aliens, the scout, the diver, the pilot)
+needs-assets | an object deleted from the owner's own film stays deleted | assets/aliens
+needs-assets | The squad stands three on one bank and two on the other | assets/aliens
+needs-assets | the motion context reaches the alien, in the alien's own space | assets/aliens
+needs-assets | the Glowmere alien stands on terrain with its feet on the ground | assets/aliens (first seen on 36065418960; the crash hid it before)
+needs-assets | the opt-in body is posed by its provider chain, and the others are not | assets/aliens
+needs-assets | the provider's pose actually reaches the drawn rig | assets/aliens
+needs-assets | §: a foot layer's lock strength survives the scene file | assets/aliens
+needs-assets | body compensation is what puts the alien's feet on the ground | assets/aliens
+needs-assets | the shipping driver seeds every layer it drives | assets/aliens
+needs-assets | the shipping look drive sets the schedule, not just the weight | assets/aliens
+needs-assets | the motion debug seam reports the layer state the frame ran with | assets/aliens
+needs-assets | The multicam's five deciders move, and they do not walk through each other | assets/aliens
+needs-assets | A starred character is not a wall around itself | assets/aliens
+needs-assets | The multicam's five aliens carry a pose stack that resolves against their own rigs | assets/aliens
+needs-assets | A joint name this rig does not carry resolves to nothing, and the film's do not | assets/aliens
+needs-assets | Every one of the film's five aliens turns its head, and the attend pose is why | assets/aliens
+needs-assets | with the key absent, Glowmere behaves exactly as it did before ADR-623 | assets/aliens (hard-coded digest of the full scene)
+needs-assets | the trace is not blind: the key switched on for one alien changes it | assets/aliens
+needs-assets | no animated asset in the repository carries root motion | assets/aliens + assets/quaternius (counts clips on disk)
+needs-assets | the animation capability inventory is what the lab documentation says it is | assets/aliens + assets/quaternius (counts clips on disk)
+
+# --- assets/quaternius (trees, rocks, plants)
+needs-assets | Swarm centres sit in real crowns, and the table is a function of the camera alone | assets/quaternius
+needs-assets | The firefly material lights exactly the swarm trees and leaves every other tree as it was | assets/quaternius
+
+# --- assets/kenney/city
+needs-assets | A city node turns into instanced geometry | assets/kenney/city
+needs-assets | A piece that dresses the ground actually covers its tile | assets/kenney/city
+
+# --- assets/treeisle/*.glb
+needs-assets | The tree is carried by the island, not animated beside it | assets/treeisle
+
+# --- audio: assets/audio/*.wav (generated) and ~/Desktop/*.mp3
+needs-assets | sequence.get_state hands back beats only where they were asked for | assets/audio/night-shift.wav
+needs-assets | probe: Save As of the multicam project to an outside folder | ~/Desktop/*.mp3 + assets/aliens (asserts a load with no warnings)
+needs-assets | Save As takes its own copies and stops writing back to the original | ~/Desktop/*.mp3 + assets/aliens

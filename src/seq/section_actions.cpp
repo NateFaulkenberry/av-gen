@@ -19,6 +19,7 @@ std::string knownVerbs() {
         }
         out += entity::actionKindName(kind);
     }
+    out += ", release, goal";
     return out;
 }
 
@@ -36,7 +37,7 @@ Result<void> validate(const SectionPerformanceSet& set) {
         if (entry.direction.subject.empty()) {
             return fail("section direction for '{}': needs a subject to act on", kindName);
         }
-        if (!entity::actionKindFromName(entry.direction.verb)) {
+        if (!isSectionVerb(entry.direction.verb)) {
             return fail("section direction for '{}': '{}' is not a verb ({})", kindName,
                         entry.direction.verb, knownVerbs());
         }
@@ -112,10 +113,34 @@ SectionPerformanceTable tableFrom(SectionPerformanceSet set) {
     };
 }
 
+bool isSectionVerb(std::string_view verb) {
+    return verb == kReleaseVerb || verb == kGoalVerb || entity::actionKindFromName(verb).has_value();
+}
+
 Result<DirectedAction> actionFromEvent(std::string_view subject, std::string_view verb,
                                        std::string_view argument) {
     if (subject.empty()) {
         return fail("a section action needs a subject");
+    }
+    if (verb == kReleaseVerb) {
+        DirectedAction released;
+        released.entity = std::string(subject);
+        released.release = true;
+        return released;
+    }
+    if (verb == kGoalVerb) {
+        if (argument.empty()) {
+            return fail("'goal' needs what to go after: a subject, or subject.affordance");
+        }
+        DirectedAction goal;
+        goal.entity = std::string(subject);
+        goal.goal = true;
+        const auto dot = argument.find('.');
+        goal.goalSubject = std::string(argument.substr(0, dot));
+        if (dot != std::string_view::npos) {
+            goal.goalAffordance = std::string(argument.substr(dot + 1));
+        }
+        return goal;
     }
     const auto kind = entity::actionKindFromName(verb);
     if (!kind) {

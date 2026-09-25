@@ -202,6 +202,8 @@ public:
     // motion reads it to tell "the same clip, later" from "the clip was restarted", which are the
     // same clip index and must not be the same displacement.
     [[nodiscard]] double currentStart() const { return current_.start; }
+    // Clip seconds per timeline second of the current play (ADR-828's clip readout).
+    [[nodiscard]] float currentSpeed() const { return current_.speed; }
     // The state being faded out, or "" when the player has settled.
     [[nodiscard]] std::string_view fadingState() const;
     // 0 at the instant of the change, 1 once the cross-fade is over.

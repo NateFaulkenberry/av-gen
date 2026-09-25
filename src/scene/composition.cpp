@@ -1896,11 +1896,21 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     if (state.clipOwned) {
         return;
     }
+    // ADR-827, the owner's ruling (2026-09-25): an autonomous body plays its clips as they measure
+    // (ADR-821) -- one that does not close plays once and holds its last frame. `react` on `Crazy`
+    // ends in its crouch instead of starting the fit again; `Landing` ends standing. Every clip whose
+    // end joins its start loops exactly as before. Unmeasured (no rig table): the state's default.
+    std::optional<bool> loop;
+    if (const ClipSemanticsTable* table = owner_.clipSemanticsFor(node_)) {
+        if (const ClipSemantics* clip = table->find(want)) {
+            loop = clip->loops;
+        }
+    }
     // Unconditional every frame: the player treats a request for the state it is already in as a
     // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
     // reproducible (ADR-086).
-    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate);
+    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate, /*rebase=*/false, loop);
 }
 
 // ADR-300. The other four fields.
@@ -1958,9 +1968,13 @@ void Composition::AnimationSink::buildChain(const SkinnedRig& rig) {
     // When the database could not be built, the chain is the clip provider alone and the log says
     // so: falling back is the designed behaviour, and doing it silently is not.
     matchAsset_.reset();
+    matchSlot_ = nullptr;
     matchProvider_.setDatabase(nullptr);
     matchProvider_.setClips(nullptr);
     if (entity_.desc().motionMatching.enabled) {
+        if (!entity_.desc().motionMatching.databaseResolved.empty()) {
+            matchSlot_ = owner_.motionSlotFor(entity_.desc().motionMatching); // ADR-825
+        }
         matchAsset_ = owner_.matchAssetFor(rig, entity_.desc().motionMatching, entity_.desc().name);
         if (matchAsset_ != nullptr) {
             matchProvider_.setDatabase(&matchAsset_->db);
@@ -2031,15 +2045,53 @@ void Composition::AnimationSink::prepareChain() {
     if (id >= owner_.scene_.rigs.size() || !owner_.scene_.rigs[id].skeleton.valid()) {
         return;
     }
+    // ADR-825: a baked database that has arrived (or been hot-swapped) since the chain was built.
+    if (chainBuilt_ && matchSlot_ != nullptr && matchSlot_->current() != matchAsset_) {
+        chainBuilt_ = false;
+    }
     if (!chainBuilt_ || chainRig_ != id) {
         buildChain(owner_.scene_.rigs[id]);
         chainRig_ = id;
     }
 }
 
+MotionDatabaseSlot* Composition::motionSlotFor(const entity::MotionMatchingDesc& m) {
+    const std::string key = m.packResolved + "|" + m.databaseResolved;
+    auto it = motionSlots_.find(key);
+    if (it == motionSlots_.end()) {
+        it = motionSlots_.emplace(key, std::make_unique<MotionDatabaseSlot>()).first;
+        it->second->requestLoad(m.packResolved, m.databaseResolved);
+        if (blockingMotionLoads_) {
+            (void)it->second->waitIdle(std::chrono::seconds(120));
+        }
+    }
+    return it->second.get();
+}
+
+std::vector<std::pair<std::string, MotionLoadStatus>> Composition::motionLoadStatus() const {
+    std::vector<std::pair<std::string, MotionLoadStatus>> out;
+    for (const auto& [key, slot] : motionSlots_) {
+        out.emplace_back(key, slot->status());
+    }
+    return out;
+}
+
 std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& rig,
                                                               const entity::MotionMatchingDesc& m,
                                                               const std::string& who) {
+    // ADR-825: a baked database is loaded, not built. What the slot has published now -- null
+    // while it loads, or when it failed (the slot keeps the reason, and the body stays on its
+    // clip provider) -- and the sink rebuilds its chain when that changes.
+    if (!m.databaseResolved.empty()) {
+        MotionDatabaseSlot* slot = motionSlotFor(m);
+        std::shared_ptr<const MotionAsset> asset = slot->current();
+        if (asset != nullptr && asset->pack.skeletonDigest != skeletonDigest(rig.skeleton)) {
+            log::warn("entity '{}': baked database '{}' was built for another skeleton; the body stays "
+                      "on its clip provider", who, m.database);
+            return nullptr;
+        }
+        return asset;
+    }
     // The key is everything the database is a function of: the skeleton, and the config.
     std::string key = skeletonDigest(rig.skeleton) + "|p" + m.packResolved + "|j";
     for (const std::string& j : m.joints) {
@@ -2156,6 +2208,10 @@ Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
         const entity::Entity* live = entityWorld_.find(sink->entityName());
         out.found = true;
         out.posedByProvider = sink->posedByProvider();
+        if (const entity::MatchMotionProvider* m = sink->matcher(); m != nullptr) {
+            out.matching = true;
+            out.databaseSamples = m->database() != nullptr ? m->database()->sampleCount() : 0;
+        }
         if (const CompositionNode* n = findNode(std::string(node));
             n != nullptr && !n->rigs.empty() && n->rigs.front() < scene_.rigs.size()) {
             const SkinnedRig& rig = scene_.rigs[n->rigs.front()];
@@ -2780,6 +2836,37 @@ void Composition::setPerformers(std::vector<Performer> performers) {
     performers_ = std::move(performers);
 }
 
+void Composition::setDirectives(std::vector<Directive> directives) {
+    std::stable_sort(directives.begin(), directives.end(),
+                     [](const Directive& a, const Directive& b) { return a.timeSeconds < b.timeSeconds; });
+    directives_ = std::move(directives);
+}
+
+void Composition::applyDirectives(double now, double dt) {
+    // (now - dt, now]: each second belongs to exactly one step of a forward play or replay. A step
+    // with no duration (the first frame; the instant a seek lands on) owns only its own second, and
+    // re-applying the same order at the same second leaves the queue exactly as it was.
+    for (const Directive& d : directives_) {
+        if (d.timeSeconds > now) {
+            break;
+        }
+        const bool due = dt > 0.0 ? d.timeSeconds > now - dt : d.timeSeconds == now;
+        if (!due) {
+            continue;
+        }
+        if (d.release) {
+            (void)entityWorld_.release(d.entity, d.timeSeconds);
+        } else if (d.goal) {
+            entity::DirectorGoal g = d.goalSpec;
+            g.since = d.timeSeconds;
+            g.until = d.goalSpec.until > 0.0 ? d.timeSeconds + d.goalSpec.until : 0.0;
+            (void)entityWorld_.setGoal(d.entity, std::move(g));
+        } else {
+            (void)entityWorld_.direct(d.entity, d.actions, d.timeSeconds);
+        }
+    }
+}
+
 void Composition::applyPerformers(double now, double dt) {
     for (const Performer& p : performers_) {
         if (!p.pose) {
@@ -2869,6 +2956,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
         }
     }
     applyPerformers(time.renderTime, time.deltaTime); // ADR-758: after the director, before the step
+    applyDirectives(time.renderTime, time.deltaTime); // ADR-824: the same point, on both paths
     // ADR-245: what the camera director can see of the world's events, read straight after the
     // staging tick so a scenario that began this frame can claim this frame's cut.
     observeCameraEvents(time.renderTime);
@@ -3010,15 +3098,23 @@ struct DirectorCheckpoint final : entity::HostCheckpoint {
     std::vector<stage::VisualPlacement> placed;
     std::vector<std::uint8_t> valid;
     world::HistoryBank::Snapshot history; // ADR-703: empty when nothing subscribes to HIST
+    std::shared_ptr<const entity::HostCheckpoint> signals; // ADR-870: null when the replay has no bus
+    std::vector<params::ProcessorChain::State> reactions;  // ADR-870: the reaction routes' envelopes
     std::size_t measured = 0;
     [[nodiscard]] std::size_t bytes() const override { return measured; }
 };
 
 // ADR-703: the host half of a checkpoint for a scene with no director -- the transform history and
 // nothing else, since without a director the replay has no other host state.
+// ADR-870: and the replayed signal pipeline's state, when there is one.
 struct HistoryCheckpoint final : entity::HostCheckpoint {
     world::HistoryBank::Snapshot history;
-    [[nodiscard]] std::size_t bytes() const override { return history.bytes() + sizeof(HistoryCheckpoint); }
+    std::shared_ptr<const entity::HostCheckpoint> signals;
+    std::vector<params::ProcessorChain::State> reactions;
+    [[nodiscard]] std::size_t bytes() const override {
+        return history.bytes() + sizeof(HistoryCheckpoint) + (signals != nullptr ? signals->bytes() : 0) +
+               reactions.size() * sizeof(params::ProcessorChain::State);
+    }
 };
 
 // The checkpoint key with HIST's inputs folded in: which nodes are recorded, how deep, and the
@@ -3029,6 +3125,74 @@ std::uint64_t withHistoryKey(std::uint64_t key, const world::HistoryBank* bank) 
         return key; // exactly the key a scene with no HIST had
     }
     return key ^ (bank->key() + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2));
+}
+
+// ADR-870: an entity's `reactions` are modulation routes (ADR-088), and a play applies them to the
+// finals before the director and the bodies read them -- the saucer's height rides `audio.bass`,
+// and the aliens that watch it see it there. A replay with a bus applies them too; these are they.
+bool isReaction(const params::ModRoute& route) { return route.fromEntity; }
+
+// Their envelopes are history, so they ride in the checkpoint, in route order.
+std::vector<params::ProcessorChain::State> reactionStates(const params::Modulator& modulator) {
+    std::vector<params::ProcessorChain::State> out;
+    for (const params::ModRoute& route : modulator.routes()) {
+        if (isReaction(route)) {
+            out.push_back(route.state);
+        }
+    }
+    return out;
+}
+
+void restoreReactionStates(params::Modulator& modulator, const std::vector<params::ProcessorChain::State>& states) {
+    std::size_t i = 0;
+    for (params::ModRoute& route : modulator.routes()) {
+        if (isReaction(route) && i < states.size()) {
+            route.state = states[i++];
+        }
+    }
+}
+
+// The replayed signals' inputs and the reaction routes' definitions, folded in the same way. No
+// source leaves the key exactly as it was, so a scene with no audio keeps the checkpoints it had.
+std::uint64_t withSignalKey(std::uint64_t key, const entity::ReplaySignalSource* signals,
+                            const params::Modulator* reactions) {
+    if (signals == nullptr) {
+        return key;
+    }
+    std::uint64_t h = signals->inputKey();
+    const auto mix = [&h](std::uint64_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+    const auto bits = [](float f) {
+        std::uint32_t u = 0;
+        std::memcpy(&u, &f, sizeof u);
+        return static_cast<std::uint64_t>(u);
+    };
+    if (reactions != nullptr) {
+        mix(bits(reactions->masterGain));
+        for (const params::ModRoute& r : reactions->routes()) {
+            if (!isReaction(r)) {
+                continue;
+            }
+            mix(std::hash<std::string>{}(r.source));
+            mix(std::hash<std::string>{}(r.target));
+            mix(static_cast<std::uint64_t>(r.component + 1));
+            mix(bits(r.amount));
+            mix(static_cast<std::uint64_t>(r.op));
+            mix(static_cast<std::uint64_t>(r.polarity));
+            mix(r.enabled ? 1u : 0u);
+            mix(bits(r.spatialGain));
+            const params::ProcessorChain& c = r.chain;
+            for (const float f : {c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
+                                  c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
+                                  c.remapInMax, c.remapOutMin, c.remapOutMax}) {
+                mix(bits(f));
+            }
+            mix(static_cast<std::uint64_t>(c.curve));
+            mix(static_cast<std::uint64_t>(c.threshold));
+            mix(static_cast<std::uint64_t>(c.envelope));
+            mix((c.clampEnabled ? 1u : 0u) | (c.remapEnabled ? 2u : 0u));
+        }
+    }
+    return key ^ (h + 0x7f4a7c159e3779b9ull + (key << 6) + (key >> 2));
 }
 
 } // namespace
@@ -3052,6 +3216,13 @@ std::uint64_t Composition::replayInputKey() const {
     for (const Performer& p : performers_) { // ADR-758: a changed performance is a different replay
         mix(p.signature);
     }
+    for (const Directive& d : directives_) { // ADR-824: likewise a changed schedule of orders
+        mix(d.signature);
+    }
+    for (const auto& [key, slot] : motionSlots_) { // ADR-825: a newly published database is new input
+        mix(slot->status().publishes);
+        mix(slot->current() != nullptr ? 1u : 0u);
+    }
     mix(bits(rootAngle_));
     mix(bits(center_.x));
     mix(bits(center_.y));
@@ -3064,9 +3235,25 @@ std::uint64_t Composition::replayInputKey() const {
 }
 
 void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
-                                   entity::SeekBudget budget, double step) {
+                                   entity::SeekBudget budget, double step,
+                                   entity::ReplaySignalSource* signals) {
     staging_.reset(&entityWorld_, &params);
     seekPlacementLive_ = false;
+    // ADR-870: the replay's bus. Reset to a play's frame-zero state here -- a replay from zero starts
+    // there, and a checkpoint restore overwrites it -- and rebuilt at the top of every step.
+    const signals::SignalBus* const bus = signals != nullptr ? &signals->bus() : nullptr;
+    if (signals != nullptr) {
+        signals->reset();
+    }
+    // ADR-870: the entity reaction routes, replayed on that bus. Their envelopes start where the
+    // host's seek left them -- `Engine::seekSeconds` resets the modulator's state first -- and end
+    // where the replay leaves them, which is where the next played frame continues from.
+    params::Modulator* const reactions = bus != nullptr ? modulator_ : nullptr;
+    const auto applyReactions = [&](double dt) {
+        if (reactions != nullptr) {
+            reactions->applyRoutesWhere(*bus, params, dt, &isReaction);
+        }
+    };
     // ADR-703: HIST is replayed with the simulation. Cleared first -- a replay from zero starts with
     // no history, and a restore overwrites it -- then recorded after every replayed step and carried
     // in every checkpoint. With nothing subscribed none of this runs and the hooks are unchanged.
@@ -3076,10 +3263,22 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     }
     if (stagingDesc_.empty()) {
         entity::EntityWorld::SeekHooks hooks;
-        hooks.inputKey = withHistoryKey(replayInputKey(), history);
-        if (!performers_.empty()) {
-            // ADR-758: the director-less replay still has the one director a sequence brings.
-            hooks.before = [this](double now, double dt) { applyPerformers(now, dt); };
+        hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
+        if (!performers_.empty() || !directives_.empty() || signals != nullptr) {
+            // ADR-758/824: the director-less replay still has the direction a sequence brings.
+            // ADR-870: and the frame's bus, built first, as `Engine::update` builds it first, and
+            // the reactions on finals rebuilt from the bases, as its routes are. The order is a
+            // play frame's: bus, routes, then the direction `updateBehaviour` applies (performers,
+            // then scheduled orders), then the entity step.
+            hooks.before = [&, signals](double now, double dt) {
+                if (signals != nullptr) {
+                    signals->build(now, dt);
+                    params.resetFinals();
+                    applyReactions(dt);
+                }
+                applyPerformers(now, dt);
+                applyDirectives(now, dt);
+            };
         }
         if (history != nullptr) {
             hooks.after = [&](double now, double) {
@@ -3092,16 +3291,35 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                 recordHistory(*history, now, history->automation());
                 params.resetFinals();
             };
+        }
+        if (history != nullptr || signals != nullptr) {
             hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
                 auto c = std::make_shared<HistoryCheckpoint>();
-                c->history = history->snapshot();
+                if (history != nullptr) {
+                    c->history = history->snapshot();
+                }
+                if (signals != nullptr) {
+                    c->signals = signals->capture();
+                }
+                if (reactions != nullptr) {
+                    c->reactions = reactionStates(*reactions);
+                }
                 return c;
             };
             hooks.restore = [&](const entity::HostCheckpoint& host) {
-                history->restore(static_cast<const HistoryCheckpoint&>(host).history);
+                const auto& c = static_cast<const HistoryCheckpoint&>(host);
+                if (history != nullptr) {
+                    history->restore(c.history);
+                }
+                if (signals != nullptr && c.signals != nullptr) {
+                    signals->restore(*c.signals);
+                }
+                if (reactions != nullptr) {
+                    restoreReactionStates(*reactions, c.reactions);
+                }
             };
         }
-        entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
+        entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
         return;
     }
     ReplayPlacement placement(*this);
@@ -3109,20 +3327,26 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     placement.invalidate(); // the play's first frame has no flattening to ask
     entity::EntityWorld::SeekHooks hooks;
     hooks.before = [&](double now, double dt) {
-        // A play frame's top: finals rebuilt from bases, then the director (ADR-209), then the
-        // entities. Routes and reactions are not replayed -- a scrub has no signal history, the
-        // limit every seek in this engine already has.
+        // A play frame's top: the frame's signals (ADR-870, when the host's pipeline is
+        // deterministic), finals rebuilt from bases, then the director (ADR-209), then the
+        // entities. Modulation routes are still not replayed: the finals stay unmodulated, and the
+        // director and the bodies read the bus directly.
+        if (signals != nullptr) {
+            signals->build(now, dt);
+        }
         params.resetFinals();
+        applyReactions(dt); // ADR-870: the entity reactions, where a play's routes land
         stage::StageContext ctx;
         ctx.time = now;
         ctx.dt = dt;
         ctx.world = &entityWorld_;
         ctx.params = &params;
         ctx.visuals = &placement;
-        ctx.bus = nullptr;
+        ctx.bus = bus;
         staging_.update(ctx);
         raiseDirectorBeats(now);
         applyPerformers(now, dt); // ADR-758: the same point of the step a play applies them at
+        applyDirectives(now, dt); // ADR-824
     };
     hooks.after = [&](double now, double) {
         // The offsets a play's entity pass writes, and the "flattening" the next step's director
@@ -3143,6 +3367,12 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         if (history != nullptr) {
             c->history = history->snapshot();
         }
+        if (signals != nullptr) {
+            c->signals = signals->capture();
+        }
+        if (reactions != nullptr) {
+            c->reactions = reactionStates(*reactions);
+        }
         c->measured = static_cast<std::size_t>(core::allocCounters().bytes - before) + sizeof(DirectorCheckpoint);
         return c;
     };
@@ -3153,9 +3383,15 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         if (history != nullptr) {
             history->restore(c.history);
         }
+        if (signals != nullptr && c.signals != nullptr) {
+            signals->restore(*c.signals);
+        }
+        if (reactions != nullptr) {
+            restoreReactionStates(*reactions, c.reactions);
+        }
     };
-    hooks.inputKey = withHistoryKey(replayInputKey(), history);
-    entityWorld_.seek(seconds, &params, nullptr, step, budget, &hooks);
+    hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
+    entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
     seekPlaced_ = placement.placed();
     seekPlacedValid_ = placement.valid();
     seekPlacementLive_ = true;
@@ -4949,10 +5185,11 @@ void Composition::unregisterParameters() {
         // Exactly what `attach` recorded registering. This was a list of twenty-seven path
         // strings, kept by hand beside a registrar that adds them one at a time, and it had fallen
         // sixty-four behind -- see `registeredPaths_`.
-        for (const std::string& path : registeredPaths_) {
-            params_->remove(path);
-        }
-        registeredPaths_.clear();
+        // The unregisters that read through cached parameter pointers go FIRST. The sweep of
+        // `registeredPaths_` below frees every parameter `attach` made -- particle, material-part
+        // and light parameters among them -- and a node's unregister afterwards read `p->path()`
+        // through a pointer to one it had just freed: the heap-use-after-free ASan found on CI in
+        // `removeNode` of a nested scene (test_composition.cpp's nested-removal sweep).
         if (!lightRigParams_.all.empty()) {
             unregisterLightRigParameters(*params_, lightRigParams_);
             lightRigParams_ = {};
@@ -4965,6 +5202,14 @@ void Composition::unregisterParameters() {
         for (auto& node : nodes_) {
             unregisterNodeParameters(*node);
         }
+        // Then exactly what `attach` recorded registering, which catches whatever the hand-kept
+        // lists above still miss. This was a list of twenty-seven path strings, kept by hand
+        // beside a registrar that adds them one at a time, and it had fallen sixty-four behind --
+        // see `registeredPaths_`. Removing a path already gone is a no-op.
+        for (const std::string& path : registeredPaths_) {
+            params_->remove(path);
+        }
+        registeredPaths_.clear();
     }
     detach();
 }
@@ -6756,6 +7001,30 @@ void Composition::updateCharacters(const FrameTime& time) {
         node.animationPushed = true; // whether or not it landed: do not warn again every frame
     }
     rigStats_ = updateRigs(scene_, time);
+}
+
+Composition::ClipReadout Composition::clipReadout(const std::string& nodeName, double now) const {
+    ClipReadout out;
+    const CompositionNode* node = findNode(nodeName);
+    if (node == nullptr || node->rigs.empty() || node->rigs.front() >= scene_.rigs.size()) {
+        return out;
+    }
+    const SkinnedRig& rig = scene_.rigs[node->rigs.front()];
+    if (!rig.player.active()) {
+        return out;
+    }
+    out.found = true;
+    out.state = std::string(rig.player.currentState());
+    const int index = rig.player.currentStateIndex();
+    const auto& state = rig.player.states()[static_cast<std::size_t>(index)];
+    const float clipStart = state.clip < rig.clips.size() ? rig.clips[state.clip].start : 0.0f;
+    out.clipSeconds = rig.player.stateTime(rig.clips, now) - clipStart;
+    out.speed = rig.player.currentSpeed();
+    out.startSeconds = rig.player.currentStart();
+    out.loops = rig.player.currentLooping();
+    out.finished = rig.player.finished(rig.clips, now);
+    out.fadingFrom = std::string(rig.player.fadingState());
+    return out;
 }
 
 const ClipSemanticsTable* Composition::clipSemanticsFor(const std::string& nodeName) const {

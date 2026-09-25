@@ -587,6 +587,28 @@ public:
         float entrySeconds = 0.0f;
     };
     void setPerformers(std::vector<Performer> performers);
+
+    // ---- scheduled directions (ADR-824) ----------------------------------------------------------
+    //
+    // A sequence event that hands an entity an order at a KNOWN second (`seq` tier 2: section
+    // actions, a Director's timed `direct`). Applied here, at the same point of the step as the
+    // performers, on a play and in both replay paths -- so a scrub reconstructs the orders a play
+    // gave, in order, instead of re-delivering only the latest one (ADR-093's "standing intent").
+    // A directive fires on the step whose (now - dt, now] contains its second; `signature` is mixed
+    // into the replay key, so a changed schedule drops stale checkpoints.
+    struct Directive {
+        double timeSeconds = 0.0;
+        std::string entity;
+        std::vector<entity::ActionDesc> actions; // given to the Director tier
+        bool release = false;                    // or: the Director tier is dropped
+        bool goal = false;                       // or: a runtime goal (ADR-824, §35; ADR-828 F7)
+        // The goal, `since` and `until` relative: `since` is filled with `timeSeconds` when it is
+        // given, and `until` > 0 is a duration from then. An empty subject clears the goal.
+        entity::DirectorGoal goalSpec;
+        std::uint64_t signature = 0;
+    };
+    void setDirectives(std::vector<Directive> directives);
+    [[nodiscard]] const std::vector<Directive>& directives() const { return directives_; }
     [[nodiscard]] const std::vector<Performer>& performers() const { return performers_; }
     void updateFields(const FrameTime& time, signals::SignalBus& bus, params::Modulator& modulator) override;
     [[nodiscard]] const Scene& scene() const override { return scene_; }
@@ -634,6 +656,21 @@ public:
     // cues the same walk at 0:12 and again at 1:04 and means two different phases -- and a scrub
     // backwards means the earlier one again. Idempotent either way: a request identical to the one
     // already in force returns immediately, so calling it per frame costs a string compare.
+    // ADR-828: what the first rig on `nodeName` is playing at `now` -- read-only, for a recording that
+    // turns a live run into clip cues (the Director's "Record"). `clipSeconds` is the clip's own
+    // local time from its first frame (wrapped for a loop, clamped for a one-shot); `speed` is clip
+    // seconds per timeline second; `startSeconds` is the phase origin a cue would reproduce it with.
+    struct ClipReadout {
+        bool found = false;
+        std::string state;
+        float clipSeconds = 0.0f;
+        float speed = 1.0f;
+        double startSeconds = 0.0;
+        bool loops = true;
+        bool finished = false;
+        std::string fadingFrom; // the state a cross-fade is leaving, or empty once it has settled
+    };
+    [[nodiscard]] ClipReadout clipReadout(const std::string& nodeName, double now) const;
     // ADR-821: what the first rig on `nodeName` measures its clips as, computed on first request and
     // shared across every node instancing the same asset. Null for a node with no rig.
     [[nodiscard]] const ClipSemanticsTable* clipSemanticsFor(const std::string& nodeName) const;
@@ -711,8 +748,13 @@ public:
     // ADR-700: and it does it from the nearest simulation checkpoint rather than from a reset, so
     // it is exact at any time rather than inside ninety seconds. The composition's half of a
     // checkpoint is the director (whole), the bases it wrote, and `ReplayPlacement`.
+    //
+    // ADR-870: `signals`, when given, is the host's deterministic signal pipeline. The replay builds
+    // its bus at every step before the director, hands that bus to the director and the entities
+    // exactly as a play frame does, and carries the pipeline's state in every checkpoint. Null --
+    // live mode, or no audio -- replays with no bus, as before.
     void seekWithDirector(double seconds, params::ParameterSet& params, entity::SeekBudget budget,
-                          double step = 1.0 / 60.0);
+                          double step = 1.0 / 60.0, entity::ReplaySignalSource* signals = nullptr);
 
     // ---- ADR-703: HIST, the transform history entity effects read -----------------------------
     //
@@ -1748,6 +1790,8 @@ private:
         // keeps it alive for as long as this provider points into it.
         entity::MatchMotionProvider matchProvider_;
         std::shared_ptr<const MotionAsset> matchAsset_;
+        // ADR-825: the slot this body's baked database arrives through, or null (built in memory).
+        const MotionDatabaseSlot* matchSlot_ = nullptr;
         entity::MotionChain chain_;
         bool chainBuilt_ = false;
         RigId chainRig_ = kInvalidRig;
@@ -1779,6 +1823,20 @@ private:
     // ADR-623/ADR-650: one motion database per (skeleton, feature config), shared by every body
     // that matches on it. Built on first use from the rig's own clips.
     std::map<std::string, std::shared_ptr<const MotionAsset>> matchAssets_;
+    // ADR-825: one slot per baked (pack, database), loading off-thread and publishing by atomic swap.
+    std::map<std::string, std::unique_ptr<MotionDatabaseSlot>> motionSlots_;
+    bool blockingMotionLoads_ = false;
+    [[nodiscard]] MotionDatabaseSlot* motionSlotFor(const entity::MotionMatchingDesc& m);
+
+public:
+    // ADR-825: wait for every requested database before returning from a request -- what an offline
+    // render or a headless run sets, so its frames never depend on how long a load took. A live
+    // session leaves it off: the body plays its clips until the matcher's database arrives.
+    void setBlockingMotionLoads(bool blocking) { blockingMotionLoads_ = blocking; }
+    // The slots this composition has asked for, by (pack|database), for a status line and for tests.
+    [[nodiscard]] std::vector<std::pair<std::string, MotionLoadStatus>> motionLoadStatus() const;
+
+private:
     [[nodiscard]] std::shared_ptr<const MotionAsset> matchAssetFor(const SkinnedRig& rig,
                                                                    const entity::MotionMatchingDesc& m,
                                                                    const std::string& who);
@@ -1801,6 +1859,10 @@ public:
         bool posedByProvider = false;  // ...and it actually happened, this frame
         entity::MotionStatus status = entity::MotionStatus::NoContent;
         int provider = -1;             // which one answered, as a chain index
+        // ADR-825 / C §68: a matcher is in this body's chain (its database built or arrived), and
+        // what it holds. Index 0 alone cannot say: with no matcher, index 0 IS the clip provider.
+        bool matching = false;
+        std::size_t databaseSamples = 0;
         std::uint32_t fellThrough = 0; // how many declined before it
         std::uint32_t generation = 0;  // the memory's, so "it never ran" is visible
         float localTime = 0.0f;
@@ -1939,6 +2001,8 @@ private:
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
     std::vector<Performer> performers_;           // ADR-758: not authored here; the sequence's
     void applyPerformers(double now, double dt);
+    std::vector<Directive> directives_; // ADR-824, ascending by time
+    void applyDirectives(double now, double dt);
     std::vector<entity::EntityWorld::EventProfile> eventProfiles_; // Phase D §26: "worldEvents"
     // Phase D §26: the director's beats this update, raised as world events. Shared by
     // `updateBehaviour` and the replay in `seekWithDirector`.

@@ -150,6 +150,43 @@ target_link_libraries(avgen_slope_probe PRIVATE avgen_core)
 add_executable(avgen_behavior_trace behavior_trace.cpp)
 target_link_libraries(avgen_behavior_trace PRIVATE avgen_core)
 
+# ADR-826 (Glowmere review build, item 9): simulate a scene or a project headless and report each
+# character's motion and behaviour quality -- root pops, foot slip, stuck time, activity churn --
+# as individual metrics in JSON. It drives the real `app::Engine`, so a project's Director and
+# staging move the cast exactly as they do in the film; that needs the same app/ sources
+# `avgen_metal_rt_probe` lists, for the same reason (`Engine` lives in the executable's glob), and
+# the ui/ files that keep it free of Dear ImGui and a window.
+add_executable(avgen_character_quality character_quality.cpp
+    "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/world_director.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/music_runtime.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/placement.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/edit_system.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/camera_director.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/asset_browser.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/job_system.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/world_builder.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/ai_edit_sink.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/edit_capture.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/viewport_camera.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/examples.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/edit_history.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_edit.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_editor.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/world_probe.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/brush.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/gizmo.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp")
+target_link_libraries(avgen_character_quality PRIVATE avgen_core)
+
 # Phase D §58: validate a scene's autonomous characters before runtime.
 add_executable(avgen_character_validate character_validate.cpp)
 target_link_libraries(avgen_character_validate PRIVATE avgen_core)

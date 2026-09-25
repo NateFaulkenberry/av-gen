@@ -9079,6 +9079,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9115,6 +9116,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9241,6 +9243,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9277,6 +9280,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9404,6 +9408,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9440,6 +9445,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9584,6 +9590,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9620,6 +9627,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9767,6 +9775,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9803,6 +9812,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -10658,7 +10668,7 @@
   "worldEvents": [
     {
       "name": "abduction/beam",
-      "radius": 60.0,
+      "radius": 150.0,
       "magnitude": 1.0
     }
   ],

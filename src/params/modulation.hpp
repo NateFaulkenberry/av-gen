@@ -71,6 +71,11 @@ public:
     // The route half of evaluate() without the reset, so a caller can run automation (the
     // timeline) between resetFinals() and the routes.
     void applyRoutes(const signals::SignalBus& bus, ParameterSet& params, double dt);
+    // ADR-870: the same pass over only the routes `pick` accepts, in the same op order. A route
+    // whose source is not on `bus` is skipped -- a seek replay's bus carries only the deterministic
+    // prefix of the engine's signals, and a route reading anything else is not replayed.
+    void applyRoutesWhere(const signals::SignalBus& bus, ParameterSet& params, double dt,
+                          bool (*pick)(const ModRoute&));
 
     void resetState(); // clears smoothing/envelope state (on seek)
 

@@ -121,6 +121,11 @@ struct MotionMatchingDesc {
     // not, the body falls back to its clip provider and the log says why.
     std::string pack;
     std::string packResolved;
+    // ADR-825 (C §37/§39): a database baked offline from `pack` (`avgen_motion build-db`), loaded
+    // off the render thread and published by atomic swap instead of extracted at composition build.
+    // Needs `pack`. As authored and as resolved, like the pack.
+    std::string database;
+    std::string databaseResolved;
     // §14: which clips the matcher may use, as name prefixes ("Walking" admits `Walking_crouch` and
     // `Walking~turn+1.40`). Empty admits every clip. The scout's pack has no authored tags, so an
     // action clip like `Button_push` otherwise serves as an idle; this is the authoring surface
@@ -362,6 +367,26 @@ struct DirectorMotion {
     float timeScale = 1.0f;
 };
 
+// ADR-824 (Phase D §35): a goal a director gives a character at runtime -- "investigate the Umbra
+// cap" from 32 s. It fills the character's `goal` considerer instead of the authored subject, so the
+// character still decides the how (path, approach, affordance) and still weighs it against
+// everything else it wants: a goal is a bias, never an order. State, so a checkpoint carries it and
+// a scrub lands on the same goal a play had. Needs a `goal` considerer in the decider -- authored
+// with no subject, it is an empty slot a director can fill.
+struct DirectorGoal {
+    bool active = false;
+    std::string subject;    // an entity or a landmark
+    std::string affordance; // the verb to use when offered and capable; empty: observe it
+    double since = 0.0;     // when it was given: the "done it since" test counts from here
+    // ADR-828 (F7 `CharacterGoal`): when it lapses (0 = until replaced or released), and how the
+    // character goes about it. Empty or negative: the goal considerer's own authored value.
+    double until = 0.0;
+    std::string intent;
+    std::string activity;
+    float approach = -1.0f;
+    float dwell = -1.0f;
+};
+
 // ADR-820: where a body was when a performance with an entry blend took it -- the point the blend
 // starts from. Entity state, so a checkpoint carries it and a seek into the blend lands where a
 // play does.
@@ -564,6 +589,7 @@ public:
     // ADR-820: set by the composition's performers when a blended entry begins, cleared at release.
     void setPerformanceEntry(const PerformanceEntry& entry) { performanceEntry_ = entry; }
     [[nodiscard]] const PerformanceEntry& performanceEntry() const { return performanceEntry_; }
+    [[nodiscard]] const DirectorGoal& directorGoal() const { return directorGoal_; }
 
     // A named number this entity declared. `setProperty` refuses a name the entity did not
     // declare rather than inventing one, because a property invented at runtime is a property no
@@ -634,6 +660,7 @@ private:
     MotionOffset motion_{};
     DirectorMotion director_{};
     PerformanceEntry performanceEntry_{}; // ADR-820
+    DirectorGoal directorGoal_{};         // ADR-824
     LocomotionState locomotion_{};
     BehaviorList behaviors_;
 
@@ -819,6 +846,33 @@ struct HostCheckpoint {
     [[nodiscard]] virtual std::size_t bytes() const = 0;
 };
 
+// ADR-870: the signal bus a seek's replay steps through. A play builds its bus once per frame
+// (`Engine::update`); a replay that is to land where the play does has to see, at every replayed
+// instant, the bus the play saw there. The host that owns the signal pipeline implements this and
+// hands it to `Composition::seekWithDirector`, which is how `scene` replays signals without
+// depending on `app`.
+//
+// Only a deterministic pipeline can honestly implement it -- offline analysis of a known track is
+// a pure function of time; a live analysis thread, MIDI and OSC are not -- so a host with a live
+// pipeline passes none and the replay keeps its null bus.
+class ReplaySignalSource {
+public:
+    virtual ~ReplaySignalSource() = default;
+    // The bus every `build` writes into. The same object for the whole seek, so the entity world
+    // can be handed its address once.
+    [[nodiscard]] virtual const signals::SignalBus& bus() const = 0;
+    // The pipeline as a play from zero has it before its first frame.
+    virtual void reset() = 0;
+    // The frame at `now` (dt = 0 at step zero, ADR-521): the bus a play built for that instant.
+    virtual void build(double now, double dt) = 0;
+    // The pipeline's state after the last `build`, for a seek checkpoint (ADR-700), and back.
+    [[nodiscard]] virtual std::shared_ptr<const HostCheckpoint> capture() const = 0;
+    virtual void restore(const HostCheckpoint& checkpoint) = 0;
+    // Everything the built signals depend on that is not state: the audio, the tempo, the musical
+    // structure. Mixed into the checkpoints' key, so a changed track drops them.
+    [[nodiscard]] virtual std::uint64_t inputKey() const = 0;
+};
+
 class EntityWorld {
 public:
     EntityWorld() = default;
@@ -877,6 +931,15 @@ public:
     // A director override: it preempts whatever the entity was doing and, when it drains, the
     // entity resumes rather than resets (ADR-091).
     bool direct(std::string_view entity, std::vector<ActionDesc> actions, double now);
+    // ADR-824: the other half of `direct` -- drops the Director tier, so the body resumes whatever the
+    // tiers below were doing (ADR-091). What a timeline "release" and a Director's hand-back call.
+    // Anything the tier was in the middle of is reported Cancelled. False for an unknown entity.
+    bool release(std::string_view entity, double now);
+    // ADR-824 (§35): gives `entity` a runtime goal (see `DirectorGoal`), replacing any earlier one.
+    // An empty subject clears it. False for an unknown entity.
+    bool setGoal(std::string_view entity, std::string subject, std::string affordance, double now);
+    // ADR-828: the whole goal, as a `CharacterGoal` event states it. `goal.since` is taken as given.
+    bool setGoal(std::string_view entity, DirectorGoal goal);
     // ---- trigger volumes and music influence fields (ADR-097) --------------------------------
 
     // Replaces the field set. Call *before* registerParameters(): a field's strength, scale, inner
@@ -1099,6 +1162,12 @@ public:
     // that the same seek time always produces the same state. Matching a played-through timeline
     // exactly would need the analysis replayed too; an offline render plays from zero and never
     // seeks, so it is exact either way.
+    //
+    // ADR-870 is that replay. A host with a deterministic pipeline (offline, an analysed track) no
+    // longer hands one instant's bus to every step: it hands a bus it REBUILDS at every step, in its
+    // `before` hook, to what a play built at that instant (`ReplaySignalSource`). That is a replay
+    // of something, so the argument above does not apply to it; and the step raises the bus's
+    // world events where `update` does. Live seeks still pass null.
     //
     // `budget` bounds the work; see `SeekBudget`. `params`, when given, is put back to its authored
     // values first: behaviours read parameter *finals*, and a final still holding the last played
