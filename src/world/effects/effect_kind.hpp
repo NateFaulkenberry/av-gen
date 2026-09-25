@@ -75,6 +75,12 @@ enum class EffectKind : std::uint8_t {
     MotionSmear = 31,      // the owner's trailing side stretches back along its path
     // Wave 2 (the lead's): the sky's star field, owned by an effect instead of skybox constants.
     Stars = 32, // a controllable star field: density, magnitudes, colour, twinkle, a galactic band
+    // Wave 3 reserves, by slice (explicit values, as Waves 1 and 2 did):
+    //   bolt (BOLT):         Lightning = 33, Arc = 34, ElectricField = 35, Discharge = 36
+    //   shell (SHELL):       Plasma = 37, EnergyShield = 38, ForceField = 39
+    //   lens (DF):           HeatShimmer = 41, GravitationalLens = 42
+    //   shell 2 (phase 2):   ChargeUp = 40, LightBeam = 43, Halo = 44, Bubble = 45, Portal = 46,
+    //                        RealityTear = 47
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not
