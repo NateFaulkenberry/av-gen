@@ -1971,36 +1971,6 @@
    "target": "fx/bioluminescent-comet/coreIntensity"
   },
   {
-   "amount": 1.0,
-   "chain": {
-    "attackMs": 20.0,
-    "clampEnabled": false,
-    "clampMax": 1.0,
-    "clampMin": 0.0,
-    "curve": "linear",
-    "curveAmount": 1.0,
-    "decayMs": 200.0,
-    "envelope": "none",
-    "envelopeFallPerSecond": 4.0,
-    "envelopeHoldMs": 0.0,
-    "gain": 1.0,
-    "offset": 0.0,
-    "remapEnabled": false,
-    "remapInMax": 1.0,
-    "remapInMin": 0.0,
-    "remapOutMax": 1.0,
-    "remapOutMin": 0.0,
-    "threshold": "none",
-    "thresholdLevel": 0.5
-   },
-   "component": -1,
-   "enabled": true,
-   "op": "add",
-   "polarity": "unipolar",
-   "source": "state.progress",
-   "target": "post/grade/hueShift"
-  },
-  {
    "amount": 0.5,
    "chain": {
     "attackMs": 40.0,
