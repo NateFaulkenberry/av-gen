@@ -75,7 +75,8 @@ TEST_CASE("Rook's card is what his entity and his loaded rig say, and has no bac
     CHECK(run->clip == "Running");
     CHECK_THAT(run->seconds, WithinAbs(0.70, 0.005));
     CHECK(run->kind == directing::ActivityKind::Ground);
-    // Reported as the engine has it: every state the rig builds loops today (Slice 3's problem).
+    // Measured (ADR-821, ADR-761): the scout's jump clip loops -- its end joins its start -- which is
+    // why a compiled jump plays it `once` rather than trusting this flag.
     CHECK(rook->activity("jump")->loops);
 
     // `Jump_running` was the clip nothing mapped until ADR-822 mapped it as `jumpRunning` on all five

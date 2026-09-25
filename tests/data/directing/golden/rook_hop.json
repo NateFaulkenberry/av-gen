@@ -1,0 +1,97 @@
+{
+  "description": "Rook runs past Umbra, hops on the run and lands; the lights flash at the top of the hop.",
+  "plan": {
+    "schemaVersion": 1,
+    "id": "rook-hop",
+    "title": "Rook hops past Umbra",
+    "tier": "baked",
+    "subjects": [
+      {
+        "alias": "rook",
+        "text": "Rook"
+      },
+      {
+        "alias": "umbra",
+        "text": "the Umbra hero mushroom",
+        "hint": "hero"
+      }
+    ],
+    "shots": [
+      {
+        "key": "hop-shot",
+        "name": "rook-hops",
+        "start": "1:30",
+        "durationSeconds": 8,
+        "subject": "rook",
+        "locked": true,
+        "camera": [
+          {
+            "move": "low_angle"
+          },
+          {
+            "move": "chase",
+            "distanceMetres": 3
+          }
+        ]
+      }
+    ],
+    "performances": [
+      {
+        "key": "hop",
+        "subject": "rook",
+        "mode": "scripted",
+        "beats": [
+          {
+            "action": "run_past",
+            "target": "umbra",
+            "emits": "rook.passes_umbra"
+          },
+          {
+            "action": "run",
+            "seconds": 0.5
+          },
+          {
+            "action": "jump",
+            "emits": "rook.jump_peak"
+          },
+          {
+            "action": "land",
+            "emits": "rook.landed"
+          },
+          {
+            "action": "run",
+            "seconds": 1.0
+          }
+        ]
+      }
+    ],
+    "cues": [
+      {
+        "key": "flash",
+        "parameter": "scene/brightness",
+        "on": "rook.jump_peak",
+        "value": 1.4,
+        "rampSeconds": 0.05,
+        "holdSeconds": 0.2
+      }
+    ]
+  },
+  "expect": {
+    "errors": [],
+    "blocked": [],
+    "produced": {
+      "sequence.shot": 1,
+      "camera.rig": 1,
+      "camera.shot": 1,
+      "sequence.actor": 1,
+      "sequence.marker": 3,
+      "sequence.event": 1
+    },
+    "diff": [
+      "rook jumps: 1.10 m up",
+      "the jump clip plays once, fitted to the arc",
+      "Marker rook.jump_peak",
+      "rook lands and recovers"
+    ]
+  }
+}

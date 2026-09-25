@@ -167,8 +167,21 @@ TEST_CASE("the Rook/Umbra benchmark: refused honestly, the feasible part built, 
     CHECK(cut->startSeconds == 90.0);
     CHECK(cut->endSeconds == 95.0);
     CHECK(cut->locked); // UFO Watch claims abductions; this moment is the plan's
-    // rise_over and pass are named as not compiled, not dropped silently
-    CHECK(issuesWith(v, IssueCode::Unsupported, "rook-umbra").size() == 2);
+    // 10-11 (ADR-760): rise_over and pass compile as keys on the chase rig's offset, inside the shot
+    CHECK(issuesWith(v, IssueCode::Unsupported, "rook-umbra").empty());
+    const seq::Shot* shot = c.staged.sequence.shotNamed("rook-umbra");
+    REQUIRE(shot->tracks.size() == 1);
+    const params::Track& offset = shot->tracks[0];
+    CHECK(offset.target == "cameras/" + rig->slug + "/followOffset");
+    REQUIRE(offset.keys.size() >= 4);
+    const auto at = [&](double t) { return offset.evaluate(t); };
+    CHECK_THAT(at(0.0)[1], Catch::Matchers::WithinAbs(0.4, 1e-4));  // chase: low, behind
+    CHECK_THAT(at(0.0)[2], Catch::Matchers::WithinAbs(-3.0, 1e-4));
+    CHECK_THAT(at(2.2)[1], Catch::Matchers::WithinAbs(0.4, 1e-4));  // holds until 1:32.2
+    CHECK_THAT(at(3.2)[1], Catch::Matchers::WithinAbs(4.0, 1e-4));  // over by 1:33.2
+    CHECK(at(4.2)[2] > 0.0f);                 // ahead of Rook by 1:34.2, looking back
+    CHECK(diffHas(c, '+', "Camera \"rook-umbra\" rises over at 01:32.200"));
+    CHECK(diffHas(c, '+', "Camera \"rook-umbra\" passes at 01:33.200"));
 
     // 12: the diff reads as intent
     CHECK(diffHas(c, '+', "Shot \"rook-umbra\" 01:30.000-01:35.000"));

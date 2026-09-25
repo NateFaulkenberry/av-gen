@@ -1,7 +1,9 @@
 #include "directing/compiler.hpp"
+#include "directing/performance.hpp"
 
 #include "app/cinematic.hpp"
 #include "seq/events.hpp"
+#include "seq/retime.hpp"
 #include "world/atmospherics.hpp"
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_stack.hpp"
@@ -23,6 +25,11 @@ namespace avgen::directing {
 const Place* SceneFacts::place(std::string_view id) const {
     const auto it = std::find_if(places.begin(), places.end(), [&](const Place& p) { return p.id == id; });
     return it == places.end() ? nullptr : &*it;
+}
+
+const CharacterMark* SceneFacts::character(std::string_view id) const {
+    const auto it = std::find_if(characters.begin(), characters.end(), [&](const CharacterMark& c) { return c.id == id; });
+    return it == characters.end() ? nullptr : &*it;
 }
 
 const std::vector<float>* SceneFacts::base(std::string_view path) const {
@@ -157,6 +164,14 @@ std::optional<nlohmann::json> contentOf(const ContentRef& ref, const Staging& st
         }
         break;
     case ContentDomain::SequenceActor:
+        for (const seq::Actor& a : sequence.actors) {
+            if (a.id == ref.id) {
+                seq::Sequence one;
+                one.actors.push_back(a);
+                return one.toJson().at("actors").at(0);
+            }
+        }
+        break;
     case ContentDomain::SequenceTrack:
     case ContentDomain::TimelineTrack: break;
     }
@@ -335,6 +350,74 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         return std::string();
     };
 
+    // ADR-760: the follow rig's offset over the shot, from its rise_over / pass beats. Shot-relative
+    // keys on `cameras/<slug>/followOffset` (spec 17's shot tracks): they move with the shot, bake at
+    // install, and edit as three keys -- chase, over, past -- rather than as a camera path.
+    std::vector<std::string> keyedNotes;
+    const auto offsetTrack = [&](const Plan& p, std::size_t shotIndex, const PlanShot& ps, const scene::CameraRig& rig,
+                                 const PlanTimes& times, double start, double end) {
+        keyedNotes.clear();
+        params::Track track;
+        track.target = "cameras/" + rig.slug + "/followOffset";
+        struct Beat {
+            CameraMove move;
+            double at;
+            const CameraBeat* beat;
+        };
+        std::vector<Beat> beats;
+        std::size_t k = 0;
+        for (std::size_t b = 0; b < ps.camera.size(); ++b) {
+            const CameraBeat& cb = ps.camera[b];
+            if (cb.move != CameraMove::RiseOver && cb.move != CameraMove::Pass) {
+                continue;
+            }
+            double at = start + ((end - start) * static_cast<double>(++k) / 3.0); // default: thirds of the shot
+            if (cb.at) {
+                if (const auto t = times.at(fmt::format("/shots/{}/camera/{}/at", shotIndex, b))) {
+                    at = *t;
+                }
+            }
+            beats.push_back(Beat{cb.move, std::clamp(at, start, end), &cb});
+        }
+        (void)p;
+        if (beats.empty()) {
+            return track;
+        }
+        std::stable_sort(beats.begin(), beats.end(), [](const Beat& a, const Beat& b) { return a.at < b.at; });
+        const auto key = [&](double at, glm::vec3 v) {
+            params::Key key;
+            key.time = at - start;
+            key.value = {v.x, v.y, v.z, 0.0f};
+            key.interp = params::KeyInterp::EaseInOut;
+            track.addKey(key);
+        };
+        glm::vec3 current = rig.followOffset;
+        key(start, current);
+        for (std::size_t b = 0; b < beats.size(); ++b) {
+            const double next = b + 1 < beats.size() ? beats[b + 1].at : end;
+            const double arrive = std::min(beats[b].at + 1.0, std::max(beats[b].at + 0.25, next));
+            glm::vec3 target = current;
+            const CameraBeat& cb = *beats[b].beat;
+            if (beats[b].move == CameraMove::RiseOver) {
+                const float height = cb.heightMetres.value_or(std::max(4.0f, (rig.followOffset.y * 2.0f) + 2.0f));
+                target = glm::vec3(0.0f, height, -0.5f);
+                keyedNotes.push_back(fmt::format("Camera \"{}\" rises over at {}: {:.1f} m above by {}", rig.name, clock(beats[b].at), height,
+                                                 clock(arrive)));
+            } else {
+                const float ahead = cb.distanceMetres.value_or(std::abs(rig.followOffset.z) + 2.0f);
+                const float side = cb.side == "left" ? -1.5f : (cb.side == "right" ? 1.5f : 0.0f);
+                const float height = cb.heightMetres.value_or(std::max(1.5f, rig.followOffset.y));
+                target = glm::vec3(side, height, ahead);
+                keyedNotes.push_back(fmt::format("Camera \"{}\" passes at {}: {:.1f} m ahead, looking back, by {}", rig.name, clock(beats[b].at),
+                                                 ahead, clock(arrive)));
+            }
+            key(beats[b].at, current);
+            key(arrive, target);
+            current = target;
+        }
+        return track;
+    };
+
     // ---- shots ---------------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.shots.size(); ++i) {
         const PlanShot& ps = plan.shots[i];
@@ -395,6 +478,13 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                     liveCamera = id;
                     const scene::CameraRig* added = out.staged.cameras.find(id);
                     record(ps.key, ContentDomain::CameraRig, added->slug);
+                    // ADR-760: rise_over / pass, as keys on this rig's offset, inside the shot.
+                    if (auto keyed = offsetTrack(plan, i, ps, *added, v.times, start, end); !keyed.keys.empty()) {
+                        shot.tracks.push_back(keyed);
+                        for (const std::string& note : keyedNotes) {
+                            line(removedLine(ps.key), ps.key, note);
+                        }
+                    }
                     line(removedLine(ps.key), ps.key,
                          fmt::format("Camera \"{}\": {}{} on {} (follows node '{}', {:.1f} m up, {:.1f} m behind)",
                                      added->name, lowAngle ? "low-angle " : "", cameraMoveName(beat.move), idOf(subject),
@@ -423,6 +513,64 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         }
     }
 
+    // ---- performances (ADR-758, ADR-759) --------------------------------------------------------------
+    std::map<std::string, double> eventTimes;
+    for (std::size_t i = 0; i < plan.performances.size(); ++i) {
+        const PlanPerformance& pp = plan.performances[i];
+        if (v.isBlocked(pp.key)) {
+            continue;
+        }
+        CompiledPerformance cp = compilePerformance(plan, i, facts, v.times);
+        // ADR-823: slow motion on this performance -- its actor reparameterised over each window,
+        // in time order. The plan events it raises move with it, so cues on them stay on the moment.
+        std::vector<std::pair<std::size_t, double>> windows;
+        for (std::size_t r = 0; r < plan.retimes.size(); ++r) {
+            if (plan.retimes[r].performance == pp.key && !v.isBlocked(plan.retimes[r].key)) {
+                windows.emplace_back(r, *v.times.at(fmt::format("/retimes/{}/from", r)));
+            }
+        }
+        std::sort(windows.begin(), windows.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+        double shift = 0.0; // how much the earlier windows have already pushed later times back
+        std::vector<std::pair<std::string, std::string>> retimeLines;
+        for (const auto& [r, fromTime] : windows) {
+            const PlanRetime& rt = plan.retimes[r];
+            const double a = fromTime + shift;
+            const double b = *v.times.at(fmt::format("/retimes/{}/until", r)) + shift;
+            const auto rate = static_cast<float>(rt.factor);
+            if (auto ok = seq::retimeActor(cp.actor, a, b, rate); !ok) {
+                retimeLines.emplace_back(rt.key, fmt::format("Retime {} not applied: {}", rt.key, ok.error().message));
+                continue;
+            }
+            for (auto& [name, time] : cp.events) {
+                time = seq::retimeMap(time, a, b, rate);
+            }
+            cp.to = seq::retimeMap(cp.to, a, b, rate);
+            shift += (b - a) * ((1.0 / rt.factor) - 1.0);
+            retimeLines.emplace_back(rt.key, fmt::format("Retime {}: {} at {:.2f}x from {} to {}; the performance now ends {}",
+                                                         rt.key, cp.actor.id, rt.factor, clock(a),
+                                                         clock(seq::retimeMap(b, a, b, rate)), clock(cp.to)));
+        }
+        std::erase_if(out.staged.sequence.actors, [&](const seq::Actor& a) { return a.id == cp.actor.id; });
+        out.staged.sequence.actors.push_back(cp.actor);
+        record(pp.key, ContentDomain::SequenceActor, cp.actor.id);
+        line(removedLine(pp.key), pp.key,
+             fmt::format("Performance {}: {}-{}, {} key(s) from its mark", cp.actor.id, clock(cp.from), clock(cp.to),
+                         cp.actor.keys.size()));
+        for (const std::string& s : cp.summary) {
+            line(removedLine(pp.key), pp.key, "  " + s);
+        }
+        for (const auto& [key, text] : retimeLines) {
+            line(removedLine(key), key, text);
+        }
+        for (const auto& [name, time] : cp.events) {
+            eventTimes[name] = time;
+            seq::Marker marker{time, name, seq::MarkerKind::Cue};
+            out.staged.sequence.markers.push_back(marker);
+            record(pp.key, ContentDomain::SequenceMarker, markerId(marker));
+            line(removedLine(pp.key), pp.key, fmt::format("Marker {} {} (computed)", name, clock(time)));
+        }
+    }
+
     // ---- markers -------------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.markers.size(); ++i) {
         const PlanMarker& pm = plan.markers[i];
@@ -441,10 +589,17 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
     // ---- parameter cues ------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.cues.size(); ++i) {
         const PlanCue& pc = plan.cues[i];
-        if (v.isBlocked(pc.key) || !pc.at) {
+        if (v.isBlocked(pc.key)) {
             continue;
         }
-        const double t = *v.times.at(fmt::format("/cues/{}/at", i));
+        double t = 0.0;
+        if (pc.at) {
+            t = *v.times.at(fmt::format("/cues/{}/at", i));
+        } else if (const auto e = eventTimes.find(pc.on); e != eventTimes.end()) {
+            t = e->second; // a plan event, at the time the compiler computed for it (spec §30)
+        } else {
+            continue;
+        }
         std::string parameter = pc.parameter;
         if (pc.effect) {
             const ResolvedEffect effect = resolveEffect(*pc.effect, plan, facts);

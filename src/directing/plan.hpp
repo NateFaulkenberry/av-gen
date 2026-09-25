@@ -147,6 +147,8 @@ struct PerformanceBeat {
     std::optional<TimeRef> at;
     std::optional<double> seconds;   // how long, when the request said
     std::string emits;               // a plan event this beat raises: "rook.backflip_peak"
+    std::string moment;              // which moment `emits` names, for a beat with several: a jump's
+                                     // "takeoff" | "peak" (default) | "touchdown"
     std::optional<float> clearanceMetres; // over-the-target beats: how far above it to pass
     friend bool operator==(const PerformanceBeat&, const PerformanceBeat&) = default;
 };
@@ -156,6 +158,10 @@ struct PlanPerformance {
     std::string subject;             // alias
     PerformanceMode mode = PerformanceMode::Scripted;
     std::vector<PerformanceBeat> beats;
+    // ADR-820's entry blend: seconds over which the body blends from wherever the simulation had it
+    // into the performance. 0 (the default) takes it at the mark instantly, which is the only form a
+    // baked plan may use -- where a live character stands is not a plan-time fact (ADR-758).
+    double entrySeconds = 0.0;
     friend bool operator==(const PlanPerformance&, const PlanPerformance&) = default;
 };
 

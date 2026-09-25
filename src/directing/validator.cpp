@@ -1,6 +1,7 @@
 #include "directing/validator.hpp"
 
 #include "directing/compiler.hpp"
+#include "directing/performance.hpp"
 #include "directing/text.hpp"
 #include "seq/events.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -15,7 +16,7 @@
 namespace avgen::directing {
 namespace {
 
-constexpr float kDefaultClearance = 0.25f; // metres above an obstacle a jump must pass
+constexpr float kDefaultClearance = kDefaultJumpClearance;
 
 struct Collector {
     Validation& v;
@@ -137,8 +138,9 @@ CameraSupport cameraSupport(CameraMove move, SubjectKind subject) {
         return subject == SubjectKind::Entity ? CameraSupport::Unsupported : CameraSupport::Framing;
     case CameraMove::RiseOver:
     case CameraMove::Pass:
-        // Time-varying offsets on a behaviour: Slice 3.
-        return CameraSupport::Unsupported;
+        // ADR-760: keys on the follow rig's offset, so only where a follow rig exists -- on a
+        // character. Rising over a place is a framing move's elevation, not compiled yet.
+        return subject == SubjectKind::Entity ? CameraSupport::KeyedOffset : CameraSupport::Unsupported;
     }
     return CameraSupport::Unsupported;
 }
@@ -301,6 +303,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
     // ---- the previous revision: hand edits are never overwritten ------------------------------------
     std::vector<std::string> ownShots;   // seq shots the previous revision made, still as made
     std::vector<std::string> ownMarkers; // "name@time"
+    std::vector<std::string> ownActors;
     if (const Plan* previous = facts.plan(plan.id); previous != nullptr) {
         for (const ContentRef& ref : previous->produced) {
             const auto now = contentOf(ref, facts.staged);
@@ -321,6 +324,8 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 ownShots.push_back(ref.id);
             } else if (ref.domain == ContentDomain::SequenceMarker) {
                 ownMarkers.push_back(ref.id);
+            } else if (ref.domain == ContentDomain::SequenceActor) {
+                ownActors.push_back(ref.id);
             }
         }
     }
@@ -362,6 +367,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         // One primary camera move per shot: a move that changes within the shot (chase -> rise ->
         // pass) needs time-varying behaviour state, which is Slice 3's.
         bool primary = false;
+        bool followsCharacter = false;
         for (std::size_t b = 0; b < shot.camera.size() && shot.rig.empty(); ++b) {
             const CameraBeat& beat = shot.camera[b];
             const std::string subject = beat.subject.empty() ? shot.subject : beat.subject;
@@ -376,13 +382,24 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             if (support == CameraSupport::Modifier) {
                 continue;
             }
+            if (support == CameraSupport::KeyedOffset) {
+                if (!followsCharacter) {
+                    Issue& issue = c.warning(IssueCode::Unsupported, shot.key, where,
+                                             fmt::format("'{}' changes a follow camera's offset, and no chase or follow on "
+                                                         "a character comes before it in this shot",
+                                                         cameraMoveName(beat.move)));
+                    issue.suggestions = {"put a chase or follow on the character first"};
+                }
+                continue;
+            }
             if (support == CameraSupport::Unsupported) {
                 Issue& issue = c.warning(IssueCode::Unsupported, shot.key, where,
                                          fmt::format("'{}' on {} '{}' is not compiled yet; the shot is built without it",
                                                      cameraMoveName(beat.move), subjectKindName(kind), idOf(subject)));
                 issue.cause = (beat.move == CameraMove::RiseOver || beat.move == CameraMove::Pass)
-                                  ? "a move whose offset changes over the shot needs time-varying camera behaviour (Slice 3)"
-                                  : "framing a moving character needs it to be a scripted performance (Slice 2)";
+                                  ? "rising over or passing a PLACE is not compiled yet; over a character it is (ADR-760)"
+                                  : "framing a moving character by a move would frame where it stood at the cut; "
+                                    "follow it with chase or follow";
                 continue;
             }
             if (primary) {
@@ -395,6 +412,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 continue;
             }
             primary = true;
+            followsCharacter = support == CameraSupport::FollowRig;
             if (support == CameraSupport::Framing && facts.place(idOf(subject)) == nullptr) {
                 c.error(IssueCode::SpatialInfeasible, shot.key, where,
                         fmt::format("cannot frame '{}': its position is not known", idOf(subject)));
@@ -478,6 +496,19 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                                                performanceModeName(p.mode)));
             issue.suggestions = {"make it scripted", "mark the plan \"directed\" if a live result is intended"};
         }
+        if (p.entrySeconds < 0.0) {
+            c.error(IssueCode::SchemaInvalid, p.key, at + "/entrySeconds", "an entry blend cannot be negative");
+        } else if (p.entrySeconds > 0.0) {
+            // ADR-820: a blend starts from wherever the simulation had the body at the cut, which
+            // depends on everything the world did before it -- live state, not a plan-time fact.
+            Issue& issue = c.add(plan.tier == Tier::Baked ? Severity::Error : Severity::Warning,
+                                 IssueCode::NonDeterministic, p.key, at + "/entrySeconds",
+                                 fmt::format("an entry blend of {:.2f} s starts from where the simulation left {}, "
+                                             "which is live state: the performance would not begin the same way twice",
+                                             p.entrySeconds, idOf(p.subject)));
+            issue.suggestions = {"set entrySeconds to 0 and start the performance at a cut",
+                                 "mark the plan \"directed\" if a live start is intended"};
+        }
         const SubjectKind kind = kindOf(p.subject);
         if (kind != SubjectKind::Unresolved && kind != SubjectKind::Entity) {
             c.error(IssueCode::CapabilityUnavailable, p.key, at + "/subject",
@@ -488,9 +519,20 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         if (card == nullptr) {
             continue; // unresolved: already reported and blocked
         }
+        std::vector<std::size_t> clearedStatically; // jump beats already refused on height alone
         for (std::size_t b = 0; b < p.beats.size(); ++b) {
             const PerformanceBeat& beat = p.beats[b];
             const std::string where = fmt::format("{}/beats/{}", at, b);
+            if (!beat.moment.empty()) {
+                const bool known = std::find(std::begin(kJumpMoments), std::end(kJumpMoments), beat.moment) !=
+                                   std::end(kJumpMoments);
+                if (beat.action != "jump" || !known) {
+                    c.error(IssueCode::SchemaInvalid, p.key, where + "/moment",
+                            fmt::format("'moment' names one of a jump's moments (takeoff, peak, touchdown); '{}' on a "
+                                        "'{}' beat is not one",
+                                        beat.moment, beat.action));
+                }
+            }
             if (beat.action == "look_at") {
                 continue; // the aim layer, not an activity
             }
@@ -525,27 +567,155 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 if (obstacle != nullptr && obstacle->height > 0.0f) {
                     const float clearance = beat.clearanceMetres.value_or(kDefaultClearance);
                     const float required = obstacle->height + clearance;
-                    if (card->jump.apex < required) {
+                    // ADR-822: what a plan may ask is the character's highest leap, not its hop.
+                    const float limit = card->jump.maxApex > 0.0f ? card->jump.maxApex : card->jump.apex;
+                    if (limit < required) {
                         Issue& issue = c.error(IssueCode::SpatialInfeasible, p.key, where,
-                                               fmt::format("{}'s jump peaks {:.2f} m up; clearing '{}' ({:.2f} m tall, "
+                                               fmt::format("{}'s highest jump peaks {:.2f} m up; clearing '{}' ({:.2f} m tall, "
                                                            "+{:.2f} m clearance) needs {:.2f} m",
-                                                           card->subject, card->jump.apex, obstacle->id, obstacle->height,
+                                                           card->subject, limit, obstacle->id, obstacle->height,
                                                            clearance, required));
                         issue.subject = card->subject;
-                        issue.details = {{"apex", card->jump.apex}, {"apexSource", card->jump.source},
+                        issue.details = {{"apex", limit}, {"hopApex", card->jump.apex}, {"apexSource", card->jump.source},
                                          {"obstacle", obstacle->id}, {"obstacleHeight", obstacle->height},
                                          {"required", required}};
-                        issue.suggestions = {"jump past the target rather than over it", "choose a lower obstacle",
-                                             fmt::format("raise {}'s jump apex to at least {:.2f} m", card->subject, required)};
+                        issue.suggestions = {"use a character with a larger jump",
+                                             fmt::format("take a different path: run past {} rather than over it", obstacle->id),
+                                             "choose a lower obstacle"};
+                        clearedStatically.push_back(b);
                     }
                 }
             }
         }
-        // Scripted performances compile in Slice 2. Reported last, so the findings above -- which a
-        // revision can act on -- come first.
-        Issue& issue = c.error(IssueCode::Unsupported, p.key, at,
-                               "character performances are not compiled yet; nothing will move");
-        issue.cause = "scripted performance compilation is Slice 2";
+        // What this build compiles (ADR-759). Reported after the capability and spatial findings,
+        // which a revision can act on.
+        if (p.mode != PerformanceMode::Scripted) {
+            c.error(IssueCode::Unsupported, p.key, at + "/mode",
+                    fmt::format("{} performances are not compiled yet (Slice 4); only scripted ones", performanceModeName(p.mode)));
+        }
+        for (std::size_t b = 0; b < p.beats.size(); ++b) {
+            const PerformanceBeat& beat = p.beats[b];
+            const std::string where = fmt::format("{}/beats/{}", at, b);
+            if (!beatCompilable(beat.action)) {
+                if (card->can(activityFor(beat.action)) || beat.action == "look_at") {
+                    Issue& issue = c.error(IssueCode::Unsupported, p.key, where + "/action",
+                                           fmt::format("'{}' is not compiled yet", beat.action));
+                    issue.cause = beat.action == "fall"
+                                      ? "a fall needs a drop to fall from, which a plan cannot place yet; jump and land compile"
+                                      : "this build compiles run_to, walk_to, run_past, walk_past, run, walk, hold, look_at, "
+                                        "jump and land";
+                }
+                continue;
+            }
+            const bool needsTarget = beat.action.ends_with("_to") || beat.action.ends_with("_past");
+            if (needsTarget && beat.target.empty()) {
+                c.error(IssueCode::SchemaInvalid, p.key, where + "/target", fmt::format("'{}' needs a target", beat.action));
+            }
+            if (!beat.target.empty()) {
+                const SubjectKind tk = kindOf(beat.target);
+                if (tk == SubjectKind::Entity) {
+                    c.error(IssueCode::Unsupported, p.key, where + "/target",
+                            "a performance toward another character is not compiled: where a character is, is its "
+                            "simulation's, not a plan-time fact (ADR-758)");
+                } else if (tk != SubjectKind::Unresolved && facts.place(idOf(beat.target)) == nullptr) {
+                    c.error(IssueCode::SpatialInfeasible, p.key, where + "/target",
+                            fmt::format("'{}' has no known place to move toward", idOf(beat.target)));
+                }
+            }
+        }
+        const std::optional<double> start = performanceStart(plan, i, v.times);
+        if (!start) {
+            Issue& issue = c.error(IssueCode::SchemaInvalid, p.key, at,
+                                   "a performance needs a start: give its first beat a time, or a shot of the same subject");
+            issue.suggestions = {"\"at\" on the first beat", "a shot whose subject is the performer"};
+        } else {
+            // ADR-758: a performance takes the body at its first instant, from wherever the
+            // simulation had it. A cut hides that; anywhere else it is a visible jump.
+            bool atCut = false;
+            for (std::size_t s = 0; s < plan.shots.size(); ++s) {
+                const auto shotStart = v.times.at(fmt::format("/shots/{}/start", s));
+                atCut = atCut || (shotStart && std::abs(*shotStart - *start) < 1e-3);
+            }
+            for (const seq::Shot& shot : facts.staged.sequence.shots) {
+                atCut = atCut || std::abs(shot.startSeconds - *start) < 1e-3;
+            }
+            for (const scene::CameraShot& cut : facts.staged.cameras.shots) {
+                atCut = atCut || std::abs(cut.startSeconds - *start) < 1e-3;
+            }
+            if (!atCut) {
+                Issue& issue = c.warning(IssueCode::TimingConflict, p.key, at,
+                                         fmt::format("the performance starts at {:.3f}s, not at a cut: {} will visibly jump "
+                                                     "from where the simulation has them to the performance's mark",
+                                                     *start, card->subject));
+                issue.suggestions = {"start the performance with a shot of the performer"};
+            }
+        }
+        // Jumps, checked on the path the compiler would fly (ADR-822): the same `compilePerformance`,
+        // so what is refused is exactly what would have been compiled. Only when the path can be
+        // placed: a start, and every target a place.
+        const bool hasJump = std::any_of(p.beats.begin(), p.beats.end(), [](const PerformanceBeat& b) { return b.action == "jump"; });
+        const bool placeable = std::all_of(p.beats.begin(), p.beats.end(), [&](const PerformanceBeat& b) {
+            return b.target.empty() || facts.place(idOf(b.target)) != nullptr;
+        });
+        if (hasJump && start && placeable) {
+            const CompiledPerformance probe = compilePerformance(plan, i, facts, v.times);
+            for (const JumpOutcome& j : probe.jumps) {
+                const std::string where = fmt::format("{}/beats/{}", at, j.beat);
+                const bool refused = std::find(clearedStatically.begin(), clearedStatically.end(), j.beat) !=
+                                     clearedStatically.end();
+                const auto infeasible = [&](std::string message) -> Issue& {
+                    Issue& issue = c.error(IssueCode::SpatialInfeasible, p.key, where, std::move(message));
+                    issue.subject = card->subject;
+                    issue.details = {{"apex", j.apex},        {"minimumApex", j.minimumApex}, {"apexLimit", j.apexLimit},
+                                     {"distance", j.distance}, {"maxDistance", j.maxDistance}, {"obstacle", j.obstacle}};
+                    return issue;
+                };
+                if (!j.groundKnown) {
+                    infeasible("the ground under the jump is not known (this scene has no terrain), so its arc "
+                               "cannot be placed or checked");
+                    continue;
+                }
+                if (!j.arc) {
+                    infeasible(fmt::format("no arc exists from where {} takes off to where it would land", card->subject));
+                    continue;
+                }
+                if (!refused && j.apex > j.apexLimit + 1e-4f) {
+                    Issue& issue = infeasible(fmt::format(
+                        "on this path, clearing '{}' takes an arc peaking {:.2f} m above the take-off; {}'s highest "
+                        "jump is {:.2f} m",
+                        j.obstacle, j.apex, card->subject, j.apexLimit));
+                    issue.suggestions = {"use a character with a larger jump", "take off closer to the obstacle",
+                                         "take a different path"};
+                }
+                if (j.distance > j.maxDistance + 1e-4f) {
+                    Issue& issue = infeasible(fmt::format("the leap is {:.2f} m long, and {}'s farthest is {:.2f} m",
+                                                          j.distance, card->subject, j.maxDistance));
+                    issue.suggestions = {"jump over something narrower", "use a character with a longer jump"};
+                }
+                if (!j.ground.clear) {
+                    Issue& issue = infeasible(fmt::format(
+                        "the arc meets the ground {:.2f} s after take-off, before it lands", j.ground.firstContact));
+                    issue.suggestions = {"jump somewhere flatter", "jump in another direction"};
+                }
+            }
+        }
+        // One actor per character: another performance of the same subject in this plan, or an actor
+        // already on this character that this plan did not make, would fight for the body.
+        for (std::size_t o = 0; o < i; ++o) {
+            if (plan.performances[o].subject == p.subject) {
+                c.error(IssueCode::TimingConflict, p.key, at,
+                        fmt::format("{} already has a performance in this plan ('{}'); combine the beats",
+                                    card->subject, plan.performances[o].key));
+            }
+        }
+        for (const seq::Actor& actor : facts.staged.sequence.actors) {
+            const bool mine = std::find(ownActors.begin(), ownActors.end(), actor.id) != ownActors.end();
+            if (!mine && actor.id == card->subject) {
+                c.error(IssueCode::TimingConflict, p.key, at,
+                        fmt::format("the sequence already has an actor '{}' that this plan did not make", actor.id))
+                    .suggestions = {"remove that actor first", "revise the plan that made it"};
+            }
+        }
     }
 
     // ---- cues ---------------------------------------------------------------------------------------
@@ -659,12 +829,55 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
 
     // ---- retimes -------------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.retimes.size(); ++i) {
+        // ADR-823: slow motion is a reparameterisation of one performance's actor (`seq::retimeActor`)
+        // -- its keys, clip cues and airborne spans -- never of the film's clock (spec §33).
         const PlanRetime& r = plan.retimes[i];
-        Issue& issue = c.error(IssueCode::Unsupported, r.key, fmt::format("/retimes/{}", i),
-                               fmt::format("slow motion ({:.2f}x) is not compiled yet", r.factor));
-        issue.cause = "performance-local retiming is Slice 3; there is no global time warp (spec §33)";
-        if (const PlanPerformance* p = performance(plan, r.performance); p != nullptr && v.isBlocked(p->key)) {
+        const std::string at = fmt::format("/retimes/{}", i);
+        const PlanPerformance* p = performance(plan, r.performance);
+        if (p == nullptr) {
+            Issue& issue = c.error(IssueCode::SchemaInvalid, r.key, at + "/performance",
+                                   fmt::format("no performance '{}' to slow down", r.performance));
+            issue.suggestions = {"retime a performance of this plan, by its key"};
+            continue;
+        }
+        if (!(r.factor > 0.0)) {
+            c.error(IssueCode::SchemaInvalid, r.key, at + "/factor", "a retime's factor must be greater than 0");
+            continue;
+        }
+        const auto from = v.times.at(at + "/from");
+        const auto until = v.times.at(at + "/until");
+        if (!from || !until) {
+            continue; // unplaceable: already reported
+        }
+        if (*until <= *from) {
+            c.error(IssueCode::SchemaInvalid, r.key, at + "/until",
+                    fmt::format("the window ends ({:.3f}s) before it starts ({:.3f}s)", *until, *from));
+            continue;
+        }
+        for (std::size_t o = 0; o < i; ++o) {
+            const PlanRetime& other = plan.retimes[o];
+            const auto oFrom = v.times.at(fmt::format("/retimes/{}/from", o));
+            const auto oUntil = v.times.at(fmt::format("/retimes/{}/until", o));
+            if (other.performance == r.performance && oFrom && oUntil && *from < *oUntil && *until > *oFrom) {
+                c.error(IssueCode::TimingConflict, r.key, at,
+                        fmt::format("overlaps retime '{}' of the same performance; one stretch of time has one rate",
+                                    other.key));
+            }
+        }
+        if (v.isBlocked(p->key)) {
+            Issue& issue = c.error(IssueCode::Blocked, r.key, at + "/performance",
+                                   fmt::format("slows performance '{}', which is not possible as planned", p->key));
             issue.details = {{"dependsOn", p->key}};
+            continue;
+        }
+        const std::size_t index = static_cast<std::size_t>(p - plan.performances.data());
+        if (performanceStart(plan, index, v.times)) {
+            const CompiledPerformance probe = compilePerformance(plan, index, facts, v.times);
+            if (*until <= probe.from || *from >= probe.to) {
+                c.error(IssueCode::TimingConflict, r.key, at,
+                        fmt::format("the window {:.3f}-{:.3f}s misses performance '{}' ({:.3f}-{:.3f}s)", *from, *until,
+                                    p->key, probe.from, probe.to));
+            }
         }
     }
     return v;

@@ -65,31 +65,22 @@ ActivityKind kindOf(std::string_view activity) {
     return ActivityKind::Custom;
 }
 
-// The `explore` behaviour is the one place a body's jump is authored (ADR-194). Its settings keys
-// are read with `entity::JumpSettings`' own defaults, so the numbers a character with no explore
-// behaviour gets are the engine's, not this file's.
+// ADR-822: a character's jump is one data block, read by `explore`'s autonomous hops and by this
+// card alike, so the two cannot disagree about what the body can do. The numbers are the entity's
+// own; when it authors no block they are `entity::JumpSettings`' defaults, and the card says so.
 JumpEnvelope jumpOf(const entity::EntityDesc& desc) {
     const entity::JumpSettings defaults;
+    const entity::JumpSettings& j = desc.jump;
     JumpEnvelope out;
-    out.apex = defaults.apex;
-    out.gravity = defaults.gravity;
-    out.maxDistance = defaults.maxDistance;
-    out.source = "default";
-    for (const entity::BehaviorDesc& behavior : desc.behaviors) {
-        if (behavior.kind != "explore" || !behavior.settings.is_object()) {
-            continue;
-        }
-        const nlohmann::json& s = behavior.settings;
-        out.apex = s.value("jumpApex", out.apex);
-        out.gravity = s.value("jumpGravity", out.gravity);
-        // `explore` treats a missing jumpRange as 0 -- a body that does not leap on its own. That is
-        // about autonomy; a planned jump still has the engine's distance ceiling unless one is set.
-        if (s.contains("jumpRange") && s["jumpRange"].is_number() && s["jumpRange"].get<float>() > 0.0f) {
-            out.maxDistance = s["jumpRange"].get<float>();
-        }
-        out.source = "explore";
-        break;
-    }
+    out.apex = j.apex;
+    out.maxApex = j.apexLimit();
+    out.gravity = j.gravity;
+    out.maxDistance = j.maxDistance;
+    out.landSeconds = j.landSeconds;
+    const bool authored = j.apex != defaults.apex || j.maxApex != defaults.maxApex || j.gravity != defaults.gravity ||
+                          j.maxDistance != defaults.maxDistance || j.landSeconds != defaults.landSeconds ||
+                          j.maxSeconds != defaults.maxSeconds;
+    out.source = authored ? "jump" : "default";
     return out;
 }
 
@@ -114,6 +105,7 @@ CharacterCard cardFor(const entity::EntityDesc& desc, const scene::Composition& 
         }
     }
     card.rigLoaded = !rigs.empty();
+    const scene::ClipSemanticsTable* semantics = composition.clipSemanticsFor(card.node);
 
     std::set<std::string> mappedClips;
     for (const auto& [activity, stateName] : desc.clips) {
@@ -128,6 +120,14 @@ CharacterCard cardFor(const entity::EntityDesc& desc, const scene::Composition& 
                 cap.seconds = rig->clips[state->clip].length();
                 cap.loops = state->loop;
                 cap.clip = rig->clips[state->clip].name;
+                if (semantics != nullptr) {
+                    const scene::ClipSemantics* measured = semantics->find(stateName);
+                    measured = measured != nullptr ? measured : semantics->find(cap.clip);
+                    if (measured != nullptr) {
+                        cap.semantics = *measured;
+                        cap.loops = measured->loops;
+                    }
+                }
                 break;
             }
         }
@@ -187,6 +187,14 @@ nlohmann::json CharacterCard::toJson() const {
                                   {"seconds", a.seconds},
                                   {"loops", a.loops},
                                   {"clip", a.clip}});
+        if (a.semantics) {
+            nlohmann::json events = nlohmann::json::array();
+            for (const scene::ClipEvent& e : a.semantics->events) {
+                events.push_back({{"name", e.name}, {"seconds", e.seconds}});
+            }
+            activitiesJson.back()["events"] = std::move(events);
+            activitiesJson.back()["ground"] = scene::clipGroundName(a.semantics->ground);
+        }
     }
     return {{"subject", subject},
             {"node", node},
@@ -194,7 +202,8 @@ nlohmann::json CharacterCard::toJson() const {
             {"activities", std::move(activitiesJson)},
             {"locomotion", {{"walkSpeed", walkSpeed}, {"runSpeed", runSpeed}}},
             {"jump",
-             {{"apex", jump.apex}, {"gravity", jump.gravity}, {"maxDistance", jump.maxDistance}, {"source", jump.source}}},
+             {{"apex", jump.apex}, {"maxApex", jump.maxApex}, {"gravity", jump.gravity}, {"maxDistance", jump.maxDistance},
+              {"landSeconds", jump.landSeconds}, {"source", jump.source}}},
             {"affordances", affordances},
             {"unmappedClips", unmappedClips},
             {"rigLoaded", rigLoaded}};
