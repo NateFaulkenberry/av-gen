@@ -9116,6 +9116,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9279,6 +9280,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9443,6 +9445,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9624,6 +9627,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
@@ -9808,6 +9812,7 @@
               }
             },
             "considerers": [
+              {"kind": "goal", "name": "goal"},
               {
                 "kind": "react",
                 "name": "beam",
