@@ -18,6 +18,7 @@
 #include "scene/composition.hpp"
 #include "seq/sequence.hpp"
 #include "signals/signal_bus.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -204,6 +205,7 @@ TEST_CASE("an actor's handoff entry survives the project file", "[motion][handof
 
 TEST_CASE("on the benchmark, a performer's clip owns Rook's rig for its span and no longer",
           "[motion][handoff][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(std::filesystem::path(AVGEN_SOURCE_DIR) /
                                "examples/world/glowmere-valley-2-multicam.json"));

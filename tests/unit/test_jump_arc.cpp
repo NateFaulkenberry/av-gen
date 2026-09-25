@@ -17,6 +17,7 @@
 #include "seq/jump.hpp"
 #include "seq/sequence.hpp"
 #include "signals/signal_bus.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -273,6 +274,7 @@ TEST_CASE("a jump compiles to keys, a span and a cue that line up", "[motion][ju
 
 TEST_CASE("on the benchmark, a performed jump keeps the arc's height and the ground gets the rest",
           "[motion][jump][handoff][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadProject(std::filesystem::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
     const entity::Entity* rook = engine.composition()->entityWorld().find("rook");

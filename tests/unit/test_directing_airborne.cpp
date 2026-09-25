@@ -12,6 +12,7 @@
 #include "entity/entity.hpp"
 #include "seq/jump.hpp"
 #include "seq/retime.hpp"
+#include "support/project_assets.hpp"
 #include "ui/edit_history.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -87,6 +88,7 @@ void playTo(app::Engine& engine, std::uint64_t& frame, double seconds) {
 } // namespace
 
 TEST_CASE("Rook's card: his jump is data, and his jump clip is measured", "[directing][airborne][capabilities]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);
     const CharacterCard* rook = facts.capabilities.character("rook");
@@ -135,6 +137,7 @@ TEST_CASE("the owner's acceptance case: Rook cannot leap Umbra, and says what wo
 
 TEST_CASE("a hop compiles to the engine's arc, its clip once, and its peak as a marker; played, the body flies it",
           "[directing][airborne][performance][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);
     const Compilation c = compilePlan(planFrom(hopPlan()), facts);
@@ -178,6 +181,7 @@ TEST_CASE("a hop compiles to the engine's arc, its clip once, and its peak as a 
 
 TEST_CASE("slow motion stretches the performance around the jump, and its peak marker moves with it",
           "[directing][airborne][retime]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);
     const Compilation plain = compilePlan(planFrom(hopPlan()), facts);

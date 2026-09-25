@@ -10,6 +10,7 @@
 #include "directing/plan.hpp"
 #include "directing/validator.hpp"
 #include "params/serialization.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 #include "ui/edit_history.hpp"
 #include "world/effects/effect_kind.hpp"
@@ -131,6 +132,7 @@ TEST_CASE("an effect reference resolves by owner and type, or says exactly why n
 
 TEST_CASE("activating the Umbra hero effect compiles to its own window, applies as one undo, and survives a save",
           "[directing][effects][benchmark][persistence]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     ui::EditHistory history;
     // Captured lists (slider bases included): what an undo restores, and what a save writes.
