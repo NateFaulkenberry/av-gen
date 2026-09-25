@@ -97,4 +97,23 @@ private:
 // the editor (and by tests); each call starts a `RecordingJob` and hands the orchestrator a handle.
 [[nodiscard]] ai::RecordingHook makeRecordingHook(RecordOptions options = {});
 
+// ---- watching the film (ADR-767) -------------------------------------------------------------------
+//
+// Every world event a play of the project raises from zero to `untilSeconds` -- its name, when, and
+// who raised it -- on a scratch copy with no live control, no audio and the cull lifted (the recording
+// conditions), so what an event-driven plan is placed on is what the film does on its own.
+struct WatchReport {
+    std::vector<directing::ObservedEvent> events;
+    double untilSeconds = 0.0;
+    double watchMs = 0.0;
+};
+[[nodiscard]] Result<WatchReport> watchFromCopy(const std::filesystem::path& copy, double untilSeconds,
+                                                const std::atomic<bool>* cancel = nullptr,
+                                                const RecordProgress& progress = {});
+[[nodiscard]] Result<WatchReport> watchWorldEvents(Engine& live, double untilSeconds);
+// The observation a plan carries, as `director.watch_events` returns it.
+[[nodiscard]] nlohmann::json observationJson(const WatchReport& report);
+// ADR-767: the host's side of `director.watch_events`.
+[[nodiscard]] ai::WatchHook makeWatchHook(std::filesystem::path scratchDir = {});
+
 } // namespace avgen::app

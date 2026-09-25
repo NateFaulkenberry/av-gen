@@ -89,6 +89,15 @@ nlohmann::json TimeRef::toJson() const {
         }
         j["anchor"] = anchor == Anchor::End ? "end" : "start";
         break;
+    case Kind::Event:
+        j["event"] = event;
+        if (!eventSubject.empty()) {
+            j["subject"] = eventSubject;
+        }
+        if (occurrence != 0) {
+            j["occurrence"] = occurrence;
+        }
+        break;
     }
     if (offsetSeconds != 0.0) {
         j["offsetSeconds"] = offsetSeconds;
@@ -119,9 +128,10 @@ std::optional<TimeRef> TimeRef::fromJson(const nlohmann::json& j, std::string_vi
     if (!j.is_object()) {
         return invalid("expected an object or a string");
     }
-    const int forms = (j.contains("seconds") ? 1 : 0) + (j.contains("bar") ? 1 : 0) + (j.contains("section") ? 1 : 0);
+    const int forms = (j.contains("seconds") ? 1 : 0) + (j.contains("bar") ? 1 : 0) + (j.contains("section") ? 1 : 0) +
+                      (j.contains("event") ? 1 : 0);
     if (forms > 1) {
-        return invalid("give exactly one of seconds, bar or section");
+        return invalid("give exactly one of seconds, bar, section or event");
     }
     TimeRef t;
     try {
@@ -138,6 +148,11 @@ std::optional<TimeRef> TimeRef::fromJson(const nlohmann::json& j, std::string_vi
         if (j.contains("seconds")) {
             t.kind = Kind::Seconds;
             t.seconds = j.at("seconds").get<double>();
+        } else if (j.contains("event")) {
+            t.kind = Kind::Event;
+            t.event = j.at("event").get<std::string>();
+            t.eventSubject = j.value("subject", std::string{});
+            t.occurrence = j.value("occurrence", 0);
         } else if (j.contains("bar")) {
             t.kind = Kind::Bar;
             t.bar = j.at("bar").get<int>();
@@ -183,6 +198,12 @@ std::string TimeRef::describe() const {
         base = fmt::format("{} of {}", anchor == Anchor::End ? "end" : "start", which);
         break;
     }
+    case Kind::Event:
+        base = fmt::format("{}{}{}", event, eventSubject.empty() ? "" : " by " + eventSubject,
+                           occurrence == 0    ? std::string()
+                           : occurrence == -1 ? std::string(" (the last)")
+                                              : fmt::format(" #{}", occurrence));
+        break;
     }
     if (offsetSeconds != 0.0) {
         base += fmt::format(" {} {:.3f}s", offsetSeconds > 0.0 ? "+" : "-", std::abs(offsetSeconds));
@@ -446,6 +467,67 @@ TimeResolution resolveTime(const TimeRef& ref, const MusicalContext& ctx, std::s
         seconds = ref.anchor == TimeRef::Anchor::End ? chosen->endSeconds : chosen->startSeconds;
         out.explanation = fmt::format("{} {} runs {:.2f}-{:.2f}s (from the {})", chosen->type, chosen->occurrence,
                                       chosen->startSeconds, chosen->endSeconds, ctx.sectionSource);
+        break;
+    }
+    case TimeRef::Kind::Event: {
+        // ADR-767: placed by what a watched play raised. Never guessed: unwatched is an error.
+        if (ctx.observedUntil < 0.0) {
+            Issue& i = issue(Severity::Error, IssueCode::UnresolvableTime,
+                             fmt::format("when '{}' happens is known only by watching the film", ref.event));
+            i.suggestions = {"watch the film first (director.watch_events), and propose with its observation"};
+            return out;
+        }
+        std::vector<const ObservedEvent*> hits;
+        std::vector<std::string> names;
+        for (const ObservedEvent& e : ctx.observed) {
+            if (std::find(names.begin(), names.end(), e.name) == names.end()) {
+                names.push_back(e.name);
+            }
+            if (e.name == ref.event && (ref.eventSubject.empty() || e.subject == ref.eventSubject)) {
+                hits.push_back(&e);
+            }
+        }
+        if (hits.empty()) {
+            Issue& i = issue(Severity::Error, IssueCode::UnresolvableTime,
+                             fmt::format("'{}'{} did not happen in the first {:.1f}s of the watched film", ref.event,
+                                         ref.eventSubject.empty() ? "" : " by " + ref.eventSubject, ctx.observedUntil));
+            i.suggestions = text::nearest(ref.event, names);
+            return out;
+        }
+        const ObservedEvent* chosen = nullptr;
+        if (ref.occurrence == -1) {
+            chosen = hits.back();
+        } else if (ref.occurrence == 0) {
+            if (hits.size() > 1) {
+                Issue& i = issue(Severity::Error, IssueCode::AmbiguousTime,
+                                 fmt::format("'{}' happened {} times; say which", ref.event, hits.size()));
+                nlohmann::json candidates = nlohmann::json::array();
+                for (const ObservedEvent* h : hits) {
+                    candidates.push_back({{"seconds", h->seconds}, {"subject", h->subject}});
+                }
+                i.details = {{"candidates", std::move(candidates)}};
+                i.suggestions = {"give an occurrence (1 = the first)"};
+                return out;
+            }
+            chosen = hits.front();
+        } else if (ref.occurrence > static_cast<int>(hits.size())) {
+            Issue& i = issue(Severity::Error, IssueCode::UnresolvableTime,
+                             fmt::format("'{}' happened only {} time(s) in the watched film", ref.event, hits.size()));
+            i.suggestions = {"the last one (occurrence -1)"};
+            return out;
+        } else {
+            chosen = hits[static_cast<std::size_t>(ref.occurrence - 1)];
+        }
+        seconds = chosen->seconds;
+        out.explanation = fmt::format("{}{} happened at {:.3f}s in the watched film", chosen->name,
+                                      chosen->subject.empty() ? "" : " (" + chosen->subject + ")", chosen->seconds);
+        // Watched with audio off (ADR-763's recording conditions). Behaviour that reacts to the music
+        // can move the event in a render until seeks replay audio (ADR-870).
+        Issue& w = issue(Severity::Warning, IssueCode::NonDeterministic,
+                         fmt::format("'{}' was timed by watching the film with audio off; if audio drives it, a render "
+                                     "may see it at another moment",
+                                     chosen->name));
+        w.suggestions = {"record the characters involved to fix their behaviour"};
         break;
     }
     }

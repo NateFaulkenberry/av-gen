@@ -242,6 +242,10 @@ struct Plan {
     std::vector<PlanCue> cues;
     std::vector<PlanRetime> retimes;
     std::vector<ContentRef> produced;
+    // ADR-767: what a watched play of the project raised, when this plan places items on events
+    // ("when the saucer starts beaming"). Carried in the plan, so its times are the same whenever it
+    // is compiled; watch again to refresh them.
+    std::optional<std::pair<std::vector<ObservedEvent>, double>> observation; // (events, watched until)
 
     [[nodiscard]] const Subject* subject(std::string_view alias) const;
     [[nodiscard]] Subject* subject(std::string_view alias);

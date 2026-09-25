@@ -293,8 +293,15 @@ std::optional<double> PlanTimes::at(std::string_view location) const {
     return std::nullopt;
 }
 
-PlanTimes resolvePlanTimes(const Plan& plan, const MusicalContext& context) {
+PlanTimes resolvePlanTimes(const Plan& plan, const MusicalContext& musical) {
     PlanTimes out;
+    // ADR-767: an event-driven plan carries what the watched film raised; its Event times are
+    // placed from that, and from nothing else.
+    MusicalContext context = musical;
+    if (plan.observation) {
+        context.observed = plan.observation->first;
+        context.observedUntil = plan.observation->second;
+    }
     const auto place = [&](const TimeRef& ref, const std::string& location) {
         TimeResolution r = resolveTime(ref, context, location);
         if (r.seconds) {

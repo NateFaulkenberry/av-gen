@@ -34,7 +34,9 @@ struct Sequence;
 namespace avgen::directing {
 
 struct TimeRef {
-    enum class Kind : std::uint8_t { Seconds, Bar, Section };
+    // Event (ADR-767): when something happened in the film -- a world event, observed by watching a
+    // play of the project from zero (`Plan::observation`). What makes a plan event-driven.
+    enum class Kind : std::uint8_t { Seconds, Bar, Section, Event };
     enum class Anchor : std::uint8_t { Start, End };
 
     Kind kind = Kind::Seconds;
@@ -45,6 +47,8 @@ struct TimeRef {
     // Section: 1-based occurrence; 0 = not said (ambiguous when the song has several); -1 = the last.
     int occurrence = 0;
     Anchor anchor = Anchor::Start; // Section: its start or its end
+    std::string event;             // Event: the world event's name ("abduction/beam", "goal.arrived")
+    std::string eventSubject;      // Event: who raised it (an entity), or empty for anyone
     double offsetSeconds = 0.0;    // added after resolution ("chorus 2 + 1.5s")
     std::string text;              // as the request wrote it, for display; never parsed again
 
@@ -82,6 +86,14 @@ struct SectionRun {
     int occurrence = 1; // 1-based among runs of this type
 };
 
+// One thing that happened in a watched play (ADR-767): a world event, when, and who raised it.
+struct ObservedEvent {
+    std::string name;
+    std::string subject; // the entity that raised it, or empty
+    double seconds = 0.0;
+    friend bool operator==(const ObservedEvent&, const ObservedEvent&) = default;
+};
+
 struct MusicalContext {
     std::vector<double> beatTimes; // ascending; the analysed grid
     int beatsPerBar = 4;
@@ -93,6 +105,10 @@ struct MusicalContext {
     // "" (none). Reported on every section resolution, so a plan never silently uses the detector's
     // guess when the person has authored their own.
     std::string sectionSource;
+    // ADR-767: the events a watched play of the project raised, when a plan carries an observation.
+    // `observedUntil` < 0: nothing was watched, so an Event time cannot be placed.
+    std::vector<ObservedEvent> observed;
+    double observedUntil = -1.0;
 };
 
 // Builds the context from a sequence: the authored section timeline when it has one, otherwise the

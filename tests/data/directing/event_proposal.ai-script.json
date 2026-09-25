@@ -1,0 +1,73 @@
+{
+  "turns": [
+    {
+      "text": "I'll watch the first half-minute to see when the saucer beams.",
+      "toolCalls": [
+        {
+          "id": "w1",
+          "name": "director.watch_events",
+          "arguments": {
+            "untilSeconds": 30
+          }
+        }
+      ]
+    },
+    {
+      "text": "It beams twice in that time. Cutting to it a second before the second beam, and marking it.",
+      "toolCalls": [
+        {
+          "id": "p1",
+          "name": "director.propose_plan",
+          "arguments": {
+            "plan": {
+              "schemaVersion": 1,
+              "id": "beams",
+              "title": "The second beam",
+              "tier": "baked",
+              "subjects": [
+                {
+                  "alias": "visitor",
+                  "text": "the visitor",
+                  "hint": "hero"
+                }
+              ],
+              "markers": [
+                {
+                  "key": "beam2",
+                  "name": "second beam",
+                  "at": {
+                    "event": "abduction/beam",
+                    "subject": "visitor",
+                    "occurrence": 2
+                  }
+                }
+              ],
+              "shots": [
+                {
+                  "key": "shot",
+                  "name": "the-beam",
+                  "start": {
+                    "event": "abduction/beam",
+                    "occurrence": 2,
+                    "offsetSeconds": -1
+                  },
+                  "durationSeconds": 4,
+                  "subject": "visitor",
+                  "locked": true,
+                  "camera": [
+                    {
+                      "move": "follow"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "text": "Approve to apply."
+    }
+  ]
+}
