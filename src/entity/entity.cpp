@@ -1167,6 +1167,7 @@ void EntityWorld::reset() {
         // up a beam would make a scrubbed frame depend on how the playhead got there. `stage::Staging`
         // resets alongside this and re-issues whatever the scenario is doing at the new second.
         entity->director_ = DirectorMotion{};
+        entity->performanceEntry_ = PerformanceEntry{}; // ADR-820: rebuilt by the replay
         entity->locomotion_ = LocomotionState{};
         // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
@@ -1897,7 +1898,9 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
             // are also world events a replayed character may hear -- and a replay that did not
             // re-raise them would be a scrub in which the mushroom never bloomed.
             raiseActionEvents(seekEvents_, 0, entityIndex, now);
-            if (entity.locomotion_.action != out.activity) {
+            // ADR-820: a performance owns the body's clip too -- its own cue, or the gait on its
+            // path. A decider's Routine action ("observe") must not name the clip under it.
+            if (!performing(entity) && entity.locomotion_.action != out.activity) {
                 entity.locomotion_.action.assign(out.activity);
             }
         }
@@ -2198,6 +2201,10 @@ void EntityWorld::applyAllOffsets() {
     }
 }
 
+bool EntityWorld::performing(const Entity& entity) {
+    return entity.director_.active && entity.director_.performance;
+}
+
 void EntityWorld::directorBefore(Entity& entity) {
     // A director says where a body *is*. Written as `travel` rather than as an offset so that
     // `position()`, the crowd field, the fields pass and every query that reads an entity's
@@ -2214,6 +2221,10 @@ void EntityWorld::directorBefore(Entity& entity) {
 }
 
 void EntityWorld::directorAfter(Entity& entity) {
+    // ADR-820: whether the sequencer owns the rig this step. Written on every step, both paths, so
+    // it can never latch past the cue or the span that raised it.
+    entity.locomotion_.clipOwned =
+        entity.director_.active && entity.director_.performance && entity.director_.clipOwned;
     // The director's *additive* half, after the behaviours rather than before them: a craft keeps
     // hovering, drifting and banking while it is being flown somewhere.
     if (entity.director_.active && entity.director_.performance) {
@@ -2616,7 +2627,12 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         }
         entity.locomotion_.blend = entity.desc_.gait.blend;
         // What an action asked to be played, if it asked for anything. Assigned rather than
-        // rebuilt so a steady state reuses the string's capacity.
+        // rebuilt so a steady state reuses the string's capacity. ADR-820: not under a
+        // performance, which owns the clip (its cue, or the gait on its path) -- measured on
+        // Rook: the decider's `observe` held the rig in Idle through a 6 m/s run.
+        if (performing(entity)) {
+            intentActivity.clear();
+        }
         if (entity.locomotion_.action != intentActivity) {
             entity.locomotion_.action.assign(intentActivity);
         }

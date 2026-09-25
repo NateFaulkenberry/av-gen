@@ -94,8 +94,34 @@ void applyAnimation(const Sequence& sequence, scene::Composition& composition, d
 // it travelled in within the span. Nothing when the actor has no span (clips only, or one key).
 // `groundAt`, when the scene has terrain, gives the pose its height: a directed body is airborne to
 // its `ground` behaviour, so the performance itself must stand on the ground.
+//
+// ADR-820: `scheduled` is the install's clip schedule. Wherever the actor -- by an authored cue or a
+// scheduled one -- names a clip inside the span, the pose says the sequencer owns the rig, and
+// the gait yields it; elsewhere the gait picks from the path's speed. `entrySeconds` comes from the
+// actor.
+// ADR-821: what a cue actually plays at `seconds`. `lookup` answers what a clip measures as (its
+// loop and its length, `scene::clipSemantics`); without one, `Auto` keeps the state's own looping
+// and a `then` never fires, because a clip with no known length has no known end.
+using ClipLookup = std::function<const scene::ClipSemantics*(std::string_view clip)>;
+struct ResolvedCue {
+    std::string clip;                // the state to be in; empty when `gait`
+    double startSeconds = 0.0;       // its phase origin: the cue's time, or the one-shot's end
+    float speed = 1.0f;
+    float blendSeconds = -1.0f;
+    std::optional<bool> loop;        // unset: the state's own
+    bool gait = false;               // a `then: gait` has handed the rig back
+};
+[[nodiscard]] std::optional<ResolvedCue> resolveCue(const AnimationCue& cue, double seconds,
+                                                    const ClipLookup& lookup);
+// A clip event (clip seconds from `scene::ClipSemantics::events`) on the timeline, under `cue`:
+// the cue's time plus the event's clip time over the cue's speed. Plan-time and pure.
+[[nodiscard]] double clipEventSeconds(const AnimationCue& cue, float eventClipSeconds);
+// What the rig on `node` measures its clips as, or an empty lookup when it has none.
+[[nodiscard]] ClipLookup clipLookupFor(const scene::Composition& composition, const std::string& node);
+
 [[nodiscard]] std::optional<scene::Composition::Performer> performerFor(
-    const Actor& actor, std::string entity, std::function<float(float x, float z)> groundAt = {});
+    const Actor& actor, std::string entity, std::function<float(float x, float z)> groundAt = {},
+    std::span<const ScheduledClip> scheduled = {}, ClipLookup lookup = {});
 // ...including the clips a `PlayClip` event scheduled. Same guarantee: pure in `seconds`.
 void applyAnimation(const Sequence& sequence, std::span<const ScheduledClip> scheduled,
                     scene::Composition& composition, double seconds);

@@ -724,6 +724,30 @@ ShotCamera cameraFromPreset(CameraPreset preset, const app::FocalTarget& subject
     return cam;
 }
 
+// ---- clip playback (ADR-821) --------------------------------------------------------------------
+
+const char* clipPlaybackName(ClipPlayback playback) {
+    switch (playback) {
+    case ClipPlayback::Auto: return "auto";
+    case ClipPlayback::Loop: return "loop";
+    case ClipPlayback::Once: return "once";
+    }
+    return "auto";
+}
+
+bool clipPlaybackFromName(std::string_view name, ClipPlayback& out) {
+    if (name == "auto") {
+        out = ClipPlayback::Auto;
+    } else if (name == "loop") {
+        out = ClipPlayback::Loop;
+    } else if (name == "once") {
+        out = ClipPlayback::Once;
+    } else {
+        return false;
+    }
+    return true;
+}
+
 // ---- actor evaluation -------------------------------------------------------------------------
 
 glm::vec3 Actor::positionAt(double seconds) const {
@@ -1222,7 +1246,9 @@ std::vector<AnimationCue> Sequence::animationAt(double seconds) const {
                                    .clip = cue->clip,
                                    .startSeconds = cue->timeSeconds,
                                    .speed = cue->speed,
-                                   .blendSeconds = cue->blendSeconds});
+                                   .blendSeconds = cue->blendSeconds,
+                                   .playback = cue->playback,
+                                   .then = cue->then});
     }
     return out;
 }
@@ -1946,6 +1972,12 @@ json actorToJson(const Actor& a) {
         if (c.blendSeconds >= 0.0f) {
             e["blend"] = c.blendSeconds;
         }
+        if (c.playback != ClipPlayback::Auto) { // ADR-821: absent is Auto
+            e["playback"] = clipPlaybackName(c.playback);
+        }
+        if (!c.then.empty()) {
+            e["then"] = c.then;
+        }
         clips.push_back(std::move(e));
     }
     json j{{"id", a.id},
@@ -1953,6 +1985,9 @@ json actorToJson(const Actor& a) {
            {"visible", a.visible},
            {"keys", std::move(keys)},
            {"clips", std::move(clips)}};
+    if (a.entrySeconds != 0.0f) {
+        j["entrySeconds"] = a.entrySeconds; // ADR-820: absent means 0, the plan-safe default
+    }
     if (a.path.active) {
         j["path"] = json{{"spline", a.path.spline.toJson()},
                          {"start", a.path.startSeconds},
@@ -2015,10 +2050,20 @@ Result<Actor> actorFromJson(const json& j) {
             c.clip = readString(e, "clip");
             c.speed = static_cast<float>(readNumber(e, "speed", 1.0));
             c.blendSeconds = static_cast<float>(readNumber(e, "blend", -1.0));
+            if (const auto pb = e.find("playback"); pb != e.end()) {
+                if (!pb->is_string() || !clipPlaybackFromName(pb->get<std::string>(), c.playback)) {
+                    return fail("actor '{}': clip cue playback must be \"auto\", \"loop\" or \"once\"", a.id);
+                }
+            }
+            c.then = readString(e, "then");
             a.clips.push_back(c);
         }
         std::stable_sort(a.clips.begin(), a.clips.end(),
                          [](const ClipCue& x, const ClipCue& y) { return x.timeSeconds < y.timeSeconds; });
+    }
+    a.entrySeconds = static_cast<float>(readNumber(j, "entrySeconds", 0.0));
+    if (a.entrySeconds < 0.0f) {
+        return fail("actor '{}': 'entrySeconds' must not be negative", a.id);
     }
     if (const auto p = j.find("path"); p != j.end()) {
         if (!p->is_object()) {

@@ -347,6 +347,17 @@ struct DirectorMotion {
     //    limit a run-in cut to at 6 m/s read as a walk for its first second.
     // Off for staging, so a carried animal's legs still ramp and nothing staged changes.
     bool performance = false;
+    // ADR-820, performances only: the actor names a clip now, so the gait must not push its own.
+    bool clipOwned = false;
+};
+
+// ADR-820: where a body was when a performance with an entry blend took it -- the point the blend
+// starts from. Entity state, so a checkpoint carries it and a seek into the blend lands where a
+// play does.
+struct PerformanceEntry {
+    bool active = false;
+    glm::vec3 position{0.0f};
+    float yaw = 0.0f;
 };
 
 // What answered a `socketTransform` call (ADR-274). Three outcomes, because the two that used to
@@ -539,6 +550,9 @@ public:
     void setDirectorMotion(const DirectorMotion& motion) { director_ = motion; }
     void clearDirectorMotion() { director_ = DirectorMotion{}; }
     [[nodiscard]] const DirectorMotion& directorMotion() const { return director_; }
+    // ADR-820: set by the composition's performers when a blended entry begins, cleared at release.
+    void setPerformanceEntry(const PerformanceEntry& entry) { performanceEntry_ = entry; }
+    [[nodiscard]] const PerformanceEntry& performanceEntry() const { return performanceEntry_; }
 
     // A named number this entity declared. `setProperty` refuses a name the entity did not
     // declare rather than inventing one, because a property invented at runtime is a property no
@@ -608,6 +622,7 @@ private:
     bool hasLastVelocity_ = false;
     MotionOffset motion_{};
     DirectorMotion director_{};
+    PerformanceEntry performanceEntry_{}; // ADR-820
     LocomotionState locomotion_{};
     BehaviorList behaviors_;
 
@@ -1297,6 +1312,8 @@ private:
     static void applyNodeOffsets(Entity& entity);
     // The Director tier's two halves (ADR-210), shared by `update` and `seek`.
     static void directorBefore(Entity& entity);
+    // ADR-758/820: a scripted performance holds this body now.
+    [[nodiscard]] static bool performing(const Entity& entity);
     static void directorAfter(Entity& entity);
     static void rescaleIntent(EntityState& state);
     // Rebuilds `bodyGrid_` and `bodyPoints_` from where every entity's simulation stands now, and

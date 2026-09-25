@@ -355,12 +355,27 @@ struct Shot {
 // function of (state, the second it was entered, speed, now), so driving it from the cue's own
 // absolute time -- rather than from the moment a scrub happened to notice the cue -- is what makes
 // a character's feet land in the same place whether the frame was played to or jumped to.
+// ADR-821: how a cued clip plays. `Auto` asks the clip: a clip whose end joins its start loops,
+// and one that does not (a jump, a landing, a death) plays once and holds its last frame -- measured
+// by `scene::clipSemantics`, not declared. The player's own default, that every state loops, was
+// right for a behaviour's walk and wrong for an authored stunt.
+enum class ClipPlayback : std::uint8_t { Auto, Loop, Once };
+[[nodiscard]] const char* clipPlaybackName(ClipPlayback playback);
+[[nodiscard]] bool clipPlaybackFromName(std::string_view name, ClipPlayback& out);
+
 struct ClipCue {
     double timeSeconds = 0.0;
     std::string clip;          // animation state name; empty = leave the rig alone from here
     float speed = 1.0f;        // clip seconds per timeline second
     float blendSeconds = -1.0f; // cross-fade in; < 0 = the rig's own transition time
+    ClipPlayback playback = ClipPlayback::Auto;
+    // ADR-821: what follows a clip that plays once, at `timeSeconds + length / speed`. Empty holds
+    // the last frame. `"gait"` hands the rig back: to the body's gait, for an actor performing an
+    // entity (ADR-758); to nothing, for any other actor, which then holds as if empty. Otherwise a
+    // state name, entered with its own blend and played by the same rules. Ignored for a loop.
+    std::string then;
 };
+inline constexpr std::string_view kThenGait = "gait";
 
 struct ActorKey {
     double timeSeconds = 0.0;
@@ -395,13 +410,19 @@ struct Actor {
     ActorPath path;
     std::vector<ClipCue> clips;
     bool visible = true;
+    // ADR-820. When this actor performs an entity's body (ADR-758): how long the body takes to
+    // blend onto the actor from wherever the simulation had it. 0, the default, takes the body at
+    // the authored mark on the span's first step -- the only form a baked plan may depend on, since
+    // where a live character stands is not a plan-time fact. Ignored for a node no entity drives.
+    float entrySeconds = 0.0f;
 
     [[nodiscard]] const std::string& nodeName() const { return node.empty() ? id : node; }
     // Pure evaluation, used by the bake and by a camera that looks at this actor. The path wins
     // inside its time range; outside it, the keys; with neither, the origin.
     [[nodiscard]] glm::vec3 positionAt(double seconds) const;
-    // Heading in radians about +Y, derived from the path tangent or from the direction between the
-    // surrounding keys. Zero when the actor is not moving.
+    // Heading in DEGREES about +Y (0 faces +Z), derived from the path tangent or from the direction
+    // between the surrounding keys -- the unit the bake writes to `nodes/<node>/rotation`. Zero when
+    // the actor is not moving.
     [[nodiscard]] float headingAt(double seconds) const;
     [[nodiscard]] const ClipCue* clipAt(double seconds) const;
     // Latest time this actor has anything to say.
@@ -415,6 +436,8 @@ struct AnimationCue {
     double startSeconds = 0.0;  // the cue's own time, not the time it was noticed
     float speed = 1.0f;
     float blendSeconds = -1.0f;
+    ClipPlayback playback = ClipPlayback::Auto; // ADR-821
+    std::string then;
 };
 
 // ---- the sequence -----------------------------------------------------------------------------
