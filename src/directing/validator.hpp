@@ -35,6 +35,7 @@ enum class CameraSupport : std::uint8_t {
     Framing,     // a `seq::ShotCamera` move framing a place (a hero, a node): baked, editable
     FollowRig,   // a `scene::CameraRig` following a node (a character): evaluated every frame
     Modifier,    // changes how another move is shot (low_angle), compiles nothing of its own
+    KeyedOffset, // changes a follow rig's offset over the shot (rise_over, pass): keys, ADR-760
     Unsupported, // not compilable yet
 };
 [[nodiscard]] CameraSupport cameraSupport(CameraMove move, SubjectKind subject);

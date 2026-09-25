@@ -349,6 +349,74 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         return std::string();
     };
 
+    // ADR-760: the follow rig's offset over the shot, from its rise_over / pass beats. Shot-relative
+    // keys on `cameras/<slug>/followOffset` (spec 17's shot tracks): they move with the shot, bake at
+    // install, and edit as three keys -- chase, over, past -- rather than as a camera path.
+    std::vector<std::string> keyedNotes;
+    const auto offsetTrack = [&](const Plan& p, std::size_t shotIndex, const PlanShot& ps, const scene::CameraRig& rig,
+                                 const PlanTimes& times, double start, double end) {
+        keyedNotes.clear();
+        params::Track track;
+        track.target = "cameras/" + rig.slug + "/followOffset";
+        struct Beat {
+            CameraMove move;
+            double at;
+            const CameraBeat* beat;
+        };
+        std::vector<Beat> beats;
+        std::size_t k = 0;
+        for (std::size_t b = 0; b < ps.camera.size(); ++b) {
+            const CameraBeat& cb = ps.camera[b];
+            if (cb.move != CameraMove::RiseOver && cb.move != CameraMove::Pass) {
+                continue;
+            }
+            double at = start + ((end - start) * static_cast<double>(++k) / 3.0); // default: thirds of the shot
+            if (cb.at) {
+                if (const auto t = times.at(fmt::format("/shots/{}/camera/{}/at", shotIndex, b))) {
+                    at = *t;
+                }
+            }
+            beats.push_back(Beat{cb.move, std::clamp(at, start, end), &cb});
+        }
+        (void)p;
+        if (beats.empty()) {
+            return track;
+        }
+        std::stable_sort(beats.begin(), beats.end(), [](const Beat& a, const Beat& b) { return a.at < b.at; });
+        const auto key = [&](double at, glm::vec3 v) {
+            params::Key key;
+            key.time = at - start;
+            key.value = {v.x, v.y, v.z, 0.0f};
+            key.interp = params::KeyInterp::EaseInOut;
+            track.addKey(key);
+        };
+        glm::vec3 current = rig.followOffset;
+        key(start, current);
+        for (std::size_t b = 0; b < beats.size(); ++b) {
+            const double next = b + 1 < beats.size() ? beats[b + 1].at : end;
+            const double arrive = std::min(beats[b].at + 1.0, std::max(beats[b].at + 0.25, next));
+            glm::vec3 target = current;
+            const CameraBeat& cb = *beats[b].beat;
+            if (beats[b].move == CameraMove::RiseOver) {
+                const float height = cb.heightMetres.value_or(std::max(4.0f, (rig.followOffset.y * 2.0f) + 2.0f));
+                target = glm::vec3(0.0f, height, -0.5f);
+                keyedNotes.push_back(fmt::format("Camera \"{}\" rises over at {}: {:.1f} m above by {}", rig.name, clock(beats[b].at), height,
+                                                 clock(arrive)));
+            } else {
+                const float ahead = cb.distanceMetres.value_or(std::abs(rig.followOffset.z) + 2.0f);
+                const float side = cb.side == "left" ? -1.5f : (cb.side == "right" ? 1.5f : 0.0f);
+                const float height = cb.heightMetres.value_or(std::max(1.5f, rig.followOffset.y));
+                target = glm::vec3(side, height, ahead);
+                keyedNotes.push_back(fmt::format("Camera \"{}\" passes at {}: {:.1f} m ahead, looking back, by {}", rig.name, clock(beats[b].at),
+                                                 ahead, clock(arrive)));
+            }
+            key(beats[b].at, current);
+            key(arrive, target);
+            current = target;
+        }
+        return track;
+    };
+
     // ---- shots ---------------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.shots.size(); ++i) {
         const PlanShot& ps = plan.shots[i];
@@ -409,6 +477,13 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                     liveCamera = id;
                     const scene::CameraRig* added = out.staged.cameras.find(id);
                     record(ps.key, ContentDomain::CameraRig, added->slug);
+                    // ADR-760: rise_over / pass, as keys on this rig's offset, inside the shot.
+                    if (auto keyed = offsetTrack(plan, i, ps, *added, v.times, start, end); !keyed.keys.empty()) {
+                        shot.tracks.push_back(keyed);
+                        for (const std::string& note : keyedNotes) {
+                            line(removedLine(ps.key), ps.key, note);
+                        }
+                    }
                     line(removedLine(ps.key), ps.key,
                          fmt::format("Camera \"{}\": {}{} on {} (follows node '{}', {:.1f} m up, {:.1f} m behind)",
                                      added->name, lowAngle ? "low-angle " : "", cameraMoveName(beat.move), idOf(subject),

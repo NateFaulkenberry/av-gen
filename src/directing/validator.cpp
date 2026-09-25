@@ -138,8 +138,9 @@ CameraSupport cameraSupport(CameraMove move, SubjectKind subject) {
         return subject == SubjectKind::Entity ? CameraSupport::Unsupported : CameraSupport::Framing;
     case CameraMove::RiseOver:
     case CameraMove::Pass:
-        // Time-varying offsets on a behaviour: Slice 3.
-        return CameraSupport::Unsupported;
+        // ADR-760: keys on the follow rig's offset, so only where a follow rig exists -- on a
+        // character. Rising over a place is a framing move's elevation, not compiled yet.
+        return subject == SubjectKind::Entity ? CameraSupport::KeyedOffset : CameraSupport::Unsupported;
     }
     return CameraSupport::Unsupported;
 }
@@ -366,6 +367,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         // One primary camera move per shot: a move that changes within the shot (chase -> rise ->
         // pass) needs time-varying behaviour state, which is Slice 3's.
         bool primary = false;
+        bool followsCharacter = false;
         for (std::size_t b = 0; b < shot.camera.size() && shot.rig.empty(); ++b) {
             const CameraBeat& beat = shot.camera[b];
             const std::string subject = beat.subject.empty() ? shot.subject : beat.subject;
@@ -380,13 +382,24 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             if (support == CameraSupport::Modifier) {
                 continue;
             }
+            if (support == CameraSupport::KeyedOffset) {
+                if (!followsCharacter) {
+                    Issue& issue = c.warning(IssueCode::Unsupported, shot.key, where,
+                                             fmt::format("'{}' changes a follow camera's offset, and no chase or follow on "
+                                                         "a character comes before it in this shot",
+                                                         cameraMoveName(beat.move)));
+                    issue.suggestions = {"put a chase or follow on the character first"};
+                }
+                continue;
+            }
             if (support == CameraSupport::Unsupported) {
                 Issue& issue = c.warning(IssueCode::Unsupported, shot.key, where,
                                          fmt::format("'{}' on {} '{}' is not compiled yet; the shot is built without it",
                                                      cameraMoveName(beat.move), subjectKindName(kind), idOf(subject)));
                 issue.cause = (beat.move == CameraMove::RiseOver || beat.move == CameraMove::Pass)
-                                  ? "a move whose offset changes over the shot needs time-varying camera behaviour (Slice 3)"
-                                  : "framing a moving character needs it to be a scripted performance (Slice 2)";
+                                  ? "rising over or passing a PLACE is not compiled yet; over a character it is (ADR-760)"
+                                  : "framing a moving character by a move would frame where it stood at the cut; "
+                                    "follow it with chase or follow";
                 continue;
             }
             if (primary) {
@@ -399,6 +412,7 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 continue;
             }
             primary = true;
+            followsCharacter = support == CameraSupport::FollowRig;
             if (support == CameraSupport::Framing && facts.place(idOf(subject)) == nullptr) {
                 c.error(IssueCode::SpatialInfeasible, shot.key, where,
                         fmt::format("cannot frame '{}': its position is not known", idOf(subject)));

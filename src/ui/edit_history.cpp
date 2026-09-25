@@ -137,6 +137,8 @@ scene::CameraDirection capturedCameraDirection(app::Engine& engine) {
         read1(p + "splineT", rig.splineT);
         read1(p + "lookAhead", rig.lookAhead);
         read3(p + "splineOffset", rig.splineOffset);
+        read3(p + "followOffset", rig.followOffset); // ADR-760; absent unless the rig follows
+        read3(p + "aimOffset", rig.aimOffset);       // ...or aims
     }
     return out;
 }

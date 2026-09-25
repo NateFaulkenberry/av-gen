@@ -6760,6 +6760,14 @@ void Composition::registerCameraChannels(params::ParameterSet& params, float rea
         ch.lookAhead = &params.add(floatDesc(p + "lookAhead", rig.lookAhead, -100.0f, 100.0f, 0.0f, 10.0f));
         ch.splineOffset =
             &params.add(vec3Desc(p + "splineOffset", rig.splineOffset, -1e3f, 1e3f, -5.0f, 5.0f));
+        // ADR-760: what makes "chase low, rise over him, pass ahead" one editable camera -- a follow
+        // rig whose offset is keyed over the shot -- rather than forty-eight opaque camera keys.
+        if (!rig.followNode.empty()) {
+            ch.followOffset = &params.add(vec3Desc(p + "followOffset", rig.followOffset, -1e3f, 1e3f, -20.0f, 20.0f));
+        }
+        if (!rig.aimNode.empty()) {
+            ch.aimOffset = &params.add(vec3Desc(p + "aimOffset", rig.aimOffset, -1e3f, 1e3f, -10.0f, 10.0f));
+        }
         cameraChannels_.push_back(ch);
     }
 }
@@ -6860,8 +6868,9 @@ CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const Camer
             }
             // World axes by default, which is every rig that existed before this; the subject's own
             // frame when asked, which is what makes "behind" mean behind.
-            const glm::vec3 offset =
-                rig.followLocal ? at.rotation * rig.followOffset : rig.followOffset;
+            const glm::vec3 authored =
+                channels != nullptr && channels->followOffset != nullptr ? channels->followOffset->value() : rig.followOffset;
+            const glm::vec3 offset = rig.followLocal ? at.rotation * authored : authored;
             pose.position = at.position + offset;
 
             // The whole of camera collision: keep the eye above the surface. Applied after the
@@ -6885,7 +6894,8 @@ CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const Camer
     }
     if (!rig.aimNode.empty()) {
         if (const CompositionNode* node = findNode(rig.aimNode); node != nullptr) {
-            pose.target = nodeWorldTransform(*node).position + rig.aimOffset;
+            pose.target = nodeWorldTransform(*node).position +
+                          (channels != nullptr && channels->aimOffset != nullptr ? channels->aimOffset->value() : rig.aimOffset);
         }
     }
     ensureDistinctAim(pose);

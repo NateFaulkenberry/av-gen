@@ -129,13 +129,37 @@ namespace avgen::app {
 // (`applyCompilation` in a capture; an AI task in its transaction, whose sink makes it one command).
 // Stops at the first refusal and says which; the caller owns the rollback.
 [[nodiscard]] inline Result<void> installCompilation(Engine& engine, const directing::Compilation& compilation) {
-    if (auto r = engine.setSequence(compilation.staged.sequence); !r) {
-        return fail("{}", r.error().message);
-    }
+    // Cameras before the sequence (ADR-760): a shot's tracks key a rig's channels
+    // (`cameras/<slug>/followOffset`), so the rig's parameters should exist when the sequence
+    // installs and binds. The other order also works today, only because `setCameraDirection`
+    // rebinds the whole timeline afterwards; this order does not lean on that.
     if (engine.composition() != nullptr) {
         if (auto r = engine.setCameraDirection(compilation.staged.cameras); !r) {
             return fail("{}", r.error().message);
         }
+        // ADR-760: a follow rig's offsets are parameters, and re-registering keeps an existing
+        // parameter's value -- so a rig revised in place (a new chase distance) would keep the old
+        // offset. The collection is the compiled one, so its offsets are what should be in force.
+        // Every rig, not just the plan's: the others were captured from these very bases.
+        for (const scene::CameraRig& rig : compilation.staged.cameras.cameras) {
+            const auto write = [&](const char* channel, glm::vec3 value) {
+                if (params::IParameter* p = engine.params().find("cameras/" + rig.slug + "/" + channel);
+                    p != nullptr && p->componentCount() == 3) {
+                    for (std::size_t i = 0; i < 3; ++i) {
+                        p->setBaseComponent(i, value[static_cast<int>(i)]);
+                    }
+                }
+            };
+            if (!rig.slug.empty() && !rig.followNode.empty()) {
+                write("followOffset", rig.followOffset);
+            }
+            if (!rig.slug.empty() && !rig.aimNode.empty()) {
+                write("aimOffset", rig.aimOffset);
+            }
+        }
+    }
+    if (auto r = engine.setSequence(compilation.staged.sequence); !r) {
+        return fail("{}", r.error().message);
     }
     // The effect list only when it changed: `setEffects` re-registers every fx/ parameter, which is
     // not free and not needed for a plan that touched no effect.

@@ -1607,6 +1607,11 @@ private:
         params::Parameter<float>* splineT = nullptr;
         params::Parameter<float>* lookAhead = nullptr;
         params::Parameter<glm::vec3>* splineOffset = nullptr;
+        // ADR-760: a follow rig's offset and an aim rig's offset, as keyable channels -- registered
+        // only for a rig that follows or aims at a node, so every other rig and every project
+        // written before this keeps exactly the parameters it had. Null otherwise.
+        params::Parameter<glm::vec3>* followOffset = nullptr;
+        params::Parameter<glm::vec3>* aimOffset = nullptr;
     };
     std::vector<CameraChannels> cameraChannels_;
     ActiveCameraState activeCamera_;

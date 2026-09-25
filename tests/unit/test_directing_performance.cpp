@@ -239,3 +239,79 @@ TEST_CASE("the validator on performances: starts, targets, collisions, and what 
         CHECK(has(found, "CAPABILITY_UNAVAILABLE", Severity::Error));
     }
 }
+
+TEST_CASE("a chase that rises over its character and passes it moves behind, over, then ahead, played",
+          "[directing][performance][camera][benchmark]") {
+    // ADR-760. The camera is measured in Rook's frame while the shot plays -- behind and low, then
+    // above, then in front looking back -- which is the claim the plan makes, not a key's value.
+    auto engine = benchmark();
+    json doc = runPastPlan();
+    doc["shots"][0]["camera"].push_back(json{{"move", "rise_over"}, {"at", "1:33"}});
+    doc["shots"][0]["camera"].push_back(json{{"move", "pass"}, {"at", "1:35"}});
+    doc.erase("cues");
+    const Compilation c = compilePlan(planFrom(doc), app::sceneFactsFor(*engine));
+    INFO(c.diffText());
+    REQUIRE_FALSE(c.validation.hasErrors());
+    REQUIRE(c.validation.issues.empty());
+    ui::EditHistory history;
+    REQUIRE(app::applyCompilation(*engine, history, c));
+    const entity::Entity* rook = engine->composition()->entityWorld().find("rook");
+    REQUIRE(rook != nullptr);
+
+    struct Relative {
+        float along; // + in front of Rook
+        float up;
+    };
+    std::uint64_t frame = 0;
+    const auto sampleAt = [&](double seconds) {
+        const auto last = static_cast<std::uint64_t>(std::llround(seconds * 60.0));
+        for (; frame <= last; ++frame) {
+            engine->update(FrameTime{static_cast<double>(frame) / 60.0, frame == 0 ? 0.0 : 1.0 / 60.0, frame});
+        }
+        REQUIRE(engine->composition()->activeCamera().name == "rook-passes");
+        const glm::vec3 body = rook->state().position();
+        const glm::vec3 forward(std::sin(rook->state().yaw), 0.0f, std::cos(rook->state().yaw));
+        const glm::vec3 d = engine->scene().camera.position - body;
+        INFO("t " << seconds << " along " << glm::dot(d, forward) << " up " << d.y);
+        return Relative{glm::dot(d, forward), d.y};
+    };
+    const Relative chase = sampleAt(92.0);
+    const Relative over = sampleAt(94.2);
+    const Relative ahead = sampleAt(96.5);
+    INFO("chase " << chase.along << "/" << chase.up << " over " << over.along << "/" << over.up << " ahead "
+                  << ahead.along << "/" << ahead.up);
+    CHECK(chase.along < -2.5f);
+    CHECK(chase.up < 1.0f);
+    CHECK(over.up > 3.5f);
+    CHECK(std::abs(over.along) < 1.0f);
+    CHECK(ahead.along > 2.5f);
+    REQUIRE(history.undo(*engine).ok());
+}
+
+TEST_CASE("revising a chase's distance moves the camera, and undoing the revision moves it back",
+          "[directing][performance][camera]") {
+    // ADR-760: the offset is now a parameter, and `ParameterSet::add` keeps an existing parameter's
+    // value -- so a rig revised in place would keep the OLD distance unless the install writes it.
+    auto engine = benchmark();
+    json doc = runPastPlan();
+    doc.erase("cues");
+    doc.erase("performances");
+    ui::EditHistory history;
+    REQUIRE(app::applyCompilation(*engine, history, compilePlan(planFrom(doc), app::sceneFactsFor(*engine))));
+    const scene::CameraRig* rig = engine->composition()->cameraDirection().findByName("rook-passes");
+    REQUIRE(rig != nullptr);
+    const std::string slug = rig->slug; // `rig` points into the collection the revision replaces
+    const std::string path = "cameras/" + slug + "/followOffset";
+    REQUIRE(engine->params().find(path) != nullptr);
+    CHECK(engine->params().find(path)->baseComponent(2) == Catch::Approx(-3.0f));
+
+    doc["shots"][0]["camera"][1]["distanceMetres"] = 6.0;
+    const Compilation revised = compilePlan(planFrom(doc), app::sceneFactsFor(*engine));
+    INFO(revised.diffText());
+    REQUIRE(revised.plan.revision == 2);
+    REQUIRE(app::applyCompilation(*engine, history, revised));
+    CHECK(engine->composition()->cameraDirection().findByName("rook-passes")->slug == slug); // in place
+    CHECK(engine->params().find(path)->baseComponent(2) == Catch::Approx(-6.0f));
+    REQUIRE(history.undo(*engine).ok());
+    CHECK(engine->params().find(path)->baseComponent(2) == Catch::Approx(-3.0f));
+}
