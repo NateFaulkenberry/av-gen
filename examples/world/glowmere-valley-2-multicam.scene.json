@@ -9079,6 +9079,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9241,6 +9242,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9404,6 +9406,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9584,6 +9587,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
@@ -9767,6 +9771,7 @@
         "fullDetailDistance": 120.0,
         "coarseInterval": 0.1,
         "cullDistance": 340.0,
+        "proceduralMotion": true,
         "clips": {
           "idle": "Idle",
           "walk": "Walking",
