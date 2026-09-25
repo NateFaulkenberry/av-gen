@@ -1,8 +1,8 @@
 # AV Gen Director System — Development Progress
-Last updated: 2026-09-25
-Current branch: `agent/director` (worktree `../av-gen-director`; agent/motion merged at d4854cb4, main 9fa84413 at aa84e42d)
+Last updated: 2026-09-25 (HANDOFF: paused by the owner)
+Current branch: `agent/director` (worktree `../av-gen-director`; main b0f141b5 merged at 34cfe13a)
 Current commit: see Recent changes
-Overall status: Slices 0-2 complete; Slice 3 compile side complete (ADR-761); Director panel verified in a running session (ADR-762) with preview stills (ADR-764); Slice 4 goal compile and recording built (ADR-763 on ADR-824/828); Slice 5 cost harness incl. seek
+Overall status: PAUSED by the owner (see HANDOFF). Slices 0-5 done on the Director side; panel incl. Modify/Regenerate; the vegetation-jump acceptance benchmark is the first thing to resume
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -33,6 +33,87 @@ Since then:
   fitted to it; landings, slow motion and the peak marker compile (ADR-761).
 - Per the owner, the Umbra leap stays refused: 5.75 m needed against Rook's 1.1 m highest jump,
   with "a character with a larger jump" or "a different path" offered instead.
+
+## HANDOFF (2026-09-25): paused by the owner
+
+The owner paused the Director program to build out the project on the current stack. This section
+is the state to resume from. It supersedes the status lines further down where they differ.
+
+### The owner's rulings
+- **The backflip and synthesised animation are deferred** ("saved for another time"). The backflip
+  refusal stays a separate, permanent test that the Director never fabricates a capability (the
+  `rook_backflip` golden and the benchmark compile test).
+- **The spec 57 acceptance request becomes Rook jumping over some vegetation on his route, at his
+  own 1.1 m jump.** Everything else in the request is unchanged: the 1:30 cut, the low-angle chase
+  rising over him and passing, the slow-motion frame-drag, and the Umbra hero effect at the jump's
+  peak.
+- **Modify and Regenerate: approved.** They are built (ADR-770).
+- Earlier rulings stand: Rook's jump stays 1.1 m (no invented capability); react/Crazy holds;
+  Director plans are saved in the project as provenance.
+
+### Done, per slice
+| Slice | State | ADRs |
+|---|---|---|
+| 0 Foundations | Done | 750-754 |
+| 1 Plan + cameras | Done; approval gate | 755-757 |
+| 2 Scripted performances | Done; the handoff is now the Motion lead's M1 | 758-760 |
+| 3 Airborne + events | Done (jump, land, retime, clip once, peak events) | 761 |
+| 4 Autonomous direction | Done on the compile side: goals, recording (panel + assistant), directed orders, event-driven plans, runtime shots and precedence | 763, 765-768 |
+| 5 Verification + scale | Done on the Director side: 15 goldens, perf harness (compile, rebuild, seek, live paths), preview stills with a framing critique | 764, 769 |
+| Panel (spec 35) | Done, including Modify and Regenerate; 6 UI-script arms | 762, 770 |
+
+### The finishing list (A1-A10) at pause
+| # | State |
+|---|---|
+| A1 Watch control in the panel | Not started |
+| A2 Directed orders raising events | Not started; waits on Motion (section `onComplete`) |
+| A3 InteractionComplete / VolumeEnter producers | Not started; waits on Motion |
+| A4 Occlusion in the still critique | Not started (needs a depth readback) |
+| A5 First-still texture-upload hitch (~1 s) | Not started (renderer) |
+| A6 Seek cost | The engine's; not Director work |
+| A7 One scratch session for record / watch / stills | Not started |
+| A8 Modify / Regenerate | **DONE** (ADR-770; `director-modify` arm, 12 checks) |
+| A9 Persistent sessions (spec 36) | Partly: Modify revises a named plan; conversation linkage not started |
+| A10 Re-check precedence after `fix/continuous-shot` | Waiting on that branch |
+
+### The benchmark at pause
+- **What exists:** the Rook/Umbra request as the backflip version, the `rook_backflip` golden.
+  It proves the refusal and builds the feasible part: the shot, the chase with rise-over and pass,
+  and the cut. The jump and cue machinery it would need are proven on other plans:
+  - `rook_hop`: a hop with its peak marker and a flash on it;
+  - the airborne tests: `minimumApex` / `checkArc`;
+  - retime keeping the peak on the peak.
+- **WIP, not started:** the owner's vegetation-jump acceptance benchmark. To do on resume:
+  1. Pick a real piece of vegetation on Rook's run toward Umbra that his 1.1 m arc clears. Walk the
+     run_past/run_to path, list scatter instances within a metre of it, and keep those with
+     `entity::minimumApex(from, to, centre, radius, top, 0.25) <= 1.1` and
+     `entity::checkArc(...).clear`.
+  2. The plan: a run to it, a `jump` over it (`clearanceMetres` defaulted), a run on, the
+     low-angle chase with rise_over at the jump and pass after it, a retime around the flight,
+     and the Umbra hero effect on the jump's `peak`.
+  3. Make it the new `rook_vegetation_jump` golden, the spec 57 acceptance test (ScriptedProvider:
+     propose → preview → approve → one undo → save → reload → verify, played to check the
+     clearance, the peak and the camera), and update this record.
+  4. Keep `rook_backflip` as the refusal case.
+
+  **Open question:** vegetation is scattered instances, not places. The planner's `jump` targets a
+  place. Either expose a chosen instance as a place (the Director side), or jump at a time on the
+  path with a computed clearance. Recommended: a place derived from the chosen instance, so the
+  validator's `minimumApex` / `checkArc` check it the same way as Umbra.
+
+### How to resume
+1. The worktree is `../av-gen-director`, branch `agent/director`. Build `build/release`: reconfigure
+   CMake after adding files. There are two test binaries, and GPU tests run under
+   `tools/gpu-lock.sh`.
+2. Merge main first; the conflicts so far were in the ADR index and `ui_script`.
+3. Verify the state:
+   - both suites;
+   - all six Director UI arms (`director-{reject,accept,record,cancel,modify}` and `viewpoint`).
+     Commands are in the ADR-762/765/770 "Consequences" sections; the multicam project and the
+     `tests/data/directing/*.ai-script.json` scripts drive them.
+4. Then work down the finishing list: the vegetation-jump benchmark first (C in "What finishing
+   means" below), then A1, A7 and A9. A2, A3 and A10 need the Motion lead's and the camera
+   director's work on main.
 
 ## What finishing means (written 2026-09-25, before the finishing focus)
 
