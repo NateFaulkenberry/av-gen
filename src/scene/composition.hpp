@@ -1489,7 +1489,6 @@ private:
     float cameraAngle_ = 0.0f;
     // Free camera (camera/mode = 1): explicit position/target parameters instead of the orbit.
     params::Parameter<int>* cameraMode_ = nullptr;
-    params::Parameter<float>* fogDensity_ = nullptr;
     // Volumetric atmosphere (ADR-032): scene/volume* next to scene/fog*.
     params::Parameter<float>* volumeDensity_ = nullptr;
     nlohmann::json postJson_;
@@ -1499,6 +1498,7 @@ private:
     params::Parameter<float>* fogUpperDensity_ = nullptr;
     params::Parameter<float>* fogHeightCurve_ = nullptr;
     params::Parameter<float>* fogGroundFollow_ = nullptr; // ADR-715
+    params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
@@ -1547,7 +1547,6 @@ private:
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
-    float fogDensitySetting_ = 0.0f;
     scene::Environment volumeSetting_; // the scene-file values behind the scene/volume* parameters
     wind::WindParams windSetting_;     // the scene-file values behind the scene/wind* parameters
     std::string volumeDensityFieldSetting_;

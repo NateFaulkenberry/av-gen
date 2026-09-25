@@ -294,7 +294,6 @@ def build(only=None, legacy=False):
             # the one thing in this scene that could make a beam look like it is somewhere it is
             # not, and the lab's job is to remove those.
             ("fogColor", [0.02, 0.03, 0.05]),
-            ("fogDensity", 0.0008),
             ("fogHeight", 40.0),
             ("fogHeightFalloff", 0.05),
             ("volumeDensity", 0.004),

@@ -30,8 +30,8 @@
    0.03,
    0.035
   ],
-  "fogDensity": 0.012,
-  "volumeDensity": 0.0,
+  "volumeDensity": 0.004,
+  "volumeMaxDistance": 0.0,
   "sky": {
    "zenithColor": [
     0.1,

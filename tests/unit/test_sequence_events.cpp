@@ -148,7 +148,7 @@ TEST_CASE("A known trigger with an imperative action is scheduled, not baked", "
     piece.events.push_back(
         event("go", seq::Trigger{.kind = seq::TriggerKind::ShotStart, .name = "a"}, walk));
     piece.events.push_back(event("fog", seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 2.0},
-                                 setParam("scene/fogDensity", 0.4f, params::TrackMode::Add)));
+                                 setParam("scene/volumeDensity", 0.4f, params::TrackMode::Add)));
 
     seq::NullLayerSink sink;
     auto baked = piece.bake(sink);
@@ -173,7 +173,7 @@ TEST_CASE("A volume trigger is live and no amount of context schedules it", "[se
                                  seq::Trigger{.kind = seq::TriggerKind::VolumeEnter,
                                               .name = "porch",
                                               .subject = "elder"},
-                                 setParam("scene/fogDensity", 2.0f)));
+                                 setParam("scene/volumeDensity", 2.0f)));
     seq::NullLayerSink sink;
     auto baked = piece.bake(sink);
     REQUIRE(baked);
@@ -183,7 +183,7 @@ TEST_CASE("A volume trigger is live and no amount of context schedules it", "[se
     CHECK(baked->events.dispatches.empty());
     REQUIRE(baked->events.live.size() == 1);
     CHECK(baked->events.live.front() == 0);
-    CHECK_FALSE(hasTrack(timelineOf(*baked), "scene/fogDensity"));
+    CHECK_FALSE(hasTrack(timelineOf(*baked), "scene/volumeDensity"));
 }
 
 // ---- the baked tier ------------------------------------------------------------------------------
@@ -196,7 +196,7 @@ TEST_CASE("A shot edge fires exactly once, whichever way the playhead reaches it
 
     piece.events.push_back(event("open",
                                  seq::Trigger{.kind = seq::TriggerKind::ShotStart, .name = "close"},
-                                 setParam("scene/fogDensity", 3.0f, params::TrackMode::Add)));
+                                 setParam("scene/volumeDensity", 3.0f, params::TrackMode::Add)));
     piece.events.push_back(event("shut",
                                  seq::Trigger{.kind = seq::TriggerKind::ShotEnd, .name = "close"},
                                  setParam("env/sky/sunIntensity", 5.0f, params::TrackMode::Add)));
@@ -211,10 +211,10 @@ TEST_CASE("A shot edge fires exactly once, whichever way the playhead reaches it
     const params::Timeline timeline = timelineOf(*baked);
     // "Exactly once" in a baked world is not a counter. It is that the value changes at one second
     // and holds on both sides of it -- which no scrub can skip and no scrub can do twice.
-    CHECK(valueAt(timeline, "scene/fogDensity", 0.0, params::TrackMode::Add) == Approx(0.0f));
-    CHECK(valueAt(timeline, "scene/fogDensity", 5.999, params::TrackMode::Add) == Approx(0.0f));
-    CHECK(valueAt(timeline, "scene/fogDensity", 6.0, params::TrackMode::Add) == Approx(3.0f));
-    CHECK(valueAt(timeline, "scene/fogDensity", 100.0, params::TrackMode::Add) == Approx(3.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 0.0, params::TrackMode::Add) == Approx(0.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 5.999, params::TrackMode::Add) == Approx(0.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 6.0, params::TrackMode::Add) == Approx(3.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 100.0, params::TrackMode::Add) == Approx(3.0f));
     CHECK(valueAt(timeline, "env/sky/sunIntensity", 11.9, params::TrackMode::Add) == Approx(0.0f));
     CHECK(valueAt(timeline, "env/sky/sunIntensity", 12.0, params::TrackMode::Add) == Approx(5.0f));
 
@@ -223,7 +223,7 @@ TEST_CASE("A shot edge fires exactly once, whichever way the playhead reaches it
     seq::Sequence all = piece;
     all.events.clear();
     all.events.push_back(event("each", seq::Trigger{.kind = seq::TriggerKind::ShotStart},
-                               setParam("scene/fogDensity", 1.0f, params::TrackMode::Add)));
+                               setParam("scene/volumeDensity", 1.0f, params::TrackMode::Add)));
     auto everyShot = all.bake(sink);
     REQUIRE(everyShot);
     CHECK(everyShot->events.baked.size() == 3);
@@ -236,7 +236,7 @@ TEST_CASE("Scrubbing a baked event list is four pure evaluations", "[seq][events
         piece.events.push_back(
             event("step" + std::to_string(i),
                   seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 4.0 * (i + 1)},
-                  setParam("scene/fogDensity", static_cast<float>(i + 1), params::TrackMode::Add)));
+                  setParam("scene/volumeDensity", static_cast<float>(i + 1), params::TrackMode::Add)));
     }
     seq::NullLayerSink sink;
     auto baked = piece.bake(sink);
@@ -247,11 +247,11 @@ TEST_CASE("Scrubbing a baked event list is four pure evaluations", "[seq][events
     const std::vector<double> walk{10.0, 45.0, 3.0, 30.0};
     std::vector<float> first;
     for (const double t : walk) {
-        first.push_back(valueAt(timeline, "scene/fogDensity", t, params::TrackMode::Add));
+        first.push_back(valueAt(timeline, "scene/volumeDensity", t, params::TrackMode::Add));
     }
     std::vector<float> second;
     for (const double t : {30.0, 3.0, 45.0, 10.0}) {
-        second.push_back(valueAt(timeline, "scene/fogDensity", t, params::TrackMode::Add));
+        second.push_back(valueAt(timeline, "scene/volumeDensity", t, params::TrackMode::Add));
     }
     std::reverse(second.begin(), second.end());
     CHECK(first == second);
@@ -269,7 +269,7 @@ TEST_CASE("A bake of the same events is byte-identical", "[seq][events]") {
     piece.setBeatMarkers(std::vector<double>{0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0});
     piece.events.push_back(event("beat",
                                  seq::Trigger{.kind = seq::TriggerKind::Beat, .every = 2},
-                                 setParam("scene/fogDensity", 1.0f, params::TrackMode::Add), 1));
+                                 setParam("scene/volumeDensity", 1.0f, params::TrackMode::Add), 1));
     piece.events.push_back(event("time",
                                  seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 1.0},
                                  setParam("env/sky/sunIntensity", 2.0f, params::TrackMode::Add), 0));
@@ -416,7 +416,7 @@ TEST_CASE("An event past the end of the shots is not silently dropped", "[seq][e
     piece.shots.push_back(keyedShot("a", 0.0, 6.0));
     piece.events.push_back(event("late",
                                  seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 42.0},
-                                 setParam("scene/fogDensity", 1.0f, params::TrackMode::Add)));
+                                 setParam("scene/volumeDensity", 1.0f, params::TrackMode::Add)));
     seq::NullLayerSink sink;
     auto baked = piece.bake(sink);
     REQUIRE(baked);
@@ -440,7 +440,7 @@ TEST_CASE("A replace event says out loud that its value holds backwards", "[seq]
     piece.shots.push_back(keyedShot("a", 0.0, 20.0));
     piece.events.push_back(event("fog",
                                  seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 12.0},
-                                 setParam("scene/fogDensity", 3.0f, params::TrackMode::Replace)));
+                                 setParam("scene/volumeDensity", 3.0f, params::TrackMode::Replace)));
     seq::NullLayerSink sink;
     auto baked = piece.bake(sink);
     REQUIRE(baked);
@@ -454,7 +454,7 @@ TEST_CASE("A replace event says out loud that its value holds backwards", "[seq]
     relative.shots.push_back(keyedShot("a", 0.0, 20.0));
     relative.events.push_back(event("fog",
                                     seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 12.0},
-                                    setParam("scene/fogDensity", 3.0f, params::TrackMode::Add)));
+                                    setParam("scene/volumeDensity", 3.0f, params::TrackMode::Add)));
     auto additive = relative.bake(sink);
     REQUIRE(additive);
     CHECK(std::none_of(additive->warnings.begin(), additive->warnings.end(),
@@ -462,9 +462,9 @@ TEST_CASE("A replace event says out loud that its value holds backwards", "[seq]
                            return w.find("holds backwards") != std::string::npos;
                        }));
     const params::Timeline timeline = timelineOf(*additive);
-    CHECK(valueAt(timeline, "scene/fogDensity", 0.0, params::TrackMode::Add) == Approx(0.0f));
-    CHECK(valueAt(timeline, "scene/fogDensity", 11.99, params::TrackMode::Add) == Approx(0.0f));
-    CHECK(valueAt(timeline, "scene/fogDensity", 12.0, params::TrackMode::Add) == Approx(3.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 0.0, params::TrackMode::Add) == Approx(0.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 11.99, params::TrackMode::Add) == Approx(0.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 12.0, params::TrackMode::Add) == Approx(3.0f));
 }
 
 TEST_CASE("An instantaneous set does not glide into itself from the previous key",
@@ -476,17 +476,17 @@ TEST_CASE("An instantaneous set does not glide into itself from the previous key
     piece.shots.push_back(keyedShot("a", 0.0, 20.0));
     piece.events.push_back(event("first",
                                  seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 4.0},
-                                 setParam("scene/fogDensity", 1.0f, params::TrackMode::Add)));
+                                 setParam("scene/volumeDensity", 1.0f, params::TrackMode::Add)));
     piece.events.push_back(event("second",
                                  seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 8.0},
-                                 setParam("scene/fogDensity", 9.0f, params::TrackMode::Add)));
+                                 setParam("scene/volumeDensity", 9.0f, params::TrackMode::Add)));
     seq::NullLayerSink sink;
     auto baked = piece.bake(sink);
     REQUIRE(baked);
     const params::Timeline timeline = timelineOf(*baked);
-    CHECK(valueAt(timeline, "scene/fogDensity", 6.0, params::TrackMode::Add) == Approx(1.0f));
-    CHECK(valueAt(timeline, "scene/fogDensity", 7.99, params::TrackMode::Add) == Approx(1.0f));
-    CHECK(valueAt(timeline, "scene/fogDensity", 8.0, params::TrackMode::Add) == Approx(9.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 6.0, params::TrackMode::Add) == Approx(1.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 7.99, params::TrackMode::Add) == Approx(1.0f));
+    CHECK(valueAt(timeline, "scene/volumeDensity", 8.0, params::TrackMode::Add) == Approx(9.0f));
 }
 
 TEST_CASE("A ramp and a hold are keys, not timers", "[seq][events]") {
@@ -1256,7 +1256,7 @@ TEST_CASE("Installing a sequence hands the event schedule to the host", "[seq][e
     piece.shots.push_back(keyedShot("a", 0.0, 20.0));
     piece.events.push_back(event("fog",
                                  seq::Trigger{.kind = seq::TriggerKind::Time, .timeSeconds = 8.0},
-                                 setParam("scene/fogDensity", 2.0f, params::TrackMode::Add)));
+                                 setParam("scene/volumeDensity", 2.0f, params::TrackMode::Add)));
     seq::EventAction act;
     act.kind = seq::EventActionKind::Notify;
     act.target = "selection";
@@ -1273,7 +1273,7 @@ TEST_CASE("Installing a sequence hands the event schedule to the host", "[seq][e
     params.add(params::ParamDesc<float>{
         .path = "camera/mode", .defaultValue = 0.0f, .hardMin = 0.0f, .hardMax = 2.0f});
     params.add(params::ParamDesc<float>{
-        .path = "scene/fogDensity", .defaultValue = 0.0f, .hardMin = 0.0f, .hardMax = 8.0f});
+        .path = "scene/volumeDensity", .defaultValue = 0.0f, .hardMin = 0.0f, .hardMax = 8.0f});
 
     params::Timeline timeline;
     seq::NullLayerSink sink;

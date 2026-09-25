@@ -78,11 +78,26 @@ bool VolumeRenderer::enabled(const scene::Environment& environment) {
     // ADR-387: the vortex moved out of `Environment` and into the atmospheric effects, so this
     // overload can no longer see it. Kept for the fog-only callers; `enabled(scene)` below is the
     // one that knows about both.
-    return environment.volumeDensity > 0.0f;
+    //
+    // ADR-705: and it needs somewhere to march. `volumeMaxDistance` 0 is "the air has a density and
+    // no march carries it" -- the surface pass then integrates the whole ray in closed form, under
+    // the same law, which is what a scene that only ever wanted distance fog asks for. Without this
+    // gate such a scene would pay for a fullscreen march that stops after one centimetre.
+    return environment.volumeDensity > 0.0f && environment.volumeMaxDistance > 0.0f;
 }
 
 bool VolumeRenderer::enabled(const scene::Scene& scene) {
-    return scene.environment.volumeDensity > 0.0f || scene.atmospherics.mediumCount > 0;
+    return enabled(scene.environment) || scene.atmospherics.mediumCount > 0;
+}
+
+float VolumeRenderer::surfaceFogStart(const scene::Scene& scene) {
+    // A surface-only environment (`volumeMaxDistance` 0, ADR-705) is the surface pass's alone, the
+    // whole ray, whether or not a placed medium makes the march run -- see `marchReach` below.
+    if (!enabled(scene) || scene.environment.volumeMaxDistance <= 0.0f) {
+        return 0.0f;
+    }
+    // The same clamp `update()` gives `params1.w`, so the two sides agree on the handover to the bit.
+    return std::max(scene.environment.volumeMaxDistance, 0.01f);
 }
 
 const gpu::RenderTarget& VolumeRenderer::target() const {
@@ -350,11 +365,38 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
                                 : -1;
     const int colorSlot =
         (fields != nullptr && !env.volumeColorField.empty()) ? fields->slotOf(env.volumeColorField) : -1;
+    // How far the march goes, and whether it carries the environment's air. Normally both are
+    // `volumeMaxDistance` (ADR-573/705). But ADR-705 made 0 mean "no march: the surface pass carries
+    // the whole ray", and the march's reach also bounds every placed MEDIUM -- so a tornado or a fog
+    // bank added to a surface-only scene was marched for one centimetre and drew nothing, silently.
+    // In that case the march carries the media alone, out to the farthest point any of them can
+    // reach, and none of the environment's air (which `surfaceFogStart` hands wholly to the surface
+    // pass) -- so the environment fog is the same frame with or without a medium in it.
+    float marchReach = std::max(env.volumeMaxDistance, 0.01f);
+    float environmentDensity = std::max(env.volumeDensity, 0.0f);
+    if (env.volumeMaxDistance <= 0.0f && scene.atmospherics.mediumCount > 0) {
+        environmentDensity = 0.0f;
+        const glm::vec3 eye = scene.camera.position;
+        float farthest = 0.01f;
+        for (std::size_t slot = 0; slot < scene.atmospherics.mediumCount && slot < world::kMaxMedia; ++slot) {
+            const world::MediumSlot& m = scene.atmospherics.media[slot];
+            const world::MediumBound b = world::mediumBound(m);
+            if (b.radiusXZ < 0.0f) {
+                continue;
+            }
+            const glm::vec3 centre(m.lane[0]);
+            const float r = std::max(b.radiusXZ, b.capRadiusXZ);
+            const float dy = std::max(std::abs(b.yTop - eye.y), std::abs(b.yBot - eye.y));
+            const float dxz = glm::length(glm::vec2(centre.x - eye.x, centre.z - eye.z)) + r;
+            farthest = std::max(farthest, std::sqrt(dxz * dxz + dy * dy));
+        }
+        marchReach = std::min(farthest, 20000.0f);
+    }
     VolumeUniforms u{};
-    u.params0 = glm::vec4(std::max(env.volumeDensity, 0.0f), env.fogHeight, std::max(env.fogHeightFalloff, 0.0f),
+    u.params0 = glm::vec4(environmentDensity, env.fogHeight, std::max(env.fogHeightFalloff, 0.0f),
                           std::max(env.volumeScattering, 0.0f));
     u.params1 = glm::vec4(std::max(env.volumeAbsorption, 0.0f), env.volumeAnisotropy,
-                          std::max(env.volumeEmission, 0.0f), std::max(env.volumeMaxDistance, 0.01f));
+                          std::max(env.volumeEmission, 0.0f), marchReach);
     u.noiseParams = glm::vec4(env.volumeNoiseAmount, env.volumeNoiseScale, env.volumeNoiseSpeed,
                               static_cast<float>(time.renderTime));
     u.info = glm::vec4(static_cast<float>(steps), static_cast<float>(densitySlot), static_cast<float>(colorSlot),
@@ -372,7 +414,8 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     // follows, so the march and the surface fog take the ground branch together or not at all.
     u.heightFog = glm::vec4(std::clamp(env.fogUpperDensity, 0.0f, 1.0f),
                             std::clamp(env.fogHeightCurve, 0.0f, 1.0f),
-                            scene.terrainGround.valid() ? std::clamp(env.fogGroundFollow, 0.0f, 1.0f) : 0.0f, 0.0f);
+                            scene.terrainGround.valid() ? std::clamp(env.fogGroundFollow, 0.0f, 1.0f) : 0.0f,
+                            std::clamp(env.horizonDensity, 0.0f, scene::kHorizonDensityMax));
     // ADR-570 (§20/§22). The step count is NOT scaled by the quality tier's `volumeStepScale`, and
     // that is deliberate: ADR-035's rule lets a tier scale "sample counts, resolutions and history
     // lengths", and this is a sample count -- but it is also the difference between a fog bank

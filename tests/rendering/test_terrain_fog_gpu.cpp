@@ -106,7 +106,8 @@ scene::Scene valleyScene(bool terrain) {
     s.environment.showSkybox = false;
     // Fog brighter than the ground, so more fog is a brighter pixel.
     s.environment.fogColor = glm::vec3(0.9f);
-    s.environment.fogDensity = 0.012f;
+    // ADR-705: one density; the march carries the first `volumeMaxDistance` metres and the surface
+    // pass the rest, so both readers see this layer.
     s.environment.fogHeightAmount = 1.0f;
     s.environment.fogHeight = 3.0f;
     s.environment.fogHeightFalloff = 0.3f;
@@ -196,7 +197,6 @@ TEST_CASE("fogGroundFollow 0 is the frame without a terrain, bit for bit", "[gpu
     // The instrument: the frame has fog in it, so "identical" is not two frames with nothing to
     // differ in. Most of the frame moves when both readers are switched off.
     scene::Scene clear = valleyScene(true);
-    clear.environment.fogDensity = 0.0f;
     clear.environment.volumeDensity = 0.0f;
     CHECK(pixelsDiffering(a, render(*renderer, clear), 1.0f / 255.0f) > kSize * kSize / 2);
 }
@@ -224,16 +224,16 @@ TEST_CASE("with a terrain, fogGroundFollow moves the fog in both readers", "[gpu
     REQUIRE(renderer->init().has_value());
 
     // Each reader alone, so a pass that ignored the control cannot hide behind the other.
+    // ADR-705: which reader carries the ray is `volumeMaxDistance` -- 0 is no march (the surface pass
+    // integrates the whole ray), and a reach past the far plane leaves the surface pass nothing.
     struct Arm {
         const char* name;
-        float surface;
-        float volume;
+        float marchReach;
     };
-    for (const Arm arm : {Arm{"surface fog only", 0.012f, 0.0f}, Arm{"march only", 0.0f, 0.02f}}) {
+    for (const Arm arm : {Arm{"surface fog only", 0.0f}, Arm{"march only", 100000.0f}}) {
         INFO(arm.name);
         scene::Scene s = valleyScene(true);
-        s.environment.fogDensity = arm.surface;
-        s.environment.volumeDensity = arm.volume;
+        s.environment.volumeMaxDistance = arm.marchReach;
         s.environment.fogGroundFollow = 0.0f;
         const gpu::ImageF flat = render(*renderer, s);
         s.environment.fogGroundFollow = 1.0f;
@@ -254,7 +254,8 @@ TEST_CASE("with a terrain, fogGroundFollow moves the fog in both readers", "[gpu
 // EVERY frame alike -- routing follow 0 through `fogGroundMean` with a zero ground, for instance,
 // which sums eight difference quotients where there used to be one and differs by an ULP. This
 // holds the SHIPPED `applyFog` (compiled from common.wgsl, the file the renderer loads) against the
-// function as it stood before ADR-715, restated here verbatim -- the move ADR-568's bit-identity
+// function as it stood before ADR-715 -- since ADR-705 merged, ADR-705's one-law applyFog, with
+// Horizon Density read from `fogShape.w` -- restated here verbatim, the move ADR-568's bit-identity
 // case makes for the profile. At follow 0 the two must agree to the bit on every input; at 0.5 they
 // must not, which is the control that the comparison can see anything at all.
 //
@@ -265,22 +266,36 @@ namespace {
 
 constexpr const char* kApplyFogKernel = R"(
 fn applyFogBeforeAdr715(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
-    let density = frame.fogParams.w;
-    if (density <= 0.0) {
+    let extinction = frame.fogParams.w;
+    if (extinction <= 0.0) {
         return color;
     }
-    var travel = distance(frame.cameraPos.xyz, worldPos);
+    let dist = distance(frame.cameraPos.xyz, worldPos);
+    let start = frame.fogHeight.w;
+    if (dist <= start) {
+        return color; // the march has this whole ray
+    }
+    var travel = dist - start;
     let amount = frame.fogHeight.z;
     let falloff = frame.fogHeight.y;
     if (amount > 0.0 && falloff > 0.0) {
-        let y0 = frame.cameraPos.y - frame.fogHeight.x;
+        let yEye = frame.cameraPos.y - frame.fogHeight.x;
         let y1 = worldPos.y - frame.fogHeight.x;
+        // Where the segment starts: the point the march hands over at. `start` 0 is the eye itself,
+        // exactly -- `(y1 - yEye) * 0 / dist` is 0 and adds nothing.
+        let y0 = yEye + (y1 - yEye) * (start / dist);
         let rise = y1 - y0;
+        // The mean of the layer's density along the segment. The difference quotient is the whole
+        // integral because the ray climbs at a constant rate: metres of mist per metre travelled.
         var mean = 1.0;
         let upper = frame.fogShape.x;
         let curve = frame.fogShape.y;
         if (max(y0, y1) > 0.0) {
-            mean = fogHeightProfile(y0, falloff, upper, curve);
+            // Both endpoints below the layer's top puts the whole segment below it, so the mean is
+            // exactly one and this branch is skipped. Leaving it to the quotient would give 1.0
+            // only to within rounding, because the numerator and the denominator are the same
+            // subtraction written twice and the compiler is free to fuse one and not the other.
+            mean = fogHeightProfile(y0, falloff, upper, curve); // a level ray never leaves its altitude
             if (abs(rise) > 1e-3) {
                 mean = (fogHeightIntegral(y1, falloff, upper, curve) -
                         fogHeightIntegral(y0, falloff, upper, curve)) / rise;
@@ -288,8 +303,12 @@ fn applyFogBeforeAdr715(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         }
         travel = travel * mix(1.0, mean, amount);
     }
-    let d = travel * density;
-    let f = exp(-d * d);
+    var depth = extinction * travel;
+    let horizon = frame.fogShape.w; // ADR-705 (moved from z when ADR-715 took z)
+    if (horizon > 0.0) {
+        depth = depth * (1.0 + horizon * (start + dist) * 0.0005);
+    }
+    let f = exp(-depth);
     return mix(frame.fogParams.rgb, color, f);
 }
 

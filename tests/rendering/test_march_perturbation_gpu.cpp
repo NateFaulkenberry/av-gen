@@ -18,12 +18,14 @@
 // the one claim that now holds exactly.
 
 #include "app/engine.hpp"
+#include "assets/image.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "rendering/volume_renderer.hpp"
 #include "scene/scene.hpp"
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -312,8 +314,10 @@ TEST_CASE("a medium no camera ray reaches leaves the frame byte-identical", "[gp
     const scene::Scene none = sceneBySeek(engine, kSecond);
     REQUIRE(none.atmospherics.mediumCount == 0);
     const gpu::Image8 without = render(renderer, none, kSecond);
-    // The premise: the film's environment fog is off, so without a medium there is no volume pass.
-    REQUIRE(none.environment.volumeDensity == 0.0f);
+    // The premise: the film's environment fog runs no march -- since ADR-705 it is surface-only
+    // (`volumeMaxDistance` 0), which is "off" for the volume pass -- so without a medium there is no
+    // volume pass.
+    REQUIRE_FALSE(rendering::VolumeRenderer::enabled(none.environment));
     CHECK(renderer.stats().volume.steps == 0);
 
     setEnabled(engine, tornado, true);
@@ -327,4 +331,65 @@ TEST_CASE("a medium no camera ray reaches leaves the frame byte-identical", "[gp
     const Diff d = diff(without, behind);
     INFO(d.fraction * 100.0 << "% of pixels differ, max " << d.maxChannel << " levels");
     CHECK(gpu::hashImage(without) == gpu::hashImage(behind));
+}
+
+// ADR-705 x the placed media. `volumeMaxDistance` 0 means "no march: the surface pass carries the
+// environment's whole ray" -- and the march's reach also bounds every placed medium, so a tornado
+// added to a surface-only scene was marched for one centimetre and drew NOTHING, with no warning.
+// Now the march carries the media alone out to their far side. The film is such a scene.
+TEST_CASE("a medium in a surface-only scene is still drawn", "[gpu][volume][effects][fog]") {
+    constexpr double kSecond = 20.0;
+    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    const scene::Camera camera = sceneBySeek(engine, kSecond).camera;
+    std::string tornado;
+    // Negative metres puts it IN FRONT of the camera, where every ray to it is a camera ray.
+    REQUIRE(engine
+                .editEffects([&](std::vector<world::EffectInstance>& list) -> Result<void> {
+                    auto added = world::insertEffect(list, tornadoBehind(camera, -30.0f));
+                    if (!added) {
+                        return std::unexpected(added.error());
+                    }
+                    tornado = *added;
+                    return {};
+                })
+                .has_value());
+    setEnabled(engine, tornado, false);
+    const scene::Scene none = sceneBySeek(engine, kSecond);
+    REQUIRE(none.environment.volumeMaxDistance == 0.0f); // the premise: surface-only
+    REQUIRE(none.environment.volumeDensity > 0.0f);
+    const gpu::Image8 without = render(renderer, none, kSecond);
+
+    setEnabled(engine, tornado, true);
+    const scene::Scene with = sceneBySeek(engine, kSecond);
+    REQUIRE(with.atmospherics.mediumCount == 1);
+    const gpu::Image8 drawn = render(renderer, with, kSecond);
+    CHECK(renderer.stats().volume.media == 1);
+    INFO("march steps " << renderer.stats().volume.steps << ", camera " << camera.position.x << ","
+                        << camera.position.y << "," << camera.position.z);
+    if (const char* dir = std::getenv("AVGEN_EFFECT_DUMP"); dir != nullptr && dir[0] != '\0') {
+        static_cast<void>(assets::writePng(fs::path(dir) / "surface-only-tornado-off.png", without.width,
+                                           without.height, without.rgba));
+        static_cast<void>(assets::writePng(fs::path(dir) / "surface-only-tornado-on.png", drawn.width,
+                                           drawn.height, drawn.rgba));
+    }
+    // VISIBLY different pixels (channel sum over 24), not any difference: moving the fog's handover
+    // by a centimetre shifts faint levels across the whole frame, and that must not pass for a storm.
+    std::size_t visible = 0;
+    for (std::size_t i = 0; i + 3 < without.rgba.size(); i += 4) {
+        int sum = 0;
+        for (int c = 0; c < 3; ++c) {
+            sum += std::abs(static_cast<int>(without.rgba[i + c]) - static_cast<int>(drawn.rgba[i + c]));
+        }
+        visible += sum > 24 ? 1u : 0u;
+    }
+    const double visibleFraction = static_cast<double>(visible) / static_cast<double>(without.rgba.size() / 4);
+    INFO(visibleFraction * 100.0 << "% of pixels visibly changed");
+    // A tornado 30 m ahead covers a real part of the frame.
+    CHECK(visibleFraction > 0.05);
 }

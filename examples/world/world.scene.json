@@ -30,7 +30,6 @@
    0.022,
    0.038
   ],
-  "fogDensity": 0.01,
   "volumeDensity": 0.02,
   "volumeScattering": 1.4,
   "volumeAnisotropy": 0.62,

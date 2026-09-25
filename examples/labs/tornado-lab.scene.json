@@ -7,7 +7,6 @@
  "environment": {
   "background": [0.30, 0.36, 0.44],
   "intensity": 1.0,
-  "fogDensity": 0.0,
   "volumeDensity": 0.0,
   "volumeSteps": 64,
   "volumeJitter": 0.0,

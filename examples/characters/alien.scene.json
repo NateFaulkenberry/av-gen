@@ -14,8 +14,8 @@
   "intensity": 0.35,
   "background": [0.016, 0.018, 0.024],
   "fogColor": [0.02, 0.022, 0.03],
-  "fogDensity": 0.008,
-  "volumeDensity": 0.0,
+  "volumeDensity": 0.0133209,
+  "volumeMaxDistance": 0.0,
   "sky": {
    "zenithColor": [0.30, 0.35, 0.46],
    "horizonColor": [0.32, 0.33, 0.36],

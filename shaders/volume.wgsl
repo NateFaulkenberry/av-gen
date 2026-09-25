@@ -52,7 +52,7 @@ struct VolumeUniforms {
     depthParams: vec4<f32>, // camera near, camera far, march start jitter (ADR-461), 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
     glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), y = local-light strength
-    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow, w = 0
+    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow; ADR-705: w = horizonDensity
     selfShadow: vec4<f32>, // ADR-570: x = shadow march steps (0 = off), y = strength, zw = 0
     // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
     //
@@ -1013,7 +1013,14 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         // ADR-562 §4: a slot whose interval this step is outside costs one comparison instead of a
         // field evaluation. That is the difference between ADR-560's measured 7% saving from a
         // smaller medium and a proportional one.
-        let fogDensity = volumeDensityAt(p);
+        var fogDensity = volumeDensityAt(p);
+        // ADR-705, §7's Horizon Density: the environment's air grows denser with distance from the
+        // eye, by the same factor `applyFog` integrates past the march's reach, so the two passes
+        // stay one law. Only the environment layer -- a placed medium has its own size and its own
+        // density (ADR-564) and is not "the horizon". The branch keeps horizon 0 bit-identical.
+        if (vol.heightFog.w > 0.0) { // ADR-705; z is ADR-715's ground follow
+            fogDensity = fogDensity * (1.0 + vol.heightFog.w * t * 0.001);
+        }
         var mediumDensity = 0.0;
         var mediumScatter = 0.0;
         var mediumEmission = vec3<f32>(0.0);

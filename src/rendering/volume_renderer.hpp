@@ -130,11 +130,23 @@ public:
                                     wgpu::Buffer particleGlow = nullptr);
     [[nodiscard]] Result<void> reload(); // hot reload of volume.wgsl (keeps the old pipelines on failure)
 
-    // True when this scene wants volumetrics at all (volumeDensity > 0).
+    // True when this scene's air is marched at all: volumeDensity > 0 and, ADR-705, a march
+    // distance > 0 to carry it over.
     [[nodiscard]] static bool enabled(const scene::Environment& environment);
     // ADR-387: the vortex lives in the atmospheric effects now, so the whole-scene overload is
     // the one that answers correctly for a scene with a vortex and no fog.
     [[nodiscard]] static bool enabled(const scene::Scene& scene);
+    // ADR-705: the distance at which the surface fog takes the air over from the march -- how far
+    // the march carries it (`volumeMaxDistance`, clamped exactly as the march clamps it), and 0
+    // where the scene has no march, so the surface pass integrates the whole ray. One number read
+    // by both sides of the handover, so a metre of air is counted exactly once.
+    //
+    // It deliberately does NOT look at the renderer's debug pass toggle. `--disable volume` removes
+    // the pass and exactly what the pass draws; if switching the march off handed its segment to
+    // the surface pass, the diagnostic would repaint the air rather than subtract it, and the
+    // Volumetric Lab's "the two ways of not running the volume agree at the byte" would be false.
+    // That case is what found this: the first version took the toggle and differed by 3 levels.
+    [[nodiscard]] static float surfaceFogStart(const scene::Scene& scene);
 
     // Per frame, before encode(): sizes the half-res target, resolves the density/colour field
     // names to slots and writes the uniforms. Does nothing (and clears the stats) when off.

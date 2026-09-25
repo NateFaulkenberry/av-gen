@@ -16,7 +16,8 @@
    0.038,
    0.07
   ],
-  "fogDensity": 0.01,
+  "volumeDensity": 0.0166511,
+  "volumeMaxDistance": 0.0,
   "fogHeight": 16.0,
   "fogHeightFalloff": 0.05
  },
