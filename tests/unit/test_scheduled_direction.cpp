@@ -24,6 +24,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -331,7 +332,10 @@ TEST_CASE("on the multicam film, a scrub replays the section directions a play g
     Film probe(project, true);
     const auto directives = probe.engine.composition()->directives();
     REQUIRE(directives.size() >= 3);
-    const double target = directives[2].timeSeconds + 5.0; // after three of the film's directions
+    // After three of the film's directions, ON the 60 Hz grid: a scrub lands on the second it is
+    // given and a play on frames, so an off-grid target compares two different instants. (The first
+    // version of this test did exactly that and read the gap as a divergence of the film.)
+    const double target = std::round((directives[2].timeSeconds + 5.0) * 60.0) / 60.0;
     std::set<std::string> directed;
     for (const auto& d : directives) {
         if (d.timeSeconds <= target) {
@@ -340,70 +344,11 @@ TEST_CASE("on the multicam film, a scrub replays the section directions a play g
     }
     const auto [withDirections, unused] = gaps(true, target);
     const auto [withoutDirections, unused2] = gaps(false, target);
-    // The directions are installed and given: every directed alien's Director tier was filled.
     REQUIRE_FALSE(directed.empty());
-    // **The film is not scrub-exact without them.** Measured on the project-loaded composition at
-    // this second, after ADR-800: farm animals up to 3.5 cm and the saucer 3 mm apart, with no
-    // direction in the piece at all (see the hidden case below, for the seek's owner). So the claim
-    // this film can carry is that the directions add no divergence of their own: the worst gap is
-    // the film's own worst gap. Per body the existing divergence moves around as the aliens react
-    // to one another, which is why this is a bound on the whole and not a per-body identity. The
-    // exact per-body claim is carried by the scenes above, which are exact without directions.
-    float worstWith = 0.0f;
-    float worstWithout = 0.0f;
     for (const auto& [name, gap] : withDirections) {
-        worstWith = std::max(worstWith, gap);
-        worstWithout = std::max(worstWithout, withoutDirections.at(name));
-    }
-    INFO("worst gap " << worstWith << " m with the directions, " << worstWithout << " m without");
-    CHECK(worstWith <= worstWithout + 1e-4f);
-}
-
-// For the seek's owner: the project-loaded multicam film, with no sequence direction and no motion
-// change in it, does not scrub exactly on the composition harness (cull off, no audio). The scene-only
-// Film harness of test_glowmere_scrub.cpp does. Measured 2026-09-25 after ADR-800 at ~50.3 s: cow-3
-// 3.5 cm, bull-10 1.6 cm, sage 2.5 cm, the visitor 3 mm.
-TEST_CASE("the project-loaded multicam film scrubs exactly on the composition harness",
-          "[.known-defect][glowmere][seek]") {
-    const fs::path project = fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
-    struct Film {
-        app::Engine engine{app::EngineMode::Offline};
-        signals::SignalBus bus;
-        long long frame = 0;
-        explicit Film(const fs::path& p) {
-            REQUIRE(engine.loadProject(p).has_value());
-            engine.composition()->scene().detailLimits.entityDistanceCull = false;
-        }
-        void tick() {
-            FrameTime time;
-            time.renderTime = static_cast<double>(frame) / 60.0;
-            time.deltaTime = frame == 0 ? 0.0 : 1.0 / 60.0;
-            time.frameIndex = static_cast<std::uint64_t>(frame);
-            engine.params().resetFinals();
-            engine.composition()->updateBehaviour(time, bus);
-            engine.composition()->update(time);
-            ++frame;
-        }
-    };
-    constexpr double kTarget = 50.0;
-    Film played(project);
-    while (played.frame <= static_cast<long long>(kTarget * 60.0)) {
-        played.tick();
-    }
-    played.tick();
-    Film scrubbed(project);
-    scrubbed.tick();
-    scrubbed.engine.composition()->seekWithDirector(
-        kTarget, scrubbed.engine.params(),
-        entity::SeekBudget{.maxSeconds = 90.0, .maxBodySteps = entity::SeekBudget::kEditorBodySteps,
-                           .mode = entity::SeekMode::Checkpointed},
-        1.0 / 60.0);
-    scrubbed.frame = static_cast<long long>(kTarget * 60.0) + 1;
-    scrubbed.tick();
-    for (const auto& e : played.engine.composition()->entityWorld().entities()) {
-        const float gap = glm::length(e->visualPosition() -
-                                      scrubbed.engine.composition()->entityWorld().find(e->name())->visualPosition());
-        INFO(e->name() << " " << gap << " m");
+        INFO(name << (directed.contains(name) ? " (directed)" : "") << " lands " << gap << " m from the play; "
+                  << withoutDirections.at(name) << " m without the directions");
         CHECK(gap < 1e-4f);
+        CHECK(withoutDirections.at(name) < 1e-4f); // and the film is exact without them too
     }
 }
