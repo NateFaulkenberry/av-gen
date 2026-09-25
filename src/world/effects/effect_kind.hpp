@@ -81,6 +81,11 @@ enum class EffectKind : std::uint8_t {
     //   lens (DF):           HeatShimmer = 41, GravitationalLens = 42
     //   shell 2 (phase 2):   ChargeUp = 40, LightBeam = 43, Halo = 44, Bubble = 45, Portal = 46,
     //                        RealityTear = 47
+    // BOLT (bolt_path.hpp): seeded fractal paths drawn through RIBBON.
+    Lightning = 33,     // a triggered strike: leader, return stroke, restrikes, afterglow, a flash
+    Arc = 34,           // a continuous writhing arc between two things
+    ElectricField = 35, // a crackling web over the owner's surface, and arcs hopping across it
+    Discharge = 36,     // a triggered burst of bolts, sparks and a flash from the owner
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not
