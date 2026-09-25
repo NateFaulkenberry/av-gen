@@ -1,0 +1,55 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "avgen",
+    "version": "0.1.0"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": {
+        "path": "clip-playback-lab.scene.json"
+      }
+    }
+  },
+  "render": {
+    "fps": 12.0,
+    "width": 640,
+    "height": 480,
+    "start": 0.0,
+    "end": 6.0,
+    "output": "png",
+    "path": "jumping-once",
+    "pattern": "frame_{:06d}.png",
+    "tier": "offline",
+    "limits": "unlimited",
+    "supersample": 1.0
+  },
+  "sequence": {
+    "name": "clip-playback",
+    "duration": 3.0,
+    "actors": [
+      {
+        "id": "scout",
+        "node": "scout",
+        "visible": true,
+        "keys": [],
+        "clips": [
+          {
+            "time": 0.0,
+            "clip": "Idle",
+            "speed": 1.0
+          },
+          {
+            "time": 0.5,
+            "clip": "Jumping",
+            "speed": 1.0,
+            "blend": 0.0,
+            "playback": "once"
+          }
+        ]
+      }
+    ]
+  }
+}
