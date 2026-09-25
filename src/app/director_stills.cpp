@@ -125,6 +125,11 @@ std::vector<std::pair<std::string, const seq::Shot*>> proposedShots(const direct
             out.emplace_back(ps.key, shot);
         }
     }
+    // In film order: each still's seek then starts from the checkpoints the last one left behind,
+    // instead of re-simulating from further back for a shot the plan happened to list later.
+    std::stable_sort(out.begin(), out.end(), [](const auto& a, const auto& b) {
+        return a.second->startSeconds < b.second->startSeconds;
+    });
     return out;
 }
 
