@@ -27,6 +27,9 @@
 #include "scene/camera_rig.hpp"
 #include "scene/composition.hpp"
 #include "signals/signal_bus.hpp"
+#include "params/parameter.hpp"
+#include "world/hero.hpp"
+#include "app/engine.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -297,4 +300,153 @@ TEST_CASE("A viewport mode is not a camera the director can see", "[viewport][ca
     }
     // The control: the resolver is not answering the same thing at every second either.
     CHECK(filmAt({}, 1.0).camera != filmAt({}, 7.0).camera);
+}
+
+// ---- the Director's aim-follow does not reach a frame the film does not own (ADR-890) -----------
+//
+// Reported: "if I have control of the camera in the world editor sometimes it is still moved by the
+// director", on the multicam film, straight after opening it. The editor's viewpoint was never
+// re-seeded and never written by anybody else -- the frame was. `Composition::update` runs
+// `applyDirectedAim` *after* `applyParameters`, so after `applyViewportView` had already put the
+// editor's pose on screen, and it added the hero's movement since the cut to `Scene::camera.target`
+// regardless of whose pose that was. On the multicam film 39 shots carry an aim-follow entry, so for
+// most of the film the editor's aim was dragged after whichever hero the cut was made for: "sometimes"
+// is "while an aim-follow shot is on the main camera", and nothing the person did could stop it.
+namespace {
+
+struct AimFollowFixture {
+    // The engine, not a bare composition: the parameters' finals are resolved by `Engine::update`,
+    // and the frame the person sees is what that produces.
+    app::Engine engine{app::EngineMode::Offline};
+    FixedStepClock clock{60.0};
+    scene::Composition* comp = nullptr;
+
+    // The main camera in free placement, aimed at the origin; one hero standing forty metres from
+    // where the cut saw it, so the aim-follow's offset is (40, 0, 0) on every frame of the shot.
+    AimFollowFixture() {
+        engine.newComposition();
+        comp = engine.composition();
+        REQUIRE(comp != nullptr);
+        auto* mode = dynamic_cast<params::Parameter<int>*>(engine.params().find("camera/mode"));
+        REQUIRE(mode != nullptr);
+        mode->setBase(1);
+        auto* pos = engine.params().find("camera/position");
+        auto* tgt = engine.params().find("camera/target");
+        REQUIRE(pos != nullptr);
+        REQUIRE(tgt != nullptr);
+        for (std::size_t c = 0; c < 3; ++c) {
+            pos->setBaseComponent(c, glm::vec3(0.0f, 10.0f, 50.0f)[static_cast<int>(c)]);
+            tgt->setBaseComponent(c, 0.0f);
+        }
+        world::HeroPoint walker;
+        walker.name = "walker";
+        walker.assetId = "asset";
+        walker.position = glm::vec3(0.0f);
+        walker.height = 4.0f;
+        walker.radius = 2.0f;
+        walker.importance = 0.9f;
+        walker.preferredCameraDistance = 18.0f;
+        walker.activationRadius = 54.0f;
+        REQUIRE(comp->setHeroes({walker}).has_value());
+        comp->setAimFollow({scene::AimFollow{.startSeconds = 0.0,
+                                             .endSeconds = 100.0,
+                                             .hero = "walker",
+                                             .heroAtCut = glm::vec3(-40.0f, 0.0f, 0.0f)}});
+    }
+
+    // One frame of playback from `seconds`, the way the application runs one.
+    const scene::Camera& frameAt(double seconds) {
+        engine.seekSeconds(seconds);
+        clock.seek(seconds);
+        engine.update(engine.tick(clock));
+        return comp->scene().camera;
+    }
+};
+
+} // namespace
+
+TEST_CASE("The director's aim-follow does not move the editor's viewpoint", "[viewport][camera][follow]") {
+    AimFollowFixture fx;
+
+    // The control: on the film, the table is live and the aim is where the hero went.
+    const glm::vec3 filmAim = fx.frameAt(1.0).target;
+    INFO("film aim " << filmAim.x << ", " << filmAim.y << ", " << filmAim.z);
+    REQUIRE(glm::length(filmAim - glm::vec3(40.0f, 0.0f, 0.0f)) < 1e-3f);
+
+    // The person takes the canvas: the editor's viewpoint, placed where they flew to.
+    fx.comp->setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
+    const glm::vec3 eye(200.0f, 50.0f, 200.0f);
+    const glm::vec3 look(10.0f, 5.0f, 10.0f);
+    scene::CameraPose pose;
+    pose.position = eye;
+    pose.target = look;
+    fx.comp->setEditorCamera(pose);
+
+    // Several frames of the shot, paused and playing: the frame is the pose they left, exactly.
+    for (const double seconds : {1.0, 1.0, 2.0, 30.0, 99.0}) {
+        const scene::Camera& shown = fx.frameAt(seconds);
+        INFO("at " << seconds << " s the editor's aim is " << shown.target.x << ", " << shown.target.y
+                   << ", " << shown.target.z);
+        CHECK(shown.position == eye);
+        CHECK(shown.target == look);
+    }
+    // And the editor's own pose was not what moved.
+    CHECK(fx.comp->editorCamera().target == look);
+
+    // Back on the film, the director's nudge is still there -- it was withheld from a frame, not
+    // switched off.
+    fx.comp->setViewportView({});
+    CHECK(glm::length(fx.frameAt(3.0).target - glm::vec3(40.0f, 0.0f, 0.0f)) < 1e-3f);
+}
+
+TEST_CASE("The director's aim-follow does not move a camera you are looking through", "[viewport][camera][follow]") {
+    AimFollowFixture fx;
+    // An authored rig with no shot: the film stays on the main camera, whose aim-follow is live.
+    scene::CameraDirection dir = fx.comp->cameraDirection();
+    scene::CameraRig side;
+    side.id = 2;
+    side.name = "Side";
+    side.slug = "side";
+    side.position = {-80.0f, 12.0f, 0.0f};
+    side.target = {0.0f, 2.0f, 0.0f};
+    dir.cameras.push_back(side);
+    dir.nextId = 3;
+    REQUIRE(fx.comp->setCameraDirection(std::move(dir)).has_value());
+
+    fx.comp->setViewportView({scene::ViewportCamera::Through, 2});
+    const scene::Camera& shown = fx.frameAt(1.0);
+    REQUIRE(fx.comp->activeCamera().camera == scene::kMainCamera);
+    INFO("through Side, aim " << shown.target.x << ", " << shown.target.y << ", " << shown.target.z);
+    CHECK(glm::length(shown.target - glm::vec3(0.0f, 2.0f, 0.0f)) < 1e-4f);
+    CHECK(glm::length(shown.position - glm::vec3(-80.0f, 12.0f, 0.0f)) < 1e-4f);
+}
+
+// The second road to the same report (ADR-890). An assistant task that is rolled back or aborted
+// puts the scene back with `Engine::setCompositionJson`, which builds a new `Composition` -- and the
+// editor's viewpoint lived on the old one. The new one re-seeded it from the film's camera on its
+// first frame, so the canvas jumped to wherever the director had the film.
+TEST_CASE("Restoring the scene document keeps the editor's viewpoint", "[viewport][camera][follow]") {
+    AimFollowFixture fx;
+    fx.comp->setViewportView({scene::ViewportCamera::Editor, scene::kNoCamera});
+    scene::CameraPose pose;
+    pose.position = glm::vec3(-300.0f, 80.0f, 120.0f);
+    pose.target = glm::vec3(5.0f, 1.0f, -5.0f);
+    pose.fovDegrees = 42.0f;
+    fx.comp->setEditorCamera(pose);
+    static_cast<void>(fx.frameAt(1.0));
+
+    REQUIRE(fx.engine.setCompositionJson(fx.comp->toJson()).has_value());
+    scene::Composition* restored = fx.engine.composition();
+    REQUIRE(restored != nullptr);
+    CHECK(restored->editorCameraSeeded());
+    CHECK(restored->viewportView().mode == scene::ViewportCamera::Editor);
+
+    fx.engine.seekSeconds(1.0);
+    fx.clock.seek(1.0);
+    fx.engine.update(fx.engine.tick(fx.clock));
+    const scene::Camera& shown = restored->scene().camera;
+    INFO("after the restore the frame is at " << shown.position.x << ", " << shown.position.y << ", "
+                                              << shown.position.z);
+    CHECK(shown.position == pose.position);
+    CHECK(shown.target == pose.target);
 }
