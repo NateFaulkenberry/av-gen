@@ -3,11 +3,12 @@
 //
 // **How it is drawn.** SHELL: a sphere proxy (world/effects/shell_frame) whose fragment stage marches
 // the ray's analytic interval through the sphere -- entered at the front face, left where the sphere
-// or the scene's linear depth ends it, whichever is nearer -- and integrates emission only:
-// `L += colour(r) * density * dt`, density = a soft limb times fBM filaments through a
-// divergence-free warp that evolves in place (shaders/shell.wgsl `fs_plasma`), plus a hot core.
-// Additive, so it hides nothing behind it, which is right for a self-emitting medium; it writes the
-// emission target, so the bloom makes its halo. Fog in front of it dims it at the shell's surface.
+// or the scene's linear depth ends it, whichever is nearer (shaders/shell.wgsl `fs_plasma`). Ridged fBM
+// strands that run outward from the centre, through a divergence-free warp that boils in place, both
+// emit and veil what is behind them, so a pixel's strand light saturates at the strand colour and the
+// gaps stay dark; a bounded hot core (its peak IS the core brightness) glows through them, and the limb
+// has a thin rim. Additive. Only the core writes the emission target at full weight, so the bloom
+// haloes the orb without washing its strands out. Fog in front of it dims it at the shell's surface.
 //
 // **Light.** A LIGHTMOD pool light at the orb's centre, in the orb's colour, so it lights what it
 // floats over. The pool is shared with the entity glows and is 16 slots; a plasma whose light does
@@ -42,12 +43,15 @@ constexpr EffectField kFields[] = {
     storedFloat("radius", "Radius", 1.2f, 0.02f, 500.0f, 0.1f, 12.0f).fmt("%.2f m").main().log().floorAt(0.02f)
         .tooltip("The orb's radius in metres."),
     storedColor("coreColor", "Core colour", glm::vec3(1.0f, 0.93f, 0.8f)).main().sec("Glow"),
-    storedFloat("coreIntensity", "Core brightness", 14.0f, 0.0f, 2000.0f, 0.0f, 150.0f).main().floorAt(0.0f)
-        .tooltip("HDR brightness at the heart of the orb, integrated through it. Past about 1 it\n"
-                 "blooms; a night scene's exposure makes the same number far brighter than a day's."),
-    storedColor("edgeColor", "Filament colour", glm::vec3(0.35f, 0.55f, 1.0f)).main(),
-    storedFloat("edgeIntensity", "Filament brightness", 4.0f, 0.0f, 500.0f, 0.0f, 40.0f).main().floorAt(0.0f)
-        .tooltip("HDR brightness of the swirling filaments towards the limb."),
+    storedFloat("coreIntensity", "Core brightness", 3.0f, 0.0f, 500.0f, 0.0f, 20.0f).main().floorAt(0.0f)
+        .tooltip("HDR brightness at the very centre of the orb. Only the core should pass about 1:\n"
+                 "it is what blooms, and it is seen through the strands in front of it."),
+    storedColor("edgeColor", "Strand colour", glm::vec3(0.3f, 0.4f, 1.0f)).main(),
+    storedFloat("edgeIntensity", "Strand brightness", 0.9f, 0.0f, 100.0f, 0.0f, 4.0f).main().floorAt(0.0f)
+        .tooltip("Brightness where the swirling strands are dense. Kept near or below 1 the strands\n"
+                 "read as structure; far above it they blow out into a flat glow."),
+    storedFloat("rim", "Limb glow", 0.7f, 0.0f, 20.0f, 0.0f, 3.0f).main().floorAt(0.0f)
+        .tooltip("A thin brighter edge where the view grazes the orb."),
     storedFloat("turbulence", "Turbulence", 0.8f, 0.0f, 6.0f, 0.0f, 3.0f).main().sec("Motion").floorAt(0.0f)
         .tooltip("How strongly the flow twists the filaments. 0 is a calm, marbled orb."),
     storedFloat("scale", "Filament scale", 2.2f, 0.1f, 20.0f, 0.5f, 8.0f).main().floorAt(0.1f)
@@ -63,13 +67,14 @@ constexpr EffectField kFields[] = {
                  "proportion to the orb's size on screen."),
     storedFloat("limbSoftness", "Limb softness", 0.35f, 0.02f, 1.0f, 0.05f, 1.0f).clampTo(0.02f, 1.0f)
         .tooltip("How gradually the orb fades at its edge: small is a crisp ball, 1 a diffuse glow."),
-    storedFloat("coreSize", "Core size", 0.3f, 0.02f, 1.0f, 0.05f, 0.8f).clampTo(0.02f, 1.0f)
+    storedFloat("coreSize", "Core size", 0.18f, 0.02f, 1.0f, 0.05f, 0.8f).clampTo(0.02f, 1.0f)
         .tooltip("The hot core's size, as a fraction of the radius."),
-    storedFloat("filaments", "Filament sharpness", 0.45f, 0.0f, 0.95f, 0.0f, 0.9f).clampTo(0.0f, 0.95f)
+    storedFloat("filaments", "Strand sharpness", 0.45f, 0.0f, 0.95f, 0.0f, 0.9f).clampTo(0.0f, 0.95f)
         .tooltip("How thin the strands are: 0 is a soft marbled glow, higher leaves fine crackling\n"
                  "strands with dark gaps between them."),
-    storedFloat("density", "Density", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f).floorAt(0.0f)
-        .tooltip("Overall emission of the interior."),
+    storedFloat("density", "Strand opacity", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f).floorAt(0.0f)
+        .tooltip("How much the strands hide what is behind them, the core included: higher is a\n"
+                 "denser, more solid-looking orb; lower is a see-through web."),
     storedFloat("lightRange", "Light reach", 8.0f, 1.0f, 60.0f, 2.0f, 20.0f).fmt("%.1f x radius").sec("Light").floorAt(1.0f)
         .tooltip("How far the light reaches, in orb radii."),
     storedFloat("lightFog", "Light in fog", 0.35f, 0.0f, 1.0f, 0.0f, 1.0f).clampTo(0.0f, 1.0f)
@@ -90,20 +95,20 @@ struct Look {
     glm::vec3 core;
     float coreIntensity;
     glm::vec3 edge;
-    float edgeIntensity, turbulence, scale, speed, light, limb, coreSize, filaments, density;
+    float edgeIntensity, turbulence, scale, speed, light, limb, coreSize, filaments, density, rim;
 };
 
 // Every look writes every look row (radius and placement are the author's), so switching looks never
 // leaves the last one's settings behind.
 constexpr Look kLooks[] = {
-    // A contained ball of plasma: white-hot heart, blue-violet filaments, a slow boil.
-    {"Plasma Ball", {1.0f, 0.93f, 0.85f}, 14.0f, {0.4f, 0.5f, 1.0f}, 4.0f, 0.8f, 2.2f, 0.6f, 60.0f, 0.35f, 0.3f, 0.45f, 1.0f},
-    // A fireball's core: yellow-white to orange, turbulent and fast, a big warm light.
-    {"Fireball Core", {1.0f, 0.85f, 0.5f}, 22.0f, {1.0f, 0.38f, 0.08f}, 6.0f, 1.6f, 1.6f, 1.4f, 180.0f, 0.5f, 0.4f, 0.3f, 1.4f},
-    // Ball lightning: small, cyan-white, thin crackling strands and a sharp limb.
-    {"Ball Lightning", {0.85f, 0.97f, 1.0f}, 30.0f, {0.3f, 0.85f, 1.0f}, 8.0f, 2.2f, 3.4f, 2.2f, 90.0f, 0.2f, 0.18f, 0.62f, 1.2f},
-    // An arcane orb: magenta filaments round a pale violet core, calm and soft.
-    {"Arcane Orb", {0.95f, 0.8f, 1.0f}, 10.0f, {0.8f, 0.2f, 1.0f}, 4.5f, 0.5f, 1.8f, 0.35f, 40.0f, 0.6f, 0.35f, 0.4f, 1.0f},
+    // A contained ball of plasma: a white-hot heart inside a web of blue-violet strands, a slow boil.
+    {"Plasma Ball", {1.0f, 0.93f, 0.85f}, 3.0f, {0.3f, 0.4f, 1.0f}, 0.9f, 0.8f, 2.2f, 0.6f, 60.0f, 0.35f, 0.18f, 0.45f, 1.0f, 0.7f},
+    // A fireball's core: yellow-white inside dense orange strands, turbulent and fast, a big warm light.
+    {"Fireball Core", {1.0f, 0.85f, 0.5f}, 3.5f, {1.0f, 0.32f, 0.05f}, 1.0f, 1.6f, 1.6f, 1.4f, 180.0f, 0.5f, 0.25f, 0.3f, 1.4f, 0.5f},
+    // Ball lightning: small and cyan-white, fine crackling strands, a sharp bright limb.
+    {"Ball Lightning", {0.85f, 0.97f, 1.0f}, 4.0f, {0.2f, 0.75f, 1.0f}, 0.9f, 2.2f, 2.4f, 2.2f, 90.0f, 0.2f, 0.16f, 0.75f, 0.65f, 0.9f},
+    // An arcane orb: magenta strands round a pale violet core, calm and soft.
+    {"Arcane Orb", {0.95f, 0.8f, 1.0f}, 2.5f, {0.75f, 0.15f, 1.0f}, 0.85f, 0.5f, 1.8f, 0.35f, 40.0f, 0.6f, 0.2f, 0.4f, 1.0f, 0.7f},
 };
 
 void applyLook(E& e, const Look& l) {
@@ -119,6 +124,7 @@ void applyLook(E& e, const Look& l) {
     kRows.set(e, "coreSize", l.coreSize);
     kRows.set(e, "filaments", l.filaments);
     kRows.set(e, "density", l.density);
+    kRows.set(e, "rim", l.rim);
     e.style = l.name;
 }
 void style0(E& e) { applyLook(e, kLooks[0]); }
@@ -134,7 +140,7 @@ constexpr EffectStyle kStyles[] = {
 // response slider drives the turbulence).
 constexpr EffectRoute kRoutes[] = {
     {"audio.bass", "radius", 0.25f, 10.0f, 260.0f},
-    {"audio.rms", "coreIntensity", 25.0f, 20.0f, 300.0f},
+    {"audio.rms", "coreIntensity", 3.0f, 20.0f, 300.0f},
 };
 
 E make(std::string name) {
@@ -185,7 +191,7 @@ EffectStatus emit(const E& e, const EffectContext& ctx, ShellSink& sink, std::st
                                 std::clamp(kRows.f(e, "limbSoftness"), 0.02f, 1.0f));
     shell.params[4] = glm::vec4(std::clamp(kRows.f(e, "coreSize"), 0.02f, 1.0f),
                                 std::clamp(kRows.f(e, "filaments"), 0.0f, 0.95f), std::max(kRows.f(e, "density"), 0.0f),
-                                0.0f);
+                                std::max(kRows.f(e, "rim"), 0.0f) * envelope);
     if (!sink.append(ShellShading::Plasma, ShellMesh::Sphere, shell)) {
         reason = "The shell budget (128) is full this frame: not drawn.";
         return EffectStatus::Dropped;

@@ -37,6 +37,7 @@
 
 #include <glm/gtc/constants.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -359,7 +360,91 @@ TEST_CASE("a plasma orb is depth-tested against the world and writes emission",
             right += p[0] + p[1] + p[2];
         }
         INFO("emission along the orb's row, right of the wall: " << right);
-        CHECK(right > 50.0f);
+        // The orb feeds the bloom mostly from its hot core (the strands at a fifth, so the bloom does
+        // not wash them out): about 14 along this row, and nothing at all without the orb.
+        CHECK(right > 5.0f);
+    }
+}
+
+TEST_CASE("a plasma orb up close shows its strands: not clipped, and structured inside",
+          "[gpu][shell][effects][plasma][look]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    world::reportShellLinearDepth(true);
+
+    // The camera at the origin, the orb 6 m ahead filling most of the frame's height, a dark sky.
+    scene::Scene s;
+    s.camera.position = glm::vec3(0.0f);
+    s.camera.target = glm::vec3(0.0f, 0.0f, -1.0f);
+    s.camera.fovYRadians = glm::radians(50.0f);
+    s.environment.backgroundColor = glm::vec3(0.01f, 0.012f, 0.02f);
+    constexpr float kRadius = 2.0f;
+    const glm::vec3 centre(0.0f, 0.0f, -6.0f);
+    const auto disc = [&](std::uint32_t x, std::uint32_t y, float within) {
+        const glm::vec2 c = toPixels(s.camera, centre);
+        const glm::vec2 edge = toPixels(s.camera, centre + glm::vec3(0.0f, kRadius, 0.0f));
+        return glm::length(glm::vec2(static_cast<float>(x) + 0.5f, static_cast<float>(y) + 0.5f) - c) <
+               within * glm::length(edge - c);
+    };
+
+    for (const char* look : {"Plasma Ball", "Fireball Core", "Ball Lightning", "Arcane Orb"}) {
+        INFO("look: " << look);
+        world::EffectInstance orb = world::makeEffect(world::EffectKind::Plasma, "orb");
+        orb.id = "orb";
+        orb.owner = world::EffectOwner::world();
+        REQUIRE(world::applyEffectStyle(orb, world::EffectKind::Plasma, look));
+        orb.activation = world::Activation::Always;
+        orb.timing = world::Timing{};
+        orb.timing.fadeIn = 0.0;
+        orb.values.setFloat("plasma/radius", kRadius);
+        orb.values.setFloat("plasma/offsetZ", centre.z);
+        scene::Scene lit = s;
+        REQUIRE(buildShells(lit, {orb}, 3.0)[0] == world::EffectStatus::Drawn);
+        const gpu::Image8 img = render(renderer, lit, 3.0);
+        dump(img, std::string("shell-plasma-look-") + look);
+
+        // Inside 90 % of the orb's projected radius: how much is washed to white at the tone-mapped
+        // clip (AgX compresses an over-bright colour to white rather than clipping one channel, so
+        // "every channel high" is the clip), how much the brightness varies (strands and gaps, not a
+        // flat blown disc), and how much colour survives.
+        std::size_t inside = 0;
+        std::size_t clipped = 0;
+        double sum = 0.0;
+        double sumSq = 0.0;
+        double saturation = 0.0;
+        for (std::uint32_t y = 0; y < kHeight; ++y) {
+            for (std::uint32_t x = 0; x < kWidth; ++x) {
+                if (!disc(x, y, 0.9f)) {
+                    continue;
+                }
+                const std::uint8_t* p = img.pixel(x, y);
+                const double l = 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+                ++inside;
+                const int lo = std::min({p[0], p[1], p[2]});
+                const int hi = std::max({p[0], p[1], p[2]});
+                clipped += lo >= 200 ? 1u : 0u;
+                saturation += static_cast<double>(hi - lo) / static_cast<double>(std::max(hi, 1));
+                sum += l;
+                sumSq += l * l;
+            }
+        }
+        REQUIRE(inside > 1000);
+        const double mean = sum / static_cast<double>(inside);
+        const double spread = std::sqrt(std::max(sumSq / static_cast<double>(inside) - mean * mean, 0.0));
+        const double clipFraction = static_cast<double>(clipped) / static_cast<double>(inside);
+        saturation /= static_cast<double>(inside);
+        INFO("inside " << inside << " px: " << clipFraction * 100.0 << " % at the clip, mean luma " << mean
+                       << ", spread " << spread << ", saturation " << saturation);
+        std::printf("plasma look %s: white %.1f %%, mean %.1f, spread %.1f, saturation %.3f\n", look,
+                    clipFraction * 100.0, mean, spread, saturation);
+        // Measured on the Wave 3 review's first look (a blown, white-washed orb): 17-37 % white,
+        // saturation 0.15-0.27. After: under 4 % white (the hot core), saturation 0.27-0.48.
+        CHECK(clipFraction < 0.08); // a small hot core may wash out; the orb may not
+        CHECK(mean > 40.0);         // the control: it is a glowing ball, not a dim one
+        CHECK(spread > 18.0);       // strands and gaps, not a flat disc
+        CHECK(saturation > 0.22);   // its colour survives the tone mapping
     }
 }
 

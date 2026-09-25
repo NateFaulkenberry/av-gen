@@ -211,19 +211,27 @@ fn borderLine(edge: f32, width: f32) -> f32 {
 }
 
 // ---- Plasma ----------------------------------------------------------------------------------------
-//   params[0] rgb = core colour, a = core intensity (HDR, envelope included)
-//   params[2] rgb = edge colour, a = edge intensity
-//   params[3] x = turbulence (domain warp), y = noise scale (per unit radius), z = steps, w = limb softness
-//   params[4] x = core size (fraction of the radius), y = filament sharpness (0..0.95), z = density, w = 0
-// Drawn with its FRONT faces: the ray enters there, leaves where the analytic sphere says or where
-// the scene's depth stops it, whichever is nearer. A camera inside the orb sees no front face and
-// draws nothing, which is documented rather than hidden.
+//   params[0] rgb = core colour, a = core brightness at the centre (HDR, envelope included)
+//   params[2] rgb = strand colour, a = strand brightness where the strands are dense (envelope included)
+//   params[3] x = turbulence (domain warp), y = strand scale (per unit radius), z = steps, w = limb softness
+//   params[4] x = core size (fraction of the radius), y = strand sharpness (0..0.95), z = strand opacity,
+//             w = limb glow
+// Drawn with its FRONT faces: the ray enters there, leaves where the analytic sphere says or where the
+// scene's depth stops it, whichever is nearer. A camera inside the orb sees no front face and draws
+// nothing, which is documented rather than hidden.
+//
+// **Why it is not a light bulb.** The strands both emit and occlude (front to back, `L += c (1 - e^-s)`
+// with transmittance carried), so a pixel's strand light saturates at the strand colour however deep the
+// orb is: brightness says how much strand the ray met, not how long the ray was, and the gaps between
+// strands stay dark. The core is a bounded Gaussian whose peak IS the core brightness, seen through the
+// strands in front of it. Only the core writes the emission target at full weight -- the strands and the
+// limb feed the bloom a little -- so the bloom haloes the orb without washing its strands out.
 
 @fragment
 fn fs_plasma(in: ShellVaryings) -> ShellOut {
     let r = shells[in.instance];
     let core = r.params[0];
-    let edge = r.params[2];
+    let strand = r.params[2];
     let shape = r.params[3];
     let body = r.params[4];
     let seed = u32(r.params[1].x);
@@ -237,7 +245,9 @@ fn fs_plasma(in: ShellVaryings) -> ShellOut {
     let b = dot(o, d);
     let c = dot(o, o) - 1.0;
     let disc = b * b - a * c;
-    var radiance = vec3<f32>(0.0);
+    var strands = vec3<f32>(0.0);
+    var hotLight = vec3<f32>(0.0);
+    var transmit = 1.0;
     if (disc > 0.0) {
         let sq = sqrt(disc);
         let t0 = max((-b - sq) / a, 0.0);
@@ -257,9 +267,13 @@ fn fs_plasma(in: ShellVaryings) -> ShellOut {
             let scale = max(shape.y, 0.05);
             let soft = clamp(shape.w, 0.02, 1.0);
             let coreSize = max(body.x, 0.02);
-            let threshold = clamp(body.y, 0.0, 0.95);
+            let sharp = 2.0 + 12.0 * clamp(body.y, 0.0, 0.95);
+            let opacity = max(body.z, 0.0) * 3.5;
+            let strandRgb = strand.rgb * strand.a;
             let coreRgb = core.rgb * core.a;
-            let edgeRgb = edge.rgb * edge.a;
+            // The core Gaussian integrates to coreSize * sqrt(pi) through the centre, so dividing by it
+            // makes the centre's brightness the core brightness.
+            let coreNorm = 1.0 / (coreSize * 1.7724539);
             for (var i = 0u; i < n; i = i + 1u) {
                 let t = t0 + (f32(i) + jitter) * dt;
                 let p = o + d * t;
@@ -268,28 +282,40 @@ fn fs_plasma(in: ShellVaryings) -> ShellOut {
                 if (limb <= 0.0) {
                     continue;
                 }
-                // Filaments: fBM through a divergence-free warp that evolves in place, so the orb
-                // boils rather than scrolling.
+                // Strands: ridged fBM, mostly a function of the direction from the centre (so they run
+                // outward, as a plasma globe's do), through a divergence-free warp that evolves in place
+                // (so they boil rather than scroll). A pure function of the transport clock.
                 let warp = flowCurl(p * (scale * 0.5), clock, seed) * shape.x;
-                // Mostly a function of the DIRECTION from the centre, weakly of the radius: the
-                // strands run outward from the core, as a plasma globe's do, rather than lying about
-                // like a cloud's.
                 let dir = p / max(rr, 1e-3);
-                let q = dir * (scale * 1.3) + p * (scale * 0.35) + warp + vec3<f32>(0.0, -clock * 0.35, 0.0);
-                // Ridged: bright on the noise's mid-level set, a web of thin sheets with dark gaps
-                // between -- the strands of a plasma ball -- rather than value noise's soft blobs.
-                // The threshold sharpens them (1 .. ~9 as the exponent).
+                let q = dir * scale + p * (scale * 0.7) + warp + vec3<f32>(0.0, -clock * 0.35, 0.0);
                 let f = fbm3(q, seed);
-                let ridge = 1.0 - abs(2.0 * f - 1.0);
-                let filament = pow(ridge, 1.0 + 8.0 * threshold);
+                let ridge = pow(1.0 - abs(2.0 * f - 1.0), sharp);
                 let hot = exp(-(rr * rr) / (coreSize * coreSize));
-                let density = limb * (filament + 0.8 * hot);
-                radiance = radiance + mix(edgeRgb, coreRgb, hot) * density * dtLocal;
+                // Strands brighten towards the core: the plasma is hottest where it is densest.
+                let tint = strandRgb * (1.0 + 1.5 * hot);
+                let absorb = 1.0 - exp(-opacity * ridge * limb * dtLocal);
+                strands = strands + tint * (absorb * transmit);
+                hotLight = hotLight + coreRgb * (hot * coreNorm * dtLocal * transmit);
+                transmit = transmit * (1.0 - absorb * 0.7); // strands veil the core, never black it out
             }
-            radiance = radiance * (0.5 * body.z);
         }
     }
-    return shellLight(in, radiance);
+    // The limb: where the ray grazes the shell, a thin brighter rim, as a glowing ball's edge.
+    let v = normalize(frame.cameraPos.xyz - in.world);
+    let rim = pow(1.0 - clamp(abs(dot(in.normal, v)), 0.0, 1.0), 3.0) * body.w;
+    let rimLight = strand.rgb * strand.a * rim;
+
+    let fog = fogTransmit(in.world);
+    let lit = (strands + hotLight + rimLight) * fog;
+    let glow = (0.5 * hotLight + 0.15 * strands + 0.3 * rimLight) * fog;
+    let coverage = clamp(luminance(glow), 0.0, 1.0);
+    var out: ShellOut;
+    out.color = vec4<f32>(lit, 0.0);
+    out.normalRoughness = vec4<f32>(0.0);
+    out.velocity = vec4<f32>(screenVelocityAt(in.clip, in.prevClip), 0.0, clamp(luminance(lit), 0.0, 1.0));
+    out.emission = vec4<f32>(glow, coverage);
+    out.ids = 0u;
+    return out;
 }
 
 // ---- Shield ----------------------------------------------------------------------------------------
