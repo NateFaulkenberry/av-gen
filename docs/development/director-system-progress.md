@@ -2,7 +2,7 @@
 Last updated: 2026-09-25
 Current branch: `agent/director` (worktree `../av-gen-director`; agent/motion merged at d4854cb4, main 9fa84413 at aa84e42d)
 Current commit: see Recent changes
-Overall status: Slices 0-2 complete; Slice 3 compile side complete on M1-M5 (ADR-761: jump, land, retime, entrySeconds); Slice 5 cost harness incl. seek; Slice 4 not started
+Overall status: Slices 0-2 complete; Slice 3 compile side complete (ADR-761); Director panel (ADR-762); Slice 4 researched and proposed (ADR-763), interface requested from the Motion lead; Slice 5 cost harness incl. seek
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -41,7 +41,7 @@ Since then:
 | 1 Plan + Cameras | Complete | 95% | 26 `[directing]` cases + 10 golden plans | Remaining: the Director panel beyond Approve/Reject (spec §35 says do not overbuild); UI not verified |
 | 2 Scripted Performances | Complete | 100% | 16 cases + 1 golden | The handoff is M1 (merged from main; this branch's copy dropped). Non-zero `entrySeconds` is NON_DETERMINISTIC in a baked plan |
 | 3 Airborne + Events | Compile side complete | 85% | 5 `[directing][airborne]` cases + 2 goldens | ADR-761. Remaining: `fall`; acrobatics need assets; UI not verified |
-| 4 Autonomous Direction | Not started | 0% | 0 | |
+| 4 Autonomous Direction | Researched | 10% | 0 | ADR-763 proposed: goal -> F7 `CharacterGoal`; live until recorded; interface requested (goal event, semantic events, clip readout, checkpointed considerer) |
 | 5 Verification + Scale | Started | 30% | 11 golden plans, `[.perf][directing]` CPU + GPU + seek | Cost harness over the golden plans, and seek after ADR-800 |
 
 ## Current focus
@@ -275,6 +275,8 @@ undo, serialization or compilation will be built on them.
   exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-25: Director panel (4dcb8f1f, ADR-762): headless capture in
+  `~/Desktop/av-gen-review/15-director-panel/`. Slice 4 proposal (ADR-763).
 - 2026-09-25: merged agent/motion (d4854cb4), dropping this branch's copy of the handoff; merged
   main 9fa84413 (aa84e42d). Slice 3 on M2-M5 (ADR-761). `entrySeconds` validator rule.
 - **Full suites at ce92f3ba (Slice 3):** CPU 3,329 cases, exit 0 (1 expected shouldfail, 16
