@@ -5,6 +5,7 @@
 // it visualises the plan, validator and compiler, and every decision it makes is in
 // `director_panel_logic.hpp`, where a test can reach it.
 
+#include "app/directing_record.hpp"
 #include "directing/compiler.hpp"
 
 #include <cstdint>
@@ -69,10 +70,12 @@ public:
         Rect accept;
         Rect reject;
         Rect stills;
+        Rect record;
     };
     [[nodiscard]] const Buttons& buttons() const { return buttons_; }
     [[nodiscard]] bool previewing() const { return !previewTask_.empty(); }
     [[nodiscard]] const std::string& status() const { return status_; }
+    [[nodiscard]] bool recording() const { return recording_.running(); }
 
 private:
     // The proposal's dry run, recompiled only when the proposal or the project changed.
@@ -90,6 +93,10 @@ private:
     std::uint64_t previewBase_ = 0; // the history state just before the preview edit
     std::string status_;
     Buttons buttons_;
+    // ADR-765: the proposal's live performances, being recorded on a thread of their own.
+    app::RecordingJob recording_;
+    std::string recordingTask_;
+    std::string cachedDiff_; // the proposal's diff as last compiled: a revised proposal recompiles
 };
 
 } // namespace avgen::ui

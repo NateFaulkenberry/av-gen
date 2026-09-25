@@ -277,6 +277,17 @@ void registerDirectorTools(ToolRegistry& registry) {
         });
 }
 
+Result<ToolContext::Proposal> proposalFor(app::Engine& engine, const directing::Plan& plan) {
+    directing::Plan clean = plan;
+    clean.produced.clear(); // provenance is the compiler's to write, on the project it installs into
+    const directing::Compilation c = directing::compilePlan(clean, app::sceneFactsFor(engine));
+    if (!c.changesAnything()) {
+        return fail("nothing in this plan can be built");
+    }
+    json issues = issuesJson(c.validation.issues);
+    return ToolContext::Proposal{clean.toJson(), c.plan.id, c.diffText(), std::move(issues)};
+}
+
 Result<CommitReport> commitProposal(app::Engine& engine, const ToolContext::Proposal& proposal) {
     directing::PlanParse parsed = directing::parsePlan(proposal.plan);
     if (!parsed.plan) {

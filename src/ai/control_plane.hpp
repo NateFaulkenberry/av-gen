@@ -134,6 +134,10 @@ public:
     // current task is not waiting for one.
     bool approveCurrentTask();
     bool rejectCurrentTask();
+    // ADR-765: replaces the waiting proposal with another -- a recording of it -- so the person
+    // approves or rejects what will actually be installed, through the same gate. Only while the
+    // current task is waiting; `note` is shown in its activity.
+    bool reviseCurrentProposal(ToolContext::Proposal proposal, std::string note);
     void clearHistory();
 
     // ---- the frame loop's only obligation --------------------------------------------------------

@@ -611,8 +611,8 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
         out.staged.sequence.actors.push_back(cp.actor);
         record(pp.key, ContentDomain::SequenceActor, cp.actor.id);
         line(removedLine(pp.key), pp.key,
-             fmt::format("Performance {}: {}-{}, {} key(s) from its mark", cp.actor.id, clock(cp.from), clock(cp.to),
-                         cp.actor.keys.size()));
+             fmt::format("Performance {}: {}-{}, {} key(s) {}", cp.actor.id, clock(cp.from), clock(cp.to),
+                         cp.actor.keys.size(), pp.recording ? "as recorded" : "from its mark"));
         for (const std::string& s : cp.summary) {
             line(removedLine(pp.key), pp.key, "  " + s);
         }
@@ -624,7 +624,8 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
             seq::Marker marker{time, name, seq::MarkerKind::Cue};
             out.staged.sequence.markers.push_back(marker);
             record(pp.key, ContentDomain::SequenceMarker, markerId(marker));
-            line(removedLine(pp.key), pp.key, fmt::format("Marker {} {} (computed)", name, clock(time)));
+            line(removedLine(pp.key), pp.key,
+                 fmt::format("Marker {} {} ({})", name, clock(time), pp.recording ? "as recorded" : "computed"));
         }
     }
 

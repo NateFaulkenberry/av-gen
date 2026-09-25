@@ -303,6 +303,20 @@ bool ControlPlane::approveCurrentTask() {
     return task != nullptr && orchestrator_.approve(*task);
 }
 
+bool ControlPlane::reviseCurrentProposal(ToolContext::Proposal proposal, std::string note) {
+    std::shared_ptr<AgentTask> task = currentTask();
+    if (task == nullptr || task->state() != TaskState::AwaitingApproval) {
+        return false;
+    }
+    Activity a;
+    a.kind = ActivityKind::Plan;
+    a.title = "Revised proposal";
+    a.detail = note + "\n" + proposal.diff;
+    task->setProposal(std::move(proposal));
+    task->append(std::move(a));
+    return true;
+}
+
 bool ControlPlane::rejectCurrentTask() {
     std::shared_ptr<AgentTask> task = currentTask();
     return task != nullptr && orchestrator_.reject(*task);

@@ -109,6 +109,11 @@ enum class UiScriptArm : std::uint32_t {
     // the panel after any step.
     DirectorReject = 1u << 16,
     DirectorAccept = 1u << 17,
+    // ADR-765: Record, against a waiting GOAL proposal (run with a goal `--ai-script`): press Record,
+    // wait for the recording to replace the proposal, check it is baked; then Accept at frame 1500,
+    // check one undo labelled with the request and the recorded actor installed; Cmd+Z at 1600 and
+    // check it is all gone. Captures after 1450 show the recorded proposal, 1550 the accepted plan.
+    DirectorRecord = 1u << 18,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -173,6 +178,8 @@ private:
     std::size_t directorUndoBefore_ = 0;
     std::uint64_t directorStateBefore_ = 0;
     std::string directorSequenceBefore_;
+    std::uint64_t recordedAt_ = 0; // the frame the recording replaced the proposal, 0 = not yet
+    void stepDirectorRecord(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t sliceShotsBefore_ = 0;
