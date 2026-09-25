@@ -323,5 +323,17 @@ TEST_CASE("VISUAL bolt types over Glowmere at night", "[.visual][bolt-review][gl
         const scene::Scene& s = frameAt(engine, t, kW, kH);
         CHECK(engine.effectStatus("link") == world::EffectStatus::Drawn);
         dump(render(renderer, s, t, kW, kH), "glowmere-bolt-" + tag + "-on-" + std::to_string(f));
+        if (f == 3) {
+            // Where a thin core's coloured fringe comes from: the same frame with the film's lens
+            // chromatic aberration and its halation (a red-weighted bloom tier) switched off.
+            INFO("post: chromatic aberration " << s.post.chromaticAberration << ", halation "
+                 << (s.post.halationEnabled ? "on" : "off") << " at " << s.post.halationIntensity);
+            CHECK(true);
+            scene::Scene plain = s;
+            plain.post.chromaticAberration = 0.0f;
+            dump(render(renderer, plain, t, kW, kH), "glowmere-bolt-" + tag + "-on-3-no-aberration");
+            plain.post.halationEnabled = false;
+            dump(render(renderer, plain, t, kW, kH), "glowmere-bolt-" + tag + "-on-3-no-aberration-no-halation");
+        }
     }
 }

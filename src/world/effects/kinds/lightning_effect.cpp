@@ -45,8 +45,9 @@ using namespace bolt_rows;
 constexpr EffectField kFields[] = {
     // ---- the bolt ----
     storedFloat("jaggedness", "Jaggedness", 0.26f, 0.0f, 1.0f, 0.05f, 0.5f).main().sec("Bolt")
-        .tooltip("How far the channel zig-zags: each segment's midpoint is pushed sideways by about\n"
-                 "this fraction of the segment, at every scale."),
+        .tooltip("How far the channel zig-zags: the largest kink is up to this fraction of the strike's\n"
+                 "length off the straight line, and each finer scale a little over half the one above.\n"
+                 "However high, a segment never leans more than 35 degrees off its course."),
     storedFloat("branchProbability", "Branching", 0.55f, 0.0f, 1.0f, 0.0f, 1.0f).main()
         .tooltip("How readily the channel forks. Forks are commoner near the cloud."),
     storedFloat("branchDecay", "Branch length", 0.5f, 0.1f, 0.9f, 0.2f, 0.8f).main()

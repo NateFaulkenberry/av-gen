@@ -16,25 +16,14 @@ namespace {
 // a higher one.
 constexpr int kGrid = 1 << kBoltMaxDepth;
 
-// tan(20 deg) and tan(60 deg): the range a branch leaves its parent's direction by. A tangent rather
-// than an angle so the generator needs no trigonometry.
-constexpr float kTanMin = 0.36397023f;
-constexpr float kTanMax = 1.7320508f;
+// tan(15 deg) and tan(45 deg): the range a branch leaves its heading by. A tangent rather than an
+// angle so the generator needs no trigonometry.
+constexpr float kTanMin = 0.26794919f;
+constexpr float kTanMax = 1.0f;
 
 std::uint32_t mix32(std::uint32_t a, std::uint32_t b) {
     const noise::U3 h = noise::pcg3d({a, b, 0x9e3779b9u});
     return h.x ^ h.z;
-}
-
-// An approximately normal deviate with mean 0 and standard deviation 1: the sum of four uniforms,
-// centred and scaled (Irwin-Hall). Bounded at +-3.46, which is the point: a bolt has no one-in-a-
-// million midpoint thrown across the sky, and no log/cos whose last bit differs between libms.
-float gauss(std::uint64_t seed, std::uint32_t a, std::uint32_t b, std::uint32_t c, std::uint32_t ch) {
-    float sum = 0.0f;
-    for (std::uint32_t k = 0; k < 4; ++k) {
-        sum += boltHash(seed, a, b, c, ch * 4u + k);
-    }
-    return (sum - 2.0f) * 1.7320508f;
 }
 
 // Two unit vectors across `t` (unit). Chosen from the axis least aligned with it, which is a fixed
@@ -45,32 +34,79 @@ void across(const glm::vec3& t, glm::vec3& e1, glm::vec3& e2) {
     e2 = glm::cross(t, e1);
 }
 
+// How steeply any segment may lean off its path's chord: 35 degrees. Two consecutive segments then
+// turn by at most 70 degrees, which is what separates a lightning channel (sharp kinks, always
+// going somewhere) from a random walk (hairpins, loops, doubling back).
+constexpr float kMaxLean = 0.70020754f; // tan(35 deg)
+// The top level's displacement is `jaggedness` times the chord; each level below is this much of
+// the one above -- a little more than the halving of the segment, so fine detail stays visible.
+constexpr float kLevelDecay = 0.55f;
+
 // Midpoint displacement of one path from `p0` to `p1` on the fixed grid, refined `depth` times.
 // Writes the grid points the depth visits into `grid` (the rest are left alone).
+//
+// Every point is `p0 + chord * (i / 256)` plus a LATERAL offset in the plane across the chord: a
+// point's position along the chord is fixed by its grid index, so the path advances strictly from
+// start to end (no backtracking, no loops) by construction. A midpoint's offset is uniform in
+// [-1, 1] on each lateral axis times `jag * |chord| * 0.55^level`, and then held so that neither
+// half of the segment it splits leans off the chord by more than 35 degrees. That is always
+// possible (the parent segment leaned at most 35 degrees over twice the length, so its midpoint
+// satisfies both halves), and it is found by a fixed 16-step bisection on the offset's scale -- the
+// same arithmetic on every platform.
 void refine(const glm::vec3& p0, const glm::vec3& p1, int depth, float jag, std::uint64_t seed,
             std::uint32_t index, std::uint32_t pathId, std::array<glm::vec3, kGrid + 1>& grid) {
+    const glm::vec3 chord = p1 - p0;
+    const float length = glm::length(chord);
     grid[0] = p0;
     grid[kGrid] = p1;
-    for (int level = 0; level < depth; ++level) {
-        const int half = kGrid >> (level + 1);
-        for (int i = half; i < kGrid; i += 2 * half) {
-            const glm::vec3 a = grid[static_cast<std::size_t>(i - half)];
-            const glm::vec3 b = grid[static_cast<std::size_t>(i + half)];
-            const glm::vec3 mid = (a + b) * 0.5f;
-            const glm::vec3 d = b - a;
-            const float len = glm::length(d);
-            if (!(len > 1e-9f) || jag <= 0.0f) {
-                grid[static_cast<std::size_t>(i)] = mid;
-                continue;
-            }
-            glm::vec3 e1;
-            glm::vec3 e2;
-            across(d / len, e1, e2);
-            const auto key = static_cast<std::uint32_t>((level << 16) | i);
-            const float g1 = gauss(seed, index, pathId, key, 0u);
-            const float g2 = gauss(seed, index, pathId, key, 1u);
-            grid[static_cast<std::size_t>(i)] = mid + (e1 * g1 + e2 * g2) * (jag * len);
+    if (!(length > 1e-9f)) {
+        for (int i = 1; i < kGrid; ++i) {
+            grid[static_cast<std::size_t>(i)] = p0;
         }
+        return;
+    }
+    const glm::vec3 dir = chord / length;
+    glm::vec3 e1;
+    glm::vec3 e2;
+    across(dir, e1, e2);
+    std::array<glm::vec2, kGrid + 1> lateral{};
+    float amplitude = jag * length;
+    for (int level = 0; level < depth; ++level, amplitude *= kLevelDecay) {
+        const int half = kGrid >> (level + 1);
+        const float reach = kMaxLean * length * static_cast<float>(half) / static_cast<float>(kGrid);
+        for (int i = half; i < kGrid; i += 2 * half) {
+            const glm::vec2 a = lateral[static_cast<std::size_t>(i - half)];
+            const glm::vec2 b = lateral[static_cast<std::size_t>(i + half)];
+            const glm::vec2 centre = (a + b) * 0.5f;
+            glm::vec2 w(0.0f);
+            if (amplitude > 0.0f) {
+                const auto key = static_cast<std::uint32_t>((level << 16) | i);
+                w = glm::vec2(boltHash(seed, index, pathId, key, 0u) * 2.0f - 1.0f,
+                              boltHash(seed, index, pathId, key, 1u) * 2.0f - 1.0f) *
+                    amplitude;
+            }
+            const auto fits = [&](float k) {
+                const glm::vec2 m = centre + w * k;
+                return glm::length(m - a) <= reach && glm::length(b - m) <= reach;
+            };
+            float scale = 1.0f;
+            if (!fits(1.0f)) {
+                float lo = 0.0f; // fits: the centre always does
+                float hi = 1.0f;
+                for (int step = 0; step < 16; ++step) {
+                    const float midK = 0.5f * (lo + hi);
+                    (fits(midK) ? lo : hi) = midK;
+                }
+                scale = lo;
+            }
+            lateral[static_cast<std::size_t>(i)] = centre + w * scale;
+        }
+    }
+    const int stride = kGrid >> depth;
+    for (int i = stride; i < kGrid; i += stride) {
+        const glm::vec2 l = lateral[static_cast<std::size_t>(i)];
+        grid[static_cast<std::size_t>(i)] =
+            p0 + dir * (length * static_cast<float>(i) / static_cast<float>(kGrid)) + e1 * l.x + e2 * l.y;
     }
 }
 
@@ -193,15 +229,18 @@ void generateBolt(const BoltParams& raw, std::uint64_t seed, std::uint32_t index
             }
             const std::uint32_t rootVertex = parent.first + static_cast<std::uint32_t>(j * step);
             const BoltVertex root = out.vertices[rootVertex];
-            // The direction the parent is going here, over the neighbouring candidates (coarse, so it
-            // is the same at every depth), turned 20-60 degrees about a random axis across it.
+            // The heading: half-way between where the parent is going here (over the neighbouring
+            // candidates, so it is the same at every depth) and where the whole bolt is going (the
+            // channel's +Z: the target, downward for a sky strike). A branch then leaves that heading
+            // at a shallow 15-45 degrees about a random axis across it -- forking forward, never back.
             const glm::vec3 ahead = out.vertices[parent.first + static_cast<std::uint32_t>(std::min(n - 1, (j + 1) * step))].position;
             const glm::vec3 behind = out.vertices[parent.first + static_cast<std::uint32_t>((j - 1) * step)].position;
             glm::vec3 t = ahead - behind;
             if (!(glm::length(t) > 1e-9f)) {
                 t = chordLength > 1e-9f ? chord : glm::vec3(0.0f, 0.0f, 1.0f);
             }
-            t = glm::normalize(t);
+            t = glm::normalize(t) + glm::vec3(0.0f, 0.0f, 1.0f);
+            t = glm::length(t) > 1e-6f ? glm::normalize(t) : glm::vec3(0.0f, 0.0f, 1.0f);
             glm::vec3 e1;
             glm::vec3 e2;
             across(t, e1, e2);
@@ -247,7 +286,20 @@ void blendBolts(const BoltPath& a, const BoltPath& b, float f, BoltPath& out) {
     const std::uint32_t n = a.paths[0].count;
     // Displacements from the chord, blended so their size holds: independent displacements lerped
     // shrink by sqrt((1-f)^2 + f^2), which is 0.71 half-way -- a visibly straighter arc mid-writhe.
-    const float norm = 1.0f / std::sqrt((1.0f - f) * (1.0f - f) + f * f);
+    // Both sources lean at most 35 degrees per segment, so their plain blend does too; the size-holding
+    // scale is then capped so the result still does (it is a uniform scale of the lateral offsets,
+    // which keeps the endpoints and the strictly increasing progress along the chord).
+    float norm = 1.0f / std::sqrt((1.0f - f) * (1.0f - f) + f * f);
+    float steepest = 0.0f;
+    const float h = 1.0f / static_cast<float>(n - 1);
+    for (std::uint32_t k = 0; k + 1 < n; ++k) {
+        const glm::vec3 l0 = a.vertices[k].position * (1.0f - f) + b.vertices[k].position * f;
+        const glm::vec3 l1 = a.vertices[k + 1].position * (1.0f - f) + b.vertices[k + 1].position * f;
+        steepest = std::max(steepest, glm::length(glm::vec2(l1.x - l0.x, l1.y - l0.y)) / h);
+    }
+    if (steepest * norm > kMaxLean) {
+        norm = std::max(kMaxLean / std::max(steepest, 1e-9f), 0.0f);
+    }
     float s = 0.0f;
     glm::vec3 prev(0.0f);
     for (std::uint32_t k = 0; k < n; ++k) {
@@ -257,6 +309,7 @@ void blendBolts(const BoltPath& a, const BoltPath& b, float f, BoltPath& out) {
         const glm::vec3 db = b.vertices[k].position - chord;
         BoltVertex v = a.vertices[k];
         v.position = chord + (da * (1.0f - f) + db * f) * norm;
+        v.position.z = u; // on the chord's grid exactly, as both sources are
         s += glm::length(v.position - prev);
         prev = v.position;
         v.s = s;

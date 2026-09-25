@@ -4,12 +4,16 @@
 // catalog-energy.md). The CPU generator behind Lightning, Arc, Electric Field and Discharge.
 //
 // **The shape.** Midpoint displacement with branches [R13]: the main channel runs between its two
-// endpoints and is refined `depth` times, each refinement pushing every segment's midpoint sideways
-// (in the plane across the segment) by about `jaggedness` times the segment's length -- so each
-// level is half the size of the one above it, which is the scale hierarchy "random segments" lack.
+// endpoints and is refined `depth` times, each refinement pushing every midpoint sideways -- across
+// the path's CHORD, never along it -- by up to `jaggedness` times the chord at the top level and
+// 0.55 of that per level below, which is the scale hierarchy "random segments" lack. Two rules make
+// it read as lightning rather than a random walk: every vertex's position along the chord is fixed
+// by its grid index, so a path always advances towards its end (no backtracking, no loops); and no
+// segment leans more than 35 degrees off the chord, so consecutive segments turn by at most 70.
 // Branches leave the channel at its coarse vertices with a probability that falls towards the far
-// end, deviate 20-60 degrees from the local direction, and are themselves smaller bolts: their
-// length and intensity fall by `branchDecay` per generation.
+// end, at a shallow 15-45 degrees off a heading between the parent's direction and the target's,
+// and are themselves smaller bolts under the same rules: their length and intensity fall by
+// `branchDecay` per generation.
 //
 // **Canonical space.** A path is generated ONCE per key in a canonical frame -- the main channel from
 // (0,0,0) to (0,0,1) -- and placed in the world by a similarity transform (`BoltPlacement`). So an

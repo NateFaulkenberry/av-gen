@@ -155,6 +155,89 @@ TEST_CASE("a bolt never exceeds its vertex cap, and its branches stay inside the
     CHECK(mostBranches >= 8);
 }
 
+namespace {
+
+// The shape rules a bolt must obey to read as lightning rather than a random-walk scribble. Every
+// path (the channel and every branch) advances along its own start -> end chord at every vertex, and
+// no two consecutive segments turn by more than `kMaxTurnDegrees`. Returns the first violation.
+constexpr float kMaxTurnDegrees = 75.0f;
+
+std::string shapeViolation(const world::BoltPath& path) {
+    const float cosCap = std::cos(glm::radians(kMaxTurnDegrees));
+    for (std::size_t i = 0; i < path.paths.size(); ++i) {
+        const std::span<const world::BoltVertex> vs = path.path(i);
+        const glm::vec3 chord = vs.back().position - vs.front().position;
+        const float len2 = glm::dot(chord, chord);
+        if (len2 <= 0.0f) {
+            return "path " + std::to_string(i) + " has no chord";
+        }
+        float last = -1.0f;
+        for (std::size_t k = 0; k < vs.size(); ++k) {
+            const float u = glm::dot(vs[k].position - vs.front().position, chord) / len2;
+            if (k > 0 && !(u > last)) {
+                return "path " + std::to_string(i) + " vertex " + std::to_string(k) + " goes back along its chord (" +
+                       std::to_string(last) + " -> " + std::to_string(u) + ")";
+            }
+            last = u;
+        }
+        for (std::size_t k = 1; k + 1 < vs.size(); ++k) {
+            const glm::vec3 a = glm::normalize(vs[k].position - vs[k - 1].position);
+            const glm::vec3 b = glm::normalize(vs[k + 1].position - vs[k].position);
+            if (glm::dot(a, b) < cosCap) {
+                return "path " + std::to_string(i) + " turns " +
+                       std::to_string(glm::degrees(std::acos(std::clamp(glm::dot(a, b), -1.0f, 1.0f)))) +
+                       " degrees at vertex " + std::to_string(k);
+            }
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+TEST_CASE("a bolt always advances towards its end and never turns sharply (no backtracking or loops)",
+          "[bolt]") {
+    std::size_t checked = 0;
+    for (int depth = 2; depth <= 8; ++depth) {
+        for (const float jag : {0.1f, 0.26f, 0.5f, 1.0f}) {
+            world::BoltParams p;
+            p.depth = depth;
+            p.jaggedness = jag;
+            p.branchProbability = 0.8f;
+            p.branchDecay = 0.6f;
+            p.generations = 2;
+            for (std::uint64_t seed = 1; seed <= 40; ++seed) {
+                world::BoltPath path;
+                world::generateBolt(p, seed, static_cast<std::uint32_t>(seed * 7), path);
+                const std::string bad = shapeViolation(path);
+                INFO("depth " << depth << " jaggedness " << jag << " seed " << seed << ": " << bad);
+                CHECK(bad.empty());
+                checked += path.paths.size();
+            }
+        }
+    }
+    // An Arc's cross-fade between two shapes obeys the same rules at every instant of the blend.
+    world::BoltParams arc;
+    arc.depth = 6;
+    arc.jaggedness = 0.3f;
+    arc.branchProbability = 0.3f;
+    arc.generations = 1;
+    for (std::uint32_t k = 0; k < 20; ++k) {
+        world::BoltPath a;
+        world::BoltPath b;
+        world::BoltPath out;
+        world::generateBolt(arc, 11, k, a);
+        world::generateBolt(arc, 11, k + 1, b);
+        for (const float f : {0.25f, 0.5f, 0.75f}) {
+            world::blendBolts(a, b, f, out);
+            const std::string bad = shapeViolation(out);
+            INFO("arc step " << k << " blend " << f << ": " << bad);
+            CHECK(bad.empty());
+        }
+    }
+    CHECK(checked > 1000); // the control: many paths, branches included
+}
+
 TEST_CASE("a lower depth is a prefix of a higher one: level of detail keeps the shape", "[bolt]") {
     // Below the vertex cap (which, when it binds, decides how many branches fit at each depth).
     world::BoltParams fine = busy();
