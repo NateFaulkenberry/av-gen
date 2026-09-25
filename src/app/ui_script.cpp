@@ -37,7 +37,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 20> kArms{{
+constexpr std::array<ArmName, 21> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
