@@ -93,7 +93,9 @@ def run_shards(args) -> list[dict]:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     procs = []
+    total = args.shard_total or args.shards
     for i in range(args.shards):
+        g = args.shard_first + i   # the global Catch2 shard index
         tmp = out / f"tmp-{i}"
         tmp.mkdir(exist_ok=True)
         cmd = [args.binary, *args.spec,
@@ -102,8 +104,8 @@ def run_shards(args) -> list[dict]:
                "--reporter", f"xml::out={out}/shard-{i}.xml",
                "--reporter", f"junit::out={out}/shard-{i}.junit.xml",
                "--durations", "yes"]
-        if args.shards > 1:
-            cmd += ["--shard-count", str(args.shards), "--shard-index", str(i)]
+        if total > 1:
+            cmd += ["--shard-count", str(total), "--shard-index", str(g)]
         # Each shard gets its own TMPDIR: tests write fixtures under temp_directory_path(), and two
         # processes of the same binary would otherwise share (and delete) each other's files.
         env = dict(os.environ, TMPDIR=str(tmp) + "/")
@@ -112,10 +114,13 @@ def run_shards(args) -> list[dict]:
         p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env,
                              cwd=args.cwd or None, start_new_session=True)
         procs.append({"index": i, "proc": p, "log": log, "start": time.monotonic(),
-                      "timed_out": False})
+                      "timed_out": False, "end": None})
 
     deadline = time.monotonic() + args.timeout_min * 60
     while any(s["proc"].poll() is None for s in procs):
+        for s in procs:
+            if s["end"] is None and s["proc"].poll() is not None:
+                s["end"] = time.monotonic()
         if time.monotonic() > deadline:
             for s in procs:
                 if s["proc"].poll() is None:
@@ -134,8 +139,9 @@ def run_shards(args) -> list[dict]:
     for s in procs:
         rc = s["proc"].wait()   # the BINARY's own status, not a wrapper's (docs/testing.md 18)
         s["log"].close()
+        end = s["end"] or time.monotonic()
         results.append({"index": s["index"], "returncode": rc, "timed_out": s["timed_out"],
-                        "seconds": round(time.monotonic() - s["start"], 1)})
+                        "seconds": round(end - s["start"], 1)})
         print(f"[catch2_run] shard {s['index']}: exit {rc}"
               f"{' (TIMEOUT)' if s['timed_out'] else ''} after {results[-1]['seconds']} s", flush=True)
     return results
@@ -594,6 +600,13 @@ def cmd_run(args) -> int:
         # The selector could not report a miss (testing.md 14): refuse rather than under-measure.
         print(f"::error title=Exclusion arithmetic::{base} - {len(excluded)} != {listed}; refusing to run")
         return 2
+    if args.shard_total and args.shard_total != args.shards:
+        # Part of a wider split across jobs: this job's own cases, as the binary itself lists them.
+        listed = sum(list_case_count(args.binary, args.spec + ["--shard-count", str(args.shard_total),
+                                                             "--shard-index", str(args.shard_first + k)]) or 0
+                     for k in range(args.shards))
+        print(f"[catch2_run] this job runs global shards {args.shard_first}..{args.shard_first + args.shards - 1}"
+              f" of {args.shard_total}: {listed} cases")
     statuses = run_shards(args)
     r = summarise(args.name, args.binary, listed, statuses, Path(args.out), args.label, args.seed,
                   args.expected_label, exceptions, excluded)
@@ -707,7 +720,10 @@ def main() -> int:
     r.add_argument("--name", required=True, help="short id, e.g. cpu, gpu")
     r.add_argument("--label", required=True, help="human name shown in the summary")
     r.add_argument("--out", required=True)
-    r.add_argument("--shards", type=int, default=1)
+    r.add_argument("--shards", type=int, default=1, help="shards run in parallel by this invocation")
+    r.add_argument("--shard-total", type=int, default=0,
+                   help="total shards across all jobs (default: --shards); needs the same --seed everywhere")
+    r.add_argument("--shard-first", type=int, default=0, help="global index of this invocation's first shard")
     r.add_argument("--timeout-min", type=float, default=120)
     r.add_argument("--seed", type=int, default=int(time.time()) % 2**31)
     r.add_argument("--filter", default="",
