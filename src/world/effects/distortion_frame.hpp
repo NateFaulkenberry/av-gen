@@ -55,8 +55,27 @@ enum class DistortionShape : std::uint8_t {
     // hull needs), sampled where the view ray PIERCES the plane: Ripple's membrane.
     Disc = 1,
     Quad = 2,       // reserved: a camera-facing or placed quad (Portal, Reality Tear)
-    FullScreen = 3, // reserved: a screen-covering triangle (Radial Distortion, Heat Shimmer)
+    FullScreen = 3, // reserved: a screen-covering triangle (Radial Distortion)
+    // Shapes from 4 up are drawn by their own offset entry point (`fs_offset_ext`), so the Wave 1-2
+    // shapes' shader is untouched and renders byte-identically (see shaders/distortion.wgsl).
+    // Wave 3. A sphere hull (the three axes' lengths) sampled where the view ray pierces the plane
+    // through the centre FACING THE CAMERA (normal = the camera's forward axis, taken in the shader,
+    // so the producer never needs the camera): Gravitational Lens's lens plane.
+    Facing = 4,
+    // Wave 3. A finite cylinder: axis1 is its half-height (the rise direction), axis0/axis2 its two
+    // radii. The shader intersects the view ray with it analytically and knows the ENTRY and EXIT, so
+    // the field is weighted by how much of the column lies between the camera and the scene surface
+    // (a surface in front of the column is not bent at all; one inside it only by the part in front
+    // of it). The hull is the proxy sphere grown by sqrt(2), which circumscribes the unit cylinder.
+    Cylinder = 5,
 };
+
+// How much larger than the axes the hull of `shape` is drawn, over the unit sphere's: 1 for every
+// shape the unit sphere contains, sqrt(2) for the cylinder. The renderer's screen rects and
+// `vs_proxy` both apply it.
+[[nodiscard]] constexpr float distortionHullScale(float shapeLane) {
+    return shapeLane > 4.5f && shapeLane < 5.5f ? 1.41422f : 1.0f;
+}
 
 // The displacement FIELD evaluated inside the shape. One per family of look; the proxy's numbered
 // lanes mean what the field says they mean. Only the warp field exists today.
@@ -66,6 +85,9 @@ enum class DistortionField : std::uint8_t {
     Shock = 1,  // a thin refracting band at a normalised radius: an expanding front (Shockwave)
     Ripple = 2, // a damped train of concentric waves inside a front, in a disc's plane (Ripple)
     Wake = 3,   // ripples across a tube segment of the owner's recent path (Velocity Distortion)
+    // Wave 3 (the lens slice). Lanes as `DistortionProxy` documents per field.
+    Shimmer = 4, // rising, temporally coherent turbulence through a hot column (Heat Shimmer)
+    Lens = 5,    // a thin-lens REMAP around a mass, with an optional horizon (Gravitational Lens)
 };
 
 // One proxy, exactly as `shaders/distortion.wgsl` reads it (`DfProxy`, 144 bytes, nine vec4s).
@@ -107,6 +129,23 @@ struct DistortionProxy {
     //           noise.x = the train's phase in cycles, noise.y chroma; rim.rgb crest emission.
     //   Wake:   shape.x = ripple cycles across the tube's radius, shape.y edge softness;
     //           noise.x = phase in cycles, noise.y chroma. axis0 runs along the path.
+    // Wave 3:
+    //   Shimmer (Cylinder): terms.w = peak displacement (m) at the reference thickness, terms.x =
+    //           the most the thickness ratio may multiply it by (so terms.x * terms.w bounds it);
+    //           shape.x = eddy size (m), shape.y = edge softness (0..1 of the radius),
+    //           shape.w = reference thickness (m); motion.xyz = the scroll ONE flow layer makes over
+    //           its cycle (rise direction times rise speed times the cycle), motion.w = 0 (so the rect
+    //           bound's bow term is zero); noise.x / noise.z = layer A's / B's phase in its cycle
+    //           (0..1), noise.y chroma, noise.w / rim.z = layer A's / B's seed; rim.x = height falloff
+    //           exponent, rim.y = the distance (m) at which the shimmer has faded out (0 = never),
+    //           rim.w = the churn (flow evolution) over one cycle. rim.rgb is NOT radiance here: the
+    //           field emits nothing.
+    //   Lens (Facing): terms.x = 1, terms.w = the displacement bound (m), 2 theta_E times the envelope;
+    //           shape.x = theta_E, the Einstein radius in metres at the lens plane; shape.y = the
+    //           horizon's radius over theta_E (0 = no horizon); shape.w = where the feather starts,
+    //           over the proxy radius; motion.x = the remap's weight (the envelope), motion.y = the
+    //           horizon's opacity (0..1); noise.y chroma, noise.z = the photon ring's width over
+    //           theta_E; rim.rgb = the photon ring's radiance (HDR, envelope folded in).
 };
 static_assert(sizeof(DistortionProxy) == 144, "DfProxy in shaders/distortion.wgsl is nine vec4s");
 

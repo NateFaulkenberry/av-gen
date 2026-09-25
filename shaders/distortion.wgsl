@@ -14,6 +14,14 @@
 //      reads the HDR copy at uv + offset with the depth-aware foreground-leak mask, three chroma taps,
 //      and adds the rim to HDR and to the emission target (so selective bloom sees it).
 //
+// **Wave 3 (the lens slice)** adds a second offset entry point, `fs_offset_ext`, for the shapes and
+// fields from 4 up (Facing + Lens, Cylinder + Shimmer), drawn by its own pipeline over its own
+// instance range, and a third offset target, COVER (R16F, additive): the opacity of what a proxy HIDES
+// (a black hole's horizon), which the resolve applies before adding the glow. The Wave 1-2 entry
+// point `fs_offset` is left textually unchanged ON PURPOSE: adding the new shapes' branches to it
+// moved one pixel of an existing Space Warp frame by one level (the Metal compiler reassociated the
+// shared code), and the promise is that every existing proxy renders byte-identically.
+//
 // **The depth rules** (Sousa, GPU Gems 2 ch.19, plus self-exclusion):
 //   - The LENS PLANE of a proxy is at its centre's view depth plus its exclusion radius (the owner's
 //     bounding radius for an entity, 0 for a warp at a point). A pixel nearer than the lens plane is
@@ -56,6 +64,7 @@ struct DfParams {
 @group(1) @binding(5) var offsetTex: texture_2d<f32>;
 @group(1) @binding(6) var auxTex: texture_2d<f32>;
 @group(1) @binding(7) var copySampler: sampler;
+@group(1) @binding(8) var coverTex: texture_2d<f32>;
 
 const DF_FAR: f32 = 1.0e7;
 
@@ -113,7 +122,12 @@ struct ProxyOut {
 @vertex
 fn vs_proxy(@location(0) position: vec3<f32>, @builtin(instance_index) index: u32) -> ProxyOut {
     let p = proxies[index];
-    let local = position * df.misc.y;
+    // A cylinder's hull is grown by sqrt(2), which circumscribes the unit cylinder (Wave 3; the
+    // CPU's `distortionHullScale`). Every other shape is untouched.
+    var local = position * df.misc.y;
+    if (u32(p.axis0.w + 0.5) == 5u) {
+        local = local * 1.41422;
+    }
     let world = p.centre.xyz + p.axis0.xyz * local.x + p.axis1.xyz * local.y + p.axis2.xyz * local.z;
     var out: ProxyOut;
     out.clip = frame.viewProj * vec4<f32>(world, 1.0);
@@ -312,6 +326,185 @@ fn fs_offset(in: ProxyOut) -> OffsetOut {
     return out;
 }
 
+// ---- pass 1, Wave 3: the extended offset field ---------------------------------------------------
+//
+// Shapes 4 (Facing) and 5 (Cylinder), fields 4 (Shimmer) and 5 (Lens); see distortion_frame.hpp for
+// every lane. The same outputs as `fs_offset` plus COVER. The renderer draws only proxies whose shape
+// is 4 or more through this entry point.
+
+struct OffsetExtOut {
+    @location(0) offset: vec4<f32>,
+    @location(1) aux: vec4<f32>,
+    @location(2) cover: f32,
+};
+
+@fragment
+fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
+    let p = proxies[in.index];
+    let texel = vec2<i32>(in.clip.xy);
+    let uv = in.clip.xy * df.viewport.zw;
+    let cam = frame.cameraPos.xyz;
+    let fwd = frame.cameraForward.xyz;
+    let sceneZ = dfSceneDepth(texel);
+    let field = u32(p.axis1.w + 0.5);
+    let shape = u32(p.axis0.w + 0.5);
+    let band = max(p.axis2.w, 1e-3);
+
+    let farH = frame.invViewProj * vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, 1.0, 1.0);
+    let dir = normalize(farH.xyz / farH.w - cam);
+    let near = max(frame.clusterDepth.z, 1e-3);
+
+    var q = vec3<f32>(0.0);
+    var bl = vec3<f32>(0.0);
+    var r = 0.0;
+    var lensZ = 0.0;
+    var thick = 0.0;     // Cylinder: metres of the column between the camera and the scene surface
+    var depthGate = 1.0; // Facing: the lens-plane fade; Cylinder: 1 (its thickness is its depth rule)
+    if (shape == 4u) {
+        // Facing: the plane through the centre whose normal is the camera's forward axis, so a circle
+        // in it projects to a circle on screen wherever the proxy is in the frame.
+        let denom = dot(dir, fwd);
+        if (denom < 1e-4) {
+            discard;
+        }
+        let tHit = dot(p.centre.xyz - cam, fwd) / denom;
+        if (tHit <= near) {
+            discard;
+        }
+        q = cam + dir * tHit;
+        r = length(q - p.centre.xyz) / max(length(p.axis0.xyz), 1e-6);
+        if (r >= 1.0) {
+            discard;
+        }
+        lensZ = dot(p.centre.xyz - cam, fwd) + p.centre.w;
+        depthGate = smoothstep(lensZ, lensZ + band, sceneZ);
+    } else if (shape == 5u) {
+        // Cylinder: the view ray against the unit cylinder x^2 + z^2 <= 1, |y| <= 1 in the proxy's
+        // frame (axis1 its axis). t is the WORLD ray parameter (the frame is linear in it), so the
+        // entry and exit are distances along the ray, and the scene surface cuts the stretch short.
+        let i0 = p.axis0.xyz / max(dot(p.axis0.xyz, p.axis0.xyz), 1e-8);
+        let i1 = p.axis1.xyz / max(dot(p.axis1.xyz, p.axis1.xyz), 1e-8);
+        let i2 = p.axis2.xyz / max(dot(p.axis2.xyz, p.axis2.xyz), 1e-8);
+        let oc = cam - p.centre.xyz;
+        let o = vec3<f32>(dot(oc, i0), dot(oc, i1), dot(oc, i2));
+        let v = vec3<f32>(dot(dir, i0), dot(dir, i1), dot(dir, i2));
+        var t0 = -DF_FAR;
+        var t1 = DF_FAR;
+        let a = v.x * v.x + v.z * v.z;
+        let hb = o.x * v.x + o.z * v.z;
+        let c = o.x * o.x + o.z * o.z - 1.0;
+        if (a > 1e-12) {
+            let disc = hb * hb - a * c;
+            if (disc <= 0.0) {
+                discard;
+            }
+            let sq = sqrt(disc);
+            t0 = (-hb - sq) / a;
+            t1 = (-hb + sq) / a;
+        } else if (c > 0.0) {
+            discard; // parallel to the axis and outside the side
+        }
+        if (abs(v.y) > 1e-12) {
+            let ta = (-1.0 - o.y) / v.y;
+            let tb = (1.0 - o.y) / v.y;
+            t0 = max(t0, min(ta, tb));
+            t1 = min(t1, max(ta, tb));
+        } else if (abs(o.y) > 1.0) {
+            discard; // parallel to the caps and above or below them
+        }
+        let cosF = max(dot(dir, fwd), 1e-4);
+        let tIn = max(t0, near);
+        let tEnd = min(t1, sceneZ / cosF);
+        if (tEnd <= tIn) {
+            discard; // the column is behind the surface, or behind the camera: nothing bends
+        }
+        thick = tEnd - tIn;
+        let tMid = 0.5 * (tIn + tEnd);
+        q = cam + dir * tMid;
+        bl = o + v * tMid;
+        r = length(bl.xz);
+        // The lens plane is where this ray ENTERS the column: a surface in front of that is never a
+        // tap, and one inside the column bends by the air in front of it (`thick`), not by a gate.
+        lensZ = cosF * tIn + p.centre.w;
+    } else {
+        discard; // not an extended shape: `fs_offset` draws it
+    }
+
+    var d = vec3<f32>(0.0);
+    var win = 1.0;
+    var glow = 0.0;
+    var cover = 0.0;
+    if (field == 4u) {
+        // Shimmer: rising turbulence through a hot column. Strongest at the base and the axis, fading
+        // up the column, toward its side and with distance; scaled by the air in front of the surface
+        // (capped at terms.x reference thicknesses). Two flow layers, each scrolled up by its own
+        // phase of the cycle and crossfaded with weights whose squares sum to one (see
+        // heat_shimmer_effect.cpp): coherent in time, and no scroll distance ever grows large.
+        let soft = max(p.shape.y, 1e-3);
+        let side = 1.0 - smoothstep(1.0 - soft, 1.0, r);
+        let h01 = saturate(0.5 * (bl.y + 1.0));
+        let rise = pow(max(1.0 - h01, 0.0), p.rim.x);
+        var fade = 1.0;
+        if (p.rim.y > 0.0) {
+            fade = 1.0 - smoothstep(0.5 * p.rim.y, p.rim.y, dot(q - cam, fwd));
+        }
+        win = side * rise * fade;
+        let ratio = min(thick / max(p.shape.w, 1e-3), p.terms.x);
+        let inv = 1.0 / max(p.shape.x, 1e-3);
+        let wa = sin(3.14159265 * p.noise.x);
+        let wb = sin(3.14159265 * p.noise.z);
+        var flow = vec3<f32>(0.0);
+        if (wa > 1e-4) {
+            flow = flow + wa * flowCurl((q - p.motion.xyz * p.noise.x) * inv, p.rim.w * p.noise.x, u32(p.noise.w));
+        }
+        if (wb > 1e-4) {
+            flow = flow + wb * flowCurl((q - p.motion.xyz * p.noise.z) * inv, p.rim.w * p.noise.z, u32(p.rim.z));
+        }
+        let fl = flow / (1.0 + length(flow));
+        d = fl * (p.terms.w * ratio * win);
+    } else if (field == 5u) {
+        // Lens: the softened point-mass remap beta = theta (1 - tE^2 / (|theta|^2 + c^2)), c = tE / 4,
+        // as a displacement beta - theta in the lens plane, feathered to zero at the proxy's edge and
+        // weighted by the envelope. Plus the horizon's opacity and the ring's glow, their edges a pixel
+        // wide wherever the lens is.
+        let theta = q - p.centre.xyz;
+        let th = length(theta);
+        let tE = max(p.shape.x, 1e-4);
+        let core = 0.25 * tE;
+        let tn = select(vec3<f32>(0.0), theta / th, th > 1e-6);
+        win = 1.0 - smoothstep(p.shape.w, 1.0, r);
+        let bend = tE * tE * th / (th * th + core * core);
+        d = -tn * (bend * win * p.motion.x);
+        let pxM = 1.0 / max(length(dfToUv(q + frame.cameraRight.xyz) - dfToUv(q)) * df.viewport.x, 1e-6);
+        let rh = p.shape.y * tE;
+        if (rh > 0.0) {
+            cover = (1.0 - smoothstep(rh - pxM, rh + pxM, th)) * p.motion.y;
+        }
+        let ringR = select(tE, rh + 0.5 * p.noise.z * tE, rh > 0.0);
+        let sigma = max(0.5 * p.noise.z * tE, pxM);
+        let e = (th - ringR) / sigma;
+        glow = exp(-e * e) * win;
+    }
+
+    var offset = (dfToUv(q + d) - dfToUv(q)) * depthGate;
+    // The lens remap is bounded by construction (2 tE) and must not be clipped: a clipped remap draws
+    // a false ring where the clip starts. The shimmer keeps DF's safety bound.
+    let len = length(offset);
+    if (field != 5u && len > df.misc.x) {
+        offset = offset * (df.misc.x / len);
+    }
+
+    // The emission and the cover sit at the sampled point: hidden by whatever stands in front of it.
+    let qZ = dot(q - cam, fwd);
+    let vis = smoothstep(qZ - 0.05 * band, qZ, sceneZ);
+
+    var out: OffsetExtOut;
+    out.offset = vec4<f32>(offset, win * lensZ, win);
+    out.aux = vec4<f32>(p.rim.rgb * (glow * vis), win * depthGate * p.noise.y);
+    out.cover = cover * vis;
+    return out;
+}
+
 // ---- pass 2: the resolve ------------------------------------------------------------------------
 
 struct ResolveIn {
@@ -370,8 +563,10 @@ fn fs_resolve(in: ResolveIn) -> ResolveOut {
     let a = textureLoad(auxTex, texel, 0);
     let bent = dot(o.xy, o.xy) > 1e-12;
     let lit = any(a.rgb > vec3<f32>(0.0));
+    let cov = saturate(textureLoad(coverTex, texel, 0).r);
+    let covered = cov > 0.0;
     // Untouched pixels are left exactly as they were, even inside the scissor: no write at all.
-    if (!bent && !lit) {
+    if (!bent && !lit && !covered) {
         discard;
     }
     let base = textureLoad(sceneCopy, texel, 0);
@@ -391,6 +586,10 @@ fn fs_resolve(in: ResolveIn) -> ResolveOut {
         } else {
             color = g;
         }
+    }
+    // Wave 3: what a horizon hides, before the glow is added (a ring in front of the disc stays lit).
+    if (covered) {
+        color = vec4<f32>(color.rgb * (1.0 - cov), color.a);
     }
     var out: ResolveOut;
     out.hdr = vec4<f32>(color.rgb + a.rgb, base.a);

@@ -30,6 +30,7 @@
 #include "world/effects/entity_fx.hpp"
 #include "world/effects/history_bank.hpp"
 #include "world/effects/ribbon_frame.hpp"
+#include "world/effects/shell_frame.hpp"
 #include "world/effects/star_field.hpp"
 #include "world/effects/transform_frame.hpp"
 
@@ -4461,6 +4462,43 @@ public:
         return true;
     }
 
+    // Wave 3 (phase 2): a Light owner's light as the frame places it -- the authored light, carried
+    // by the drawn transform of the node it rides (the flatten's own rule, composition.cpp).
+    [[nodiscard]] bool lightView(std::string_view id, world::LightView& out) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        for (const scene::Composition::AuthoredLight& a : comp_->authoredLights()) {
+            // The stored id when there is one (no allocation); the derived one otherwise.
+            if (!(a.id.empty() ? scene::Composition::authoredLightId(a) == id : a.id == id)) {
+                continue;
+            }
+            const scene::PunctualLight& l = a.light;
+            out = world::LightView{};
+            out.position = l.position;
+            out.direction = glm::length(l.direction) > 1e-6f ? glm::normalize(l.direction) : glm::vec3(0.0f, -1.0f, 0.0f);
+            if (!a.node.empty()) {
+                const scene::CompositionNode* node = comp_->findNode(a.node);
+                if (node == nullptr) {
+                    return false;
+                }
+                const scene::Transform t = comp_->nodeDrawnWorldTransform(*node);
+                out.position = t.position + t.rotation * (l.position * t.scale);
+                const glm::vec3 d = t.rotation * out.direction;
+                out.direction = glm::length(d) > 1e-6f ? glm::normalize(d) : out.direction;
+            }
+            out.color = l.color;
+            out.intensity = l.enabled ? l.intensity : 0.0f;
+            out.range = l.range;
+            out.spot = l.type == scene::PunctualLight::Type::Spot;
+            out.directional = l.type == scene::PunctualLight::Type::Directional;
+            out.outerCone = out.spot ? l.outerConeAngle : 0.0f;
+            out.innerCone = out.spot ? l.innerConeAngle : 0.0f;
+            return true;
+        }
+        return false;
+    }
+
 private:
     const scene::Composition* comp_;
     const world::HistoryBank* history_;
@@ -4809,6 +4847,7 @@ void Engine::updateEffects(EffectPhase phase) {
         live.ribbons.strips.clear();
         live.ribbons.dropped = 0;
         live.stars = world::StarField{};
+        live.shells.clear(); // capacity kept, as the ribbons'
         return;
     }
     // The parameters were applied, and the status table sized and its reasons cleared, by the
@@ -4838,6 +4877,10 @@ void Engine::updateEffects(EffectPhase phase) {
     // RenderStage::Particles -- ADR-703's camera-facing strips (Trail), RIBBON over HIST.
     world::buildRibbonFrame(effects_, ctx, historyBank_, live.ribbons, effectOrder_, effectStatus_,
                             effectStatusReason_);
+    // RenderStage::Particles -- Wave 3's analytic proxy shells (Plasma, Energy Shield, Force Field).
+    // After the lanes: a plasma's core light takes what the lanes' spills left of LIGHTMOD's pool.
+    world::buildShellFrame(effects_, ctx, live.shells, live.entityFx.lights, effectOrder_, effectStatus_,
+                           effectStatusReason_);
     // RenderStage::Sky -- the star field (Stars, Wave 2), in place of the background's fixed stars.
     world::buildStarField(effects_, ctx, live.stars, effectOrder_, effectStatus_, effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
@@ -4868,11 +4911,11 @@ void Engine::updateEffects(EffectPhase phase) {
         if (dropped > 0) {
             log::warn("{} effect(s) are active but not drawn: their render stage's GPU capacity is "
                       "full (surface waves {}, comets {}, auroras {}, placed media {}, distortion "
-                      "proxies {}, ribbon vertices {}, effect particle systems {}). The Effects panel "
-                      "marks which, and says why.",
+                      "proxies {}, ribbon vertices {}, effect particle systems {}, shells {}). The "
+                      "Effects panel marks which, and says why.",
                       dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
                       world::kMaxMedia, world::kMaxDistortionProxies, world::kRibbonVertexBudget,
-                      world::kMaxEffectParticleSystems);
+                      world::kMaxEffectParticleSystems, world::kMaxShells);
         }
     }
     lastMediaDropped_ = live.atmospherics.mediaDropped;

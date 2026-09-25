@@ -77,9 +77,10 @@ DistortionRects distortionRects(const world::DistortionFrame& frame, const glm::
     for (std::size_t i = 0; i < n && !out.fullScreen; ++i) {
         const world::DistortionProxy& p = frame.proxies[i];
         const glm::vec3 c(p.centre);
+        // The hull's own growth over the axes (a cylinder's sqrt 2; exactly 1 for every other shape).
         const float r = std::max({glm::length(glm::vec3(p.axis0)), glm::length(glm::vec3(p.axis1)),
                                   glm::length(glm::vec3(p.axis2))}) *
-                        meshScale;
+                        meshScale * world::distortionHullScale(p.axis0.w);
         // How far a tap can reach beyond the field: the displacement's bound (every term's weight at
         // the profile's peak of 1, turbulence soft-limited to 2x its amount), and the chroma taps'
         // extra half.
@@ -118,6 +119,10 @@ struct DistortionRenderer::Impl {
     wgpu::PipelineLayout offsetPipelineLayout;
     wgpu::PipelineLayout resolvePipelineLayout;
     wgpu::RenderPipeline offsetPipeline;
+    wgpu::RenderPipeline offsetExtPipeline; // Wave 3: shapes 4 and up (`fs_offset_ext`)
+    // The frame's proxies as uploaded: the Wave 1-2 shapes first, the extended ones after, each in
+    // the frame's own order -- so a frame with no extended proxy uploads exactly the frame block.
+    std::array<world::DistortionProxy, world::kMaxDistortionProxies> ordered{};
     wgpu::RenderPipeline resolvePipeline;
     wgpu::Buffer proxies;
     wgpu::Buffer params;
@@ -132,7 +137,7 @@ struct DistortionRenderer::Impl {
     wgpu::BindGroup offsetGroup;
     wgpu::TextureView offsetGroupDepth;
     wgpu::BindGroup resolveGroup;
-    std::array<wgpu::TextureView, 4> resolveGroupViews{}; // copy, offset, aux, depth
+    std::array<wgpu::TextureView, 5> resolveGroupViews{}; // copy, offset, aux, depth, cover
 
     gpu::FrameTimeline* timeline = nullptr;
     double lastOffsetMs = -1.0;
@@ -173,17 +178,22 @@ Result<void> DistortionRenderer::Impl::createPipelines(const wgpu::ShaderModule&
     add.color.srcFactor = wgpu::BlendFactor::One;
     add.color.dstFactor = wgpu::BlendFactor::One;
     add.alpha = add.color;
-    std::array<wgpu::ColorTargetState, 2> offsetTargets{};
+    std::array<wgpu::ColorTargetState, 3> offsetTargets{};
     for (auto& t : offsetTargets) {
         t.format = DistortionRenderer::kOffsetFormat;
         t.blend = &add;
         t.writeMask = wgpu::ColorWriteMask::All;
     }
+    offsetTargets[2].format = DistortionRenderer::kCoverFormat;
+    // The Wave 1-2 entry point writes no cover: its pipeline masks the third target off, so the
+    // shader it runs is exactly the one it ran before the cover existed (see distortion.wgsl).
+    std::array<wgpu::ColorTargetState, 3> legacyTargets = offsetTargets;
+    legacyTargets[2].writeMask = wgpu::ColorWriteMask::None;
     wgpu::FragmentState offsetFragment{};
     offsetFragment.module = module;
     offsetFragment.entryPoint = "fs_offset";
-    offsetFragment.targetCount = offsetTargets.size();
-    offsetFragment.targets = offsetTargets.data();
+    offsetFragment.targetCount = legacyTargets.size();
+    offsetFragment.targets = legacyTargets.data();
     wgpu::VertexAttribute position{};
     position.format = wgpu::VertexFormat::Float32x3;
     position.offset = 0;
@@ -213,6 +223,18 @@ Result<void> DistortionRenderer::Impl::createPipelines(const wgpu::ShaderModule&
     if (!offset) {
         return std::unexpected(offset.error());
     }
+    // Wave 3: the extended shapes (Facing, Cylinder) through their own entry point, same hull.
+    wgpu::FragmentState extFragment = offsetFragment;
+    extFragment.entryPoint = "fs_offset_ext";
+    extFragment.targetCount = offsetTargets.size();
+    extFragment.targets = offsetTargets.data();
+    wgpu::RenderPipelineDescriptor extDesc = offsetDesc;
+    extDesc.label = "distortion-offset-ext";
+    extDesc.fragment = &extFragment;
+    auto offsetExt = make(extDesc, "distortion-offset-ext");
+    if (!offsetExt) {
+        return std::unexpected(offsetExt.error());
+    }
 
     // ---- the resolve: HDR replaced where bent, emission added where the rim glows ----
     std::array<wgpu::ColorTargetState, 2> resolveTargets{};
@@ -241,6 +263,7 @@ Result<void> DistortionRenderer::Impl::createPipelines(const wgpu::ShaderModule&
         return std::unexpected(resolve.error());
     }
     offsetPipeline = *offset;
+    offsetExtPipeline = *offsetExt;
     resolvePipeline = *resolve;
     return {};
 }
@@ -343,7 +366,7 @@ Result<void> DistortionRenderer::init(const wgpu::BindGroupLayout& frameLayout, 
         im.offsetLayout = device.CreateBindGroupLayout(&desc);
     }
     {
-        std::array<wgpu::BindGroupLayoutEntry, 6> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 7> entries{};
         entries[0] = texture(2, wgpu::TextureSampleType::Depth);
         entries[1] = uniform(3, wgpu::ShaderStage::Fragment);
         entries[2] = texture(4, wgpu::TextureSampleType::Float);
@@ -352,6 +375,7 @@ Result<void> DistortionRenderer::init(const wgpu::BindGroupLayout& frameLayout, 
         entries[5].binding = 7;
         entries[5].visibility = wgpu::ShaderStage::Fragment;
         entries[5].sampler.type = wgpu::SamplerBindingType::Filtering;
+        entries[6] = texture(8, wgpu::TextureSampleType::UnfilterableFloat);
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "distortion-resolve-layout";
         desc.entryCount = entries.size();
@@ -428,7 +452,20 @@ bool DistortionRenderer::encode(wgpu::CommandEncoder& encoder, const world::Dist
 
     const auto& device = im.context.device();
     auto& queue = im.context.queue();
-    queue.WriteBuffer(im.proxies, 0, frame.proxies.data(), sizeof(world::DistortionProxy) * count);
+    // A stable partition by entry point: the two offset pipelines draw two instance ranges.
+    std::uint32_t legacyCount = 0;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        if (frame.proxies[i].axis0.w < 3.5f) {
+            im.ordered[legacyCount++] = frame.proxies[i];
+        }
+    }
+    std::uint32_t extCount = 0;
+    for (std::uint32_t i = 0; i < count; ++i) {
+        if (!(frame.proxies[i].axis0.w < 3.5f)) {
+            im.ordered[legacyCount + extCount++] = frame.proxies[i];
+        }
+    }
+    queue.WriteBuffer(im.proxies, 0, im.ordered.data(), sizeof(world::DistortionProxy) * count);
     const float w = static_cast<float>(targets.width);
     const float h = static_cast<float>(targets.height);
     DfParams params{};
@@ -445,6 +482,8 @@ bool DistortionRenderer::encode(wgpu::CommandEncoder& encoder, const world::Dist
         pool.acquire(targets.width, targets.height, kOffsetFormat, targetUsage, "distortion-offset");
     const gpu::TransientTexture aux =
         pool.acquire(targets.width, targets.height, kOffsetFormat, targetUsage, "distortion-aux");
+    const gpu::TransientTexture cover =
+        pool.acquire(targets.width, targets.height, kCoverFormat, targetUsage, "distortion-cover");
     const gpu::TransientTexture copy =
         pool.acquire(targets.width, targets.height, im.hdrFormat,
                      wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst, "distortion-scene-copy");
@@ -467,13 +506,13 @@ bool DistortionRenderer::encode(wgpu::CommandEncoder& encoder, const world::Dist
         im.offsetGroup = device.CreateBindGroup(&desc);
         im.offsetGroupDepth = targets.depthView;
     }
-    const std::array<wgpu::TextureView, 4> views = {copy.view, offset.view, aux.view, targets.depthView};
+    const std::array<wgpu::TextureView, 5> views = {copy.view, offset.view, aux.view, targets.depthView, cover.view};
     bool stale = !im.resolveGroup;
     for (std::size_t i = 0; i < views.size(); ++i) {
         stale = stale || im.resolveGroupViews[i].Get() != views[i].Get();
     }
     if (stale) {
-        std::array<wgpu::BindGroupEntry, 6> e{};
+        std::array<wgpu::BindGroupEntry, 7> e{};
         e[0].binding = 2;
         e[0].textureView = targets.depthView;
         e[1].binding = 3;
@@ -487,6 +526,8 @@ bool DistortionRenderer::encode(wgpu::CommandEncoder& encoder, const world::Dist
         e[4].textureView = aux.view;
         e[5].binding = 7;
         e[5].sampler = im.sampler;
+        e[6].binding = 8;
+        e[6].textureView = cover.view;
         wgpu::BindGroupDescriptor desc{};
         desc.label = "distortion-resolve-group";
         desc.layout = im.resolveLayout;
@@ -498,9 +539,9 @@ bool DistortionRenderer::encode(wgpu::CommandEncoder& encoder, const world::Dist
 
     // ---- 1. the offset field ----
     {
-        std::array<wgpu::RenderPassColorAttachment, 2> attachments{};
+        std::array<wgpu::RenderPassColorAttachment, 3> attachments{};
         for (std::size_t i = 0; i < attachments.size(); ++i) {
-            attachments[i].view = i == 0 ? offset.view : aux.view;
+            attachments[i].view = i == 0 ? offset.view : i == 1 ? aux.view : cover.view;
             attachments[i].loadOp = wgpu::LoadOp::Clear;
             attachments[i].storeOp = wgpu::StoreOp::Store;
             attachments[i].clearValue = {0.0, 0.0, 0.0, 0.0};
@@ -512,12 +553,20 @@ bool DistortionRenderer::encode(wgpu::CommandEncoder& encoder, const world::Dist
         pass.timestampWrites =
             im.timeline != nullptr ? im.timeline->mark("distort.offset", gpu::FrameTimeline::PassKind::Render) : nullptr;
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
-        rp.SetPipeline(im.offsetPipeline);
+        rp.SetPipeline(legacyCount > 0 ? im.offsetPipeline : im.offsetExtPipeline);
         rp.SetBindGroup(0, targets.frameBindGroup);
         rp.SetBindGroup(1, im.offsetGroup);
         rp.SetVertexBuffer(0, im.vertices);
         rp.SetIndexBuffer(im.indices, wgpu::IndexFormat::Uint32);
-        rp.DrawIndexed(im.indexCount, count);
+        if (legacyCount > 0) {
+            rp.DrawIndexed(im.indexCount, legacyCount);
+        }
+        if (extCount > 0) {
+            if (legacyCount > 0) {
+                rp.SetPipeline(im.offsetExtPipeline);
+            }
+            rp.DrawIndexed(im.indexCount, extCount, 0, 0, legacyCount);
+        }
         rp.End();
     }
 
@@ -562,6 +611,7 @@ bool DistortionRenderer::encode(wgpu::CommandEncoder& encoder, const world::Dist
 
     pool.release(offset);
     pool.release(aux);
+    pool.release(cover);
     pool.release(copy);
 
     im.passThisFrame = true;

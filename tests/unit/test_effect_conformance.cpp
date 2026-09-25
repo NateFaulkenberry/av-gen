@@ -450,6 +450,29 @@ TEST_CASE("every type is attachable to what ADR-702 says, and to nothing else",
         {EffectKind::VelocityDistortion, {EffectTarget::Entity}},
         {EffectKind::Stars, {EffectTarget::World}}, // Wave 2: the sky has one star field
         {EffectKind::MotionSmear, {EffectTarget::Entity}},
+        // Wave 3 (BOLT): a strike, an arc and a discharge may belong to the World or to an entity; an
+        // electric field crawls over a surface, so it needs one.
+        {EffectKind::Lightning, {EffectTarget::World, EffectTarget::Entity}},
+        {EffectKind::Arc, {EffectTarget::World, EffectTarget::Entity}},
+        {EffectKind::ElectricField, {EffectTarget::Entity}},
+        {EffectKind::Discharge, {EffectTarget::World, EffectTarget::Entity}},
+        // Wave 3 (SHELL). An orb and a shield ride an entity or stand placed in the world; a barrier
+        // is placed first and may be projected from an entity.
+        {EffectKind::Plasma, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::EnergyShield, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::ForceField, {EffectTarget::World, EffectTarget::Entity}},
+        // Wave 3 (DF): a hot column or a mass can stand at a World point or ride an entity.
+        {EffectKind::HeatShimmer, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::GravitationalLens, {EffectTarget::Entity, EffectTarget::World}},
+        // Wave 3 (SHELL phase 2). A beam and a halo belong to a light as much as to an entity or a
+        // point; a charge, a bubble, a portal and a tear to an entity or a point. A tear's Camera form
+        // (an FXPOST transition) is not built.
+        {EffectKind::ChargeUp, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::LightBeam, {EffectTarget::Light, EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Halo, {EffectTarget::Light, EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Bubble, {EffectTarget::Entity, EffectTarget::World}},
+        {EffectKind::Portal, {EffectTarget::World, EffectTarget::Entity}},
+        {EffectKind::RealityTear, {EffectTarget::World, EffectTarget::Entity}},
     };
     REQUIRE(expected.size() == conf::kEffectKinds.size());
     for (const EffectKind kind : conf::kEffectKinds) {
@@ -501,6 +524,8 @@ TEST_CASE("every type's render stage is the stage its bucket is drawn at",
         // Wave 2: XFORM offsets are composed by the flatten, before any pass draws.
         case world::EffectBucket::Transform: return world::RenderStage::Geometry;
         case world::EffectBucket::Starfield: return world::RenderStage::Sky;
+        // Wave 3: shells draw in pass 1's blended section, beside the particles and ribbons.
+        case world::EffectBucket::Shell: return world::RenderStage::Particles;
         }
         return world::RenderStage::PostProcess; // unreachable for a real bucket, and wrong for all
     };
@@ -581,6 +606,7 @@ TEST_CASE("a type's endpoint accessors are complete and actually reach the insta
             CHECK(s->getTarget(*back).name == "rook");
         }
     }
-    // The control: the two surface waves declare endpoints, so the loop body ran.
-    CHECK(withEndpoints == 2);
+    // The control: the two surface waves and three bolt types (Lightning, Arc, Discharge) declare
+    // endpoints, so the loop body ran.
+    CHECK(withEndpoints == 5);
 }

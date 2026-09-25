@@ -47,8 +47,8 @@ Liveness liveContribution(const EffectInstance& e, const EffectContext& ctx, Nod
         return Liveness::Disabled;
     }
     const EffectSchema* schema = effectSchema(e.kind);
-    if (schema == nullptr || schema->resolve.bucket != EffectBucket::EntityLanes ||
-        schema->resolve.lanes == nullptr || e.owner.kind != EffectTarget::Entity || ctx.scene == nullptr) {
+    if (schema == nullptr || schema->resolve.lanes == nullptr || e.owner.kind != EffectTarget::Entity ||
+        ctx.scene == nullptr) {
         return Liveness::Dormant;
     }
     // A `HeroFocus` lane effect fires while the cut holds ITS OWNER -- the same rule an entity-owned
@@ -124,6 +124,31 @@ Scratch& scratch() {
 // How many records a contribution takes: its own, and an extension when it has pattern sub-blocks.
 bool hasExt(const EntityLaneContribution& c) { return (entityFxSurfaceFlags(c) & kFxExt) != 0; }
 std::uint32_t recordsFor(const EntityLaneContribution& c) { return hasExt(c) ? 2u : 1u; }
+
+// Wave 3: the lights of types whose own contribution another builder draws (`EffectResolve::light`),
+// in evaluation order, ranked with the spills by `resolveEffectLights`.
+void appendHookLights(std::span<const EffectInstance> effects, const EffectContext& ctx,
+                      std::span<const std::uint32_t> order, std::vector<EffectLightRequest>& requests) {
+    const std::size_t n = order.empty() ? effects.size() : order.size();
+    for (std::size_t walk = 0; walk < n; ++walk) {
+        const std::size_t at = order.empty() ? walk : order[walk];
+        if (at >= effects.size() || !effects[at].enabled) {
+            continue;
+        }
+        const EffectSchema* schema = effectSchema(effects[at].kind);
+        if (schema == nullptr || schema->resolve.light == nullptr) {
+            continue;
+        }
+        EffectLightRequest request;
+        if (!schema->resolve.light(effects[at], ctx, request.light) || !(request.light.intensity > 0.0f)) {
+            continue;
+        }
+        request.instance = static_cast<std::uint32_t>(at);
+        request.priority = schema->priority;
+        request.order = static_cast<std::uint32_t>(walk);
+        requests.push_back(request);
+    }
+}
 
 std::uint32_t addRecord(EntityFxFrame& out, Scratch& s, const EntityLaneContribution& c) {
     const auto index = static_cast<std::uint32_t>(out.records.size());
@@ -674,7 +699,9 @@ void buildEntityFxFrame(std::span<const EffectInstance> effects, const EffectCon
         }
         const EffectInstance& e = effects[at];
         const EffectSchema* schema = effectSchema(e.kind);
-        if (schema == nullptr || schema->resolve.bucket != EffectBucket::EntityLanes) {
+        // Every EntityLanes type, and (Wave 3) a type of another bucket with a secondary lane term.
+        if (schema == nullptr ||
+            (schema->resolve.bucket != EffectBucket::EntityLanes && schema->resolve.lanes == nullptr)) {
             continue;
         }
         NodeView view;
@@ -743,7 +770,14 @@ void buildEntityFxFrame(std::span<const EffectInstance> effects, const EffectCon
         setStatus(at, EffectStatus::Drawn);
     }
     if (s.groups.empty()) {
-        return; // no records: the renderer writes zero lanes, and the frame is the frame without FXL
+        // No records: the renderer writes zero lanes, and the frame is the frame without FXL. Lights
+        // other builders' types asked for (Wave 3) are still ranked -- and only when there are any,
+        // so a frame with neither is untouched.
+        appendHookLights(effects, ctx, order, s.requests);
+        if (!s.requests.empty()) {
+            resolveEffectLights(s.requests, ctx.cameraPosition, out.lights, status, reasons);
+        }
+        return;
     }
     // The owner frame, for every owner whose folded state has a clip, a displacement or a pattern:
     // from its drawn view, so it rides the owner exactly as the draw does this frame.
@@ -853,6 +887,7 @@ void buildEntityFxFrame(std::span<const EffectInstance> effects, const EffectCon
         request.light.volumetric = std::clamp(p.c.spillFog, 0.0f, 1.0f);
         s.requests.push_back(request);
     }
+    appendHookLights(effects, ctx, order, s.requests);
     resolveEffectLights(s.requests, ctx.cameraPosition, out.lights, status, reasons);
 }
 
