@@ -15,7 +15,6 @@
   "skyIntensity": 0.0,
   "lightFromEnvironment": false,
   "intensity": 0.0,
-  "fogDensity": 0.0,
   "volumeDensity": 0.0
  },
  "nodes": [

@@ -26,7 +26,6 @@
   ],
   "skyIntensity": 0.0,
   "lightFromEnvironment": false,
-  "fogDensity": 0.0,
   "volumeDensity": 0.0,
   "shadowCascades": 3
  },

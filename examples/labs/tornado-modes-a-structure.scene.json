@@ -25,7 +25,6 @@
    0.44
   ],
   "intensity": 1.0,
-  "fogDensity": 0.0,
   "volumeDensity": 0.0,
   "volumeSteps": 128,
   "volumeJitter": 0.0,

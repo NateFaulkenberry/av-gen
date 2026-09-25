@@ -8,8 +8,8 @@
   "background": [0.004, 0.006, 0.012],
   "intensity": 0.5,
   "fogColor": [0.015, 0.025, 0.05],
-  "fogDensity": 0.002,
-  "volumeDensity": 0.0,
+  "volumeDensity": 0.00067,
+  "volumeMaxDistance": 0.0,
   "sky": {"enabled": false, "background": false}
  },
  "nodes": [

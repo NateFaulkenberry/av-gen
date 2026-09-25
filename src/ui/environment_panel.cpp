@@ -122,6 +122,9 @@ void drawEnvironmentPanel(app::Engine& engine) {
             p != nullptr && p->baseComponent(0) > 0.0f && !engine.scene().terrainGround.valid()) {
             ImGui::TextColored(kMuted, "  this scene has no terrain: the layer stays flat");
         }
+        // ADR-705, §7's last control: the air grows denser with distance from the eye (1 doubles it
+        // a kilometre out). One number, read by the march and the surface fog alike.
+        slider(engine, "scene/horizonDensity", "Horizon density", "%.2f");
         // ADR-570 (§20/§22). Named for what an artist is buying rather than for the algorithm:
         // what these do is make a bank light from a direction and cast a shaft, and "shadow steps"
         // is the number that costs frame time. Both are drawn because a control that exists and

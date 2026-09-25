@@ -8,7 +8,7 @@
 // It is not a second animation system. The engine already has one coherent property-animation
 // architecture -- `params::Timeline` with `Track`s of `Key`s against a `ParameterSet` -- and every
 // scene already exposes its camera, its nodes and its environment through that set:
-// `camera/position`, `nodes/<name>/rotation`, `scene/fogDensity`, `env/sky/sunIntensity`. There was
+// `camera/position`, `nodes/<name>/rotation`, `scene/volumeDensity`, `env/sky/sunIntensity`. There was
 // never a missing animation system. What was missing was *choreography*: the idea that a piece is a
 // list of shots, that a shot is about a subject over a span of time, and that a character walking
 // down a street is a path plus a gait plus a place in a song.

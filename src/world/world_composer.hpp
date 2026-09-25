@@ -137,7 +137,6 @@ struct EnvironmentPlan {
     float sunGlow = 0.35f;
     float haze = 0.30f;
     float keyLight = 1.0f;
-    float fogDensity = 0.02f;
     float fogHeight = 0.0f;
     float fogHeightFalloff = 0.05f;
     float volumeDensity = 0.02f;

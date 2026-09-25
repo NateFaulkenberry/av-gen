@@ -664,7 +664,8 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         const bool ground = frame_.terrainHeight && frame_.terrainMap1.w > 0.5f;
         u.fog3 = glm::vec4(std::clamp(frame_.fogUpperDensity, 0.0f, 1.0f),
                            std::clamp(frame_.fogHeightCurve, 0.0f, 1.0f),
-                           ground ? std::clamp(frame_.fogGroundFollow, 0.0f, 1.0f) : 0.0f, 0.0f);
+                           ground ? std::clamp(frame_.fogGroundFollow, 0.0f, 1.0f) : 0.0f,
+                           std::clamp(frame_.horizonDensity, 0.0f, scene::kHorizonDensityMax));
         u.terrain0 = ground ? frame_.terrainMap0 : glm::vec4(0.0f);
         u.terrain1 = ground ? frame_.terrainMap1 : glm::vec4(0.0f);
         // Lifetime curves (ADR-040): at most kMaxCurveKeys keys each; fewer than two disables the

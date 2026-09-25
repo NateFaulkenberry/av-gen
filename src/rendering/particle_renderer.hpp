@@ -59,7 +59,7 @@ struct ParticleUniforms {
     // ADR-568 (§7): the height layer's shape. Here because this pass estimates its own
     // transmittance through the SAME layer the march integrates (ADR-567), and a reader
     // left on the old model is a third atmosphere in the same frame.
-    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, fogGroundFollow (ADR-715; 0 without a terrain), 0
+    glm::vec4 fog3;       // fogUpperDensity, fogHeightCurve, fogGroundFollow (ADR-715; 0 without a terrain), horizonDensity (ADR-705)
     // ADR-715: where the terrain height texture (render group binding 12) sits in the world, the
     // same two lanes `FrameUniforms::terrainMap0/1` carry -- so this estimate follows the ground the
     // march and the surface fog follow, rather than being the third atmosphere ADR-567 warns of.
@@ -130,6 +130,7 @@ struct ParticleFrameContext {
     glm::vec4 terrainMap0{0.0f};
     glm::vec4 terrainMap1{0.0f};
     wgpu::TextureView terrainHeight;
+    float horizonDensity = 0.0f;    // ADR-705: the march's distance factor, so this estimate agrees
     float fogAbsorption = 1.0f;
     float fogMaxDistance = 200.0f;
     // The ADR-035 R32F linear-depth target, resolved by the depth prepass. Null disables the fog

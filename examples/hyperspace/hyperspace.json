@@ -214,9 +214,6 @@
     "scene/volumeDensity": [
      4e-05
     ],
-    "scene/fogDensity": [
-     0.0016
-    ],
     "post/bloom/intensity": [
      0.38
     ],
@@ -249,9 +246,6 @@
     "scene/volumeDensity": [
      9e-05
     ],
-    "scene/fogDensity": [
-     0.0024
-    ],
     "post/bloom/intensity": [
      0.52
     ],
@@ -283,9 +277,6 @@
     ],
     "scene/volumeDensity": [
      0.00024
-    ],
-    "scene/fogDensity": [
-     0.0031
     ],
     "post/bloom/intensity": [
      0.72

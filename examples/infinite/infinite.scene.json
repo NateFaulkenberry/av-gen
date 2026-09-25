@@ -19,7 +19,6 @@
  },
  "environment": {
   "intensity": 0.0,
-  "fogDensity": 0.0028,
   "fogColor": [
    0.011,
    0.012,
@@ -31,15 +30,16 @@
    0.013
   ],
   "lightRig": "../lightrigs/colonnade.rig.json",
-  "volumeDensity": 0.00055,
+  "volumeDensity": 0.00165,
+  "horizonDensity": 6.0,
   "fogHeight": 11.0,
   "fogHeightFalloff": 0.055,
-  "volumeScattering": 1.0,
+  "volumeScattering": 0.577,
   "volumeAnisotropy": 0.72,
   "volumeNoise": 0.55,
   "volumeNoiseScale": 0.045,
   "volumeSteps": 32,
-  "volumeMaxDistance": 300.0,
+  "volumeMaxDistance": 40.0,
   "volumeAbsorption": 0.9,
   "sky": {
    "zenithColor": [

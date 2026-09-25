@@ -106,7 +106,8 @@ scene::Scene valleyScene(bool terrain) {
     s.environment.showSkybox = false;
     // Fog brighter than the ground, so more fog is a brighter pixel.
     s.environment.fogColor = glm::vec3(0.9f);
-    s.environment.fogDensity = 0.012f;
+    // ADR-705: one density; the march carries the first `volumeMaxDistance` metres and the surface
+    // pass the rest, so both readers see this layer.
     s.environment.fogHeightAmount = 1.0f;
     s.environment.fogHeight = 3.0f;
     s.environment.fogHeightFalloff = 0.3f;
@@ -196,7 +197,6 @@ TEST_CASE("fogGroundFollow 0 is the frame without a terrain, bit for bit", "[gpu
     // The instrument: the frame has fog in it, so "identical" is not two frames with nothing to
     // differ in. Most of the frame moves when both readers are switched off.
     scene::Scene clear = valleyScene(true);
-    clear.environment.fogDensity = 0.0f;
     clear.environment.volumeDensity = 0.0f;
     CHECK(pixelsDiffering(a, render(*renderer, clear), 1.0f / 255.0f) > kSize * kSize / 2);
 }
@@ -224,16 +224,16 @@ TEST_CASE("with a terrain, fogGroundFollow moves the fog in both readers", "[gpu
     REQUIRE(renderer->init().has_value());
 
     // Each reader alone, so a pass that ignored the control cannot hide behind the other.
+    // ADR-705: which reader carries the ray is `volumeMaxDistance` -- 0 is no march (the surface pass
+    // integrates the whole ray), and a reach past the far plane leaves the surface pass nothing.
     struct Arm {
         const char* name;
-        float surface;
-        float volume;
+        float marchReach;
     };
-    for (const Arm arm : {Arm{"surface fog only", 0.012f, 0.0f}, Arm{"march only", 0.0f, 0.02f}}) {
+    for (const Arm arm : {Arm{"surface fog only", 0.0f}, Arm{"march only", 100000.0f}}) {
         INFO(arm.name);
         scene::Scene s = valleyScene(true);
-        s.environment.fogDensity = arm.surface;
-        s.environment.volumeDensity = arm.volume;
+        s.environment.volumeMaxDistance = arm.marchReach;
         s.environment.fogGroundFollow = 0.0f;
         const gpu::ImageF flat = render(*renderer, s);
         s.environment.fogGroundFollow = 1.0f;

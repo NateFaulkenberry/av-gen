@@ -55,12 +55,13 @@ is the falloff of a local emitter, never an occluded shaft. The emission
 colour is `volumeColorField`'s colour sample (rgb × alpha) when one is named, otherwise
 `fogColor`. The march stops early once transmittance falls below 0.002.
 
-`fogDensity` (the older exponential-squared distance fog in `pbr_shade.wgsl`) is unrelated and
-still applies to surfaces; the two can be used together.
+The surface fog is the same medium (ADR-705): `applyFog` integrates `volumeDensity *
+volumeAbsorption` under the same law past `volumeMaxDistance`, where the march stops. The older
+exponential-squared `fogDensity`, a second density with a second law, was removed.
 
 ### 1.2 Parameters and JSON
 
-Registered in `scene/composition.cpp` next to `scene/fogDensity`, so audio, the timeline,
+Registered in `scene/composition.cpp` with the other `scene/` parameters, so audio, the timeline,
 presets, OSC/MIDI and macros drive them through the ordinary routes.
 
 | Parameter | Environment member | JSON key (`environment`) | Default | Meaning |

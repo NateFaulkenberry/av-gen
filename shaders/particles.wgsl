@@ -112,7 +112,7 @@ struct Params {
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
     fog: vec4<f32>,         // volume density, fog height, height falloff, absorption
     fog2: vec4<f32>,        // volume max distance, fog coupling 0..1, glow strength, linear depth 1/0
-    fog3: vec4<f32>,        // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow, w = 0
+    fog3: vec4<f32>,        // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow; ADR-705: w = horizonDensity
     terrain0: vec4<f32>,    // ADR-715: the terrain height's placement, as FrameUniforms::terrainMap0
     terrain1: vec4<f32>,    // ADR-715: ... and terrainMap1 (w = 1 when there is a terrain)
     // ADR-370: leaf cards. x = shape (0 round, 1 leaf), y = tumble rate (rad/s), z = leaf aspect
@@ -1052,14 +1052,19 @@ fn fogTransmittance(origin: vec3<f32>, dir: vec3<f32>, dist: f32) -> f32 {
         // a third statement of the model, written out here -- the shape ADR-562 §9 names: every
         // reader of a shared model is a call site to audit, and a reader that restates it is one
         // edit away from being a different atmosphere in the same frame.
+        var profile = fogHeightProfile(y - params.fog.y, params.fog.z, params.fog3.x, params.fog3.y);
         if (params.fog3.z > 0.0 && params.terrain1.w > 0.5) {
             // ADR-715: the same ground-following term the march evaluates, per sample.
             let p = origin + dir * t;
-            sum += fogGroundProfileAt(terrainHeightTex, params.terrain0, params.terrain1, p, params.fog.y,
-                                      params.fog3.z, params.fog.z, params.fog3.x, params.fog3.y);
-        } else {
-            sum += fogHeightProfile(y - params.fog.y, params.fog.z, params.fog3.x, params.fog3.y);
+            profile = fogGroundProfileAt(terrainHeightTex, params.terrain0, params.terrain1, p, params.fog.y,
+                                         params.fog3.z, params.fog.z, params.fog3.x, params.fog3.y);
         }
+        // ADR-705: Horizon Density, the factor the march multiplies into the same air. Without it
+        // this estimate would be a different atmosphere from the one it is correcting for.
+        if (params.fog3.w > 0.0) {
+            profile = profile * (1.0 + params.fog3.w * t * 0.001);
+        }
+        sum += profile;
     }
     return exp(-density * params.fog.w * (sum * 0.25) * dist);
 }
