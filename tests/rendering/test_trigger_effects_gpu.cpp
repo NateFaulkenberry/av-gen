@@ -294,6 +294,11 @@ TEST_CASE("Shockwave on pixels: a ring that moves outward frame by frame, and a 
     const gpu::Image8 glowing = render(renderer, s, 1.3);
     dump(glowing, "shockwave-energy-blast");
     CHECK(changedPixels(plainBloom, glowing) > 300);
+    // Its expansion, for a person to look at: the front born, at its brightest, and spreading.
+    for (const double t : {1.04, 1.1, 1.2}) {
+        s.distortion = frameOf(blast, t, clock);
+        dump(render(renderer, s, t), "shockwave-energy-blast-" + std::to_string(static_cast<int>(t * 100.0 + 0.5)));
+    }
 
     // After a drawn frame, a dormant one is byte-identical again: nothing of DF lingers.
     s.post.bloomEnabled = false;

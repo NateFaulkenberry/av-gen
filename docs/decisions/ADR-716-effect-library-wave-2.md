@@ -160,10 +160,18 @@ first live instance draws, and another is `Dropped` naming it.
   `discard` as demoting to a helper invocation, so later derivatives are defined by the spec. Alpha-masked
   foliage has rendered correctly throughout, and moving the discard would change every foliage frame to
   fix a failure never seen. Recorded here; revisit if a masked material ever blacks out a frame.
-- **The inside of a dissolving hollow owner renders black.** Through the saucer's holes its back faces
-  read as solid black. A two-sided edge-lit interior is the fix; it is a look decision.
-- **The Energy Blast Shockwave on the saucer** is still a thick bright band across the frame at its
-  peak, after its rim was cut. It needs an art pass, with the owner's eye.
+- **The inside of a dissolving hollow owner rendered black** (fixed after the wave). It was not a
+  shading result: the depth prepass never culls, so where the clip removed a front face the prepass
+  kept the back face behind it, and the procedural lit pass culled that back face -- the pixel kept
+  the clear colour. Mesh entities already drew a live clip two-sided (`fxTwoSided`); procedural nodes
+  now do too, so the inside is shaded as a two-sided surface with the flipped normal `shadeSurface`
+  already gives a back face. Chosen over a darkened edge colour because it is the owner's own
+  material (its Glow and lighting included), and it holds with the edge glow at 0. Gated on the clip
+  bit, so no other draw changes. GPU test `[interior]`.
+- **The Energy Blast Shockwave** was a thick bright band across the frame at its peak (fixed after
+  the wave, in the preset only): thickness 1.0 -> 0.4 m, edge glow 4.0 -> 1.5, chroma 0.4 -> 0.25,
+  strength 1.0 -> 1.3 so the thinner band still bends. Explosion shares a heavy band (1.8 m, 2.5) and
+  was left alone: a fiery front may want it; the owner's call.
 - **Velocity Distortion's wake is faint** on the film's saucer. The film never moves it fast; it was
   checked with an Orbit added.
 - **The stock audio routes** (the root's spin) make node paths differ between play and scrub whenever

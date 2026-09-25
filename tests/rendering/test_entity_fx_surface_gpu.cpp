@@ -466,6 +466,92 @@ TEST_CASE("FXL displacement runs in the depth prepass: a contracting owner leave
     CHECK(b.black < 20);
 }
 
+namespace {
+
+// `breathingScene`'s layout -- a reddish sphere before a green emissive wall, black clear colour --
+// with the sphere either a mesh entity or a procedural node. Every pixel is the sphere's outside,
+// its inside, or the wall; black is none of them.
+scene::Scene hollowScene(bool procedural) {
+    scene::Scene s = breathingScene();
+    if (!procedural) {
+        return s;
+    }
+    s.entities.pop_back(); // the entity pod; the same sphere comes back as a procedural node
+    scene::ProceduralGeometry g;
+    g.name = "pod";
+    g.source.kind = scene::PrimitiveKind::Sphere;
+    g.source.radius = 2.0f;
+    g.source.radialSegments = 48;
+    g.source.heightSegments = 24;
+    scene::InstanceRecord r{};
+    r.position = {0.0f, 3.0f, 0.0f, 1.0f};
+    r.rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+    r.scale = {1.0f, 1.0f, 1.0f, 0.0f};
+    r.color = {1.0f, 1.0f, 1.0f, 0.0f};
+    r.emissive = {1.0f, 1.0f, 1.0f, 0.0f};
+    g.instances.push_back(r);
+    g.structureVersion = 1;
+    g.meshHash = 0x401107ull;
+    g.material.baseColor = {0.9f, 0.25f, 0.2f};
+    g.material.roughness = 0.6f;
+    s.procedurals.push_back(g);
+    return s;
+}
+
+world::NodeView hollowProceduralView() {
+    world::NodeView v;
+    v.world[3] = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
+    v.boundsMin = glm::vec3(-2.0f, 1.0f, -2.0f);
+    v.boundsMax = glm::vec3(2.0f, 5.0f, 2.0f);
+    v.hasBounds = true;
+    v.firstProcedural = 0;
+    v.proceduralCount = 1;
+    return v;
+}
+
+} // namespace
+
+TEST_CASE("FXL clip: through a dissolving hollow owner's holes its inside is shaded, not black",
+          "[gpu][effects][fxl][clip][interior]") {
+    // The depth prepass never culls, so where the clip removes a front face the prepass keeps the
+    // back face behind it. A lit pass that culls back faces then draws nothing there, the depth test
+    // refuses everything behind, and the pixel keeps the clear colour: the black inside of the
+    // dissolving saucer. A live clip draws its owner two-sided -- mesh entities and procedural nodes
+    // alike -- so the inside is shaded, with the flipped normal `shadeSurface` gives a back face.
+    Harness h;
+    for (const bool procedural : {false, true}) {
+        const std::string what = procedural ? "procedural" : "entity";
+        INFO("owner: " << what);
+        const gpu::Image8 whole = render(h.renderer, hollowScene(procedural));
+        scene::Scene s = hollowScene(procedural);
+        EntityScene q(s);
+        q.addProcedural("pod", hollowProceduralView());
+        // No edge glow: the inside must be visible by the surface's own shading, not painted by it.
+        world::EffectInstance e = effectOn(EffectKind::Dissolve, "pod", "pod-dissolve");
+        e.values.setFloat("dissolve/progress", 0.45f);
+        e.values.setFloat("dissolve/scale", 2.0f);
+        e.values.setFloat("dissolve/edgeEmission", 0.0f);
+        const Evaluated ev = evaluate(s, {e}, 1.0, &q);
+        INFO(ev.reasons[0]);
+        REQUIRE(ev.status[0] == EffectStatus::Drawn);
+        const gpu::Image8 open = render(h.renderer, s);
+        dump(whole, "surface-hollow-" + what + "-whole");
+        dump(open, "surface-hollow-" + what + "-dissolved");
+        const Coverage a = coverage(whole);
+        const Coverage b = coverage(open);
+        INFO("whole: sphere " << a.sphere << ", wall " << a.backdrop << ", black " << a.black
+                              << "; dissolved: sphere " << b.sphere << ", wall " << b.backdrop << ", black "
+                              << b.black);
+        REQUIRE(a.black < 20);
+        REQUIRE(a.sphere > 1500);
+        // The clip really opened holes: the wall shows through where both walls are gone.
+        CHECK(b.backdrop > a.backdrop + 100);
+        // And where only the front wall is gone, the inside is drawn. With the back faces culled
+        // (the pre-fix procedural path) the inside shows the clear colour.
+        CHECK(b.black < 20);
+    }
+}
+
 TEST_CASE("FXL displacement is in the velocity target at the previous frame's time",
           "[gpu][effects][fxl][displace]") {
     Harness h;

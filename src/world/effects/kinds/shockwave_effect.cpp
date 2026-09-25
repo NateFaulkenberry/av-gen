@@ -129,8 +129,11 @@ const Look kLooks[] = {
     {"Explosion", 1.3f, 22.0f, 1.3f, 1.8f, Ease::OutCubic, {1.0f, 0.55f, 0.22f}, 2.5f, 0.12f, 0.8f, onsets(1.6f)},
     // Refraction only, fast and linear: a sound barrier giving way.
     {"Sonic Boom", 1.1f, 30.0f, 0.9f, 1.2f, Ease::Linear, {1.0f, 1.0f, 1.0f}, 0.0f, 0.06f, 0.5f, beats(4)},
-    // A cyan energy front with a strong rim and colour split.
-    {"Energy Blast", 1.0f, 16.0f, 1.1f, 1.0f, Ease::OutExpo, {0.35f, 0.9f, 1.0f}, 4.0f, 0.4f, 0.9f, beats(4)},
+    // A cyan energy front: a thin glowing line with a clear bend behind it. The band is thin (0.4 m)
+    // and the edge modest (1.5), so the bloom softens it into a filament instead of saturating a
+    // metre-wide bar across the frame (at 1.0 m and 4.0 it read as a solid bright band on the UFO
+    // film); the strength is raised so the thinner band still bends what is behind it visibly.
+    {"Energy Blast", 1.3f, 16.0f, 1.1f, 0.4f, Ease::OutExpo, {0.35f, 0.9f, 1.0f}, 1.5f, 0.25f, 0.9f, beats(4)},
     // Large and subtle, on the music's drops.
     {"Bass Drop", 0.7f, 60.0f, 2.6f, 4.0f, Ease::OutQuad, {0.6f, 0.7f, 1.0f}, 0.0f, 0.1f, 0.4f, music("drop")},
 };
