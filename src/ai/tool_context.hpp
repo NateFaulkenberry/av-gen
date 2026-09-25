@@ -30,6 +30,11 @@
 #include <utility>
 #include <vector>
 
+namespace avgen::directing {
+struct Compilation;
+struct Plan;
+} // namespace avgen::directing
+
 namespace avgen::app {
 class Engine;
 } // namespace avgen::app
@@ -87,6 +92,23 @@ struct PerformanceSnapshot {
 using PerformanceSource = std::function<PerformanceSnapshot()>;
 
 // ---- what a tool changed --------------------------------------------------------------------------
+
+// ADR-765: recording a live performance, requested by the assistant and done by the HOST. The
+// recorder is application code (it loads scratch copies of the project on a thread of its own), so
+// the core library sees only this seam: the host installs a hook that starts a recording and hands
+// back a handle to watch. The recording's result is proposed like any plan -- the person approves.
+class RecordingHandle {
+public:
+    virtual ~RecordingHandle() = default;
+    [[nodiscard]] virtual bool done() const = 0;
+    [[nodiscard]] virtual std::string phase() const = 0;
+    // The recorded plan, once, after `done()`; or why there is none.
+    [[nodiscard]] virtual Result<directing::Plan> take() = 0;
+    virtual void cancel() = 0;
+};
+// Main thread: starts recording `compilation`'s live performances against the engine's project.
+using RecordingHook =
+    std::function<Result<std::shared_ptr<RecordingHandle>>(app::Engine&, const directing::Compilation&)>;
 
 struct ChangeRecord {
     std::string target;   // parameter path, track target, route target, ...
@@ -163,6 +185,14 @@ public:
     }
 
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
+
+    // ADR-765. Null when the host records nothing (a headless session with no recorder installed).
+    void setRecordingHook(RecordingHook hook) { recordingHook_ = std::move(hook); }
+    [[nodiscard]] const RecordingHook& recordingHook() const { return recordingHook_; }
+    // A tool that started a recording hands it back here; the orchestrator waits for it OFF the main
+    // thread and proposes its result, so the editor keeps drawing for the seconds it takes.
+    void deferProposal(std::shared_ptr<RecordingHandle> handle) { deferred_ = std::move(handle); }
+    [[nodiscard]] const std::shared_ptr<RecordingHandle>& deferredProposal() const { return deferred_; }
     [[nodiscard]] PerformanceSnapshot performance() const {
         return performance_ ? performance_() : PerformanceSnapshot{};
     }
@@ -198,6 +228,8 @@ private:
     std::filesystem::path projectsRoot_;
     std::vector<std::filesystem::path> contentRoots_;
     PerformanceSource performance_;
+    RecordingHook recordingHook_;
+    std::shared_ptr<RecordingHandle> deferred_;
     ChangeLog changes_;
     std::optional<Proposal> proposal_;
 };

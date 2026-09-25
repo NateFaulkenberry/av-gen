@@ -1366,6 +1366,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->ai.plane = ai_.get();
         panel_->ai.edits = &edits_;
         panel_->director.plane = ai_.get();
+        ai_->setRecordingHook(makeRecordingHook()); // ADR-765: the assistant may ask; the person approves
         panel_->director.edits = &edits_;
         panel_->director.onRequestStills = [this](const std::string& task, const directing::Compilation& c) {
             pendingStills_.emplace(task, c); // rendered between frames, never inside the UI pass

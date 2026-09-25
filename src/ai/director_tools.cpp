@@ -246,6 +246,46 @@ void registerDirectorTools(ToolRegistry& registry) {
     proposes.idempotent = false;
     proposes.requiresApproval = true;
     proposes.deterministic = true;
+
+    // ADR-765: the assistant may ASK for a recording; the host does it, and the person approves the
+    // result. Nothing is applied by this tool.
+    ToolAnnotations records = proposes;
+    records.deterministic = false; // what the characters do while recorded is theirs
+    add(registry, "director.record_plan", "Record a plan's live performances",
+        "Bake a plan whose performances are live (mode goal): play the project from zero on a scratch "
+        "copy, keep what each character actually did and when its events happened, check the recording "
+        "plays back and scrubs exactly, and put the RECORDED plan in front of the person for approval. "
+        "Nothing is applied until they approve. Takes seconds; use it when the person wants a live "
+        "performance fixed, or wants cues on its events (which only a recording can time).",
+        schema::object({{"plan", planArgument()}}, {"plan"}), records,
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            json out;
+            std::optional<directing::Plan> plan = readPlan(args, out);
+            if (!plan) {
+                return ToolResult::ok(out, "the plan is not well formed; nothing recorded");
+            }
+            if (!ctx.recordingHook()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "recording is not available in this session (the host installed no recorder)");
+            }
+            const directing::Compilation c = directing::compilePlan(*plan, app::sceneFactsFor(ctx.engine()));
+            const bool live = std::any_of(c.plan.performances.begin(), c.plan.performances.end(),
+                                          [&](const directing::PlanPerformance& p) {
+                                              return p.mode != directing::PerformanceMode::Scripted && !p.recording &&
+                                                     !c.validation.isBlocked(p.key);
+                                          });
+            if (!live) {
+                out["issues"] = issuesJson(c.validation.issues);
+                return ToolResult::ok(out, "nothing live to record: every performance is scripted, recorded or blocked");
+            }
+            auto handle = ctx.recordingHook()(ctx.engine(), c);
+            if (!handle) {
+                return ToolResult::failure(ToolErrorCode::Internal, "the recording did not start: " + handle.error().message);
+            }
+            ctx.deferProposal(std::move(*handle));
+            out["recording"] = true;
+            return ToolResult::ok(out, "recording started");
+        });
     add(registry, "director.propose_plan", "Propose a Director Plan",
         "Compile a plan against the scene WITHOUT changing it, and put the result in front of the person: "
         "what will be added or replaced, and every finding. Nothing is applied until they approve; the "

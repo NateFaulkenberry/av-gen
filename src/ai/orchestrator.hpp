@@ -202,6 +202,7 @@ public:
     [[nodiscard]] const std::shared_ptr<Provider>& provider() const { return provider_; }
     void setTransactionSink(TransactionSink* sink) { sink_ = sink; }
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
+    void setRecordingHook(RecordingHook hook) { recordingHook_ = std::move(hook); }
     // Where `project.create` / `open` / `save_as` resolve a name. Empty means those tools refuse,
     // which is the right default: a session that never says where projects live should not have
     // one guessed for it.
@@ -237,6 +238,7 @@ private:
     std::shared_ptr<Provider> provider_;
     TransactionSink* sink_ = nullptr;
     PerformanceSource performance_;
+    RecordingHook recordingHook_;
     std::filesystem::path projectsRoot_;
     std::vector<std::filesystem::path> contentRoots_;
     TaskLimits limits_;

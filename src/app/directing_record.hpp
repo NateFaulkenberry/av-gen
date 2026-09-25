@@ -15,6 +15,7 @@
 // body must be where the recording says at every key; and a scrub into the recording must land where
 // that play did (ADR-800's method). Worst differences are reported and stored in the recording.
 
+#include "ai/tool_context.hpp"
 #include "core/error.hpp"
 #include "directing/compiler.hpp"
 
@@ -77,6 +78,7 @@ public:
     [[nodiscard]] std::string phase() const;
     // The result once, when it is ready; nothing while running (or after it was taken).
     [[nodiscard]] std::optional<Result<RecordReport>> take();
+    [[nodiscard]] bool finished() const { return done_.load(); }
     void cancel();
 
 private:
@@ -89,5 +91,9 @@ private:
     std::optional<Result<RecordReport>> result_;
     std::filesystem::path copy_;
 };
+
+// ADR-765: the host's side of `director.record_plan`. Installed on the control plane by whoever owns
+// the editor (and by tests); each call starts a `RecordingJob` and hands the orchestrator a handle.
+[[nodiscard]] ai::RecordingHook makeRecordingHook(RecordOptions options = {});
 
 } // namespace avgen::app

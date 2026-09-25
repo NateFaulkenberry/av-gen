@@ -431,4 +431,36 @@ std::optional<Result<RecordReport>> RecordingJob::take() {
 
 void RecordingJob::cancel() { cancel_ = true; }
 
+namespace {
+
+class JobHandle final : public ai::RecordingHandle {
+public:
+    [[nodiscard]] bool done() const override { return job.finished(); }
+    [[nodiscard]] std::string phase() const override { return job.phase(); }
+    [[nodiscard]] Result<directing::Plan> take() override {
+        auto r = job.take();
+        if (!r) {
+            return fail("the recording has not finished");
+        }
+        if (!*r) {
+            return std::unexpected(r->error());
+        }
+        return (*r)->plan;
+    }
+    void cancel() override { job.cancel(); }
+    RecordingJob job;
+};
+
+} // namespace
+
+ai::RecordingHook makeRecordingHook(RecordOptions options) {
+    return [options](Engine& engine, const directing::Compilation& c) -> Result<std::shared_ptr<ai::RecordingHandle>> {
+        auto handle = std::make_shared<JobHandle>();
+        if (auto r = handle->job.start(engine, c, options); !r) {
+            return std::unexpected(r.error());
+        }
+        return handle;
+    };
+}
+
 } // namespace avgen::app
