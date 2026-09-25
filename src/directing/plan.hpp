@@ -153,6 +153,17 @@ struct PerformanceBeat {
     friend bool operator==(const PerformanceBeat&, const PerformanceBeat&) = default;
 };
 
+// ADR-763: a live (goal) performance, recorded -- what a scratch play from zero, audio off, did
+// with the body, and when its events happened. A performance that carries one compiles verbatim from
+// it as a scripted actor, so it is baked whatever mode it was recorded from.
+struct PerformanceRecording {
+    nlohmann::json actor;                                  // a `seq::Actor`, as the sequence writes it
+    std::vector<std::pair<std::string, double>> events;    // (plan event, timeline seconds)
+    std::string fromMode;                                  // "goal"
+    double replayWorstMetres = 0.0;                        // the replay check's worst difference
+    friend bool operator==(const PerformanceRecording&, const PerformanceRecording&) = default;
+};
+
 struct PlanPerformance {
     std::string key;
     std::string subject;             // alias
@@ -162,6 +173,7 @@ struct PlanPerformance {
     // into the performance. 0 (the default) takes it at the mark instantly, which is the only form a
     // baked plan may use -- where a live character stands is not a plan-time fact (ADR-758).
     double entrySeconds = 0.0;
+    std::optional<PerformanceRecording> recording; // ADR-763: present once a live performance is recorded
     friend bool operator==(const PlanPerformance&, const PlanPerformance&) = default;
 };
 

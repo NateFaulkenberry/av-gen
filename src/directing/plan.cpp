@@ -374,6 +374,16 @@ json Plan::toJson() const {
         if (p.entrySeconds != 0.0) {
             perf["entrySeconds"] = p.entrySeconds; // omitted at its default: canonical JSON
         }
+        if (p.recording) {
+            json events = json::array();
+            for (const auto& [name, t] : p.recording->events) {
+                events.push_back({{"name", name}, {"seconds", t}});
+            }
+            perf["recording"] = {{"actor", p.recording->actor},
+                                 {"events", std::move(events)},
+                                 {"fromMode", p.recording->fromMode},
+                                 {"replayWorstMetres", p.recording->replayWorstMetres}};
+        }
         perfJson.push_back(std::move(perf));
     }
     j["performances"] = std::move(perfJson);
@@ -539,6 +549,20 @@ PlanParse parsePlan(const json& document) {
             perf.subject = p.string("subject", true);
             perf.mode = p.choice("mode", kModes).value_or(PerformanceMode::Scripted);
             perf.entrySeconds = p.number<double>("entrySeconds").value_or(0.0);
+            if (const json* rec = p.raw("recording"); rec != nullptr && rec->is_object()) {
+                PerformanceRecording r;
+                r.actor = rec->value("actor", json::object());
+                r.fromMode = rec->value("fromMode", std::string());
+                r.replayWorstMetres = rec->value("replayWorstMetres", 0.0);
+                if (const auto ev = rec->find("events"); ev != rec->end() && ev->is_array()) {
+                    for (const json& e : *ev) {
+                        if (e.is_object()) {
+                            r.events.emplace_back(e.value("name", std::string()), e.value("seconds", 0.0));
+                        }
+                    }
+                }
+                perf.recording = std::move(r);
+            }
             forEach(p, "beats", issues, [&](Reader& b, std::size_t) {
                 PerformanceBeat beat;
                 beat.action = b.string("action", true);

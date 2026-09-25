@@ -93,6 +93,16 @@ CharacterCard cardFor(const entity::EntityDesc& desc, const scene::Composition& 
     card.walkSpeed = desc.gait.walkSpeed;
     card.runSpeed = desc.gait.runSpeed;
     card.jump = jumpOf(desc);
+    for (const entity::BehaviorDesc& behavior : desc.behaviors) {
+        if (behavior.kind != "decide" || !behavior.settings.is_object()) {
+            continue;
+        }
+        if (const auto it = behavior.settings.find("considerers"); it != behavior.settings.end() && it->is_array()) {
+            for (const nlohmann::json& c : *it) {
+                card.goalSlot = card.goalSlot || (c.is_object() && c.value("kind", std::string()) == "goal");
+            }
+        }
+    }
 
     // The node's loaded rigs: what clips actually exist, not what the description hopes for.
     std::vector<const scene::SkinnedRig*> rigs;
@@ -206,6 +216,7 @@ nlohmann::json CharacterCard::toJson() const {
               {"landSeconds", jump.landSeconds}, {"source", jump.source}}},
             {"affordances", affordances},
             {"unmappedClips", unmappedClips},
+            {"goalSlot", goalSlot},
             {"rigLoaded", rigLoaded}};
 }
 
