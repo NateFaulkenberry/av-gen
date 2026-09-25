@@ -419,6 +419,10 @@ enum class EffectBucket : std::uint8_t {
     // The sky's star field (world/effects/star_field.hpp): one per frame, drawn by the background
     // pass in place of its fixed stars. Stars.
     Starfield,
+    // ---- Wave 3 ---------------------------------------------------------------------------------
+    // Analytic proxy shells drawn in pass 1's blended section beside the particles (SHELL,
+    // world/effects/shell_frame.hpp): Plasma, Energy Shield, Force Field.
+    Shell,
 };
 
 // The three buckets `resolveAtmosphericEffects` owns. Everything else has a builder of its own.
@@ -639,7 +643,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 39> kEffectKinds{
+inline constexpr std::array<EffectKind, 42> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -677,6 +681,9 @@ inline constexpr std::array<EffectKind, 39> kEffectKinds{
     EffectKind::Arc,           // Wave 3 (BOLT + RIBBON)
     EffectKind::ElectricField, // Wave 3 (BOLT + RIBBON + FXL crackle)
     EffectKind::Discharge,     // Wave 3 (BOLT + RIBBON + LIGHTMOD + TRIGGER)
+    EffectKind::Plasma,        // Wave 3 (SHELL)
+    EffectKind::EnergyShield,  // Wave 3 (SHELL + TRIGGER)
+    EffectKind::ForceField,    // Wave 3 (SHELL)
     EffectKind::HeatShimmer,   // Wave 3 (DF: Cylinder + Shimmer)
     EffectKind::GravitationalLens, // Wave 3 (DF: Facing + Lens)
 };

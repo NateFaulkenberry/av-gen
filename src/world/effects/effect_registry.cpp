@@ -70,6 +70,9 @@ const EffectSchema& lightningSchema();   // Wave 3 (BOLT)
 const EffectSchema& arcSchema();         // Wave 3 (BOLT)
 const EffectSchema& electricFieldSchema(); // Wave 3 (BOLT + FXL)
 const EffectSchema& dischargeSchema();   // Wave 3 (BOLT)
+const EffectSchema& plasmaSchema();      // Wave 3 (SHELL)
+const EffectSchema& energyShieldSchema(); // Wave 3 (SHELL + TRIGGER)
+const EffectSchema& forceFieldSchema();  // Wave 3 (SHELL)
 const EffectSchema& heatShimmerSchema(); // Wave 3 (DF)
 const EffectSchema& gravitationalLensSchema(); // Wave 3 (DF)
 
@@ -114,6 +117,9 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &arcSchema(),
         &electricFieldSchema(),
         &dischargeSchema(),
+        &plasmaSchema(),
+        &energyShieldSchema(),
+        &forceFieldSchema(),
         &heatShimmerSchema(),
         &gravitationalLensSchema(),
     };
@@ -784,6 +790,7 @@ std::vector<RegistryFinding> checkRegistry() {
             case EffectBucket::Emitter: return RenderStage::Particles;
             case EffectBucket::Transform: return RenderStage::Geometry;
             case EffectBucket::Starfield: return RenderStage::Sky;
+            case EffectBucket::Shell: return RenderStage::Particles;
             }
             return RenderStage::Sky;
         }();

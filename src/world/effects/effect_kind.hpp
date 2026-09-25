@@ -86,6 +86,10 @@ enum class EffectKind : std::uint8_t {
     Arc = 34,           // a continuous writhing arc between two things
     ElectricField = 35, // a crackling web over the owner's surface, and arcs hopping across it
     Discharge = 36,     // a triggered burst of bolts, sparks and a flash from the owner
+    // SHELL (world/effects/shell_frame.hpp): analytic proxy shells drawn beside the particles.
+    Plasma = 37,       // a boiling orb of emission, marched inside a sphere, with a core light
+    EnergyShield = 38, // a shell round its owner: rim, cells, rings from each hit, a ground line
+    ForceField = 39,   // a placed barrier -- wall, box, cylinder, dome -- revealed by what comes near
     // The lens slice (DF): Heat Shimmer's Cylinder/Shimmer and Gravitational Lens's Facing/Lens.
     HeatShimmer = 41,       // DF: the view wobbling through a column of hot air
     GravitationalLens = 42, // DF: background light bent around a mass, optionally a black hole

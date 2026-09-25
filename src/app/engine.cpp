@@ -30,6 +30,7 @@
 #include "world/effects/entity_fx.hpp"
 #include "world/effects/history_bank.hpp"
 #include "world/effects/ribbon_frame.hpp"
+#include "world/effects/shell_frame.hpp"
 #include "world/effects/star_field.hpp"
 #include "world/effects/transform_frame.hpp"
 
@@ -4789,6 +4790,7 @@ void Engine::updateEffects(EffectPhase phase) {
         live.ribbons.strips.clear();
         live.ribbons.dropped = 0;
         live.stars = world::StarField{};
+        live.shells.clear(); // capacity kept, as the ribbons'
         return;
     }
     // The parameters were applied, and the status table sized and its reasons cleared, by the
@@ -4818,6 +4820,10 @@ void Engine::updateEffects(EffectPhase phase) {
     // RenderStage::Particles -- ADR-703's camera-facing strips (Trail), RIBBON over HIST.
     world::buildRibbonFrame(effects_, ctx, historyBank_, live.ribbons, effectOrder_, effectStatus_,
                             effectStatusReason_);
+    // RenderStage::Particles -- Wave 3's analytic proxy shells (Plasma, Energy Shield, Force Field).
+    // After the lanes: a plasma's core light takes what the lanes' spills left of LIGHTMOD's pool.
+    world::buildShellFrame(effects_, ctx, live.shells, live.entityFx.lights, effectOrder_, effectStatus_,
+                           effectStatusReason_);
     // RenderStage::Sky -- the star field (Stars, Wave 2), in place of the background's fixed stars.
     world::buildStarField(effects_, ctx, live.stars, effectOrder_, effectStatus_, effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
@@ -4848,11 +4854,11 @@ void Engine::updateEffects(EffectPhase phase) {
         if (dropped > 0) {
             log::warn("{} effect(s) are active but not drawn: their render stage's GPU capacity is "
                       "full (surface waves {}, comets {}, auroras {}, placed media {}, distortion "
-                      "proxies {}, ribbon vertices {}, effect particle systems {}). The Effects panel "
-                      "marks which, and says why.",
+                      "proxies {}, ribbon vertices {}, effect particle systems {}, shells {}). The "
+                      "Effects panel marks which, and says why.",
                       dropped, world::kMaxGpuWaves, world::kMaxGpuComets, world::kMaxGpuAuroras,
                       world::kMaxMedia, world::kMaxDistortionProxies, world::kRibbonVertexBudget,
-                      world::kMaxEffectParticleSystems);
+                      world::kMaxEffectParticleSystems, world::kMaxShells);
         }
     }
     lastMediaDropped_ = live.atmospherics.mediaDropped;
