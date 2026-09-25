@@ -1,7 +1,7 @@
 # AV Gen Director System — Development Progress
 Last updated: 2026-09-24 16:30
 Current branch: `agent/director` (worktree `../av-gen-director`; main merged in at 423fdf2b and 6f0da410; main = 232a50d7)
-Current commit: f009638d (plus this record)
+Current commit: 6bd98d5f (plus this record)
 Overall status: Slices 0 and 1 complete; Slice 2 compiler side complete (handoff mechanism moving to the Motion lead as M1); Slice 3 planned against M3-M5
 
 ## Executive status
@@ -53,7 +53,10 @@ with the Motion lead (`agent/motion`), who now owns motion mechanics in `src/ent
 - [x] Ownership of the entity-side pieces decided: the Motion lead takes them as M1, starting from this
       implementation; this branch drops its copy after M1 lands on main (ADR-758 addendum)
 - [ ] When M1 adds `entrySeconds`: validator flags a non-zero entry blend as live-dependent
-- [ ] Full CPU and GPU suites on f009638d (targeted suites green so far)
+- [x] Full suites at 6bd98d5f: CPU 3,295 cases, exit 0 (1 expected shouldfail); GPU 443 cases,
+      1 failure (`Watching a render does not change it`), a collision on the shared fixed temp
+      directory `$TMPDIR/avgen_render_job` with another agent's concurrent GPU run. It passes alone,
+      twice; nothing in this branch touches render jobs.
 
 ### Acceptance criteria
 - [x] Inside its span the body is exactly where the performance says, on the terrain, in the right
@@ -297,6 +300,9 @@ this side will use, and what it does with each:
   `CAPABILITY_UNAVAILABLE` until an asset exists.
 
 ## Known issues found in Slice 2 (reported, not worked around)
+- `tests/rendering/test_render_job.cpp` writes to a fixed, shared temp directory
+  (`avgen_render_job`), which collides with any other agent's concurrent GPU run (docs/testing.md's
+  shared-scratchpad family). It should be namespaced by pid.
 - **A seek on an engine that has never stepped a frame** lands differently from the same seek once it
   has: the same engine, same inputs, seeking to 8 s twice gave (3.864, 1.035) then (-2.828, 2.828) on
   an orbiting body. This is in the seek investigation's family (the coordinator's item 3). Tests warm
