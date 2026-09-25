@@ -104,6 +104,11 @@ void Modulator::evaluate(const signals::SignalBus& bus, ParameterSet& params, do
 }
 
 void Modulator::applyRoutes(const signals::SignalBus& bus, ParameterSet& params, double dt) {
+    applyRoutesWhere(bus, params, dt, nullptr);
+}
+
+void Modulator::applyRoutesWhere(const signals::SignalBus& bus, ParameterSet& params, double dt,
+                                 bool (*pick)(const ModRoute&)) {
     (void)params;
     if (!bound_) {
         return;
@@ -111,7 +116,8 @@ void Modulator::applyRoutes(const signals::SignalBus& bus, ParameterSet& params,
     for (const ModOp op : kOpPriority) {
         for (ModRoute& route : routes_) {
             if (route.op != op || !route.enabled || route.targetParam == nullptr ||
-                route.sourceId == signals::kInvalidSignal) {
+                route.sourceId == signals::kInvalidSignal || route.sourceId >= bus.size() ||
+                (pick != nullptr && !pick(route))) {
                 continue;
             }
             float x = bus.value(route.sourceId);

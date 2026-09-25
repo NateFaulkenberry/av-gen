@@ -1780,6 +1780,11 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
     if (hooks != nullptr && hooks->before) {
         hooks->before(now, stepDt);
     }
+    // ADR-870: the bus's semantic events, where `update` raises them -- after the tier above and
+    // before any body steps. With a null bus (every live seek) this does nothing, as before; with
+    // the replayed bus a host's `before` just built, the film's audio events are heard on the
+    // replayed step they were heard on in the play.
+    raiseSignalEvents(bus, now);
 
     // The crowd, as it was at the end of the previous step, built before anything moves so
     // every body separates against the same snapshot. `update` has done this since crowd
