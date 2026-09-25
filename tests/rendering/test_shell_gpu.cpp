@@ -212,6 +212,9 @@ TEST_CASE("the shell ground line lies where the shell meets the floor", "[gpu][s
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
 
     constexpr float kRadius = 4.0f;
     const scene::Scene bare = floorStage();
@@ -239,6 +242,9 @@ TEST_CASE("without this frame's linear depth the ground line is off, and the bui
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
     const rendering::QualitySettings full = renderer.qualitySettings();
 
     constexpr float kRadius = 4.0f;
@@ -282,6 +288,9 @@ TEST_CASE("a plasma orb is depth-tested against the world and writes emission",
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
 
     // Camera at the origin looking down -Z; an orb 20 m away; a wall 10 m away covering the left half.
     const auto stage = [] {
@@ -360,6 +369,9 @@ TEST_CASE("the shell capacity on the GPU: 131 walls draw 128 shells in one insta
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
     scene::Scene s = floorStage();
     std::vector<world::EffectInstance> walls;
     for (int i = 0; i < 131; ++i) {
@@ -412,6 +424,9 @@ TEST_CASE("the shell gate: a disabled Energy Shield renders the same bytes as no
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
     constexpr double kSecond = 4.0;
 
     app::Engine engine(app::EngineMode::Offline);
@@ -510,6 +525,9 @@ TEST_CASE("VISUAL Energy Shield around the UFO saucer, with hits", "[.visual][sh
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
     constexpr std::uint32_t kW = 960;
     constexpr std::uint32_t kH = 540;
 
@@ -584,6 +602,9 @@ TEST_CASE("VISUAL Plasma orbs over Glowmere at night", "[.visual][shell-review][
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
     constexpr std::uint32_t kW = 960;
     constexpr std::uint32_t kH = 540;
     const double second = static_cast<double>(envFloat("AVGEN_SHELL_SECOND", 40.0f));
@@ -633,6 +654,9 @@ TEST_CASE("VISUAL Force Field wall across the Glowmere river", "[.visual][shell-
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // The renderer's depth report is process-wide (a status sentence one frame late); a case that
+    // rendered without the prepass before this one would otherwise make this one's first build Partial.
+    world::reportShellLinearDepth(true);
     constexpr std::uint32_t kW = 960;
     constexpr std::uint32_t kH = 540;
     const double second = static_cast<double>(envFloat("AVGEN_SHELL_SECOND", 40.0f));
