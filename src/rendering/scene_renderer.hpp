@@ -321,8 +321,23 @@ struct FrameUniforms {
     // ADR-568 (§7): the height layer's shape, for the surface fog's analytic integral. Appended
     // last for the reason every block before it was -- no offset above moves, so every other
     // pass's view of this structure is byte-identical and none of the `offsetof` assertions
-    // below change. x = fogUpperDensity, y = fogHeightCurve, zw = 0.
+    // below change. x = fogUpperDensity, y = fogHeightCurve, w = 0.
+    // ADR-715: z = fogGroundFollow, forced to 0 when the scene has no terrain -- so a scene with no
+    // ground to follow takes the flat branch and is the frame it always was.
     glm::vec4 fogShape{0.0f};
+    // ADR-715: where the terrain height texture (group 0 binding 12) sits in the world, as
+    // `world::TerrainGround::map0/map1`. Appended last, for the reason every block above was.
+    glm::vec4 terrainMap0{0.0f}; // world origin xz, 1 / spacing xz
+    glm::vec4 terrainMap1{0.0f}; // height scale, height offset, fade metres, 1 when there is a terrain
+    // ADR-717: x = fogPooling, forced to 0 when the scene has no terrain; yzw = 0. The march reads
+    // this lane too (volume.wgsl), so the surface fog and the march cannot be handed different
+    // pooling. Appended after the terrain lanes.
+    glm::vec4 fogPool{0.0f};
+    // Effect Library Wave 2: the Stars effect's field (world/effects/star_field.hpp), appended last.
+    // starsA.x = 0 is the background pass's own fixed field, exactly as before any Stars instance.
+    glm::vec4 starsA{0.0f}; // x = on, y = density, z = brightness (envelope folded in), w = magnitude slope
+    glm::vec4 starsB{0.0f}; // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
+    glm::vec4 starsC{0.0f}; // x = band, y = band tilt, z = daylight hiding, w = seconds (wrapped)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 surface waves. The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -332,7 +347,10 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::
                                        16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
                                        64 + // ADR-345: four vec4s of analytic sky
                                        32 + // ADR-379: two vec4s of vortex glow
-                                       16); // ADR-568: one vec4 of height-fog shape, appended last
+                                       16 + // ADR-568: one vec4 of height-fog shape
+                                       32 + // ADR-715: two vec4s of terrain height placement
+                                       16 + // ADR-717: one vec4 of fog pooling
+                                       48); // Wave 2: three vec4s of star field, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -816,6 +834,11 @@ private:
     Result<wgpu::RenderPipeline> finishPipeline(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     void uploadMeshes(const scene::Scene& scene);
     void uploadTextures(const scene::Scene& scene);
+    // ADR-715: uploads the scene's terrain height bake when it is not the one already resident.
+    void uploadTerrainHeight(const scene::Scene& scene);
+    [[nodiscard]] const wgpu::TextureView& terrainHeightView() const {
+        return terrainHeight_.valid() ? terrainHeight_.view : terrainHeightDefault_.view;
+    }
     void updateEnvironment(const scene::Scene& scene);
     void updateSpectrum(const analysis::AnalysisFrame* frame);
     Result<void> ensurePostTargets(std::uint32_t width, std::uint32_t height);
@@ -959,6 +982,13 @@ private:
     wgpu::BindGroup clusterBindGroup_;
     wgpu::ShaderModule clusterModule_;
     gpu::GpuTexture linearDepthDefault_; // 1x1 stand-in before the first frame's prepass
+    // ADR-715: group 0 binding 12, the terrain's baked height (RG32F since ADR-717: ground, basin). `terrainHeight_` is the
+    // uploaded bake, re-created only when `Scene::terrainGround`'s field hash moves;
+    // `terrainHeightDefault_` is the 1x1 bound when the scene has none.
+    gpu::GpuTexture terrainHeight_;
+    gpu::GpuTexture terrainHeightDefault_;
+    std::uint64_t terrainHeightHash_ = 0;
+    const void* terrainHeightField_ = nullptr;
     gpu::GpuTexture ltc1_;            // group 0 bindings 8/9: the linearly-transformed-cone table
     gpu::GpuTexture ltc2_;
     wgpu::Sampler ltcSampler_;

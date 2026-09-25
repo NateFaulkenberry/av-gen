@@ -46,7 +46,6 @@
   "post/halation/enabled": true,
   "post/halation/intensity": 0.22,
   "post/halation/threshold": 2.4,
-  "scene/fogDensity": 0.0016,
   "scene/fogColor": [
    0.075,
    0.07,
@@ -1564,7 +1563,7 @@
     ]
    },
    {
-    "target": "scene/fogDensity",
+    "target": "scene/volumeDensity",
     "component": -1,
     "timeBase": "seconds",
     "mode": "replace",
@@ -1574,21 +1573,21 @@
      {
       "time": 0.0,
       "value": [
-       0.0016
+       0.003
       ],
       "interp": "smooth"
      },
      {
       "time": 60.0,
       "value": [
-       0.0024
+       0.0045
       ],
       "interp": "smooth"
      },
      {
       "time": 80.0,
       "value": [
-       0.003
+       0.005625
       ],
       "interp": "smooth"
      }

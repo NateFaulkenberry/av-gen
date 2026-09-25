@@ -39,6 +39,9 @@
 // `fbm3` and deliberately does not include `noise.wgsl` -- the include directive does not
 // de-duplicate and `fields.wgsl` above has already brought it in.
 #include "tornado.wgsl"
+// ADR-710: where the march puts its samples. Declares no bindings, so the parity harness can
+// compile it standalone.
+#include "march_schedule.wgsl"
 
 struct VolumeUniforms {
     params0: vec4<f32>,   // density, fogHeight, fogHeightFalloff, scattering
@@ -49,7 +52,7 @@ struct VolumeUniforms {
     depthParams: vec4<f32>, // camera near, camera far, march start jitter (ADR-461), 0
     fogColor: vec4<f32>,  // rgb = emission tint when no colour field is named
     glow: vec4<f32>,      // x = particle glow entries to read (ADR-040), y = local-light strength
-    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    heightFog: vec4<f32>, // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow; ADR-705: w = horizonDensity
     selfShadow: vec4<f32>, // ADR-570: x = shadow march steps (0 = off), y = strength, zw = 0
     // ADR-562: the placed media, as lanes. `mediaInfo.x` is how many are live.
     //
@@ -124,6 +127,33 @@ fn ndcOf(uv: vec2<f32>) -> vec2<f32> {
 fn worldAt(ndc: vec2<f32>, z: f32) -> vec3<f32> {
     let p = frame.invViewProj * vec4<f32>(ndc, z, 1.0);
     return p.xyz / p.w;
+}
+
+// ADR-707: the direction of the camera ray through `ndc`, built from the camera's own basis and
+// NOT from `worldAt(ndc, 1.0) - worldAt(ndc, 0.0)`.
+//
+// That subtraction is what this used to be, and it is wrong in a way that depends on WHERE the
+// camera stands. The composition derives the far plane as fifty times the orbit radius, so a
+// camera 4 km from its target has a 212 km far plane and a near/far ratio near 1:400,000. At
+// `z = 1` the inverse view-projection's `w` is about 5e-6 -- the difference of two numbers near 1
+// in f32 -- and its rounding error multiplies the camera's WORLD position into the far point. So
+// the error grows with the distance from the world origin: measured on the CPU in f32 against a
+// double reference, the worst direction error over the `_tc-4` frame is 1.3e-3 rad with the storm
+// at x = 7857 m and 3.0e-5 rad with the same storm at x = 0, which at 4.2 km is 5.6 m against
+// 0.13 m. On the GPU the error came back piecewise-constant across the screen, so whole 60-pixel
+// columns of pixels marched one ray, and a 110 m column 4 km away was hit in some and missed in
+// the rest: the "Tall Column is missing its middle" defect, which is not in the field at all.
+//
+// The basis is exact to f32: `cameraRight/Up/Forward` are orthonormal, and the projection's two
+// scale factors are the lengths of the view-projection's first two rows (the view's rows are
+// unit vectors). This ignores an off-centre projection term, which `Camera::projection` never
+// produces; if one is ever added, add it here.
+fn viewRayDirection(ndc: vec2<f32>) -> vec3<f32> {
+    let vp = frame.viewProj;
+    let sx = length(vec3<f32>(vp[0].x, vp[1].x, vp[2].x));
+    let sy = length(vec3<f32>(vp[0].y, vp[1].y, vp[2].y));
+    return normalize(frame.cameraForward.xyz + frame.cameraRight.xyz * (ndc.x / max(sx, 1e-6)) +
+                     frame.cameraUp.xyz * (ndc.y / max(sy, 1e-6)));
 }
 
 // View-space distance a clip depth stands for (used only to weight the upsample).
@@ -202,9 +232,14 @@ fn mediumKind(s: u32) -> u32 {
 // map, two readings of it, which is what keeps a fog bank a different authoring surface onto one
 // primitive rather than a second primitive (ADR-500's argument, still standing).
 fn mediumFogUniforms(s: u32) -> FogUniformsWgsl {
+    // ADR-713/714: and lanes 1, 3, 5, 8, 9, 10 and 11, in the order `shaders/fog.wgsl` names them
+    // f7..f13. Lane 4 is the one lane a fog slot leaves alone: the debug view reads its `.y` as a
+    // throat for every kind.
     return FogUniformsWgsl(mediaLane(s, 0u), mediaLane(s, 13u), mediaLane(s, 14u),
                            mediaLane(s, 7u), mediaLane(s, 12u), mediaLane(s, 2u),
-                           mediaLane(s, 6u));
+                           mediaLane(s, 6u), mediaLane(s, 1u), mediaLane(s, 3u),
+                           mediaLane(s, 5u), mediaLane(s, 8u), mediaLane(s, 9u),
+                           mediaLane(s, 10u), mediaLane(s, 11u));
 }
 
 // ADR-580's tornado: the first kind whose field is a DIFFERENT function rather than a different
@@ -254,9 +289,14 @@ fn mediumCometResponse(s: u32) -> f32 {
 }
 
 // The dispatch the kind tag exists for.
-fn mediumShape(s: u32, p: vec3<f32>, t: f32) -> f32 {
+//
+// ADR-718: `step` is the march's step AT THIS SAMPLE -- the ray's direction times the schedule's
+// spacing there -- which the fog's turbulence band-limits itself against (`fogTurbulenceBand`). A
+// zero step is a point sample. The vortex and the tornado keep `vortexFilterWidth()`, the authored
+// `maxDistance / steps`, exactly as ADR-710 left them.
+fn mediumShape(s: u32, p: vec3<f32>, t: f32, step: vec3<f32>) -> f32 {
     if (mediumKind(s) == kMediumKindFog) {
-        return fogShapeAt(mediumFogUniforms(s), p, t);
+        return fogShapeAt(mediumFogUniforms(s), p, t, step);
     }
     if (mediumKind(s) == kMediumKindTornado) {
         return tornadoDensityAt(mediumTornadoUniforms(s), p, t, vortexFilterWidth());
@@ -301,6 +341,9 @@ fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
     if (mediumKind(s) == kMediumKindFog) {
         let f = mediumFogUniforms(s);
         height = fogEmissionHeight(f, p.y - f.f0.y);
+        // ADR-714 (§25): the height and distance colours, by the same per-kind arm and for the same
+        // reason. Luminance-preserving, so they move hue and never the brightness the density set.
+        c = fogTintedColour(f, c, p.y - f.f0.y, distance(p, frame.cameraPos.xyz));
     }
     return c * (shape * l3.z * height);
 }
@@ -309,9 +352,10 @@ fn mediumEmissionAt(s: u32, p: vec3<f32>, shape: f32, t: f32) -> vec3<f32> {
 //
 // `world::mediumBound` in `src/world/medium_bound.cpp` is the transliteration of this function,
 // and that file carries the full argument. The short version: a bound is a CLAIM that every
-// non-zero sample of this slot's field lies inside it, a generous bound costs only field
-// evaluations (the march's step positions do not depend on it), and a tight one deletes part of
-// the medium in the way that is hardest to see. So when it is uncertain, be generous.
+// non-zero sample of this slot's field lies inside it, a tight one deletes part of the medium in
+// the way that is hardest to see, and a generous one costs samples -- since ADR-710 the march
+// spends its steps inside the bound, so a bound twice the medium's depth samples it half as
+// finely. So when it is uncertain, still be generous; but it is no longer free.
 //
 // It was tight in two places, both invisible at the defaults and both severe at the ends of the
 // controls that caused them:
@@ -343,19 +387,25 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
         let l2 = mediaLane(s, 2u);
         let l4 = mediaLane(s, 4u);
         let l7 = mediaLane(s, 7u);
-        let l8 = mediaLane(s, 8u);
         // The radius curve is a quadratic Bezier, so it never leaves the convex hull of its three
         // control values -- taking the largest is a provable bound and not an estimate.
         let widest = max(l1.x, max(l1.y, l1.z));
         let funnel = widest * (1.0 + max(l2.x, 0.0) + max(mediaLane(s, 3u).x, 0.0));
-        let skirt = l1.x * max(l4.x, 1.0) * (1.0 + max(l4.w, 0.0));
-        let cloud = l1.z * max(l8.w, 1.0);
+        // Only where the debris exists (ADR-710; the field gates its skirt on `skirtDensity`).
+        var skirt = 0.0;
+        if (l4.z > 0.0) {
+            skirt = l1.x * max(l4.x, 1.0) * (1.0 + max(l4.w, 0.0));
+        }
         // The axis is a curve: the lean displaces the top and the wobble swings it, and both move
         // the whole column sideways within the bound rather than deforming it.
-        let lateral = length(vec2<f32>(l7.x, l7.y)) + max(l7.z, 0.0);
-        // Vertically the field is compactly supported: `h > 1.08` and `h < -0.02` both return zero.
-        return vec3<f32>(max(funnel, max(skirt, cloud)) + lateral,
-                         centre.y - radius * 0.02,
+        let lateral = length(vec2<f32>(l7.x, l7.y)) + max(l7.z, 0.0) * 1.41422; // ADR-710: sqrt 2, see medium_bound.cpp
+        // Vertically the field is compactly supported: nothing above `h = 1.08`, and nothing below
+        // the funnel's tip or the debris cloud's rounded underside (ADR-706), which is the same
+        // `tornadoSupportBelow` the field itself early-outs on.
+        // ADR-710: this is the COLUMN -- the funnel and the debris. The wall cloud is the cap,
+        // `mediumCapOf`, over the band it can occupy.
+        return vec3<f32>(max(funnel, skirt) + lateral,
+                         centre.y - radius * tornadoSupportBelow(mediumTornadoUniforms(s)),
                          centre.y + radius * 1.08);
     }
 
@@ -374,7 +424,22 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
     if (shape == kFogShapeSphere) {
         reach = 1.0;
     }
-    let rr = radius * breath * reach * 1.35;
+    // ADR-713: the turbulence displaces a sample by at most `amount` of each semi-axis
+    // (`fogTurbulence` clamps the flow to length 1), so the support grows by exactly that --
+    // horizontally by the longer of the two horizontal semi-axes, vertically by the vertical one.
+    //
+    // Added under a BRANCH, not as `+ 0.0 * reach`: the Metal compiler is free to re-associate a sum
+    // it is handed, and a bound that moves by an ULP moves the march's sample schedule with it -- a
+    // default bank rendered one pixel one level different until this was a branch. At turbulence 0
+    // these are the pre-ADR-713 expressions, evaluated on the same bits.
+    let turbulence = clamp(mediaLane(s, 7u).y, 0.0, 1.0);
+    var rr = radius * breath * reach * 1.35;
+    var grow = 0.0;
+    if (turbulence > 0.0) {
+        let semi = fogSemiAxes(f);
+        rr = rr + turbulence * max(semi.x, semi.z);
+        grow = turbulence * semi.y;
+    }
 
     if (shape == kFogShapeBank) {
         // Solve `exp(-h * falloff) = 0.01`: 1% of the column left outside, which is below what a
@@ -384,46 +449,61 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
         let bias = clamp(mediaLane(s, 14u).y, 0.0, 1.0);
         let base = -thickness + 2.0 * thickness * bias;
         let hTop = clamp(4.6 / falloff, 3.0, 40.0);
-        return vec3<f32>(rr,
-                         centre.y + base - depth - thickness * 1.5,
-                         centre.y + base + thickness * hTop);
+        let yBot = centre.y + base - depth - thickness * 1.5;
+        let yTop = centre.y + base + thickness * hTop;
+        if (grow > 0.0) {
+            return vec3<f32>(rr, yBot - grow, yTop + grow);
+        }
+        return vec3<f32>(rr, yBot, yTop);
     }
     // A closed primitive ends where its own surface ends, and the height influence can only make
     // it thinner.
     var half = thickness;
     if (shape == kFogShapeSphere) {
         half = radius;
+        // ADR-713: the sphere swells in every direction (`fogSwellOffset`), so its vertical reach
+        // carries the swell the horizontal always has. Branched for the reason above.
+        if (breath != 1.0) {
+            half = radius * breath;
+        }
     }
-    return vec3<f32>(rr, centre.y - depth - half * 1.35, centre.y + half * 1.35);
+    let yBot = centre.y - depth - half * 1.35;
+    let yTop = centre.y + half * 1.35;
+    if (grow > 0.0) {
+        return vec3<f32>(rr, yBot - grow, yTop + grow);
+    }
+    return vec3<f32>(rr, yBot, yTop);
 }
 
-// ADR-562 §4: the per-slot ray interval, as a VERTICAL CYLINDER.
+// ADR-710: the bound's CAP -- (capRadiusXZ, capYBot) -- a wider cylinder from `capYBot` up to the
+// bound's top, for a medium that is broad only near its top. `world::mediumBound`'s `capRadiusXZ`
+// and `capYBot` are its CPU twin. Every kind but the tornado answers with its own cylinder, which
+// makes the union the one cylinder it always was.
 //
-// This is the highest-value affordance in the foundation and it is why the slot array had to come
-// before the fog authoring work. ADR-560 measured that shrinking a medium's screen footprint moved
-// `volume.march` only 7.14 -> 6.62 ms, because every pixel still marched all 32 steps across the
-// full 4 km and the only saving was the per-sample early-out inside the field. Smaller on screen
-// did not mean fewer steps. `agent/tornado` measured the same thing from the other side: a fixed
-// 128-step march put 31 m between samples and broke a 24 m column into disconnected pieces.
-//
-// A CYLINDER rather than a sphere because every term in this family's field is a function of
-// `length(rel.xz)` and `rel.y` alone -- so a cylinder is the field's own shape, and for the two
-// cases that matter it is dramatically tighter: a wide flat fog bank and a tall thin tornado are
-// both mostly empty inside their bounding spheres.
-//
-// Returns (tEnter, tExit); tExit <= tEnter means the ray misses this medium entirely.
-fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -> vec2<f32> {
-    let l0 = mediaLane(s, 0u);
-    let radius = l0.w;
-    if (radius <= 0.0) {
-        return vec2<f32>(1.0, -1.0);
+// The tornado's wall cloud is five top radii across on the hero (750 m) against a 250 m funnel, and
+// exists only above `h = 1 - cloudHeight`, the field's own gate. As one cylinder, every ray through
+// the funnel crossed 1.6 km of bound; since the march spends its steps inside the bound, that was
+// most of the hero's samples in empty air.
+fn mediumCapOf(s: u32, bound: vec3<f32>) -> vec2<f32> {
+    if (mediumKind(s) != kMediumKindTornado) {
+        return bound.xy;
     }
-    let bound = mediumBoundOf(s);
-    let rr = bound.x;
-    let yBot = bound.y;
-    let yTop = bound.z;
-    let centre = l0.xyz;
+    let l0 = mediaLane(s, 0u);
+    let l7 = mediaLane(s, 7u);
+    let l9 = mediaLane(s, 9u);
+    let lateral = length(vec2<f32>(l7.x, l7.y)) + max(l7.z, 0.0) * 1.41422; // ADR-710: sqrt 2, see medium_bound.cpp
+    let cloud = mediaLane(s, 1u).z * max(mediaLane(s, 8u).w, 1.0) + lateral;
+    if (l9.y <= 0.0 || cloud <= bound.x) {
+        return bound.xy;
+    }
+    let cloudHeight = clamp(l9.x, 1e-3, 1.0);
+    return vec2<f32>(cloud, l0.y + l0.w * (1.0 - cloudHeight));
+}
 
+// One vertical cylinder about `centre.xz`, clipped by two caps: (tEnter, tExit), empty when
+// tExit <= tEnter.
+fn cylinderInterval(origin: vec3<f32>, dir: vec3<f32>, centre: vec3<f32>, rr: f32, yBot: f32, yTop: f32,
+                    maxDistance: f32) -> vec2<f32> {
     // Infinite cylinder about +Y, then clipped by the two caps.
     let d = vec2<f32>(dir.x, dir.z);
     let o = vec2<f32>(origin.x - centre.x, origin.z - centre.z);
@@ -460,13 +540,81 @@ fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -
     return vec2<f32>(max(t0, 0.0), min(t1, maxDistance));
 }
 
+// ADR-562 §4: the per-slot ray interval, as a VERTICAL CYLINDER.
+//
+// This is the highest-value affordance in the foundation and it is why the slot array had to come
+// before the fog authoring work. ADR-560 measured that shrinking a medium's screen footprint moved
+// `volume.march` only 7.14 -> 6.62 ms, because every pixel still marched all 32 steps across the
+// full 4 km and the only saving was the per-sample early-out inside the field. Smaller on screen
+// did not mean fewer steps. `agent/tornado` measured the same thing from the other side: a fixed
+// 128-step march put 31 m between samples and broke a 24 m column into disconnected pieces.
+//
+// A CYLINDER rather than a sphere because every term in this family's field is a function of
+// `length(rel.xz)` and `rel.y` alone -- so a cylinder is the field's own shape, and for the two
+// cases that matter it is dramatically tighter: a wide flat fog bank and a tall thin tornado are
+// both mostly empty inside their bounding spheres.
+//
+// Returns (tEnter, tExit); tExit <= tEnter means the ray misses this medium entirely.
+fn mediumInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -> vec2<f32> {
+    return intervalHull(mediumColumnInterval(s, origin, dir, maxDistance),
+                        mediumCapInterval(s, origin, dir, maxDistance));
+}
+
+// ADR-710: the slot's two convex pieces, separately -- the column (every kind has one) and the cap
+// (empty for every kind but a tornado with a wall cloud wider than its funnel). The march's
+// schedule takes them as two intervals and merges them as a UNION; `mediumInterval` above is their
+// hull, which is what the per-sample cull and the shadow march want, and what the schedule must not
+// be given (see `shaders/march_schedule.wgsl` for the seam a hull draws).
+fn mediumColumnInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -> vec2<f32> {
+    let l0 = mediaLane(s, 0u);
+    if (l0.w <= 0.0) {
+        return vec2<f32>(1.0, -1.0);
+    }
+    let bound = mediumBoundOf(s);
+    return cylinderInterval(origin, dir, l0.xyz, bound.x, bound.y, bound.z, maxDistance);
+}
+
+fn mediumCapInterval(s: u32, origin: vec3<f32>, dir: vec3<f32>, maxDistance: f32) -> vec2<f32> {
+    let l0 = mediaLane(s, 0u);
+    if (l0.w <= 0.0) {
+        return vec2<f32>(1.0, -1.0);
+    }
+    let bound = mediumBoundOf(s);
+    let cap = mediumCapOf(s, bound);
+    if (cap.x <= bound.x) {
+        return vec2<f32>(1.0, -1.0);
+    }
+    return cylinderInterval(origin, dir, l0.xyz, cap.x, cap.y, bound.z, maxDistance);
+}
+
+fn intervalHull(a: vec2<f32>, b: vec2<f32>) -> vec2<f32> {
+    if (b.y <= b.x) {
+        return a;
+    }
+    if (a.y <= a.x) {
+        return b;
+    }
+    return vec2<f32>(min(a.x, b.x), max(a.y, b.y));
+}
+
 fn volumeDensityAt(p: vec3<f32>) -> f32 {
     // ADR-567: the SAME function the surface fog integrates (`height_fog.wgsl`, reached through
     // this file's include of common.wgsl). It used to be this expression written out here and the
     // antiderivative written out in common.wgsl -- two statements of one model, in two files, with
     // nothing asserting they were a function and its integral.
-    let heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z,
+    var heightTerm = fogHeightProfile(p.y - vol.params0.y, vol.params0.z,
                                       vol.heightFog.x, vol.heightFog.y);
+    // ADR-715: the layer's top follows the ground. The texture and its placement are the frame's
+    // (group 0, common.wgsl) -- the same two the surface fog reads, so the two readers cannot be
+    // handed different terrains. At follow 0 the line above is the whole of it, bit for bit.
+    // ADR-717: pooling is read from the FRAME's lane (`frame.fogPool.x`), the very number the
+    // surface fog reads, rather than copied into VolumeUniforms -- one lane, so the two readers
+    // cannot be handed different pooling.
+    if ((vol.heightFog.z > 0.0 || frame.fogPool.x > 0.0) && frame.terrainMap1.w > 0.5) {
+        heightTerm = fogGroundProfileAt(terrainHeightTex, frame.terrainMap0, frame.terrainMap1, p, vol.params0.y,
+                                        vol.heightFog.z, frame.fogPool.x, vol.params0.z, vol.heightFog.x,
+                                        vol.heightFog.y);
+    }
     var base = vol.params0.x * heightTerm;
     let densitySlot = i32(vol.info.y);
     if (densitySlot >= 0) {
@@ -488,7 +636,7 @@ fn volumeTotalDensityAt(p: vec3<f32>, t: f32) -> f32 {
     var total = volumeDensityAt(p);
     let count = u32(vol.mediaInfo.x);
     for (var s = 0u; s < count; s = s + 1u) {
-        total = total + mediumShape(s, p, t) * mediumDensityCoeff(s);
+        total = total + mediumShape(s, p, t, vec3<f32>(0.0)) * mediumDensityCoeff(s);
     }
     return total;
 }
@@ -580,35 +728,59 @@ fn mediumSelfShadow(p: vec3<f32>, towards: vec3<f32>, t: f32) -> f32 {
         // The SAME bound the primary march clips to (ADR-566), so the shadow ray cannot miss part
         // of a medium the camera ray can see -- and so an ADR-566-style defect could not be
         // introduced here separately: there is one bound and this is a second reader of it.
-        let iv = mediumInterval(s, p, towards, 1.0e7);
-        if (iv.y <= iv.x) {
-            continue;
-        }
-        let dt = (iv.y - iv.x) / f32(steps);
-        // Through the KIND-AWARE accessor, not `mediaLane(s, 1u).w`. That direct read is what this
-        // line said when ADR-570 wrote it on `agent/fog`, where the only kinds were the vortex and
-        // the fog bank and they share a lane layout. `agent/tornado` brought a kind that does not:
-        // lane 1 is its radius curve, so an unconditional read hands the shadow march
-        // `radiusMidControl` -- a number in the tens -- as an extinction in the hundredths, and a
-        // tornado would swallow every light that crossed it. The merge created that defect by
-        // putting a new shared reader and a new kind in the same tree; `mediumDensityCoeff` is the
-        // accessor that already existed for exactly this and this is now its third call site.
-        let extinctionPerShape = mediumDensityCoeff(s);
-        for (var k = 0; k < steps; k = k + 1) {
-            let x = p + towards * (iv.x + (f32(k) + 0.5) * dt);
-            let shape = mediumShape(s, x, t);
-            if (shape > 0.0) {
-                tau = tau + shape * extinctionPerShape * dt;
+        //
+        // ADR-710: in up to three PIECES -- the column, and the part of the cap before and after it
+        // -- each with its own `steps`, never their hull. The shadow ray's spacing is its interval's
+        // length over `steps`, so a hull that jumps by the gap between funnel and cloud the moment
+        // the ray grazes the cloud jumps the spacing with it, and the first ADR-710 render drew
+        // that as a diagonal seam across the hero's shadowed side. A piece's length varies
+        // continuously, and a piece of length zero contributes zero, so the sum cannot jump.
+        let column = mediumColumnInterval(s, p, towards, 1.0e7);
+        let cap = mediumCapInterval(s, p, towards, 1.0e7);
+        var pieces: array<vec2<f32>, 3>;
+        pieces[0] = column;
+        pieces[1] = vec2<f32>(1.0, -1.0);
+        pieces[2] = vec2<f32>(1.0, -1.0);
+        if (cap.y > cap.x) {
+            if (column.y <= column.x) {
+                pieces[1] = cap;
+            } else {
+                pieces[1] = vec2<f32>(cap.x, min(cap.y, column.x));
+                pieces[2] = vec2<f32>(max(cap.x, column.y), cap.y);
             }
-            // NO EARLY-OUT HERE, and that is a measurement rather than an oversight. The primary
-            // march breaks at `transmittance < 0.002` and the same test was written into this
-            // loop, expecting the same win. Measured interleaved at 4 steps with one volumetric
-            // light, three repeats: +1.57, +0.85, -0.78 ms. **Mixed sign, so no effect is
-            // established** (docs/testing.md 19's discard rule: discard on sign disagreement,
-            // never on spread), and it was removed rather than kept on the argument that it must
-            // help. At four steps the loop can save at most three evaluations and only deep
-            // inside a thick medium, which is probably why. If `volumeShadowSteps`' cap of 16 is
-            // ever raised, measure it again before assuming the answer is the same.
+        }
+        // Through the KIND-AWARE accessor (see below).
+        let extinctionPerShape = mediumDensityCoeff(s);
+        for (var piece = 0; piece < 3; piece = piece + 1) {
+            let iv = pieces[piece];
+            if (iv.y <= iv.x) {
+                continue;
+            }
+            let dt = (iv.y - iv.x) / f32(steps);
+            // Through the KIND-AWARE accessor, not `mediaLane(s, 1u).w`. That direct read is what this
+            // line said when ADR-570 wrote it on `agent/fog`, where the only kinds were the vortex and
+            // the fog bank and they share a lane layout. `agent/tornado` brought a kind that does not:
+            // lane 1 is its radius curve, so an unconditional read hands the shadow march
+            // `radiusMidControl` -- a number in the tens -- as an extinction in the hundredths, and a
+            // tornado would swallow every light that crossed it. The merge created that defect by
+            // putting a new shared reader and a new kind in the same tree; `mediumDensityCoeff` is the
+            // accessor that already existed for exactly this and this is now its third call site.
+            for (var k = 0; k < steps; k = k + 1) {
+                let x = p + towards * (iv.x + (f32(k) + 0.5) * dt);
+                let shape = mediumShape(s, x, t, towards * dt);
+                if (shape > 0.0) {
+                    tau = tau + shape * extinctionPerShape * dt;
+                }
+                // NO EARLY-OUT HERE, and that is a measurement rather than an oversight. The primary
+                // march breaks at `transmittance < 0.002` and the same test was written into this
+                // loop, expecting the same win. Measured interleaved at 4 steps with one volumetric
+                // light, three repeats: +1.57, +0.85, -0.78 ms. **Mixed sign, so no effect is
+                // established** (docs/testing.md 19's discard rule: discard on sign disagreement,
+                // never on spread), and it was removed rather than kept on the argument that it must
+                // help. At four steps the loop can save at most three evaluations and only deep
+                // inside a thick medium, which is probably why. If `volumeShadowSteps`' cap of 16 is
+                // ever raised, measure it again before assuming the answer is the same.
+            }
         }
     }
     // `params1.x` is the absorption the primary march turns density into extinction with, so the
@@ -755,8 +927,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     let fullPx = vec2<i32>(min(mapped.x, i32(vol.sizes.z) - 1), min(mapped.y, i32(vol.sizes.w) - 1));
     let ndc = ndcOf((vec2<f32>(fullPx) + vec2<f32>(0.5)) / vol.sizes.zw);
     let origin = worldAt(ndc, 0.0);
-    let farPoint = worldAt(ndc, 1.0);
-    let direction = normalize(farPoint - origin);
+    let direction = viewRayDirection(ndc);
 
     let sceneZ = textureLoad(sceneDepth, fullPx, 0);
     var maxDistance = vol.params1.w;
@@ -776,37 +947,72 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
     let anisotropy = clamp(vol.params1.y, -0.95, 0.95);
     let colorSlot = i32(vol.info.z);
 
-    // ADR-562 §4: each slot's ray interval, computed ONCE per pixel rather than per step.
-    //
-    // The march's step positions are deliberately unchanged -- the same `steps` over the same
-    // `maxDistance`, so the Environment fog integrates exactly as it did and no existing frame
-    // moves. What the intervals buy is that a step outside a medium's cylinder costs a comparison
-    // instead of a field evaluation, and ADR-374 measured that the cost IS how many samples have
-    // non-zero density.
-    //
-    // Redistributing the steps into the union of the intervals is the bigger win and is NOT done
-    // here: it would change the fog's own integration and every existing frame with it, so it is a
-    // separate measurement with its own arm. `agent/tornado`'s per-medium step derivation (rope 462
-    // steps, wedge 96, against a fixed 128 that broke a 24 m column into pieces) is the evidence
-    // that it is worth doing next.
+    // ADR-562 §4: each slot's ray interval, computed ONCE per pixel rather than per step. What an
+    // interval buys is twofold: a sample outside a medium's cylinder costs a comparison instead of
+    // a field evaluation (ADR-374: the cost IS how many samples have non-zero density), and --
+    // since ADR-710 -- the samples are placed inside the intervals rather than across the ray.
     let mediumCount = u32(vol.mediaInfo.x);
     var slotMin: array<f32, 4>;
     var slotMax: array<f32, 4>;
+    var intervals: array<vec2<f32>, 8>;
     for (var s = 0u; s < 4u; s = s + 1u) {
         if (s < mediumCount) {
-            let iv = mediumInterval(s, origin, direction, maxDistance);
+            // ADR-710: the column and the cap go to the schedule separately (a union), and their
+            // hull is this slot's cull range.
+            let column = mediumColumnInterval(s, origin, direction, maxDistance);
+            let cap = mediumCapInterval(s, origin, direction, maxDistance);
+            intervals[2u * s] = column;
+            intervals[2u * s + 1u] = cap;
+            let iv = intervalHull(column, cap);
             slotMin[s] = iv.x;
             slotMax[s] = iv.y;
         } else {
             slotMin[s] = 1.0;
             slotMax[s] = -1.0;
+            intervals[2u * s] = vec2<f32>(1.0, -1.0);
+            intervals[2u * s + 1u] = vec2<f32>(1.0, -1.0);
         }
+    }
+
+    // ADR-710 (fog §31 = tornado item 5): the steps go WHERE THE MEDIA ARE.
+    //
+    // ADR-562 §4 computed the intervals above and then marched the fixed grid anyway -- `steps`
+    // samples over the whole `maxDistance` -- so an interval only turned a step outside a medium
+    // into a comparison. A thin medium far down a long ray got one or two samples: the hero's 32
+    // steps over 4 km are 125 m apart through a 140-220 m funnel, which is why ADR-708 found it
+    // grainy at every shadow step count until the GLOBAL count went to 256.
+    //
+    // `marchSchedule` spends the authored step count inside the union of the intervals, and
+    // leaves the environment fog's legacy grid alone outside it. A ray that crosses no medium is
+    // marched exactly as before (one segment, the same `(i + jitter) * stepLength`), and a ray
+    // whose environment fog is off skips the empty air between media. So a scene with no placed
+    // medium does not move by a byte, and neither does any pixel whose ray misses them all.
+    //
+    // What it does NOT change is the density any sample reads. `vortexFilterWidth()` -- the step
+    // the tornado's and vortex's noise band-limit themselves to (ADR-389) -- stays the authored
+    // `maxDistance / steps`, so the field is the same function it was and only where it is
+    // sampled moved. A finer filter would be a second density change in the same edit, which is
+    // the attribution trap the plan's §4 ordering exists to avoid.
+    let schedule = marchSchedule(intervals, maxDistance, steps, vol.params0.x > 0.0);
+    var samples = 0;
+    for (var g = 0u; g < schedule.segments; g = g + 1u) {
+        samples = samples + schedule.count[g];
     }
 
     var transmittance = 1.0;
     var scattered = vec3<f32>(0.0);
-    for (var i = 0; i < steps; i = i + 1) {
-        let t = (f32(i) + jitter) * stepLength;
+    // One flat loop over the schedule's samples, walking its segments in order, so transmittance
+    // accumulates front to back across them exactly as it did across the one grid.
+    var segment = 0u;
+    var inSegment = 0;
+    for (var k = 0; k < samples; k = k + 1) {
+        if (inSegment >= schedule.count[segment]) {
+            segment = segment + 1u;
+            inSegment = 0;
+        }
+        let segmentStep = schedule.step[segment];
+        let t = schedule.start[segment] + (f32(inSegment) + jitter) * segmentStep;
+        inSegment = inSegment + 1;
         let p = origin + direction * t;
         // ADR-371/562: every placed medium is part of ONE medium as far as the march is
         // concerned -- one density, one transmittance, one early-out. Keeping them separate would
@@ -816,7 +1022,14 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         // ADR-562 §4: a slot whose interval this step is outside costs one comparison instead of a
         // field evaluation. That is the difference between ADR-560's measured 7% saving from a
         // smaller medium and a proportional one.
-        let fogDensity = volumeDensityAt(p);
+        var fogDensity = volumeDensityAt(p);
+        // ADR-705, §7's Horizon Density: the environment's air grows denser with distance from the
+        // eye, by the same factor `applyFog` integrates past the march's reach, so the two passes
+        // stay one law. Only the environment layer -- a placed medium has its own size and its own
+        // density (ADR-564) and is not "the horizon". The branch keeps horizon 0 bit-identical.
+        if (vol.heightFog.w > 0.0) { // ADR-705; z is ADR-715's ground follow
+            fogDensity = fogDensity * (1.0 + vol.heightFog.w * t * 0.001);
+        }
         var mediumDensity = 0.0;
         var mediumScatter = 0.0;
         var mediumEmission = vec3<f32>(0.0);
@@ -825,7 +1038,7 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
             if (t < slotMin[s] || t > slotMax[s]) {
                 continue;
             }
-            let shape = mediumShape(s, p, vol.noiseParams.w);
+            let shape = mediumShape(s, p, vol.noiseParams.w, direction * segmentStep);
             if (shape <= 0.0) {
                 continue;
             }
@@ -925,8 +1138,8 @@ fn fs_volume(in: FsIn) -> @location(0) vec4<f32> {
         // catches more of it - which is what reads as "the sparks are lighting the dust".
         let local = localInScatterAt(p, screenUv, max(t * depthAlongRay, 1e-3), direction, anisotropy);
         let source = scattering * (inScatterAt(p, direction, anisotropy) + particleGlowAt(p) + local) + emission;
-        scattered = scattered + transmittance * source * stepLength;
-        transmittance = transmittance * exp(-extinction * stepLength);
+        scattered = scattered + transmittance * source * segmentStep;
+        transmittance = transmittance * exp(-extinction * segmentStep);
         if (transmittance < 0.002) {
             break;
         }
@@ -956,6 +1169,18 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
 
     var accum = vec4<f32>(0.0);
     var weightSum = 0.0;
+    // ADR-709: whether all four texels are the march's "nothing here" -- no light, full
+    // transmittance. Then this pixel is left EXACTLY as the lit pass drew it.
+    //
+    // It was not, and that was the "whole-frame perturbation" ADR-702 recorded. The normalisation
+    // below divides `accum.a` by `weightSum`, which are the same four products summed in the same
+    // order, so in exact arithmetic the ratio is 1 -- but the Metal compiler computes `x / y` as
+    // `x * (1 / y)`, which comes back 0.99999994 for some `x`, and `hdr * 0.99999994` rounds to a
+    // different half-float in a fraction of pixels. On Glowmere Valley 2 with its environment fog
+    // off, a medium 2 km behind the camera moved 0.35% of the frame by one level (and 0.14% by up
+    // to three at t = 62). Most of what ADR-702 measured was not this at all -- it was its harness
+    // advancing the engine between arms; see ADR-709.
+    var untouched = true;
     for (var j = 0; j < 2; j = j + 1) {
         for (var i = 0; i < 2; i = i + 1) {
             let hx = clamp(bx + i, 0, maxX);
@@ -965,11 +1190,13 @@ fn fs_composite(in: FsIn) -> @location(0) vec4<f32> {
             let sourcePx = vec2<i32>(min(mapped.x, fullMaxX), min(mapped.y, fullMaxY));
             let theirDepth = linearDepth(textureLoad(sceneDepth, sourcePx, 0));
             let w = bilinear / (1.0 + 8.0 * abs(theirDepth - myDepth) / max(myDepth, 1e-3));
-            accum = accum + textureLoad(volumeTex, vec2<i32>(hx, hy), 0) * w;
+            let texel = textureLoad(volumeTex, vec2<i32>(hx, hy), 0);
+            untouched = untouched && all(texel == vec4<f32>(0.0, 0.0, 0.0, 1.0));
+            accum = accum + texel * w;
             weightSum = weightSum + w;
         }
     }
-    if (weightSum <= 1e-6) {
+    if (weightSum <= 1e-6 || untouched) {
         return vec4<f32>(0.0, 0.0, 0.0, 1.0);
     }
     let result = accum / weightSum;

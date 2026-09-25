@@ -99,10 +99,11 @@
   "intensity": 1.0,
   "skyIntensity": 1.0,
   "skyBloom": 0.0,
-  "fogDensity": 0.0,
   "shadowRange": 420.0,
   "volumeMaxDistance": 4000.0,
   "volumeSteps": 48,
+  "volumeShadowSteps": 4,
+  "volumeShadowStrength": 0.45,
   "sky": {
    "enabled": true,
    "background": false,
@@ -205,17 +206,17 @@
      0.0
     ],
     "density": 0.05,
-    "emission": 0.004,
-    "scattering": 0.15,
+    "emission": 0.008,
+    "scattering": 0.1,
     "colorThin": [
-     0.28,
-     0.62,
-     0.78
+     0.2,
+     0.72,
+     0.88
     ],
     "colorThick": [
-     0.06,
      0.1,
-     0.3
+     0.06,
+     0.32
     ]
    }
   }

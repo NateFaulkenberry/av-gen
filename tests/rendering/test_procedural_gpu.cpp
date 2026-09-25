@@ -468,9 +468,13 @@ TEST_CASE("Distance fog pulls a far object towards the fog colour", "[gpu][proce
         return std::abs(int(centre[0]) - int(corner[0])) + std::abs(int(centre[1]) - int(corner[1])) +
                std::abs(int(centre[2]) - int(corner[2]));
     };
-    s.environment.fogDensity = 0.0f;
+    // ADR-705: the surface fog is the air's one density under Beer--Lambert, and `volumeMaxDistance`
+    // 0 keeps the march off so this is the surface pass alone. Was exp-squared `fogDensity` 0.05,
+    // exp(-(40 * 0.05)^2) = exp(-4); the same exp(-4) is now 0.2 * absorption 0.5 * 40 m.
+    s.environment.volumeMaxDistance = 0.0f;
+    s.environment.volumeDensity = 0.0f;
     const auto clear = renderOnce(*ctx, s, 0.0, 64, 64);
-    s.environment.fogDensity = 0.05f; // distance 40 -> exp(-4): almost fully fogged
+    s.environment.volumeDensity = 0.2f; // distance 40 -> exp(-4): almost fully fogged
     const auto foggy = renderOnce(*ctx, s, 0.0, 64, 64);
     const int clearDist = dist(clear);
     const int foggyDist = dist(foggy);
@@ -479,7 +483,7 @@ TEST_CASE("Distance fog pulls a far object towards the fog colour", "[gpu][proce
     CHECK(foggyDist < clearDist / 4);
     CHECK(gpu::hashImage(clear) != gpu::hashImage(foggy));
     // Density 0 with a different fog colour is a no-op.
-    s.environment.fogDensity = 0.0f;
+    s.environment.volumeDensity = 0.0f;
     s.environment.fogColor = {1.0f, 0.0f, 0.0f};
     CHECK(gpu::hashImage(renderOnce(*ctx, s, 0.0, 64, 64)) == gpu::hashImage(clear));
     CHECK(ctx->errorCount() == 0);

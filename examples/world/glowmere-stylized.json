@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "glowmere-stylized.scene.json",
-        "sha256": "2dc88fd785c5f2fce577c31b4a4e314502c14d7205ee43cf71dc72d872e490c9",
-        "size": 40772
+        "sha256": "5f0fc47f8d17d2ace22d41863bcd36b805f04eb20ebeec7eea4b7153e16483a2",
+        "size": 40747
       }
     }
   },
@@ -2652,7 +2652,6 @@
       0.18000000715255737,
       0.3199999928474426
     ],
-    "scene/fogDensity": 0.005499999970197678,
     "scene/fogHeight": 4.0,
     "scene/fogHeightFalloff": 0.10000000149011612,
     "scene/gridIntensity": 0.6000000238418579,
@@ -2672,6 +2671,7 @@
     "scene/volumeAnisotropy": 0.11999999731779099,
     "scene/volumeDensity": 0.006000000052154064,
     "scene/volumeEmission": 0.0,
+    "scene/volumeMaxDistance": 320.0,
     "scene/volumeNoiseScale": 0.019999999552965164,
     "scene/volumeNoiseSpeed": 0.10000000149011612,
     "scene/volumeScattering": 0.5,

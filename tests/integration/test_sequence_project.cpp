@@ -259,7 +259,7 @@ seq::Sequence eventPiece() {
     fog.id = "fog-up";
     fog.when = {.kind = seq::TriggerKind::ShotStart, .name = "night"};
     fog.what.kind = seq::EventActionKind::SetParameter;
-    fog.what.target = "scene/fogDensity";
+    fog.what.target = "scene/volumeDensity";
     fog.what.amount = glm::vec4(0.08f, 0.0f, 0.0f, 0.0f);
     fog.what.mode = params::TrackMode::Add;
     s.events.push_back(std::move(fog));
@@ -341,7 +341,7 @@ TEST_CASE("a baked event is the same state however the playhead reached it",
     };
     CHECK(shakeAmplitude(3.0) == Approx(0.0f));
     CHECK(shakeAmplitude(10.5) == Approx(0.35f));
-    const params::IParameter* fogParam = jumped.params().find("scene/fogDensity");
+    const params::IParameter* fogParam = jumped.params().find("scene/volumeDensity");
     REQUIRE(fogParam != nullptr);
     sampleAt(jumped, 3.0, jumpFrame++);
     const float fogBefore = fogParam->finalComponent(0);

@@ -1911,7 +1911,6 @@
       0.18,
       0.32
     ],
-    "fogDensity": 0.0055,
     "fogHeight": 4.0,
     "fogHeightFalloff": 0.1,
     "styledSkyAmbient": [
@@ -1924,13 +1923,13 @@
       0.011,
       0.024
     ],
-    "volumeDensity": 0.006,
-    "volumeScattering": 0.5,
+    "volumeDensity": 0.009,
+    "volumeScattering": 0.6,
     "volumeAnisotropy": 0.12,
     "volumeNoise": 0.45,
     "volumeNoiseScale": 0.02,
     "volumeSteps": 12,
-    "volumeMaxDistance": 320.0,
+    "volumeMaxDistance": 220.0,
     "volumeAbsorption": 0.4,
     "sky": {
       "enabled": true,

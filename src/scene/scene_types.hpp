@@ -483,6 +483,10 @@ enum class SkyBackground : std::uint8_t {
     IblCube,      // sample whatever the IBL was built from -- a map's equirect or the sky's cube
 };
 
+// ADR-705: Horizon Density's hard range. 8 makes the air nine times as dense a kilometre out, well
+// past anything that still reads as distance rather than as a wall.
+inline constexpr float kHorizonDensityMax = 8.0f;
+
 struct Environment;
 [[nodiscard]] SkyBackground skyBackgroundFor(const Environment& env, bool haveIbl, bool iblFromSky);
 
@@ -544,10 +548,16 @@ struct Environment {
     // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
     // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
     SkySettings sky;
-    // Distance fog (exponential-squared by view distance) applied to lit/unlit surfaces after
-    // shading; the skybox is untouched. Default colour = the default background colour.
+    // The colour the air fades a surface towards, where the surface pass carries the air (ADR-705,
+    // below). The skybox is untouched. Default colour = the default background colour.
+    //
+    // ADR-705 (resolving ADR-569): there is no separate surface-fog density any more. The surfaces
+    // are fogged by THE SAME air the volumetric march integrates -- extinction `volumeDensity *
+    // volumeAbsorption`, the same height layer, the same Beer--Lambert law -- and the only split is
+    // WHERE each pass carries it: the march out to `volumeMaxDistance`, the surface pass in closed
+    // form beyond. `fogDensity`, the exp-squared density that used to sit here, is removed rather
+    // than aliased (ADR-441); ADR-705 lists what every scene that set it was re-tuned to.
     glm::vec3 fogColor{0.012f, 0.012f, 0.02f};
-    float fogDensity = 0.0f; // 0 = off; factor = exp(-(distance * density)^2)
     // ADR-058: how much of the volumetric's mist layer the *surface* fog sees. At 0 the distance
     // above is uniform, which is what it has always been; at 1 the view ray is integrated through
     // the same flat-topped layer the volumetric marches (uniform up to `fogHeight`, thinning by
@@ -605,6 +615,27 @@ struct Environment {
     // the air is does not read as one place.
     float fogUpperDensity = 0.0f;          // fraction of the layer's density left at any height
     float fogHeightCurve = 0.0f;           // 0 = exponential tail, 1 = a layer with a definite top
+    // ADR-715 (ADR-575 §18, "fog sits in valleys"): how far the layer's reference follows the
+    // terrain. The layer's top is `fogHeight + fogGroundFollow * ground(x, z)`, so 0 is the flat
+    // plane this always was -- bit for bit, `test_terrain_fog_gpu.cpp` asserts it -- and 1 measures
+    // `fogHeight` from the terrain surface under each sample -- a blanket of constant thickness,
+    // which is LESS valley-and-ridge contrast than the flat plane, not more (ADR-715's finding).
+    // Between, the layer's surface is a flattened copy of the ground. Every
+    // reader of the layer applies it (the march, the surface integral, the particle estimate), and
+    // a scene with no terrain is unchanged at any value.
+    float fogGroundFollow = 0.0f;
+    // ADR-717: the layer POOLS. Its top is measured from `mix(follow * ground, basin, fogPooling)`,
+    // where `basin` is the terrain low-passed over `world::kTerrainBasinSigma` metres -- above the
+    // floor in a valley, below the crest on a ridge -- so at 1 the layer's surface lies nearly flat
+    // across each basin and the fog is deep in valleys and thin over ridges. 0 is ADR-715's layer
+    // bit for bit; a scene with no terrain is unchanged at any value.
+    float fogPooling = 0.0f;
+    // ADR-705, the brief's §7 Horizon Density: extra extinction that grows with distance from the
+    // eye. The air at distance s is `1 + horizonDensity * s / 1000` times as dense as at the eye,
+    // so 1 doubles it a kilometre out. Applied by the march to every sample of the environment
+    // layer, by the surface pass in closed form past the march's reach and by the particle
+    // estimate, from this one number. 0 is off and is bit-identical to having no such control.
+    float horizonDensity = 0.0f;
     // ADR-570 (the fog brief's §20 and §22): the self-shadow march. At each march sample a short
     // secondary ray goes toward each light that lights the air, through the PLACED MEDIA's own
     // density, and that light's in-scatter is attenuated by the transmittance. It is what makes a
@@ -654,6 +685,11 @@ struct Environment {
     // fog at only 12 steps moves by a mean of **0.024 luminance levels** with 44 of 921600 pixels
     // past two levels and no change in its row structure.
     float volumeJitter = 1.0f;
+    // ADR-705: how far the MARCH carries the air. Past it the surface pass integrates the same air
+    // in closed form, so this is a cost/fidelity split rather than where the fog ends: nearer
+    // than it the air is lit (in-scatter, shadows, local lights), beyond it it fades towards
+    // `fogColor`. 0 means no march at all -- the whole ray is integrated analytically, which is
+    // what a scene that only wants distance fog asks for, at none of the march's cost.
     float volumeMaxDistance = 200.0f;
     // ADR-387: the cosmic vortex used to live here, as a singleton on the environment. It is an
     // authored `world::EffectInstance` of kind `Vortex` now, for the reason the consolidation

@@ -80,6 +80,59 @@ fn skyEquirectLod(uv: vec2<f32>, size: vec2<f32>) -> f32 {
     return max(log2(max(footprint, 1.0)), 0.0);
 }
 
+// ---- Effect Library Wave 2: the Stars effect (world/effects/star_field.hpp) ---------------------
+// The fixed field's cell layout and footprint anti-aliasing, with the effect's controls: a density,
+// a power-law magnitude per star, a temperature per star, scintillation strongest near the horizon,
+// a galactic band, and a bright sky hiding what is behind it. Pure in (direction, second).
+fn starSmoothNoise(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = hash21(i);
+    let b = hash21(i + vec2<f32>(1.0, 0.0));
+    let c = hash21(i + vec2<f32>(0.0, 1.0));
+    let d = hash21(i + vec2<f32>(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+fn effectStars(dir: vec3<f32>, sky: vec3<f32>) -> vec3<f32> {
+    let brightness = frame.starsA.z;
+    let horizon = frame.starsB.w;
+    let fade = smoothstep(horizon * 0.15, horizon, dir.y);
+    let hide = 1.0 - frame.starsC.z * smoothstep(0.02, 0.4, dot(sky, vec3<f32>(0.2126, 0.7152, 0.0722)));
+    let coordinate = dir.xz / max(dir.y + 1.0, 0.02) * 190.0;
+    let footprint = max(length(fwidth(coordinate)), 0.015);
+    // The band: a great circle tilted `bandTilt` from the horizon, Gaussian across.
+    let tilt = frame.starsC.y;
+    let across = dot(dir, vec3<f32>(0.0, cos(tilt), sin(tilt)));
+    let band = exp(-(across * across) / (0.14 * 0.14)) * frame.starsC.x;
+
+    let cell = floor(coordinate);
+    let exists = step(1.0 - frame.starsA.y * (1.0 + 3.0 * band), hash21(cell));
+    let offset = vec2<f32>(hash21(cell + 17.0), hash21(cell + 43.0)) * 0.6 + 0.2;
+    let radius = length(fract(coordinate) - offset);
+    let star = (1.0 - smoothstep(0.02, 0.02 + footprint, radius)) * min(0.0064 / (footprint * footprint), 1.0);
+    let magnitude = pow(hash21(cell + 71.0), frame.starsA.w);
+    let temperature = hash21(cell + 97.0);
+    let tint = mix(vec3<f32>(0.5, 0.7, 1.0),
+                   mix(vec3<f32>(0.55, 0.72, 1.0), vec3<f32>(1.0, 0.7, 0.42), temperature), frame.starsB.x);
+    // Scintillation: deepest at the horizon, where the light crosses the most air. Each star's rate is
+    // snapped to whole cycles per 256 s, so the wrapped second the frame carries never jumps.
+    let air = 1.0 - smoothstep(0.0, 0.6, max(dir.y, 0.0));
+    let depth = frame.starsB.y * mix(0.35, 1.0, air);
+    let rate = frame.starsB.z * (0.7 + 0.6 * hash21(cell + 131.0));
+    let cycles = round(rate * 256.0 / 6.2831853);
+    let phase = 6.2831853 * fract(cycles * frame.starsC.w / 256.0 + hash21(cell + 151.0));
+    let twinkle = 1.0 - depth * (0.5 + 0.5 * sin(phase));
+
+    let points = tint * (brightness * magnitude * star * exists * twinkle);
+    // The band's glow is mottled at two scales and split by a dark rift, as a galaxy's dust lanes do.
+    let mottle = 0.6 * starSmoothNoise(coordinate * 0.03) + 0.4 * starSmoothNoise(coordinate * 0.11 + 13.0);
+    let rift = smoothstep(0.3, 0.65, starSmoothNoise(coordinate * 0.018 + 71.0));
+    let glow = vec3<f32>(0.34, 0.36, 0.46) * band * brightness * 0.02 * (0.25 + 0.75 * mottle) * (0.35 + 0.65 * rift);
+    return (points + glow) * fade * max(hide, 0.0);
+}
+
 @fragment
 fn fs_sky(in: SkyOut) -> SceneOut {
     let near = frame.invViewProj * vec4<f32>(in.ndc, 0.0, 1.0);
@@ -130,16 +183,24 @@ fn fs_sky(in: SkyOut) -> SceneOut {
             let moon = 1.0 - smoothstep(0.014, 0.018, separation);
             color = mix(color, vec3<f32>(1.8, 2.1, 2.4), moon);
         }
-        let coordinate = dir.xz / max(dir.y + 1.0, 0.02) * 190.0;
-        let cell = floor(coordinate);
-        let random = hash21(cell);
-        let offset = vec2<f32>(hash21(cell + 17.0), hash21(cell + 43.0)) * 0.6 + 0.2;
-        let radius = length(fract(coordinate) - offset);
-        let footprint = max(length(fwidth(coordinate)), 0.015);
-        let star = (1.0 - smoothstep(0.02, 0.02 + footprint, radius))
-                   * min(0.0064 / (footprint * footprint), 1.0);
-        color += vec3<f32>(0.5, 0.7, 1.0) * star * step(0.988, random)
-                 * smoothstep(0.05, 0.35, dir.y) * 0.6;
+        if (frame.starsA.x < 0.5) {
+            // The fixed field, drawn when no Stars effect owns the sky. Untouched by Wave 2.
+            let coordinate = dir.xz / max(dir.y + 1.0, 0.02) * 190.0;
+            let cell = floor(coordinate);
+            let random = hash21(cell);
+            let offset = vec2<f32>(hash21(cell + 17.0), hash21(cell + 43.0)) * 0.6 + 0.2;
+            let radius = length(fract(coordinate) - offset);
+            let footprint = max(length(fwidth(coordinate)), 0.015);
+            let star = (1.0 - smoothstep(0.02, 0.02 + footprint, radius))
+                       * min(0.0064 / (footprint * footprint), 1.0);
+            color += vec3<f32>(0.5, 0.7, 1.0) * star * step(0.988, random)
+                     * smoothstep(0.05, 0.35, dir.y) * 0.6;
+        }
+    }
+    // Effect Library Wave 2: a Stars effect owns the star field, on any sky (the uniform `on` flag
+    // is the gate: with none the frame is exactly the fixed field's above).
+    if (frame.starsA.x > 0.5 && isSky) {
+        color += effectStars(dir, color);
     }
     // The sky is at infinity, so its velocity is the camera's rotation alone. Its bloom weight is
     // whatever the scene grants it (ADR-049 `skyBloom`); at the default 0 a bright environment

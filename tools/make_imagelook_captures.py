@@ -196,7 +196,7 @@ def scene_doc(name, overrides):
         # compared frame to frame.
         "camera": {"mode": 0, "position": [0, 0, 12], "target": [0, 0, 0], "fov": 42.0,
                    "orbitSpeed": 0.0},
-        "environment": {"intensity": 0.0, "background": [0.01, 0.012, 0.02], "fogDensity": 0.0},
+        "environment": {"intensity": 0.0, "background": [0.01, 0.012, 0.02]},
         "nodes": patch_nodes(overrides.get("patches", "grey")),
         # Only the depth arm needs a light: every other arm's patches are emissive on purpose, so
         # their value is the authored number rather than the product of a light rig.

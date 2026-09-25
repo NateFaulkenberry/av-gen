@@ -32,14 +32,13 @@
    0.038,
    0.07
   ],
-  "fogDensity": 0.02,
   "fogHeight": 14.0,
   "fogHeightFalloff": 0.05,
-  "volumeDensity": 0.016,
-  "volumeScattering": 0.55,
+  "volumeDensity": 0.064,
+  "volumeScattering": 0.3,
   "volumeAnisotropy": 0.35,
   "volumeSteps": 24,
-  "volumeMaxDistance": 140.0,
+  "volumeMaxDistance": 15.0,
   "styledSkyAmbient": [
    0.02,
    0.045,

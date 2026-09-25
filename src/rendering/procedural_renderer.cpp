@@ -253,6 +253,11 @@ struct ProceduralRenderer::Impl {
         // readback said it was occupied, because that readback is one to three frames old and the
         // frame an instance *arrives* on a level is exactly the frame it is wrong about.
         LevelRange levels{};
+        // Effect Library Wave 2 (FXL): the owner's clip is live, so its back faces are drawn -- the
+        // depth prepass never culls, and a back face it wrote where the clip removed the front one
+        // would otherwise be left unshaded (the clear colour: solid black through a dissolving
+        // saucer's holes). The mesh entities' `fxTwoSided`, for procedural nodes.
+        bool fxTwoSided = false;
     };
     struct ComputeItem {
         const ObjectState* state;
@@ -455,9 +460,10 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[0].buffer.hasDynamicOffset = true;
         entries[0].buffer.minBindingSize = sizeof(ObjectUniforms);
-        // ADR-703 (FXL): the per-owner effect records, read by `fs_proc` at `entityFx[fxA.w]`.
+        // ADR-703 (FXL): the per-owner effect records, read by `fs_proc` at `entityFx[fxA.w]` -- and
+        // (Wave 2) by `vs_proc` for the owner's displacement.
         entries[8].binding = 8;
-        entries[8].visibility = wgpu::ShaderStage::Fragment;
+        entries[8].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[8].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[8].buffer.minBindingSize = sizeof(world::EntityFxRecord);
         entries[1].binding = 1;
@@ -1940,11 +1946,12 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             obj.fxA = scene.entityFx.records[record].lanes[world::kFxLaneA];
             obj.fxB = scene.entityFx.records[record].lanes[world::kFxLaneB];
         }
+        const bool fxTwoSided = (static_cast<std::uint32_t>(obj.fxA.z + 0.5f) & world::kFxClip) != 0;
         const std::uint32_t offset = slot * kObjectStride;
         std::memcpy(im.staging.data() + offset, &obj, sizeof(obj));
 
         im.items.push_back(Impl::DrawItem{i, lodMeshes, &state, offset, instanceCount, lodCount, cullActive,
-                                          fullyCulled, shadowFullyCulled, levels});
+                                          fullyCulled, shadowFullyCulled, levels, fxTwoSided});
         ++stats_.objects;
         stats_.sourceVertices += mesh->vertexCount;
         stats_.sourceTriangles += mesh->indexCount / 3;
@@ -2171,7 +2178,8 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
         }
         const auto& material = object.material;
         // Point billboards face the camera by construction: never cull them.
-        const bool twoSided = material.doubleSided || object.source.kind == scene::PrimitiveKind::Point;
+        const bool twoSided =
+            material.doubleSided || object.source.kind == scene::PrimitiveKind::Point || item.fxTwoSided;
         // Which of the two compacted lists this pass draws: the camera's, or the shadow caster
         // list's own slices of the same `visible` buffer.
         const auto& groups = shadowPass

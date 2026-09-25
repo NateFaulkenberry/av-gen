@@ -30,6 +30,8 @@
 #include "world/effects/entity_fx.hpp"
 #include "world/effects/history_bank.hpp"
 #include "world/effects/ribbon_frame.hpp"
+#include "world/effects/star_field.hpp"
+#include "world/effects/transform_frame.hpp"
 
 #include <fmt/ranges.h>
 
@@ -4347,8 +4349,14 @@ namespace {
 // rather than a lambda so resolution allocates nothing: the engine counts allocations per frame.
 class CompositionEffectScene final : public world::EffectSceneQuery {
 public:
-    CompositionEffectScene(const scene::Composition* comp, const world::HistoryBank* history)
-        : comp_(comp), history_(history) {}
+    CompositionEffectScene(const scene::Composition* comp, const world::HistoryBank* history,
+                           std::span<const world::EffectInstance> effects = {},
+                           std::span<const std::uint32_t> order = {})
+        : comp_(comp), history_(history), effects_(effects), order_(order) {}
+
+    // The frame's context, for re-evaluating XFORM offsets at past instants. Set once the context
+    // (which points back at this adapter) exists.
+    void setContext(const world::EffectContext* ctx) { ctx_ = ctx; }
 
     [[nodiscard]] bool nodePosition(std::string_view name, glm::vec3& out) const override {
         if (comp_ == nullptr) {
@@ -4384,13 +4392,61 @@ public:
     // grid). Deterministic under seek because the history is checkpointed and replayed (ADR-700).
     // False when the node is not subscribed -- the engine subscribes the entity owner of every
     // type in a Wave 1 bucket -- or has not been recorded yet.
+    //
+    // Wave 2: an owner an XFORM type offsets is differenced over its DRAWN path instead (the history
+    // re-applied with the offset at each end), so an orbiting saucer's Space Warp stretches along the
+    // orbit. Every other owner keeps HIST's own difference, bit for bit.
     [[nodiscard]] bool nodeVelocity(std::string_view name, glm::vec3& out) const override {
-        return history_ != nullptr && history_->velocity(name, out);
+        if (history_ == nullptr) {
+            return false;
+        }
+        if (ctx_ == nullptr || !world::hasTransformProducer(effects_, name)) {
+            return history_->velocity(name, out);
+        }
+        const std::size_t ring = history_->find(name);
+        if (ring >= history_->ringCount() || history_->sampleCount(ring) == 0) {
+            return false;
+        }
+        const double t1 = history_->sample(ring, history_->sampleCount(ring) - 1).t;
+        const double t0 = t1 - world::HistoryBank::kGridStep;
+        glm::vec3 p0;
+        glm::vec3 p1;
+        if (!nodeDrawnPosition(name, t1, p1)) {
+            return false;
+        }
+        if (!nodeDrawnPosition(name, t0, p0)) {
+            out = glm::vec3(0.0f); // one sample: at rest, as HIST says
+            return true;
+        }
+        out = (p1 - p0) / static_cast<float>(world::HistoryBank::kGridStep);
+        return true;
+    }
+
+    [[nodiscard]] bool nodeDrawnPosition(std::string_view name, double t, glm::vec3& out) const override {
+        world::HistorySample s;
+        if (history_ == nullptr || !history_->sampleAt(name, t, s)) {
+            return false;
+        }
+        out = s.position;
+        if (ctx_ == nullptr || !world::hasTransformProducer(effects_, name)) {
+            return true;
+        }
+        world::EffectContext at = *ctx_;
+        at.seconds = t;
+        at.scene = nullptr; // a Geometry type never reads the drawn scene (rendering-architecture §3)
+        world::TransformOffset offset;
+        if (world::transformOffsetAt(effects_, order_, at, name, offset)) {
+            out = world::drawnOrigin(offset, s.position, s.rotation, s.scale);
+        }
+        return true;
     }
 
 private:
     const scene::Composition* comp_;
     const world::HistoryBank* history_;
+    std::span<const world::EffectInstance> effects_;
+    std::span<const std::uint32_t> order_;
+    const world::EffectContext* ctx_ = nullptr;
 };
 
 // ADR-703. The play's transform automation, for the seek replay to re-apply when it records HIST.
@@ -4664,8 +4720,62 @@ void Engine::publishFields() {
 // of the instances it owns. Stages are not forced through one implementation: the surface waves
 // are a per-fragment term in the lit pass, the sky is a far-plane draw, the media are marched --
 // and all three coexist because each writes its own block of the frame and its own slots in it.
-void Engine::updateEffects() {
+world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene) const {
+    const scene::Scene& live = controller_->scene();
+    world::EffectContext ctx;
+    ctx.seconds = timelineClock_.seconds;
+    ctx.cameraPosition = live.camera.position;
+    ctx.cameraTarget = live.camera.target;
+    const glm::vec3 aim = live.camera.target - live.camera.position;
+    ctx.cameraForward = glm::length(aim) > 1e-5f ? glm::normalize(aim) : glm::vec3(0.0f, 0.0f, -1.0f);
+    ctx.cameraVelocity = cameraVelocityOnTimeline();
+    ctx.shots = shotSpans_;
+    ctx.scene = scene;
+    if (const auto* comp = composition()) {
+        ctx.heroes = comp->heroes();
+    }
+    ctx.spectrum = auroraSpectrum_;
+    ctx.fieldBus = &fieldBus_;
+    // Wave 2 (TRIGGER): beats and onsets from the offline track, the sequence's markers, HIST.
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, phraseBars_, sectionPhrases_);
+    ctx.triggers = &triggerClock_;
+    return ctx;
+}
+
+void Engine::updateEffects(EffectPhase phase) {
     scene::Scene& live = controller_->scene();
+    if (phase == EffectPhase::BeforeScene) {
+        // ---- the Geometry stage, before the flatten (rendering-architecture §3) --------------------
+        // The parameters are applied here, once for the frame: the routes have run, so these are this
+        // frame's finals, and nothing between here and `AfterScene` writes an effect parameter.
+        transformFrame_.count = 0;
+        transformFrame_.dropped = 0;
+        if (!effects_.empty()) {
+            world::applyEffectParameters(effectParams_, effects_);
+            if (effectStatus_.size() != effects_.size()) {
+                effectStatus_.assign(effects_.size(), world::EffectStatus::Dormant);
+            }
+            if (effectStatusReason_.size() != effects_.size()) {
+                effectStatusReason_.assign(effects_.size(), std::string());
+            }
+            // Reasons are rewritten every frame; clearing keeps the strings' storage.
+            for (std::string& r : effectStatusReason_) {
+                r.clear();
+            }
+            // No scene query: this frame's drawn transforms do not exist yet, and last frame's are
+            // not an input a Geometry type may have (it would lag, and differ between play and scrub).
+            const world::EffectContext ctx = effectContext(nullptr);
+            // RenderStage::Geometry -- XFORM offsets (Orbit, Spiral, Float, Shake, Bounce).
+            world::buildTransformFrame(effects_, ctx, transformFrame_, effectOrder_, effectStatus_,
+                                       effectStatusReason_);
+        }
+        // Every frame, so a replaced composition is handed the frame too; an empty frame is the
+        // flatten exactly as it was without XFORM.
+        if (auto* comp = composition()) {
+            comp->setEffectOffsets(&transformFrame_);
+        }
+        return;
+    }
     if (effects_.empty()) {
         live.waves = world::WaveFrame{};
         live.atmospherics = world::AtmosphericFrame{};
@@ -4678,38 +4788,21 @@ void Engine::updateEffects() {
         live.ribbons.vertices.clear(); // capacity kept: no allocation when a trail comes back
         live.ribbons.strips.clear();
         live.ribbons.dropped = 0;
+        live.stars = world::StarField{};
         return;
     }
-    world::applyEffectParameters(effectParams_, effects_);
+    // The parameters were applied, and the status table sized and its reasons cleared, by the
+    // `BeforeScene` phase this frame; the Geometry stage's statuses are already written.
     updateAuroraSpectrum();
     publishFields();
 
-    const CompositionEffectScene sceneAdapter(composition(), &historyBank_);
-    world::EffectContext ctx;
-    ctx.seconds = timelineClock_.seconds;
-    ctx.cameraPosition = live.camera.position;
-    ctx.cameraTarget = live.camera.target;
-    const glm::vec3 aim = live.camera.target - live.camera.position;
-    ctx.cameraForward = glm::length(aim) > 1e-5f ? glm::normalize(aim) : glm::vec3(0.0f, 0.0f, -1.0f);
-    ctx.cameraVelocity = cameraVelocityOnTimeline();
-    ctx.shots = shotSpans_;
-    ctx.scene = &sceneAdapter;
-    if (const auto* comp = composition()) {
-        ctx.heroes = comp->heroes();
-    }
-    ctx.spectrum = auroraSpectrum_;
-    ctx.fieldBus = &fieldBus_;
-
-    if (effectStatus_.size() != effects_.size()) {
+    CompositionEffectScene sceneAdapter(composition(), &historyBank_, effects_, effectOrder_);
+    const world::EffectContext ctx = effectContext(&sceneAdapter);
+    sceneAdapter.setContext(&ctx);
+    if (effectStatus_.size() != effects_.size() || effectStatusReason_.size() != effects_.size()) {
+        // Only if the list changed between the phases, which nothing in `update` does.
         effectStatus_.assign(effects_.size(), world::EffectStatus::Dormant);
-    }
-    if (effectStatusReason_.size() != effects_.size()) {
         effectStatusReason_.assign(effects_.size(), std::string());
-    }
-    // Reasons are rewritten every frame; clearing keeps the strings' storage (no allocation once a
-    // reason has been said).
-    for (std::string& r : effectStatusReason_) {
-        r.clear();
     }
     // RenderStage::Material -- the surface waves.
     world::buildWaveFrame(effects_, ctx, live.waves, effectOrder_, effectStatus_);
@@ -4725,6 +4818,8 @@ void Engine::updateEffects() {
     // RenderStage::Particles -- ADR-703's camera-facing strips (Trail), RIBBON over HIST.
     world::buildRibbonFrame(effects_, ctx, historyBank_, live.ribbons, effectOrder_, effectStatus_,
                             effectStatusReason_);
+    // RenderStage::Sky -- the star field (Stars, Wave 2), in place of the background's fixed stars.
+    world::buildStarField(effects_, ctx, live.stars, effectOrder_, effectStatus_, effectStatusReason_);
     // An instance attached to an entity the scene does not have is reported as such, whatever its
     // builder said: "orphaned" is the actionable answer, "dormant" would send somebody looking at
     // its timing.
@@ -4979,6 +5074,10 @@ void Engine::update(const FrameTime& time) {
     probeStage(probe2::frame().updModulationMs); // TEMPORARY: phase 2
     stats_.allocsModulation = allocsNow() - allocMark;
     allocMark = allocsNow();
+    // RenderStage::Geometry (Wave 2, rendering-architecture §3): the XFORM offsets, which the
+    // flatten below composes into their owners' transforms -- before it, so children, attachments,
+    // effects reading the drawn view and `prevModel` all follow them.
+    updateEffects(EffectPhase::BeforeScene);
     controller_->update(time);
     // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects
     // read them -- so a Trail's head and its newest sample are the same instant.
@@ -5034,7 +5133,7 @@ void Engine::update(const FrameTime& time) {
     // ADR-039's selective bloom and ADR-035's identifier mask were both shipped missing exactly
     // this assignment, and both were invisible because the feature simply never ran.
     controller_->scene().temporal = temporal_;
-    updateEffects();
+    updateEffects(EffectPhase::AfterScene); // every stage after Geometry, against the flattened scene
     {
         shaders::StdUniforms base;
         const auto& f = clock_.latest;
@@ -5101,8 +5200,10 @@ void Engine::refreshHistorySubscriptions() {
             continue;
         }
         const world::EffectSchema* schema = world::effectSchema(e.kind);
+        // XFORM (Wave 2) reads nothing of its owner's motion either: it is a function of t alone.
         if (schema == nullptr || world::isAtmosphericBucket(schema->resolve.bucket) ||
-            schema->resolve.bucket == world::EffectBucket::Surface) {
+            schema->resolve.bucket == world::EffectBucket::Surface ||
+            schema->resolve.bucket == world::EffectBucket::Transform) {
             continue;
         }
         wanted.push_back(world::HistorySubscription{e.owner.name, world::ribbonHistorySeconds(e)});
@@ -5122,6 +5223,7 @@ void Engine::refreshHistorySubscriptions() {
             }
         }
     }
+    world::appendEffectHistoryNeeds(effects_, wanted); // Wave 2: Proximity triggers, a Shockwave's release point, a wake
     if (historyBank_.subscribe(wanted) || entitySignals_.size() != historyBank_.ringCount()) {
         // Signals of an entity nobody reads any more go quiet rather than holding their last value.
         for (const EntitySignalIds& old : entitySignals_) {

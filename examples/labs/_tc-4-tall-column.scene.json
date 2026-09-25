@@ -25,7 +25,6 @@
    0.48
   ],
   "intensity": 1.0,
-  "fogDensity": 0.0,
   "volumeDensity": 0.0,
   "volumeSteps": 296,
   "volumeJitter": 0.0,
@@ -36,7 +35,9 @@
   "sky": {
    "enabled": false,
    "background": false
-  }
+  },
+  "volumeShadowSteps": 4,
+  "volumeShadowStrength": 0.45
  },
  "lights": [
   {
@@ -123,8 +124,8 @@
      0.0,
      0.0
     ],
-    "density": 0.06,
-    "emission": 0.0,
+    "density": 0.03,
+    "emission": 0.01,
     "scattering": 1.0,
     "colorThin": [
      0.62,
@@ -205,8 +206,8 @@
      0.0,
      0.0
     ],
-    "density": 0.35,
-    "emission": 0.0,
+    "density": 0.175,
+    "emission": 0.045,
     "scattering": 1.2,
     "colorThin": [
      0.72,
@@ -287,8 +288,8 @@
      0.0,
      0.0
     ],
-    "density": 0.05,
-    "emission": 0.0,
+    "density": 0.025,
+    "emission": 0.008,
     "scattering": 1.0,
     "colorThin": [
      0.46,
@@ -369,8 +370,8 @@
      0.0,
      0.0
     ],
-    "density": 0.09,
-    "emission": 0.0,
+    "density": 0.045,
+    "emission": 0.015,
     "scattering": 1.0,
     "colorThin": [
      0.55,
@@ -452,7 +453,7 @@
      0.0
     ],
     "density": 0.09,
-    "emission": 0.0,
+    "emission": 0.03,
     "scattering": 1.0,
     "colorThin": [
      0.66,
@@ -616,7 +617,7 @@
      0.0
     ],
     "density": 0.07,
-    "emission": 0.0,
+    "emission": 0.023,
     "scattering": 1.0,
     "colorThin": [
      0.62,

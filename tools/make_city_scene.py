@@ -387,7 +387,6 @@ def piece_scene(asset_dir, rig_path):
             # Dusk: a blue-violet zenith over a warm horizon. The sequence keys these to night.
             "background": [0.030, 0.038, 0.062],
             "fogColor": [0.075, 0.070, 0.090],
-            "fogDensity": 0.0016,
             "fogHeight": 40.0,
             "fogHeightFalloff": 0.035,
             "volumeDensity": 0.0030,

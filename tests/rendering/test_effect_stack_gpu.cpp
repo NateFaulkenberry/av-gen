@@ -78,13 +78,16 @@ gpu::Image8 render(rendering::SceneRenderer& renderer, const scene::Scene& s, do
 
 // Pixels that differ VISIBLY: summed over the three channels by more than 24 of 765.
 //
-// Not "any byte differs", and the reason is measured rather than assumed. Switching on the
-// volumetric march for ANY placed medium -- even one entirely behind the camera -- moves up to ~70% of
-// the frame by at most 7 of 255 per channel (mean 1.4), a whole-frame perturbation of the march and
-// its composite that has nothing to do with where the medium is. With an exact comparison the first
-// version of the Glowmere case below passed with a tornado that was not in shot at all: the counts
-// were that perturbation. A contribution a person can see clears this threshold by a wide margin;
-// the perturbation cannot reach it (3 channels x 7 = 21).
+// Not "any byte differs", and the reason is measured rather than assumed. Between two arms here up to
+// ~70% of the frame moves by a few levels even when the arms differ only by a medium entirely behind
+// the camera. ADR-702 attributed that to the volumetric march; ADR-709 found it is THIS HARNESS:
+// `sceneAt` is an `Engine::update` at the same second with a non-zero `dt`, once per arm, and the
+// engine advances the scene's content by `dt` on every update, so each arm is a slightly later scene
+// than the one before (the medium switched off in both, two updates apart: 91% of pixels, up to 48
+// levels). The march's own share was 0.35% of pixels by one level, and ADR-709 removed it. With an
+// exact comparison the first version of the Glowmere case below passed with a tornado that was not
+// in shot at all. A contribution a person can see clears this threshold by a wide margin. An arm
+// reached through a seek (`test_march_perturbation_gpu.cpp`'s `sceneBySeek`) needs no threshold.
 std::size_t differingPixels(const gpu::Image8& a, const gpu::Image8& b) {
     REQUIRE(a.rgba.size() == b.rgba.size());
     std::size_t differ = 0;

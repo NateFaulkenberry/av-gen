@@ -13,8 +13,8 @@
       "kind": "composition",
       "path": {
         "path": "tree-of-life-floating-island.scene.json",
-        "sha256": "ab4bd7f85cee37577cf9d6a47820c63886a65268fe201abdcc75e6004d781d19",
-        "size": 13887
+        "sha256": "af8158e76db8d01291060f181885196a118c08d0a4d97f4ee441cd9c5d8aaaf1",
+        "size": 13866
       }
     }
   },
@@ -1546,7 +1546,6 @@
       0.006200000178068876,
       0.01850000023841858
     ],
-    "scene/fogDensity": 0.0,
     "scene/fogHeight": 0.0,
     "scene/fogHeightFalloff": 0.0,
     "scene/gridIntensity": 0.6000000238418579,

@@ -38,6 +38,16 @@
 // teaches an artist that the system is broken (ADR-421), and nine of a vortex's controls do
 // nothing to a fog bank.
 //
+// **And the same header said the vortex's dead controls were "simply not declared here". Eight
+// were.** ADR-713 found them by the lane audit its brief asked for: Billow, Churn, Wisps, Wisp
+// scale and Fine detail packed into lanes 2 and 6, which ADR-571 had already given to the drift
+// and the density curve, and Drift, Swell and Swell speed packed into lanes nothing in
+// `shaders/fog.wgsl` read -- declared, drawn on the panel, set by every preset, routed from the
+// audio, and reaching nothing. The five noise-stack rows are CUT (ADR-441: no aliases); the three
+// motion rows were §16's own controls under vortex names, so they are made LIVE instead -- Drift
+// as Swirl, Swell as §16's expansion and contraction. The rule this adds to the one above: *a
+// panel's rows are claims too, and the lane audit is the test of them.*
+//
 // **Where its numbers live.** `e.vortex`, aliased on purpose: it is the same medium, so it is the
 // same struct and the same block in the saved file (the rows say so with an absolute `/vortex/...`
 // JSON path). The nine controls a bank has no use for are simply not declared here -- which means
@@ -123,10 +133,6 @@ constexpr EffectField kFields[] = {
                SETF(e.vortex.emission)).json("/vortex/emission").fmt("%.3f /m").main()
         .tooltip("Emissive density per metre: the bank's own light. Bioluminescent mist glows;\n"
                  "ordinary fog does not, so 0 is a real setting here rather than a floor."),
-    floatField("billow", "Billow", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.smokeBillow),
-               SETF(e.vortex.field.smokeBillow)).json("/vortex/smokeBillow").main()
-        .tooltip("0 is a thin wispy haze; 1 is rounded masses with creases between them.\n"
-                 "The difference between a mist and a bank of cloud."),
     // ADR-561. §53's control, and the reason it is a MAIN row on a fog bank rather than an advanced
     // one: the brief's §4 D, its §44 bar 1 and its Definition of Done are all this parameter. "With
     // all noise and detail at zero the system must still produce clean, coherent fog" is a claim an
@@ -205,6 +211,34 @@ constexpr EffectField kFields[] = {
                  "bank's own long axis. It sets the DIRECTION only: the speed stays Drift speed,\n"
                  "so turning this up cannot make the bank move faster than you asked.\n"
                  "Does nothing until the effect subscribes to a flow field."),
+    // ADR-713 (§16): SWIRL. This row existed as "Drift" -- "how fast the whole bank turns over" --
+    // on `rotationSpeed`, which `packVortex` puts in lane 1.z, and nothing in `shaders/fog.wgsl`
+    // read lane 1.z. So it was §16's swirl under a vortex's name, dead. Renamed for what it does
+    // and made live: the bank's INTERNAL structure (detail and turbulence) circulates rigidly
+    // about its vertical axis. Radians a second, because that is the unit the lane has always had.
+    floatField("swirl", "Swirl", -4.0f, 4.0f, -0.1f, 0.1f, GET(e.vortex.field.rotationSpeed),
+               SETF(e.vortex.field.rotationSpeed)).json("/vortex/rotationSpeed").fmt("%.3f rad/s")
+        .tooltip("The bank's inner structure circulates about its vertical axis, in radians a\n"
+                 "second (0.05 is a turn every two minutes). It turns the detail and the\n"
+                 "turbulence, not the outline -- so with both at 0 there is nothing to see turn.\n"
+                 "Slow: the rim of a 1 km bank at 0.05 moves 50 m a second."),
+    // ADR-713 (§16): TURBULENCE, which is also §16's CURL -- one mechanism, because a flow sampled
+    // per position is what shears a structure, and ADR-572 said so before either existed. The
+    // whole field is evaluated at a point displaced by a divergence-free flow, so the OUTLINE
+    // deforms, not only the density inside it. Measured in the bank's own semi-axes, so the same
+    // number deforms a 30 m wisp and a 2 km bank alike.
+    storedFloat("turbulence", "Turbulence", 0.0f, 0.0f, 1.0f, 0.0f, 0.5f)
+        .tooltip("Deforms the bank's whole shape with a swirling, divergence-free flow, so its\n"
+                 "edge billows and folds instead of staying the primitive's clean outline.\n"
+                 "The number is how far, as a fraction of the bank's own size in each direction.\n"
+                 "The flow moves density; it cannot make fog where the bank has none."),
+    storedFloat("turbulenceScale", "Turbulence scale", 1.5f, 0.25f, 8.0f, 0.5f, 4.0f)
+        .tooltip("How many turbulent folds fit across the bank. Low is a few big lobes; high is\n"
+                 "a ragged edge."),
+    storedFloat("turbulenceSpeed", "Turbulence evolution", 0.25f, 0.0f, 4.0f, 0.0f, 1.0f)
+        .tooltip("How fast the turbulence changes shape in place. 0 freezes it -- it still drifts\n"
+                 "and swirls with the bank. A function of the song's time, so scrubbing to a\n"
+                 "moment lands on the same shape playing to it does."),
     // ADR-571 (§24): the density response curve's threshold and softness. `Contrast` is its third
     // term and is declared below, as the absolute row on `e.vortex.field.contrast` it always was.
     storedFloat("densityThreshold", "Density threshold", 0.0f, 0.0f, 0.99f, 0.0f, 0.8f)
@@ -232,43 +266,54 @@ constexpr EffectField kFields[] = {
         .tooltip("How much the bank's glow follows its height profile instead of being even.\n"
                  "At 1 a ground-hugging bank glows at its floor and fades upward with its\n"
                  "density; at 0 it glows evenly through its whole height."),
+    // ADR-714 (§25): HEIGHT and DISTANCE colour, in addition to the three depth colours. Both are
+    // LUMINANCE-PRESERVING -- they change the hue of the glow and never its brightness, because
+    // brightness is where the eye reads density and §25's warning is exactly "avoid making colour
+    // responsible for structure". Like the depth colours, they tint the bank's own GLOW.
+    storedColor("heightColor", "Height colour", glm::vec3(0.34f, 0.24f, 0.30f))
+        .sec("Colour by place")
+        .tooltip("The hue the top of the bank takes, blending in from its densest layer to two\n"
+                 "heights above it. Changes the glow's colour, never its brightness.\n"
+                 "Needs Self glow above 0: a bank that does not glow takes its colour from the lights."),
+    storedFloat("heightColorAmount", "Height colour amount", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f),
+    storedColor("distanceColor", "Distance colour", glm::vec3(0.14f, 0.18f, 0.28f))
+        .tooltip("The hue the far parts of the bank take -- aerial perspective inside the fog.\n"
+                 "Changes the glow's colour, never its brightness."),
+    storedFloat("distanceColorAmount", "Distance colour amount", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f),
+    storedFloat("distanceColorRange", "Distance colour range", 600.0f, 1.0f, 50000.0f, 50.0f, 4000.0f)
+        .fmt("%.0f m")
+        .tooltip("How far from the camera the distance colour is about two-thirds of the way in."),
     floatField("detailAmount", "Detail amount", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.cloudNoise),
                SETF(e.vortex.field.cloudNoise)).json("/vortex/cloudNoise").sec("Detail").main()
         .tooltip("How much of the bank's density comes from procedural detail rather than from\n"
                  "its shape. At 0 the bank is its analytic volume alone -- which is the check\n"
                  "that the fog is fog and not a noise field: it should still read as fog."),
-    floatField("drift", "Drift", -4.0f, 4.0f, -0.2f, 0.2f, GET(e.vortex.field.rotationSpeed),
-               SETF(e.vortex.field.rotationSpeed)).json("/vortex/rotationSpeed").main()
-        .tooltip("How fast the whole bank turns over. Slow: fog that moves quickly reads as\n"
-                 "smoke, and the eye notices the motion instead of the place."),
 
     // ---- Advanced
-    // ADR-579, the brief's §36: this block is the NOISE STACK -- churn, wisps, fine detail,
-    // threads -- and it was headed "Structure", which is what the shape rows above are. Two
-    // sections with one name on one page draw the heading twice with unrelated controls under
-    // each, and the registry guard catches that now. §36's word for this group is **Detail**, and
-    // it is the same group `detailScale` already opens further up.
-    floatField("churn", "Churn", 0.0f, 8.0f, 0.0f, 2.0f, GET(e.vortex.field.smokeWarp),
-               SETF(e.vortex.field.smokeWarp)).sec("Detail texture").json("/vortex/smokeWarp")
-        .tooltip("ADR-389: drags the fine detail through the coarse flow, so the detail is\n"
-                 "carried BY the structure rather than sitting ON it. The one control that\n"
-                 "turns noise into something that looks like moving air."),
-    floatField("wisps", "Wisps", 0.0f, 1.0f, 0.0f, 1.0f, GET(e.vortex.field.turbulence),
-               SETF(e.vortex.field.turbulence)).json("/vortex/turbulence"),
-    floatField("wispScale", "Wisp scale", 0.001f, 40.0f, 0.1f, 8.0f, GET(e.vortex.field.turbulenceScale),
-               SETF(e.vortex.field.turbulenceScale)).json("/vortex/turbulenceScale"),
-    floatField("fineDetail", "Fine detail", 0.0f, 2.0f, 0.0f, 1.0f, GET(e.vortex.field.detail),
-               SETF(e.vortex.field.detail)).json("/vortex/detail"),
+    // ADR-713: this block was the vortex's NOISE STACK -- Churn, Wisps, Wisp scale, Fine detail --
+    // and all four packed into lanes 2 and 6, which ADR-571 gave to the drift and the density curve.
+    // They drew, they were set by every preset, `audio.mid` routed to Churn, and none of them reached
+    // the field. CUT, not aliased (ADR-441). The fog's detail is `detailAmount`/`detailScale` and its
+    // turbulence is `turbulence` above; Threads is the one survivor because it is read (lane 3.w,
+    // the accent in the densest folds).
     floatField("threads", "Threads", 0.0f, 4.0f, 0.0f, 2.0f, GET(e.vortex.filaments),
-               SETF(e.vortex.filaments)).json("/vortex/filaments")
+               SETF(e.vortex.filaments)).json("/vortex/filaments").sec("Filaments")
         .tooltip("Bright luminous threads in the densest folds, in Glow colour. 0 for\n"
                  "ordinary fog; this is what makes a bank read as alive."),
+    // ADR-713 (§16's EXPANSION and CONTRACTION): this tooltip described the vortex's breath, and
+    // for a fog bank it was not true -- lanes 3.x/3.y reached the ray BOUND (ADR-566) and never the
+    // field. `fogSwell` reads them now. Periodic, a pure function of the transport second; a bank
+    // that grows or clears ONCE over a shot is Bank radius or Fog density keyframed, which the
+    // timeline already does exactly (ADR-018), so no second row claims it.
     floatField("swell", "Swell", 0.0f, 1.0f, 0.0f, 0.3f, GET(e.vortex.field.breathAmount),
                SETF(e.vortex.field.breathAmount)).json("/vortex/breathAmount").sec("Breathing")
-        .tooltip("The bank widens and narrows slowly. Applied to the RADIUS rather than the\n"
-                 "density, so the silhouette moves -- scaling density alone just pulses it."),
+        .tooltip("The bank expands and contracts slowly, by this fraction of its size. Applied to\n"
+                 "the RADIUS rather than the density, so the outline moves -- scaling density alone\n"
+                 "just pulses it. For a bank that grows or clears once over a shot, keyframe\n"
+                 "Bank radius or Fog density instead."),
     floatField("swellSpeed", "Swell speed", 0.0f, 4.0f, 0.0f, 1.0f, GET(e.vortex.field.breathSpeed),
-               SETF(e.vortex.field.breathSpeed)).json("/vortex/breathSpeed"),
+               SETF(e.vortex.field.breathSpeed)).json("/vortex/breathSpeed").fmt("%.3f rad/s")
+        .tooltip("How fast the swell cycles, in radians a second: 0.1 is one breath a minute."),
 
     // ADR-388's measured range, unchanged from the vortex's: laddered on the shipped Tree of Life,
     // nearly linear and usable across the whole of 0..1, with a hard ceiling of 4 because a route
@@ -359,6 +404,12 @@ void applyStyle(EffectInstance& e, std::string_view style) {
     v.field.throat = 1.0f;       // ...and the mouth does not narrow
     v.field.throatDensity = 0.0f;
     v.field.innerVoid = 0.0f;    // filled, not a ring
+    // ADR-713: the two motion rows that became live. `Vortex{}` spins at 0.035 rad/s and breathes
+    // 5% every 35 s, which is a cyclone's resting motion and was harmless while the fog read
+    // neither; a preset that wants a swirl or a swell now says so below, like any other row.
+    v.field.rotationSpeed = 0.0f;
+    v.field.breathAmount = 0.0f;
+    v.field.breathSpeed = 0.0f;
     // ADR-561, and `innerVoid = 0` alone did NOT achieve it. The envelope's eye term is
     // `smoothstep(innerVoid, innerVoid + eyeWallWidth, rr)`, and `eyeWallWidth` defaults to the
     // 0.22 ADR-374 hardcoded for the vortex -- so with the void at zero the density still climbed
@@ -385,8 +436,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         v.density = 0.9f; v.emission = 0.002f; v.field.contrast = 1.0f;
         shape(FogShape::Bank); set("bankLength", 2.2f); set("edgeSoftness", 0.7f);
         set("groundHug", 0.0f); set("heightFalloff", 3.2f); set("driftSpeed", 0.6f);
-        v.field.turbulence = 0.20f; v.field.turbulenceScale = 0.8f; v.field.smokeWarp = 0.5f;
-        v.field.detail = 0.15f; v.field.cloudNoise = 0.35f;
+        v.field.cloudNoise = 0.35f;
         v.scattering = 0.7f; v.spill = 0.4f;
         v.colorDeep = {0.060f, 0.066f, 0.078f}; v.colorMid = {0.150f, 0.163f, 0.185f};
         v.colorAccent = {0.230f, 0.245f, 0.270f};
@@ -395,8 +445,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         v.density = 2.4f; v.emission = 0.004f; v.field.contrast = 1.5f;
         shape(FogShape::Bank); set("bankLength", 3.4f); set("edgeSoftness", 0.35f);
         set("groundHug", 0.0f); set("heightFalloff", 1.8f); set("driftSpeed", 1.2f);
-        v.field.turbulence = 0.35f; v.field.turbulenceScale = 1.1f; v.field.smokeWarp = 0.9f;
-        v.field.smokeBillow = 0.35f; v.field.detail = 0.25f; v.field.cloudNoise = 0.5f;
+        v.field.cloudNoise = 0.5f;
         v.field.breathAmount = 0.06f; v.field.breathSpeed = 0.09f;
         v.scattering = 0.6f; v.spill = 0.8f;
         v.colorDeep = {0.050f, 0.062f, 0.085f}; v.colorMid = {0.140f, 0.170f, 0.210f};
@@ -407,8 +456,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         shape(FogShape::Bank); set("bankLength", 2.6f); set("edgeSoftness", 0.45f);
         set("groundHug", 0.25f); set("heightFalloff", 1.1f); set("domeShape", 0.55f);
         set("driftSpeed", 4.5f); set("driftWind", 1.0f); set("detailScale", 4.0f);
-        v.field.turbulence = 0.55f; v.field.turbulenceScale = 1.6f; v.field.smokeWarp = 1.5f;
-        v.field.smokeBillow = 0.6f; v.field.detail = 0.3f; v.field.cloudNoise = 0.6f;
+        v.field.cloudNoise = 0.6f;
         v.field.breathAmount = 0.08f; v.field.breathSpeed = 0.07f;
         v.scattering = 0.7f; v.spill = 1.0f;
         v.colorDeep = {0.055f, 0.058f, 0.068f}; v.colorMid = {0.165f, 0.172f, 0.190f};
@@ -419,8 +467,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         shape(FogShape::Ellipsoid); set("bankLength", 1.8f); set("edgeSoftness", 0.8f);
         set("heightInfluence", 0.7f); set("groundHug", 0.1f); set("heightFalloff", 2.2f);
         set("driftSpeed", 0.8f); set("densitySoftness", 0.6f);
-        v.field.turbulence = 0.30f; v.field.turbulenceScale = 2.4f; v.field.smokeWarp = 0.8f;
-        v.field.detail = 0.3f; v.field.cloudNoise = 0.45f;
+        v.field.cloudNoise = 0.45f;
         v.scattering = 0.9f; v.spill = 0.6f;
         v.colorDeep = {0.042f, 0.058f, 0.050f}; v.colorMid = {0.130f, 0.165f, 0.148f};
         v.colorAccent = {0.215f, 0.265f, 0.240f};
@@ -431,8 +478,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         // ADR-579: the same interaction, measured -- centre was 0.035 with the threshold at 0.15.
         set("groundHug", 0.30f); set("heightFalloff", 1.0f); set("densityThreshold", 0.08f);
         set("densitySoftness", 0.8f); set("driftSpeed", 1.5f); set("detailScale", 5.0f);
-        v.field.turbulence = 0.70f; v.field.turbulenceScale = 2.6f; v.field.smokeWarp = 2.0f;
-        v.field.smokeBillow = 0.90f; v.field.detail = 0.45f; v.field.cloudNoise = 0.55f;
+        v.field.cloudNoise = 0.55f;
         v.filaments = 0.3f; v.field.breathAmount = 0.12f; v.field.breathSpeed = 0.16f;
         v.scattering = 0.8f; v.spill = 1.4f;
         v.colorDeep = {0.060f, 0.058f, 0.070f}; v.colorMid = {0.190f, 0.185f, 0.205f};
@@ -442,7 +488,6 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         v.density = 0.35f; v.emission = 0.001f; v.field.contrast = 0.8f;
         shape(FogShape::Bank); set("bankLength", 1.0f); set("edgeSoftness", 1.0f);
         set("groundHug", 0.5f); set("heightFalloff", 0.35f); set("driftSpeed", 0.2f);
-        v.field.turbulence = 0.10f; v.field.turbulenceScale = 0.5f; v.field.detail = 0.05f;
         v.field.cloudNoise = 0.15f;
         v.scattering = 0.5f; v.spill = 0.2f;
         v.colorDeep = {0.070f, 0.078f, 0.092f}; v.colorMid = {0.150f, 0.163f, 0.185f};
@@ -452,8 +497,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         v.density = 1.3f; v.emission = 0.002f; v.field.contrast = 1.6f;
         shape(FogShape::Bank); set("bankLength", 2.8f); set("edgeSoftness", 0.6f);
         set("groundHug", 0.0f); set("heightFalloff", 2.4f); set("driftSpeed", 0.9f);
-        v.field.turbulence = 0.25f; v.field.turbulenceScale = 1.2f; v.field.smokeWarp = 0.7f;
-        v.field.detail = 0.2f; v.field.cloudNoise = 0.4f;
+        v.field.cloudNoise = 0.4f;
         // Scene light is what makes this one read: it is lit rather than self-luminous, which is
         // the difference between moonlight and a glow (§20, and ADR-570's self-shadow march is
         // what gives it a direction).
@@ -466,8 +510,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         shape(FogShape::Bank); set("bankLength", 1.4f); set("edgeSoftness", 0.5f);
         set("groundHug", 0.4f); set("heightFalloff", 1.4f); set("emissionHeight", 0.4f);
         set("driftSpeed", 1.0f); set("detailScale", 7.0f);
-        v.field.turbulence = 0.55f; v.field.turbulenceScale = 1.8f; v.field.smokeWarp = 1.4f;
-        v.field.smokeBillow = 0.55f; v.field.detail = 0.35f; v.field.cloudNoise = 0.55f;
+        v.field.cloudNoise = 0.55f;
         v.filaments = 1.4f; v.field.breathAmount = 0.10f; v.field.breathSpeed = 0.14f;
         v.scattering = 0.35f; v.spill = 2.0f;
         v.colorDeep = {0.014f, 0.040f, 0.048f}; v.colorMid = {0.040f, 0.150f, 0.145f};
@@ -477,8 +520,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         v.density = 1.8f; v.emission = 0.012f; v.field.contrast = 0.6f;
         shape(FogShape::Sphere); set("edgeSoftness", 1.0f); set("heightInfluence", 0.0f);
         set("densitySoftness", 1.0f); set("driftSpeed", 0.4f); set("driftVertical", 0.3f);
-        v.field.turbulence = 0.15f; v.field.turbulenceScale = 0.6f; v.field.smokeWarp = 0.3f;
-        v.field.detail = 0.1f; v.field.cloudNoise = 0.25f;
+        v.field.cloudNoise = 0.25f;
         v.field.breathAmount = 0.18f; v.field.breathSpeed = 0.05f;
         v.scattering = 0.9f; v.spill = 1.2f;
         v.colorDeep = {0.085f, 0.070f, 0.100f}; v.colorMid = {0.200f, 0.175f, 0.225f};
@@ -494,8 +536,7 @@ void applyStyle(EffectInstance& e, std::string_view style) {
         // artist points at it is not a starting point.
         set("groundHug", 0.0f); set("heightFalloff", 2.2f); set("densityThreshold", 0.10f);
         set("driftSpeed", 0.5f); set("detailScale", 9.0f);
-        v.field.turbulence = 0.45f; v.field.turbulenceScale = 3.0f; v.field.smokeWarp = 1.2f;
-        v.field.detail = 0.4f; v.field.cloudNoise = 0.5f;
+        v.field.cloudNoise = 0.5f;
         v.scattering = 0.25f; v.spill = 0.1f;
         v.colorDeep = {0.020f, 0.022f, 0.024f}; v.colorMid = {0.070f, 0.074f, 0.078f};
         v.colorAccent = {0.130f, 0.136f, 0.142f};
@@ -503,7 +544,6 @@ void applyStyle(EffectInstance& e, std::string_view style) {
     e.kind = EffectKind::VolumetricFog;
     e.style = std::string(style);
 }
-
 void style0(E& e) { applyStyle(e, kStyleNames[0]); }
 void style1(E& e) { applyStyle(e, kStyleNames[1]); }
 void style2(E& e) { applyStyle(e, kStyleNames[2]); }
@@ -532,7 +572,6 @@ constexpr EffectStyle kStyles[] = {
 constexpr EffectRoute kRoutes[] = {
     {"audio.bass", "fogDensity", 0.0018f, 90.0f, 620.0f},
     {"audio.bass", "swell", 0.060f, 110.0f, 700.0f},
-    {"audio.mid", "churn", 0.400f, 60.0f, 420.0f},
     {"audio.treble", "threads", 0.300f, 30.0f, 260.0f},
     {"beat.pulse", "selfGlow", 0.020f, 12.0f, 300.0f},
 };
@@ -611,6 +650,28 @@ Result<void> validate(const EffectInstance& e) { return e.vortex.validate(); }
 //  11  luminous accent
 //  12  SPILL, 0, 0, 0   -- the thirteenth lane, and it is not decoration
 //  13-15 unused (headroom; the tornado fills through 13)
+//
+// ADR-713/714: THE FOG SLOT'S LANE MAP AS IT NOW STANDS, from the audit
+// `grep -o 'mediaLane(s, [0-9]*u)' shaders/volume.wgsl` run BEFORE any row was written. For a slot
+// tagged fog, a lane is free when its only readers are `mediumVortexUniforms` and
+// `mediumTornadoUniforms` (arms a fog slot never takes) and `mediumCapOf`'s tornado branch:
+//
+//   0   centre.xyz, radius                         bound, field
+//   1   x thickness (bound)  y --  z SWIRL rad/s    w density (extinction/m)
+//   2   xyz DRIFT m/s        w DISTANCE COLOUR RANGE (m)
+//   3   x SWELL  y swell rate   z emission  w filaments
+//   4   x depth (bound), yzw untouched: `debug_visualizer.cpp` reads 4.y as a throat for every kind
+//   5   x comet  y comet reach  z scene scattering  w HEIGHT COLOUR AMOUNT
+//   6   xyz density curve (contrast, threshold, softness)   w TURBULENCE RATE
+//   7   x detail scale  y TURBULENCE AMOUNT  z detail amount  w TURBULENCE SCALE
+//   8   xyz DISTANCE COLOUR  w its AMOUNT
+//   9..11  rgb the three depth colours; their .w are the HEIGHT COLOUR's r, g, b
+//   12  spill, shape, height influence, emission height
+//   13  thickness, bankLength, cos/sin rotation     14  edge softness, bias, falloff, dome
+//   15  the kind tag
+//
+// Spare for a fog slot after ADR-714: 1.y and 4.yzw (the latter only with the debug view taught
+// the kind). Upper-case entries are what ADR-713/714 added.
 //
 // Lane 12 exists because `spill` is a SURFACE irradiance consumed by the lit pass (ADR-379), not a
 // per-metre coefficient the march integrates -- so it appears in no lane the march needs, and
@@ -691,27 +752,45 @@ void packMedium(const E& e, float envelope, const MediumFlowInput& flow, MediumS
     }
     out.lane[2] = glm::vec4(driftDir * driftSpeed, 0.0f);
     out.lane[2].y = storedOf(e, "driftVertical", 0.0f) + driftDir.y * driftSpeed;
+    // ADR-714: the distance colour's range, in the drift lane's spare slot.
+    out.lane[2].w = std::max(storedOf(e, "distanceColorRange", 600.0f), 1.0f);
     out.lane[3] = glm::vec4(f.v3.x, f.v3.y, std::max(v.emission, 0.0f) * envelope,
                             std::max(v.filaments, 0.0f));
     out.lane[4] = f.v4;
     out.lane[5] = glm::vec4(std::max(v.cometResponse, 0.0f), std::max(v.cometReach, 1.0f),
-                            std::max(v.scattering, 0.0f), 0.0f);
+                            std::max(v.scattering, 0.0f),
+                            // ADR-714: the height colour's amount.
+                            std::clamp(storedOf(e, "heightColorAmount", 0.0f), 0.0f, 1.0f));
     // ADR-571 (§24): lane 6 is the bank's DENSITY RESPONSE CURVE. Free for a fog bank by the same
     // audit as lane 2 -- `mediumVortexUniforms` is its only reader in the march and a bank never
     // takes that arm. `contrast` finally reaches the field through it: the row has existed since
     // this kind did and all three styles set it, and nothing has read it since ADR-563.
     out.lane[6] = glm::vec4(std::max(v.field.contrast, 0.05f),
                             std::clamp(storedOf(e, "densityThreshold", 0.0f), 0.0f, 0.99f),
-                            std::clamp(storedOf(e, "densitySoftness", 0.0f), 0.0f, 1.0f), 0.0f);
+                            std::clamp(storedOf(e, "densitySoftness", 0.0f), 0.0f, 1.0f),
+                            // ADR-713: how fast the turbulence evolves in place.
+                            std::max(storedOf(e, "turbulenceSpeed", 0.25f), 0.0f));
     // ADR-565: a fog bank has no eye, so lane 7's first two slots carry its macro-detail terms
     // instead. `.z` stays `cloudNoise` exactly where `packVortex` put it, so the control an artist
     // moves is the one the field reads.
+    //
+    // ADR-713: `.y` carried `storedOf(e, "detailDrift", 0.01f)` -- a row ADR-571 removed, so a
+    // constant 0.01 nobody read. It is the TURBULENCE amount now, and `.w` its scale.
     out.lane[7] = glm::vec4(std::max(storedOf(e, "detailScale", 6.0f), 0.05f),
-                            storedOf(e, "detailDrift", 0.01f), f.v7.z, 0.0f);
-    out.lane[8] = f.v8;
-    out.lane[9] = glm::vec4(v.colorDeep, 0.0f);
-    out.lane[10] = glm::vec4(v.colorMid, 0.0f);
-    out.lane[11] = glm::vec4(v.colorAccent, 0.0f);
+                            std::clamp(storedOf(e, "turbulence", 0.0f), 0.0f, 1.0f), f.v7.z,
+                            std::max(storedOf(e, "turbulenceScale", 1.5f), 0.05f));
+    // ADR-714: lane 8 was the vortex's spiral bands, read only by the vortex arm; for a fog slot it
+    // is the DISTANCE COLOUR and its amount.
+    out.lane[8] = glm::vec4(glm::max(e.values.getColor("fog/distanceColor", glm::vec3(0.14f, 0.18f, 0.28f)),
+                                     glm::vec3(0.0f)),
+                            std::clamp(storedOf(e, "distanceColorAmount", 0.0f), 0.0f, 1.0f));
+    // ADR-714: and the HEIGHT COLOUR rides in the three depth colours' fourth components -- the
+    // colour lanes carry a fourth colour.
+    const glm::vec3 heightColor =
+        glm::max(e.values.getColor("fog/heightColor", glm::vec3(0.34f, 0.24f, 0.30f)), glm::vec3(0.0f));
+    out.lane[9] = glm::vec4(v.colorDeep, heightColor.r);
+    out.lane[10] = glm::vec4(v.colorMid, heightColor.g);
+    out.lane[11] = glm::vec4(v.colorAccent, heightColor.b);
     // ADR-566: lane 12's first slot is `spill`, which the surface glow reads and this kind must
     // leave alone. The two zeroes beside it are where the primitive selector and its height
     // influence live -- one lane, read by `shaders/fog.wgsl` and `world::fogShapeAt` and by

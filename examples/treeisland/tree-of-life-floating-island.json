@@ -13,8 +13,8 @@
    "kind": "composition",
    "path": {
     "path": "tree-of-life-floating-island.scene.json",
-    "sha256": "ab4bd7f85cee37577cf9d6a47820c63886a65268fe201abdcc75e6004d781d19",
-    "size": 13887
+    "sha256": "e0388614ad54938ca5f2e22fda75f68fdd1b4dab3c3b91ac4dbcfbc49c32762e",
+    "size": 13923
    }
   }
  },
@@ -128,7 +128,7 @@
    "parameters": {
     "base": [
      -1496.0,
-     -620.0,
+     -1000.0,
      -1588.0
     ],
     "circulation": 2600.0,
@@ -136,16 +136,16 @@
     "cloudAmount": 0.6,
     "cloudDensity": 1.1,
     "cloudHeight": 0.2,
-    "cloudWidth": 5.0,
+    "cloudWidth": 2.6,
     "colorThick": [
-     0.06,
      0.1,
-     0.3
+     0.06,
+     0.32
     ],
     "colorThin": [
-     0.28,
-     0.62,
-     0.78
+     0.2,
+     0.72,
+     0.88
     ],
     "coreDensity": 0.25,
     "coreRadius": 0.5,
@@ -154,10 +154,10 @@
     "detailScale": 1.9,
     "edgeSoft": 0.35,
     "edgeWidth": 0.6,
-    "emission": 0.004,
+    "emission": 0.002,
     "erosion": 1.2,
     "footSoft": 0.04,
-    "height": 1400.0,
+    "height": 1150.0,
     "inflow": 0.3,
     "lean": [
      0.0,
@@ -173,7 +173,7 @@
     "rotationBottom": 1.3,
     "rotationCurve": 1.0,
     "rotationTop": 0.5,
-    "scattering": 0.15,
+    "scattering": 0.1,
     "shellGain": 1.6,
     "shellWidth": 0.3,
     "skirtDensity": 0.0,
@@ -1567,7 +1567,6 @@
    0.006200000178068876,
    0.01850000023841858
   ],
-  "scene/fogDensity": 0.0,
   "scene/fogHeight": 0.0,
   "scene/fogHeightFalloff": 0.0,
   "scene/gridIntensity": 0.6000000238418579,
@@ -2182,7 +2181,7 @@
    "target": "particles/tree-motes/emissive"
   },
   {
-   "amount": 0.08,
+   "amount": 0.006,
    "chain": {
     "attackMs": 0.0,
     "clampEnabled": false,

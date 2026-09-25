@@ -287,6 +287,16 @@ std::vector<glm::vec3> positions() {
     out.emplace_back(10.0f, 380.0f, 0.0f);    // squarely in the core
     out.emplace_back(70.0f, 20.0f, 0.0f);     // squarely in the skirt
     out.emplace_back(180.0f, 780.0f, 0.0f);   // squarely in the wall cloud
+    // ADR-706's two new shapes, which lie outside every position above: the funnel's rounded TIP
+    // below the ground contact (footSoft 0.04 of 800 m reaches -32 m), the debris cloud's rounded
+    // UNDERSIDE (0.3 of its 80 m height), and its superelliptic shoulder. A parity probe built from
+    // the old field's extent is blind to a feature outside it (ADR-565 §4).
+    out.emplace_back(6.0f, -20.0f, 0.0f);     // the funnel tip, below the contact
+    out.emplace_back(0.0f, -8.0f, 20.0f);     // the funnel tip, near the axis
+    out.emplace_back(60.0f, -12.0f, 0.0f);    // the debris underside
+    out.emplace_back(-40.0f, -20.0f, 55.0f);  // the underside, near its lowest reach
+    out.emplace_back(95.0f, 45.0f, 0.0f);     // the debris shoulder
+    out.emplace_back(0.0f, 60.0f, -110.0f);   // the shoulder, the other side
     return out;
 }
 
@@ -318,6 +328,15 @@ std::vector<glm::vec3> bodyPositions() {
         const float a = static_cast<float>(i) * 0.61803f * 6.2831853f;
         const float dist = 120.0f + static_cast<float>(i) * 9.0f; // 120 .. 327 m: across the rim
         const float y = 690.0f + static_cast<float>(i % 6) * 18.0f;
+        out.emplace_back(std::cos(a) * dist, y, std::sin(a) * dist);
+    }
+    // And the debris cloud and the funnel's tip (ADR-706), for the same reason: the skirt knobs now
+    // shape a mound out to 2.2 x 1.6 ground radii and below the contact, and a probe that never
+    // samples there would report `skirtFlare` reachable only through the old field's footprint.
+    for (int i = 0; i < 24; ++i) {
+        const float a = static_cast<float>(i) * 0.61803f * 6.2831853f;
+        const float dist = 10.0f + static_cast<float>(i) * 5.5f; // 10 .. 137 m: tip to mound edge
+        const float y = -22.0f + static_cast<float>(i % 8) * 11.0f; // underside to mound top
         out.emplace_back(std::cos(a) * dist, y, std::sin(a) * dist);
     }
     return out;

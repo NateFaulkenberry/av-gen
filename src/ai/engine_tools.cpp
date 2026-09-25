@@ -2390,8 +2390,8 @@ constexpr const char* kEnvironmentPaths[] = {
     "env/sky/background",   "env/sky/zenithColor",  "env/sky/horizonColor",
     "env/sky/groundColor",  "env/sky/sunColor",     "env/sky/haze",
     "env/sky/sunIntensity", "env/sky/sunSize",      "env/sky/sunGlow",
-    "env/sky/intensity",    "scene/brightness",     "scene/fogDensity",
-    "scene/fogHeight",      "scene/fogHeightFalloff", "scene/volumeDensity",
+    "env/sky/intensity",    "scene/brightness",     "scene/volumeDensity",
+    "scene/fogHeight",      "scene/fogHeightFalloff", "scene/horizonDensity",
     "scene/volumeScattering", "scene/keyLight",     "scene/windSpeed",
     "scene/windDirection",  "scene/stylized",
 };
@@ -2437,7 +2437,7 @@ void registerEnvironmentTools(ToolRegistry& registry) {
             if (!values.is_object() || values.empty()) {
                 return ToolResult::failure(ToolErrorCode::InvalidArguments,
                                            "'values' must be a non-empty object of path -> value",
-                                           "e.g. {\"scene/fogDensity\": 0.08}");
+                                           "e.g. {\"scene/volumeDensity\": 0.008}");
             }
             json applied = json::object();
             json unknown = json::array();

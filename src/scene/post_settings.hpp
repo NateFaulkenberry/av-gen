@@ -47,7 +47,8 @@ struct ImageLookIntegration {
     // density it also corrected (it was 15x too high). This control is deliberately NOT a second
     // fog and must not be sold as one.
     //
-    // **Prefer `environment.fogDensity`.** That comparison has now been measured rather than
+    // **Prefer the scene's fog (`environment.volumeDensity`, ADR-705; this was measured against the
+    // exp-squared `fogDensity` it replaced).** That comparison has now been measured rather than
     // assumed (docs/image-look-audit.md §8): on a scene that already has ADR-347's fog, taking this
     // control to 0.6 moves 1.6% of pixels by at most three code values, where the fog alone moves
     // 32% by up to 109. Scene fog is the stronger and the more physical of the two -- per surface,

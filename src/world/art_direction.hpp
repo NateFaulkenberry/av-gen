@@ -57,7 +57,6 @@ struct EmissionLadder {
 // The air. Field for field, what the scene's environment already takes.
 struct AtmosphereProfile {
     glm::vec3 fogColor{0.10f, 0.18f, 0.32f};
-    float fogDensity = 0.0055f;
     float fogHeight = 4.0f;
     float fogHeightFalloff = 0.10f;
     glm::vec3 skyZenith{0.008f, 0.016f, 0.048f};

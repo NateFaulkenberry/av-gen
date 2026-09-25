@@ -44,6 +44,22 @@
 //        that true is to add nothing to a lane a shared accessor already reads. Lane 12.y and 12.z
 //        are read by this file and by `world::fogShapeAt`, and by nothing else in the engine.
 
+//
+// ADR-713 (§16, flow) and ADR-714 (§25, colour) read seven more lanes, every one of them audited
+// free for a fog slot with `grep -o 'mediaLane(s, [0-9]*u)' shaders/volume.wgsl` BEFORE a row was
+// written -- the same audit ADR-571 ran, and the lane map beside `packMedium` is the contract:
+//   f7  = LANE 1.  z = SWIRL, rad/s (the vortex's `rotationSpeed`, packed by `packVortex` where it
+//        always was; nothing read it for a fog bank until ADR-713). x/w are the bound's thickness
+//        and the density, which this file does not touch.
+//   f8  = LANE 3.  x = SWELL amount, y = swell rate (rad/s) -- `breathAmount`/`breathSpeed`, which
+//        the BOUND has carried since ADR-566 and the field never read. z/w are emission.
+//   f9  = LANE 5.  w = HEIGHT COLOUR amount. x..z are comet and scattering, not read here.
+//   f10 = LANE 8.  xyz = DISTANCE COLOUR, w = its amount.
+//   f11 = LANE 9, f12 = LANE 10, f13 = LANE 11: rgb are the three depth colours (read by
+//        `mediumEmissionAt`, not here); their three `.w` are the HEIGHT COLOUR's r, g, b.
+//   and three single slots in lanes this struct already had: f3.y = TURBULENCE amount (the dead
+//   `detailDrift` write ADR-571 left behind), f3.w = turbulence scale, f6.w = turbulence rate,
+//   and f5.w = the distance colour's range in metres.
 struct FogUniformsWgsl {
     f0: vec4<f32>,
     f1: vec4<f32>,
@@ -52,6 +68,13 @@ struct FogUniformsWgsl {
     f4: vec4<f32>,
     f5: vec4<f32>,
     f6: vec4<f32>,
+    f7: vec4<f32>,
+    f8: vec4<f32>,
+    f9: vec4<f32>,
+    f10: vec4<f32>,
+    f11: vec4<f32>,
+    f12: vec4<f32>,
+    f13: vec4<f32>,
 };
 
 // ADR-566, the brief's §9: the five local volume primitives, plus the bank that was here first.
@@ -121,6 +144,184 @@ fn fogVerticalProfile(f: FogUniformsWgsl, relY: f32) -> f32 {
     return mix(thin, dome * dome, clamp(f.f2.w, 0.0, 1.0));
 }
 
+// ---- ADR-713, the brief's §16: the flow controls ----------------------------------------------
+//
+// Every one of these is a PURE FUNCTION OF THE TRANSPORT SECOND and the packed lanes (ADR-091):
+// no history, no accumulation, so a seek to t lands on the same field a play to t does. And every
+// one is the IDENTITY at its default by a branch rather than by a small number, so a bank that
+// does not use them evaluates the same expressions on the same bits it did before ADR-713.
+
+// SWIRL: the bank's internal structure circulates about its own vertical axis, rigidly, at
+// `f7.z` radians a second. It returns where in the structure's REST frame the world point `p` is,
+// before the drift -- the drift is subtracted by the callers exactly as ADR-571 wrote it.
+//
+// Rigid on purpose. A differential swirl (the core turning faster than the rim) winds the
+// structure into a spiral whose pitch shrinks without bound as t grows: at 0.02 rad/s it is
+// twelve turns of shear after ten minutes, finer than the march can carry. A rigid rotation is
+// periodic in t, so the field at t = 3600 is as well-sampled as the field at t = 0.
+//
+// It moves what is INSIDE the bank -- the detail and the turbulence -- and not the primitive:
+// rotating the silhouette itself is `bankRotation` keyframed, which the timeline already does.
+fn fogStructureFrame(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> vec3<f32> {
+    let omega = f.f7.z;
+    if (omega == 0.0) {
+        return p;
+    }
+    let a = -omega * t;
+    let c = cos(a);
+    let s = sin(a);
+    let rel = p - f.f0.xyz;
+    return f.f0.xyz + vec3<f32>(rel.x * c - rel.z * s, rel.y, rel.x * s + rel.z * c);
+}
+
+// SWELL: the bank widens and narrows, `1 + amount * sin(rate * t)`, the vortex's own breath
+// (`vortex.wgsl`) applied to the fog's primitive. Returned as the factor the horizontal offset is
+// DIVIDED by, which is the same as multiplying the radius and the long axis by it -- and for the
+// sphere, whose one size is the radius in every direction, the vertical too.
+//
+// The amount is clamped below 0.9 so the divisor never reaches zero; the bound
+// (`mediumBoundOf`) has carried `1 + amount` horizontally since ADR-566, which is the most this
+// can widen the field. ADR-713 adds the sphere's vertical to it.
+fn fogSwell(f: FogUniformsWgsl, t: f32) -> f32 {
+    let amount = clamp(f.f8.x, 0.0, 0.9);
+    if (amount <= 0.0) {
+        return 1.0;
+    }
+    return 1.0 + amount * sin(t * f.f8.y);
+}
+
+fn fogSwellOffset(f: FogUniformsWgsl, rel: vec3<f32>, swell: f32) -> vec3<f32> {
+    if (swell == 1.0) {
+        return rel;
+    }
+    if (fogShapeKind(f) == kFogShapeSphere) {
+        return rel / swell;
+    }
+    return vec3<f32>(rel.x / swell, rel.y, rel.z / swell);
+}
+
+// The primitive's three semi-axes in its own yawed frame (ax along the long axis, ay up, az
+// across), which is what the turbulence is measured against: a displacement of 0.2 means a fifth
+// of the bank's own size in each direction, so the same number deforms a 30 m wisp and a 2 km
+// bank alike -- ADR-564's size independence applied to motion.
+fn fogSemiAxes(f: FogUniformsWgsl) -> vec3<f32> {
+    let radius = max(f.f0.w, 1e-3);
+    if (fogShapeKind(f) == kFogShapeSphere) {
+        return vec3<f32>(radius);
+    }
+    return vec3<f32>(radius * max(f.f1.y, 0.05), max(f.f1.x, 1e-3), radius);
+}
+
+// The flow's magnitude is O(1) with a long tail; this scales it so the clamp below touches only
+// the tail (measured in `test_fog_turbulence.cpp`: the clamp engages on under 2% of samples).
+const kFogTurbulenceGain: f32 = 1.3;
+
+// TURBULENCE -- and it is also §16's CURL, for the reason ADR-572 gave in advance: a flow sampled
+// PER POSITION shears the structure, which is what turbulence is. So there is one mechanism, not
+// two rows that do the same thing.
+//
+// The world point `p` is displaced by a DIVERGENCE-FREE flow (`flowCurl`, noise.wgsl: the cross
+// product of two noise gradients, so it swirls and never sources or sinks) sampled in the
+// structure's rest frame -- so it drifts and swirls with the bank -- and evolving at `f6.w` of
+// its own rate. The WHOLE field is evaluated at the displaced point: silhouette, height profile
+// and detail. That is the difference from the detail term, which can only modulate density
+// inside a boundary that stays where it was.
+//
+// Bounded, and the bound is a proof rather than a tuning: the flow is clamped to length 1, so the
+// displacement is at most `amount` of each semi-axis, and `mediumBoundOf` grows by exactly that.
+// §17's rule holds: this moves density that exists, it cannot make any where the primitive has none
+// within `amount` of a semi-axis.
+fn fogTurbulence(f: FogUniformsWgsl, p: vec3<f32>, t: f32, step: vec3<f32>) -> vec3<f32> {
+    let amount = clamp(f.f3.y, 0.0, 1.0);
+    if (amount <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    let scale = max(f.f3.w, 0.05);
+    let rate = max(f.f6.w, 0.0);
+    let local = fogFlowLocal(f, p, t);
+    // ADR-718: each octave weighted by how well `step` can carry it. (1, 1) -- a point sample, or
+    // a step that resolves both -- is `flowCurl` itself, through `flowCurlBanded`'s own branch.
+    let band = fogTurbulenceBand(f, t, step);
+    var n = flowCurlBanded(local * scale, t * rate, 53u, band.x, band.y) * kFogTurbulenceGain;
+    let len = length(n);
+    if (len > 1.0) {
+        n = n / len;
+    }
+    let semi = fogSemiAxes(f);
+    let d = n * amount * semi;
+    // Back from the bank's frame to the world's.
+    let c = f.f1.z;
+    let s = f.f1.w;
+    return vec3<f32>(d.x * c - d.z * s, d.y, d.x * s + d.z * c);
+}
+
+// The point `p` in the flow's own coordinates: the structure's rest frame (drift and swirl
+// removed), yawed into the primitive's axes and measured in its semi-axes. `flowCurl` is sampled at
+// this times the turbulence scale, so one unit here is one lattice cell of the flow's first octave.
+fn fogFlowLocal(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> vec3<f32> {
+    let rest = fogStructureFrame(f, p, t) - f.f5.xyz * t - f.f0.xyz;
+    let c = f.f1.z;
+    let s = f.f1.w;
+    let semi = fogSemiAxes(f);
+    return vec3<f32>((rest.x * c + rest.z * s) / semi.x, rest.y / semi.y,
+                     (-rest.x * s + rest.z * c) / semi.z);
+}
+
+// ADR-718: THE BAND-LIMIT. The flow has two octaves, one lattice cell and 1/2.03 of one in
+// `fogFlowLocal`'s units, and the march samples it once per `step` (the ray's direction times the
+// schedule's spacing there). An octave with more cycles per step than the march can carry is not
+// structure, it is grain: at turbulence 0.7 and scale 4 its second octave put 0.085 of grain at
+// matched luminance on the review ellipsoid at 32 steps, 3.4x the tornado hero's.
+//
+// The cycles per step are measured ALONG THE STEP -- the flow's coordinates are anisotropic (a
+// bank's vertical semi-axis is a tenth of its horizontal ones), and a horizontal ray through a flat
+// bank crosses the vertical frequency not at all. `fogFlowLocal` is affine, so
+// `local(p + step) - local(p)` is its linear part applied to the step -- the swirl's rotation, the
+// yaw and the division by the semi-axes, with the drift and the centre cancelled -- and the cycles
+// per step are that length times the scale. It does not depend on `p` at all. Each octave keeps its full weight up to the
+// Nyquist rate, half a cycle per step, and fades to 0 at one cycle per step, where every sample
+// lands on the same phase and the octave is pure alias -- `vortexOctaveWeight`'s rule (ADR-389)
+// with a hard floor. Measured against two stricter windows in ADR-718: fading from a quarter cycle
+// moved turbulence 0.7 at scale 1.5, which this window leaves alone. The octaves fade; the scale
+// never moves, because a scale that depended on the step would move the whole pattern with every
+// ray's spacing.
+//
+// A pure function of position, time and the step (ADR-091). A zero step is a point sample and
+// returns (1, 1): the CPU bound, the tests and anything else that asks where the fog IS.
+const kFogBandFull: f32 = 0.5;
+const kFogBandZero: f32 = 1.0;
+
+fn fogTurbulenceBand(f: FogUniformsWgsl, t: f32, step: vec3<f32>) -> vec2<f32> {
+    if (step.x == 0.0 && step.y == 0.0 && step.z == 0.0) {
+        return vec2<f32>(1.0);
+    }
+    var v = step;
+    let omega = f.f7.z;
+    if (omega != 0.0) {
+        // `fogStructureFrame`'s rotation, without its centre.
+        let a = -omega * t;
+        v = vec3<f32>(v.x * cos(a) - v.z * sin(a), v.y, v.x * sin(a) + v.z * cos(a));
+    }
+    let c = f.f1.z;
+    let s = f.f1.w;
+    let semi = fogSemiAxes(f);
+    let dl = vec3<f32>((v.x * c + v.z * s) / semi.x, v.y / semi.y, (-v.x * s + v.z * c) / semi.z);
+    let cycles = length(dl) * max(f.f3.w, 0.05);
+    return vec2<f32>(1.0 - smoothstep(kFogBandFull, kFogBandZero, cycles),
+                     1.0 - smoothstep(kFogBandFull, kFogBandZero, cycles * 2.03));
+}
+
+// How far, in the primitive's normalised distance, a displacement of `amount` semi-axes can move
+// a sample -- which is what the early-out below must allow for. 1 for every primitive whose
+// distance is a norm of the per-axis ratios; the capsule measures its long axis in units of its
+// width, so a displacement along it counts `bankLength` times over.
+fn fogTurbulenceReach(f: FogUniformsWgsl) -> f32 {
+    if (fogShapeKind(f) == kFogShapeCapsule) {
+        return max(f.f1.y, 1.0);
+    }
+    return 1.0;
+}
+
 // §13/§14: MACRO detail, and the three properties that keep it secondary.
 //
 // 1. **Identity at zero.** `detail` 0 returns exactly 1.0, so the analytic field is untouched and
@@ -159,7 +360,10 @@ fn fogMacroDetail(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     // one number meant a different speed in every bank -- and its direction was not a control at
     // all. The artist had a drift knob with no drift direction, which is the first line of §16's
     // list.
-    let n = fbm3((p - f.f5.xyz * t) * scale, 41u);
+    //
+    // ADR-713: through `fogStructureFrame`, which is `p` itself at swirl 0 -- so this is the same
+    // expression, evaluated on the same bits, as the line ADR-571 wrote.
+    let n = fbm3((fogStructureFrame(f, p, t) - f.f5.xyz * t) * scale, 41u);
     return 1.0 + amount * (n * 2.0 - 1.0);
 }
 
@@ -276,13 +480,102 @@ fn fogEmissionHeight(f: FogUniformsWgsl, relY: f32) -> f32 {
     return mix(1.0, fogVerticalProfile(f, relY), amount);
 }
 
+// ---- ADR-714, the brief's §25: height colour and distance colour ---------------------------
+//
+// Two more colours beside the three through the bank's depth (`colorDeep/Mid/Accent`, mixed on
+// density in `mediumEmissionAt`), and the brief's own warning is the design: *"avoid making colour
+// responsible for structure."* In this medium the eye reads structure from LUMINANCE -- the depth
+// hierarchy is dark where the bank is thin and bright where it is dense -- so a height or distance
+// colour that changed luminance would be drawing density that is not there. So both tints are
+// **luminance-preserving**: the tint colour is rescaled to the luminance of the colour it replaces
+// before it is mixed in, and the mix therefore changes hue and saturation and leaves luminance
+// exactly where the density put it. `test_fog_colour.cpp` holds that as an equality.
+//
+// Both weights are functions of WHERE the sample is (its height in the bank, its distance from
+// the camera) and never of the density: the same point is the same tint in a thick bank and a
+// thin one. Both are the identity at amount 0, by a branch.
+
+// Rec. 709 luminance, the weights the rest of the engine's grading uses.
+fn fogLuminance(c: vec3<f32>) -> f32 {
+    return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+}
+
+// `base` with `tint`'s hue at `base`'s luminance, `w` of the way. A tint too dark to carry a hue
+// (a black height colour) leaves the colour alone rather than dividing by nothing.
+fn fogHueMix(base: vec3<f32>, tint: vec3<f32>, w: f32) -> vec3<f32> {
+    let lt = fogLuminance(tint);
+    if (w <= 0.0 || lt <= 1e-4) {
+        return base;
+    }
+    return mix(base, tint * (fogLuminance(base) / lt), w);
+}
+
+// The height weight: 0 at the bank's densest layer, 1 two thicknesses above it -- the SAME vertical
+// frame `fogVerticalProfile` measures in, so "the top of the bank" means the same height to the
+// density, to the glow's height influence (§26) and to this. One vertical model (ADR-567).
+fn fogHeightColourWeight(f: FogUniformsWgsl, relY: f32) -> f32 {
+    let amount = clamp(f.f9.w, 0.0, 1.0);
+    if (amount <= 0.0) {
+        return 0.0;
+    }
+    let thickness = max(f.f1.x, 1e-3);
+    let bias = clamp(f.f2.y, 0.0, 1.0);
+    let base = -thickness + 2.0 * thickness * bias;
+    return amount * smoothstep(0.0, 2.0, (relY - base) / thickness);
+}
+
+// The distance weight: aerial perspective inside the bank, `1 - exp(-d / range)` -- 63% of the
+// way at `range` metres from the camera. Exponential rather than a smoothstep between two
+// distances because that is what extinction along a path is; one number instead of two.
+fn fogDistanceColourWeight(f: FogUniformsWgsl, cameraDistance: f32) -> f32 {
+    let amount = clamp(f.f10.w, 0.0, 1.0);
+    if (amount <= 0.0) {
+        return 0.0;
+    }
+    return amount * (1.0 - exp(-max(cameraDistance, 0.0) / max(f.f5.w, 1.0)));
+}
+
+// The depth colour `base` with both tints applied, height first. The identity when both amounts
+// are 0: `fogHueMix` returns `base` itself on a zero weight.
+fn fogTintedColour(f: FogUniformsWgsl, base: vec3<f32>, relY: f32, cameraDistance: f32) -> vec3<f32> {
+    let height = vec3<f32>(f.f11.w, f.f12.w, f.f13.w);
+    let c = fogHueMix(base, height, fogHeightColourWeight(f, relY));
+    return fogHueMix(c, f.f10.xyz, fogDistanceColourWeight(f, cameraDistance));
+}
+
 // The bank, analytic and complete. Zero outside, and compactly so, which is the property ADR-374
 // measured the march's cost against and ADR-562's ray interval depends on.
-fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
+fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32, step: vec3<f32>) -> f32 {
     if (f.f0.w <= 0.0) {
         return 0.0;
     }
-    let rel = p - f.f0.xyz;
+    // ADR-713: swell and turbulence. At their defaults the field is evaluated at `p` itself,
+    // through the pre-ADR-713 expression `p - f.f0.xyz` and on its own branch -- NOT through a
+    // `var q = p` that the flow branch may overwrite. The version that shared one path was the
+    // identity in exact arithmetic and still moved one pixel of a default bank by one level: the
+    // Metal compiler contracted the shared path differently. Measured, then split.
+    let swell = fogSwell(f, t);
+    let turbulence = clamp(f.f3.y, 0.0, 1.0);
+    if (swell == 1.0 && turbulence <= 0.0) {
+        return fogShapeFrom(f, p, p - f.f0.xyz, t);
+    }
+    var q = p;
+    if (turbulence > 0.0) {
+        // The flow costs sixteen noise gradients, so skip it where no displacement it can produce
+        // reaches the primitive: `amount` semi-axes, measured in the swelled frame.
+        let reach0 = fogPrimitiveDistance(f, fogSwellOffset(f, p - f.f0.xyz, swell));
+        if (reach0 > 1.35 + turbulence * fogTurbulenceReach(f) / min(swell, 1.0)) {
+            return 0.0;
+        }
+        q = p + fogTurbulence(f, p, t, step);
+    }
+    return fogShapeFrom(f, q, fogSwellOffset(f, q - f.f0.xyz, swell), t);
+}
+
+// The field at the (possibly displaced) point `q`, whose offset from the centre in the (possibly
+// swelled) primitive frame is `rel`. Everything from here down is what `fogShapeAt` was before
+// ADR-713.
+fn fogShapeFrom(f: FogUniformsWgsl, q: vec3<f32>, rel: vec3<f32>, t: f32) -> f32 {
     let rr = fogPrimitiveDistance(f, rel);
     if (rr > 1.35) {
         return 0.0;
@@ -308,5 +601,5 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     if (fogShapeKind(f) != kFogShapeBank) {
         profile = mix(1.0, profile, clamp(f.f4.z, 0.0, 1.0));
     }
-    return fogDensityRemap(f, max(rim * profile * fogMacroDetail(f, p, t), 0.0));
+    return fogDensityRemap(f, max(rim * profile * fogMacroDetail(f, q, t), 0.0));
 }

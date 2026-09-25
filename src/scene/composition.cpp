@@ -54,13 +54,13 @@ constexpr std::string_view kSceneKeys[] = {
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
     "worldEvents"};
 constexpr std::string_view kEnvironmentKeys[] = {
-    "map", "lightRig", "intensity", "fogDensity", "stylized", "rotation", "skyIntensity",
+    "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
     "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
     "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve",
+    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowRange", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -3608,6 +3608,45 @@ Transform Composition::nodeWorldTransform(const CompositionNode& node) const {
     return world;
 }
 
+// Wave 2 (XFORM, transform_frame.hpp): the offset rule. The parent-space translation is added to the
+// node's own position; the local part (rotation and scale about the pivots, already a TRS) is
+// applied inside the node's own transform.
+Transform Composition::nodeDrawnTransform(const CompositionNode& node) const {
+    Transform t = nodeTransform(node);
+    if (effectOffsets_ == nullptr || effectOffsets_->count == 0) {
+        return t;
+    }
+    const world::TransformOffset* offset = effectOffsets_->find(node.name);
+    if (offset == nullptr) {
+        return t;
+    }
+    t.position += offset->translation;
+    Transform local;
+    local.position = offset->localPosition;
+    local.rotation = offset->localRotation;
+    local.scale = offset->localScale;
+    return compose(t, local);
+}
+
+Transform Composition::nodeDrawnWorldTransform(const CompositionNode& node) const {
+    // The gate: with no live offset this IS `nodeWorldTransform`, the same calls in the same order,
+    // so a scene with no XFORM instance flattens to the same bits it always did.
+    if (effectOffsets_ == nullptr || effectOffsets_->count == 0) {
+        return nodeWorldTransform(node);
+    }
+    Transform world = nodeDrawnTransform(node);
+    const CompositionNode* current = &node;
+    for (std::size_t guard = 0; !current->parent.empty() && guard < nodes_.size(); ++guard) {
+        const CompositionNode* parent = findNode(current->parent);
+        if (parent == nullptr || parent == &node) {
+            break;
+        }
+        world = compose(nodeDrawnTransform(*parent), world);
+        current = parent;
+    }
+    return world;
+}
+
 CompositionNode cloneNodeSpec(const CompositionNode& node) {
     CompositionNode copy;
     copy.name = node.name;
@@ -4254,7 +4293,6 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     }
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
-    fogDensity_ = &params.add(floatDesc(prefix_ + "scene/fogDensity", fogDensitySetting_, 0.0f, 2.0f, 0.0f, 0.2f));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
     // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only
     // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
@@ -4324,6 +4362,22 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                              0.0f, 1.0f, 0.0f, 1.0f));
     fogHeightCurve_ = &params.add(floatDesc(prefix_ + "scene/fogHeightCurve", volumeSetting_.fogHeightCurve,
                                             0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-715 (ADR-575 §18): the layer follows the terrain. Hard-clamped to 0..1 for the reason
+    // `upper` and `curve` are: 0 is the flat plane and 1 is "measured from the ground under the
+    // sample", and outside that the layer would be steeper than the terrain or tilted against it.
+    fogGroundFollow_ = &params.add(floatDesc(prefix_ + "scene/fogGroundFollow", volumeSetting_.fogGroundFollow,
+                                             0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-717: the layer pools in the basins -- its top measured from the low-passed ground. 0 is
+    // ADR-715's layer, 1 is the basin alone; hard-clamped because past 1 the top would be pushed
+    // BELOW the basin in valleys, which is the opposite of pooling.
+    fogPooling_ = &params.add(floatDesc(prefix_ + "scene/fogPooling", volumeSetting_.fogPooling, 0.0f, 1.0f, 0.0f,
+                                        1.0f));
+    // ADR-705 (§7's Horizon Density): the air grows denser with distance from the eye, read by the
+    // march, the surface pass and the particle estimate from this one number. An ordinary
+    // parameter, so audio, the timeline and presets drive it like any other. Soft range 0..2 is
+    // where it reads as distance; the hard 8 is `kHorizonDensityMax`.
+    horizonDensity_ = &params.add(floatDesc(prefix_ + "scene/horizonDensity", volumeSetting_.horizonDensity, 0.0f,
+                                            scene::kHorizonDensityMax, 0.0f, 2.0f));
     volumeScattering_ = &params.add(floatDesc(prefix_ + "scene/volumeScattering", volumeSetting_.volumeScattering,
                                               0.0f, 20.0f, 0.0f, 4.0f));
     volumeAbsorption_ = &params.add(floatDesc(prefix_ + "scene/volumeAbsorption", volumeSetting_.volumeAbsorption,
@@ -4370,9 +4424,12 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // ADR-573: the same, for how far the march goes. Thirty-two shipped scenes set it and none of
     // them could have done so from the editor. The hard maximum is generous because a scene whose
     // subject is kilometres of air legitimately wants one; the soft range is where a frame budget
-    // survives.
+    // survives. The hard minimum is 0, not a centimetre: ADR-705 made 0 mean "no march, the surface
+    // pass carries the whole ray", and a floor of 0.01 turned every such scene loaded through its
+    // parameter into a fullscreen march that stops after one centimetre -- the cost the gate in
+    // `VolumeRenderer::enabled` exists to avoid.
     volumeMaxDistance_ = &params.add(floatDesc(prefix_ + "scene/volumeMaxDistance",
-                                               volumeSetting_.volumeMaxDistance, 0.01f, 20000.0f,
+                                               volumeSetting_.volumeMaxDistance, 0.0f, 20000.0f,
                                                10.0f, 4000.0f));
     // ADR-574: ADR-058's coupling -- how much of the volumetric's mist layer the SURFACE fog
     // integrates. It had no parameter, on a recorded reason that turned out to be false about the
@@ -5283,7 +5340,6 @@ void Composition::detach() {
     skyIntensity_ = nullptr;
     stylized_ = nullptr;
     brightness_ = nullptr;
-    fogDensity_ = nullptr;
     fogColor_ = nullptr;
     styledSkyAmbient_ = nullptr;
     styledGroundAmbient_ = nullptr;
@@ -5292,6 +5348,9 @@ void Composition::detach() {
     fogHeightFalloff_ = nullptr;
     fogUpperDensity_ = nullptr;
     fogHeightCurve_ = nullptr;
+    fogGroundFollow_ = nullptr;
+    fogPooling_ = nullptr;
+    horizonDensity_ = nullptr;
     windEnabled_ = nullptr;
     windSpeed_ = nullptr;
     windDirection_ = nullptr;
@@ -5649,6 +5708,7 @@ void Composition::rebuild() {
     }
     scene_.materialPrograms.clear();
     scene_.waters.clear();
+    scene_.terrainGround = world::TerrainGround{};
     ownMaterialCount_ = materialPrograms_.size();
     for (const MaterialProgram& src : materialPrograms_) {
         MaterialProgram mp = src;
@@ -6335,6 +6395,17 @@ void Composition::rebuild() {
                         return scene_.addMesh(std::move(mesh));
                     }, &mutableNode.waterBodies);
                 fresh.chunks = mutableNode.chunks;
+                // ADR-715: the height bake, on the same miss as the meshes and keyed the same way.
+                {
+                    const auto bakeStart = std::chrono::steady_clock::now();
+                    fresh.height = std::make_shared<const world::TerrainHeightField>(
+                        world::bakeTerrainHeight(node.worldMap, terrainKey));
+                    const double bakeMs = std::chrono::duration<double, std::milli>(
+                                              std::chrono::steady_clock::now() - bakeStart)
+                                              .count();
+                    log::info("terrain '{}': height baked, {} x {} samples at {:.2f} m in {:.1f} ms", node.name,
+                              fresh.height->width, fresh.height->depth, fresh.height->spacing, bakeMs);
+                }
                 for (world::TerrainChunk& chunk : fresh.chunks) {
                     // `TerrainChunk::meshes` is value-initialised, so the slots above `lodLevels`
                     // hold 0 rather than kInvalidMesh. Subtracting the base from those wraps, and at
@@ -6353,6 +6424,26 @@ void Composition::rebuild() {
             }
             if (!reusedProducts) {
                 mutableNode.terrainProducts = std::move(fresh);
+            }
+            // ADR-715: the first terrain in the scene is the ground a ground-following fog reads.
+            // One height texture per frame is the binding's budget; a second terrain is said out
+            // loud rather than silently ignored.
+            if (!scene_.terrainGround.valid()) {
+                const glm::quat q = nodeT.rotation;
+                const bool rotated = std::abs(std::abs(q.w) - 1.0f) > 1e-6f;
+                scene_.terrainGround = world::placeTerrainGround(mutableNode.terrainProducts.height, nodeT.position,
+                                                                 nodeT.scale, rotated);
+                if (rotated && !mutableNode.terrainHeightWarned) {
+                    log::warn("terrain '{}': rotated, so its height is not baked for ground-following fog; "
+                              "fogGroundFollow reads a flat plane here (ADR-715)",
+                              node.name);
+                    mutableNode.terrainHeightWarned = true;
+                }
+            } else if (!mutableNode.terrainHeightWarned) {
+                log::warn("terrain '{}': a second terrain in one scene; ground-following fog follows the first "
+                          "only (ADR-715)",
+                          node.name);
+                mutableNode.terrainHeightWarned = true;
             }
             for (std::size_t c = 0; c < mutableNode.chunks.size(); ++c) {
                 const world::TerrainChunk& chunk = mutableNode.chunks[c];
@@ -7380,7 +7471,9 @@ void Composition::applyParameters() {
             node.opacityScale = node.opacityParam->base();
         }
 
-        const Transform nodeT = nodeWorldTransform(node);
+        // Wave 2: the DRAWN transform, with any XFORM offset on this node or an ancestor composed in
+        // (the simulation and HIST keep reading `nodeWorldTransform`; see `setEffectOffsets`).
+        const Transform nodeT = nodeDrawnWorldTransform(node);
         bool visible = nodeVisible(node);
         bool dayNightVisibleOverride = true;
         float emissiveBoost =
@@ -7921,7 +8014,6 @@ void Composition::applyParameters() {
     if (brightness_ != nullptr) {
         scene_.environment.brightness = brightness_->value();
     }
-    scene_.environment.fogDensity = fogDensity_ != nullptr ? fogDensity_->value() : fogDensitySetting_;
     scene_.environment.stylized = stylized_ != nullptr ? stylized_->value() : stylizedSetting_;
     if (addedKeyLight_ && !scene_.lights.empty() && keyLight_ != nullptr) {
         scene_.lights.back().intensity = defaultKeyLight().intensity * keyLight_->value();
@@ -7976,6 +8068,9 @@ void Composition::applyParameters() {
         env.fogHeightFalloff = pick(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
         env.fogUpperDensity = pick(fogUpperDensity_, volumeSetting_.fogUpperDensity);
         env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
+        env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
+        env.fogPooling = pick(fogPooling_, volumeSetting_.fogPooling);
+        env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
         env.volumeScattering = pick(volumeScattering_, volumeSetting_.volumeScattering);
         env.volumeAbsorption = pick(volumeAbsorption_, volumeSetting_.volumeAbsorption);
         env.volumeAnisotropy = pick(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -8162,7 +8257,9 @@ void Composition::applyDayNight() {
     const DayNightState& s = dayNightState_;
     Environment& env = scene_.environment;
     env.environmentIntensity *= s.hdriIntensity;
-    env.fogDensity = s.fogDensity;
+    // ADR-705: the cycle drives the ONE density. It used to drive the surface pass's own
+    // exp-squared density, which no longer exists.
+    env.volumeDensity = s.volumeDensity;
     env.fogColor = s.fogColor;
     // ADR-049 splits these two and the distinction bites here: `Environment::skyIntensity` scales
     // the *visible background pass*, `SkySettings::intensity` scales the sky as an IBL source.
@@ -8886,7 +8983,7 @@ nlohmann::json Composition::toJson() const {
             writeFloatCurve("hdriIntensity", dn.hdriIntensity);
             writeFloatCurve("hdriBlend", dn.hdriBlend);
             writeFloatCurve("glowScale", dn.glowScale);
-            writeFloatCurve("fogDensity", dn.fogDensity);
+            writeFloatCurve("volumeDensity", dn.volumeDensity);
             writeFloatCurve("waterReflection", dn.waterReflection);
         }
         environment["dayNight"] = std::move(d);
@@ -8900,7 +8997,6 @@ nlohmann::json Composition::toJson() const {
     if (lightFromEnvironmentSetting_) {
         environment["lightFromEnvironment"] = true;
     }
-    environment["fogDensity"] = fogDensity_ != nullptr ? fogDensity_->base() : fogDensitySetting_;
     {
         // ADR-358. Out here rather than in the volumetric block below, which is where it was
         // first written and where a test caught it: that block is guarded by the volume being ON,
@@ -9009,6 +9105,10 @@ nlohmann::json Composition::toJson() const {
             environment["fogHeightFalloff"] = base(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
             environment["fogUpperDensity"] = base(fogUpperDensity_, volumeSetting_.fogUpperDensity);
             environment["fogHeightCurve"] = base(fogHeightCurve_, volumeSetting_.fogHeightCurve);
+            // ADR-705: written only when set, so a file that never used it round-trips unchanged.
+            if (const float horizon = base(horizonDensity_, volumeSetting_.horizonDensity); horizon > 0.0f) {
+                environment["horizonDensity"] = horizon;
+            }
             environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
             environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
             environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
@@ -9031,6 +9131,18 @@ nlohmann::json Composition::toJson() const {
             if (!volumeColorFieldSetting_.empty()) {
                 environment["volumeColorField"] = volumeColorFieldSetting_;
             }
+        }
+        // ADR-715. Outside the gate above because the surface fog reads the layer too
+        // (`fogHeightAmount`), with or without the march; written only when it is not 0, so every
+        // scene saved before the key existed round-trips to the same bytes.
+        const float follow = fogGroundFollow_ != nullptr ? fogGroundFollow_->base() : volumeSetting_.fogGroundFollow;
+        if (follow != 0.0f) {
+            environment["fogGroundFollow"] = follow;
+        }
+        // ADR-717, by the same rule: only when not 0.
+        const float pooling = fogPooling_ != nullptr ? fogPooling_->base() : volumeSetting_.fogPooling;
+        if (pooling != 0.0f) {
+            environment["fogPooling"] = pooling;
         }
     }
     j["environment"] = std::move(environment);
@@ -9883,7 +9995,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             readFloatCurve("hdriIntensity", dn.hdriIntensity);
             readFloatCurve("hdriBlend", dn.hdriBlend);
             readFloatCurve("glowScale", dn.glowScale);
-            readFloatCurve("fogDensity", dn.fogDensity);
+            readFloatCurve("volumeDensity", dn.volumeDensity);
             readFloatCurve("waterReflection", dn.waterReflection);
             // Curves the scene did not override get the Tree of Life defaults, so `enabled: true`
             // on its own is a complete cycle rather than a black world. `fill` only writes into an
@@ -9917,11 +10029,6 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return std::unexpected(intensity.error());
         }
         comp->envIntensitySetting_ = *intensity;
-        auto fog = readFloat(e, "fogDensity", comp->fogDensitySetting_);
-        if (!fog) {
-            return std::unexpected(fog.error());
-        }
-        comp->fogDensitySetting_ = *fog;
         if (e.contains("stylized")) {
             if (!e["stylized"].is_boolean()) {
                 return fail("'stylized' must be a boolean");
@@ -10004,6 +10111,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"fogHeightFalloff", &v.fogHeightFalloff},
                                       FloatKey{"fogUpperDensity", &v.fogUpperDensity},
                                       FloatKey{"fogHeightCurve", &v.fogHeightCurve},
+                                      FloatKey{"fogGroundFollow", &v.fogGroundFollow},
+                                      FloatKey{"fogPooling", &v.fogPooling},
+                                      FloatKey{"horizonDensity", &v.horizonDensity},
                                       FloatKey{"volumeShadowStrength", &v.volumeShadowStrength},
                                       FloatKey{"volumeScattering", &v.volumeScattering},
                                       FloatKey{"volumeAbsorption", &v.volumeAbsorption},

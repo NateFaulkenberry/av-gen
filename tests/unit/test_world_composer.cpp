@@ -368,12 +368,13 @@ TEST_CASE("A composed world plans its atmosphere from the recipe", "[world][comp
     auto thick = world::composeWorld(recipe, library);
     REQUIRE(thick.has_value());
 
-    CHECK(thick->environment.fogDensity > thin->environment.fogDensity);
+    // ADR-705: `atmosphere.fog` scales the ONE density now; the surface pass's own is gone.
+    CHECK(thick->environment.volumeDensity > thin->environment.volumeDensity);
     CHECK(thick->environment.sunIntensity > thin->environment.sunIntensity);
     // Fog densities are per metre over a world hundreds of metres across. The first pass reached
     // 0.055, which is total fog by fifty metres -- the whole valley in a glass of milk.
-    CHECK(thick->environment.fogDensity < 0.02f);
-    CHECK(thin->environment.fogDensity > 0.0f);
+    CHECK(thick->environment.volumeDensity < 0.02f);
+    CHECK(thin->environment.volumeDensity > 0.0f);
 }
 
 TEST_CASE("Ecological zones make different places, not just denser patches", "[world][composer][zone]") {

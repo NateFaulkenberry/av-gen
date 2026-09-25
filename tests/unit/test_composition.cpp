@@ -3,6 +3,8 @@
 #include "core/time.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "params/serialization.hpp"
+#include "signals/signal_bus.hpp"
 #include "scene/composition.hpp"
 #include "scene/mesh_generators.hpp"
 #include "support/gltf_fixture.hpp"
@@ -1225,6 +1227,91 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     REQUIRE((*again)->grids().size() == 1);
     CHECK((*again)->grids()[0].structuralHash() == (*comp)->grids()[0].structuralHash());
     CHECK((*again)->toJson() == j);
+}
+
+// ADR-705: `volumeMaxDistance` 0 is "no march; the surface pass carries the whole ray". It must
+// survive the PARAMETER, not only the scene struct: a hard minimum of 0.01 clamped it to a 1 cm march
+// that paid for the whole volume pass, in every surface-only scene loaded through a project.
+TEST_CASE("volumeMaxDistance 0 survives its parameter, so a surface-only scene runs no march",
+          "[scene][composition][fog][environment]") {
+    Fixture fx;
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "surface-only",
+      "environment": { "volumeDensity": 0.04, "volumeMaxDistance": 0.0 }
+    })";
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->scene().environment.volumeMaxDistance == 0.0f);
+    params::IParameter* p = params.find("scene/volumeMaxDistance");
+    REQUIRE(p != nullptr);
+    p->setBaseComponent(0, 0.0f); // as a project's parameter block sets it
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->scene().environment.volumeMaxDistance == 0.0f);
+}
+
+// ADR-705, §7's Horizon Density. The four things "a scene parameter" means in this engine, each asked
+// separately because each has failed alone before (ADR-561/565/571): the scene file reaches the
+// environment, a modulation route reaches it, the scene serialiser writes the BASE back, and the
+// project serialiser (the parameter block) keeps it too.
+TEST_CASE("Horizon Density is a scene parameter that both serialisers keep", "[scene][composition][fog][environment]") {
+    Fixture fx;
+    const std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "horizon",
+      "environment": { "volumeDensity": 0.01, "volumeMaxDistance": 80.0, "horizonDensity": 0.75 }
+    })";
+    auto comp = scene::Composition::fromJson(nlohmann::json::parse(text), fx.registry);
+    REQUIRE(comp.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    (*comp)->update(FrameTime{});
+    CHECK((*comp)->scene().environment.horizonDensity == 0.75f);
+    params::IParameter* p = params.find("scene/horizonDensity");
+    REQUIRE(p != nullptr);
+    CHECK(p->hardMax(0) == scene::kHorizonDensityMax);
+    CHECK(p->hardMin(0) == 0.0f);
+
+    // Modulated like any other: a route adds to the final, and the final is what the renderer sees.
+    signals::SignalBus bus;
+    const signals::SignalId drive = bus.declare("test.drive");
+    params::ModRoute route;
+    route.source = "test.drive";
+    route.target = "scene/horizonDensity";
+    route.amount = 0.5f;
+    modulator.addRoute(route);
+    // bind() reports every unresolved route in the set, and a bare composition's own routes name
+    // signals this bus never declared; what matters here is that THIS one resolved.
+    (void)modulator.bind(bus, params);
+    REQUIRE(modulator.routes().back().targetParam == p);
+    bus.set(drive, 1.0f);
+    params.resetFinals();
+    modulator.applyRoutes(bus, params, 1.0 / 60.0);
+    (*comp)->update(FrameTime{});
+    CHECK_THAT((*comp)->scene().environment.horizonDensity, WithinAbs(1.25f, 1e-6));
+
+    // The scene serialiser writes the authored base, not this frame's modulation, and round-trips.
+    const nlohmann::json j = (*comp)->toJson();
+    CHECK(j["environment"]["horizonDensity"] == 0.75f);
+    auto again = scene::Composition::fromJson(j, fx.registry);
+    REQUIRE(again.has_value());
+    CHECK((*again)->toJson() == j);
+    // The project serialiser: a project's `parameters` block is this pair, per parameter.
+    const nlohmann::json saved = params::parameterToJson(*p);
+    CHECK(saved == 0.75f);
+    p->setBaseComponent(0, 0.1f);
+    REQUIRE(params::parameterFromJson(*p, saved).has_value());
+    CHECK(p->baseComponent(0) == 0.75f);
+
+    // Off is written as nothing, so a scene that never used it round-trips byte for byte.
+    const std::string off = R"({"format": "avgen-scene", "version": 1, "name": "plain",
+      "environment": { "volumeDensity": 0.01 }})";
+    auto plain = scene::Composition::fromJson(nlohmann::json::parse(off), fx.registry);
+    REQUIRE(plain.has_value());
+    CHECK_FALSE((*plain)->toJson()["environment"].contains("horizonDensity"));
 }
 
 TEST_CASE("A scene file's environment can name a light rig", "[scene][composition][lightrig]") {
