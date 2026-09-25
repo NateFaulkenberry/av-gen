@@ -819,6 +819,33 @@ struct HostCheckpoint {
     [[nodiscard]] virtual std::size_t bytes() const = 0;
 };
 
+// ADR-870: the signal bus a seek's replay steps through. A play builds its bus once per frame
+// (`Engine::update`); a replay that is to land where the play does has to see, at every replayed
+// instant, the bus the play saw there. The host that owns the signal pipeline implements this and
+// hands it to `Composition::seekWithDirector`, which is how `scene` replays signals without
+// depending on `app`.
+//
+// Only a deterministic pipeline can honestly implement it -- offline analysis of a known track is
+// a pure function of time; a live analysis thread, MIDI and OSC are not -- so a host with a live
+// pipeline passes none and the replay keeps its null bus.
+class ReplaySignalSource {
+public:
+    virtual ~ReplaySignalSource() = default;
+    // The bus every `build` writes into. The same object for the whole seek, so the entity world
+    // can be handed its address once.
+    [[nodiscard]] virtual const signals::SignalBus& bus() const = 0;
+    // The pipeline as a play from zero has it before its first frame.
+    virtual void reset() = 0;
+    // The frame at `now` (dt = 0 at step zero, ADR-521): the bus a play built for that instant.
+    virtual void build(double now, double dt) = 0;
+    // The pipeline's state after the last `build`, for a seek checkpoint (ADR-700), and back.
+    [[nodiscard]] virtual std::shared_ptr<const HostCheckpoint> capture() const = 0;
+    virtual void restore(const HostCheckpoint& checkpoint) = 0;
+    // Everything the built signals depend on that is not state: the audio, the tempo, the musical
+    // structure. Mixed into the checkpoints' key, so a changed track drops them.
+    [[nodiscard]] virtual std::uint64_t inputKey() const = 0;
+};
+
 class EntityWorld {
 public:
     EntityWorld() = default;
@@ -1099,6 +1126,12 @@ public:
     // that the same seek time always produces the same state. Matching a played-through timeline
     // exactly would need the analysis replayed too; an offline render plays from zero and never
     // seeks, so it is exact either way.
+    //
+    // ADR-870 is that replay. A host with a deterministic pipeline (offline, an analysed track) no
+    // longer hands one instant's bus to every step: it hands a bus it REBUILDS at every step, in its
+    // `before` hook, to what a play built at that instant (`ReplaySignalSource`). That is a replay
+    // of something, so the argument above does not apply to it; and the step raises the bus's
+    // world events where `update` does. Live seeks still pass null.
     //
     // `budget` bounds the work; see `SeekBudget`. `params`, when given, is put back to its authored
     // values first: behaviours read parameter *finals*, and a final still holding the last played

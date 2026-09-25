@@ -65,6 +65,23 @@ namespace avgen::app {
 
 enum class EngineMode { Live, Offline };
 
+// ADR-870: everything the per-frame signal pipeline carries from one frame into the next -- the
+// offline analysis cursor, the last analysis frame published, the music classifier and the beat
+// clock. One copyable struct, so a seek's replay can run the very same pipeline on its own copy
+// (`Engine::ReplaySignals`) and hand the state it arrives with back to the live one. Both drive it
+// through `Engine::consumeAnalysis` and `Engine::advanceClock`; there is no second copy of either.
+struct SignalClock {
+    std::size_t analysisCursor = 0; // the next offline analysis frame to consume
+    analysis::AnalysisFrame latest; // the last one published
+    bool hasFrame = false;
+    MusicRuntime music;             // music.* (ADR-073); its detector is history
+    // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
+    double beatPhase = 0.0;
+    std::uint32_t beatCount = 0;
+    std::uint32_t lastAnalysisBeatCount = 0;
+    std::uint32_t lastPhraseIndex = 0;
+};
+
 // ADR-582: what a deliberate hand-back of the camera takes *off* the camera, kept exactly as it was
 // so it can be put back. The focus schedule (`Engine::shotSpans`) is not in here, because parking
 // does not touch it: effects keep following it while the director is parked.
@@ -791,7 +808,7 @@ public:
     // The musical event signals (ADR-073): music.beat ... music.impact, and the classifier behind
     // them. Read it to ask *when* something fired; the bus clears event values at the end of every
     // update(), so polling the signals from outside the frame only ever sees zero.
-    [[nodiscard]] const MusicRuntime& music() const { return music_; }
+    [[nodiscard]] const MusicRuntime& music() const { return clock_.music; }
     [[nodiscard]] audio::AudioPlayer* player() { return player_.get(); }
     [[nodiscard]] analysis::AnalysisRunner* runner() { return runner_.get(); }
     [[nodiscard]] const analysis::AnalysisTrack* track() const { return track_.get(); }
@@ -801,8 +818,13 @@ public:
     // as a `shared_ptr` rather than copied into the job because an analyzed four-minute track is
     // tens of megabytes of spectra.
     [[nodiscard]] std::shared_ptr<const analysis::AnalysisTrack> trackShared() const { return track_; }
-    [[nodiscard]] const analysis::AnalysisFrame& latestFrame() const { return latest_; }
-    [[nodiscard]] bool hasFrame() const { return hasFrame_; }
+    [[nodiscard]] const analysis::AnalysisFrame& latestFrame() const { return clock_.latest; }
+    [[nodiscard]] bool hasFrame() const { return clock_.hasFrame; }
+    // ADR-870: the signal pipeline's carried state. For tests that compare a scrub with a play.
+    [[nodiscard]] const SignalClock& signalClock() const { return clock_; }
+    // True when a seek replays the signal bus: offline, with an analysed track. Live mode keeps a
+    // null bus in its replay -- a live analysis thread, MIDI and OSC are not functions of time.
+    [[nodiscard]] bool seekReplaysSignals() const;
     [[nodiscard]] const EngineStats& stats() const { return stats_; }
 
     // ADR-410. The renderer publishes what the temporal ring actually holds; the Engine carries it
@@ -817,7 +839,33 @@ public:
     [[nodiscard]] params::ModRoute* routeForTarget(const std::string& path);
 
 private:
-    void publishFrame(const analysis::AnalysisFrame& frame);
+    // ---- the per-frame signal pipeline (ADR-870) ----
+    // Each takes the clock and the bus it works on, so `update` (the live `clock_`/`bus_`) and a
+    // seek's replay (`ReplaySignals`' own) run one implementation.
+    void publishFrame(SignalClock& clock, signals::SignalBus& bus, const analysis::AnalysisFrame& frame) const;
+    // Offline: consumes every analysis frame at or before `renderTime` into the classifier and
+    // publishes the last, with the batch's onsets merged. True when a new frame was published.
+    [[nodiscard]] bool consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double renderTime) const;
+    // What the beat clock reads that is not carried state.
+    struct ClockInputs {
+        double bpm = 0.0;
+        bool midi = false; // the MIDI clock owns phase and count (live only)
+        double midiPhase = 0.0;
+        std::uint32_t midiCount = 0;
+        bool midiPulse = false;
+        double position = 0.0;
+        double duration = 0.0;
+        bool playing = false;
+    };
+    // The time and beat signals of `time`, advancing the beat clock. Returns the beat pulse.
+    bool advanceClock(SignalClock& clock, signals::SignalBus& bus, const FrameTime& time,
+                      bool newAnalysisFrame, const ClockInputs& in) const;
+    [[nodiscard]] std::pair<audio::TempoProvenance, double> resolvedTempo(const SignalClock& clock,
+                                                                         bool midiActive) const;
+    // The inputs a replayed signal is a function of, for the checkpoint key.
+    [[nodiscard]] std::uint64_t replaySignalKey(bool playing) const;
+    class ReplaySignals;
+    std::unique_ptr<ReplaySignals> replaySignals_;
     // Shared by loadComposition and setCompositionJson: detach, swap, attach, reapply.
     [[nodiscard]] Result<void> installComposition(std::unique_ptr<scene::Composition> composition);
     void installController(std::unique_ptr<scene::SceneController> controller);
@@ -842,7 +890,6 @@ private:
     params::ParameterSet params_;
     signals::SignalBus bus_;
     signals::AudioSignals audioSignals_;
-    MusicRuntime music_;
     params::Modulator modulator_;
     signals::SourceRack sources_;
     params::PresetBank presets_;
@@ -968,7 +1015,6 @@ private:
     TimeSignals timeSignals_;
     int phraseBars_ = 4;
     int sectionPhrases_ = 4;
-    std::uint32_t lastPhraseIndex_ = 0;
     signals::SourceContext sourceContext_;
     assets::AssetRegistry registry_;
     std::unique_ptr<scene::SceneController> controller_;
@@ -988,10 +1034,6 @@ private:
     std::vector<std::string> projectWarnings_;
     LoadReporter loadReporter_;
     std::vector<std::pair<std::string, double>> loadTimings_;
-    // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
-    double beatClockPhase_ = 0.0;
-    std::uint32_t beatClockCount_ = 0;
-    std::uint32_t lastAnalysisBeatCount_ = 0;
 
     // Installs a decoded buffer as *the* audio: the player's source, the analysis runner, the
     // offline analysis track and `audioFile_`. The one place that does it, so `loadAudio` and a
@@ -1028,10 +1070,7 @@ private:
     std::unique_ptr<audio::AudioPlayer> player_;
     std::unique_ptr<analysis::AnalysisRunner> runner_;
     std::shared_ptr<analysis::AnalysisTrack> track_;
-    std::size_t offlineFrameCursor_ = 0;
-
-    analysis::AnalysisFrame latest_;
-    bool hasFrame_ = false;
+    SignalClock clock_; // ADR-870: the live signal pipeline's carried state
     double lastRenderTime_ = 0.0;
     EngineStats stats_;
 };

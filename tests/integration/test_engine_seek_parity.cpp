@@ -7,8 +7,9 @@
 //   1. The live entity distance cull. A play culls far bodies and the replay never does. This is
 //      the preview's documented trade (ADR-186); offline renders lift it (ADR-191), so the cases
 //      here lift it as well.
-//   2. Audio-reactive world events and behaviours. The replay has no signal bus. This one is the
-//      hidden `[.known-defect]` case below.
+//   2. Audio-reactive world events and behaviours. The replay had no signal bus: Vane 92 m off by
+//      90 s. Fixed by ADR-870 -- offline, the replay rebuilds the bus a play saw at every step, and
+//      the live pipeline continues from the replay's state. The cases tagged [adr870] hold it.
 //   3. The landing instant was evaluated twice. `loadProject` ends in a seek to zero and the first
 //      frame is at zero, and a render seeks to its start and then ticks at its start. The second
 //      pass ran the saucer's director again and entered its next beat a frame early; everything
@@ -24,6 +25,7 @@
 #include <glm/glm.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <map>
 #include <sstream>
@@ -112,11 +114,163 @@ TEST_CASE("an Engine scrub of the Glowmere film lands where an Engine play does"
     requireScrubEqualsPlay(false, {60, 1800});
 }
 
-// Cause 2, recorded rather than fixed yet: with the film's audio, its audio-reactive world events
-// and behaviours fire in a play and not in the replay, and the aliens part company (Vane 92 m by 90 s).
-TEST_CASE("an Engine scrub of the Glowmere film with its audio lands where the play does", "[.known-defect][seek][engine][glowmere][adr800]") {
+// Cause 2 (ADR-870). With the film's audio its audio-reactive world events and behaviours fire in a
+// play; before the replay rebuilt the bus they never fired in a scrub, and the aliens parted company
+// (Vane 92.0 m, Rook 42.2 m, Sage 7.5 m and Ember 6.9 m at 90 s). Thirty, ninety and a hundred and
+// fifty seconds: every body exactly equal.
+TEST_CASE("an Engine scrub of the Glowmere film with its audio lands where the play does", "[seek][engine][glowmere][adr800][adr870]") {
     if (!assetsPresent()) {
         SKIP("farm or alien assets missing");
     }
-    requireScrubEqualsPlay(true, {5400});
+    requireScrubEqualsPlay(true, {1800, 5400, 9000});
+}
+
+namespace {
+
+// The worst body between two engines, with who moved, for the message.
+float worstBody(const std::map<std::string, glm::vec3>& a, const std::map<std::string, glm::vec3>& b,
+                std::string& who) {
+    REQUIRE(a.size() == b.size());
+    float worst = 0.0f;
+    std::ostringstream out;
+    for (const auto& [name, p] : a) {
+        const float d = glm::length(p - b.at(name));
+        if (d > 0.0f) {
+            out << name << ' ' << d << " m; ";
+        }
+        worst = std::max(worst, d);
+    }
+    who = out.str();
+    return worst;
+}
+
+// The signal pipeline's carried state, field by field: where two engines' next frames would differ.
+void requireSameClock(const app::SignalClock& a, const app::SignalClock& b) {
+    CHECK(a.analysisCursor == b.analysisCursor);
+    CHECK(a.hasFrame == b.hasFrame);
+    CHECK(a.beatPhase == b.beatPhase);
+    CHECK(a.beatCount == b.beatCount);
+    CHECK(a.lastAnalysisBeatCount == b.lastAnalysisBeatCount);
+    CHECK(a.lastPhraseIndex == b.lastPhraseIndex);
+    CHECK(a.music.consumedFrames() == b.music.consumedFrames());
+}
+
+} // namespace
+
+// ADR-870: a scrub that restores a checkpoint carries the signal pipeline's state in it. The first
+// seek records a checkpoint every second to 60 s; the second lands between two of them and must
+// resume from one -- it replays under a second, not from zero -- and still land where the play does.
+TEST_CASE("an Engine scrub of the film with its audio that resumes from a checkpoint lands where the play does", "[seek][engine][glowmere][adr870]") {
+    if (!assetsPresent()) {
+        SKIP("farm or alien assets missing");
+    }
+    constexpr long long kTarget = 2710; // 45.17 s: ten frames past the 45 s checkpoint
+    app::Engine played(app::EngineMode::Offline);
+    load(played, true);
+    for (long long frame = 0; frame <= kTarget + 1; ++frame) {
+        frameAt(played, frame);
+    }
+
+    app::Engine scrubbed(app::EngineMode::Offline);
+    load(scrubbed, true);
+    REQUIRE(scrubbed.seekReplaysSignals());
+    scrubbed.seekSeconds(60.0);
+    REQUIRE(scrubbed.composition()->entityWorld().checkpointStats().count >= 45);
+    scrubbed.seekSeconds(static_cast<double>(kTarget) / 60.0);
+    const auto work = scrubbed.composition()->entityWorld().lastSeekWork();
+    REQUIRE(work.exact);
+    REQUIRE(work.restoredFrom == 45.0); // from the checkpoint, not from zero
+    REQUIRE(work.steps == 10);
+    frameAt(scrubbed, kTarget + 1);
+
+    std::string who;
+    const float worst = worstBody(drawn(played), drawn(scrubbed), who);
+    INFO("scrub via a checkpoint to " << static_cast<double>(kTarget) / 60.0 << " s: " << who);
+    CHECK(worst == 0.0f);
+    requireSameClock(played.signalClock(), scrubbed.signalClock());
+}
+
+// ADR-870: after a scrub the live pipeline continues from the replay's state, not from a reset. Five
+// seconds of play after a scrub to 30 s, against a play from zero, compared on every frame.
+TEST_CASE("an Engine that plays on after a scrub of the film with its audio stays with the play", "[seek][engine][glowmere][adr870]") {
+    if (!assetsPresent()) {
+        SKIP("farm or alien assets missing");
+    }
+    constexpr long long kScrub = 1800;
+    constexpr long long kFrames = 300;
+    app::Engine played(app::EngineMode::Offline);
+    load(played, true);
+    for (long long frame = 0; frame <= kScrub; ++frame) {
+        frameAt(played, frame);
+    }
+    app::Engine scrubbed(app::EngineMode::Offline);
+    load(scrubbed, true);
+    scrubbed.seekSeconds(static_cast<double>(kScrub) / 60.0);
+    requireSameClock(played.signalClock(), scrubbed.signalClock());
+
+    float worst = 0.0f;
+    long long worstFrame = -1;
+    std::string worstWho;
+    for (long long frame = kScrub + 1; frame <= kScrub + kFrames; ++frame) {
+        frameAt(played, frame);
+        frameAt(scrubbed, frame);
+        std::string who;
+        const float d = worstBody(drawn(played), drawn(scrubbed), who);
+        if (d > worst) {
+            worst = d;
+            worstFrame = frame;
+            worstWho = who;
+        }
+    }
+    INFO("worst at frame " << worstFrame << ": " << worstWho);
+    CHECK(worst == 0.0f);
+    requireSameClock(played.signalClock(), scrubbed.signalClock());
+    // And the signals ADR-870 replays, value by value: the analysis, the clock and the classifier.
+    // (Control sources and scene states are not replayed and not claimed.)
+    const auto& a = played.signals();
+    const auto& b = scrubbed.signals();
+    REQUIRE(a.size() == b.size());
+    std::size_t differing = 0;
+    std::size_t compared = 0;
+    std::string first;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        const auto id = static_cast<signals::SignalId>(i);
+        const std::string& name = a.info(id).name;
+        const bool replayed = name.starts_with("audio.") || name.starts_with("time.") ||
+                              name.starts_with("beat.") || name.starts_with("music.");
+        if (!replayed) {
+            continue;
+        }
+        ++compared;
+        if (a.value(id) != b.value(id)) {
+            if (differing++ == 0) {
+                first = a.info(id).name;
+            }
+        }
+    }
+    INFO("first differing signal: " << first);
+    CHECK(compared >= 30);
+    CHECK(differing == 0);
+}
+
+// ADR-870: what a seek costs on the film, cold (no checkpoints: the first scrub after a load) and
+// warm (the checkpoints the cold one recorded). Hidden: a timing, not a property. Run it by tag.
+TEST_CASE("the cost of an Engine seek on the Glowmere film", "[.bench][seek][engine][glowmere][adr870]") {
+    if (!assetsPresent()) {
+        SKIP("farm or alien assets missing");
+    }
+    for (const bool withAudio : {false, true}) {
+        for (const double at : {30.0, 90.0, 150.0}) {
+            app::Engine engine(app::EngineMode::Offline);
+            load(engine, withAudio);
+            const auto t0 = std::chrono::steady_clock::now();
+            engine.seekSeconds(at);
+            const auto t1 = std::chrono::steady_clock::now();
+            engine.seekSeconds(at - 0.5);
+            const auto t2 = std::chrono::steady_clock::now();
+            const auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+            WARN((withAudio ? "audio" : "no audio") << " seek to " << at << " s: cold " << ms(t0, t1)
+                                                   << " ms, warm (to " << at - 0.5 << " s) " << ms(t1, t2) << " ms");
+        }
+    }
 }
