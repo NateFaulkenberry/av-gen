@@ -14,6 +14,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <optional>
 
 using namespace avgen;
 using Catch::Approx;
@@ -145,19 +146,45 @@ TEST_CASE("the clamp is reported rather than applied silently", "[stride][layers
     CHECK(high.foot.z == Approx(2.0f + (0.8f * 1.6f)).margin(1e-4));
 }
 
-TEST_CASE("the lift scales with the step, on a dial", "[stride][layers]") {
-    // A short step does not lift the foot as high; shortening the reach while leaving the lift
-    // alone is what makes a shortened walk read as a march. The foot is 0.2 above the body.
+TEST_CASE("the lift scales the swing above the ground, on a dial", "[stride][layers]") {
+    // ADR-829. A short step does not lift the foot as high -- so the lift scales the foot's height
+    // ABOVE ITS STANDING HEIGHT (the rest pose's, here y = 0), not its offset from the body. This
+    // test used to assert the second, which is the definition that lifted Rook's PLANTED feet 0.12
+    // off the ground whenever a walk started slow (the owner's report, 2026-09-25).
+    // The foot is swung 1.2 above its standing height.
     const Result none = run(0.5f, 0.35f, 1.6f, 0.0f);
-    CHECK(none.foot.y == Approx(1.2f).margin(1e-4));           // height untouched
+    CHECK(none.foot.y == Approx(1.2f).margin(1e-4));        // height untouched
 
     const Result full = run(0.5f, 0.35f, 1.6f, 1.0f);
-    CHECK(full.foot.y == Approx(1.0f + 0.1f).margin(1e-4));    // halved with the stride
+    CHECK(full.foot.y == Approx(0.6f).margin(1e-4));        // the swing halved with the stride
 
     const Result partial = run(0.5f, 0.35f, 1.6f, 0.7f);
     INFO("partial lift y " << partial.foot.y);
     CHECK(partial.foot.y > full.foot.y);
     CHECK(partial.foot.y < none.foot.y);
+}
+
+TEST_CASE("a planted foot stays planted, and the stance keeps its width", "[stride][layers]") {
+    // ADR-829, the owner's bug in miniature. A foot on the ground (at its standing height) has no
+    // swing, so no stride ratio and no lift may move it vertically; and the step is along the body's
+    // forward axis, so the lateral offset -- the stance width -- is not a stride either.
+    const scene::Skeleton sk = walkerRig();
+    const std::vector<scene::AnimationClip> clips = travellingClip();
+    scene::PoseLayer layer = strideLayer(0.4f);
+    layer.strideMin = 0.4f;
+    layer.strideLift = 0.75f; // Rook's
+    scene::PoseLayerStack stack;
+    REQUIRE(stack.bind({layer}, sk, clips).empty());
+    scene::Pose pose;
+    scene::setRestPose(sk, pose);
+    pose.local[1].position = glm::vec3(0.0f, 1.0f, 2.0f);   // body: hips a metre up
+    pose.local[2].position = glm::vec3(0.15f, 0.0f, 2.3f);  // foot: planted, 0.15 to the side, 0.3 ahead
+    stack.apply(sk, clips, 0.0, pose);
+    const glm::vec3 foot = pose.local[2].position;
+    INFO("foot " << foot.x << "," << foot.y << "," << foot.z);
+    CHECK(foot.y == Approx(0.0f).margin(1e-5));              // still on the ground (was 0.45 before)
+    CHECK(foot.x == Approx(0.15f).margin(1e-5));             // stance width kept (was 0.06)
+    CHECK(foot.z == Approx(2.0f + 0.3f * 0.4f).margin(1e-4)); // the step itself shortened
 }
 
 TEST_CASE("weight fades the correction rather than switching it", "[stride][layers]") {
@@ -583,4 +610,60 @@ TEST_CASE("an unlocked foot is the behaviour every scene had before", "[footlock
     CHECK(plain.footLock == 0.0f);
     const glm::vec3 v(0.0f, 0.0f, 2.0f);
     CHECK(footAfter(0.0f, v, 0.25f, 0.25f).z == Approx(footAfter(0.0f, glm::vec3(0.0f), 0.0f, 0.5f).z).margin(1e-4));
+}
+
+// ADR-829, on the film the owner watched. Rook turns in place at 3.03 s and walks off at 3.30 s. The
+// stride warp used to switch on as he began to move -- on the in-place turn clip, pivoting its
+// vertical term on the hips -- and both feet left the ground in one posed frame (0.12 model units up,
+// 0.15 across), then the IK clamped. Measured on the final pose at the rig's own 30 Hz grid.
+#include "app/engine.hpp"
+#include "scene/composition.hpp"
+#include "scene/detail_limits.hpp"
+#include <filesystem>
+
+TEST_CASE("Rook's feet stay on the ground through the turn at 3 s", "[stride][layers][glowmere][benchmark]") {
+    const std::filesystem::path project =
+        std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2-multicam.json";
+    if (!std::filesystem::exists(std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "aliens" / "alien-scout.glb")) {
+        SKIP("Glowmere assets are not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(project).has_value());
+    engine.setDetailLimits(scene::DetailLimits::unlimited());
+    const scene::CompositionNode* node = engine.composition()->findNode("rook");
+    REQUIRE(node != nullptr);
+    float worstHeight = 0.0f;
+    float worstMove = 0.0f;
+    double at = 0.0;
+    std::optional<std::pair<glm::vec3, glm::vec3>> last;
+    double lastPosed = -1.0;
+    for (int i = 0; i <= 60 * 4; ++i) {
+        engine.update(FrameTime{i / 60.0, i == 0 ? 0.0 : 1.0 / 60.0, static_cast<std::uint64_t>(i)});
+        const scene::SkinnedRig& rig = engine.composition()->scene().rigs.at(node->rigs.front());
+        if (i < 60 * 2.8 || rig.paletteTime == lastPosed) {
+            continue; // before the window, or a frame the 30 Hz rig was not re-posed on
+        }
+        lastPosed = rig.paletteTime;
+        std::vector<glm::mat4> model;
+        scene::poseToModel(rig.skeleton, rig.pose, model);
+        const glm::vec3 l(model[static_cast<std::size_t>(rig.skeleton.find("foot.l"))][3]);
+        const glm::vec3 r(model[static_cast<std::size_t>(rig.skeleton.find("foot.r"))][3]);
+        if (last) {
+            const float h = std::max(std::abs(l.y - last->first.y), std::abs(r.y - last->second.y));
+            const float m = std::max(glm::length(l - last->first), glm::length(r - last->second));
+            if (h > worstHeight) {
+                worstHeight = h;
+                at = i / 60.0;
+            }
+            if (i <= 60 * 3.5) {
+                worstMove = std::max(worstMove, m); // the turn and the first steps; later is full-speed walking
+            }
+        }
+        last = std::pair{l, r};
+    }
+    INFO("worst foot-height step " << worstHeight << " at " << at << " s; worst foot move " << worstMove);
+    // A walk starting from a stand moves a foot ~0.04 per posed frame and lifts it ~0.01; the defect
+    // lifted both 0.12 and moved them 0.15 in one.
+    CHECK(worstHeight < 0.03f);
+    CHECK(worstMove < 0.06f);
 }

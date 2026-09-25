@@ -12,6 +12,7 @@
 #include "directing/performance.hpp"
 #include "directing/plan.hpp"
 #include "entity/entity.hpp"
+#include "support/project_assets.hpp"
 #include "support/project_round_trip.hpp"
 #include "ui/edit_history.hpp"
 #include "world/terrain_query.hpp"
@@ -75,6 +76,7 @@ void playTo(app::Engine& engine, double seconds) {
 
 TEST_CASE("Rook runs past Umbra: the performance, its events and its cue, played from zero",
           "[directing][performance][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);
     const Compilation c = compilePlan(planFrom(runPastPlan()), facts);
@@ -159,6 +161,7 @@ TEST_CASE("Rook runs past Umbra: the performance, its events and its cue, played
 
 TEST_CASE("a walk_to stops short of its target, from a mark on the line from the character's anchor",
           "[directing][performance][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);
     json doc = runPastPlan();
@@ -187,6 +190,7 @@ TEST_CASE("a walk_to stops short of its target, from a mark on the line from the
 
 TEST_CASE("the validator on performances: starts, targets, collisions, and what is not compiled yet",
           "[directing][performance][validate][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);
     const auto codes = [&](const json& doc, const std::string& item) {
@@ -246,6 +250,7 @@ TEST_CASE("the validator on performances: starts, targets, collisions, and what 
 
 TEST_CASE("a chase that rises over its character and passes it moves behind, over, then ahead, played",
           "[directing][performance][camera][benchmark]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // ADR-760. The camera is measured in Rook's frame while the shot plays -- behind and low, then
     // above, then in front looking back -- which is the claim the plan makes, not a key's value.
     auto engine = benchmark();
@@ -322,6 +327,7 @@ TEST_CASE("revising a chase's distance moves the camera, and undoing the revisio
 
 TEST_CASE("an entry blend is live state: a baked plan refuses it, a directed plan is warned",
           "[directing][performance][determinism]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // ADR-820 / ADR-758: a non-zero entrySeconds starts from wherever the simulation had the body.
     auto engine = benchmark();
     const SceneFacts facts = app::sceneFactsFor(*engine);

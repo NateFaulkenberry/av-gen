@@ -429,6 +429,14 @@ std::vector<std::string> PoseLayerStack::rebind(const Skeleton& skeleton,
                 origin = -1;
             }
             stride_[i] = glm::ivec2(joint, origin);
+            // ADR-829: the joint's standing height -- its model-space height in the rest pose -- which
+            // is what a step's swing is measured from. See the stride solve for why not the origin.
+            if (joint >= 0) {
+                setRestPose(skeleton, reference_);
+                poseToModel(skeleton, reference_, model_);
+                modelPose_.local.clear();
+                restTipHeight_[i] = model_[static_cast<std::size_t>(joint)][3].y;
+            }
         } else if (layer.kind == PoseLayerKind::Foot || layer.kind == PoseLayerKind::Reach) {
             const int root = skeleton.find(layer.chainRoot);
             const int mid = skeleton.find(layer.chainMid);
@@ -841,13 +849,23 @@ PoseLayerStats PoseLayerStack::apply(const Skeleton& skeleton, const std::vector
             const auto originIndex = static_cast<std::size_t>(ids.y);
             const glm::vec3 jointModel(model_[jointIndex][3]);
             const glm::vec3 originModel(model_[originIndex][3]);
-            glm::vec3 excursion = jointModel - originModel;
-            // Horizontal by `scale`, vertical by `strideLift` of it: a shorter step does not lift
-            // the foot as high, and shortening the reach while leaving the lift alone is what
-            // makes a shortened walk read as a march.
+            const glm::vec3 excursion = jointModel - originModel;
+            // ADR-829. **Forward reach by `scale`; swing height by `strideLift` of it -- and both
+            // measured from where a foot actually is when it is not stepping.**
+            //
+            //  * The step is along the body's forward axis (+Z, the rig convention every clip here
+            //    is authored to). Scaling the lateral offset as well narrowed the stance by the same
+            //    factor, so a slow walk at scale 0.4 stood with its feet 60% closer together.
+            //  * The lift is a fraction of the foot's height ABOVE ITS STANDING HEIGHT (the rest pose's,
+            //    the ground under a planted foot), not of its drop below the origin. Measured from the
+            //    hips, a 0.4 scale multiplied the leg's whole length by 0.55 and pulled a PLANTED foot
+            //    0.12 model units off the ground -- the foot IK then could not reach the ground from
+            //    there and clamped, and Rook's legs "snapped up" whenever a walk started slow (the
+            //    owner's report, 2026-09-25). A planted foot has no swing, so it does not move now.
             const float lift = 1.0f + ((scale - 1.0f) * std::clamp(layer.strideLift, 0.0f, 1.0f));
-            const glm::vec3 wantedModel =
-                originModel + glm::vec3(excursion.x * scale, excursion.y * lift, excursion.z * scale);
+            const float stand = restTipHeight_[i];
+            const glm::vec3 wantedModel(jointModel.x, stand + ((jointModel.y - stand) * lift),
+                                        originModel.z + (excursion.z * scale));
             // Blended by the layer's weight, like every other correction here, so a scene can fade
             // it in rather than snap it (§63).
             const glm::vec3 finalModel = glm::mix(jointModel, wantedModel, std::clamp(layerWeight, 0.0f, 1.0f));
