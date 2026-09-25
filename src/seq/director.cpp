@@ -125,7 +125,7 @@ std::optional<ResolvedCue> resolveCue(const AnimationCue& cue, double seconds, c
     const scene::ClipSemantics* clip = lookup ? lookup(cue.clip) : nullptr;
     ResolvedCue out;
     out.clip = cue.clip;
-    out.startSeconds = cue.startSeconds;
+    out.startSeconds = cue.originSeconds(); // ADR-823: the phase origin, offset included
     out.speed = cue.speed;
     out.blendSeconds = cue.blendSeconds;
     switch (cue.playback) {
@@ -141,7 +141,7 @@ std::optional<ResolvedCue> resolveCue(const AnimationCue& cue, double seconds, c
     // A one-shot with somewhere to go, once it is over. Its length is the measured one; a clip nobody
     // measured has no known end, and holds.
     if (out.loop == std::optional<bool>(false) && !cue.then.empty() && clip != nullptr && cue.speed > 0.0f) {
-        const double end = cue.startSeconds + static_cast<double>(clip->length / cue.speed);
+        const double end = cue.originSeconds() + static_cast<double>(clip->length / cue.speed);
         if (seconds >= end) {
             if (cue.then == kThenGait) {
                 out.gait = true;
@@ -158,7 +158,7 @@ std::optional<ResolvedCue> resolveCue(const AnimationCue& cue, double seconds, c
 
 double clipEventSeconds(const AnimationCue& cue, float eventClipSeconds) {
     const float speed = cue.speed > 0.0f ? cue.speed : 1.0f;
-    return cue.startSeconds + static_cast<double>(eventClipSeconds / speed);
+    return cue.originSeconds() + static_cast<double>(eventClipSeconds / speed); // ADR-823: from frame zero
 }
 
 ClipLookup clipLookupFor(const scene::Composition& composition, const std::string& node) {
@@ -232,7 +232,8 @@ std::optional<AnimationCue> actorCueAt(const Actor& actor, std::span<const Sched
     }
     return AnimationCue{.node = actor.nodeName(), .clip = authored->clip, .startSeconds = authored->timeSeconds,
                         .speed = authored->speed, .blendSeconds = authored->blendSeconds,
-                        .playback = authored->playback, .then = authored->then};
+                        .playback = authored->playback, .then = authored->then,
+                        .offsetSeconds = authored->offsetSeconds};
 }
 
 } // namespace
@@ -290,6 +291,7 @@ std::optional<scene::Composition::Performer> performerFor(const Actor& actor, st
             return b > a ? (actor.positionAt(b) - actor.positionAt(a)) / static_cast<float>(b - a) : glm::vec3(0.0f);
         };
         scene::Composition::PerformerPose pose;
+        pose.timeScale = actor.timeScaleAt(t); // ADR-823
         // ADR-821: owned while a cue plays; handed back once a one-shot's `then: gait` is reached.
         if (const std::optional<AnimationCue> cue = actorCueAt(actor, mine, t)) {
             const std::optional<ResolvedCue> resolved = resolveCue(*cue, t, lookup);

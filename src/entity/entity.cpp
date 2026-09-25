@@ -1976,6 +1976,9 @@ void EntityWorld::publishSeek(double target, double dt, bool replayedNothing) {
         }
         entity.locomotion_.playbackRate =
             Gait::playbackRate(entity.desc_.gait, entity.locomotion_.activity, entity.state_.speed);
+        if (performing(entity)) {
+            entity.locomotion_.playbackRate *= entity.director_.timeScale; // ADR-823, as `update` does
+        }
         entity.locomotion_.blend = entity.desc_.gait.blend;
         entity.locomotion_.time = target;
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
@@ -2238,7 +2241,9 @@ void EntityWorld::directorAfter(Entity& entity) {
     if (entity.director_.active) {
         entity.motion_.rotation += entity.director_.rotation;
         if (entity.director_.hasSpeed) {
-            entity.state_.speed = entity.director_.speed;
+            entity.state_.speed = entity.director_.performance && entity.director_.timeScale > 0.0f
+                                      ? entity.director_.speed / entity.director_.timeScale // ADR-823
+                                      : entity.director_.speed;
         }
     }
 }
@@ -2606,6 +2611,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
                                 entity.state_.turnRate, dt);
         entity.locomotion_.activity = gait;
         entity.locomotion_.playbackRate = Gait::playbackRate(entity.desc_.gait, gait, entity.state_.speed);
+        if (performing(entity)) {
+            entity.locomotion_.playbackRate *= entity.director_.timeScale; // ADR-823: slowed, not swapped
+        }
         // The feet against the ground they are crossing. Two numbers authored by different people
         // in different files -- a behaviour's travel speed and a gait's stride speed -- with
         // nothing comparing them until now; the only symptom is an animation that looks wrong in a

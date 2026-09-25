@@ -573,6 +573,8 @@ public:
         // ADR-820: the actor names a clip at this instant, so the sequencer owns the rig and the
         // gait yields it. False: the gait picks the clip from `speed`, as for any body.
         bool clipOwned = false;
+        // ADR-823: the actor's local time rate here (1 outside any retime window).
+        float timeScale = 1.0f;
     };
     struct Performer {
         std::string entity;

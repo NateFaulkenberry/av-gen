@@ -2824,6 +2824,7 @@ void Composition::applyPerformers(double now, double dt) {
             motion.hasSpeed = true;
             motion.performance = true;
             motion.clipOwned = pose.clipOwned;
+            motion.timeScale = pose.timeScale;
             e->setDirectorMotion(motion);
         } else if (now >= p.to && now - dt < p.to) {
             // The step the span ends on hands the body back -- where the performance left it, since

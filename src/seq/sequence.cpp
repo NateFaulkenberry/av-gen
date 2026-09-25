@@ -821,6 +821,15 @@ const ClipCue* Actor::clipAt(double seconds) const {
     return current;
 }
 
+float Actor::timeScaleAt(double seconds) const {
+    for (const TimeWarp& w : timeWarps) {
+        if (seconds >= w.startSeconds && seconds < w.endSeconds) {
+            return w.rate;
+        }
+    }
+    return 1.0f;
+}
+
 bool Actor::airborneAt(double seconds) const {
     for (const auto& [from, to] : airborne) {
         if (seconds >= from && seconds <= to) {
@@ -1257,7 +1266,8 @@ std::vector<AnimationCue> Sequence::animationAt(double seconds) const {
                                    .speed = cue->speed,
                                    .blendSeconds = cue->blendSeconds,
                                    .playback = cue->playback,
-                                   .then = cue->then});
+                                   .then = cue->then,
+                                   .offsetSeconds = cue->offsetSeconds});
     }
     return out;
 }
@@ -1987,6 +1997,9 @@ json actorToJson(const Actor& a) {
         if (!c.then.empty()) {
             e["then"] = c.then;
         }
+        if (c.offsetSeconds != 0.0f) {
+            e["offset"] = c.offsetSeconds; // ADR-823
+        }
         clips.push_back(std::move(e));
     }
     json j{{"id", a.id},
@@ -1996,6 +2009,13 @@ json actorToJson(const Actor& a) {
            {"clips", std::move(clips)}};
     if (a.entrySeconds != 0.0f) {
         j["entrySeconds"] = a.entrySeconds; // ADR-820: absent means 0, the plan-safe default
+    }
+    if (!a.timeWarps.empty()) {
+        json warps = json::array();
+        for (const Actor::TimeWarp& w : a.timeWarps) {
+            warps.push_back(json{{"start", w.startSeconds}, {"end", w.endSeconds}, {"rate", w.rate}});
+        }
+        j["timeWarps"] = std::move(warps); // ADR-823
     }
     if (!a.airborne.empty()) {
         json spans = json::array();
@@ -2072,12 +2092,28 @@ Result<Actor> actorFromJson(const json& j) {
                 }
             }
             c.then = readString(e, "then");
+            c.offsetSeconds = static_cast<float>(readNumber(e, "offset", 0.0));
             a.clips.push_back(c);
         }
         std::stable_sort(a.clips.begin(), a.clips.end(),
                          [](const ClipCue& x, const ClipCue& y) { return x.timeSeconds < y.timeSeconds; });
     }
     a.entrySeconds = static_cast<float>(readNumber(j, "entrySeconds", 0.0));
+    if (const auto warps = j.find("timeWarps"); warps != j.end()) {
+        if (!warps->is_array()) {
+            return fail("actor '{}': 'timeWarps' must be an array", a.id);
+        }
+        for (const auto& w : *warps) {
+            Actor::TimeWarp warp;
+            warp.startSeconds = readNumber(w, "start", 0.0);
+            warp.endSeconds = readNumber(w, "end", 0.0);
+            warp.rate = static_cast<float>(readNumber(w, "rate", 1.0));
+            if (warp.endSeconds < warp.startSeconds || warp.rate <= 0.0f) {
+                return fail("actor '{}': a time warp needs start <= end and rate > 0", a.id);
+            }
+            a.timeWarps.push_back(warp);
+        }
+    }
     if (const auto air = j.find("airborne"); air != j.end()) {
         if (!air->is_array()) {
             return fail("actor '{}': 'airborne' must be an array of [start, end] spans", a.id);

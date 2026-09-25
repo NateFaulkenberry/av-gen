@@ -355,6 +355,11 @@ struct DirectorMotion {
     bool performance = false;
     // ADR-820, performances only: the actor names a clip now, so the gait must not push its own.
     bool clipOwned = false;
+    // ADR-823, performances only: the actor is in a local slow-motion (or fast-motion) window at
+    // this rate. `speed` is the path's speed ON THE TIMELINE; the gait chooses its clip from
+    // `speed / timeScale` -- the speed the performance was authored at -- and plays it at
+    // `timeScale`, so a slowed run stays a run, slowed, rather than becoming a walk.
+    float timeScale = 1.0f;
 };
 
 // ADR-820: where a body was when a performance with an entry blend took it -- the point the blend

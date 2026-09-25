@@ -369,6 +369,10 @@ struct ClipCue {
     float speed = 1.0f;        // clip seconds per timeline second
     float blendSeconds = -1.0f; // cross-fade in; < 0 = the rig's own transition time
     ClipPlayback playback = ClipPlayback::Auto;
+    // ADR-823: clip seconds already elapsed at `timeSeconds` -- the clip picks up where it was rather
+    // than from its first frame. What a retime writes when it splits a cue at a window's edge, so a
+    // run slowed in mid-stride carries on mid-stride. The phase origin is `timeSeconds - offset/speed`.
+    float offsetSeconds = 0.0f;
     // ADR-821: what follows a clip that plays once, at `timeSeconds + length / speed`. Empty holds
     // the last frame. `"gait"` hands the rig back: to the body's gait, for an actor performing an
     // entity (ADR-758); to nothing, for any other actor, which then holds as if empty. Otherwise a
@@ -420,6 +424,17 @@ struct Actor {
     // what keeps a walk on a hillside -- and what would flatten a jump arc into a skid.
     std::vector<std::pair<double, double>> airborne;
     [[nodiscard]] bool airborneAt(double seconds) const;
+    // ADR-823: the windows a local retime (`seq::retimeActor`) has stretched, in timeline seconds, and
+    // the rate each plays at. A record of what was done, not an instruction: the keys, spans and cues
+    // are already retimed. Read by a performance, so the gait plays a slowed run slowly instead of
+    // reading its slower speed as a walk.
+    struct TimeWarp {
+        double startSeconds = 0.0;
+        double endSeconds = 0.0;
+        float rate = 1.0f;
+    };
+    std::vector<TimeWarp> timeWarps;
+    [[nodiscard]] float timeScaleAt(double seconds) const;
 
     [[nodiscard]] const std::string& nodeName() const { return node.empty() ? id : node; }
     // Pure evaluation, used by the bake and by a camera that looks at this actor. The path wins
@@ -443,6 +458,11 @@ struct AnimationCue {
     float blendSeconds = -1.0f;
     ClipPlayback playback = ClipPlayback::Auto; // ADR-821
     std::string then;
+    float offsetSeconds = 0.0f; // ADR-823
+    // The second the clip was at frame zero: the phase origin the player is given.
+    [[nodiscard]] double originSeconds() const {
+        return startSeconds - static_cast<double>(offsetSeconds / (speed > 0.0f ? speed : 1.0f));
+    }
 };
 
 // ---- the sequence -----------------------------------------------------------------------------
