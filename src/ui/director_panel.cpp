@@ -62,6 +62,11 @@ void heading(const char* text) {
 
 // The newest task that proposed a plan, or the newest task at all: the conversation the panel is about.
 std::shared_ptr<AgentTask> directorTask(const avgen::ai::ControlPlane& plane) {
+    // A task still working (a Modify or Regenerate that has not proposed yet) is the conversation now,
+    // not the proposal it superseded.
+    if (auto current = plane.currentTask(); current != nullptr && !current->finished()) {
+        return current;
+    }
     const auto& history = plane.history();
     for (auto it = history.rbegin(); it != history.rend(); ++it) {
         if ((*it)->proposal()) {
@@ -199,6 +204,7 @@ void DirectorPanel::draw(app::Engine& engine) {
                                             !compiled_->validation.isBlocked(p.key);
                                  });
     PanelState ps;
+    ps.followUp = !followUp.empty();
     ps.proposal = proposal.has_value() && compiled_.has_value();
     ps.liveToRecord = liveToRecord;
     ps.recording = recording_.running();
@@ -259,7 +265,36 @@ void DirectorPanel::draw(app::Engine& engine) {
         (void)plane->rejectCurrentTask();
         status_ = "rejected; nothing was changed";
     }
-    // The second row: what makes or shows something from the proposal, rather than decides it. Its
+    // ADR-770: a follow-up, and what to do with it -- revise this plan, or ask again from the top.
+    {
+        std::string buffer = followUp;
+        buffer.resize(std::max<std::size_t>(buffer.size() + 256, 512), '\0');
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::InputTextWithHint("##director-followup", "what to change, e.g. \"hold the chase lower\"",
+                                     buffer.data(), buffer.size())) {
+            followUp = std::string(buffer.c_str());
+        }
+    }
+    if (button("Modify", actions.modify, buttons_.modify)) {
+        if (actions.revertPreviewFirst) {
+            (void)endPreview(engine);
+        }
+        if (plane->modifyCurrentTask(followUp) != nullptr) {
+            status_ = "modifying: the revision will wait for your approval";
+            followUp.clear();
+        } else {
+            status_ = "could not modify the proposal";
+        }
+    }
+    ImGui::SameLine();
+    if (button("Regenerate", actions.regenerate, buttons_.regenerate)) {
+        if (actions.revertPreviewFirst) {
+            (void)endPreview(engine);
+        }
+        status_ = plane->regenerateCurrentTask() != nullptr ? "asking again from the original request"
+                                                            : "could not regenerate";
+    }
+    // The next row: what makes or shows something from the proposal, rather than decides it. Its
     // own row, so a narrow docked panel does not push a button past the window's edge.
     if (button("Record", actions.record, buttons_.record) && compiled_) {
         if (actions.revertPreviewFirst) {

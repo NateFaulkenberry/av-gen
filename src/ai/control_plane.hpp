@@ -142,6 +142,13 @@ public:
     // approves or rejects what will actually be installed, through the same gate. Only while the
     // current task is waiting; `note` is shown in its activity.
     bool reviseCurrentProposal(ToolContext::Proposal proposal, std::string note);
+    // ADR-770: the panel's Modify and Regenerate. Both close the waiting task (declined, as
+    // superseded) and start a new one, which ends at the same approval gate.
+    //   Modify: the follow-up, briefed with the waiting plan -- revise THAT plan (same id).
+    //   Regenerate: the original request again, briefed that the last proposal was not wanted.
+    // Nothing when no task is waiting for approval.
+    [[nodiscard]] std::shared_ptr<AgentTask> modifyCurrentTask(std::string followUp);
+    [[nodiscard]] std::shared_ptr<AgentTask> regenerateCurrentTask();
     void clearHistory();
 
     // ---- the frame loop's only obligation --------------------------------------------------------

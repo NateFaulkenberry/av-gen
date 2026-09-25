@@ -320,6 +320,51 @@ bool ControlPlane::reviseCurrentProposal(ToolContext::Proposal proposal, std::st
     return true;
 }
 
+std::shared_ptr<AgentTask> ControlPlane::modifyCurrentTask(std::string followUp) {
+    std::shared_ptr<AgentTask> waiting = currentTask();
+    if (waiting == nullptr || waiting->state() != TaskState::AwaitingApproval || followUp.empty()) {
+        return nullptr;
+    }
+    const auto proposal = waiting->proposal();
+    if (!proposal) {
+        return nullptr;
+    }
+    const std::string briefing = fmt::format(
+        "This modifies the proposal waiting for approval. Revise that plan -- keep its id '{}' -- and "
+        "propose it again with director.propose_plan; change only what the request above asks.\n"
+        "The original request: {}\nThe waiting plan:\n{}",
+        proposal->planId, waiting->originalRequest(), proposal->plan.dump());
+    const std::string original = waiting->originalRequest();
+    if (!orchestrator_.reject(*waiting, "superseded: modified by \"" + followUp + "\"")) {
+        return nullptr;
+    }
+    auto task = submit(std::move(followUp));
+    if (task != nullptr) {
+        task->setBriefing(briefing);
+        task->setOriginalRequest(original);
+    }
+    return task;
+}
+
+std::shared_ptr<AgentTask> ControlPlane::regenerateCurrentTask() {
+    std::shared_ptr<AgentTask> waiting = currentTask();
+    if (waiting == nullptr || waiting->state() != TaskState::AwaitingApproval) {
+        return nullptr;
+    }
+    const std::string original = waiting->originalRequest();
+    const std::string declined = waiting->proposal() ? waiting->proposal()->planId : std::string();
+    if (!orchestrator_.reject(*waiting, "superseded: regenerated")) {
+        return nullptr;
+    }
+    auto task = submit(original);
+    if (task != nullptr) {
+        task->setBriefing(fmt::format("The person asked for this again: the last proposal ('{}') was not what they "
+                                      "wanted. Propose afresh.",
+                                      declined));
+    }
+    return task;
+}
+
 bool ControlPlane::rejectCurrentTask() {
     std::shared_ptr<AgentTask> task = currentTask();
     return task != nullptr && orchestrator_.reject(*task);

@@ -159,6 +159,16 @@ PanelActions panelActions(const PanelState& state) {
                    : state.previewing && !state.previewIsNewest
                        ? "later edits were made after the preview: undo it from the history first"
                        : "plays a scratch copy from zero, keeps what the characters did, checks it, and proposes that";
+    // ADR-770: both replace the waiting proposal with a new task's, which ends at the same gate.
+    a.modify.enabled = live && state.followUp && !state.recording;
+    a.modify.why = !live            ? none
+                   : state.recording ? "wait for the recording"
+                   : !state.followUp ? "say what to change in the box first"
+                                     : "revises this plan (same id) from what you wrote; you approve the revision";
+    a.regenerate.enabled = live && !state.recording;
+    a.regenerate.why = !live            ? none
+                       : state.recording ? "wait for the recording"
+                                         : "asks again from the original request; you approve what comes back";
     a.cancelRecording.enabled = state.recording;
     a.cancelRecording.why = state.recording ? "stops the recording; the proposal stays as it was" : "no recording is running";
     if (state.recording) {

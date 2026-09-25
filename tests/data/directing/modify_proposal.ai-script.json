@@ -1,0 +1,205 @@
+{
+  "turns": [
+    {
+      "text": "Rook runs past Umbra, followed low.",
+      "toolCalls": [
+        {
+          "id": "p1",
+          "name": "director.propose_plan",
+          "arguments": {
+            "plan": {
+              "schemaVersion": 1,
+              "id": "rook-run-past",
+              "title": "Rook runs past Umbra",
+              "tier": "baked",
+              "subjects": [
+                {
+                  "alias": "rook",
+                  "text": "Rook"
+                },
+                {
+                  "alias": "umbra",
+                  "text": "the Umbra hero mushroom",
+                  "hint": "hero"
+                }
+              ],
+              "performances": [
+                {
+                  "key": "run",
+                  "subject": "rook",
+                  "mode": "scripted",
+                  "beats": [
+                    {
+                      "action": "run_past",
+                      "target": "umbra",
+                      "emits": "rook.passes_umbra"
+                    },
+                    {
+                      "action": "run",
+                      "seconds": 1.0
+                    }
+                  ]
+                }
+              ],
+              "shots": [
+                {
+                  "key": "run-shot",
+                  "name": "rook-runs-past",
+                  "start": "1:30",
+                  "durationSeconds": 5,
+                  "subject": "rook",
+                  "locked": true,
+                  "camera": [
+                    {
+                      "move": "low_angle"
+                    },
+                    {
+                      "move": "follow"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "text": "Approve to apply."
+    },
+    {
+      "text": "Holding the shot two seconds longer.",
+      "toolCalls": [
+        {
+          "id": "p2",
+          "name": "director.propose_plan",
+          "arguments": {
+            "plan": {
+              "schemaVersion": 1,
+              "id": "rook-run-past",
+              "title": "Rook runs past Umbra",
+              "tier": "baked",
+              "subjects": [
+                {
+                  "alias": "rook",
+                  "text": "Rook"
+                },
+                {
+                  "alias": "umbra",
+                  "text": "the Umbra hero mushroom",
+                  "hint": "hero"
+                }
+              ],
+              "performances": [
+                {
+                  "key": "run",
+                  "subject": "rook",
+                  "mode": "scripted",
+                  "beats": [
+                    {
+                      "action": "run_past",
+                      "target": "umbra",
+                      "emits": "rook.passes_umbra"
+                    },
+                    {
+                      "action": "run",
+                      "seconds": 1.0
+                    }
+                  ]
+                }
+              ],
+              "shots": [
+                {
+                  "key": "run-shot",
+                  "name": "rook-runs-past",
+                  "start": "1:30",
+                  "durationSeconds": 7,
+                  "subject": "rook",
+                  "locked": true,
+                  "camera": [
+                    {
+                      "move": "low_angle"
+                    },
+                    {
+                      "move": "follow"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "text": "Revised; approve to apply."
+    },
+    {
+      "text": "Proposing it again.",
+      "toolCalls": [
+        {
+          "id": "p3",
+          "name": "director.propose_plan",
+          "arguments": {
+            "plan": {
+              "schemaVersion": 1,
+              "id": "rook-run-past",
+              "title": "Rook runs past Umbra",
+              "tier": "baked",
+              "subjects": [
+                {
+                  "alias": "rook",
+                  "text": "Rook"
+                },
+                {
+                  "alias": "umbra",
+                  "text": "the Umbra hero mushroom",
+                  "hint": "hero"
+                }
+              ],
+              "performances": [
+                {
+                  "key": "run",
+                  "subject": "rook",
+                  "mode": "scripted",
+                  "beats": [
+                    {
+                      "action": "run_past",
+                      "target": "umbra",
+                      "emits": "rook.passes_umbra"
+                    },
+                    {
+                      "action": "run",
+                      "seconds": 1.0
+                    }
+                  ]
+                }
+              ],
+              "shots": [
+                {
+                  "key": "run-shot",
+                  "name": "rook-runs-past",
+                  "start": "1:30",
+                  "durationSeconds": 5,
+                  "subject": "rook",
+                  "locked": true,
+                  "camera": [
+                    {
+                      "move": "low_angle"
+                    },
+                    {
+                      "move": "follow"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "text": "Approve to apply."
+    }
+  ]
+}

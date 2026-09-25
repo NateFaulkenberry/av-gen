@@ -37,7 +37,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 21> kArms{{
+constexpr std::array<ArmName, 22> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -59,6 +59,7 @@ constexpr std::array<ArmName, 21> kArms{{
     {"director-record", UiScriptArm::DirectorRecord},
     {"viewpoint", UiScriptArm::Viewpoint},
     {"director-cancel", UiScriptArm::DirectorCancel},
+    {"director-modify", UiScriptArm::DirectorModify},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -326,6 +327,9 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
     }
     if (has(arms_, UiScriptArm::Slice)) {
         stepSlice(engine, *panel, window, frame);
+    }
+    if (panel != nullptr && has(arms_, UiScriptArm::DirectorModify)) {
+        stepDirectorModify(engine, *panel, window, frame);
     }
     if (panel != nullptr && has(arms_, UiScriptArm::DirectorCancel)) {
         stepDirectorCancel(engine, *panel, window, frame);
@@ -1698,6 +1702,74 @@ void UiScript::stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platf
         check(director.edits->history().undoSize() == directorUndoBefore_ &&
                   engine.sequence().toJson().dump() == directorSequenceBefore_,
               "nothing in the project changed");
+    }
+}
+
+void UiScript::stepDirectorModify(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                                  std::uint64_t frame) {
+    ui::DirectorPanel& director = panel.director;
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Director"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Director");
+        return;
+    }
+    if (director.plane == nullptr) {
+        if (frame == 60) {
+            check(false, "the Director panel has no control plane; THIS ARM TESTED NOTHING");
+        }
+        return;
+    }
+    const auto press = [&](const ui::DirectorPanel::Rect& r, std::uint64_t start) {
+        if (!r.valid) {
+            return;
+        }
+        if (frame >= start && frame < start + 6) {
+            warpAndMove(window, r.cx(), r.cy());
+        } else if (frame == start + 6) {
+            pushButton(window, r.cx(), r.cy(), true);
+        } else if (frame == start + 8) {
+            pushButton(window, r.cx(), r.cy(), false);
+        }
+    };
+    const auto& history = director.plane->history();
+    const auto waitingDuration = [&]() -> double {
+        const auto t = director.plane->currentTask();
+        const auto p = t ? t->proposal() : std::nullopt;
+        return p ? p->plan["shots"][0].value("durationSeconds", 0.0) : 0.0;
+    };
+    if (frame == 60) {
+        check(history.size() == 1 && director.plane->currentTask()->state() == ai::TaskState::AwaitingApproval,
+              "one proposal is waiting");
+        check(director.buttons().modify.valid && director.buttons().regenerate.valid,
+              "Modify and Regenerate are drawn and in view");
+        director.followUp = "hold the shot two seconds longer"; // typed, as a value arm writes a value
+    }
+    press(director.buttons().modify, 80);
+    if (frame == 300) {
+        const auto current = director.plane->currentTask();
+        check(history.size() == 2, fmt::format("Modify started a second task ({} tasks)", history.size()));
+        check(history.size() >= 1 && history.front()->state() == ai::TaskState::Rejected,
+              "the first proposal was superseded");
+        check(current != nullptr && current->state() == ai::TaskState::AwaitingApproval && current->proposal() &&
+                  current->proposal()->planId == "rook-run-past",
+              "the revision waits for approval, with the same plan id");
+        check(waitingDuration() == 7.0, fmt::format("the revision holds the shot longer ({} s)", waitingDuration()));
+        check(current != nullptr && current->prompt() == "hold the shot two seconds longer",
+              "the revision's request is the person's own words");
+        check(engine.directingPlans().empty(), "nothing is applied yet");
+    }
+    press(director.buttons().regenerate, 320);
+    if (frame == 540) {
+        const auto current = director.plane->currentTask();
+        check(history.size() == 3, fmt::format("Regenerate started a third task ({} tasks)", history.size()));
+        check(current != nullptr && current->state() == ai::TaskState::AwaitingApproval && current->proposal() &&
+                  current->proposal()->planId == "rook-run-past",
+              "the regenerated proposal waits for approval");
+        check(current != nullptr && current->prompt() == "Have Rook run past Umbra at 1:30, followed low.",
+              "Regenerate asked the original request again, not the follow-up");
+        check(engine.directingPlans().empty(), "still nothing applied");
     }
 }
 

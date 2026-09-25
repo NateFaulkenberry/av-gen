@@ -402,3 +402,65 @@ TEST_CASE("event-driven: the assistant watches the film, proposes on what happen
     REQUIRE(s.engine.directingPlans().size() == 1);
     CHECK(s.engine.directingPlans()[0].observation.has_value());
 }
+
+TEST_CASE("Modify revises the waiting plan from a follow-up; Regenerate asks again; each ends at the gate",
+          "[directing][agent][modify]") {
+    // ADR-770. The waiting task is declined as superseded and a new one proposes; the follow-up is
+    // briefed with the waiting plan so the revision keeps its id. The ScriptedProvider plays the model.
+    Session s;
+    s.smallScene();
+    json revised = smallPlan();
+    revised["shots"][0]["durationSeconds"] = 6; // "hold it longer"
+    json fresh = smallPlan();
+    fresh["markers"][0]["at"] = "0:13";
+    s.script({ai::ScriptedTurn{"Proposing.", {call("p1", "director.propose_plan", json{{"plan", smallPlan()}})},
+                               ai::StopReason::EndTurn, {}},
+              ai::ScriptedTurn{"Approve to apply.", {}, ai::StopReason::EndTurn, {}},
+              ai::ScriptedTurn{"Holding the shot longer.", {call("p2", "director.propose_plan", json{{"plan", revised}})},
+                               ai::StopReason::EndTurn, {}},
+              ai::ScriptedTurn{"Revised; approve to apply.", {}, ai::StopReason::EndTurn, {}},
+              ai::ScriptedTurn{"A different take.", {call("p3", "director.propose_plan", json{{"plan", fresh}})},
+                               ai::StopReason::EndTurn, {}},
+              ai::ScriptedTurn{"Approve to apply.", {}, ai::StopReason::EndTurn, {}}});
+    auto first = s.plane.submit("establish the stone at 0:10 and mark 0:12.5");
+    REQUIRE(s.runUntil(first, ai::TaskState::AwaitingApproval));
+
+    // Modify: the first is declined as superseded; the second is briefed with the plan and revises it.
+    auto second = s.plane.modifyCurrentTask("hold the shot a little longer");
+    REQUIRE(second != nullptr);
+    CHECK(first->state() == ai::TaskState::Rejected);
+    CHECK(second->prompt() == "hold the shot a little longer"); // the person's words, and the undo's label
+    CHECK(second->briefing().find("keep its id 'small'") != std::string::npos);
+    CHECK(second->briefing().find("\"id\":\"small\"") != std::string::npos);
+    REQUIRE(s.runUntil(second, ai::TaskState::AwaitingApproval));
+    // The model saw the briefing (the waiting plan), not only the three words.
+    bool briefed = false;
+    for (const ai::CompletionRequest& r : s.provider->received()) {
+        for (const ai::Message& m : r.messages) {
+            briefed = briefed || m.text.find("This modifies the proposal waiting for approval") != std::string::npos;
+        }
+    }
+    CHECK(briefed);
+    REQUIRE(second->proposal());
+    CHECK(second->proposal()->planId == "small");
+    CHECK(second->proposal()->diff.find("00:10.000-00:16.000") != std::string::npos);
+    CHECK(s.engine.directingPlans().empty()); // nothing applied yet
+
+    // Regenerate: the original request again, briefed that the last proposal was not wanted.
+    auto third = s.plane.regenerateCurrentTask();
+    REQUIRE(third != nullptr);
+    CHECK(second->state() == ai::TaskState::Rejected);
+    CHECK(third->prompt() == "establish the stone at 0:10 and mark 0:12.5"); // the chain's original request
+    REQUIRE(s.runUntil(third, ai::TaskState::AwaitingApproval));
+    REQUIRE(third->proposal());
+
+    // And the gate is the same: approve, one undo labelled with the request.
+    REQUIRE(s.plane.approveCurrentTask());
+    CHECK(s.edits.history().undoSize() == 1);
+    CHECK(s.edits.history().undoLabel() == third->prompt());
+    REQUIRE(s.engine.directingPlans().size() == 1);
+    CHECK(s.engine.directingPlans()[0].id == "small");
+    // Modify and Regenerate need a waiting proposal: with none, they do nothing.
+    CHECK(s.plane.modifyCurrentTask("again") == nullptr);
+    CHECK(s.plane.regenerateCurrentTask() == nullptr);
+}
