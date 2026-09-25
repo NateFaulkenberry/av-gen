@@ -71,23 +71,22 @@ const FIELD_PLANE: u32 = 5u;
 const FIELD_NOISE: u32 = 6u;
 const FIELD_VORONOI: u32 = 7u;
 const FIELD_DISTANCE: u32 = 8u;
-const FIELD_SDF_DISTANCE: u32 = 9u;
-const FIELD_WAVE: u32 = 10u;
-const FIELD_DIRECTION: u32 = 11u;
-const FIELD_RADIAL_VECTOR: u32 = 12u;
-const FIELD_ATTRACTOR: u32 = 13u;
-const FIELD_REPULSOR: u32 = 14u;
-const FIELD_VORTEX: u32 = 15u;
-const FIELD_CURL_NOISE: u32 = 16u;
-const FIELD_SPIRAL: u32 = 17u;
-const FIELD_WAVE_VECTOR: u32 = 18u;
-const FIELD_CONSTANT_COLOR: u32 = 19u;
-const FIELD_GRADIENT: u32 = 20u;
-const FIELD_RADIAL_GRADIENT: u32 = 21u;
-const FIELD_NOISE_COLOR: u32 = 22u;
-const FIELD_POSITION_COLOR: u32 = 23u;
-const FIELD_COMPOUND: u32 = 24u;
-const FIELD_GRID: u32 = 25u;
+const FIELD_WAVE: u32 = 9u;
+const FIELD_DIRECTION: u32 = 10u;
+const FIELD_RADIAL_VECTOR: u32 = 11u;
+const FIELD_ATTRACTOR: u32 = 12u;
+const FIELD_REPULSOR: u32 = 13u;
+const FIELD_VORTEX: u32 = 14u;
+const FIELD_CURL_NOISE: u32 = 15u;
+const FIELD_SPIRAL: u32 = 16u;
+const FIELD_WAVE_VECTOR: u32 = 17u;
+const FIELD_CONSTANT_COLOR: u32 = 18u;
+const FIELD_GRADIENT: u32 = 19u;
+const FIELD_RADIAL_GRADIENT: u32 = 20u;
+const FIELD_NOISE_COLOR: u32 = 21u;
+const FIELD_POSITION_COLOR: u32 = 22u;
+const FIELD_COMPOUND: u32 = 23u;
+const FIELD_GRID: u32 = 24u;
 
 const FIELD_TYPE_SCALAR: u32 = 0u;
 const FIELD_TYPE_VECTOR: u32 = 1u;
@@ -402,10 +401,7 @@ fn scalarShape(fi: u32, q: vec3<f32>) -> f32 {
     if (kind == FIELD_GRID) {
         return gridScalarAt(fi, q);
     }
-    // ADR-576: SdfDistance is unbound here AND on the CPU, and a spec naming it is now
-    // refused at load, so this arm is unreachable from any scene. Kept defined rather
-    // than removed, because an unknown kind must also land somewhere.
-    return 0.0; // SdfDistance (unbound on the GPU) and anything unknown
+    return 0.0; // anything unknown
 }
 
 // Direction of a vector kind (before invert and weight), in the field's local frame.

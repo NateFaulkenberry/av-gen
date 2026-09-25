@@ -52,6 +52,12 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     for (const char* path : {"scene/volumeDensity", "scene/fogHeight", "scene/fogHeightFalloff",
                              // ADR-568 (§7): drawn beside the falloff, so they are asked for here.
                              "scene/fogUpperDensity", "scene/fogHeightCurve",
+                             // ADR-715: the layer follows the terrain, drawn beside them.
+                             "scene/fogGroundFollow",
+                             // ADR-717: pooling, beside it.
+                             "scene/fogPooling",
+                             // ADR-705 (§7's Horizon Density), on the unified law.
+                             "scene/horizonDensity",
                              // ADR-570 (§20/§22): the self-shadow march's two controls.
                              "scene/volumeShadowSteps", "scene/volumeShadowStrength",
                              // ADR-573 (§27): two controls that shipped without a way to reach them.
@@ -68,6 +74,9 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     // A scene that still carries them in its file is migrated on load -- see test_vortex_effect.cpp.
     CHECK_FALSE(registered(params, "scene/vortex/radius"));
     CHECK_FALSE(registered(params, "scene/vortex/emission"));
+    // ADR-705: one law, one density. The surface pass's own exp-squared density is gone, not
+    // aliased (ADR-441), so a route or a look still naming it resolves to nothing.
+    CHECK_FALSE(registered(params, "scene/fogDensity"));
 }
 
 TEST_CASE("Every path the Environment panel's wind section asks for exists",

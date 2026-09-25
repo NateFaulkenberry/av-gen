@@ -13,8 +13,8 @@
              "kind": "composition",
              "path": {
                "path": "glowmere-valley-2-multicam.scene.json",
-               "sha256": "e1703f9891d4c2c3b562cb99048359af5f2d4c784c0415dc9b2f06ef2d57990e",
-               "size": 263720
+               "sha256": "c40d034b9748b09b8f33f08360a61f892101d95cb0d277b16f102c18495ce25c",
+               "size": 263694
              }
            }
  },
@@ -15205,7 +15205,6 @@
    0.18000000715255737,
    0.3199999928474426
   ],
-  "scene/fogDensity": 0.01899999938905239,
   "scene/fogHeight": 4.0,
   "scene/fogHeightFalloff": 0.10000000149011612,
   "scene/gridIntensity": 0.6000000238418579,

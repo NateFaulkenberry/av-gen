@@ -159,10 +159,11 @@ chain from the analytic procedural sky (`scene/sky.hpp`, `docs/lighting.md`), ha
 once per parameter change rather than per frame. The skybox is only *drawn* for a map, or for a sky
 that asks to stand behind the scene.
 
-Distance fog (`Environment::fogColor`, `fogDensity`; 0 = off) is exponential-squared in view
-distance, `mix(fogColor, color, exp(-(d * density)^2))`, applied in `pbr_shade.wgsl` after
-lighting to lit and unlit surfaces (entities and procedural instances alike); the skybox and
-particles are untouched.
+Distance fog (ADR-705) is the volumetric medium's own air under the same Beer--Lambert law:
+`mix(fogColor, color, exp(-volumeDensity * volumeAbsorption * travel))`, applied by `applyFog`
+(`common.wgsl`) after lighting to lit and unlit surfaces (entities and procedural instances alike),
+over the part of the ray BEYOND the march's reach (`volumeMaxDistance`, or all of it when no march
+runs); the skybox and particles are untouched. There is no separate surface-fog density.
 
 Procedural geometry (`rendering::ProceduralRenderer`, ADR-023): per `scene::ProceduralGeometry`
 a source mesh cached by `meshHash` (generated with `scene::makeSourceMesh`), an instance storage

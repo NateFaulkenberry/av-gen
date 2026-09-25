@@ -232,7 +232,7 @@ Result<void> SceneRenderer::init() {
         // 1..10 are the lighting bindings shaders/shadows.wgsl and shaders/lighting.wgsl declare
         // (ADR-033/034), and 11 is the shadow mask shaders/shadows.wgsl reads (ADR-087); a pass
         // whose shader does not mention them simply never reads them.
-        std::array<wgpu::BindGroupLayoutEntry, 13> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 14> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -274,6 +274,8 @@ Result<void> SceneRenderer::init() {
         entries[12].binding = 15;
         entries[12].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[12].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        entries[13] = entries[6];
+        entries[13].binding = 12; // ADR-715: the terrain's baked height, read by the height layer's readers
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "frame-layout";
         desc.entryCount = entries.size();
@@ -808,6 +810,28 @@ Result<void> SceneRenderer::createLightResources() {
         const wgpu::Extent3D size = {1, 1, 1};
         context_.queue().WriteTexture(&destination, &far, sizeof(far), &layout, &size);
     }
+    {
+        // ADR-715: bound at group 0 binding 12 while the scene has no terrain. Its one texel is
+        // never read -- `terrainMap1.w` is 0 and `terrainGroundAt` returns before the load.
+        wgpu::TextureDescriptor desc{};
+        desc.label = "terrain-height-placeholder";
+        desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        desc.dimension = wgpu::TextureDimension::e2D;
+        desc.size = {1, 1, 1};
+        desc.format = wgpu::TextureFormat::R32Float;
+        terrainHeightDefault_.texture = device.CreateTexture(&desc);
+        terrainHeightDefault_.view = terrainHeightDefault_.texture.CreateView();
+        terrainHeightDefault_.width = terrainHeightDefault_.height = 1;
+        terrainHeightDefault_.format = desc.format;
+        const float zero = 0.0f;
+        wgpu::TexelCopyTextureInfo destination{};
+        destination.texture = terrainHeightDefault_.texture;
+        wgpu::TexelCopyBufferLayout layout{};
+        layout.bytesPerRow = 4;
+        layout.rowsPerImage = 1;
+        const wgpu::Extent3D size = {1, 1, 1};
+        context_.queue().WriteTexture(&destination, &zero, sizeof(zero), &layout, &size);
+    }
     lightStaging_.resize(kMaxSceneLights);
     clusterStaging_.assign(kClusterBufferWords, 0u);
     return {};
@@ -818,7 +842,7 @@ void SceneRenderer::rebuildFrameBindGroups() {
     auto make = [&](const wgpu::Buffer& frameBuffer, const wgpu::TextureView& shadowAtlas,
                     const wgpu::TextureView& aoView, const wgpu::TextureView& depthView,
                     const wgpu::TextureView& maskView, const char* label) {
-        std::array<wgpu::BindGroupEntry, 13> entries{};
+        std::array<wgpu::BindGroupEntry, 14> entries{};
         entries[0].binding = 0;
         entries[0].buffer = frameBuffer;
         entries[0].size = sizeof(FrameUniforms);
@@ -850,6 +874,8 @@ void SceneRenderer::rebuildFrameBindGroups() {
         entries[12].binding = 15;
         entries[12].buffer = fields_->gridBuffer();
         entries[12].size = FieldUniforms::kGridBufferSize;
+        entries[13].binding = 12;
+        entries[13].textureView = terrainHeightView();
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = frameLayout_;
@@ -2103,6 +2129,56 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
     meshVersion_ = scene.meshVersion;
 }
 
+void SceneRenderer::uploadTerrainHeight(const scene::Scene& scene) {
+    // ADR-715. The bake is made once per terrain build and cached on `TerrainProducts`; this is the
+    // matching once-per-build upload. A frame whose field is the resident one costs a compare.
+    const world::TerrainGround& ground = scene.terrainGround;
+    if (!ground.valid()) {
+        if (terrainHeight_.valid()) {
+            terrainHeight_ = gpu::GpuTexture{};
+            terrainHeightHash_ = 0;
+            terrainHeightField_ = nullptr;
+        }
+        return;
+    }
+    const world::TerrainHeightField& field = *ground.field;
+    if (terrainHeight_.valid() && terrainHeightField_ == ground.field.get() && terrainHeightHash_ == field.hash) {
+        return;
+    }
+    const auto& device = context_.device();
+    wgpu::TextureDescriptor desc{};
+    desc.label = "terrain-height";
+    desc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+    desc.dimension = wgpu::TextureDimension::e2D;
+    desc.size = {field.width, field.depth, 1};
+    // ADR-717: two channels -- r = the ground, g = the low-passed basin a pooling layer is measured
+    // from. A field without a basin (never baked, only hand-built) repeats the ground in g; its
+    // pooling lane is 0 (`TerrainGround::poolingLane`), so nothing reads that channel.
+    desc.format = wgpu::TextureFormat::RG32Float;
+    gpu::GpuTexture uploaded;
+    uploaded.texture = device.CreateTexture(&desc);
+    uploaded.view = uploaded.texture.CreateView();
+    uploaded.width = field.width;
+    uploaded.height = field.depth;
+    uploaded.format = desc.format;
+    wgpu::TexelCopyTextureInfo destination{};
+    destination.texture = uploaded.texture;
+    wgpu::TexelCopyBufferLayout layout{};
+    layout.bytesPerRow = field.width * 8;
+    layout.rowsPerImage = field.depth;
+    const wgpu::Extent3D size = {field.width, field.depth, 1};
+    std::vector<float> texels(field.heights.size() * 2);
+    const bool pooled = field.pooled();
+    for (std::size_t k = 0; k < field.heights.size(); ++k) {
+        texels[k * 2] = field.heights[k];
+        texels[k * 2 + 1] = pooled ? field.basin[k] : field.heights[k];
+    }
+    context_.queue().WriteTexture(&destination, texels.data(), texels.size() * sizeof(float), &layout, &size);
+    terrainHeight_ = std::move(uploaded);
+    terrainHeightHash_ = field.hash;
+    terrainHeightField_ = ground.field.get();
+}
+
 void SceneRenderer::uploadTextures(const scene::Scene& scene) {
     if (&scene == textureScene_ && scene.identity == textureIdentity_ &&
         scene.textureVersion == textureVersion_ && textures_.size() == scene.textures.size()) {
@@ -2492,6 +2568,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                      static_cast<std::size_t>(count) * sizeof(world::EntityFxRecord));
     }
     uploadTextures(scene);
+    uploadTerrainHeight(scene);
     // ADR-086: this frame's joint palettes. The renderer never *poses* anything -- the scene
     // arrives already posed by scene::updateRigs -- it only moves matrices the scene computed.
     skinning_->resetFrameStats();
@@ -2774,18 +2851,34 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.vortexGlowColor = glm::vec4(0.0f);
     }
     }
-    frame.fogParams = glm::vec4(scene.environment.fogColor, std::max(scene.environment.fogDensity, 0.0f));
+    // ADR-705: ONE law and ONE density. The surface pass's extinction is the march's own --
+    // `volumeDensity * volumeAbsorption`, the product `fs_march` turns density into extinction with
+    // -- and it is Beer--Lambert in both. There is no second density to set; `fogDensity` is gone.
+    frame.fogParams = glm::vec4(scene.environment.fogColor,
+                                std::max(scene.environment.volumeDensity, 0.0f) *
+                                    std::max(scene.environment.volumeAbsorption, 0.0f));
     // ADR-058: the surface fog borrows the volumetric's mist layer rather than declaring one of
     // its own, so the air a ray is drawn through and the air it is marched through are the same
     // air. Amount 0 (the default) leaves applyFog on its uniform-distance branch.
     frame.fogHeight = glm::vec4(scene.environment.fogHeight,
                                 std::max(scene.environment.fogHeightFalloff, 0.0f),
-                                std::clamp(scene.environment.fogHeightAmount, 0.0f, 1.0f), 0.0f);
+                                std::clamp(scene.environment.fogHeightAmount, 0.0f, 1.0f),
+                                VolumeRenderer::surfaceFogStart(scene));
     // ADR-568 (§7): the same two numbers the march and the particle estimate read. Clamped here
     // rather than trusted, because `applyFog` divides by the layer's falloff and a negative
     // `upper` would make the distance through the air shorter than the ray.
+    // ADR-715: z is the ground follow, and it is 0 -- the flat branch, the old frame to the bit --
+    // whenever there is no terrain to follow, whatever the parameter says.
     frame.fogShape = glm::vec4(std::clamp(scene.environment.fogUpperDensity, 0.0f, 1.0f),
-                               std::clamp(scene.environment.fogHeightCurve, 0.0f, 1.0f), 0.0f, 0.0f);
+                               std::clamp(scene.environment.fogHeightCurve, 0.0f, 1.0f),
+                               scene.terrainGround.valid() ? std::clamp(scene.environment.fogGroundFollow, 0.0f, 1.0f)
+                                                           : 0.0f,
+                               std::clamp(scene.environment.horizonDensity, 0.0f, scene::kHorizonDensityMax));
+    frame.terrainMap0 = scene.terrainGround.map0();
+    frame.terrainMap1 = scene.terrainGround.map1();
+    // ADR-717: x is the pooling, 0 -- ADR-715's branch, its frame to the bit -- whenever there is no
+    // basin to pool in. The march reads this same lane.
+    frame.fogPool = glm::vec4(scene.terrainGround.poolingLane(scene.environment.fogPooling), 0.0f, 0.0f, 0.0f);
     // ADR-058: the styled hemisphere, authorable because a scene that is lit mostly by its ambient
     // needs to say how dark the side facing away from the sky is allowed to get.
     frame.styledSky = glm::vec4(scene.environment.styledSkyAmbient,
@@ -3462,6 +3555,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             particleFrame.fogHeightFalloff = scene.environment.fogHeightFalloff;
             particleFrame.fogUpperDensity = scene.environment.fogUpperDensity;
             particleFrame.fogHeightCurve = scene.environment.fogHeightCurve;
+            particleFrame.fogGroundFollow = scene.terrainGround.valid() ? scene.environment.fogGroundFollow : 0.0f;
+            particleFrame.fogPooling = scene.terrainGround.poolingLane(scene.environment.fogPooling); // ADR-717
+            particleFrame.terrainMap0 = scene.terrainGround.map0();
+            particleFrame.terrainMap1 = scene.terrainGround.map1();
+            particleFrame.terrainHeight = terrainHeight_.valid() ? terrainHeight_.view : nullptr;
+            particleFrame.horizonDensity = scene.environment.horizonDensity;
             particleFrame.fogAbsorption = scene.environment.volumeAbsorption;
             particleFrame.fogMaxDistance = scene.environment.volumeMaxDistance;
         }

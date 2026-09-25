@@ -182,6 +182,11 @@ one file. Read the rule as satisfied in the layer it governs, not violated.
 
 ### 1. Ground interaction — a debris cloud where the funnel meets something. *The highest-value work on this effect.*
 
+> **Status (2026-09-24): done, ADR-706.** The funnel ends in a rounded tip instead of a plane, and
+> the debris term is the funnel's own sheath around a mound, driven by the existing Debris
+> controls. The Tree of Life keeps Debris 0 (it renders as the pool of light the §6 ruling removed);
+> the hero gets the tip.
+
 *(the need is evidenced; the design is yours)*
 
 The funnel's own bottom is a **flat horizontal cut**, not a shape. `core/tornado.cpp::evaluate`:
@@ -203,6 +208,11 @@ The **owner's brief §25** wanted dust, debris and wisps as a secondary layer �
 them, on the ADR-421 rule that a control doing nothing is worse than an absent one.
 
 ### 2. The Tall Column defect — `_tc-4` renders with its middle missing
+
+> **Status (2026-09-24): fixed, ADR-707. Neither hypothesis below was right.** The field has no hole
+> (optical depth 6.8 across the displaced axis) and it is not a contrast floor: the march's ray
+> directions carried an f32 error proportional to the camera's distance from the world origin.
+> Five of the seven showcase variants were pixelated by it, not only this one.
 
 *(reproduced today; the diagnosis below is evidenced by five renders and is **not** the previous
 agent's — the record says only "not yet diagnosed")*
@@ -233,6 +243,10 @@ Note the consequence if the field turns out to be at fault: this is a failure of
 structure**, which is exactly what §1's constraint is about.
 
 ### 3. Self-shadowing — ~~blocked~~ **unblocked; read §10 before planning this**
+
+> **Status (2026-09-24): measured, not shipped, ADR-708.** It works and is cheap (+1.1 ms), and in
+> the labs it is the biggest read improvement on record; on the hero's 32 march steps it is grain,
+> clean only at 256 steps (7x the march). It waits for the step redistribution (§5.5).
 
 *(evidenced: ADR-580 §7, Phase 5, and the review sheet's "WHAT IS NOT DONE" — then superseded)*
 

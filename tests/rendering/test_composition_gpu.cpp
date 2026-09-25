@@ -2936,13 +2936,17 @@ TEST_CASE("each isolation arm removes exactly its own pass", "[gpu][composition]
 
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.loadComposition(project).has_value());
-    // The volumetric march is off at zero density however its arm is set, and RendererQA authors
-    // zero -- so without this the volume arm would be tested against a pass that never ran and
-    // would pass by removing nothing.
+    // The volumetric march is off at zero density however its arm is set, and -- ADR-705 -- off at
+    // zero reach too: RendererQA is a surface-only scene (`volumeMaxDistance` 0). So both are set,
+    // or the volume arm would be tested against a pass that never ran and pass by removing nothing.
+    // (Until the parameter's floor was lowered to 0, a clamp to 1 cm kept a march running here.)
     {
         auto* density = engine.params().findAs<float>("scene/volumeDensity");
         REQUIRE(density != nullptr);
         density->setBase(0.06f);
+        auto* reach = engine.params().findAs<float>("scene/volumeMaxDistance");
+        REQUIRE(reach != nullptr);
+        reach->setBase(200.0f);
         engine.params().resetFinals();
     }
     FixedStepClock clock(60.0);

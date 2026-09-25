@@ -78,9 +78,11 @@ struct FrameUniforms {
                                // the background instead of the flat colour; ADR-049: z = the
                                // visible sky's intensity, w = how much of it the bloom mask sees
     skySun: vec4<f32>,         // xyz = direction *towards* the sky's sun/moon, w = 1 when it has one
-    fogParams: vec4<f32>,      // rgb = fog colour, w = fog density (0 = off; exp2 fog by view distance)
+    fogParams: vec4<f32>,      // rgb = fog colour, w = the air's extinction per metre (ADR-705:
+                               // volumeDensity * volumeAbsorption, the march's own; 0 = off)
     fogHeight: vec4<f32>,      // ADR-058: x = mist layer top (m), y = falloff per metre above it,
-                               // z = how much of that layer the surface fog integrates, w = 0
+                               // z = how much of that layer the surface fog integrates,
+                               // w = ADR-705: how far the march carries the air (0 = it does not run)
     styledSky: vec4<f32>,      // ADR-058: rgb = styled ambient towards +Y, w = the AO floor
     styledGround: vec4<f32>,   // ADR-058: rgb = styled ambient towards -Y, w = 0
     audio: vec4<f32>,          // ADR-030 material inputs: rms, bass, mid, treble
@@ -139,7 +141,17 @@ struct FrameUniforms {
     // FrameUniforms; the sum in scene_renderer.hpp's static_assert catches these drifting apart.
     vortexGlow: vec4<f32>,          // xyz = mouth centre, w = mouth radius
     vortexGlowColor: vec4<f32>,     // rgb = radiance, w = intensity (0 = no vortex)
-    fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve, zw = 0
+    fogShape: vec4<f32>,            // ADR-568: x = fogUpperDensity, y = fogHeightCurve; ADR-715: z = fogGroundFollow (0 without a terrain); ADR-705: w = horizonDensity
+    // ADR-715: where `terrainHeightTex` sits in the world -- `world::TerrainGround::map0/map1`.
+    // Appended last, mirroring FrameUniforms; the sum in scene_renderer.hpp's static_assert
+    // catches the two drifting apart.
+    terrainMap0: vec4<f32>,         // world origin xz, 1 / spacing xz
+    terrainMap1: vec4<f32>,         // height scale, height offset, fade metres, 1 when there is a terrain
+    // ADR-717: the layer pools in the basins. x = fogPooling (0 without a terrain), yzw = 0.
+    // Appended last, mirroring FrameUniforms; the static_assert's sum catches the two drifting apart.
+    // MERGE NOTE: Effect Library Wave 2 appends starsA/B/C here too -- keep both, in either order,
+    // as long as this file and scene_renderer.hpp agree.
+    fogPool: vec4<f32>,
 };
 
 struct ObjectUniforms {
@@ -243,6 +255,12 @@ fn materialTierLocalLights(tier: u32) -> u32 {
 
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;
+// ADR-715: the terrain's baked height (RG32F since ADR-717: r = the ground, g = the low-passed basin;
+// vertex-aligned grid, read by texel fetch through
+// `terrainGroundAt` in height_fog.wgsl). A 1x1 placeholder in a scene with no terrain, where
+// `frame.terrainMap1.w` is 0 and nothing reads it. Read by the two frame-bound readers of the
+// height layer: the surface fog below and the volumetric march.
+@group(0) @binding(12) var terrainHeightTex: texture_2d<f32>;
 
 // ADR-055's wind field, and ADR-360's reason for hoisting it here from procedural.wgsl: the mesh
 // vertex stage below now deforms too, and wind.wgsl needs `frame`, so it has to come after the
@@ -490,39 +508,75 @@ fn treeEnergyAt(worldPos: vec3<f32>) -> vec3<f32> {
 // include of this file, and a second include would compile two copies into one module.
 #include "height_fog.wgsl"
 
-// Exponential-squared distance fog towards frame.fogParams.rgb; density 0 leaves the colour
-// untouched (the branch keeps the no-fog output bit-identical to the pre-fog shader).
+// ADR-705: the surface pass is the SAME air the march integrates, under the same law. Beer--Lambert
+// towards frame.fogParams.rgb, with the extinction the march uses -- `volumeDensity *
+// volumeAbsorption`, packed by the renderer -- so there is one law and one density (ADR-569's
+// option 2, the owner's ruling). Extinction 0 leaves the colour untouched.
 //
-// ADR-058: when frame.fogHeight.z is non-zero the geometric distance is first replaced by the
-// distance *through the mist*, integrating the same flat-topped layer the volumetric marches along
-// the view ray. Both endpoints inside the layer integrate to the ray's own length, so a scene that
-// keeps everything below the fog bank is unchanged to the last bit; what moves is the ridge line
-// and the canopy crowns standing out of it, which are now seen through the air that is actually
-// between them and the eye rather than through a uniform slab.
+// It used to be `exp(-(d * fogDensity)^2)` from a second, unrelated density. The two agreed at one
+// distance (median 79.3 m across the shipped scenes) and nowhere else; at 400 m in Glowmere they
+// disagreed 48x. ADR-705 has the census and the re-tuning that removing that cost.
+//
+// **Where the march stops, this starts.** `frame.fogHeight.w` is how far the volumetric march carries
+// the air on this frame (`volumeMaxDistance`), or 0 when no march runs. The march already
+// extinguishes every surface nearer than that -- it stops at the depth buffer -- so this pass
+// integrates only the segment BEYOND it. Each metre of air is then counted once: marched near the
+// eye, integrated in closed form past the march's reach, and the product of the two is the
+// transmittance of the whole ray. Counting the near segment here as well would square it.
+//
+// ADR-058: when frame.fogHeight.z is non-zero the segment's length is scaled by the mean of the
+// height layer along it -- the same flat-topped layer the march samples, through its closed-form
+// antiderivative (ADR-567) -- so a ridge standing clear of the mist is seen through the air that is
+// actually between it and the eye.
+//
+// ADR-705, the brief's §7 Horizon Density: `frame.fogShape.w` makes the air denser with distance
+// from the eye, `(1 + horizon * s / 1000)` at distance s -- 1 is twice as dense a kilometre out.
+// Its integral over the segment is exact for uniform air, `(1 + horizon * (s0 + d) / 2000)` times
+// the segment; under a height layer it is taken outside the layer's mean, which is exact for a
+// level ray and first-order otherwise. The march multiplies the same factor into every sample.
+// The branch keeps horizon 0 bit-identical to the law without it.
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
-    let density = frame.fogParams.w;
-    if (density <= 0.0) {
+    let extinction = frame.fogParams.w;
+    if (extinction <= 0.0) {
         return color;
     }
-    var travel = distance(frame.cameraPos.xyz, worldPos);
+    let dist = distance(frame.cameraPos.xyz, worldPos);
+    let start = frame.fogHeight.w;
+    if (dist <= start) {
+        return color; // the march has this whole ray
+    }
+    var travel = dist - start;
     let amount = frame.fogHeight.z;
     let falloff = frame.fogHeight.y;
     if (amount > 0.0 && falloff > 0.0) {
-        let y0 = frame.cameraPos.y - frame.fogHeight.x;
+        let yEye = frame.cameraPos.y - frame.fogHeight.x;
         let y1 = worldPos.y - frame.fogHeight.x;
+        // Where the segment starts: the point the march hands over at. `start` 0 is the eye itself,
+        // exactly -- `(y1 - yEye) * 0 / dist` is 0 and adds nothing.
+        let y0 = yEye + (y1 - yEye) * (start / dist);
         let rise = y1 - y0;
-        // The mean of the layer's density along the ray. The difference quotient is the whole
+        // The mean of the layer's density along the segment. The difference quotient is the whole
         // integral because the ray climbs at a constant rate: metres of mist per metre travelled.
         var mean = 1.0;
         let upper = frame.fogShape.x;
         let curve = frame.fogShape.y;
-        if (max(y0, y1) > 0.0) {
+        let follow = frame.fogShape.z;
+        let pooling = frame.fogPool.x; // ADR-717
+        if ((follow > 0.0 || pooling > 0.0) && frame.terrainMap1.w > 0.5) {
+            // ADR-715: the layer's top follows the ground, and the ray is integrated piecewise
+            // against it -- `fogGroundMean` says how, and why it agrees with the march. Only with a
+            // terrain bound: without one the flat branch below is the frame there always was, to
+            // the bit, which eight pieces of a flat layer summed would not be.
+            // Over the SAME segment the flat branch integrates: from the march's handover point
+            // (ADR-705) to the surface, not from the eye -- the march already carried the near part.
+            let segStart = mix(frame.cameraPos.xyz, worldPos, start / dist);
+            mean = fogGroundMean(terrainHeightTex, frame.terrainMap0, frame.terrainMap1, segStart,
+                                 worldPos, frame.fogHeight.x, follow, pooling, falloff, upper, curve);
+        } else if (max(y0, y1) > 0.0) {
             // Both endpoints below the layer's top puts the whole segment below it, so the mean is
-            // exactly one and this branch is skipped -- which is what keeps a scene that sits
-            // inside its own fog bank bit-identical when the integration is switched on. Leaving
-            // it to the quotient would give 1.0 only to within rounding, because the numerator and
-            // the denominator are the same subtraction written twice and the compiler is free to
-            // fuse one of them and not the other.
+            // exactly one and this branch is skipped. Leaving it to the quotient would give 1.0
+            // only to within rounding, because the numerator and the denominator are the same
+            // subtraction written twice and the compiler is free to fuse one and not the other.
             mean = fogHeightProfile(y0, falloff, upper, curve); // a level ray never leaves its altitude
             if (abs(rise) > 1e-3) {
                 mean = (fogHeightIntegral(y1, falloff, upper, curve) -
@@ -531,8 +585,12 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         }
         travel = travel * mix(1.0, mean, amount);
     }
-    let d = travel * density;
-    let f = exp(-d * d);
+    var depth = extinction * travel;
+    let horizon = frame.fogShape.w; // z is ADR-715's ground follow
+    if (horizon > 0.0) {
+        depth = depth * (1.0 + horizon * (start + dist) * 0.0005);
+    }
+    let f = exp(-depth);
     return mix(frame.fogParams.rgb, color, f);
 }
 

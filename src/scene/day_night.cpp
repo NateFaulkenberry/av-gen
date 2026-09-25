@@ -167,9 +167,12 @@ void DayNightSettings::applyDefaults() {
         {kTwilight, {0.0520f, 0.0260f, 0.0700f}},  // violet
         {kNight, {0.0018f, 0.0064f, 0.0162f}},
     });
-    fill<float>(fogDensity, {
-        {kMidnight, 0.000135f}, {kSunrise, 0.000215f}, {kNoon, 0.000095f}, {kSunset, 0.000205f},
-        {kTwilight, 0.000165f}, {kNight, 0.000140f},
+    // ADR-705: converted from the exp-squared curve this used to be (0.000135 at midnight, ...) by
+    // matching the distance at which half the light gets through: sigma = sqrt(ln 2) * density,
+    // over the default absorption 0.5.
+    fill<float>(volumeDensity, {
+        {kMidnight, 0.000225f}, {kSunrise, 0.000358f}, {kNoon, 0.000158f}, {kSunset, 0.000341f},
+        {kTwilight, 0.000275f}, {kNight, 0.000233f},
     });
     fill<glm::vec3>(fogColor, {
         {kMidnight, {0.0125f, 0.0165f, 0.0335f}},
@@ -235,7 +238,7 @@ std::uint64_t DayNightSettings::hash() const {
     hf(glowScale);
     hf(waterReflection);
     hv(waterDeepColor);
-    hf(fogDensity);
+    hf(volumeDensity);
     hv(fogColor);
     return h.value();
 }
@@ -288,7 +291,7 @@ DayNightState resolveDayNight(const DayNightSettings& settings, float phase) {
     s.glowScale = std::max(0.0f, 1.0f + (glow - 1.0f) * settings.glowInfluence);
     s.waterReflection = std::max(0.0f, samplePhase(settings.waterReflection, s.phase));
     s.waterDeepColor = glm::max(samplePhase(settings.waterDeepColor, s.phase), glm::vec3(0.0f));
-    s.fogDensity = std::max(0.0f, samplePhase(settings.fogDensity, s.phase));
+    s.volumeDensity = std::max(0.0f, samplePhase(settings.volumeDensity, s.phase));
     const glm::vec3 authoredFog = glm::max(samplePhase(settings.fogColor, s.phase), glm::vec3(0.0f));
     // The colour the sky actually is at the horizon, scaled the way the visible sky is scaled, so
     // water receding into fog and sky meeting the horizon arrive at the same value.

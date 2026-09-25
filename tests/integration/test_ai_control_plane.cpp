@@ -124,7 +124,7 @@ TEST_CASE("A prompt produces real engine modifications inside one transaction",
     Session s;
     REQUIRE(s.engine.loadComposition(helixScene()).has_value());
 
-    auto* fog = s.engine.params().find("scene/fogDensity");
+    auto* fog = s.engine.params().find("scene/volumeDensity");
     auto* brightness = s.engine.params().find("scene/brightness");
     REQUIRE(fog != nullptr);
     REQUIRE(brightness != nullptr);
@@ -138,7 +138,7 @@ TEST_CASE("A prompt produces real engine modifications inside one transaction",
               call("c2", "parameter.search", json{{"query", "fog"}})}),
         turn("Thickening the atmosphere and lifting the ambient level.",
              {call("c3", "environment.set",
-                   json{{"values", json{{"scene/fogDensity", 0.14}, {"scene/brightness", 1.35}}}}),
+                   json{{"values", json{{"scene/volumeDensity", 0.14}, {"scene/brightness", 1.35}}}}),
               call("c4", "parameter.set", json{{"path", "scene/keyLight"}, {"value", 0.6}})}),
         turn("I thickened the fog, lifted the ambient brightness and dropped the key light so the "
              "scene reads as a hazier, moodier space."),
@@ -167,7 +167,7 @@ TEST_CASE("A prompt produces real engine modifications inside one transaction",
         // taken before the first mutation and the project afterwards.
         REQUIRE(outcome.changedTargets.size() == 3);
         CHECK(std::find(outcome.changedTargets.begin(), outcome.changedTargets.end(),
-                        "scene/fogDensity") != outcome.changedTargets.end());
+                        "scene/volumeDensity") != outcome.changedTargets.end());
         CHECK(std::find(outcome.changedTargets.begin(), outcome.changedTargets.end(),
                         "scene/keyLight") != outcome.changedTargets.end());
     }

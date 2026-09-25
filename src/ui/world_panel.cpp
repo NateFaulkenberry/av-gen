@@ -424,8 +424,9 @@ void WorldPanel::drawOverview(app::Engine& engine) {
     }
     if (ImGui::TreeNode("Atmosphere")) {
         select(WorldSelection::Kind::Environment, "", "environment", 0);
-        ImGui::TextDisabled("fog %.3f  volume %.3f", static_cast<double>(s.environment.fogDensity),
-                            static_cast<double>(s.environment.volumeDensity));
+        ImGui::TextDisabled("fog %.4f  horizon %.2f  march %.0f m", static_cast<double>(s.environment.volumeDensity),
+                            static_cast<double>(s.environment.horizonDensity),
+                            static_cast<double>(s.environment.volumeMaxDistance));
         ImGui::TreePop();
     }
     if (ImGui::TreeNode("Camera & lighting")) {

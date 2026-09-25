@@ -269,15 +269,18 @@ EnvironmentPlan planEnvironment(const WorldRecipe& recipe, const PaletteRoles& r
         return base * glm::mix(0.35f, 2.0f, glm::clamp(weight, 0.0f, 1.0f));
     };
     env.fogColor = a.fogColor;
-    env.fogDensity = scaled(a.fogDensity, air.fog);
     env.fogHeight = a.fogHeight;
     env.fogHeightFalloff = a.fogHeightFalloff;
     env.skyZenith = a.skyZenith;
     env.skyHorizon = a.skyHorizon;
     env.skyGround = a.skyGround;
     env.haze = glm::mix(a.skyHaze * 0.5f, a.skyHaze * 1.6f, air.depthHaze);
-    env.volumeDensity = scaled(a.volumeDensity, light.volumetric);
-    env.volumeScattering = a.volumeScattering;
+    // ADR-705: one density for the air, so `atmosphere.fog` -- "how much air" -- scales it. It used
+    // to scale the surface pass's separate exp-squared density while `lighting.volumetric` scaled
+    // this one; with the two laws unified, the lighting weight scales what it is actually about,
+    // how much of the key the air catches.
+    env.volumeDensity = scaled(a.volumeDensity, air.fog);
+    env.volumeScattering = scaled(a.volumeScattering, light.volumetric);
     env.volumeAbsorption = a.volumeAbsorption;
     env.volumeAnisotropy = a.volumeAnisotropy;
     env.volumeNoise = glm::mix(a.volumeNoise * 0.4f, a.volumeNoise * 1.8f, air.spores);

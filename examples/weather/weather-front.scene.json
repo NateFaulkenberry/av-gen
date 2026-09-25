@@ -23,7 +23,6 @@
   "intensity": 0.42,
   "background": [0.028, 0.032, 0.040],
   "fogColor": [0.045, 0.050, 0.060],
-  "fogDensity": 0.0022,
   "fogHeight": 20.0,
   "fogHeightFalloff": 0.08,
   "volumeDensity": 0.0045,

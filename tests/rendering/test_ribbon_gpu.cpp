@@ -199,7 +199,7 @@ namespace {
 // marker pillar, and surface fog so the trail is fogged like everything else.
 constexpr const char* kScene = R"({ "format": "avgen-scene", "version": 1, "name": "trail-fixture",
   "camera": { "mode": 1, "position": [0.0, 26.0, 46.0], "target": [0.0, 4.0, 0.0], "fov": 50.0, "orbitSpeed": 0.0 },
-  "environment": { "background": [0.01, 0.014, 0.03], "fogColor": [0.02, 0.03, 0.06], "fogDensity": 0.004 },
+  "environment": { "background": [0.01, 0.014, 0.03], "fogColor": [0.02, 0.03, 0.06], "volumeDensity": 0.0067, "volumeMaxDistance": 0.0 },
   "nodes": [ { "kind": "orb", "name": "craft", "position": [0, 6, 0], "scale": [0.6, 0.6, 0.6] },
              { "kind": "orb", "name": "pillar", "position": [0, 2, 4], "scale": [0.5, 3.0, 0.5] } ],
   "entities": [ { "name": "craft", "node": "craft", "seed": 7,
@@ -394,7 +394,9 @@ TEST_CASE("VISUAL Trail styles on a moving craft, consecutive frames", "[.visual
         for (const bool fog : {false, true}) {
             nlohmann::json d = doc;
             if (fog) {
-                d["environment"]["fogDensity"] = 0.03;
+                // ADR-705: the one density, surface pass only (was exp-squared `fogDensity` 0.03).
+                d["environment"]["volumeDensity"] = 0.05;
+                d["environment"]["volumeMaxDistance"] = 0.0;
             }
             app::Engine engine(app::EngineMode::Offline);
             REQUIRE(engine.setCompositionJson(d).has_value());

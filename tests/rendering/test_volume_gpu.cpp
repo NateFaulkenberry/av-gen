@@ -12,6 +12,7 @@
 #include "scene/scene.hpp"
 #include "spatial/field.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -434,7 +435,12 @@ TEST_CASE("A view ray entirely inside the mist layer is fogged identically wheth
     // way along every ray. G's difference quotient is then exactly 1 and the integrated branch
     // must reduce to the uniform one -- not approximately, bit for bit.
     scene::Scene s = twoBoxScene();
-    s.environment.fogDensity = 0.02f;
+    // ADR-705: the surface pass's density is the air's one density now. `volumeMaxDistance` 0 keeps
+    // the march off, so these three cases still see the surface pass alone -- which is what they
+    // are about. 0.0333 at the default absorption 0.5 is the Beer--Lambert extinction that matches
+    // the exp-squared 0.02 they used to set at the distance where half the light gets through.
+    s.environment.volumeMaxDistance = 0.0f;
+    s.environment.volumeDensity = 0.0333f;
     s.environment.fogHeight = 500.0f;
     s.environment.fogHeightFalloff = 0.05f;
 
@@ -460,7 +466,8 @@ TEST_CASE("A surface standing clear of the mist layer is fogged less than the sa
     // Fog colour brighter than the boxes, so more fog means a brighter pixel and the sign of the
     // comparison cannot be confused with the boxes' own shading.
     s.environment.fogColor = glm::vec3(0.9f);
-    s.environment.fogDensity = 0.02f;
+    s.environment.volumeMaxDistance = 0.0f; // ADR-705: surface pass alone, as above
+    s.environment.volumeDensity = 0.0333f;
     s.environment.fogHeightFalloff = 0.25f;
     s.environment.fogHeightAmount = 1.0f;
 
@@ -481,6 +488,151 @@ TEST_CASE("A surface standing clear of the mist layer is fogged less than the sa
     CHECK(std::abs(nearClear - nearBuried) < 0.5f * std::abs(clear - buried));
 }
 
+// ---- ADR-705: one law, one density ---------------------------------------------------------------
+//
+// ADR-569 measured that the surface pass and the march were two laws with two densities that agreed
+// at exactly one distance. ADR-705 unified them: the surface pass is Beer--Lambert with the march's
+// own extinction, and it takes the air over where the march stops. These cases are the invariant.
+//
+// The instrument is the far box of `twoBoxScene`: unlit, so its pixel is its colour times whatever
+// the air lets through; fog colour black and no scattering or emission, so nothing is ADDED and the
+// ratio to the clear frame is the transmittance itself, from either pass.
+namespace {
+
+struct Transmittances {
+    float marched;   // the march carries the whole ray (its reach is past the box)
+    float surface;   // no march at all: the surface pass integrates the whole ray
+    float handover;  // the march carries the first 12 m and the surface pass the rest
+};
+
+Transmittances farBoxTransmittance(rendering::SceneRenderer& renderer, float extinction, float horizon = 0.0f) {
+    scene::Scene s = twoBoxScene();
+    s.environment.fogColor = glm::vec3(0.0f);
+    const float clear = luminanceAt(renderFloat(renderer, s), kFarX, kMidY);
+    REQUIRE(clear > 0.05f);
+    enableFog(s, extinction); // absorption 1, so density IS extinction
+    s.environment.volumeScattering = 0.0f;
+    s.environment.volumeSteps = 256; // the march's own quadrature error well under the tolerance
+    s.environment.volumeJitter = 0.0f;
+    s.environment.horizonDensity = horizon;
+    Transmittances t{};
+    s.environment.volumeMaxDistance = 120.0f;
+    t.marched = luminanceAt(renderFloat(renderer, s), kFarX, kMidY) / clear;
+    s.environment.volumeMaxDistance = 0.0f;
+    t.surface = luminanceAt(renderFloat(renderer, s), kFarX, kMidY) / clear;
+    s.environment.volumeMaxDistance = 12.0f;
+    t.handover = luminanceAt(renderFloat(renderer, s), kFarX, kMidY) / clear;
+    return t;
+}
+
+} // namespace
+
+TEST_CASE("The surface fog and the march agree on the transmittance of the same air",
+          "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    // The far box's front face is 35 m down the axis; the sample pixel's ray reaches it at about
+    // 36.5 m. Three extinctions, from light haze to most of the light gone.
+    for (const float extinction : {0.01f, 0.033f, 0.06f}) {
+        const Transmittances t = farBoxTransmittance(*renderer, extinction);
+        const float expected = std::exp(-extinction * 36.5f);
+        INFO("extinction " << extinction << ": marched " << t.marched << ", surface " << t.surface
+                           << ", handover " << t.handover << ", Beer-Lambert " << expected);
+        // The air is really there, and really thinner than nothing: without these the equalities
+        // below would pass against a surface pass that did nothing or a march that stopped at once.
+        REQUIRE(t.marched < 0.95f);
+        REQUIRE(t.marched > 0.05f);
+        // ONE LAW. The surface pass on its own attenuates this box exactly as the march does. The
+        // exp-squared law this replaced gives exp(-(36.5 * sigma)^2): at 0.06 that is 0.008
+        // against the march's 0.112, and at 0.01 it is 0.875 against 0.694 -- it fails at both
+        // ends, which is ADR-569's 79 m crossover seen from either side.
+        CHECK(t.surface == Catch::Approx(t.marched).epsilon(0.03));
+        CHECK(t.surface == Catch::Approx(expected).epsilon(0.03));
+        // ONE DENSITY, COUNTED ONCE. The march carrying 12 m and the surface pass the remaining
+        // 24.5 multiply to the whole ray. Counting the near segment in both passes would give
+        // exp(-sigma * 48.5) here instead -- 0.055 against 0.112 at 0.06.
+        CHECK(t.handover == Catch::Approx(t.marched).epsilon(0.03));
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-705, §7's Horizon Density, on the unified law. Three properties: off is off, to the bit; more
+// of it thickens the far air and barely the near; and it is still ONE law -- the march and the
+// surface pass read the same number and agree on what it does.
+TEST_CASE("Horizon Density at 0 renders exactly as the environment's default", "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    // Both passes live: the march carries the first 12 m and the surface pass the rest, so the
+    // zero has to be a no-op in both shaders, not only in the one that happens to see the box.
+    scene::Scene s = twoBoxScene();
+    enableFog(s, 0.03f);
+    s.environment.volumeMaxDistance = 12.0f;
+    REQUIRE(s.environment.horizonDensity == 0.0f); // the default is off
+    const auto silent = renderFloat(*renderer, s);
+    s.environment.horizonDensity = 0.0f;
+    const auto spoken = renderFloat(*renderer, s);
+    // ...and a control that moved nothing when non-zero would pass the equality vacuously.
+    s.environment.horizonDensity = 1.0f;
+    const auto on = renderFloat(*renderer, s);
+    CHECK(gpu::hashImage(spoken) == gpu::hashImage(silent));
+    CHECK(gpu::hashImage(on) != gpu::hashImage(silent));
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Horizon Density thickens the far air monotonically and leaves the near air alone",
+          "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    scene::Scene s = twoBoxScene();
+    s.environment.fogColor = glm::vec3(0.0f);
+    enableFog(s, 0.02f);
+    s.environment.volumeScattering = 0.0f;
+    s.environment.volumeMaxDistance = 12.0f; // near box marched, far box handed over
+    float lastFar = 2.0f;
+    float nearAtZero = 0.0f;
+    for (const float horizon : {0.0f, 2.0f, 4.0f, 8.0f}) {
+        s.environment.horizonDensity = horizon;
+        const auto image = renderFloat(*renderer, s);
+        const float farL = luminanceAt(image, kFarX, kMidY);
+        const float nearL = luminanceAt(image, kNearX, kMidY);
+        if (horizon == 0.0f) {
+            nearAtZero = nearL;
+        }
+        INFO("horizon " << horizon << ": near " << nearL << ", far " << farL);
+        CHECK(farL < lastFar); // strictly darker every step
+        // The near box is 4 m out, where the factor is 1 + 8 * 0.004 at most: a few percent.
+        CHECK(nearL == Catch::Approx(nearAtZero).epsilon(0.05));
+        lastFar = farL;
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Horizon Density is one law: the march and the surface fog agree on it", "[volume][gpu][fog]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    // At 36.5 m a horizon of 8 makes the air up to 1.29x as dense: optical depth x(1 + 8 * 36.5 / 2000).
+    const float extinction = 0.03f;
+    const float horizon = 8.0f;
+    const Transmittances t = farBoxTransmittance(*renderer, extinction, horizon);
+    const Transmittances off = farBoxTransmittance(*renderer, extinction, 0.0f);
+    const float expected = std::exp(-extinction * 36.5f * (1.0f + horizon * 36.5f / 2000.0f));
+    INFO("marched " << t.marched << ", surface " << t.surface << ", handover " << t.handover
+                    << ", expected " << expected << ", without horizon " << off.marched);
+    // The control does something in each pass, or the agreement below is two zeros agreeing.
+    REQUIRE(t.marched < off.marched * 0.93f);
+    REQUIRE(t.surface < off.surface * 0.93f);
+    CHECK(t.surface == Catch::Approx(t.marched).epsilon(0.03));
+    CHECK(t.surface == Catch::Approx(expected).epsilon(0.03));
+    CHECK(t.handover == Catch::Approx(t.marched).epsilon(0.03));
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("The styled ambient defaults are the constants the shader used to carry",
           "[volume][gpu][fog][stylized]") {
     // ADR-058 made three shader constants authorable on the promise that a scene naming none of
@@ -498,7 +650,8 @@ TEST_CASE("The styled ambient defaults are the constants the shader used to carr
     auto renderer = makeRenderer(*ctx, shaders);
     scene::Scene s = twoBoxScene();
     s.environment.stylized = true;
-    s.environment.fogDensity = 0.01f;
+    s.environment.volumeMaxDistance = 0.0f; // ADR-705: surface pass alone, as above
+    s.environment.volumeDensity = 0.0167f;
     const auto silent = renderFloat(*renderer, s);
     s.environment.styledSkyAmbient = defaults.styledSkyAmbient;
     s.environment.styledGroundAmbient = defaults.styledGroundAmbient;

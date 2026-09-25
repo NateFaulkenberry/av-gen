@@ -25,7 +25,8 @@
       0.11
     ],
     "intensity": 1.0,
-    "fogDensity": 0.004,
+    "volumeDensity": 0.00133,
+    "volumeMaxDistance": 0.0,
     "sky": {
       "enabled": true,
       "background": true,

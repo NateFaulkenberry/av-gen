@@ -309,7 +309,6 @@ Result<Scene> buildTreeScene(const TreeGraph& graph, const TreeMeshes& meshes, c
     scene.environment.sky.showBackground = true;
     scene.environment.sky.sunIntensity = 0.0f; // no sun disc: this is a night shot
     scene.environment.fogColor = look.fogColor;
-    scene.environment.fogDensity = look.fogDensity;
     scene.environment.volumeDensity = look.volumeDensity;
     scene.environment.fogHeight = look.fogHeight;
     scene.environment.fogHeightFalloff = look.fogHeightFalloff;

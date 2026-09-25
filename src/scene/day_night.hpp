@@ -111,7 +111,10 @@ struct DayNightSettings {
     std::vector<PhaseKey<float>> glowScale;       // multiplies the tree's Glowmere channels
     std::vector<PhaseKey<float>> waterReflection;  // scales the surface's environment sample
     std::vector<PhaseKey<glm::vec3>> waterDeepColor;
-    std::vector<PhaseKey<float>> fogDensity;
+    // ADR-705: the air's ONE density (`Environment::volumeDensity`), at the default absorption 0.5.
+    // Was `fogDensity`, the surface pass's own exp-squared density, which no longer exists; the
+    // defaults were converted so the fog is as thick at the distance it reaches half (ADR-705).
+    std::vector<PhaseKey<float>> volumeDensity;
     std::vector<PhaseKey<glm::vec3>> fogColor;
 
     // Scalars the UI exposes on top of the curves, so an author can push the whole night brighter
@@ -163,7 +166,7 @@ struct DayNightState {
     float glowScale = 1.0f;
     float waterReflection = 1.0f;
     glm::vec3 waterDeepColor{0.0f};
-    float fogDensity = 0.0f;
+    float volumeDensity = 0.0f;
     glm::vec3 fogColor{0.0f};
     // True when the night map should be bound. The renderer holds one environment cube, so the
     // two maps cannot be blended in shading; the swap is made where `hdriBlend` crosses 0.5, which

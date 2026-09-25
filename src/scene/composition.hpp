@@ -47,6 +47,7 @@
 #include "world/effects/history_bank.hpp"
 #include "world/hero.hpp"
 #include "world/terrain.hpp"
+#include "world/terrain_height.hpp"
 #include "world/terrain_query.hpp"
 
 #include <glm/glm.hpp>
@@ -440,6 +441,12 @@ struct CompositionNode {
         // whenever a node is added. They are rebased on reuse.
         std::vector<world::TerrainChunk> chunks;
         std::vector<MeshData> meshes; // in the order buildTerrain emitted them
+        // ADR-715 (ADR-575 §18): the terrain's height on a 2 m grid, baked on the same cache miss
+        // that builds the meshes and never otherwise -- the terrain is static, so a ground-following
+        // fog costs one bake per terrain edit and nothing per frame. Local to the node; placed in
+        // the world by `Scene::terrainGround`. Shared, so reuse is a pointer copy and the renderer
+        // can tell by its hash that nothing moved.
+        std::shared_ptr<const world::TerrainHeightField> height;
         [[nodiscard]] bool usable(std::uint64_t want) const {
             return hash != 0 && hash == want && !meshes.empty();
         }
@@ -448,6 +455,7 @@ struct CompositionNode {
     // Said once per node, not once per rebuild: a terrain flattens every frame and a warning on
     // every frame is a warning nobody reads.
     bool terrainGroundWarned = false;
+    bool terrainHeightWarned = false; // ADR-715: rotated, or a second terrain; said once
     std::vector<world::TerrainChunk> chunks;  // Terrain: built at rebuild, indexed by entity offset
     // Terrain (ADR-099): the water bodies derived from this node's map, built at rebuild. The
     // surface mesh's flow lanes come from it, and so does every floating thing on it.
@@ -1564,7 +1572,6 @@ private:
     float cameraAngle_ = 0.0f;
     // Free camera (camera/mode = 1): explicit position/target parameters instead of the orbit.
     params::Parameter<int>* cameraMode_ = nullptr;
-    params::Parameter<float>* fogDensity_ = nullptr;
     // Volumetric atmosphere (ADR-032): scene/volume* next to scene/fog*.
     params::Parameter<float>* volumeDensity_ = nullptr;
     nlohmann::json postJson_;
@@ -1573,6 +1580,9 @@ private:
     // ADR-568 (§7): the layer's shape, beside the height and the falloff it shapes.
     params::Parameter<float>* fogUpperDensity_ = nullptr;
     params::Parameter<float>* fogHeightCurve_ = nullptr;
+    params::Parameter<float>* fogGroundFollow_ = nullptr; // ADR-715
+    params::Parameter<float>* fogPooling_ = nullptr;      // ADR-717
+    params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored
     // only, and `enabled` -- the gate every other one hangs off -- was reachable from neither the
     // UI nor a save, so `scene/windSpeed` could be dragged to its maximum and do nothing. The two
@@ -1621,7 +1631,6 @@ private:
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
-    float fogDensitySetting_ = 0.0f;
     scene::Environment volumeSetting_; // the scene-file values behind the scene/volume* parameters
     wind::WindParams windSetting_;     // the scene-file values behind the scene/wind* parameters
     std::string volumeDensityFieldSetting_;
