@@ -66,6 +66,10 @@ namespace avgen::app {
     facts.plans = engine.directingPlans();
     if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
         facts.capabilities = directing::CapabilityRegistry::fromComposition(*comp);
+        // The same ground a performer stands on (Engine::setSequence's `groundHeightAt`).
+        if (const world::TerrainQuery ground = comp->terrainQuery(); ground.valid()) {
+            facts.groundAt = [ground](float x, float z) { return ground.surfaceAt(glm::vec2(x, z)); };
+        }
         facts.staged.cameras = comp->cameraDirection();
         // Places are AUTHORED positions -- a hero's anchor, a node's base transform -- never a
         // simulation's current state, so validation and compilation are the same whenever they run.

@@ -1,8 +1,8 @@
 # AV Gen Director System — Development Progress
-Last updated: 2026-09-24 16:30
-Current branch: `agent/director` (worktree `../av-gen-director`; main merged in at 423fdf2b and 6f0da410; main = 232a50d7)
-Current commit: 7ee369e3 (plus this record)
-Overall status: Slices 0 and 1 complete; Slice 2 compiler side complete (handoff moving to M1); rise_over/pass compiled (ADR-760); Slice 5 cost harness in; next: merge agent/motion (M1-M3) and build Slice 3 on it
+Last updated: 2026-09-25
+Current branch: `agent/director` (worktree `../av-gen-director`; agent/motion merged at d4854cb4, main 9fa84413 at aa84e42d)
+Current commit: see Recent changes
+Overall status: Slices 0-2 complete; Slice 3 compile side complete on M1-M5 (ADR-761: jump, land, retime, entrySeconds); Slice 5 cost harness incl. seek; Slice 4 not started
 
 ## Executive status
 **Slice 0 is complete, including the effect items deferred until ADR-702 merged. Slice 1 is complete.**
@@ -26,19 +26,23 @@ The Rook/Umbra benchmark (spec §34) meets the requirements this build can meet:
 - the effect cues are blocked on the impossible flip;
 - it applies on approval as one undo, survives save/reload, and recompiles deterministically.
 
-Since then: performances compile (ADR-759), and the chase rises over Rook and passes him as keys on
-the follow rig's offset (ADR-760). What it cannot do yet is Slice 3 work: the jump arc, one-shot
-clips and clip events, and slow motion.
+Since then:
+- Performances compile (ADR-759).
+- The chase rises over Rook and passes him, as keys on the follow rig's offset (ADR-760).
+- On the Motion lead's M1-M5, jumps fly the engine's one arc with the jump clip played once and
+  fitted to it; landings, slow motion and the peak marker compile (ADR-761).
+- Per the owner, the Umbra leap stays refused: 5.75 m needed against Rook's 1.1 m highest jump,
+  with "a character with a larger jump" or "a different path" offered instead.
 
 ## Overall progress
 | Slice | Status | Progress | Tests | Notes |
 |---|---|---:|---:|---|
 | 0 Foundations | Complete | 95% | 23 `[directing]` cases | Remaining: human UI edit paths other than Cameras still bypass history (out of Director scope) |
 | 1 Plan + Cameras | Complete | 95% | 26 `[directing]` cases + 10 golden plans | Remaining: the Director panel beyond Approve/Reject (spec §35 says do not overbuild); UI not verified |
-| 2 Scripted Performances | Compiler side complete | 90% | 14 cases + 1 golden | Handoff (ADR-758) moves to the Motion lead as M1; this branch drops its copy after M1 lands. Remaining: validator rule for non-zero `entrySeconds` once M1 adds it |
-| 3 Airborne + Events | Planned | 0% | 0 | Compile side planned against the Motion lead's M3 (clip semantics/events), M4 (jump arc), M5 (retime) |
+| 2 Scripted Performances | Complete | 100% | 16 cases + 1 golden | The handoff is M1 (merged from main; this branch's copy dropped). Non-zero `entrySeconds` is NON_DETERMINISTIC in a baked plan |
+| 3 Airborne + Events | Compile side complete | 85% | 5 `[directing][airborne]` cases + 2 goldens | ADR-761. Remaining: `fall`; acrobatics need assets; UI not verified |
 | 4 Autonomous Direction | Not started | 0% | 0 | |
-| 5 Verification + Scale | Started | 25% | golden plans, `[.perf][directing]` CPU + GPU | Cost harness over the golden plans; seek measurement waits for ADR-800 |
+| 5 Verification + Scale | Started | 30% | 11 golden plans, `[.perf][directing]` CPU + GPU + seek | Cost harness over the golden plans, and seek after ADR-800 |
 
 ## Current focus
 ### Task
@@ -258,7 +262,12 @@ undo, serialization or compilation will be built on them.
     `Composition::rebuild` frame costs 384 ms, which is what an apply would cost if it caused one.
   - GPU, 640x360: a full `SceneRenderer::uploadTextures` re-upload is 53 textures, 942 ms (a 968 ms
     frame against a 17.8 ms steady one). The frame after each golden apply uploads 0 textures.
-  - `EntityWorld::seek` not measured: it waits for ADR-800 on main.
+  - **Seek** (`Engine::seekSeconds`, post-ADR-800, cull lifted, no audio, fresh engine per target;
+    load high from concurrent suites):
+    - Cold seek (nothing checkpointed) to 30/60/90 s: 609/955/1,592 ms with no plan, and
+      459/887/1,371 ms with `rook_hop` applied. Almost all of it is `EntityWorld::seek`.
+    - A repeated seek to the same instant: 12–28 ms.
+    - The performer does not make a seek dearer.
 - **Full CPU suite at the ADR-760 state (before the last test fix):** 3,298 cases, 1 expected
   shouldfail, 16 skips, 1 real failure. The failure was in my new revision test, which read a rig
   pointer the revision had replaced. It is fixed, and `[directing]` now has 65 cases, all green.
@@ -266,6 +275,8 @@ undo, serialization or compilation will be built on them.
   exit 0, 1 skip (NDI).
 
 ## Recent changes
+- 2026-09-25: merged agent/motion (d4854cb4), dropping this branch's copy of the handoff; merged
+  main 9fa84413 (aa84e42d). Slice 3 on M2-M5 (ADR-761). `entrySeconds` validator rule.
 - 2026-09-24: ADR-760 `rise_over` / `pass` (45498d03); cost harness `[.perf][directing]` (7ee369e3);
   per-process test temp directory (f61ce286, also on `fix/test-tmpdir-per-process` as 3efe55e3).
 - 2026-09-24: Slice 2 core (f009638d): handoff probe → ADR-758; performance compiler → ADR-759.

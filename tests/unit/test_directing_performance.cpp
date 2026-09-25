@@ -230,13 +230,17 @@ TEST_CASE("the validator on performances: starts, targets, collisions, and what 
         doc["performances"].push_back(second);
         CHECK(has(codes(doc, "again"), "TIMING_CONFLICT", Severity::Error));
     }
-    SECTION("an airborne action the character HAS is not compiled yet; one it lacks is unavailable") {
+    SECTION("an airborne action the character HAS compiles (ADR-761), except a fall; one it lacks is unavailable") {
         json doc = runPastPlan();
         doc["performances"][0]["beats"].push_back({{"action", "jump"}});
+        doc["performances"][0]["beats"].push_back({{"action", "fall"}});
         doc["performances"][0]["beats"].push_back({{"action", "backflip"}});
         const auto found = codes(doc, "run");
-        CHECK(has(found, "UNSUPPORTED", Severity::Error));
+        CHECK(has(found, "UNSUPPORTED", Severity::Error)); // the fall: no drop to fall from
         CHECK(has(found, "CAPABILITY_UNAVAILABLE", Severity::Error));
+        json hop = runPastPlan();
+        hop["performances"][0]["beats"].push_back({{"action", "jump"}});
+        CHECK_FALSE(has(codes(hop, "run"), "UNSUPPORTED", Severity::Error));
     }
 }
 
@@ -314,4 +318,51 @@ TEST_CASE("revising a chase's distance moves the camera, and undoing the revisio
     CHECK(engine->params().find(path)->baseComponent(2) == Catch::Approx(-6.0f));
     REQUIRE(history.undo(*engine).ok());
     CHECK(engine->params().find(path)->baseComponent(2) == Catch::Approx(-3.0f));
+}
+
+TEST_CASE("an entry blend is live state: a baked plan refuses it, a directed plan is warned",
+          "[directing][performance][determinism]") {
+    // ADR-820 / ADR-758: a non-zero entrySeconds starts from wherever the simulation had the body.
+    auto engine = benchmark();
+    const SceneFacts facts = app::sceneFactsFor(*engine);
+    json doc = runPastPlan();
+    doc.erase("cues");
+
+    const Compilation instant = compilePlan(planFrom(doc), facts);
+    REQUIRE_FALSE(instant.validation.isBlocked("run"));
+    const auto actorOf = [](const Compilation& c) -> const seq::Actor* {
+        for (const seq::Actor& a : c.staged.sequence.actors) {
+            if (a.id == "rook") {
+                return &a;
+            }
+        }
+        return nullptr;
+    };
+    REQUIRE(actorOf(instant) != nullptr);
+    CHECK(actorOf(instant)->entrySeconds == 0.0f);
+
+    doc["performances"][0]["entrySeconds"] = 0.5;
+    const Plan blended = planFrom(doc);
+    CHECK(blended.performances[0].entrySeconds == 0.5);
+    CHECK(parsePlan(blended.toJson()).plan->performances[0].entrySeconds == 0.5); // round-trips
+    const Compilation baked = compilePlan(blended, facts);
+    INFO(baked.diffText());
+    CHECK(baked.validation.isBlocked("run"));
+    bool flagged = false;
+    for (const Issue& i : baked.validation.issues) {
+        flagged = flagged || (i.code == IssueCode::NonDeterministic && i.item == "run" &&
+                              i.severity == Severity::Error && i.location == "/performances/0/entrySeconds");
+    }
+    CHECK(flagged);
+
+    doc["tier"] = "directed";
+    const Compilation directed = compilePlan(planFrom(doc), facts);
+    bool warned = false;
+    for (const Issue& i : directed.validation.issues) {
+        warned = warned || (i.code == IssueCode::NonDeterministic && i.item == "run" && i.severity == Severity::Warning &&
+                            i.location == "/performances/0/entrySeconds");
+    }
+    CHECK(warned);
+    REQUIRE(actorOf(directed) != nullptr);
+    CHECK(actorOf(directed)->entrySeconds == 0.5f); // compiled as asked, with the warning
 }

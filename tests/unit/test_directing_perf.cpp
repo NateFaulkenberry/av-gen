@@ -28,11 +28,12 @@
 //
 // Method, per the standing rule: minima over repeats, never means.
 //
-// Not measured here: `EntityWorld::seek`. It waits for ADR-800 (the seek fix) to land on main.
+// And `EntityWorld::seek`, by `Engine::seekSeconds`, in its own case below (after ADR-800).
 
 #include "app/directing_apply.hpp"
 #include "app/directing_context.hpp"
 #include "app/engine.hpp"
+#include "core/phase2_probe.hpp"
 #include "directing/compiler.hpp"
 #include "directing/plan.hpp"
 #include "scene/composition.hpp"
@@ -159,6 +160,48 @@ TEST_CASE("the Director's costs on the golden plans", "[.perf][directing]") {
                            : std::string("nothing to apply"));
         CHECK_FALSE(rebuilt);
         CHECK_FALSE(retextured);
+    }
+    fmt::print("\n");
+}
+
+TEST_CASE("what a preview seek costs on the benchmark, with and without a Director plan applied",
+          "[.perf][directing][seek]") {
+    // Spec §37's last item, measured now that ADR-800 is on main. As the coordinator asked: the
+    // entity distance cull lifted (every body simulated, as an offline render has it) and no audio
+    // (audio-reactive divergence, cause 2, is still open). One fresh engine per target, so the first
+    // seek is cold -- nothing checkpointed yet -- and the second, to the same instant, is what a
+    // repeated preview costs.
+    const auto load = [](app::Engine& engine) {
+        REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
+        scene::DetailLimits limits = engine.detailLimits();
+        limits.entityDistanceCull = false;
+        engine.setDetailLimits(limits);
+        REQUIRE(engine.setAudioClips({}).has_value());
+        engine.update(FrameTime{0.0, 0.0, 0});
+    };
+    const json hop = testsupport::readJson(fs::path(AVGEN_SOURCE_DIR) / "tests/data/directing/golden/rook_hop.json");
+    fmt::print("\nSeek on Glowmere Valley 2 multicam, cull lifted, no audio, ms (entity re-simulation in brackets)\n");
+    fmt::print("  {:<8} {:>9} {:>20} {:>20}\n", "plan", "target s", "cold seek", "repeat seek");
+    for (const bool withPlan : {false, true}) {
+        for (const double target : {30.0, 60.0, 90.0}) {
+            app::Engine engine(app::EngineMode::Offline);
+            load(engine);
+            if (withPlan) {
+                PlanParse parsed = parsePlan(hop.at("plan"));
+                REQUIRE(parsed.plan);
+                REQUIRE(app::installCompilation(engine, compilePlan(*parsed.plan, app::sceneFactsFor(engine))));
+            }
+            const auto seek = [&](double t) {
+                probe2::frame().clear();
+                const double ms = millis([&] { engine.seekSeconds(t); });
+                return std::pair{ms, probe2::frame().entitySeekMs};
+            };
+            const auto cold = seek(target);
+            (void)seek(1.0);
+            const auto repeat = seek(target);
+            fmt::print("  {:<8} {:>9.0f} {:>11.1f} ({:>6.1f}) {:>11.1f} ({:>6.1f})\n", withPlan ? "rook_hop" : "none",
+                       target, cold.first, cold.second, repeat.first, repeat.second);
+        }
     }
     fmt::print("\n");
 }

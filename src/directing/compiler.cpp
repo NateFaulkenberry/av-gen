@@ -3,6 +3,7 @@
 
 #include "app/cinematic.hpp"
 #include "seq/events.hpp"
+#include "seq/retime.hpp"
 #include "world/atmospherics.hpp"
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_stack.hpp"
@@ -520,6 +521,35 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
             continue;
         }
         CompiledPerformance cp = compilePerformance(plan, i, facts, v.times);
+        // ADR-823: slow motion on this performance -- its actor reparameterised over each window,
+        // in time order. The plan events it raises move with it, so cues on them stay on the moment.
+        std::vector<std::pair<std::size_t, double>> windows;
+        for (std::size_t r = 0; r < plan.retimes.size(); ++r) {
+            if (plan.retimes[r].performance == pp.key && !v.isBlocked(plan.retimes[r].key)) {
+                windows.emplace_back(r, *v.times.at(fmt::format("/retimes/{}/from", r)));
+            }
+        }
+        std::sort(windows.begin(), windows.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+        double shift = 0.0; // how much the earlier windows have already pushed later times back
+        std::vector<std::pair<std::string, std::string>> retimeLines;
+        for (const auto& [r, fromTime] : windows) {
+            const PlanRetime& rt = plan.retimes[r];
+            const double a = fromTime + shift;
+            const double b = *v.times.at(fmt::format("/retimes/{}/until", r)) + shift;
+            const auto rate = static_cast<float>(rt.factor);
+            if (auto ok = seq::retimeActor(cp.actor, a, b, rate); !ok) {
+                retimeLines.emplace_back(rt.key, fmt::format("Retime {} not applied: {}", rt.key, ok.error().message));
+                continue;
+            }
+            for (auto& [name, time] : cp.events) {
+                time = seq::retimeMap(time, a, b, rate);
+            }
+            cp.to = seq::retimeMap(cp.to, a, b, rate);
+            shift += (b - a) * ((1.0 / rt.factor) - 1.0);
+            retimeLines.emplace_back(rt.key, fmt::format("Retime {}: {} at {:.2f}x from {} to {}; the performance now ends {}",
+                                                         rt.key, cp.actor.id, rt.factor, clock(a),
+                                                         clock(seq::retimeMap(b, a, b, rate)), clock(cp.to)));
+        }
         std::erase_if(out.staged.sequence.actors, [&](const seq::Actor& a) { return a.id == cp.actor.id; });
         out.staged.sequence.actors.push_back(cp.actor);
         record(pp.key, ContentDomain::SequenceActor, cp.actor.id);
@@ -528,6 +558,9 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                          cp.actor.keys.size()));
         for (const std::string& s : cp.summary) {
             line(removedLine(pp.key), pp.key, "  " + s);
+        }
+        for (const auto& [key, text] : retimeLines) {
+            line(removedLine(key), key, text);
         }
         for (const auto& [name, time] : cp.events) {
             eventTimes[name] = time;

@@ -365,11 +365,16 @@ json Plan::toJson() const {
             put(o, "at", b.at);
             put(o, "seconds", b.seconds);
             putString(o, "emits", b.emits);
+            putString(o, "moment", b.moment);
             put(o, "clearanceMetres", b.clearanceMetres);
             beats.push_back(std::move(o));
         }
-        perfJson.push_back({{"key", p.key}, {"subject", p.subject}, {"mode", performanceModeName(p.mode)},
-                            {"beats", std::move(beats)}});
+        json perf{{"key", p.key}, {"subject", p.subject}, {"mode", performanceModeName(p.mode)},
+                  {"beats", std::move(beats)}};
+        if (p.entrySeconds != 0.0) {
+            perf["entrySeconds"] = p.entrySeconds; // omitted at its default: canonical JSON
+        }
+        perfJson.push_back(std::move(perf));
     }
     j["performances"] = std::move(perfJson);
 
@@ -533,6 +538,7 @@ PlanParse parsePlan(const json& document) {
             perf.key = p.string("key", true);
             perf.subject = p.string("subject", true);
             perf.mode = p.choice("mode", kModes).value_or(PerformanceMode::Scripted);
+            perf.entrySeconds = p.number<double>("entrySeconds").value_or(0.0);
             forEach(p, "beats", issues, [&](Reader& b, std::size_t) {
                 PerformanceBeat beat;
                 beat.action = b.string("action", true);
@@ -541,6 +547,7 @@ PlanParse parsePlan(const json& document) {
                 beat.seconds = b.number<double>("seconds");
                 beat.emits = b.string("emits");
                 beat.clearanceMetres = b.number<float>("clearanceMetres");
+                beat.moment = b.string("moment");
                 ok = ok && b.ok();
                 perf.beats.push_back(std::move(beat));
             });
@@ -722,9 +729,11 @@ json planSchema() {
                                                            {"degrees", "orbit"}, {"side", "left|right"}}})}}})},
           {"markers", json::array({{{"key", "unique"}, {"name", "string"}, {"at", time}}})},
           {"performances", json::array({{{"key", "unique"}, {"subject", "alias"}, {"mode", namesIn(kModes)},
+                                         {"entrySeconds", "0 (default): take the body at the mark; > 0 is live"},
                                          {"beats", json::array({{{"action", "run_to|walk_to|run|walk|jump|land|fall|look_at|..."},
                                                                  {"target", "alias"}, {"at", time}, {"seconds", "number"},
                                                                  {"emits", "a plan event name, e.g. rook.jump_peak"},
+                                                                 {"moment", "jump: takeoff|peak|touchdown, which moment emits names"},
                                                                  {"clearanceMetres", "number"}}})}}})},
           {"cues", json::array({{{"key", "unique"}, {"parameter", "a parameter path"},
                                  {"effect", {{"owner", "alias or \"world\""}, {"type", "effect type"}, {"id", "optional"}}},

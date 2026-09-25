@@ -16,6 +16,7 @@
 
 #include <glm/glm.hpp>
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -53,6 +54,11 @@ struct CharacterMark {
 
 struct SceneFacts {
     CapabilityRegistry capabilities;
+    // The ground's height at a world x, z: the terrain's surface (water included, as the performer
+    // stands on it). Authored geometry, so a plan-time fact. Null when the scene has no terrain; a
+    // jump then cannot be checked or compiled, and says so. Holds a copy of the terrain query, so it
+    // is valid only while the composition it came from is.
+    std::function<float(float x, float z)> groundAt;
     SubjectIndex subjects;
     MusicalContext music;
     std::vector<Place> places;
