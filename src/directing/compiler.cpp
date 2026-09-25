@@ -566,6 +566,54 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
             }
             continue;
         }
+        if (pp.mode == PerformanceMode::Directed && !pp.recording) {
+            // ---- directed (ADR-766 on ADR-824): one scheduled EntityAction per order, live -----------
+            const Subject* who = plan.subject(pp.subject);
+            const CharacterCard* card = facts.capabilities.character(who->id);
+            for (std::size_t b = 0; b < pp.beats.size(); ++b) {
+                const PerformanceBeat& beat = pp.beats[b];
+                const auto verb = directedBeat(beat.action, *card);
+                const double t = *goalBeatTime(plan, i, b, v.times);
+                const Subject* target = beat.target.empty() ? nullptr : plan.subject(beat.target);
+                seq::SequenceEvent order;
+                order.id = fmt::format("{}.{}.order{}", plan.id, pp.key, b);
+                order.when.kind = seq::TriggerKind::Time;
+                order.when.timeSeconds = t;
+                order.what.kind = seq::EventActionKind::EntityAction;
+                order.what.target = who->id;
+                order.what.value = verb->seqVerb;
+                if (verb->verb == DirectedVerb::Pose) {
+                    order.what.argument = beat.action; // the activity
+                } else if (verb->verb == DirectedVerb::Interact) {
+                    order.what.argument = beat.target; // "prop.verb", as written
+                } else if (target != nullptr) {
+                    order.what.argument = target->id;
+                }
+                out.staged.sequence.events.push_back(order);
+                record(pp.key, ContentDomain::SequenceEvent, order.id);
+                line(removedLine(pp.key), pp.key,
+                     fmt::format("Order for {} at {}: {}{}{} -- live: carried out by {} its own way", who->id, clock(t),
+                                 beat.action, order.what.argument.empty() || verb->verb == DirectedVerb::Pose ? "" : " ",
+                                 verb->verb == DirectedVerb::Pose ? std::string() : order.what.argument, who->id));
+                if (!beat.emits.empty() && verb->verb == DirectedVerb::GoTo) {
+                    seq::SequenceEvent heard;
+                    heard.id = fmt::format("{}.{}.{}", plan.id, pp.key, beat.emits);
+                    heard.when.kind = seq::TriggerKind::ActionComplete;
+                    heard.when.name = goalEventName(beat.moment);
+                    heard.when.subject = who->id;
+                    heard.when.fromSeconds = t;
+                    heard.when.repeat = 1;
+                    heard.what.kind = seq::EventActionKind::Notify;
+                    heard.what.target = beat.emits;
+                    out.staged.sequence.events.push_back(heard);
+                    record(pp.key, ContentDomain::SequenceEvent, heard.id);
+                    line(removedLine(pp.key), pp.key,
+                         fmt::format("Live event {} when {} reports {} (after {})", beat.emits, who->id,
+                                     goalEventName(beat.moment), clock(t)));
+                }
+            }
+            continue;
+        }
         CompiledPerformance cp;
         if (pp.recording) {
             // ---- recorded (ADR-763): the recording IS the actor --------------------------------------

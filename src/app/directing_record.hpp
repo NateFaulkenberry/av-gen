@@ -36,6 +36,7 @@ class Engine;
 struct RecordOptions {
     double tailSeconds = 1.0;     // kept after the last goal event, or after `maxSeconds`
     double maxSeconds = 40.0;     // the longest a goal is recorded for, from when it is given
+    double ordersTailSeconds = 6.0; // how long after its last order a performance with no events is kept
     double keyEverySeconds = 0.1; // the recording's key spacing (Linear keys; the body is exact on them)
     std::filesystem::path scratchDir;
     const std::atomic<bool>* cancel = nullptr; // polled every frame of every play

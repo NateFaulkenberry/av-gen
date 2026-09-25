@@ -105,7 +105,7 @@ Result<RecordReport> recordFromCopy(const std::filesystem::path& copy, const dir
     const SceneFacts facts = sceneFactsFor(**scratch);
     for (std::size_t i = 0; i < compilation.plan.performances.size(); ++i) {
         const PlanPerformance& p = compilation.plan.performances[i];
-        if (p.mode != PerformanceMode::Goal || p.recording || compilation.validation.isBlocked(p.key)) {
+        if (p.mode == PerformanceMode::Scripted || p.recording || compilation.validation.isBlocked(p.key)) {
             continue;
         }
         Window w;
@@ -122,7 +122,9 @@ Result<RecordReport> recordFromCopy(const std::filesystem::path& copy, const dir
                 w.events.push_back(p.beats[b].emits);
             }
         }
-        w.until = last + options.maxSeconds; // shortened below to the last event heard
+        // Shortened below to the last event heard. A directed performance's orders raise none (only a
+        // go_to's arrival does), so without events it is recorded for a fixed tail after its last order.
+        w.until = last + (w.events.empty() ? options.ordersTailSeconds : options.maxSeconds);
         windows.push_back(std::move(w));
     }
     if (windows.empty()) {

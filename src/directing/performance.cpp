@@ -285,6 +285,16 @@ CompiledPerformance compilePerformance(const Plan& plan, std::size_t index, cons
     return out;
 }
 
+std::optional<DirectedBeat> directedBeat(std::string_view action, const CharacterCard& card) {
+    if (action == "face") return DirectedBeat{DirectedVerb::Face, "face"};
+    if (action == "approach") return DirectedBeat{DirectedVerb::Approach, "move"};
+    if (action == "go_to") return DirectedBeat{DirectedVerb::GoTo, "goal"};
+    if (action == "interact") return DirectedBeat{DirectedVerb::Interact, "interact"};
+    if (action == "release") return DirectedBeat{DirectedVerb::Release, "release"};
+    if (card.can(action)) return DirectedBeat{DirectedVerb::Pose, "pose"};
+    return std::nullopt;
+}
+
 const GoalVerb* goalVerb(std::string_view action) {
     for (const GoalVerb& v : kGoalVerbs) {
         if (v.action == action) {
