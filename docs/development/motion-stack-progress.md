@@ -7,8 +7,12 @@ engine side of the actor handoff). Not `src/directing/` or the AI layer.
 
 ## Status in one line
 
-The recount is done. **M1–M5 are built**, which is everything the Director's Slices 2–3 asked of
-the motion engine. Next: the remaining C and D work, ordered below.
+M1–M5 are merged into main (9fa84413). Since then:
+- the Director-facing D items (ADR-824);
+- C's loading path (ADR-825);
+- the Glowmere review build on the multicam film (ADR-826, ADR-827, `docs/reports/glowmere-review-build.md`).
+
+Next: the remaining D items and B §39.
 
 ## How this was counted
 
@@ -36,9 +40,9 @@ impose something checkable.
 | 0 Research | 5 | 0 | 0 | 0 | done | |
 | A Foundation | 17 | 0 | 2 | – | done | not re-audited this round; the board's own data had 2 rows planned under a "done" phase |
 | B Procedural (§1–67) | 54 | 2 | 0 | 11 | 54/56 | §39 and §66 are partial; see below |
-| C Matching (§1–95) | 76 | 5 | 1 | 13 | 52 / 25 / 5 | the gates §85 and §86 are **not met in the product** |
-| D Behaviour (§1–78 + demo) | 39 + demo | 27 | 2 | 10 | 44 / 16 / 8 | §63 scrub and §66 Glowmere landed; five "done" rows downgraded |
-| ★ Glowmere review build (10) | 2 | 5 | 3 | – | 0 / 10 | specified only on the board; no spec text exists |
+| C Matching (§1–95) | 81 | 0 | 1 | 13 | 52 / 25 / 5 | §37/39/40/76/81 done by ADR-825 (the product loads a baked database through the slot); §68 is partly live (`MotionDebug::matching`) and counted done-in-CLI as before; §94 waits on the owner. **§86 (the Phase D gate)**: the matcher runs on Glowmere as a review arm and is not yet in the film |
+| D Behaviour (§1–78 + demo) | 40 + demo | 26 | 2 | 10 | 44 / 16 / 8 | §35 done (ADR-824: runtime goals, `release`, scheduled direction replayed); §63/§66 as before |
+| ★ Glowmere review build (10) | 8 | 2 | 0 | – | 0 / 10 | done: 1–5, 8–10 (10's cost figures were taken under load); partial: 6 (the director reads scenario beats), 7 (no in-app inspector panel) |
 | E Learned motion (13 board rows) | 0 | 0 | 13 | – | 13 planned | gated; see recommendation |
 | F Advanced (9 tracks) | – | – | – | – | 9 gated | pieces exist in F7, F8 and F9; no track has been measured or classified |
 
