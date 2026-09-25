@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace avgen::rendering {
 
@@ -50,13 +51,67 @@ scene::MeshData canonicalMesh(world::ShellMesh mesh) {
     return scene::makeIcosphere(1.0f, 4);
 }
 
-const char* entryPoint(world::ShellShading s) {
+// How each shading kind's pipeline differs. The first three are phase 1's, exactly as they were (one
+// module, `vs_shell`, light added, depth-tested, no depth write). Phase 2's live in shell_fx.wgsl:
+//   - a Glare is glare, not a surface: it is not depth-tested per pixel (its visibility comes from
+//     the linear depth at the source, in the shader);
+//   - a Bubble, a Portal and a Tear are BLENDED OVER the frame, premultiplied (a thin film transmits
+//     1 - R of what is behind it; an opening hides it), and a Bubble wobbles in its own vertex stage;
+//   - a Portal's and a Tear's interiors write depth, so the fog composite, DF and the blended meshes
+//     that follow treat the opening as the surface it is (shared-infrastructure.md "SHELL").
+struct ShadingState {
+    const char* module = "shell.wgsl";
+    const char* vertex = "vs_shell";
+    const char* fragment = "fs_shield";
+    wgpu::CullMode cull = wgpu::CullMode::None;
+    bool depthTest = true;
+    bool depthWrite = false;
+    bool over = false; // premultiplied "over" rather than additive
+};
+
+ShadingState shadingState(world::ShellShading s) {
+    ShadingState st;
     switch (s) {
-    case world::ShellShading::Plasma: return "fs_plasma";
-    case world::ShellShading::Shield: return "fs_shield";
-    case world::ShellShading::Barrier: return "fs_barrier";
+    case world::ShellShading::Plasma:
+        st.fragment = "fs_plasma";
+        st.cull = wgpu::CullMode::Back;
+        break;
+    case world::ShellShading::Shield: st.fragment = "fs_shield"; break;
+    case world::ShellShading::Barrier: st.fragment = "fs_barrier"; break;
+    case world::ShellShading::Beam:
+        st.module = "shell_fx.wgsl";
+        st.fragment = "fs_beam";
+        break;
+    case world::ShellShading::Glare:
+        st.module = "shell_fx.wgsl";
+        st.vertex = "vs_glare";
+        st.fragment = "fs_glare";
+        st.depthTest = false;
+        break;
+    case world::ShellShading::Ring:
+        st.module = "shell_fx.wgsl";
+        st.fragment = "fs_ring";
+        break;
+    case world::ShellShading::Bubble:
+        st.module = "shell_fx.wgsl";
+        st.vertex = "vs_bubble";
+        st.fragment = "fs_bubble";
+        st.over = true;
+        break;
+    case world::ShellShading::Portal:
+        st.module = "shell_fx.wgsl";
+        st.fragment = "fs_portal";
+        st.over = true;
+        st.depthWrite = true;
+        break;
+    case world::ShellShading::Tear:
+        st.module = "shell_fx.wgsl";
+        st.fragment = "fs_tear";
+        st.over = true;
+        st.depthWrite = true;
+        break;
     }
-    return "fs_shield";
+    return st;
 }
 
 } // namespace
@@ -113,6 +168,10 @@ Result<void> ShellRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
     if (!module) {
         return std::unexpected(module.error());
     }
+    auto fxModule = shaders.load("shell_fx.wgsl");
+    if (!fxModule) {
+        return std::unexpected(fxModule.error());
+    }
     const MeshVertexLayout vertex;
     const wgpu::Device& device = context_->device();
 
@@ -152,35 +211,45 @@ Result<void> ShellRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
     targets[0].blend = &color;
     targets[2].blend = &velocity;
     targets[3].blend = &emission;
+    // Phase 2's "over" kinds: the same targets, the colour and the emission composited premultiplied
+    // (src + dst (1 - src.a)), the HDR target's alpha kept as it was.
+    wgpu::BlendState overColor = color;
+    overColor.color.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
+    wgpu::BlendState overEmission = emission;
+    overEmission.color.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> overTargets = targets;
+    overTargets[0].blend = &overColor;
+    overTargets[3].blend = &overEmission;
 
     std::array<wgpu::RenderPipeline, world::kShellShadingCount> built{};
     for (std::size_t k = 0; k < world::kShellShadingCount; ++k) {
         const auto shading = static_cast<world::ShellShading>(k);
+        const ShadingState st = shadingState(shading);
+        const wgpu::ShaderModule& code = std::string_view(st.module) == "shell.wgsl" ? *module : *fxModule;
         wgpu::FragmentState fragment{};
-        fragment.module = *module;
-        fragment.entryPoint = entryPoint(shading);
+        fragment.module = code;
+        fragment.entryPoint = st.fragment;
         fragment.targetCount = kSceneTargetCount;
-        fragment.targets = targets.data();
+        fragment.targets = st.over ? overTargets.data() : targets.data();
 
         wgpu::DepthStencilState depth{};
         depth.format = depthFormat_;
-        depth.depthWriteEnabled = wgpu::OptionalBool::False;
-        depth.depthCompare = wgpu::CompareFunction::Less;
+        depth.depthWriteEnabled = st.depthWrite ? wgpu::OptionalBool::True : wgpu::OptionalBool::False;
+        depth.depthCompare = st.depthTest ? wgpu::CompareFunction::Less : wgpu::CompareFunction::Always;
 
         wgpu::RenderPipelineDescriptor desc{};
         const std::string label = std::string("shell-") + world::shellShadingName(shading);
         desc.label = label.c_str();
         desc.layout = layout_;
-        desc.vertex.module = *module;
-        desc.vertex.entryPoint = "vs_shell";
+        desc.vertex.module = code;
+        desc.vertex.entryPoint = st.vertex;
         desc.vertex.bufferCount = 1;
         desc.vertex.buffers = &vertex.layout;
         desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
         desc.primitive.frontFace = wgpu::FrontFace::CCW;
         // A plasma orb is marched from where the ray enters it, its front faces; a shield and a
         // barrier are sheets seen from both sides (the far side of a shield dimmer).
-        desc.primitive.cullMode =
-            shading == world::ShellShading::Plasma ? wgpu::CullMode::Back : wgpu::CullMode::None;
+        desc.primitive.cullMode = st.cull;
         desc.depthStencil = &depth;
         desc.multisample.count = 1;
         desc.multisample.mask = 0xFFFFFFFFu;

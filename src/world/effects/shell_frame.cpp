@@ -45,6 +45,12 @@ const char* shellShadingName(ShellShading s) {
     case ShellShading::Plasma: return "plasma";
     case ShellShading::Shield: return "shield";
     case ShellShading::Barrier: return "barrier";
+    case ShellShading::Beam: return "beam";
+    case ShellShading::Glare: return "glare";
+    case ShellShading::Ring: return "ring";
+    case ShellShading::Bubble: return "bubble";
+    case ShellShading::Portal: return "portal";
+    case ShellShading::Tear: return "tear";
     }
     return "?";
 }

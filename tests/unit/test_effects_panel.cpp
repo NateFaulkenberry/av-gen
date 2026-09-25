@@ -344,10 +344,9 @@ TEST_CASE("a refused structural edit changes nothing and records nothing", "[eff
     app::Engine engine(app::EngineMode::Offline);
     REQUIRE(engine.setEffects({}).has_value());
     ui::EditHistory history;
-    // No type attaches to a light today; if one ever does, pick a target nothing supports instead.
-    if (!world::effectKindsFor(world::EffectTarget::Light).empty()) {
-        SKIP("a type now supports lights");
-    }
+    // An aurora does not attach to a light (Wave 3's Light Beam and Halo do, so "no type takes a
+    // light" is no longer the precondition; this is).
+    REQUIRE_FALSE(world::effectAllowedOn(world::EffectKind::Aurora, world::EffectTarget::Light));
     auto refused = ui::addEffectTo(engine, &history, world::EffectOwner::light("key"), world::EffectKind::Aurora);
     CHECK_FALSE(refused.has_value());
     CHECK(engine.effects().empty());

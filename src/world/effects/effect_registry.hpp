@@ -104,10 +104,15 @@ class ParameterSet;
 struct ModRoute;
 } // namespace avgen::params
 
+namespace avgen::scene {
+struct ParticleSystem; // scene/particles.hpp (EMIT)
+} // namespace avgen::scene
+
 namespace avgen::world {
 
 struct EntityLaneContribution; // world/effects/entity_fx.hpp (ADR-703, FXL)
 struct EffectLight;            // world/effects/effect_lights.hpp (LIGHTMOD)
+struct DistortionProxy;        // world/effects/distortion_frame.hpp (DF)
 
 // ---- one row ------------------------------------------------------------------------------------
 
@@ -421,7 +426,8 @@ enum class EffectBucket : std::uint8_t {
     Starfield,
     // ---- Wave 3 ---------------------------------------------------------------------------------
     // Analytic proxy shells drawn in pass 1's blended section beside the particles (SHELL,
-    // world/effects/shell_frame.hpp): Plasma, Energy Shield, Force Field.
+    // world/effects/shell_frame.hpp): Plasma, Energy Shield, Force Field; Charge-Up, Light Beam, Halo,
+    // Bubble, Portal, Reality Tear.
     Shell,
 };
 
@@ -550,6 +556,20 @@ struct EffectResolve {
     // and its drops are one decision. False for "no light this frame". An instance whose light
     // loses finds the pool's reason in its reason slot when its own builder runs.
     bool (*light)(const EffectInstance&, const EffectContext&, EffectLight&) = nullptr;
+    // Wave 3 (phase 2). DF proxies an instance adds when its own contribution another builder draws
+    // -- a Portal's swirl, a Bubble's rim lensing, a Reality Tear's shear (the shells are SHELL). The DF
+    // builder walks these after its own producers' instances in evaluation order, under the same
+    // budget, and writes NO status for them: a shortfall leaves its reason in the slot, which the
+    // instance's own builder (running later) reports as Partial. Returns how many it wrote (at most
+    // `out.size()`, 8); must be a pure function of its arguments (ADR-091).
+    std::size_t (*distortion)(const EffectInstance&, const EffectContext&, std::span<DistortionProxy> out) = nullptr;
+    // Wave 3 (phase 2). A secondary EMIT system -- a Charge-Up's inward motes, a Portal's drawn-in
+    // sparks, a Bubble's droplets. The EMIT builder keeps one `fx:<id>` system per such instance, as it
+    // does for a Particle Emitter, and hands it here to be described IN PLACE each frame (the whole
+    // configuration, the placement, the rate and the burst). False: not emitting this frame (the
+    // builder zeroes the rate and burst, so what is in the air finishes). No status is written; a
+    // system the budget refuses leaves its reason in the slot, as `distortion` does.
+    bool (*particles)(const EffectInstance&, const EffectContext&, scene::ParticleSystem&) = nullptr;
 };
 
 // The declaration. One of these per kind, in that kind's own file.
@@ -643,7 +663,7 @@ struct EffectSchema {
 // enumerators declared there, failing **by the name of the one that is missing**. That is the guard,
 // and it is the only one that fires: `AVGEN_WARNINGS_AS_ERRORS` is OFF (`CMakeLists.txt:33`), so a
 // `-Wswitch` diagnostic is a line in a five-thousand-line log.
-inline constexpr std::array<EffectKind, 42> kEffectKinds{
+inline constexpr std::array<EffectKind, 48> kEffectKinds{
     EffectKind::Comet,         //
     EffectKind::Aurora,        //
     EffectKind::Vortex,        //
@@ -684,8 +704,14 @@ inline constexpr std::array<EffectKind, 42> kEffectKinds{
     EffectKind::Plasma,        // Wave 3 (SHELL)
     EffectKind::EnergyShield,  // Wave 3 (SHELL + TRIGGER)
     EffectKind::ForceField,    // Wave 3 (SHELL)
+    EffectKind::ChargeUp,      // Wave 3 (SHELL + EMIT + LIGHTMOD + TRIGGER)
     EffectKind::HeatShimmer,   // Wave 3 (DF: Cylinder + Shimmer)
     EffectKind::GravitationalLens, // Wave 3 (DF: Facing + Lens)
+    EffectKind::LightBeam,     // Wave 3 (SHELL + LIGHTMOD)
+    EffectKind::Halo,          // Wave 3 (SHELL)
+    EffectKind::Bubble,        // Wave 3 (SHELL + DF + EMIT + TRIGGER)
+    EffectKind::Portal,        // Wave 3 (SHELL + DF + EMIT + LIGHTMOD)
+    EffectKind::RealityTear,   // Wave 3 (BOLT + SHELL + DF + EMIT)
 };
 
 // The kind's position in `kEffectKinds`, or `size()` for an enumerator that is not in it --

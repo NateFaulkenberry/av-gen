@@ -4442,6 +4442,43 @@ public:
         return true;
     }
 
+    // Wave 3 (phase 2): a Light owner's light as the frame places it -- the authored light, carried
+    // by the drawn transform of the node it rides (the flatten's own rule, composition.cpp).
+    [[nodiscard]] bool lightView(std::string_view id, world::LightView& out) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        for (const scene::Composition::AuthoredLight& a : comp_->authoredLights()) {
+            // The stored id when there is one (no allocation); the derived one otherwise.
+            if (!(a.id.empty() ? scene::Composition::authoredLightId(a) == id : a.id == id)) {
+                continue;
+            }
+            const scene::PunctualLight& l = a.light;
+            out = world::LightView{};
+            out.position = l.position;
+            out.direction = glm::length(l.direction) > 1e-6f ? glm::normalize(l.direction) : glm::vec3(0.0f, -1.0f, 0.0f);
+            if (!a.node.empty()) {
+                const scene::CompositionNode* node = comp_->findNode(a.node);
+                if (node == nullptr) {
+                    return false;
+                }
+                const scene::Transform t = comp_->nodeDrawnWorldTransform(*node);
+                out.position = t.position + t.rotation * (l.position * t.scale);
+                const glm::vec3 d = t.rotation * out.direction;
+                out.direction = glm::length(d) > 1e-6f ? glm::normalize(d) : out.direction;
+            }
+            out.color = l.color;
+            out.intensity = l.enabled ? l.intensity : 0.0f;
+            out.range = l.range;
+            out.spot = l.type == scene::PunctualLight::Type::Spot;
+            out.directional = l.type == scene::PunctualLight::Type::Directional;
+            out.outerCone = out.spot ? l.outerConeAngle : 0.0f;
+            out.innerCone = out.spot ? l.innerConeAngle : 0.0f;
+            return true;
+        }
+        return false;
+    }
+
 private:
     const scene::Composition* comp_;
     const world::HistoryBank* history_;

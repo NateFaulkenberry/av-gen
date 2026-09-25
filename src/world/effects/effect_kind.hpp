@@ -90,9 +90,17 @@ enum class EffectKind : std::uint8_t {
     Plasma = 37,       // a boiling orb of emission, marched inside a sphere, with a core light
     EnergyShield = 38, // a shell round its owner: rim, cells, rings from each hit, a ground line
     ForceField = 39,   // a placed barrier -- wall, box, cylinder, dome -- revealed by what comes near
+    // Shell 2 (phase 2): SHELL's other users.
+    ChargeUp = 40, // energy gathered into the owner over a charge time, held, released in a flare
     // The lens slice (DF): Heat Shimmer's Cylinder/Shimmer and Gravitational Lens's Facing/Lens.
     HeatShimmer = 41,       // DF: the view wobbling through a column of hot air
     GravitationalLens = 42, // DF: background light bent around a mass, optionally a black hole
+    // Shell 2 (phase 2), continued.
+    LightBeam = 43,   // a visible cone of lit air from a spot light, an entity or a placed point
+    Halo = 44,        // glare and a ring round a bright source, or a ring above the owner's head
+    Bubble = 45,      // a thin-film sphere: interference colour, reflection, rim lensing, a triggered pop
+    Portal = 46,      // an opening with a swirling rim and an interior with depth (no Remote View)
+    RealityTear = 47, // a jagged crack in space: white-hot edges, a void inside, the image sheared apart
 };
 
 // Derived from the registry's schemas rather than written out here, so a type whose name does not

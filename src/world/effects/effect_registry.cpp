@@ -73,8 +73,14 @@ const EffectSchema& dischargeSchema();   // Wave 3 (BOLT)
 const EffectSchema& plasmaSchema();      // Wave 3 (SHELL)
 const EffectSchema& energyShieldSchema(); // Wave 3 (SHELL + TRIGGER)
 const EffectSchema& forceFieldSchema();  // Wave 3 (SHELL)
+const EffectSchema& chargeUpSchema();    // Wave 3 (SHELL phase 2)
 const EffectSchema& heatShimmerSchema(); // Wave 3 (DF)
 const EffectSchema& gravitationalLensSchema(); // Wave 3 (DF)
+const EffectSchema& lightBeamSchema();   // Wave 3 (SHELL phase 2)
+const EffectSchema& haloSchema();        // Wave 3 (SHELL phase 2)
+const EffectSchema& bubbleSchema();      // Wave 3 (SHELL phase 2)
+const EffectSchema& portalSchema();      // Wave 3 (SHELL phase 2)
+const EffectSchema& realityTearSchema(); // Wave 3 (SHELL phase 2)
 
 namespace {
 
@@ -120,8 +126,14 @@ const std::vector<const EffectSchema*>& builtinSchemas() {
         &plasmaSchema(),
         &energyShieldSchema(),
         &forceFieldSchema(),
+        &chargeUpSchema(),
         &heatShimmerSchema(),
         &gravitationalLensSchema(),
+        &lightBeamSchema(),
+        &haloSchema(),
+        &bubbleSchema(),
+        &portalSchema(),
+        &realityTearSchema(),
     };
     return kSchemas;
 }

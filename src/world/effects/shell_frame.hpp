@@ -70,13 +70,21 @@ inline constexpr std::uint32_t kMaxShellExtra = kMaxShells * kMaxShellExtraPerSh
 enum class ShellMesh : std::uint8_t { Sphere, Box, Quad, Disc, Cylinder, Cone };
 inline constexpr std::size_t kShellMeshCount = 6;
 
-// One pipeline each (ADR-118). Phase 2 appends Beam, Bubble, Portal, Halo, Tear.
+// One pipeline each (ADR-118).
 enum class ShellShading : std::uint8_t {
     Plasma,  // an emission-only march through the shell's interior (front faces)
     Shield,  // rim, cell pattern, impact rings, ground line; both faces (the far side dimmer)
     Barrier, // a scrolling pattern revealed near entities and the camera, and where it meets the ground
+    // Phase 2 (shaders/shell_fx.wgsl). The last three are BLENDED OVER the frame (premultiplied alpha)
+    // rather than added to it, and the last two write depth: see rendering/shell_renderer.cpp.
+    Beam,   // a cone of lit air integrated along the view ray inside a box proxy (Light Beam)
+    Glare,  // a camera-facing glare disc and ring, occlusion-faded, not depth-tested (Halo, optical)
+    Ring,   // a glowing torus marched inside a box proxy (Halo, ring)
+    Bubble, // a thin-film sphere: interference colour, reflection, Fresnel alpha, a pop (Bubble)
+    Portal, // an opening on a disc: swirling interior and a noisy rim; writes depth (Portal)
+    Tear,   // a jagged crack on a quad: void interior and white-hot edges; writes depth (Reality Tear)
 };
-inline constexpr std::size_t kShellShadingCount = 3;
+inline constexpr std::size_t kShellShadingCount = 9;
 [[nodiscard]] const char* shellShadingName(ShellShading s);
 
 // One shell, 192 bytes. Mirrors `ShellRecord` in shaders/shell.wgsl.
