@@ -279,6 +279,8 @@ undo, serialization or compilation will be built on them.
   `director-record` UI arm, 18 checks) and the assistant's `director.record_plan` through a host
   hook (1071ff63; ScriptedProvider test). Both run off the main thread and end at the one approval
   gate. Captures 07-11 in `15-director-panel/`.
+- **Full suites at f6cf96ca:** CPU 3,446 cases, exit 0 (1 expected shouldfail, 19 skips); GPU 490,
+  exit 0 (1 skip).
 - 2026-09-25: OSC: evaluating engines open no live control (86d81b9a). Stills no longer block the
   editor: a cached scratch session simulated on its own thread (2ed68542). Merged main 9a37c9bb
   (7af0244f). Slice 4 goal compile (ce3a740e) and recording (see ADR-763's "Implemented").
