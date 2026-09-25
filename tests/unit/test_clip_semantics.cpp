@@ -354,3 +354,30 @@ TEST_CASE("on the benchmark, a stunt cue plays once on Rook and hands him back t
     CHECK(rig().player.currentState() == "Running"); // 6 m/s path, his gait's own choice
     CHECK(rig().player.currentLooping());
 }
+
+TEST_CASE("an autonomous react plays Crazy once and holds its crouch (the owner's ruling)",
+          "[motion][semantics][benchmark]") {
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
+    const scene::CompositionNode* node = engine.composition()->findNode("rook");
+    REQUIRE(node != nullptr);
+    const auto rig = [&]() -> const scene::SkinnedRig& { return engine.composition()->scene().rigs.at(node->rigs.front()); };
+    entity::ActionDesc react;
+    react.kind = entity::ActionKind::Pose;
+    react.activity = "react";
+    react.duration = 6.0;
+    testsupport::stepFrames(engine, 60);
+    REQUIRE(engine.composition()->entityWorld().direct("rook", {react}, 1.0));
+    testsupport::stepFrames(engine, 60 * 4, 1.0); // to 5 s: Crazy (2.63 s) is over
+    REQUIRE(rig().player.currentState() == "Crazy");
+    CHECK_FALSE(rig().player.currentLooping());
+    CHECK(rig().player.finished(rig().clips, 5.0));
+    SECTION("control: a clip that closes still loops for the same body") {
+        entity::ActionDesc idle = react;
+        idle.activity = "idle";
+        REQUIRE(engine.composition()->entityWorld().direct("rook", {idle}, 5.0));
+        testsupport::stepFrames(engine, 60 * 4, 5.0);
+        REQUIRE(rig().player.currentState() == "Idle");
+        CHECK(rig().player.currentLooping());
+    }
+}

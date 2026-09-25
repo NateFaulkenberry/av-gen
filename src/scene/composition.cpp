@@ -1896,11 +1896,21 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     if (state.clipOwned) {
         return;
     }
+    // ADR-827, the owner's ruling (2026-09-25): an autonomous body plays its clips as they measure
+    // (ADR-821) -- one that does not close plays once and holds its last frame. `react` on `Crazy`
+    // ends in its crouch instead of starting the fit again; `Landing` ends standing. Every clip whose
+    // end joins its start loops exactly as before. Unmeasured (no rig table): the state's default.
+    std::optional<bool> loop;
+    if (const ClipSemanticsTable* table = owner_.clipSemanticsFor(node_)) {
+        if (const ClipSemantics* clip = table->find(want)) {
+            loop = clip->loops;
+        }
+    }
     // Unconditional every frame: the player treats a request for the state it is already in as a
     // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
     // reproducible (ADR-086).
-    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate);
+    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate, /*rebase=*/false, loop);
 }
 
 // ADR-300. The other four fields.
