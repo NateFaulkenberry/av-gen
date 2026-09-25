@@ -58,6 +58,7 @@ constexpr std::array<ArmName, 20> kArms{{
     {"director-accept", UiScriptArm::DirectorAccept},
     {"director-record", UiScriptArm::DirectorRecord},
     {"viewpoint", UiScriptArm::Viewpoint},
+    {"director-cancel", UiScriptArm::DirectorCancel},
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -325,6 +326,9 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
     }
     if (has(arms_, UiScriptArm::Slice)) {
         stepSlice(engine, *panel, window, frame);
+    }
+    if (panel != nullptr && has(arms_, UiScriptArm::DirectorCancel)) {
+        stepDirectorCancel(engine, *panel, window, frame);
     }
     if (panel != nullptr && has(arms_, UiScriptArm::DirectorRecord)) {
         stepDirectorRecord(engine, *panel, window, frame);
@@ -1638,6 +1642,62 @@ void UiScript::stepDirectorRecord(Engine& engine, ui::ControlPanel& panel, platf
         check(history.undoSize() == directorUndoBefore_, "Cmd+Z took it back");
         check(engine.directingPlans().empty(), "the plan is gone with it");
         check(engine.sequence().toJson().dump() == directorSequenceBefore_, "the sequence is as it was");
+    }
+}
+
+void UiScript::stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platform::Window& window,
+                                  std::uint64_t frame) {
+    ui::DirectorPanel& director = panel.director;
+    if (frame == 4 || frame == 5) {
+        if (bool* slot = panel.layout().slot("Director"); slot != nullptr) {
+            *slot = true;
+        }
+        ImGui::SetWindowFocus("Director");
+        return;
+    }
+    if (director.plane == nullptr || director.edits == nullptr) {
+        if (frame == 60) {
+            check(false, "the Director panel has no control plane or history; THIS ARM TESTED NOTHING");
+        }
+        return;
+    }
+    const auto task = director.plane->currentTask();
+    const auto press = [&](const ui::DirectorPanel::Rect& r, std::uint64_t start) {
+        if (!r.valid) {
+            return;
+        }
+        if (frame >= start && frame < start + 6) {
+            warpAndMove(window, r.cx(), r.cy());
+        } else if (frame == start + 6) {
+            pushButton(window, r.cx(), r.cy(), true);
+        } else if (frame == start + 8) {
+            pushButton(window, r.cx(), r.cy(), false);
+        }
+    };
+    const auto tier = [&] {
+        const auto p = task ? task->proposal() : std::nullopt;
+        return p ? p->plan.value("tier", std::string()) : std::string();
+    };
+    if (frame == 60) {
+        directorUndoBefore_ = director.edits->history().undoSize();
+        directorSequenceBefore_ = engine.sequence().toJson().dump();
+        check(tier() == "goal", "a live proposal is waiting");
+    }
+    press(director.buttons().record, 80);
+    if (frame == 110) {
+        check(director.recording(), "the recording is running");
+        check(director.buttons().cancelRecording.valid, "Cancel recording is drawn and in view");
+    }
+    press(director.buttons().cancelRecording, 120);
+    if (frame == 400) {
+        check(!director.recording(), "the recording stopped");
+        check(director.status() == "recording cancelled; the proposal is as it was",
+              fmt::format("the panel says it was cancelled: \"{}\"", director.status()));
+        check(tier() == "goal", "the proposal is still the live one");
+        check(task != nullptr && task->state() == ai::TaskState::AwaitingApproval, "it is still waiting");
+        check(director.edits->history().undoSize() == directorUndoBefore_ &&
+                  engine.sequence().toJson().dump() == directorSequenceBefore_,
+              "nothing in the project changed");
     }
 }
 

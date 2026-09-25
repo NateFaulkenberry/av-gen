@@ -105,7 +105,7 @@ Result<RecordReport> recordFromCopy(const std::filesystem::path& copy, const dir
     const SceneFacts facts = sceneFactsFor(**scratch);
     for (std::size_t i = 0; i < compilation.plan.performances.size(); ++i) {
         const PlanPerformance& p = compilation.plan.performances[i];
-        if (p.mode != PerformanceMode::Goal || p.recording || compilation.validation.isBlocked(p.key)) {
+        if (p.mode == PerformanceMode::Scripted || p.recording || compilation.validation.isBlocked(p.key)) {
             continue;
         }
         Window w;
@@ -122,7 +122,9 @@ Result<RecordReport> recordFromCopy(const std::filesystem::path& copy, const dir
                 w.events.push_back(p.beats[b].emits);
             }
         }
-        w.until = last + options.maxSeconds; // shortened below to the last event heard
+        // Shortened below to the last event heard. A directed performance's orders raise none (only a
+        // go_to's arrival does), so without events it is recorded for a fixed tail after its last order.
+        w.until = last + (w.events.empty() ? options.ordersTailSeconds : options.maxSeconds);
         windows.push_back(std::move(w));
     }
     if (windows.empty()) {
@@ -457,6 +459,194 @@ ai::RecordingHook makeRecordingHook(RecordOptions options) {
     return [options](Engine& engine, const directing::Compilation& c) -> Result<std::shared_ptr<ai::RecordingHandle>> {
         auto handle = std::make_shared<JobHandle>();
         if (auto r = handle->job.start(engine, c, options); !r) {
+            return std::unexpected(r.error());
+        }
+        return handle;
+    };
+}
+
+Result<WatchReport> watchFromCopy(const std::filesystem::path& copy, double untilSeconds,
+                                  const std::atomic<bool>* cancel, const RecordProgress& progress) {
+    const auto start = std::chrono::steady_clock::now();
+    if (progress) {
+        progress("loading a scratch copy of the project");
+    }
+    auto scratch = loadCopy(copy);
+    if (!scratch) {
+        return std::unexpected(scratch.error());
+    }
+    Engine& engine = **scratch;
+    WatchReport report;
+    report.untilSeconds = untilSeconds;
+    std::uint64_t lastSequence = 0;
+    bool any = false;
+    // ADR-768: the runtime candidate shots -- every span a camera took the frame for a running
+    // scenario, as "camera/<its name>" with the scenario as its subject.
+    std::optional<directing::ObservedEvent> openCamera;
+    const auto closeCamera = [&](double t) {
+        if (openCamera) {
+            openCamera->endSeconds = t;
+            report.events.push_back(std::move(*openCamera));
+            openCamera.reset();
+        }
+    };
+    const auto lastFrame = static_cast<std::uint64_t>(std::ceil(untilSeconds * 60.0));
+    for (std::uint64_t f = 0; f <= lastFrame; ++f) {
+        if (cancel != nullptr && cancel->load()) {
+            return fail("watch: cancelled");
+        }
+        frame(engine, f);
+        if (progress && f % 60 == 0) {
+            progress(fmt::format("watching: {:.0f} of {:.0f} s, {} event(s) so far", static_cast<double>(f) / 60.0,
+                                 untilSeconds, report.events.size()));
+        }
+        const double now = static_cast<double>(f) / 60.0;
+        const scene::ActiveCameraState& active = engine.composition()->activeCamera();
+        const bool eventCamera = active.reason == scene::ActiveCameraReason::Event;
+        const std::string cameraName = "camera/" + active.name;
+        if (openCamera && (!eventCamera || openCamera->name != cameraName)) {
+            closeCamera(now);
+        }
+        if (eventCamera && !openCamera) {
+            openCamera = directing::ObservedEvent{cameraName, active.eventName, now, 0.0};
+        }
+        const entity::EntityWorld& world = engine.composition()->entityWorld();
+        for (const entity::WorldEvent& e : world.worldEvents()) {
+            if (any && e.sequence <= lastSequence) {
+                continue; // heard already: the window keeps the last 60 s
+            }
+            any = true;
+            lastSequence = e.sequence;
+            directing::ObservedEvent o;
+            o.name = std::string(world.eventName(e.type));
+            o.seconds = e.time;
+            if (e.source < world.entities().size()) {
+                o.subject = world.entities()[e.source]->name();
+            }
+            report.events.push_back(std::move(o));
+        }
+    }
+    closeCamera(untilSeconds);
+    std::stable_sort(report.events.begin(), report.events.end(),
+                     [](const directing::ObservedEvent& a, const directing::ObservedEvent& b) { return a.seconds < b.seconds; });
+    report.watchMs = since(start);
+    log::info("director watch: {} event(s) in {:.0f} s of film, watched in {:.0f} ms", report.events.size(),
+              untilSeconds, report.watchMs);
+    return report;
+}
+
+Result<WatchReport> watchWorldEvents(Engine& live, double untilSeconds) {
+    auto copy = writeRecordingCopy(live, {});
+    if (!copy) {
+        return std::unexpected(copy.error());
+    }
+    auto report = watchFromCopy(*copy, untilSeconds);
+    std::error_code ec;
+    std::filesystem::remove(*copy, ec);
+    return report;
+}
+
+nlohmann::json observationJson(const WatchReport& report) {
+    nlohmann::json events = nlohmann::json::array();
+    for (const directing::ObservedEvent& e : report.events) {
+        nlohmann::json o{{"name", e.name}, {"seconds", e.seconds}};
+        if (!e.subject.empty()) {
+            o["subject"] = e.subject;
+        }
+        if (e.endSeconds > e.seconds) {
+            o["end"] = e.endSeconds;
+        }
+        events.push_back(std::move(o));
+    }
+    return {{"events", std::move(events)}, {"until", report.untilSeconds}};
+}
+
+namespace {
+
+// A watch on a thread of its own, answering JSON (ADR-767).
+class WatchHandle final : public ai::DeferredResult {
+public:
+    ~WatchHandle() override {
+        cancel_ = true;
+        if (thread_.joinable()) {
+            thread_.join();
+        }
+        std::error_code ec;
+        std::filesystem::remove(copy_, ec);
+    }
+    Result<void> start(Engine& live, double until, const std::filesystem::path& dir) {
+        auto copy = writeRecordingCopy(live, dir);
+        if (!copy) {
+            return std::unexpected(copy.error());
+        }
+        copy_ = *copy;
+        thread_ = std::thread([this, until] {
+            auto r = watchFromCopy(copy_, until, &cancel_, [this](const std::string& p) {
+                std::lock_guard lock(mutex_);
+                phase_ = p;
+            });
+            std::lock_guard lock(mutex_);
+            result_ = std::move(r);
+            done_ = true;
+        });
+        return {};
+    }
+    [[nodiscard]] bool done() const override { return done_.load(); }
+    [[nodiscard]] std::string phase() const override {
+        std::lock_guard lock(mutex_);
+        return phase_;
+    }
+    [[nodiscard]] Result<nlohmann::json> take() override {
+        if (thread_.joinable()) {
+            thread_.join();
+        }
+        std::lock_guard lock(mutex_);
+        if (!result_) {
+            return fail("the watch has not finished");
+        }
+        if (!*result_) {
+            return std::unexpected(result_->error());
+        }
+        // A digest of the names for the model to plan with, and the observation to plan on.
+        std::map<std::string, int> counts;
+        for (const directing::ObservedEvent& e : (*result_)->events) {
+            ++counts[e.name + (e.subject.empty() ? std::string() : " by " + e.subject)];
+        }
+        nlohmann::json kinds = nlohmann::json::object();
+        for (const auto& [k, n] : counts) {
+            kinds[k] = n;
+        }
+        // ADR-768: the runtime cameras' claims, as candidate shots a plan can adopt (rig + times) or
+        // must yield to (an unlocked shot over one loses the frame to it).
+        nlohmann::json candidates = nlohmann::json::array();
+        for (const directing::ObservedEvent& e : (*result_)->events) {
+            if (e.name.rfind("camera/", 0) == 0 && e.endSeconds > e.seconds) {
+                candidates.push_back({{"camera", e.name.substr(7)}, {"scenario", e.subject}, {"from", e.seconds},
+                                      {"until", e.endSeconds}});
+            }
+        }
+        return nlohmann::json{{"observation", observationJson(**result_)}, {"kinds", std::move(kinds)},
+                              {"runtimeShots", std::move(candidates)},
+                              {"conditions", "a play from zero, audio off, every body simulated"}};
+    }
+    void cancel() override { cancel_ = true; }
+
+private:
+    std::thread thread_;
+    std::atomic<bool> cancel_{false};
+    std::atomic<bool> done_{false};
+    mutable std::mutex mutex_;
+    std::string phase_;
+    std::optional<Result<WatchReport>> result_;
+    std::filesystem::path copy_;
+};
+
+} // namespace
+
+ai::WatchHook makeWatchHook(std::filesystem::path scratchDir) {
+    return [scratchDir](Engine& engine, double until) -> Result<std::shared_ptr<ai::DeferredResult>> {
+        auto handle = std::make_shared<WatchHandle>();
+        if (auto r = handle->start(engine, until, scratchDir); !r) {
             return std::unexpected(r.error());
         }
         return handle;

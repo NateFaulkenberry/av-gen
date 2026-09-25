@@ -124,6 +124,7 @@ void ControlPlane::setContentRoots(std::vector<std::filesystem::path> roots) {
 }
 
 void ControlPlane::setRecordingHook(RecordingHook hook) { orchestrator_.setRecordingHook(std::move(hook)); }
+void ControlPlane::setWatchHook(WatchHook hook) { orchestrator_.setWatchHook(std::move(hook)); }
 
 void ControlPlane::setPerformanceSource(PerformanceSource source) {
     orchestrator_.setPerformanceSource(std::move(source));

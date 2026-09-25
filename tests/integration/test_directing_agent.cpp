@@ -17,6 +17,8 @@
 #include "support/project_round_trip.hpp"
 #include "world/hero.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
@@ -280,7 +282,10 @@ TEST_CASE("the Director tools declare themselves honestly", "[directing][agent][
         CHECK_FALSE(tool->definition.annotations.mutatesProject);
         ++count;
     }
-    CHECK(count == 8); // ADR-765 added director.record_plan
+    CHECK(count == 9); // ADR-765 added director.record_plan, ADR-767 director.watch_events
+    const ai::Tool* watch = registry.find("director.watch_events");
+    REQUIRE(watch != nullptr);
+    CHECK_FALSE(watch->definition.annotations.requiresApproval); // it only looks
     const ai::Tool* propose = registry.find("director.propose_plan");
     REQUIRE(propose != nullptr);
     CHECK(propose->definition.annotations.requiresApproval);
@@ -299,6 +304,7 @@ TEST_CASE("the Director tools declare themselves honestly", "[directing][agent][
 
 TEST_CASE("the assistant asks for a recording; the host records, and the person approves the recorded plan",
           "[directing][agent][record]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // ADR-765: `director.record_plan` goes through the host's hook and the approval gate. The
     // ScriptedProvider stands in for the model; every tool and the recorder are real.
     Session s;
@@ -351,4 +357,48 @@ TEST_CASE("the assistant asks for a recording; the host records, and the person 
         REQUIRE(s.edits.execute(app::EditAction::Undo, s.engine));
         CHECK(s.engine.sequence().toJson() == sequenceBefore);
     }
+}
+
+TEST_CASE("event-driven: the assistant watches the film, proposes on what happens in it, and the person approves",
+          "[directing][agent][events]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
+    // ADR-767. The model never copies a time: it watches, then writes {"event": ...}; the tool
+    // attaches the observation it got, and the plan's times are placed from that.
+    Session s;
+    REQUIRE(s.engine.loadProject(fs::path(AVGEN_SOURCE_DIR) / "examples/world/glowmere-valley-2-multicam.json"));
+    s.plane.setWatchHook(app::makeWatchHook());
+    const json plan = json::parse(R"({"schemaVersion": 1, "id": "beams", "title": "Mark the second beam", "tier": "baked",
+        "subjects": [{"alias": "visitor", "text": "the visitor", "hint": "hero"}],
+        "markers": [{"key": "beam2", "name": "second beam", "at": {"event": "abduction/beam", "subject": "visitor", "occurrence": 2}}]})");
+    s.script({ai::ScriptedTurn{"Watching the first half-minute for what the saucer does.",
+                               {call("w1", "director.watch_events", json{{"untilSeconds", 30}})}, ai::StopReason::EndTurn, {}},
+              ai::ScriptedTurn{"It beams twice; marking the second.", {call("p1", "director.propose_plan", json{{"plan", plan}})},
+                               ai::StopReason::EndTurn, {}},
+              ai::ScriptedTurn{"Marked; approve to apply.", {}, ai::StopReason::EndTurn, {}}});
+    auto task = s.plane.submit("Put a marker on the second time the saucer beams someone up");
+    REQUIRE(s.runUntil(task, ai::TaskState::AwaitingApproval, 180.0));
+    const json watched = s.resultOf("w1")["result"];
+    INFO(watched.dump().substr(0, 400));
+    REQUIRE(watched.contains("observation"));
+    double second = -1.0;
+    int beams = 0;
+    for (const json& e : watched["observation"]["events"]) {
+        if (e["name"] == "abduction/beam" && e.value("subject", "") == "visitor" && ++beams == 2) {
+            second = e["seconds"].get<double>();
+        }
+    }
+    REQUIRE(second > 0.0);
+    const auto proposal = task->proposal();
+    REQUIRE(proposal);
+    CHECK(proposal->plan.contains("observation")); // attached for the model, and kept as the times' source
+    CHECK(proposal->diff.find("second beam") != std::string::npos);
+
+    REQUIRE(s.plane.approveCurrentTask());
+    CHECK(task->outcome().success);
+    const auto& markers = s.engine.sequence().markers;
+    const auto m = std::find_if(markers.begin(), markers.end(), [](const seq::Marker& x) { return x.name == "second beam"; });
+    REQUIRE(m != markers.end());
+    CHECK(m->timeSeconds == second);
+    REQUIRE(s.engine.directingPlans().size() == 1);
+    CHECK(s.engine.directingPlans()[0].observation.has_value());
 }

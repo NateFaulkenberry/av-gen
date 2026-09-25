@@ -119,6 +119,8 @@ enum class UiScriptArm : std::uint32_t {
     // seeks, and checks on every frame that what is on screen is still exactly the pose the drag
     // left -- naming the frame, the second and the film's camera the first time it is not.
     Viewpoint = 1u << 19,
+    // Record, then Cancel recording while it runs: the recording stops and the proposal is untouched.
+    DirectorCancel = 1u << 20,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -192,6 +194,7 @@ private:
     std::size_t viewpointFramesHeld_ = 0;
     std::size_t viewpointFramesMoved_ = 0;
     float viewpointWorstDrift_ = 0.0f;
+    void stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
 
     std::vector<std::string> editLog_;
     std::size_t sliceShotsBefore_ = 0;

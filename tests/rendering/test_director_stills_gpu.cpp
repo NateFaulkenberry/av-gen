@@ -14,6 +14,8 @@
 #include "scene/composition.hpp"
 #include "support/project_round_trip.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -45,6 +47,7 @@ double meanAbsDifference(const gpu::Image8& a, const gpu::Image8& b) {
 
 TEST_CASE("a proposal's stills come from a scratch copy with it installed, and leave the project alone",
           "[directing][stills]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     log::init(log::Level::Warn);
     auto ctx = gpu::Context::create(gpu::ContextDesc{});
     if (!ctx) {
@@ -105,6 +108,7 @@ TEST_CASE("a proposal's stills come from a scratch copy with it installed, and l
 
 TEST_CASE("the stills session keeps the editor's frames short, reuses its scratch copy, and rebuilds it on a new key",
           "[directing][stills]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     log::init(log::Level::Warn);
     auto ctx = gpu::Context::create(gpu::ContextDesc{});
     if (!ctx) {

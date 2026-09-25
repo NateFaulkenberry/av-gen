@@ -116,6 +116,92 @@ void validateGoalPerformance(Collector& c, const Plan& plan, std::size_t i, cons
     }
 }
 
+// ADR-766: a directed performance -- orders at seconds, carried out by the character.
+template <typename KindOf, typename IdOf>
+void validateDirectedPerformance(Collector& c, const Plan& plan, std::size_t i, const CharacterCard& card,
+                                 const SceneFacts& facts, const PlanTimes& times, const KindOf& kindOf,
+                                 const IdOf& idOf) {
+    const PlanPerformance& p = plan.performances[i];
+    const std::string at = fmt::format("/performances/{}", i);
+    if (p.beats.empty()) {
+        c.error(IssueCode::SchemaInvalid, p.key, at + "/beats", "a directed performance needs at least one order");
+    }
+    for (std::size_t b = 0; b < p.beats.size(); ++b) {
+        const PerformanceBeat& beat = p.beats[b];
+        const std::string where = fmt::format("{}/beats/{}", at, b);
+        const auto verb = directedBeat(beat.action, card);
+        if (!verb) {
+            std::vector<std::string> words = {"face", "approach", "go_to", "interact", "release"};
+            for (const ActivityCapability& a : card.activities) {
+                if (a.available) {
+                    words.push_back(a.activity);
+                }
+            }
+            Issue& issue = c.error(IssueCode::Unsupported, p.key, where + "/action",
+                                   fmt::format("'{}' is not an order {} can be given", beat.action, card.subject));
+            issue.suggestions = text::nearest(beat.action, words);
+            continue;
+        }
+        const SubjectKind tk = beat.target.empty() ? SubjectKind::Unresolved : kindOf(beat.target);
+        switch (verb->verb) {
+        case DirectedVerb::Face:
+        case DirectedVerb::Approach:
+            if (beat.target.empty()) {
+                c.error(IssueCode::SchemaInvalid, p.key, where + "/target", fmt::format("'{}' needs a target", beat.action));
+            } else if (tk != SubjectKind::Unresolved && tk != SubjectKind::Entity) {
+                Issue& issue = c.error(IssueCode::Unsupported, p.key, where + "/target",
+                                       fmt::format("'{}' is directed at characters; '{}' is a {}", beat.action,
+                                                   idOf(beat.target), subjectKindName(tk)));
+                issue.suggestions = {"go_to a place instead"};
+            } else if (idOf(beat.target) == card.subject) {
+                c.error(IssueCode::SchemaInvalid, p.key, where + "/target", "a character cannot be directed at itself");
+            }
+            break;
+        case DirectedVerb::GoTo:
+            if (beat.target.empty()) {
+                c.error(IssueCode::SchemaInvalid, p.key, where + "/target", "'go_to' needs a place");
+            } else if (tk != SubjectKind::Unresolved && facts.place(idOf(beat.target)) == nullptr &&
+                       tk != SubjectKind::Entity) {
+                c.error(IssueCode::SpatialInfeasible, p.key, where + "/target",
+                        fmt::format("'{}' is not a place a character can go to", idOf(beat.target)));
+            } else if (!card.goalSlot) {
+                c.error(IssueCode::CapabilityUnavailable, p.key, where + "/action",
+                        fmt::format("'go_to' a place is carried out by {}'s goal considerer, and it has none",
+                                    card.subject));
+            }
+            break;
+        case DirectedVerb::Interact:
+            if (beat.target.empty()) {
+                c.error(IssueCode::SchemaInvalid, p.key, where + "/target",
+                        "'interact' needs the prop and its verb, as 'lamp.light'");
+            }
+            break;
+        case DirectedVerb::Pose:
+        case DirectedVerb::Release:
+            break;
+        }
+        // The only event a directed order raises is the one its goal raises: a go_to's arrival.
+        if (!beat.emits.empty() && verb->verb != DirectedVerb::GoTo) {
+            Issue& issue = c.error(IssueCode::Unsupported, p.key, where + "/emits",
+                                   fmt::format("a '{}' order raises no named event to hang things on", beat.action));
+            issue.suggestions = {"emit from a go_to (its arrival)", "use a scripted performance, whose events are computed"};
+        }
+        if (!beat.moment.empty() && (verb->verb != DirectedVerb::GoTo ||
+                                     std::find(std::begin(kGoalMoments), std::end(kGoalMoments), beat.moment) ==
+                                         std::end(kGoalMoments))) {
+            c.error(IssueCode::SchemaInvalid, p.key, where + "/moment", "only a go_to names a moment: 'arrived' or 'done'");
+        }
+        if (!goalBeatTime(plan, i, b, times)) {
+            Issue& issue = c.error(IssueCode::SchemaInvalid, p.key, where + "/at",
+                                   b == 0 ? "a directed performance needs a start: give its first order a time, or a "
+                                            "shot of the same subject"
+                                          : "each order after the first needs its own time: when the last one is done "
+                                            "is the character's to decide");
+            issue.suggestions = {"\"at\" on the order"};
+        }
+    }
+}
+
 // "/shots/2/start" -> the key of shots[2]. How a time or subject issue finds the item it blocks.
 std::string itemAt(const Plan& plan, std::string_view location) {
     const auto index = [&](std::string_view prefix) -> std::optional<std::size_t> {
@@ -532,7 +618,34 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         } else if (!v.isBlocked(shot.key)) {
             planned.emplace_back(*start, end);
         }
-        if (eventCameras && !shot.locked && !v.isBlocked(shot.key)) {
+        // ADR-768: precedence between this authored shot and the runtime cameras. Watched, it is
+        // exact -- which camera, which scenario, which seconds; unwatched, it is the possibility.
+        const bool watchedThrough = plan.observation && end <= plan.observation->second + 1e-6;
+        if (watchedThrough && !v.isBlocked(shot.key)) {
+            for (const ObservedEvent& span : plan.observation->first) {
+                if (span.name.rfind("camera/", 0) != 0 || span.endSeconds <= span.seconds ||
+                    span.seconds >= end - 1e-6 || span.endSeconds <= *start + 1e-6) {
+                    continue;
+                }
+                const std::string camera = span.name.substr(7);
+                if (shot.locked) {
+                    Issue& issue = c.add(Severity::Info, IssueCode::CameraConflict, shot.key, at + "/locked",
+                                         fmt::format("locked: this shot keeps the frame from '{}' ({}, {:.2f}-{:.2f}s)",
+                                                     camera, span.subject, span.seconds, span.endSeconds));
+                    issue.details = {{"camera", camera}, {"scenario", span.subject}, {"from", span.seconds},
+                                     {"until", span.endSeconds}, {"winner", "authored"}};
+                } else {
+                    Issue& issue = c.warning(IssueCode::CameraConflict, shot.key, at + "/locked",
+                                             fmt::format("'{}' takes the frame {:.2f}-{:.2f}s during this shot (its "
+                                                         "scenario '{}' runs then, in the watched film)",
+                                                         camera, span.seconds, span.endSeconds, span.subject));
+                    issue.details = {{"camera", camera}, {"scenario", span.subject}, {"from", span.seconds},
+                                     {"until", span.endSeconds}, {"winner", "runtime"}};
+                    issue.suggestions = {"lock the shot (\"locked\": true) to keep the frame",
+                                         fmt::format("or adopt it: a shot on rig '{}' at those seconds", camera)};
+                }
+            }
+        } else if (eventCameras && !shot.locked && !v.isBlocked(shot.key)) {
             Issue& issue = c.warning(IssueCode::CameraConflict, shot.key, at + "/locked",
                                      "an event camera in this scene can take the frame during this shot");
             for (const scene::CameraRig& r : facts.staged.cameras.cameras) {
@@ -602,6 +715,16 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             } else if (actor->id != card->subject) {
                 c.error(IssueCode::SchemaInvalid, p.key, at + "/recording",
                         fmt::format("the recording is of '{}', not '{}'", actor->id, card->subject));
+            }
+            continue;
+        }
+        if (p.mode == PerformanceMode::Directed) {
+            validateDirectedPerformance(c, plan, i, *card, facts, v.times, kindOf, idOf);
+            for (std::size_t o = 0; o < i; ++o) {
+                if (plan.performances[o].subject == p.subject) {
+                    c.error(IssueCode::TimingConflict, p.key, at,
+                            fmt::format("performance '{}' already directs {}", plan.performances[o].key, card->subject));
+                }
             }
             continue;
         }
@@ -977,10 +1100,10 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             continue;
         }
         const std::size_t index = static_cast<std::size_t>(p - plan.performances.data());
-        if (p->mode == PerformanceMode::Goal && !p->recording) {
+        if (p->mode != PerformanceMode::Scripted && !p->recording) {
             Issue& issue = c.error(IssueCode::Unsupported, r.key, at + "/performance",
-                                   fmt::format("slowing '{}' needs its motion to be known, and a goal's is live until "
-                                               "it is recorded",
+                                   fmt::format("slowing '{}' needs its motion to be known, and a live performance's "
+                                               "is not until it is recorded",
                                                p->key));
             issue.suggestions = {"record the performance first"};
             continue;

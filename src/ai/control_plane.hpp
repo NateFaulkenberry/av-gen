@@ -116,6 +116,8 @@ public:
     void setPerformanceSource(PerformanceSource source);
     // ADR-765: the host's recorder, for `director.record_plan`. Unset: the tool says it is unavailable.
     void setRecordingHook(RecordingHook hook);
+    // ADR-767: the host's watcher, for `director.watch_events`.
+    void setWatchHook(WatchHook hook);
     // Where projects live, for the project life-cycle tools.
     void setProjectsRoot(std::filesystem::path root);
     // Directories the assistant may read content from.

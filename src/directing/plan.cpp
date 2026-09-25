@@ -426,6 +426,20 @@ json Plan::toJson() const {
         producedJson.push_back(std::move(o));
     }
     j["produced"] = std::move(producedJson);
+    if (observation) {
+        json events = json::array();
+        for (const ObservedEvent& e : observation->first) {
+            json o{{"name", e.name}, {"seconds", e.seconds}};
+            if (!e.subject.empty()) {
+                o["subject"] = e.subject;
+            }
+            if (e.endSeconds > e.seconds) {
+                o["end"] = e.endSeconds;
+            }
+            events.push_back(std::move(o));
+        }
+        j["observation"] = {{"events", std::move(events)}, {"until", observation->second}};
+    }
     return j;
 }
 
@@ -626,6 +640,19 @@ PlanParse parsePlan(const json& document) {
             plan.retimes.push_back(std::move(retime));
         });
 
+        if (const json* obs = r.raw("observation"); obs != nullptr && obs->is_object()) {
+            std::vector<ObservedEvent> events;
+            if (const auto ev = obs->find("events"); ev != obs->end() && ev->is_array()) {
+                for (const json& e : *ev) {
+                    if (e.is_object()) {
+                        events.push_back(ObservedEvent{e.value("name", std::string()), e.value("subject", std::string()),
+                                                       e.value("seconds", 0.0), e.value("end", 0.0)});
+                    }
+                }
+            }
+            plan.observation = std::make_pair(std::move(events), obs->value("until", 0.0));
+        }
+
         forEach(r, "produced", issues, [&](Reader& p, std::size_t) {
             ContentRef ref;
             ref.item = p.string("item", true);
@@ -733,7 +760,10 @@ json planSchema() {
         {"oneOf", json::array({"a string: \"1:30\", \"90s\", \"bar 64 beat 3\", \"the second chorus\", \"end of the bridge\", \"chorus 2 + 1.5s\"",
                                json{{"seconds", "number"}},
                                json{{"bar", "integer >= 1"}, {"beat", "integer >= 1"}},
-                               json{{"section", "type, e.g. chorus"}, {"occurrence", "1-based; -1 = last"}, {"anchor", "start|end"}}})},
+                               json{{"section", "type, e.g. chorus"}, {"occurrence", "1-based; -1 = last"}, {"anchor", "start|end"}},
+                               json{{"event", "a world event from director.watch_events, e.g. abduction/beam"},
+                                    {"subject", "who raised it, optional"}, {"occurrence", "1-based; -1 = last"},
+                                    {"offsetSeconds", "number, optional"}}})},
         {"note", "never convert musical time to seconds yourself; write what was asked"}};
     return {
         {"schemaVersion", kPlanSchemaVersion},
@@ -764,7 +794,8 @@ json planSchema() {
                                  {"field", "the effect's field; omit to activate it"}, {"at", time}, {"on", "a plan event"},
                                  {"until", time}, {"holdSeconds", "number"}, {"value", "number"}, {"rampSeconds", "number"}}})},
           {"retimes", json::array({{{"key", "unique"}, {"performance", "key"}, {"from", time}, {"until", time}, {"factor", "> 0"}}})},
-          {"produced", "set by the engine; never write it"}}},
+          {"produced", "set by the engine; never write it"},
+          {"observation", "copy director.watch_events' observation here when any time is {\"event\": ...}"}}},
         {"rules",
          {"a cue names exactly one of parameter or effect, and starts either at a time or on a plan event",
           "never ask for a capability the subject does not list; the validator refuses it and says what exists",

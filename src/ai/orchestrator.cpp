@@ -108,6 +108,16 @@ std::optional<ToolContext::Proposal> AgentTask::proposal() const {
     return proposal_;
 }
 
+nlohmann::json AgentTask::observation() const {
+    const std::lock_guard lock(mutex_);
+    return observation_;
+}
+
+void AgentTask::setObservation(nlohmann::json observation) {
+    const std::lock_guard lock(mutex_);
+    observation_ = std::move(observation);
+}
+
 void AgentTask::setProposal(ToolContext::Proposal proposal) {
     const std::lock_guard lock(mutex_);
     proposal_ = std::move(proposal);
@@ -142,6 +152,7 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
                                             ChangeLog& changes) {
     ToolResult result;
     std::shared_ptr<RecordingHandle> deferred;
+    std::shared_ptr<DeferredResult> answer;
     const bool ran = queue_->run(
         [&] {
             ToolContext ctx(*engine_);
@@ -158,6 +169,10 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             if (recordingHook_) {
                 ctx.setRecordingHook(recordingHook_);
             }
+            if (watchHook_) {
+                ctx.setWatchHook(watchHook_);
+            }
+            ctx.setObservation(task.observation());
             ctx.onProgress = [&task, &call](float fraction, const std::string& note) {
                 Activity a;
                 a.kind = ActivityKind::ToolProgress;
@@ -176,6 +191,7 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
                 task.setProposal(*ctx.proposal());
             }
             deferred = ctx.deferredProposal();
+            answer = ctx.deferredResult();
         },
         task.cancel());
     if (!ran) {
@@ -183,6 +199,33 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
                                    fmt::format("'{}' did not run: the task was cancelled or the "
                                                "application did not service it in time",
                                                call.name));
+    }
+    if (answer) {
+        // ADR-767: the tool started work that answers (a watch). Waited for here, off the main thread.
+        std::string last;
+        while (!answer->done()) {
+            if (task.cancel().cancelled()) {
+                answer->cancel();
+            }
+            if (const std::string phase = answer->phase(); phase != last) {
+                last = phase;
+                Activity a;
+                a.kind = ActivityKind::ToolProgress;
+                a.title = call.name;
+                a.detail = phase;
+                task.append(std::move(a));
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        }
+        auto value = answer->take();
+        if (!value) {
+            return ToolResult::failure(ToolErrorCode::Internal, value.error().message);
+        }
+        if (value->contains("observation")) {
+            task.setObservation((*value)["observation"]);
+        }
+        const std::size_t count = value->contains("observation") ? (*value)["observation"]["events"].size() : 0;
+        return ToolResult::ok(*value, fmt::format("{} event(s) observed", count));
     }
     if (deferred) {
         // ADR-765: the tool started a recording. Waited for HERE, on the task's worker thread, so

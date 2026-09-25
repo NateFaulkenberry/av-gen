@@ -71,6 +71,7 @@ public:
         Rect reject;
         Rect stills;
         Rect record;
+        Rect cancelRecording;
     };
     [[nodiscard]] const Buttons& buttons() const { return buttons_; }
     [[nodiscard]] bool previewing() const { return !previewTask_.empty(); }
@@ -96,6 +97,7 @@ private:
     // ADR-765: the proposal's live performances, being recorded on a thread of their own.
     app::RecordingJob recording_;
     std::string recordingTask_;
+    bool cancelledRecording_ = false;
     std::string cachedDiff_; // the proposal's diff as last compiled: a revised proposal recompiles
 };
 

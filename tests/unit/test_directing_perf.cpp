@@ -40,6 +40,8 @@
 #include "support/project_round_trip.hpp"
 #include "ui/edit_history.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <fmt/format.h>
@@ -75,6 +77,7 @@ struct Minimum {
 } // namespace
 
 TEST_CASE("the Director's costs on the golden plans", "[.perf][directing]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     const fs::path dir = fs::path(AVGEN_SOURCE_DIR) / "tests/data/directing/golden";
     std::vector<fs::path> files;
     for (const auto& entry : fs::directory_iterator(dir)) {
@@ -166,6 +169,7 @@ TEST_CASE("the Director's costs on the golden plans", "[.perf][directing]") {
 
 TEST_CASE("what a preview seek costs on the benchmark, with and without a Director plan applied",
           "[.perf][directing][seek]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     // Spec §37's last item, measured now that ADR-800 is on main. As the coordinator asked: the
     // entity distance cull lifted (every body simulated, as an offline render has it) and no audio
     // (audio-reactive divergence, cause 2, is still open). One fresh engine per target, so the first

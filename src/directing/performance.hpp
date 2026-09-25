@@ -102,6 +102,29 @@ inline constexpr std::string_view kGoalMoments[] = {"arrived", "done"};
 [[nodiscard]] std::optional<double> goalBeatTime(const Plan& plan, std::size_t performance, std::size_t beat,
                                                  const PlanTimes& times);
 
+// ---- directed mode (ADR-766 on the Motion lead's ADR-824) ----------------------------------------
+//
+// A directed performance gives a character ORDERS at seconds: Director-tier actions it carries out
+// its own way (walking, turning, playing an activity), then hands back to its autonomy. Each beat
+// is one scheduled `EntityAction` sequence event, which ADR-824 applies inside the simulation at its
+// exact second on a play and on a scrub alike. Still live -- how the body does it is the
+// simulation's -- so a directed plan is baked, like a goal, only by recording it.
+enum class DirectedVerb : std::uint8_t {
+    Face,     // turn toward a character          -> seq verb "face" (EntityRef)
+    Approach, // walk to a character              -> "move" (EntityRef)
+    GoTo,     // walk to a place                  -> "goal" (a place is a landmark, not an entity)
+    Pose,     // play one of its activities       -> "pose" (the beat's action IS the activity name)
+    Interact, // use a prop's verb ("lamp.light") -> "interact"
+    Release,  // hand the body back to autonomy   -> "release"
+};
+struct DirectedBeat {
+    DirectedVerb verb = DirectedVerb::Pose;
+    std::string seqVerb;  // the section verb the event carries
+};
+// The directed reading of a beat's action: "face", "approach", "go_to", "interact", "release", or
+// any activity name the character's card lists (a pose). Nothing when it is none of these.
+[[nodiscard]] std::optional<DirectedBeat> directedBeat(std::string_view action, const CharacterCard& card);
+
 // A recorded performance's actor, parsed from the plan (ADR-763). Nothing when it does not parse.
 [[nodiscard]] std::optional<seq::Actor> recordedActor(const PerformanceRecording& recording);
 [[nodiscard]] nlohmann::json actorDocument(const seq::Actor& actor);

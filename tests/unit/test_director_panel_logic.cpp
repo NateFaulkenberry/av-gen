@@ -164,9 +164,31 @@ TEST_CASE("the Record button: only for a live proposal, and it holds Accept whil
     CHECK_FALSE(a.accept.enabled); // what would be accepted is about to change
     CHECK_FALSE(a.preview.enabled);
     CHECK(a.reject.enabled);       // declining is always possible
+    CHECK(a.cancelRecording.enabled);
+    CHECK_FALSE(panelActions(live).cancelRecording.enabled);
 
     PanelState stalePreview = live;
     stalePreview.previewing = true;
     stalePreview.previewIsNewest = false;
     CHECK_FALSE(panelActions(stalePreview).record.enabled);
+}
+
+TEST_CASE("an Info finding is said on its row but marks nothing", "[directing][panel]") {
+    directing::Plan plan;
+    plan.id = "p";
+    directing::PlanShot s;
+    s.key = "s";
+    s.name = "one";
+    plan.shots.push_back(s);
+    directing::Validation v;
+    directing::Issue kept;
+    kept.severity = directing::Severity::Info;
+    kept.item = "s";
+    kept.message = "locked: this shot keeps the frame from 'UFO Watch'";
+    v.issues.push_back(kept);
+    const auto rows = planItemRows(plan, v);
+    REQUIRE(rows.size() == 1);
+    CHECK(rows[0].mark == ItemMark::Ok);
+    REQUIRE(rows[0].lines.size() == 1);
+    CHECK(rows[0].lines[0] == kept.message);
 }

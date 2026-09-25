@@ -191,6 +191,11 @@ private:
     std::vector<Activity> activities_;
     TaskOutcome outcome_;
     std::optional<ToolContext::Proposal> proposal_;
+    nlohmann::json observation_; // ADR-767: the last watch's observation, for the tools that follow it
+public:
+    [[nodiscard]] nlohmann::json observation() const;
+    void setObservation(nlohmann::json observation);
+private:
     std::chrono::steady_clock::time_point started_ = std::chrono::steady_clock::now();
 };
 
@@ -203,6 +208,7 @@ public:
     void setTransactionSink(TransactionSink* sink) { sink_ = sink; }
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
     void setRecordingHook(RecordingHook hook) { recordingHook_ = std::move(hook); }
+    void setWatchHook(WatchHook hook) { watchHook_ = std::move(hook); }
     // Where `project.create` / `open` / `save_as` resolve a name. Empty means those tools refuse,
     // which is the right default: a session that never says where projects live should not have
     // one guessed for it.
@@ -239,6 +245,7 @@ private:
     TransactionSink* sink_ = nullptr;
     PerformanceSource performance_;
     RecordingHook recordingHook_;
+    WatchHook watchHook_;
     std::filesystem::path projectsRoot_;
     std::vector<std::filesystem::path> contentRoots_;
     TaskLimits limits_;

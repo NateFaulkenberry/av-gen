@@ -36,6 +36,7 @@ class Engine;
 struct RecordOptions {
     double tailSeconds = 1.0;     // kept after the last goal event, or after `maxSeconds`
     double maxSeconds = 40.0;     // the longest a goal is recorded for, from when it is given
+    double ordersTailSeconds = 6.0; // how long after its last order a performance with no events is kept
     double keyEverySeconds = 0.1; // the recording's key spacing (Linear keys; the body is exact on them)
     std::filesystem::path scratchDir;
     const std::atomic<bool>* cancel = nullptr; // polled every frame of every play
@@ -95,5 +96,24 @@ private:
 // ADR-765: the host's side of `director.record_plan`. Installed on the control plane by whoever owns
 // the editor (and by tests); each call starts a `RecordingJob` and hands the orchestrator a handle.
 [[nodiscard]] ai::RecordingHook makeRecordingHook(RecordOptions options = {});
+
+// ---- watching the film (ADR-767) -------------------------------------------------------------------
+//
+// Every world event a play of the project raises from zero to `untilSeconds` -- its name, when, and
+// who raised it -- on a scratch copy with no live control, no audio and the cull lifted (the recording
+// conditions), so what an event-driven plan is placed on is what the film does on its own.
+struct WatchReport {
+    std::vector<directing::ObservedEvent> events;
+    double untilSeconds = 0.0;
+    double watchMs = 0.0;
+};
+[[nodiscard]] Result<WatchReport> watchFromCopy(const std::filesystem::path& copy, double untilSeconds,
+                                                const std::atomic<bool>* cancel = nullptr,
+                                                const RecordProgress& progress = {});
+[[nodiscard]] Result<WatchReport> watchWorldEvents(Engine& live, double untilSeconds);
+// The observation a plan carries, as `director.watch_events` returns it.
+[[nodiscard]] nlohmann::json observationJson(const WatchReport& report);
+// ADR-767: the host's side of `director.watch_events`.
+[[nodiscard]] ai::WatchHook makeWatchHook(std::filesystem::path scratchDir = {});
 
 } // namespace avgen::app

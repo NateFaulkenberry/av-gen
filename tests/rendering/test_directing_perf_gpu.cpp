@@ -30,6 +30,8 @@
 #include "scene/composition.hpp"
 #include "support/project_round_trip.hpp"
 
+#include "support/project_assets.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <fmt/format.h>
@@ -45,6 +47,7 @@ using namespace avgen::directing;
 namespace fs = std::filesystem;
 
 TEST_CASE("the renderer's cost of the Director's golden plans", "[.perf][directing]") {
+    testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     log::init(log::Level::Warn);
     auto ctx = gpu::Context::create(gpu::ContextDesc{});
     if (!ctx) {
