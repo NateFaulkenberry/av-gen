@@ -264,10 +264,14 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
     if (m.lane[0].w <= 0.0f) {
         return 0.0f;
     }
-    // ADR-713: swell and turbulence, both the identity at their defaults.
+    // ADR-713: swell and turbulence -- the default on its own branch, as `shaders/fog.wgsl` has it
+    // (there it is load-bearing for byte identity; here it keeps the twin the same shape).
     const float swell = fogSwell(m, t);
-    glm::vec3 q = p;
     const float turbulence = std::clamp(m.lane[7].y, 0.0f, 1.0f);
+    if (swell == 1.0f && turbulence <= 0.0f) {
+        return fogShapeFrom(m, p, p - glm::vec3(m.lane[0]), t);
+    }
+    glm::vec3 q = p;
     if (turbulence > 0.0f) {
         const float reach0 = fogPrimitiveDistance(m, fogSwellOffset(m, p - glm::vec3(m.lane[0]), swell));
         if (reach0 > 1.35f + turbulence * fogTurbulenceReach(m) / std::min(swell, 1.0f)) {
@@ -275,7 +279,10 @@ float fogShapeAt(const MediumSlot& m, const glm::vec3& p, float t) {
         }
         q = p + fogTurbulence(m, p, t);
     }
-    const glm::vec3 rel = fogSwellOffset(m, q - glm::vec3(m.lane[0]), swell);
+    return fogShapeFrom(m, q, fogSwellOffset(m, q - glm::vec3(m.lane[0]), swell), t);
+}
+
+float fogShapeFrom(const MediumSlot& m, const glm::vec3& q, const glm::vec3& rel, float t) {
     const float rr = fogPrimitiveDistance(m, rel);
     if (rr > 1.35f) {
         return 0.0f;

@@ -665,6 +665,9 @@ inline constexpr float kFogTurbulenceGain = 1.3f;
 [[nodiscard]] glm::vec3 fogSemiAxes(const MediumSlot& m);
 [[nodiscard]] glm::vec3 fogTurbulence(const MediumSlot& m, const glm::vec3& p, float t);
 [[nodiscard]] float fogTurbulenceReach(const MediumSlot& m);
+// The field at the (possibly displaced) point `q` with primitive-frame offset `rel`: the pre-ADR-713
+// body of `fogShapeAt`, which calls it on both of its paths.
+[[nodiscard]] float fogShapeFrom(const MediumSlot& m, const glm::vec3& q, const glm::vec3& rel, float t);
 
 // ADR-714 (§25): height and distance colour. Luminance-preserving by construction: the tint moves
 // hue and saturation and leaves the luminance the density hierarchy set exactly where it was.

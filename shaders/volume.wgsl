@@ -422,10 +422,19 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
     // ADR-713: the turbulence displaces a sample by at most `amount` of each semi-axis
     // (`fogTurbulence` clamps the flow to length 1), so the support grows by exactly that --
     // horizontally by the longer of the two horizontal semi-axes, vertically by the vertical one.
+    //
+    // Added under a BRANCH, not as `+ 0.0 * reach`: the Metal compiler is free to re-associate a sum
+    // it is handed, and a bound that moves by an ULP moves the march's sample schedule with it -- a
+    // default bank rendered one pixel one level different until this was a branch. At turbulence 0
+    // these are the pre-ADR-713 expressions, evaluated on the same bits.
     let turbulence = clamp(mediaLane(s, 7u).y, 0.0, 1.0);
-    let semi = fogSemiAxes(f);
-    let rr = radius * breath * reach * 1.35 + turbulence * max(semi.x, semi.z);
-    let grow = turbulence * semi.y;
+    var rr = radius * breath * reach * 1.35;
+    var grow = 0.0;
+    if (turbulence > 0.0) {
+        let semi = fogSemiAxes(f);
+        rr = rr + turbulence * max(semi.x, semi.z);
+        grow = turbulence * semi.y;
+    }
 
     if (shape == kFogShapeBank) {
         // Solve `exp(-h * falloff) = 0.01`: 1% of the column left outside, which is below what a
@@ -435,19 +444,30 @@ fn mediumBoundOf(s: u32) -> vec3<f32> {
         let bias = clamp(mediaLane(s, 14u).y, 0.0, 1.0);
         let base = -thickness + 2.0 * thickness * bias;
         let hTop = clamp(4.6 / falloff, 3.0, 40.0);
-        return vec3<f32>(rr,
-                         centre.y + base - depth - thickness * 1.5 - grow,
-                         centre.y + base + thickness * hTop + grow);
+        let yBot = centre.y + base - depth - thickness * 1.5;
+        let yTop = centre.y + base + thickness * hTop;
+        if (grow > 0.0) {
+            return vec3<f32>(rr, yBot - grow, yTop + grow);
+        }
+        return vec3<f32>(rr, yBot, yTop);
     }
     // A closed primitive ends where its own surface ends, and the height influence can only make
     // it thinner.
     var half = thickness;
     if (shape == kFogShapeSphere) {
+        half = radius;
         // ADR-713: the sphere swells in every direction (`fogSwellOffset`), so its vertical reach
-        // carries the swell the horizontal always has.
-        half = radius * breath;
+        // carries the swell the horizontal always has. Branched for the reason above.
+        if (breath != 1.0) {
+            half = radius * breath;
+        }
     }
-    return vec3<f32>(rr, centre.y - depth - half * 1.35 - grow, centre.y + half * 1.35 + grow);
+    let yBot = centre.y - depth - half * 1.35;
+    let yTop = centre.y + half * 1.35;
+    if (grow > 0.0) {
+        return vec3<f32>(rr, yBot - grow, yTop + grow);
+    }
+    return vec3<f32>(rr, yBot, yTop);
 }
 
 // ADR-710: the bound's CAP -- (capRadiusXZ, capYBot) -- a wider cylinder from `capYBot` up to the

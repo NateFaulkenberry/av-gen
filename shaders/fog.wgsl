@@ -492,11 +492,17 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
     if (f.f0.w <= 0.0) {
         return 0.0;
     }
-    // ADR-713: swell and turbulence, both the identity at their defaults. `q` IS `p` then, and
-    // `rel` is the same subtraction on the same bits it always was.
+    // ADR-713: swell and turbulence. At their defaults the field is evaluated at `p` itself,
+    // through the pre-ADR-713 expression `p - f.f0.xyz` and on its own branch -- NOT through a
+    // `var q = p` that the flow branch may overwrite. The version that shared one path was the
+    // identity in exact arithmetic and still moved one pixel of a default bank by one level: the
+    // Metal compiler contracted the shared path differently. Measured, then split.
     let swell = fogSwell(f, t);
-    var q = p;
     let turbulence = clamp(f.f3.y, 0.0, 1.0);
+    if (swell == 1.0 && turbulence <= 0.0) {
+        return fogShapeFrom(f, p, p - f.f0.xyz, t);
+    }
+    var q = p;
     if (turbulence > 0.0) {
         // The flow costs sixteen noise gradients, so skip it where no displacement it can produce
         // reaches the primitive: `amount` semi-axes, measured in the swelled frame.
@@ -506,7 +512,13 @@ fn fogShapeAt(f: FogUniformsWgsl, p: vec3<f32>, t: f32) -> f32 {
         }
         q = p + fogTurbulence(f, p, t);
     }
-    let rel = fogSwellOffset(f, q - f.f0.xyz, swell);
+    return fogShapeFrom(f, q, fogSwellOffset(f, q - f.f0.xyz, swell), t);
+}
+
+// The field at the (possibly displaced) point `q`, whose offset from the centre in the (possibly
+// swelled) primitive frame is `rel`. Everything from here down is what `fogShapeAt` was before
+// ADR-713.
+fn fogShapeFrom(f: FogUniformsWgsl, q: vec3<f32>, rel: vec3<f32>, t: f32) -> f32 {
     let rr = fogPrimitiveDistance(f, rel);
     if (rr > 1.35) {
         return 0.0;
