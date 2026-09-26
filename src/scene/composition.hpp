@@ -500,6 +500,18 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterShallowColorParam = nullptr;
     params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
+    // Terrain (ADR-905): each scatter layer's emission lane, registered by the layer's NAME --
+    // `nodes/<terrain>/scatter/<layer>/{emissionGain, hueOffset, emissiveFieldAmount}` -- so a route
+    // written against "fungi" still means fungi after a layer is added in front of it. One entry per
+    // `ecology.layers`, in order. The gain and hue are applied after the material program to every
+    // part of the layer (the object emission lane); the field amount is the layer's `emissiveField`
+    // depth, which acts after the program too.
+    struct ScatterLayerParameters {
+        params::Parameter<float>* emissionGain = nullptr;
+        params::Parameter<float>* hueOffset = nullptr;
+        params::Parameter<float>* emissiveFieldAmount = nullptr;
+    };
+    std::vector<ScatterLayerParameters> scatterParams;
 };
 
 // ADR-833 (Phase D §25): the node's authored `tags` plus what it demonstrably is (a generated
@@ -1679,6 +1691,8 @@ private:
     // `Environment::shadowRange` for why a scene is allowed an opinion about this one.
     params::Parameter<float>* shadowRange_ = nullptr;
     params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
+    // ADR-905: `scene/ecologyLight`, the final behind `ecologyLightGain_` (the file's value).
+    params::Parameter<float>* ecologyLight_ = nullptr;
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
@@ -2232,6 +2246,15 @@ private:
         // fungus in the world. A click on one selected nothing at all.
         std::size_t ecologyFirst = 0;
         std::size_t ecologyCount = 0;
+        // ADR-905: which of those procedurals belong to which scatter layer -- the layer's index in
+        // `ecology.layers`, and its run (part 0 and its material subs) -- so the layer's emission
+        // lane reaches every part of it. A layer that placed nothing has no run.
+        struct EcologyLayerRun {
+            std::size_t layer = 0;
+            std::size_t first = 0;
+            std::size_t count = 0;
+        };
+        std::vector<EcologyLayerRun> ecologyLayers;
         int fieldIndex = -1;                         // index into scene_.fields.fields (Field kind)
         std::size_t firstField = 0;                  // Scene kind: the child's fields copied in
         std::size_t fieldCount = 0;

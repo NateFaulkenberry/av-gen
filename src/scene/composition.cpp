@@ -2,6 +2,8 @@
 
 #include "params/timeline.hpp"
 
+#include "core/color.hpp"
+
 #include "core/json_keys.hpp"
 #include "core/log.hpp"
 #include "core/phase_profiler.hpp"
@@ -4513,6 +4515,14 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
+    // ADR-905: the light a glowing ecology casts on what grows around it (ADR-053), as a parameter.
+    // The file's `ecologyLight` is its default; the per-frame pass reads the final, so a route or a
+    // key moves the light the mushrooms throw with the mushrooms. 0 makes no lights at all.
+    {
+        params::ParamDesc<float> d = floatDesc(prefix_ + "scene/ecologyLight", ecologyLightGain_, 0.0f, 50.0f, 0.0f, 4.0f);
+        d.label = "light from glowing plants";
+        ecologyLight_ = &params.add(std::move(d));
+    }
     // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only
     // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
     // active() is false", reading the gate as speed alone, which is how a field nobody could switch
@@ -5302,6 +5312,35 @@ void Composition::registerNodeParameters(CompositionNode& node) {
         node.sdfParams = registerSdfParameters(*params_, node.sdfRest, "sdf/" + sanitise(prefix_) + node.name + "/");
     }
     if (node.kind == NodeKind::Terrain) {
+        // ADR-905: every scatter layer's emission lane, by the layer's name. The gain and hue act
+        // after the material program on every part of the layer, so they reach the mushrooms that
+        // `glowmereTissue` lights as surely as a plain emissive layer; the field amount is the
+        // depth of the layer's `emissiveField`. Stable names -- a layer added in front of "fungi"
+        // does not move what `scatter/fungi/emissionGain` means.
+        // Labelled for what a viewer sees rather than what the lane is called: the panel shows
+        // "<terrain> / scatter / fungi" as the heading, then "glow", "hue shift" and "light wave".
+        node.scatterParams.clear();
+        const auto labelled = [](params::ParamDesc<float> d, const char* label) {
+            d.label = label;
+            return d;
+        };
+        for (const world::ScatterLayer& layer : node.ecology.layers) {
+            const std::string s = base + "scatter/" + layer.name + "/";
+            CompositionNode::ScatterLayerParameters p;
+            p.emissionGain = &params_->add(
+                labelled(floatDesc(s + "emissionGain", layer.emissionGain, 0.0f, 50.0f, 0.0f, 4.0f), "glow"));
+            // Turns of hue. The soft range is half a turn each way; the hard range lets a key spin it.
+            p.hueOffset = &params_->add(
+                labelled(floatDesc(s + "hueOffset", layer.hueOffset, -4.0f, 4.0f, -0.5f, 0.5f), "hue shift"));
+            // The depth of the layer's `emissiveField`: how strongly a travelling ring (or any field)
+            // lights the layer as it passes.
+            p.emissiveFieldAmount = &params_->add(labelled(
+                floatDesc(s + "emissiveFieldAmount", layer.emissiveFieldAmount, 0.0f, 100.0f, 0.0f, 8.0f),
+                "light wave"));
+            node.scatterParams.push_back(p);
+        }
+    }
+    if (node.kind == NodeKind::Terrain) {
         // Four knobs, all of them for looking at the thing rather than art-directing it: turn LOD
         // off to see whether a shading artefact is a level boundary, turn culling off to see what
         // culling was removing, and pull the two distances to find where the budget goes.
@@ -5398,6 +5437,17 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
             node.windFlutterParam = nullptr;
             node.windLagParam = nullptr;
         }
+        // ADR-905: the scatter layers' lanes, by the exact paths they were registered at.
+        for (const CompositionNode::ScatterLayerParameters& p : node.scatterParams) {
+            for (const params::IParameter* parameter :
+                 std::array<const params::IParameter*, 3>{p.emissionGain, p.hueOffset, p.emissiveFieldAmount}) {
+                if (parameter != nullptr) {
+                    const std::string path = parameter->path(); // copied: remove() destroys the owner
+                    params_->remove(path);
+                }
+            }
+        }
+        node.scatterParams.clear();
         if (node.kind == NodeKind::Terrain) {
             for (const char* suffix :
                  {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance",
@@ -5527,6 +5577,7 @@ void Composition::detach() {
         node->waterGlowColorParam = nullptr;
         node->particleParams = {};
         node->materialPartParams.clear(); // see the note at the end of this function
+        node->scatterParams.clear();      // ADR-905, and for the same reason
         if (node->child) {
             node->child->detach();
         }
@@ -5603,6 +5654,7 @@ void Composition::detach() {
     fogHeightAmount_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
+    ecologyLight_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
     rootRotationSpeed_ = nullptr;
@@ -6339,17 +6391,18 @@ void Composition::rebuild() {
             // new kind of drawable.
             std::vector<world::GlowCluster> nodeGlow;
             std::unordered_map<std::string, std::shared_ptr<spatial::PointCloud>> habitats;
-            // Everything this terrain produces is a pure function of these six -- the water settings
+            // Everything this terrain produces is a pure function of these five -- the water settings
             // among them since ADR-099, because the surface mesh bakes its flow lanes into the
             // vertices, so a flow an author retunes has to move the key. A rebuild caused by
             // anything else -- a node placed, a material program added, an HDR swapped -- reuses
             // what the last one made (ADR-092); a change to any of them moves the key and the
-            // terrain is built again, with nothing to remember to invalidate.
+            // terrain is built again, with nothing to remember to invalidate. The ecology light's
+            // gain is not one of them since ADR-905: it is a per-frame parameter, and the glow it
+            // scales is reduced whether or not it is zero.
             CompositionNode& mutableNode = *nodePtr;
             const std::uint64_t terrainKey =
                 node.worldMap.structuralHash() ^ (node.terrain.structuralHash() * 0x9E3779B97F4A7C15ull) ^
                 (node.ecology.structuralHash() * 0xC2B2AE3D27D4EB4Full) ^
-                (static_cast<std::uint64_t>(ecologyLightGain_ * 1024.0f) * 0x165667B19E3779F9ull) ^
                 (static_cast<std::uint64_t>(ecologyGlowCell_ * 1024.0f) * 0x27D4EB2F165667C5ull) ^
                 (node.waterFlow.structuralHash() * 0x85EBCA77C2B2AE63ull);
             // AVGEN_NO_TERRAIN_CACHE=1 turns the reuse off, so the claim "placing a node used to
@@ -6484,6 +6537,13 @@ void Composition::rebuild() {
                     pg.material.program = prefixed(sanitise(prefix_), layer.materialProgram);
                 }
                 pg.materialVariation.perceptualHue = true;
+                // ADR-905: the layer's emission lane. Its authored values are the starting point; the
+                // per-frame pass writes the parameters' finals over them (applyParameters), and the
+                // field name carries the prefix every other reference in this scene does.
+                pg.emissionGain = layer.emissionGain;
+                pg.emissionHue = layer.hueOffset;
+                pg.emissiveField = prefixed(sanitise(prefix_), layer.emissiveField);
+                pg.emissiveFieldAmount = layer.emissiveFieldAmount;
                 // ADR-055: how this species answers the wind, straight through. Nothing else in the
                 // scatter path changes -- Tier 0 is a vertex-stage deformation over instances that
                 // already exist, so there is no new buffer, no new pass and no new draw.
@@ -6509,9 +6569,15 @@ void Composition::rebuild() {
                         pg.sourceTransform.scale = glm::vec3(layer.height / authored);
                     }
                 }
-                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f && !reuseTerrain) {
+                // Reduced whenever the layer emits, whatever `scene/ecologyLight` is: the gain is a
+                // parameter (ADR-905) and a route may raise it from zero, which a light that was
+                // never built cannot answer. A gain of zero makes no lights (updateEcologyLights).
+                if (layer.emissiveIntensity > 0.0f && !reuseTerrain) {
                     auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_,
                                                          pg.variation.seed);
+                    for (world::GlowCluster& cluster : clusters) {
+                        cluster.layer = static_cast<std::uint32_t>(layerIndex - 1);
+                    }
                     log::info("terrain '{}': scatter '{}' glow reduced to {} emitters", node.name,
                               layer.name, clusters.size());
                     nodeGlow.insert(nodeGlow.end(), clusters.begin(), clusters.end());
@@ -6545,6 +6611,8 @@ void Composition::rebuild() {
                     }
                     subs.push_back(std::move(sub));
                 }
+                range.ecologyLayers.push_back(
+                    {layerIndex - 1, scene_.procedurals.size(), 1 + subs.size()});
                 scene_.procedurals.push_back(std::move(pg));
                 for (ProceduralGeometry& sub : subs) {
                     scene_.procedurals.push_back(std::move(sub));
@@ -7869,6 +7937,41 @@ void Composition::applyParameters() {
             pg.emissionHue = 0.0f;
             // generated by rebuildProcedurals() once every object and spline has its finals
         }
+        // ADR-905: a terrain's scatter layers. Each layer's gain and hue -- its parameters' finals,
+        // or the file's values for a composition nobody attached -- ride on the terrain's own boost,
+        // and reach every part of the layer.
+        if (node.kind == NodeKind::Terrain) {
+            // The bases back into the layers, as the node's own values are above, so a save keeps
+            // what the user set. None of the three is structural, so this moves no terrain key.
+            for (std::size_t l = 0; l < node.scatterParams.size() && l < node.ecology.layers.size(); ++l) {
+                const CompositionNode::ScatterLayerParameters& p = node.scatterParams[l];
+                world::ScatterLayer& layer = node.ecology.layers[l];
+                if (p.emissionGain != nullptr) layer.emissionGain = p.emissionGain->base();
+                if (p.hueOffset != nullptr) layer.hueOffset = p.hueOffset->base();
+                if (p.emissiveFieldAmount != nullptr) layer.emissiveFieldAmount = p.emissiveFieldAmount->base();
+            }
+            for (const NodeRange::EcologyLayerRun& run : range.ecologyLayers) {
+                if (run.layer >= node.ecology.layers.size()) {
+                    continue;
+                }
+                const world::ScatterLayer& layer = node.ecology.layers[run.layer];
+                const CompositionNode::ScatterLayerParameters* p =
+                    run.layer < node.scatterParams.size() ? &node.scatterParams[run.layer] : nullptr;
+                const auto value = [](const params::Parameter<float>* q, float authored) {
+                    return q != nullptr ? q->value() : authored;
+                };
+                const float gain = value(p != nullptr ? p->emissionGain : nullptr, layer.emissionGain);
+                const float hue = value(p != nullptr ? p->hueOffset : nullptr, layer.hueOffset);
+                const float field =
+                    value(p != nullptr ? p->emissiveFieldAmount : nullptr, layer.emissiveFieldAmount);
+                for (std::size_t q = run.first; q < run.first + run.count && q < scene_.procedurals.size(); ++q) {
+                    ProceduralGeometry& part = scene_.procedurals[q];
+                    part.emissionGain = emissiveBoost * gain;
+                    part.emissionHue = hue;
+                    part.emissiveFieldAmount = field;
+                }
+            }
+        }
         if (node.kind == NodeKind::Spline && range.splineIndex >= 0 &&
             static_cast<std::size_t>(range.splineIndex) < scene_.splines.splines.size()) {
             spatial::Spline& sp = scene_.splines.splines[static_cast<std::size_t>(range.splineIndex)];
@@ -8581,6 +8684,13 @@ void Composition::updateEcologyLights() {
     if (!ecologyLightsEnabled_) {
         return;
     }
+    // ADR-905: the parameter's final -- a route or a key on `scene/ecologyLight` -- and the file's
+    // value for a composition nobody attached. Zero makes no lights, exactly as a scene that never
+    // asked for any has always had.
+    const float gain = ecologyLight_ != nullptr ? ecologyLight_->value() : ecologyLightGain_;
+    if (gain <= 0.0f) {
+        return;
+    }
     const std::size_t budget = kMaxEcologyLights > scene_.lights.size()
                                    ? kMaxEcologyLights - scene_.lights.size()
                                    : 0;
@@ -8592,6 +8702,7 @@ void Composition::updateEcologyLights() {
         const world::GlowCluster* cluster;
         float distanceSq;
         glm::vec3 position;
+        const CompositionNode* node;
     };
     std::vector<Candidate> candidates;
     const glm::vec3 eye = scene_.camera.position;
@@ -8607,7 +8718,7 @@ void Composition::updateEcologyLights() {
             if (d2 > ecologyLightRange_ * ecologyLightRange_) {
                 continue;
             }
-            candidates.push_back({&g, d2, world});
+            candidates.push_back({&g, d2, world, &node});
         }
     }
     if (candidates.empty()) {
@@ -8624,6 +8735,18 @@ void Composition::updateEcologyLights() {
 
     for (std::size_t i = 0; i < candidates.size(); ++i) {
         const world::GlowCluster& g = *candidates[i].cluster;
+        const CompositionNode& owner = *candidates[i].node;
+        // ADR-905: the light a layer casts follows the glow it shows -- the terrain's boost and the
+        // layer's own gain and hue, the same finals its surfaces take after their program.
+        float layerGain = 1.0f;
+        float layerHue = 0.0f;
+        if (g.layer < owner.ecology.layers.size()) {
+            const world::ScatterLayer& layer = owner.ecology.layers[g.layer];
+            const CompositionNode::ScatterLayerParameters* p =
+                g.layer < owner.scatterParams.size() ? &owner.scatterParams[g.layer] : nullptr;
+            layerGain = p != nullptr && p->emissionGain != nullptr ? p->emissionGain->value() : layer.emissionGain;
+            layerHue = p != nullptr && p->hueOffset != nullptr ? p->hueOffset->value() : layer.hueOffset;
+        }
         PunctualLight light;
         light.name = fmt::format("{}{}", kEcologyLightPrefix, i);
         // A point light, not a Sphere: a sphere emitter goes through the LTC area-light
@@ -8632,11 +8755,11 @@ void Composition::updateEcologyLights() {
         light.type = PunctualLight::Type::Point;
         light.role = PunctualLight::Role::Practical;
         light.position = candidates[i].position;
-        light.color = g.color;
+        light.color = layerHue != 0.0f ? color::hueShift(g.color, layerHue) : g.color;
         // The aggregate's power is a sum of emissive weights, not photometric candela. The scale
         // is the one free constant here: it sets how far a patch of glowing ecology throws light,
         // and it is authored per scene rather than guessed once.
-        light.intensity = g.power * ecologyLightGain_;
+        light.intensity = g.power * gain * nodeEmissiveBoost(owner) * std::max(layerGain, 0.0f);
         light.radius = std::max(g.radius, 0.25f);
         light.range = g.radius * 4.0f;
         light.castsShadow = false;   // hundreds of these; none of them can afford a shadow map
@@ -9234,8 +9357,11 @@ nlohmann::json Composition::toJson() const {
         environment["dayNight"] = std::move(d);
     }
     environment["skyBloom"] = skyBloomSetting_;
-    if (ecologyLightGain_ > 0.0f) {
-        environment["ecologyLight"] = ecologyLightGain_;
+    // ADR-905: the parameter's base, as the volumetric block below does, so a save keeps what the
+    // user set on `scene/ecologyLight` rather than the value the file was loaded with.
+    if (const float ecologyLight = ecologyLight_ != nullptr ? ecologyLight_->base() : ecologyLightGain_;
+        ecologyLight > 0.0f) {
+        environment["ecologyLight"] = ecologyLight;
         environment["ecologyLightRange"] = ecologyLightRange_;
         environment["ecologyGlowCell"] = ecologyGlowCell_;
     }
