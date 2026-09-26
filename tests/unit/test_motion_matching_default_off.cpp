@@ -38,7 +38,13 @@ namespace {
 // once, by ADR-830, which changed the Glowmere terrain itself (overlapping waters cut continuously):
 // the world moved under the trace, not the matcher, and the control arm below still shows the key
 // changes it. The old value was 0x5599cff790bc8a34.
-constexpr std::uint64_t kPreWiringDigest = 0xd53e94d7c2073392ull;
+//
+// Re-pinned a second time, by ADR-893, 894 and 895, for the same reason. The stride bob now eases in
+// (ADR-895), which changes every walking rig's pose from its first step. The path levels and the water
+// line moved under the cast (ADR-893, 894). No matcher code changed, the scene still carries no key,
+// and the control arm below still shows the key changes the trace. The old value was
+// 0xd53e94d7c2073392.
+constexpr std::uint64_t kPreWiringDigest = 0x6e863d80f8c6146full;
 
 fs::path glowmere() {
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";

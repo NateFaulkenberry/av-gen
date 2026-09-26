@@ -2,13 +2,18 @@
 // is turned into triangles. Hypsometric tint plus hillshade plus 10 m contours plus water, which is
 // the same set of cues a topographic map uses, for the same reason: it makes shape legible.
 //
-//   avgen_world_preview [--biomes] [world.json] [out.png] [pixels] [probeX probeZ]...
+//   avgen_world_preview [--biomes] [--seams] [world.json] [out.png] [pixels] [probeX probeZ]...
 //   avgen_world_preview --terrain <style> [--seed N] [--set key=value]... [out.png] [pixels]
 //
 // The second form generates a map from `terrain_gen`'s artistic parameters instead of loading one,
 // which is the only way to look at a style before it has been committed to a recipe. It installs the
 // composer's five biomes so `--biomes` means the same thing in both forms, and it prints the water
 // courses the generator produced -- the half of the water seam that a picture cannot show.
+//
+// `--seams` scans the whole map for discontinuities -- a step in the ground or in the water surface
+// that no slope explains -- paints them on the map (red ground, magenta water), prints them as runs
+// with their size, and exits 3 if it found any. A hillshade shows a cliff only as a thin dark line,
+// which is how three 2 m walls across Glowmere Valley went unnoticed until a map was read closely.
 
 #include "assets/image.hpp"
 #include "world/terrain.hpp"
@@ -51,6 +56,169 @@ glm::vec3 biomeInk(int index) {
     return inks[std::clamp(index, 0, world::kMaxBiomes - 1)];
 }
 
+// ---- seams --------------------------------------------------------------------------------------
+//
+// A discontinuity is a step that stands out from the slope around it: a difference between two
+// neighbouring samples above an absolute floor AND several times larger than the differences on
+// either side of it. The second test is what separates a cliff from a steep but continuous wall --
+// a plain gradient threshold cannot, because Glowmere's valley walls climb more per metre than some
+// of its seams are tall.
+constexpr float kSeamSpacing = 0.5f; // metres between samples
+constexpr float kGroundStep = 0.30f; // metres; below this the shading hides a step
+constexpr float kWaterStep = 0.05f;  // metres; a water surface is flat enough to show five centimetres
+constexpr float kStandsOut = 4.0f;   // times the larger neighbouring difference
+
+bool standsOut(float step, float before, float after, float floor) {
+    const float a = std::fabs(step);
+    return a > floor && a > kStandsOut * std::max(std::fabs(before), std::fabs(after));
+}
+
+struct SeamRun {
+    glm::vec2 lo{1e30f};
+    glm::vec2 hi{-1e30f};
+    std::size_t cells = 0;
+    float largest = 0.0f;
+};
+
+// Scans `map` on a kSeamSpacing grid, paints what it finds into the `size` x `size` preview, prints
+// the runs, and returns how many cells stepped. Ground and water are scanned separately because they
+// fail differently: the ground's seams are walls across a hillside, the water's are walls across a
+// river -- the same fault in `closestOnPath`'s level, read by two different consumers.
+std::size_t scanSeams(const world::WorldMap& map, int size, std::vector<std::uint8_t>& rgba) {
+    const int nx = static_cast<int>(std::ceil(map.size.x / kSeamSpacing));
+    const int nz = static_cast<int>(std::ceil(map.size.y / kSeamSpacing));
+    const auto point = [&](int x, int z) {
+        return map.min() + glm::vec2((static_cast<float>(x) + 0.5f) * kSeamSpacing,
+                                     (static_cast<float>(z) + 0.5f) * kSeamSpacing);
+    };
+    const std::size_t count = static_cast<std::size_t>(nx) * static_cast<std::size_t>(nz);
+    std::vector<float> ground(count);
+    std::vector<float> water(count);
+    for (int z = 0; z < nz; ++z) {
+        for (int x = 0; x < nx; ++x) {
+            const std::size_t i = static_cast<std::size_t>(z) * nx + x;
+            ground[i] = map.height(point(x, z));
+            water[i] = map.waterSurface(point(x, z));
+        }
+    }
+    const auto wet = [&](std::size_t i) { return water[i] > ground[i] + 0.01f; };
+    // bit 1: the ground steps between this cell and the next; bit 2: the water does.
+    std::vector<std::uint8_t> flag(count, 0);
+    std::vector<float> step(count, 0.0f);
+    const auto scanLine = [&](std::size_t first, std::size_t stride, int length) {
+        for (int k = 0; k + 1 < length; ++k) {
+            const std::size_t i = first + static_cast<std::size_t>(k) * stride;
+            const std::size_t j = i + stride;
+            const float d = ground[j] - ground[i];
+            const float before = k > 0 ? ground[i] - ground[i - stride] : 0.0f;
+            const float after = k + 2 < length ? ground[j + stride] - ground[j] : 0.0f;
+            if (standsOut(d, before, after, kGroundStep)) {
+                flag[i] |= 1;
+                step[i] = std::max(step[i], std::fabs(d));
+            }
+            if (wet(i) && wet(j)) {
+                const float e = water[j] - water[i];
+                const float eb = k > 0 && wet(i - stride) ? water[i] - water[i - stride] : 0.0f;
+                const float ea = k + 2 < length && wet(j + stride) ? water[j + stride] - water[j] : 0.0f;
+                if (standsOut(e, eb, ea, kWaterStep)) {
+                    flag[i] |= 2;
+                    step[i] = std::max(step[i], std::fabs(e));
+                }
+            }
+        }
+    };
+    for (int z = 0; z < nz; ++z) {
+        scanLine(static_cast<std::size_t>(z) * nx, 1, nx);
+    }
+    for (int x = 0; x < nx; ++x) {
+        scanLine(static_cast<std::size_t>(x), static_cast<std::size_t>(nx), nz);
+    }
+
+    // Runs: 8-connected groups of flagged cells, per kind, so one wall reads as one line of output.
+    std::size_t total = 0;
+    for (int kind = 1; kind <= 2; kind <<= 1) {
+        std::vector<SeamRun> runs;
+        std::vector<std::uint8_t> seen(count, 0);
+        std::vector<std::size_t> stack;
+        for (std::size_t start = 0; start < count; ++start) {
+            if (!(flag[start] & kind) || seen[start]) {
+                continue;
+            }
+            SeamRun run;
+            stack.assign(1, start);
+            seen[start] = 1;
+            while (!stack.empty()) {
+                const std::size_t i = stack.back();
+                stack.pop_back();
+                const int x = static_cast<int>(i % static_cast<std::size_t>(nx));
+                const int z = static_cast<int>(i / static_cast<std::size_t>(nx));
+                const glm::vec2 p = point(x, z);
+                run.lo = glm::min(run.lo, p);
+                run.hi = glm::max(run.hi, p);
+                ++run.cells;
+                run.largest = std::max(run.largest, step[i]);
+                for (int dz = -1; dz <= 1; ++dz) {
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        const int ax = x + dx;
+                        const int az = z + dz;
+                        if (ax < 0 || az < 0 || ax >= nx || az >= nz) {
+                            continue;
+                        }
+                        const std::size_t a = static_cast<std::size_t>(az) * nx + ax;
+                        if ((flag[a] & kind) && !seen[a]) {
+                            seen[a] = 1;
+                            stack.push_back(a);
+                        }
+                    }
+                }
+            }
+            runs.push_back(run);
+        }
+        std::sort(runs.begin(), runs.end(), [](const SeamRun& a, const SeamRun& b) { return a.cells > b.cells; });
+        std::size_t cells = 0;
+        float largest = 0.0f;
+        for (const SeamRun& r : runs) {
+            cells += r.cells;
+            largest = std::max(largest, r.largest);
+        }
+        const char* what = kind == 1 ? "ground" : "water";
+        std::printf("  seams: %s %zu cell(s) in %zu run(s), largest step %.2f m\n", what, cells, runs.size(), largest);
+        for (std::size_t r = 0; r < std::min<std::size_t>(runs.size(), 12); ++r) {
+            std::printf("    %s run: x %.0f..%.0f  z %.0f..%.0f  %zu cell(s), step up to %.2f m\n", what,
+                        runs[r].lo.x, runs[r].hi.x, runs[r].lo.y, runs[r].hi.y, runs[r].cells, runs[r].largest);
+        }
+        total += cells;
+    }
+
+    // Paint: a 3 x 3 pixel dot per flagged cell, so a one-cell-wide wall is still visible at 1280 px.
+    const glm::vec3 inks[3] = {{0.0f, 0.0f, 0.0f}, {1.0f, 0.1f, 0.1f}, {1.0f, 0.2f, 1.0f}};
+    for (std::size_t i = 0; i < count; ++i) {
+        if (!flag[i]) {
+            continue;
+        }
+        const glm::vec2 p = point(static_cast<int>(i % static_cast<std::size_t>(nx)),
+                                  static_cast<int>(i / static_cast<std::size_t>(nx)));
+        const glm::vec2 uv = (p - map.min()) / map.size;
+        const int cx = static_cast<int>(uv.x * static_cast<float>(size));
+        const int cy = static_cast<int>(uv.y * static_cast<float>(size));
+        const glm::vec3 ink = inks[(flag[i] & 2) ? 2 : 1];
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const int px = cx + dx;
+                const int py = cy + dy;
+                if (px < 0 || py < 0 || px >= size || py >= size) {
+                    continue;
+                }
+                const std::size_t o = (static_cast<std::size_t>(py) * size + px) * 4;
+                for (int k = 0; k < 3; ++k) {
+                    rgba[o + k] = static_cast<std::uint8_t>(ink[k] * 255.0f);
+                }
+            }
+        }
+    }
+    return total;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -59,6 +227,7 @@ int main(int argc, char** argv) {
     // biome map has to answer is whether its regions sit where the geography put them.
     int arg = 1;
     bool biomeView = false;
+    bool seams = false;
     bool generate = false;
     std::string recipePath;
     world::TerrainParams params;
@@ -66,6 +235,9 @@ int main(int argc, char** argv) {
         const std::string flag = argv[arg];
         if (flag == "--biomes") {
             biomeView = true;
+            ++arg;
+        } else if (flag == "--seams") {
+            seams = true;
             ++arg;
         } else if (flag == "--terrain" && arg + 1 < argc) {
             const auto style = world::terrainStyleFromName(argv[arg + 1]);
@@ -294,20 +466,27 @@ int main(int argc, char** argv) {
             }
         }
     }
+    const std::size_t seamCount = seams ? scanSeams(map, size, rgba) : 0;
     // Probes: the heights a scene author actually needs -- where to stand a camera, where the ground
-    // is under a focal point -- printed rather than guessed at from a colour ramp.
+    // is under a focal point -- printed rather than guessed at from a colour ramp. The water level
+    // too, not only whether it is wet: a surface that jumps between two probes a step apart is a
+    // visible wall of water, and "wet, wet" says nothing about it.
     for (int i = firstProbe; i + 1 < argc; i += 2) {
         const glm::vec2 q(static_cast<float>(std::atof(argv[i])), static_cast<float>(std::atof(argv[i + 1])));
         const world::Sample sm = map.sample(q, 0.6f);
         const world::BiomeWeights bw = map.biomes.at(sm.altitude, sm.slope, sm.moisture, q);
         const char* biome = map.biomes.empty() ? "-" : map.biomes.biomes[static_cast<std::size_t>(bw.dominant())].name.c_str();
-        std::printf("  probe (%.1f, %.1f): height %.2f  slope %.2f  moisture %.2f  %s  biome %s (axis %.2f)\n",
-                    q.x, q.y, sm.height, sm.slope, sm.moisture, sm.submerged ? "wet" : "dry", biome, bw.axis());
+        char water[32] = "none";
+        if (sm.waterSurface > -1.0e6f) {
+            std::snprintf(water, sizeof(water), "%.3f", sm.waterSurface);
+        }
+        std::printf("  probe (%.1f, %.1f): height %.3f  slope %.2f  moisture %.2f  %s  water %s  biome %s (axis %.2f)\n",
+                    q.x, q.y, sm.height, sm.slope, sm.moisture, sm.submerged ? "wet" : "dry", water, biome, bw.axis());
     }
     if (auto r = assets::writePng(outPath, static_cast<std::uint32_t>(size), static_cast<std::uint32_t>(size), rgba); !r) {
         std::fprintf(stderr, "%s\n", r.error().message.c_str());
         return 1;
     }
     std::printf("wrote %s\n", outPath.c_str());
-    return 0;
+    return seamCount > 0 ? 3 : 0;
 }

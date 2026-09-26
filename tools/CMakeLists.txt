@@ -155,8 +155,9 @@ target_link_libraries(avgen_behavior_trace PRIVATE avgen_core)
 # as individual metrics in JSON. It drives the real `app::Engine`, so a project's Director and
 # staging move the cast exactly as they do in the film; that needs the same app/ sources
 # `avgen_metal_rt_probe` lists, for the same reason (`Engine` lives in the executable's glob), and
-# the ui/ files that keep it free of Dear ImGui and a window.
-add_executable(avgen_character_quality character_quality.cpp
+# the ui/ files that keep it free of Dear ImGui and a window. `avgen_cast_trace` below needs exactly
+# the same engine, so the list is named once.
+set(AVGEN_OFFLINE_ENGINE_SOURCES
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
@@ -185,7 +186,13 @@ add_executable(avgen_character_quality character_quality.cpp
     "${CMAKE_SOURCE_DIR}/src/ui/brush.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/gizmo.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/output_preview.cpp")
+add_executable(avgen_character_quality character_quality.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
 target_link_libraries(avgen_character_quality PRIVATE avgen_core)
+
+# Glowmere Valley 3: where every character is at every moment of a film, so a camera can be placed
+# on somebody who is not following a script. Runs the same offline engine as the quality meter.
+add_executable(avgen_cast_trace cast_trace.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
+target_link_libraries(avgen_cast_trace PRIVATE avgen_core)
 
 # Phase D §58: validate a scene's autonomous characters before runtime.
 add_executable(avgen_character_validate character_validate.cpp)

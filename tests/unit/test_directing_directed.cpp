@@ -48,6 +48,20 @@ json directedPlan() {
     })");
 }
 
+// The played test's orders face Sage rather than Vane. Its control needs a subject Rook does not face
+// on his own between 20 and 22 s, and that depends on where the world sends the cast. ADR-894
+// (overlapping waters blend by weight) moved water, and the aliens, who are drawn to it, re-routed.
+// On his own, Rook now comes within 0.31 rad of facing Vane in that window, which is inside the gap
+// between the test's "facing" (< 0.2) and "not facing" (> 0.5). Measured the same way, his closest to
+// the others is Tide 0.98, Ember 0.93 and Sage 2.01 rad, so Sage is the control with the most margin.
+// The compile tests keep Vane: they do not depend on the world.
+json playedPlan() {
+    json doc = directedPlan();
+    doc["subjects"][1] = json{{"alias", "sage"}, {"text", "Sage"}};
+    doc["performances"][0]["beats"][0]["target"] = "sage";
+    return doc;
+}
+
 Plan planFrom(const json& doc) {
     PlanParse parsed = parsePlan(doc);
     for (const Issue& i : parsed.issues) {
@@ -109,25 +123,26 @@ TEST_CASE("a directed performance compiles to scheduled orders, only in a live p
     }
 }
 
-TEST_CASE("orders, played: Rook turns to Vane and reacts; a scrub lands where the play did; a recording bakes it",
+TEST_CASE("orders, played: Rook turns to Sage and reacts; a scrub lands where the play did; a recording bakes it",
           "[directing][directed][benchmark]") {
     testsupport::skipUnlessGlowmereBenchmarkAssetsPresent();
     app::Engine played(app::EngineMode::Offline);
     load(played);
-    const Compilation c = compilePlan(planFrom(directedPlan()), app::sceneFactsFor(played));
+    const Compilation c = compilePlan(planFrom(playedPlan()), app::sceneFactsFor(played));
     REQUIRE_FALSE(c.validation.hasErrors());
     ui::EditHistory history;
     REQUIRE(app::applyCompilation(played, history, c));
     const entity::Entity* rook = played.composition()->entityWorld().find("rook");
-    const entity::Entity* tide = played.composition()->entityWorld().find("vane");
+    const entity::Entity* target = played.composition()->entityWorld().find("sage");
     // The same world without the orders: where Rook faces on his own at that moment.
     app::Engine idle(app::EngineMode::Offline);
     load(idle);
     const entity::Entity* idleRook = idle.composition()->entityWorld().find("rook");
-    const entity::Entity* idleVane = idle.composition()->entityWorld().find("vane");
+    const entity::Entity* idleTarget = idle.composition()->entityWorld().find("sage");
     float idleFacingError = 1e9f;
     REQUIRE(rook != nullptr);
-    REQUIRE(tide != nullptr);
+    REQUIRE(target != nullptr);
+    REQUIRE(idleTarget != nullptr);
     float facingError = 1e9f;
     scene::Composition::ClipReadout at8;
     scene::Composition::ClipReadout idleAt23;
@@ -142,8 +157,8 @@ TEST_CASE("orders, played: Rook turns to Vane and reacts; a scrub lands where th
         frame(played, f);
         frame(idle, f);
         if (f >= 20 * 60 && f < 22 * 60) { // between the face order and the react order
-            facingError = std::min(facingError, facing(*rook, *tide));
-            idleFacingError = std::min(idleFacingError, facing(*idleRook, *idleVane));
+            facingError = std::min(facingError, facing(*rook, *target));
+            idleFacingError = std::min(idleFacingError, facing(*idleRook, *idleTarget));
         }
         // When the rig starts playing the react clip after the face order: the first frame it says so.
         // (Not `startSeconds`, which is the clip's phase origin and moves with the clip's speed.)
@@ -159,7 +174,7 @@ TEST_CASE("orders, played: Rook turns to Vane and reacts; a scrub lands where th
             idleAt23 = idle.composition()->clipReadout("rook", 23.0);
         }
     }
-    INFO("closest to facing Vane between the orders " << facingError << " rad (on his own " << idleFacingError
+    INFO("closest to facing Sage between the orders " << facingError << " rad (on his own " << idleFacingError
                                            << "); the rig starts Crazy at " << reactFrom << " s (on his own at "
                                            << idleReactFrom << " s); at 23 s it plays '" << at8.state
                                            << "' (on his own '" << idleAt23.state << "')");
@@ -175,7 +190,7 @@ TEST_CASE("orders, played: Rook turns to Vane and reacts; a scrub lands where th
     app::Engine scrubbed(app::EngineMode::Offline);
     load(scrubbed);
     ui::EditHistory h2;
-    REQUIRE(app::applyCompilation(scrubbed, h2, compilePlan(planFrom(directedPlan()), app::sceneFactsFor(scrubbed))));
+    REQUIRE(app::applyCompilation(scrubbed, h2, compilePlan(planFrom(playedPlan()), app::sceneFactsFor(scrubbed))));
     frame(scrubbed, 0);
     scrubbed.seekSeconds(24.0);
     frame(scrubbed, 24 * 60 + 1);
