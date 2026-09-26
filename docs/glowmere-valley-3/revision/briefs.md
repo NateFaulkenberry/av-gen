@@ -120,31 +120,142 @@ on branch `agent/<topic>`, created from main `0b623b88`. Assets are linked with
   - **The tests in water.md §3.**
   - **Before/after stills** of GV3's water shots, kept outside the repository.
 
-## Wave 2: not launched yet
-It starts after signals, routes and emission merge.
+## Wave 2
 
-### director (ADRs 920 and up)
-From reports/director.md recommendations 2–5. The owner chose "Build it; GV3 uses it".
-- **A reactivity planner:**
-  - a `PlanRoute` plan item, compiled to `ModRoute` plus sources;
-  - a `ReactiveCatalog` generated from engine data (emissive materials, particle systems, scatter populations, effect fields, lights, atmosphere, wind);
-  - a validator that refuses dead targets through the routes stream's registry and flags "everything on the kick";
-  - a deterministic default proposer: catalogue × musical layers → micro/meso/macro routes with staggered phases, delays and section-aware depth.
-- **Song Mode musical durations and arcs:**
-  - carry arc, energy and visualDensity through `songPlanFromCues`;
-  - beat-snapped cuts;
-  - risers that accelerate the cutting;
-  - peak sections given to the most important or event subject;
-  - the dead `camera/focus/emphasis` and `ShotSpan::emphasis` wired or cut.
-- **Scenario items in plans:** set pieces such as several abductions at chosen places and times, with variation.
-- **An evaluator hook:**
-  - `director.evaluate` and `director.compare`, calling the Creative Critic CLI;
-  - evaluations stored per revision;
-  - a policy of iterating in scratch and showing only the winner.
+The Director work is three streams, so the part with no wave-1 dependency can start first:
 
-### render and post (ADRs 917–919)
-From reports/render-post.md engine gaps 3, 6 and 7:
-- post radii that hold across resolutions: bloom levels and reach, anamorphic stretch, halation and motion-blur tiles;
-- optionally, fog colour taken from sky radiance, and the offline tier raising authored sample counts.
+| Stream | ADRs | Depends on | Worktree / branch |
+|---|---|---|---|
+| setpieces (set pieces and the evaluator hook) | 928–931 | nothing in wave 1 | `av-gen-setpieces`, `agent/setpieces` |
+| render (post and offline quality) | 917–919 | nothing in wave 1 (camera owns the cut reset) | `av-gen-render`, `agent/render` |
+| song (musical durations and arcs) | 920–923 | signals | `av-gen-song`, `agent/song` |
+| reactivity (the reactivity planner) | 924–927 | signals, routes, emission | `av-gen-reactivity`, `agent/reactivity` |
 
-(The motion-blur reset at cuts is in the camera stream.)
+Every stream creates its worktree from the main of the moment it launches, and keeps the two
+headless paths GV3 depends on working:
+`avgen --project X --director mode=song --song-plan P --save-project OUT`, and `--render` with `--range`.
+**GV3 consumes each stream through JSON**, so each stream ends with a headless dump that a Python
+generator can read.
+
+### setpieces (ADRs 928–931): set pieces in plans, and the evaluator hook
+- **Read:** the brief's §9, §10, §15, §16 and §17; reports/director.md §2 (rows "More UFO events",
+  "Hero moments"), §4 and recommendations 4–5; `src/stage/staging.hpp` (the whole file header);
+  `tools/gv3/cast.py` (how GV3 stages its one abduction today, as data); the Critic's
+  `~/Documents/GitHub/creative-critic/INTEGRATION_GUIDE.md` §3–4.
+- **What exists:** `stage::StagingDesc` can already express a lot: several scenarios, each with its
+  own seed, `startOn`/`stopOn` events, `maxCycles`, region queries (`center` + `radius`), claims,
+  several bound roles, parallel cues and the `stillRoles` gate. What is missing is a way to *plan*
+  them. The Plan cannot author a scenario (`validator.cpp:495`, `:622-653` only reads them), and
+  every GV3 set piece was hand-written beat by beat in Python.
+- **Deliverables:**
+  1. **Set-piece templates in `stage/`.** A template is a parameterised `ScenarioDesc` with named
+     slots, instanced with overrides. Ship at least:
+     - `abduction`: 1–3 animals lifted in parallel (one role and one cue each), with the `stillRoles` gate kept;
+     - `flyby`: a crossing on a path;
+     - `survey`: the beam sweeps a field and lifts nothing.
+     
+     Variation comes from parameters:
+     - place (a point, or a region plus a tag query with `clearance`);
+     - approach bearing, hover height and duration;
+     - beam colour and intensity;
+     - animal count;
+     - lift speed and spin.
+     
+     One craft can play several set pieces in sequence. The compiler orders them on its timeline, and refuses overlaps and travel it cannot make in the gap.
+  2. **`PlanSetPiece`,** a `directing::Plan` item modelled on `PlanCue` (`plan.hpp:191-203`).
+     - Its time is a musical anchor (bar, section or event) or seconds; its place and variation as above.
+     - It compiles to staging scenarios next to the authored ones.
+     - The validator refuses: an unknown template, a target with no clear air, a time outside the song, and one craft in two places.
+     - It warns when two set pieces share a place or a framing distance ("do not duplicate the same abduction shot").
+     - It round-trips and supports undo.
+  3. **Staging events per set piece**, e.g. `setpiece/<id>/beam`, `.../lift` and `.../depart`, on the bus and in seek replay. Event cameras (ADR-245), cue placement (ADR-767) and routes can then key on them.
+  4. **The evaluator hook** (`director.evaluate`, `director.compare`):
+     - It renders a scratch copy of a requested span, then calls the Critic CLI with `critic submit ... --video-start <a> --wait --json --strict`, using the adapter's scene and intent export.
+     - It returns an `EvaluationReport`: findings keyed by time span and plan item, plus metrics.
+     - It stores evaluations per plan revision beside `directingPlans`. `director.compare` diffs two revisions.
+     - Autonomy policy: iterate in scratch, show only the winner (ADR-757 must not stop every iteration).
+     - The Critic's path is configurable. A missing Critic is a clear error, never a silent pass.
+     - Tests use a stub evaluator. One ScriptedProvider test runs propose → evaluate → Modify → compare.
+  5. **A headless path GV3 can use:** a plan file with set pieces compiles into the saved project's staging (for example `avgen --project X --plan P.json --save-project OUT`, or whatever fits the existing CLI). A trace of where each set piece's craft and animals actually were comes from `avgen_cast_trace`.
+- **Proof:** a GPU or trace test in which three abductions at three places, with 1, 2 and 3 animals, play in one film with one craft. Each lift happens under a still craft. Seek lands on the same frame as play.
+- **Stay out of:** the route chain (routes), Song Mode (song).
+
+### render (ADRs 917–919): post and offline quality at any resolution
+- **Read:** the brief's §13 and §14; reports/render-post.md, all of it (engine gaps 3, 6 and 7 are
+  this stream's); `docs/image-formation.md`.
+- **Deliverables:**
+  1. **Post radii that hold across resolution** (gap 3): bloom level count and reach, anamorphic stretch, halation radius and motion-blur tiles scale with the output's reference size, so a 960×540 preview, a 1080p×2 final and a 4K×2 final show the same look.
+     - Pick one reference (the preview) and scale from it.
+     - Record every scene whose look changes.
+     - Test: GPU renders of one scene at two resolutions, compared after downsampling, with a control that fails on today's code.
+  2. **Fog colour from the sky** (gap 6): aerial perspective takes the sky's radiance, including the aurora, as an option on the existing fog.
+     - The distant rim must read as air, not as a dark cut-out.
+     - Test: a difference image against a constant-colour control.
+  3. **The offline tier raises authored sample counts** (gap 7): volume steps, anisotropy and the sky cube's resolution get tier floors, and a log line says what was raised.
+     - Test: the counts reach the renderer (a log or measured value), and the sky's banding falls at 4K (measure it).
+  4. **A report on the world edge** (gap 2): what it would take for `WorldMap` to be larger than 640 m, or to draw a backdrop ring beyond it. Say whether it fits in this stream.
+     - If it is contained (hours, not days), build it with tests; otherwise report.
+     - GV3 will close its valley ends with ridge features in scene data either way.
+- **Stay out of:** motion-blur reset at cuts (camera), water (water).
+
+### song (ADRs 920–923): musical shot durations and arcs
+- **Read:** the brief's §7 and §8 and the Director assessment; reports/director.md, all of it;
+  01-music.md; signals' ADRs 896–899 as merged.
+- **Deliverables:**
+  1. **Intent survives into the Director.** Carry arc, energy and visualDensity through `songPlanFromCues` (`song_plan.cpp:350-393`), and give `SectionCue::intentAt` a caller.
+  2. **Musical cuts in `directSong`.**
+     - Every cut lands on the beat grid, and a section boundary on its downbeat (signals' musical time).
+     - A Rising arc gives monotonically shorter shots. Burst gives short ones; Suspended holds.
+     - Rising and Burst may go below the global minimum.
+     - A drop opens its own shot on the downbeat.
+  3. **Durations from music and content,** not one global band:
+     - density (signals' onset rate and energy composite);
+     - how much the subject moves;
+     - whether the shot establishes scale (longer, for contrast).
+     
+     Write the rule down in the ADR and keep it deterministic.
+  4. **Peak sections go to the event subject:** a staging set piece (setpieces' events), the most important hero, or the subject of the section's event, instead of the rotation.
+  5. **`camera/focus/emphasis` and `ShotSpan::emphasis`:** wire them up or cut them (ADR-442).
+  6. **A headless cut report GV3's generator can read:** each shot's span, subject, arc, and the reason for its duration.
+- **Tests:**
+  - In `test_song_director.cpp`: Rising gives monotonic durations; every cut is on a beat; the label-scramble test still passes.
+  - `installSequence` drops no baked track.
+  - On `~/Desktop/Rebuild.mp3` (skip cleanly when absent):
+    - cuts land on downbeats within one frame;
+    - durations are not uniform (state the measure);
+    - the riser (bars 89–96) accelerates;
+    - the drop (177.71 s) opens a shot.
+
+### reactivity (ADRs 924–927): the reactivity planner
+- **Read:** the brief's §3, §4, §5, §6 and §16; reports/director.md recommendation 2;
+  reports/modulation.md and reports/mushrooms-wind.md, all of them; signals', routes' and emission's ADRs as merged.
+- **Deliverables:**
+  1. **`PlanRoute`,** a Plan item compiled to `params::ModRoute` plus sources. It carries routes' `delayMs` and `depthSource`. It round-trips, supports undo, and is seek-exact.
+  2. **A `ReactiveCatalog`** in `CapabilityRegistry`, generated from engine data (ADR-754):
+     - emissive materials (program-owned emission and `emissiveBoost`);
+     - the mushrooms' per-layer lanes and emissive fields;
+     - particle systems;
+     - scatter populations;
+     - effect fields, including fields timed from the last event;
+     - lights;
+     - atmosphere and fog;
+     - wind;
+     - water tears.
+     
+     Each entry has its neutral value, a safe range, and what kind of change it makes (luminance, hue, motion, density).
+  3. **The validator:**
+     - It refuses dead targets through routes' liveness registry.
+     - It flags a plan where everything follows one source, where every route shares one phase, where one entity is over-saturated, or where a phase-rate trap appears.
+  4. **A deterministic default proposer:** catalogue × musical layers → routes at three levels:
+     - **micro:** hats and snares on small, fast, local things;
+     - **meso:** the kick and bar on heroes, and waves through the mushrooms along the bar;
+     - **macro:** section energy on the ecology light, fog, emission gain and colour, through `depthSource`.
+     
+     Phases are staggered with `delayMs`. Each hero gets its own source, timing and amplitude, and depth follows the section. It must not be "everything pulses to the beat".
+  5. **A headless dump** of the proposal (routes plus the reason for each) for GV3's generator to read, edit and install.
+- **Tests:**
+  - golden plans on a fixture scene;
+  - the dead-target refusal, with a control;
+  - the "everything on the kick" flag;
+  - round-trip;
+  - one GPU difference image per target kind, proving that a proposed route reaches the pixels.
