@@ -587,6 +587,49 @@ TEST_CASE("A scatter layer's lane reaches every part of it, and the light it cas
     CHECK(doubledCount == lightCount);
     CHECK_THAT(doubled, WithinAbs(lightAfter * 2.0, lightAfter * 1e-4));
 
+    // Routable, not only settable: routes onto the layer's glow and the ecology light reach the
+    // parts and the lights the same frame, through the modulator's finals, and leave the bases (what
+    // a save writes) alone. At rest the routes move nothing.
+    {
+        signals::SignalBus bus;
+        const signals::SignalId swell = bus.declare("test.swell");
+        modulator.clearRoutes();
+        params::ModRoute toGlow;
+        toGlow.source = "test.swell";
+        toGlow.target = "nodes/ground/scatter/fungi/emissionGain";
+        toGlow.amount = 2.5f; // 2.5 at rest -> 5.0 with the signal up
+        params::ModRoute toLight = toGlow;
+        toLight.target = "scene/ecologyLight";
+        toLight.amount = 2.8f; // 2.8 -> 5.6
+        modulator.addRoute(toGlow);
+        modulator.addRoute(toLight);
+        REQUIRE(modulator.bind(bus, params).has_value());
+        const auto routed = [&](float value) {
+            bus.set(swell, value);
+            params.resetFinals();
+            modulator.applyRoutes(bus, params, 1.0 / 60.0);
+            (*comp)->update(FrameTime{});
+        };
+        routed(0.0f);
+        for (const auto* g : fungi) {
+            CHECK(g->emissionGain == 5.0f); // the terrain's boost 2 x the layer's 2.5, as before
+        }
+        CHECK_THAT(ecologyLights("").first, WithinAbs(doubled, doubled * 1e-4));
+        routed(1.0f);
+        for (const auto* g : fungi) {
+            CHECK(g->emissionGain == 10.0f);
+        }
+        for (const auto* g : beacons) {
+            CHECK(g->emissionGain == 2.0f); // the other layer is not routed
+        }
+        // The fungi's lights double twice over (gain 2.5 -> 5, ecology 2.8 -> 5.6); the beacons' once.
+        CHECK(ecologyLights("").first > doubled * 2.0);
+        CHECK(gain->base() == 2.5f);
+        CHECK(ecology->base() == 2.8f);
+        routed(0.0f);
+        modulator.clearRoutes();
+    }
+
     // A save keeps what the user set, on the layer and on the environment.
     const nlohmann::json saved = (*comp)->toJson();
     CHECK(saved.at("environment").at("ecologyLight") == 2.8f);
