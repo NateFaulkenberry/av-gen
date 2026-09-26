@@ -217,6 +217,16 @@ fn flowDesync(p: vec2<f32>) -> f32 {
 // and only aliases -- and on water that aliasing is not a static shimmer but a crawling one, because
 // the pattern is travelling. Fading each layer out as it approaches the footprint is the whole of
 // the level of detail here, and it is why the far reach of a river stays smooth instead of boiling.
+//
+// The pixels are *reference* pixels (ADR-915): a 1080-row frame's, or the frame's own when it has
+// fewer rows. Counted in the frame's own pixels, a render at twice the resolution kept detail out to
+// twice the distance -- GV3's previews (960x540 at 2x supersampling, 1080 rows) showed its far river
+// as a mirror and its final (1920x1080 at 2x, 2160 rows) showed ripple texture right across it. At or
+// above 1080 rows every resolution now fades the same world-space detail, so a preview is a preview
+// of the final; below 1080 rows the frame's own pixels still set the limit, because detail finer than
+// a real pixel can only alias.
+const kWaterReferenceRows: f32 = 1080.0;
+
 fn rippleLayerFade(frequency: f32, footprint: f32) -> f32 {
     let pixels = 1.0 / (max(frequency, 1e-4) * max(footprint, 1e-4));
     return smoothstep(1.0, 3.0, pixels);
@@ -341,11 +351,15 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     let dPdx = dpdx(in.worldPos.xz);
     let dPdy = dpdy(in.worldPos.xz);
     let footprint = length(dPdx) + length(dPdy);
+    // ...and of one reference pixel (ADR-915), which is what every fade on this surface counts: a
+    // 1080-row frame's pixel, or this frame's own when it has fewer rows than that.
+    let refScale = max(frame.targetSize.y / kWaterReferenceRows, 1.0);
+    let lodFootprint = footprint * refScale;
     // Where this part of the surface is in the advection cycle (ADR-914), shared by every effect
     // below that travels, each at its own offset into it.
     let desync = flowDesync(in.worldPos.xz);
     var rippleAmplitude = water.ripples.x;
-    let gradient = rippleGradient(in.worldPos.xz, dir, speed, t, footprint, desync) * rippleAmplitude;
+    let gradient = rippleGradient(in.worldPos.xz, dir, speed, t, lodFootprint, desync) * rippleAmplitude;
     var n = normalize(vec3<f32>(-gradient.x, 1.0, -gradient.y));
     if (underwater) {
         n = vec3<f32>(-n.x, -n.y, -n.z);
@@ -511,7 +525,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     var sparkle = vec3<f32>(0.0);
     if (water.sparkleColor.w > 0.0) {
         let frequency = water.ripples.y * 26.0;
-        let fade = sparkleBandFade(frequency, footprint);
+        let fade = sparkleBandFade(frequency, lodFootprint);
         if (fade > 0.0) {
             // ADR-914: two samples, each scrolling through the noise for one cycle. The scroll is in
             // noise cells, not metres, as it always was: at any frequency a glint field turns over
@@ -558,7 +572,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         // Two thresholds, not one: the band says "near the waterline" and the field says "and on a
         // crest", and a foam that fires on either reads as scum on still water.
         let broken = smoothstep(0.46, 0.88, surf * 0.55 + band * 0.55) *
-                     rippleLayerFade(surfFrequency, footprint);
+                     rippleLayerFade(surfFrequency, lodFootprint);
         foam = band * broken * water.foamColor.w * mix(0.45, 1.0, speedFraction);
     }
 
