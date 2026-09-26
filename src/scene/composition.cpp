@@ -8120,7 +8120,11 @@ void Composition::applyParameters() {
     // a blend, the one it is coming from). Every other camera in the collection costs its
     // parameters and nothing else -- no spline sample, no arithmetic, no draw.
     const CameraId cameraWas = activeCamera_.camera;
-    activeCamera_ = resolveActiveCamera(cameraDirection_, cameraEvents_, currentTime_);
+    // ADR-892: a continuous take owns the frame. The shots and the event cameras are left where
+    // they are and simply not consulted, so the event table keeps being observed and an Edited or
+    // Song cut later resolves exactly as ADR-245 describes.
+    activeCamera_ = continuousTake_ ? continuousTakeCamera(cameraDirection_)
+                                    : resolveActiveCamera(cameraDirection_, cameraEvents_, currentTime_);
     // ADR-391. The viewport's own viewpoint used to be expressed here, as a redirection of the
     // resolver's *answer* to the main camera ("free roam"). It is not expressed here any more, and
     // the reason is worth keeping: redirecting the answer made `activeCamera_` stop reporting the

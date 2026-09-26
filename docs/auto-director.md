@@ -8,7 +8,7 @@ called a director, and a rename that reached into `app::WorldDirector`, `seq::Di
 
 What "Enable Auto-director" does, what it can be relied on for, and where it stops. Written against
 the code as of 2026-09-16; the decisions behind it are ADR-062, ADR-071, ADR-072, ADR-075, ADR-080,
-ADR-104 to ADR-107, ADR-200 to ADR-203, ADR-245 and ADR-249.
+ADR-104 to ADR-107, ADR-200 to ADR-203, ADR-245, ADR-249 and ADR-892.
 
 ## Three modes, and what actually differs between them
 
@@ -17,7 +17,7 @@ differ in what they read.
 
 | Mode | Reads | Decides | Output |
 |---|---|---|---|
-| **Continuous shot** | a fold of the audio into musical sections | one uninterrupted move whose *intent* changes at section boundaries | timeline keys on one camera |
+| **Continuous shot** | a fold of the audio into musical sections | one uninterrupted move whose *intent* changes at section boundaries; it owns the frame (ADR-892) | timeline keys on one camera |
 | **Edited sequence** | the same fold | a cut list: each shot composed independently | timeline keys on one camera |
 | **Song** | an **authored song plan** — sections, each with a shot intent | which camera, what it frames, how it moves, and when to cut | timeline keys **and a camera shot track** |
 
@@ -234,12 +234,32 @@ and the hero stays where it was declared.
 not collision avoidance: it does not know about buildings, water, moving entities, or anything that
 arrives after the shot is cut.
 
-**The cut cannot see the world's own events, except through a camera.** A Continuous or Edited shot
-can land in the middle of a staging scenario (ADR-210) and the next one can walk out of it. The
-answer since ADR-245 is an *event camera*: a camera whose `eventScenario` names the scenario takes
-the frame while it runs, and gives it back by falling through the resolver. (ADR-217's aim hold did
-this approximately, for one camera, and has been retired — `holdScenario`, `holdRole` and
-`holdRelease` no longer exist in the settings, the project block or `--director`.)
+**The cut cannot see the world's own events, except through a camera.** An Edited shot can land in
+the middle of a staging scenario (ADR-210) and the next one can walk out of it. The answer since
+ADR-245 is an *event camera*: a camera whose `eventScenario` names the scenario takes the frame while
+it runs, and gives it back by falling through the resolver. (ADR-217's aim hold did this
+approximately, for one camera, and has been retired — `holdScenario`, `holdRole` and `holdRelease`
+no longer exist in the settings, the project block or `--director`.)
+
+**A continuous take owns the frame (ADR-892).** When the cut in force was directed in Continuous
+shot, the main camera has the frame at every instant. No authored shot, locked or not, and no event
+camera takes it, so a Continuous film makes no camera changes at all. The camera track and the event
+cameras are ignored, not deleted: direct again in Edited sequence or Song and they cut exactly as
+before. A continuous take therefore does not see a world event unless its own framing happens to
+include it; easing the take's aim toward an event is recorded follow-up work in ADR-892.
+
+Which claim wins, per mode:
+
+| Claim on the frame | Continuous shot | Edited sequence | Song | Never directed, or parked |
+|---|---|---|---|---|
+| Locked shot (authored, or Song's for a Locked section) | ignored | wins | wins | wins |
+| Event camera | ignored | 2nd | 2nd | 2nd |
+| Unlocked shot (authored, or Song's own) | ignored | 3rd | 3rd | 3rd |
+| The Auto-director's camera (main) | always | default | default | default |
+
+A project directed in Continuous shot before ADR-892 keeps ADR-245's order until it is directed
+again; the fact is stored with the cut (`cameraContinuousTake`), not read off the shot mode, whose
+default is Continuous.
 
 **No re-cut during an offline render.** `refreshDirection` runs in the interactive loop only; a
 render's heroes cannot change while it runs.

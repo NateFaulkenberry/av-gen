@@ -91,6 +91,7 @@ struct ParkedDirectorsCut {
     std::vector<params::Track> tracks;          // the `directedCameraTargets()` tracks, unbound
     std::vector<scene::AimFollow> aimFollow;    // ADR-158's table
     std::vector<scene::CameraShot> cameraShots; // ADR-249's `Origin::Directed` shots
+    bool continuousTake = false;                // ADR-892: the parked cut is a continuous take
     [[nodiscard]] bool empty() const {
         return tracks.empty() && aimFollow.empty() && cameraShots.empty();
     }

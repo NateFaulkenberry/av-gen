@@ -590,6 +590,18 @@ ActiveCameraState resolveActiveCamera(const CameraDirection& direction,
     return state;
 }
 
+ActiveCameraState continuousTakeCamera(const CameraDirection& direction) {
+    ActiveCameraState state;
+    state.camera = kMainCamera;
+    state.previous = kMainCamera;
+    state.reason = ActiveCameraReason::Default;
+    state.name = direction.nameOf(kMainCamera);
+    if (const CameraRig* rig = direction.find(kMainCamera); rig != nullptr) {
+        state.focalLength = rig->focalLength;
+    }
+    return state;
+}
+
 // ---- pose maths ---------------------------------------------------------------------------------
 
 CameraPose blendPoses(const CameraPose& from, const CameraPose& to, float t) {
