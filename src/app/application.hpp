@@ -96,6 +96,13 @@ struct AppOptions {
     // does not carry one. The same reason `--director` exists: a mode that can only be reached
     // through a GUI is a mode nobody can measure, reproduce or regression-test.
     std::optional<std::filesystem::path> songPlan;
+    // `--plan <file>` (ADR-929): a Director Plan -- set pieces among its items -- compiled into the
+    // loaded project and installed exactly as an approved proposal is, before any `--director` cut,
+    // so a Song Mode cut can see the set pieces it compiled. `--plan-report <file>` writes what it
+    // did as JSON: every finding, what was left out, each set piece's nominal timeline. GV3's
+    // generator consumes the engine through these two and `--save-project`.
+    std::optional<std::filesystem::path> plan;
+    std::optional<std::filesystem::path> planReport;
     std::optional<std::filesystem::path> saveProject;  // write on exit
     // `--save-scene <file>`: write the composition on exit, the symmetry `--save-project`
     // has always lacked. Needed by Song Mode (ADR-249), whose camera track lives in the
