@@ -1,5 +1,7 @@
 #include "analysis/structure.hpp"
 
+#include "analysis/span_profile.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -572,9 +574,6 @@ Result<SongStructure> detectStructure(const AnalysisTrack& track, const Structur
 
         const std::size_t dims = beatChroma.front().size() + beatTimbre.front().size();
         seg.signature.assign(dims, 0.0f);
-        float rms = 0.0f;
-        float onsets = 0.0f;
-        int counted = 0;
         for (int b = seg.firstBeat; b < seg.lastBeat && b < beatCount; ++b) {
             const auto bi = static_cast<std::size_t>(b);
             for (std::size_t d = 0; d < beatChroma[bi].size(); ++d) {
@@ -583,36 +582,42 @@ Result<SongStructure> detectStructure(const AnalysisTrack& track, const Structur
             for (std::size_t d = 0; d < beatTimbre[bi].size(); ++d) {
                 seg.signature[beatChroma[bi].size() + d] += beatTimbre[bi][d];
             }
-            if (!beatEnergy[bi].empty()) {
-                rms += beatEnergy[bi][0];
-            }
-            if (beatEnergy[bi].size() > 1) {
-                onsets += beatEnergy[bi][1];
-            }
-            ++counted;
         }
-        const auto divisor = static_cast<float>(std::max(counted, 1));
         normalise(seg.signature);
-        seg.energy = rms / divisor;
-        seg.density = onsets / divisor;
         segments.push_back(std::move(seg));
     }
     if (segments.empty()) {
         return fail("song structure: no segments were produced");
     }
 
-    // Energy and density rescaled across the piece, because "high energy" is a claim about this
-    // track and not about audio in general. A quiet ballad has a loudest section too.
+    // Energy and density (ADR-897), measured level-free over each segment and then expressed against
+    // the piece, because "high energy" is a claim about this track and not about audio in general --
+    // a quiet ballad has a most energetic section too.
+    //
+    // They used to be the segment's mean RMS and the *median* of a per-hop onset flag, min-max
+    // rescaled. On a limited master that is noise: "Rebuild"'s sub-heavy break read 1.0 and its
+    // thinned suspension 0.0, and a picked onset is one hop in thirty, so the median was 0 in every
+    // segment and density was structurally zero. Now: the energy composite (high band, brightness,
+    // flux, percussive density, width) and the onset rate in onsets per second, each divided by the
+    // piece's largest -- a ratio, so the quietest section keeps its distance from silence instead of
+    // being stretched to 0.
     {
         std::vector<float> e, d;
         e.reserve(segments.size());
         d.reserve(segments.size());
         for (const Segment& s : segments) {
-            e.push_back(s.energy);
-            d.push_back(s.density);
+            const SpanProfile profile = profileSpan(track, s.startSeconds, s.endSeconds);
+            e.push_back(profile.energy);
+            d.push_back(profile.onsetRate);
         }
-        rescale(e);
-        rescale(d);
+        const auto byLargest = [](std::vector<float>& v) {
+            const float top = v.empty() ? 0.0f : *std::max_element(v.begin(), v.end());
+            for (float& x : v) {
+                x = top > 1e-6f ? std::clamp(x / top, 0.0f, 1.0f) : 0.0f;
+            }
+        };
+        byLargest(e);
+        byLargest(d);
         for (std::size_t i = 0; i < segments.size(); ++i) {
             segments[i].energy = e[i];
             segments[i].density = d[i];
