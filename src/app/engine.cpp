@@ -61,15 +61,31 @@ void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, 
     time.playing = bus.declare("time.playing");
     time.beatPhase = bus.declare("beat.phase");
     time.beatPulse = bus.declare("beat.pulse", 0.0f, 1.0f, true);
-    time.beatCount = bus.declare("beat.count", 0.0f, 100000.0f);
+    // ADR-896: counted from beat 1 of bar 1, so a pickup before it is negative.
+    time.beatCount = bus.declare("beat.count", -100000.0f, 100000.0f);
     time.bpm = bus.declare("beat.bpm", 0.0f, 300.0f);
     time.barPhase = bus.declare("beat.bar");
     time.phrasePhase = bus.declare("beat.phrase");
-    time.phraseCount = bus.declare("beat.phraseCount", 0.0f, 100000.0f);
+    time.phraseCount = bus.declare("beat.phraseCount", -100000.0f, 100000.0f);
     time.phrasePulse = bus.declare("beat.phrasePulse", 0.0f, 1.0f, true);
     time.sectionPhase = bus.declare("beat.section");
-    time.sectionCount = bus.declare("beat.sectionCount", 0.0f, 100000.0f);
+    time.sectionCount = bus.declare("beat.sectionCount", -100000.0f, 100000.0f);
     music.declare(bus); // music.beat ... music.impact (ADR-073)
+    // ADR-899: the sequence's authored section timeline, on the bus a seek replays.
+    time.timelineSection = bus.declare("section.index", -1.0f, 1024.0f);
+    time.timelineProgress = bus.declare("section.progress");
+    time.timelineEnergy = bus.declare("section.energy");
+    time.timelineChange = bus.declare("section.change", 0.0f, 1.0f, true);
+    // What the route-source picker shows beside the names whose meaning changed (ADR-896) or is new
+    // (ADR-899).
+    bus.setLabel(time.beatCount, "beat number (0 = bar 1, beat 1)");
+    bus.setLabel(time.barPhase, "position in the bar (0 = the downbeat)");
+    bus.setLabel(time.phrasePhase, "position in the phrase");
+    bus.setLabel(time.sectionPhase, "position in the counted section (bars x phrases)");
+    bus.setLabel(time.timelineSection, "section number (Sequence section timeline, -1 = none)");
+    bus.setLabel(time.timelineProgress, "progress through the current section");
+    bus.setLabel(time.timelineEnergy, "energy of the current section");
+    bus.setLabel(time.timelineChange, "section change (a new section begins)");
 }
 
 } // namespace
@@ -221,10 +237,123 @@ std::uint64_t Engine::replaySignalKey(bool playing) const {
     mix(embeddedTempo_.available ? 1u : 0u);
     mix(bits(embeddedTempo_.available ? embeddedTempo_.bpm : 0.0));
     mix(bits(durationSeconds()));
-    mix(static_cast<std::uint64_t>(phraseBars_));
-    mix(static_cast<std::uint64_t>(sectionPhrases_));
+    // ADR-896: the meter every bar, phrase and section on the bus is divided by.
+    const analysis::Meter m = meter();
+    mix(static_cast<std::uint64_t>(m.beatsPerBar));
+    mix(static_cast<std::uint64_t>(m.phraseBars));
+    mix(static_cast<std::uint64_t>(m.sectionPhrases));
+    mix(static_cast<std::uint64_t>(static_cast<std::int64_t>(m.downbeat)));
+    // ADR-899: section.* reads the section timeline.
+    for (const song::Section& section : sequence_.sectionTimeline.sections) {
+        mix(bits(section.startSeconds));
+        mix(bits(section.endSeconds));
+        mix(bits(static_cast<double>(section.energy)));
+    }
     mix(playing ? 1u : 0u);
     return h;
+}
+
+Engine::MeterSettings Engine::meterSettings() const {
+    // The parameters when they are registered -- they are what the Parameters panel edits and what
+    // the project file restores -- and the held values in the moment between a parameter-set clear
+    // and the re-registration.
+    MeterSettings out = meterSettings_;
+    if (bar1BeatParam_ != nullptr) {
+        out.bar1Beat = bar1BeatParam_->base();
+    }
+    if (phraseBarsParam_ != nullptr) {
+        out.phraseBars = phraseBarsParam_->base();
+    }
+    if (sectionPhrasesParam_ != nullptr) {
+        out.sectionPhrases = sectionPhrasesParam_->base();
+    }
+    return out;
+}
+
+void Engine::setMeterSettings(const MeterSettings& settings) {
+    meterSettings_ = settings;
+    if (bar1BeatParam_ != nullptr) {
+        bar1BeatParam_->setBase(settings.bar1Beat);
+    }
+    if (phraseBarsParam_ != nullptr) {
+        phraseBarsParam_->setBase(settings.phraseBars);
+    }
+    if (sectionPhrasesParam_ != nullptr) {
+        sectionPhrasesParam_->setBase(settings.sectionPhrases);
+    }
+    refreshTransport(); // the bars readout counts from bar 1
+}
+
+void Engine::registerMeterParameters() {
+    // ADR-896: the meter's three settings, exposed where an artist looks for settings -- the
+    // Parameters panel's "music" group, "meter" section -- with labels that say what each one does
+    // and what its "detect" value is. Not modulatable: a bar line that moved with the audio would
+    // be no bar line at all.
+    const params::ParamFlags flags{.exposed = true, .modulatable = false, .serialized = true};
+    const MeterSettings held = meterSettings_;
+    if (params_.find(kBar1BeatPath) == nullptr) {
+        bar1BeatParam_ = &params_.add(params::ParamDesc<int>{.path = kBar1BeatPath,
+                                                            .defaultValue = -1,
+                                                            .hardMin = -1,
+                                                            .hardMax = 63,
+                                                            .label = "bar 1 starts on beat (-1 = detect)",
+                                                            .flags = flags});
+        bar1BeatParam_->setBase(held.bar1Beat);
+    }
+    if (params_.find(kPhraseBarsPath) == nullptr) {
+        phraseBarsParam_ = &params_.add(params::ParamDesc<int>{.path = kPhraseBarsPath,
+                                                              .defaultValue = 0,
+                                                              .hardMin = 0,
+                                                              .hardMax = 64,
+                                                              .label = "bars per phrase (0 = detect)",
+                                                              .flags = flags});
+        phraseBarsParam_->setBase(held.phraseBars);
+    }
+    if (params_.find(kSectionPhrasesPath) == nullptr) {
+        sectionPhrasesParam_ = &params_.add(params::ParamDesc<int>{.path = kSectionPhrasesPath,
+                                                                  .defaultValue = 4,
+                                                                  .hardMin = 1,
+                                                                  .hardMax = 64,
+                                                                  .label = "phrases per section",
+                                                                  .flags = flags});
+        sectionPhrasesParam_->setBase(held.sectionPhrases);
+    }
+}
+
+analysis::Meter Engine::meter() const { return resolveMeter(nullptr); }
+
+Engine::MeterSource Engine::meterSource() const {
+    MeterSource source;
+    static_cast<void>(resolveMeter(&source));
+    return source;
+}
+
+analysis::Meter Engine::resolveMeter(MeterSource* source) const {
+    const MeterSettings settings = meterSettings();
+    analysis::Meter m;
+    m.sectionPhrases = settings.sectionPhrases;
+    const analysis::MeterEstimate* estimate =
+        track_ != nullptr && track_->meterEstimate().valid ? &track_->meterEstimate() : nullptr;
+    MeterSource from;
+    // A MIDI clock's beat 0 is its own downbeat: the analysis's estimate is about tracked beats and
+    // says nothing about it. A pinned offset is the person's word and applies to either clock.
+    if (settings.bar1Beat >= 0) {
+        m.downbeat = settings.bar1Beat;
+    } else if (estimate != nullptr && !midiClockActive_) {
+        m.downbeat = estimate->downbeat;
+        from.downbeatDetected = true;
+        from.downbeatConfidence = estimate->downbeatConfidence;
+    }
+    if (settings.phraseBars > 0) {
+        m.phraseBars = settings.phraseBars;
+    } else if (estimate != nullptr && estimate->phraseBars > 0) {
+        m.phraseBars = estimate->phraseBars;
+        from.phraseDetected = true;
+    }
+    if (source != nullptr) {
+        *source = from;
+    }
+    return m.sanitized();
 }
 
 const char* tempoSourceName(TempoSource source) {
@@ -380,6 +509,7 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
                                                             .softMin = 0.0f,
                                                             .softMax = 4.0f});
     }
+    registerMeterParameters(); // ADR-896
     if (params_.find("post/bloom/intensity") == nullptr) {
         scene::PostSettings keep = post_;
         postParams_ = scene::registerPostParameters(params_, keep);
@@ -449,6 +579,7 @@ Result<seq::InstallReport> Engine::installSequence() {
     // dive through the lake on its way -- a shot from under water is a decision, not a side effect.
     // Null when the scene has no terrain, which the bake reports rather than silently ignoring.
     seq::BakeOptions options;
+    options.meter = meter(); // ADR-896: the sequence's Bar and Beat events count with the bus
     if (scene::Composition* comp = composition()) {
         if (const world::TerrainQuery ground = comp->terrainQuery(); ground.valid()) {
             options.groundHeightAt = [ground](float x, float z) {
@@ -477,6 +608,12 @@ Result<seq::InstallReport> Engine::installSequence() {
         }
     }
     auto report = seq::install(sequence_, timeline_, params_, sink, sequenceTargets_, options);
+    // Recorded whether or not the install succeeded: a failed one retried every frame for a meter
+    // it already tried would only repeat its error.
+    installedMeter_ = options.meter;
+    installedEventsUseMeter_ = std::any_of(sequence_.events.begin(), sequence_.events.end(), [](const seq::SequenceEvent& e) {
+        return e.when.kind == seq::TriggerKind::Beat || e.when.kind == seq::TriggerKind::Bar;
+    });
     if (scene::Composition* comp = composition()) {
         std::vector<scene::Composition::Performer> performers;
         if (report) {
@@ -640,6 +777,7 @@ void Engine::clearSequence() {
     seq::uninstall(timeline_, params_, sink, sequenceTargets_);
     sequenceTargets_.clear();
     sequenceReport_ = seq::InstallReport{};
+    installedEventsUseMeter_ = false;
     sequenceEvents_.clear();
     firedEvents_.clear();
     sequence_ = seq::Sequence{};
@@ -979,6 +1117,12 @@ Result<std::size_t> Engine::renameEffectOwner(const world::EffectOwner& from, co
 }
 
 void Engine::detachSceneParameters() {
+    // ADR-896: the meter's parameters are about to go with the rest of the set; hold their values so
+    // the re-registration carries them over.
+    meterSettings_ = meterSettings();
+    bar1BeatParam_ = nullptr;
+    phraseBarsParam_ = nullptr;
+    sectionPhrasesParam_ = nullptr;
     if (auto* comp = composition()) {
         comp->detach();
     }
@@ -1903,8 +2047,9 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         doc["outputs"] = outputs_;
     }
     doc["control"]["tempoSource"] = tempoSourceName(tempoSource_);
-    doc["control"]["phraseBars"] = phraseBars_;
-    doc["control"]["sectionPhrases"] = sectionPhrases_;
+    // ADR-896: the meter's settings (bar 1's beat, bars per phrase, phrases per section) are
+    // parameters now and are saved in `parameters` with the rest; their "detect" values are saved as
+    // such, so a measurement is never written down as a decision.
     nlohmann::json assets = nlohmann::json::object();
     // One plain clip is written as it always was -- `assets.audio`, a single reference -- so every
     // project made before arrangements existed round-trips byte for byte. Anything richer is a clip
@@ -2159,6 +2304,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     lens_ = scene::LensSettings{};
     exposure_ = scene::ExposureSettings{};
     focus_ = scene::FocusSettings{};
+    meterSettings_ = MeterSettings{}; // ADR-896: the loop above reset the parameters; this, what they re-register from
     auto warn = [&](std::string message) {
         log::warn("project: {}", message);
         projectWarnings_.push_back(std::move(message));
@@ -2475,8 +2621,16 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         } else {
             return fail("control.tempoSource '{}' unknown (analysis|midi)", tempo);
         }
-        setPhraseBars(doc["control"].value("phraseBars", 4));
-        setSectionPhrases(doc["control"].value("sectionPhrases", 4));
+        // ADR-896: the meter moved to the `music/meter/*` parameters and these keys are not read.
+        // Said, not silently dropped -- a phrase length that loads without a word and does nothing is
+        // the no-op family -- and not aliased either (ADR-442): the tracked projects were stripped.
+        for (const char* stale : {"phraseBars", "sectionPhrases"}) {
+            if (doc["control"].contains(stale)) {
+                warn(fmt::format("control.{} is no longer read; the meter's settings are the parameters "
+                                 "music/meter/phraseBars and music/meter/sectionPhrases (ADR-896)",
+                                 stale));
+            }
+        }
     } else {
         controlHub_.setMap(control::ControlMap{});
         setTempoSource(TempoSource::Analysis);
@@ -2837,6 +2991,8 @@ void Engine::newProject() {
     controlHub_.setMap(control::ControlMap{});
     outputs_ = nlohmann::json::array();
     setTempoSource(TempoSource::Analysis);
+    // The meter's settings belong to a piece (ADR-896); a new one starts detected.
+    setMeterSettings(MeterSettings{});
     ensureControlSource();
     sources_.attach(bus_, params_);
     modulator_.masterGain = 1.0f;
@@ -3669,6 +3825,12 @@ void Engine::seekSeconds(double seconds) {
         clock_.music.reset();
         clock_.beatPhase = 0.0;
         clock_.lastAnalysisBeatCount = 0;
+        // Nor is a jump a beat, a phrase boundary or a section change (ADR-896/899): the first frame
+        // after it has no previous frame to have crossed anything since.
+        clock_.haveClockBeats = false;
+        clock_.lastPhraseIndex = SignalClock::kNoIndex;
+        clock_.lastSectionIndex = SignalClock::kNoIndex;
+        clock_.liveOverlaySeconds = -1.0;
     }
     ReplaySignals* signalReplay = nullptr;
     if (replaySignals) {
@@ -3931,8 +4093,14 @@ void Engine::refreshTransport() {
     transport_.setDuration(duration);
     // The tempo is for the bars/beats readout and for beat stepping with no analyzed grid. It comes
     // from wherever the beat clock came from this frame, so the display cannot disagree with the
-    // signals.
-    transport_.setTempo(resolvedTempo().second, 4);
+    // signals -- and so does where bar 1 begins (ADR-896): the second the meter's downbeat falls on.
+    const analysis::Meter m = meter();
+    double origin = 0.0;
+    if (track_ != nullptr && !track_->beats().beatTimes.empty()) {
+        origin = analysis::secondsAtClockBeats(track_->beats().beatTimes, track_->beatSeconds(),
+                                               static_cast<double>(m.downbeat));
+    }
+    transport_.setTempo(resolvedTempo().second, m.beatsPerBar, origin);
     // The project's frame rate *is* the render settings' frame rate. Not a second one: the frames a
     // person steps through have to be the frames the project exports, and two numbers that are
     // nearly always equal are two numbers that will one day not be.
@@ -4109,6 +4277,8 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     clock_.beatPhase = 0.0;
     clock_.beatCount = 0;
     clock_.lastAnalysisBeatCount = 0;
+    clock_.haveClockBeats = false;
+    clock_.lastPhraseIndex = SignalClock::kNoIndex;
     log::info("live audio input '{}' at {} Hz", input_->deviceName(), input_->sampleRate());
     return {};
 }
@@ -4163,11 +4333,18 @@ FrameTime Engine::tick(FrameClock& clock) {
 
 void Engine::publishFrame(SignalClock& clock, signals::SignalBus& bus, const analysis::AnalysisFrame& frame) const {
     clock.latest = frame;
+    // ADR-896/898: live playback of a loaded file takes the whole-track analysis's beat and band
+    // onsets at the same position, so the editor hears what a render of the same second hears. Live
+    // INPUT has no track and keeps the causal tracker's answers.
+    if (track_ != nullptr && input_ == nullptr && !track_->empty()) {
+        clock.liveOverlaySeconds = analysis::overlayTrackFields(clock.latest, *track_, clock.liveOverlaySeconds);
+    }
+    const analysis::AnalysisFrame& published = clock.latest;
     clock.hasFrame = true;
-    audioSignals_.publish(bus, frame);
+    audioSignals_.publish(bus, published);
     // Live, this is every analysis frame the render thread sees. Offline it is the last of the
     // batch update() already walked, which consume() recognises by frame index and ignores.
-    clock.music.consume(frame, phraseBars_, sectionPhrases_);
+    clock.music.consume(published, meter());
 }
 
 bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double renderTime) const {
@@ -4175,22 +4352,43 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
         audioSignals_.publishSilence(bus);
         return false;
     }
-    // Consume every analysis frame whose centre lies at or before renderTime so onsets that
-    // fall between two render frames are not lost at low frame rates.
+    // Consume every analysis frame whose centre lies at or before renderTime so events that fall
+    // between two render frames are not lost at low frame rates: the broadband onset, the tracked
+    // beat, and the three band onsets (ADR-898) are each OR-ed across the batch with their
+    // strongest strength. Before ADR-898 only the onset was, and `audio.beat` lost about a third of
+    // its beats at 60 fps (a beat on any but the batch's last analysis frame).
     const auto& frames = track_->frames();
+    const analysis::Meter m = meter();
     bool onset = false;
     float onsetStrength = 0.0f;
+    bool beat = false;
+    bool low = false, mid = false, high = false;
+    float lowStrength = 0.0f, midStrength = 0.0f, highStrength = 0.0f;
     std::size_t cursor = clock.analysisCursor;
     while (cursor < frames.size() && frames[cursor].timeSeconds <= renderTime) {
-        if (frames[cursor].onset) {
+        const analysis::AnalysisFrame& f = frames[cursor];
+        if (f.onset) {
             onset = true;
-            onsetStrength = std::max(onsetStrength, frames[cursor].onsetStrength);
+            onsetStrength = std::max(onsetStrength, f.onsetStrength);
+        }
+        beat = beat || f.beat;
+        if (f.lowOnset) {
+            low = true;
+            lowStrength = std::max(lowStrength, f.lowOnsetStrength);
+        }
+        if (f.midOnset) {
+            mid = true;
+            midStrength = std::max(midStrength, f.midOnsetStrength);
+        }
+        if (f.highOnset) {
+            high = true;
+            highStrength = std::max(highStrength, f.highOnsetStrength);
         }
         // The classifier is fed here rather than from publishFrame() below, which only ever
         // sees the last frame of the batch: at 30 fps that is one analysis frame in three, and
         // a detector that samples the music at the frame rate is a detector whose answers
         // depend on the frame rate (ADR-073).
-        clock.music.consume(frames[cursor], phraseBars_, sectionPhrases_);
+        clock.music.consume(f, m);
         ++cursor;
     }
     if (cursor > clock.analysisCursor) {
@@ -4201,15 +4399,22 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
         if (onset) {
             clock.latest.onsetStrength = onsetStrength;
         }
+        clock.latest.beat = beat;
+        clock.latest.lowOnset = low;
+        clock.latest.lowOnsetStrength = lowStrength;
+        clock.latest.midOnset = mid;
+        clock.latest.midOnsetStrength = midStrength;
+        clock.latest.highOnset = high;
+        clock.latest.highOnsetStrength = highStrength;
         clock.hasFrame = true;
         audioSignals_.publish(bus, clock.latest);
-        clock.music.consume(clock.latest, phraseBars_, sectionPhrases_); // a repeat: ignored by index
+        clock.music.consume(clock.latest, m); // a repeat: ignored by index
         clock.analysisCursor = cursor;
         return true;
     }
     if (clock.hasFrame) {
-        // No new analysis this render frame: keep continuous values, drop the event pulse.
-        bus.setEvent(audioSignals_.onset, false);
+        // No new analysis this render frame: keep continuous values, drop the event pulses.
+        audioSignals_.clearEvents(bus);
     } else {
         audioSignals_.publishSilence(bus);
     }
@@ -4218,16 +4423,36 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
 
 bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const FrameTime& time,
                           bool newAnalysisFrame, const ClockInputs& in) const {
-    double bpm = in.bpm;
+    const double bpm = in.bpm;
+    // ADR-896: the one meter, resolved once for the frame, that every count below is divided by.
+    const analysis::Meter m = meter();
     bool pulse = false;
+    bool running = true;
+    double clockBeats = 0.0;
+    // An analysed grid is the clock whenever there is one and nothing else owns the beat: a file is
+    // loaded (not live input) and no MIDI clock is running. In both engine modes, so the editor's
+    // bars are the render's bars.
+    const std::vector<double>* grid =
+        !in.midi && track_ != nullptr && input_ == nullptr && !track_->beats().beatTimes.empty()
+            ? &track_->beats().beatTimes
+            : nullptr;
     if (in.midi) {
         // The MIDI clock owns the beat clock: phase and count come straight from the tracker
-        // (already extrapolated to this frame by the hub).
+        // (already extrapolated to this frame by the hub). Its beat 0 is the song's first beat.
         clock.beatPhase = in.midiPhase;
         clock.beatCount = in.midiCount;
         pulse = in.midiPulse;
+        clockBeats = static_cast<double>(in.midiCount) + in.midiPhase;
+    } else if (grid != nullptr) {
+        // ADR-896: a pure function of the second -- interpolated between tracked beats, extrapolated
+        // at the track's tempo outside them -- so a seek lands on the beat a play reaches, at any
+        // frame rate. The pulse is the frame on which the clock passes a whole beat.
+        clockBeats = analysis::clockBeatsAt(*grid, track_->beatSeconds(), time.renderTime);
+        pulse = clock.haveClockBeats && std::floor(clockBeats) > std::floor(clock.clockBeats);
+        clock.beatPhase = clockBeats - std::floor(clockBeats);
     } else if (bpm > 0.0) {
-        // Advance the per-frame beat clock; re-sync to the analyzer whenever it reports a beat.
+        // Live input: advance the per-frame beat clock; re-sync to the analyzer whenever it reports
+        // a beat.
         clock.beatPhase += time.deltaTime * bpm / 60.0;
         if (newAnalysisFrame && clock.latest.beatCount != clock.lastAnalysisBeatCount) {
             clock.beatPhase = static_cast<double>(clock.latest.beatPhase);
@@ -4239,33 +4464,65 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
             ++clock.beatCount;
             pulse = true;
         }
+        // Resynchronised to a tracker, `beatCount` counts the beats that have landed, so the beat
+        // this frame is in is one less. Free-running from the first frame with no tracked beat yet
+        // (a tempo with no audio), the count started at 0 on the first beat and already is it.
+        const double landed = clock.lastAnalysisBeatCount > 0 ? 1.0 : 0.0;
+        clockBeats = static_cast<double>(clock.beatCount) - landed + clock.beatPhase;
     } else {
         clock.beatPhase = 0.0;
+        running = false;
     }
+    clock.clockBeats = clockBeats;
+    clock.haveClockBeats = running;
+    // The musical position: 0.0 on beat 1 of bar 1. With no clock at all everything sits at zero.
+    const double musical = running ? m.beats(clockBeats) : 0.0;
+
     const double duration = in.duration;
     bus.set(timeSignals_.seconds, static_cast<float>(time.renderTime));
     bus.set(timeSignals_.progress, duration > 0.0 ? static_cast<float>(std::clamp(in.position / duration, 0.0, 1.0)) : 0.0f);
     bus.set(timeSignals_.playing, in.playing ? 1.0f : 0.0f);
     bus.set(timeSignals_.beatPhase, static_cast<float>(clock.beatPhase));
     bus.setEvent(timeSignals_.beatPulse, pulse, 1.0f);
-    bus.set(timeSignals_.beatCount, static_cast<float>(clock.beatCount));
+    bus.set(timeSignals_.beatCount, static_cast<float>(std::floor(musical)));
     bus.set(timeSignals_.bpm, static_cast<float>(bpm));
-    bus.set(timeSignals_.barPhase, static_cast<float>((clock.beatCount % 4 + clock.beatPhase) / 4.0));
+    bus.set(timeSignals_.barPhase, static_cast<float>(m.barPhase(musical)));
     {
         // Phrases and sections from the beat clock: continuous phases plus an event at each phrase
         // boundary, so a state machine can escalate over musical structure rather than per beat.
-        const double beatsPerBar = 4.0;
-        const double beats = static_cast<double>(clock.beatCount) + clock.beatPhase;
-        const double bars = beats / beatsPerBar;
-        const double phrases = bars / static_cast<double>(phraseBars_);
-        const double sections = phrases / static_cast<double>(sectionPhrases_);
-        const auto phraseIndex = static_cast<std::uint32_t>(phrases < 0.0 ? 0.0 : phrases);
+        const double phrases = musical / static_cast<double>(m.beatsPerPhrase());
+        const double sections = musical / static_cast<double>(m.beatsPerSection());
+        const auto phraseIndex = static_cast<std::int64_t>(std::floor(phrases));
         bus.set(timeSignals_.phrasePhase, static_cast<float>(phrases - std::floor(phrases)));
         bus.set(timeSignals_.phraseCount, static_cast<float>(phraseIndex));
-        bus.setEvent(timeSignals_.phrasePulse, phraseIndex != clock.lastPhraseIndex, 1.0f);
+        bus.setEvent(timeSignals_.phrasePulse,
+                     clock.lastPhraseIndex != SignalClock::kNoIndex && phraseIndex != clock.lastPhraseIndex, 1.0f);
         clock.lastPhraseIndex = phraseIndex;
         bus.set(timeSignals_.sectionPhase, static_cast<float>(sections - std::floor(sections)));
-        bus.set(timeSignals_.sectionCount, static_cast<float>(static_cast<std::uint32_t>(sections < 0.0 ? 0.0 : sections)));
+        bus.set(timeSignals_.sectionCount, static_cast<float>(std::floor(sections)));
+    }
+    {
+        // ADR-899: the authored section timeline -- which section the transport is in, how far
+        // through it, the energy its author (or the analysis) gave it, and an event on the frame it
+        // changes. A function of the position, so a replay rebuilds it exactly.
+        const song::SectionTimeline& timeline = sequence_.sectionTimeline;
+        std::int64_t index = -1;
+        float progress = 0.0f;
+        float energy = 0.0f;
+        if (const auto found = timeline.indexAt(in.position)) {
+            const song::Section& section = timeline.sections[*found];
+            index = static_cast<std::int64_t>(*found);
+            const double span = section.endSeconds - section.startSeconds;
+            progress = span > 0.0 ? static_cast<float>(std::clamp((in.position - section.startSeconds) / span, 0.0, 1.0))
+                                  : 0.0f;
+            energy = section.energy;
+        }
+        bus.set(timeSignals_.timelineSection, static_cast<float>(index));
+        bus.set(timeSignals_.timelineProgress, progress);
+        bus.set(timeSignals_.timelineEnergy, energy);
+        bus.setEvent(timeSignals_.timelineChange,
+                     clock.lastSectionIndex != SignalClock::kNoIndex && index != clock.lastSectionIndex, 1.0f);
+        clock.lastSectionIndex = index;
     }
     // The classifier's events, after the clock as they always were. Unconditional: no audio
     // consumed means every music.* signal is false.
@@ -4298,7 +4555,7 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     sourceContext_.audioDuration = in.duration;
     sourceContext_.playing = in.playing;
     sourceContext_.beatPhase = static_cast<float>(clock_.beatPhase);
-    sourceContext_.beatCount = clock_.beatCount;
+    sourceContext_.musicalBeats = clock_.haveClockBeats ? meter().beats(clock_.clockBeats) : 0.0;
     sourceContext_.tempoBpm = static_cast<float>(in.bpm);
     sourceContext_.beatEvent = pulse;
 }
@@ -4372,7 +4629,9 @@ void Engine::updateTimelineClock(const FrameTime& time) {
     // the wav however long the sequence was.
     static_cast<void>(time);
     timelineClock_.seconds = transport_.positionSeconds();
-    timelineClock_.beats = static_cast<double>(clock_.beatCount) + clock_.beatPhase;
+    // ADR-896: the musical position, so a key at beat 0 lands on beat 1 of bar 1 and one at beat 4
+    // on bar 2 -- the same numbering the bus, the LFOs and the triggers use.
+    timelineClock_.beats = sourceContext_.musicalBeats;
 }
 
 void Engine::applyCues() {
@@ -4844,7 +5103,7 @@ world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene)
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
     // Wave 2 (TRIGGER): beats and onsets from the offline track, the sequence's markers, HIST.
-    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, phraseBars_, sectionPhrases_);
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, meter());
     ctx.triggers = &triggerClock_;
     return ctx;
 }
@@ -5067,6 +5326,17 @@ void Engine::update(const FrameTime& time) {
         controller_->scene().detailLimits = detailLimits_;
     }
 
+    // ADR-896: a sequence's Beat and Bar events were resolved against the meter it was baked with. A
+    // meter changed since -- pinned in the Parameters panel, or a new track's estimate -- re-bakes
+    // it, so the editor's events land where a render of the saved project puts them. Only a
+    // sequence that has such events pays for it; a render never changes its meter mid-film.
+    if (installedEventsUseMeter_ && !(installedMeter_ == meter())) {
+        if (auto r = installSequence(); !r) {
+            log::warn("sequence: {}", r.error().message);
+            noteBindingProblem(r.error().message);
+        }
+    }
+
     if (mode_ == EngineMode::Offline) {
         // The offline position, taken from whatever clock produced this frame. No clamp, no loop and
         // no end rule: a render of 0..120 s against 30 s of audio renders 120 seconds, and a loop
@@ -5082,8 +5352,8 @@ void Engine::update(const FrameTime& time) {
             stats_.analysisHopMicros = runner_->averageHopMicros();
             stats_.analysisFrames = runner_->framesProduced();
         } else if (clock_.hasFrame) {
-            // No new analysis this render frame: keep continuous values, drop the event pulse.
-            bus_.setEvent(audioSignals_.onset, false);
+            // No new analysis this render frame: keep continuous values, drop the event pulses.
+            audioSignals_.clearEvents(bus_);
         } else {
             audioSignals_.publishSilence(bus_);
         }
@@ -5136,7 +5406,7 @@ void Engine::update(const FrameTime& time) {
         beat.onsetStrength = bus_.value(audioSignals_.onsetStrength);
         const double bpm = sourceContext_.tempoBpm > 1.0f ? static_cast<double>(sourceContext_.tempoBpm) : 120.0;
         beat.beatSeconds = 60.0 / bpm;
-        beat.barSeconds = beat.beatSeconds * 4.0;
+        beat.barSeconds = beat.beatSeconds * static_cast<double>(meter().beatsPerBar);
         states_.update(time.renderTime, time.deltaTime, bus_, beat, params_, presets_);
         bus_.set(stateProgressSignal_, states_.progress());
         bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
@@ -5264,7 +5534,8 @@ void Engine::update(const FrameTime& time) {
         base.audio2[2] = clock_.hasFrame ? std::min(1.0f, f.onsetStrength / 2.0f) : 0.0f;
         base.audio2[3] = static_cast<float>(clock_.beatPhase);
         base.beat[0] = sourceContext_.tempoBpm;
-        base.beat[1] = static_cast<float>(clock_.beatCount);
+        // ADR-896: the musical beat and the bar phase, as the bus has them.
+        base.beat[1] = bus_.value(timeSignals_.beatCount);
         base.beat[2] = bus_.value(timeSignals_.barPhase);
         base.beat[3] = bus_.value(timeSignals_.progress);
         shaderLayers_.update(time, base);

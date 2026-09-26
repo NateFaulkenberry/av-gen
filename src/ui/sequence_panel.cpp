@@ -9,6 +9,7 @@
 #include <chrono>
 
 #include "analysis/analysis_track.hpp"
+#include "analysis/span_profile.hpp"
 #include "analysis/structure.hpp"
 #include "core/log.hpp"
 #include "app/edit_system.hpp"
@@ -2775,6 +2776,30 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
         }
     }
 
+    // ADR-899: the number `section.energy` publishes while the playhead is in this section -- what a
+    // route keyed to it reads -- and what the audio under the span measures (level-free), so a
+    // section's sound can be read where the section is. Read-only: the energy is the timeline's
+    // (detected, or typed into the project), the profile is the track's.
+    ImGui::TextDisabled("section.energy %.2f", static_cast<double>(section.energy));
+    if (ImGui::IsItemHovered()) {
+        tooltip("What the section.energy signal carries in this section -- route it to scale anything\n"
+                "by the section. Detected sections carry the analysis's energy; authored ones what\n"
+                "their author typed.");
+    }
+    if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr && !track->empty()) {
+        const analysis::SpanProfile p = analysis::profileSpan(*track, section.startSeconds, section.endSeconds);
+        if (p.measured()) {
+            ImGui::TextDisabled("measured: energy %.2f, %.1f hits/s (kick %.1f), brightness %.0f Hz",
+                                static_cast<double>(p.energy), static_cast<double>(p.onsetRate),
+                                static_cast<double>(p.kickRate), static_cast<double>(p.brightnessHz));
+            if (ImGui::IsItemHovered()) {
+                tooltip("The audio under this section, measured independently of loudness: the energy\n"
+                        "composite (audio.energy), percussive hits per second (audio.onsetRate), kicks\n"
+                        "per second (audio.onsetLow) and the mean spectral centroid.");
+            }
+        }
+    }
+
     // **Making a type, which until now had to be done by editing the project file.**
     //
     // The model has supported custom types since ADR-247 and the picker above lists them, but there
@@ -3897,16 +3922,11 @@ double SequencePanel::snapSection(const app::Engine& engine, double seconds) con
     if (sectionSnap_ == 1) {
         return seq::snapTime(seconds, seq::SnapMode::Beats, beats);
     }
-    // Bars: every fourth beat, which is the same assumption `seq::BakeOptions::beatsPerBar` makes
-    // and is stated in one place there. It is now *read* from there rather than restated as a 4 --
-    // the comment promised one place and there were two, and the arrow keys' bar step (ADR-357)
-    // would have made it three. The returned value is still a beat's own time.
-    const auto perBar = static_cast<std::size_t>(std::max(1, seq::BakeOptions{}.beatsPerBar));
-    std::vector<double> bars;
-    bars.reserve(beats.size() / perBar + 1);
-    for (std::size_t i = 0; i < beats.size(); i += perBar) {
-        bars.push_back(beats[i]);
-    }
+    // Bars: the engine's meter (ADR-896), the one every bar in the engine is counted by -- so a
+    // section boundary snapped to "a bar" lands on the downbeat `music.downbeat` fires on, not on
+    // every fourth beat from whichever beat the tracker happened to find first. The returned value
+    // is still a beat's own time.
+    const std::vector<double> bars = engine.meter().barTimes(beats);
     return seq::snapTime(seconds, seq::SnapMode::Beats, bars);
 }
 

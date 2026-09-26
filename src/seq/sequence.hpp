@@ -488,10 +488,11 @@ struct BakeOptions {
     // sequencer's job is to ask how high the ground is, and whose ground it is belongs to whoever
     // installs the sequence.
     std::function<float(float x, float z)> groundHeightAt;
-    // How many beats are in a bar, for `TriggerKind::Bar`. The analysis publishes a beat list and a
-    // bar counter but a sequence only carries the beats, so the fold back into bars is stated here
-    // rather than assumed to be four everywhere.
-    int beatsPerBar = 4;
+    // The meter, for `TriggerKind::Bar` and `TriggerKind::Beat` (ADR-896): a sequence carries the
+    // beats but not which of them is beat 1, so the engine hands over the same meter the bus, the
+    // triggers and the Director use -- rather than every fourth beat from the first, which put
+    // "bar 9" a beat early on any track whose first tracked beat is not a downbeat.
+    analysis::Meter meter;
     // Nodes an entity drives (ADR-758). An actor on one of these is a scripted PERFORMANCE: the
     // installer hands it to the entity as a director motion for its span, so the bake writes no
     // position, rotation or scale track for it -- a track would be summed with the entity's own
@@ -690,7 +691,7 @@ struct Sequence {
     // Everything the event resolver can know before the piece runs: the shot edges, the markers the
     // analysis put here, the cues an author placed and the clip spans the actors state. Pure, and
     // public because the editor wants to show what an event would resolve to without baking.
-    [[nodiscard]] TriggerContext triggerContext(int beatsPerBar = 4) const;
+    [[nodiscard]] TriggerContext triggerContext(const analysis::Meter& meter = {}) const;
 
     // Turns the whole thing into timeline tracks. Pure: the same sequence bakes to the same JSON.
     [[nodiscard]] Result<BakeResult> bake(LayerSink& sink, const BakeOptions& options = {}) const;

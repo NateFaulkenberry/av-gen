@@ -208,8 +208,8 @@ void LfoSource::update(SignalBus& bus, const SourceContext& context) {
     const auto offset = static_cast<double>(phase_->value());
     double position = 0.0;
     if (beatSync_->value() && context.tempoBpm > 0.0f) {
-        const double beats = static_cast<double>(context.beatCount) + static_cast<double>(context.beatPhase);
-        position = beats / static_cast<double>(std::max(beatsPerCycle_->value(), 0.25f)) + offset;
+        // ADR-896: the musical position, so a cycle of beatsPerBar beats begins on a downbeat.
+        position = context.musicalBeats / static_cast<double>(std::max(beatsPerCycle_->value(), 0.25f)) + offset;
     } else {
         position = context.time.renderTime * static_cast<double>(rate_->value()) + offset;
     }

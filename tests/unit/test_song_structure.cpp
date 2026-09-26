@@ -298,6 +298,13 @@ TEST_CASE("Energy and density are measured against the track, not asserted absol
         CHECK(s.density <= 1.0f);
     }
     CHECK(loudest > quietest); // a rescale that collapsed would pass every bound above
+
+    // ADR-897: density is an onset rate. Every section here clicks on every beat, so every section
+    // has one -- and each is a ratio to the densest, so none reads 0. The old measure, the median of
+    // a per-hop onset flag, was 0 in every section of every track (an onset is one hop in thirty).
+    for (const auto& s : structure->sections) {
+        CHECK(s.density > 0.5f);
+    }
 }
 
 // ---- the labels are claims, and say how strong they are -----------------------------------------

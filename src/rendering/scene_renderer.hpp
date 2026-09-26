@@ -87,6 +87,10 @@ class EnvironmentProcessor;
 struct ShaderFrameInputs {
     const shaders::ShaderLayerSet* layers = nullptr;
     const analysis::AnalysisFrame* frame = nullptr; // for the audio spectrum texture (may be null)
+    // ADR-896: how far through the bar, 0..1, as the engine's meter has it (`Engine::barPhase`) --
+    // the `frame.beat.w` a material program reads. Not derived from the analysis frame's beat
+    // count here, which counted the first tracked beat as beat 1 and put every bar on beat 4.
+    float barPhase = 0.0f;
 };
 
 struct RenderStats {

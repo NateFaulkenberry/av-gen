@@ -148,6 +148,14 @@ TEST_CASE("only a continuous take joins its follow offsets; an edited sequence s
     settings.mode = app::DirectorMode::ContinuousShot;
     REQUIRE(app::directEngine(engine, engine.composition()->heroes(), settings).has_value());
     CHECK(joins() > 0);
+    // The take's last shot (it follows the visitor) lets its offset go over a join as well: the film
+    // runs a frame past the fold, and that frame was a 72-degree cut once the saucer had flown far
+    // from where the shot was cut.
+    {
+        const scene::AimFollow& last = engine.composition()->aimFollow().back();
+        INFO("last follow entry: " << last.hero << " until " << last.endSeconds << " s");
+        CHECK(last.joinOutSeconds > 0.0);
+    }
 
     // The joins ride in the project, or a render of the saved film would snap where playback did not.
     testsupport::ScratchDir dir("continuous_joins");
