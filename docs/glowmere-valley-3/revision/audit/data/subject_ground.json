@@ -1,0 +1,112 @@
+{
+ "s03": {
+  "subject": "ember",
+  "walk_frac": 1.0,
+  "resid_min_cm": -1.7000000000000348,
+  "resid_max_cm": 37.60000000000004,
+  "resid_fdom": 0.9523809523809523,
+  "model_f_bob": 1.0325607476635514,
+  "model_pp_cm": 18.35663551401869,
+  "terrainHF_cm": 0.8186810265878243,
+  "bobHF_cm": 11.035752482203403
+ },
+ "s09": {
+  "subject": "ember",
+  "walk_frac": 0.3924050632911392,
+  "resid_min_cm": 0.40000000000004476,
+  "resid_max_cm": 39.1,
+  "resid_fdom": 0.12658227848101264,
+  "model_f_bob": 1.0325607476635514,
+  "model_pp_cm": 18.35663551401869,
+  "terrainHF_cm": 0.10952519526658637,
+  "bobHF_cm": 6.839849540276053
+ },
+ "s10": {
+  "subject": "tide",
+  "walk_frac": 0.0,
+  "resid_min_cm": null,
+  "resid_max_cm": null,
+  "resid_fdom": 0.12658227848101264,
+  "model_f_bob": 0.9590625,
+  "model_pp_cm": 7.459375000000001,
+  "terrainHF_cm": 1.7763568394002505e-13,
+  "bobHF_cm": 0.0
+ },
+ "s13": {
+  "subject": "rook",
+  "walk_frac": 1.0,
+  "resid_min_cm": -3.6000000000001364,
+  "resid_max_cm": 9.600000000000009,
+  "resid_fdom": 1.0126582278481011,
+  "model_f_bob": 0.9557439446366782,
+  "model_pp_cm": 11.681314878892733,
+  "terrainHF_cm": 0.8572590982859918,
+  "bobHF_cm": 3.2718107319143557
+ },
+ "s18": {
+  "subject": "sage",
+  "walk_frac": 0.761437908496732,
+  "resid_min_cm": -5.400000000000027,
+  "resid_max_cm": 17.499999999999893,
+  "resid_fdom": 0.06535947712418301,
+  "model_f_bob": 0.9657692307692307,
+  "model_pp_cm": 9.657692307692308,
+  "terrainHF_cm": 2.5808093449367817,
+  "bobHF_cm": 2.41936468229043
+ },
+ "s19": {
+  "subject": "vane",
+  "walk_frac": 0.4885245901639344,
+  "resid_min_cm": -3.399999999999981,
+  "resid_max_cm": 50.30000000000001,
+  "resid_fdom": 0.06557377049180328,
+  "model_f_bob": 1.0325607476635514,
+  "model_pp_cm": 18.35663551401869,
+  "terrainHF_cm": 2.4306999016139157,
+  "bobHF_cm": 7.421665580848748
+ },
+ "s20": {
+  "subject": "vane",
+  "walk_frac": 0.620253164556962,
+  "resid_min_cm": -2.000000000000046,
+  "resid_max_cm": 37.90000000000005,
+  "resid_fdom": 1.0126582278481011,
+  "model_f_bob": 1.0325607476635514,
+  "model_pp_cm": 18.35663551401869,
+  "terrainHF_cm": 1.201363429888715,
+  "bobHF_cm": 8.42989350513686
+ },
+ "s25": {
+  "subject": "ember",
+  "walk_frac": 0.6309523809523809,
+  "resid_min_cm": 4.300000000000004,
+  "resid_max_cm": 47.29999999999998,
+  "resid_fdom": 0.9523809523809523,
+  "model_f_bob": 1.0325607476635514,
+  "model_pp_cm": 18.35663551401869,
+  "terrainHF_cm": 2.0928875600633923,
+  "bobHF_cm": 8.654777954570768
+ },
+ "s36": {
+  "subject": "ember",
+  "walk_frac": 0.5833333333333334,
+  "resid_min_cm": -1.0000000000000009,
+  "resid_max_cm": 33.599999999999994,
+  "resid_fdom": 0.47619047619047616,
+  "model_f_bob": 1.0325607476635514,
+  "model_pp_cm": 18.35663551401869,
+  "terrainHF_cm": 2.159009542553032,
+  "bobHF_cm": 6.8926454471170056
+ },
+ "s38": {
+  "subject": "vane",
+  "walk_frac": 0.4936708860759494,
+  "resid_min_cm": -0.40000000000004476,
+  "resid_max_cm": 39.40000000000001,
+  "resid_fdom": 1.0126582278481011,
+  "model_f_bob": 1.0325607476635514,
+  "model_pp_cm": 18.35663551401869,
+  "terrainHF_cm": 0.9098702356322645,
+  "bobHF_cm": 7.481565487935117
+ }
+}

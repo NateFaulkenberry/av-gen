@@ -1,0 +1,41 @@
+smoothed centreline: 104 nodes, length 757.9 m, descent 26.0 m, course speed 0.412 m/s, halfWidth 26.0 m
+per-node turn: max 5.16 deg, mean |turn| 2.38 deg, nodes with |turn| > 2 deg: 48
+t = 33.70 s, rippleScale 5.2 cycles/m: 53972 wet triangles
+  compression >  1.5:   2088 triangles (3.87%)
+  compression >    3:    316 triangles (0.59%)
+  compression >    5:    198 triangles (0.37%)
+  compression >   10:     82 triangles (0.15%)
+  compression >   20:      0 triangles (0.00%)
+  max compression 15.6; band triangles at the river/pool switch: 316
+  layer1: nominal wavelength 19.2 cm; in the median band triangle ~2.6 cm
+  layer2: nominal wavelength 7.1 cm; in the median band triangle ~1.0 cm
+  layer3: nominal wavelength 2.6 cm; in the median band triangle ~0.4 cm
+
+smoothed centreline: 104 nodes, length 757.9 m, descent 26.0 m, course speed 0.412 m/s, halfWidth 26.0 m
+per-node turn: max 5.16 deg, mean |turn| 2.38 deg, nodes with |turn| > 2 deg: 48
+t = 171.25 s, rippleScale 5.2 cycles/m: 53972 wet triangles
+  compression >  1.5:  40537 triangles (75.11%)
+  compression >    3:  16768 triangles (31.07%)
+  compression >    5:    840 triangles (1.56%)
+  compression >   10:    381 triangles (0.71%)
+  compression >   20:    236 triangles (0.44%)
+  max compression 77.8; band triangles at the river/pool switch: 375
+  segment-switch bands (compression > 3): 3 separate runs along the river
+  layer1: nominal wavelength 19.2 cm; in the median band triangle ~5.4 cm
+  layer2: nominal wavelength 7.1 cm; in the median band triangle ~2.0 cm
+  layer3: nominal wavelength 2.6 cm; in the median band triangle ~0.7 cm
+
+smoothed centreline: 104 nodes, length 757.9 m, descent 26.0 m, course speed 0.412 m/s, halfWidth 26.0 m
+per-node turn: max 5.16 deg, mean |turn| 2.38 deg, nodes with |turn| > 2 deg: 48
+t = 214.60 s, rippleScale 5.2 cycles/m: 53972 wet triangles
+  compression >  1.5:  42603 triangles (78.94%)
+  compression >    3:  24032 triangles (44.53%)
+  compression >    5:   2080 triangles (3.85%)
+  compression >   10:    414 triangles (0.77%)
+  compression >   20:    288 triangles (0.53%)
+  max compression 97.4; band triangles at the river/pool switch: 375
+  segment-switch bands (compression > 3): 2 separate runs along the river
+  layer1: nominal wavelength 19.2 cm; in the median band triangle ~4.8 cm
+  layer2: nominal wavelength 7.1 cm; in the median band triangle ~1.8 cm
+  layer3: nominal wavelength 2.6 cm; in the median band triangle ~0.6 cm
+

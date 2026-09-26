@@ -1,0 +1,365 @@
+[06:43:46.203] [info] avgen 0.1.0 starting (headless mode)
+[06:43:46.209] [info] ai: control plane ready -- 67 tool(s) across 20 domain(s), 5 provider(s) available
+[06:43:46.209] [info] ai: no provider selected
+[06:43:46.224] [debug] adapter tile/bandwidth features present: TransientAttachments, DualSourceBlending, Subgroups, ShaderF16
+[06:43:46.224] [debug] adapter tile/bandwidth features absent:  FramebufferFetch, PixelLocalStorageCoherent, PixelLocalStorageNonCoherent, MSAARenderToSingleSampled
+[06:43:46.225] [info] GPU: Apple M2 Max (apple, integrated) via Metal; timestamps=true; sharedTextures=true; maxColorAttachments=8, maxBufferSize=4095 MB
+[06:43:47.238] [info] loaded 'Rebuild.mp3': 48000 Hz, 2 ch, 10863360 frames (226.32 s)
+[06:43:47.238] [info] embedded tempo: none found in 'Rebuild.mp3'
+[06:43:47.603] [info] analyzed 226.32 s of audio: 21214 frames
+[06:43:47.637] [warning] procedural 'procedural': lod: unknown setting 'lodCount' ignored
+[06:43:47.637] [warning] procedural 'procedural': lod: unknown setting 'lodCount' ignored
+[06:43:47.637] [warning] procedural 'procedural': lod: unknown setting 'lodCount' ignored
+[06:43:47.645] [info] loaded glTF 'alien-scout.glb': 2 meshes, 2 entities, 1 materials, 3 textures, 0 lights, 0 cameras, 1 rig(s)/90 joints/26 clips, bounds [-0.463 -0.000 -0.148]..[0.463 1.662 0.294], 0 warning(s), 7.0 ms
+[06:43:47.651] [info] loaded glTF 'alien-diver.glb': 3 meshes, 3 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 1 rig(s)/90 joints/26 clips, bounds [-0.467 -0.000 -0.199]..[0.467 1.666 0.324], 0 warning(s), 6.4 ms
+[06:43:47.658] [info] loaded glTF 'alien-elder.glb': 3 meshes, 3 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 1 rig(s)/90 joints/26 clips, bounds [-0.463 -0.000 -0.170]..[0.463 1.678 0.294], 0 warning(s), 6.1 ms
+[06:43:47.664] [info] loaded glTF 'alien-ranger.glb': 4 meshes, 4 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 1 rig(s)/90 joints/26 clips, bounds [-0.463 -0.000 -0.263]..[0.463 1.794 0.312], 0 warning(s), 6.0 ms
+[06:43:47.670] [info] loaded glTF 'alien-pilot.glb': 4 meshes, 4 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 1 rig(s)/90 joints/26 clips, bounds [-0.467 -0.000 -0.263]..[0.467 1.794 0.312], 0 warning(s), 6.2 ms
+[06:43:47.671] [info] loaded glTF 'bull.glb': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 1 rig(s)/28 joints/1 clips, bounds [-0.381 -0.001 -1.084]..[0.381 1.770 1.565], 0 warning(s), 1.0 ms
+[06:43:47.672] [info] loaded glTF 'horse.glb': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 1 rig(s)/30 joints/1 clips, bounds [-0.283 -0.001 -0.982]..[0.283 1.752 1.334], 0 warning(s), 1.0 ms
+[06:43:47.673] [info] loaded glTF 'cow.glb': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 1 rig(s)/28 joints/1 clips, bounds [-0.347 -0.001 -0.931]..[0.347 1.573 1.427], 0 warning(s), 1.0 ms
+[06:43:47.674] [info] loaded scene 'glowmere-valley-3.scene.json': 77 node(s)
+[06:43:47.674] [warning] terrain 'valley': groundGlow 0.08 is carried by the generated ground material, and this terrain draws with the authored program 'paintedGround2' instead -- so the glow, its scale, its coverage, its colour and groundMottle all do nothing. Clear the program to use the generated material, or author the glow into 'paintedGround2'.
+[06:43:47.794] [info] loaded glTF 'CommonTree_1.gltf': 2 meshes, 2 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-2.194 -0.243 -2.225]..[2.117 7.022 2.353], 0 warning(s), 100.4 ms
+[06:43:47.796] [info] 'valley': mesh asset '../../assets/quaternius/glTF/CommonTree_1.gltf' carries 2 materials; one instanced draw each
+[06:43:47.796] [info] terrain 'valley': scatter 'canopy' contributed 551 navigation obstacles (trunk)
+[06:43:47.796] [info] terrain 'valley': scatter 'canopy' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:47.796] [info] terrain 'valley': scatter 'canopy' glow reduced to 508 emitters
+[06:43:47.796] [info] terrain 'valley': scatter 'canopy' placed 551 instances
+[06:43:47.908] [info] loaded glTF 'CommonTree_4.gltf': 2 meshes, 2 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-1.797 -0.243 -2.080]..[2.028 9.196 1.676], 0 warning(s), 98.2 ms
+[06:43:47.910] [info] 'valley': mesh asset '../../assets/quaternius/glTF/CommonTree_4.gltf' carries 2 materials; one instanced draw each
+[06:43:47.910] [info] terrain 'valley': scatter 'canopy-broad' contributed 349 navigation obstacles (trunk)
+[06:43:47.910] [info] terrain 'valley': scatter 'canopy-broad' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:47.910] [info] terrain 'valley': scatter 'canopy-broad' glow reduced to 336 emitters
+[06:43:47.910] [info] terrain 'valley': scatter 'canopy-broad' placed 349 instances
+[06:43:48.031] [info] loaded glTF 'TwistedTree_2.gltf': 2 meshes, 2 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-6.620 -0.201 -5.541]..[3.943 18.748 3.662], 0 warning(s), 112.5 ms
+[06:43:48.033] [info] 'valley': mesh asset '../../assets/quaternius/glTF/TwistedTree_2.gltf' carries 2 materials; one instanced draw each
+[06:43:48.033] [info] terrain 'valley': scatter 'twisted' contributed 485 navigation obstacles (trunk)
+[06:43:48.033] [info] terrain 'valley': scatter 'twisted' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:48.033] [info] terrain 'valley': scatter 'twisted' glow reduced to 462 emitters
+[06:43:48.034] [info] terrain 'valley': scatter 'twisted' placed 485 instances
+[06:43:48.167] [info] loaded glTF 'TwistedTree_4.gltf': 2 meshes, 2 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-4.327 -0.201 -7.143]..[6.053 18.537 4.150], 0 warning(s), 126.7 ms
+[06:43:48.169] [info] 'valley': mesh asset '../../assets/quaternius/glTF/TwistedTree_4.gltf' carries 2 materials; one instanced draw each
+[06:43:48.169] [info] terrain 'valley': scatter 'twisted-low' contributed 314 navigation obstacles (trunk)
+[06:43:48.169] [info] terrain 'valley': scatter 'twisted-low' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:48.169] [info] terrain 'valley': scatter 'twisted-low' glow reduced to 308 emitters
+[06:43:48.169] [info] terrain 'valley': scatter 'twisted-low' placed 314 instances
+[06:43:48.282] [info] loaded glTF 'Pine_3.gltf': 2 meshes, 2 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-2.114 -0.235 -2.292]..[1.498 7.157 1.703], 0 warning(s), 101.5 ms
+[06:43:48.285] [info] 'valley': mesh asset '../../assets/quaternius/glTF/Pine_3.gltf' carries 2 materials; one instanced draw each
+[06:43:48.285] [info] terrain 'valley': scatter 'pine-upper' contributed 469 navigation obstacles (trunk)
+[06:43:48.285] [info] terrain 'valley': scatter 'pine-upper' in wind 0.74: steady 0.018 gust 0.006 flutter 0.003 of height, ring 0.07 Hz, lag 3.04 s, curve 3.5
+[06:43:48.285] [info] terrain 'valley': scatter 'pine-upper' glow reduced to 452 emitters
+[06:43:48.285] [info] terrain 'valley': scatter 'pine-upper' placed 469 instances
+[06:43:48.393] [info] loaded glTF 'Pine_1.gltf': 2 meshes, 2 entities, 2 materials, 3 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-2.449 -0.235 -2.477]..[2.496 7.082 2.061], 0 warning(s), 98.2 ms
+[06:43:48.396] [info] 'valley': mesh asset '../../assets/quaternius/glTF/Pine_1.gltf' carries 2 materials; one instanced draw each
+[06:43:48.396] [info] terrain 'valley': scatter 'pine-rim' contributed 327 navigation obstacles (trunk)
+[06:43:48.396] [info] terrain 'valley': scatter 'pine-rim' in wind 0.74: steady 0.018 gust 0.006 flutter 0.003 of height, ring 0.07 Hz, lag 3.04 s, curve 3.5
+[06:43:48.396] [info] terrain 'valley': scatter 'pine-rim' glow reduced to 324 emitters
+[06:43:48.396] [info] terrain 'valley': scatter 'pine-rim' placed 327 instances
+[06:43:48.509] [info] loaded glTF 'DeadTree_1.gltf': 1 meshes, 1 entities, 1 materials, 2 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-2.592 -0.336 -2.903]..[3.557 9.160 2.845], 0 warning(s), 107.1 ms
+[06:43:48.511] [info] terrain 'valley': scatter 'deadwood' contributed 254 navigation obstacles (trunk)
+[06:43:48.511] [info] terrain 'valley': scatter 'deadwood' in wind 0.74: steady 0.003 gust 0.001 flutter 0.000 of height, ring 0.09 Hz, lag 2.62 s, curve 3.6
+[06:43:48.511] [info] terrain 'valley': scatter 'deadwood' glow reduced to 252 emitters
+[06:43:48.511] [info] terrain 'valley': scatter 'deadwood' placed 254 instances
+[06:43:48.621] [info] loaded glTF 'DeadTree_4.gltf': 1 meshes, 1 entities, 1 materials, 2 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-3.363 -0.336 -3.599]..[4.598 12.435 4.133], 0 warning(s), 104.2 ms
+[06:43:48.623] [info] terrain 'valley': scatter 'deadwood-rim' contributed 128 navigation obstacles (trunk)
+[06:43:48.623] [info] terrain 'valley': scatter 'deadwood-rim' in wind 0.74: steady 0.003 gust 0.001 flutter 0.000 of height, ring 0.09 Hz, lag 2.62 s, curve 3.6
+[06:43:48.623] [info] terrain 'valley': scatter 'deadwood-rim' glow reduced to 123 emitters
+[06:43:48.623] [info] terrain 'valley': scatter 'deadwood-rim' placed 128 instances
+[06:43:48.636] [info] loaded glTF 'Bush_Common.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.923 -0.235 -0.974]..[0.991 1.347 0.991], 0 warning(s), 5.2 ms
+[06:43:48.636] [info] terrain 'valley': scatter 'bushes' in wind 0.74: steady 0.049 gust 0.042 flutter 0.006 of height, ring 0.33 Hz, lag 0.86 s, curve 2.0
+[06:43:48.636] [info] terrain 'valley': scatter 'bushes' glow reduced to 1591 emitters
+[06:43:48.636] [info] terrain 'valley': scatter 'bushes' placed 2070 instances
+[06:43:48.688] [info] loaded glTF 'Fern_1.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-1.381 -0.077 -1.279]..[1.446 0.763 1.374], 0 warning(s), 32.1 ms
+[06:43:48.689] [info] terrain 'valley': scatter 'ferns' in wind 0.74: steady 0.103 gust 0.116 flutter 0.012 of height, ring 0.61 Hz, lag 0.49 s, curve 1.7
+[06:43:48.689] [info] terrain 'valley': scatter 'ferns' glow reduced to 1120 emitters
+[06:43:48.689] [info] terrain 'valley': scatter 'ferns' placed 1951 instances
+[06:43:48.866] [info] loaded glTF 'Grass_Common_Short.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.356 -0.022 -0.479]..[0.283 1.312 0.258], 0 warning(s), 2.5 ms
+[06:43:48.866] [info] terrain 'valley': scatter 'grass' in wind 0.74: steady 0.144 gust 0.183 flutter 0.017 of height, ring 0.62 Hz, lag 0.49 s, curve 1.5
+[06:43:48.867] [info] terrain 'valley': scatter 'grass' glow reduced to 2180 emitters
+[06:43:48.867] [info] terrain 'valley': scatter 'grass' placed 55515 instances
+[06:43:48.924] [info] loaded glTF 'Plant_1_Big.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.871 -0.035 -1.036]..[0.935 2.313 0.918], 0 warning(s), 31.7 ms
+[06:43:48.925] [info] terrain 'valley': scatter 'fan-plants' contributed 117 navigation obstacles (vegetation)
+[06:43:48.925] [info] terrain 'valley': scatter 'fan-plants' in wind 0.74: steady 0.017 gust 0.015 flutter 0.002 of height, ring 0.23 Hz, lag 1.24 s, curve 1.8
+[06:43:48.925] [info] terrain 'valley': scatter 'fan-plants' glow reduced to 307 emitters
+[06:43:48.925] [info] terrain 'valley': scatter 'fan-plants' placed 330 instances
+[06:43:48.973] [info] loaded glTF 'Flower_3_Group.gltf': 2 meshes, 2 entities, 2 materials, 2 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.614 -0.035 -0.802]..[0.875 2.020 0.789], 0 warning(s), 39.0 ms
+[06:43:48.973] [info] 'valley': mesh asset '../../assets/quaternius/glTF/Flower_3_Group.gltf' carries 2 materials; one instanced draw each
+[06:43:48.973] [info] terrain 'valley': scatter 'flowers' in wind 0.74: steady 0.127 gust 0.150 flutter 0.015 of height, ring 0.63 Hz, lag 0.47 s, curve 2.2
+[06:43:48.973] [info] terrain 'valley': scatter 'flowers' glow reduced to 186 emitters
+[06:43:48.973] [info] terrain 'valley': scatter 'flowers' placed 226 instances
+[06:43:49.003] [info] loaded glTF 'Mushroom_Common.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.333 -0.017 -0.445]..[0.230 0.446 0.334], 0 warning(s), 16.0 ms
+[06:43:49.003] [info] terrain 'valley': scatter 'fungi' in wind 0.74: steady 0.011 gust 0.003 flutter 0.001 of height, ring 0.18 Hz, lag 1.58 s, curve 2.6
+[06:43:49.004] [info] terrain 'valley': scatter 'fungi' glow reduced to 741 emitters
+[06:43:49.004] [info] terrain 'valley': scatter 'fungi' placed 1131 instances
+[06:43:49.028] [info] loaded glTF 'Mushroom_Laetiporus.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.650 -0.160 -0.328]..[0.716 0.607 0.775], 0 warning(s), 13.2 ms
+[06:43:49.028] [info] terrain 'valley': scatter 'shelf-fungi' in wind 0.74: steady 0.004 gust 0.001 flutter 0.000 of height, ring 0.19 Hz, lag 1.50 s, curve 2.8
+[06:43:49.028] [info] terrain 'valley': scatter 'shelf-fungi' glow reduced to 239 emitters
+[06:43:49.028] [info] terrain 'valley': scatter 'shelf-fungi' placed 243 instances
+[06:43:49.085] [info] loaded glTF 'Rock_Medium_1.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-1.727 -0.271 -1.150]..[1.498 1.989 1.839], 0 warning(s), 42.6 ms
+[06:43:49.086] [info] terrain 'valley': scatter 'boulders' contributed 478 navigation obstacles (rock)
+[06:43:49.086] [info] terrain 'valley': scatter 'boulders' placed 500 instances
+[06:43:49.107] [info] loaded glTF 'Pebble_Round_2.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.215 -0.003 -0.222]..[0.234 0.091 0.189], 0 warning(s), 12.5 ms
+[06:43:49.108] [info] terrain 'valley': scatter 'pebbles' placed 59 instances
+[06:43:49.109] [info] terrain 'valley': scatter 'beacons' in wind 0.74: steady 0.027 gust 0.013 flutter 0.003 of height, ring 0.19 Hz, lag 1.48 s, curve 2.2
+[06:43:49.109] [info] terrain 'valley': scatter 'beacons' glow reduced to 53 emitters
+[06:43:49.109] [info] terrain 'valley': scatter 'beacons' placed 53 instances
+[06:43:49.109] [info] terrain 'valley': 3482 navigation obstacles (3482 blocking) indexed at 12.1 m cells
+[06:43:49.211] [info] terrain 'valley': height baked, 321 x 321 samples at 2.00 m in 20.0 ms
+[06:43:49.211] [info] terrain 'valley': 196 chunks (28 with water), 689920 triangles at LOD 0, built in 102 ms
+[06:43:49.211] [info]   water 'glowmere-run-2': river 758 m, half width 26.0 m, descent 26.0 m, 0.41 m/s, heading (-0.21, 0.98)
+[06:43:49.211] [info]   water 'elder-pool': pond 0 m, half width 36.0 m, descent 0.0 m, 0.07 m/s, heading (0.71, 0.71)
+[06:43:49.213] [info] loaded glTF 'ufo.gltf': 6 meshes, 6 entities, 4 materials, 0 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-230.355 -41.820 -230.355]..[230.355 161.113 230.355], 0 warning(s), 1.9 ms
+[06:43:49.213] [info] 'procedural 'visitor'': mesh asset '../../assets/imported/ufo.gltf' carries 4 materials; one instanced draw each
+[06:43:49.213] [info] procedural 'visitor': material parts 0=Gray, 1=Light, 2=Black, 3=Blue
+[06:43:49.244] [info] loaded glTF 'Plant_7.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.448 0.079 -0.464]..[0.600 0.329 0.498], 0 warning(s), 30.9 ms
+[06:43:49.275] [info] loaded glTF 'Plant_7_Big.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.701 0.050 -0.851]..[0.610 0.304 0.512], 0 warning(s), 30.6 ms
+[06:43:49.283] [info] loaded glTF 'Petal_5.gltf': 1 meshes, 1 entities, 1 materials, 1 textures, 0 lights, 0 cameras, 0 rig(s)/0 joints/0 clips, bounds [-0.401 0.001 -0.420]..[0.433 0.290 0.376], 0 warning(s), 7.4 ms
+[06:43:49.543] [info] composition 'glowmere-valley-3': flattened 77 node(s) -> 252 entities, 864 meshes, 73 procedurals in 1869.4 ms (53 texture(s), digest 99.08 ms, changed, re-uploading)
+[06:43:49.747] [info] nav grid: 154x154 at 4.0 m (23716 cells, 20214 walkable, 1177 water, 2194 blocked), 4 regions (largest 10409 cells), 289 shore and 37 vista points, built in 201.5 ms
+[06:43:49.747] [info] nav grid: the grid answers the terrain half of a straight walk for this world; 951 sampled walks agreed with the world exactly
+[06:43:49.747] [warning] nav grid: the walkable ground is in 4 disconnected pieces; 9805 of 20214 walkable cells (49%) cannot be reached from the largest
+[06:43:49.748] [info] composition 'glowmere-valley-3': 19 entities installed, 22 reactions bound, 0 unresolved
+[06:43:49.754] [info] OSC receiver listening on 0.0.0.0:9000
+[06:43:49.754] [info] osc: listening on 0.0.0.0:9000 (prefix '/avgen')
+[06:43:49.767] [info] MIDI input open: 0 source(s) connected (filter '*')
+[06:43:49.767] [info] midi: 0 source(s) connected
+[06:43:49.781] [info] 'valley': mesh asset '../../assets/quaternius/glTF/CommonTree_1.gltf' carries 2 materials; one instanced draw each
+[06:43:49.781] [info] terrain 'valley': scatter 'canopy' contributed 551 navigation obstacles (trunk)
+[06:43:49.781] [info] terrain 'valley': scatter 'canopy' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:49.784] [info] 'valley': mesh asset '../../assets/quaternius/glTF/CommonTree_4.gltf' carries 2 materials; one instanced draw each
+[06:43:49.784] [info] terrain 'valley': scatter 'canopy-broad' contributed 349 navigation obstacles (trunk)
+[06:43:49.784] [info] terrain 'valley': scatter 'canopy-broad' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:49.787] [info] 'valley': mesh asset '../../assets/quaternius/glTF/TwistedTree_2.gltf' carries 2 materials; one instanced draw each
+[06:43:49.787] [info] terrain 'valley': scatter 'twisted' contributed 485 navigation obstacles (trunk)
+[06:43:49.787] [info] terrain 'valley': scatter 'twisted' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:49.790] [info] 'valley': mesh asset '../../assets/quaternius/glTF/TwistedTree_4.gltf' carries 2 materials; one instanced draw each
+[06:43:49.790] [info] terrain 'valley': scatter 'twisted-low' contributed 314 navigation obstacles (trunk)
+[06:43:49.790] [info] terrain 'valley': scatter 'twisted-low' in wind 0.74: steady 0.034 gust 0.013 flutter 0.005 of height, ring 0.08 Hz, lag 3.06 s, curve 3.2
+[06:43:49.794] [info] 'valley': mesh asset '../../assets/quaternius/glTF/Pine_3.gltf' carries 2 materials; one instanced draw each
+[06:43:49.794] [info] terrain 'valley': scatter 'pine-upper' contributed 469 navigation obstacles (trunk)
+[06:43:49.794] [info] terrain 'valley': scatter 'pine-upper' in wind 0.74: steady 0.018 gust 0.006 flutter 0.003 of height, ring 0.07 Hz, lag 3.04 s, curve 3.5
+[06:43:49.798] [info] 'valley': mesh asset '../../assets/quaternius/glTF/Pine_1.gltf' carries 2 materials; one instanced draw each
+[06:43:49.798] [info] terrain 'valley': scatter 'pine-rim' contributed 327 navigation obstacles (trunk)
+[06:43:49.798] [info] terrain 'valley': scatter 'pine-rim' in wind 0.74: steady 0.018 gust 0.006 flutter 0.003 of height, ring 0.07 Hz, lag 3.04 s, curve 3.5
+[06:43:49.800] [info] terrain 'valley': scatter 'deadwood' contributed 254 navigation obstacles (trunk)
+[06:43:49.800] [info] terrain 'valley': scatter 'deadwood' in wind 0.74: steady 0.003 gust 0.001 flutter 0.000 of height, ring 0.09 Hz, lag 2.62 s, curve 3.6
+[06:43:49.803] [info] terrain 'valley': scatter 'deadwood-rim' contributed 128 navigation obstacles (trunk)
+[06:43:49.803] [info] terrain 'valley': scatter 'deadwood-rim' in wind 0.74: steady 0.003 gust 0.001 flutter 0.000 of height, ring 0.09 Hz, lag 2.62 s, curve 3.6
+[06:43:49.803] [info] terrain 'valley': scatter 'bushes' in wind 0.74: steady 0.049 gust 0.042 flutter 0.006 of height, ring 0.33 Hz, lag 0.86 s, curve 2.0
+[06:43:49.804] [info] terrain 'valley': scatter 'ferns' in wind 0.74: steady 0.103 gust 0.116 flutter 0.012 of height, ring 0.61 Hz, lag 0.49 s, curve 1.7
+[06:43:49.804] [info] terrain 'valley': scatter 'grass' in wind 0.74: steady 0.144 gust 0.183 flutter 0.017 of height, ring 0.62 Hz, lag 0.49 s, curve 1.5
+[06:43:49.806] [info] terrain 'valley': scatter 'fan-plants' contributed 117 navigation obstacles (vegetation)
+[06:43:49.806] [info] terrain 'valley': scatter 'fan-plants' in wind 0.74: steady 0.017 gust 0.015 flutter 0.002 of height, ring 0.23 Hz, lag 1.24 s, curve 1.8
+[06:43:49.807] [info] 'valley': mesh asset '../../assets/quaternius/glTF/Flower_3_Group.gltf' carries 2 materials; one instanced draw each
+[06:43:49.807] [info] terrain 'valley': scatter 'flowers' in wind 0.74: steady 0.127 gust 0.150 flutter 0.015 of height, ring 0.63 Hz, lag 0.47 s, curve 2.2
+[06:43:49.808] [info] terrain 'valley': scatter 'fungi' in wind 0.74: steady 0.011 gust 0.003 flutter 0.001 of height, ring 0.18 Hz, lag 1.58 s, curve 2.6
+[06:43:49.808] [info] terrain 'valley': scatter 'shelf-fungi' in wind 0.74: steady 0.004 gust 0.001 flutter 0.000 of height, ring 0.19 Hz, lag 1.50 s, curve 2.8
+[06:43:49.810] [info] terrain 'valley': scatter 'boulders' contributed 478 navigation obstacles (rock)
+[06:43:49.810] [info] terrain 'valley': scatter 'beacons' in wind 0.74: steady 0.027 gust 0.013 flutter 0.003 of height, ring 0.19 Hz, lag 1.48 s, curve 2.2
+[06:43:49.810] [info] terrain 'valley': 3482 navigation obstacles (3482 blocking) indexed at 12.1 m cells
+[06:43:49.819] [info] terrain 'valley': 196 chunks (28 with water), 689920 triangles at LOD 0, reused in 9 ms
+[06:43:49.819] [info]   water 'glowmere-run-2': river 758 m, half width 26.0 m, descent 26.0 m, 0.41 m/s, heading (-0.21, 0.98)
+[06:43:49.819] [info]   water 'elder-pool': pond 0 m, half width 36.0 m, descent 0.0 m, 0.07 m/s, heading (0.71, 0.71)
+[06:43:49.819] [info] 'procedural 'visitor'': mesh asset '../../assets/imported/ufo.gltf' carries 4 materials; one instanced draw each
+[06:43:49.819] [info] procedural 'visitor': material parts 0=Gray, 1=Light, 2=Black, 3=Blue
+[06:43:50.296] [info] nav grid: 154x154 at 4.0 m (23716 cells, 20214 walkable, 1177 water, 2194 blocked), 4 regions (largest 10409 cells), 289 shore and 37 vista points, built in 197.6 ms
+[06:43:50.296] [info] nav grid: the grid answers the terrain half of a straight walk for this world; 951 sampled walks agreed with the world exactly
+[06:43:50.296] [warning] nav grid: the walkable ground is in 4 disconnected pieces; 9805 of 20214 walkable cells (49%) cannot be reached from the largest
+[06:43:50.296] [info] composition 'glowmere-valley-3': flattened 77 node(s) -> 252 entities, 864 meshes, 73 procedurals in 525.5 ms (53 texture(s), digest 98.02 ms, unchanged, no re-upload)
+[06:43:50.497] [info] nav grid: 154x154 at 4.0 m (23716 cells, 20214 walkable, 1177 water, 2194 blocked), 4 regions (largest 10409 cells), 289 shore and 37 vista points, built in 199.2 ms
+[06:43:50.497] [info] nav grid: the grid answers the terrain half of a straight walk for this world; 951 sampled walks agreed with the world exactly
+[06:43:50.497] [warning] nav grid: the walkable ground is in 4 disconnected pieces; 9805 of 20214 walkable cells (49%) cannot be reached from the largest
+[06:43:50.498] [info] composition 'glowmere-valley-3': 19 entities installed, 22 reactions bound, 0 unresolved
+[06:43:50.498] [info] sequence 'sequence': 0 shot(s), 0 actor(s), 0 overlay cue(s) -> 0 track(s), 0 key(s), 0 layer(s)
+[06:43:50.498] [info] project load: 3390 ms total -- Reading the project 5 ms; Loading audio 491 ms; Building the scene 2145 ms; Layers and parameters 18 ms; Timeline and automation 731 ms; 
+[06:43:50.528] [info] project 'glowmere-valley-3.json' loaded: 6507 parameters, 33 routes, 5 sources, 0 presets, 71 timeline tracks, 0 cues, 0 warning(s)
+[06:43:50.530] [debug] auto-director: shot  1 intro-1                   0.00s + 5.92s  vane
+[06:43:50.530] [debug] auto-director: shot  2 intro-2                   5.92s + 5.92s  vane
+[06:43:50.530] [debug] auto-director: shot  3 intro-3                  11.83s + 5.92s  visitor
+[06:43:50.530] [debug] auto-director: shot  4 intro-4                  17.75s + 5.92s  visitor
+[06:43:50.530] [debug] auto-director: shot  5 intro-5                  23.66s + 5.92s  scree-cap
+[06:43:50.530] [debug] auto-director: shot  6 verse-6                  29.58s + 5.90s  scree-cap
+[06:43:50.530] [debug] auto-director: shot  7 verse-7                  35.48s + 5.90s  scree-cap
+[06:43:50.530] [debug] auto-director: shot  8 verse-8                  41.38s + 5.90s  ember-cap
+[06:43:50.530] [debug] auto-director: shot  9 verse-9                  47.29s + 5.90s  ember-cap
+[06:43:50.530] [debug] auto-director: shot 10 verse-10                 53.19s + 5.90s  elder-2-cap
+[06:43:50.530] [debug] auto-director: shot 11 verse-11                 59.09s + 5.91s  elder-2-cap
+[06:43:50.530] [debug] auto-director: shot 12 verse-12                 65.00s + 5.91s  spire-cap
+[06:43:50.530] [debug] auto-director: shot 13 verse-13                 70.91s + 5.91s  spire-cap
+[06:43:50.530] [debug] auto-director: shot 14 verse-14                 76.81s + 5.91s  bloom-cap
+[06:43:50.530] [debug] auto-director: shot 15 verse-15                 82.72s + 5.91s  bloom-cap
+[06:43:50.530] [debug] auto-director: shot 16 verse-16                 88.63s + 5.91s  umbra-cap
+[06:43:50.530] [debug] auto-director: shot 17 verse-17                 94.54s + 5.91s  umbra-cap
+[06:43:50.530] [debug] auto-director: shot 18 verse-18                100.45s + 5.91s  sage
+[06:43:50.530] [debug] auto-director: shot 19 verse-19                106.36s + 5.91s  sage
+[06:43:50.530] [debug] auto-director: shot 20 verse-20                112.27s + 5.91s  ember
+[06:43:50.530] [debug] auto-director: shot 21 verse-21                118.18s + 5.91s  ember
+[06:43:50.530] [debug] auto-director: shot 22 verse-22                124.08s + 5.91s  veil-cap
+[06:43:50.530] [debug] auto-director: shot 23 verse-23                129.99s + 5.91s  veil-cap
+[06:43:50.530] [debug] auto-director: shot 24 verse-24                135.90s + 5.91s  lantern-cap
+[06:43:50.530] [debug] auto-director: shot 25 verse-25                141.80s + 5.91s  lantern-cap
+[06:43:50.530] [debug] auto-director: shot 26 verse-26                147.71s + 5.91s  tide
+[06:43:50.530] [debug] auto-director: shot 27 verse-27                153.62s + 5.91s  tide
+[06:43:50.530] [debug] auto-director: shot 28 verse-28                159.53s + 5.91s  rook
+[06:43:50.530] [debug] auto-director: shot 29 verse-29                165.45s + 5.91s  rook
+[06:43:50.530] [debug] auto-director: shot 30 verse-30                171.36s + 5.91s  ridge-cap
+[06:43:50.530] [debug] auto-director: shot 31 verse-31                177.27s + 5.90s  ridge-cap
+[06:43:50.530] [debug] auto-director: shot 32 verse-32                183.17s + 5.90s  vane
+[06:43:50.530] [debug] auto-director: shot 33 verse-33                189.08s + 5.90s  vane
+[06:43:50.530] [debug] auto-director: shot 34 verse-34                194.98s + 5.90s  cairn-cap
+[06:43:50.530] [debug] auto-director: shot 35 verse-35                200.88s + 5.90s  cairn-cap
+[06:43:50.530] [debug] auto-director: shot 36 verse-36                206.78s + 4.88s  elder-2-cap
+[06:43:50.530] [debug] auto-director: shot 37 verse-37                211.66s + 4.88s  elder-2-cap
+[06:43:50.530] [debug] auto-director: shot 38 verse-38                216.54s + 4.88s  visitor
+[06:43:50.530] [debug] auto-director: shot 39 verse-39                221.42s + 4.88s  visitor
+[06:43:50.530] [info] auto-director: 20 of 39 shot(s) shortened to hold 1.7 m/s
+[06:43:50.536] [info] auto-director: 17 of 39 shot(s) given a longer swing to hold 7 deg/s
+[06:43:50.536] [info] auto-director: the cut peaks at 1.7 m/s and 640 deg/s; the caps asked for 1.7 m/s and 7 deg/s. A continuous take has to cross the ground between subjects in the time the music gives it -- hold each subject for more shots, or give the shots longer, to lower that floor
+[06:43:50.536] [info] auto-director: 226s of audio folded into 8 section(s)
+[06:43:51.028] [info] auto-director: moved 164 camera key(s) clear of the terrain, the canopy or a hero -- up out of the ground, and sideways out of a subject
+[06:43:51.028] [info] auto-director: 21 of 210 key(s) holding a hero could not see it; 1 moved clear (worst 18.32 m), 20 left as composed because clearing them would have cost more than the shot (worst 892.02 m)
+[06:43:51.028] [info] auto-director: 1 baked track(s) name parameters this build does not have and were left out: camera/focus/emphasis
+[06:43:51.028] [info] auto-director: 22 of 39 shot(s) hold a subject and will follow it
+[06:43:51.028] [debug] auto-director: span    0.00s..   5.92s holding   vane
+[06:43:51.028] [debug] auto-director: span    5.92s..  11.83s holding   vane
+[06:43:51.028] [debug] auto-director: span   11.83s..  17.75s holding   visitor
+[06:43:51.028] [debug] auto-director: span   17.75s..  23.66s holding   visitor
+[06:43:51.028] [debug] auto-director: span   23.66s..  29.58s holding   scree-cap
+[06:43:51.028] [debug] auto-director: span   29.58s..  35.48s holding   scree-cap
+[06:43:51.028] [debug] auto-director: span   35.48s..  41.38s travelling scree-cap -> ember-cap
+[06:43:51.028] [debug] auto-director: span   41.38s..  47.29s holding   ember-cap
+[06:43:51.028] [debug] auto-director: span   47.29s..  53.19s travelling ember-cap -> elder-2-cap
+[06:43:51.028] [debug] auto-director: span   53.19s..  59.09s holding   elder-2-cap
+[06:43:51.028] [debug] auto-director: span   59.09s..  65.00s travelling elder-2-cap -> spire-cap
+[06:43:51.028] [debug] auto-director: span   65.00s..  70.91s holding   spire-cap
+[06:43:51.028] [debug] auto-director: span   70.91s..  76.81s travelling spire-cap -> bloom-cap
+[06:43:51.028] [debug] auto-director: span   76.81s..  82.72s holding   bloom-cap
+[06:43:51.028] [debug] auto-director: span   82.72s..  88.63s travelling bloom-cap -> umbra-cap
+[06:43:51.028] [debug] auto-director: span   88.63s..  94.54s holding   umbra-cap
+[06:43:51.028] [debug] auto-director: span   94.54s.. 100.45s travelling umbra-cap -> sage
+[06:43:51.028] [debug] auto-director: span  100.45s.. 106.36s holding   sage
+[06:43:51.028] [debug] auto-director: span  106.36s.. 112.27s travelling sage -> ember
+[06:43:51.028] [debug] auto-director: span  112.27s.. 118.18s holding   ember
+[06:43:51.028] [debug] auto-director: span  118.18s.. 124.08s travelling ember -> veil-cap
+[06:43:51.028] [debug] auto-director: span  124.08s.. 129.99s holding   veil-cap
+[06:43:51.028] [debug] auto-director: span  129.99s.. 135.90s travelling veil-cap -> lantern-cap
+[06:43:51.028] [debug] auto-director: span  135.90s.. 141.80s holding   lantern-cap
+[06:43:51.028] [debug] auto-director: span  141.80s.. 147.71s travelling lantern-cap -> tide
+[06:43:51.028] [debug] auto-director: span  147.71s.. 153.62s holding   tide
+[06:43:51.028] [debug] auto-director: span  153.62s.. 159.53s travelling tide -> rook
+[06:43:51.028] [debug] auto-director: span  159.53s.. 165.45s holding   rook
+[06:43:51.028] [debug] auto-director: span  165.45s.. 171.36s travelling rook -> ridge-cap
+[06:43:51.028] [debug] auto-director: span  171.36s.. 177.27s holding   ridge-cap
+[06:43:51.029] [debug] auto-director: span  177.27s.. 183.17s travelling ridge-cap -> vane
+[06:43:51.029] [debug] auto-director: span  183.17s.. 189.08s holding   vane
+[06:43:51.029] [debug] auto-director: span  189.08s.. 194.98s travelling vane -> cairn-cap
+[06:43:51.029] [debug] auto-director: span  194.98s.. 200.88s holding   cairn-cap
+[06:43:51.029] [debug] auto-director: span  200.88s.. 206.78s travelling cairn-cap -> elder-2-cap
+[06:43:51.029] [debug] auto-director: span  206.78s.. 211.66s holding   elder-2-cap
+[06:43:51.029] [debug] auto-director: span  211.66s.. 216.54s travelling elder-2-cap -> visitor
+[06:43:51.029] [debug] auto-director: span  216.54s.. 221.42s holding   visitor
+[06:43:51.029] [debug] auto-director: span  221.42s.. 226.29s travelling visitor -> spire-cap
+[06:43:51.029] [info] auto-director: 39 span(s) for world effects: 17 travelling, 22 holding
+[06:43:51.029] [info] auto-director: 39 shot(s), 6 track(s) installed, 0 replaced
+[06:43:51.029] [info] direct: 6 camera track(s) from 16 hero(es)
+[06:43:51.029] [debug] HDR target resized to 320x180
+[06:43:51.029] [info] entity 'rook': procedural motion on, 3 clip entry(s), chain of 1
+[06:43:51.029] [info] entity 'tide': procedural motion on, 3 clip entry(s), chain of 1
+[06:43:51.029] [info] entity 'sage': procedural motion on, 3 clip entry(s), chain of 1
+[06:43:51.029] [info] entity 'ember': procedural motion on, 3 clip entry(s), chain of 1
+[06:43:51.029] [info] entity 'vane': procedural motion on, 3 clip entry(s), chain of 1
+[06:43:51.248] [info] camera: s01 Nocturne: low through the ferns toward the elder (shot) at 0.00 s
+[06:43:52.221] [info] procedural sky built in 15.5 ms: cube 256 (9 mips), irradiance 32, prefiltered 128 x 6 mips; sun (0.83, 0.37, 0.41)
+[06:43:52.225] [info] particles 'tree-fireflies': 956 of 2877 scatter instances carry a swarm (33.2%; 2488 of them lit)
+[06:43:52.237] [debug] procedural 'valley_canopy': lod 1 = 97 triangles, 35% of the source mesh's 276
+[06:43:52.238] [debug] procedural 'valley_canopy': lod 2 = 97 triangles, 35% of the source mesh's 276
+[06:43:52.239] [debug] procedural 'valley_canopy': lod 3 = 97 triangles, 35% of the source mesh's 276
+[06:43:52.241] [debug] procedural 'valley_canopy_m1': lod 1 = 187 triangles, 34% of the source mesh's 545
+[06:43:52.243] [debug] procedural 'valley_canopy_m1': lod 2 = 65 triangles, 12% of the source mesh's 545
+[06:43:52.244] [debug] procedural 'valley_canopy_m1': lod 3 = 65 triangles, 12% of the source mesh's 545
+[06:43:52.245] [debug] procedural 'valley_canopy-broad': lod 1 = 56 triangles, 35% of the source mesh's 159
+[06:43:52.246] [debug] procedural 'valley_canopy-broad': lod 2 = 19 triangles, 12% of the source mesh's 159
+[06:43:52.246] [debug] procedural 'valley_canopy-broad': lod 3 = 8 triangles, 5% of the source mesh's 159
+[06:43:52.248] [debug] procedural 'valley_canopy-broad_m1': lod 1 = 643 triangles, 100% of the source mesh's 643
+[06:43:52.250] [debug] procedural 'valley_canopy-broad_m1': lod 2 = 643 triangles, 100% of the source mesh's 643
+[06:43:52.252] [debug] procedural 'valley_canopy-broad_m1': lod 3 = 643 triangles, 100% of the source mesh's 643
+[06:43:52.254] [debug] procedural 'valley_twisted': lod 1 = 68 triangles, 35% of the source mesh's 195
+[06:43:52.254] [debug] procedural 'valley_twisted': lod 2 = 23 triangles, 12% of the source mesh's 195
+[06:43:52.255] [debug] procedural 'valley_twisted': lod 3 = 23 triangles, 12% of the source mesh's 195
+[06:43:52.258] [debug] procedural 'valley_twisted_m1': lod 1 = 498 triangles, 100% of the source mesh's 498
+[06:43:52.261] [debug] procedural 'valley_twisted_m1': lod 2 = 498 triangles, 100% of the source mesh's 498
+[06:43:52.264] [debug] procedural 'valley_twisted_m1': lod 3 = 498 triangles, 100% of the source mesh's 498
+[06:43:52.266] [debug] procedural 'valley_twisted-low': lod 1 = 69 triangles, 35% of the source mesh's 197
+[06:43:52.266] [debug] procedural 'valley_twisted-low': lod 2 = 24 triangles, 12% of the source mesh's 197
+[06:43:52.267] [debug] procedural 'valley_twisted-low': lod 3 = 24 triangles, 12% of the source mesh's 197
+[06:43:52.270] [debug] procedural 'valley_twisted-low_m1': lod 1 = 153 triangles, 32% of the source mesh's 471
+[06:43:52.273] [debug] procedural 'valley_twisted-low_m1': lod 2 = 153 triangles, 32% of the source mesh's 471
+[06:43:52.275] [debug] procedural 'valley_twisted-low_m1': lod 3 = 153 triangles, 32% of the source mesh's 471
+[06:43:52.276] [debug] procedural 'valley_pine-upper': lod 1 = 55 triangles, 100% of the source mesh's 55
+[06:43:52.276] [debug] procedural 'valley_pine-upper': lod 2 = 8 triangles, 15% of the source mesh's 55
+[06:43:52.276] [debug] procedural 'valley_pine-upper': lod 3 = 8 triangles, 15% of the source mesh's 55
+[06:43:52.279] [debug] procedural 'valley_pine-upper_m1': lod 1 = 235 triangles, 33% of the source mesh's 702
+[06:43:52.281] [debug] procedural 'valley_pine-upper_m1': lod 2 = 80 triangles, 11% of the source mesh's 702
+[06:43:52.283] [debug] procedural 'valley_pine-upper_m1': lod 3 = 80 triangles, 11% of the source mesh's 702
+[06:43:52.284] [debug] procedural 'valley_pine-rim': lod 1 = 27 triangles, 26% of the source mesh's 102
+[06:43:52.284] [debug] procedural 'valley_pine-rim': lod 2 = 27 triangles, 26% of the source mesh's 102
+[06:43:52.285] [debug] procedural 'valley_pine-rim': lod 3 = 27 triangles, 26% of the source mesh's 102
+[06:43:52.286] [debug] procedural 'valley_pine-rim_m1': lod 1 = 176 triangles, 34% of the source mesh's 516
+[06:43:52.288] [debug] procedural 'valley_pine-rim_m1': lod 2 = 176 triangles, 34% of the source mesh's 516
+[06:43:52.289] [debug] procedural 'valley_pine-rim_m1': lod 3 = 176 triangles, 34% of the source mesh's 516
+[06:43:52.294] [debug] procedural 'valley_deadwood': lod 1 = 219 triangles, 33% of the source mesh's 660
+[06:43:52.297] [debug] procedural 'valley_deadwood': lod 2 = 219 triangles, 33% of the source mesh's 660
+[06:43:52.299] [debug] procedural 'valley_deadwood': lod 3 = 219 triangles, 33% of the source mesh's 660
+[06:43:52.304] [debug] procedural 'valley_deadwood-rim': lod 1 = 600 triangles, 100% of the source mesh's 600
+[06:43:52.307] [debug] procedural 'valley_deadwood-rim': lod 2 = 600 triangles, 100% of the source mesh's 600
+[06:43:52.309] [debug] procedural 'valley_deadwood-rim': lod 3 = 600 triangles, 100% of the source mesh's 600
+[06:43:52.310] [debug] procedural 'valley_bushes': lod 1 = 91 triangles, 35% of the source mesh's 260
+[06:43:52.310] [debug] procedural 'valley_bushes': lod 2 = 31 triangles, 12% of the source mesh's 260
+[06:43:52.311] [debug] procedural 'valley_bushes': lod 3 = 10 triangles, 4% of the source mesh's 260
+[06:43:52.311] [debug] procedural 'valley_ferns': lod 1 = 91 triangles, 35% of the source mesh's 260
+[06:43:52.312] [debug] procedural 'valley_ferns': lod 2 = 31 triangles, 12% of the source mesh's 260
+[06:43:52.312] [debug] procedural 'valley_ferns': lod 3 = 9 triangles, 3% of the source mesh's 260
+[06:43:52.312] [debug] procedural 'valley_grass': lod 1 = 28 triangles, 35% of the source mesh's 79
+[06:43:52.312] [debug] procedural 'valley_grass': lod 2 = 9 triangles, 11% of the source mesh's 79
+[06:43:52.312] [debug] procedural 'valley_grass': lod 3 = 8 triangles, 10% of the source mesh's 79
+[06:43:52.314] [debug] procedural 'valley_fan-plants': lod 1 = 98 triangles, 35% of the source mesh's 280
+[06:43:52.314] [debug] procedural 'valley_fan-plants': lod 2 = 34 triangles, 12% of the source mesh's 280
+[06:43:52.314] [debug] procedural 'valley_fan-plants': lod 3 = 34 triangles, 12% of the source mesh's 280
+[06:43:52.315] [debug] procedural 'valley_flowers': lod 1 = 62 triangles, 33% of the source mesh's 188
+[06:43:52.315] [debug] procedural 'valley_flowers': lod 2 = 23 triangles, 12% of the source mesh's 188
+[06:43:52.315] [debug] procedural 'valley_flowers': lod 3 = 23 triangles, 12% of the source mesh's 188
+[06:43:52.315] [debug] procedural 'valley_flowers_m1': lod 1 = 8 triangles, 67% of the source mesh's 12
+[06:43:52.316] [debug] procedural 'valley_flowers_m1': lod 2 = 8 triangles, 67% of the source mesh's 12
+[06:43:52.316] [debug] procedural 'valley_flowers_m1': lod 3 = 8 triangles, 67% of the source mesh's 12
+[06:43:52.316] [debug] procedural 'valley_fungi': lod 1 = 239 triangles, 100% of the source mesh's 239
+[06:43:52.317] [debug] procedural 'valley_fungi': lod 2 = 239 triangles, 100% of the source mesh's 239
+[06:43:52.317] [debug] procedural 'valley_fungi': lod 3 = 239 triangles, 100% of the source mesh's 239
+[06:43:52.320] [debug] procedural 'valley_shelf-fungi': lod 1 = 146 triangles, 35% of the source mesh's 420
+[06:43:52.321] [debug] procedural 'valley_shelf-fungi': lod 2 = 50 triangles, 12% of the source mesh's 420
+[06:43:52.322] [debug] procedural 'valley_shelf-fungi': lod 3 = 16 triangles, 4% of the source mesh's 420
+[06:43:52.323] [debug] procedural 'valley_boulders': lod 1 = 88 triangles, 49% of the source mesh's 180
+[06:43:52.323] [debug] procedural 'valley_boulders': lod 2 = 12 triangles, 7% of the source mesh's 180
+[06:43:52.323] [debug] procedural 'valley_boulders': lod 3 = 12 triangles, 7% of the source mesh's 180
+[06:43:52.324] [debug] procedural 'valley_pebbles': lod 1 = 42 triangles, 37% of the source mesh's 114
+[06:43:52.324] [debug] procedural 'valley_pebbles': lod 2 = 12 triangles, 11% of the source mesh's 114
+[06:43:52.324] [debug] procedural 'valley_pebbles': lod 3 = 8 triangles, 7% of the source mesh's 114
+[06:43:52.325] [debug] procedural 'valley_beacons': lod 1 = 307 triangles, 35% of the source mesh's 880
+[06:43:52.325] [debug] procedural 'valley_beacons': lod 2 = 100 triangles, 11% of the source mesh's 880
+[06:43:52.326] [debug] procedural 'valley_beacons': lod 3 = 34 triangles, 4% of the source mesh's 880
+[06:43:52.364] [debug] offline frame    0 hash=58c2538931f52b83
+[06:43:52.364] [info] offline frame    0 t=  0.000s bass=0.00 mid=0.00 treble=0.00 rms=0.00 onset=0 scale=1.000 emissive=0.00 gpu=22.02ms hash=58c2538931f52b83
+[06:43:52.364] [info]              gpu 22.02 ms over 46 passes (sum 22.02): scene=9.70 shadow=6.68 particles=2.36 cull=1.90 shadowmask=0.33 ao=0.26 post/motionblur=0.26 clusters=0.20 post/bloom=0.20 post/anamorphic=0.07 post/fxaa=0.07 background=0.00 depth=0.00 post/exposure=0.00 post/look-atmos=0.00 post/lens=0.00 post/composite=0.00 tonemap=0.00
+[06:43:52.364] [debug]              in order: clusters=0.197 particles=0.918 particles=0.393 particles=0.066 particles=0.655 particles=0.066 particles=0.000 particles=0.000 particles=0.066 particles=0.000 particles=0.000 particles=0.066 particles=0.000 particles=0.131 cull=1.901 shadow=3.801 shadow=0.262 shadow=2.621 background=0.000 depth=0.000 depth=0.000 ao=0.197 ao=0.066 shadowmask=0.328 scene=9.699 post/exposure=0.000 post/look-atmos=0.000 post/motionblur=0.262 post/motionblur=0.000 post/motionblur=0.000 post/lens=0.000 post/bloom=0.066 post/bloom=0.000 post/bloom=0.000 post/bloom=0.000 post/bloom=0.066 post/bloom=0.000 post/bloom=0.000 post/bloom=0.000 post/bloom=0.000 post/bloom=0.000 post/bloom=0.066 post/anamorphic=0.066 post/composite=0.000 post/fxaa=0.066 tonemap=0.000
+[06:43:52.364] [debug]              3 pass timestamp(s) the driver did not write (an empty render pass); their cost folds into the pass after them
+[06:43:52.364] [info]              draws=276 (indirect 440, empty 0, skipped 0) shadowDraws=58 cascades=3/3 spots=0 dispatches=15 tris=179543 instances=0v/0c/0 lod=0/0/0/0 particles=13sys/21888cap/0emit cpu(proc)=106.63ms cpu(scene)=400.51ms
+[06:43:52.364] [info]              cpu(update): control=0.00 signals=0.00 modulation=216.80 controller=3.49 other=180.22 | meshUp=11.61ms/1pass/864buf texUp=762.53ms/53 env=15.58 analysisCatchup=0.00
+[06:43:52.364] [info]              workload: volumeSteps=0 volumeTarget=0x0 media=0+0dropped fogShadow=0steps cascades=3 shadowRes=2048 aoTarget=160x90 aoSlices=3x6 shadowMask=160x90/2L postPasses=20 bloomLevels=6 sdf=0ray/0mesh simGrids=0 transient=20 wind=23obj plants=0/0awake (0 examined, 0 slot writes)
+[06:43:52.364] [info] frame wall clock over 1 steady frames: median 1335.21 ms  p10 1335.21  p90 1335.21  min 1335.21
+[06:43:52.364] [info]              wall p95 1335.21  p99 1335.21  max 1335.21  1%low 1335.21  0.1%low 1335.21  var 0.000 ms^2 (sd 0.00)
+[06:43:52.364] [info]              cpu  p50 933.65  p90 933.65  p99 933.65  max 933.65  1%low 933.65
+[06:43:52.364] [info]              gpu  p50 22.02  p90 22.02  p95 22.02  p99 22.02  max 22.02  1%low 22.02  0.1%low 22.02  var 0.000 ms^2
+[06:43:52.364] [info] gpu frame median 22.02 ms; pass medians (sum 22.02): scene=9.70 shadow=6.68 particles=2.36 cull=1.90 shadowmask=0.33 ao=0.26 post/motionblur=0.26 clusters=0.20 post/bloom=0.20 post/anamorphic=0.07 post/fxaa=0.07 background=0.00 depth=0.00 post/exposure=0.00 post/look-atmos=0.00 post/lens=0.00 post/composite=0.00 tonemap=0.00
+[06:43:52.364] [info] headless run complete: 1 block(s) of 1 frames at 60 fps; GPU errors: 0
+[06:43:52.397] [info] project saved to /private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/004befa7-093f-41d0-b2da-3d5e53a50a3a/scratchpad/audit/gv3-edited.json
+[06:43:52.479] [debug] OSC receiver on port 9000 closed

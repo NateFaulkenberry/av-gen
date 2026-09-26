@@ -39,6 +39,7 @@ the heroes, the saucer, the cut, the look and its modulation) is in the two proj
 | [06-iterations.md](06-iterations.md) | The iteration history |
 | [07-technical.md](07-technical.md) | Engine and tooling changes made for the production |
 | [08-final-evaluation.md](08-final-evaluation.md) | The end-to-end evaluation, written last |
+| [revision/](revision/) | **The second pass, in progress.** The owner's revision brief, the capability audit, the evaluator gate, the engine plan, and [PROGRESS.md](revision/PROGRESS.md), the operational state file to read first |
 
 ## How it is made
 
