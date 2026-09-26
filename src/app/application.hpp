@@ -267,6 +267,9 @@ struct AppOptions {
     // the parser a case has become a project, a size, a tier and a set of arms.
     bool listLabs = false;
     std::optional<labs::LabCase> labCase;
+    // ADR-902: `--audit-routes <out.json>` loads --project headless (no window, no GPU), writes the
+    // route/track/effect liveness report to the file ("-" = stdout) and exits.
+    std::optional<std::filesystem::path> auditRoutes;
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::optional<std::string> syphon; // --syphon <name>
     std::optional<std::string> example; // --example <name>

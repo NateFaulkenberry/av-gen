@@ -3386,8 +3386,12 @@ std::uint64_t withSignalKey(std::uint64_t key, const entity::ReplaySignalSource*
             mix(static_cast<std::uint64_t>(r.polarity));
             mix(r.enabled ? 1u : 0u);
             mix(bits(r.spatialGain));
+            // ADR-900: the depth changes what a reaction writes, and the delay is chain state.
+            mix(std::hash<std::string>{}(r.depthSource));
+            mix(bits(r.depthMin));
+            mix(bits(r.depthMax));
             const params::ProcessorChain& c = r.chain;
-            for (const float f : {c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
+            for (const float f : {c.delayMs, c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
                                   c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
                                   c.remapInMax, c.remapOutMin, c.remapOutMax}) {
                 mix(bits(f));
