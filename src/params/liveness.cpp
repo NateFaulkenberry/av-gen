@@ -45,8 +45,8 @@ constexpr std::array<RuleInfo, 23> kRules{{
      "material/<program>/emissionIntensity on a program that writes no emission register: the intensity "
      "multiplies nothing."},
     {"emission-lives-in-layer", "route|track", "dead",
-     "material/<program>/emissionIntensity where the program's emission comes only from its layers, whose "
-     "intensities are not registered parameters."},
+     "material/<program>/emissionIntensity where the program's emission comes only from its layers: key or "
+     "route the layer's own material/<program>/layer/<i>/<name>/emissionIntensity instead (ADR-905)."},
     {"program-owns-emission", "route|track", "dead",
      "A material's own emissive intensity, gain or colour on a surface whose program writes emission: the "
      "program's output replaces it (ADR-179)."},
@@ -222,6 +222,15 @@ std::vector<Finding> Registry::checkTarget(std::string_view path, int component,
     std::vector<Finding> out;
     const IParameter* param = facts.parameter(path);
     if (param == nullptr) {
+        // An unregistered target may still have a reason the scene can give, and that reason is the
+        // useful one. ADR-905 registers `material/<program>/emissionIntensity` only where the
+        // program's base writes emission, so on the programs that write none the path is simply not
+        // there -- and "program 'dull' writes no emission register" says why, where "not a
+        // registered parameter" says only that.
+        if (auto dead = facts.deadTarget(path, component)) {
+            out.push_back(std::move(*dead));
+            return out;
+        }
         out.push_back(make("unknown-target", Verdict::Dead, fmt::format("'{}' is not a registered parameter", path)));
         return out;
     }

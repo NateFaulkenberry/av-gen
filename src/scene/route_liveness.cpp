@@ -379,9 +379,13 @@ std::optional<Finding> SceneLivenessFacts::deadTarget(std::string_view path, int
             Cache::Program info;
             info.index = i;
             info.writesEmission = inRange(p.emissionRegister);
-            for (const MaterialLayer& layer : p.layers) {
+            // Each emissive layer by the path its own intensity is registered at (ADR-905,
+            // `registerMaterialProgramParameters`): `layer/<i>/<name>`, counted from 1.
+            for (std::size_t li = 0; li < p.layers.size(); ++li) {
+                const MaterialLayer& layer = p.layers[li];
                 if (layer.enabled && inRange(layer.emissionRegister)) {
-                    info.emissiveLayers.push_back(layer.name.empty() ? std::string("(unnamed)") : layer.name);
+                    info.emissiveLayers.push_back("layer/" + std::to_string(li + 1) + "/" +
+                                                  (layer.name.empty() ? std::string("layer") : layer.name));
                 }
             }
             c.programs.emplace(p.name, std::move(info));
@@ -423,11 +427,11 @@ std::optional<Finding> SceneLivenessFacts::deadTarget(std::string_view path, int
             if (!p.emissiveLayers.empty()) {
                 std::string layers;
                 for (const std::string& l : p.emissiveLayers) {
-                    layers += (layers.empty() ? "" : ", ") + l;
+                    layers += (layers.empty() ? "" : ", ") + fmt::format("material/{}/{}/emissionIntensity", seg[1], l);
                 }
                 return make("emission-lives-in-layer", Verdict::Dead,
-                            fmt::format("program '{}' writes no base emission; its glow comes from layer(s) {}, "
-                                        "whose emission intensity is not a registered parameter",
+                            fmt::format("program '{}' writes no base emission; its glow comes from its layers: key "
+                                        "or route {} instead (ADR-905)",
                                         seg[1], layers));
             }
             return make("program-has-no-emission", Verdict::Dead,

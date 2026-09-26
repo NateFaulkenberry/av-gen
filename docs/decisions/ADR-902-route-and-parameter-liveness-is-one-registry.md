@@ -204,3 +204,13 @@ whether the project already has one with the same source, target and component.
 - **What it does not judge.** Behaviour and meaning (the evaluator's renders); a scene file's effects
   replaced by the project's `effects` list (GV3's twelve), since the report reads the running project;
   terrain settings overridden by an authored program; the two content-dependent phase-rate cases above.
+- **Amended at integration with ADR-905 (2026-09-26).** ADR-905 registers
+  `material/<program>/emissionIntensity` only where the program's base writes emission. On every other
+  program the path is no longer there, so `program-has-no-emission` and `emission-lives-in-layer` could
+  never fire, and those targets would have read only "not a registered parameter". So `checkTarget` now
+  asks the scene's facts for an explanation before it reports `unknown-target`. An unregistered path the
+  facts can explain gets their reason; any other still reads `unknown-target`.
+  - `emission-lives-in-layer` names each layer's own registered path,
+    `material/<program>/layer/<i>/<name>/emissionIntensity`, as the one to key or route instead.
+  - The rule tests that asserted these reasons on unregistered paths are the control: they fail without
+    the change.
