@@ -1641,6 +1641,28 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     static const char* envelopes[] = {"none", "peak hold", "linear fall"};
     int removeIndex = -1;
     auto& routes = modulator.routes();
+    // ADR-902: each route's liveness verdict, shown beside its header the way "[ignored]" is shown
+    // beside an inert parameter. Re-checked when a route changed, and once a second besides, because
+    // a rule also reads the scene; the rules sample the chain, so not every frame.
+    {
+        const double now = ImGui::GetTime();
+        bool stale = routeLiveness_.size() != routes.size() || now - routeLivenessCheckedAt_ > 1.0;
+        for (std::size_t i = 0; !stale && i < routes.size(); ++i) {
+            stale = routeLiveness_[i].signature != routeSignature(routes[i]);
+        }
+        if (stale) {
+            const scene::SceneLivenessFacts facts(engine.livenessInputs());
+            const auto& registry = liveness::Registry::standard();
+            const auto set = registry.checkSet(routes, engine.timeline().tracks());
+            routeLiveness_.assign(routes.size(), RouteLivenessRow{});
+            for (std::size_t i = 0; i < routes.size(); ++i) {
+                auto findings = registry.checkRoute(routes[i], facts);
+                findings.insert(findings.end(), set.routes[i].begin(), set.routes[i].end());
+                routeLiveness_[i] = RouteLivenessRow{routeSignature(routes[i]), routeBadge(findings)};
+            }
+            routeLivenessCheckedAt_ = now;
+        }
+    }
     for (std::size_t i = 0; i < routes.size(); ++i) {
         auto& route = routes[i];
         ImGui::PushID(static_cast<int>(i));
@@ -1665,6 +1687,15 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::PopStyleColor();
             // After the item, so the scroll target is the row that was just laid out.
             ImGui::SetScrollHereY(0.35f);
+        }
+        if (i < routeLiveness_.size() && routeLiveness_[i].badge.show) {
+            const RouteBadge& badge = routeLiveness_[i].badge;
+            ImGui::SameLine();
+            ImGui::TextColored(badge.dead ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f) : ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s",
+                               badge.text.c_str());
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted(badge.tooltip.c_str());
+            }
         }
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
         ImGui::Checkbox("##on", &route.enabled);
@@ -1694,6 +1725,40 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(140);
             ImGui::SliderFloat("decay ms", &route.chain.decayMs, 0.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            // ADR-900: the delay stage and the depth source.
+            ImGui::SetNextItemWidth(140);
+            ImGui::SliderFloat("delay ms", &route.chain.delayMs, 0.0f, ProcessorChain::kMaxDelayMs, "%.0f",
+                               ImGuiSliderFlags_Logarithmic);
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted("The route reads its source as it was this long ago -- a stagger or an echo. "
+                                   "An event arrives whole, on the first frame at or after its delayed instant.");
+            }
+            ImGui::SameLine();
+            {
+                const std::vector<std::string> choices = depthSourceChoices(bus, route.depthSource);
+                std::vector<const char*> labels;
+                labels.reserve(choices.size());
+                for (const std::string& c : choices) {
+                    labels.push_back(c.c_str());
+                }
+                int depth = depthSourceIndex(choices, route.depthSource);
+                ImGui::SetNextItemWidth(170);
+                if (ImGui::Combo("depth", &depth, labels.data(), static_cast<int>(labels.size()))) {
+                    route.depthSource = depth == 0 ? std::string() : choices[static_cast<std::size_t>(depth)];
+                    engine.rebind(); // the depth signal is resolved at bind
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltipUnformatted("A signal that scales how far the route moves its target: depth = min + "
+                                       "(max - min) x signal. (none) is full depth, always.");
+                }
+            }
+            if (!route.depthSource.empty()) {
+                ImGui::SetNextItemWidth(100);
+                ImGui::SliderFloat("depth min", &route.depthMin, -1.0f, 2.0f);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(100);
+                ImGui::SliderFloat("depth max", &route.depthMax, -1.0f, 2.0f);
+            }
             int curve = static_cast<int>(route.chain.curve);
             ImGui::SetNextItemWidth(110);
             if (ImGui::Combo("curve", &curve, curves, 5)) {
@@ -1737,6 +1802,7 @@ void ControlPanel::drawSourcesTab(app::Engine& engine) {
     auto& bus = engine.signals();
     std::string removeKind;
     std::string removeName;
+    bool reattach = false;
     for (const auto& source : engine.sources().sources()) {
         ImGui::PushID(source.get());
         const std::string header = source->kind() + " " + source->name();
@@ -1761,10 +1827,28 @@ void ControlPanel::drawSourcesTab(app::Engine& engine) {
                     lfo->setShape(static_cast<signals::LfoShape>(shape));
                 }
             }
+            if (source->kind() == "timeline") {
+                // ADR-900: a timeline's keys are a curve, or each positive key is a hit -- a one-frame
+                // event an envelope source can be triggered by and no frame rate can miss.
+                auto* timeline = dynamic_cast<signals::TimelineSource*>(source.get());
+                int mode = static_cast<int>(timeline->mode());
+                static const char* modes[] = {"values (a curve)", "events (each key > 0 a hit)"};
+                ImGui::SetNextItemWidth(200);
+                if (ImGui::Combo("keys are", &mode, modes, 2)) {
+                    timeline->setMode(static_cast<signals::TimelineMode>(mode));
+                    reattach = true; // the bus learns the output is (or is no longer) an event
+                }
+                ImGui::SameLine();
+                ImGui::TextDisabled("%zu keys", timeline->keys().size());
+            }
             ImGui::TextDisabled("settings: Parameters window, group 'sources'");
             ImGui::TreePop();
         }
         ImGui::PopID();
+    }
+    if (reattach) {
+        engine.sources().attach(bus, engine.params());
+        engine.rebind();
     }
     if (!removeName.empty()) {
         engine.removeSource(removeKind, removeName);

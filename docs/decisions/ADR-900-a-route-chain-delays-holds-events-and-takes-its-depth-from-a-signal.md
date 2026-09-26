@@ -15,7 +15,8 @@ them. The same audit measured GV2's event routes arriving at 0.6-6.4% of their a
 `TimelineSource::hitBetween`/`positiveSpans`, `Source::readsTriggers`, `SourceRack::update`
 (`src/signals/source.*`); `SignalBus::setEventKind`
 **Tests:** `tests/unit/test_route_chain.cpp` (`[adr900]`); seek exactness in
-`tests/integration/test_route_seek.cpp` (ADR-901)
+`tests/integration/test_route_seek.cpp` (ADR-901); the route rows' logic in
+`tests/unit/test_route_row_logic.cpp`
 
 ---
 
@@ -126,6 +127,15 @@ crossfades from the value it found, and a depth of 0 leaves the target exactly a
 - A route writes `"depthSource"`, `"depthMin"` and `"depthMax"` only when it has a depth source.
 - A timeline source writes `"mode": "value"|"event"`; absent reads as value; an unknown mode is refused.
 - Entity reactions read and write chains through the same functions, so they take `delayMs` too.
+
+### Where an artist finds it
+
+- **Modulation panel, Routes tab**, each route's row: a `delay ms` slider (0-4000, beside `attack ms`
+  and `decay ms`), a `depth` combo listing `(none)` and every signal on the bus, and `depth min` /
+  `depth max` once a depth source is chosen (`src/ui/control_panel.cpp`, `drawRoutesTab`; the combo's
+  entries come from `ui::depthSourceChoices`, `src/ui/route_row_logic.hpp`).
+- **Modulation panel, Sources tab**, a timeline source's row: `keys are` -- `values (a curve)` or
+  `events (each key > 0 a hit)`, with its key count (`drawSourcesTab`).
 
 ### Rejected
 

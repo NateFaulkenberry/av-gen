@@ -1029,7 +1029,8 @@ scene::LivenessInputs Engine::livenessInputs() const {
     in.sectionPhrases = sectionPhrases_;
     in.durationSeconds = durationSeconds();
     in.frameRate = render_.fps > 0.0 ? render_.fps : 60.0;
-    in.hasAudio = track_ != nullptr && !track_->empty();
+    // An analysed track, or a live input whose analysis runs as it plays: either moves audio.*.
+    in.hasAudio = (track_ != nullptr && !track_->empty()) || input_ != nullptr;
     in.hasTempo = in.hasAudio || tempoOverride_.available || embeddedTempo_.available;
     in.offline = mode_ == EngineMode::Offline;
     return in;

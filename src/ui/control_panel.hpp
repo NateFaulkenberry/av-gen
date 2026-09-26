@@ -32,6 +32,7 @@
 #include "ui/editor_layout.hpp"
 #include "ui/output_preview.hpp"
 #include "ui/theme.hpp"
+#include "ui/route_row_logic.hpp"
 #include "ui/ui_logic.hpp"
 
 #include <algorithm>
@@ -547,6 +548,14 @@ private:
     char assetSearch_[96] = "";
     int newRouteSource_ = 0;
     int newRouteTarget_ = 0;
+    // ADR-902: each route row's liveness badge, re-checked when that route changed and once a second
+    // besides (a rule also reads the scene). The rules sample the route's chain, so not every frame.
+    struct RouteLivenessRow {
+        std::uint64_t signature = 0;
+        RouteBadge badge;
+    };
+    std::vector<RouteLivenessRow> routeLiveness_;
+    double routeLivenessCheckedAt_ = -1.0;
     int newSourceKind_ = 0;
     char newSourceName_[64] = "wobble";
     char presetName_[64] = "preset";

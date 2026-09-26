@@ -15,7 +15,8 @@ could not affect, speeds whose phase is time x speed, arcs on program outputs no
 `auditRoutes`, `reportRouteLiveness` (`src/app/engine.*`); `app::runRouteAuditCommand`
 (`src/app/route_audit_cli.*`) and `--audit-routes` (`src/app/main.cpp`, `application.cpp`)
 **Tests:** `tests/unit/test_route_liveness.cpp` (`[adr902]`): every rule with a case it must flag and a
-neighbour it must not; `tests/integration/test_route_audit_cli.cpp`: the report of a project on disk
+neighbour it must not; `tests/integration/test_route_audit_cli.cpp`: the report of a project on disk;
+`tests/unit/test_route_row_logic.cpp`: the editor's badge
 
 ---
 
@@ -56,6 +57,10 @@ a sentence.
   - `avgen --project <file> --audit-routes <out.json>` writes the whole report, headless and with no
     GPU. A validator asks `Registry::standard().checkTarget(path, component, facts)` before it proposes
     a route or a track.
+  - **In the editor, beside the route**: the Modulation panel's Routes tab shows `[dead: <rule>]` (red)
+    or `[hazard: <rule>]` (amber) after a route's `source -> target` header, the way `[ignored]` sits
+    beside an inert parameter, with every finding in its tooltip. Rows are re-checked when a route
+    changes and once a second (`ui::routeBadge`, `ui::routeSignature`, `src/ui/route_row_logic.hpp`).
 
 ### The rules
 
