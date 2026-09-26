@@ -1680,3 +1680,19 @@ TEST_CASE("The engine's grid is its meter over the tracked beats", "[song][direc
     REQUIRE(grid.nearestDownbeat(3.0, 1.0).has_value());
     CHECK(*grid.nearestDownbeat(3.0, 1.0) == 6); // 3.4 s, bar 2
 }
+
+TEST_CASE("Every arc says what it does to the cutting, where a treatment is chosen", "[song][director][ui]") {
+    // The Sequence panel's section inspector and the Auto-director panel's section tooltip show this
+    // beside a treatment, so an accelerating riser or a held suspension can be traced from the
+    // picture to the control that made it (the owner's UI-reach rule). Named for what a viewer sees.
+    std::set<std::string> seen;
+    for (const song::Arc arc : song::allArcs()) {
+        const std::string note = app::arcCutNote(arc);
+        INFO(song::arcName(arc) << ": " << note);
+        CHECK(note.rfind(song::arcName(arc), 0) == 0); // starts with the arc's own name
+        CHECK(note.find("--") != std::string::npos);    // ...and then what it does
+        seen.insert(note);
+    }
+    CHECK(seen.size() == song::allArcs().size());
+    CHECK(std::string(app::arcCutNote(song::Arc::Rising)).find("shortest shot") != std::string::npos);
+}

@@ -479,7 +479,11 @@ std::optional<Layout> layoutOnGrid(const Positions& pos, double beatSeconds, dou
     const std::size_t last = n - 1;
     const double span = pos.t[last] - pos.t[0];
     const double tolerance = 0.25 * beatSeconds;
-    const double slack = 4.0 * beatSeconds; // a bar of grace past a ceiling, so a cut can find its line
+    // The floor and the ceiling are the panel's own numbers and are held -- with half a beat of
+    // grace for the tracked grid's own jitter (ADR-896: within 19 ms of the true beats), so a
+    // four-bar shot is not refused for being a millisecond long.
+    const double grace = std::max(0.5 * beatSeconds, 1e-6);
+    const double floorGrace = std::min(grace, 0.01 * floor);
     constexpr double kInf = std::numeric_limits<double>::infinity();
     const auto edgeCost = [&](std::size_t k, std::size_t i, std::size_t j, double& aimOut) -> double {
         const double length = pos.t[j] - pos.t[i];
@@ -487,10 +491,11 @@ std::optional<Layout> layoutOnGrid(const Positions& pos, double beatSeconds, dou
             return kInf;
         }
         const bool whole = i == 0 && j == last;
-        if (length < floor - 1e-6 && !(whole && span < floor)) {
+        if (length < floor - floorGrace && !(whole && span < floor)) {
             return kInf;
         }
-        if (length > ceilingOf(k) + slack && !(whole && k == 0 && fixedCount <= 1)) {
+        // A section that cannot be divided inside the band is one shot, rather than no film.
+        if (length > ceilingOf(k) + grace && !(whole && k == 0 && fixedCount <= 1)) {
             return kInf;
         }
         aimOut = aimOf(k, i);
@@ -866,6 +871,22 @@ float cameraMatch(const scene::CameraRig& camera, const ShotIntentProfile& inten
     const float lens = 1.0f - std::abs(widenessOf(camera) - intent.distance);
     const float subject = 1.0f - std::abs(subjectnessOf(camera) - intent.heroEmphasis);
     return std::clamp(0.5f * lens + 0.5f * subject, 0.0f, 1.0f);
+}
+
+const char* arcCutNote(song::Arc arc) {
+    switch (arc) {
+    case song::Arc::Steady:
+        return "steady -- one pace for the whole section";
+    case song::Arc::Rising:
+        return "rising -- shots shorten toward the section's end, below 'shortest shot' if they must";
+    case song::Arc::Falling:
+        return "falling -- shots lengthen toward the section's end";
+    case song::Arc::Suspended:
+        return "suspended -- held as one shot, up to twice 'longest shot'";
+    case song::Arc::Burst:
+        return "burst -- opens on short cuts on its downbeat, then settles";
+    }
+    return "steady -- one pace for the whole section";
 }
 
 std::vector<scene::CameraRig> eligibleCameras(const scene::CameraDirection& direction) {

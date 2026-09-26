@@ -254,6 +254,11 @@ struct SongDirection {
                                                std::span<const scene::CameraRig> eligible,
                                                const SongDirectorOptions& options);
 
+// What an arc does to a section's cuts, in the words the Auto-director panel's section tooltip and
+// the Sequence panel's section inspector show beside a treatment (ADR-921): the visible effect, named
+// for what a viewer sees rather than for the enum.
+[[nodiscard]] const char* arcCutNote(song::Arc arc);
+
 // Which cameras of a collection the Auto-director may use. Exposed because two things need to agree
 // about it -- what the director picks from and what a panel says is available -- and because a
 // caller wanting to know why its film used one camera should be able to ask.
