@@ -29,6 +29,10 @@ The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner
 | emission | 903–906 | `0b623b88` + **54 uncommitted files** | Died mid-work applying viewer-facing labels. No report, and no commit. |
 | characters | 907–910 | `5dc541db` + **22 uncommitted files** | Died mid-fix (gait state must start as authored for bodies seeked but never stepped). No report. |
 
+**Round 1, launched 14:35:** the signals finisher (agent `a544c532ad5e8e2f3`) and the routes finisher (`a48d9ba7c7b4c3bf2`).
+- **Main baseline for routes' GPU failures,** run by the coordinator on main's own build (the gv3 worktree's build is main's tree, `a58f77ac`): the readback-ring and EXR-determinism tests pass on main, so those two failures are routes'.
+- **"Glowmere Valley 2 from several viewpoints" fails on main too,** identically (`test_glowmere_valley_2_views.cpp:201`, camera 72.478889 m off). It is a pre-existing defect, not caused by any stream. Nobody owns it yet.
+
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
 2. emission finisher + camera finisher.
