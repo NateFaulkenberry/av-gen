@@ -309,10 +309,14 @@ freedom turns that derived plan into the project's own, saved with it.
 On the command line:
 
 ```
---director mode=song,autonomy=guided,minShot=1.6,maxShot=5,seed=1
---song-plan <file>        a song plan, for a project that does not carry one
+--director mode=song,autonomy=guided,minShot=1.6,maxShot=5,minBuildShot=0.5,seed=1
+--song-plan <file>        a song plan, cut for this run instead of the project's own sections (ADR-923)
+--cut-report <file>       the cut as JSON: every shot's span, subject, arc and the reason for its length
 --save-scene <file>       the camera shot track lives in the scene, not the project
 ```
+
+`avgen_song_cut --project P [--song-plan PLAN] [--director k=v,...] [--out CUT.json]` makes the same
+cut and report on the CPU -- no window, no GPU, no GPU lock -- for a generator iterating on a plan.
 
 `examples/world/glowmere-valley-2-song.json` is the worked example; `tools/make_song_demo.py` builds
 it from the three-camera demo and prints the two commands that direct and render it.
