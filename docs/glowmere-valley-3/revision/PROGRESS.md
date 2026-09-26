@@ -1,7 +1,7 @@
 # GV3 revision: progress and state
 
 This is the operational state file. Update it whenever the state changes. It was last updated
-2026-09-26 at 10:14, at a pause for the session's usage limit, with eight engine agents mid-work.
+2026-09-26 at 14:25, after resuming from the usage limit.
 
 ## Start of a session: do this first
 1. **Read this file**, then [00-brief.md](00-brief.md) (the owner's revision spec, verbatim).
@@ -15,33 +15,30 @@ This is the operational state file. Update it whenever the state changes. It was
    ```
 3. **Verify, don't assume.** A worktree with uncommitted changes and no running agent means a stream was interrupted. See "Relaunching" below.
 
-## At the pause (2026-09-26 10:14): read this first
-The session paused for its usage limit.
-- **All eight engine agents were told to checkpoint.** They were to commit what is solid with honest WIP messages, start no new long runs, and send a status. Whether each managed to before the limit hit is unknown, so check each worktree.
-- **Nothing is merged into main since `0b623b88`.** The owner's checkout was clean on `main`.
-- **The gate has passed.** No GV3 scene edit has been made yet.
+## State after the usage limit (2026-09-26 14:21): read this first
+The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner's instruction since then: at most one or two subagents in parallel**, to spare the session limit. No stray processes were left; two stuck wait loops were removed. Nothing is merged into main since `0b623b88`, and no GV3 scene edit has been made. The evaluator gate passed.
 
-**Snapshot at the pause:**
-
-| Stream | ADRs | Commits on the branch (newest first) | Uncommitted files |
+| Stream | ADRs | Branch head | State |
 |---|---|---|---|
-| signals | 896–899 | none | 82 |
-| routes | 900–902 | `2b0b6f26` route rows: delay, depth and timeline event mode editable, liveness shown beside each route; `f133cad7` ADR-900–902; `6aca24ec` the seek replays routes, liveness at bind, at load and via `--audit-routes`; `3dc12138` the route chain | **0**: looks complete; its final report never arrived |
-| emission | 903–906 | none | 49 |
-| characters | 907–910 | `5dc541db` ADR-910 quality metrics | 22 |
-| camera | 911–913 | `e09c8ebb` ADR-911–913; `24bab779` the filtered follow reference, cuts declared; `e239159e` a cut drops motion history; `ae3b75dd` cast_trace `--camera` | 10 |
-| water | 914–916 | `3384f287` ADR-915 fades count reference pixels; `5ae32389` ADR-914 bounded advection; `6948f72d` the unregister fix | 24 (the tears, ADR-916, were being tested) |
-| setpieces (wave 2) | 928–931 | none | 32 |
-| render (wave 2) | 917–919 | none | 30 |
+| routes | 900–902 | `8f2dfd41` (WIP checkpoint), clean | Built. Full CPU suite passed after the pause (3,571 cases, 3,551 passed, 19 skipped, 1 expected failure, exit 0). **Left:** 3 GPU failures unexplained (`test_render_job.cpp:248` readback ring vs sync path, `:318` EXR determinism, `test_glowmere_valley_2_views.cpp:201` camera 72 m off). The camera branch passes all three, so routes is the likely cause; the suspects are in its commit message. Then the report. UI done: route rows edit delay and depth, and show liveness badges. |
+| camera | 911–913 | `3d9795f2` (WIP checkpoint), clean | All seven deliverables committed. Full GPU suite 510/509 passed/1 skipped. GV3's follow shots went from 10 of 11 failing the bar to all 11 passing. **Left:** UI reach (plan in the WIP commit: a control table in `scene/camera_rig.hpp`, drawn in `ControlPanel::drawCameras`); the full CPU suite (it stopped at 2,650 of 3,532 cases with one wall-clock failure under load at `test_directing_agent.cpp:379`). GV3 rig values are in ADR-913 and [audit/data/camera-gv3-recommended-rig-changes.json](audit/data/camera-gv3-recommended-rig-changes.json). |
+| water | 914–916 | `ddf44a85` (tears WIP), clean | ADR-914 (bounded advection) and 915 (fades count 1080-row reference pixels) finished and tested. **Left:** re-run `[tears]`, `[water]` and `[water6_2]` GPU tests after the last shader change; UI reach (a `water/tears/` sub-group); ADR-916; full suites. **For GV3:** go back to ripple 0.1 at rippleScale 2.6, with the bass route at 0.03 (ADR-915 makes the final-only values wrong). Stills and scripts are in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/water-work/`. |
+| setpieces | 928–931 | `905c91ac`, clean | `2ea9c7b5` built and tested: templates (abduction with 1–3 animals, survey, flyby), `PlanSetPiece` with validation, staging at timeline seconds, a bus-id bug fixed; 23 cases pass. `905c91ac` (`avgen --plan`, cast_trace `setPieces`) was never compiled. **Left:** build and fix; the UI home (a "UFO set pieces" section in the Director panel); the three-abduction end-to-end proof; the evaluator hook; ADRs; the full suite. The Critic's adapter should read the trace's `setPieces` instead of hard-coding GV3's beats. Notes: `docs/development/setpieces-design-notes.md` in the worktree. |
+| render | 917–919 | `7f36b8e3` (WIP), clean | Built, and the CPU tests pass. `post/referenceHeight` (720) scales every pixel-sized post value; `scene/fogSky`, a sky-radiance fog map; offline floors. **Nothing has run on the GPU.** **Left:** GPU tests and their thresholds, suites, re-baselining small-frame bloom tests, GV3 evidence, the 4K cost, the ADRs' measurements. World edge: report only (a backdrop ring would take 1–2 days). Notes: `docs/development/render-design-notes.md`. |
+| signals | 896–899 | `0b623b88` + **82 uncommitted files** | Died mid-work adding a UI-reach test. No report, and no commit. |
+| emission | 903–906 | `0b623b88` + **54 uncommitted files** | Died mid-work applying viewer-facing labels. No report, and no commit. |
+| characters | 907–910 | `5dc541db` + **22 uncommitted files** | Died mid-fix (gait state must start as authored for bodies seeked but never stepped). No report. |
 
-**How to resume:**
-1. Run the state checks under "Start of a session".
-2. Look for leftover processes from the paused session (`avgen_tests`, `avgen_render_tests`, `ninja`, `gpu-lock.sh`, `avgen_cast_trace`), and let them finish or stop them. They belonged to agents that no longer exist. Check `tools/gpu-lock.sh`'s lock is not held by a dead process.
-3. For each stream, read `git log main..HEAD` and `git diff --stat`.
-   - **Complete** (committed, clean, its ADRs present): review it and run its targeted tests plus the full suites, then merge (step 2 of "Next steps").
-   - **Otherwise,** relaunch a fresh agent with [ENGINEERING-RULES.md](ENGINEERING-RULES.md), its section of [briefs.md](briefs.md), and: "Your worktree already holds partial work. Inspect `git log main..HEAD` and `git diff`, finish from there, and write the final report."
-4. **routes** is probably ready to review first. It was committed and clean at the pause, but its report never arrived.
-5. **The "UI reach" rule** (the owner's pinned rule: anything visible is controllable) was added to ENGINEERING-RULES.md at `dfc6c512` and sent to all eight agents. Relaunched agents get it from the rules file. Check every report lists where its controls live.
+**The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
+1. signals finisher + routes finisher.
+2. emission finisher + camera finisher.
+3. water finisher + characters finisher.
+4. setpieces finisher + render finisher.
+5. song (wave 2) + reactivity (wave 2).
+
+The coordinator merges each finished stream through an integration worktree (below), then Phase 3 starts.
+
+**Merging:** merge each finished branch into an integration branch `integrate/revision` in a worktree `~/Documents/GitHub/av-gen-integrate`, created from main. Build there and run the full CPU and GPU suites. Then fast-forward main (`git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision`, only after checking the owner's checkout is clean and on `main`). Finally, merge main into `gv3/production`.
 
 ## Goal
 Revise the music video Glowmere Valley 3 (GV3) to the owner's brief. The phases are ordered and gated:
