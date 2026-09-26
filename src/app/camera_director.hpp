@@ -194,9 +194,15 @@ struct AutoDirectorSettings {
 // A fresh detector is used rather than the engine's live one: the engine's has been walking the
 // track as it plays and its state reflects wherever playback happens to be, so folding from it would
 // give a different structure depending on when you pressed the button.
+//
+// The meter is the one the engine resolves (ADR-896): its bar phase decides where the fold's phrase
+// and section boundaries fall. The one-argument form uses the track's own estimate, for a caller
+// with no engine.
 [[nodiscard]] Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack& track,
-                                                                 int phraseBars = 4,
-                                                                 int sectionPhrases = 4);
+                                                                 const analysis::Meter& meter);
+[[nodiscard]] Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack& track);
+// The meter a track implies on its own: its estimated downbeat and phrase length (4 when unclear).
+[[nodiscard]] analysis::Meter estimatedMeter(const analysis::AnalysisTrack& track);
 
 // The whole path: an engine holding an analyzed track and a world holding heroes, to a camera that
 // moves to the music. Returns how many tracks were installed.

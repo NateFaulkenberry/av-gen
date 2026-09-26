@@ -465,8 +465,24 @@ Result<Sequence> directHeroes(std::span<const world::HeroPoint> heroes,
     return sequence;
 }
 
+analysis::Meter estimatedMeter(const analysis::AnalysisTrack& track) {
+    analysis::Meter meter;
+    const analysis::MeterEstimate& estimate = track.meterEstimate();
+    if (estimate.valid) {
+        meter.downbeat = estimate.downbeat;
+        if (estimate.phraseBars > 0) {
+            meter.phraseBars = estimate.phraseBars;
+        }
+    }
+    return meter;
+}
+
+Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack& track) {
+    return structureOfTrack(track, estimatedMeter(track));
+}
+
 Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack& track,
-                                                   int phraseBars, int sectionPhrases) {
+                                                   const analysis::Meter& meter) {
     const auto& frames = track.frames();
     if (frames.empty()) {
         return fail("the Auto-director needs an analyzed track: this one has no frames");
@@ -477,7 +493,7 @@ Result<signals::MusicalStructure> structureOfTrack(const analysis::AnalysisTrack
     MusicRuntime runtime;
     std::vector<signals::MusicalMoment> moments;
     for (const analysis::AnalysisFrame& frame : frames) {
-        runtime.consume(frame, phraseBars, sectionPhrases);
+        runtime.consume(frame, meter);
         const auto found = runtime.lastMoments();
         moments.insert(moments.end(), found.begin(), found.end());
     }
@@ -625,7 +641,7 @@ Result<SongPlan> songPlanForEngine(const Engine& engine) {
     const seq::Sequence& piece = engine.sequence();
     if (!piece.sectionTimeline.sections.empty()) {
         const std::vector<song::SectionCue> cues =
-            song::cueSheet(piece.sectionTimeline, piece.shotLanguage);
+            song::cueSheet(piece.sectionTimeline, piece.shotLanguage, engine.track());
         if (!cues.empty()) {
             return songPlanFromCues(cues);
         }
@@ -642,7 +658,7 @@ Result<SongPlan> songPlanForEngine(const Engine& engine) {
         return fail("Song Mode needs a song structure: analyze the track in the Sequence panel, or "
                     "author a song plan, before directing to it");
     }
-    return songPlanFromMeasurements(structure);
+    return songPlanFromMeasurements(structure, engine.track());
 }
 
 Result<SongDirection> directSongFromPlan(std::span<const world::HeroPoint> heroes,
@@ -783,7 +799,7 @@ Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoin
     if (track == nullptr) {
         return fail("the Auto-director needs analyzed audio; load a track first");
     }
-    auto structure = structureOfTrack(*track);
+    auto structure = structureOfTrack(*track, engine.meter());
     if (!structure) {
         return std::unexpected(structure.error());
     }
@@ -1029,6 +1045,15 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
             // Joined into one that follows somebody, that entry's `joinIn` does the handing over.
             if (joinedAt(i + 1) && !follows(sequence.shots[i + 1])) {
                 entry.joinOutSeconds = joinFor(sequence.shots[i + 1]);
+            }
+            // The take's last shot. Past its end there is no next shot and still no cut: the film
+            // runs on -- the audio outlasts the fold by a frame or so -- with the camera holding its
+            // last key, so the offset is let go over a join here too. Dropped in one frame, it swung
+            // the multicam film's final frame through 72 degrees once the saucer had flown far from
+            // where the shot was cut (surfaced when ADR-898 stopped `audio.beat` losing a third of
+            // its beats, which the saucer's spin reads).
+            if (settings.mode == DirectorMode::ContinuousShot && i + 1 == sequence.shots.size()) {
+                entry.joinOutSeconds = joinFor(shot);
             }
             follow.push_back(entry);
         }

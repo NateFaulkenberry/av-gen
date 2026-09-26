@@ -2685,7 +2685,8 @@ Result<void> Application::captureFrame(const FrameTime& time, const std::filesys
     const std::uint32_t w = window_ ? window_->pixelWidth() : 1280;
     const std::uint32_t h = window_ ? window_->pixelHeight() : 720;
     const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                    engine_->barPhase()};
     auto image = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
     if (!image) {
         return std::unexpected(image.error());
@@ -3416,11 +3417,11 @@ void Application::nudgePlayhead(int direction, bool coarse) {
     const int snapMode = panel_ != nullptr ? panel_->sequence.snapMode()
                                            : static_cast<int>(seq::SnapMode::Frames);
     const double viewSpan = panel_ != nullptr ? panel_->sequence.visibleSpanSeconds() : 0.0;
-    // `beatsPerBar` from the bake options rather than a literal 4, so the day time-signature
-    // detection lands there is one default to change and this follows it.
+    // `beatsPerBar` from the engine's meter (ADR-896) rather than a literal 4, so the day
+    // time-signature detection lands there is one place to change and this follows it.
     const ui::Nudge nudge =
         ui::arrowNudge(snapMode, direction, coarse, engine_->renderSettings().fps, viewSpan,
-                       seq::BakeOptions{}.beatsPerBar);
+                       engine_->meter().beatsPerBar);
     switch (nudge.unit) {
     case ui::NudgeUnit::Frames:
         engine_->stepFrames(nudge.count);
@@ -4879,7 +4880,8 @@ int Application::runLive() {
                                           &transformHistory_, &lodLevels, renderer_->shadows().views());
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                        engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                        engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                        engine_->barPhase()};
         // ADR-364. `drawUi` is deliberately not consulted here: the interface is drawn
         // unconditionally a few lines below, and the field exists so that invariant is written down
         // rather than being true by accident. What this skips is the world -- the scene pass, the
@@ -5941,7 +5943,8 @@ int Application::runHeadless() {
                                               nullptr, &lodLevels, renderer_->shadows().views());
             }
             const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                            engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                            engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                            engine_->barPhase()};
             // Pixels are only pulled back on the frames something reads them: the captured frame, or
             // every frame when debug logging wants a determinism hash. The rest render and submit and
             // stop there, as the live path does.

@@ -2936,8 +2936,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const auto band = [&af](std::size_t i) { return i < af.bandCount ? af.bands[i] : 0.0f; };
         frame.audio = glm::vec4(af.rms, band(0), band(2), band(4));
         frame.audioBands = glm::vec4(band(1), band(3), af.centroidNorm, af.flux);
-        frame.beat = glm::vec4(af.beatPhase, 1.0f - af.beatPhase, std::min(1.0f, af.onsetStrength / 2.0f),
-                               std::fmod((static_cast<float>(af.beatCount) + af.beatPhase) * 0.25f, 1.0f));
+        frame.beat = glm::vec4(af.beatPhase, 1.0f - af.beatPhase, std::min(1.0f, af.onsetStrength / 2.0f), 0.0f);
+    }
+    // ADR-896: the bar phase is the engine's (its meter, its clock -- a MIDI clock with no audio has
+    // one too), not a count derived from the analysis frame here.
+    if (shaderInputs != nullptr) {
+        frame.beat.w = shaderInputs->barPhase;
     }
     // ---- ambient occlusion (ADR-034): sized here so the frame block can carry its resolution ----
     {

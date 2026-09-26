@@ -35,6 +35,7 @@
 // onto the axes a camera can act on. A shot intent may carry a description, a category, an icon and
 // a colour; a camera cannot do anything with any of them.
 
+#include "analysis/span_profile.hpp"
 #include "analysis/structure.hpp"
 #include "core/error.hpp"
 
@@ -142,6 +143,11 @@ struct SongPlanSection {
     float energy = 0.5f;
     float density = 0.5f;
     float transition = 0.0f;
+    // ADR-899: the measured, level-free profile of the audio under the span -- energy composite,
+    // onsets per second (kick / snare / hat apart), brightness in Hz, band levels, width -- when the
+    // plan was made with the analysed track (`audio.measured()`). `energy` and `density` above are
+    // the section's own (authored or detected); this is what the track says.
+    analysis::SpanProfile audio;
 
     Autonomy autonomy = Autonomy::Guided;
 
@@ -242,6 +248,7 @@ struct SongPlan {
 //
 // Every one of those is a defensible default and none of them is a rule. The moment a person
 // assigns a section type, that type's shot intent replaces the lot.
-[[nodiscard]] SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure);
+[[nodiscard]] SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure,
+                                                const analysis::AnalysisTrack* track = nullptr);
 
 } // namespace avgen::app
