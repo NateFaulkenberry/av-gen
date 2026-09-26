@@ -385,6 +385,13 @@ struct Entity {
         [[nodiscard]] bool active() const { return intensity > 0.0f || shimmer > 0.0f; }
     };
     TreeEnergy energy;
+    // ADR-903: the entity's emission gain, applied by the lit shader AFTER the material program (and
+    // after every FXL lane) to everything the surface emits -- its own emission, its emissive
+    // texture, its rim and its tree energy. The owning node's `emissiveBoost` writes it every frame;
+    // 1, the default, is the surface exactly as its material and program make it. A multiplier on
+    // `Material::emissiveIntensity` cannot do this job: a program that asserts emission discards
+    // that lane (ADR-179). Runtime only: never authored, never serialised.
+    float emissionGain = 1.0f;
 };
 
 // ---- lights ---------------------------------------------------------------------------------

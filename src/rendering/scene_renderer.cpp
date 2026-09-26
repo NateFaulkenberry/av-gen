@@ -3268,6 +3268,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         obj.baseColor = glm::vec4(m.baseColor, m.opacity);
         obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);
         obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
+        // ADR-903: the owning node's emissiveBoost, applied after the program. No hue lane here.
+        obj.emission = glm::vec4(entity.emissionGain, 0.0f, 0.0f, 0.0f);
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < textures_.size() && textures_[ref.texture].valid();

@@ -1508,6 +1508,11 @@ private:
     // is a thing an artist hides -- hiding "the village" and watching the houses stay up is not a
     // subtlety, it is the feature not working. Non-static for that reason; it has to walk parents.
     [[nodiscard]] bool nodeVisible(const CompositionNode& node) const;
+    // ADR-903: this frame's `emissiveBoost` for the node -- its parameter's final, times the
+    // day/night cycle's factor when the scene names it a star or a glow node (ADR-343). Every
+    // drawable the node owns takes it after its material program. Deliberately the node's own and
+    // not inherited, like `roughnessScale` and `opacity`: a group has nothing of its own to boost.
+    [[nodiscard]] float nodeEmissiveBoost(const CompositionNode& node) const;
     [[nodiscard]] float fitDistance() const;
     // Loads a nested scene file for a Scene node (cycle and depth checks against this chain).
     [[nodiscard]] Result<std::unique_ptr<Composition>> loadChild(const std::filesystem::path& asset) const;
@@ -2209,7 +2214,6 @@ private:
         Transform world;
         bool worldValid = false;
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
-        std::vector<float> restEmissive;
         std::vector<float> restRoughness;
         // The opacity the asset was built with, captured the first time a node's `opacity`
         // parameter is read rather than pushed alongside `restRoughness` at every one of the six

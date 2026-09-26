@@ -1,4 +1,5 @@
 {
+ "_note": "ADR-904: the engine applies each instance's emission variation once, after this program, as a rotation of the displayed hue and a gain. Do not multiply `instanceEmissive` into the emission here: it is a ratio made against the MATERIAL's emissive colour, and reading it makes this program own the variation. The op that read it is a constant 1 in place, so every op path stays where projects saved it (ADR-232).",
  "name": "glowmereTissue",
  "ops": [
   {"kind": "input", "dst": 0, "input": "normal"},
@@ -12,7 +13,7 @@
    "constant2": [0.08, 0.22, 0.15, 1.0],
    "constant3": [0.24, 0.34, 0.2, 1.0]},
   {"kind": "remap", "dst": 5, "srcA": 2, "value": 1.0, "constant": [0.0, 1.0, 0.3, 0.65]},
-  {"kind": "input", "dst": 4, "input": "instanceEmissive"},
+  {"kind": "constant", "dst": 4, "constant": [1.0, 1.0, 1.0, 1.0]},
   {"kind": "constant", "dst": 6, "constant": [0.08, 0.95, 0.53, 1.0]},
   {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 6},
     {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 1},

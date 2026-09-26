@@ -4343,10 +4343,23 @@ void MaterialPartParameters::apply(Material& material) const {
             material.emissiveIntensity = 1.0f;
         }
     }
-    if (emissiveGain != nullptr) material.emissiveIntensity *= emissiveGain->value();
+    // `emissiveGain` is not applied here since ADR-903: it is the part's emission lane, after the
+    // material program (see `partEmissiveGain`), because a multiplier on `emissiveIntensity` is
+    // discarded by a program that writes emission (ADR-179).
     if (roughnessScale != nullptr) material.roughness = std::clamp(material.roughness * roughnessScale->value(), 0.0f, 1.0f);
     if (opacityScale != nullptr) material.opacity = std::clamp(material.opacity * opacityScale->value(), 0.0f, 1.0f);
 }
+
+namespace {
+// ADR-903: part `index`'s `emissiveGain` (procedural/<node>/parts/<index>/emissiveGain), or 1 for a
+// node whose parts carry no parameters. It multiplies the part's emission lane with the node's boost.
+float partEmissiveGain(const CompositionNode& node, std::size_t index) {
+    if (index < node.materialPartParams.size() && node.materialPartParams[index].emissiveGain != nullptr) {
+        return node.materialPartParams[index].emissiveGain->value();
+    }
+    return 1.0f;
+}
+} // namespace
 
 float Composition::fitDistance() const {
     return radius_ / std::tan(kFitFovRadians * 0.5f) * 1.15f;
@@ -5200,8 +5213,12 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     node.scaleParam =
         &params_->add(vec3Desc(base + "scale", node.transform.scale, 0.001f, 100.0f, 0.01f, 5.0f));
     node.visibleParam = &params_->add(boolDesc(base + "visible", node.visible));
-    node.emissiveParam =
-        &params_->add(floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f));
+    {
+        // ADR-903: the node's glow, after any material program, on everything it draws.
+        params::ParamDesc<float> d = floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f);
+        d.label = "glow boost";
+        node.emissiveParam = &params_->add(std::move(d));
+    }
     node.roughnessParam =
         &params_->add(floatDesc(base + "roughnessScale", node.roughnessScale, 0.0f, 2.0f, 0.0f, 2.0f));
     // ADR-385: the whole-node fade. Hard range [0,1] so nothing can ramp it past opaque.
@@ -5719,6 +5736,24 @@ bool Composition::nodeVisible(const CompositionNode& node) const {
     return true;
 }
 
+float Composition::nodeEmissiveBoost(const CompositionNode& node) const {
+    float boost = node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
+    // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
+    // Multiplying the boost rather than replacing it is what keeps the authored per-layer
+    // intensities independently controllable, which the brief asks for explicitly.
+    if (dayNight_.enabled) {
+        const auto named = [&node](const std::vector<std::string>& names) {
+            return std::find(names.begin(), names.end(), node.name) != names.end();
+        };
+        if (named(dayNight_.starNodes)) {
+            boost *= dayNightState_.starBrightness;
+        } else if (named(dayNight_.glowNodes)) {
+            boost *= dayNightState_.glowScale;
+        }
+    }
+    return boost;
+}
+
 void Composition::ensureBuilt() {
     if (dirty_) {
         rebuild();
@@ -6136,7 +6171,6 @@ void Composition::rebuild() {
                 e.visible = visible && src.visible;
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
-                range.restEmissive.push_back(src.material.emissiveIntensity);
                 range.restRoughness.push_back(src.material.roughness);
             }
             range.firstLight = scene_.lights.size();
@@ -6170,7 +6204,6 @@ void Composition::rebuild() {
             orb.transform = nodeT;
             orb.visible = visible;
             range.restTransforms.emplace_back();
-            range.restEmissive.push_back(orb.material.emissiveIntensity);
             range.restRoughness.push_back(orb.material.roughness);
             break;
         }
@@ -6188,7 +6221,6 @@ void Composition::rebuild() {
             grid.transform = nodeT;
             grid.visible = visible;
             range.restTransforms.emplace_back();
-            range.restEmissive.push_back(0.0f);
             range.restRoughness.push_back(0.5f);
             break;
         }
@@ -6666,7 +6698,6 @@ void Composition::rebuild() {
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();
-                range.restEmissive.push_back(node.terrainMaterial.emissiveIntensity);
                 range.restRoughness.push_back(node.terrainMaterial.roughness);
             }
             // Water second, so it draws after the ground it sits in: the surface is translucent at
@@ -6692,7 +6723,6 @@ void Composition::rebuild() {
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();
-                range.restEmissive.push_back(0.0f);
                 range.restRoughness.push_back(node.terrain.water.roughness);
             }
             // ADR-099: every water body's centreline, published as a scene spline named
@@ -6936,7 +6966,6 @@ void Composition::rebuild() {
                 e.visible = visible && src.visible;
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
-                range.restEmissive.push_back(src.material.emissiveIntensity);
                 range.restRoughness.push_back(src.material.roughness);
             }
             for (const PunctualLight& src : cs.lights) {
@@ -7681,29 +7710,16 @@ void Composition::applyParameters() {
         // (the simulation and HIST keep reading `nodeWorldTransform`; see `setEffectOffsets`).
         const Transform nodeT = nodeDrawnWorldTransform(node);
         bool visible = nodeVisible(node);
-        bool dayNightVisibleOverride = true;
-        float emissiveBoost =
-            node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
-        // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
-        // Multiplying the boost rather than replacing it is what keeps the authored per-layer
-        // intensities independently controllable, which the brief asks for explicitly.
-        if (dayNight_.enabled) {
-            const auto named = [&node](const std::vector<std::string>& names) {
-                return std::find(names.begin(), names.end(), node.name) != names.end();
-            };
-            if (named(dayNight_.starNodes)) {
-                emissiveBoost *= dayNightState_.starBrightness;
-                // A star that has been faded to zero emission is not gone -- it is still geometry,
-                // and its base colour is black, so at noon the sky filled with small DARK squares
-                // instead of with nothing. Scaling emission is how a star dims; hiding it is how a
-                // star sets. Seen in a frame; no number in the cycle table showed it.
-                if (dayNightState_.starBrightness <= 1e-3f) {
-                    dayNightVisibleOverride = false;
-                }
-            } else if (named(dayNight_.glowNodes)) {
-                emissiveBoost *= dayNightState_.glowScale;
-            }
-            visible = visible && dayNightVisibleOverride;
+        // ADR-903: the boost every drawable of this node takes after its material program.
+        const float emissiveBoost = nodeEmissiveBoost(node);
+        // A star that has been faded to zero emission is not gone -- it is still geometry, and its
+        // base colour is black, so at noon the sky filled with small DARK squares instead of with
+        // nothing. Scaling emission is how a star dims; hiding it is how a star sets. Seen in a
+        // frame; no number in the cycle table showed it.
+        if (dayNight_.enabled && dayNightState_.starBrightness <= 1e-3f &&
+            std::find(dayNight_.starNodes.begin(), dayNight_.starNodes.end(), node.name) !=
+                dayNight_.starNodes.end()) {
+            visible = false;
         }
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
@@ -7745,7 +7761,6 @@ void Composition::applyParameters() {
             // Nested parameters moved the child's entities: take its current state as the rest.
             for (std::size_t k = 0; k < range.entityCount; ++k) {
                 range.restTransforms[k] = child->entities[k].transform;
-                range.restEmissive[k] = child->entities[k].material.emissiveIntensity;
                 range.restRoughness[k] = child->entities[k].material.roughness;
             }
         }
@@ -7754,8 +7769,12 @@ void Composition::applyParameters() {
             Entity& e = scene_.entities[range.firstEntity + k];
             e.transform = compose(full, range.restTransforms[k]);
             e.visible = visible && (child == nullptr || child->entities[k].visible);
+            // ADR-903: the boost is the entity's emission lane, applied by the shader after any
+            // material program -- not a multiplier on `emissiveIntensity`, which a program that
+            // asserts emission discards (ADR-179). A nested scene's entity keeps its own node's
+            // boost and takes this one on top.
+            e.emissionGain = (child != nullptr ? child->entities[k].emissionGain : 1.0f) * emissiveBoost;
             if (e.style == MeshStyle::Lit) {
-                e.material.emissiveIntensity = range.restEmissive[k] * emissiveBoost;
                 e.material.roughness = std::clamp(range.restRoughness[k] * roughnessScale, 0.0f, 1.0f);
             }
             if (fading) {
@@ -7839,10 +7858,15 @@ void Composition::applyParameters() {
                 sub.distributionTransform =
                     Transform::fromMatrix(full.matrix() * sub.distributionTransform.matrix());
                 sub.visible = sub.visible && visible;
+                // ADR-903: the node's boost and this part's own gain, after the program.
+                sub.emissionGain = emissiveBoost * partEmissiveGain(node, k + 1);
+                sub.emissionHue = 0.0f;
             }
             if (!node.materialPartParams.empty()) {
                 node.materialPartParams[0].apply(pg.material);
             }
+            pg.emissionGain = emissiveBoost * partEmissiveGain(node, 0);
+            pg.emissionHue = 0.0f;
             // generated by rebuildProcedurals() once every object and spline has its finals
         }
         if (node.kind == NodeKind::Spline && range.splineIndex >= 0 &&
@@ -7869,6 +7893,7 @@ void Composition::applyParameters() {
             prefixFieldReferences(so, sanitise(prefix_));
             so.transform = compose(full, so.transform);
             so.visible = so.visible && visible;
+            so.emissionGain = emissiveBoost; // ADR-903
         }
         if (node.kind == NodeKind::Field && range.fieldIndex >= 0 &&
             static_cast<std::size_t>(range.fieldIndex) < scene_.fields.fields.size()) {
@@ -7893,6 +7918,9 @@ void Composition::applyParameters() {
             ps.sizeStart *= scale;
             ps.sizeEnd *= scale;
             ps.enabled = ps.enabled && visible;
+            // ADR-903: a particle node's boost is its particles' HDR emission multiplier; `ps` was
+            // reset from the rest above, so this does not compound.
+            ps.emissive *= emissiveBoost;
         } else if (child != nullptr && child->particles.size() == range.particleCount) {
             const float scale = lengthScale(full);
             const std::string childPrefix = nestedPrefix(node);
@@ -7907,6 +7935,7 @@ void Composition::applyParameters() {
                 ps.sizeStart = src.sizeStart * scale;
                 ps.sizeEnd = src.sizeEnd * scale;
                 ps.enabled = src.enabled && visible;
+                ps.emissive = src.emissive * emissiveBoost; // ADR-903
             }
         }
         if (child != nullptr && child->procedurals.size() == range.proceduralCount) {
@@ -7929,6 +7958,8 @@ void Composition::applyParameters() {
                 prefixFieldReferences(pg, childPrefix);
                 pg.distributionTransform = Transform::fromMatrix(full.matrix() * src.distributionTransform.matrix());
                 pg.visible = pg.visible && visible;
+                // ADR-903: the child's own lanes (copied with it) under this node's boost.
+                pg.emissionGain = src.emissionGain * emissiveBoost;
             }
         }
         if (child != nullptr && child->splines.splines.size() == range.splineCount) {
@@ -7957,6 +7988,7 @@ void Composition::applyParameters() {
                 prefixFieldReferences(so, childPrefix);
                 so.transform = compose(full, src.transform);
                 so.visible = src.visible && visible;
+                so.emissionGain = src.emissionGain * emissiveBoost; // ADR-903
             }
         }
         if (child != nullptr && child->materialPrograms.size() == range.materialCount) {

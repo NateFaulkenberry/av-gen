@@ -74,7 +74,8 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ADR-376: the tree's own light. Added to both the radiance and the emission target, because
     // an emissive term that reaches the frame but not the AOV is invisible to bloom -- which is
     // most of what makes a conducted pulse read.
-    let energy = treeEnergyAt(in.worldPos);
+    // ADR-903: the entity's emission lane reaches its conducted light as well.
+    let energy = emissionLane(treeEnergyAt(in.worldPos), object.emission.y, object.emission.x);
     var out: SceneOut;
     out.color = shaded.color + vec4<f32>(energy, 0.0);
     out.normalRoughness = packNormalRoughness(shaded.normal, shaded.roughness, shaded.flags);

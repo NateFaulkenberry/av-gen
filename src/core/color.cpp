@@ -265,4 +265,23 @@ float livingChromaTurns(const glm::vec3& p, float t, float amount, float invScal
     return amount * (0.5f * a + 0.35f * b + 0.15f * c);
 }
 
+glm::vec2 emissionVariationOf(const glm::vec3& base, const glm::vec3& mult) {
+    const glm::vec3 safe = glm::max(base, glm::vec3(1e-3f));
+    const glm::vec3 a = rgbToOklab(safe);
+    const glm::vec3 b = rgbToOklab(glm::max(safe * mult, glm::vec3(0.0f)));
+    float gain = 0.0f;
+    if (a.x > 1e-6f) {
+        const float r = b.x / a.x;
+        gain = r * r * r;
+    }
+    float hue = 0.0f;
+    const float ca = std::sqrt(a.y * a.y + a.z * a.z);
+    const float cb = std::sqrt(b.y * b.y + b.z * b.z);
+    if (ca > 1e-4f && cb > 1e-4f) {
+        const float d = (std::atan2(b.z, b.y) - std::atan2(a.z, a.y)) / 6.283185307179586f;
+        hue = d - std::round(d); // the short way round, in (-0.5, 0.5]
+    }
+    return {hue, gain};
+}
+
 } // namespace avgen::color

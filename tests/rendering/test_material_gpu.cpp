@@ -110,6 +110,7 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     ctx.normalVariance = contexts[b + 12u].x;
     ctx.footprint = contexts[b + 12u].y;
     ctx.materialId = contexts[b + 12u].z;
+    ctx.materialEmission = contexts[b + 13u]; // ADR-904
 
     var base = materialResultZero();
     base.baseColor = vec3<f32>(0.8, 0.7, 0.6);
@@ -200,6 +201,7 @@ public:
             p[10] = glm::vec4(c.viewDirection, static_cast<float>(cases[i].program));
             p[11] = glm::vec4(c.curvature, c.cavity, c.occlusion, c.height);
             p[12] = glm::vec4(c.normalVariance, c.footprint, c.materialId, 0.0f);
+            p[13] = c.materialEmission; // ADR-904
         }
 
         const auto& device = ctx_.device();
@@ -365,6 +367,7 @@ std::vector<scene::MaterialContext> makeContexts() {
         c.normalVariance = t * 0.011f;
         c.footprint = t * 0.004f;
         c.materialId = std::fmod(t, 4.0f);
+        c.materialEmission = {0.35f + t * 0.02f, 0.1f + t * 0.05f, 0.9f - t * 0.03f, 1.0f}; // ADR-904
         out.push_back(c);
     }
     return out;
@@ -516,6 +519,8 @@ TEST_CASE("material program inputs match the CPU interpreter", "[material][gpu]"
                  build("beatPhase", MaterialInput::BeatPhase), build("viewDirection", MaterialInput::ViewDirection),
                  build("depth", MaterialInput::Depth)},
                 noFields, 0.0);
+    // ADR-904: the material's own emission as the instance shows it.
+    checkParity(harness, {build("materialEmission", MaterialInput::MaterialEmission)}, noFields, 0.0);
     CHECK(ctx->errorCount() == 0);
 }
 

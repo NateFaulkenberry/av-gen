@@ -48,7 +48,7 @@ Result<std::unique_ptr<GltfScene>> GltfScene::load(const std::filesystem::path& 
     // Rest state: imported transforms and material values the parameters modulate around.
     ctrl->rest_.reserve(ctrl->scene_.entities.size());
     for (const auto& e : ctrl->scene_.entities) {
-        ctrl->rest_.push_back({e.transform, e.material.emissiveIntensity, e.material.roughness});
+        ctrl->rest_.push_back({e.transform, e.material.roughness});
     }
     const auto [lo, hi] = ctrl->scene_.bounds();
     ctrl->center_ = (lo + hi) * 0.5f;
@@ -60,7 +60,7 @@ Result<std::unique_ptr<GltfScene>> GltfScene::load(const std::filesystem::path& 
         auto& g = ctrl->scene_.addEntity("grid", grid);
         g.style = MeshStyle::Grid;
         g.transform.position = glm::vec3(ctrl->center_.x, lo.y - 0.001f, ctrl->center_.z);
-        ctrl->rest_.push_back({g.transform, 0.0f, 0.5f});
+        ctrl->rest_.push_back({g.transform, 0.5f});
     }
     // A key light if the file has none, so untextured scenes are visible without an environment.
     if (ctrl->scene_.lights.empty()) {
@@ -221,8 +221,10 @@ void GltfScene::update(const FrameTime& time) {
         e.transform.position = rootPos + rootRot * (local * scale);
         e.transform.rotation = rootRot * rest.transform.rotation;
         e.transform.scale = rest.transform.scale * scale;
+        // ADR-903: the boost is the entity's emission lane, after any material program -- the one
+        // mechanism a composition node's `emissiveBoost` uses too.
+        e.emissionGain = emissiveBoost_->value();
         if (e.style == MeshStyle::Lit) {
-            e.material.emissiveIntensity = rest.emissiveIntensity * emissiveBoost_->value();
             e.material.roughness = std::clamp(rest.roughness * roughnessScale_->value(), 0.0f, 1.0f);
         }
     }

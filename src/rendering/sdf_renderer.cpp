@@ -71,6 +71,8 @@ ObjectUniforms objectUniformsFor(const scene::SdfObject& object, std::size_t obj
     obj.baseColor = glm::vec4(m.baseColor, m.opacity);
     obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);
     obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
+    // ADR-903: the owning node's emissiveBoost, applied after the program by the shared shading.
+    obj.emission = glm::vec4(object.emissionGain, 0.0f, 0.0f, 0.0f);
     // No UVs on either path: textures are never sampled (mask 0). Blend materials draw opaque.
     const float alphaMode = m.alphaMode == scene::AlphaMode::Mask ? 1.0f : 0.0f;
     obj.flags = glm::vec4(alphaMode, m.alphaCutoff, m.unlit ? 1.0f : 0.0f, 0.0f);
