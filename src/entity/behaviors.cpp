@@ -326,6 +326,7 @@ public:
         // bounce would rise and fall together, which reads as one animation on four puppets rather
         // than as four creatures. This is the entire difference and it costs one number.
         phase_ = rng.range(0.0f, 6.2831853f);
+        strength_ = 0.0f;
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset& motion) override {
@@ -343,7 +344,18 @@ public:
                       6.2831853f;
             // Normalised against the clip's own authored speed, so `bounce` is "how much at a
             // normal walk" rather than a number that means something different per character.
-            const float strength = std::min(travel / strideDefault_, 2.0f);
+            //
+            // And eased, never stepped. A decider that wants a sharp turn drops its speed to almost
+            // nothing in a single step -- the intent and the body's measured travel both -- and a
+            // bob scaled by that fell from its crest to the ground in one frame: 0.31 m in 1/60 s
+            // on Glowmere's Ember, a drop the foot IK then swallowed as a 0.19 m jump in both feet.
+            // ADR-830's benchmark caught it the day a terrain fix for Glowmere Valley 3 sent Ember
+            // a different way. The body stopping dead is the locomotion's to answer; the bob letting
+            // a drawn body fall its whole height in a frame is this behaviour's, and a settle of a
+            // quarter of a second is how a real body comes off a stride.
+            const float target = std::min(travel / strideDefault_, 2.0f);
+            strength_ += (target - strength_) * lerpRate(kBobSettleMs, ctx.dt);
+            const float strength = strength_;
             // A rise from ground contact, not an oscillation about it.
             //
             // This was `sin(phase * 2)`, which is symmetric, and a symmetric bob on a *grounded*
@@ -396,8 +408,10 @@ private:
     params::Parameter<float>* swayRate_ = nullptr;
     params::Parameter<float>* nod_ = nullptr;
     std::vector<std::string> paths_;
+    static constexpr float kBobSettleMs = 250.0f;
     std::uint32_t seed_ = 1u;
     float phase_ = 0.0f;
+    float strength_ = 0.0f; // the bob's eased amplitude, as a fraction of a normal walk's
 };
 
 // ---- drift -----------------------------------------------------------------------------------

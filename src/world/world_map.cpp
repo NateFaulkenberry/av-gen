@@ -60,9 +60,12 @@ float octaveSum(glm::vec2 p, const std::vector<NoiseLayer>& layers, std::uint32_
 
 // Distance from p to the polyline, and the level (path y) interpolated at the closest point. One
 // point is a radial feature; the loop below degenerates to a point distance without a special case.
+// `foot` is where on the path that closest point is -- what `blendedLevel` needs to tell the nearest
+// arm of a bent path from a second arm that is almost as near.
 struct PathHit {
     float distance = 0.0f;
     float level = 0.0f;
+    glm::vec2 foot{0.0f};
 };
 // Segments per bounding block. Eight is enough to pay for the box test out of the segments it skips
 // and small enough that a block of a meandering curve is still a local piece of it.
@@ -93,7 +96,7 @@ PathHit closestOnPath(const std::vector<glm::vec3>& path, glm::vec2 p,
         return {0.0f, 0.0f};
     }
     if (path.size() == 1) {
-        return {glm::distance(p, glm::vec2(path[0].x, path[0].z)), path[0].y};
+        return {glm::distance(p, glm::vec2(path[0].x, path[0].z)), path[0].y, glm::vec2(path[0].x, path[0].z)};
     }
     const bool blocked = blocks.size() * kPathBlock >= path.size() - 1;
     // ---- a cutoff, so the skip bites from the first block (interactive-performance pass) --------
@@ -184,9 +187,129 @@ PathHit closestOnPath(const std::vector<glm::vec3>& path, glm::vec2 p,
         if (d < best.distance) {
             best.distance = d;
             best.level = glm::mix(path[i].y, path[i + 1].y, t);
+            best.foot = a + ab * t;
         }
     }
     return best;
+}
+
+// ---- a level that is continuous across a bend ------------------------------------------------
+//
+// `closestOnPath` answers the level at the single nearest point of the path, and on the inside of a
+// bend that point is not unique. Past the bend's centre of curvature a point is almost as near the
+// path's other arm, and across the line where the two arms are equally near -- the path's medial
+// axis -- the nearest point jumps from one arm to the other, and the level jumps with it, because
+// the level is the path's height *there*. Every consumer of the level turns that into a wall: a
+// flattened corridor into a cliff, a river's water line into a waterfall with nothing falling. A
+// 300 m valley corridor descending about 2 m per 60 m of course made four straight cliffs of up to
+// 2.35 m across Glowmere Valley 2 (`avgen_world_preview --seams` measures them).
+//
+// So the level is an average of the path's level over every part of the path that is nearly as
+// near as the nearest point, weighted by a kernel of how much further it is:
+//
+//     level(p) = integral L(s) K(d(s) - d1) ds / integral K(d(s) - d1) ds,   K(x) = smoothstep(1 - x/band)
+//
+// Every term is a continuous function of p -- the nearest distance d1 is, and so is each point's
+// distance -- so the integral is continuous wherever the nearest point jumps. Two cheaper schemes
+// were tried first and both left steps, for one reason worth keeping: they *picked points* (the
+// local minima of distance along the path), and far inside a bend that distance is nearly flat
+// over a long stretch, so any rule that picks a point jumps as the flat stretch's deepest wiggle
+// moves -- up to 2.5 m. Only an average over the whole stretch does not.
+//
+// The integral is taken per segment by 5-point Gauss-Legendre over the stretch inside the band, so
+// it is exact for the symmetric case that matters most (a straight run with a level that falls
+// linearly returns its nearest point's level) and a continuous function of p everywhere.
+//
+// Where the average agrees with the nearest level to kLevelKeep the nearest level is returned
+// exactly, fading to the average over the next kLevelKeep: beside a straight run, or outside a
+// bend, terrain that was never stepped stays bit for bit where it was, and every scene placed on it
+// with it. Only the insides of bends move, and there the old level was stepped anyway.
+//
+// `AVGEN_LEVEL_BLEND=0` takes it out without taking the build apart, the twin of the two switches
+// above, so the terrain before and after can be compared in one session.
+constexpr float kLevelBand = 10.0f;   // metres of distance past the nearest that still count
+constexpr float kLevelKeep = 0.05f;   // metres: agreement within this keeps the nearest level exactly
+
+float smoothUnit(float u) {
+    const float c = glm::clamp(u, 0.0f, 1.0f);
+    return c * c * (3.0f - 2.0f * c);
+}
+
+float blendedLevel(const std::vector<glm::vec3>& path, glm::vec2 p, const PathHit& nearest,
+                   const std::vector<glm::vec4>& blocks = {}) {
+    static const bool enabled = [] {
+        const char* v = std::getenv("AVGEN_LEVEL_BLEND");
+        return v == nullptr || (v[0] != '0' || v[1] != '\0');
+    }();
+    // One point is a radial feature: its level is its level.
+    if (!enabled || path.size() < 2) {
+        return nearest.level;
+    }
+    // Gauss-Legendre, five points on [-1, 1].
+    constexpr std::array<float, 5> kNode = {0.0f, -0.5384693101f, 0.5384693101f, -0.9061798459f, 0.9061798459f};
+    constexpr std::array<float, 5> kWeight = {0.5688888889f, 0.4786286705f, 0.4786286705f, 0.2369268851f,
+                                              0.2369268851f};
+    const float reach = nearest.distance + kLevelBand;
+    const bool blocked = blocks.size() * kPathBlock >= path.size() - 1;
+    // Accumulated as deviations from the nearest level: the quotient is then a small correction to
+    // an exact number rather than a re-derivation of it.
+    double sumWeight = 0.0;
+    double sumDeviation = 0.0;
+    for (std::size_t i = 0; i + 1 < path.size(); ++i) {
+        // A block whose box is beyond the band holds no part of the average.
+        if (blocked && i % kPathBlock == 0 && boxDistance(blocks[i / kPathBlock], p) > reach + kCutoffSlack(reach)) {
+            i += kPathBlock - 1;
+            continue;
+        }
+        const glm::vec2 a(path[i].x, path[i].z);
+        const glm::vec2 b(path[i + 1].x, path[i + 1].z);
+        const float len = glm::distance(a, b);
+        if (len < 1e-6f) {
+            continue;
+        }
+        const glm::vec2 dir = (b - a) / len;
+        const glm::vec2 ap = p - a;
+        const float along = glm::dot(ap, dir);             // p's foot on this segment's line, metres from a
+        const float across = std::fabs(ap.x * dir.y - ap.y * dir.x); // p's distance to that line
+        if (across >= reach) {
+            continue;
+        }
+        // The stretch of this segment inside the band: where sqrt(across^2 + (u - along)^2) < reach.
+        const float half = std::sqrt(reach * reach - across * across);
+        const float lo = std::max(0.0f, along - half);
+        const float hi = std::min(len, along + half);
+        if (hi <= lo) {
+            continue;
+        }
+        const float mid = 0.5f * (lo + hi);
+        const float radius = 0.5f * (hi - lo);
+        for (std::size_t k = 0; k < kNode.size(); ++k) {
+            const float u = mid + radius * kNode[k];
+            const float offset = u - along;
+            const float d = std::sqrt(across * across + offset * offset);
+            const float w = smoothUnit(1.0f - (d - nearest.distance) / kLevelBand) * kWeight[k] * radius;
+            if (w > 0.0f) {
+                const float level = glm::mix(path[i].y, path[i + 1].y, u / len);
+                sumWeight += static_cast<double>(w);
+                sumDeviation += static_cast<double>(w) * static_cast<double>(level - nearest.level);
+            }
+        }
+    }
+    if (sumWeight <= 0.0) {
+        return nearest.level;
+    }
+    const float deviation = static_cast<float>(sumDeviation / sumWeight);
+    // Keep the nearest level exactly where the average agrees with it, and fade to the average.
+    const float take = smoothUnit((std::fabs(deviation) - kLevelKeep) / kLevelKeep);
+    return take > 0.0f ? nearest.level + deviation * take : nearest.level;
+}
+
+// The nearest point of the path with its level made continuous across the path's bends (above).
+// Every consumer of a feature's level goes through here; `closestOnPath` alone is for distance.
+PathHit levelledHit(const std::vector<glm::vec3>& path, glm::vec2 p, const std::vector<glm::vec4>& blocks) {
+    PathHit hit = closestOnPath(path, p, blocks);
+    hit.level = blendedLevel(path, p, hit, blocks);
+    return hit;
 }
 
 // Weight of a feature at distance d. smoothstep first so the shoulder meets the untouched terrain
@@ -575,6 +698,10 @@ float WorldMap::heightUncached(glm::vec2 p) const {
         if (w <= 0.0f) {
             continue;
         }
+        // Only a ridge or valley reads nothing but the distance; everything below reads the level.
+        const bool needsLevel = f.kind == FeatureKind::River || (f.kind == FeatureKind::Flat && f.water) ||
+                                w * f.flatten > 0.0f;
+        const float level = needsLevel ? blendedLevel(f.samplePath(), p, hit, f.blocks) : hit.level;
         switch (f.kind) {
         case FeatureKind::Ridge: raise += f.amplitude * w; break;
         case FeatureKind::Valley: raise -= f.amplitude * w; break;
@@ -582,11 +709,11 @@ float WorldMap::heightUncached(glm::vec2 p) const {
             // The path level is the water surface; the bed is `amplitude` below it. The cut is
             // applied with weight w at the end, so the channel centre is guaranteed under the water
             // line along the whole course while the banks blend out continuously.
-            addCut(hit.level - f.amplitude, w);
+            addCut(level - f.amplitude, w);
             break;
         case FeatureKind::Flat:
             if (f.water) {
-                addCut(hit.level, w);
+                addCut(level, w);
             }
             break;
         }
@@ -595,7 +722,7 @@ float WorldMap::heightUncached(glm::vec2 p) const {
         if (fw > 0.0f) {
             // Overlapping flatteners average by weight rather than fighting: two clearings that
             // touch produce one terrace, not a step.
-            flattenTarget = (flattenTarget * flattenWeight + hit.level * fw) / (flattenWeight + fw);
+            flattenTarget = (flattenTarget * flattenWeight + level * fw) / (flattenWeight + fw);
             flattenWeight = std::min(1.0f, flattenWeight + fw);
         }
     }
@@ -628,17 +755,38 @@ glm::vec3 WorldMap::normal(glm::vec2 p, float epsilon) const {
 }
 
 float WorldMap::waterSurface(glm::vec2 p) const {
-    float surface = seaLevel;
+    // Where two waters overlap, each surface counts in proportion to its own weight, so a surface
+    // fades out where its feature does. This used to be the highest surface of any feature reaching
+    // p -- which is right for one water and a wall for two. Glowmere's elder-pool sits on the river
+    // with its surface 1.2 m above the river's, and the max carried that surface across the channel
+    // to the edge of the pool's reach and dropped it 2.6 m there, in mid-river, in one grid step
+    // (`avgen_world_preview --seams`). The terrain's cuts already work this way (ADR-830: each water
+    // cuts with its own weight); the water line now does too. One water reaching p gives exactly
+    // its own surface, as before.
+    float weightSum = 0.0f;
+    float surfaceSum = 0.0f;
+    float single = 0.0f;
+    int reaching = 0;
     for (const Feature& f : features) {
         if (!f.water || !f.reaches(p)) {
             continue;
         }
-        const PathHit hit = closestOnPath(f.samplePath(), p, f.blocks);
+        const PathHit hit = levelledHit(f.samplePath(), p, f.blocks);
         // Only inside the bank, and only where the feature actually reaches: a wide, soft-shouldered
         // river should not flood the shoulder just because the shoulder is within `width`.
-        if (featureWeight(hit.distance, f.width, f.falloff) > 0.0f) {
-            surface = std::max(surface, hit.level + f.waterDepth);
+        const float w = featureWeight(hit.distance, f.width, f.falloff);
+        if (w > 0.0f) {
+            single = hit.level + f.waterDepth;
+            weightSum += w;
+            surfaceSum += w * single;
+            ++reaching;
         }
+    }
+    float surface = seaLevel;
+    if (reaching == 1) {
+        surface = std::max(surface, single);
+    } else if (reaching > 1) {
+        surface = std::max(surface, surfaceSum / weightSum);
     }
     return surface > kNegInf ? surface : kNegInf;
 }
@@ -654,7 +802,9 @@ float WorldMap::waterTable(glm::vec2 p) const {
             continue;
         }
         // No `reaches` gate, unlike `waterSurface`: the whole purpose is to answer outside the bank.
-        const PathHit hit = closestOnPath(f.samplePath(), p, f.blocks);
+        // The level is the continuous one (`blendedLevel`), so a course's own table does not step
+        // across its bends.
+        const PathHit hit = levelledHit(f.samplePath(), p, f.blocks);
         if (hit.distance < best) {
             best = hit.distance;
             surface = hit.level + f.waterDepth;
