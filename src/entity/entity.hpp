@@ -1001,6 +1001,14 @@ public:
         ++inputEpoch_;
         terrainLandmarks_ = std::move(names);
     }
+    // ADR-833 (Phase D §25): semantic words for named landmarks -- "mushroom", "ufo", "rock" -- so
+    // a landmark's interest point says what the thing is, the way an entity's does from its `tags`.
+    // Keyed by the landmark's name; a name with no landmark is simply never read.
+    void setLandmarkTags(std::vector<std::pair<std::string, std::vector<std::string>>> tags) {
+        ++inputEpoch_;
+        landmarkTags_ = std::move(tags);
+        refreshInterestPoints();
+    }
     // Where `name` is, looking first at entities (which move) and then at landmarks (which do not).
     [[nodiscard]] bool pointOfInterest(std::string_view name, glm::vec3& out) const;
 
@@ -1344,6 +1352,7 @@ private:
     // from compileReactions, which has one; refreshed by bind() and update().
     mutable const params::ParameterSet* params_ = nullptr;
     std::vector<std::pair<std::string, glm::vec3>> landmarks_;
+    std::vector<std::pair<std::string, std::vector<std::string>>> landmarkTags_; // ADR-833
     std::vector<std::string> terrainLandmarks_;
     std::vector<InterestPoint> interests_;
     std::vector<InterestPoint> extraInterests_;

@@ -61,7 +61,8 @@ seq::SequenceEvent onArrival() {
 
 // The demo, the warden's decider given an EMPTY goal slot (the plan owns the goal, not the entity),
 // and a sequence carrying the goal event.
-void build(app::Engine& engine, bool withGoal, double goalSeconds = 0.0) {
+void build(app::Engine& engine, bool withGoal, double goalSeconds = 0.0,
+           const std::vector<seq::SequenceEvent>& extra = {}) {
     REQUIRE(engine.loadComposition(demo()).has_value());
     engine.setDetailLimits(scene::DetailLimits::unlimited());
     std::vector<entity::EntityDesc> descs = engine.composition()->entities();
@@ -82,7 +83,20 @@ void build(app::Engine& engine, bool withGoal, double goalSeconds = 0.0) {
         piece.events.push_back(characterGoal(20.0, goalSeconds));
         piece.events.push_back(onArrival());
     }
+    piece.events.insert(piece.events.end(), extra.begin(), extra.end());
     REQUIRE(engine.setSequence(piece).has_value());
+}
+
+// A live sequence event that notifies when `kind`/`name` happens to the warden.
+seq::SequenceEvent onWarden(const std::string& id, seq::TriggerKind kind, const std::string& name) {
+    seq::SequenceEvent e;
+    e.id = id;
+    e.when.kind = kind;
+    e.when.name = name;
+    e.when.subject = "warden";
+    e.what.kind = seq::EventActionKind::Notify;
+    e.what.target = id;
+    return e;
 }
 
 void frame(app::Engine& engine, long long f) {
@@ -239,4 +253,64 @@ TEST_CASE("the clip readout reports what a cue would reproduce", "[motion][goal]
     const float wrapped = clip->loops && clip->length > 0.0f ? std::fmod(reproduced, clip->length) : std::min(reproduced, clip->length);
     CHECK(std::abs(wrapped - r.clipSeconds) < 1e-3f);
     CHECK_FALSE(engine.composition()->clipReadout("no-such-node", now).found);
+}
+
+// ADR-832 (Phase D §26): the two live trigger kinds that had no producer. An interaction completing
+// posts `InteractionComplete` named "prop.verb"; a field's edge posts `VolumeEnter`/`VolumeExit`
+// named after the field. Each must fire at the simulation second the world recorded it.
+TEST_CASE("an interaction and a volume edge fire their live triggers at the second they happen",
+          "[motion][goal][adr832][benchmark]") {
+    if (!present()) {
+        SKIP("alien assets are not present");
+    }
+    app::Engine engine(app::EngineMode::Offline);
+    build(engine, true, 60.0,
+          {onWarden("inspected", seq::TriggerKind::InteractionComplete, "mushroom-2.inspect"),
+           onWarden("entered", seq::TriggerKind::VolumeEnter, "by-the-mushroom"),
+           onWarden("left", seq::TriggerKind::VolumeExit, "by-the-mushroom")});
+    const entity::Entity* mushroom = engine.composition()->entityWorld().find("mushroom-2");
+    REQUIRE(mushroom != nullptr);
+    entity::FieldDesc field;
+    field.name = "by-the-mushroom";
+    field.volume.shape = entity::VolumeShape::Sphere;
+    field.volume.center = mushroom->state().position();
+    field.volume.radius = 3.0f;
+    field.scaleReactions = false; // an edge detector only: the demo's reactions are not its business
+    REQUIRE(engine.composition()->setFields({field}).has_value());
+
+    double inspectedAt = -1.0;
+    engine.composition()->entityWorld().setActionListener([&](const entity::ActionEvent& e) {
+        if (e.entity == "warden" && e.interaction == "mushroom-2.inspect" &&
+            e.result == entity::ActionResult::Completed && inspectedAt < 0.0) {
+            inspectedAt = e.time;
+        }
+    });
+    std::map<std::string, double> fired;
+    double enteredAt = -1.0;
+    double leftAt = -1.0;
+    for (long long f = 0; f <= 60 * 100; ++f) {
+        frame(engine, f);
+        const entity::EntityWorld& world = engine.composition()->entityWorld();
+        for (const entity::TriggerEvent& t : world.triggerEvents()) {
+            if (world.entities()[t.entity]->name() != "warden") {
+                continue;
+            }
+            double& at = t.enter ? enteredAt : leftAt;
+            if (at < 0.0) {
+                at = t.time;
+            }
+        }
+        for (const seq::FiredEvent& e : engine.firedEvents()) {
+            fired.try_emplace(engine.sequence().events[e.eventIndex].id, e.timeSeconds);
+        }
+    }
+    const auto when = [&](const char* id) { return fired.count(id) != 0 ? fired.at(id) : -1.0; };
+    INFO("inspected " << inspectedAt << " (fired " << when("inspected") << "); entered " << enteredAt << " (fired "
+                      << when("entered") << "); left " << leftAt << " (fired " << when("left") << ")");
+    REQUIRE(inspectedAt >= 20.0); // the goal sends the warden to the mushroom, so all three happen
+    REQUIRE(enteredAt >= 20.0);
+    REQUIRE(leftAt > enteredAt);
+    CHECK(when("inspected") == inspectedAt);
+    CHECK(when("entered") == enteredAt);
+    CHECK(when("left") == leftAt);
 }

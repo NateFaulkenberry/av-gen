@@ -249,6 +249,9 @@ struct ActionEvent {
     std::string entity;
     std::string action; // the action's label, or its kind when it has none
     std::string event;  // ActionDesc::onComplete, empty when the author named none
+    // ADR-832 (Phase D §26): "prop.verb" when the action was an `Interact` -- the interaction's own
+    // name, whether or not the author named an event -- and empty for every other kind.
+    std::string interaction;
     ActionResult result = ActionResult::Completed;
     std::string reason; // why it failed
     double time = 0.0;  // the timeline second, never a wall clock

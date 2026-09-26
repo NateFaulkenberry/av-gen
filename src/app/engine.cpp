@@ -601,11 +601,32 @@ void Engine::postCharacterEvents() {
     if (comp == nullptr) {
         return;
     }
-    for (const entity::ActionEvent& e : comp->entityWorld().actionEvents()) {
-        if (e.event.empty() || e.result != entity::ActionResult::Completed) {
+    const entity::EntityWorld& world = comp->entityWorld();
+    for (const entity::ActionEvent& e : world.actionEvents()) {
+        if (e.result != entity::ActionResult::Completed) {
             continue;
         }
-        sequenceEvents_.post(seq::TriggerSignal{seq::TriggerKind::ActionComplete, e.event, e.entity, e.time});
+        if (!e.event.empty()) {
+            sequenceEvents_.post(seq::TriggerSignal{seq::TriggerKind::ActionComplete, e.event, e.entity, e.time});
+        }
+        // ADR-832: an interaction says it finished by its own name, "prop.verb", with nothing
+        // authored on the action -- "when Rook has sat on the stump" is `{interactionComplete,
+        // "stump.sit", "rook"}`.
+        if (!e.interaction.empty()) {
+            sequenceEvents_.post(
+                seq::TriggerSignal{seq::TriggerKind::InteractionComplete, e.interaction, e.entity, e.time});
+        }
+    }
+    // ADR-832: the field pass's edges, by the field's name and the entity's. `TriggerEvent` was
+    // recorded for "whoever wants edges" and nobody read it until now.
+    const auto& fields = world.fields();
+    const auto& entities = world.entities();
+    for (const entity::TriggerEvent& t : world.triggerEvents()) {
+        if (t.field >= fields.size() || t.entity >= entities.size()) {
+            continue;
+        }
+        sequenceEvents_.post(seq::TriggerSignal{t.enter ? seq::TriggerKind::VolumeEnter : seq::TriggerKind::VolumeExit,
+                                                fields[t.field].name, entities[t.entity]->name(), t.time});
     }
 }
 
@@ -5202,6 +5223,12 @@ void Engine::update(const FrameTime& time) {
         // post/motionBlur/amount stays exactly as authored.
     }
     controller_->scene().post = post_;
+    // ADR-834 (Phase D §36): where each character sits in the finished frame, published after the
+    // camera and its lens are final. Read by routes and reactions from the next frame, like every
+    // other bus signal; never read by the simulation's own step.
+    if (auto* comp = composition()) {
+        comp->publishCinematicSignals(bus_);
+    }
     // Without this line every temporal parameter resolves, round-trips and reaches nothing --
     // ADR-039's selective bloom and ADR-035's identifier mask were both shipped missing exactly
     // this assignment, and both were invisible because the feature simply never ran.

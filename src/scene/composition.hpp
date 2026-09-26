@@ -55,6 +55,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <nlohmann/json.hpp>
 
+#include <array>
 #include <cstdint>
 #include <chrono>
 #include <filesystem>
@@ -285,6 +286,10 @@ struct CompositionNode {
     // working, not an edit to the work. It is saved with the scene, because which things you had
     // put out of the way is worth keeping between sessions.
     bool locked = false;
+    // ADR-833 (Phase D §25): what this thing IS, in the world's semantic words ("ufo", "rock",
+    // "world_effect"), for the characters' perception. Authored as `"tags"`; a generated
+    // procedural adds its generator's name ("mushroom") by itself -- see `semanticTagsOf`.
+    std::vector<std::string> tags;
     float emissiveBoost = 1.0f;
     float roughnessScale = 1.0f;
     // ADR-385. A whole-node opacity multiplier, for the same reason `emissiveBoost` and
@@ -496,6 +501,10 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
 };
+
+// ADR-833 (Phase D §25): the node's authored `tags` plus what it demonstrably is (a generated
+// procedural's generator name). Deduplicated, in that order.
+[[nodiscard]] std::vector<std::string> semanticTagsOf(const CompositionNode& node);
 
 // A copy of everything *authored* about a node -- exactly the fields the scene file writes -- with
 // every piece of runtime state left behind for `addNode` to rebuild: the loaded glTF asset, the
@@ -1940,6 +1949,24 @@ public:
     };
     [[nodiscard]] MotionDebug motionDebug(std::string_view node) const;
 
+    // ---- cinematic awareness (Phase D §36, ADR-834) ----------------------------------------------
+    //
+    // Where each character sits in the finished frame: optional signals a scene MAY route into
+    // behaviour priority, animation quality or attention, and which never feed the simulation's
+    // own step -- a character's world state must not depend on where the camera is (§36).
+    struct CinematicSignals {
+        bool isHero = false;          // the active camera follows or aims at this character's node
+        bool inShot = false;          // the character's centre is inside the frame
+        float distanceToCamera = 0.0f; // metres, eye to the character's base
+        float visibility = 0.0f;      // 0..1: of the rays to it, those the ground and heroes let through
+        float screenImportance = 0.0f; // 0..1: frame height it fills, weighted toward the centre
+    };
+    // The last frame's answer for `entity`, or all-zero for a name that is not a character.
+    [[nodiscard]] CinematicSignals cinematicSignals(std::string_view entity) const;
+    // Computes every character's signals from the camera as it stands now and writes them to
+    // `character.<name>.{isHero,inShot,distanceToCamera,visibility,screenImportance}`.
+    void publishCinematicSignals(signals::SignalBus& bus);
+
 private:
 
     std::vector<world::EffectInstance> effects_; // ADR-702: authored, round-tripped as "effects"
@@ -1955,6 +1982,15 @@ private:
     std::size_t authoredLightFirst_ = 0;
     std::vector<std::size_t> authoredLightNodeIndex_;
     std::vector<world::HeroPoint> heroes_;   // ADR-074: authored, round-tripped as "heroes"
+    // ADR-834: per entity, in entity order, the last published cinematic signals and their ids.
+    struct CinematicSlot {
+        std::string name;
+        CinematicSignals value;
+        std::array<signals::SignalId, 5> ids{};
+        float height = 0.0f; // the body's height, measured once
+    };
+    std::vector<CinematicSlot> cinematic_;
+    const signals::SignalBus* cinematicBus_ = nullptr;
     // The subset of `heroes_` a *walker's* clearance field may treat as solid: the ones no entity
     // drives (ADR-349). Storage rather than a filter at the point of use, because
     // `ClearanceField::heroes` is a span and the field outlives the call that built it. Rebuilt by

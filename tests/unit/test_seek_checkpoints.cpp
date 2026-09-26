@@ -161,7 +161,7 @@ TEST_CASE("a checkpoint holds every member EntityWorld has, or the author was ma
     // A size is a crude fingerprint: two edits that cancel would pass it. It is the tripwire, not the
     // proof; the proof is the digest test in test_glowmere_scrub.cpp, which restores into a world
     // that has been somewhere else and compares everything.
-    constexpr std::size_t kEntityWorldSize = 2056;
+    constexpr std::size_t kEntityWorldSize = 2080; // ADR-833: landmarkTags_, configuration (setLandmarkTags bumps inputEpoch_)
     INFO("sizeof(EntityWorld) = " << sizeof(entity::EntityWorld));
     CHECK(sizeof(entity::EntityWorld) == kEntityWorldSize);
 

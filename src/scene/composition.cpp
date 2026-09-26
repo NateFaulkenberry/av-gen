@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <optional>
 #include <array>
+#include "world/camera_clearance.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <chrono>
@@ -1606,6 +1607,7 @@ void Composition::installEntities() {
     bindings.reserve(nodes_.size());
     std::vector<std::pair<std::string, glm::vec3>> landmarks;
     std::vector<std::string> terrainLandmarks;
+    std::vector<std::pair<std::string, std::vector<std::string>>> landmarkTags; // ADR-833
     landmarks.reserve(nodes_.size() + heroes_.size());
     for (const auto& nodePtr : nodes_) {
         const CompositionNode& node = *nodePtr;
@@ -1632,6 +1634,9 @@ void Composition::installEntities() {
         const glm::vec3 forward = placed.rotation * glm::vec3(0.0f, 0.0f, 1.0f);
         binding.facing = std::atan2(forward.x, forward.z);
         landmarks.emplace_back(node.name, binding.anchor);
+        if (std::vector<std::string> words = semanticTagsOf(node); !words.empty()) {
+            landmarkTags.emplace_back(node.name, std::move(words)); // ADR-833
+        }
         // Phase D §23: a terrain is the ground itself, not a place on it -- both aliens of the
         // autonomy demo opened by walking "to the ground". It stays in the landmark list (the
         // pre-Phase-D deciders and their golden traces read it) and is *tagged* "terrain", by what
@@ -1649,6 +1654,7 @@ void Composition::installEntities() {
     }
     entityWorld_.setBindings(std::move(bindings));
     entityWorld_.setTerrainLandmarks(std::move(terrainLandmarks));
+    entityWorld_.setLandmarkTags(std::move(landmarkTags));
     entityWorld_.setLandmarks(std::move(landmarks));
 
     // The ground an entity walks on is the ground the terrain was built from -- the same WorldMap
@@ -1765,6 +1771,21 @@ void Composition::installEntities() {
         }
         entityWorld_.recordProblems(problems);
     }
+}
+
+// ADR-833 (Phase D §25): the words a node contributes to the world's semantics. What the author
+// wrote, then what the node demonstrably is -- a generated procedural is named for its generator
+// ("mushroom"), which is a fact of the data rather than a guess from the node's name (§66). A
+// terrain is "terrain" already, by `setTerrainLandmarks`.
+std::vector<std::string> semanticTagsOf(const CompositionNode& node) {
+    std::vector<std::string> out = node.tags;
+    if (node.kind == NodeKind::Procedural) {
+        const std::string& generator = node.procedural.source.generated.generator;
+        if (!generator.empty() && std::find(out.begin(), out.end(), generator) == out.end()) {
+            out.push_back(generator);
+        }
+    }
+    return out;
 }
 
 std::vector<entity::InterestPoint> Composition::glowInterestPoints() const {
@@ -2251,6 +2272,115 @@ std::shared_ptr<const MotionAsset> Composition::matchAssetFor(const SkinnedRig& 
     // A failure is cached too, so a body that cannot match does not rebuild every frame.
     matchAssets_[key] = out;
     return out;
+}
+
+// ---- cinematic awareness (Phase D §36, ADR-834) ------------------------------------------------
+
+Composition::CinematicSignals Composition::cinematicSignals(std::string_view entity) const {
+    for (const CinematicSlot& slot : cinematic_) {
+        if (slot.name == entity) {
+            return slot.value;
+        }
+    }
+    return CinematicSignals{};
+}
+
+void Composition::publishCinematicSignals(signals::SignalBus& bus) {
+    const auto& entities = entityWorld_.entities();
+    // (Re)declared when the cast or the bus changes; otherwise the ids are cached and a frame
+    // allocates nothing here.
+    bool same = cinematicBus_ == &bus && cinematic_.size() == entities.size();
+    for (std::size_t i = 0; same && i < entities.size(); ++i) {
+        same = cinematic_[i].name == entities[i]->name();
+    }
+    if (!same) {
+        cinematic_.clear();
+        cinematic_.reserve(entities.size());
+        for (const auto& e : entities) {
+            CinematicSlot slot;
+            slot.name = e->name();
+            const std::string base = "character." + slot.name + ".";
+            slot.ids = {bus.declare(base + "isHero"), bus.declare(base + "inShot"),
+                        bus.declare(base + "distanceToCamera", 0.0f, 10000.0f), bus.declare(base + "visibility"),
+                        bus.declare(base + "screenImportance")};
+            cinematic_.push_back(std::move(slot));
+        }
+        cinematicBus_ = &bus;
+    }
+    if (cinematic_.empty()) {
+        return;
+    }
+
+    const Camera& camera = scene_.camera;
+    const float aspect = viewportWidth_ > 0 && viewportHeight_ > 0
+                             ? static_cast<float>(viewportWidth_) / static_cast<float>(viewportHeight_)
+                             : 16.0f / 9.0f;
+    const glm::mat4 viewProjection = camera.projection(aspect) * camera.view();
+    const float tanHalf = std::tan(camera.effectiveFovY() * 0.5f);
+
+    // The subject of the active camera, by node: a follow or an aim names it.
+    std::string_view subjectFollow;
+    std::string_view subjectAim;
+    const ActiveCameraState active = activeCamera();
+    if (const CameraRig* rig = cameraDirection_.find(active.camera)) {
+        subjectFollow = rig->followNode;
+        subjectAim = rig->aimNode;
+    }
+
+    // The camera's view is blocked by the ground and by heroes -- the same exact obstructions the
+    // camera's own sightline correction uses (ADR-349's camera field, heroes included).
+    world::ClearanceField field;
+    for (const auto& nodePtr : nodes_) {
+        if (nodePtr->kind == NodeKind::Terrain) {
+            field.map = &nodePtr->worldMap;
+            field.ecology = &nodePtr->ecology;
+            break;
+        }
+    }
+    field.heroes = heroes_;
+
+    for (std::size_t i = 0; i < entities.size(); ++i) {
+        const entity::Entity& e = *entities[i];
+        CinematicSlot& slot = cinematic_[i];
+        CinematicSignals out;
+        const std::string& nodeName = e.desc().node.empty() ? e.name() : e.desc().node;
+        const glm::vec3 base = e.visualPosition();
+        // The body's height, measured once from its node's meshes: a body does not change size.
+        if (slot.height <= 0.0f) {
+            const WorldBounds b = nodeBounds(nodeName);
+            slot.height = b.valid ? std::max(b.size().y, 0.5f) : 1.8f;
+        }
+        const glm::vec3 centre = base + glm::vec3(0.0f, slot.height * 0.5f, 0.0f);
+        out.distanceToCamera = glm::length(base - camera.position);
+        out.isHero = !nodeName.empty() && (nodeName == subjectFollow || nodeName == subjectAim);
+        const glm::vec4 clip = viewProjection * glm::vec4(centre, 1.0f);
+        if (clip.w > 1e-4f) {
+            const glm::vec2 ndc(clip.x / clip.w, clip.y / clip.w);
+            out.inShot = std::abs(ndc.x) <= 1.0f && std::abs(ndc.y) <= 1.0f;
+            if (out.inShot) {
+                const float depth = clip.w;
+                const float fraction = std::clamp(slot.height / (2.0f * depth * std::max(tanHalf, 1e-4f)), 0.0f, 1.0f);
+                const float centrality = 1.0f - std::clamp(glm::length(ndc) / 1.41421356f, 0.0f, 1.0f);
+                out.screenImportance = std::clamp(fraction * (0.5f + (0.5f * centrality)), 0.0f, 1.0f);
+                if (field.map != nullptr) {
+                    world::SubjectCapsule subject;
+                    subject.position = base;
+                    subject.height = slot.height;
+                    subject.radius = std::max(slot.height * 0.2f, 0.2f);
+                    subject.name = nodeName;
+                    out.visibility = world::heroSightline(field, camera.position, subject, 2.0f).visible;
+                } else {
+                    out.visibility = 1.0f;
+                }
+            }
+        }
+        slot.value = out;
+        bus.set(slot.ids[0], out.isHero ? 1.0f : 0.0f);
+        bus.set(slot.ids[1], out.inShot ? 1.0f : 0.0f);
+        bus.set(slot.ids[2], out.distanceToCamera);
+        bus.set(slot.ids[3], out.visibility);
+        bus.set(slot.ids[4], out.screenImportance);
+    }
 }
 
 Composition::MotionDebug Composition::motionDebug(std::string_view node) const {
@@ -9317,6 +9447,9 @@ nlohmann::json Composition::toJson() const {
         if (node.locked) {
             n["locked"] = true;
         }
+        if (!node.tags.empty()) { // ADR-833: additive, written only when authored
+            n["tags"] = node.tags;
+        }
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
         // ADR-360. Written only when the node declares a wind body, so nothing else grows a key,
@@ -10637,6 +10770,18 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             auto scale = readVec<3>(item, "scale", node.transform.scale);
             auto visible = readBool(item, "visible", true);
             auto locked = readBool(item, "locked", false);
+            // ADR-833 (Phase D §25): the node's semantic words.
+            if (item.contains("tags")) {
+                if (!item.at("tags").is_array()) {
+                    return fail("node '{}': 'tags' must be an array of strings", node.name);
+                }
+                for (const auto& tag : item.at("tags")) {
+                    if (!tag.is_string() || tag.get<std::string>().empty()) {
+                        return fail("node '{}': 'tags' must be an array of non-empty strings", node.name);
+                    }
+                    node.tags.push_back(tag.get<std::string>());
+                }
+            }
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
             // ADR-370: which node's canopy a particle emitter is measured from.

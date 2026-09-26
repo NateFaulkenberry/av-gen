@@ -8941,6 +8941,7 @@
       "name": "visitor",
       "profile": "../entities/craft-lights.profile.json",
       "node": "visitor",
+      "tags": ["ufo", "vehicle"],
       "seed": 20260911,
       "fullDetailDistance": 420.0,
       "coarseInterval": 0.1,
@@ -9002,6 +9003,7 @@
     {
       "name": "visitor-beam",
       "node": "visitor-beam",
+      "tags": ["world_effect", "beam"],
       "seed": 771155,
       "cullDistance": 900.0,
       "reactions": [

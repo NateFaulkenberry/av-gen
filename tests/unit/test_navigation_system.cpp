@@ -1008,6 +1008,84 @@ TEST_CASE("characters make room for each other rather than standing in each othe
     }
 }
 
+TEST_CASE("the crowd's push is published as steering the motion tier can execute",
+          "[navigation][crowd][adr835]") {
+    // ADR-835 (Phase B §39). Separation moves a body the behaviour did not ask to move; the motion
+    // tier is handed `desiredVelocity + steering`, so the push has to arrive there as steering or
+    // the motion tier believes the body walks straight while the crowd slides it sideways.
+    world::WorldMap map;
+    map.name = "flat";
+    map.size = glm::vec2(160.0f, 160.0f);
+    map.prepare();
+    world::Ecology ecology;
+    world::ClearanceField clearance;
+    clearance.map = &map;
+    clearance.ecology = &ecology;
+    const entity::Navigator nav(&map, clearance);
+
+    params::ParameterSet params;
+    entity::EntityWorld world;
+    std::vector<entity::EntityDesc> descs;
+    for (int i = 0; i < 2; ++i) {
+        entity::EntityDesc desc;
+        desc.name = i == 0 ? "one" : "two";
+        desc.seed = static_cast<std::uint32_t>(7717 + i * 13);
+        entity::BehaviorDesc walk;
+        walk.kind = "explore";
+        walk.settings = nlohmann::json{{"speed", 3.0f},     {"runSpeed", 3.0f}, {"bodyRadius", 2.0f},
+                                       {"minRange", 4.0f},  {"maxRange", 60.0f}, {"strollChance", 1.0f},
+                                       {"idleMin", 0.0f},   {"idleMax", 0.0f},  {"observeChance", 0.0f}};
+        desc.behaviors.push_back(walk);
+        descs.push_back(std::move(desc));
+    }
+    world.setEntities(std::move(descs), 4242u);
+    // Two bindings the entities drive nothing through: this test is about the behaviour layer, and
+    // an entity with no node still runs its behaviours (that is the ADR-088 split).
+    std::vector<entity::NodeBinding> bindings;
+    for (const char* name : {"one", "two"}) {
+        entity::NodeBinding binding;
+        binding.node = name;
+        binding.exists = true;
+        binding.transformPrefix = std::string("nodes/") + name + "/";
+        // Half a metre apart, with two-metre bodies: they start three metres inside each other.
+        // Waiting for two wanderers to happen to collide tests nothing -- over nine hundred frames
+        // of an earlier version of this they never met once, and it passed.
+        binding.anchor = glm::vec3(name[0] == 'o' ? -0.25f : 0.25f, 0.0f, 0.0f);
+        bindings.push_back(std::move(binding));
+    }
+    world.setBindings(std::move(bindings));
+    world.setNavigator(nav);
+    world.registerParameters(params, "entity/");
+    world.bind(params, "entity/");
+    entity::EntityUpdate tick;
+    tick.dt = 1.0 / 60.0;
+    int pushedFrames = 0;
+    for (std::uint64_t frame = 0; frame < 900; ++frame) {
+        tick.time = static_cast<double>(frame) / 60.0;
+        tick.frameIndex = frame;
+        world.update(tick, params);
+        const entity::Entity* one = world.find("one");
+        const entity::Entity* two = world.find("two");
+        const glm::vec3 a = one->locomotion().position;
+        const glm::vec3 b = two->locomotion().position;
+        const glm::vec3 s1 = one->state().intent.steering;
+        const glm::vec3 s2 = two->state().intent.steering;
+        if (glm::length(s1) > 1e-3f && glm::length(s2) > 1e-3f) {
+            ++pushedFrames;
+            // Apart: each body is steered away from the other, and not vertically.
+            CHECK(glm::dot(glm::vec2(s1.x, s1.z), glm::vec2(a.x - b.x, a.z - b.z)) > 0.0f);
+            CHECK(glm::dot(glm::vec2(s2.x, s2.z), glm::vec2(b.x - a.x, b.z - a.z)) > 0.0f);
+            CHECK(s1.y == 0.0f);
+            // A speed, bounded as the push is (never faster than 1 m/s or the body's walk).
+            CHECK(glm::length(s1) <= 3.0f + 1e-3f);
+        }
+    }
+    // They start three metres inside each other and separate as soon as they set off (an idle body
+    // is not pushed), so a run of frames is pushed and every one of them steers apart.
+    INFO("frames with steering published on both bodies: " << pushedFrames);
+    CHECK(pushedFrames >= 10);
+}
+
 // ---- water as a depth rather than a wall --------------------------------------------------------
 
 namespace {
