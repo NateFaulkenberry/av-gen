@@ -154,14 +154,14 @@ app::SongPlan rebuildPlan(const analysis::AnalysisTrack& track) {
 }
 
 app::SongDirection cut(const analysis::AnalysisTrack& track, const app::SongPlan& plan,
-                       const app::SongDirectorOptions& options) {
+                       const app::SongDirectorOptions& options, const char* suffix = "") {
     auto brief = app::briefFromHeroes(heroes());
     REQUIRE(brief.has_value());
     auto d = app::directSong(plan, *brief, cameras(), options);
     INFO((d ? std::string() : d.error().message));
     REQUIRE(d.has_value());
     if (const char* path = std::getenv("AVGEN_SONG_REPORT"); path != nullptr && *path != '\0') {
-        std::ofstream(path) << d->report().dump(2) << "\n";
+        std::ofstream(std::string(path) + suffix) << d->report().dump(2) << "\n";
     }
     return *d;
 }
@@ -249,7 +249,7 @@ TEST_CASE("Rebuild: shot lengths are not one global duration", "[song][director]
     }
     app::SongDirectorOptions guided = optionsFor(*track);
     guided.autonomy = app::Autonomy::Guided;
-    const nlohmann::json flatStats = cut(*track, flat, guided).report()["stats"];
+    const nlohmann::json flatStats = cut(*track, flat, guided, ".flat").report()["stats"];
     INFO("control: " << flatStats.dump());
     CHECK(flatStats["modalShare"].get<double>() > 0.6);
     CHECK(flatStats["cv"].get<double>() < 0.25);

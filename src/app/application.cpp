@@ -3931,6 +3931,10 @@ Result<void> Application::directCameraFromTrack() {
                   options_.songPlan->string());
         commandLinePlan = *plan;
         engine_->songPlan() = std::move(*plan);
+        // Once. This function is also every interactive re-cut (Enable, a section edit), and the
+        // plan on the command line was for the run's first cut: afterwards the project holds it as
+        // its saved plan and a person's edits to the film's sections take over, as they always do.
+        options_.songPlan.reset();
     }
     // Heroes come from whichever source the world has one. An authored scene declares them
     // (ADR-074); a generated world's composer places them (ADR-072). Preferring the scene's own is
