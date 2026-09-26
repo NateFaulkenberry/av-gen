@@ -820,6 +820,10 @@ public:
     // it is the simulation's, the camera rigs' and HIST's answer, and the offset is visual-only.
     // Null, or a frame with no live offset, is the flatten exactly as it was before XFORM existed.
     void setEffectOffsets(const world::TransformFrame* frame) { effectOffsets_ = frame; }
+    // ADR-906: the engine's trigger clock, bound for the frame BEFORE `update` -- where a field with
+    // a `trigger` counts its clock from (`resolveFieldTriggers`, at the end of the parameter pass).
+    // Null -- a composition no engine drives -- leaves every triggered field silent.
+    void setTriggerClock(const world::TriggerClock* clock) { triggerClock_ = clock; }
     // The node's world transform as the flatten DRAWS it: `nodeWorldTransform` with every offset on
     // the node and its ancestors composed in. Equal to `nodeWorldTransform` when none applies.
     [[nodiscard]] Transform nodeDrawnWorldTransform(const CompositionNode& node) const;
@@ -2147,6 +2151,7 @@ private:
     // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
     world::HistoryBank* historyBank_ = nullptr; // ADR-703: the engine's; see `setHistoryBank`
     const world::TransformFrame* effectOffsets_ = nullptr; // Wave 2 (XFORM): the engine's; see `setEffectOffsets`
+    const world::TriggerClock* triggerClock_ = nullptr;    // ADR-906: the engine's; see `setTriggerClock`
     // A node's own transform with its XFORM offset composed in (identity when it has none).
     [[nodiscard]] Transform nodeDrawnTransform(const CompositionNode& node) const;
     std::vector<stage::VisualPlacement> seekPlaced_;

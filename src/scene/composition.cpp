@@ -20,6 +20,7 @@
 #include "scene/sky.hpp"
 #include "world/effects/effect_lights.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_trigger.hpp"
 #include "spatial/detail.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -8118,6 +8119,10 @@ void Composition::applyParameters() {
             }
         }
     }
+    // ADR-906: a triggered field's clock for this frame, once every field -- a nested scene's
+    // included -- has its finals. The clock is the engine's, bound to this frame's transport second.
+    resolveFieldTriggers(scene_.fields, triggerClock_,
+                         triggerClock_ != nullptr ? triggerClock_->seconds() : currentTime_);
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
