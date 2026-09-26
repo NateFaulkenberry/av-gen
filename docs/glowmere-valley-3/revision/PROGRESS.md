@@ -25,7 +25,7 @@ The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner
 | water | 914–916 | `ddf44a85` (tears WIP), clean | ADR-914 (bounded advection) and 915 (fades count 1080-row reference pixels) finished and tested. **Left:** re-run `[tears]`, `[water]` and `[water6_2]` GPU tests after the last shader change; UI reach (a `water/tears/` sub-group); ADR-916; full suites. **For GV3:** go back to ripple 0.1 at rippleScale 2.6, with the bass route at 0.03 (ADR-915 makes the final-only values wrong). Stills and scripts are in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/water-work/`. |
 | setpieces | 928–931 | `905c91ac`, clean | `2ea9c7b5` built and tested: templates (abduction with 1–3 animals, survey, flyby), `PlanSetPiece` with validation, staging at timeline seconds, a bus-id bug fixed; 23 cases pass. `905c91ac` (`avgen --plan`, cast_trace `setPieces`) was never compiled. **Left:** build and fix; the UI home (a "UFO set pieces" section in the Director panel); the three-abduction end-to-end proof; the evaluator hook; ADRs; the full suite. The Critic's adapter should read the trace's `setPieces` instead of hard-coding GV3's beats. Notes: `docs/development/setpieces-design-notes.md` in the worktree. |
 | render | 917–919 | `7f36b8e3` (WIP), clean | Built, and the CPU tests pass. `post/referenceHeight` (720) scales every pixel-sized post value; `scene/fogSky`, a sky-radiance fog map; offline floors. **Nothing has run on the GPU.** **Left:** GPU tests and their thresholds, suites, re-baselining small-frame bloom tests, GV3 evidence, the 4K cost, the ADRs' measurements. World edge: report only (a backdrop ring would take 1–2 days). Notes: `docs/development/render-design-notes.md`. |
-| signals | 896–899 | `0b623b88` + **82 uncommitted files** | Died mid-work adding a UI-reach test. No report, and no commit. |
+| signals | 896–899 | **merged** (`e0657a26`) | Done. |
 | emission | 903–906 | `0b623b88` + **54 uncommitted files** | Died mid-work applying viewer-facing labels. No report, and no commit. |
 | characters | 907–910 | `5dc541db` + **22 uncommitted files** | Died mid-fix (gait state must start as authored for bodies seeked but never stepped). No report. |
 
@@ -34,6 +34,12 @@ The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner
 - **"Glowmere Valley 2 from several viewpoints" fails on main too,** identically (`test_glowmere_valley_2_views.cpp:201`, camera 72.478889 m off). It is a pre-existing defect, not caused by any stream. Nobody owns it yet.
 
 **15:35: the owner allowed a third agent.** The emission finisher (`a272c875ba85fb192`) joined round 1, because it is on the critical path for the reactivity planner.
+
+**Merged: signals** into main as `e0657a26` (ADR-896–899; the branch's suites were CPU 3,554/3,554 and GPU 510 with 509 passed and 1 skipped). Main was then merged into `gv3/production` (`cfd50932`).
+- The coordinator restored `examples/world/glowmere-valley-2-multicam.json` on the branch (`fe711eab`), because the owner's brief forbids modifying it. Its stale `control.phraseBars`/`sectionPhrases` keys are ignored at load with a warning. The multicam tests passed with the file restored: 17 cases, 12,373 assertions.
+- **For GV3:** delete `control.phraseBars` and `control.sectionPhrases` from the generator's project, and pin `"music/meter/bar1Beat": 0, "music/meter/phraseBars": 8`. `beat.count` is 0 at bar 1; bar n, beat m is `(n−1)×4 + (m−1)` beats. `audio.onsetLow` matches the scored kicks (precision 0.969, recall 0.979), but fires 0–18 ms late, so keep the scored kicks where GV3's 20 ms lead matters. For the arrival's sparkle, use the hat rate or `audio.energy`, not the treble level.
+
+**Launched: song** (wave 2, agent `ab2d20dab3b1ac697`) in `~/Documents/GitHub/av-gen-song`, branch `agent/song`, from `e0657a26`.
 
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
