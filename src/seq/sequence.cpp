@@ -1443,7 +1443,8 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
     // shot would spend its whole length gliding towards the *next* shot's opening frame. The last
     // key of a shot that is cut away from therefore lands a millisecond early: short enough that no
     // frame rate this engine renders at can see the ramp, long enough that both poses survive.
-    constexpr double kCutSeconds = 1e-3;
+    // ADR-912: and the renderer finds the cut again from exactly this ramp (`Track::jumpsWithin`).
+    constexpr double kCutSeconds = params::kCutRampSeconds;
     for (std::size_t si = 0; si < shots.size(); ++si) {
         const Shot& s = shots[si];
         ShotCamera cam = s.camera;

@@ -2518,6 +2518,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         resetTemporalHistory();
         temporalScene_ = &scene;
     }
+    // ADR-912: a cut. The scene says so by changing `camera.cutSerial`, and a cut is a
+    // discontinuity of the PICTURE -- not of the world, so the particle pools stay -- which is
+    // exactly `resetScreenHistory`: the previous view-projection and models (so this frame's
+    // velocity is zero, and the blur with it), the AO history and the temporal ring. Without it the
+    // first frame of every shot was blurred along a "movement" from the old camera to the new one,
+    // at the blur's full length -- measured on GV3's final at 20-40% of its neighbours' sharpness.
+    if (!sceneChanged && scene.camera.cutSerial != lastCutSerial_) {
+        resetScreenHistory();
+        ++stats_.cameraCuts;
+    }
+    lastCutSerial_ = scene.camera.cutSerial;
     if (sceneChanged || time.renderTime < previousRenderTime_) {
         // A seek/reverse is a discontinuity, not motion. Reusing forward temporal history would
         // create false object/camera velocities and make the first reversed frame differ from a
