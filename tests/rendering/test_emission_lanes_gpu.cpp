@@ -471,6 +471,44 @@ TEST_CASE("The emission lane composes with an FXL Glow: the gains multiply", "[g
     CHECK(std::abs(rb - 1.0) < 0.01);
 }
 
+TEST_CASE("A program-lit mesh takes its lane after the program, where its material's intensity cannot reach",
+          "[gpu][emission][boost]") {
+    // The four-kinds case's mesh has no program, so its boost worked before ADR-903 as well (it was
+    // the one kind that did). What is new for a mesh is a program-lit one: an entity whose material
+    // runs a program that writes emission. Orb A runs one; orb B stays plain.
+    Harness h;
+    const auto scene = [](float lane, float intensity) {
+        scene::Scene s = twoOrbs(lane);
+        scene::MaterialProgram glow;
+        glow.name = "glow";
+        scene::MaterialOp colour;
+        colour.kind = scene::MaterialOpKind::Constant;
+        colour.dst = 4;
+        colour.constant = glm::vec4(0.1f, 0.9f, 0.5f, 1.0f);
+        glow.ops.push_back(colour);
+        glow.emissionRegister = 4;
+        glow.emissionIntensity = 0.05f;
+        s.materialPrograms.push_back(glow);
+        s.entities[0].material.program = "glow";
+        s.entities[0].material.emissiveIntensity = intensity;
+        return s;
+    };
+    const gpu::Image8 control = h.emission(scene(1.0f, 0.05f), 2.0f);
+    const gpu::Image8 laned = h.emission(scene(3.0f, 0.05f), 2.0f);
+    const gpu::Image8 materialLane = h.emission(scene(1.0f, 0.15f), 2.0f);
+    dump(control, "mesh-program-control");
+    dump(laned, "mesh-program-lane-x3");
+    const double c = total(maskedMean(control, control, 0, kWidth / 2));
+    const double l = total(maskedMean(laned, control, 0, kWidth / 2));
+    const double m = total(maskedMean(materialLane, control, 0, kWidth / 2));
+    INFO("program-lit orb: control " << c << ", lane x3 " << l << " (x" << l / c << "), material intensity x3 " << m
+                                     << " (x" << m / c << ")");
+    CHECK(l / c > 2.85);
+    CHECK(l / c < 3.15);
+    // The control arm: the old mechanism -- the material's intensity -- is discarded by the program.
+    CHECK(std::abs(m / c - 1.0) < 0.01);
+}
+
 // ---- ADR-904: the instance variation, once, as a rotation ----------------------------------------
 
 namespace {
