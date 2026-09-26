@@ -19,6 +19,7 @@ renderers; `Composition::nodeEmissiveBoost` and the node pass of `Composition::a
   program-lit surface")
 - "A route onto emissiveBoost reaches the pixels, and at rest changes none"
 - "The emission lane composes with an FXL Glow: the gains multiply"
+- "A program-lit mesh takes its lane after the program, where its material's intensity cannot reach"
 
 `tests/unit/test_emission_lanes.cpp`: "emissiveBoost lands on every drawable a node owns, after the
 program, and nowhere else"; "A route onto emissiveBoost reaches the lane the same frame".
@@ -96,7 +97,9 @@ So a Glow of gain 2 on a node boosted x3 emits x6.
 x3.01 (main: x1, x1, x3, x1). The control arm, the old lane (the material's intensity x3): the
 program-lit box x1.00, the plain box x3.00 -- the old mechanism could not have reached a program-lit
 surface. A route `1 + 2 x signal` on the program-lit node: x2.98 with the signal up,
-byte-identical at rest, every other node within 1%. With an FXL Glow of gain 2 on top: x5.99.
+byte-identical at rest, every other node within 1%. With an FXL Glow of gain 2 on top: x5.99. A
+program-lit mesh (an entity whose program writes emission): x2.97 for x3, and x1.00 for the old
+lane.
 
 **The scenes that change,** rendered by main 0b623b88's `avgen` and this branch's from exports of
 each tree (same assets, same audio), 640x360, tier high, supersample 1; display-referred PNGs, Rec.709
