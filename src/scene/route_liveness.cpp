@@ -688,7 +688,7 @@ std::optional<Finding> SceneLivenessFacts::effectNeverFires(const world::EffectI
             if (!c.triggers) {
                 c.triggers = std::make_unique<world::TriggerClock>();
                 c.triggers->bind(in_.track, in_.markers, in_.history,
-                                 duration > 0.0 ? duration : 1e9, in_.phraseBars, in_.sectionPhrases);
+                                 duration > 0.0 ? duration : 1e9, in_.meter);
             }
             const std::string_view owner =
                 e.owner.kind == world::EffectTarget::Entity ? std::string_view(e.owner.name) : std::string_view();

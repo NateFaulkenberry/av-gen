@@ -338,7 +338,9 @@ private:
         ctx.audioDuration = duration_;
         ctx.playing = playing_;
         ctx.beatPhase = static_cast<float>(state_.beatPhase);
-        ctx.beatCount = state_.beatCount;
+        // Exactly as the play path fills it (ADR-896): the musical position in beats, from this
+        // replay's own beat clock through the engine's meter.
+        ctx.musicalBeats = state_.haveClockBeats ? engine_.meter().beats(state_.clockBeats) : 0.0;
         ctx.tempoBpm = static_cast<float>(bpm);
         ctx.beatEvent = pulse;
         engine_.sources_.sample(sampling_, ctx);
@@ -1169,8 +1171,7 @@ scene::LivenessInputs Engine::livenessInputs() const {
     in.track = track_.get();
     in.markers = sequence_.markers;
     in.history = &historyBank_;
-    in.phraseBars = phraseBars_;
-    in.sectionPhrases = sectionPhrases_;
+    in.meter = meter();
     in.durationSeconds = durationSeconds();
     in.frameRate = render_.fps > 0.0 ? render_.fps : 60.0;
     // An analysed track, or a live input whose analysis runs as it plays: either moves audio.*.

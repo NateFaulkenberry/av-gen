@@ -11,6 +11,7 @@
 // events and which score pulses. It reads the live composition, so it is built per question (a bind,
 // a load, an audit) and is cheap to build: every fact is computed the first time a rule asks for it.
 
+#include "analysis/meter.hpp"
 #include "params/liveness.hpp"
 #include "params/modulation.hpp"
 #include "params/timeline.hpp"
@@ -53,8 +54,9 @@ struct LivenessInputs {
     const analysis::AnalysisTrack* track = nullptr;
     std::span<const seq::Marker> markers;
     const world::HistoryBank* history = nullptr;
-    int phraseBars = 4;
-    int sectionPhrases = 4;
+    // The engine's musical time (ADR-896): the downbeat, and the bar, phrase and section lengths
+    // an effect's Bar/Phrase/Section trigger counts in. The same one the trigger clock uses in play.
+    analysis::Meter meter{};
     double durationSeconds = 0.0; // the piece's length; 0 = unknown
     double frameRate = 60.0;      // the project's render rate
     bool hasAudio = false;        // an analysed track is installed
