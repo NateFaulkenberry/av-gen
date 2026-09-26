@@ -96,7 +96,7 @@ All seven had been stopped once by an account usage limit and resumed with SendM
    - **setpieces** (928–931) and **render** (917–919) were launched 2026-09-26 from main `0b623b88`, in `~/Documents/GitHub/av-gen-setpieces` and `av-gen-render` (branches `agent/setpieces`, `agent/render`).
    - **song** (920–923) launches after signals merges; **reactivity** (924–927) after signals, routes and emission merge. Create their worktrees from the main of that moment.
    - The launch prompt is the rules file plus the brief's section, plus: the other streams in flight, the ADR numbers, the Critic daemon on 8765 being the coordinator's (never restart it), and the final-report requirement.
-4. **Phase 3, the GV3 revision** (only after the gate and the Director merge). Work from `tools/make_glowmere_valley_3.py` + `tools/gv3/*`, iterating with the Critic on single-shot clips. It must cover everything in the brief:
+4. **Phase 3, the GV3 revision** (after the Director streams merge). **The plan is [03-revision-plan.md](03-revision-plan.md)**: the drop without a style shift, five UFO events (E1–E5), the reactivity map, the animals' flat meadows, and a check per item. Work from `tools/make_glowmere_valley_3.py` + `tools/gv3/*`, iterating with the Critic on single-shot clips. It must cover everything in the brief:
    - audio reactivity at micro, meso and macro levels: hero effects on the heroes' `-under`/`-gills` nodes, the small mushrooms' per-layer lanes, travelling waves, wind, the macro arc;
    - water tears;
    - smooth cameras;
