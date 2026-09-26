@@ -95,9 +95,28 @@ fn vs_water(in: VertexIn) -> WaterOut {
 // a finite-difference normal would cost three evaluations per layer instead of one. Quintic fade,
 // because the cubic smoothstep's second derivative is discontinuous at the cell boundary and that
 // shows up in a specular highlight as a faint grid.
+//
+// The lattice hash is an integer one (ADR-914). The `fract(sin(dot(cell, k)) * 43758)` it replaces
+// is only as good as `sin` is on a large argument, and the arguments here are large: the sparkle
+// runs at 26 times the ripple scale, which on Glowmere's river is 135 cells a metre, so 350 m from
+// the origin the hash was taking the sine of numbers near ten million -- where one float step is a
+// whole radian and the "random" value is whatever the GPU's range reduction happens to return.
+// Integer arithmetic is exact at any cell and identical on every device.
+fn waterHashU(x: u32) -> u32 {
+    // Wellons' lowbias32: every input bit reaches every output bit.
+    var h = x;
+    h = h ^ (h >> 16u);
+    h = h * 0x7feb352du;
+    h = h ^ (h >> 15u);
+    h = h * 0x846ca68bu;
+    h = h ^ (h >> 16u);
+    return h;
+}
+
 fn waterHash(cell: vec2<f32>) -> f32 {
-    let h = dot(cell, vec2<f32>(127.1, 311.7));
-    return fract(sin(h) * 43758.5453123);
+    let c = bitcast<vec2<u32>>(vec2<i32>(cell));
+    let h = waterHashU(c.x ^ waterHashU(c.y + 0x9e3779b9u));
+    return f32(h >> 8u) * (1.0 / 16777216.0);
 }
 
 // Returns (value in [-1, 1], d/dx, d/dy).
@@ -117,6 +136,72 @@ fn noiseD(p: vec2<f32>) -> vec3<f32> {
     let dx = du.x * (k1 + k3 * u.y);
     let dy = du.y * (k2 + k3 * u.x);
     return vec3<f32>(value * 2.0 - 1.0, dx * 2.0, dy * 2.0);
+}
+
+// ---- bounded advection (ADR-914) -----------------------------------------------------------
+//
+// Everything on this surface that travels -- the three ripple layers, the sparkle, the foam's
+// break-up and the glow -- used to sample its noise at `p - v * t`: an offset that grows without
+// limit. Wherever the baked flow `v` differs between two neighbouring vertices, the offset across the
+// triangle between them differs by `|dv| * t`, and the noise there is compressed by that over the
+// triangle's width. At the start of a film nothing shows; by three minutes Glowmere's pool boundary
+// compressed its ripples 28-fold and every Chaikin node of the river drew a stepped seam. The whole
+// channel streaked, too, because the bank shear is a smooth `dv` that grows the same way.
+//
+// So nothing travels for more than one period. Each effect keeps two samples of its field, half a
+// period apart; each sample travels for one period and is then re-seeded at a new place in the noise,
+// at the instant its weight is zero. The weights are triangles (1 at the middle of a sample's period,
+// 0 at its ends), so one sample is always carrying the picture while the other resets. They are
+// normalised by the root of their squares rather than by their sum: two uncorrelated fields averaged
+// with weights summing to one have *less* contrast than either, and a linear blend pulses flat twice a
+// period. `desync` shifts the cycle by up to two periods across the world, so the crossfade happens at
+// different moments in different places and never across a whole frame at once.
+//
+// The travel at any instant is at most `v * period`, so what a flow discontinuity can do to the noise is
+// bounded by `|dv| * period` whatever the second: the same at 10 s and at 200 s.
+const kFlowPeriod: f32 = 8.0;
+
+struct FlowPhases {
+    travel: vec2<f32>, // seconds each sample has travelled this cycle: x = sample 0, y = sample 1
+    weight: vec2<f32>, // their weights, variance-preserving
+    jump0: vec2<f32>,  // where in the noise sample 0's current cycle reads, in noise cells
+    jump1: vec2<f32>,
+};
+
+// A new, unrelated place in the noise for each cycle, so a sample that resets does not replay the
+// patch it showed a period ago. A hash of the cycle's index, so it is bounded for any t.
+fn flowJump(cycle: f32, salt: u32) -> vec2<f32> {
+    let hx = waterHashU(bitcast<u32>(i32(cycle)) ^ (salt * 0x9e3779b9u));
+    let hy = waterHashU(hx ^ 0x68e31da4u);
+    return (vec2<f32>(f32(hx >> 8u), f32(hy >> 8u)) * (1.0 / 16777216.0) - 0.5) * 128.0;
+}
+
+// `period` is the cycle in seconds; a faster effect uses a shorter one, so its travel per cycle is
+// bounded by the same distance a layer at the water's own speed covers in `kFlowPeriod`.
+fn flowPhases(t: f32, period: f32, desync: f32, salt: u32) -> FlowPhases {
+    var out: FlowPhases;
+    // ---- flow phases (ADR-914) begin ----
+    let c0 = t / period + desync;
+    let c1 = c0 + 0.5;
+    let f0 = fract(c0);
+    let f1 = fract(c1);
+    let w0 = 1.0 - abs(2.0 * f0 - 1.0);
+    let w1 = 1.0 - abs(2.0 * f1 - 1.0);
+    out.travel = vec2<f32>(f0, f1) * period;
+    // w0 + w1 is always 1, so the root is never under 1/sqrt(2).
+    out.weight = vec2<f32>(w0, w1) * inverseSqrt(w0 * w0 + w1 * w1);
+    out.jump0 = flowJump(floor(c0), salt);
+    out.jump1 = flowJump(floor(c1), salt);
+    // ---- flow phases (ADR-914) end ----
+    return out;
+}
+
+// Where in its cycle this part of the surface is, 0..2 periods, over about eighty metres. Slow on
+// purpose: the travel is `v * period * fract(t / period + desync)`, so how fast `desync` changes
+// across the world is a shear of its own -- at most 0.15 on a river as fast as Glowmere's, and a
+// constant one that never grows.
+fn flowDesync(p: vec2<f32>) -> f32 {
+    return noiseD(p * (1.0 / 80.0) + vec2<f32>(-71.3, 23.9)).x + 1.0;
 }
 
 // The layered surface (§11). Three travelling layers, each finer, weaker and faster than the one
@@ -148,10 +233,18 @@ fn sparkleBandFade(frequency: f32, footprint: f32) -> f32 {
     return smoothstep(2.0, 5.0, pixels) * (1.0 - smoothstep(28.0, 70.0, pixels));
 }
 
-fn rippleGradient(p: vec2<f32>, flowDir: vec2<f32>, speed: f32, t: f32, footprint: f32) -> vec2<f32> {
+// Each layer is two samples of its field under ADR-914's bounded advection; its gradient is their
+// variance-preserving blend. `desync` is `flowDesync` at this point.
+fn rippleGradient(p: vec2<f32>, flowDir: vec2<f32>, speed: f32, t: f32, footprint: f32,
+                  desync: f32) -> vec2<f32> {
     let across = vec2<f32>(-flowDir.y, flowDir.x);
     let scale = water.ripples.y;
     let chop = water.ripples.w;
+    // The point every layer samples around, and the footprint every layer fades against. Named
+    // rather than read from the arguments, because a tear (ADR-916) moves the first and widens the
+    // second.
+    var at = p;
+    var blur = footprint;
     var g = vec2<f32>(0.0);
 
     // Each layer's *height* falls as roughly the square of its frequency, which is what keeps the
@@ -159,23 +252,32 @@ fn rippleGradient(p: vec2<f32>, flowDir: vec2<f32>, speed: f32, t: f32, footprin
     // give every layer the same slope, and a surface whose slope is dominated by its finest layer
     // reads as crazed glass rather than as water. Nature does this too: capillary waves are
     // millimetres tall on top of metre-long swell.
+    //
+    // Each layer's period is `kFlowPeriod` over its speed multiplier, so the distance any layer
+    // travels in one cycle is the same: the water's own speed times `kFlowPeriod`.
     // Layer 1: the broad swell of the current itself, travelling downstream at the water's speed.
-    let o1 = flowDir * (speed * t);
-    let n1 = noiseD((p - o1) * scale);
-    g = g + n1.yz * scale * rippleLayerFade(scale, footprint);
+    let v1 = flowDir * speed;
+    let ph1 = flowPhases(t, kFlowPeriod, desync, 1u);
+    let a1 = noiseD((at - v1 * ph1.travel.x) * scale + ph1.jump0);
+    let b1 = noiseD((at - v1 * ph1.travel.y) * scale + ph1.jump1);
+    g = g + (a1.yz * ph1.weight.x + b1.yz * ph1.weight.y) * scale * rippleLayerFade(scale, blur);
 
     // Layer 2: shorter, quicker, angled off the current -- the wind-driven chop.
     let s2 = scale * 2.7;
-    let o2 = (flowDir * 1.35 + across * chop) * (speed * t * 1.6);
-    let n2 = noiseD((p - o2) * s2 + vec2<f32>(37.2, 11.9));
-    g = g + n2.yz * s2 * 0.20 * rippleLayerFade(s2, footprint);
+    let v2 = (flowDir * 1.35 + across * chop) * (speed * 1.6);
+    let ph2 = flowPhases(t, kFlowPeriod / 1.6, desync + 0.37, 2u);
+    let a2 = noiseD((at - v2 * ph2.travel.x) * s2 + vec2<f32>(37.2, 11.9) + ph2.jump0);
+    let b2 = noiseD((at - v2 * ph2.travel.y) * s2 + vec2<f32>(37.2, 11.9) + ph2.jump1);
+    g = g + (a2.yz * ph2.weight.x + b2.yz * ph2.weight.y) * s2 * 0.20 * rippleLayerFade(s2, blur);
 
     // Layer 3: capillary detail, travelling the other way across the flow, so the two upper layers
     // interfere and the pattern never settles. This is the layer the sparkle rides.
     let s3 = scale * 7.4;
-    let o3 = (flowDir * 0.6 - across * chop * 1.7) * (speed * t * 2.4);
-    let n3 = noiseD((p - o3) * s3 + vec2<f32>(-19.4, 63.1));
-    g = g + n3.yz * s3 * 0.05 * rippleLayerFade(s3, footprint);
+    let v3 = (flowDir * 0.6 - across * chop * 1.7) * (speed * 2.4);
+    let ph3 = flowPhases(t, kFlowPeriod / 2.4, desync + 0.71, 3u);
+    let a3 = noiseD((at - v3 * ph3.travel.x) * s3 + vec2<f32>(-19.4, 63.1) + ph3.jump0);
+    let b3 = noiseD((at - v3 * ph3.travel.y) * s3 + vec2<f32>(-19.4, 63.1) + ph3.jump1);
+    g = g + (a3.yz * ph3.weight.x + b3.yz * ph3.weight.y) * s3 * 0.05 * rippleLayerFade(s3, blur);
     return g;
 }
 
@@ -236,8 +338,14 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ---- the surface normal ------------------------------------------------------------------
     // The world-space size of one pixel on this surface, which is what the ripple layers fade
     // against. Derivatives, so it is taken here in uniform control flow and nowhere inside a branch.
-    let footprint = length(dpdx(in.worldPos.xz)) + length(dpdy(in.worldPos.xz));
-    let gradient = rippleGradient(in.worldPos.xz, dir, speed, t, footprint) * water.ripples.x;
+    let dPdx = dpdx(in.worldPos.xz);
+    let dPdy = dpdy(in.worldPos.xz);
+    let footprint = length(dPdx) + length(dPdy);
+    // Where this part of the surface is in the advection cycle (ADR-914), shared by every effect
+    // below that travels, each at its own offset into it.
+    let desync = flowDesync(in.worldPos.xz);
+    var rippleAmplitude = water.ripples.x;
+    let gradient = rippleGradient(in.worldPos.xz, dir, speed, t, footprint, desync) * rippleAmplitude;
     var n = normalize(vec3<f32>(-gradient.x, 1.0, -gradient.y));
     if (underwater) {
         n = vec3<f32>(-n.x, -n.y, -n.z);
@@ -317,12 +425,22 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // dimming the whole river -- which is the difference between "something is glowing under there"
     // and "the river is green".
     if (water.glowColor.w > 0.0) {
-        let drift = in.worldPos.xz - dir * (speed * t * 0.45);
-        let patchField = noiseD(drift * water.life.x).x * 0.5 + 0.5;
+        // ADR-914: two samples of the patch field, each drifting for one cycle.
+        let phg = flowPhases(t, kFlowPeriod / 0.45, desync + 0.83, 5u);
+        let vg = dir * (speed * 0.45);
+        let drift0 = in.worldPos.xz - vg * phg.travel.x;
+        let drift1 = in.worldPos.xz - vg * phg.travel.y;
+        let patchField = clamp((noiseD(drift0 * water.life.x + phg.jump0).x * phg.weight.x +
+                                noiseD(drift1 * water.life.x + phg.jump1).x * phg.weight.y) * 0.5 + 0.5,
+                               0.0, 1.0);
         let edge = 1.0 - clamp(water.life.y, 0.0, 1.0);
         let mask = smoothstep(edge, min(edge + 0.22, 1.0), patchField);
         // A second, faster field breaks each patch into drifting organisms rather than one blob.
-        let grain = noiseD(drift * water.life.x * 6.3 + vec2<f32>(11.0, -4.0)).x * 0.5 + 0.5;
+        let grainOffset = vec2<f32>(11.0, -4.0);
+        let grain = clamp((noiseD(drift0 * water.life.x * 6.3 + grainOffset + phg.jump0).x * phg.weight.x +
+                           noiseD(drift1 * water.life.x * 6.3 + grainOffset + phg.jump1).x * phg.weight.y) *
+                              0.5 + 0.5,
+                          0.0, 1.0);
         let depthGate = smoothstep(water.life.z * 0.35, water.life.z, vertical) *
                         (1.0 - smoothstep(water.life.z * 6.0, water.life.z * 14.0, vertical));
         // And it keeps to the channel. Depth alone does not say where the middle of a river is -- a
@@ -395,8 +513,15 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         let frequency = water.ripples.y * 26.0;
         let fade = sparkleBandFade(frequency, footprint);
         if (fade > 0.0) {
-            let sp = in.worldPos.xz * frequency - dir * (speed * t * 2.1);
-            let crest = noiseD(sp).x * 0.5 + 0.5;
+            // ADR-914: two samples, each scrolling through the noise for one cycle. The scroll is in
+            // noise cells, not metres, as it always was: at any frequency a glint field turns over
+            // about as often.
+            let phs = flowPhases(t, kFlowPeriod / 2.1, desync + 0.19, 4u);
+            let base = in.worldPos.xz * frequency;
+            let vs = dir * (speed * 2.1);
+            let crest = clamp((noiseD(base - vs * phs.travel.x + phs.jump0).x * phs.weight.x +
+                               noiseD(base - vs * phs.travel.y + phs.jump1).x * phs.weight.y) * 0.5 + 0.5,
+                              0.0, 1.0);
             let cut = smoothstep(0.90, 0.995, crest);
             // And only where the surface is already turned toward the eye's reflection of the sky:
             // a sparkle on a part of the water that is not reflecting anything is paint.
@@ -423,7 +548,13 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         // faded against the pixel footprint like everything else here. A coarse break-up field is
         // what turns a foam line into a row of white blobs lying on the shallows.
         let surfFrequency = water.ripples.y * 7.0;
-        let surf = noiseD(in.worldPos.xz * surfFrequency - dir * (speed * t * 0.9)).x * 0.5 + 0.5;
+        // ADR-914: two samples, each scrolling for one cycle, in noise cells as the sparkle does.
+        let phf = flowPhases(t, kFlowPeriod / 0.9, desync + 0.53, 6u);
+        let surfBase = in.worldPos.xz * surfFrequency;
+        let vf = dir * (speed * 0.9);
+        let surf = clamp((noiseD(surfBase - vf * phf.travel.x + phf.jump0).x * phf.weight.x +
+                          noiseD(surfBase - vf * phf.travel.y + phf.jump1).x * phf.weight.y) * 0.5 + 0.5,
+                         0.0, 1.0);
         // Two thresholds, not one: the band says "near the waterline" and the field says "and on a
         // crest", and a foam that fires on either reads as scum on still water.
         let broken = smoothstep(0.46, 0.88, surf * 0.55 + band * 0.55) *
