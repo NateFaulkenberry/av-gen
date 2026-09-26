@@ -84,7 +84,32 @@ palette and still makes a hue offset mean a hue offset.
 
 ## Consequences
 
-@@MEASUREMENTS@@
+**Measured on pixels** (`test_emission_lanes_gpu.cpp`, the emission target of five instances whose
+multipliers are baked against GV3's fungi purple and drawn by a program that asserts
+glowmereTissue's teal):
+
+| Instance's variation | Displayed, after | Before ADR-904 |
+|---|---|---|
+| gain 0.5 | x0.502 brightness | x0.25 (m squared) |
+| gain 1.6 | x1.596 | x2.56 |
+| hue +0.20 turns | +0.199 turns, lightness 0.727 -> 0.727 | wherever the ratio pushed it |
+| hue -0.10 turns | -0.100 turns | |
+
+A program that still multiplies `instanceEmissive` in itself (the heroes' shape) gets it once too
+(x0.502), but its hue is the ratio's, not a rotation: +0.20 asked, -0.45 displayed. That is why the
+library's scatter programs stopped reading it.
+
+**The scenes that change,** main 0b623b88 against this branch, measured as in ADR-903 (640x360,
+tier high, display-referred):
+
+| Scene, second | Measured |
+|---|---|
+| `terrain`, 5 s (`frondGlow`, `bushGlow`, the fireflies) | 7.40% of pixels; those pixels x0.93. Glowing fronds that read yellow, orange and red on main are the program's green with small rotations |
+| Glowmere Valley 3, 30.0 and 30.1 s | 0.04% and 0.21% (the valley's mushrooms); those pixels x0.98 |
+| `glowmere-stylized`, 10-14 s | 0.18-0.33%, the scatter (separately from ADR-903's filaments) |
+| Glowmere Valley 2, 176-182 s, close on the elder | 0.01-0.19%, the ground scatter only |
+
+Before/after strips are in `~/Desktop/av-gen-review/emission-adr903-906/`.
 
 - **Every scene with a program-lit scatter layer changes:** the brightness spread of its instances
   narrows from g squared to g, and their hue variation becomes a rotation of the program's colour by

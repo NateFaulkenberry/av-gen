@@ -18,6 +18,7 @@ renderers; `Composition::nodeEmissiveBoost` and the node pass of `Composition::a
   (and its control section, "the old lane -- the material's intensity -- cannot reach a
   program-lit surface")
 - "A route onto emissiveBoost reaches the pixels, and at rest changes none"
+- "The emission lane composes with an FXL Glow: the gains multiply"
 
 `tests/unit/test_emission_lanes.cpp`: "emissiveBoost lands on every drawable a node owns, after the
 program, and nowhere else"; "A route onto emissiveBoost reaches the lane the same frame".
@@ -90,10 +91,29 @@ So a Glow of gain 2 on a node boosted x3 emits x6.
 
 ## Consequences
 
-Measured before (main 0b623b88) and after, rendered at the size and times listed, frame mean
-luminance on the display-referred PNG:
+**On pixels, in the unit's own scene** (`test_emission_lanes_gpu.cpp`, the emission target, boost 1
+-> 3 on each node): program-lit procedural x2.98, program-less procedural x3.00, mesh x3.00, SDF
+x3.01 (main: x1, x1, x3, x1). The control arm, the old lane (the material's intensity x3): the
+program-lit box x1.00, the plain box x3.00 -- the old mechanism could not have reached a program-lit
+surface. A route `1 + 2 x signal` on the program-lit node: x2.98 with the signal up,
+byte-identical at rest, every other node within 1%. With an FXL Glow of gain 2 on top: x5.99.
 
-@@MEASUREMENTS@@
+**The scenes that change,** rendered by main 0b623b88's `avgen` and this branch's from exports of
+each tree (same assets, same audio), 640x360, tier high, supersample 1; display-referred PNGs, Rec.709
+luminance; "changed" is a pixel whose summed |difference| exceeds 6 of 765:
+
+| Scene, second | What changed | Measured |
+|---|---|---|
+| `tree-of-life-floating-island-night`, 5 s | the stars and motes take their authored 2.1-2.2x and 1.9x | 0.30% of pixels, all stars; those pixels x1.22 (bloom and the tone curve compress the 2x); the tree, island and sky identical |
+| `tree-of-life-ocean-world`, 0 s (midnight) | nothing: the cycle's star factor is 1 at midnight | byte-identical |
+| same, 60 s (sunrise, factor 0.28) | the cycle now dims the procedural stars | 0.10% of the sky's pixels, x0.88 |
+| same, 197 s (twilight, factor ~0.55) | the same | 0.18% of the sky's pixels, x0.91 |
+| `glowmere-stylized`, 10-14 s at 5 fps, close on the elder | the downbeat route on `elder-filaments` is live | at the downbeats (11.6 s, 13.6 s) the filaments' pixels x1.022, decaying over the next frames; with the three boost routes removed from the same build, the two differ only there |
+| Glowmere Valley 2, 176-182 s at 10 fps, close on the elder | the downbeat route on `elder-2-gills` is live | at the downbeats (177.3, 179.2, 181.0 s) the gills' lamellae x1.017-1.024 on 0.13-0.32% of the frame, decaying; main (with the routes) matches this build without them everywhere on the elder -- main's routes never reached a pixel |
+
+The drop route (+0.18 on the gills) and the section route (+0.06 on `elder-2-cap`,
+`elder-crown`) are live by the same path; no drop or section event fell in the windows rendered.
+Before/after strips of every row are in `~/Desktop/av-gen-review/emission-adr903-906/`.
 
 - **The GV2 family's elder routes are live.** `elder-2-gills` pulses +10% on each downbeat and +18%
   on a drop, and `elder-2-cap` +6% per section, as their authors wrote in 2026-09. GV3's project
@@ -103,6 +123,13 @@ luminance on the display-referred PNG:
   and the eleven check projects' 1.15-1.25x. **The ocean world's day/night cycle** now dims its
   procedural stars through the day instead of only hiding them at zero.
 - **A particle node's boost** multiplies its particles' emission. No shipped scene sets one.
+- **Meshes do not change.** For an entity with no program the lane is the old multiplier moved:
+  `(colour x intensity x texture) x gain` instead of `colour x (intensity x boost) x texture`, rim
+  included. So the tree-of-life films' boosted tree meshes, the farm animals GV2 holds at boost 0,
+  and the abduction's `glow-rise`/`glow-fade` (a scenario `set` on the target's boost) draw as they
+  did. What is new for meshes is reach: a program-lit mesh now answers its boost too.
+- **A tree's conducted light (ADR-376) takes the lane** (`pbr.wgsl`), since it is emission. No
+  shipped scene has tree energy switched on, so no picture moves from this.
 - **Water** is not a `shadeSurface` draw and takes no lane: a terrain's boost reaches its ground
   chunks and its scatter, not its water (the water shader belongs to agent/water).
 - **`ObjectUniforms` is 464 bytes** (was 448; the slot stride stays 512). The WGSL layout guard

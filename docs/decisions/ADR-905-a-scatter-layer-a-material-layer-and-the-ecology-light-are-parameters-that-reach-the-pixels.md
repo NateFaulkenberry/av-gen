@@ -13,14 +13,17 @@ emissiveFieldAmount}` (`src/world/ecology.*`); `CompositionNode::scatterParams`,
 of `registerNodeParameters`/`applyParameters`, `NodeRange::ecologyLayers` and
 `Composition::updateEcologyLights` (`src/scene/composition.*`); `GlowCluster::layer`;
 `registerMaterialProgramParameters` (`src/scene/material_params.cpp`); `fs_proc`'s emissive field
-(`shaders/procedural.wgsl`).
+(`shaders/procedural.wgsl`); `ui::inspectorRowLabel` (`src/ui/ui_logic.hpp`), used by the World
+panel Inspector (`src/ui/world_panel.cpp`).
 **Tests:** `tests/rendering/test_emission_lanes_gpu.cpp`: "A scatter layer's gain and hue act after
 its program, on that layer alone", "A material layer's emissionIntensity parameter moves a glow that
 lives in a layer", "Through a composition: a layer's lanes, the ecology light and a ring on a marker
 reach the mushrooms" (three sections). `tests/unit/test_emission_lanes.cpp`: "A scatter layer's
 emission lane round-trips and replants nothing", "A scatter layer's lane reaches every part of it,
 and the light it casts follows", "A program's base intensity is registered only where the base
-emits", "A material layer's emission intensity is a parameter, by index and name".
+emits", "A material layer's emission intensity is a parameter, by index and name", "UI reach: every
+new emission control is exposed, sectioned and named for what the viewer sees" (both panels' own
+arithmetic on the registered set).
 
 ## Context
 
@@ -70,6 +73,24 @@ leaves the terrain's build key -- changing it no longer rebuilds the terrain.
 writes emission. **And an intensity that multiplies nothing is no longer registered:** the program's
 own `emissionIntensity` exists only when its base writes emission.
 
+**UI reach (the owner's rule: anything visible is findable, under a name for what the viewer
+sees).** Every control here is a parameter, so both panels list it. The labels say what the picture
+does, and the World panel Inspector now draws a label that is words (it drew only the bare path
+below its heading, `ui::inspectorRowLabel`; a label with a slash, or equal to the leaf, keeps the row
+exactly as before, which on main is every labelled parameter the Inspector shows):
+
+| Control | Parameters panel: group -> section -> row | World panel Inspector: selection -> heading -> row |
+|---|---|---|
+| a layer's gain | nodes -> `<terrain>/scatter/<layer>` -> "glow" | the terrain (a click on a mushroom selects it) -> scatter -> `fungi/glow` |
+| a layer's hue | same section -> "hue shift" | -> scatter -> `fungi/hue shift` |
+| a layer's field depth | same section -> "light wave" | -> scatter -> `fungi/light wave` |
+| the ecology light | scene -> (none) -> "light cast by glowing plants and fungi" | Atmosphere -> environment -> the same words |
+| a material layer's intensity | material/`<program>` -> `layer/<i>/<name>` -> "glow" | Materials -> `<program>` -> layer -> `1/fireflies/glow` |
+
+The layer's `emissiveField` (which field) is a name in the scene file, as every other reference
+between scene objects is; the field it names is listed under the World panel's Fields, where its
+own parameters (position, speed, width, falloff, and ADR-906's trigger numbers) are edited.
+
 ## Consequences
 
 - **GV3 can address each mushroom layer** -- routes, keys and fields on `valley/scatter/fungi`,
@@ -84,3 +105,6 @@ own `emissionIntensity` exists only when its base writes emission.
 - **A scene with `ecologyLight` 0 now reduces its glow clusters** at build (one `aggregateGlow` per
   emitting layer, logged as before) and makes no lights, as it always did.
 - **The terrain's water** takes no lane (ADR-903).
+- **The Inspector's rows for labelled parameters** read in words: `fungi/light wave` rather than
+  `fungi/emissiveFieldAmount`. No row that existed on main changes (every label the Inspector could
+  show there is a path or equal to its leaf).

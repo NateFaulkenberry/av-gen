@@ -14,7 +14,9 @@ envelope route on it, which is stateful and lands differently on a seek than on 
 ring of light through the instances after it" (and the composition test's ring section);
 `tests/unit/test_emission_lanes.cpp` "A field's trigger round-trips, and a proximity is refused by
 name", "A triggered field counts from the latest event, is silent before the first, and is pure in
-time", "A composition resolves its fields' triggers from the clock it is handed".
+time", "A composition resolves its fields' triggers from the clock it is handed", "The engine times a
+triggered field from its sequence's markers, in a play and after a seek" (through `Engine::update`;
+with the engine's `setTriggerClock` hand-off removed, 7 of its assertions fail).
 
 ## Context
 
@@ -44,6 +46,13 @@ walk, the markers, a schedule). Fields could not use it.
   composition (`setTriggerClock`), whether or not the project has effects; binding it again later in
   the frame is the same frame (`TriggerClock::setFrame`).
 - Hashed and serialised only when present, so every field before this keeps its hash and its file.
+- **Where it is adjusted.** The trigger's numbers are the field's parameters, under a `trigger`
+  section beside its other controls, registered only for the source that reads them and labelled for
+  what they do: `field/<name>/trigger/everyN` "fires every N beats" and `.../offset` "starting at
+  beat" (beat), `.../threshold` "fires on onsets stronger than" (onset), `.../period` "fires every
+  (seconds)" and `.../phase` "first fires at (seconds)" (repeat). What it fires on -- the source,
+  and the event or marker name -- stays in the scene file, as an effect's trigger does. In the World
+  panel: Fields -> the field -> trigger.
 
 ## Consequences
 
@@ -52,6 +61,14 @@ walk, the markers, a schedule). Fields could not use it.
   a marker at 10 m/s and finds its crest 5 m out 0.5 s after the marker and 9 m out 0.9 s after, on
   both sides, nothing before the marker, and the same bytes for a second reached by stepping from zero
   and one asked cold.
+- **In the film itself** (measured, not committed: GV3's files belong to its own worktree): a copy of
+  Glowmere Valley 3 with a radial pulse `drop-wave` at the elder (wavelength 40 m, 20 m/s, falloff
+  180-300 m, `trigger` on the `drop` marker at 177.71 s) named by the fungi, shelf-fungi and beacons
+  (`emissiveFieldAmount` 8, 6, 4), rendered 177.6-181.4 s at 960x540 against the same film without
+  it. The frames match exactly before the marker; after it the mushrooms the front crosses brighten
+  x1.3-1.43, and the lit region spreads outward (x368-720 at 178.4 s, x346-951 at 179.4 s, then
+  across the frame). In that shot -- s33's 28 mm wide -- the 0.28 m fungi are specks at preview size:
+  0.1-0.2% of the frame. Side-by-side videos are in `~/Desktop/av-gen-review/emission-adr903-906/`.
 - The same field can drive anything else that samples fields -- `volumeColorField` for a glowing
   crest in the mist, an effector, a hero part's `emissiveField`.
 - Only the latest event's front exists: a new event restarts the wave. Overlapping rings are what a
