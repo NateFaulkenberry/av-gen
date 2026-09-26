@@ -1,7 +1,7 @@
 # GV3 revision: progress and state
 
 This is the operational state file. Update it whenever the state changes. It was last updated
-2026-09-26, after the gate passed, while wave-1 engine agents were running.
+2026-09-26 at 10:14, at a pause for the session's usage limit, with eight engine agents mid-work.
 
 ## Start of a session: do this first
 1. **Read this file**, then [00-brief.md](00-brief.md) (the owner's revision spec, verbatim).
@@ -14,6 +14,34 @@ This is the operational state file. Update it whenever the state changes. It was
    ps -eo pid,etime,command | grep -E "avgen_tests|avgen_render_tests|ninja|avgen --project|critic" | grep -v grep
    ```
 3. **Verify, don't assume.** A worktree with uncommitted changes and no running agent means a stream was interrupted. See "Relaunching" below.
+
+## At the pause (2026-09-26 10:14): read this first
+The session paused for its usage limit.
+- **All eight engine agents were told to checkpoint.** They were to commit what is solid with honest WIP messages, start no new long runs, and send a status. Whether each managed to before the limit hit is unknown, so check each worktree.
+- **Nothing is merged into main since `0b623b88`.** The owner's checkout was clean on `main`.
+- **The gate has passed.** No GV3 scene edit has been made yet.
+
+**Snapshot at the pause:**
+
+| Stream | ADRs | Commits on the branch (newest first) | Uncommitted files |
+|---|---|---|---|
+| signals | 896–899 | none | 82 |
+| routes | 900–902 | `2b0b6f26` route rows: delay, depth and timeline event mode editable, liveness shown beside each route; `f133cad7` ADR-900–902; `6aca24ec` the seek replays routes, liveness at bind, at load and via `--audit-routes`; `3dc12138` the route chain | **0**: looks complete; its final report never arrived |
+| emission | 903–906 | none | 49 |
+| characters | 907–910 | `5dc541db` ADR-910 quality metrics | 22 |
+| camera | 911–913 | `e09c8ebb` ADR-911–913; `24bab779` the filtered follow reference, cuts declared; `e239159e` a cut drops motion history; `ae3b75dd` cast_trace `--camera` | 10 |
+| water | 914–916 | `3384f287` ADR-915 fades count reference pixels; `5ae32389` ADR-914 bounded advection; `6948f72d` the unregister fix | 24 (the tears, ADR-916, were being tested) |
+| setpieces (wave 2) | 928–931 | none | 32 |
+| render (wave 2) | 917–919 | none | 30 |
+
+**How to resume:**
+1. Run the state checks under "Start of a session".
+2. Look for leftover processes from the paused session (`avgen_tests`, `avgen_render_tests`, `ninja`, `gpu-lock.sh`, `avgen_cast_trace`), and let them finish or stop them. They belonged to agents that no longer exist. Check `tools/gpu-lock.sh`'s lock is not held by a dead process.
+3. For each stream, read `git log main..HEAD` and `git diff --stat`.
+   - **Complete** (committed, clean, its ADRs present): review it and run its targeted tests plus the full suites, then merge (step 2 of "Next steps").
+   - **Otherwise,** relaunch a fresh agent with [ENGINEERING-RULES.md](ENGINEERING-RULES.md), its section of [briefs.md](briefs.md), and: "Your worktree already holds partial work. Inspect `git log main..HEAD` and `git diff`, finish from there, and write the final report."
+4. **routes** is probably ready to review first. It was committed and clean at the pause, but its report never arrived.
+5. **The "UI reach" rule** (the owner's pinned rule: anything visible is controllable) was added to ENGINEERING-RULES.md at `dfc6c512` and sent to all eight agents. Relaunched agents get it from the rules file. Check every report lists where its controls live.
 
 ## Goal
 Revise the music video Glowmere Valley 3 (GV3) to the owner's brief. The phases are ordered and gated:
@@ -52,7 +80,7 @@ Revise the music video Glowmere Valley 3 (GV3) to the owner's brief. The phases 
 ## In progress: wave-1 engine streams
 Each stream has a worktree `~/Documents/GitHub/av-gen-<topic>` on branch `agent/<topic>` from main `0b623b88`, with assets linked. Briefs are in [briefs.md](briefs.md); the shared rules are in [ENGINEERING-RULES.md](ENGINEERING-RULES.md).
 
-State when this file was saved (all were running as background agents of the session that wrote this):
+State earlier in the day (superseded by the snapshot at the top of this file):
 
 | Stream | ADRs | Committed | Uncommitted work at save |
 |---|---|---|---|
