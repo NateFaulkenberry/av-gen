@@ -1236,14 +1236,24 @@ TEST_CASE("each follow row moves the camera when installed the way the Cameras p
         const float value = c.isToggle()          ? 1.0f - current
                             : current > c.minimum ? c.minimum
                                                   : 0.5f * (c.minimum + c.maximum);
-        const double moved = apart(base, film([&](scene::CameraRig& rig) {
-                                       prepared(rig);
-                                       c.apply(rig, value);
-                                   }));
+        const auto edit = [&](scene::CameraRig& rig) {
+            prepared(rig);
+            c.apply(rig, value);
+        };
+        const double moved = apart(base, film(edit));
         INFO("'" << c.label << "' from " << current << " to " << value << " moves the camera up to " << moved << " m");
         // Ten centimetres at least: on this walk the least of them, "follow the ground", moves it 0.23 m
         // and the rest 0.45 to 12 m, so a setter wired to a fraction of its field still fails.
         CHECK(moved > 0.1);
+        // And the rig the engine holds after the install reads back, through the row, what the row set.
+        // Moving the camera alone cannot tell a row from its neighbour -- a setter wired to the wrong
+        // knob still moves it -- but that setter's own getter then reads a value nobody wrote.
+        app::Engine held(app::EngineMode::Offline);
+        REQUIRE(held.loadFile(dir / "panel.json").has_value());
+        install(held, edit, true);
+        const scene::CameraRig* rig = held.composition()->cameraDirection().find(2);
+        REQUIRE(rig != nullptr);
+        CHECK(c.get(*rig) == value);
     }
     fs::remove_all(dir);
 }
