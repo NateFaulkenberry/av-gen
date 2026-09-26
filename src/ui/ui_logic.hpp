@@ -4,6 +4,7 @@
 
 #include "params/modulation.hpp"
 #include "scene/procedural.hpp"
+#include "signals/signal_bus.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -46,8 +47,12 @@ inline bool pathStartsWith(const std::string& s, std::string_view prefix) {
 // owner's standing rule is that if it is visible an artist must be able to find it -- a rule this
 // project has now broken twice by leaving a group off this list, where the defect is not a missing
 // control but a control that silently belongs to a layer nobody is on (ADR-375).
-inline constexpr std::string_view kBeginnerPrefixes[] = {"macros/", "scene/",    "env/",   "post/",
-                                                         "camera/", "root/",     "shader/", "temporal/"};
+// `music/` is here for the same reason (ADR-896): the meter -- which beat is bar 1, bars per phrase
+// -- decides when every downbeat, phrase and bar-synced pulse in the picture lands. Off every list it
+// showed only on Advanced, and the editor opens on Intermediate: a third instance of ADR-375, caught
+// before it shipped.
+inline constexpr std::string_view kBeginnerPrefixes[] = {"macros/", "scene/", "env/",    "post/",     "camera/",
+                                                         "root/",   "music/", "shader/", "temporal/"};
 inline constexpr std::string_view kIntermediatePrefixes[] = {
     "procedural/", "field/", "spline/", "sdf/", "material/", "particles/"};
 } // namespace detail
@@ -98,6 +103,56 @@ inline constexpr std::string_view kIntermediatePrefixes[] = {
     }
     const std::size_t slash = rest.rfind('/');
     return slash == std::string_view::npos ? std::string{} : std::string(rest.substr(0, slash));
+}
+
+// A route source as the Modulation panel's picker lists it: the signal's name, and beside it what the
+// signal is when the bus carries a label -- "audio.onsetLow  -  kick (low-band onset)". The name
+// leads, so typing it still finds it, and the label is what a person scanning the list for "kick" or
+// "density" or "section" sees (the owner's rule: anything usable must be findable by what it is).
+[[nodiscard]] inline std::string routeSourceItem(const signals::SignalInfo& info) {
+    return info.label.empty() ? info.name : info.name + "  -  " + info.label;
+}
+
+// Every signal on the bus, as the picker lists them, in bus order.
+[[nodiscard]] inline std::vector<std::string> routeSourceItems(const signals::SignalBus& bus) {
+    std::vector<std::string> out;
+    out.reserve(bus.size());
+    for (const signals::SignalInfo& info : bus.infos()) {
+        out.push_back(routeSourceItem(info));
+    }
+    return out;
+}
+
+// ADR-896: what a meter setting left on "detect" resolved to, for the Parameters panel to print beside
+// it. `music/meter/bar1Beat` at -1 and `music/meter/phraseBars` at 0 mean "let the analysis decide";
+// a slider reading -1 says nothing about what it decided, and whether to pin a value depends on
+// exactly that. Empty for any other path and for a pinned value (the slider already says it).
+//
+//   `resolved`  the value the engine is using (`Engine::meter()`'s downbeat or phraseBars)
+//   `detected`  whether that value came from the analysis (false: no track, a MIDI clock, or an
+//               estimate that found nothing clear -- the engine's default is then in use)
+//   `confidence` the downbeat estimate's confidence, 0..1 (ignored for the phrase length)
+[[nodiscard]] inline std::string meterDetectNote(std::string_view path, int base, int resolved, bool detected,
+                                                 float confidence = 0.0f) {
+    char buffer[96];
+    if (path == "music/meter/bar1Beat" && base < 0) {
+        if (detected) {
+            std::snprintf(buffer, sizeof(buffer), "detected: beat %d (confidence %.2f)", resolved,
+                          static_cast<double>(confidence));
+        } else {
+            std::snprintf(buffer, sizeof(buffer), "nothing detected: beat %d", resolved);
+        }
+        return buffer;
+    }
+    if (path == "music/meter/phraseBars" && base <= 0) {
+        if (detected) {
+            std::snprintf(buffer, sizeof(buffer), "detected: %d bars", resolved);
+        } else {
+            std::snprintf(buffer, sizeof(buffer), "not clear from the audio: %d bars", resolved);
+        }
+        return buffer;
+    }
+    return {};
 }
 
 // The last path segment: the switch a section is gated on is found by its leaf being "enabled",
@@ -844,7 +899,7 @@ inline constexpr double kNudgeFallbackSeconds = 0.1;
 // 1 Frames, 2 Beats, 3 Markers. The caller static_asserts that against the enum; this header
 // deliberately does not include the sequencer to find out.
 //
-// `direction` is -1 or +1. `coarse` is Shift. `beatsPerBar` comes from `seq::BakeOptions` rather
+// `direction` is -1 or +1. `coarse` is Shift. `beatsPerBar` comes from the engine's meter rather
 // than being spelled 4 here, so that the day time-signature detection lands, one default changes and
 // this follows it.
 [[nodiscard]] inline Nudge arrowNudge(int snapMode, int direction, bool coarse, double fps,

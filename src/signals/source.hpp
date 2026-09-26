@@ -26,8 +26,11 @@ struct SourceContext {
     double audioPosition = 0.0;    // seconds
     double audioDuration = 0.0;    // seconds (0 when no audio)
     bool playing = false;
-    float beatPhase = 0.0f;        // 0..1 within the current beat (extrapolated per frame)
-    std::uint32_t beatCount = 0;   // beats since the last reset
+    float beatPhase = 0.0f;        // 0..1 within the current beat
+    // The musical position in beats (ADR-896): 0.0 exactly on beat 1 of bar 1, negative in a pickup
+    // before it, and fractional between beats. What a beat-synced LFO cycles on, so a four-beat
+    // cycle starts on a downbeat.
+    double musicalBeats = 0.0;
     float tempoBpm = 0.0f;         // 0 = unknown
     bool beatEvent = false;        // a beat landed this frame
 };
@@ -66,7 +69,8 @@ enum class LfoShape : std::uint8_t { Sine, Triangle, Saw, Square, SampleHold };
 // Outputs: "lfo.<name>" in 0..1 and "lfo.<name>.bipolar" in -1..1.
 // Parameters: rate (Hz), phase (0..1 offset), pulseWidth (square duty, 0..1), beatSync (bool),
 // beatsPerCycle (used when beatSync). Free-running phase = frac(renderTime * rate + phase):
-// a function of time, never integrated, so seeking is exact.
+// a function of time, never integrated, so seeking is exact. Beat-synced phase =
+// frac(musicalBeats / beatsPerCycle + phase), so cycles of a whole bar start on its downbeat.
 class LfoSource final : public Source {
 public:
     explicit LfoSource(std::string name, LfoShape shape = LfoShape::Sine);

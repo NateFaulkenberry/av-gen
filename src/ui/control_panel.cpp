@@ -1591,10 +1591,18 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     auto& modulator = engine.modulator();
 
     // ---- add route ----
+    // The picker shows each signal's name with what it is beside it (`ui::routeSourceItem`: "kick",
+    // "density", "section change"...); the route stores the name.
     std::vector<const char*> signalNames;
     signalNames.reserve(bus.size());
     for (const auto& info : bus.infos()) {
         signalNames.push_back(info.name.c_str());
+    }
+    const std::vector<std::string> sourceItems = ui::routeSourceItems(bus);
+    std::vector<const char*> sourceLabels;
+    sourceLabels.reserve(sourceItems.size());
+    for (const std::string& item : sourceItems) {
+        sourceLabels.push_back(item.c_str());
     }
     std::vector<const char*> targetNames;
     for (const auto* p : paramSet.ordered()) {
@@ -1615,8 +1623,8 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
               [](const char* a, const char* b) { return std::string_view(a) < std::string_view(b); });
     newRouteSource_ = std::clamp(newRouteSource_, 0, std::max(0, static_cast<int>(signalNames.size()) - 1));
     newRouteTarget_ = std::clamp(newRouteTarget_, 0, std::max(0, static_cast<int>(targetNames.size()) - 1));
-    ImGui::SetNextItemWidth(200);
-    ImGui::Combo("##src", &newRouteSource_, signalNames.data(), static_cast<int>(signalNames.size()));
+    ImGui::SetNextItemWidth(260);
+    ImGui::Combo("##src", &newRouteSource_, sourceLabels.data(), static_cast<int>(sourceLabels.size()));
     ImGui::SameLine();
     ImGui::TextUnformatted("->");
     ImGui::SameLine();
@@ -1661,6 +1669,12 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.78f, 0.35f, 1.0f));
         }
         const bool open = ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+        if (ImGui::IsItemHovered()) {
+            // What the source is, in words, for a route whose name alone does not say it.
+            if (const auto id = bus.find(route.source); id && !bus.info(*id).label.empty()) {
+                ImGui::SetTooltip("%s: %s", route.source.c_str(), bus.info(*id).label.c_str());
+            }
+        }
         if (focused) {
             ImGui::PopStyleColor();
             // After the item, so the scroll target is the row that was just laid out.
@@ -2001,6 +2015,21 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "[A]");
             if (ImGui::IsItemHovered()) {
                 tooltip("automated by the timeline; the slider is the base value");
+            }
+        }
+        // ADR-896: a meter setting left on "detect" says what the analysis decided, so pinning it is
+        // a decision about a number you can see rather than a guess.
+        if (param->group() == "music") {
+            const analysis::Meter meter = engine.meter();
+            const app::Engine::MeterSource source = engine.meterSource();
+            const bool downbeat = param->path() == app::Engine::kBar1BeatPath;
+            const std::string note = ui::meterDetectNote(
+                param->path(), static_cast<int>(std::lround(param->baseComponent(0))),
+                downbeat ? meter.downbeat : meter.phraseBars,
+                downbeat ? source.downbeatDetected : source.phraseDetected, source.downbeatConfidence);
+            if (!note.empty()) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", note.c_str());
             }
         }
         // Not reaching the picture in the state the scene is in. Said next to the slider, in the

@@ -236,7 +236,10 @@ struct TriggerContext {
         double endSeconds = -1.0;
     };
     std::vector<double> beatTimes;    // ascending
-    std::vector<double> barTimes;     // ascending
+    // ADR-896: beatTimes[downbeat] is beat 1 of bar 1, so a Beat trigger's index counts musical
+    // beats -- the numbering `beat.count` and the effect triggers use.
+    int downbeat = 0;
+    std::vector<double> barTimes;     // ascending, from bar 1
     std::vector<NamedSpan> shots;     // in start order
     std::vector<NamedSpan> sections;  // in start order
     std::vector<std::pair<std::string, double>> cues; // author cue markers, in time order

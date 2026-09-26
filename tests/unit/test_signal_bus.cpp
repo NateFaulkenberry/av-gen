@@ -63,11 +63,16 @@ TEST_CASE("SignalBus events carry strength for one frame and clear", "[signals]"
 TEST_CASE("AudioSignals declares the fixed vocabulary and publishes frames", "[signals][audio]") {
     SignalBus bus;
     const AudioSignals audio = AudioSignals::declare(bus);
-    CHECK(bus.size() == 16);
+    // The original sixteen, plus ADR-897's five long-term band levels, energy, onset rate and width,
+    // and ADR-898's three band onsets.
+    CHECK(bus.size() == 27);
     for (const char* name : {"audio.rms", "audio.peak", "audio.bass", "audio.lowMid", "audio.mid",
                              "audio.highMid", "audio.treble", "audio.spectralCentroid", "audio.spectralFlux",
                              "audio.onsetStrength", "audio.onset", "audio.tempo", "audio.tempoConfidence",
-                             "audio.beat", "audio.beatPhase", "audio.beatCount"}) {
+                             "audio.beat", "audio.beatPhase", "audio.beatCount", "audio.bassLevel",
+                             "audio.lowMidLevel", "audio.midLevel", "audio.highMidLevel", "audio.trebleLevel",
+                             "audio.energy", "audio.onsetRate", "audio.width", "audio.onsetLow", "audio.onsetMid",
+                             "audio.onsetHigh"}) {
         INFO(name);
         CHECK(bus.find(name).has_value());
     }

@@ -175,7 +175,8 @@ Result<void> RenderJob::start() {
         engine_->setViewport(settings_.width, settings_.height);
         engine_->update(t);
         const rendering::ShaderFrameInputs inputs{&engine_->shaderLayers(),
-                                                  engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                  engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                  engine_->barPhase()};
         for (int i = 0; i < 2; ++i) {
             if (auto img = warm.renderToImage(engine_->scene(), t, settings_.width, settings_.height, &inputs); !img) {
                 return std::unexpected(img.error());
@@ -669,7 +670,8 @@ Result<void> RenderJob::renderOne() {
     engine_->setViewport(settings_.width, settings_.height);
     engine_->update(time);
     const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                  engine_->barPhase()};
     // The debug overlays, if `--debug-draw` asked for any. Built from the scene the frame is about
     // to be drawn from, so the lines are the same frame's as the pixels. An empty option set builds
     // nothing and costs a handful of branches, which is what a deliverable render pays.

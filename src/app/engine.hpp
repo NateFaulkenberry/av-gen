@@ -57,6 +57,7 @@
 #include <optional>
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <set>
 #include <span>
 #include <string>
@@ -73,15 +74,28 @@ enum class EngineMode { Live, Offline };
 // (`Engine::ReplaySignals`) and hand the state it arrives with back to the live one. Both drive it
 // through `Engine::consumeAnalysis` and `Engine::advanceClock`; there is no second copy of either.
 struct SignalClock {
+    // "No index yet": the value the phrase, section and section-timeline trackers hold before their
+    // first frame, so a first frame that lands in a pickup (index -1) is not read as a change.
+    static constexpr std::int64_t kNoIndex = std::numeric_limits<std::int64_t>::min();
+
     std::size_t analysisCursor = 0; // the next offline analysis frame to consume
     analysis::AnalysisFrame latest; // the last one published
     bool hasFrame = false;
     MusicRuntime music;             // music.* (ADR-073); its detector is history
-    // Beat clock extrapolated per render frame from the analysis tempo (ADR-012).
+    // The beat clock (ADR-896). `clockBeats` is its position, 0 at the clock's first beat. With an
+    // analysed grid it is a pure function of the second (`analysis::clockBeatsAt`); live input and a
+    // MIDI clock extrapolate it per render frame from the tempo (ADR-012), resynchronised whenever
+    // they report a beat -- `beatCount` and `lastAnalysisBeatCount` are that extrapolation's state.
     double beatPhase = 0.0;
     std::uint32_t beatCount = 0;
     std::uint32_t lastAnalysisBeatCount = 0;
-    std::uint32_t lastPhraseIndex = 0;
+    double clockBeats = 0.0;
+    bool haveClockBeats = false;
+    std::int64_t lastPhraseIndex = kNoIndex;
+    // ADR-899: which section of the sequence's section timeline the previous frame was in (-1 = none).
+    std::int64_t lastSectionIndex = kNoIndex;
+    // ADR-896/898: the live frame time the whole-track overlay last reached (live playback only).
+    double liveOverlaySeconds = -1.0;
 };
 
 // ADR-582: what a deliberate hand-back of the camera takes *off* the camera, kept exactly as it was
@@ -628,31 +642,107 @@ public:
     [[nodiscard]] params::Timeline::CueState cueState() const { return cueState_; }
 
     // Built-in signals published every frame: time.seconds, time.progress, time.playing,
-    // beat.phase (per-frame extrapolated), beat.pulse (event), beat.count, beat.bpm, beat.bar.
+    // beat.phase, beat.pulse (event), beat.count, beat.bpm, beat.bar and the phrase and section
+    // counters -- every one of them read through `meter()` (ADR-896) -- and section.* from the
+    // sequence's section timeline (ADR-899).
     struct TimeSignals {
         signals::SignalId seconds = signals::kInvalidSignal;
         signals::SignalId progress = signals::kInvalidSignal;
         signals::SignalId playing = signals::kInvalidSignal;
         signals::SignalId beatPhase = signals::kInvalidSignal;
         signals::SignalId beatPulse = signals::kInvalidSignal;
-        signals::SignalId beatCount = signals::kInvalidSignal;
+        signals::SignalId beatCount = signals::kInvalidSignal; // the musical beat: 0 = bar 1 beat 1
         signals::SignalId bpm = signals::kInvalidSignal;
         signals::SignalId barPhase = signals::kInvalidSignal;
         // Musical structure above the bar (ADR-041): a phrase is `phraseBars` bars, a section is
         // `sectionPhrases` phrases. States and slow escalations key to these rather than to beats.
         signals::SignalId phrasePhase = signals::kInvalidSignal;  // 0..1 through the current phrase
-        signals::SignalId phraseCount = signals::kInvalidSignal;  // phrases since the start
+        signals::SignalId phraseCount = signals::kInvalidSignal;  // phrases since bar 1
         signals::SignalId phrasePulse = signals::kInvalidSignal;  // event at each phrase boundary
         signals::SignalId sectionPhase = signals::kInvalidSignal; // 0..1 through the current section
         signals::SignalId sectionCount = signals::kInvalidSignal;
+        // ADR-899: the authored section timeline (`sequence().sectionTimeline`), which the counters
+        // above know nothing about.
+        signals::SignalId timelineSection = signals::kInvalidSignal;  // section.index (-1 = none)
+        signals::SignalId timelineProgress = signals::kInvalidSignal; // section.progress, 0..1
+        signals::SignalId timelineEnergy = signals::kInvalidSignal;   // section.energy, the section's own
+        signals::SignalId timelineChange = signals::kInvalidSignal;   // section.change (event)
     };
     [[nodiscard]] const TimeSignals& timeSignals() const { return timeSignals_; }
-    // Musical structure: bars per phrase (default 4) and phrases per section (default 4). Saved
-    // with the project so a piece keeps its structure.
-    [[nodiscard]] int phraseBars() const { return phraseBars_; }
-    void setPhraseBars(int bars) { phraseBars_ = std::max(1, bars); }
-    [[nodiscard]] int sectionPhrases() const { return sectionPhrases_; }
-    void setSectionPhrases(int phrases) { sectionPhrases_ = std::max(1, phrases); }
+
+    // ---- musical time (ADR-896) -----------------------------------------------------------------
+    //
+    // The one definition every beat-to-bar conversion reads: the bus, music.*, the LFOs, the
+    // timeline's beats time base, the shaders' bar input, the effect triggers, the sequencer's bars
+    // and the Director's "bar N beat M". Resolved per call from what the project pins over what the
+    // analysis estimated:
+    //   downbeat      `barOffsetBeats()` when pinned, else the track's estimate (0 without one, and
+    //                 always 0 for a MIDI clock, whose beat 0 is its own downbeat)
+    //   phraseBars    `phraseBarsPinned()` when pinned, else the estimate, else 4
+    //   sectionPhrases the project's (default 4)
+    //
+    // The three settings are exposed parameters -- Parameters panel > music > meter, and the World
+    // Inspector -- saved in the project's `parameters` like any other:
+    //   music/meter/bar1Beat        "bar 1 starts on beat": the beat of the beat clock (0 = the first
+    //                               tracked beat) on which bar 1 begins; -1 = detect (the estimate)
+    //   music/meter/phraseBars      "bars per phrase"; 0 = detect
+    //   music/meter/sectionPhrases  "phrases per section"
+    struct MeterSettings {
+        int bar1Beat = -1;
+        int phraseBars = 0;
+        int sectionPhrases = 4;
+    };
+    static constexpr const char* kBar1BeatPath = "music/meter/bar1Beat";
+    static constexpr const char* kPhraseBarsPath = "music/meter/phraseBars";
+    static constexpr const char* kSectionPhrasesPath = "music/meter/sectionPhrases";
+    [[nodiscard]] analysis::Meter meter() const;
+    // Where `meter()`'s downbeat and phrase length came from: the analysis's estimate, or a pinned
+    // value or the default. What the Parameters panel prints beside a setting left on "detect"
+    // (`ui::meterDetectNote`), so an artist can see what the analysis decided before pinning.
+    struct MeterSource {
+        bool downbeatDetected = false;
+        bool phraseDetected = false;
+        float downbeatConfidence = 0.0f; // the estimate's, 0..1; 0 when the downbeat was not detected
+    };
+    [[nodiscard]] MeterSource meterSource() const;
+    [[nodiscard]] MeterSettings meterSettings() const;
+    void setMeterSettings(const MeterSettings& settings);
+    // The pinned bar phase, or nothing when it is detected.
+    [[nodiscard]] std::optional<int> barOffsetBeats() const {
+        const int b = meterSettings().bar1Beat;
+        return b >= 0 ? std::optional<int>(b) : std::nullopt;
+    }
+    void setBarOffsetBeats(std::optional<int> beats) {
+        MeterSettings m = meterSettings();
+        m.bar1Beat = beats ? std::max(0, *beats) : -1;
+        setMeterSettings(m);
+    }
+    // Musical structure: bars per phrase and phrases per section. Setting the phrase length pins it;
+    // clearing it hands it back to the estimate.
+    [[nodiscard]] int phraseBars() const { return meter().phraseBars; }
+    void setPhraseBars(int bars) {
+        MeterSettings m = meterSettings();
+        m.phraseBars = std::max(1, bars);
+        setMeterSettings(m);
+    }
+    void clearPhraseBars() {
+        MeterSettings m = meterSettings();
+        m.phraseBars = 0;
+        setMeterSettings(m);
+    }
+    [[nodiscard]] std::optional<int> phraseBarsPinned() const {
+        const int b = meterSettings().phraseBars;
+        return b > 0 ? std::optional<int>(b) : std::nullopt;
+    }
+    [[nodiscard]] int sectionPhrases() const { return std::max(1, meterSettings().sectionPhrases); }
+    void setSectionPhrases(int phrases) {
+        MeterSettings m = meterSettings();
+        m.sectionPhrases = std::max(1, phrases);
+        setMeterSettings(m);
+    }
+    // The beat clock's musical position this frame (0 = bar 1 beat 1) and how far through the bar.
+    [[nodiscard]] double musicalBeats() const { return sourceContext_.musicalBeats; }
+    [[nodiscard]] float barPhase() const { return bus_.value(timeSignals_.barPhase); }
     [[nodiscard]] const signals::SourceContext& sourceContext() const { return sourceContext_; }
     [[nodiscard]] bool hasAudio() const { return audioFile_ != nullptr; }
 
@@ -816,6 +906,9 @@ public:
     // them. Read it to ask *when* something fired; the bus clears event values at the end of every
     // update(), so polling the signals from outside the frame only ever sees zero.
     [[nodiscard]] const MusicRuntime& music() const { return clock_.music; }
+    // The effect triggers' clock, as the last effect update bound it (ADR-896: its Beat source
+    // counts through `meter()`).
+    [[nodiscard]] const world::TriggerClock& triggerClock() const { return triggerClock_; }
     [[nodiscard]] audio::AudioPlayer* player() { return player_.get(); }
     [[nodiscard]] analysis::AnalysisRunner* runner() { return runner_.get(); }
     [[nodiscard]] const analysis::AnalysisTrack* track() const { return track_.get(); }
@@ -929,6 +1022,12 @@ private:
     seq::Sequence sequence_;
     std::vector<std::string> sequenceTargets_;
     seq::InstallReport sequenceReport_;
+    // ADR-896: the meter the installed sequence's Beat and Bar events were resolved with, and whether
+    // it has any. `update` re-installs when the two differ, so pinning the meter in the Parameters
+    // panel (or a new track's estimate) moves those events to where a render of the saved project
+    // puts them. Never a real meter until the first install.
+    analysis::Meter installedMeter_{0, 0, 0, 0};
+    bool installedEventsUseMeter_ = false;
     seq::EventDispatcher sequenceEvents_;
     std::vector<seq::FiredEvent> firedEvents_;
     // ADR-216: hands this frame's EntityAction firings to the action system. Not a decision about
@@ -1040,8 +1139,16 @@ private:
     scene::FocusState focusState_;
     bool cameraStateReset_ = true; // forwarded to the post chain as PostSettings::exposureReset
     TimeSignals timeSignals_;
-    int phraseBars_ = 4;
-    int sectionPhrases_ = 4;
+    // ADR-896: the meter's settings. The parameters are what the UI and the project file see; the
+    // struct holds their values across a parameter-set clear (a scene swap re-registers them).
+    MeterSettings meterSettings_;
+    params::Parameter<int>* bar1BeatParam_ = nullptr;
+    params::Parameter<int>* phraseBarsParam_ = nullptr;
+    params::Parameter<int>* sectionPhrasesParam_ = nullptr;
+    void registerMeterParameters();
+    // `meter()` and `meterSource()` in one pass, so the two cannot disagree about where a field came
+    // from. `source` may be null.
+    [[nodiscard]] analysis::Meter resolveMeter(MeterSource* source) const;
     signals::SourceContext sourceContext_;
     assets::AssetRegistry registry_;
     std::unique_ptr<scene::SceneController> controller_;

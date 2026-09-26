@@ -152,6 +152,9 @@ void requireSameClock(const app::SignalClock& a, const app::SignalClock& b) {
     CHECK(a.beatCount == b.beatCount);
     CHECK(a.lastAnalysisBeatCount == b.lastAnalysisBeatCount);
     CHECK(a.lastPhraseIndex == b.lastPhraseIndex);
+    CHECK(a.clockBeats == b.clockBeats);           // ADR-896
+    CHECK(a.haveClockBeats == b.haveClockBeats);
+    CHECK(a.lastSectionIndex == b.lastSectionIndex); // ADR-899
     CHECK(a.music.consumedFrames() == b.music.consumedFrames());
 }
 
