@@ -216,6 +216,9 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         out.entityIndex = ei;
         out.entityName = e.name;
         out.material = e.material;
+        // ADR-903: the entity's emission lane (its node's emissiveBoost). The path tracer shades the
+        // material alone -- no program -- so the gain folds straight into the intensity.
+        out.material.emissiveIntensity *= e.emissionGain;
 
         const glm::mat4 m = e.transform.matrix();
         const glm::mat3 nm = normalMatrix(m);
@@ -360,6 +363,7 @@ Snapshot buildSnapshot(const scene::Scene& scene, const scene::Scene* previous) 
         obj.source.entityIndex = static_cast<std::uint32_t>(pi);
         obj.source.entityName = obj.name;
         obj.source.material = proc.material;
+        obj.source.material.emissiveIntensity *= proc.emissionGain; // ADR-903, as above
         // The source keeps OBJECT space. `sourceTransform` is folded in here because it is the same
         // for every instance; everything that differs per copy stays in the transform.
         const glm::mat3 srcNormal = normalMatrix(sourceXf);

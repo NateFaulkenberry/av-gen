@@ -526,6 +526,12 @@ struct MaterialInstanceInfo {
     instanceRandom: vec4<f32>,
     instanceColor: vec4<f32>,
     instanceEmissive: vec4<f32>,
+    // ADR-904: the instance's emission variation as (hue turns, gain), read back in the vertex stage
+    // for a program that writes emission and leaves the variation to the engine; (0, 1) otherwise.
+    variation: vec2<f32>,
+    // ADR-905: the object's emissive field at this fragment, 1 + amount * field (1 = none). A gain on
+    // everything the surface emits, after the program.
+    emissionField: f32,
 };
 
 fn materialInstanceZero(localPosition: vec3<f32>) -> MaterialInstanceInfo {
@@ -537,7 +543,20 @@ fn materialInstanceZero(localPosition: vec3<f32>) -> MaterialInstanceInfo {
     info.instanceRandom = vec4<f32>(0.0);
     info.instanceColor = vec4<f32>(1.0);
     info.instanceEmissive = vec4<f32>(1.0);
+    info.variation = vec2<f32>(0.0, 1.0);
+    info.emissionField = 1.0;
     return info;
+}
+
+// ADR-903/905: the object's emission lane -- a hue rotation (OKLCH, lightness and chroma kept) and a
+// gain -- on something the surface emits. Identity at (0, 1), which is every draw that keeps the
+// defaults. A negative gain (a field below -1/amount) is no emission, not negative light.
+fn emissionLane(e: vec3<f32>, hue: f32, gain: f32) -> vec3<f32> {
+    var o = e;
+    if (hue != 0.0) {
+        o = hueShift(o, hue);
+    }
+    return o * max(gain, 0.0);
 }
 
 // Everything one fragment needs to fill the auxiliary targets as well as the colour (ADR-035).
@@ -673,6 +692,8 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         ctx.footprint = geometry.w;
         ctx.occlusion = occlusion.visibility;
         ctx.materialId = object.ids.y;
+        // ADR-904: what this instance would emit with no program, variation included.
+        ctx.materialEmission = vec4<f32>(object.emissive.rgb * emissiveMul * object.emissive.w, 1.0);
         var base = materialResultZero();
         base.baseColor = object.baseColor.rgb;
         base.metallic = object.material.y;
@@ -686,6 +707,32 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         matRoughMetal = vec2<f32>(program.roughness, program.metallic);
         programNormal = program.normal;
         programOcclusion = program.occlusion;
+    }
+
+    // ---- ADR-903/904/905: the emission lane, and the instance's variation exactly once ----
+    //
+    // The lane is the object's own (object.emission: a node's boost, a part's gain, a scatter
+    // layer's gain and hue) times its emissive field, applied below to everything the surface emits,
+    // an effect's added glow included. The instance's variation is a per-channel multiplier made
+    // against the MATERIAL's emissive colour: exact on the material's own emission, which keeps it;
+    // meaningless on a program's, which owns its colour (ADR-179). So when a program writes emission
+    // the multiplier is dropped and the variation comes back as the rotation and gain it was made
+    // from, on the surface's own emission -- unless the program read the instance's emission itself,
+    // in which case it has applied it and gets neither. Once, always.
+    var ownEmissiveMul = emissiveMul;
+    var ownHue = 0.0;  // the instance's variation, on the surface's OWN emission only
+    var ownGain = 1.0;
+    let laneHue = object.emission.y;
+    let laneGain = object.emission.x * info.emissionField;
+    if (programRuns) {
+        let programFlags = materialProgramFlags(programIndex);
+        if ((programFlags & MAT_FLAG_WRITES_EMISSION) != 0) {
+            ownEmissiveMul = vec3<f32>(1.0);
+            if ((programFlags & MAT_FLAG_EMISSION_READS_INSTANCE) == 0) {
+                ownHue = info.variation.x;
+                ownGain = info.variation.y;
+            }
+        }
     }
 
     var baseColor = matColor * vec4<f32>(colorMul, 1.0);
@@ -770,13 +817,20 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         }
         fxAdded = fxAdded + fxEdge;
     }
-    let emissiveBase = matEmissive.rgb * emissiveMul;
+    let emissiveBase = matEmissive.rgb * ownEmissiveMul;
     var emissive = emissiveBase * matEmissive.w;
     if (hasEmissive) {
         emissive = emissive * textureSample(emissiveTex, materialSampler, uv).rgb;
     }
+    // ADR-903/904: the instance's variation on the surface's own emission, then the object's lane on
+    // the finished emission -- after the program, the texture and every FXL lane (whose gain it
+    // multiplies and whose hue it adds to) -- and before the waves, which amplify what the surface
+    // actually emits, and before the fog. One rotation where no effect adds light (uniform per draw).
     if (fxFlags != 0u) {
-        emissive = emissive + fxAdded;
+        emissive = emissionLane(emissive, ownHue, ownGain) + fxAdded;
+        emissive = emissionLane(emissive, laneHue, laneGain);
+    } else {
+        emissive = emissionLane(emissive, ownHue + laneHue, ownGain * laneGain);
     }
 
     if (object.flags.z > 0.5) { // unlit
@@ -952,7 +1006,8 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     ambient = ambient * ao;
 
     // Fresnel rim tinted with the emissive colour so glowing objects read as luminous at grazing angles.
-    let rim = pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * matEmissive.w);
+    let rim = emissionLane(pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * matEmissive.w), ownHue + laneHue,
+                           ownGain * laneGain);
 
     // ADR-207, as on the styled path above: additive, pre-fog, and into the emission target.
     let fx = wavesAt(worldPos, n, emissive);

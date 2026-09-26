@@ -500,6 +500,18 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterShallowColorParam = nullptr;
     params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
+    // Terrain (ADR-905): each scatter layer's emission lane, registered by the layer's NAME --
+    // `nodes/<terrain>/scatter/<layer>/{emissionGain, hueOffset, emissiveFieldAmount}` -- so a route
+    // written against "fungi" still means fungi after a layer is added in front of it. One entry per
+    // `ecology.layers`, in order. The gain and hue are applied after the material program to every
+    // part of the layer (the object emission lane); the field amount is the layer's `emissiveField`
+    // depth, which acts after the program too.
+    struct ScatterLayerParameters {
+        params::Parameter<float>* emissionGain = nullptr;
+        params::Parameter<float>* hueOffset = nullptr;
+        params::Parameter<float>* emissiveFieldAmount = nullptr;
+    };
+    std::vector<ScatterLayerParameters> scatterParams;
 };
 
 // ADR-833 (Phase D §25): the node's authored `tags` plus what it demonstrably is (a generated
@@ -808,6 +820,10 @@ public:
     // it is the simulation's, the camera rigs' and HIST's answer, and the offset is visual-only.
     // Null, or a frame with no live offset, is the flatten exactly as it was before XFORM existed.
     void setEffectOffsets(const world::TransformFrame* frame) { effectOffsets_ = frame; }
+    // ADR-906: the engine's trigger clock, bound for the frame BEFORE `update` -- where a field with
+    // a `trigger` counts its clock from (`resolveFieldTriggers`, at the end of the parameter pass).
+    // Null -- a composition no engine drives -- leaves every triggered field silent.
+    void setTriggerClock(const world::TriggerClock* clock) { triggerClock_ = clock; }
     // The node's world transform as the flatten DRAWS it: `nodeWorldTransform` with every offset on
     // the node and its ancestors composed in. Equal to `nodeWorldTransform` when none applies.
     [[nodiscard]] Transform nodeDrawnWorldTransform(const CompositionNode& node) const;
@@ -1508,6 +1524,11 @@ private:
     // is a thing an artist hides -- hiding "the village" and watching the houses stay up is not a
     // subtlety, it is the feature not working. Non-static for that reason; it has to walk parents.
     [[nodiscard]] bool nodeVisible(const CompositionNode& node) const;
+    // ADR-903: this frame's `emissiveBoost` for the node -- its parameter's final, times the
+    // day/night cycle's factor when the scene names it a star or a glow node (ADR-343). Every
+    // drawable the node owns takes it after its material program. Deliberately the node's own and
+    // not inherited, like `roughnessScale` and `opacity`: a group has nothing of its own to boost.
+    [[nodiscard]] float nodeEmissiveBoost(const CompositionNode& node) const;
     [[nodiscard]] float fitDistance() const;
     // Loads a nested scene file for a Scene node (cycle and depth checks against this chain).
     [[nodiscard]] Result<std::unique_ptr<Composition>> loadChild(const std::filesystem::path& asset) const;
@@ -1674,6 +1695,8 @@ private:
     // `Environment::shadowRange` for why a scene is allowed an opinion about this one.
     params::Parameter<float>* shadowRange_ = nullptr;
     params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
+    // ADR-905: `scene/ecologyLight`, the final behind `ecologyLightGain_` (the file's value).
+    params::Parameter<float>* ecologyLight_ = nullptr;
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;
@@ -2128,6 +2151,7 @@ private:
     // frame after a 30 s scrub: `bull-18`, mid-abduction, 43 m from the play's.
     world::HistoryBank* historyBank_ = nullptr; // ADR-703: the engine's; see `setHistoryBank`
     const world::TransformFrame* effectOffsets_ = nullptr; // Wave 2 (XFORM): the engine's; see `setEffectOffsets`
+    const world::TriggerClock* triggerClock_ = nullptr;    // ADR-906: the engine's; see `setTriggerClock`
     // A node's own transform with its XFORM offset composed in (identity when it has none).
     [[nodiscard]] Transform nodeDrawnTransform(const CompositionNode& node) const;
     std::vector<stage::VisualPlacement> seekPlaced_;
@@ -2209,7 +2233,6 @@ private:
         Transform world;
         bool worldValid = false;
         std::vector<Transform> restTransforms;       // entity transforms inside the asset
-        std::vector<float> restEmissive;
         std::vector<float> restRoughness;
         // The opacity the asset was built with, captured the first time a node's `opacity`
         // parameter is read rather than pushed alongside `restRoughness` at every one of the six
@@ -2228,6 +2251,15 @@ private:
         // fungus in the world. A click on one selected nothing at all.
         std::size_t ecologyFirst = 0;
         std::size_t ecologyCount = 0;
+        // ADR-905: which of those procedurals belong to which scatter layer -- the layer's index in
+        // `ecology.layers`, and its run (part 0 and its material subs) -- so the layer's emission
+        // lane reaches every part of it. A layer that placed nothing has no run.
+        struct EcologyLayerRun {
+            std::size_t layer = 0;
+            std::size_t first = 0;
+            std::size_t count = 0;
+        };
+        std::vector<EcologyLayerRun> ecologyLayers;
         int fieldIndex = -1;                         // index into scene_.fields.fields (Field kind)
         std::size_t firstField = 0;                  // Scene kind: the child's fields copied in
         std::size_t fieldCount = 0;

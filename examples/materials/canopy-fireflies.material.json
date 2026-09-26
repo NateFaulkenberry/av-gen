@@ -1,4 +1,5 @@
 {
+ "_note": "ADR-904: the engine applies each instance's emission variation once, after this program, as a rotation of the displayed hue and a gain. Do not multiply `instanceEmissive` into the emission here: it is a ratio made against the MATERIAL's emissive colour, and reading it makes this program own the variation. The op that read it is a constant 1 in place, so every op path stays where projects saved it (ADR-232).",
  "name": "canopyFireflies",
  "ops": [
   {
@@ -103,9 +104,14 @@
    "srcC": 6
   },
   {
-   "kind": "input",
+   "kind": "constant",
    "dst": 2,
-   "input": "instanceEmissive"
+   "constant": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ]
   },
   {
    "kind": "constant",

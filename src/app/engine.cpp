@@ -5714,6 +5714,13 @@ void Engine::update(const FrameTime& time) {
     // flatten below composes into their owners' transforms -- before it, so children, attachments,
     // effects reading the drawn view and `prevModel` all follow them.
     updateEffects(EffectPhase::BeforeScene);
+    // ADR-906: the trigger clock, bound to this frame's transport second before the flatten, which
+    // counts every triggered field's clock from it. Binding it again later in the frame is the same
+    // frame (`TriggerClock::setFrame`), and it binds here even when the project has no effects.
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter());
+    if (auto* comp = composition()) {
+        comp->setTriggerClock(&triggerClock_);
+    }
     controller_->update(time);
     // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects
     // read them -- so a Trail's head and its newest sample are the same instant.

@@ -415,8 +415,17 @@ struct ObjectUniforms {
     // byte-identical to one from before these existed.
     glm::vec4 fxA{0.0f}; // x = emission gain, y = bloom share, z = flags, w = record index in `entityFx`
     glm::vec4 fxB{0.0f}; // rgb = tint on the material's own emission, w = 0
+    // ADR-903/905: the object's own emission lane, the third of the padding vec4s. x = gain, y = hue
+    // rotation in turns, zw = 0. Applied by `pbr_shade.wgsl` AFTER the material program and after the
+    // FXL lanes, to everything the surface emits -- the one place a node's `emissiveBoost`, a part's
+    // `emissiveGain` and a scatter layer's `emissionGain`/`hueOffset` reach a surface, whatever kind
+    // of drawable it is (entity, procedural object and every part of it, SDF). Unlike `fxA` it is not
+    // the effect system's: FXL is rebuilt from effect instances every frame and gates on a flag,
+    // while this is the node's own value and is always on. (1, 0) is the identity, so a draw that
+    // keeps the default is the draw it was before this existed.
+    glm::vec4 emission{1.0f, 0.0f, 0.0f, 0.0f};
 };
-static_assert(sizeof(ObjectUniforms) == 448);
+static_assert(sizeof(ObjectUniforms) == 464);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -431,6 +440,7 @@ static_assert(offsetof(ObjectUniforms, windTune) == 304);
 static_assert(offsetof(ObjectUniforms, energyB) == 400);
 static_assert(offsetof(ObjectUniforms, fxA) == 416);
 static_assert(offsetof(ObjectUniforms, fxB) == 432);
+static_assert(offsetof(ObjectUniforms, emission) == 448);
 
 struct TonemapUniforms {
     float exposure;

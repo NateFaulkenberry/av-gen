@@ -34,3 +34,29 @@ fn livingChromaMultiplier(base: vec3<f32>, mult: vec3<f32>, turns: f32) -> vec3<
     let rotated = max(hueShift(safe * mult, turns), vec3<f32>(0.0));
     return clamp(rotated / safe, vec3<f32>(0.0), vec3<f32>(96.0));
 }
+
+// ADR-904: an instance's emission variation read back as (hue rotation in turns, gain), for a
+// program that writes emission and leaves the variation to the engine.
+//
+// The multiplier is a ratio made against the MATERIAL's emissive colour, which such a program never
+// shows: multiplied into the program's own colour it lands the hue wherever the ratios push it. So it
+// is read back as what it was made from -- OKLCH rotation keeps L and C, and a gain g scales OKLab L
+// by cbrt(g) -- and applied to the displayed colour as that rotation and gain. The CPU reference is
+// color::emissionVariationOf (src/core/color.cpp). The 1e-3 floor is the one the CPU made the
+// multiplier against; an achromatic base carries no hue to read back.
+fn emissionVariationOf(base: vec3<f32>, mult: vec3<f32>) -> vec2<f32> {
+    let safe = max(base, vec3<f32>(1e-3));
+    let a = rgbToOklab(safe);
+    let b = rgbToOklab(max(safe * mult, vec3<f32>(0.0)));
+    var gain = 0.0;
+    if (a.x > 1e-6) {
+        let r = b.x / a.x;
+        gain = r * r * r;
+    }
+    var hue = 0.0;
+    if (length(a.yz) > 1e-4 && length(b.yz) > 1e-4) {
+        let d = (atan2(b.z, b.y) - atan2(a.z, a.y)) / COLOR_TWO_PI;
+        hue = d - round(d); // the short way round
+    }
+    return vec2<f32>(hue, gain);
+}

@@ -561,6 +561,14 @@ struct ProceduralGeometry {
     std::string emissiveField;
     float emissiveFieldAmount = 0.0f;
     std::string extraLane;
+    // ADR-903/905: the object's emission lanes, applied by the lit shader AFTER the material program
+    // to everything the surface emits: a gain, and a hue rotation in turns (OKLCH, so the displayed
+    // colour turns round the wheel at constant lightness). The Composition writes them every frame
+    // from the owning node's `emissiveBoost`, a part's `emissiveGain`, and a scatter layer's
+    // `emissionGain` and `hueOffset`. 1 and 0, the defaults, are the object exactly as its material
+    // and program make it. Runtime only: not authored here, not serialised, not structural.
+    float emissionGain = 1.0f;
+    float emissionHue = 0.0f;
     // Cutout foliage. The path of a base-colour texture whose alpha is the mask, resolved by the
     // Composition against the scene file's folder and loaded once per rebuild.
     //

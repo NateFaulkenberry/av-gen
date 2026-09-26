@@ -119,6 +119,7 @@ constexpr InputName kInputNames[] = {
     {MaterialInput::CameraDistance, "cameraDistance"},
     {MaterialInput::MaterialId, "materialId"},
     {MaterialInput::Footprint, "footprint"},
+    {MaterialInput::MaterialEmission, "materialEmission"},
 };
 
 // ---- structural hashing (FNV-1a over the bit patterns, as in procedural.cpp) ----------------------
@@ -474,6 +475,8 @@ glm::vec4 inputValue(MaterialInput input, const MaterialContext& ctx) {
         return glm::vec4(ctx.materialId);
     case MaterialInput::Footprint:
         return glm::vec4(ctx.footprint);
+    case MaterialInput::MaterialEmission:
+        return ctx.materialEmission;
     }
     return glm::vec4(0.0f);
 }
@@ -726,6 +729,119 @@ int MaterialProgram::totalOpCount() const {
         count += layer.ops.size();
     }
     return static_cast<int>(count);
+}
+
+namespace {
+
+// Which source registers an op reads, per `evaluateOp`: the data flow ADR-904 follows. Every op
+// reads some subset of srcA, srcB and srcC; the ones that read none write from an input, a constant
+// or the fragment's own geometry.
+struct OpReads {
+    bool a = false;
+    bool b = false;
+    bool c = false;
+};
+
+OpReads opReads(MaterialOpKind kind) {
+    switch (kind) {
+    case MaterialOpKind::Input:
+    case MaterialOpKind::Constant:
+    case MaterialOpKind::Fresnel:
+    case MaterialOpKind::Field:
+    case MaterialOpKind::WorldProject:
+    case MaterialOpKind::ObjectProject:
+    case MaterialOpKind::CurvatureMask:
+    case MaterialOpKind::EdgeWear:
+    case MaterialOpKind::DecalBox:
+        return {};
+    case MaterialOpKind::Gradient:
+    case MaterialOpKind::Noise:
+    case MaterialOpKind::Voronoi:
+    case MaterialOpKind::Ramp:
+    case MaterialOpKind::Remap:
+    case MaterialOpKind::Power:
+    case MaterialOpKind::Smoothstep:
+    case MaterialOpKind::Threshold:
+    case MaterialOpKind::Saturate:
+    case MaterialOpKind::Palette:
+    case MaterialOpKind::Triplanar:
+    case MaterialOpKind::Anisotropy:
+    case MaterialOpKind::RoughnessFilter:
+    case MaterialOpKind::MicroDetail:
+    case MaterialOpKind::Swizzle:
+        return {true, false, false};
+    case MaterialOpKind::Multiply:
+    case MaterialOpKind::Add:
+    case MaterialOpKind::Mix:
+    case MaterialOpKind::HueShift:
+    case MaterialOpKind::DetailNormal:
+        return {true, true, false};
+    case MaterialOpKind::MixBy:
+    case MaterialOpKind::HeightBlend:
+        return {true, true, true};
+    }
+    return {true, true, true}; // an op this list does not know reads everything: the safe answer
+}
+
+// The layers the shader runs: the enabled ones, at most kMaxMaterialLayers, in order (as packed).
+template <typename Fn>
+void forEachRunLayer(const std::vector<MaterialLayer>& layers, Fn&& fn) {
+    int count = 0;
+    for (const MaterialLayer& layer : layers) {
+        if (!layer.enabled || count >= kMaxMaterialLayers) {
+            continue;
+        }
+        ++count;
+        fn(layer);
+    }
+}
+
+} // namespace
+
+bool MaterialProgram::writesEmission() const {
+    bool writes = registerInRange(emissionRegister);
+    forEachRunLayer(layers, [&writes](const MaterialLayer& layer) {
+        writes = writes || registerInRange(layer.emissionRegister);
+    });
+    return writes;
+}
+
+bool MaterialProgram::emissionReadsInstance() const {
+    // One flag per register, run over the ops exactly as `runOps` runs them (enabled ops only, the
+    // shared budget, out-of-range ops skipped): a register holds the instance's emission when the op
+    // that last wrote it read either input, or read a register that held it.
+    std::array<bool, kMaterialRegisters> held{};
+    int budget = kMaxMaterialOps;
+    const auto run = [&held, &budget](const std::vector<MaterialOp>& list) {
+        for (const MaterialOp& op : list) {
+            if (!op.enabled) {
+                continue;
+            }
+            if (budget <= 0) {
+                return;
+            }
+            --budget;
+            if (!registerInRange(op.dst) || !registerInRange(op.srcA) || !registerInRange(op.srcB) ||
+                !registerInRange(op.srcC)) {
+                continue;
+            }
+            const OpReads reads = opReads(op.kind);
+            const bool input = op.kind == MaterialOpKind::Input &&
+                               (op.input == MaterialInput::InstanceEmissive ||
+                                op.input == MaterialInput::MaterialEmission);
+            const auto at = [&held](int r) { return held[static_cast<std::size_t>(r)]; };
+            held[static_cast<std::size_t>(op.dst)] =
+                input || (reads.a && at(op.srcA)) || (reads.b && at(op.srcB)) || (reads.c && at(op.srcC));
+        }
+    };
+    run(ops);
+    bool reads = registerInRange(emissionRegister) && held[static_cast<std::size_t>(emissionRegister)];
+    forEachRunLayer(layers, [&](const MaterialLayer& layer) {
+        run(layer.ops);
+        reads = reads || (registerInRange(layer.emissionRegister) &&
+                          held[static_cast<std::size_t>(layer.emissionRegister)]);
+    });
+    return reads;
 }
 
 Result<void> MaterialProgram::validate() const {
@@ -1161,6 +1277,11 @@ MaterialProgramGpu packMaterialProgramWithSlots(const MaterialProgram& program,
     gpu.emissionIntensityPad.z = program.gate.near;
     gpu.emissionIntensityPad.w = program.gate.far;
     gpu.aux = glm::ivec4(program.normalRegister, program.occlusionRegister, program.heightRegister, count);
+    // ADR-904: whether the program's emission replaces the material's, and whether it already carries
+    // the instance's variation -- the two facts `shadeSurface` needs to apply that variation once.
+    gpu.flags = glm::ivec4((program.writesEmission() ? kMaterialWritesEmission : 0) |
+                               (program.emissionReadsInstance() ? kMaterialEmissionReadsInstance : 0),
+                           0, 0, 0);
     return gpu;
 }
 

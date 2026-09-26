@@ -1,6 +1,9 @@
 #include "scene/field_params.hpp"
 
+#include "world/effects/effect_trigger.hpp"
+
 #include <algorithm>
+#include <array>
 #include <utility>
 
 namespace avgen::scene {
@@ -13,9 +16,9 @@ struct FieldRegistrar {
     std::string group;
 
     template <typename T>
-    params::Parameter<T>* add(params::ParamDesc<T> d, const char* rel) {
+    params::Parameter<T>* add(params::ParamDesc<T> d, const char* rel, const char* label = nullptr) {
         d.path = out.prefix + rel;
-        d.label = rel;
+        d.label = label != nullptr ? label : rel;
         d.group = group;
         auto& p = params.add(std::move(d));
         out.all.push_back(&p);
@@ -29,6 +32,27 @@ struct FieldRegistrar {
         d.softMin = slo;
         d.softMax = shi;
         return add(std::move(d), rel);
+    }
+    // ADR-906: a parameter whose leaf is cryptic gets a label saying what it does (the panel heads it
+    // with the field's name and the path between).
+    params::Parameter<float>* f(const char* rel, const char* label, float def, float lo, float hi, float slo,
+                                float shi) {
+        params::ParamDesc<float> d;
+        d.defaultValue = def;
+        d.hardMin = lo;
+        d.hardMax = hi;
+        d.softMin = slo;
+        d.softMax = shi;
+        return add(std::move(d), rel, label);
+    }
+    params::Parameter<int>* i(const char* rel, const char* label, int def, int lo, int hi, int shi) {
+        params::ParamDesc<int> d;
+        d.defaultValue = def;
+        d.hardMin = lo;
+        d.hardMax = hi;
+        d.softMin = lo;
+        d.softMax = shi;
+        return add(std::move(d), rel, label);
     }
     params::Parameter<bool>* b(const char* rel, bool def) {
         params::ParamDesc<bool> d;
@@ -118,6 +142,29 @@ FieldParameters registerFieldParameters(params::ParameterSet& params, const spat
     r.f("falloff/exponent", rest.falloff.exponent, 0.01f, 32.0f, 0.1f, 8.0f);
     r.f("falloff/noiseAmount", rest.falloff.noiseAmount, 0.0f, 10.0f, 0.0f, 1.0f);
     r.f("falloff/noiseScale", rest.falloff.noiseScale, 0.001f, 100.0f, 0.01f, 5.0f);
+    // ADR-906: a triggered field's timing, adjustable where the field is. What it fires on -- the
+    // source, and the name of the musical event or marker -- stays in the file, as an effect's does;
+    // the numbers that say which of those events are here, and only the ones its source reads.
+    if (rest.trigger) {
+        const world::Trigger& t = *rest.trigger;
+        switch (t.source) {
+        case world::TriggerSource::Beat:
+            r.i("trigger/everyN", "fires every N beats", t.everyN, 1, 256, 16);
+            r.i("trigger/offset", "starting at beat", t.offset, 0, 100000, 16);
+            break;
+        case world::TriggerSource::Onset:
+            r.f("trigger/threshold", "fires on onsets stronger than", t.threshold, 0.0f, 100.0f, 0.0f, 4.0f);
+            break;
+        case world::TriggerSource::Repeat:
+            r.f("trigger/period", "fires every (seconds)", static_cast<float>(t.period), 0.01f, 3600.0f, 0.1f, 16.0f);
+            r.f("trigger/phase", "first fires at (seconds)", static_cast<float>(t.phase), -3600.0f, 3600.0f, 0.0f, 16.0f);
+            break;
+        case world::TriggerSource::MusicEvent:
+        case world::TriggerSource::TimelineMarker:
+        case world::TriggerSource::Proximity:
+            break;
+        }
+    }
     return p;
 }
 
@@ -152,6 +199,18 @@ void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& re
     copyValue(p, "falloff/exponent", live.falloff.exponent);
     copyValue(p, "falloff/noiseAmount", live.falloff.noiseAmount);
     copyValue(p, "falloff/noiseScale", live.falloff.noiseScale);
+    // ADR-906: the trigger's numbers (registered only for the source that reads them).
+    if (live.trigger) {
+        copyValue(p, "trigger/everyN", live.trigger->everyN);
+        copyValue(p, "trigger/offset", live.trigger->offset);
+        copyValue(p, "trigger/threshold", live.trigger->threshold);
+        float period = static_cast<float>(live.trigger->period);
+        float phase = static_cast<float>(live.trigger->phase);
+        copyValue(p, "trigger/period", period);
+        copyValue(p, "trigger/phase", phase);
+        live.trigger->period = static_cast<double>(period);
+        live.trigger->phase = static_cast<double>(phase);
+    }
 }
 
 void unregisterFieldParameters(params::ParameterSet& params, const FieldParameters& p) {
@@ -159,6 +218,22 @@ void unregisterFieldParameters(params::ParameterSet& params, const FieldParamete
         if (ip != nullptr) {
             const std::string path = ip->path(); // remove() destroys the parameter that owns it
             params.remove(path);
+        }
+    }
+}
+
+void resolveFieldTriggers(spatial::FieldSet& fields, const world::TriggerClock* clock, double seconds) {
+    for (spatial::FieldSpec& f : fields.fields) {
+        if (!f.trigger) {
+            continue;
+        }
+        f.triggerAge = -1.0;
+        if (clock == nullptr) {
+            continue;
+        }
+        std::array<double, 1> latest{};
+        if (clock->lastTriggers(*f.trigger, f.name, seconds, latest) > 0) {
+            f.triggerAge = std::max(seconds - latest[0], 0.0);
         }
     }
 }

@@ -2,6 +2,8 @@
 
 #include "params/timeline.hpp"
 
+#include "core/color.hpp"
+
 #include "core/json_keys.hpp"
 #include "core/log.hpp"
 #include "core/phase_profiler.hpp"
@@ -18,6 +20,7 @@
 #include "scene/sky.hpp"
 #include "world/effects/effect_lights.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_trigger.hpp"
 #include "spatial/detail.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -4347,10 +4350,23 @@ void MaterialPartParameters::apply(Material& material) const {
             material.emissiveIntensity = 1.0f;
         }
     }
-    if (emissiveGain != nullptr) material.emissiveIntensity *= emissiveGain->value();
+    // `emissiveGain` is not applied here since ADR-903: it is the part's emission lane, after the
+    // material program (see `partEmissiveGain`), because a multiplier on `emissiveIntensity` is
+    // discarded by a program that writes emission (ADR-179).
     if (roughnessScale != nullptr) material.roughness = std::clamp(material.roughness * roughnessScale->value(), 0.0f, 1.0f);
     if (opacityScale != nullptr) material.opacity = std::clamp(material.opacity * opacityScale->value(), 0.0f, 1.0f);
 }
+
+namespace {
+// ADR-903: part `index`'s `emissiveGain` (procedural/<node>/parts/<index>/emissiveGain), or 1 for a
+// node whose parts carry no parameters. It multiplies the part's emission lane with the node's boost.
+float partEmissiveGain(const CompositionNode& node, std::size_t index) {
+    if (index < node.materialPartParams.size() && node.materialPartParams[index].emissiveGain != nullptr) {
+        return node.materialPartParams[index].emissiveGain->value();
+    }
+    return 1.0f;
+}
+} // namespace
 
 float Composition::fitDistance() const {
     return radius_ / std::tan(kFitFovRadians * 0.5f) * 1.15f;
@@ -4504,6 +4520,14 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
+    // ADR-905: the light a glowing ecology casts on what grows around it (ADR-053), as a parameter.
+    // The file's `ecologyLight` is its default; the per-frame pass reads the final, so a route or a
+    // key moves the light the mushrooms throw with the mushrooms. 0 makes no lights at all.
+    {
+        params::ParamDesc<float> d = floatDesc(prefix_ + "scene/ecologyLight", ecologyLightGain_, 0.0f, 50.0f, 0.0f, 4.0f);
+        d.label = "light cast by glowing plants and fungi"; // what it looks like: pools on the ground
+        ecologyLight_ = &params.add(std::move(d));
+    }
     // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only
     // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
     // active() is false", reading the gate as speed alone, which is how a field nobody could switch
@@ -5204,8 +5228,12 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     node.scaleParam =
         &params_->add(vec3Desc(base + "scale", node.transform.scale, 0.001f, 100.0f, 0.01f, 5.0f));
     node.visibleParam = &params_->add(boolDesc(base + "visible", node.visible));
-    node.emissiveParam =
-        &params_->add(floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f));
+    {
+        // ADR-903: the node's glow, after any material program, on everything it draws.
+        params::ParamDesc<float> d = floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f);
+        d.label = "glow boost";
+        node.emissiveParam = &params_->add(std::move(d));
+    }
     node.roughnessParam =
         &params_->add(floatDesc(base + "roughnessScale", node.roughnessScale, 0.0f, 2.0f, 0.0f, 2.0f));
     // ADR-385: the whole-node fade. Hard range [0,1] so nothing can ramp it past opaque.
@@ -5287,6 +5315,35 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     }
     if (node.kind == NodeKind::Sdf) {
         node.sdfParams = registerSdfParameters(*params_, node.sdfRest, "sdf/" + sanitise(prefix_) + node.name + "/");
+    }
+    if (node.kind == NodeKind::Terrain) {
+        // ADR-905: every scatter layer's emission lane, by the layer's name. The gain and hue act
+        // after the material program on every part of the layer, so they reach the mushrooms that
+        // `glowmereTissue` lights as surely as a plain emissive layer; the field amount is the
+        // depth of the layer's `emissiveField`. Stable names -- a layer added in front of "fungi"
+        // does not move what `scatter/fungi/emissionGain` means.
+        // Labelled for what a viewer sees rather than what the lane is called: the panel shows
+        // "<terrain> / scatter / fungi" as the heading, then "glow", "hue shift" and "light wave".
+        node.scatterParams.clear();
+        const auto labelled = [](params::ParamDesc<float> d, const char* label) {
+            d.label = label;
+            return d;
+        };
+        for (const world::ScatterLayer& layer : node.ecology.layers) {
+            const std::string s = base + "scatter/" + layer.name + "/";
+            CompositionNode::ScatterLayerParameters p;
+            p.emissionGain = &params_->add(
+                labelled(floatDesc(s + "emissionGain", layer.emissionGain, 0.0f, 50.0f, 0.0f, 4.0f), "glow"));
+            // Turns of hue. The soft range is half a turn each way; the hard range lets a key spin it.
+            p.hueOffset = &params_->add(
+                labelled(floatDesc(s + "hueOffset", layer.hueOffset, -4.0f, 4.0f, -0.5f, 0.5f), "hue shift"));
+            // The depth of the layer's `emissiveField`: how strongly a travelling ring (or any field)
+            // lights the layer as it passes.
+            p.emissiveFieldAmount = &params_->add(labelled(
+                floatDesc(s + "emissiveFieldAmount", layer.emissiveFieldAmount, 0.0f, 100.0f, 0.0f, 8.0f),
+                "light wave"));
+            node.scatterParams.push_back(p);
+        }
     }
     if (node.kind == NodeKind::Terrain) {
         // Four knobs, all of them for looking at the thing rather than art-directing it: turn LOD
@@ -5385,6 +5442,17 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
             node.windFlutterParam = nullptr;
             node.windLagParam = nullptr;
         }
+        // ADR-905: the scatter layers' lanes, by the exact paths they were registered at.
+        for (const CompositionNode::ScatterLayerParameters& p : node.scatterParams) {
+            for (const params::IParameter* parameter :
+                 std::array<const params::IParameter*, 3>{p.emissionGain, p.hueOffset, p.emissiveFieldAmount}) {
+                if (parameter != nullptr) {
+                    const std::string path = parameter->path(); // copied: remove() destroys the owner
+                    params_->remove(path);
+                }
+            }
+        }
+        node.scatterParams.clear();
         if (node.kind == NodeKind::Terrain) {
             for (const char* suffix :
                  {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance",
@@ -5514,6 +5582,7 @@ void Composition::detach() {
         node->waterGlowColorParam = nullptr;
         node->particleParams = {};
         node->materialPartParams.clear(); // see the note at the end of this function
+        node->scatterParams.clear();      // ADR-905, and for the same reason
         if (node->child) {
             node->child->detach();
         }
@@ -5590,6 +5659,7 @@ void Composition::detach() {
     fogHeightAmount_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
+    ecologyLight_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
     rootRotationSpeed_ = nullptr;
@@ -5721,6 +5791,24 @@ bool Composition::nodeVisible(const CompositionNode& node) const {
         n = findNode(n->parent);
     }
     return true;
+}
+
+float Composition::nodeEmissiveBoost(const CompositionNode& node) const {
+    float boost = node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
+    // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
+    // Multiplying the boost rather than replacing it is what keeps the authored per-layer
+    // intensities independently controllable, which the brief asks for explicitly.
+    if (dayNight_.enabled) {
+        const auto named = [&node](const std::vector<std::string>& names) {
+            return std::find(names.begin(), names.end(), node.name) != names.end();
+        };
+        if (named(dayNight_.starNodes)) {
+            boost *= dayNightState_.starBrightness;
+        } else if (named(dayNight_.glowNodes)) {
+            boost *= dayNightState_.glowScale;
+        }
+    }
+    return boost;
 }
 
 void Composition::ensureBuilt() {
@@ -6140,7 +6228,6 @@ void Composition::rebuild() {
                 e.visible = visible && src.visible;
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
-                range.restEmissive.push_back(src.material.emissiveIntensity);
                 range.restRoughness.push_back(src.material.roughness);
             }
             range.firstLight = scene_.lights.size();
@@ -6174,7 +6261,6 @@ void Composition::rebuild() {
             orb.transform = nodeT;
             orb.visible = visible;
             range.restTransforms.emplace_back();
-            range.restEmissive.push_back(orb.material.emissiveIntensity);
             range.restRoughness.push_back(orb.material.roughness);
             break;
         }
@@ -6192,7 +6278,6 @@ void Composition::rebuild() {
             grid.transform = nodeT;
             grid.visible = visible;
             range.restTransforms.emplace_back();
-            range.restEmissive.push_back(0.0f);
             range.restRoughness.push_back(0.5f);
             break;
         }
@@ -6311,17 +6396,18 @@ void Composition::rebuild() {
             // new kind of drawable.
             std::vector<world::GlowCluster> nodeGlow;
             std::unordered_map<std::string, std::shared_ptr<spatial::PointCloud>> habitats;
-            // Everything this terrain produces is a pure function of these six -- the water settings
+            // Everything this terrain produces is a pure function of these five -- the water settings
             // among them since ADR-099, because the surface mesh bakes its flow lanes into the
             // vertices, so a flow an author retunes has to move the key. A rebuild caused by
             // anything else -- a node placed, a material program added, an HDR swapped -- reuses
             // what the last one made (ADR-092); a change to any of them moves the key and the
-            // terrain is built again, with nothing to remember to invalidate.
+            // terrain is built again, with nothing to remember to invalidate. The ecology light's
+            // gain is not one of them since ADR-905: it is a per-frame parameter, and the glow it
+            // scales is reduced whether or not it is zero.
             CompositionNode& mutableNode = *nodePtr;
             const std::uint64_t terrainKey =
                 node.worldMap.structuralHash() ^ (node.terrain.structuralHash() * 0x9E3779B97F4A7C15ull) ^
                 (node.ecology.structuralHash() * 0xC2B2AE3D27D4EB4Full) ^
-                (static_cast<std::uint64_t>(ecologyLightGain_ * 1024.0f) * 0x165667B19E3779F9ull) ^
                 (static_cast<std::uint64_t>(ecologyGlowCell_ * 1024.0f) * 0x27D4EB2F165667C5ull) ^
                 (node.waterFlow.structuralHash() * 0x85EBCA77C2B2AE63ull);
             // AVGEN_NO_TERRAIN_CACHE=1 turns the reuse off, so the claim "placing a node used to
@@ -6456,6 +6542,13 @@ void Composition::rebuild() {
                     pg.material.program = prefixed(sanitise(prefix_), layer.materialProgram);
                 }
                 pg.materialVariation.perceptualHue = true;
+                // ADR-905: the layer's emission lane. Its authored values are the starting point; the
+                // per-frame pass writes the parameters' finals over them (applyParameters), and the
+                // field name carries the prefix every other reference in this scene does.
+                pg.emissionGain = layer.emissionGain;
+                pg.emissionHue = layer.hueOffset;
+                pg.emissiveField = prefixed(sanitise(prefix_), layer.emissiveField);
+                pg.emissiveFieldAmount = layer.emissiveFieldAmount;
                 // ADR-055: how this species answers the wind, straight through. Nothing else in the
                 // scatter path changes -- Tier 0 is a vertex-stage deformation over instances that
                 // already exist, so there is no new buffer, no new pass and no new draw.
@@ -6481,9 +6574,15 @@ void Composition::rebuild() {
                         pg.sourceTransform.scale = glm::vec3(layer.height / authored);
                     }
                 }
-                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f && !reuseTerrain) {
+                // Reduced whenever the layer emits, whatever `scene/ecologyLight` is: the gain is a
+                // parameter (ADR-905) and a route may raise it from zero, which a light that was
+                // never built cannot answer. A gain of zero makes no lights (updateEcologyLights).
+                if (layer.emissiveIntensity > 0.0f && !reuseTerrain) {
                     auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_,
                                                          pg.variation.seed);
+                    for (world::GlowCluster& cluster : clusters) {
+                        cluster.layer = static_cast<std::uint32_t>(layerIndex - 1);
+                    }
                     log::info("terrain '{}': scatter '{}' glow reduced to {} emitters", node.name,
                               layer.name, clusters.size());
                     nodeGlow.insert(nodeGlow.end(), clusters.begin(), clusters.end());
@@ -6517,6 +6616,8 @@ void Composition::rebuild() {
                     }
                     subs.push_back(std::move(sub));
                 }
+                range.ecologyLayers.push_back(
+                    {layerIndex - 1, scene_.procedurals.size(), 1 + subs.size()});
                 scene_.procedurals.push_back(std::move(pg));
                 for (ProceduralGeometry& sub : subs) {
                     scene_.procedurals.push_back(std::move(sub));
@@ -6670,7 +6771,6 @@ void Composition::rebuild() {
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();
-                range.restEmissive.push_back(node.terrainMaterial.emissiveIntensity);
                 range.restRoughness.push_back(node.terrainMaterial.roughness);
             }
             // Water second, so it draws after the ground it sits in: the surface is translucent at
@@ -6696,7 +6796,6 @@ void Composition::rebuild() {
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();
-                range.restEmissive.push_back(0.0f);
                 range.restRoughness.push_back(node.terrain.water.roughness);
             }
             // ADR-099: every water body's centreline, published as a scene spline named
@@ -6940,7 +7039,6 @@ void Composition::rebuild() {
                 e.visible = visible && src.visible;
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
-                range.restEmissive.push_back(src.material.emissiveIntensity);
                 range.restRoughness.push_back(src.material.roughness);
             }
             for (const PunctualLight& src : cs.lights) {
@@ -7685,29 +7783,16 @@ void Composition::applyParameters() {
         // (the simulation and HIST keep reading `nodeWorldTransform`; see `setEffectOffsets`).
         const Transform nodeT = nodeDrawnWorldTransform(node);
         bool visible = nodeVisible(node);
-        bool dayNightVisibleOverride = true;
-        float emissiveBoost =
-            node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
-        // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
-        // Multiplying the boost rather than replacing it is what keeps the authored per-layer
-        // intensities independently controllable, which the brief asks for explicitly.
-        if (dayNight_.enabled) {
-            const auto named = [&node](const std::vector<std::string>& names) {
-                return std::find(names.begin(), names.end(), node.name) != names.end();
-            };
-            if (named(dayNight_.starNodes)) {
-                emissiveBoost *= dayNightState_.starBrightness;
-                // A star that has been faded to zero emission is not gone -- it is still geometry,
-                // and its base colour is black, so at noon the sky filled with small DARK squares
-                // instead of with nothing. Scaling emission is how a star dims; hiding it is how a
-                // star sets. Seen in a frame; no number in the cycle table showed it.
-                if (dayNightState_.starBrightness <= 1e-3f) {
-                    dayNightVisibleOverride = false;
-                }
-            } else if (named(dayNight_.glowNodes)) {
-                emissiveBoost *= dayNightState_.glowScale;
-            }
-            visible = visible && dayNightVisibleOverride;
+        // ADR-903: the boost every drawable of this node takes after its material program.
+        const float emissiveBoost = nodeEmissiveBoost(node);
+        // A star that has been faded to zero emission is not gone -- it is still geometry, and its
+        // base colour is black, so at noon the sky filled with small DARK squares instead of with
+        // nothing. Scaling emission is how a star dims; hiding it is how a star sets. Seen in a
+        // frame; no number in the cycle table showed it.
+        if (dayNight_.enabled && dayNightState_.starBrightness <= 1e-3f &&
+            std::find(dayNight_.starNodes.begin(), dayNight_.starNodes.end(), node.name) !=
+                dayNight_.starNodes.end()) {
+            visible = false;
         }
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
@@ -7749,7 +7834,6 @@ void Composition::applyParameters() {
             // Nested parameters moved the child's entities: take its current state as the rest.
             for (std::size_t k = 0; k < range.entityCount; ++k) {
                 range.restTransforms[k] = child->entities[k].transform;
-                range.restEmissive[k] = child->entities[k].material.emissiveIntensity;
                 range.restRoughness[k] = child->entities[k].material.roughness;
             }
         }
@@ -7758,8 +7842,12 @@ void Composition::applyParameters() {
             Entity& e = scene_.entities[range.firstEntity + k];
             e.transform = compose(full, range.restTransforms[k]);
             e.visible = visible && (child == nullptr || child->entities[k].visible);
+            // ADR-903: the boost is the entity's emission lane, applied by the shader after any
+            // material program -- not a multiplier on `emissiveIntensity`, which a program that
+            // asserts emission discards (ADR-179). A nested scene's entity keeps its own node's
+            // boost and takes this one on top.
+            e.emissionGain = (child != nullptr ? child->entities[k].emissionGain : 1.0f) * emissiveBoost;
             if (e.style == MeshStyle::Lit) {
-                e.material.emissiveIntensity = range.restEmissive[k] * emissiveBoost;
                 e.material.roughness = std::clamp(range.restRoughness[k] * roughnessScale, 0.0f, 1.0f);
             }
             if (fading) {
@@ -7843,11 +7931,51 @@ void Composition::applyParameters() {
                 sub.distributionTransform =
                     Transform::fromMatrix(full.matrix() * sub.distributionTransform.matrix());
                 sub.visible = sub.visible && visible;
+                // ADR-903: the node's boost and this part's own gain, after the program.
+                sub.emissionGain = emissiveBoost * partEmissiveGain(node, k + 1);
+                sub.emissionHue = 0.0f;
             }
             if (!node.materialPartParams.empty()) {
                 node.materialPartParams[0].apply(pg.material);
             }
+            pg.emissionGain = emissiveBoost * partEmissiveGain(node, 0);
+            pg.emissionHue = 0.0f;
             // generated by rebuildProcedurals() once every object and spline has its finals
+        }
+        // ADR-905: a terrain's scatter layers. Each layer's gain and hue -- its parameters' finals,
+        // or the file's values for a composition nobody attached -- ride on the terrain's own boost,
+        // and reach every part of the layer.
+        if (node.kind == NodeKind::Terrain) {
+            // The bases back into the layers, as the node's own values are above, so a save keeps
+            // what the user set. None of the three is structural, so this moves no terrain key.
+            for (std::size_t l = 0; l < node.scatterParams.size() && l < node.ecology.layers.size(); ++l) {
+                const CompositionNode::ScatterLayerParameters& p = node.scatterParams[l];
+                world::ScatterLayer& layer = node.ecology.layers[l];
+                if (p.emissionGain != nullptr) layer.emissionGain = p.emissionGain->base();
+                if (p.hueOffset != nullptr) layer.hueOffset = p.hueOffset->base();
+                if (p.emissiveFieldAmount != nullptr) layer.emissiveFieldAmount = p.emissiveFieldAmount->base();
+            }
+            for (const NodeRange::EcologyLayerRun& run : range.ecologyLayers) {
+                if (run.layer >= node.ecology.layers.size()) {
+                    continue;
+                }
+                const world::ScatterLayer& layer = node.ecology.layers[run.layer];
+                const CompositionNode::ScatterLayerParameters* p =
+                    run.layer < node.scatterParams.size() ? &node.scatterParams[run.layer] : nullptr;
+                const auto value = [](const params::Parameter<float>* q, float authored) {
+                    return q != nullptr ? q->value() : authored;
+                };
+                const float gain = value(p != nullptr ? p->emissionGain : nullptr, layer.emissionGain);
+                const float hue = value(p != nullptr ? p->hueOffset : nullptr, layer.hueOffset);
+                const float field =
+                    value(p != nullptr ? p->emissiveFieldAmount : nullptr, layer.emissiveFieldAmount);
+                for (std::size_t q = run.first; q < run.first + run.count && q < scene_.procedurals.size(); ++q) {
+                    ProceduralGeometry& part = scene_.procedurals[q];
+                    part.emissionGain = emissiveBoost * gain;
+                    part.emissionHue = hue;
+                    part.emissiveFieldAmount = field;
+                }
+            }
         }
         if (node.kind == NodeKind::Spline && range.splineIndex >= 0 &&
             static_cast<std::size_t>(range.splineIndex) < scene_.splines.splines.size()) {
@@ -7873,6 +8001,7 @@ void Composition::applyParameters() {
             prefixFieldReferences(so, sanitise(prefix_));
             so.transform = compose(full, so.transform);
             so.visible = so.visible && visible;
+            so.emissionGain = emissiveBoost; // ADR-903
         }
         if (node.kind == NodeKind::Field && range.fieldIndex >= 0 &&
             static_cast<std::size_t>(range.fieldIndex) < scene_.fields.fields.size()) {
@@ -7897,6 +8026,9 @@ void Composition::applyParameters() {
             ps.sizeStart *= scale;
             ps.sizeEnd *= scale;
             ps.enabled = ps.enabled && visible;
+            // ADR-903: a particle node's boost is its particles' HDR emission multiplier; `ps` was
+            // reset from the rest above, so this does not compound.
+            ps.emissive *= emissiveBoost;
         } else if (child != nullptr && child->particles.size() == range.particleCount) {
             const float scale = lengthScale(full);
             const std::string childPrefix = nestedPrefix(node);
@@ -7911,6 +8043,7 @@ void Composition::applyParameters() {
                 ps.sizeStart = src.sizeStart * scale;
                 ps.sizeEnd = src.sizeEnd * scale;
                 ps.enabled = src.enabled && visible;
+                ps.emissive = src.emissive * emissiveBoost; // ADR-903
             }
         }
         if (child != nullptr && child->procedurals.size() == range.proceduralCount) {
@@ -7933,6 +8066,8 @@ void Composition::applyParameters() {
                 prefixFieldReferences(pg, childPrefix);
                 pg.distributionTransform = Transform::fromMatrix(full.matrix() * src.distributionTransform.matrix());
                 pg.visible = pg.visible && visible;
+                // ADR-903: the child's own lanes (copied with it) under this node's boost.
+                pg.emissionGain = src.emissionGain * emissiveBoost;
             }
         }
         if (child != nullptr && child->splines.splines.size() == range.splineCount) {
@@ -7961,6 +8096,7 @@ void Composition::applyParameters() {
                 prefixFieldReferences(so, childPrefix);
                 so.transform = compose(full, src.transform);
                 so.visible = src.visible && visible;
+                so.emissionGain = src.emissionGain * emissiveBoost; // ADR-903
             }
         }
         if (child != nullptr && child->materialPrograms.size() == range.materialCount) {
@@ -7987,6 +8123,10 @@ void Composition::applyParameters() {
             }
         }
     }
+    // ADR-906: a triggered field's clock for this frame, once every field -- a nested scene's
+    // included -- has its finals. The clock is the engine's, bound to this frame's transport second.
+    resolveFieldTriggers(scene_.fields, triggerClock_,
+                         triggerClock_ != nullptr ? triggerClock_->seconds() : currentTime_);
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -8553,6 +8693,13 @@ void Composition::updateEcologyLights() {
     if (!ecologyLightsEnabled_) {
         return;
     }
+    // ADR-905: the parameter's final -- a route or a key on `scene/ecologyLight` -- and the file's
+    // value for a composition nobody attached. Zero makes no lights, exactly as a scene that never
+    // asked for any has always had.
+    const float gain = ecologyLight_ != nullptr ? ecologyLight_->value() : ecologyLightGain_;
+    if (gain <= 0.0f) {
+        return;
+    }
     const std::size_t budget = kMaxEcologyLights > scene_.lights.size()
                                    ? kMaxEcologyLights - scene_.lights.size()
                                    : 0;
@@ -8564,6 +8711,7 @@ void Composition::updateEcologyLights() {
         const world::GlowCluster* cluster;
         float distanceSq;
         glm::vec3 position;
+        const CompositionNode* node;
     };
     std::vector<Candidate> candidates;
     const glm::vec3 eye = scene_.camera.position;
@@ -8579,7 +8727,7 @@ void Composition::updateEcologyLights() {
             if (d2 > ecologyLightRange_ * ecologyLightRange_) {
                 continue;
             }
-            candidates.push_back({&g, d2, world});
+            candidates.push_back({&g, d2, world, &node});
         }
     }
     if (candidates.empty()) {
@@ -8596,6 +8744,18 @@ void Composition::updateEcologyLights() {
 
     for (std::size_t i = 0; i < candidates.size(); ++i) {
         const world::GlowCluster& g = *candidates[i].cluster;
+        const CompositionNode& owner = *candidates[i].node;
+        // ADR-905: the light a layer casts follows the glow it shows -- the terrain's boost and the
+        // layer's own gain and hue, the same finals its surfaces take after their program.
+        float layerGain = 1.0f;
+        float layerHue = 0.0f;
+        if (g.layer < owner.ecology.layers.size()) {
+            const world::ScatterLayer& layer = owner.ecology.layers[g.layer];
+            const CompositionNode::ScatterLayerParameters* p =
+                g.layer < owner.scatterParams.size() ? &owner.scatterParams[g.layer] : nullptr;
+            layerGain = p != nullptr && p->emissionGain != nullptr ? p->emissionGain->value() : layer.emissionGain;
+            layerHue = p != nullptr && p->hueOffset != nullptr ? p->hueOffset->value() : layer.hueOffset;
+        }
         PunctualLight light;
         light.name = fmt::format("{}{}", kEcologyLightPrefix, i);
         // A point light, not a Sphere: a sphere emitter goes through the LTC area-light
@@ -8604,11 +8764,11 @@ void Composition::updateEcologyLights() {
         light.type = PunctualLight::Type::Point;
         light.role = PunctualLight::Role::Practical;
         light.position = candidates[i].position;
-        light.color = g.color;
+        light.color = layerHue != 0.0f ? color::hueShift(g.color, layerHue) : g.color;
         // The aggregate's power is a sum of emissive weights, not photometric candela. The scale
         // is the one free constant here: it sets how far a patch of glowing ecology throws light,
         // and it is authored per scene rather than guessed once.
-        light.intensity = g.power * ecologyLightGain_;
+        light.intensity = g.power * gain * nodeEmissiveBoost(owner) * std::max(layerGain, 0.0f);
         light.radius = std::max(g.radius, 0.25f);
         light.range = g.radius * 4.0f;
         light.castsShadow = false;   // hundreds of these; none of them can afford a shadow map
@@ -9206,8 +9366,11 @@ nlohmann::json Composition::toJson() const {
         environment["dayNight"] = std::move(d);
     }
     environment["skyBloom"] = skyBloomSetting_;
-    if (ecologyLightGain_ > 0.0f) {
-        environment["ecologyLight"] = ecologyLightGain_;
+    // ADR-905: the parameter's base, as the volumetric block below does, so a save keeps what the
+    // user set on `scene/ecologyLight` rather than the value the file was loaded with.
+    if (const float ecologyLight = ecologyLight_ != nullptr ? ecologyLight_->base() : ecologyLightGain_;
+        ecologyLight > 0.0f) {
+        environment["ecologyLight"] = ecologyLight;
         environment["ecologyLightRange"] = ecologyLightRange_;
         environment["ecologyGlowCell"] = ecologyGlowCell_;
     }

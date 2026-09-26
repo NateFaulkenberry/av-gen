@@ -233,6 +233,26 @@ Every field is written (defaults fill missing ones on read):
 `wavelength` > 0, `softness`, `frequency`, `waveWidth` >= 0, at most 4 non-empty compound
 children that are not the field itself, and a `reference` (the grid's name) for `grid`.
 
+### A field's clock can start at an event (ADR-906)
+
+An optional `"trigger"` -- the same block an effect instance carries (`beat` with `everyN` and
+`offset`, `onset` with `threshold`, `musicEvent` with `name`, `marker` with `name`, `repeat` with
+`period` and `phase`; `proximity` is refused, a field has no path to measure) -- makes the field's
+`t` the seconds since the most recent such event at or before the transport second, taken from the
+engine's `TriggerClock` (`scene::resolveFieldTriggers`, every frame, a pure function of the second:
+a seek lands on the frame a play reaches). Before the first event the field is silent: it samples
+as a disabled field does. A wave field on a trigger is therefore a front that leaves `waveOrigin`
+at each event and travels out at `waveSpeed`:
+
+```json
+{ "name": "ripple", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
+  "wavelength": 4, "waveSpeed": 12, "waveWidth": 0,
+  "falloff": {"kind": "smoothstep", "inner": 30, "outer": 45},
+  "trigger": {"source": "marker", "name": "drop"} }
+```
+
+Written only when set; a field without one runs on the transport clock exactly as before.
+
 ## Effectors (`spatial::Effector`)
 
 An effector is a field name, an operation, a blend, `strength`, `weight` (mix factor), `axis`
