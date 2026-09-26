@@ -148,12 +148,27 @@ struct AutoDirectorSettings {
 // own camera, and a *camera track* naming which camera is seen when -- so the install writes to the
 // composition's `CameraDirection` as well as to the timeline.
 
+// What the engine knows that neither the plan nor the heroes say (ADR-921): the beat grid -- the
+// engine's own meter over the analysed track's beats, ADR-896's one musical time -- and how much
+// each hero moves on its own, read off the scene (0 a prop, 0.5 a body that hovers, sways or spins,
+// 1 one that travels: a walker, a craft a scenario flies). Default-constructed is "nothing known":
+// no grid, every subject still.
+struct SongInputs {
+    MusicalGrid grid;
+    std::vector<std::pair<std::string, float>> motion; // hero name -> 0..1
+};
+[[nodiscard]] SongInputs songInputsForEngine(const Engine& engine);
+// How much the node a hero names moves on its own, from the composition's entities and staging.
+[[nodiscard]] float heroMotion(const Engine& engine, const world::HeroPoint& hero);
+
 // Heroes plus a plan plus the scene's cameras into a direction. Engine-free, like `directHeroes`:
-// a direction can be inspected before anything is installed.
+// a direction can be inspected before anything is installed. `inputs` carries the beat grid and the
+// heroes' motion when the caller has an engine to read them from.
 [[nodiscard]] Result<SongDirection> directSongFromPlan(std::span<const world::HeroPoint> heroes,
                                                        const SongPlan& plan,
                                                        const scene::CameraDirection& cameras,
-                                                       const AutoDirectorSettings& settings);
+                                                       const AutoDirectorSettings& settings,
+                                                       const SongInputs& inputs = {});
 
 // Installs both halves. The timeline half is `installSequence`; the camera-track half replaces every
 // shot the director owns (`CameraShot::Origin::Directed`) and leaves every authored shot exactly
@@ -168,7 +183,19 @@ struct AutoDirectorSettings {
 // measurement-derived stand-in when there is not (`songPlanFromMeasurements`). Separate from
 // `directEngine` because "what would Song Mode direct" is a question a panel asks without wanting
 // to cut anything.
+//
+// ADR-922: whichever the sections come from, the plan carries the film's events -- the saved song
+// plan's own `events`, and every event a watched play of the project observed (the directing plans'
+// `observation`, ADR-767), so a scenario's or a set piece's events reach Song Mode without it knowing
+// either exists.
 [[nodiscard]] Result<SongPlan> songPlanForEngine(const Engine& engine);
+// The events `songPlanForEngine` attaches: the saved plan's and every watched observation's, in time
+// order, without duplicates.
+[[nodiscard]] std::vector<SongEvent> songEventsForEngine(const Engine& engine);
+
+// The last Song Mode cut this process made, one line per section ("4 shots, 3.7-0.5 s, rising"),
+// for the Auto-director panel's section rows. Empty until something is directed in Song Mode.
+[[nodiscard]] std::vector<std::string> lastSongCutSummary();
 
 // Installs a sequence's baked tracks on the engine's timeline, replacing any tracks that drive the
 // same camera parameters and leaving every other track alone.
@@ -212,9 +239,21 @@ struct AutoDirectorSettings {
 // control in the panel was bound to a struct the first cut never read, and choosing Continuous shot
 // did nothing at all. A defaulted argument that silently means "ignore what the user chose" is worth
 // a compile error at every call site instead of a test that has to remember to exist.
+//
+// Song Mode only: `plan`, when given, is directed instead of `songPlanForEngine`'s -- what a plan
+// named on the command line means for its run (`--song-plan`), which the film-first rule otherwise
+// shadowed for any project with sections. `direction`, when given, receives the cut (for
+// `--cut-report`).
 [[nodiscard]] Result<std::size_t> directEngine(Engine& engine,
                                                std::span<const world::HeroPoint> heroes,
-                                               const AutoDirectorSettings& settings);
+                                               const AutoDirectorSettings& settings,
+                                               const SongPlan* plan = nullptr,
+                                               SongDirection* direction = nullptr);
+
+// `--director k=v,...`: the Auto-director panel's settings from a line of text, over `settings`.
+// Shared by the application and `avgen_song_cut`, so one setting has one spelling. Keys: mode,
+// autonomy, minShot, minBuildShot, maxShot, maxSpeed, maxSwing, dwell, seed.
+[[nodiscard]] Result<void> applyDirectorArgs(AutoDirectorSettings& settings, std::string_view text);
 
 // ---- keeping a directed camera in step with the heroes -----------------------------------------
 //

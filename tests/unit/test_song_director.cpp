@@ -17,8 +17,12 @@
 #include "app/engine.hpp"
 #include "app/song_director.hpp"
 #include "app/song_plan.hpp"
+#include "directing/plan.hpp"
+#include "entity/entity.hpp"
 #include "scene/camera_rig.hpp"
 #include "scene/composition.hpp"
+#include "song/section_cue.hpp"
+#include "song/section_timeline.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -994,4 +998,685 @@ TEST_CASE("Every director mode has a name and parses back", "[song][director]") 
         CHECK(*parsed == a);
     }
     CHECK(app::allAutonomies().size() == 3);
+}
+
+// ================================================================================================
+// ADR-920..923: musical cuts, arcs, peaks, and the cut report
+// ================================================================================================
+
+namespace {
+
+// A synthetic beat grid: `bpm`, the first beat at `first`, bar 1 on it, `phraseBars`-bar phrases. The
+// director reads nothing else of the music's time, so this is the whole of what a grid test needs.
+app::MusicalGrid gridOf(double bpm, double seconds, double first = 0.0, int phraseBars = 4) {
+    app::MusicalGrid g;
+    const double beat = 60.0 / bpm;
+    for (double t = first; t <= seconds + 1e-9; t += beat) {
+        g.beatTimes.push_back(t);
+    }
+    g.downbeat = 0;
+    g.beatsPerBar = 4;
+    g.phraseBars = phraseBars;
+    return g;
+}
+
+app::SongPlanSection sectionOf(const char* label, double start, double end, app::ShotIntentProfile i,
+                               float energy = 0.6f, float density = 0.5f) {
+    app::SongPlanSection s;
+    s.label = label;
+    s.startSeconds = start;
+    s.endSeconds = end;
+    s.intent = std::move(i);
+    s.energy = energy;
+    s.density = density;
+    s.autonomy = app::Autonomy::Expressive;
+    return s;
+}
+
+app::ShotIntentProfile arcIntent(const char* id, song::Arc arc, float cutRate, float heroEmphasis = 0.6f,
+                                 float distance = 0.5f, int cameras = 1) {
+    app::ShotIntentProfile p = intent(id, heroEmphasis, distance, 0.5f, 0.5f, cutRate, cameras);
+    p.arc = arc;
+    return p;
+}
+
+app::SongDirectorOptions gridded(const app::MusicalGrid& grid) {
+    app::SongDirectorOptions o = guided();
+    o.minShotSeconds = 4.0;
+    o.maxShotSeconds = 12.0;
+    o.minBuildShotSeconds = 0.5;
+    o.grid = grid;
+    return o;
+}
+
+std::vector<double> lengthsIn(const app::SongDirection& d, std::size_t section) {
+    std::vector<double> out;
+    for (const app::SongDecision& s : d.decisions) {
+        if (s.sectionIndex == section) {
+            out.push_back(s.endSeconds - s.startSeconds);
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("A Burst section opens on short shots and settles", "[song][director][arc][burst]") {
+    const app::MusicalGrid grid = gridOf(120.0, 60.0);
+    app::SongPlan plan;
+    plan.sections.push_back(sectionOf("impact", 0.0, 32.0, arcIntent("impact", song::Arc::Burst, 0.9f)));
+    auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(d.has_value());
+    const auto lengths = lengthsIn(*d, 0);
+    std::string text;
+    for (const app::SongDecision& s : d->decisions) {
+        text += s.line() + " | " + s.timing.why + "\n";
+    }
+    INFO(text);
+    REQUIRE(lengths.size() >= 3);
+    CHECK(lengths.front() < 4.0);          // below the ordinary floor: a burst may
+    CHECK(lengths.back() > lengths.front()); // and it settles
+    for (std::size_t i = 1; i < lengths.size(); ++i) {
+        CHECK(lengths[i] >= lengths[i - 1] - 0.13);
+    }
+}
+
+TEST_CASE("A Rising section cuts monotonically shorter shots, below the ordinary floor",
+          "[song][director][arc][rising]") {
+    // 16 bars at 120 BPM, a treatment that accelerates.
+    const app::MusicalGrid grid = gridOf(120.0, 60.0);
+    const auto direct = [&](song::Arc arc) {
+        app::SongPlan plan;
+        plan.sections.push_back(sectionOf("build", 0.0, 32.0, arcIntent("build", arc, 0.8f)));
+        auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+        REQUIRE(d.has_value());
+        return *d;
+    };
+    const app::SongDirection rising = direct(song::Arc::Rising);
+    const auto lengths = lengthsIn(rising, 0);
+    std::string text;
+    for (const double l : lengths) {
+        text += std::to_string(l) + " ";
+    }
+    INFO("rising: " << text);
+    REQUIRE(lengths.size() >= 4);
+    // Never longer than the shot before (a quarter beat of grid jitter allowed; this grid has none)...
+    for (std::size_t i = 1; i < lengths.size(); ++i) {
+        CHECK(lengths[i] <= lengths[i - 1] + 1e-6);
+    }
+    // ...an acceleration and not a plateau, and one that may go below the 4 s floor (ADR-921).
+    CHECK(lengths.back() * 3.0 <= lengths.front());
+    CHECK(lengths.back() < 4.0);
+    CHECK(lengths.back() >= 0.5 - 1e-6); // the build floor: never below it
+
+    // Control: the same section Steady never goes below the floor, and holds roughly one length.
+    const auto steady = lengthsIn(direct(song::Arc::Steady), 0);
+    REQUIRE_FALSE(steady.empty());
+    for (const double l : steady) {
+        CHECK(l >= 4.0 - 1e-6);
+    }
+    CHECK(*std::max_element(steady.begin(), steady.end()) <= 3.0 * *std::min_element(steady.begin(), steady.end()));
+}
+
+TEST_CASE("The build floor is the Auto-director panel's 'shortest build', and it reaches the cut",
+          "[song][director][arc][settings]") {
+    const app::MusicalGrid grid = gridOf(120.0, 60.0);
+    app::SongPlan plan;
+    plan.sections.push_back(sectionOf("riser", 0.0, 16.0, arcIntent("riser", song::Arc::Rising, 1.0f)));
+    const auto shortest = [&](double buildFloor) {
+        app::SongDirectorOptions o = gridded(grid);
+        o.minBuildShotSeconds = buildFloor;
+        auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), o);
+        REQUIRE(d.has_value());
+        const auto lengths = lengthsIn(*d, 0);
+        return *std::min_element(lengths.begin(), lengths.end());
+    };
+    // A beat (0.5 s here) lets the riser cut on the beat; two seconds holds it to a bar.
+    CHECK(shortest(0.5) < 1.0);
+    CHECK(shortest(2.0) >= 2.0 - 1e-6);
+    // Never above the ordinary floor: a build may go below the floor, not above it.
+    CHECK(shortest(10.0) <= 4.0 + 1e-6);
+}
+
+TEST_CASE("Every cut lands on the beat grid, and every section boundary on its downbeat",
+          "[song][director][grid]") {
+    // demoPlan's sections, authored a little off the grid -- as a hand-edited timeline or a detector
+    // a beat early is (ADR-896) -- on a 120 BPM grid.
+    app::SongPlan plan = demoPlan();
+    const double offsets[] = {0.0, 0.31, -0.42, 0.18, -0.66, 0.51, -0.2, 0.37};
+    for (std::size_t i = 1; i < plan.sections.size(); ++i) {
+        plan.sections[i].startSeconds += offsets[i];
+        plan.sections[i - 1].endSeconds = plan.sections[i].startSeconds;
+    }
+    const app::MusicalGrid grid = gridOf(120.0, 200.0);
+    auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(d.has_value());
+    const auto beatIndex = [&](double t) -> std::optional<std::size_t> { return grid.nearestBeat(t, 1e-6); };
+    for (std::size_t i = 1; i < d->decisions.size(); ++i) {
+        const double t = d->decisions[i].startSeconds;
+        INFO(d->decisions[i].line());
+        const auto k = beatIndex(t);
+        REQUIRE(k.has_value()); // on a beat, exactly
+    }
+    for (std::size_t si = 1; si < d->sections.size(); ++si) {
+        const app::SongSectionCut& s = d->sections[si];
+        INFO(s.label << " authored " << s.authoredStart << " cut " << s.startSeconds);
+        const auto k = beatIndex(s.startSeconds);
+        REQUIRE(k.has_value());
+        CHECK(grid.strength(*k) >= 2);                             // a bar line
+        CHECK(std::abs(s.startSeconds - s.authoredStart) <= 1.0); // within half a bar of the author's
+        CHECK(d->decisions[s.firstShot].startSeconds == s.startSeconds);
+    }
+    // The film's own ends are not moved.
+    CHECK(d->decisions.front().startSeconds == plan.sections.front().startSeconds);
+    CHECK(d->decisions.back().endSeconds == plan.sections.back().endSeconds);
+
+    // Control: without a grid the same plan cuts where the pace puts it, which is off the beat.
+    auto free = app::directSong(plan, threeHeroBrief(), threeCameras(), guided());
+    REQUIRE(free.has_value());
+    std::size_t offBeat = 0;
+    for (std::size_t i = 1; i < free->decisions.size(); ++i) {
+        offBeat += beatIndex(free->decisions[i].startSeconds) ? 0 : 1;
+    }
+    CHECK(offBeat > 0);
+}
+
+TEST_CASE("A Suspended section holds", "[song][director][arc][suspended]") {
+    const app::MusicalGrid grid = gridOf(120.0, 120.0);
+    const auto shots = [&](double seconds) {
+        app::SongPlan plan;
+        plan.sections.push_back(sectionOf("stop", 0.0, seconds, arcIntent("stop", song::Arc::Suspended, 0.9f)));
+        auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+        REQUIRE(d.has_value());
+        return lengthsIn(*d, 0);
+    };
+    // Held past the longest shot (12 s) -- a hold is the contrast -- up to twice it...
+    CHECK(shots(20.0).size() == 1);
+    // ...and split at the grid only beyond that.
+    const auto long_ = shots(40.0);
+    CHECK(long_.size() == 2);
+    for (const double l : long_) {
+        CHECK(l <= 24.0 + 2.0 + 1e-6);
+    }
+    // Control: the same cut rate Steady cuts many times.
+    app::SongPlan plan;
+    plan.sections.push_back(sectionOf("go", 0.0, 20.0, arcIntent("go", song::Arc::Steady, 0.9f)));
+    auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(d.has_value());
+    CHECK(lengthsIn(*d, 0).size() >= 3);
+}
+
+TEST_CASE("A drop opens its own shot on its downbeat, with a cut", "[song][director][drop]") {
+    // A groove, then an impact authored 0.3 s late, as a hand edit would put it.
+    const app::MusicalGrid grid = gridOf(120.0, 80.0);
+    app::SongPlan plan;
+    plan.sections.push_back(sectionOf("groove", 0.0, 32.3, arcIntent("groove", song::Arc::Steady, 0.5f, 0.5f, 0.5f, 2),
+                                      0.6f, 0.5f));
+    plan.sections.push_back(sectionOf("drop", 32.3, 64.0, arcIntent("drop", song::Arc::Burst, 0.9f, 0.8f, 0.5f, 2),
+                                      0.95f, 0.9f));
+    plan.sections[1].intent.energy = 1.0f;
+    auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(d.has_value());
+    const app::SongSectionCut& drop = d->sections[1];
+    CHECK(drop.startSeconds == 32.0); // bar 17's downbeat, not the authored 32.3
+    const app::SongDecision& opener = d->decisions[drop.firstShot];
+    CHECK(opener.startSeconds == 32.0);
+    CHECK(opener.transition == scene::ShotTransition::Cut);
+    CHECK(opener.timing.visible);
+    for (const app::SongDecision& s : d->decisions) {
+        CHECK_FALSE((s.startSeconds < 32.0 - 1e-6 && s.endSeconds > 32.0 + 1e-6));
+    }
+    // The camera track has a cut exactly there too: an entry starts on the downbeat, or the
+    // director's own camera re-frames across it.
+    bool entry = false;
+    for (const scene::CameraShot& s : d->shots) {
+        entry = entry || std::abs(s.startSeconds - 32.0) < 1e-9;
+    }
+    CHECK((entry || opener.camera == scene::kMainCamera));
+}
+
+TEST_CASE("A peak section goes to its event's subject, else to the film's hero",
+          "[song][director][peak]") {
+    const app::MusicalGrid grid = gridOf(120.0, 90.0);
+    const auto planWith = [](float peakPush) {
+        app::SongPlan plan;
+        plan.sections.push_back(sectionOf("verse", 0.0, 32.0, arcIntent("verse", song::Arc::Steady, 0.6f, 0.5f), 0.5f, 0.5f));
+        plan.sections.push_back(sectionOf("chorus", 32.0, 64.0, arcIntent("chorus", song::Arc::Steady, 0.6f, 0.5f), 0.95f, 0.9f));
+        plan.sections.push_back(sectionOf("outro", 64.0, 80.0, arcIntent("outro", song::Arc::Steady, 0.4f, 0.5f), 0.4f, 0.3f));
+        plan.sections[0].intent.energy = 0.4f;
+        plan.sections[1].intent.energy = peakPush;
+        plan.sections[2].intent.energy = 0.3f;
+        return plan;
+    };
+    const auto opener = [&](const app::SongPlan& plan) {
+        auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+        REQUIRE(d.has_value());
+        REQUIRE(d->sections.size() == 3);
+        return std::make_pair(d->decisions[d->sections[1].firstShot], d->sections[1]);
+    };
+
+    // The event: something happens to "bloom" -- the least important hero -- as the chorus lands.
+    app::SongPlan withEvent = planWith(1.0f);
+    withEvent.events.push_back(app::SongEvent{"setpiece/lift/beam", "bloom", 32.5, 40.0});
+    const auto [shot, section] = opener(withEvent);
+    CHECK(section.peak);
+    CHECK(shot.subject == "bloom");
+    CHECK(shot.subjectReason.find("setpiece/lift/beam") != std::string::npos);
+    CHECK(section.eventSubject == "bloom");
+
+    // No event: the film's hero, not whoever's turn it was.
+    const auto [heroShot, heroSection] = opener(planWith(1.0f));
+    CHECK(heroSection.peak);
+    CHECK(heroShot.subject == "elder");
+
+    // Control: the same chorus with an ordinary push is no peak, and the event does not take it.
+    app::SongPlan ordinary = planWith(0.4f);
+    ordinary.events = withEvent.events;
+    ordinary.sections[0].intent.energy = 0.45f;
+    ordinary.sections[2].intent.energy = 0.45f;
+    const auto [rotShot, rotSection] = opener(ordinary);
+    CHECK_FALSE(rotSection.peak);
+    CHECK(rotShot.subjectReason == "rotation");
+
+    // An event on somebody who is not a hero is said, not silently dropped.
+    app::SongPlan stranger = planWith(1.0f);
+    stranger.events.push_back(app::SongEvent{"abduction/beam", "visitor", 33.0, 0.0});
+    auto d = app::directSong(stranger, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(d.has_value());
+    bool said = false;
+    for (const std::string& w : d->warnings) {
+        said = said || w.find("'visitor'") != std::string::npos;
+    }
+    CHECK(said);
+}
+
+TEST_CASE("Density, the subject's motion and scale move shot length", "[song][director][duration]") {
+    const app::MusicalGrid grid = gridOf(120.0, 90.0);
+    const auto meanLength = [](const std::vector<double>& v) {
+        double sum = 0.0;
+        for (const double x : v) {
+            sum += x;
+        }
+        return v.empty() ? 0.0 : sum / static_cast<double>(v.size());
+    };
+
+    SECTION("a denser section cuts faster, when the director may read the music") {
+        const auto direct = [&](float onsets, app::Autonomy autonomy) {
+            app::SongPlan plan;
+            app::SongPlanSection s = sectionOf("groove", 0.0, 64.0, arcIntent("groove", song::Arc::Steady, 0.5f));
+            s.audio.frames = 100;
+            s.audio.energy = 0.5f;
+            s.audio.onsetRate = onsets;
+            plan.sections.push_back(s);
+            app::SongDirectorOptions o = gridded(grid);
+            o.autonomy = autonomy;
+            auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), o);
+            REQUIRE(d.has_value());
+            return lengthsIn(*d, 0).size();
+        };
+        CHECK(direct(9.0f, app::Autonomy::Expressive) > direct(1.0f, app::Autonomy::Expressive));
+        // Control: Guided does not read the music, so the two are cut alike.
+        CHECK(direct(9.0f, app::Autonomy::Guided) == direct(1.0f, app::Autonomy::Guided));
+    }
+
+    SECTION("a subject that moves on its own holds its shot longer") {
+        const auto direct = [&](float walkerMotion) {
+            app::DirectionBrief brief = threeHeroBrief();
+            brief.supporting[0].motion = walkerMotion; // spire walks
+            app::SongPlan plan;
+            app::ShotIntentProfile i = arcIntent("coverage", song::Arc::Steady, 0.55f, 0.5f);
+            i.movement = 0.3f;  // shots that hold their subject, so each is about exactly one
+            i.variation = 0.0f; // and no length variation: only motion can make a length differ
+            plan.sections.push_back(sectionOf("walk", 0.0, 80.0, i));
+            auto d = app::directSong(plan, brief, threeCameras(), gridded(grid));
+            REQUIRE(d.has_value());
+            std::vector<double> walker;
+            std::vector<double> still;
+            for (const app::SongDecision& s : d->decisions) {
+                (s.subject == "spire" ? walker : still).push_back(s.endSeconds - s.startSeconds);
+            }
+            return std::make_pair(meanLength(walker), meanLength(still));
+        };
+        const auto [walking, standing] = direct(1.0f);
+        INFO("walker " << walking << " s, still " << standing << " s");
+        CHECK(walking > standing * 1.1);
+        // Control: nobody moves, and nobody is held longer for it.
+        const auto [a, b] = direct(0.0f);
+        INFO("control " << a << " s against " << b << " s");
+        CHECK(a < b * 1.35);
+        CHECK(b < a * 1.35);
+    }
+
+    SECTION("a wide opener that establishes scale is held longer than the rest") {
+        // Cut fast enough that the rest aim at two bars, where the grid can say "longer": at a
+        // four-bar pace every length snaps to the same phrase line whatever it aimed at.
+        const auto openerShare = [&](float distance, float hero, bool onGrid) {
+            app::SongPlan plan;
+            app::ShotIntentProfile i = arcIntent("open", song::Arc::Steady, 1.0f, hero, distance, 2);
+            i.variation = 0.0f; // no length variation: only scale can make the opener differ
+            plan.sections.push_back(sectionOf("open", 0.0, 48.0, i));
+            auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), onGrid ? gridded(grid) : guided());
+            REQUIRE(d.has_value());
+            const auto lengths = lengthsIn(*d, 0);
+            REQUIRE(lengths.size() >= 3);
+            const std::vector<double> rest(lengths.begin() + 1, lengths.end());
+            return lengths.front() / meanLength(rest);
+        };
+        CHECK(openerShare(1.0f, 0.0f, true) > 1.25);   // the world, wide: establishes scale
+        CHECK(openerShare(1.0f, 0.0f, false) > 1.4);   // and without a grid, the rule's own 1.6
+        CHECK(openerShare(0.1f, 0.9f, true) < 1.15);   // control: a close hero shot does not
+        CHECK(openerShare(0.1f, 0.9f, false) < 1.05);
+    }
+}
+
+TEST_CASE("Scrambling every label changes nothing on a beat grid either", "[song][director][semantics][grid]") {
+    const app::MusicalGrid grid = gridOf(120.0, 200.0);
+    app::SongPlan plan = demoPlan();
+    plan.sections[2].intent.arc = song::Arc::Rising;
+    plan.sections[3].intent.arc = song::Arc::Burst;
+    plan.sections[3].intent.energy = 1.0f;
+    plan.sections[5].intent.arc = song::Arc::Suspended;
+    plan.events.push_back(app::SongEvent{"lift", "spire", 58.0, 0.0});
+    auto original = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(original.has_value());
+    app::SongPlan scrambled = plan;
+    int n = 0;
+    for (app::SongPlanSection& s : scrambled.sections) {
+        s.label = "zzz" + std::to_string(n);
+        s.intent.id = "qqq" + std::to_string(n++);
+    }
+    scrambled.events.front().name = "qqq-event";
+    auto after = app::directSong(scrambled, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(after.has_value());
+    CHECK(decided(*original) == decided(*after));
+    // ...and the same inputs twice are the same film, to the byte (ADR-091 is a bake).
+    auto again = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(again.has_value());
+    CHECK(again->decisions == original->decisions);
+    CHECK(again->report() == original->report());
+}
+
+TEST_CASE("The treatment's arc reaches the director through the song model's own arc",
+          "[song][plan][arc][adapter]") {
+    // `SongPlanSection::intentAt` is `SectionCue::intentAt`'s twin: the same `ShotIntent::atProgress`
+    // over the same dials. Checked against the cue at every arc and five points of every section.
+    for (const song::Arc arc : song::allArcs()) {
+        song::ShotIntent treatment;
+        treatment.id = "t";
+        treatment.arc = arc;
+        treatment.movement = 0.7f;
+        treatment.energy = 0.8f;
+        treatment.variation = 0.6f;
+        treatment.cutFrequency = 0.9f;
+        treatment.visualDensity = 0.35f;
+        song::SectionCue cue;
+        cue.startSeconds = 10.0;
+        cue.endSeconds = 30.0;
+        cue.displayName = "section";
+        cue.intent = treatment;
+        auto plan = app::songPlanFromCues(std::vector<song::SectionCue>{cue});
+        REQUIRE(plan.has_value());
+        const app::SongPlanSection& s = plan->sections.front();
+        // Carried, not dropped (ADR-920).
+        CHECK(s.intent.arc == arc);
+        CHECK(s.intent.energy == 0.8f);
+        CHECK(s.intent.visualDensity == 0.35f);
+        for (const double t : {10.0, 14.0, 20.0, 26.0, 30.0}) {
+            INFO(song::arcName(arc) << " at " << t);
+            const song::ShotIntent fromCue = cue.intentAt(t);
+            const app::ShotIntentProfile fromPlan = s.intentAt(t);
+            CHECK(fromPlan.cutRate == fromCue.cutFrequency);
+            CHECK(fromPlan.movement == fromCue.movement);
+            CHECK(fromPlan.variation == fromCue.variation);
+            CHECK(fromPlan.energy == fromCue.energy);
+        }
+    }
+}
+
+TEST_CASE("The new intent dials and the events round-trip, and a bad arc is refused",
+          "[song][plan][adr225]") {
+    app::SongPlan plan = demoPlan();
+    plan.sections[1].intent.arc = song::Arc::Rising;
+    plan.sections[1].intent.energy = 0.75f;
+    plan.sections[1].intent.visualDensity = 0.2f;
+    plan.events.push_back(app::SongEvent{"abduction/beam", "visitor", 170.3, 177.7});
+    plan.events.push_back(app::SongEvent{"crash", "", 177.71, 0.0});
+    auto back = app::songPlanFromJson(plan.toJson());
+    INFO((back ? std::string() : back.error().message));
+    REQUIRE(back.has_value());
+    CHECK(*back == plan);
+    // An event list in `director.watch_events`'s shape reads as it stands.
+    CHECK(plan.toJson()["events"][0]["end"].get<double>() == 177.7);
+    CHECK_FALSE(plan.toJson()["events"][1].contains("end"));
+
+    nlohmann::json doc = plan.toJson();
+    doc["sections"][0]["intent"]["arc"] = "wobbly";
+    CHECK_FALSE(app::songPlanFromJson(doc).has_value());
+    doc = plan.toJson();
+    doc["events"][0]["end"] = 1.0; // ends before it starts
+    CHECK_FALSE(app::songPlanFromJson(doc).has_value());
+    // A plan written before these keys existed reads as Steady, push 0.5, frame 0.5, no events.
+    doc = plan.toJson();
+    doc.erase("events");
+    for (auto& s : doc["sections"]) {
+        s["intent"].erase("arc");
+        s["intent"].erase("energy");
+        s["intent"].erase("visualDensity");
+    }
+    auto old = app::songPlanFromJson(doc);
+    REQUIRE(old.has_value());
+    CHECK(old->events.empty());
+    CHECK(old->sections[1].intent.arc == song::Arc::Steady);
+    CHECK(old->sections[1].intent.energy == 0.5f);
+}
+
+TEST_CASE("The cut report carries every shot's span, subject, arc and reason", "[song][director][report]") {
+    const app::MusicalGrid grid = gridOf(120.0, 200.0);
+    app::SongPlan plan = demoPlan();
+    plan.sections[2].intent.arc = song::Arc::Rising;
+    auto d = app::directSong(plan, threeHeroBrief(), threeCameras(), gridded(grid));
+    REQUIRE(d.has_value());
+    const nlohmann::json r = d->report();
+    CHECK(r["format"] == "avgen-song-cut");
+    CHECK(r["version"] == 1);
+    REQUIRE(r["grid"].is_object());
+    CHECK(r["grid"]["beats"].get<std::size_t>() == grid.beatTimes.size());
+    REQUIRE(r["shots"].size() == d->decisions.size());
+    REQUIRE(r["sections"].size() == plan.sections.size());
+    for (std::size_t i = 0; i < d->decisions.size(); ++i) {
+        const auto& s = r["shots"][i];
+        CHECK(s["start"].get<double>() == d->decisions[i].startSeconds);
+        CHECK(s["end"].get<double>() == d->decisions[i].endSeconds);
+        CHECK(s["subject"] == d->decisions[i].subject);
+        CHECK_FALSE(s["why"].get<std::string>().empty());
+        CHECK_FALSE(s["endsOn"].get<std::string>().empty());
+        CHECK(s.contains("arc"));
+        CHECK(s.contains("beats"));
+    }
+    CHECK(r["sections"][2]["arc"] == "rising");
+    CHECK(r["stats"]["shots"].get<std::size_t>() == d->decisions.size());
+    CHECK(r["stats"]["cutsOnBeat"].get<std::size_t>() == r["stats"]["cuts"].get<std::size_t>());
+    // Without a grid the report says so rather than inventing bars.
+    auto free = app::directSong(plan, threeHeroBrief(), threeCameras(), guided());
+    REQUIRE(free.has_value());
+    CHECK(free->report()["grid"].is_null());
+    CHECK(free->report()["shots"][0]["endsOn"] == "free");
+}
+
+TEST_CASE("installSequence drops no baked track", "[song][director][install][adr922]") {
+    // Every track the bake emits names a parameter this build registers, so every one is installed.
+    // `camera/focus/emphasis` did not: it was baked on every direction and left out of every install
+    // with a log line -- the control this test would have failed on before ADR-922.
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    installThreeCameras(engine);
+    app::AutoDirectorSettings settings;
+    settings.mode = app::DirectorMode::Song;
+    settings.minShotSeconds = 4.0;
+    auto direction = app::directSongFromPlan(threeHeroes(), demoPlan(), engine.composition()->cameraDirection(),
+                                             settings);
+    REQUIRE(direction.has_value());
+    // The directions spotlight their heroes, which is what the emphasis track used to carry.
+    REQUIRE(std::any_of(direction->sequence.shots.begin(), direction->sequence.shots.end(),
+                        [](const app::Shot& s) { return s.spotlight.active; }));
+    const nlohmann::json baked = direction->sequence.toTimelineTracks();
+    for (const auto& track : baked) {
+        const std::string target = track["target"].get<std::string>();
+        INFO(target);
+        CHECK(engine.params().find(target) != nullptr);
+    }
+    REQUIRE(app::installSongDirection(engine, *direction, settings).has_value());
+    std::set<std::string> installed;
+    for (const params::Track& t : engine.timeline().tracks()) {
+        installed.insert(t.target);
+    }
+    for (const auto& track : baked) {
+        CHECK(installed.count(track["target"].get<std::string>()) == 1);
+    }
+    CHECK(installed.size() == baked.size());
+}
+
+// ================================================================================================
+// ADR-922/923 through the engine
+// ================================================================================================
+
+TEST_CASE("A watched play's events and the saved plan's reach Song Mode's plan", "[song][director][events]") {
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    installThreeCameras(engine);
+    engine.songPlan() = demoPlan();
+    engine.songPlan().events.push_back(app::SongEvent{"authored", "spire", 60.0, 0.0});
+    // A directing plan that watched the film (ADR-767): a scenario's world event and an event
+    // camera's span, in the shape `director.watch_events` records them.
+    directing::Plan watched;
+    watched.id = "watched";
+    watched.observation = std::make_pair(
+        std::vector<directing::ObservedEvent>{{"abduction/beam", "bloom", 57.5, 0.0},
+                                              {"camera/UFO Watch", "abduction", 57.0, 70.0}},
+        120.0);
+    engine.directingPlans().push_back(watched);
+
+    auto plan = app::songPlanForEngine(engine);
+    REQUIRE(plan.has_value());
+    REQUIRE(plan->events.size() == 3);
+    CHECK(plan->events[0].name == "camera/UFO Watch"); // in time order
+    CHECK(plan->events[1].subject == "bloom");
+    CHECK(plan->events[2].name == "authored");
+
+    // ...and through the director: the Chorus (57-83 s) is demoPlan's loudest, heaviest section, so
+    // its opener goes to the subject of the event it opens on, rather than to the rotation.
+    for (app::SongPlanSection& s : engine.songPlan().sections) {
+        s.intent.energy = 0.3f;
+    }
+    engine.songPlan().sections[3].intent.energy = 1.0f;
+    app::AutoDirectorSettings settings;
+    settings.mode = app::DirectorMode::Song;
+    settings.minShotSeconds = 4.0;
+    app::SongDirection cut;
+    REQUIRE(app::directEngine(engine, threeHeroes(), settings, nullptr, &cut).has_value());
+    REQUIRE(cut.sections.size() == engine.songPlan().sections.size());
+    CHECK(cut.sections[3].peak);
+    CHECK(cut.decisions[cut.sections[3].firstShot].subject == "bloom");
+}
+
+TEST_CASE("A plan handed to the director for a run is the plan it cuts", "[song][director][install][adr923]") {
+    // The film outranks a saved plan (a project's sections are what is being edited) -- which used to
+    // mean `--song-plan` on a project with sections was stored and never cut.
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    installThreeCameras(engine);
+    seq::Sequence piece = engine.sequence();
+    song::Section a;
+    a.type = "verse";
+    a.startSeconds = 0.0;
+    a.endSeconds = 50.0;
+    song::Section b;
+    b.type = "chorus";
+    b.startSeconds = 50.0;
+    b.endSeconds = 100.0;
+    piece.sectionTimeline.sections = {a, b};
+    piece.sectionTimeline.durationSeconds = 100.0;
+    piece.sectionTimeline.renumber();
+    REQUIRE(engine.setSequence(piece).has_value());
+
+    app::AutoDirectorSettings settings;
+    settings.mode = app::DirectorMode::Song;
+    settings.minShotSeconds = 4.0;
+    app::SongDirection fromFilm;
+    REQUIRE(app::directEngine(engine, threeHeroes(), settings, nullptr, &fromFilm).has_value());
+    CHECK(fromFilm.sections.size() == 2); // the film's two sections
+
+    const app::SongPlan handed = demoPlan();
+    app::SongDirection fromPlan;
+    REQUIRE(app::directEngine(engine, threeHeroes(), settings, &handed, &fromPlan).has_value());
+    CHECK(fromPlan.sections.size() == handed.sections.size());
+    CHECK(fromPlan.decisions.back().endSeconds == handed.sections.back().endSeconds);
+}
+
+TEST_CASE("How much a hero moves is read off the scene", "[song][director][motion]") {
+    app::Engine engine(app::EngineMode::Offline);
+    engine.newComposition();
+    const auto node = [&](const char* name) {
+        scene::CompositionNode n;
+        n.name = name;
+        n.kind = scene::NodeKind::Group;
+        REQUIRE(engine.addNode(std::move(n)).has_value());
+    };
+    node("walker");
+    node("hoverer");
+    node("statue");
+    const auto body = [](const char* name, const char* behaviour) {
+        entity::EntityDesc d;
+        d.name = name;
+        entity::BehaviorDesc b;
+        b.kind = behaviour;
+        d.behaviors.push_back(b);
+        return d;
+    };
+    REQUIRE(engine.composition()->setEntities({body("walker", "wander"), body("hoverer", "hover")}).has_value());
+    const auto hero = [](const char* name) {
+        world::HeroPoint h;
+        h.name = name;
+        h.radius = 1.0f;
+        h.height = 2.0f;
+        return h;
+    };
+    CHECK(app::heroMotion(engine, hero("walker")) == 1.0f);
+    CHECK(app::heroMotion(engine, hero("hoverer")) == 0.5f);
+    CHECK(app::heroMotion(engine, hero("statue")) == 0.0f);
+
+    // ...and the director hears it: the inputs carry every hero's motion.
+    std::vector<world::HeroPoint> heroes = {hero("statue"), hero("walker")};
+    heroes[0].importance = 0.9f;
+    heroes[1].importance = 0.5f;
+    REQUIRE(engine.composition()->setHeroes(heroes).has_value());
+    const app::SongInputs inputs = app::songInputsForEngine(engine);
+    REQUIRE(inputs.motion.size() == 2);
+    CHECK(inputs.motion[1].first == "walker");
+    CHECK(inputs.motion[1].second == 1.0f);
+    CHECK(inputs.grid.empty()); // no track, no grid
+}
+
+TEST_CASE("The engine's grid is its meter over the tracked beats", "[song][director][grid][meter]") {
+    // Beat 2 of the tracker is bar 1 (a two-beat pickup), 8-bar phrases.
+    std::vector<double> beats;
+    for (int i = 0; i < 64; ++i) {
+        beats.push_back(0.4 + 0.5 * i);
+    }
+    analysis::Meter meter;
+    meter.downbeat = 2;
+    meter.phraseBars = 8;
+    const app::MusicalGrid grid = app::musicalGridFrom(beats, meter);
+    CHECK(grid.beatSeconds() == 0.5);
+    CHECK(grid.barNumber(2) == 1);
+    CHECK(grid.beatInBar(2) == 1);
+    CHECK(grid.barNumber(1) == 0);    // the pickup is bar 0
+    CHECK(grid.beatInBar(1) == 4);
+    CHECK(grid.strength(2) == 4);     // bar 1 is a phrase line
+    CHECK(grid.strength(2 + 16) == 3); // bar 5: half an 8-bar phrase
+    CHECK(grid.strength(2 + 4) == 2);
+    CHECK(grid.strength(2 + 2) == 1);
+    CHECK(grid.strength(3) == 0);
+    REQUIRE(grid.nearestDownbeat(3.0, 1.0).has_value());
+    CHECK(*grid.nearestDownbeat(3.0, 1.0) == 6); // 3.4 s, bar 2
 }
