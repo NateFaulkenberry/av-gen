@@ -182,6 +182,10 @@ std::string usageText() {
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
+           "  --audit-routes <f>  with --project: write every route, timeline track, effect default\n"
+           "                      route and effect with a verdict (live / dead / hazard) and the\n"
+           "                      reason to <f> as JSON (\"-\" = stdout), and exit. Headless, no GPU;\n"
+           "                      --fps overrides the frame rate the event rules sample at (ADR-902)\n"
            "  --generate <file>   compose a world from a recipe (see examples/recipes/) at start-up\n"
            "  --direct            cut the camera to the loaded track: folds the audio into\n"
            "                      musical sections and shoots the world's heroes\n"
@@ -494,6 +498,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--project");
             if (!v) return std::unexpected(v.error());
             options.project = *v;
+            ++i;
+        } else if (arg == "--audit-routes") {
+            auto v = need(i, "--audit-routes");
+            if (!v) return std::unexpected(v.error());
+            options.auditRoutes = *v;
             ++i;
         } else if (arg == "--direct") {
             options.directCamera = true;
