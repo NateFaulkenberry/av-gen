@@ -57,6 +57,18 @@ You are one of several engineering agents working in parallel on AV Gen: C++23, 
    - If you find a defect outside your scope, write it down in your report; don't fix it.
    - Do not edit GV3's own files (`tools/gv3/`, `tools/make_glowmere_valley_3.py`, `examples/world/glowmere-valley-3.*`, `docs/glowmere-valley-3/`). The coordinator applies features to GV3 in the revision phase.
 
+## UI reach (the owner's standing rule)
+Anything your work makes visible in the picture must be findable and adjustable in the app's UI,
+under a name that describes what the viewer sees. A control that exists but that nobody can connect
+to what they are looking at counts as a defect.
+- **Parameters show up automatically.** Every exposed parameter appears in the Parameters panel and the World panel's Inspector, grouped by its path (ADR-387, `ui::parameterSubGroup`). So:
+  - choose paths whose middle segments name the visual thing (for example `.../water/tears/...` reads as "tears");
+  - set an explicit `label` where the leaf is cryptic;
+  - keep `flags.exposed` on.
+- **Anything that is not a parameter** (a template, a plan item, an effect) needs a named home in an existing panel. Say where it is edited.
+- **Never run the windowed app or `--capture-ui` to check this.** The windowed app rewrites the owner's preferences. Verify from the grouping code, or with a CPU test on the registry.
+- **In your report,** list each new control and where an artist finds it (panel → group → sub-group).
+
 ## Before you finish
 - Run your targeted tests.
 - Run the full CPU suite (`<wt>/build/release/tests/avgen_tests`, or `ctest --test-dir <wt>/build/release -j 4`) and record exact counts.
@@ -65,6 +77,7 @@ You are one of several engineering agents working in parallel on AV Gen: C++23, 
 
 ## Final report (your last message)
 - What you built, with the main files.
+- Where each new visible control lives in the UI (see "UI reach").
 - Each ADR (number and title).
 - Tests added, with their controls.
 - Suite results with exact counts, and the exit codes.
