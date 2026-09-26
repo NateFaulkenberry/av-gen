@@ -9,9 +9,10 @@ replayed signal bus), ADR-267 (the scrub already matches the play)
 **Implemented by:** `scene::followReference`, `SubjectTrail`, `softFloor` and `headingOf`
 (`src/scene/follow_reference.{hpp,cpp}`); `Composition::evaluateAuthoredCamera`,
 `appendCameraHistoryNeeds`, `subjectHead` (`src/scene/composition.cpp`); `CameraRig`'s new fields and
-their JSON (`src/scene/camera_rig.{hpp,cpp}`); `Engine::refreshHistorySubscriptions`
+their JSON, and the Cameras panel's rows for them, `scene::followControls` (`src/scene/camera_rig.{hpp,cpp}`);
+`ControlPanel::drawFollowControls` (`src/ui/control_panel.cpp`); `Engine::refreshHistorySubscriptions`
 (`src/app/engine.cpp`); the Director compiler's `followRig` (`src/directing/compiler.cpp`)
-**Tests:** `tests/unit/test_follow_camera.cpp` (`[adr911]`), below
+**Tests:** `tests/unit/test_follow_camera.cpp` (`[adr911]`; the panel's rows are also `[ui]`), below
 **Measured with:** `avgen_cast_trace --camera` and `tools/camera_stability.py` (ADR-913)
 
 ## Context
@@ -102,6 +103,36 @@ panel ever set it.
 **The Director compiler's chase and follow rigs use the knobs:** `followSmoothSeconds` 0.3,
 `followVerticalSmoothSeconds` 0.8, `followLead` 1, `followGround` on, `followHeadingSmoothSeconds`
 1.2, and no lag (was 0.25 s on the eye alone).
+
+**Every knob is adjustable in the Cameras panel, under the name of what it does to the picture**
+(the owner's rule that anything visible must be findable and adjustable). The knobs are rig settings,
+not parameters, so the Parameters panel cannot show them, and before this nothing in the app did --
+nor the lag, clearance or `followLocal` that predate it. `scene::followControls()`, beside the fields
+in `camera_rig.hpp`, is a UI-free table of them (label, units, range, which cameras a row acts on,
+getter and setter); `ControlPanel::drawFollowControls` draws it in the selected camera's section of
+the **Cameras** panel, under its lens slider, headed "following its subject" with the node it follows
+named beneath:
+
+| Cameras panel row | key | range | acts on |
+|---|---|---|---|
+| follow smoothing (s) | `followSmoothSeconds` | 0-3 s | a camera with a subject (`followNode` or `aimNode`) |
+| height smoothing (s) | `followVerticalSmoothSeconds` | 0-3 s | a camera with a subject |
+| keep up with the subject (0-1) | `followLead` | 0-1 | follow smoothing above 0 |
+| follow the ground | `followGround` | on / off | either smoothing above 0; terrain in the scene |
+| follow lag (s) | `followLagSeconds` | 0-3 s | a camera whose eye follows (`followNode`) |
+| stay behind as it turns | `followLocal` | on / off | a camera whose eye follows |
+| turn smoothing (s) | `followHeadingSmoothSeconds` | 0-3 s | "stay behind as it turns" on |
+| ground clearance (m) | `followClearance` | 0-10 m | a camera whose eye follows; terrain in the scene |
+
+A row that would do nothing on the selected camera is drawn greyed, with the reason in its tooltip,
+rather than hidden or left live; the main camera, placed by the legacy `camera/*` block, has none.
+An edit is one undo step (a drag, press to release) installed through `Engine::setCameraDirection`,
+which re-subscribes HIST, so smoothing turned on for a camera that read no history records its
+subject from that frame on. The ranges keep every reachable setting inside HIST -- a 3 s lag and four
+3 s constants read 15 s of its 16 -- so the panel cannot make a rig `validate` refuses. `followLocal`
+is a row because turn smoothing does nothing without it. Which node a camera follows is not a row
+(it is the scene's), and the two offsets were already parameters (`cameras/<slug>/followOffset`,
+`.../aimOffset`, in the Parameters panel).
 
 ## Consequences
 

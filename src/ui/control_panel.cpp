@@ -4031,7 +4031,9 @@ void ControlPanel::drawOutputsTab(app::Engine& /*engine*/) {
 // Deeper editing is not duplicated here on purpose. A camera's channels are ordinary parameters, so
 // keyframing one is the Sequence panel's job and tuning one is the Parameters panel's; a second set
 // of controls for the same values would be a second source of truth, which section 28 of the brief
-// forbids in as many words.
+// forbids in as many words. How a follow camera moves (ADR-911: its smoothing, lag, ground and
+// clearance) is the exception, because it is rig settings that no other panel shows: those rows are
+// drawn here, under the lens, by `drawFollowControls`, and this is their only home.
 //
 // **Unverified visually.** This agent cannot see ImGui; what is checked is the model underneath
 // (tests/integration/test_camera_multicam.cpp), not the drawing.
@@ -4196,16 +4198,17 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                 float mm = rig.focalLength;
                 const bool lensMoved = ImGui::SliderFloat("lens (0 = use fov)", &mm, 0.0f, 200.0f, "%.0f mm");
                 if (ImGui::IsItemActivated()) {
-                    lensDrag_.begin(engine);
+                    rigSliderDrag_.begin(engine);
                 }
                 if (lensMoved) {
                     rig.focalLength = mm;
                     changed = true;
                 }
-                if (ImGui::IsItemDeactivated() && lensDrag_.open()) {
+                if (ImGui::IsItemDeactivated() && rigSliderDrag_.open()) {
                     // Pushed after this frame's install below has landed, by the block at the end.
                     editLabel = "Change lens of " + rig.name;
                 }
+                drawFollowControls(rig, comp->terrainQuery().valid(), engine, changed, editLabel);
             }
             if (ImGui::Checkbox("available to the Auto-director", &rig.autoDirectorEligible)) {
                 changed = true;
@@ -4333,11 +4336,12 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         }
     }
 
-    // A lens drag in progress installs every frame but records nothing until release: its capture
-    // opened on press. Anything else is measured around its own install, here.
-    const bool dragging = lensDrag_.open() && editLabel.empty();
+    // A slider drag in progress -- the lens or a follow setting -- installs every frame but records
+    // nothing until release: its capture opened on press. Anything else is measured around its own
+    // install, here.
+    const bool dragging = rigSliderDrag_.open() && editLabel.empty();
     app::EditCapture single;
-    app::EditCapture& capture = lensDrag_.open() ? lensDrag_ : single;
+    app::EditCapture& capture = rigSliderDrag_.open() ? rigSliderDrag_ : single;
     if (changed && !capture.open()) {
         capture.begin(engine);
     }
@@ -4361,6 +4365,83 @@ void ControlPanel::drawCameras(app::Engine& engine) {
     }
     if (!cameraProblem_.empty()) {
         ImGui::TextUnformatted(cameraProblem_.c_str());
+    }
+}
+
+// How a follow camera moves, under the names of what it does to the picture (ADR-911: UI reach).
+//
+// The rows are `scene::followControls()`, the UI-free table beside the rig's fields, so what this
+// draws and what tests/unit/test_follow_camera.cpp walks are one list. They are rig settings, not
+// parameters -- nothing else in the app edits them -- so this is their one home. An edit rides the
+// section's single install at the end of `drawCameras` (`Engine::setCameraDirection`, one undo step,
+// a drag measured press to release), and that install re-subscribes HIST: smoothing turned on for a
+// camera that read no history records its subject from that frame on.
+//
+// A row that would do nothing on this camera is drawn greyed, with the reason in its tooltip, rather
+// than hidden or left live: a slider that silently does nothing is the defect this exists to stop,
+// and a row that vanishes cannot be found.
+void ControlPanel::drawFollowControls(scene::CameraRig& rig, bool haveTerrain, app::Engine& engine, bool& changed,
+                                      std::string& editLabel) {
+    if (!scene::followsSomething(rig)) {
+        ImGui::TextDisabled("Follows nothing, so it has no follow settings. A camera that follows or\n"
+                            "watches a subject (followNode / aimNode in the scene) has them here.");
+        return;
+    }
+    std::string subject;
+    if (!rig.followNode.empty()) {
+        subject = "follows '" + rig.followNode + "'";
+        if (rig.aimNode == rig.followNode) {
+            subject += " and looks at it";
+        } else if (!rig.aimNode.empty()) {
+            subject += ", looking at '" + rig.aimNode + "'";
+        }
+    } else {
+        subject = "stands still and watches '" + rig.aimNode + "'";
+    }
+    ImGui::SeparatorText("following its subject");
+    ImGui::TextDisabled("%s", subject.c_str());
+    for (const scene::FollowControl& control : scene::followControls()) {
+        const std::string label(control.label);
+        const std::string name(control.name());
+        const bool noTerrain = control.needsTerrain && !haveTerrain;
+        const bool applies = control.appliesTo(rig) && !noTerrain;
+        ImGui::BeginDisabled(!applies);
+        if (control.isToggle()) {
+            bool on = control.get(rig) >= 0.5f;
+            if (ImGui::Checkbox(label.c_str(), &on)) {
+                control.apply(rig, on ? 1.0f : 0.0f);
+                changed = true;
+                editLabel = (on ? "Turn on '" : "Turn off '") + name + "' for " + rig.name;
+            }
+        } else {
+            float value = control.get(rig);
+            const char* format = control.kind == scene::FollowControlKind::Seconds  ? "%.2f s"
+                                 : control.kind == scene::FollowControlKind::Metres ? "%.1f m"
+                                                                                   : "%.2f";
+            const bool moved = ImGui::SliderFloat(label.c_str(), &value, control.minimum, control.maximum, format,
+                                                  ImGuiSliderFlags_AlwaysClamp);
+            if (ImGui::IsItemActivated()) {
+                rigSliderDrag_.begin(engine);
+            }
+            if (moved) {
+                control.apply(rig, value);
+                changed = true;
+            }
+            if (ImGui::IsItemDeactivated() && rigSliderDrag_.open()) {
+                editLabel = "Change " + name + " of " + rig.name;
+            }
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            const std::string_view why =
+                noTerrain ? std::string_view("This scene has no terrain for it to read.") : control.whenNot;
+            std::string tip(control.tip);
+            if (!applies && !why.empty()) {
+                tip += "\n\n";
+                tip += why;
+            }
+            tooltipUnformatted(tip.c_str());
+        }
     }
 }
 

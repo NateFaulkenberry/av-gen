@@ -13,7 +13,10 @@
 //     does (ADR-267's 0.000022 m), and a 30 fps play draws the same camera as a 60 fps one;
 //   * a cut to another camera changes `Scene::camera.cutSerial` and holds the skinned rigs, while a
 //     blend, a new shot on the same camera and a steady frame do not; a keyed jump in the timeline
-//     is found by the engine.
+//     is found by the engine;
+//   * the Cameras panel's follow rows (`scene::followControls`) cover every knob, write the field they
+//     name, never reach a value the collection refuses, and each moves the camera when installed the
+//     way the panel installs it.
 //
 // Every case has a control arm that fails without the thing it tests.
 
@@ -39,9 +42,13 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <numbers>
+#include <set>
+#include <span>
 #include <string>
+#include <string_view>
 #include <unistd.h>
 #include <vector>
 
@@ -960,6 +967,283 @@ TEST_CASE("the engine records the follow camera's subject in HIST and finds a ke
         CHECK_THAT(cuts[0], WithinAbs(2.0, 1e-9));
         // And the picture did jump there, which is what the serial is a statement about.
         CHECK_THAT(engine.composition()->scene().camera.position.x, WithinAbs(-41.0f, 1e-3f));
+    }
+    fs::remove_all(dir);
+}
+
+// ---- the Cameras panel's follow rows (ADR-911: UI reach) --------------------------------------------
+//
+// The knobs above are rig settings, not parameters, so nothing showed them to a person: the Parameters
+// panel lists parameters only. The Cameras panel draws `scene::followControls()` under the selected
+// camera's lens, and these two cases hold the table to what the panel promises: a row for every knob,
+// each row writing the field it names, no reachable value the collection refuses, rows greyed exactly
+// where they would do nothing -- and each row, installed the way the panel installs it, moving the
+// camera.
+
+namespace {
+
+std::set<std::string> serialisedFollowKeys(const scene::CameraRig& rig) {
+    scene::CameraDirection d;
+    d.ensureMainCamera();
+    d.addCamera(rig);
+    std::set<std::string> keys;
+    for (const auto& [key, value] : d.toJson()["cameras"][1].items()) {
+        // The subject and its offset are not knobs: the offset is a parameter, in the Parameters panel.
+        if (key.starts_with("follow") && key != "followNode" && key != "followOffset") {
+            keys.insert(key);
+        }
+    }
+    return keys;
+}
+
+const scene::FollowControl& followRow(std::string_view key) {
+    for (const scene::FollowControl& c : scene::followControls()) {
+        if (c.key == key) {
+            return c;
+        }
+    }
+    FAIL("no follow row for " << key);
+    return scene::followControls().front();
+}
+
+std::set<std::string> rowsThatApply(const scene::CameraRig& rig) {
+    std::set<std::string> out;
+    for (const scene::FollowControl& c : scene::followControls()) {
+        if (c.appliesTo(rig)) {
+            out.insert(std::string(c.key));
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("the Cameras panel's follow rows cover every knob and write the key each names within what HIST holds",
+          "[camera][follow][ui][adr911]") {
+    const std::span<const scene::FollowControl> rows = scene::followControls();
+
+    // Every follow knob a rig serialises has exactly one row.
+    scene::CameraRig full;
+    full.name = "Full";
+    full.followNode = "subject";
+    full.aimNode = "subject";
+    full.followLocal = true;
+    full.followLagSeconds = 0.2;
+    full.followClearance = 1.0f;
+    full.followSmoothSeconds = 0.3;
+    full.followVerticalSmoothSeconds = 0.8;
+    full.followLead = 1.0f;
+    full.followGround = true;
+    full.followHeadingSmoothSeconds = 1.2;
+    const std::set<std::string> knobs = serialisedFollowKeys(full);
+    CHECK(knobs.size() == 8); // control: the fixture does set every knob there is
+    std::set<std::string> covered;
+    for (const scene::FollowControl& c : rows) {
+        INFO(c.label);
+        CHECK(covered.insert(std::string(c.key)).second);
+        CHECK_FALSE(c.label.empty());
+        CHECK_FALSE(c.tip.empty());
+        CHECK(c.minimum < c.maximum);
+        // A person's words, not the field's: never the key, never camelCase.
+        CHECK(c.label != c.key);
+        CHECK(std::none_of(c.label.begin(), c.label.end(), [](char ch) { return ch >= 'A' && ch <= 'Z'; }));
+        REQUIRE(c.appliesTo != nullptr);
+        REQUIRE(c.get != nullptr);
+        REQUIRE(c.set != nullptr);
+    }
+    CHECK(covered == knobs);
+
+    // Each row writes the field its key names and no other: set on a plain follow rig, that key is the
+    // only follow key the rig then serialises. A row wired to the wrong field fails here.
+    for (const scene::FollowControl& c : rows) {
+        INFO(c.label);
+        scene::CameraRig rig;
+        rig.name = "Plain";
+        rig.followNode = "subject";
+        rig.aimNode = "subject";
+        CHECK(serialisedFollowKeys(rig).empty()); // control: nothing is written before the row sets it
+        const float value = c.isToggle() ? 1.0f : 0.5f * (c.minimum + c.maximum);
+        c.apply(rig, value);
+        CHECK(c.get(rig) == value);
+        CHECK(serialisedFollowKeys(rig) == std::set<std::string>{std::string(c.key)});
+        // `apply` keeps to the range; a toggle is on from one half.
+        c.apply(rig, c.maximum + 100.0f);
+        CHECK(c.get(rig) == c.maximum);
+        c.apply(rig, c.minimum - 100.0f);
+        CHECK(c.get(rig) == c.minimum);
+        c.apply(rig, std::numeric_limits<float>::quiet_NaN());
+        CHECK(c.get(rig) == c.minimum);
+    }
+    // A slider's float is kept to the millisecond, so a saved scene says 0.3 and not 0.30000001192092896.
+    scene::CameraRig tidy;
+    tidy.followNode = "subject";
+    followRow("followSmoothSeconds").apply(tidy, 0.3f);
+    CHECK(tidy.followSmoothSeconds == 0.3);
+    CHECK(static_cast<double>(0.3f) != 0.3); // control: what an unrounded write would have kept
+
+    // No value a row can reach is refused: every row at its maximum, the heading counted, reads 15 s of
+    // HIST's 16. Control: a second more lag than the slider reaches is refused, so the ranges are the
+    // bound that matters rather than an arbitrary smallness.
+    scene::CameraRig most = full;
+    for (const scene::FollowControl& c : rows) {
+        c.apply(most, c.maximum);
+    }
+    const auto accepted = [](const scene::CameraRig& rig) {
+        scene::CameraDirection d;
+        d.ensureMainCamera();
+        d.addCamera(rig);
+        return d.validate().has_value();
+    };
+    CHECK(most.subjectHistorySeconds() <= static_cast<double>(world::HistoryBank::kMaxSeconds));
+    CHECK(accepted(most));
+    most.followLagSeconds += 1.0;
+    CHECK_FALSE(accepted(most));
+
+    // Where each row means anything -- the rows the panel greys, with the reason in the tooltip.
+    CHECK(rowsThatApply(full) == covered);
+    scene::CameraRig mainRig = full;
+    mainRig.id = scene::kMainCamera; // placed by the legacy camera block: no follow row acts on it
+    CHECK(rowsThatApply(mainRig).empty());
+    CHECK_FALSE(scene::followsSomething(mainRig));
+    scene::CameraRig plain;
+    plain.followNode = "subject";
+    plain.aimNode = "subject";
+    CHECK(rowsThatApply(plain) == std::set<std::string>{"followSmoothSeconds", "followVerticalSmoothSeconds",
+                                                        "followLagSeconds", "followLocal", "followClearance"});
+    scene::CameraRig watcher; // a fixed eye watching something move: the smoothing, none of the eye's own
+    watcher.aimNode = "subject";
+    watcher.followSmoothSeconds = 0.3;
+    CHECK(rowsThatApply(watcher) == std::set<std::string>{"followSmoothSeconds", "followVerticalSmoothSeconds",
+                                                          "followLead", "followGround"});
+    scene::CameraRig nothing;
+    CHECK(rowsThatApply(nothing).empty());
+    for (const scene::FollowControl& c : rows) {
+        INFO(c.label);
+        // A row that can be greyed on a camera with a subject says why.
+        if (!c.appliesTo(plain) || !c.appliesTo(watcher)) {
+            CHECK_FALSE(c.whenNot.empty());
+        }
+    }
+    CHECK(followRow("followGround").needsTerrain);
+    CHECK(followRow("followClearance").needsTerrain);
+    CHECK_FALSE(followRow("followSmoothSeconds").needsTerrain);
+}
+
+TEST_CASE("each follow row moves the camera when installed the way the Cameras panel installs it",
+          "[camera][follow][ui][integration][adr911]") {
+    const fs::path dir = fixtureDir();
+    // A plain follow rig, as a scene file writes one: no knob set, so nothing records its subject yet.
+    writeFile(dir / "panel.json", scriptedScene({{"followNode", "subject"},
+                                                 {"followOffset", {0, 2, 6}},
+                                                 {"aimNode", "subject"},
+                                                 {"aimOffset", {0, 1, 0}}},
+                                                true));
+    // The panel's edit: the rig in a working copy of the collection, a row's `apply`, then one
+    // `Engine::setCameraDirection` -- which is also what subscribes the subject to HIST. `viaEngine`
+    // false hands the same collection to the composition alone, for the control arm below.
+    const auto install = [](app::Engine& engine, const std::function<void(scene::CameraRig&)>& edit, bool viaEngine) {
+        scene::CameraDirection direction = engine.composition()->cameraDirection();
+        scene::CameraRig* rig = direction.find(2);
+        REQUIRE(rig != nullptr);
+        edit(*rig);
+        if (viaEngine) {
+            REQUIRE(engine.setCameraDirection(std::move(direction)).has_value());
+        } else {
+            REQUIRE(engine.composition()->setCameraDirection(std::move(direction)).has_value());
+        }
+    };
+    // A rig every row acts on, set through the rows themselves.
+    const auto prepared = [](scene::CameraRig& rig) {
+        followRow("followSmoothSeconds").apply(rig, 0.3f);
+        followRow("followVerticalSmoothSeconds").apply(rig, 0.8f);
+        followRow("followLocal").apply(rig, 1.0f);
+    };
+    struct Frame {
+        glm::vec3 eye;
+        glm::vec3 aim;
+    };
+    // Six seconds of a body walking across the terrain at 3 m/s with the stride bob, turning a quarter
+    // at 1.5 s: something for every row to act on.
+    const auto film = [&](const std::function<void(scene::CameraRig&)>& edit, bool* subscribed = nullptr,
+                          bool viaEngine = true) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadFile(dir / "panel.json").has_value());
+        install(engine, edit, viaEngine);
+        if (subscribed != nullptr) {
+            *subscribed = engine.historyBank().find("subject") < engine.historyBank().ringCount();
+        }
+        const world::TerrainQuery ground = engine.composition()->terrainQuery();
+        REQUIRE(ground.valid());
+        params::IParameter* position = engine.params().find("nodes/subject/position");
+        params::IParameter* rotation = engine.params().find("nodes/subject/rotation");
+        REQUIRE(position != nullptr);
+        REQUIRE(rotation != nullptr);
+        FixedStepClock clock(60.0);
+        std::vector<Frame> frames;
+        for (int f = 0; f <= 360; ++f) {
+            const FrameTime time = engine.tick(clock);
+            const double t = time.renderTime;
+            const glm::vec2 xz(-40.0f + (3.0f * static_cast<float>(t)), 10.0f);
+            position->setBaseComponent(0, xz.x);
+            position->setBaseComponent(1, ground.heightAt(xz) + 1.0f + bob(t));
+            position->setBaseComponent(2, xz.y);
+            rotation->setBaseComponent(1, t < 1.5 ? 0.0f : 90.0f);
+            engine.update(time);
+            const scene::Camera& camera = engine.composition()->scene().camera;
+            frames.push_back(Frame{camera.position, camera.target});
+        }
+        return frames;
+    };
+    const auto apart = [](const std::vector<Frame>& a, const std::vector<Frame>& b) {
+        REQUIRE(a.size() == b.size());
+        double worst = 0.0;
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            worst = std::max({worst, static_cast<double>(glm::length(a[i].eye - b[i].eye)),
+                              static_cast<double>(glm::length(a[i].aim - b[i].aim))});
+        }
+        return worst;
+    };
+
+    bool plainSubscribed = true;
+    const std::vector<Frame> plain = film([](scene::CameraRig&) {}, &plainSubscribed);
+    bool preparedSubscribed = false;
+    const std::vector<Frame> base = film(prepared, &preparedSubscribed);
+    CHECK_FALSE(plainSubscribed); // control: a plain rig reads no history, so nothing records its subject
+    CHECK(preparedSubscribed);    // the panel's install subscribed it
+    CHECK(apart(plain, base) > 0.1);
+    // The film is deterministic, so every difference below is the row's.
+    CHECK(apart(base, film(prepared)) == 0.0);
+    // Control: the same edit handed to the composition alone, without the engine's re-subscription,
+    // leaves the subject unrecorded, so the rig warns once and follows the raw node -- only its
+    // "stay behind as it turns" survives, which needs no history. The silent no-op the panel's path
+    // (`Engine::setCameraDirection`) is there to prevent, and what makes the path load-bearing.
+    bool bypassSubscribed = true;
+    const std::vector<Frame> bypass = film(prepared, &bypassSubscribed, false);
+    const std::vector<Frame> turnsOnly = film([](scene::CameraRig& rig) { followRow("followLocal").apply(rig, 1.0f); });
+    CHECK_FALSE(bypassSubscribed);
+    CHECK(apart(bypass, turnsOnly) < 1e-3);
+    CHECK(apart(bypass, base) > 0.1);
+
+    scene::CameraRig reference;
+    reference.followNode = "subject";
+    reference.aimNode = "subject";
+    prepared(reference);
+    for (const scene::FollowControl& c : scene::followControls()) {
+        REQUIRE(c.appliesTo(reference));
+        // Well away from the prepared rig's value: a toggle flipped, a set knob back to its minimum, an
+        // unset one to the middle of its range.
+        const float current = c.get(reference);
+        const float value = c.isToggle()          ? 1.0f - current
+                            : current > c.minimum ? c.minimum
+                                                  : 0.5f * (c.minimum + c.maximum);
+        const double moved = apart(base, film([&](scene::CameraRig& rig) {
+                                       prepared(rig);
+                                       c.apply(rig, value);
+                                   }));
+        INFO("'" << c.label << "' from " << current << " to " << value << " moves the camera up to " << moved << " m");
+        // Ten centimetres at least: on this walk the least of them, "follow the ground", moves it 0.23 m
+        // and the rest 0.45 to 12 m, so a setter wired to a fraction of its field still fails.
+        CHECK(moved > 0.1);
     }
     fs::remove_all(dir);
 }

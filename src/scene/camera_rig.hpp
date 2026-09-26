@@ -276,6 +276,62 @@ struct CameraRig {
     friend bool operator==(const CameraRig&, const CameraRig&) = default;
 };
 
+// ---- the follow controls: a follow camera's motion, as a person adjusts it (ADR-911) -------------
+//
+// Every knob above that shapes how a follow camera moves, as a row a panel draws and a test walks --
+// `ui::EffectRow`'s reasoning (ADR-382): a list that is plain data can be checked, and a run of
+// `ImGui::SliderFloat` calls cannot. A row names what the viewer sees change rather than the field
+// ("height smoothing", not `followVerticalSmoothSeconds`), with its units and range, which cameras it
+// means anything on, and a getter and setter on the field itself.
+//
+// Here, beside the fields, so a knob added above without a row is a screen away from the list that
+// must name it; tests/unit/test_follow_camera.cpp fails when a follow key the rig serialises has no
+// row, or when a row's setter does not move the camera. The Cameras panel draws the rows in the
+// selected camera's section under its lens (`ControlPanel::drawFollowControls`) and installs an edit
+// through `Engine::setCameraDirection`. `followNode`, `aimNode` and the two offsets are not rows: the
+// offsets are parameters (`cameras/<slug>/followOffset`, `.../aimOffset`, in the Parameters panel),
+// and which node a camera follows is the scene's.
+//
+// The ranges are ones HIST can always serve: a 3 s lag plus four 3 s constants reads 15 s of the
+// subject's past, inside HIST's 16 (`CameraRig::subjectHistorySeconds`), so no value a row can reach is
+// refused by `CameraDirection::validate`. `apply` clamps to them.
+enum class FollowControlKind : std::uint8_t {
+    Seconds,  // a time constant or a delay
+    Fraction, // 0 to 1
+    Metres,
+    Toggle, // read and written as 1 (on) or 0 (off)
+};
+
+struct FollowControl {
+    std::string_view label; // what the panel shows, with its units: "follow smoothing (s)"
+    std::string_view key;   // the rig's JSON key, which is also its field's name
+    std::string_view tip;   // what it does to the picture, for the tooltip
+    FollowControlKind kind = FollowControlKind::Seconds;
+    float minimum = 0.0f;
+    float maximum = 1.0f;
+    // Reads the ground, so a scene with no terrain gives it nothing to act on (the panel greys it).
+    bool needsTerrain = false;
+    // Whether the row means anything on this camera, from what the evaluation actually reads -- a
+    // camera with no subject, or a lead with no smoothing to lead. `whenNot` says why not, on the
+    // greyed row: a control that silently does nothing is the defect this table exists to prevent.
+    bool (*appliesTo)(const CameraRig&) = nullptr;
+    std::string_view whenNot;
+    float (*get)(const CameraRig&) = nullptr;
+    void (*set)(CameraRig&, float) = nullptr; // raw; `apply` is what a caller uses
+
+    // Writes `value` to the rig: clamped to the range, or for a toggle, on from 0.5.
+    void apply(CameraRig& rig, float value) const;
+    [[nodiscard]] bool isToggle() const { return kind == FollowControlKind::Toggle; }
+    // The label without its units, for an undo entry: "follow smoothing".
+    [[nodiscard]] std::string_view name() const;
+};
+
+// The rows, in the order the panel draws them: the subject reference's smoothing, then the eye's own.
+[[nodiscard]] std::span<const FollowControl> followControls();
+// Whether a camera has a subject for the rows to act on: a node it follows or watches. Never the main
+// camera, whose placement is the legacy `camera/*` block (see `CameraRig`).
+[[nodiscard]] bool followsSomething(const CameraRig& rig);
+
 // ---- a shot ----------------------------------------------------------------------------------
 
 // A span of time that names a camera. The whole of "authored camera direction".
