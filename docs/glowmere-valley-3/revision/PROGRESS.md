@@ -23,7 +23,7 @@ Revise the music video Glowmere Valley 3 (GV3) to the owner's brief. The phases 
 | 0 | Quality-evaluator gate: the Creative Critic must work in the loop before any scene edit | **passed** 2026-09-26 ([02-gate.md](02-gate.md)) |
 | 1 | Capability audit (Director, characters, cameras, modulation, mushrooms/wind, render/post, water) | **done** ([01-audit-and-plan.md](01-audit-and-plan.md), [audit/reports/](audit/reports/)) |
 | 2a | Engine wave 1: six streams in parallel worktrees | **in progress** |
-| 2b | Engine wave 2: Director capabilities, render/post | not started |
+| 2b | Engine wave 2: Director capabilities, render/post | **in progress**: setpieces and render launched 2026-09-26; song and reactivity wait for wave-1 merges |
 | 3 | GV3 scene revision with the Director's planners and the evaluator in the loop | blocked on 2 |
 | 4 | Final 4K render; revision report; the Director's self-critique | not started |
 
@@ -74,6 +74,8 @@ State when this file was saved (all were running as background agents of the ses
 | characters | a5ac25e540728df3c |
 | camera | affb91850489e817e |
 | water | aa297869a066886dd |
+| setpieces (wave 2) | a0862ba1386aa8345 |
+| render (wave 2) | a98789a22624b1131 |
 
 All seven had been stopped once by an account usage limit and resumed with SendMessage.
 
@@ -90,7 +92,10 @@ All seven had been stopped once by an account usage limit and resumed with SendM
    - merge in the owner's main checkout, only after checking `git status` is clean and the branch is `main`: `git -C ~/Documents/GitHub/av-gen merge --no-ff agent/<t> -F <msgfile>` (`-F -` does not work with merge);
    - later streams: merge or rebase main into them before merging;
    - after each merge, merge main into `gv3/production`.
-3. **Launch wave 2** (the Director, and render/post) from updated main, in new worktrees, with briefs from [briefs.md](briefs.md) § Wave 2 and the audit reports.
+3. **Wave 2** ([briefs.md](briefs.md) § Wave 2):
+   - **setpieces** (928–931) and **render** (917–919) were launched 2026-09-26 from main `0b623b88`, in `~/Documents/GitHub/av-gen-setpieces` and `av-gen-render` (branches `agent/setpieces`, `agent/render`).
+   - **song** (920–923) launches after signals merges; **reactivity** (924–927) after signals, routes and emission merge. Create their worktrees from the main of that moment.
+   - The launch prompt is the rules file plus the brief's section, plus: the other streams in flight, the ADR numbers, the Critic daemon on 8765 being the coordinator's (never restart it), and the final-report requirement.
 4. **Phase 3, the GV3 revision** (only after the gate and the Director merge). Work from `tools/make_glowmere_valley_3.py` + `tools/gv3/*`, iterating with the Critic on single-shot clips. It must cover everything in the brief:
    - audio reactivity at micro, meso and macro levels: hero effects on the heroes' `-under`/`-gills` nodes, the small mushrooms' per-layer lanes, travelling waves, wind, the macro arc;
    - water tears;
