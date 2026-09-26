@@ -49,6 +49,12 @@ struct WaterUniforms {
     life: vec4<f32>,           // x = glowScale, y = glowCoverage, z = glowDepth (m), w = swell (m)
     params: vec4<f32>,         // x = flow time (s), y = world's fastest body (m/s), z = 1 when the
                                //   linear-depth texture is real, w = 0
+    // ---- tears (ADR-916) begin ----
+    tears: vec4<f32>,          // x = amount (ripple amplitude a seam adds), y = shear (m), z = coverage,
+                               //   w = lattice cell (m)
+    tearShape: vec4<f32>,      // x = spacing (m), y = stretch, z = drift (m/s), w = wind coupling
+    tearFrame: vec4<f32>,      // xy = seam direction in XZ, z = 1 when it follows the scene wind, w = 0
+    // ---- tears (ADR-916) end ----
 };
 
 @group(2) @binding(0) var<uniform> water: WaterUniforms;
@@ -203,6 +209,134 @@ fn flowPhases(t: f32, period: f32, desync: f32, salt: u32) -> FlowPhases {
 fn flowDesync(p: vec2<f32>) -> f32 {
     return noiseD(p * (1.0 / 80.0) + vec2<f32>(-71.3, 23.9)).x + 1.0;
 }
+// ---- tears (ADR-916) begin ----
+// Deliberate tears: thin, stepped seams across the water in which the ripples are compressed into
+// dense parallel stripes. The owner's reference is the accident ADR-914 removed -- ripples sheared by
+// an unbounded offset wherever the baked flow jumped between two vertices of the water mesh -- so this
+// is that accident's mechanism with every quantity that made it an accident replaced by one somebody
+// chose:
+//
+//   * where: a rigid lattice of `tearCell` metres aligned with the seam direction (the scene wind, or
+//     an authored angle), drifting along it at `tearDrift`. Each lattice corner is on one side or the
+//     other of the zero line of a smooth field whose seams are `tearSpacing` apart and `tearStretch`
+//     times longer than wide; `S` interpolates the corners' sides over the lattice triangles with the
+//     water mesh's own split, so where the side changes `S` ramps 0 -> 1 across one triangle. That is
+//     the stepped band, one or two cells wide, running along the lattice axes and the anti-diagonal.
+//   * how much: across a band the ripple layers' sample point moves back while the pixel moves
+//     forward, so `tearShear` metres of ripple fold into the band: a compression of `tearShear /
+//     tearCell`, `tearShear * rippleScale` stripes, all of them parallel to the band, as in the
+//     reference. Bounded, and never a function of the timeline second. (A shift *along* the seam was
+//     tried first: that is a shear, not a compression, and it tilts the ripples into a twisted rope at
+//     `atan(cell / shear)` to the band instead of packing them.)
+//   * how far it reaches: nowhere past the band. The shift goes out and comes back inside the band (a
+//     tent in `S`: out across the first half, back across the second), so the band holds its ripple
+//     twice, mirrored about its middle, and outside every band the shift is exactly zero. A shear that
+//     changes -- a gust, a route, a seam fading in -- moves the ripples inside a band and nowhere else.
+//     (A step in `S`, relaxed back to zero over the surrounding metres, was tried first. Value noise
+//     sits near zero, so the relaxation reached most of the surface and restretched ripples everywhere,
+//     which is the "whole surface busy" the brief rules out.)
+//   * which seams show: `tearCoverage`, a threshold on a second slow field, so a lower coverage removes
+//     seams rather than fading all of them.
+//   * the wind: with `tearWind` above 0 the local wind's strength and gust envelope (`windSampleAt`, on
+//     the same clock) scale the shear, so a gust front crossing the water tightens the seams it
+//     crosses in step with the grass on the bank. A scene with no wind leaves them as authored.
+//   * the slope: the band's own `tears` of ripple amplitude on top of the surface's. The analytic
+//     gradient does not carry the shear's Jacobian, so compressed stripes keep the slope they had --
+//     which on a calm surface (GV3's 0.05) is too faint to read. This is what makes a seam visible
+//     without making the rest of the surface any busier.
+//   * the pixels: the band's width and the compressed layers are both counted in reference pixels
+//     (ADR-915). A layer compressed below three of them fades, as an uncompressed one does, and a band
+//     narrower than about two fades out whole rather than breaking into a crawl of dots.
+//
+// A surface whose `tears` is 0 is not drawn by this code at all. Everything between these markers is
+// compiled out of a second pipeline (`WaterRenderer`), and a material with no tears is drawn with that
+// one: exactly the shader ADR-914 and ADR-915 left, so its pixels are the same bytes. (Gating the code
+// on `tears > 0` inside one shader was tried and was not enough: with the tear written in `fs_water`
+// and read in `rippleGradient`, the compiler built the shared ripple path differently and ~130 glint
+// channels of the QA scene moved, by up to 0.125.) test_water_tears_gpu.cpp holds the renderer to it.
+var<private> waterTearShift: vec2<f32>;
+var<private> waterTearBlur: f32;
+
+struct WaterTear {
+    shift: vec2<f32>, // metres the ripple layers' sample point moves
+    blur: f32,        // metres per reference pixel the shear adds to the layers' footprint
+    band: f32,        // ripple amplitude the seam adds here
+};
+
+// The seam field at a lattice point: negative on one side of a seam, positive on the other.
+fn tearField(lattice: vec2<f32>, toNoise: vec2<f32>) -> f32 {
+    return noiseD(lattice * toNoise + vec2<f32>(113.7, -57.1)).x;
+}
+
+fn tearAt(p: vec2<f32>, t: f32, dPdx: vec2<f32>, dPdy: vec2<f32>, refScale: f32) -> WaterTear {
+    var out: WaterTear;
+    // The seams' frame. The wind's is its steady direction, uniform across the frame; turbulence turns
+    // the grass, not the lattice, or the seams would bend wherever the air does.
+    var along = water.tearFrame.xy;
+    if (water.tearFrame.z > 0.5) {
+        along = frame.windDir.xy;
+    }
+    along = along * inverseSqrt(max(dot(along, along), 1e-8));
+    let across = vec2<f32>(-along.y, along.x);
+    let cell = water.tears.w;
+    let spacing = water.tearShape.x;
+    // Lattice coordinates, in cells, drifting rigidly along the seams.
+    let lattice = vec2<f32>(dot(p, along) - water.tearShape.z * t, dot(p, across)) / cell;
+    let toNoise = vec2<f32>(cell / (spacing * water.tearShape.y), cell / spacing);
+    let base = floor(lattice);
+    let f = lattice - base;
+    let a = step(0.0, tearField(base, toNoise));
+    let b = step(0.0, tearField(base + vec2<f32>(1.0, 0.0), toNoise));
+    let c = step(0.0, tearField(base + vec2<f32>(0.0, 1.0), toNoise));
+    let d = step(0.0, tearField(base + vec2<f32>(1.0, 1.0), toNoise));
+    // The water mesh's split ({a, c, b} and {b, c, d}: the anti-diagonal), so a seam steps the way
+    // the accident did.
+    var s: f32;
+    var slope: vec2<f32>; // dS per cell, along and across
+    if (f.x + f.y < 1.0) {
+        s = a + (b - a) * f.x + (c - a) * f.y;
+        slope = vec2<f32>(b - a, c - a);
+    } else {
+        s = d + (d - c) * (f.x - 1.0) + (d - b) * (f.y - 1.0);
+        slope = vec2<f32>(d - c, d - b);
+    }
+    // How much S changes from one pixel to the next: its world gradient against the pixel's own
+    // footprint, which is what the band's width in pixels and the compressed layers' fade are made of.
+    let gradient = (along * slope.x + across * slope.y) / cell;
+    let perPixel = abs(dot(gradient, dPdx)) + abs(dot(gradient, dPdy));
+    // Which seams show: a threshold on a slow field, mapped so `tearCoverage` is roughly the share of
+    // the seam network that does (value noise is not uniform; the quintic puts its median at 0.5 and its
+    // deciles at 0.19 and 0.81). Exactly none at 0 and all of it at 1.
+    let x = water.tears.z - 0.5;
+    let threshold = 0.5 - 0.6 * x - 9.6 * x * x * x * x * x;
+    let m = noiseD(lattice * vec2<f32>(cell / spacing, cell / (spacing * 2.5)) + vec2<f32>(-41.9, 88.3)).x *
+                0.5 + 0.5;
+    let live = smoothstep(threshold - 0.1, threshold + 0.1, m);
+    // The wind: 1 = the seams as authored; a fresh breeze (strength 1) with no gust leaves them there.
+    var energy = 1.0;
+    if (frame.windDir.w > 0.5 && water.tearShape.w > 0.0) {
+        let w = windSampleAt(vec3<f32>(p.x, 0.0, p.y), t);
+        energy = mix(1.0, clamp(w.strength * (1.0 + w.gust), 0.0, 2.0), water.tearShape.w);
+    }
+    // The shear comes in with the first quarter of the amount, so a route that lifts `tears` off 0 --
+    // which is where a surface changes pipeline -- grows the seams instead of snapping the ripples
+    // beside them sideways by the whole shear in one frame.
+    let emerge = min(water.tears.x * 4.0, 1.0);
+    // How far the sample point moves at the middle of a band: half the shear plus half the cell, so each
+    // half of the band packs half the shear into half the cell and the band holds the whole shear. The
+    // wind scales the shear; a seam that is hidden or still coming in moves nothing.
+    let travel = 0.5 * (water.tears.y * energy + cell) * live * emerge;
+    out.shift = across * (travel * (1.0 - abs(2.0 * s - 1.0)));
+    out.blur = 2.0 * travel * perPixel * refScale;
+    // The band: flat across the middle of the ramp, soft at its two edges so the added slope does not
+    // start on a hard pixel line, and gone when the band is under a couple of reference pixels wide.
+    let plateau = smoothstep(0.0, 0.3, s) * smoothstep(0.0, 0.3, 1.0 - s);
+    let bandPixels = 1.0 / max(perPixel * refScale, 1e-6);
+    out.band = water.tears.x * plateau * live * smoothstep(1.0, 3.0, bandPixels);
+    return out;
+}
+
+// ---- tears (ADR-916) end ----
 
 // The layered surface (§11). Three travelling layers, each finer, weaker and faster than the one
 // below it, each carried *along* the local flow and pushed a different amount *across* it. The
@@ -255,6 +389,10 @@ fn rippleGradient(p: vec2<f32>, flowDir: vec2<f32>, speed: f32, t: f32, footprin
     // second.
     var at = p;
     var blur = footprint;
+    // ---- tears (ADR-916) begin ----
+    at = at - waterTearShift;
+    blur = blur + waterTearBlur;
+    // ---- tears (ADR-916) end ----
     var g = vec2<f32>(0.0);
 
     // Each layer's *height* falls as roughly the square of its frequency, which is what keeps the
@@ -359,6 +497,14 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // below that travels, each at its own offset into it.
     let desync = flowDesync(in.worldPos.xz);
     var rippleAmplitude = water.ripples.x;
+    // ---- tears (ADR-916) begin ----
+    if (water.tears.x > 0.0) {
+        let tear = tearAt(in.worldPos.xz, t, dPdx, dPdy, refScale);
+        waterTearShift = tear.shift;
+        waterTearBlur = tear.blur;
+        rippleAmplitude = rippleAmplitude + tear.band;
+    }
+    // ---- tears (ADR-916) end ----
     let gradient = rippleGradient(in.worldPos.xz, dir, speed, t, lodFootprint, desync) * rippleAmplitude;
     var n = normalize(vec3<f32>(-gradient.x, 1.0, -gradient.y));
     if (underwater) {

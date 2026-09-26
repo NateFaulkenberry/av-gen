@@ -500,6 +500,11 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterShallowColorParam = nullptr;
     params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
+    // ADR-916: the three tear settings a route may move. The lattice's cell, spacing, stretch and
+    // direction and its drift are deliberately not parameters (WaterSettings says why).
+    params::Parameter<float>* waterTearsParam = nullptr;
+    params::Parameter<float>* waterTearShearParam = nullptr;
+    params::Parameter<float>* waterTearCoverageParam = nullptr;
 };
 
 // ADR-833 (Phase D §25): the node's authored `tags` plus what it demonstrably is (a generated

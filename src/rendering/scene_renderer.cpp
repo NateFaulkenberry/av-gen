@@ -4018,9 +4018,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // composite over the surface. Its own pipeline, so the branch it needs is not in the
         // shader every other entity in the world runs.
         if (!water.empty() && water_->ready()) {
-            rp.SetPipeline(water_->pipeline());
-            ++stats_.state.pipelineBinds;
+            // ADR-916: a material with tears and one without are drawn by two pipelines, so the bind
+            // follows the item -- once per frame for a scene whose waters agree.
+            const wgpu::RenderPipeline* bound = nullptr;
             for (const auto& item : water) {
+                const wgpu::RenderPipeline& pipeline = water_->pipeline(item.water);
+                if (&pipeline != bound) {
+                    rp.SetPipeline(pipeline);
+                    bound = &pipeline;
+                    ++stats_.state.pipelineBinds;
+                }
                 const GpuMesh& mesh = *item.geometry;
                 const std::uint32_t waterOffset = water_->offset(item.water);
                 rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);

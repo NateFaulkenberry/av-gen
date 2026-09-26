@@ -2,6 +2,8 @@
 
 #include "scene/struct_hash.hpp"
 
+#include <cmath>
+
 namespace avgen::scene {
 
 using detail::StructHash;
@@ -72,6 +74,36 @@ Result<void> WaterSettings::validate() const {
     }
     if (swell < 0.0f || swell > 100.0f) {
         return fail("water: swell must be in [0, 100] metres");
+    }
+    // ADR-916. Written as `!(inside)` so a NaN fails too.
+    if (!(tears >= 0.0f && tears <= 20.0f)) {
+        return fail("water: tears must be in [0, 20]");
+    }
+    if (!(tearShear >= 0.0f && tearShear <= 8.0f)) {
+        return fail("water: tearShear must be in [0, 8] metres");
+    }
+    if (!(tearCoverage >= 0.0f && tearCoverage <= 1.0f)) {
+        return fail("water: tearCoverage must be in [0, 1]");
+    }
+    if (!(tearCell >= 0.05f && tearCell <= 50.0f)) {
+        return fail("water: tearCell must be in [0.05, 50] metres");
+    }
+    // The seam field is sampled at the lattice's corners, so seams closer than two cells apart would be
+    // sampled below their own frequency and break up into noise.
+    if (!(tearSpacing >= 2.0f * tearCell && tearSpacing <= 2000.0f)) {
+        return fail("water: tearSpacing must be at least twice tearCell and at most 2000 metres");
+    }
+    if (!(tearStretch >= 0.25f && tearStretch <= 20.0f)) {
+        return fail("water: tearStretch must be in [0.25, 20]");
+    }
+    if (!(std::fabs(tearAngle) <= 100.0f)) {
+        return fail("water: tearDirection's angle must be a finite number of radians");
+    }
+    if (!(tearDrift >= -20.0f && tearDrift <= 20.0f)) {
+        return fail("water: tearDrift must be in [-20, 20] metres per second");
+    }
+    if (!(tearWind >= 0.0f && tearWind <= 1.0f)) {
+        return fail("water: tearWind must be in [0, 1]");
     }
     return {};
 }

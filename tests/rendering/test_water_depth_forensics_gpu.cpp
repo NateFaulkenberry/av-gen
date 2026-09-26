@@ -1158,6 +1158,16 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
             {"glowCoverage", [&](scene::WaterSettings& w) { w.glowCoverage = nan; }},
             {"glowDepth", [&](scene::WaterSettings& w) { w.glowDepth = nan; }},
             {"swell", [&](scene::WaterSettings& w) { w.swell = nan; }},
+            // ADR-916. A NaN shear or cell reaches every ripple through the shared sample point.
+            {"tears", [&](scene::WaterSettings& w) { w.tears = nan; }},
+            {"tearShear", [&](scene::WaterSettings& w) { w.tearShear = inf; }},
+            {"tearCoverage", [&](scene::WaterSettings& w) { w.tearCoverage = nan; }},
+            {"tearCell", [&](scene::WaterSettings& w) { w.tearCell = nan; }},
+            {"tearSpacing", [&](scene::WaterSettings& w) { w.tearSpacing = nan; }},
+            {"tearStretch", [&](scene::WaterSettings& w) { w.tearStretch = nan; }},
+            {"tearAngle", [&](scene::WaterSettings& w) { w.tearAngle = inf; }},
+            {"tearDrift", [&](scene::WaterSettings& w) { w.tearDrift = nan; }},
+            {"tearWind", [&](scene::WaterSettings& w) { w.tearWind = nan; }},
         };
         for (const Poison& poison : poisons) {
             scene::WaterSettings poisoned = healthy;
@@ -1167,6 +1177,15 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
             CHECK(finiteUniforms(u));
             CHECK(u.surface.w == 0.0f);
         }
+        // The list is hand-kept, so it is counted against the struct: one entry per scalar and per colour
+        // of WaterSettings (`shallow` is poisoned by the section above), and the struct's size says how
+        // many of each there are. A float added to WaterSettings without a poison here changes the size
+        // and fails this, which is how the nine tear fields were found to need one.
+        constexpr std::size_t kScalarFloats = 31; // 22 of the surface's, 9 of ADR-916's tears
+        constexpr std::size_t kColours = 7;
+        CHECK(poisons.size() + 1 == kScalarFloats + kColours);
+        // Two bools (`enabled`, `tearFollowsWind`), each padded out to a float's alignment.
+        CHECK(sizeof(scene::WaterSettings) == sizeof(float) * (kScalarFloats + 3 * kColours) + 2 * alignof(float));
     }
 
     SECTION("the two frame-supplied values are checked too") {
