@@ -7,7 +7,9 @@
 // every drawable it names and on nothing else -- the half of "reaches the output" a difference image
 // cannot localise.
 
+#include "app/engine.hpp"
 #include "assets/asset_registry.hpp"
+#include "audio/audio_file.hpp"
 #include "core/color.hpp"
 #include "core/time.hpp"
 #include "params/modulation.hpp"
@@ -17,9 +19,11 @@
 #include "scene/material_params.hpp"
 #include "scene/material_program.hpp"
 #include "scene/scatter_anchors.hpp"
+#include "seq/sequence.hpp"
 #include "signals/signal_bus.hpp"
 #include "spatial/field.hpp"
 #include "support/gltf_fixture.hpp"
+#include "support/synth.hpp"
 #include "support/temp_dir.hpp"
 #include "ui/ui_logic.hpp"
 #include "world/ecology.hpp"
@@ -716,6 +720,91 @@ TEST_CASE("A composition resolves its fields' triggers from the clock it is hand
     // Every 4th beat from beat 1: 0.5, 2.5, 4.5 ... the latest at or before 3.2 s is 2.5 s.
     CHECK_THAT(fields[0].triggerAge, WithinAbs(0.7, 1e-9));
     std::filesystem::remove(path);
+}
+
+TEST_CASE("The engine times a triggered field from its sequence's markers, in a play and after a seek",
+          "[emission][fields][trigger][engine]") {
+    // The wiring the cases above stand in for by hand: `Engine::update` binds its own TriggerClock
+    // to the frame's transport second and the sequence's markers, and hands it to the composition
+    // before the flatten. Without that binding every triggered field in a project is silent forever
+    // -- the silent no-op this engine keeps producing -- and nothing above would notice.
+    constexpr std::uint32_t kRate = 48000;
+    auto mono = testsupport::silence(static_cast<std::size_t>(kRate * 8));
+    auto file = audio::AudioFile::fromInterleaved(testsupport::interleave(mono, 2), 2, kRate);
+    const auto wav = testsupport::processTempDir() / "avgen_emission_engine_clock.wav";
+    REQUIRE(file.writeWav(wav).has_value());
+    const auto scenePath = writeJson("engine_clock", R"({
+      "format": "avgen-scene", "version": 1, "name": "engine-clock",
+      "nodes": [ { "name": "ripple", "kind": "field", "field": {
+          "name": "ripple", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
+          "wavelength": 2.0, "waveSpeed": 10.0, "waveWidth": 0.0,
+          "trigger": { "source": "marker", "name": "drop" } } } ]
+    })");
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadAudio(wav).has_value());
+    REQUIRE(engine.loadComposition(scenePath).has_value());
+    seq::Sequence piece;
+    piece.markers.push_back(seq::Marker{.timeSeconds = 2.0, .name = "drop"});
+    piece.markers.push_back(seq::Marker{.timeSeconds = 5.0, .name = "drop"});
+    piece.markers.push_back(seq::Marker{.timeSeconds = 3.0, .name = "verse"});
+    REQUIRE(engine.setSequence(piece).has_value());
+    REQUIRE(engine.composition() != nullptr);
+    const auto field = [&engine]() -> const spatial::FieldSpec& {
+        const auto& fields = engine.composition()->scene().fields.fields;
+        REQUIRE(fields.size() == 1);
+        return fields[0];
+    };
+    // The front's distance from the origin, from the field the renderer is handed.
+    const auto crestAt = [&](float radius) {
+        const spatial::FieldSpec& f = field();
+        return spatial::sampleScalar(f, glm::vec3(radius, 0.0f, 0.0f), 0.0, &engine.composition()->scene().fields);
+    };
+
+    FixedStepClock clock(50.0); // 20 ms steps land on whole and half seconds exactly
+    const auto runUntil = [&](double seconds) {
+        for (;;) {
+            const FrameTime time = engine.tick(clock);
+            engine.update(time);
+            if (time.renderTime >= seconds - 1e-9) {
+                return;
+            }
+        }
+    };
+    // Played: silent before the first drop, 0.5 s old half a second after it, restarted by the
+    // second drop and not by the verse marker between them.
+    runUntil(1.9);
+    CHECK(field().silent());
+    CHECK(crestAt(0.0f) == 0.0f);
+    runUntil(2.5);
+    CHECK_FALSE(field().silent());
+    CHECK_THAT(field().triggerAge, WithinAbs(0.5, 1e-6));
+    CHECK(crestAt(5.0f) > 0.99f); // 0.5 s at 10 m/s
+    runUntil(3.5);
+    CHECK_THAT(field().triggerAge, WithinAbs(1.5, 1e-6));
+    runUntil(5.5);
+    CHECK_THAT(field().triggerAge, WithinAbs(0.5, 1e-6));
+    const double playedAge = field().triggerAge;
+
+    // Sought: one frame evaluated at the second sought, with nothing played in between. Back before
+    // the first drop is silence again; 2.5 s is the first drop's clock; 5.5 s is exactly the played
+    // frame's clock.
+    const auto seekTo = [&](double seconds) {
+        engine.seekSeconds(seconds);
+        clock.restartAt(seconds);
+        const FrameTime time = engine.tick(clock);
+        REQUIRE(time.renderTime == seconds);
+        engine.update(time);
+    };
+    seekTo(1.0);
+    CHECK(field().silent());
+    seekTo(2.5);
+    CHECK_THAT(field().triggerAge, WithinAbs(0.5, 1e-6));
+    seekTo(5.5);
+    CHECK(field().triggerAge == playedAge);
+    CHECK(crestAt(5.0f) > 0.99f);
+    std::filesystem::remove(scenePath);
+    std::filesystem::remove(wav);
 }
 
 // ---- UI reach: each new control, where an artist finds it and what it is called there ----------------
