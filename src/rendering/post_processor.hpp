@@ -87,6 +87,14 @@ struct PostStats {
     std::uint32_t bloomLevels = 0;
     std::uint32_t halationLevels = 0;
     std::uint32_t anamorphicTaps = 0; // taps a side the streak spent; 0 when it did not run
+    // ADR-917: what the chain did with the frame's size. `pixelScale` is height / referenceHeight;
+    // the rest are the numbers it produced, in this frame's pixels, so a test can read that a
+    // setting reached the pass rather than infer it from the picture alone.
+    float pixelScale = 1.0f;
+    float anamorphicReach = 0.0f;       // the streak's reach in quarter-resolution texels (0 = off)
+    std::uint32_t motionBlurTile = 0;   // velocity tile edge in pixels (0 = motion blur did not run)
+    float motionBlurRadius = 0.0f;      // the smear's clamp in pixels
+    std::uint32_t lookOctaves = 0;      // extra octaves the look stage's low-pass was taken down
     float exposureScale = 1.0f;      // the linear scale applied before bloom
     float exposureEv100 = 0.0f;      // the EV in force (scene-referred; see scene/camera.hpp)
     float meteredLuminance = -1.0f;  // the previous frame's centre-weighted luminance (-1 = none)
@@ -199,11 +207,12 @@ private:
     void encodeMetering(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool,
                         const Uniforms& base);
     // Downsample/upsample pyramid over an already-prefiltered base; returns its finest level.
+    // `blends` is the upsample blend per step, finest first (`scene::planPyramid`, ADR-917).
     // `tier` names the pyramid for a diagnostic capture ("bloom" / "halation") and is unused
     // otherwise.
     wgpu::TextureView buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool, const Uniforms& base,
-                                   std::vector<gpu::TransientTexture>& down, float spread, float blend,
-                                   const char* tier);
+                                   std::vector<gpu::TransientTexture>& down, float spread,
+                                   const std::array<float, scene::kMaxPyramidLevels>& blends, const char* tier);
     // Records one intermediate when a capture is armed; a no-op otherwise.
     void captureStage(std::string name, const gpu::TransientTexture& texture);
     // The usage the pyramid and wide textures are allocated with: CopySrc only while capturing.
@@ -260,6 +269,10 @@ private:
     float measuredLuminance_ = 0.0f;
     scene::ExposureState exposureState_;
     PostStats stats_;
+    // ADR-917: the chain height and reference the scale was last reported for, so a resize is said
+    // once rather than every frame.
+    std::uint32_t loggedScaleHeight_ = 0;
+    float loggedScaleReference_ = 0.0f;
     wgpu::Texture output_;
     bool capturing_ = false;
     PostCapture capture_;

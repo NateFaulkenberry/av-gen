@@ -54,8 +54,15 @@ constexpr std::uint32_t kMeterReduceFactor = 4;  // then quarters again per pass
 constexpr std::uint32_t kAnamorphicTapBudget = 48;
 // Image/Look §68.3: the separable low-pass the late look stage is built on. 32 taps a side at
 // quarter resolution covers a full-resolution radius of about 128 px, which is the parameter's own
-// hard maximum, so the budget is a guard rather than a limit an author can reach.
+// hard maximum -- at the reference height. ADR-917 scales the radius with the frame, so at 4320
+// lines the budget CAN be reached; the stage then takes the low-pass down an octave instead of
+// truncating the gaussian, which is what it silently did before (a 3-sigma kernel cut at 0.9 sigma).
 constexpr std::uint32_t kLookBlurTapBudget = 32;
+// ADR-917: the largest velocity tile the scaled tile size may reach. 20 px at the reference is 80
+// at four times the height and 160 at eight; past that a tile-max texel reads more of the velocity
+// target than is worth doing serially, and no deliverable this engine renders is that far from the
+// height it was tuned at.
+constexpr std::uint32_t kMaxMotionBlurTile = 160;
 
 } // namespace
 
@@ -452,7 +459,8 @@ wgpu::TextureUsage PostProcessor::pyramidUsage() const {
 
 wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool,
                                               const Uniforms& base, std::vector<gpu::TransientTexture>& down,
-                                              float spread, float blend, const char* tier) {
+                                              float spread, const std::array<float, scene::kMaxPyramidLevels>& blends,
+                                              const char* tier) {
     if (down.empty()) {
         return {};
     }
@@ -463,7 +471,10 @@ wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu
         auto target = pool.acquire(fine.width, fine.height, kHdrFormat, pyramidUsage(), "bloom-up");
         Uniforms u = base;
         u.texelSize = 1.0f / glm::vec2(static_cast<float>(coarse.width), static_cast<float>(coarse.height));
-        u.params0 = glm::vec4(spread, blend, 0.0f, 0.0f);
+        // ADR-917: each step's own blend. At the reference height every step carries the authored
+        // one exactly; in a finer frame the steps finer than the reference's first level are 1 --
+        // a plain tent of what is below, adding nothing of their own level.
+        u.params0 = glm::vec4(spread, blends[static_cast<std::size_t>(level)], 0.0f, 0.0f);
         // No stage of its own: the pyramid is shared by bloom and halation, and the caller has
         // already said which one this is.
         runPass(encoder, upsample_, target.view, acc, fine.view, nullptr, u);
@@ -496,7 +507,20 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     base.gain = glm::vec4(s.gain, 1.0f);
 
     wgpu::TextureView current = in.sceneHdr;
-    const float pixelScale = static_cast<float>(in.height) / 720.0f;
+    // ADR-917: every pixel-sized value in the settings is a size at `referenceHeight`, and this is
+    // how far this frame is from it. The defocus radii, the motion-blur radius and the local
+    // contrast radius always scaled (by height / 720, the default reference); the two pyramids, the
+    // streak and the motion-blur tiles did not, which is what made a final look unlike its preview.
+    const float pixelScale = scene::postPixelScale(s, in.height);
+    const float octaves = std::log2(pixelScale);
+    stats_.pixelScale = pixelScale;
+    if (in.height != loggedScaleHeight_ || s.referenceHeight != loggedScaleReference_) {
+        loggedScaleHeight_ = in.height;
+        loggedScaleReference_ = s.referenceHeight;
+        // Debug, not info: the editor's canvas changes height on every splitter drag. A render says
+        // it once at info from the job, where the number is a property of the deliverable.
+        log::debug("{}", scene::describePostScale(s, in.height));
+    }
     const bool autoExposure = s.exposure.mode == scene::ExposureSettings::Mode::Automatic;
 
     // ---- 1. exposure (ADR-039: before everything, so bloom thresholds are in exposed units) ----
@@ -579,10 +603,18 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     const float shutterFraction = std::clamp(s.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
     const float blurScale = s.motionBlurAmount * shutterFraction;
     if (blurScale > 1e-4f && in.velocity != nullptr) {
-        const std::uint32_t tileSize = std::clamp<std::uint32_t>(s.motionBlurTileSize, 4, 40);
+        // ADR-917: the tile scales with the radius. The reconstruction gathers only from the 3x3
+        // tiles around a pixel, so the smear a tile can carry is bounded by the tile's edge; the
+        // radius already scaled with the frame and the tile did not, so at 4320 lines a 240 px smear
+        // was being gathered through 20 px tiles and cut short at the neighbourhood's edge.
+        const auto authoredTile = static_cast<float>(std::clamp<std::uint32_t>(s.motionBlurTileSize, 4, 40));
+        const std::uint32_t tileSize = std::clamp<std::uint32_t>(
+            static_cast<std::uint32_t>(std::lround(authoredTile * pixelScale)), 4, kMaxMotionBlurTile);
         const std::uint32_t tilesX = (in.width + tileSize - 1) / tileSize;
         const std::uint32_t tilesY = (in.height + tileSize - 1) / tileSize;
         const float maxRadius = std::max(1.0f, s.motionBlurMaxRadius * pixelScale);
+        stats_.motionBlurTile = tileSize;
+        stats_.motionBlurRadius = maxRadius;
         auto tiles = pool.acquire(tilesX, tilesY, kVelocityFormat);
         auto neighbours = pool.acquire(tilesX, tilesY, kVelocityFormat);
         Uniforms u = base;
@@ -632,10 +664,13 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     wgpu::TextureView bloom;
     std::vector<gpu::TransientTexture> down;
     if (pyramidOn) {
-        const std::uint32_t levels = std::clamp<std::uint32_t>(s.bloomLevels, 1, 8);
+        // ADR-917: the authored depth is the depth at the reference height. A finer frame builds
+        // the extra levels at the fine end and gives them no weight, so the coarsest level -- the
+        // glow's reach -- is the same fraction of the frame at every size (scene::planPyramid).
         std::uint32_t w = std::max(1u, in.width / 2);
         std::uint32_t h = std::max(1u, in.height / 2);
-        for (std::uint32_t level = 0; level < levels && w >= 2 && h >= 2; ++level) {
+        const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, octaves, w, h);
+        for (std::uint32_t level = 0; level < plan.levels; ++level) {
             auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "bloom-down");
             Uniforms u = base;
             if (level == 0) {
@@ -663,17 +698,18 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             h = std::max(1u, h / 2);
         }
         stats_.bloomLevels = static_cast<std::uint32_t>(down.size());
-        bloom = buildPyramid(encoder, pool, base, down, s.bloomRadius, blend, "bloom");
+        bloom = buildPyramid(encoder, pool, base, down, s.bloomRadius, plan.blend, "bloom");
     }
 
-    // Halation: its own, coarser pyramid over a warm-weighted threshold (ADR-039).
+    // Halation: its own, coarser pyramid over a warm-weighted threshold (ADR-039), planned the same
+    // way as bloom's so its halo holds its size too (ADR-917).
     wgpu::TextureView halation;
     if (halationOn) {
-        const std::uint32_t levels = std::clamp<std::uint32_t>(s.bloomLevels, 1, 8);
         std::vector<gpu::TransientTexture> hdown;
         std::uint32_t w = std::max(1u, in.width / 4);
         std::uint32_t h = std::max(1u, in.height / 4);
-        for (std::uint32_t level = 0; level < levels && w >= 2 && h >= 2; ++level) {
+        const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, octaves, w, h);
+        for (std::uint32_t level = 0; level < plan.levels; ++level) {
             auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "halation-down");
             Uniforms u = base;
             if (level == 0) {
@@ -693,7 +729,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             h = std::max(1u, h / 2);
         }
         stats_.halationLevels = static_cast<std::uint32_t>(hdown.size());
-        halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, blend, "halation");
+        halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, plan.blend, "halation");
     }
 
     // The wide tier: halation tinted and the anamorphic streak, in one texture the composite adds.
@@ -731,8 +767,16 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         //
         // Nothing about the streak's *shape* changes: the reach stays `8 * stretch` texels and the
         // gaussian's sigma stays `3.2 * stretch` texels, expressed below in the new tap units.
+        //
+        // ADR-917: texels AT THE REFERENCE HEIGHT. This target is a quarter of the frame, so its
+        // texel is a fixed fraction of the picture only if the reach follows the frame; unscaled, a
+        // 4320-line final drew the streak a quarter as long, across the picture, as its 1080-line
+        // preview. Scaled, the tap count and the source level below are chosen from the scaled
+        // reach exactly as before, so a long streak at 4K reads the same pyramid level -- the same
+        // fraction of the frame -- its preview did, and the comb rule is kept at every size.
         const float stretch = std::max(s.anamorphicStretch, 1e-3f);
-        const float reach = 8.0f * stretch; // in this target's texels, as before
+        const float reach = 8.0f * stretch * pixelScale; // in this target's texels
+        stats_.anamorphicReach = (anamorphicOn && bloom) ? reach : 0.0f;
         const auto taps = static_cast<std::uint32_t>(
             std::clamp(std::ceil(reach), 1.0f, static_cast<float>(kAnamorphicTapBudget)));
         const float spacing = reach / static_cast<float>(taps); // texels of this target
@@ -819,8 +863,8 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     //
     // §60: none of these four passes is encoded when every amount is zero.
     if (s.look.lookActive()) {
-        const std::uint32_t lw = std::max(1u, in.width / 4);
-        const std::uint32_t lh = std::max(1u, in.height / 4);
+        std::uint32_t lw = std::max(1u, in.width / 4);
+        std::uint32_t lh = std::max(1u, in.height / 4);
         stage_ = "post/look";
 
         // Quarter-resolution prefilter. Reusing `fs_downsample` rather than a plain bilinear tap:
@@ -831,11 +875,29 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             u.texelSize = 1.0f / base.outputSize;
             runPass(encoder, downsample_, small.view, current, nullptr, nullptr, u);
         }
-        // The author's radius is in pixels at 720p, as every other radius in `PostSettings` is; at
-        // quarter resolution that is a quarter of the pixels. The tap count covers +-3 sigma, which
-        // is where a gaussian has 99.7% of its weight, and is bounded so a large radius costs
-        // samples linearly rather than making the pass unbounded.
-        const float sigma = std::max(s.look.localContrastRadius * pixelScale * 0.25f, 0.5f);
+        // The author's radius is in pixels at the reference height, as every other radius in
+        // `PostSettings` is; at quarter resolution that is a quarter of the pixels. The tap count
+        // covers +-3 sigma, which is where a gaussian has 99.7% of its weight, and is bounded so a
+        // large radius costs samples linearly rather than making the pass unbounded.
+        float sigma = std::max(s.look.localContrastRadius * pixelScale * 0.25f, 0.5f);
+        // ADR-917: when +-3 sigma is more than the budget -- which a frame four times the reference
+        // height reaches with the default radius -- take the low-pass down an octave (the same
+        // 13-tap, a real prefilter) and halve sigma, rather than cutting the gaussian off. At the
+        // reference nothing here runs, so the stage is unchanged there.
+        while (sigma * 3.0f > static_cast<float>(kLookBlurTapBudget) && lw >= 16 && lh >= 16) {
+            const std::uint32_t nw = std::max(1u, lw / 2);
+            const std::uint32_t nh = std::max(1u, lh / 2);
+            auto next = pool.acquire(nw, nh, kHdrFormat);
+            Uniforms u = base;
+            u.texelSize = 1.0f / glm::vec2(static_cast<float>(lw), static_cast<float>(lh));
+            runPass(encoder, downsample_, next.view, small.view, nullptr, nullptr, u);
+            pool.release(small);
+            small = next;
+            lw = nw;
+            lh = nh;
+            sigma *= 0.5f;
+            ++stats_.lookOctaves;
+        }
         const auto taps = static_cast<float>(
             std::clamp<std::uint32_t>(static_cast<std::uint32_t>(std::ceil(3.0f * sigma)), 1, kLookBlurTapBudget));
         auto blurH = pool.acquire(lw, lh, kHdrFormat);

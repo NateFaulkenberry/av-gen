@@ -155,6 +155,9 @@ struct FrameUniforms {
     starsA: vec4<f32>,              // x = on, y = density, z = brightness, w = magnitude slope
     starsB: vec4<f32>,              // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
     starsC: vec4<f32>,              // x = band, y = band tilt, z = daylight hiding, w = seconds
+    // ADR-918: x = how much of the surface fog's colour is the sky's radiance along the ray
+    // (0 = the constant fogParams.rgb, and `fogSkyTex` is never read), yzw = 0. Mirrors FrameUniforms.
+    fogSky: vec4<f32>,
 };
 
 struct ObjectUniforms {
@@ -264,6 +267,11 @@ fn materialTierLocalLights(tier: u32) -> u32 {
 // `frame.terrainMap1.w` is 0 and nothing reads it. Read by the two frame-bound readers of the
 // height layer: the surface fog below and the volumetric march.
 @group(0) @binding(12) var terrainHeightTex: texture_2d<f32>;
+// ADR-918: the sky's radiance by direction, low-passed, for the surface fog's colour -- written each
+// frame the fog asks for it by fog_sky.wgsl, and a 1x1 placeholder in every other group. Read only
+// by `applyFog`, and only when `frame.fogSky.x` is above zero.
+@group(0) @binding(16) var fogSkyTex: texture_2d<f32>;
+@group(0) @binding(17) var fogSkySampler: sampler;
 
 // ADR-055's wind field, and ADR-360's reason for hoisting it here from procedural.wgsl: the mesh
 // vertex stage below now deforms too, and wind.wgsl needs `frame`, so it has to come after the
@@ -551,6 +559,21 @@ fn treeEnergyAt(worldPos: vec3<f32>) -> vec3<f32> {
 // the segment; under a height layer it is taken outside the layer's mean, which is exact for a
 // level ray and first-order otherwise. The march multiplies the same factor into every sample.
 // The branch keeps horizon 0 bit-identical to the law without it.
+// ADR-918: where direction `dir` lands in the fog's sky map (fog_sky.wgsl has the parameterisation).
+// Straight up or down has no azimuth; any column will do there, because the whole top row is the
+// zenith, and the guard keeps atan2 away from (0, 0).
+fn fogSkyUv(dir: vec3<f32>) -> vec2<f32> {
+    let d = normalize(dir);
+    let flat = length(d.xz) > 1e-6;
+    let u = select(0.5, 0.5 + atan2(d.z, d.x) * (1.0 / 6.28318530718), flat);
+    return vec2<f32>(u, sqrt(clamp(d.y, 0.0, 1.0)));
+}
+
+// The sky's low-passed radiance along `dir`, as the fog map holds it.
+fn fogSkyRadiance(dir: vec3<f32>) -> vec3<f32> {
+    return textureSampleLevel(fogSkyTex, fogSkySampler, fogSkyUv(dir), 0.0).rgb;
+}
+
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     let extinction = frame.fogParams.w;
     if (extinction <= 0.0) {
@@ -607,7 +630,15 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         depth = depth * (1.0 + horizon * (start + dist) * 0.0005);
     }
     let f = exp(-depth);
-    return mix(frame.fogParams.rgb, color, f);
+    // ADR-918: aerial perspective. The colour the air fades towards is the sky's own radiance in the
+    // ray's direction, as far as `fogSky` says -- so a far ridge dissolves into the sky behind it,
+    // aurora and all, instead of fading to one colour. At 0 the map is never read and this is the
+    // constant-colour fog every scene had before, to the bit.
+    var fogColour = frame.fogParams.rgb;
+    if (frame.fogSky.x > 0.0) {
+        fogColour = mix(fogColour, fogSkyRadiance(worldPos - frame.cameraPos.xyz), frame.fogSky.x);
+    }
+    return mix(fogColour, color, f);
 }
 
 // ---- auxiliary targets (ADR-035) ---------------------------------------------------------------

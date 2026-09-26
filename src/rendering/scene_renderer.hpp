@@ -187,6 +187,7 @@ struct RenderStats {
     std::uint32_t waves = 0; // ADR-207/702: surface-wave records in the frame block this frame
     std::uint32_t comets = 0;       // ADR-230: comets live in the frame block this frame
     std::uint32_t auroras = 0;      // ADR-230: auroras live in the frame block this frame
+    bool fogSkyMap = false;         // ADR-918: the fog's sky map was rebuilt and read this frame
 };
 
 constexpr std::uint32_t kMaxLights = 8; // the uniform fallback path (ADR-033); clustered has no such limit
@@ -339,6 +340,10 @@ struct FrameUniforms {
     glm::vec4 starsA{0.0f}; // x = on, y = density, z = brightness (envelope folded in), w = magnitude slope
     glm::vec4 starsB{0.0f}; // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
     glm::vec4 starsC{0.0f}; // x = band, y = band tilt, z = daylight hiding, w = seconds (wrapped)
+    // ADR-918: the surface fog's colour from the sky. x = `Environment::fogSky` (0 = the constant
+    // fog colour, and the shader does not touch the sky map), yzw = 0. Appended last, for the reason
+    // every block above was.
+    glm::vec4 fogSky{0.0f};
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 surface waves. The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -351,7 +356,8 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::
                                        16 + // ADR-568: one vec4 of height-fog shape
                                        32 + // ADR-715: two vec4s of terrain height placement
                                        16 + // ADR-717: one vec4 of fog pooling
-                                       48); // Wave 2: three vec4s of star field, appended last
+                                       48 + // Wave 2: three vec4s of star field
+                                       16); // ADR-918: one vec4 of fog-from-sky, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -448,6 +454,9 @@ struct IblResources {
     // the sky at its own resolution. Null for a procedural sky, which has no map behind it.
     wgpu::TextureView background;
     std::uint32_t prefilteredMips = 1;
+    // ADR-919: the faces the chain was built at -- what the tier's floor actually reached.
+    std::uint32_t sourceCubeSize = 0;
+    std::uint32_t prefilteredSize = 0;
     bool valid = false;
     bool fromSky = false; // ADR-036: synthesised from the procedural sky, not from an HDR map
 };
@@ -497,6 +506,13 @@ public:
     // The RGBA16F texture the tonemap pass sampled in the last render() (the HDR target or the
     // last post output; CopySrc usage), for asynchronous HDR readback. Null before the first frame.
     [[nodiscard]] const wgpu::Texture& hdrOutputTexture() const { return hdrOutput_; }
+    // ADR-918: the fog's view of the sky -- the sky's radiance by direction, low-passed, rebuilt
+    // on every frame whose fog takes its colour from the sky (`stats().fogSkyMap`). RGBA16F,
+    // `kFogSkyWidth` x `kFogSkyHeight`, u = azimuth as the sky's equirect has it, v = the square
+    // root of the elevation's sine over the upper hemisphere. For tests and diagnostics.
+    static constexpr std::uint32_t kFogSkyWidth = 128;
+    static constexpr std::uint32_t kFogSkyHeight = 32;
+    [[nodiscard]] const wgpu::Texture& fogSkyMapTexture() const { return fogSkyMap_.texture; }
 
     // Hot reload of the engine's own WGSL files: rebuilds every pipeline whose shader compiles,
     // keeps the previous pipeline for any that fails, and returns the first error.
@@ -832,6 +848,7 @@ private:
     Result<wgpu::RenderPipeline> createGridPipeline(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> createSkyboxPipeline(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> createAtmospherePipeline(const wgpu::ShaderModule& module);
+    Result<wgpu::RenderPipeline> createFogSkyPipeline(const wgpu::ShaderModule& module); // ADR-918
     Result<wgpu::RenderPipeline> tonemapPipelineFor(wgpu::TextureFormat format);
     Result<wgpu::RenderPipeline> finishPipeline(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     void uploadMeshes(const scene::Scene& scene);
@@ -947,6 +964,14 @@ private:
     // Whether anything is live this frame; written when the frame block is packed and read at the
     // draw site, so the toggle removes the uniform content and the fragment work together.
     bool drawAtmosphere_ = false;
+    // ADR-918: the surface fog's colour from the sky. `fogSkyMap_` is group 0 binding 16 in the
+    // passes that fog surfaces; `fogSkyPlaceholder_` stands in for it in the groups whose passes run
+    // before the map is written, and in the map's own pass, which may not sample what it renders.
+    wgpu::RenderPipeline fogSkyPipeline_;
+    gpu::GpuTexture fogSkyMap_;
+    gpu::GpuTexture fogSkyPlaceholder_;
+    wgpu::Sampler fogSkySampler_; // binding 17: linear, repeating in azimuth, clamped in elevation
+    bool drawFogSky_ = false;     // written when the frame block is packed, read before the scene pass
     wgpu::RenderPipeline depthOnlyPipeline_;   // entities and meshed SDFs, depth prepass and shadows
     wgpu::RenderPipeline linearDepthPipeline_; // Depth24Plus -> R32Float view-space distance
     // The auxiliary view is drawn *after* the tone map, straight onto the target, so one pipeline
