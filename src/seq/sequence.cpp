@@ -1313,17 +1313,15 @@ std::vector<AnimationCue> Sequence::animationAt(double seconds,
     return out;
 }
 
-TriggerContext Sequence::triggerContext(int beatsPerBar) const {
+TriggerContext Sequence::triggerContext(const analysis::Meter& meter) const {
     TriggerContext ctx;
     ctx.durationSeconds = duration();
     ctx.beatTimes = markerTimes(MarkerKind::Beat);
-    // A bar is every Nth beat. The analysis has its own bar counter, but a sequence carries beats
-    // and not bars, and folding here means the editor's ruler and an event agree about where bar 9
-    // is rather than each deriving it.
-    const std::size_t per = static_cast<std::size_t>(std::max(1, beatsPerBar));
-    for (std::size_t i = 0; i < ctx.beatTimes.size(); i += per) {
-        ctx.barTimes.push_back(ctx.beatTimes[i]);
-    }
+    // Bars through the meter (ADR-896): the analysis has its own bar counter, but a sequence carries
+    // beats and not bars, and folding here with the same meter means the editor's ruler, an event
+    // and the bus agree about where bar 9 is rather than each deriving it.
+    ctx.downbeat = meter.downbeat;
+    ctx.barTimes = meter.barTimes(ctx.beatTimes);
     for (const Marker& m : markers) {
         if (m.kind == MarkerKind::Section) {
             ctx.sections.push_back(TriggerContext::NamedSpan{m.name, m.timeSeconds, 0.0});
@@ -1747,7 +1745,7 @@ Result<BakeResult> Sequence::bake(LayerSink& sink, const BakeOptions& options) c
     // what it is ramping from. Resolution is pure and the fold over it is pure, so the baked tier
     // of the event system is exactly as scrub-safe as the rest of this function -- which is the
     // point, and the argument is in seq/events.hpp.
-    result.events = resolveEvents(events, triggerContext(options.beatsPerBar));
+    result.events = resolveEvents(events, triggerContext(options.meter));
     for (const std::string& w : result.events.warnings) {
         result.warnings.push_back(w);
     }

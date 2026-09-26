@@ -19,7 +19,8 @@ ShotIntent SectionCue::intentAt(double seconds) const {
     return intent.atProgress(progressAt(seconds));
 }
 
-std::vector<SectionCue> cueSheet(const SectionTimeline& timeline, const ShotLanguage& language) {
+std::vector<SectionCue> cueSheet(const SectionTimeline& timeline, const ShotLanguage& language,
+                                 const analysis::AnalysisTrack* track) {
     std::vector<SectionCue> out;
     out.reserve(timeline.sections.size());
     for (std::size_t i = 0; i < timeline.sections.size(); ++i) {
@@ -31,6 +32,9 @@ std::vector<SectionCue> cueSheet(const SectionTimeline& timeline, const ShotLang
         cue.intent = language.intentFor(s);
         cue.energy = s.energy;
         cue.density = s.density;
+        if (track != nullptr) {
+            cue.audio = analysis::profileSpan(*track, s.startSeconds, s.endSeconds);
+        }
         cue.occurrence = s.occurrence;
         // The one thing a lone section cannot know. Derived from position, so it works for a custom
         // type nobody anticipated -- which is precisely what a `FinalChorus` enumerator could not.

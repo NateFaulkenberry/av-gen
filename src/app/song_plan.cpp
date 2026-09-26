@@ -185,6 +185,9 @@ nlohmann::json SongPlan::toJson() const {
         j["transition"] = s.transition;
         j["autonomy"] = autonomyName(s.autonomy);
         j["occurrence"] = s.occurrence;
+        if (s.audio.measured()) {
+            j["audio"] = analysis::spanProfileToJson(s.audio); // ADR-899
+        }
         list.push_back(std::move(j));
     }
     out["sections"] = std::move(list);
@@ -226,6 +229,9 @@ Result<SongPlan> SongPlan::fromJson(const nlohmann::json& doc) {
         s.energy = j.value("energy", s.energy);
         s.density = j.value("density", s.density);
         s.transition = j.value("transition", s.transition);
+        if (const auto audio = j.find("audio"); audio != j.end()) {
+            s.audio = analysis::spanProfileFromJson(*audio);
+        }
         if (const auto autonomy = j.find("autonomy"); autonomy != j.end()) {
             if (!autonomy->is_string()) {
                 return fail("song plan: 'autonomy' must be a string");
@@ -253,7 +259,7 @@ Result<SongPlan> SongPlan::fromJson(const nlohmann::json& doc) {
 
 Result<SongPlan> songPlanFromJson(const nlohmann::json& doc) { return SongPlan::fromJson(doc); }
 
-SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure) {
+SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure, const analysis::AnalysisTrack* track) {
     SongPlan plan;
     plan.name = "measured";
     plan.sections.reserve(structure.sections.size());
@@ -276,6 +282,9 @@ SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure) {
         out.label = seq::sectionDisplayName(in);
         out.energy = std::clamp(in.energy, 0.0f, 1.0f);
         out.density = std::clamp(in.density, 0.0f, 1.0f);
+        if (track != nullptr) {
+            out.audio = analysis::profileSpan(*track, in.startSeconds, in.endSeconds);
+        }
         // How hard this boundary lands: the size of the energy step across it. A measurement of the
         // boundary, not a claim about what kind of boundary it is -- the director wants to know
         // "did something change here", and that is a number the analysis already carries.
@@ -329,6 +338,7 @@ Result<SongPlan> songPlanFromCues(std::span<const song::SectionCue> cues) {
         section.label = cue.displayName;   // display only, exactly as both sides promised
         section.energy = cue.energy;
         section.density = cue.density;
+        section.audio = cue.audio;
         section.occurrence = cue.occurrence;
         // **A section with no opinion sits at the top of the range, not in the middle of it.**
         //

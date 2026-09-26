@@ -125,8 +125,11 @@ void registerDirectorTools(ToolRegistry& registry) {
     add(registry, "director.inspect_scene", "Inspect the scene for directing",
         "What a plan can name and when things happen: every subject (characters, heroes, nodes, cameras, "
         "effects) by kind and id, the song's sections as they come round (\"chorus 2\" is the second "
-        "time the chorus comes back), the piece's length, and the plans this project already holds "
-        "(revise one by reusing its id). Prefer this over parameter-level inspection when directing.",
+        "time the chorus comes back) with what each one sounds like -- its own energy, and the audio "
+        "measured under it: a level-free energy, onsets per second (kick, snare, hat), brightness in "
+        "Hz and each band's level in dB -- the meter (which beat is bar 1, bars per phrase), the "
+        "piece's length, and the plans this project already holds (revise one by reusing its id). "
+        "Prefer this over parameter-level inspection when directing.",
         schema::object({{"kinds", schema::array(schema::string("entity|hero|node|camera|effect"),
                                                 "Only these subject kinds; omit for all")}}),
         inspect(), [](const json& args, ToolContext& ctx) -> ToolResult {
@@ -141,8 +144,22 @@ void registerDirectorTools(ToolRegistry& registry) {
             }
             json sections = json::array();
             for (const directing::SectionRun& s : facts.music.sections) {
-                sections.push_back({{"type", s.type}, {"occurrence", s.occurrence}, {"start", s.startSeconds},
-                                    {"end", s.endSeconds}});
+                json section = {{"type", s.type},         {"occurrence", s.occurrence}, {"start", s.startSeconds},
+                                {"end", s.endSeconds},    {"energy", s.energy},        {"density", s.density}};
+                // ADR-899: what the track measures under the section, next to the section's own
+                // numbers -- the latter may be a person's word, the former is the audio's.
+                if (s.audio.measured()) {
+                    section["audio"] = analysis::spanProfileToJson(s.audio);
+                }
+                sections.push_back(std::move(section));
+            }
+            // ADR-896: the meter every "bar N beat M" is resolved with.
+            json meter = {{"beatsPerBar", facts.music.beatsPerBar},
+                          {"phraseBars", facts.music.phraseBars},
+                          {"downbeatBeat", facts.music.downbeat}};
+            if (facts.music.downbeat >= 0 &&
+                static_cast<std::size_t>(facts.music.downbeat) < facts.music.beatTimes.size()) {
+                meter["firstDownbeatSeconds"] = facts.music.beatTimes[static_cast<std::size_t>(facts.music.downbeat)];
             }
             json plans = json::array();
             for (const directing::Plan& p : facts.plans) {
@@ -154,6 +171,7 @@ void registerDirectorTools(ToolRegistry& registry) {
                  {"sectionSource", facts.music.sectionSource},
                  {"durationSeconds", facts.music.durationSeconds},
                  {"tempoBpm", facts.music.tempoBpm},
+                 {"meter", std::move(meter)},
                  {"plans", std::move(plans)},
                  {"cameraMoves", directing::cameraMoveNames()}},
                 fmt::format("{} subject(s), {} section(s), {} plan(s)", facts.subjects.identities().size(),

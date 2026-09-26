@@ -24,6 +24,12 @@ std::optional<SignalId> SignalBus::find(std::string_view name) const {
     return it->second;
 }
 
+void SignalBus::setLabel(SignalId id, std::string label) {
+    if (id < infos_.size()) {
+        infos_[id].label = std::move(label);
+    }
+}
+
 void SignalBus::set(SignalId id, float value) {
     if (id < values_.size()) {
         values_[id] = value;

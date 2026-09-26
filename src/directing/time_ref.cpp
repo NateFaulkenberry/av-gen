@@ -329,34 +329,63 @@ std::optional<TimeRef> parseTime(std::string_view raw, std::vector<Issue>& issue
 // ---- context ----------------------------------------------------------------------------------
 
 MusicalContext musicalContextFrom(const seq::Sequence& sequence, std::span<const double> beatTimes, double tempoBpm,
-                                  double durationSeconds) {
+                                  double durationSeconds, const analysis::AnalysisTrack* track,
+                                  const analysis::Meter& meter) {
     MusicalContext ctx;
     ctx.beatTimes.assign(beatTimes.begin(), beatTimes.end());
     ctx.tempoBpm = tempoBpm > 0.0 ? tempoBpm : static_cast<double>(sequence.structure.tempoBpm);
+    ctx.beatsPerBar = meter.beatsPerBar;
+    ctx.downbeat = meter.downbeat;
+    ctx.phraseBars = meter.phraseBars;
+    // The constant-tempo fallback counts from the first tracked beat, with the meter's downbeat in
+    // the beat index it extrapolates (`resolveTime`), so its bar 1 is the grid's bar 1.
     ctx.firstBeatSeconds = ctx.beatTimes.empty() ? 0.0 : ctx.beatTimes.front();
     ctx.durationSeconds = durationSeconds;
 
+    const auto run = [](std::string type, std::string label, double start, double end, float energy, float density) {
+        SectionRun r;
+        r.type = std::move(type);
+        r.label = std::move(label);
+        r.startSeconds = start;
+        r.endSeconds = end;
+        r.energy = energy;
+        r.density = density;
+        return r;
+    };
     std::vector<SectionRun> raw;
     if (!sequence.sectionTimeline.sections.empty()) {
         ctx.sectionSource = "sectionTimeline";
         for (const song::Section& s : sequence.sectionTimeline.sections) {
-            raw.push_back(SectionRun{normaliseSectionType(s.type), s.label, s.startSeconds, s.endSeconds, 1});
+            raw.push_back(run(normaliseSectionType(s.type), s.label, s.startSeconds, s.endSeconds, s.energy, s.density));
         }
     } else if (!sequence.structure.sections.empty()) {
         ctx.sectionSource = "structure";
         for (const analysis::SongSection& s : sequence.structure.sections) {
-            raw.push_back(SectionRun{normaliseSectionType(analysis::sectionFunctionName(s.function)), s.label,
-                                     s.startSeconds, s.endSeconds, 1});
+            raw.push_back(run(normaliseSectionType(analysis::sectionFunctionName(s.function)), s.label,
+                              s.startSeconds, s.endSeconds, s.energy, s.density));
         }
     }
     std::sort(raw.begin(), raw.end(), [](const SectionRun& a, const SectionRun& b) { return a.startSeconds < b.startSeconds; });
-    for (SectionRun& run : raw) {
-        if (!ctx.sections.empty() && ctx.sections.back().type == run.type &&
-            std::abs(ctx.sections.back().endSeconds - run.startSeconds) < 1e-3) {
-            ctx.sections.back().endSeconds = run.endSeconds; // one passage, several entries
+    for (SectionRun& entry : raw) {
+        if (!ctx.sections.empty() && ctx.sections.back().type == entry.type &&
+            std::abs(ctx.sections.back().endSeconds - entry.startSeconds) < 1e-3) {
+            // One passage, several entries: its own numbers are the entries' duration-weighted mean.
+            SectionRun& back = ctx.sections.back();
+            const double a = back.endSeconds - back.startSeconds;
+            const double b = entry.endSeconds - entry.startSeconds;
+            if (a + b > 0.0) {
+                back.energy = static_cast<float>((back.energy * a + entry.energy * b) / (a + b));
+                back.density = static_cast<float>((back.density * a + entry.density * b) / (a + b));
+            }
+            back.endSeconds = entry.endSeconds;
             continue;
         }
-        ctx.sections.push_back(std::move(run));
+        ctx.sections.push_back(std::move(entry));
+    }
+    if (track != nullptr) {
+        for (SectionRun& r : ctx.sections) {
+            r.audio = analysis::profileSpan(*track, r.startSeconds, r.endSeconds);
+        }
     }
     std::vector<std::pair<std::string, int>> counts;
     for (SectionRun& run : ctx.sections) {
@@ -396,11 +425,15 @@ TimeResolution resolveTime(const TimeRef& ref, const MusicalContext& ctx, std::s
             i.suggestions = {fmt::format("bar {} beat {}", ref.bar, ctx.beatsPerBar)};
             return out;
         }
-        const auto index = static_cast<std::size_t>((ref.bar - 1) * ctx.beatsPerBar + (ref.beat - 1));
-        if (index < ctx.beatTimes.size()) {
+        // ADR-896: counted from the meter's downbeat, so bar 1 beat 1 is the first downbeat and not
+        // whichever beat the tracker happened to find first.
+        const long long signedIndex = static_cast<long long>(ctx.downbeat) +
+                                      static_cast<long long>(ref.bar - 1) * ctx.beatsPerBar + (ref.beat - 1);
+        const auto index = static_cast<std::size_t>(std::max(0LL, signedIndex));
+        if (signedIndex >= 0 && index < ctx.beatTimes.size()) {
             seconds = ctx.beatTimes[index];
         } else if (ctx.tempoBpm > 0.0) {
-            seconds = ctx.firstBeatSeconds + (static_cast<double>(index) * 60.0 / ctx.tempoBpm);
+            seconds = ctx.firstBeatSeconds + (static_cast<double>(signedIndex) * 60.0 / ctx.tempoBpm);
             Issue& i = issue(Severity::Warning, IssueCode::UnresolvableTime,
                              fmt::format("placed on a constant {:.2f} BPM grid: the analysed beat grid {}", ctx.tempoBpm,
                                          ctx.beatTimes.empty() ? "is missing" : "ends before this bar"));

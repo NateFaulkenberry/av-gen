@@ -241,7 +241,8 @@ TEST_CASE("Render job readback ring matches the synchronous path frame for frame
         const FrameTime time = engine->tick(clock);
         engine->update(time);
         const rendering::ShaderFrameInputs inputs{&engine->shaderLayers(),
-                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr};
+                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr,
+                                                  engine->barPhase()};
         auto image = renderer.renderToImage(engine->scene(), time, settings.width, settings.height, &inputs);
         REQUIRE(image.has_value());
         INFO("frame " << i);
@@ -301,7 +302,8 @@ TEST_CASE("Render job writes a scene-linear EXR sequence deterministically", "[g
         const FrameTime time = engine->tick(clock);
         engine->update(time);
         const rendering::ShaderFrameInputs inputs{&engine->shaderLayers(),
-                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr};
+                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr,
+                                                  engine->barPhase()};
         auto image = renderer.renderToImageFloat(engine->scene(), time, settings.width, settings.height, &inputs);
         REQUIRE(image.has_value());
         CHECK(image->rgba.size() == 96u * 64u * 4u);
@@ -357,7 +359,8 @@ TEST_CASE("a scaled scene target still fills the output the caller asked for", "
         const FrameTime time = engine->tick(clock);
         engine->update(time);
         const rendering::ShaderFrameInputs inputs{&engine->shaderLayers(),
-                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr};
+                                                  engine->hasFrame() ? &engine->latestFrame() : nullptr,
+                                                  engine->barPhase()};
         auto image = renderer.renderToImage(engine->scene(), time, kW, kH, &inputs);
         REQUIRE(image.has_value());
         return std::pair{std::move(*image), renderer.stats()};

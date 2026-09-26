@@ -8,7 +8,10 @@
 // over data that is itself a function of the piece, never of how the transport got to `t`:
 //
 //   * Beat, Onset -- the offline analysis track (`analysis::AnalysisTrack`: the Ellis beat tracker's
-//     beat times, and every hop's peak-picked onset with its strength);
+//     beat times, and every hop's peak-picked onset with its strength). A Beat trigger counts
+//     musical beats through the engine's `analysis::Meter` (ADR-896): beat 0 is beat 1 of bar 1,
+//     the beat `beat.count` calls 0 and `music.downbeat` fires on, so "every 4th beat from 0" is
+//     every downbeat;
 //   * MusicEvent -- the musical-event classifier walked ONCE over the whole track from its first
 //     frame (the same walk the Auto-director's structure fold does), so a drop is where the piece
 //     puts it, not where a playback that started mid-song happened to recognise one;
@@ -34,6 +37,7 @@
 // the `Trigger` activation from here; a type that wants several fronts (a Shockwave's overlapping
 // rings) calls `effectEventTimes`.
 
+#include "analysis/meter.hpp"
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_timing.hpp"
 
@@ -83,10 +87,11 @@ public:
     // header). Called by the host once or more per frame -- repeated calls with the same second are
     // the same frame.
     void bind(const analysis::AnalysisTrack* track, std::span<const seq::Marker> markers,
-              const HistoryBank* history, double seconds, int phraseBars = 4, int sectionPhrases = 4);
+              const HistoryBank* history, double seconds, const analysis::Meter& meter = {});
 
     // Direct setters, for a host that has no track (a test, a tool) -- and what `bind` itself uses.
-    void setBeats(std::span<const double> ascending);
+    // `downbeat` is the index of the beat that is beat 1 of bar 1 (`analysis::Meter::downbeat`).
+    void setBeats(std::span<const double> ascending, int downbeat = 0);
     void setOnsets(std::span<const TriggerOnset> ascending);
     void setMusicEvents(std::span<const TriggerMoment> ascending);
     void setMarkers(std::span<const TriggerMarker> markers); // any order; sorted here
@@ -116,6 +121,7 @@ private:
     std::size_t proximity(const Trigger& trigger, std::string_view owner, double t, std::span<double> out) const;
 
     std::vector<double> beats_;
+    int downbeat_ = 0; // ADR-896: beats_[downbeat_] is musical beat 0
     std::vector<TriggerOnset> onsets_;
     std::vector<TriggerMoment> moments_;
     std::vector<TriggerMarker> markers_;
@@ -125,8 +131,7 @@ private:
     const analysis::AnalysisTrack* boundTrack_ = nullptr;
     std::size_t boundFrames_ = 0;
     std::size_t boundBeats_ = 0;
-    int boundPhraseBars_ = 0;
-    int boundSectionPhrases_ = 0;
+    analysis::Meter boundMeter_{0, 0, 0, 0}; // never a real meter, so the first bind derives
 
     double seconds_ = 0.0;
     double edgeStart_ = 0.0;
