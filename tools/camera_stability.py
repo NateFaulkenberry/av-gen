@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Camera stability, measured from `avgen_cast_trace --camera` without rendering (ADR-911).
 
-    tools/camera_stability.py TRACE.json [--scene S.scene.json] [--shots s03,s09,...] [--json OUT]
+    tools/camera_stability.py TRACE.json [--shots s03,s09,...] [--json OUT]
 
 Reads the per-frame camera track (`"camera"`, documented in tools/cast_trace.cpp) and reports, per
 shot, the numbers the GV3 camera audit set its pass bar in:
