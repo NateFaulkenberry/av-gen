@@ -932,6 +932,8 @@ TEST_CASE("UI reach: every new emission control is exposed, sectioned and named 
         const std::size_t cut = prefix.size() + (heading.empty() ? 0 : heading.size() + 1);
         CHECK(heading == r.heading);
         CHECK(ui::inspectorRowLabel(p->path(), cut, p->label()) == r.row);
+        // ...and the Inspector lists it at its default authoring layer (WorldPanel::layer).
+        CHECK(ui::layerShowsPath(ui::AuthoringLayer::Intermediate, p->path()));
     }
     // A click on a mushroom selects the terrain that grew it (Composition::nodeForProcedural), which
     // is the Inspector prefix used above for the layer's three controls.
