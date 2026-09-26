@@ -1,7 +1,7 @@
 # GV3 revision: progress and state
 
 This is the operational state file. Update it whenever the state changes. It was last updated
-2026-09-26, while wave-1 engine agents were running.
+2026-09-26, after the gate passed, while wave-1 engine agents were running.
 
 ## Start of a session: do this first
 1. **Read this file**, then [00-brief.md](00-brief.md) (the owner's revision spec, verbatim).
@@ -20,11 +20,11 @@ Revise the music video Glowmere Valley 3 (GV3) to the owner's brief. The phases 
 
 | Phase | What | State |
 |---|---|---|
-| 0 | Quality-evaluator gate: the Creative Critic must work in the loop before any scene edit | **one item left** (below) |
+| 0 | Quality-evaluator gate: the Creative Critic must work in the loop before any scene edit | **passed** 2026-09-26 ([02-gate.md](02-gate.md)) |
 | 1 | Capability audit (Director, characters, cameras, modulation, mushrooms/wind, render/post, water) | **done** ([01-audit-and-plan.md](01-audit-and-plan.md), [audit/reports/](audit/reports/)) |
 | 2a | Engine wave 1: six streams in parallel worktrees | **in progress** |
 | 2b | Engine wave 2: Director capabilities, render/post | not started |
-| 3 | GV3 scene revision with the Director's planners and the evaluator in the loop | blocked on 0 and 2 |
+| 3 | GV3 scene revision with the Director's planners and the evaluator in the loop | blocked on 2 |
 | 4 | Final 4K render; revision report; the Director's self-critique | not started |
 
 **Owner decision (asked and answered this session):** "Build it; GV3 uses it."
@@ -40,7 +40,13 @@ Revise the music video Glowmere Valley 3 (GV3) to the owner's brief. The phases 
 - **The first pass's engine fixes are merged into main:** `0b623b88`, "Merge engine/gv3-first-pass". That is ADR-893 (continuous path level), 894 (waters blend by weight), 895 (eased stride bob), plus the tools `avgen_world_preview --seams`, `avgen_cast_trace` and `tools/contact_sheet.py`. Two tests were re-baselined with evidence.
   - Suites before the merge: GPU 509/508 passed/1 skipped; CPU 3,518 cases, 3,496 passed, 19 skipped, 1 expected failure. The two re-baselined tests' groups passed afterwards.
 - **The revision brief** is saved verbatim at [00-brief.md](00-brief.md). The owner's water reference image is outside the repo at `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/water-reference-from-owner.png`.
-- **The Creative Critic** is built: a standalone repo at `~/Documents/GitHub/creative-critic`, with local commits only and no remote. See [02-gate.md](02-gate.md) for the verification.
+- **The Creative Critic** is built: a standalone repo at `~/Documents/GitHub/creative-critic` (HEAD `88a928e`), with local commits only and no remote.
+- **The Phase 0 gate passed** on 2026-09-26 ([02-gate.md](02-gate.md)). A fresh render of s16, as a PNG sequence and as a video clip, each placed at film time 85.4 s:
+  - completed with every core check evaluated (`--strict`, exit 0);
+  - read the heartbeat as "configured and observed" (+8.9% and +9.9%);
+  - compared correctly: against the v2 film's s16 it found the F37 water fix (shimmer 0.0146 → 0.0043).
+
+  The gate's session is `gate-check`, track `s16-gate`.
 - **The Phase 1 audit** is done. Seven reports are in [audit/reports/](audit/reports/), with their scripts and data in [audit/scripts/](audit/scripts/) and [audit/data/](audit/data/). The synthesis and plan are in [01-audit-and-plan.md](01-audit-and-plan.md).
 
 ## In progress: wave-1 engine streams
@@ -56,13 +62,6 @@ State when this file was saved (all were running as background agents of the ses
 | characters | 907–910 | `5dc541db` (ADR-910 quality metrics) | 11 modified, 3 untracked |
 | camera | 911–913 | `ae3b75dd` (cast_trace `--camera` pose track and `--start`) | 13 modified, 8 untracked; not yet rebuilt |
 | water | 914–916 | `6948f72d` (water parameters unregistered on removal) | 3 modified, 7 untracked |
-
-**The evaluator's last fix, in progress in `creative-critic`:**
-- film-time `start` for video clips;
-- sequences no longer silently skip `video.luma_stream`, `av.reactivity`, `video.stability`, `video.novelty`, `video.flashes` and `image.visibility`;
-- anything skipped is reported in `uncertainty.not_evaluated`.
-
-The repo was at `3e83430` with nothing written for this fix yet.
 
 **The agents' IDs**, valid only in the session that spawned them:
 
@@ -84,16 +83,7 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 3. Before relaunching, check that no old process is still running in that worktree.
 
 ## Next steps, in order
-1. **Close the Phase 0 gate** when the evaluator's clip fix lands:
-   - Restart the Critic: `~/Documents/GitHub/creative-critic/.venv/bin/critic stop`, then `critic start --daemon` (port 8765).
-   - Render one shot as a clip: `tools/gpu-lock.sh ./build/release/src/avgen --project examples/world/glowmere-valley-3.json --render /ABS/clip.mov --size 480x270 --range 85.4:89.1`.
-   - Submit it as a background command: `critic submit --mode preview --video /ABS/clip.mov --video-start 85.4 --inputs <adapter inputs> --options '{"only_shots":["s16"]}' --session gate-check --track s16-clip --wait --json`. Check the exact flag names in its INTEGRATION_GUIDE.md.
-   - Pass criteria:
-     - reactivity, stability and novelty are present and not skipped;
-     - the kick route (`timeline.kick → material/glowmere2TissueWarm/emissionIntensity`) reads "configured and observed", at about +9.5%;
-     - a second iteration compares against the first.
-   - Update [02-gate.md](02-gate.md) to "passed".
-   - The adapter's inputs for GV3 are `creative-critic/work/gv3-v2/inputs.json` (a scene, an intent, a video). The gate-test variants are in the same folder.
+1. **The Phase 0 gate: done.** For a single-shot check in the loop, use the commands in [02-gate.md](02-gate.md) (render with `--range a:b`, submit with `--video-start a`, `--strict`).
 2. **Review and merge each wave-1 stream** as it finishes. Order: signals → routes → emission → characters → camera → water. For each:
    - read its report and diff, run its targeted tests, and check that the full CPU and GPU suite counts are clean;
    - resolve ADR number collisions (renumber the file, the README row and every `ADR-NNN` reference);
@@ -124,7 +114,6 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **Learned aesthetic models stay off.** The best reached 0.65 pairwise accuracy on GV3, and none beat chance on v1→v2.
 
 ## Known problems and limitations
-- **The gate's clip gap** (above).
 - **The Critic's other limits:**
   - fast mode projects bounding boxes, so foliage and terrain can't occlude;
   - the generic per-shot reactivity grid is weak on short shots, so trust the route-locked checks;
