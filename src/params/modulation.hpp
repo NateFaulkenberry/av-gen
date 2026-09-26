@@ -1,6 +1,7 @@
 #pragma once
 
-// Modulation routes: signal -> chain -> amount -> op -> parameter component (ADR-011).
+// Modulation routes: signal -> chain -> amount -> op -> (depth) -> parameter component (ADR-011,
+// ADR-900).
 
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
@@ -8,10 +9,16 @@
 #include "signals/signal_bus.hpp"
 
 #include <cstdint>
+#include <functional>
+#include <set>
 #include <string>
 #include <vector>
 
 namespace avgen::params {
+
+namespace liveness {
+class Facts;
+}
 
 enum class ModOp : std::uint8_t { Add, Multiply, Replace, Min, Max };
 enum class Polarity : std::uint8_t { Unipolar, Bipolar }; // Bipolar maps the source 0..1 -> -1..1 before the chain
@@ -25,6 +32,16 @@ struct ModRoute {
     Polarity polarity = Polarity::Unipolar;
     ProcessorChain chain{};
     bool enabled = true;
+    // ADR-900: the route's depth follows a signal. What the route does to its target -- the distance
+    // between the value its op writes and the value the target had before it -- is scaled by
+    //   depth = depthMin + (depthMax - depthMin) * value(depthSource)
+    // so an Add route's offset and a Multiply route's deviation from 1 both scale, and a depth of 0
+    // leaves the target exactly as the route found it. Empty = full depth always: the route applies
+    // exactly as a route did before this existed. Stateless -- a function of this frame's signal --
+    // so a seek lands where a play does whenever the depth signal itself does (ADR-091).
+    std::string depthSource;
+    float depthMin = 0.0f;
+    float depthMax = 1.0f;
 
     // Runtime (not serialised)
     bool fromGraph = false;        // installed by a procedural graph evaluation (ADR-028)
@@ -49,6 +66,7 @@ struct ModRoute {
     std::uint32_t ownerEntity = kNoOwner;
     ProcessorChain::State state{};
     signals::SignalId sourceId = signals::kInvalidSignal;
+    signals::SignalId depthId = signals::kInvalidSignal; // ADR-900; invalid when depthSource is empty
     IParameter* targetParam = nullptr;
     float lastOutput = 0.0f;       // for UI display
 };
@@ -62,8 +80,21 @@ public:
 
     // Resolves source/target names. Unresolvable routes are reported and skipped by evaluate()
     // until a later bind() resolves them; their `enabled` flag is left alone.
+    //
+    // ADR-902: and puts every route it resolves through the liveness rules
+    // (`liveness::Registry::standard()`), logging each problem once for the life of the modulator --
+    // an unresolved route included, which used to be logged again by every rebind. With no facts
+    // installed the rules see only the bus and the parameter set (the chain, the source's kind);
+    // the engine installs facts that know its scene (`setLivenessFacts`).
     [[nodiscard]] Result<void> bind(const signals::SignalBus& bus, ParameterSet& params);
     [[nodiscard]] bool bound() const { return bound_; }
+
+    // ADR-902. Not owned; must outlive the modulator's binds (null = the bus and parameters only).
+    void setLivenessFacts(const liveness::Facts* facts) { facts_ = facts; }
+    [[nodiscard]] const liveness::Facts* livenessFacts() const { return facts_; }
+    // Records `key` and returns true the first time it is seen: the log-once set bind() uses, shared
+    // so that a host reporting the same finding at project load does not report it a second time.
+    bool firstReport(const std::string& key) { return reported_.insert(key).second; }
 
     // params.resetFinals(), then applies every enabled bound route in op-priority order
     // (Replace, Multiply, Add, Min, Max).
@@ -77,7 +108,17 @@ public:
     void applyRoutesWhere(const signals::SignalBus& bus, ParameterSet& params, double dt,
                           bool (*pick)(const ModRoute&));
 
-    void resetState(); // clears smoothing/envelope state (on seek)
+    // ADR-901: runs the chain of every enabled, bound route `pick` accepts on `bus` and writes
+    // nothing -- the state a play leaves a route's chain in, advanced through a frame a seek's replay
+    // steps without applying the route. A route whose source is not on `bus` is not advanced.
+    void advanceChains(const signals::SignalBus& bus, double dt, const std::function<bool(const ModRoute&)>& pick);
+    // The chain states of the routes `pick` accepts, in route order, and back (a seek checkpoint).
+    [[nodiscard]] std::vector<ProcessorChain::State> chainStates(const std::function<bool(const ModRoute&)>& pick) const;
+    void restoreChainStates(const std::function<bool(const ModRoute&)>& pick,
+                            const std::vector<ProcessorChain::State>& states);
+    void resetChainStates(const std::function<bool(const ModRoute&)>& pick);
+
+    void resetState(); // clears smoothing/envelope/delay state (on seek)
 
     // Multiplies every route's amount. The UI's "master visualization gain".
     float masterGain = 1.0f;
@@ -85,6 +126,8 @@ public:
 private:
     std::vector<ModRoute> routes_;
     bool bound_ = false;
+    const liveness::Facts* facts_ = nullptr;
+    std::set<std::string> reported_;
 };
 
 float applyModOp(ModOp op, float current, float modulation);

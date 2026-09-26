@@ -16,6 +16,12 @@ SignalId SignalBus::declare(std::string name, float minValue, float maxValue, bo
     return id;
 }
 
+void SignalBus::setEventKind(SignalId id, bool isEvent) {
+    if (id < infos_.size()) {
+        infos_[id].isEvent = isEvent;
+    }
+}
+
 std::optional<SignalId> SignalBus::find(std::string_view name) const {
     const auto it = index_.find(std::string(name));
     if (it == index_.end()) {
