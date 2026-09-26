@@ -74,6 +74,8 @@ Nothing is committed from the licensed assets; only the scene data names them.
 - **Screen time.** In the first pass, 12 shots (86 s, 38% of the film) are led by an alien. The target is 20% or less. The aliens appear more often as part of the world: in wides, reacting to E3 and E4, and crossing frames.
 - **Behaviour.** No alien stands still for more than a few seconds unless it is watching an event, and there are no walk → stop → 180° → back reversals. The characters stream's metrics are the gate: longest still stretch, reversals, pivot yaw and turn radius, measured on the cast trace of the whole film.
 - **Animals** are re-homed onto flat valley ground, with slope under every stationary body ≤ 12°, and walk through curved turns (the characters stream's `turnRadius`). Checked on the cast trace and by the evaluator's grounding check.
+  - **Measured on the first pass's world** (a 4 m grid through the engine's own height, `tools/gv3/ground.py`): 7 of the 12 animals are anchored on 17–25° hillsides. They are bull-1, bull-21, horse-2, horse-20, horse-22, cow-12 and cow-23. Only five stand on ground under 6°.
+  - **Where to put them:** a quarter of the dry valley is under 8°, almost all of it in two meadows near the elder. One is about 5.1 ha centred at (74, 13), 95 m from the elder; the other is about 3.9 ha at (−62, 36), 52 m away. Each wander circle (`homeRadius` 15.5 m) must sit wholly inside a meadow.
 
 ## 5. Audio reactivity: the map (brief §3–6, §16)
 The reactivity planner proposes routes from the reactive catalogue. This is the intent it is
