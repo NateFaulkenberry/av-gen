@@ -26,7 +26,7 @@ The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner
 | setpieces | 928–931 | `905c91ac`, clean | `2ea9c7b5` built and tested: templates (abduction with 1–3 animals, survey, flyby), `PlanSetPiece` with validation, staging at timeline seconds, a bus-id bug fixed; 23 cases pass. `905c91ac` (`avgen --plan`, cast_trace `setPieces`) was never compiled. **Left:** build and fix; the UI home (a "UFO set pieces" section in the Director panel); the three-abduction end-to-end proof; the evaluator hook; ADRs; the full suite. The Critic's adapter should read the trace's `setPieces` instead of hard-coding GV3's beats. Notes: `docs/development/setpieces-design-notes.md` in the worktree. |
 | render | 917–919 | `7f36b8e3` (WIP), clean | Built, and the CPU tests pass. `post/referenceHeight` (720) scales every pixel-sized post value; `scene/fogSky`, a sky-radiance fog map; offline floors. **Nothing has run on the GPU.** **Left:** GPU tests and their thresholds, suites, re-baselining small-frame bloom tests, GV3 evidence, the 4K cost, the ADRs' measurements. World edge: report only (a backdrop ring would take 1–2 days). Notes: `docs/development/render-design-notes.md`. |
 | signals | 896–899 | **merged** (`e0657a26`) | Done. |
-| emission | 903–906 | `0b623b88` + **54 uncommitted files** | Died mid-work applying viewer-facing labels. No report, and no commit. |
+| emission | 903–906 | `eca06448`, **done**; merged into `integrate/revision` | Report in [stream-reports/emission.md](stream-reports/emission.md). |
 | characters | 907–910 | `5dc541db` + **22 uncommitted files** | Died mid-fix (gait state must start as authored for bodies seeked but never stepped). No report. |
 
 **Round 1, launched 14:35:** the signals finisher (agent `a544c532ad5e8e2f3`) and the routes finisher (`a48d9ba7c7b4c3bf2`).
@@ -47,6 +47,14 @@ The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner
 - **Targeted tests on the combined build pass:** routes 57 cases, signals 36 cases, multicam 17 cases.
 - **Next:** merge emission when it reports, then run the full CPU and GPU suites once on the combination. The GPU suite goes in a window with no other CPU suite running. Then `git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision`.
 - **Launched: the camera finisher** (`aaf13597ae6a51721`). It merges main into `agent/camera` first, to resolve its `camera_director.cpp` conflict with signals.
+
+**Integration, continued (19:55).** Emission is merged into `integrate/revision` too (`7b030ac4`). Two more semantic fixes:
+- The ADR-906 trigger-clock bind in `Engine::update` takes `meter()`.
+- ADR-905 stopped registering `material/<p>/emissionIntensity` on programs that emit nothing, so `Registry::checkTarget` now asks the scene's facts for a reason before it reports `unknown-target`. ADR-902 is amended (`06be0d88`).
+
+Targeted tests on the three-stream build all pass: routes 57, signals and emission 51, liveness 31, emission GPU plus render-job 27 cases under the lock, multicam 17. **The full GPU and CPU suites are running** on `06be0d88` (logs `scratchpad/integrate-gpu-full.log` and `integrate-cpu-full.log`). If they pass, fast-forward main to `integrate/revision`, then merge main into `gv3/production`.
+
+**Launched: reactivity** (wave 2, agent `a2e7d46e9e7bd31bd`) in `~/Documents/GitHub/av-gen-reactivity`, branch `agent/reactivity`, from `integrate/revision` `06be0d88`. Agents running: camera finisher, song, reactivity.
 
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
