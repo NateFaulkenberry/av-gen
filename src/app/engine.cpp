@@ -1689,7 +1689,6 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
                                  {"end", span.end},
                                  {"travel", span.travel},
                                  {"spotlight", span.spotlight},
-                                 {"emphasis", span.emphasis},
                                  {"subject", span.subject},
                                  {"subjectPosition",
                                   {span.subjectPosition.x, span.subjectPosition.y, span.subjectPosition.z}},
@@ -2767,7 +2766,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 span.end = entry.value("end", 0.0);
                 span.travel = entry.value("travel", false);
                 span.spotlight = entry.value("spotlight", false);
-                span.emphasis = entry.value("emphasis", 0.0f);
+                // ADR-922: a span's `emphasis` is no longer a field. Files written before carry the
+                // key and it is not read -- it never was, by anything but this loader.
                 span.subject = entry.value("subject", std::string{});
                 const auto readVec = [&entry](const char* key, glm::vec3& out) {
                     if (entry.contains(key) && entry[key].is_array() && entry[key].size() == 3) {

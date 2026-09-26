@@ -779,9 +779,9 @@ TEST_CASE("a directed sequence flattens to spans a world effect can gate on",
     seq.shots = {hold, move, quiet};
     const std::vector<world::ShotSpan> spans = seq.shotSpans();
     REQUIRE(spans.size() == 3);
+    // A shot at zero emphasis is still a hold: the span says where the camera landed, not how much
+    // of the film the subject owns (ADR-922 cut the span's emphasis, which nothing read).
     CHECK(spans[2].spotlight);
-    CHECK_THAT(spans[2].emphasis, WithinAbs(0.0f, 1e-6f));
-    CHECK_THAT(spans[0].emphasis, WithinAbs(0.8f, 1e-6f));
     CHECK(spans[0].spotlight);
     CHECK_FALSE(spans[0].travel);
     CHECK(spans[0].subject == "elder");

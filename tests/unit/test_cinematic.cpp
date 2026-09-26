@@ -160,22 +160,22 @@ TEST_CASE("A sequence bakes into ordinary timeline tracks", "[app][cinematic]") 
     REQUIRE(seq.has_value());
     const auto tracks = seq->toTimelineTracks(6);
     REQUIRE(tracks.is_array());
-    REQUIRE(tracks.size() == 7);
+    REQUIRE(tracks.size() == 6);
 
     // The targets are the parameter paths the engine's timeline already drives; nothing new had to
-    // be taught to the camera.
+    // be taught to the camera. (A seventh, `camera/focus/emphasis`, was baked and never registered,
+    // so every install dropped it; ADR-922 cut it.)
     CHECK(tracks[0]["target"] == "camera/position");
     CHECK(tracks[1]["target"] == "camera/target");
     CHECK(tracks[2]["target"] == "camera/lens/focalLength");
     CHECK(tracks[3]["target"] == "camera/lens/aperture");
     CHECK(tracks[4]["target"] == "camera/lens/focusDistance");
-    CHECK(tracks[5]["target"] == "camera/focus/emphasis");
     // ...and the mode that makes the first two readable at all: a composition ignores
     // `camera/position` and `camera/target` unless it is in free mode, and defaults to orbit.
-    CHECK(tracks[6]["target"] == "camera/mode");
-    REQUIRE(tracks[6]["keys"].size() == 1);
-    CHECK(tracks[6]["keys"][0]["interp"] == "step");
-    CHECK_THAT(tracks[6]["keys"][0]["value"].get<double>(), Catch::Matchers::WithinAbs(1.0, 1e-9));
+    CHECK(tracks[5]["target"] == "camera/mode");
+    REQUIRE(tracks[5]["keys"].size() == 1);
+    CHECK(tracks[5]["keys"][0]["interp"] == "step");
+    CHECK_THAT(tracks[5]["keys"][0]["value"].get<double>(), Catch::Matchers::WithinAbs(1.0, 1e-9));
 
     REQUIRE(tracks[0]["keys"].size() == 12); // two shots x six samples
     CHECK_THAT(tracks[0]["keys"][0]["time"].get<double>(), Catch::Matchers::WithinAbs(0.0, 1e-9));
@@ -471,15 +471,12 @@ TEST_CASE("The spotlight is a span the rest of the engine can read", "[app][cine
     CHECK_THAT(spans[0]["end"].get<double>(), Catch::Matchers::WithinAbs(20.0, 1e-9));
     CHECK_THAT(spans[0]["emphasis"].get<double>(), Catch::Matchers::WithinAbs(0.8, 1e-6));
 
-    // On the timeline, emphasis is a state rather than a curve: it holds flat across each shot and
-    // changes at the cut, instead of ramping the hero's importance through the shot before it.
+    // ...and it is not baked onto the timeline any more: the `camera/focus/emphasis` track it used to
+    // become bound to no parameter in any build (ADR-922).
     const auto tracks = seq->toTimelineTracks(4);
-    const auto& keys = tracks[5]["keys"];
-    REQUIRE(keys.size() == 8); // two per shot
-    CHECK_THAT(keys[0]["value"].get<double>(), Catch::Matchers::WithinAbs(0.0, 1e-6));
-    CHECK_THAT(keys[1]["value"].get<double>(), Catch::Matchers::WithinAbs(0.0, 1e-6));
-    CHECK_THAT(keys[2]["value"].get<double>(), Catch::Matchers::WithinAbs(0.8, 1e-6));
-    CHECK_THAT(keys[3]["time"].get<double>(), Catch::Matchers::WithinAbs(13.999, 1e-6));
+    for (const auto& track : tracks) {
+        CHECK(track["target"] != "camera/focus/emphasis");
+    }
 }
 
 TEST_CASE("The lens focuses on what the shot is about", "[app][cinematic]") {
