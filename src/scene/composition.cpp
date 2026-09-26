@@ -5341,6 +5341,34 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     }
 }
 
+namespace {
+
+// Every cached water parameter pointer of a terrain node, in one place, for the two paths that have to
+// drop them all: an unregister and a detach. They were two hand-kept lists of seven, and both missed
+// ADR-350's ten -- `detach` then left ten pointers into a set the composition had left, which the next
+// `updateWaterSurfaces` read.
+void nullWaterParameters(CompositionNode& node) {
+    node.waterGlowParam = nullptr;
+    node.waterSparkleParam = nullptr;
+    node.waterRippleParam = nullptr;
+    node.waterFlowSpeedParam = nullptr;
+    node.waterSwellParam = nullptr;
+    node.waterFoamParam = nullptr;
+    node.waterGlowColorParam = nullptr;
+    node.waterClarityParam = nullptr;
+    node.waterMaxOpacityParam = nullptr;
+    node.waterFresnelParam = nullptr;
+    node.waterReflectionParam = nullptr;
+    node.waterRoughnessParam = nullptr;
+    node.waterRefractionParam = nullptr;
+    node.waterRippleScaleParam = nullptr;
+    node.waterShallowDepthParam = nullptr;
+    node.waterShallowColorParam = nullptr;
+    node.waterDeepColorParam = nullptr;
+}
+
+} // namespace
+
 void Composition::unregisterNodeParameters(CompositionNode& node) {
     if (params_ != nullptr) {
         const std::string base = prefix_ + "nodes/" + node.name + "/";
@@ -5382,23 +5410,23 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
             node.windLagParam = nullptr;
         }
         if (node.kind == NodeKind::Terrain) {
+            // ADR-350's ten were registered and never on this list, so a removed terrain node left
+            // them behind and a node re-added under the same name was handed the dead one's values
+            // (`ParameterSet::add` returns an existing path as it is). test_water_parameters.cpp
+            // sweeps every `water/` path rather than naming these, so the next one is caught too.
             for (const char* suffix :
                  {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance",
                   "water/glow", "water/sparkle", "water/ripple", "water/flowSpeed", "water/swell",
-                  "water/foam", "water/glowColor"}) {
+                  "water/foam", "water/glowColor", "water/clarity", "water/maxOpacity", "water/fresnel",
+                  "water/reflection", "water/roughness", "water/refraction", "water/rippleScale",
+                  "water/shallowDepth", "water/shallowColor", "water/deepColor"}) {
                 params_->remove(base + suffix);
             }
             node.terrainLodParam = nullptr;
             node.terrainCullParam = nullptr;
             node.terrainLodDistanceParam = nullptr;
             node.terrainViewDistanceParam = nullptr;
-            node.waterGlowParam = nullptr;
-            node.waterSparkleParam = nullptr;
-            node.waterRippleParam = nullptr;
-            node.waterFlowSpeedParam = nullptr;
-            node.waterSwellParam = nullptr;
-            node.waterFoamParam = nullptr;
-            node.waterGlowColorParam = nullptr;
+            nullWaterParameters(node);
         }
         forEachParticleParam(node.particleParams, [&](auto* p) {
             if (p != nullptr) {
@@ -5501,13 +5529,7 @@ void Composition::detach() {
         node->terrainCullParam = nullptr;
         node->terrainLodDistanceParam = nullptr;
         node->terrainViewDistanceParam = nullptr;
-        node->waterGlowParam = nullptr;
-        node->waterSparkleParam = nullptr;
-        node->waterRippleParam = nullptr;
-        node->waterFlowSpeedParam = nullptr;
-        node->waterSwellParam = nullptr;
-        node->waterFoamParam = nullptr;
-        node->waterGlowColorParam = nullptr;
+        nullWaterParameters(*node);
         node->particleParams = {};
         node->materialPartParams.clear(); // see the note at the end of this function
         if (node->child) {
