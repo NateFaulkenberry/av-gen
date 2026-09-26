@@ -199,6 +199,42 @@ TEST_CASE("A seek lands delayed, smoothed and depth-scaled routes where a play d
     CHECK(before[3] == played[0][3]); // depth is stateless
 }
 
+// A render job seeks twice to its first instant -- once for its pipeline warm-up frame and once for
+// real -- where a test driving the same engine by hand seeks once, and the two must agree bit for bit.
+// A seek resets the routes' chains before it replays them, so the replay's landing is only good for
+// the seek that made it: the first version kept the last seek's landing and, asked for the same
+// instant again with no composition to drive the replay, skipped it and left every replayed route
+// reset (the render job's ring-versus-synchronous test, all twenty frames different). Each path a
+// seek can take: the pipeline alone, the entity replay with its checkpoints, and no audio.
+TEST_CASE("A second seek to the instant the last one landed on lands where the first did",
+          "[seek][modulation][adr901]") {
+    const long long t = 187;
+    struct Arm {
+        const char* name;
+        bool composition;
+        bool audio;
+    };
+    for (const Arm arm : {Arm{"pipeline alone", false, true}, Arm{"entity replay", true, true},
+                          Arm{"no audio", false, false}}) {
+        INFO(arm.name);
+        const auto played = play(arm.composition, {t}, arm.audio);
+        Rig rig(arm.composition, arm.audio);
+        // The render job's order: seek, the warm-up frame at the landed instant, seek again.
+        rig.engine.seekSeconds(static_cast<double>(t) / 60.0);
+        rig.landing(t);
+        requireEqual(played[0], rig.values(), t, "first landing");
+        rig.engine.seekSeconds(static_cast<double>(t) / 60.0);
+        rig.landing(t);
+        requireEqual(played[0], rig.values(), t, "second landing");
+        // And after played frames have moved every chain on.
+        rig.frame(t + 1);
+        rig.frame(t + 2);
+        rig.engine.seekSeconds(static_cast<double>(t) / 60.0);
+        rig.landing(t);
+        requireEqual(played[0], rig.values(), t, "third landing");
+    }
+}
+
 TEST_CASE("A seek through the entity replay and its checkpoints lands routes where a play does",
           "[seek][modulation][checkpoint][adr901]") {
     // 4.5 s first (a replay from zero that records a checkpoint every second), then 7.25 s (resumed
@@ -316,4 +352,46 @@ TEST_CASE("the cost of replaying a film's routes in a seek", "[.bench][seek][mod
     WARN("cold seek to 150 s: " << cold[0] << " ms with the project's routes, " << cold[1] << " ms without");
     WARN("warm seek to 149.5 s: " << warm[0] << " ms with the project's routes, " << warm[1] << " ms without");
     CHECK(cold[0] > 0.0);
+}
+
+// ADR-901's cost with no composition, where there are no checkpoints: every seek replays the signal
+// pipeline from zero (ADR-870), and since a landing is only good for the seek that made it, a second
+// seek to the same instant does too -- a render job's warm-up seek and its real one. The orb scene's
+// own eight routes on a three-minute track, minima of three. Hidden: it is a measurement.
+//   ./build/release/tests/avgen_tests "the cost of a seek's route replay with no composition" -s
+TEST_CASE("the cost of a seek's route replay with no composition", "[.bench][seek][modulation][adr901]") {
+    const std::size_t frames = 180 * kRate;
+    auto mono = testsupport::sine(55.0f, kRate, frames, 0.5f);
+    const auto clicks = testsupport::clickTrack(120.0f, kRate, frames);
+    for (std::size_t i = 0; i < frames; ++i) {
+        mono[i] += clicks[i] * 0.6f;
+    }
+    const auto wav = testsupport::processTempDir() / "route_seek_three_minutes.wav";
+    REQUIRE(audio::AudioFile::fromInterleaved(testsupport::interleave(mono, 2), 2, kRate).writeWav(wav).has_value());
+    const auto ms = [](auto start) {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    };
+    double first = 1e18;
+    double again = 1e18;
+    for (int repeat = 0; repeat < 3; ++repeat) {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadAudio(wav).has_value());
+        REQUIRE(engine.composition() == nullptr);
+        REQUIRE_FALSE(engine.modulator().routes().empty());
+        auto start = std::chrono::steady_clock::now();
+        engine.seekSeconds(170.0);
+        first = std::min(first, ms(start));
+        // The replay consumed the analysis up to the target: it ran, and was not skipped.
+        const std::uint64_t analysed = engine.stats().analysisFrames;
+        CHECK(analysed > 170u * 80u);
+        engine.update(FrameTime{170.0, 0.0, 0});
+        start = std::chrono::steady_clock::now();
+        engine.seekSeconds(170.0);
+        again = std::min(again, ms(start));
+        CHECK(engine.stats().analysisFrames == analysed);
+        WARN("analysis frames consumed by the replay: " << analysed);
+    }
+    WARN("seek to 170 s: " << first << " ms; the same instant again: " << again << " ms ("
+                           << "no composition, the orb scene's routes)");
+    CHECK(again > 0.0);
 }

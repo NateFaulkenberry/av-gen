@@ -4,8 +4,8 @@
 **Date:** 2026-09-26
 **Follows:** ADR-870 (a seek replays the signal bus), ADR-700 (seek checkpoints), ADR-091 (two-tier
 determinism), ADR-900 (the delay stage)
-**Implemented by:** `Engine::ReplaySignals` -- `prepareRoutes`, `advanceRoutes`, and the route states
-in its `capture`/`restore`/`inputKey` (`src/app/engine.cpp`); `Engine::seekSeconds`'s route-only
+**Implemented by:** `Engine::ReplaySignals` -- `begin`, `prepareRoutes`, `advanceRoutes`, and the
+route states in its `capture`/`restore`/`inputKey` (`src/app/engine.cpp`); `Engine::seekSeconds`'s route-only
 replay offline without a track; `Source::pureInTime`/`Source::sample` and `SourceRack::sample`
 (`src/signals/source.*`); `Modulator::advanceChains`/`chainStates`/`restoreChainStates`/
 `resetChainStates` (`src/params/modulation.*`); the delay and depth fields in the reaction routes'
@@ -66,6 +66,16 @@ as it continues from the replayed bus.
   after it runs with dt = 0: a one-pole does not move, and ADR-900's delay stage re-emits what it
   emitted there. So the landing frame shows what a play showed on that frame, and the next frame
   continues from it.
+- **A landing is only good for the seek that made it.** The seek resets every route's chain in the
+  modulator before it replays, so the replay cannot keep a landing across seeks the way ADR-870's
+  bus-only replay could (its state was all its own). `ReplaySignals::begin` forgets where the last
+  seek landed. With a composition nothing changes: `seekWithDirector` resets the replay first and
+  the entity replay always replays at least one step. Without one, a second seek to the instant the
+  last one landed on now replays again, where it used to reuse the landing. The first version reused
+  it and left every replayed route reset. A render job seeks twice to its first frame (its pipeline
+  warm-up, then for real), so its frames differed from a single seek's: the GPU suite's
+  ring-versus-synchronous test had all 20 frame hashes wrong and its EXR test 1,740 mismatched
+  channels.
 - **Offline without a track** there is no signal replay (ADR-870's scope, unchanged). If any route is
   replayable the seek runs the routes on the pipeline alone from zero -- silence, the clock, the pure
   sources -- and leaves the live pipeline reset as it always was. There is no checkpoint on this path;
@@ -93,10 +103,16 @@ blast radius (ADR-870 ruled the project's routes out of the entity replay after 
   - through the entity replay and its checkpoints: a first seek to 4.5 s (replayed from zero,
     recording a checkpoint a second), then to 7.25 s (resumed from the 4 s checkpoint) and back to
     2 s (resumed from the 1 s checkpoint, whose delay lines carry the history across it);
-  - offline without audio: the delayed LFO and timeline routes.
+  - offline without audio: the delayed LFO and timeline routes;
+  - a second and a third seek to the same instant, with a landing frame between them and then with
+    two played frames, on each of the three paths (the render job's order). Before the fix, the
+    pipeline-alone arm failed 8 of its 82 assertions: the four stateful routes, on the second and
+    third landings.
   - **Controls:** the same seek followed by `Modulator::resetState()` -- the old seek -- lands the
     delayed and decayed routes elsewhere (and the stateless depth route in the same place); an edited
     route after a seek lands where a play of the edited route does, which a kept checkpoint would not.
+- **The render job's two paths agree again** (GPU suite, `tests/rendering/test_render_job.cpp`): the
+  ring-versus-synchronous test and the EXR determinism test pass with 120 assertions, as on main.
 - **Cost: not measurable on the multicam film** (40 project routes; `"[.bench][adr901]"`, the two arms
   interleaved in one process, minima of three, two runs at a load average of 60-130). A cold seek to
   150 s took 2,633 and 2,745 ms with the routes replayed and 3,194 and 3,165 ms with them removed; a
@@ -105,6 +121,11 @@ blast radius (ADR-870 ruled the project's routes out of the entity replay after 
   microseconds against the entity step's milliseconds. The checkpoints grow by the replayed chain
   states -- a `ProcessorChain::State` per route, plus a delay line's samples (16 bytes each, at most
   4 s at the replay's 60 Hz) -- counted in `Checkpoint::bytes`.
+- **Cost with no composition** (no checkpoints; every seek replays the pipeline from zero, as
+  ADR-870's did): **5.0 ms** to 170 s on a three-minute track with the orb scene's eight routes, and
+  **4.8 ms** for a second seek to the same instant, which used to cost nothing. Measured by the
+  hidden case `the cost of a seek's route replay with no composition` (minima of three), which also
+  checks that the replay consumed the track's analysis to the target (14,641 frames).
 - **Not replayed, as before:** routes on envelope, random, control, macro, state, entity, character
   and field signals; timeline automation (it is a pure function of the clock and needs no replay); a
   source's parameters modulated by a route or a track (the replay samples a source with its bases).

@@ -105,10 +105,16 @@ public:
         bus_ = zeroBus_;
     }
 
-    // What this seek's frames read that the pipeline does not carry, fixed for the seek.
+    // What this seek's frames read that the pipeline does not carry, fixed for the seek -- and none
+    // of where the last seek landed. ADR-901: the seek has just reset the routes' chains in the
+    // modulator, so a landing is only good for the seek that made it. `exactAt` must mean that this
+    // seek's replay stands at the target; the first version kept the last landing, and a second seek
+    // to the same instant with no composition to drive the replay skipped it and left every
+    // replayed route reset (a render job seeks twice to its first frame: its warm-up, then for real).
     void begin(bool playing, double duration) {
         playing_ = playing;
         duration_ = duration;
+        lastBuilt_ = -1.0;
         prepareRoutes();
     }
 
