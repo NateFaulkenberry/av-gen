@@ -148,7 +148,7 @@ struct CameraRig {
     // is the behaviour every existing rig has.
     bool followLocal = false;
 
-    // **`followLagSeconds`** puts the camera where the subject *was*, not where it is. Lag in time
+    // **`followLagSeconds`** puts the eye where the subject *was*, not where it is. Lag in time
     // rather than a spring, and that choice is the whole reason this is safe to render:
     //
     //   * A spring integrates. Its position at t = 30 s depends on the path taken to reach 30 s, so
@@ -159,25 +159,76 @@ struct CameraRig {
     //   * A time lag reads a *fact*: where the subject stood at t - lag. Two runs that agree about
     //     the subject agree about the camera.
     //
-    // What it cannot do is overshoot and settle, because that is what integration buys. A chase
-    // camera here trails and catches up; it does not swing past and come back.
-    //
-    // The honest limit, stated where it is set rather than in a release note: the trail is *seen*
-    // rather than re-derived, so a time the composition has not played through is not in it. At the
-    // head of a render, and for `lag` seconds after a seek, the camera runs un-lagged and closes to
-    // its lag over that interval. Deterministic for a given start, because a render always plays
-    // forward from `startSeconds` -- but it does mean a render from 10 s and the same frame inside
-    // a render from 0 s are not the same frame, and that is worth knowing before rendering a range.
+    // ADR-911: the fact is read from HIST (ADR-703), the transform history the ADR-700 seek replay
+    // rebuilds and the checkpoints carry, so a scrub to t and a play to t read the same past, and a
+    // render from 10 s is the same film as the same frames inside a render from 0 s. Only the EYE
+    // lags; the aim reads the reference at t. That difference is what turns a walking subject's
+    // stride bob into a nod, so a lag wants the vertical smoothing below as well.
     double followLagSeconds = 0.0;
 
-    // **`followClearance`** is metres above the terrain the eye is kept, 0 to leave it alone. The
+    // ---- the subject reference (ADR-911) ---------------------------------------------------------
+    //
+    // What the eye and the aim read is not the subject's node but a filtered REFERENCE of it: the
+    // subject's own past (HIST) through a causal, finite, critically damped kernel
+    // h(tau) = w^2 tau e^(-w tau), w = 2 / T, truncated at 8 / w. T is the kernel's mean delay
+    // (scene/follow_reference.hpp). The same reference serves the eye (at t - lag, plus the offset)
+    // and the aim (at t, plus the aim offset), and that is a rule rather than a convenience:
+    // filtering only the eye's height, or delaying only the eye, is itself a nod -- 0.7 to 1.0
+    // degrees on GV3. With no integrator anywhere the reference is a pure function of the history,
+    // so it is exactly as seek-exact as HIST is. Every knob is 0 by default, and all of them 0 is
+    // the raw node: every rig written before this.
+    //
+    // They filter every node the rig reads, `followNode` and `aimNode` alike, so an aim-only rig (a
+    // fixed eye watching something move) gets look-at damping from the same numbers.
+    //
+    // **`followSmoothSeconds`**: T for the horizontal (X and Z) -- the starts, stops and turns of a
+    // body that a welded camera takes one to one.
+    double followSmoothSeconds = 0.0;
+    // **`followVerticalSmoothSeconds`**: T for the height, separately, because the height carries
+    // the stride bob (about 1 Hz), which wants a longer constant than the horizontal can afford.
+    double followVerticalSmoothSeconds = 0.0;
+    // **`followLead`**, 0 to 1: adds `lead * T * velocity` of the filtered horizontal path, which
+    // cancels the kernel's delay on a steady walk (1 cancels it exactly), so the camera keeps up
+    // without being welded on. Horizontal only: a lead on the height re-injects the bob.
+    float followLead = 0.0f;
+    // **`followGround`**: the subject walks on the terrain, so its height is filtered RELATIVE TO THE
+    // GROUND. The vertical smoothing takes out the height above the ground (the stride, a hop), and
+    // the ground itself is followed under the horizontally smoothed path, so a body walking down a
+    // hill is followed down it with the horizontal constant's lag instead of the vertical one's.
+    // Off, a 1 m/s descent under a 0.8 s constant leaves the subject 0.8 m low in frame (GV3 s19: a
+    // third of the frame). Not for things that fly: the ground under a level craft crossing a hill
+    // is not where the craft is.
+    bool followGround = false;
+    // **`followHeadingSmoothSeconds`**: T for the heading `followLocal` turns its offset by. The
+    // heading is the subject's yaw alone -- not its sway, nod or slope tilt -- through the same
+    // kernel, so "behind" swings round after a turn instead of whipping with it. Its own constant
+    // because a chase wants its position tight and its swing slow: a body that pivots on the spot
+    // turns the camera through the whole angle either way, and only the rate is the camera's.
+    double followHeadingSmoothSeconds = 0.0;
+
+    // **`followClearance`** is metres above the surface the eye is kept, 0 to leave it alone. The
     // surface rather than the ground, so the camera does not dive through a lake either.
+    //
+    // ADR-911: a soft floor, evaluated on the filtered eye -- `floor + w ln(1 + e^((y - floor) / w))`
+    // with w = `kFollowFloorSoftness` (0.25 m). Never below the floor, within millimetres of the
+    // unclamped eye a metre above it, and -- unlike the `max` it replaced -- no step in the eye's
+    // vertical velocity where the floor takes hold or lets go (0.22 to 1.44 m/s in 50 ms on GV3 s20).
     //
     // This is the whole of camera collision in this engine, and the scope is deliberate: the ground
     // is the thing a chase camera actually hits, it is exactly queryable from `TerrainQuery`, and it
     // cannot jitter. Trunks and rocks are not covered -- a camera squeezing between scattered
     // instances pops, and a popping camera is worse than one that clips a tree.
     float followClearance = 0.0f;
+
+    // Whether the eye or the aim reads the subject's history at all: a lag, or any smoothing. False
+    // is the raw node at t, which needs no history and costs nothing.
+    [[nodiscard]] bool readsSubjectHistory() const {
+        return followLagSeconds > 0.0 || followSmoothSeconds > 0.0 || followVerticalSmoothSeconds > 0.0 ||
+               (followLocal && followHeadingSmoothSeconds > 0.0);
+    }
+    // How far back that history is read, in seconds: the lag, the longest kernel's reach and the tap
+    // the lead's difference adds, plus a step of margin. What the rig subscribes HIST to.
+    [[nodiscard]] double subjectHistorySeconds() const;
 
     // Spline placement only.
     std::string spline;

@@ -1,5 +1,8 @@
 #include "scene/camera_rig.hpp"
 
+#include "scene/follow_reference.hpp"
+#include "world/effects/history_bank.hpp"
+
 #include <array>
 
 #include <nlohmann/json.hpp>
@@ -104,6 +107,17 @@ std::string cameraSlug(std::string_view name) {
         out.insert(out.begin(), 'c');
     }
     return out;
+}
+
+double CameraRig::subjectHistorySeconds() const {
+    if (!readsSubjectHistory()) {
+        return 0.0;
+    }
+    const double heading = followLocal ? followHeadingSmoothSeconds : 0.0;
+    const double reach = followKernelReach(std::max({followSmoothSeconds, followVerticalSmoothSeconds, heading}));
+    // One tap for the lead's difference kernel, one of margin: HIST keeps one sample at or before its
+    // cut, so a read at exactly the reach is bracketed in a play and in a seek alike.
+    return std::max(followLagSeconds, 0.0) + reach + (2.0 * kFollowKernelStep);
 }
 
 std::string CameraRig::channelPrefix() const {
@@ -223,6 +237,21 @@ Result<void> CameraDirection::validate() const {
         if (rig.placement == CameraPlacement::Spline && rig.spline.empty() && rig.id != kMainCamera) {
             return fail("camera '{}' rides a spline but names none", rig.name);
         }
+        // ADR-911. Refused rather than clamped: a negative constant has no meaning, and a lead past 1
+        // puts the camera ahead of where its subject is going to be -- a typo, not a style.
+        if (rig.followLagSeconds < 0.0 || rig.followSmoothSeconds < 0.0 || rig.followVerticalSmoothSeconds < 0.0 ||
+            rig.followHeadingSmoothSeconds < 0.0 || rig.followClearance < 0.0f) {
+            return fail("camera '{}' has a negative follow lag, smoothing or clearance", rig.name);
+        }
+        if (!(rig.followLead >= 0.0f && rig.followLead <= 1.0f)) {
+            return fail("camera '{}' has a follow lead of {}; it is a fraction of the smoothing's delay, 0 to 1",
+                        rig.name, rig.followLead);
+        }
+        if (rig.subjectHistorySeconds() > static_cast<double>(world::HistoryBank::kMaxSeconds)) {
+            return fail("camera '{}' reads {:.1f} s of its subject's history (lag plus four smoothing constants); "
+                        "HIST holds at most {:.0f} s",
+                        rig.name, rig.subjectHistorySeconds(), world::HistoryBank::kMaxSeconds);
+        }
     }
     if (!cameras.empty() && ids.find(kMainCamera) == ids.end()) {
         return fail("the camera list has no main camera");
@@ -331,6 +360,25 @@ json CameraDirection::toJson() const {
                 if (rig.followClearance > 0.0f) {
                     c["followClearance"] = rig.followClearance;
                 }
+                if (rig.followHeadingSmoothSeconds > 0.0) {
+                    c["followHeadingSmoothSeconds"] = rig.followHeadingSmoothSeconds;
+                }
+            }
+            // ADR-911: the subject reference filters whichever nodes the rig reads, so an aim-only
+            // rig carries it too. Written only when set, for the same byte-identity.
+            if (!rig.followNode.empty() || !rig.aimNode.empty()) {
+                if (rig.followSmoothSeconds > 0.0) {
+                    c["followSmoothSeconds"] = rig.followSmoothSeconds;
+                }
+                if (rig.followVerticalSmoothSeconds > 0.0) {
+                    c["followVerticalSmoothSeconds"] = rig.followVerticalSmoothSeconds;
+                }
+                if (rig.followLead > 0.0f) {
+                    c["followLead"] = rig.followLead;
+                }
+                if (rig.followGround) {
+                    c["followGround"] = true;
+                }
             }
             if (rig.focalLength > 0.0f) {
                 c["focalLength"] = rig.focalLength;
@@ -403,6 +451,13 @@ Result<CameraDirection> CameraDirection::fromJson(const json& doc) {
                 rig.followLocal = c.value("followLocal", rig.followLocal);
                 rig.followLagSeconds = c.value("followLagSeconds", rig.followLagSeconds);
                 rig.followClearance = c.value("followClearance", rig.followClearance);
+                rig.followSmoothSeconds = c.value("followSmoothSeconds", rig.followSmoothSeconds);
+                rig.followVerticalSmoothSeconds =
+                    c.value("followVerticalSmoothSeconds", rig.followVerticalSmoothSeconds);
+                rig.followLead = c.value("followLead", rig.followLead);
+                rig.followGround = c.value("followGround", rig.followGround);
+                rig.followHeadingSmoothSeconds =
+                    c.value("followHeadingSmoothSeconds", rig.followHeadingSmoothSeconds);
                 rig.focalLength = c.value("focalLength", rig.focalLength);
                 rig.spline = c.value("spline", rig.spline);
                 rig.splineT = c.value("splineT", rig.splineT);

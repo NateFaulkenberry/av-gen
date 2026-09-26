@@ -3711,14 +3711,10 @@ void Engine::seekSeconds(double seconds) {
         // every character that perceives them exactly where a play from zero puts them. The
         // reset is inside `seekWithDirector`; what ADR-209 called "picks up again on the next
         // frame" is now "is where it would have been".
-        // ADR-217: and the camera's hold on it, for the same reason. The hold is derived from the
-        // scenario's state, and the scenario has just been put back to the top -- a hold left armed
-        // across the seek would keep the camera on a shot the new second is nowhere near.
-        composition->clearAimFollowState();
-        // ADR-245: and the camera director's view of what has happened, for exactly the same
-        // reason. An event span observed before the jump describes a run of a scenario that the
-        // seek has just abolished; carrying it over would cut to an event camera for an event that
-        // is no longer happening.
+        // ADR-245: and the camera director's view of what has happened, for the same reason. An
+        // event span observed before the jump describes a run of a scenario that the seek has just
+        // abolished; carrying it over would cut to an event camera for an event that is no longer
+        // happening.
         composition->clearCameraEventState();
         // No camera position and no distance-detail flag: a seek that culled by distance was a
         // function of where the camera happened to be, and ADR-267 measured that at 50.263 m over
@@ -3770,6 +3766,9 @@ void Engine::seekSeconds(double seconds) {
         }
         stats_.analysisFrames = clock_.analysisCursor;
     }
+    // ADR-912: nothing to scan for a keyed cut across a jump; the renderer drops its history for the
+    // jump itself.
+    cutScanFrom_ = std::numeric_limits<double>::quiet_NaN();
     // A live event belongs to the moment it happened and the moment is gone; the scheduled tier is
     // rebased rather than cleared, so the next frame restores the standing intents at the new
     // playhead instead of replaying everything between here and there (ADR-098).
@@ -5194,6 +5193,8 @@ void Engine::update(const FrameTime& time) {
     // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects
     // read them -- so a Trail's head and its newest sample are the same instant.
     recordHistory();
+    // ADR-912: and whether the camera just cut, by the timeline's say-so.
+    markKeyedCameraCut();
     probeStage(probe2::frame().updControllerMs); // TEMPORARY: phase 2
     stats_.allocsController = allocsNow() - allocMark;
     scene::applyPostParameters(postParams_, post_);
@@ -5342,6 +5343,11 @@ void Engine::refreshHistorySubscriptions() {
         }
     }
     world::appendEffectHistoryNeeds(effects_, wanted); // Wave 2: Proximity triggers, a Shockwave's release point, a wake
+    // ADR-911: the camera rigs' subjects, for the lag and the smoothed reference -- recorded, replayed
+    // and checkpointed like any effect owner's, which is what makes the camera seek-exact.
+    if (comp != nullptr) {
+        comp->appendCameraHistoryNeeds(wanted);
+    }
     if (historyBank_.subscribe(wanted) || entitySignals_.size() != historyBank_.ringCount()) {
         // Signals of an entity nobody reads any more go quiet rather than holding their last value.
         for (const EntitySignalIds& old : entitySignals_) {
@@ -5367,6 +5373,47 @@ void Engine::refreshHistorySubscriptions() {
     }
     if (cameraSpeedSignal_ == signals::kInvalidSignal) {
         cameraSpeedSignal_ = bus_.declare("camera.speed", 0.0f, 50.0f);
+    }
+}
+
+void Engine::markKeyedCameraCut() {
+    const double now = timelineClock_.seconds;
+    const double from = cutScanFrom_;
+    cutScanFrom_ = now;
+    scene::Composition* comp = composition();
+    if (comp == nullptr || !std::isfinite(from) || !(now > from) || timeline_.tracks().empty()) {
+        return;
+    }
+    // The tracks that place the picture: the active camera's (and, mid-blend, the outgoing one's)
+    // eye, aim and lens. The main camera's channels are the legacy `camera/*` block.
+    const scene::ActiveCameraState active = comp->activeCamera();
+    const auto prefixOf = [&](scene::CameraId id) -> std::string {
+        const scene::CameraRig* rig = comp->cameraDirection().find(id);
+        return rig == nullptr || rig->id == scene::kMainCamera ? std::string("camera/")
+                                                                 : "cameras/" + rig->slug + "/";
+    };
+    static constexpr std::array<std::string_view, 8> kPose = {"position",     "target",       "fov",
+                                                              "focalLength",  "lens/focalLength",
+                                                              "followOffset", "aimOffset",    "splineOffset"};
+    const auto jumps = [&](const std::string& prefix) {
+        for (const params::Track& track : timeline_.tracks()) {
+            if (!track.enabled || !track.target.starts_with(prefix)) {
+                continue;
+            }
+            const std::string_view leaf = std::string_view(track.target).substr(prefix.size());
+            if (std::find(kPose.begin(), kPose.end(), leaf) == kPose.end()) {
+                continue;
+            }
+            // Two ramps' worth, so a key time that went through a file and came back a few ULPs
+            // longer than the bake wrote it still reads as the cut it is.
+            if (track.jumpsWithin(from, now, 2.0 * params::kCutRampSeconds)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (jumps(prefixOf(active.camera)) || (active.blending() && jumps(prefixOf(active.previous)))) {
+        comp->markCameraCut();
     }
 }
 

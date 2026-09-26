@@ -1,5 +1,7 @@
 #include "scene/composition.hpp"
 
+#include "scene/follow_reference.hpp"
+
 #include "params/timeline.hpp"
 
 #include "core/json_keys.hpp"
@@ -1193,6 +1195,14 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
     return {};
 }
 
+std::vector<world::HeroPoint> Composition::authoredHeroes() const {
+    std::vector<world::HeroPoint> out = heroes_;
+    for (std::size_t i = 0; i < out.size() && i < heroBasePositions_.size(); ++i) {
+        out[i].position = heroBasePositions_[i];
+    }
+    return out;
+}
+
 // A hero describes an object that is already placed (ADR-074), so moving the object has to move the
 // description with it. Before this it did not: the position was a snapshot taken at declaration, so
 // dragging a hero's object left the director framing the empty space it used to occupy, and the
@@ -1206,123 +1216,6 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
 //
 // A hero that names an assembly rather than a node has no anchor and is left alone; there is no one
 // object whose movement would be the assembly's.
-void Composition::recordFollowTrails() {
-    // What has to be remembered, and for how long. Collected from the rigs each frame rather than
-    // cached, because a rig's lag is a parameter somebody can change mid-session and a trail sized
-    // against a stale lag is a chase that silently stops lagging.
-    double longest = 0.0;
-    std::vector<const std::string*> wanted;
-    for (const CameraRig& rig : cameraDirection_.cameras) {
-        if (rig.followNode.empty() || rig.followLagSeconds <= 0.0) {
-            continue;
-        }
-        longest = std::max(longest, rig.followLagSeconds);
-        if (std::none_of(wanted.begin(), wanted.end(),
-                         [&](const std::string* n) { return *n == rig.followNode; })) {
-            wanted.push_back(&rig.followNode);
-        }
-    }
-    if (wanted.empty()) {
-        // Nothing chases anything. Release rather than leave, so switching a chase off stops paying
-        // for it immediately instead of at the next scene load.
-        followTrails_.clear();
-        return;
-    }
-
-    // A margin over the longest lag, so a query lands inside the samples rather than on the oldest
-    // one; and a ceiling, because a lag of an hour is a typo and not a request.
-    const double keep = std::min(longest + 1.0, 60.0);
-
-    for (const std::string* name : wanted) {
-        auto it = std::find_if(followTrails_.begin(), followTrails_.end(),
-                               [&](const FollowTrail& t) { return t.node == *name; });
-        if (it == followTrails_.end()) {
-            followTrails_.push_back(FollowTrail{.node = *name, .samples = {}});
-            it = std::prev(followTrails_.end());
-        }
-        const CompositionNode* node = findNode(*name);
-        if (node == nullptr) {
-            continue; // a chase whose subject left the scene keeps the trail it had
-        }
-        const Transform world = nodeWorldTransform(*node);
-        // A seek is a discontinuity in a record of *when things were*, not a gap to interpolate
-        // across: time going backwards, or forwards by more than a long frame, means the samples
-        // after it do not describe the same play-through as the ones before. Dropping the old ones
-        // is what stops a chase interpolating the subject across a cut in time.
-        if (!it->samples.empty()) {
-            const double last = it->samples.back().seconds;
-            if (currentTime_ < last || currentTime_ - last > 0.5) {
-                it->samples.clear();
-                followTrailShortReported_ = false;
-            }
-        }
-        it->samples.push_back(FollowTrail::Sample{.seconds = currentTime_,
-                                                  .position = world.position,
-                                                  .rotation = world.rotation});
-        const auto stale = std::find_if(it->samples.begin(), it->samples.end(),
-                                        [&](const FollowTrail::Sample& sm) {
-                                            return sm.seconds >= currentTime_ - keep;
-                                        });
-        if (stale != it->samples.begin()) {
-            // One sample before the window is kept deliberately: a query at exactly the window's
-            // edge needs something on both sides of it to interpolate between.
-            it->samples.erase(it->samples.begin(), std::prev(stale));
-        }
-    }
-
-    // Trails nobody chases any more.
-    std::erase_if(followTrails_, [&](const FollowTrail& t) {
-        return std::none_of(wanted.begin(), wanted.end(),
-                            [&](const std::string* n) { return *n == t.node; });
-    });
-}
-
-FollowTrail::Sample Composition::followTrailAt(const std::string& node, double seconds,
-                                               const FollowTrail::Sample& fallback) const {
-    const auto trail = std::find_if(followTrails_.begin(), followTrails_.end(),
-                                    [&](const FollowTrail& t) { return t.node == node; });
-    if (trail == followTrails_.end() || trail->samples.empty()) {
-        return fallback;
-    }
-    const std::vector<FollowTrail::Sample>& s = trail->samples;
-    if (seconds <= s.front().seconds) {
-        // Before anything this play-through has seen. The camera runs un-lagged rather than
-        // pretending, and says so once -- an un-lagged chase looks exactly like a working one, so
-        // nothing but a log line distinguishes "the lag is not ready" from "the lag is zero".
-        if (!followTrailShortReported_) {
-            followTrailShortReported_ = true;
-            log::info("chase: '{}' has no trail back to {:.2f}s yet; the camera runs un-lagged "
-                      "until it does (the head of a render, or just after a seek)",
-                      node, seconds);
-        }
-        return fallback;
-    }
-    if (seconds >= s.back().seconds) {
-        return s.back();
-    }
-    const auto after = std::lower_bound(s.begin(), s.end(), seconds,
-                                        [](const FollowTrail::Sample& sm, double t) {
-                                            return sm.seconds < t;
-                                        });
-    const FollowTrail::Sample& b = *after;
-    const FollowTrail::Sample& a = *std::prev(after);
-    const double span = b.seconds - a.seconds;
-    const float u = span > 1e-9 ? static_cast<float>((seconds - a.seconds) / span) : 0.0f;
-    FollowTrail::Sample out;
-    out.seconds = seconds;
-    out.position = glm::mix(a.position, b.position, u);
-    out.rotation = glm::slerp(a.rotation, b.rotation, u);
-    return out;
-}
-
-std::vector<world::HeroPoint> Composition::authoredHeroes() const {
-    std::vector<world::HeroPoint> out = heroes_;
-    for (std::size_t i = 0; i < out.size() && i < heroBasePositions_.size(); ++i) {
-        out[i].position = heroBasePositions_[i];
-    }
-    return out;
-}
-
 void Composition::syncHeroesToNodes() {
     if (heroes_.empty()) {
         return;
@@ -1435,7 +1328,6 @@ void Composition::applyDirectedAim() {
     // are read from where the heroes are *now*, so this stays a function of the playhead and the
     // world: a scrub lands on the same aim a play does, with no memory of the frame before.
     std::optional<glm::vec3> raw;
-    bool joining = false;
     if (active != nullptr) {
         raw = walkedSinceCut(*active);
         const double into = currentTime_ - active->startSeconds;
@@ -1448,7 +1340,6 @@ void Composition::applyDirectedAim() {
                 }
             }
             raw = glm::mix(from, raw.value_or(glm::vec3(0.0f)), ease(into / active->joinInSeconds));
-            joining = true;
         }
     } else {
         // Between follow entries: a shot that aims down its move rather than at a subject. After
@@ -1458,56 +1349,26 @@ void Composition::applyDirectedAim() {
             if (shot.joinOutSeconds > 0.0 && after >= 0.0 && after < shot.joinOutSeconds) {
                 if (const auto walked = walkedSinceCut(shot)) {
                     raw = *walked * (1.0f - ease(after / shot.joinOutSeconds));
-                    joining = true;
                 }
                 break;
             }
         }
     }
-    if (active != aimFollowLast_) {
-        // A cut. The delta is zero by definition at the start of a shot -- the hero is at
-        // `heroAtCut` -- so the filter starts from zero rather than from the last shot's offset,
-        // which would open the new shot pointing at where the previous hero had got to. A join is
-        // not a cut, and the filter carries straight across it.
-        if (!joining) {
-            aimFollowSmoothed_ = glm::vec3(0.0f);
-            aimFollowPrimed_ = false;
-        }
-        aimFollowLast_ = active;
-    }
     if (raw.has_value()) {
-        glm::vec3 delta = *raw;
-        if (aimFollowSmoothingMs_ > 1e-3f) {
-            // ADR-245. Framed in seconds of the *timeline* rather than of the wall clock, so an
-            // offline render and live playback filter identically -- the same rule every other
-            // smoother in this file follows.
-            const double dt = std::max(currentTime_ - aimFollowPrevTime_, 0.0);
-            if (!aimFollowPrimed_) {
-                // The first frame of a shot has no previous sample to move away from, and the
-                // honest starting value is the delta itself: at a cut that is zero, and after a
-                // seek it is wherever the hero actually is. Starting at zero instead would make
-                // the camera crawl to its subject over the filter's constant, every seek.
-                aimFollowSmoothed_ = *raw;
-                aimFollowPrimed_ = true;
-            } else if (dt > 0.0) {
-                const double tau = static_cast<double>(aimFollowSmoothingMs_) / 1000.0;
-                const auto rate = static_cast<float>(1.0 - std::exp(-dt / std::max(tau, 1e-6)));
-                aimFollowSmoothed_ += (*raw - aimFollowSmoothed_) * rate;
-            }
-            delta = aimFollowSmoothed_;
-        }
-        // ADR-890: the nudge belongs to the film's main camera, so it lands only on a frame
-        // that *is* the film's. This runs after `applyViewportView` (it has to: the hero has
-        // only just moved), which put the editor's viewpoint or a looked-through rig on screen
-        // if the person asked for one -- and adding the hero's walk to that is the director
-        // steering a camera it does not own: "I have control of the camera and it is still
-        // moved by the director". The smoother above keeps running either way, so going back
-        // to the film mid-shot lands on the filtered offset rather than restarting it.
+        // ADR-890: the nudge belongs to the film's main camera, so it lands only on a frame that
+        // *is* the film's. This runs after `applyViewportView` (it has to: the hero has only just
+        // moved), which put the editor's viewpoint or a looked-through rig on screen if the person
+        // asked for one -- and adding the hero's walk to that is the director steering a camera it
+        // does not own: "I have control of the camera and it is still moved by the director".
+        //
+        // ADR-911: unfiltered. The one-pole smoother that sat here (ADR-245's
+        // `aimFollowSmoothingMs`) integrated across frames, so it was not seek-exact, and nothing
+        // could reach it: its constant defaulted to 0 and no file, tool or panel ever set it. It
+        // was removed rather than kept as a knob nobody can turn.
         if (!viewportOwnsFrame_) {
-            scene_.camera.target += delta;
+            scene_.camera.target += *raw;
         }
     }
-    aimFollowPrevTime_ = currentTime_;
 }
 
 // The two halves of the debounce, shared by "a hero followed its object" and "somebody edited one".
@@ -3737,8 +3598,7 @@ Result<void> Composition::setParent(const std::string& name, const std::string& 
 
 // ---- ADR-703: HIST ---------------------------------------------------------------------------------
 
-void Composition::recordHistory(world::HistoryBank& bank, double seconds,
-                                const world::HistoryAutomation* automation) const {
+Transform Composition::rootFold() const {
     // The root fold `applyParameters` and `ReplayPlacement::capture` put every node through, with
     // the same arithmetic, so a played sample and a replayed one are the same number.
     const float rootScale = (rootScale_ != nullptr ? rootScale_->value() : 1.0f) +
@@ -3747,6 +3607,12 @@ void Composition::recordHistory(world::HistoryBank& bank, double seconds,
     root.rotation = glm::angleAxis(rootAngle_, glm::vec3(0.0f, 1.0f, 0.0f));
     root.scale = glm::vec3(rootScale);
     root.position = center_ - root.rotation * (center_ * rootScale);
+    return root;
+}
+
+void Composition::recordHistory(world::HistoryBank& bank, double seconds,
+                                const world::HistoryAutomation* automation) const {
+    const Transform root = rootFold();
     for (std::size_t ring = 0; ring < bank.ringCount(); ++ring) {
         // The node's index, cached in the bank and checked by name: a replay is thirteen thousand
         // steps and a name search of every node at each is not free.
@@ -3769,6 +3635,74 @@ void Composition::recordHistory(world::HistoryBank& bank, double seconds,
         const Transform full = compose(root, local);
         bank.record(ring, seconds, full.position, full.rotation, full.scale);
     }
+}
+
+// ---- ADR-911: the camera's subjects in HIST -----------------------------------------------------------
+
+void Composition::appendCameraHistoryNeeds(std::vector<world::HistorySubscription>& out) const {
+    for (const CameraRig& rig : cameraDirection_.cameras) {
+        if (rig.id == kMainCamera || !rig.readsSubjectHistory()) {
+            continue;
+        }
+        const auto seconds = static_cast<float>(rig.subjectHistorySeconds());
+        if (!rig.followNode.empty()) {
+            out.push_back(world::HistorySubscription{rig.followNode, seconds});
+        }
+        // The aim reads the reference at t, never at t - lag: it needs the kernel's reach only. The
+        // bank merges the two when the nodes are one, keeping the deeper.
+        if (!rig.aimNode.empty() && (rig.followSmoothSeconds > 0.0 || rig.followVerticalSmoothSeconds > 0.0)) {
+            CameraRig aimOnly = rig;
+            aimOnly.followLagSeconds = 0.0;
+            out.push_back(world::HistorySubscription{rig.aimNode, static_cast<float>(aimOnly.subjectHistorySeconds())});
+        }
+    }
+}
+
+world::HistorySample Composition::subjectHead(const CompositionNode& node) const {
+    const Transform full = compose(rootFold(), nodeWorldTransform(node));
+    world::HistorySample head;
+    head.t = currentTime_;
+    head.position = full.position;
+    head.rotation = full.rotation;
+    head.scale = full.scale;
+    return head;
+}
+
+std::size_t Composition::subjectRing(const std::string& node, bool needed) const {
+    if (historyBank_ == nullptr) {
+        if (needed && std::ranges::find(cameraHistoryMissing_, node) == cameraHistoryMissing_.end()) {
+            cameraHistoryMissing_.push_back(node);
+            log::warn("camera: a rig smooths or lags '{}' but this composition has no transform history "
+                      "(HIST) attached, so it follows the raw node",
+                      node);
+        }
+        return 0;
+    }
+    const std::size_t ring = historyBank_->find(node);
+    if (ring >= historyBank_->ringCount() && needed &&
+        std::ranges::find(cameraHistoryMissing_, node) == cameraHistoryMissing_.end()) {
+        cameraHistoryMissing_.push_back(node);
+        log::warn("camera: a rig smooths or lags '{}' but HIST records no history for it (the host did "
+                  "not subscribe `appendCameraHistoryNeeds`), so it follows the raw node",
+                  node);
+    }
+    return ring;
+}
+
+void Composition::holdRigsForCut() {
+    for (SkinnedRig& rig : scene_.rigs) {
+        rig.hold();
+    }
+}
+
+void Composition::markCameraCut() {
+    if (cameraCutThisFrame_) {
+        return; // the frame is a cut already, and its rigs are held
+    }
+    cameraCutThisFrame_ = true;
+    ++cameraCutSerial_;
+    scene_.camera.cutSerial = cameraCutSerial_;
+    holdRigsForCut();
 }
 
 Transform Composition::automatedWorldTransform(const CompositionNode& node, const world::HistoryAutomation& automation,
@@ -7205,6 +7139,7 @@ void Composition::update(const FrameTime& time) {
     if (cameraOrbitSpeed_ != nullptr) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
+    cameraCutThisFrame_ = false; // ADR-912: `applyParameters` says whether this frame is a cut
     applyParameters();
     // ADR-346: after `applyParameters`, not before it. The day/night cycle asks for the map swap
     // from inside that call, so resolving first meant the swap landed a frame late -- and in a
@@ -7216,9 +7151,6 @@ void Composition::update(const FrameTime& time) {
     // After the parameters, because a node's position is one of them: a hero follows the object it
     // describes, and where that object is has only just been decided for this frame.
     syncHeroesToNodes();
-    // The chase trails, recorded at the same moment and for the same reason: this is the frame at
-    // which where a node *is* has stopped being a question.
-    recordFollowTrails();
     // And after *that*, because the aim follows where the hero is now. Putting it inside
     // `applyParameters` would have aimed at last frame's position, which is a lag nobody would ever
     // see and a wrongness anybody could later trip over.
@@ -7228,6 +7160,10 @@ void Composition::update(const FrameTime& time) {
     // frame's -- a raft that has moved out of frame must be culled on where it is now.
     updateFloaters(time.renderTime);
     updateCharacters(time);
+    // ADR-912: after the rigs are posed, so a cut's frame draws no joint motion across it either.
+    if (cameraCutThisFrame_) {
+        holdRigsForCut();
+    }
     cullEntityNodes();
 }
 
@@ -7448,6 +7384,24 @@ CameraPose Composition::evaluateMainCamera() const {
     return pose;
 }
 
+namespace {
+
+// ADR-911: the terrain a walking subject stands on, for `CameraRig::followGround` -- the navigator's
+// ground (`WorldMap::height`), which is what entities are grounded on.
+class TerrainFollowGround final : public FollowGround {
+public:
+    explicit TerrainFollowGround(const world::TerrainQuery& terrain) : terrain_(terrain) {}
+    [[nodiscard]] float heightAt(glm::vec2 xz) const override { return terrain_.heightAt(xz); }
+
+private:
+    const world::TerrainQuery& terrain_;
+};
+
+// The surface the clearance floor stands on: water or ground, whichever is higher.
+float clearanceSurfaceAt(const world::TerrainQuery& terrain, glm::vec2 xz) { return terrain.surfaceAt(xz); }
+
+} // namespace
+
 CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const CameraChannels* channels) const {
     CameraPose pose;
     // The parameters when the composition is attached, the authored bases when it is not: the same
@@ -7476,51 +7430,80 @@ CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const Camer
         // A spline camera whose spline is not in the scene falls back to its free pose rather than
         // to the origin: a camera that silently jumps to (0,0,0) is a bug that looks like a cut.
     }
-    // A camera that watches something: resolved against where that node is *now*, which is what
-    // lets one camera cover an event that moves. The node not being there leaves the channels in
-    // charge rather than sending the camera to the origin.
+    // A camera that watches something: resolved against where that node is, which is what lets one
+    // camera cover an event that moves. The node not being there leaves the channels in charge
+    // rather than sending the camera to the origin.
+    //
+    // ADR-911: "where that node is" is the rig's subject REFERENCE -- the node's own past (HIST)
+    // through the rig's kernel, a pure function of the history, so a scrub lands where a play does.
+    // With every knob at 0 it is the node at this instant, exactly as before. The eye reads it at
+    // t - lag and the aim at t, and when the two nodes are one node they read one reference: an eye
+    // filtered differently from its aim is a nod.
+    FollowFilter filter;
+    filter.horizontalSeconds = rig.followSmoothSeconds;
+    filter.verticalSeconds = rig.followVerticalSmoothSeconds;
+    filter.headingSeconds = rig.followLocal ? rig.followHeadingSmoothSeconds : 0.0;
+    filter.lead = rig.followLead;
+    filter.ground = rig.followGround;
+    // The ground is read only by a rig that asks for it: `followGround`, or a clearance floor.
+    const world::TerrainQuery terrain =
+        (rig.followGround || rig.followClearance > 0.0f) ? terrainQuery() : world::TerrainQuery{};
+    const TerrainFollowGround ground(terrain);
+    const FollowGround* groundPtr = terrain.valid() && rig.followGround ? &ground : nullptr;
+    const bool smooths = rig.followSmoothSeconds > 0.0 || rig.followVerticalSmoothSeconds > 0.0;
+    // The follow node's reference at t, when the eye read it there: the aim of a rig that aims at
+    // what it follows is the same number, and need not run the kernel twice.
+    std::optional<glm::vec3> followReferenceNow;
+
     if (!rig.followNode.empty()) {
         if (const CompositionNode* node = findNode(rig.followNode); node != nullptr) {
-            const Transform now = nodeWorldTransform(*node);
-            // Where the subject is, or -- for a chase -- where it was. Both the position and the
-            // facing come from the same instant, so a camera behind a turning subject stays behind
-            // the heading it had then rather than snapping to the one it has now.
-            FollowTrail::Sample at{.seconds = currentTime_,
-                                   .position = now.position,
-                                   .rotation = now.rotation};
-            if (rig.followLagSeconds > 0.0) {
-                at = followTrailAt(rig.followNode, currentTime_ - rig.followLagSeconds, at);
+            const bool needsHistory = rig.readsSubjectHistory();
+            const SubjectTrail trail(historyBank_, subjectRing(rig.followNode, needsHistory), currentTime_,
+                                     subjectHead(*node));
+            const FollowReference ref =
+                followReference(trail, currentTime_ - std::max(rig.followLagSeconds, 0.0), filter, groundPtr);
+            if (!(rig.followLagSeconds > 0.0)) {
+                followReferenceNow = ref.position;
             }
             // World axes by default, which is every rig that existed before this; the subject's own
-            // frame when asked, which is what makes "behind" mean behind.
+            // frame when asked, which is what makes "behind" mean behind. ADR-911: its HEADING --
+            // the yaw alone, kernel-filtered -- not its drawn rotation, which also carries the sway,
+            // the nod and the slope tilt, and swung the camera through all three.
             const glm::vec3 authored =
                 channels != nullptr && channels->followOffset != nullptr ? channels->followOffset->value() : rig.followOffset;
-            const glm::vec3 offset = rig.followLocal ? at.rotation * authored : authored;
-            pose.position = at.position + offset;
+            const glm::vec3 offset =
+                rig.followLocal ? glm::angleAxis(ref.heading, glm::vec3(0.0f, 1.0f, 0.0f)) * authored : authored;
+            pose.position = ref.position + offset;
 
-            // The whole of camera collision: keep the eye above the surface. Applied after the
-            // offset rather than to the subject, because it is the camera that hits the hill.
+            // The whole of camera collision: keep the eye above the surface. Applied to the filtered
+            // eye, after the offset, because it is the camera that hits the hill.
             //
             // `surfaceAt` rather than `heightAt`, so the camera does not dive through a lake on its
             // way round a shoreline -- a shot from under water is a decision, not a side effect of
-            // chasing something downhill.
-            if (rig.followClearance > 0.0f) {
-                const world::TerrainQuery ground = terrainQuery();
-                if (ground.valid()) {
-                    const float floorY =
-                        ground.surfaceAt(glm::vec2(pose.position.x, pose.position.z)) +
-                        rig.followClearance;
-                    // Raised, never lowered. A clearance is a floor; a camera legitimately above
-                    // the hill it is crossing must not be dragged down onto it.
-                    pose.position.y = std::max(pose.position.y, floorY);
-                }
+            // chasing something downhill. ADR-911: a softplus rather than a `max`, so the eye's
+            // vertical velocity does not step where the floor takes hold or lets go.
+            if (rig.followClearance > 0.0f && terrain.valid()) {
+                const float floorY = clearanceSurfaceAt(terrain, glm::vec2(pose.position.x, pose.position.z)) +
+                                     rig.followClearance;
+                pose.position.y = softFloor(pose.position.y, floorY);
             }
         }
     }
     if (!rig.aimNode.empty()) {
         if (const CompositionNode* node = findNode(rig.aimNode); node != nullptr) {
-            pose.target = nodeWorldTransform(*node).position +
-                          (channels != nullptr && channels->aimOffset != nullptr ? channels->aimOffset->value() : rig.aimOffset);
+            glm::vec3 subject = subjectHead(*node).position;
+            if (smooths && followReferenceNow && rig.aimNode == rig.followNode) {
+                subject = *followReferenceNow;
+            } else if (smooths) {
+                // The aim reads the same kernel at t. Its heading is never used.
+                FollowFilter aim = filter;
+                aim.headingSeconds = 0.0;
+                const SubjectTrail trail(historyBank_, subjectRing(rig.aimNode, true), currentTime_,
+                                         subjectHead(*node));
+                subject = followReference(trail, currentTime_, aim, groundPtr).position;
+            }
+            pose.target = subject + (channels != nullptr && channels->aimOffset != nullptr ? channels->aimOffset->value()
+                                                                                             : rig.aimOffset);
         }
     }
     ensureDistinctAim(pose);
@@ -8140,6 +8123,13 @@ void Composition::applyParameters() {
                   activeCameraReasonName(activeCamera_.reason),
                   activeCamera_.eventName.empty() ? "" : " ", activeCamera_.eventName, currentTime_);
     }
+    // ADR-912: a change of camera with no blend in progress is a cut. A blend starts from the
+    // outgoing camera's own pose, so it is motion and keeps its history; a new shot on the same
+    // camera is the same rig evaluated at the same instant, so it is not a cut either.
+    if (activeCamera_.camera != cameraWas && !activeCamera_.blending()) {
+        cameraCutThisFrame_ = true;
+        ++cameraCutSerial_;
+    }
     const float fov0 = cameraFov_ != nullptr ? cameraFov_->value() : cameraFovSetting_;
     float fov = fov0;
     if (!cameraDirection_.directing() && activeCamera_.camera == kMainCamera) {
@@ -8211,6 +8201,8 @@ void Composition::applyParameters() {
     //
     // In `Film` mode this is a branch and a return, so every render is byte-for-byte what it was.
     applyViewportView(fov0);
+    // ADR-912: published every frame, so nothing that rebuilds the camera block can lose it.
+    scene_.camera.cutSerial = cameraCutSerial_;
     updateTerrainLod();
     updateWaterSurfaces();
     // Last frame's ecology lights come off before the rig block, which removes its own lights by

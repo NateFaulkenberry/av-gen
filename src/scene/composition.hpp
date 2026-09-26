@@ -529,24 +529,6 @@ struct CompositionNode {
 // hero stood when the keys were written, so the offset is zero at the moment of the cut and grows
 // only as far as the hero actually walks: a shot of something standing still is bit-identical to
 // what it was before this existed.
-// Where a followed node has been, so a chase camera can stand where its subject *was*.
-//
-// One per node any rig follows with a lag. Sampled once a frame after the parameters are applied,
-// which is the only moment at which "where the subject is" is a settled fact -- the same moment
-// `syncHeroesToNodes` reads, and for the same reason.
-//
-// A ring rather than a growing list: the longest lag any rig asks for, plus a margin, is all that
-// can ever be read. A composition that plays for an hour holds a couple of hundred samples.
-struct FollowTrail {
-    struct Sample {
-        double seconds = 0.0;
-        glm::vec3 position{0.0f};
-        glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    };
-    std::string node;
-    std::vector<Sample> samples; // ordered by time, oldest first
-};
-
 struct AimFollow {
     double startSeconds = 0.0;
     double endSeconds = 0.0;
@@ -798,6 +780,12 @@ public:
     // `automation` re-applies the play's transform automation, for the replay, which has none.
     void recordHistory(world::HistoryBank& bank, double seconds,
                        const world::HistoryAutomation* automation = nullptr) const;
+    // ADR-911: the nodes the camera rigs read the past of -- every rig whose eye is lagged or whose
+    // subject reference is smoothed -- as HIST subscriptions, each as deep as its rig reads. The host
+    // folds them into its set (`Engine::refreshHistorySubscriptions`), so a camera's history is
+    // recorded by a play, rebuilt by the seek replay and carried in the checkpoints exactly like an
+    // effect owner's, and the camera is as seek-exact as they are.
+    void appendCameraHistoryNeeds(std::vector<world::HistorySubscription>& out) const;
 
     // ---- Effect Library Wave 2: XFORM, the render-transform offsets --------------------------
     //
@@ -1101,27 +1089,6 @@ public:
     void setContinuousTake(bool on) { continuousTake_ = on; }
     [[nodiscard]] bool continuousTake() const { return continuousTake_; }
 
-    // Drops the aim-follow smoother's running state. What a seek needs, so that the seeked second
-    // is a function of the second rather than of how the playhead got there. (This is all that is
-    // left of `clearAimHoldState`: the hold it also cleared was retired with ADR-217.)
-    void clearAimFollowState() {
-        aimFollowSmoothed_ = glm::vec3(0.0f);
-        aimFollowPrimed_ = false;
-    }
-
-    // How hard the aim-follow delta is filtered, in milliseconds. ADR-158 adds the hero's movement
-    // since the cut straight onto the camera target, which is right for travel and wrong for
-    // anything that oscillates: a hovering saucer with a sine on its height hands the camera that
-    // sine, one frame at a time, and the shot rocks with it.
-    //
-    // A low pass separates the two by *rate* rather than by amount, which is the only thing that
-    // distinguishes them: a body crossing two hundred metres moves far and slowly, a hover bob
-    // moves a little and quickly. Travel passes through with a small constant lag; the bob is
-    // attenuated by roughly the ratio of its period to this constant.
-    //
-    // 0 restores the unfiltered behaviour exactly, so a project that does not ask is unchanged.
-    void setAimFollowSmoothingMs(float ms) { aimFollowSmoothingMs_ = ms; }
-    [[nodiscard]] float aimFollowSmoothingMs() const { return aimFollowSmoothingMs_; }
     // ---- multiple cameras (ADR-245) ------------------------------------------------------------
     //
     // The camera collection, the authored shot track and the resolved active camera. See
@@ -1190,12 +1157,28 @@ public:
     // difference between a "static" camera and an "animated" one. There is no mode for it because
     // there is no state for it: a camera is animated exactly when somebody keyed it.
     [[nodiscard]] bool cameraIsAnimated(CameraId id, const params::Timeline& timeline) const;
-    // Drops the event observation the director accumulated. Called on a seek, next to
-    // `clearAimFollowState`, and for the same reason: a scenario's run is live state, so the seeked
-    // second must not inherit an event span observed before the jump.
+    // Drops the event observation the director accumulated. Called on a seek: a scenario's run is
+    // live state, so the seeked second must not inherit an event span observed before the jump.
     void clearCameraEventState() { cameraEvents_.clear(); }
     // The event spans the director can currently see. Exposed for tests and an overlay.
     [[nodiscard]] std::span<const CameraEventSpan> cameraEventSpans() const { return cameraEvents_; }
+
+    // ---- cuts (ADR-912) --------------------------------------------------------------------------
+    //
+    // A cut is a frame whose picture does not continue the previous one. The renderer cannot tell a
+    // cut from a very fast move -- both are a large change of view-projection between two frames --
+    // and it used to treat every cut as motion: only a seek reset its history, so each new shot
+    // opened on one frame of full-strength motion blur along a "movement" from the old camera to the
+    // new one. So the composition says so: `Scene::camera.cutSerial` changes on every cut, and the
+    // renderer drops its motion history when it does.
+    //
+    // Found here: the active camera changed without a blend (an authored shot, a directed one, an
+    // event that claims the frame with no blend). `markCameraCut` is for the host, which finds the
+    // cuts this object cannot see -- a keyed jump in the timeline driving the active camera, which
+    // is how a baked sequence cuts the main camera. Call it after `update` for the frame it belongs
+    // to; it publishes at once.
+    void markCameraCut();
+    [[nodiscard]] std::uint32_t cameraCutSerial() const { return cameraCutSerial_; }
 
     // ---- the ground (§3, ADR-090) --------------------------------------------------------------
     //
@@ -2055,20 +2038,28 @@ private:
     std::vector<glm::vec3> heroBasePositions_;
     std::vector<AimFollow> aimFollow_;  // ADR-158; empty unless a director cut this camera
     bool continuousTake_ = false;       // ADR-892; a continuous take owns the frame
-    // One trail per node some rig chases. Empty -- and costing nothing -- until a rig asks for a
-    // lag, which is what keeps every existing camera bit-identical.
-    std::vector<FollowTrail> followTrails_;
-    // Set once when a chase asks for a time the trail does not reach, so the limit is reported
-    // rather than silently producing an un-lagged camera that looks like a working one.
-    mutable bool followTrailShortReported_ = false;
-    // ADR-245: the filtered aim-follow delta, and whether it has a value yet. Reset by
-    // `clearAimFollowState` (a seek) and whenever the active shot changes -- at a cut the delta is
-    // zero by definition, and inheriting the previous shot's would start the new one off-centre.
-    glm::vec3 aimFollowSmoothed_{0.0f};
-    bool aimFollowPrimed_ = false;
-    const AimFollow* aimFollowLast_ = nullptr;
-    float aimFollowSmoothingMs_ = 0.0f;
-    double aimFollowPrevTime_ = 0.0;
+    // ADR-911: the nodes a rig asked the history of that HIST holds no ring for, each reported
+    // once. A smoothed or lagged camera with no history runs on the raw node, and that looks exactly
+    // like a working one -- so the only thing that can tell them apart is the log.
+    mutable std::vector<std::string> cameraHistoryMissing_;
+    // ADR-912: bumped whenever the picture stops continuing the previous frame's -- a hard cut to
+    // another camera, found here, or a keyed jump the host finds on the timeline (`markCameraCut`) --
+    // and published as `Scene::camera.cutSerial`, which is what the renderer drops its motion history
+    // on. `cameraCutThisFrame_` makes the same frame's skinned rigs report no motion either.
+    std::uint32_t cameraCutSerial_ = 0;
+    bool cameraCutThisFrame_ = false;
+    // The root fold every node is drawn through, and HIST records through (`recordHistory`).
+    [[nodiscard]] Transform rootFold() const;
+    // ADR-911: the subject a rig reads, as HIST would record it this frame -- the root fold over
+    // `nodeWorldTransform` -- so the head of a camera's trail and the history behind it are one
+    // quantity.
+    [[nodiscard]] world::HistorySample subjectHead(const CompositionNode& node) const;
+    // ADR-911: the ring HIST keeps for `node`, or the bank's ring count when it keeps none. Reports
+    // the missing ring once when `needed`.
+    [[nodiscard]] std::size_t subjectRing(const std::string& node, bool needed) const;
+    // ADR-912: holds every skinned rig's previous palette on the current one, so the frame of a cut
+    // draws no joint motion across it.
+    void holdRigsForCut();
 
     // A hero moved and the world has not settled yet. Moving an object is a *drag* -- sixty
     // positions a second -- and each one that reached `heroRevision_` would re-cut the directed
@@ -2077,13 +2068,6 @@ private:
     double heroSettleAt_ = 0.0;
     double heroSettleSeconds_ = 0.25;
     void syncHeroesToNodes();
-    // Appends this frame's sample to every trail some rig chases, and drops what no rig can reach.
-    void recordFollowTrails();
-    // Where `node` was at `seconds`, interpolated. `fallback` when there is no trail, or when the
-    // time asked for is outside the one there is -- which is the head of a render and the first
-    // `lag` seconds after a seek.
-    [[nodiscard]] FollowTrail::Sample followTrailAt(const std::string& node, double seconds,
-                                                    const FollowTrail::Sample& fallback) const;
     void markHeroesMoved();
     void settleHeroes();
     std::vector<entity::EntityDesc> entityDescs_; // ADR-088: authored, round-tripped as "entities"
