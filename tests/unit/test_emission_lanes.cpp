@@ -21,6 +21,7 @@
 #include "spatial/field.hpp"
 #include "support/gltf_fixture.hpp"
 #include "support/temp_dir.hpp"
+#include "ui/ui_logic.hpp"
 #include "world/ecology.hpp"
 #include "world/effects/effect_trigger.hpp"
 
@@ -715,4 +716,107 @@ TEST_CASE("A composition resolves its fields' triggers from the clock it is hand
     // Every 4th beat from beat 1: 0.5, 2.5, 4.5 ... the latest at or before 3.2 s is 2.5 s.
     CHECK_THAT(fields[0].triggerAge, WithinAbs(0.7, 1e-9));
     std::filesystem::remove(path);
+}
+
+// ---- UI reach: each new control, where an artist finds it and what it is called there ----------------
+
+TEST_CASE("UI reach: every new emission control is exposed, sectioned and named for what the viewer sees",
+          "[emission][ui]") {
+    // The owner's rule: anything visible in the picture must be findable in the UI under a name for
+    // what the viewer sees. This does both panels' own arithmetic on the registered set -- the
+    // Parameters panel's section (`parameterSubGroup` of the parameter's group) and the World panel
+    // Inspector's heading and row (`inspectorRowLabel` below the selection's prefix, as
+    // world_panel.cpp computes them) -- rather than asserting that a path was registered, which is
+    // how panels in this repository have shipped with sections nobody could find (ADR-382, ADR-387).
+    const auto glb = testsupport::writeTriangleGlb("emission_ui");
+    std::string text = R"({
+      "format": "avgen-scene", "version": 1, "name": "reach",
+      "environment": { "ecologyLight": 1.4 },
+      "materialPrograms": [
+        { "name": "crown", "layers": [ { "name": "fireflies",
+            "ops": [ { "kind": "constant", "dst": 3, "constant": [0.2, 0.6, 1.0, 1.0] } ],
+            "emission": 3, "emissionIntensity": 0.3 } ] } ],
+      "nodes": [
+        { "name": "valley", "kind": "terrain", "world": { "name": "small", "size": [60, 60], "features": [] },
+          "terrain": { "chunkSize": 30.0, "resolution": 8, "lodLevels": 1, "viewDistance": 200.0 },
+          "scatter": [ { "name": "fungi", "asset": "@GLB@", "densities": { "meadow": 0.01 },
+                         "emissiveIntensity": 2.0, "emissiveColor": [0.34, 0.08, 1.0],
+                         "emissiveField": "ripple", "emissiveFieldAmount": 3.0 } ] },
+        { "name": "ripple", "kind": "field", "field": { "name": "ripple", "kind": "wave", "waveShape": "pulse",
+            "trigger": { "source": "beat", "everyN": 4, "offset": 1 } } }
+      ]
+    })";
+    text.replace(text.find("@GLB@"), 5, glb.filename().string());
+    const auto path = writeJson("ui_reach", text);
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto comp = scene::Composition::loadFile(path.filename(), registry);
+    if (!comp) {
+        FAIL(comp.error().message);
+    }
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+
+    struct Reach {
+        const char* path;
+        const char* label;       // the Parameters panel's row
+        const char* section;     // ...under this sub-group of the parameter's group
+        const char* selection;   // the Inspector's prefix for the selection that shows it
+        const char* heading;     // ...its section heading there ("" = a plain row)
+        const char* row;         // ...and its row
+    };
+    const std::vector<Reach> reach{
+        {"nodes/valley/scatter/fungi/emissionGain", "glow", "valley/scatter/fungi", "nodes/valley/", "scatter",
+         "fungi/glow"},
+        {"nodes/valley/scatter/fungi/hueOffset", "hue shift", "valley/scatter/fungi", "nodes/valley/", "scatter",
+         "fungi/hue shift"},
+        {"nodes/valley/scatter/fungi/emissiveFieldAmount", "light wave", "valley/scatter/fungi", "nodes/valley/",
+         "scatter", "fungi/light wave"},
+        {"nodes/valley/emissiveBoost", "glow boost", "valley", "nodes/valley/", "", "glow boost"},
+        {"scene/ecologyLight", "light cast by glowing plants and fungi", "", "scene/", "",
+         "light cast by glowing plants and fungi"},
+        {"material/crown/layer/1/fireflies/emissionIntensity", "glow", "layer/1/fireflies", "material/crown/", "layer",
+         "1/fireflies/glow"},
+        {"field/ripple/trigger/everyN", "fires every N beats", "trigger", "field/ripple/", "trigger",
+         "fires every N beats"},
+        {"field/ripple/trigger/offset", "starting at beat", "trigger", "field/ripple/", "trigger", "starting at beat"},
+    };
+    for (const Reach& r : reach) {
+        INFO(r.path);
+        params::IParameter* p = params.find(r.path);
+        REQUIRE(p != nullptr);
+        CHECK(p->flags().exposed);
+        CHECK(p->flags().modulatable);
+        CHECK(p->flags().serialized);
+        // The Parameters panel: group, then the middle of the path as a heading, then the label.
+        CHECK(p->label() == r.label);
+        CHECK(ui::parameterSubGroup(p->path(), p->group()) == r.section);
+        // The World panel Inspector, for the selection whose prefix this is.
+        const std::string prefix = r.selection;
+        REQUIRE(p->path().rfind(prefix, 0) == 0);
+        const std::string rel = p->path().substr(prefix.size());
+        const std::size_t slash = rel.find('/');
+        const std::string heading = slash == std::string::npos ? std::string() : rel.substr(0, slash);
+        const std::size_t cut = prefix.size() + (heading.empty() ? 0 : heading.size() + 1);
+        CHECK(heading == r.heading);
+        CHECK(ui::inspectorRowLabel(p->path(), cut, p->label()) == r.row);
+    }
+    // A click on a mushroom selects the terrain that grew it (Composition::nodeForProcedural), which
+    // is the Inspector prefix used above for the layer's three controls.
+    const scene::Scene& s = (*comp)->scene();
+    for (std::size_t i = 0; i < s.procedurals.size(); ++i) {
+        if (s.procedurals[i].name.rfind(scene::scatterObjectName("valley", "fungi"), 0) == 0) {
+            const scene::CompositionNode* owner = (*comp)->nodeForProcedural(i);
+            REQUIRE(owner != nullptr);
+            CHECK(owner->name == "valley");
+        }
+    }
+    // The rule leaves every existing kind of row as it was: a registrar's relative path, a leaf, and
+    // no label.
+    CHECK(ui::inspectorRowLabel("field/ring/falloff/outer", std::string("field/ring/falloff/").size(),
+                                "falloff/outer") == "outer");
+    CHECK(ui::inspectorRowLabel("nodes/oak/wind/lag", std::string("nodes/oak/wind/").size(), "lag") == "lag");
+    CHECK(ui::inspectorRowLabel("scene/fogDensity", std::string("scene/").size(), "") == "fogDensity");
+    std::filesystem::remove(path);
+    std::filesystem::remove(glb);
 }

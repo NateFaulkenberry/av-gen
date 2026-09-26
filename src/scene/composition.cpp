@@ -4521,7 +4521,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // key moves the light the mushrooms throw with the mushrooms. 0 makes no lights at all.
     {
         params::ParamDesc<float> d = floatDesc(prefix_ + "scene/ecologyLight", ecologyLightGain_, 0.0f, 50.0f, 0.0f, 4.0f);
-        d.label = "light from glowing plants";
+        d.label = "light cast by glowing plants and fungi"; // what it looks like: pools on the ground
         ecologyLight_ = &params.add(std::move(d));
     }
     // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only

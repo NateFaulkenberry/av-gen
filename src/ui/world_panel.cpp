@@ -520,7 +520,10 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
         }
         const auto row = [&](params::IParameter* param, std::size_t cut) {
             ImGui::PushID(param->path().c_str());
-            const std::string rel = param->path().substr(cut);
+            // The path below the heading, its leaf said in words where the parameter was given a
+            // label for what the viewer sees (ADR-905: `fungi/light wave`, not
+            // `fungi/emissiveFieldAmount`).
+            const std::string rel = ui::inspectorRowLabel(param->path(), cut, param->label());
             drawParameterValue(*param, rel.c_str());
             if (ImGui::BeginPopupContextItem("reset")) {
                 if (ImGui::MenuItem("Reset to default")) {

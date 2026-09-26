@@ -107,6 +107,30 @@ inline constexpr std::string_view kIntermediatePrefixes[] = {
     return slash == std::string_view::npos ? path : path.substr(slash + 1);
 }
 
+// The World panel Inspector's row label for a parameter: the path below `cut` (the selection's
+// prefix and the section heading), with the leaf replaced by the parameter's own label when that
+// label is words rather than a path.
+//
+//   ("nodes/valley/scatter/fungi/emissiveFieldAmount", cut at "nodes/valley/scatter/", "light wave")
+//       -> "fungi/light wave"
+//   ("field/ring/falloff/outer", cut at "field/ring/falloff/", "falloff/outer") -> "outer"
+//
+// The Parameters panel has always drawn `label()`; the Inspector drew the bare path, so a label set
+// for the owner's rule -- anything visible must be findable under a name for what the viewer sees --
+// reached one panel and not the one an artist lands in by clicking the thing (ADR-905: a click on a
+// mushroom selects its terrain, whose rows read `fungi/emissiveFieldAmount`). A label with a slash
+// in it is a registrar's relative path ("falloff/outer", "noise/amount"), and one equal to the leaf
+// says nothing more, so both keep the path exactly as it was drawn before.
+[[nodiscard]] inline std::string inspectorRowLabel(std::string_view path, std::size_t cut, std::string_view label) {
+    const std::string_view rel = cut < path.size() ? path.substr(cut) : std::string_view{};
+    if (label.empty() || label == parameterLeaf(path) || label.find('/') != std::string_view::npos) {
+        return std::string(rel);
+    }
+    const std::size_t slash = rel.rfind('/');
+    return slash == std::string_view::npos ? std::string(label)
+                                           : std::string(rel.substr(0, slash + 1)) + std::string(label);
+}
+
 // Slider bounds for a route amount. They must NOT depend on the current amount: a range derived
 // from the value being dragged feeds back on itself (drag to the end -> range grows -> repeat)
 // until the float range overflows and ImGui asserts (regression: milestone 0.2 crash).

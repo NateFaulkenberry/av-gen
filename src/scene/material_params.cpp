@@ -99,11 +99,12 @@ MaterialProgramParameters registerMaterialProgramParameters(params::ParameterSet
         if (!emits(rest.layers[i].emissionRegister)) {
             continue;
         }
-        // Labelled "<layer> glow" -- the panel heads it with the program and the layer's path.
+        // Labelled "glow": both panels head it with the layer's path, `layer/<i>/<name>`, which is
+        // where the layer is named -- the Parameters panel under "material/<program>", the Inspector
+        // as `1/fireflies/glow`.
         const std::string path = layerPath(i, rest.layers[i]) + "emissionIntensity";
-        const std::string label = (rest.layers[i].name.empty() ? std::string("layer") : rest.layers[i].name) + " glow";
         p.layerEmissionIntensity.push_back(
-            addF(path, label, rest.layers[i].emissionIntensity, 0.0f, 1000.0f, 0.0f, 32.0f));
+            addF(path, "glow", rest.layers[i].emissionIntensity, 0.0f, 1000.0f, 0.0f, 32.0f));
     }
     for (std::size_t i = 0; i < rest.ops.size(); ++i) {
         const MaterialOp& op = rest.ops[i];
