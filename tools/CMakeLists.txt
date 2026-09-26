@@ -200,6 +200,11 @@ target_link_libraries(avgen_character_quality PRIVATE avgen_core)
 add_executable(avgen_cast_trace cast_trace.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
 target_link_libraries(avgen_cast_trace PRIVATE avgen_core)
 
+# ADR-923: the Director's Song Mode cut of a project as JSON -- every shot's span, subject, arc and
+# the reason for its duration -- on the CPU, for a generator iterating on a plan without the GPU.
+add_executable(avgen_song_cut song_cut.cpp ${AVGEN_OFFLINE_ENGINE_SOURCES})
+target_link_libraries(avgen_song_cut PRIVATE avgen_core)
+
 # Phase D §58: validate a scene's autonomous characters before runtime.
 add_executable(avgen_character_validate character_validate.cpp)
 target_link_libraries(avgen_character_validate PRIVATE avgen_core)
