@@ -5,6 +5,7 @@
 // read the Scene / parameters. Two modes (ADR-012): Live (audio device is the clock, analysis
 // runs on a thread) and Offline (fixed-step clock, analysis precomputed and indexed by time).
 
+#include "directing/evaluation.hpp"
 #include "directing/plan.hpp"
 #include "analysis/analysis_runner.hpp"
 #include "app/camera_director.hpp"
@@ -614,6 +615,26 @@ public:
     [[nodiscard]] const std::vector<nlohmann::json>& unreadableDirectingPlans() const {
         return unreadableDirectingPlans_;
     }
+    // ADR-931: what the evaluator said about plan revisions and candidates, oldest first. Records,
+    // not content: saved under "directingEvaluations" beside the plans (only when there is one), and
+    // outside the edit history -- an undo does not un-evaluate anything.
+    [[nodiscard]] std::vector<directing::EvaluationReport>& directingEvaluations() { return directingEvaluations_; }
+    [[nodiscard]] const std::vector<directing::EvaluationReport>& directingEvaluations() const {
+        return directingEvaluations_;
+    }
+
+    // ---- staging (ADR-929) ---------------------------------------------------------------------
+    //
+    // The scene's staging -- the actors and scenarios of ADR-209 -- as the session holds it, each
+    // scenario parameter's value taken from its parameter's base: what a set piece's slider set,
+    // rather than what the description was installed with. What the Director fingerprints.
+    [[nodiscard]] stage::StagingDesc capturedStaging() const;
+    // Installs a staging description: validated whole first (a refusal leaves everything as it was),
+    // then the scenarios' parameters re-registered, the timeline and routes re-bound to them, the
+    // staging bus events declared, and the current second re-simulated -- a director handed new
+    // scenarios mid-film is only where a play from zero would have it after a replay (ADR-671). The
+    // project saves it under "staging" when it is not the scene file's.
+    [[nodiscard]] Result<void> setStaging(stage::StagingDesc staging);
 
     [[nodiscard]] params::Timeline& timeline() { return timeline_; }
     [[nodiscard]] const params::Timeline& timeline() const { return timeline_; }
@@ -976,6 +997,7 @@ private:
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     std::vector<directing::Plan> directingPlans_;           // ADR-755
     std::vector<nlohmann::json> unreadableDirectingPlans_;  // ...kept verbatim, written back
+    std::vector<directing::EvaluationReport> directingEvaluations_; // ADR-931
     SongPlan songPlan_;                 // ADR-249: the same, for Song Mode's authored intents
     std::uint32_t lastWaveCount_ = 0;
     std::uint32_t lastAtmosphericCount_ = 0;
@@ -1022,6 +1044,12 @@ private:
         std::array<signals::SignalId, 6> ids{}; // in `world::kEntitySignalLeaves` order
     };
     std::vector<EntitySignalIds> entitySignals_;
+    // ADR-930: one bus event per beat of every staging scenario, "<scenario>/<beat>" -- a set
+    // piece's "setpiece/<id>/beam" among them -- fired on the frame after the beat was entered, from
+    // the entity world's event record (which a seek replays), so a route can key on a set piece.
+    std::vector<std::pair<std::string, signals::SignalId>> stagingSignals_;
+    void declareStagingSignals();
+    void publishStagingSignals(const FrameTime& time);
     signals::SignalId cameraSpeedSignal_ = signals::kInvalidSignal;
     void refreshHistorySubscriptions();
     void publishEntitySignals();

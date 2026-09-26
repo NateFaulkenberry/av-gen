@@ -28,7 +28,8 @@ std::size_t EditCommand::touched() const {
     // "Add key", "Add Aurora", "Move Ground Pulse up"), whatever the size of what they rewrote.
     return params.size() + parents.size() + heroes.size() + added.size() + removed.size() +
            (timeline != nullptr ? 1 : 0) + lightsTouched + (effects != nullptr ? 1 : 0) +
-           (automation != nullptr ? 1 : 0) + (cameras != nullptr ? 1 : 0) + (plans != nullptr ? 1 : 0);
+           (automation != nullptr ? 1 : 0) + (cameras != nullptr ? 1 : 0) + (plans != nullptr ? 1 : 0) +
+           (staging != nullptr ? 1 : 0);
 }
 
 std::vector<float> baseComponents(app::Engine& engine, const std::string& path) {
@@ -288,12 +289,23 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         }
     }
 
+    // The staging description (ADR-929), after the effects and before the parameters, so a
+    // ParamChange on a set piece's knob lands on the parameter this re-registered.
+    if (command.staging != nullptr) {
+        if (auto r = engine.setStaging(forward ? command.staging->after : command.staging->before); !r) {
+            out.problems.push_back(r.error().message);
+        } else {
+            out.stagingsInstalled = 1;
+        }
+    }
+
     scene::Composition* composition = engine.composition();
     if (composition == nullptr) {
         // Not a failure when the command was the sequencer's: there was nothing here for a
         // composition to do.
         if ((command.timeline == nullptr && command.lights == nullptr && command.effects == nullptr &&
-             command.automation == nullptr && command.cameras == nullptr && command.plans == nullptr) ||
+             command.automation == nullptr && command.cameras == nullptr && command.plans == nullptr &&
+             command.staging == nullptr) ||
             !command.params.empty() ||
             !command.added.empty() || !command.removed.empty() || !command.parents.empty() ||
             !command.heroes.empty()) {

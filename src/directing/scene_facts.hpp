@@ -12,6 +12,7 @@
 #include "directing/time_ref.hpp"
 #include "scene/camera_rig.hpp"
 #include "seq/sequence.hpp"
+#include "stage/staging.hpp"
 #include "world/effects/effect_instance.hpp"
 
 #include <glm/glm.hpp>
@@ -41,6 +42,9 @@ struct Staging {
     seq::Sequence sequence;
     scene::CameraDirection cameras;
     std::vector<world::EffectInstance> effects; // captured: every slider's base in the instance
+    // ADR-929: the scene's staging -- its actors and scenarios, each scenario parameter's value taken
+    // from its base -- which set pieces compile into.
+    stage::StagingDesc staging;
 };
 
 // A character's authored mark: where the scene file put it (its node's BASE position), never where
@@ -50,6 +54,7 @@ struct CharacterMark {
     std::string id;   // the entity
     std::string node; // the node it drives
     glm::vec3 anchor{0.0f};
+    std::vector<std::string> tags; // ADR-929: what a set piece's animal query would match it by
 };
 
 struct SceneFacts {
@@ -63,6 +68,14 @@ struct SceneFacts {
     // provider: what a goal's walk will ask). Nothing when it cannot say yet (a planner still
     // working) or the scene has no navigation.
     std::function<std::optional<bool>(glm::vec2 from, glm::vec2 to)> walkable;
+    // ADR-929: the navigation layer's canopy over a world x, z -- how much tree or cap stands above the
+    // ground there -- which is what "a target with clear air" is asked against. Null when the scene has
+    // no navigation; clear air then cannot be checked, and the validator says so.
+    std::function<float(float x, float z)> canopyAt;
+    // The walkable world's extent (x, z), when there is one: a set piece's station must be inside it.
+    std::optional<std::pair<glm::vec2, glm::vec2>> worldBounds;
+    // The film's frame, for a set piece's nominal timeline (the project's render rate).
+    double frameSeconds = 1.0 / 60.0;
     SubjectIndex subjects;
     MusicalContext music;
     std::vector<Place> places;

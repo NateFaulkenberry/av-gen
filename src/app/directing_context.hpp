@@ -12,6 +12,7 @@
 #include "directing/scene_facts.hpp"
 #include "directing/time_ref.hpp"
 #include "entity/entity.hpp"
+#include "entity/navigation.hpp"
 #include "scene/composition.hpp"
 #include "world/hero.hpp"
 
@@ -63,7 +64,13 @@ namespace avgen::app {
     facts.music = musicalContextFor(engine);
     facts.staged.sequence = engine.sequence();
     facts.staged.effects = engine.capturedEffects();
+    // ADR-929: the scenarios with each knob's base folded in, so a set piece somebody tuned by hand
+    // fingerprints as the hand edit it is (and a revision leaves it alone).
+    facts.staged.staging = engine.capturedStaging();
     facts.plans = engine.directingPlans();
+    if (const double fps = engine.renderSettings().fps; fps > 0.0) {
+        facts.frameSeconds = 1.0 / fps;
+    }
     if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
         facts.capabilities = directing::CapabilityRegistry::fromComposition(*comp);
         // What a goal's walk will ask: the entity world's path provider, straight from the character.
@@ -79,6 +86,12 @@ namespace avgen::app {
         // The same ground a performer stands on (Engine::setSequence's `groundHeightAt`).
         if (const world::TerrainQuery ground = comp->terrainQuery(); ground.valid()) {
             facts.groundAt = [ground](float x, float z) { return ground.surfaceAt(glm::vec2(x, z)); };
+        }
+        // ADR-929: the canopy a set piece's clear air is asked against -- the navigation layer's own,
+        // which is what the staging queries ask at run time -- and the walkable world's extent.
+        if (const entity::Navigator& nav = comp->entityWorld().navigator(); nav.valid()) {
+            facts.canopyAt = [nav](float x, float z) { return nav.canopyHeight(glm::vec2(x, z)); };
+            facts.worldBounds = std::make_pair(nav.worldMin(), nav.worldMax());
         }
         facts.staged.cameras = comp->cameraDirection();
         // Places are AUTHORED positions -- a hero's anchor, a node's base transform -- never a
@@ -121,6 +134,10 @@ namespace avgen::app {
             directing::CharacterMark mark;
             mark.id = desc.name;
             mark.node = desc.node.empty() ? desc.name : desc.node;
+            mark.tags = desc.tags;
+            if (!desc.profile.empty()) {
+                mark.tags.push_back(desc.profile); // a staging query matches the profile name too
+            }
             if (const params::IParameter* p = engine.params().find("nodes/" + mark.node + "/position");
                 p != nullptr && p->componentCount() == 3) {
                 mark.anchor = glm::vec3(p->baseComponent(0), p->baseComponent(1), p->baseComponent(2)); // the BASE
@@ -169,6 +186,32 @@ namespace avgen::app {
             }
             if (!rig.slug.empty() && !rig.aimNode.empty()) {
                 write("aimOffset", rig.aimOffset);
+            }
+        }
+    }
+    // ADR-929: the staging description, when a set piece changed it. The scenarios this compilation
+    // did not produce keep the form the scene installed them in -- `staged.staging` carries every
+    // knob's current base folded in, which is the right thing to fingerprint and the wrong thing to
+    // write back over an authored scenario -- and its list decides which exist, in what order.
+    if (scene::Composition* comp = engine.composition(); comp != nullptr) {
+        const stage::StagingDesc& authored = comp->staging();
+        stage::StagingDesc next;
+        next.actors = compilation.staged.staging.actors;
+        for (const stage::ScenarioDesc& s : compilation.staged.staging.scenarios) {
+            // Rebuilt by this compilation: its item was not blocked. A hand-edited set piece is still
+            // in `produced` (its provenance) but was kept, not rebuilt, and keeps its installed form.
+            const bool produced = std::any_of(compilation.plan.produced.begin(), compilation.plan.produced.end(),
+                                              [&](const directing::ContentRef& ref) {
+                                                  return ref.domain == directing::ContentDomain::StagingScenario &&
+                                                         ref.id == s.name && !compilation.validation.isBlocked(ref.item);
+                                              });
+            const auto kept = std::find_if(authored.scenarios.begin(), authored.scenarios.end(),
+                                           [&](const stage::ScenarioDesc& a) { return a.name == s.name; });
+            next.scenarios.push_back(!produced && kept != authored.scenarios.end() ? *kept : s);
+        }
+        if (stage::stagingToJson(next) != stage::stagingToJson(authored)) {
+            if (auto r = engine.setStaging(std::move(next)); !r) {
+                return fail("staging: {}", r.error().message);
             }
         }
     }

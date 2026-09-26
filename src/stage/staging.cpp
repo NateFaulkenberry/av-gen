@@ -397,6 +397,9 @@ Result<void> Staging::setDesc(StagingDesc desc) {
             if (auto r = resolveValue(beat.stillSpeed, scenario, "a beat's stillSpeed"); !r) {
                 return r;
             }
+            if (auto r = resolveValue(beat.startAt, scenario, "a beat's startAt"); !r) {
+                return r;
+            }
             for (QueryDesc& q : beat.find) {
                 if (!q.valid()) {
                     return fail("scenario '{}', beat '{}': a find binds no role", scenario.name,
@@ -486,6 +489,7 @@ void Staging::clear() {
     searchTags_.clear();
     written_.clear();
     events_.clear();
+    lastBeats_.clear();
     log_.clear();
     problems_.clear();
     report_ = StageReport{};
@@ -1114,7 +1118,7 @@ std::string Staging::parameterPath(const Run& run, std::string_view role, std::s
 }
 
 void Staging::writeParameter(const Run& run, std::string_view role, const std::string& path,
-                             float v, const StageContext& ctx) {
+                             float v, const StageContext& ctx, int component) {
     if (ctx.params == nullptr || path.empty()) {
         return;
     }
@@ -1147,10 +1151,25 @@ void Staging::writeParameter(const Run& run, std::string_view role, const std::s
         w.entity = resolveName(run, role);
         written_.push_back(std::move(w));
     }
-    p->setBaseComponent(0, v);
+    // ADR-928: one component, the one the step names. Out of range is refused rather than clamped
+    // onto component 0 -- a colour step that wrote red when it asked for blue would be a beam that
+    // is the wrong colour for a reason nobody could find.
+    if (component < 0 || static_cast<std::size_t>(component) >= p->componentCount()) {
+        const std::string message = fmt::format("staging: '{}' has no component {}", path, component);
+        if (std::find(problems_.begin(), problems_.end(), message) == problems_.end()) {
+            problems_.push_back(message);
+            log::warn("{}", message);
+        }
+        return;
+    }
+    p->setBaseComponent(static_cast<std::size_t>(component), v);
 }
 
 // ---- "why is this parameter moving?" --------------------------------------------------------------
+
+bool Staging::wrote(std::string_view path) const {
+    return std::any_of(written_.begin(), written_.end(), [&](const Written& w) { return w.path == path; });
+}
 
 std::vector<Staging::PathWriter> Staging::writersOf(std::string_view path) const {
     std::vector<PathWriter> out;
@@ -1654,7 +1673,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (path.empty()) {
             return StepStatus::Failed;
         }
-        writeParameter(run, role, path, step.kind == StepKind::Show ? 1.0f : 0.0f, ctx);
+        writeParameter(run, role, path, step.kind == StepKind::Show ? 1.0f : 0.0f, ctx, step.component);
         return StepStatus::Done;
     }
 
@@ -1665,7 +1684,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         }
         const float to = value(run, step.to);
         if (duration <= 0.0) {
-            writeParameter(run, role, path, to, ctx);
+            writeParameter(run, role, path, to, ctx, step.component);
             return StepStatus::Done;
         }
         if (!cue.started) {
@@ -1674,13 +1693,15 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
                 cue.span = value(run, step.from);
             } else if (ctx.params != nullptr) {
                 const params::IParameter* p = ctx.params->find(path);
-                cue.span = p != nullptr ? p->baseComponent(0) : to;
+                const auto c = static_cast<std::size_t>(std::max(step.component, 0));
+                cue.span = p != nullptr && c < p->componentCount() ? p->baseComponent(c) : to;
             } else {
                 cue.span = to;
             }
         }
         const auto u = static_cast<float>(std::clamp(elapsed / duration, 0.0, 1.0));
-        writeParameter(run, role, path, glm::mix(cue.span, to, step.ease ? smoothstep(u) : u), ctx);
+        writeParameter(run, role, path, glm::mix(cue.span, to, step.ease ? smoothstep(u) : u), ctx,
+                       step.component);
         return u >= 1.0f ? StepStatus::Done : StepStatus::Running;
     }
 
@@ -1843,9 +1864,24 @@ void Staging::rememberPositions(const Run& run, const StageContext& ctx) {
 }
 
 void Staging::update(const StageContext& ctx) {
+    // ADR-930: the beats the previous update entered, taken before this one forgets them, so a
+    // scenario cued on another's beat hears it now.
+    lastBeats_.clear();
+    for (const StageEvent& e : events_) {
+        if (e.kind == StageEventKind::Beat) {
+            lastBeats_.push_back(e.scenario + "/" + e.beat);
+        }
+    }
     events_.clear();
     if (desc_.scenarios.empty() || ctx.world == nullptr) {
         return;
+    }
+    if (ctx.bus != idsFor_) {
+        for (Run& run : runs_) {
+            run.startId.reset();
+            run.stopId.reset();
+        }
+        idsFor_ = ctx.bus;
     }
     // One published state per scenario, every frame, whether it runs or not -- an overlay that had
     // to distinguish "not running" from "the director did not get as far as saying" would be an
@@ -1869,12 +1905,20 @@ void Staging::update(const StageContext& ctx) {
         }
         // The signal seam. Read before the cues run, so a scenario cued on the beat starts on the
         // frame the beat fired rather than the one after it.
-        if (ctx.bus != nullptr) {
+        {
             // Names resolved once and cached, the same way a behaviour resolves a signal: the bus
             // is an id-indexed array and a name lookup per scenario per frame would be paying for
             // a string hash to read a byte.
             const auto fired = [&](const std::string& name, std::optional<signals::SignalId>& id) {
                 if (name.empty()) {
+                    return false;
+                }
+                // ADR-930: another scenario's beat, from this director's own last frame -- exact in
+                // a seek's replay, which a bus event is not guaranteed to be.
+                if (std::find(lastBeats_.begin(), lastBeats_.end(), name) != lastBeats_.end()) {
+                    return true;
+                }
+                if (ctx.bus == nullptr) {
                     return false;
                 }
                 if (!id.has_value()) {
@@ -1883,7 +1927,7 @@ void Staging::update(const StageContext& ctx) {
                         return false;
                     }
                 }
-                return ctx.bus->event(*id);
+                return *id < ctx.bus->size() && ctx.bus->event(*id);
             };
             if (runs_[i].running && fired(s.stopOn, runs_[i].stopId)) {
                 stop(s.name, ctx.time);
@@ -1919,6 +1963,18 @@ void Staging::update(const StageContext& ctx) {
         // bound is the beat count: a scenario cannot visit more beats in one frame than it has.
         std::size_t guard = scenario.beats.size() + 1;
         while (run.running && !run.entered && guard-- > 0) {
+            // ADR-928: a beat with a clock waits for it. Checked here, at the one place a beat is
+            // entered, so `start`, `trigger`, `then` and `otherwise` all respect it. The microsecond
+            // is float noise on a frame instant computed as `i / fps`: it can only let a beat in on
+            // the frame whose instant IS the second asked for, never a frame before it.
+            if (run.beat < scenario.beats.size()) {
+                const BeatDesc& next = scenario.beats[run.beat];
+                if (next.startAt.bound() || next.startAt.literal > 0.0f) {
+                    if (ctx.time + 1e-6 < static_cast<double>(value(run, next.startAt))) {
+                        break;
+                    }
+                }
+            }
             enterBeat(run, ctx);
         }
         if (!run.running || !run.entered) {
@@ -2145,6 +2201,7 @@ void Staging::reset(entity::EntityWorld* world, params::ParameterSet* params) {
     claims_.clear();
     retired_.clear();
     events_.clear();
+    lastBeats_.clear();
     log_.clear();
     problems_.clear();
     report_ = StageReport{};

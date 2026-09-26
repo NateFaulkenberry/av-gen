@@ -966,3 +966,147 @@ TEST_CASE("a beat naming a beat that is not there is refused", "[stage][director
     REQUIRE_FALSE(ok.has_value());
     CHECK_THAT(ok.error().message, ContainsSubstring("nowhere"));
 }
+
+// ---- ADR-928 / ADR-930: the beat's clock, a step's component, and a scenario cued on another's beat --
+
+TEST_CASE("a beat with a clock begins on the first frame at or after it, and one without does not wait",
+          "[stage][director][setpiece][time]") {
+    // Two beats: a short wait, then a beat clocked to 1.0 s. Without the clock the second beat would
+    // begin a frame after the wait ends (~0.2 s); with it, on the frame at 1.0 s exactly.
+    const auto run = [](bool clocked) {
+        stage::StagingDesc d = oneCue({waitStep("short", 0.2f)});
+        stage::BeatDesc later;
+        later.name = "later";
+        stage::CueDesc c;
+        c.role = "actor";
+        c.steps = {waitStep("hold", 0.1f)};
+        later.cues = {c};
+        if (clocked) {
+            later.startAt = lit(1.0f);
+        }
+        d.scenarios[0].beats.push_back(later);
+        Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, std::move(d));
+        s.staging.start("test", s.time);
+        double entered = -1.0;
+        for (int f = 0; f < 120 && entered < 0.0; ++f) {
+            s.tick(1.0 / 60.0);
+            for (const stage::StageEvent& e : s.staging.events()) {
+                if (e.kind == stage::StageEventKind::Beat && e.beat == "later") {
+                    entered = e.time;
+                }
+            }
+        }
+        return entered;
+    };
+    const double clocked = run(true);
+    const double unclocked = run(false);
+    CHECK(clocked == Approx(1.0).margin(1e-6));
+    CHECK(unclocked < 0.5); // the control: the clock is what held it
+}
+
+TEST_CASE("a set step writes the component it names and no other", "[stage][director][setpiece]") {
+    stage::StepDesc blue = step(stage::StepKind::Set, "blue");
+    blue.target = "fx/tint/color"; // absolute: a vector parameter nobody else writes
+    blue.to = lit(5.0f);
+    blue.component = 2;
+    stage::StepDesc red = step(stage::StepKind::Set, "red"); // the control: the default is component 0
+    red.target = "fx/tint/color";
+    red.to = lit(3.0f);
+    Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, oneCue({blue, red}));
+    s.params.add(v3("fx/tint/color", glm::vec3(0.2f), 0.0f, 10.0f));
+    s.staging.start("test", s.time);
+    s.tick(0.1);
+    const params::IParameter* colour = s.params.find("fx/tint/color");
+    REQUIRE(colour != nullptr);
+    CHECK(colour->baseComponent(0) == Approx(3.0f));
+    CHECK(colour->baseComponent(1) == Approx(0.2f)); // untouched
+    CHECK(colour->baseComponent(2) == Approx(5.0f));
+    // And a reset gives every component back.
+    s.staging.reset(&s.world, &s.params);
+    CHECK(colour->baseComponent(0) == Approx(0.2f));
+    CHECK(colour->baseComponent(2) == Approx(0.2f));
+}
+
+TEST_CASE("a scenario can start on another scenario's beat, without a bus", "[stage][director][setpiece][signals]") {
+    // "setpiece/east/beam"-style: B starts the frame after A enters its beat "go". No bus at all in
+    // the context -- the cue is read off the director's own last frame, which a seek replays.
+    stage::StagingDesc d = oneCue({waitStep("lead", 0.3f)});
+    stage::BeatDesc go;
+    go.name = "go";
+    stage::CueDesc c;
+    c.role = "actor";
+    c.steps = {waitStep("hold", 1.0f)};
+    go.cues = {c};
+    d.scenarios[0].beats.push_back(go);
+    d.scenarios[0].autoStart = true;
+    stage::ScenarioDesc follower = d.scenarios[0];
+    follower.name = "follower";
+    follower.autoStart = false;
+    follower.startOn = "test/go";
+    follower.beats.resize(1);
+    d.scenarios.push_back(follower);
+    Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, std::move(d));
+    double went = -1.0;
+    double followed = -1.0;
+    for (int f = 0; f < 60; ++f) {
+        stage::StageContext sc;
+        sc.time = s.time;
+        sc.dt = 1.0 / 60.0;
+        sc.world = &s.world;
+        sc.params = &s.params;
+        sc.bus = nullptr; // the point
+        s.staging.update(sc);
+        for (const stage::StageEvent& e : s.staging.events()) {
+            if (e.kind == stage::StageEventKind::Beat && e.scenario == "test" && e.beat == "go" && went < 0.0) {
+                went = e.time;
+            }
+            if (e.kind == stage::StageEventKind::Started && e.scenario == "follower" && followed < 0.0) {
+                followed = e.time;
+            }
+        }
+        s.time += 1.0 / 60.0;
+    }
+    REQUIRE(went > 0.0);
+    CHECK(followed == Approx(went + (1.0 / 60.0)).margin(1e-6));
+    // The control: a name that is not a beat of anything never starts it.
+    stage::StagingDesc e = oneCue({waitStep("lead", 0.3f)});
+    e.scenarios[0].autoStart = true;
+    stage::ScenarioDesc never = e.scenarios[0];
+    never.name = "never";
+    never.autoStart = false;
+    never.startOn = "test/nothing";
+    e.scenarios.push_back(never);
+    Stage t({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, std::move(e));
+    t.tick(1.0);
+    CHECK_FALSE(t.staging.running("never"));
+}
+
+TEST_CASE("a signal id cached against one bus is not read against another", "[stage][director][signals]") {
+    // A seek's replay hands the director its own bus (ADR-870). A scenario cued on a signal the two
+    // buses number differently must be looked up again, not read at the other bus's index.
+    stage::StagingDesc d = oneCue({waitStep("hold", 30.0f)});
+    d.scenarios[0].startOn = "cue.late";
+    Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, std::move(d));
+    // Bus A: the signal at index 0. Resolved and cached there, never fired.
+    signals::SignalBus a;
+    a.declare("cue.late", 0.0f, 1.0f, true);
+    // Bus B: two other events first, both FIRING, and the signal third, silent. Reading B at A's index
+    // would read "other.0", which is firing, and start the scenario for a signal that never came.
+    signals::SignalBus b;
+    const auto o0 = b.declare("other.0", 0.0f, 1.0f, true);
+    const auto o1 = b.declare("other.1", 0.0f, 1.0f, true);
+    b.declare("cue.late", 0.0f, 1.0f, true);
+    b.setEvent(o0, true);
+    b.setEvent(o1, true);
+    for (const signals::SignalBus* bus : {&a, &b}) {
+        stage::StageContext sc;
+        sc.time = s.time;
+        sc.dt = 1.0 / 60.0;
+        sc.world = &s.world;
+        sc.params = &s.params;
+        sc.bus = bus;
+        s.staging.update(sc);
+        s.time += 1.0 / 60.0;
+    }
+    CHECK_FALSE(s.staging.running("test"));
+}

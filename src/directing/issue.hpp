@@ -51,8 +51,10 @@ enum class IssueCode : std::uint8_t {
     UnknownEvent,             // a cue waits on a plan event nothing emits
     HandEdited,               // content this plan made was since edited by hand; a revision will not overwrite it
     Blocked,                  // cannot happen because something it depends on cannot
+    // ---- quality ----
+    Repetition,               // ADR-929: two items would read as the same moment (a set piece at the same place)
 };
-inline constexpr IssueCode kLastIssueCode = IssueCode::Blocked;
+inline constexpr IssueCode kLastIssueCode = IssueCode::Repetition;
 [[nodiscard]] const char* issueCodeName(IssueCode code);
 [[nodiscard]] std::optional<IssueCode> issueCodeFromName(std::string_view name);
 

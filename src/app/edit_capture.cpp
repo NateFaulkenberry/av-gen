@@ -78,6 +78,8 @@ void EditCapture::begin(Engine& engine) {
     routesJson_ = routesJson(engine);
     parents_ = captureParents(engine);
     plans_ = engine.directingPlans();
+    staging_ = engine.composition() != nullptr ? engine.composition()->staging() : stage::StagingDesc{};
+    stagingJson_ = stage::stagingToJson(staging_);
     effectsAuthored_ = effectsJson(engine);
     effects_ = engine.capturedEffects();
     unrecoverable_.clear();
@@ -120,6 +122,16 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
         change->before = std::move(plans_);
         change->after = engine.directingPlans();
         command.plans = std::move(change);
+    }
+
+    // ---- the staging description (ADR-929) ------------------------------------------------------
+    if (const scene::Composition* comp = engine.composition(); comp != nullptr) {
+        if (stage::stagingToJson(comp->staging()) != stagingJson_) {
+            auto change = std::make_unique<ui::StagingChange>();
+            change->before = std::move(staging_);
+            change->after = comp->staging();
+            command.staging = std::move(change);
+        }
     }
 
     // ---- the effect list (ADR-702) --------------------------------------------------------------
@@ -202,6 +214,7 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
     }
 
     // ---- parameter bases, last: only paths that existed at both ends ---------------------------
+    const scene::Composition* staged = engine.composition();
     for (const params::IParameter* parameter : engine.params().ordered()) {
         if (parameter == nullptr) {
             continue;
@@ -209,6 +222,13 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
         const auto was = bases_.find(std::string(parameter->path()));
         if (was == bases_.end()) {
             continue; // registered during the operation; its record (a camera, a node) owns it
+        }
+        // ADR-929: a base the staging director wrote -- a beam's visibility, a lifted animal's
+        // opacity -- is a photograph of a run (ADR-264's argument, for undo). Installing a staging
+        // description re-simulates the current second, which rewrites exactly these; recording
+        // them would make an undo put back the frame the operation happened to land on.
+        if (staged != nullptr && staged->director().wrote(parameter->path())) {
+            continue;
         }
         std::vector<float> now(parameter->componentCount());
         for (std::size_t i = 0; i < now.size(); ++i) {

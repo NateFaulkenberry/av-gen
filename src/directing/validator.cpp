@@ -2,6 +2,7 @@
 
 #include "directing/compiler.hpp"
 #include "directing/performance.hpp"
+#include "directing/setpieces.hpp"
 #include "directing/text.hpp"
 #include "seq/events.hpp"
 #include "world/effects/effect_registry.hpp"
@@ -223,6 +224,7 @@ std::string itemAt(const Plan& plan, std::string_view location) {
     if (auto i = index("/performances/"); i && *i < plan.performances.size()) return plan.performances[*i].key;
     if (auto i = index("/cues/"); i && *i < plan.cues.size()) return plan.cues[*i].key;
     if (auto i = index("/retimes/"); i && *i < plan.retimes.size()) return plan.retimes[*i].key;
+    if (auto i = index("/setPieces/"); i && *i < plan.setPieces.size()) return plan.setPieces[*i].key;
     return {};
 }
 
@@ -250,6 +252,11 @@ std::vector<std::string> itemsNaming(const Plan& plan, const std::string& alias)
     for (const PlanCue& c : plan.cues) {
         if (c.effect && c.effect->owner == alias) {
             out.push_back(c.key);
+        }
+    }
+    for (const PlanSetPiece& p : plan.setPieces) {
+        if (p.where.near == alias || std::find(p.animals.begin(), p.animals.end(), alias) != p.animals.end()) {
+            out.push_back(p.key);
         }
     }
     return out;
@@ -939,6 +946,35 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
         }
     }
 
+    // ---- set pieces (ADR-929) -------------------------------------------------------------------------
+    // Before the cues, because a cue may start on a set piece's moment and must know whether it can
+    // happen. Each one alone (template, craft, place, clear air, inside the song), then all of them
+    // together with the other plans' still in the scene (one craft in two places, travel, repetition).
+    {
+        std::vector<ResolvedSetPiece> pieces;
+        for (std::size_t i = 0; i < plan.setPieces.size(); ++i) {
+            std::vector<Issue> found;
+            ResolvedSetPiece r = resolveSetPiece(plan, i, facts, v.times, found);
+            for (Issue& issue : found) {
+                if (issue.severity == Severity::Error && !issue.item.empty()) {
+                    v.blocked.insert(issue.item);
+                }
+                v.issues.push_back(std::move(issue));
+            }
+            if (!v.isBlocked(plan.setPieces[i].key)) {
+                pieces.push_back(std::move(r));
+            }
+        }
+        std::vector<Issue> together;
+        checkSetPiecesTogether(pieces, otherPlansSetPieces(plan, facts), facts, together);
+        for (Issue& issue : together) {
+            if (issue.severity == Severity::Error && !issue.item.empty()) {
+                v.blocked.insert(issue.item);
+            }
+            v.issues.push_back(std::move(issue));
+        }
+    }
+
     // ---- cues ---------------------------------------------------------------------------------------
     for (std::size_t i = 0; i < plan.cues.size(); ++i) {
         const PlanCue& cue = plan.cues[i];
@@ -1001,7 +1037,18 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                 }
             }
         }
-        if (!cue.on.empty()) {
+        if (!cue.on.empty() && setPieceOfEvent(plan, cue.on)) {
+            // ADR-929: a set piece's moment, placed by the compiler -- baked, like a scripted
+            // performance's events.
+            const PlanSetPiece& piece = plan.setPieces[*setPieceOfEvent(plan, cue.on)];
+            if (v.isBlocked(piece.key)) {
+                Issue& issue = c.error(IssueCode::Blocked, cue.key, at + "/on",
+                                       fmt::format("waits on '{}', which cannot happen: set piece '{}' is not possible "
+                                                   "as planned",
+                                                   cue.on, piece.key));
+                issue.details = {{"dependsOn", piece.key}};
+            }
+        } else if (!cue.on.empty()) {
             const PlanPerformance* source = nullptr;
             for (const PlanPerformance& p : plan.performances) {
                 for (const PerformanceBeat& b : p.beats) {
@@ -1018,6 +1065,13 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
                     for (const PerformanceBeat& b : p.beats) {
                         if (!b.emits.empty()) {
                             events.push_back(b.emits);
+                        }
+                    }
+                }
+                for (const PlanSetPiece& piece : plan.setPieces) {
+                    if (const auto kind = stage::setPieceKindFromName(piece.templateName)) {
+                        for (const std::string& m : stage::setPieceMoments(*kind)) {
+                            events.push_back(fmt::format("setpiece/{}/{}", piece.key, m));
                         }
                     }
                 }

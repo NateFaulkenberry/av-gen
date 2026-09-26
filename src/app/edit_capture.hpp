@@ -16,6 +16,7 @@
 //   nodes            nodes the operation ADDED (undo detaches them) and parent changes
 //   plans            the project's Director Plans (ADR-755), so provenance and content undo together
 //   effects          the effect list (ADR-702), every owner's, with the sliders' bases captured
+//   staging          the staging description (ADR-929): the scenarios set pieces compile into
 //
 // Routes live in exactly ONE record: `AutomationChange` (the whole route list, when it moved). The
 // effect record this builds never sets `EffectChange::routesTouched` -- that flag belongs to the
@@ -78,6 +79,8 @@ private:
     nlohmann::json timelineJson_;
     std::vector<params::ModRoute> routes_;
     nlohmann::json routesJson_;
+    stage::StagingDesc staging_; // ADR-929: as installed
+    nlohmann::json stagingJson_;
     std::map<std::string, std::string> parents_; // node -> parent, "" for a root
     std::vector<directing::Plan> plans_;
     nlohmann::json effectsAuthored_;                 // decides whether the list changed
