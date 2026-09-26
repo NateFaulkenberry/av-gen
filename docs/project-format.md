@@ -239,6 +239,27 @@ or ride something that moves. `eventScenario` names a staging scenario; while it
 of `eventBeats`, or at all when that list is empty) the camera claims the frame, widened by
 `eventLead` and `eventTail`. A `locked` shot is the author's veto: an event does not take it.
 
+A follow or aim rig reads a filtered **reference** of its node rather than the node itself (ADR-911):
+the node's own transform history (HIST) through a causal, critically damped kernel, the same
+reference for the eye (at `t - followLagSeconds`, plus `followOffset`) and the aim (at `t`, plus
+`aimOffset`). It is a pure function of the history, so a scrub and a render of a range land on the
+frame a play from zero draws. Every key is optional, written only when set, and absent means the raw
+node -- every rig written before ADR-911.
+
+| Key | Meaning |
+|---|---|
+| `followLagSeconds` | the eye stands where the subject was this long ago; the aim does not lag |
+| `followSmoothSeconds` | the kernel's mean delay for X and Z, seconds |
+| `followVerticalSmoothSeconds` | the same for the height: what takes out a walker's stride bob |
+| `followLead` | 0..1: adds `lead x T x velocity` of the smoothed horizontal path; 1 cancels a steady walk's delay. Horizontal only |
+| `followGround` | the subject walks on the terrain: its height is smoothed relative to the ground, so a descent is followed without the vertical constant's lag. Not for things that fly |
+| `followHeadingSmoothSeconds` | with `followLocal`: the kernel's mean delay for the yaw the offset turns by (the yaw alone, not the sway or slope tilt) |
+| `followClearance` | metres above the surface the eye is kept, by a 0.25 m softplus rather than a hard floor |
+
+The smoothing keys filter whichever of `followNode` and `aimNode` the rig reads, so an aim-only rig
+gets look-at damping from them too. A rig reading more than 16 s of history (lag plus four of its
+longest constant) is refused at load.
+
 Resolution at any instant, highest first: a locked shot, then an event (highest `priority`, then
 lowest id), then the last shot containing the time, then `default`. `Engine::activeCamera()` reports
 which and why; the pose itself is `Scene::camera`, as it always was. The exception is a project
