@@ -214,6 +214,15 @@ bool reachableStand(const DecisionContext& ctx, glm::vec3 here, glm::vec3& stand
     return true;
 }
 
+// ADR-944: the body a goal candidate is, when it is one the world has -- a percept or an interest point
+// of kind `Character` that names an entity. Null for every place.
+const Entity* bodyOf(const DecisionContext& ctx, const GoalCandidate& candidate) {
+    if (candidate.kind != InterestKind::Character || candidate.name.empty() || ctx.world == nullptr) {
+        return nullptr;
+    }
+    return ctx.world->find(candidate.name);
+}
+
 // FNV-1a over a name, for the (seed, tick, option) draws. A string rather than an index, because an
 // option's index in this tick's list moves when the body moves and its name does not.
 std::uint32_t nameHash(std::string_view name) {
@@ -234,7 +243,18 @@ bool optionDestination(const Option& o, glm::vec3 here, glm::vec2& end, float& t
             continue;
         }
         if (a->target.kind != TargetKind::Point) {
-            goes = true; // it follows a body somewhere: it moves, to nowhere this can name
+            // It follows a body somewhere. ADR-944: an `interest` errand to a body says where the body
+            // is (`target`, taken when the option was built) and that it is one (`kind`), and is held
+            // to the habits there, as its walk to a point was before. Anything else that follows a
+            // body -- a greeting -- moves, to nowhere this can name.
+            if (a->target.kind == TargetKind::EntityRef && o.hasTarget &&
+                o.kind == static_cast<std::uint8_t>(InterestKind::Character)) {
+                end = glm::vec2(o.target.x, o.target.z);
+                tolerance = a->tolerance > 0.0f ? a->tolerance : kMoveTolerance;
+                goes = glm::length(end - glm::vec2(here.x, here.z)) > tolerance + 0.5f;
+                return true;
+            }
+            goes = true;
             return false;
         }
         end = glm::vec2(a->target.point.x, a->target.point.z);
@@ -1168,15 +1188,20 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     // arriving means to it, is how far the stand-off may move onto standable ground.
     const float tolerance = approach_ > 0.0f ? std::max(approach_ * 0.5f, 0.75f) : kMoveTolerance;
     stands_.clear();
+    bodies_.clear();
     {
         std::size_t kept = 0;
         for (std::size_t i = 0; i < scratch_.size(); ++i) {
-            glm::vec3 stand = standOff(here, scratch_[i].position, approach_);
-            if (!reachableStand(ctx, here, stand, tolerance)) {
+            // ADR-944: a body is walked to where it is, so what must be reachable is the ground it
+            // stands on now -- no stand-off to move, because the walk ends wherever it has got to.
+            const Entity* body = bodyOf(ctx, scratch_[i]);
+            glm::vec3 stand = body != nullptr ? scratch_[i].position : standOff(here, scratch_[i].position, approach_);
+            if (!reachableStand(ctx, here, stand, body != nullptr ? 0.0f : tolerance)) {
                 continue;
             }
             scratch_[kept++] = scratch_[i];
             stands_.push_back(stand);
+            bodies_.push_back(body);
         }
         scratch_.resize(kept);
     }
@@ -1198,14 +1223,29 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     const float walkSpeed = range.set() ? walkSpeedOf(ctx) : 0.0f;
     for (std::size_t c = 0; c < scratch_.size(); ++c) {
         const GoalCandidate& candidate = scratch_[c];
+        const Entity* body = bodies_[c];
         const std::size_t first = actions_.size();
         ActionDesc walk;
         walk.kind = ActionKind::Move;
         walk.name = std::string(candidate.name);
-        walk.target.kind = TargetKind::Point;
-        walk.target.point = stands_[c];
-        if (approach_ > 0.0f) {
-            walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
+        if (body != nullptr) {
+            // ADR-944: to the body, wherever it goes -- a `move` to an entity re-aims its end at it
+            // every step -- and over when the walker is within `approach` of it, never inside the two
+            // bodies' own room. Aimed at a stand-off from where the body stood when the choice was
+            // made, the walk went on to that point after the body had moved into its line: GV2's
+            // vane chose to watch ember at 33.3 s, ember walked across and stopped, and vane walked
+            // through it (0.26 m apart at 45.0 s). `social`'s greeting has walked this way since
+            // Phase D, for the same reason.
+            walk.target.kind = TargetKind::EntityRef;
+            walk.target.name = std::string(candidate.name);
+            const float room = (ctx.state != nullptr ? ctx.state->radius : 0.0f) + body->state().radius;
+            walk.tolerance = std::max({approach_, kMoveTolerance, room});
+        } else {
+            walk.target.kind = TargetKind::Point;
+            walk.target.point = stands_[c];
+            if (approach_ > 0.0f) {
+                walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
+            }
         }
         if (walkSpeed > 0.0f) {
             // Keyed on the place rather than the name, which a derived point is only given below:
@@ -1222,9 +1262,15 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
             attend.activity = activity_;
             attend.duration = dwell_;
             // The candidate itself, not `walk.target.point` -- that is the stand-off the body ends
-            // the walk on, and a look at your own feet is not a look (ADR-300).
-            attend.target.kind = TargetKind::Point;
-            attend.target.point = candidate.position;
+            // the walk on, and a look at your own feet is not a look (ADR-300). A body is looked at
+            // where it is now (ADR-944), as `investigate` and `social` look at one.
+            if (body != nullptr) {
+                attend.target.kind = TargetKind::EntityRef;
+                attend.target.name = std::string(candidate.name);
+            } else {
+                attend.target.kind = TargetKind::Point;
+                attend.target.point = candidate.position;
+            }
             actions_.push_back(std::move(attend));
         }
         ranges.emplace_back(first, actions_.size() - first);

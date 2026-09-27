@@ -66,6 +66,8 @@ namespace avgen::entity {
 // point in its list, which for an errand of several legs is the far end. False for an option that
 // walks nowhere, or only after a body that moves (a greeting); `goes` says whether the walk leaves
 // the spot the body stands on at all, which a stand-off of a thing already within reach does not.
+// ADR-944: an `interest` errand to a body (its `kind` is `Character` and it says where the body is)
+// is judged where the body is, so the habits held it to when it walked to a point still hold it.
 [[nodiscard]] bool optionDestination(const Option& o, glm::vec3 here, glm::vec2& end, float& tolerance, bool& goes);
 
 // ---- the pace of an errand (ADR-909) -------------------------------------------------------------
@@ -531,6 +533,9 @@ private:
     // within the walk's tolerance where the stand-off itself is not -- parallel to `scratch_` once the
     // candidates a walk cannot reach have been taken out of it.
     mutable std::vector<glm::vec3> stands_;
+    // ADR-944: the body each offered candidate is, when it is one (else null), parallel to `stands_`.
+    // A walk to a body goes to the body.
+    mutable std::vector<const Entity*> bodies_;
 };
 
 // Price the *way*, not the place (ADR-336).
