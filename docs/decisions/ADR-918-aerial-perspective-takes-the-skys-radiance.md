@@ -7,8 +7,8 @@ horizon colour, day/night only), ADR-230 (the aurora and comets as a sky layer),
 analytic sky in the frame block)
 **Found by:** the GV3 revision audit, `docs/glowmere-valley-3/revision/audit/reports/render-post.md`
 (engine gap 6; "Draw-distance root cause" 4)
-**Implemented by:** `Environment::fogSky` and `scene/fogSky` (`src/scene/scene_types.hpp`,
-`src/scene/composition.cpp`); the fog's sky map and its pass (`SceneRenderer`,
+**Implemented by:** `Environment::fogSky`, `Environment::fogSkyDistance`, `scene/fogSky` and
+`scene/fogSkyDistance` (`src/scene/scene_types.hpp`, `src/scene/composition.cpp`); the fog's sky map and its pass (`SceneRenderer`,
 `shaders/fog_sky.wgsl`); `applyFog`, `fogSkyUv` and `fogSkyRadiance` (`shaders/common.wgsl`); the
 background extracted into `shaders/sky_background.wgsl`
 **Tests:** `tests/rendering/test_fog_sky_gpu.cpp` (`[fogsky]`)
@@ -35,7 +35,25 @@ faded towards a colour the sky behind it did not have.
 ## Decision
 
 **`scene/fogSky` (0..1, default 0): how much of the colour the surface fog fades towards is the
-sky's own radiance in the direction of the ray.** At 1 a far ridge fades into the sky behind it.
+sky's own radiance in the direction of the ray, and `scene/fogSkyDistance` (metres, default 0 =
+automatic): how far away the fog has fully become the sky's colour.** At 1 a far ridge fades into the
+sky behind it, while the air near the camera keeps the fog colour it was tuned with.
+
+- **With distance, not everywhere.** `applyFog` blends the constant colour towards the sky's
+  radiance by `fogSky * smoothstep(0, D, d)`: nothing at the camera, fully at D and beyond. This is
+  the shape production engines use for directional in-scattering (Unreal's height fog fades its
+  in-scattering cubemap in over a start and an end distance). Physically, air near the camera is lit
+  by the whole sky, not by the sky's radiance in one direction -- and GV3's medium scatters almost
+  isotropically (anisotropy 0.12) -- so the view direction's radiance is only right where the fog
+  is thick enough to stand in for the backdrop, which is the far rim. Taking it at every distance
+  was the first version of this decision, and GV3's first render with it lit the ground mist a few
+  metres from the camera with the horizon's brightness (s14's mean level 58 -> 78 at an unchanged
+  density; the stills below).
+- **D is automatic unless set:** three of the fog's own extinction lengths, `3 / (density x
+  absorption)`, where a level ray through the base density is 95% fog. That is where a far ridge
+  would otherwise be a cut-out, and it moves with the density: 375 m in GV3's air (0.02 x 0.4), at
+  its rim (335-505 m). An explicit D is metres, for a scene that wants the sky's colour nearer or
+  further.
 
 - **The sky is read through a small map built each frame.** `fog_sky.wgsl` renders a 128 x 32
   RGBA16F map of the sky's radiance by direction:
@@ -53,15 +71,20 @@ sky's own radiance in the direction of the ray.** At 1 a far ridge fades into th
 - **One sky, not two.** The background's colour logic moved out of `skybox.wgsl` into
   `sky_background.wgsl`, and both the background pass and the map call it. The map therefore holds
   exactly what the background pass draws, including the flat background colour when the skybox is
-  off (`frame.fogSky.y`, from `skyBackgroundFor`).
-- **Where it is read.** `applyFog` mixes the constant colour towards `fogSkyRadiance(ray)` by
-  `fogSky`, so every surface the fog reaches takes it: entities, the procedural scatter, skinned
+  off (`frame.fogSky.y`, from `skyBackgroundFor`). `frame.fogSky.z` carries D.
+- **Where it is read.** `applyFog` mixes the constant colour towards `fogSkyRadiance(ray)`, so every
+  surface the fog reaches takes it: entities, the procedural scatter, skinned
   characters, SDFs, water, shells and ribbons (every caller of `applyFog`).
 - **It costs nothing when off.** At 0 the lane is zero, the map's pass is not encoded, `applyFog`
   never samples the map, and the frame is the pre-ADR-918 frame to the bit.
 - **Deterministic.** The map is a pure function of the frame block: the sky's parameters, the
   atmospheric effects' state (packed from the transport second) and the camera's position. It
   carries no history, so a seek lands on the frame play did.
+- **Where it is seen.** The Environment panel's "Sky and fog" section draws "Fog takes the sky's
+  colour" under the fog density, and while it is above zero a line saying what it does ("the far
+  distance fades into the sky behind it, aurora included") and "...all sky colour from", the
+  distance, in metres with 0 read as "where the fog is thick". The Parameters panel lists both as
+  direct rows of `scene`, labelled for what they look like.
 - **Bindings.** The map and its sampler are group 0 bindings 16 and 17 of the frame layout. The
   map's own pass draws with the aux frame group, whose binding 16 is a 1 x 1 placeholder, because a
   pass may not sample the texture it renders into. The shadow and mask groups bind the placeholder
