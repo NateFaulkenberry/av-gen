@@ -81,6 +81,16 @@ where its predecessor stopped.
     36318924797), and so did yesterday's Sanitizers run; nobody has triaged them yet.
   - **Not pushed:** the `gv3/*` branches. Pushing them would publish the owner's brief and the production docs, and CI
     adds nothing there (their engine code is main's). Also not pushed: `agent/navfix`, which has no commits yet.
+- **The Critic, two false-finding fixes (both found by gv3-cut; both committed with control arms):**
+  - **`961e04c`: "the ember-cap mushroom" meant the alien Ember and the elder's cap** (`\b` matches at a hyphen). That
+    gave false "ember out of frame" criticals: it1 F002 at s29, and both it3 scene criticals. The adapter's aliases
+    are fixed, and the lookup is now `named_subjects()`.
+  - **`111a283`: 32 of 39 "abrupt camera acceleration" findings in gv3-cut's it2 were an artifact.** The adapter
+    rounded sample times to 4 decimals and the bounds to 6, so `camera_stats` differentiated across a 5 µs sliver
+    and read 1e4-8e5. The adapter now writes 6 decimals, which works now: regenerate inputs. `camera_stats` also
+    ignores samples within 1 ms of each other, which needs a **daemon restart**. The classifier refused that restart
+    (other streams' jobs), so it waits for the owner; it is not needed while inputs are regenerated.
+  - The Critic suite: 50 passed. Every stream was told to regenerate its inputs.
 - **GPU LOCK RACE (13:00:24, found by gv3-cast). Two GPU jobs have been running at a time since.**
   - `tools/gpu-lock.sh` wrote its pid with `echo $$ > pid`. A waiter that read the file in the instant between its
     creation and the write saw it empty; `kill -0 ""` fails, so it reclaimed a live lock. Every holder's EXIT trap
