@@ -92,6 +92,9 @@ Targeted tests on the three-stream build all pass: routes 57, signals and emissi
   - **setpieces** (`82e1dde7`, `integrate/revision` merged, 32 uncommitted files): the proof, UI, evaluator hook, ADRs and suites left.
 - **Render is untouched** since its WIP checkpoint (`7f36b8e3`). It is the last stream to launch.
 
+**MERGED (07:30): main is `3f720bfa`,** now also with water (ADR-914–916). The branch already contained main, so the merged tree is the one its suites ran on: GPU 532 cases, 531 passed, 1 skipped; CPU 3,699 tests, all passing except a wall-clock limit under load that passed alone. Report in [stream-reports/water.md](stream-reports/water.md). Main was merged into `gv3/production` (`784061f7`). **7 of 10 streams are merged.**
+- **Launched: the render finisher** (`abb3faba9bb55470e`). It merges main first. Running: characters (on its last suites), setpieces, render.
+
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
 2. emission finisher + camera finisher.

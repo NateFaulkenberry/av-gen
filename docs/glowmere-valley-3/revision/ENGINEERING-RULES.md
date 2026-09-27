@@ -69,6 +69,11 @@ to what they are looking at counts as a defect.
 - **Never run the windowed app or `--capture-ui` to check this.** The windowed app rewrites the owner's preferences. Verify from the grouping code, or with a CPU test on the registry.
 - **In your report,** list each new control and where an artist finds it (panel → group → sub-group).
 
+## Shared folders
+Agents share the coordinator's scratchpad folder. Give every log and output file there a name that
+starts with your stream (`render-gpu-full.log`, not `gpu-full.log`); another agent's run overwrote a
+generic name once. Keep scratch copies of GV3 under your worktree's `build/`, never in `examples/`.
+
 ## Before you finish
 - Run your targeted tests.
 - Run the full CPU suite (`<wt>/build/release/tests/avgen_tests`, or `ctest --test-dir <wt>/build/release -j 4`) and record exact counts.
