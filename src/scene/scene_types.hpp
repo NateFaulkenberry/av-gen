@@ -571,6 +571,24 @@ struct Environment {
     // form beyond. `fogDensity`, the exp-squared density that used to sit here, is removed rather
     // than aliased (ADR-441); ADR-705 lists what every scene that set it was re-tuned to.
     glm::vec3 fogColor{0.012f, 0.012f, 0.02f};
+    // ADR-918: how much of the colour the surface fog fades towards is the SKY'S OWN RADIANCE in the
+    // direction of the ray, rather than `fogColor`. 0 (the default) is the constant colour, the fog
+    // every scene had before, to the bit. 1 is aerial perspective: a distant ridge fades into the
+    // sky behind it -- the analytic sky or the environment map, and the aurora and comets drawn over
+    // it -- so a rim seen against a bright horizon reads as air instead of as a dark cut-out. The
+    // sky is read low-passed, through a small map rebuilt every frame, so the fog carries the sky's
+    // colour and brightness by direction and none of its fine structure. Below the horizon the map
+    // holds the horizon's own radiance: looking down into a valley, the air between is lit by the
+    // sky, not by the ground colour the sky draws beneath its horizon.
+    float fogSky = 0.0f;
+    // ...and HOW FAR AWAY the fog is fully the sky's colour, in metres. Nearer air keeps `fogColor`,
+    // blending smoothly towards the sky's radiance with distance (`smoothstep(0, distance, d)`), the
+    // shape production engines use for directional in-scattering: the far rim matches the sky
+    // behind it, while ground mist in front of the camera stays the colour it was tuned as instead of
+    // glowing with the horizon's brightness. 0 (the default) is automatic: three of the fog's own
+    // extinction lengths, where a level ray through the base density is 95% fog -- which is where a
+    // far ridge would otherwise have been a cut-out.
+    float fogSkyDistance = 0.0f;
     // ADR-058: how much of the volumetric's mist layer the *surface* fog sees. At 0 the distance
     // above is uniform, which is what it has always been; at 1 the view ray is integrated through
     // the same flat-topped layer the volumetric marches (uniform up to `fogHeight`, thinning by
