@@ -93,7 +93,7 @@ coupling is a choice, not a signal: to make the music move the seams through the
 (`scene/windSpeed`, `scene/wind/gustAmount`), which moves the grass with them. `tearDirection` is
 `"wind"` or an angle in radians about +Y (0 = +X), held to one turn either way, the control's range.
 
-**The liveness registry knows them (ADR-902).** A 24th rule, `tear-setting-unread` (dead): a tear
+**The liveness registry knows them (ADR-902).** A new rule, `tear-setting-unread` (dead): a tear
 setting of a water whose amount is 0 and which no route or track lifts -- that water is drawn with the
 tear code compiled out -- or the fixed direction of seams that follow the wind. `LivenessInputs` now
 carries the modulator and the timeline for it; without them the rule gives no verdict rather than guess.
@@ -125,8 +125,15 @@ Rejected:
   test, 6 of 6 frames, with every other tear setting pushed off its default).
 - **One more pipeline compile** at start-up and on a shader reload. `WaterUniforms` grows from 192 to
   240 bytes, inside the 256-byte stride.
-- **The route audit changes shape, not verdicts.** 24 rules; the tear rows are new, and no tracked
-  project routes or keys a tear setting, so no project's findings change. `nodes/*/water/flowSpeed`'s
+- **The reactive catalogue and the default proposal follow the controls (ADR-925, ADR-927).** They were
+  written against this work's first spellings (`water/tears`, `water/tearShear`, `water/tearCoverage`),
+  which never shipped. The catalogue now offers `water/tears/{amount, shear, coverage}` -- labelled
+  water tears, tear shear, tear coverage -- and excludes all three while the amount is 0. The seven
+  static controls are never offered: they refuse routes. The proposal lifts the amount with the section
+  (key `water-tears`) and leaves the shear and coverage alone. `test_reactive_catalog.cpp` and
+  `test_reactivity_proposer.cpp` test the real controls, with the tears-off control.
+- **The route audit changes shape, not verdicts.** 26 rules with ADR-926's two; the tear rows are new,
+  and no tracked project routes or keys a tear setting, so no project's findings change. `nodes/*/water/flowSpeed`'s
   evidence now says ADR-914's bound: a change jumps each field by at most 8 s of travel, not by the
   whole elapsed time. It is still a phase-rate hazard.
 - **Measured** (test_water_tears_gpu.cpp):
