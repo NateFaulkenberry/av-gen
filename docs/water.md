@@ -144,6 +144,9 @@ crossing the water tightens the seams it crosses, in step with the grass on the 
 against a bright stretch of sky -- and only where they are at least a few reference pixels apart. Further
 out they fade, and the band reads as a smooth, slick line through the rippled water; narrower than a
 couple of reference pixels, the whole band fades out. Close shots over a lit surface carry them best.
+The reference's 1.2 m step reads only a few metres from the lens: for water seen from tens of metres
+(Glowmere Valley 3's framings), a step of about 3 m at a compression (`tearShear / tearCell`) of about
+2 keeps the packed stripes in the near water, and the seams become slick lines further out.
 
 ## Flow
 
