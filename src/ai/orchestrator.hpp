@@ -220,6 +220,7 @@ public:
     void setPerformanceSource(PerformanceSource source) { performance_ = std::move(source); }
     void setRecordingHook(RecordingHook hook) { recordingHook_ = std::move(hook); }
     void setWatchHook(WatchHook hook) { watchHook_ = std::move(hook); }
+    void setEvaluationHook(EvaluationHook hook) { evaluationHook_ = std::move(hook); } // ADR-931
     // Where `project.create` / `open` / `save_as` resolve a name. Empty means those tools refuse,
     // which is the right default: a session that never says where projects live should not have
     // one guessed for it.
@@ -257,6 +258,7 @@ private:
     PerformanceSource performance_;
     RecordingHook recordingHook_;
     WatchHook watchHook_;
+    EvaluationHook evaluationHook_;
     std::filesystem::path projectsRoot_;
     std::vector<std::filesystem::path> contentRoots_;
     TaskLimits limits_;

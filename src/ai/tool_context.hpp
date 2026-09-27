@@ -116,9 +116,36 @@ public:
     [[nodiscard]] virtual std::string phase() const = 0;
     [[nodiscard]] virtual Result<nlohmann::json> take() = 0;
     virtual void cancel() = 0;
+    // Main thread, once, after `take` succeeded: what the answer means for the project. A watch's
+    // means nothing (it is only an answer); an evaluation's is a record the project keeps (ADR-931).
+    virtual void settle(app::Engine& engine, const nlohmann::json& value) {
+        (void)engine;
+        (void)value;
+    }
 };
 // Main thread: starts watching a play of the engine's project from zero to `untilSeconds`.
 using WatchHook = std::function<Result<std::shared_ptr<DeferredResult>>(app::Engine&, double untilSeconds)>;
+
+// ADR-931: evaluating a plan -- a revision in the project, or a candidate nobody has approved -- by
+// rendering a scratch copy of a span of the film and asking the evaluator (the Creative Critic). The
+// host's, like the watcher: the core library only asks. The candidate is compiled into the SCRATCH
+// copy; the person's project is not touched and nothing is proposed (the autonomy policy: iterate in
+// scratch, propose only the winner, so the approval gate stops once rather than every iteration).
+struct EvaluationRequest {
+    nlohmann::json plan;    // the plan document evaluated, as the tool compiled it
+    std::string planId;
+    int revision = 0;       // the revision it is, or would become
+    std::string candidate;  // the document's fingerprint: two candidates of one revision differ
+    bool installed = false; // the plan is the project's own revision: render the project as it is
+    double from = 0.0;      // the film-time span rendered and evaluated
+    double until = 0.0;
+    std::string mode = "preview"; // the Critic's depth: fast | preview | deep
+    std::string label;      // what the caller calls this iteration
+};
+// Main thread: starts one evaluation. Its answer is the `EvaluationReport` as JSON; `settle` stores it
+// in `Engine::directingEvaluations()`.
+using EvaluationHook =
+    std::function<Result<std::shared_ptr<DeferredResult>>(app::Engine&, const EvaluationRequest& request)>;
 
 // Main thread: starts recording `compilation`'s live performances against the engine's project.
 using RecordingHook =
@@ -212,6 +239,10 @@ public:
     // handle back here and the orchestrator returns its answer.
     void setWatchHook(WatchHook hook) { watchHook_ = std::move(hook); }
     [[nodiscard]] const WatchHook& watchHook() const { return watchHook_; }
+    // ADR-931: evaluating. Null when the host installed no evaluator; `director.evaluate` then says so
+    // rather than passing anything silently.
+    void setEvaluationHook(EvaluationHook hook) { evaluationHook_ = std::move(hook); }
+    [[nodiscard]] const EvaluationHook& evaluationHook() const { return evaluationHook_; }
     void deferResult(std::shared_ptr<DeferredResult> handle) { deferredResult_ = std::move(handle); }
     [[nodiscard]] const std::shared_ptr<DeferredResult>& deferredResult() const { return deferredResult_; }
     // The last observation this task's watch returned (its `observation` object), attached to a plan
@@ -256,6 +287,7 @@ private:
     RecordingHook recordingHook_;
     std::shared_ptr<RecordingHandle> deferred_;
     WatchHook watchHook_;
+    EvaluationHook evaluationHook_;
     std::shared_ptr<DeferredResult> deferredResult_;
     nlohmann::json observation_;
     ChangeLog changes_;

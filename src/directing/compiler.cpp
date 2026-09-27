@@ -1,6 +1,7 @@
 #include "directing/compiler.hpp"
 #include "directing/performance.hpp"
 #include "directing/reactivity.hpp"
+#include "directing/setpieces.hpp"
 
 #include "app/cinematic.hpp"
 #include "seq/events.hpp"
@@ -112,6 +113,8 @@ bool remove(const ContentRef& ref, Staging& staged) {
     case ContentDomain::EffectInstance: return world::removeEffect(staged.effects, ref.id);
     case ContentDomain::ModRoute:
     case ContentDomain::ModSource: return removeReactivityContent(ref, staged); // ADR-924
+    case ContentDomain::StagingScenario:
+        return std::erase_if(staged.staging.scenarios, [&](const stage::ScenarioDesc& sc) { return sc.name == ref.id; }) > 0;
     case ContentDomain::SequenceTrack:
     case ContentDomain::TimelineTrack: return false; // not produced yet
     }
@@ -177,6 +180,13 @@ std::optional<nlohmann::json> contentOf(const ContentRef& ref, const Staging& st
         break;
     case ContentDomain::ModRoute:
     case ContentDomain::ModSource: return reactivityContent(ref, staged); // ADR-924
+    case ContentDomain::StagingScenario:
+        for (const stage::ScenarioDesc& sc : staged.staging.scenarios) {
+            if (sc.name == ref.id) {
+                return stage::scenarioToJson(sc);
+            }
+        }
+        break;
     case ContentDomain::SequenceTrack:
     case ContentDomain::TimelineTrack: break;
     }
@@ -693,6 +703,50 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
             line(removedLine(pp.key), pp.key,
                  fmt::format("Marker {} {} ({})", name, clock(time), pp.recording ? "as recorded" : "computed"));
         }
+    }
+
+    // ---- set pieces (ADR-929) ---------------------------------------------------------------------------
+    // Each one a staging scenario beside the authored ones, and a cue marker per moment at the time it
+    // is placed -- so the sequencer shows when the UFO events happen, and a cue can start on one.
+    for (std::size_t i = 0; i < plan.setPieces.size(); ++i) {
+        const PlanSetPiece& sp = plan.setPieces[i];
+        if (v.isBlocked(sp.key)) {
+            continue;
+        }
+        std::vector<Issue> reported; // the validator has already reported every one of these
+        const ResolvedSetPiece r = resolveSetPiece(plan, i, facts, v.times, reported);
+        if (!r.spec || !r.timeline) {
+            continue;
+        }
+        auto scenario = stage::instanceSetPiece(*r.spec);
+        if (!scenario) {
+            line('!', sp.key, fmt::format("{}: {}", issueCodeName(IssueCode::SchemaInvalid), scenario.error().message));
+            continue;
+        }
+        const std::string name = scenario->name;
+        std::erase_if(out.staged.staging.scenarios, [&](const stage::ScenarioDesc& sc) { return sc.name == name; });
+        out.staged.staging.scenarios.push_back(std::move(*scenario));
+        record(sp.key, ContentDomain::StagingScenario, name);
+        const stage::SetPieceSpec& spec = *r.spec;
+        const std::string placed = spec.moment.empty() ? stage::defaultSetPieceMoment(spec.kind) : spec.moment;
+        std::string when;
+        for (const auto& [moment, t] : r.timeline->moments) {
+            const std::string event = fmt::format("setpiece/{}/{}", sp.key, moment);
+            eventTimes[event] = t;
+            seq::Marker marker{t, event, seq::MarkerKind::Cue};
+            out.staged.sequence.markers.push_back(marker);
+            record(sp.key, ContentDomain::SequenceMarker, markerId(marker));
+            when += fmt::format("{}{} {}{}", when.empty() ? "" : ", ", moment, clock(t), moment == placed ? " (placed)" : "");
+        }
+        const int animals = stage::setPieceAnimalCount(spec);
+        line(removedLine(sp.key), sp.key,
+             fmt::format("Set piece \"{}\": {}{} by {}, {}; gone {}; over ({:.1f}, {:.1f}){}", sp.key,
+                         stage::setPieceKindName(spec.kind),
+                         animals > 0 ? fmt::format(" of {} animal{}", animals, animals == 1 ? "" : "s") : std::string(),
+                         spec.actor, when, clock(r.timeline->end), r.timeline->station.x, r.timeline->station.y,
+                         spec.kind == stage::SetPieceKind::Flyby
+                             ? std::string()
+                             : fmt::format(", in from {:.0f} deg", stage::setPieceValue(spec, "approachBearing"))));
     }
 
     // ---- markers -------------------------------------------------------------------------------------

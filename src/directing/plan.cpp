@@ -62,17 +62,18 @@ constexpr Table<CameraMove, 13> kMoves{{
 constexpr Table<PerformanceMode, 3> kModes{{
     {PerformanceMode::Scripted, "scripted"}, {PerformanceMode::Directed, "directed"}, {PerformanceMode::Goal, "goal"},
 }};
-constexpr Table<ContentDomain, 11> kDomains{{
+constexpr Table<ContentDomain, 12> kDomains{{
     {ContentDomain::SequenceShot, "sequence.shot"}, {ContentDomain::SequenceMarker, "sequence.marker"},
     {ContentDomain::SequenceActor, "sequence.actor"}, {ContentDomain::SequenceEvent, "sequence.event"},
     {ContentDomain::SequenceTrack, "sequence.track"}, {ContentDomain::CameraRig, "camera.rig"},
     {ContentDomain::CameraShot, "camera.shot"}, {ContentDomain::TimelineTrack, "timeline.track"},
     {ContentDomain::EffectInstance, "effect.instance"}, {ContentDomain::ModRoute, "modulation.route"},
-    {ContentDomain::ModSource, "modulation.source"},
+    {ContentDomain::ModSource, "modulation.source"}, {ContentDomain::StagingScenario, "staging.scenario"},
 }};
 static_assert(kSubjectKinds.back().first == SubjectKind::World);
 static_assert(kMoves.back().first == CameraMove::LowAngle);
-static_assert(kDomains.back().first == ContentDomain::ModSource);
+static_assert(kDomains.back().first == ContentDomain::StagingScenario);
+static_assert(kDomains.size() == static_cast<std::size_t>(ContentDomain::StagingScenario) + 1);
 
 // ---- a reader that reports rather than throws ---------------------------------------------------
 //
@@ -435,6 +436,55 @@ json Plan::toJson() const {
         j["sources"] = std::move(sourcesJson);
     }
 
+    // ADR-929. Written only when there is one, so a plan that never placed a set piece serialises to
+    // the bytes it always did -- and fingerprints the same.
+    if (!setPieces.empty()) {
+        json pieces = json::array();
+        for (const PlanSetPiece& p : setPieces) {
+            json o{{"key", p.key}, {"template", p.templateName}, {"craft", p.craft}, {"at", p.at.toJson()}};
+            putString(o, "moment", p.moment);
+            json where = json::object();
+            const auto pair = [](const std::pair<float, float>& v) { return json::array({v.first, v.second}); };
+            if (p.where.region) {
+                json region{{"radius", p.where.radius}};
+                if (p.where.point) {
+                    region["center"] = pair(*p.where.point);
+                }
+                putString(region, "near", p.where.near);
+                if (p.where.offset != std::pair<float, float>{0.0f, 0.0f}) {
+                    region["offset"] = pair(p.where.offset);
+                }
+                where["region"] = std::move(region);
+            } else {
+                if (p.where.point) {
+                    where["point"] = pair(*p.where.point);
+                }
+                putString(where, "near", p.where.near);
+                if (p.where.offset != std::pair<float, float>{0.0f, 0.0f}) {
+                    where["offset"] = pair(p.where.offset);
+                }
+            }
+            o["place"] = std::move(where);
+            putString(o, "tag", p.tag);
+            if (!p.animals.empty()) {
+                o["animals"] = p.animals;
+            }
+            if (!p.set.empty()) {
+                json set = json::object();
+                for (const auto& [name, value] : p.set) {
+                    set[name] = value;
+                }
+                o["set"] = std::move(set);
+            }
+            if (p.beamColor) {
+                o["beamColor"] = json::array({(*p.beamColor)[0], (*p.beamColor)[1], (*p.beamColor)[2]});
+            }
+            put(o, "framingMetres", p.framingMetres);
+            pieces.push_back(std::move(o));
+        }
+        j["setPieces"] = std::move(pieces);
+    }
+
     json producedJson = json::array();
     for (const ContentRef& c : produced) {
         json o{{"item", c.item}, {"domain", contentDomainName(c.domain)}, {"id", c.id}};
@@ -677,6 +727,92 @@ PlanParse parsePlan(const json& document) {
                 }
             }
         }
+        // ADR-929: set pieces. Their shape only -- the template's slots, the craft, clear air and
+        // the craft's timeline are the validator's, which knows the scene.
+        forEach(r, "setPieces", issues, [&](Reader& sp, std::size_t) {
+            PlanSetPiece piece;
+            piece.key = sp.string("key", true);
+            piece.templateName = sp.string("template", true);
+            piece.craft = sp.string("craft", true);
+            piece.at = sp.time("at", true).value_or(TimeRef{});
+            piece.moment = sp.string("moment");
+            piece.tag = sp.string("tag");
+            const auto readPair = [&](Reader& where, std::string_view key) -> std::optional<std::pair<float, float>> {
+                const json* v = where.raw(key);
+                if (v == nullptr) {
+                    return std::nullopt;
+                }
+                if (!v->is_array() || v->size() != 2 || !(*v)[0].is_number() || !(*v)[1].is_number()) {
+                    where.fail(key, "must be two numbers, [x, z] in metres");
+                    return std::nullopt;
+                }
+                return std::make_pair((*v)[0].get<float>(), (*v)[1].get<float>());
+            };
+            if (const json* place = sp.raw("place"); place == nullptr) {
+                sp.fail("place", "is required: {\"point\": [x, z]}, {\"near\": alias}, or {\"region\": {...}}");
+            } else {
+                Reader where(*place, sp.at("place"), issues);
+                const json* region = where.raw("region");
+                if (region != nullptr) {
+                    Reader rr(*region, where.at("region"), issues);
+                    piece.where.region = true;
+                    piece.where.point = readPair(rr, "center");
+                    piece.where.near = rr.string("near");
+                    piece.where.offset = readPair(rr, "offset").value_or(std::make_pair(0.0f, 0.0f));
+                    piece.where.radius = rr.number<float>("radius", true).value_or(0.0f);
+                    if (rr.has("radius") && !(piece.where.radius > 0.0f)) {
+                        rr.fail("radius", "must be positive");
+                    }
+                    ok = ok && rr.ok();
+                } else {
+                    piece.where.point = readPair(where, "point");
+                    piece.where.near = where.string("near");
+                    piece.where.offset = readPair(where, "offset").value_or(std::make_pair(0.0f, 0.0f));
+                }
+                if (piece.where.point.has_value() == !piece.where.near.empty()) {
+                    where.fail(region != nullptr ? "region" : "point",
+                               "a place is exactly one of a point ([x, z]) or a subject to be near");
+                }
+                ok = ok && where.ok();
+            }
+            if (const json* animals = sp.array("animals"); animals != nullptr) {
+                for (std::size_t a = 0; a < animals->size(); ++a) {
+                    if (!(*animals)[a].is_string()) {
+                        sp.fail("animals", "is a list of subject aliases");
+                        break;
+                    }
+                    piece.animals.push_back((*animals)[a].get<std::string>());
+                }
+            }
+            if (const json* set = sp.raw("set"); set != nullptr) {
+                if (!set->is_object()) {
+                    sp.fail("set", "is an object of template slots: {\"hoverHeight\": 30}");
+                } else {
+                    for (const auto& [name, value] : set->items()) {
+                        if (!value.is_number()) {
+                            sp.fail("set", fmt::format("'{}' must be a number", name));
+                            continue;
+                        }
+                        piece.set.emplace_back(name, value.get<float>());
+                    }
+                }
+            }
+            if (const json* colour = sp.raw("beamColor"); colour != nullptr) {
+                if (!colour->is_array() || colour->size() != 3 || !(*colour)[0].is_number() || !(*colour)[1].is_number() ||
+                    !(*colour)[2].is_number()) {
+                    sp.fail("beamColor", "must be three numbers, linear RGB");
+                } else {
+                    piece.beamColor = std::array<float, 3>{(*colour)[0].get<float>(), (*colour)[1].get<float>(),
+                                                           (*colour)[2].get<float>()};
+                }
+            }
+            piece.framingMetres = sp.number<float>("framingMetres");
+            if (piece.framingMetres && !(*piece.framingMetres > 0.0f)) {
+                sp.fail("framingMetres", "must be positive");
+            }
+            ok = ok && sp.ok();
+            plan.setPieces.push_back(std::move(piece));
+        });
 
         if (const json* obs = r.raw("observation"); obs != nullptr && obs->is_object()) {
             std::vector<ObservedEvent> events;
@@ -737,6 +873,20 @@ PlanParse parsePlan(const json& document) {
     for (std::size_t i = 0; i < plan.sources.size(); ++i) {
         key(plan.sources[i].key, fmt::format("/sources/{}/key", i));
     }
+    for (std::size_t i = 0; i < plan.setPieces.size(); ++i) {
+        key(plan.setPieces[i].key, fmt::format("/setPieces/{}/key", i));
+        // The key is a path segment of the scenario, its parameters and its events.
+        if (plan.setPieces[i].key.find_first_of("/ \t\n") != std::string::npos) {
+            Issue issue;
+            issue.code = IssueCode::SchemaInvalid;
+            issue.location = fmt::format("/setPieces/{}/key", i);
+            issue.subject = plan.setPieces[i].key;
+            issue.message = "a set piece's key names its scenario (setpiece/<key>) and its events, so it may not "
+                            "contain '/' or whitespace";
+            issues.push_back(std::move(issue));
+            ok = false;
+        }
+    }
     std::set<std::string> aliases;
     for (std::size_t i = 0; i < plan.subjects.size(); ++i) {
         if (!aliases.insert(plan.subjects[i].alias).second) {
@@ -778,6 +928,12 @@ PlanParse parsePlan(const json& document) {
     for (std::size_t i = 0; i < plan.cues.size(); ++i) {
         if (plan.cues[i].effect) {
             declared(plan.cues[i].effect->owner, fmt::format("/cues/{}/effect/owner", i), true);
+        }
+    }
+    for (std::size_t i = 0; i < plan.setPieces.size(); ++i) {
+        declared(plan.setPieces[i].where.near, fmt::format("/setPieces/{}/place/near", i));
+        for (std::size_t a = 0; a < plan.setPieces[i].animals.size(); ++a) {
+            declared(plan.setPieces[i].animals[a], fmt::format("/setPieces/{}/animals/{}", i, a));
         }
     }
     for (std::size_t i = 0; i < plan.retimes.size(); ++i) {
@@ -840,10 +996,29 @@ json planSchema() {
           {"retimes", json::array({{{"key", "unique"}, {"performance", "key"}, {"from", time}, {"until", time}, {"factor", "> 0"}}})},
           {"routes", planRouteSchema()},
           {"sources", planSourceSchema()},
+          {"setPieces",
+           json::array({{{"key", "unique; no '/' or spaces: the scenario is setpiece/<key>, its events setpiece/<key>/<moment>"},
+                         {"template", "abduction | survey | flyby"},
+                         {"craft", "a staging actor, e.g. saucer (director.inspect_capabilities lists them)"},
+                         {"at", time},
+                         {"moment", "which moment `at` places: abduction approach|beam|lift|depart (default beam); "
+                                    "survey approach|beam|sweep|depart (default beam); flyby cross|depart (default cross)"},
+                         {"place", json::array({json{{"point", "[x, z] metres"}},
+                                                json{{"near", "a subject alias with a place"}, {"offset", "[dx, dz], optional"}},
+                                                json{{"region", {{"center", "[x, z]"}, {"near", "or an alias"}, {"radius", "metres"}}}}})},
+                         {"tag", "what the animal query looks for; default animal"},
+                         {"animals", "aliases of named animals, 1-3, in lift order (abduction)"},
+                         {"set", "template slots, e.g. {\"animals\": 2, \"hoverHeight\": 30, \"approachBearing\": 90}; "
+                                 "director.inspect_capabilities lists every slot with its range"},
+                         {"beamColor", "[r, g, b] linear, optional"},
+                         {"framingMetres", "the distance it is meant to be seen from (declared; checked for repetition)"}}})},
           {"produced", "set by the engine; never write it"},
           {"observation", "copy director.watch_events' observation here when any time is {\"event\": ...}"}}},
         {"rules",
          {"a cue names exactly one of parameter or effect, and starts either at a time or on a plan event",
+          "a cue may start on a set piece's moment: \"on\": \"setpiece/<key>/beam\"",
+          "vary set pieces -- place, bearing, height, animal count, framing, relation to the music; the validator "
+          "warns when two share a place or a framing distance",
           "never ask for a capability the subject does not list; the validator refuses it and says what exists",
           "a baked plan may not depend on directed or goal performances",
           "a route's target must be live (the reactive catalogue lists live targets); dead targets are refused",

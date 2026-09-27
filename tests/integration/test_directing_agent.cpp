@@ -283,8 +283,19 @@ TEST_CASE("the Director tools declare themselves honestly", "[directing][agent][
         ++count;
     }
     // ADR-765 added director.record_plan, ADR-767 director.watch_events, ADR-927
-    // director.propose_reactivity (which only looks: it returns a plan to propose).
-    CHECK(count == 10);
+    // director.propose_reactivity (which only looks: it returns a plan to propose), ADR-931
+    // director.evaluate and director.compare.
+    CHECK(count == 12);
+    // ADR-931's autonomy policy: evaluating renders a scratch copy and keeps a record; it neither
+    // proposes nor changes the project, so the approval gate is not in front of every iteration.
+    const ai::Tool* evaluate = registry.find("director.evaluate");
+    REQUIRE(evaluate != nullptr);
+    CHECK_FALSE(evaluate->definition.annotations.requiresApproval);
+    CHECK_FALSE(evaluate->definition.annotations.readOnly); // it keeps the report
+    CHECK(evaluate->definition.annotations.expensive);
+    const ai::Tool* compare = registry.find("director.compare");
+    REQUIRE(compare != nullptr);
+    CHECK(compare->definition.annotations.readOnly);
     const ai::Tool* watch = registry.find("director.watch_events");
     REQUIRE(watch != nullptr);
     CHECK_FALSE(watch->definition.annotations.requiresApproval); // it only looks

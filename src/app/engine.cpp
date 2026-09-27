@@ -5,6 +5,7 @@
 
 #include "seq/layer_sink.hpp"
 #include "seq/section_actions.hpp"
+#include "stage/setpiece.hpp"
 
 #include "core/phase_profiler.hpp"
 #include "core/interaction_latency.hpp"
@@ -273,6 +274,14 @@ private:
             std::memcpy(&u, &f, sizeof u);
             return static_cast<std::uint64_t>(u);
         };
+        // ADR-930: a staging beat's event is rebuilt at every replayed step from the entity world's
+        // record, which the entity replay has written up to that step (`stagingEventsBefore`), so a
+        // route on a set piece's beam is replayed like one on an onset.
+        for (const auto& [name, id] : engine_.stagingSignals_) {
+            if (id < samplable_.size()) {
+                samplable_[id] = 1;
+            }
+        }
         for (const auto& source : engine_.sources_.sources()) {
             if (!source->pureInTime()) {
                 continue;
@@ -344,6 +353,12 @@ private:
         ctx.tempoBpm = static_cast<float>(bpm);
         ctx.beatEvent = pulse;
         engine_.sources_.sample(sampling_, ctx);
+        // ADR-930: the beats the step before this one entered. With the entity replay driving this
+        // (an analysed track) the record holds exactly the steps up to that one; replayed alone after
+        // it (`runTo`, no track) it holds the whole replay, and the window picks the same step out.
+        for (const signals::SignalId id : engine_.stagingEventsBefore(time.renderTime, time.deltaTime)) {
+            sampling_.setEvent(id, true, 1.0f);
+        }
         engine_.modulator_.advanceChains(sampling_, time.deltaTime, pick());
     }
 
@@ -1005,6 +1020,125 @@ Result<void> Engine::setCameraDirection(scene::CameraDirection direction) {
     return {};
 }
 
+// ---- staging (ADR-929) ----------------------------------------------------------------------------
+
+stage::StagingDesc Engine::capturedStaging() const {
+    const scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return {};
+    }
+    stage::StagingDesc desc = comp->staging();
+    const std::string& prefix = comp->director().prefix();
+    for (stage::ScenarioDesc& scenario : desc.scenarios) {
+        for (stage::ScenarioParam& p : scenario.params) {
+            if (const params::IParameter* param = params_.find(prefix + scenario.name + "/" + p.name);
+                param != nullptr && param->componentCount() == 1) {
+                p.value = param->baseComponent(0);
+            }
+        }
+    }
+    return desc;
+}
+
+Result<void> Engine::setStaging(stage::StagingDesc staging) {
+    scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return fail("this scene has no composition, so it has no staging");
+    }
+    // Validated on a scratch director first: `Composition::setStaging` stores the description before
+    // its director accepts it, so a refusal there would leave the two disagreeing.
+    {
+        stage::Staging probe;
+        if (auto ok = probe.setDesc(staging); !ok) {
+            return ok;
+        }
+    }
+    // The scenarios' parameters are about to be removed and re-added: nothing may hold a pointer.
+    timeline_.unbind();
+    if (auto ok = comp->setStaging(std::move(staging)); !ok) {
+        rebind();
+        return ok;
+    }
+    rebind(); // and declares the new scenarios' beats on the bus (ADR-930)
+    // A director handed scenarios it has not run is at their top, not where a play from zero would
+    // have it at this second. The replay puts it there (ADR-671); in the live editor the seek is
+    // deferred to the next frame like any other, and everywhere else it happens now.
+    requestSeek(timelineClock_.seconds, false);
+    return {};
+}
+
+// ADR-930: every beat of every scenario is a bus event, "<scenario>/<beat>". Declared here, before
+// `rebind` resolves the routes, so a route whose source is a set piece's beam binds on load. Each is
+// labelled in the words the Modulation panel's source picker shows beside it (the owner's rule: a
+// source is found by what it is), so "setpiece/field/beam" reads "UFO set piece 'field': beam".
+void Engine::declareStagingSignals() {
+    stagingSignals_.clear();
+    const scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return;
+    }
+    for (const stage::ScenarioDesc& scenario : comp->staging().scenarios) {
+        const std::string id = stage::setPieceIdOf(scenario.name);
+        for (const stage::BeatDesc& beat : scenario.beats) {
+            std::string name = scenario.name + "/" + beat.name;
+            const signals::SignalId signal = bus_.declare(name, 0.0f, 1.0f, true);
+            bus_.setLabel(signal, id.empty() ? fmt::format("scenario '{}': {}", scenario.name, beat.name)
+                                             : fmt::format("UFO set piece '{}': {}", id, beat.name));
+            stagingSignals_.emplace_back(std::move(name), signal);
+        }
+    }
+}
+
+// The staging beats one step raised, as bus ids: every world event named "<scenario>/<beat>" stamped
+// at the instant `step` before `renderTime`. The window is [renderTime - step, renderTime) with a
+// microsecond of float noise either side (instants are computed as `i / fps`): a beat entered by the
+// step at `renderTime` itself is raised after the routes of that frame have run, so it belongs to the
+// next frame -- the one frame every entity-derived signal lags by (ADR-703).
+//
+// It reads the entity world's record of world events, never the director: that record is what a
+// seek's replay rebuilds and checkpoints (`Composition::seekWithDirector` raises the beats as it
+// steps; `EntityWorld::checkpoint` carries them), so the same question asked after a seek gets the
+// answer a play got. The record keeps a minute and 128 events (`EntityWorld::kEventWindowSeconds`,
+// `kEventCapacity`); a step's own beats are always the newest in it.
+std::vector<signals::SignalId> Engine::stagingEventsBefore(double renderTime, double step) const {
+    std::vector<signals::SignalId> out;
+    const scene::Composition* comp = composition();
+    if (stagingSignals_.empty() || comp == nullptr || !(step > 0.0)) {
+        return out;
+    }
+    const entity::EntityWorld& world = comp->entityWorld();
+    const double previous = renderTime - step;
+    for (const entity::WorldEvent& e : world.worldEvents()) {
+        if (e.time < previous - 1e-6 || e.time > renderTime - 1e-6) {
+            continue;
+        }
+        const std::string_view name = world.eventName(e.type);
+        for (const auto& [signal, id] : stagingSignals_) {
+            if (signal == name && std::find(out.begin(), out.end(), id) == out.end()) {
+                out.push_back(id);
+            }
+        }
+    }
+    return out;
+}
+
+// Fired on the frame after the beat was entered. A frame with no delta -- the frame a seek lands on,
+// or a paused frame drawn again -- is the same instant as the step before it and carries what that
+// step's frame carried: the window is the last step the engine took (the replay's 1/60 s grid after a
+// seek, ADR-700), not nothing. Before this a seek that landed on the frame after a beam lit showed no
+// beam event where the play showed one, so a route on it disagreed on exactly the landing frame.
+// Carrying it again at dt = 0 moves no chain that has already consumed it: a one-pole and a ramp do not
+// advance, a hold restarts at the same instant, and a delay line merges a second sample at the same
+// instant into the first (`ProcessorChain::delay`).
+void Engine::publishStagingSignals(const FrameTime& time) {
+    if (time.deltaTime > 0.0) {
+        stagingStep_ = time.deltaTime;
+    }
+    for (const signals::SignalId id : stagingEventsBefore(time.renderTime, stagingStep_)) {
+        bus_.setEvent(id, true, 1.0f);
+    }
+}
+
 comp::TextLayer& Engine::addTextLayer(std::string text, double startSeconds, double endSeconds) {
     comp::TextLayer& layer = layers_.addText(std::move(text), startSeconds, endSeconds);
     layer.attach(params_);
@@ -1119,6 +1253,7 @@ void Engine::rebind() {
     // ADR-703: before the bind, so an `entity.<name>.*` source a route names is a declared signal
     // by the time the modulator resolves it.
     refreshHistorySubscriptions();
+    declareStagingSignals(); // ADR-930: likewise the staging beats, before the routes naming them bind
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels must exist on the bus first
     }
@@ -1894,6 +2029,15 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         }
         doc["directingPlans"] = std::move(plans);
     }
+    // ADR-931: what the evaluator said about those plans, beside them. Written only when there is
+    // one, for the same byte-stability reason.
+    if (!directingEvaluations_.empty()) {
+        nlohmann::json evaluations = nlohmann::json::array();
+        for (const directing::EvaluationReport& e : directingEvaluations_) {
+            evaluations.push_back(e.toJson());
+        }
+        doc["directingEvaluations"] = std::move(evaluations);
+    }
     // ADR-158: which hero each directed shot was cut for, beside the tracks it accompanies.
     //
     // A sibling of `timeline` rather than part of the scene, because that is what it belongs to: the
@@ -2125,6 +2269,26 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         }
         if (nlohmann::json liveCameras = authoredOnly(comp->cameraDirection()); liveCameras != fileCameras) {
             doc["cameraDirection"] = std::move(liveCameras);
+        }
+        // The staging description, and this is the same defect a **seventh** time (ADR-929). A plan's
+        // set pieces compile into `Composition::setStaging`; the composition is saved by reference;
+        // so without this every UFO event a plan placed lived in the window and in no document a
+        // render reads -- and GV3's generator compiles its plan headless and renders the saved file.
+        //
+        // The whole description, in `lights`' and `cameraDirection`'s family: a scenario's beats are
+        // not parameters. Its parameter VALUES are, and they stay where they always were -- the
+        // `parameters` block -- so this compares the description as installed (`staging()`), not the
+        // one with the bases folded in (`capturedStaging()`): a project that merely tuned the
+        // abduction's hover height keeps the file it had. Compared after a round trip through the
+        // same parser, so an untouched project writes nothing and stays byte-stable.
+        nlohmann::json fileStaging;
+        if (!sceneDoc.is_object() || !sceneDoc.contains("staging")) {
+            fileStaging = stage::stagingToJson(stage::StagingDesc{});
+        } else if (auto parsed = stage::stagingFromJson(sceneDoc["staging"]); parsed) {
+            fileStaging = stage::stagingToJson(*parsed);
+        }
+        if (nlohmann::json liveStaging = stage::stagingToJson(comp->staging()); liveStaging != fileStaging) {
+            doc["staging"] = std::move(liveStaging);
         }
     }
     if (!states_.empty()) {
@@ -2801,6 +2965,19 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             }
         }
     }
+    // ADR-929: the session's staging -- the scene's scenarios plus the set pieces a plan compiled --
+    // over the scene file's. **Before `params::loadProject`**, for the lights' reason: `setStaging`
+    // registers `staging/<scenario>/...`, and a set piece's tuned values arrive in `parameters`.
+    if (const auto entry = doc.find("staging"); entry != doc.end() && entry->is_object()) {
+        auto staging = stage::stagingFromJson(*entry);
+        if (!staging) {
+            warn("staging: " + staging.error().message);
+        } else if (auto* comp = composition(); comp != nullptr) {
+            if (auto ok = comp->setStaging(std::move(*staging)); !ok) {
+                warn("staging: " + ok.error().message);
+            }
+        }
+    }
     // ADR-702: the session's effects -- every owner's, one list -- over the ones its scene authors.
     // After the heroes, because an effect can be attached to one. The pre-ADR-702 keys are named
     // rather than read (ADR-441: every tracked project was converted in the repository).
@@ -2951,6 +3128,17 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     // it here would make the next save delete it -- the defect family this program exists to avoid.
     directingPlans_.clear();
     unreadableDirectingPlans_.clear();
+    // ADR-931: cleared when absent, like the plans they are about.
+    directingEvaluations_.clear();
+    if (const auto evaluations = doc.find("directingEvaluations"); evaluations != doc.end() && evaluations->is_array()) {
+        for (std::size_t i = 0; i < evaluations->size(); ++i) {
+            if (auto e = directing::EvaluationReport::fromJson((*evaluations)[i])) {
+                directingEvaluations_.push_back(std::move(*e));
+            } else {
+                warn(fmt::format("directingEvaluations[{}]: not an evaluation; dropped", i));
+            }
+        }
+    }
     if (const auto plans = doc.find("directingPlans"); plans != doc.end() && plans->is_array()) {
         for (std::size_t i = 0; i < plans->size(); ++i) {
             directing::PlanParse parsed = directing::parsePlan((*plans)[i]);
@@ -3204,6 +3392,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
 void Engine::newProject() {
     directingPlans_.clear();
     unreadableDirectingPlans_.clear();
+    directingEvaluations_.clear();
     sequence_ = seq::Sequence{};
     sequenceTargets_.clear();
     sequenceReport_ = seq::InstallReport{};
@@ -4087,6 +4276,9 @@ void Engine::seekSeconds(double seconds) {
     }
     cueState_ = {};   // cues re-sync from the new position on the next frame
     cueApplied_ = false;
+    // ADR-930: the frame a seek lands on carries the staging beats of the replay's last step, which is
+    // on the replay's 60 Hz grid (ADR-700), whatever step the frames before the jump took.
+    stagingStep_ = 1.0 / 60.0;
     // ADR-398. `PostSettings::exposureReset` has documented itself as "(scene change, timeline
     // seek)" since it was written, and until this line only the scene change ever set it:
     // `resetCameraState` had exactly one caller, the composition install. So a scrub reset the
@@ -5685,6 +5877,7 @@ void Engine::update(const FrameTime& time) {
     // ADR-703 (rendering-architecture §3): the entity-derived signals, from the last completed step,
     // before the routes that read them -- one step of latency, the same in a play and a scrub.
     publishEntitySignals();
+    publishStagingSignals(time); // ADR-930: last step's staging beats, as bus events
     modulator_.applyRoutes(bus_, params_, time.deltaTime);
     // Autonomous behaviour, after the routes and before the scene reads the finals (ADR-088): a
     // behaviour's own knobs have been modulated by now, and the offsets it writes land on top of

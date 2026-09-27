@@ -51,8 +51,13 @@ inline bool pathStartsWith(const std::string& s, std::string_view prefix) {
 // -- decides when every downbeat, phrase and bar-synced pulse in the picture lands. Off every list it
 // showed only on Advanced, and the editor opens on Intermediate: a third instance of ADR-375, caught
 // before it shipped.
-inline constexpr std::string_view kBeginnerPrefixes[] = {"macros/", "scene/", "env/",    "post/",     "camera/",
-                                                         "root/",   "music/", "shader/", "temporal/"};
+// `staging/` is here for the same reason (ADR-928): a staging scenario's knobs are the UFO's part in
+// the film -- the hover height, the beam's brightness and colour, the moment the beam lights -- and a
+// plan's set pieces register theirs under `staging/setpiece/<key>/`. Off every list they showed only
+// on Advanced, a fourth instance of ADR-375.
+inline constexpr std::string_view kBeginnerPrefixes[] = {"macros/", "scene/",  "env/",      "post/",
+                                                         "camera/", "root/",   "music/",    "shader/",
+                                                         "temporal/", "staging/"};
 inline constexpr std::string_view kIntermediatePrefixes[] = {
     "procedural/", "field/", "spline/", "sdf/", "material/", "particles/"};
 } // namespace detail
