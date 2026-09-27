@@ -556,6 +556,44 @@ her), and 57.1's whole column from over the river all read as meant. 29.1: Vane 
 with the elder's cap above the trees at first; by its end a near tree's canopy fills the right third:
 the scatter is not in any trace, so only a render shows it. Kept, recorded. 9.1's first try: above.
 
+## The merge: gv3-cast's world and engine-3 (`54db99c8`)
+
+`gv3/production` `274fe408` (main `876a11e2` with render ADR-917-919 and the gpu-lock fix, and
+`gv3/cast`) merged into `gv3/cut` with no conflicts; the shared build is engine-3
+(`av-gen-engine-3/build/release`, `876a11e2`; its `BUILD-READY` marker was not there, but no compile
+was running and every tool was built at 14:54). The pipeline is now the generator and then
+`tools/gv3/ufo.py`, which compiles gv3-cast's E1-E5 plan into the project; the preview world
+(`preview_world.py`, the E4 stand-in) is no longer needed.
+
+**The Director and the recorded cut.** On the merged project the live Director cuts seven spans
+differently (53.1, 55.1, 65.1, 66.1, 68.1, 89.1, 90.1); the generator keeps the recorded cut and says
+so. The cause, from the Director's own reasons (`build/gv3/cut/cut-song-cut-live-merged.json` against
+`song_cut.json`): not the engine (engine-2 and engine-3 give the same new cut on the merged project),
+not the set-piece events (identical), but the span lengths' subject term, "x0.90 for how much
+'lantern-cap' moves" against "x1.15 for how much 'rook' moves": Song Mode scales each span by how much
+the subject its own Auto-director camera would follow moves, and gv3-cast's cast changed those
+subjects. GV3 never uses that camera -- every span has an authored composition -- so the change says
+nothing about the music or the set pieces. **The recorded cut stays** (`--recut` would re-time E4's
+arrival and the break for a camera GV3 does not have, and would move again with navfix and the river).
+For the song stream: an option to leave the subject term out, or to read the subjects from the
+authored rigs, would make an authored production's cut depend only on the music and its plan.
+
+## Review material
+
+`~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`:
+- `pacing-before-after.png`: shot lengths over the film, the first pass against the Director's cut.
+- `sheets-before-first-pass/`, `sheets-after-iteration-2/`: the whole film, three frames a shot
+  (`review.py`), with each shot's measurements in `report.md`.
+- `changed-shots/`: every span iterations 3 and 4 changed, the first pass's frame at the same film time
+  beside the newest render's (the iteration-4 clips, 9.1's and 107.1's final clips, iteration 3's).
+- `set-piece-moments/`: E1-E5, fifteen moments, before and after.
+
+**Honest reading of the sheets:** most changed spans are clearly better (E2, E4, E5's riser, 9.1, 47.1,
+57.1, 75.1, 91.1, 113.1). Two are not yet: **29.1** (Vane walks the meadow among trees that hide the
+elder she was meant to be seen against) and **31.1** (the spire, centred by projection, reads as one
+mushroom among many on a busy lit hillside). Both need render-and-look iterations: the scatter is in no
+trace.
+
 ## State (2026-09-27, about 15:00)
 
 **Commits on `gv3/cut`** since the checkpoint: iteration 2 `dd2306b2`; iteration 3 `630ca638`,
