@@ -107,10 +107,70 @@ struct GaitSettings {
     // about playback and quietly "corrected" by someone who does not know what it is covering for.
     float idleRate = 1.0f;
 
+    // ---- how this body turns (ADR-908) ---------------------------------------------------------
+    //
+    // Degrees per second: the fastest this body turns, and the rate it pivots at from rest. **0 is
+    // "not authored"** and keeps each action verb's long-standing default -- 2.45 rad/s (140 deg/s)
+    // for a `move` and 2.5 rad/s for a `face` -- so every body that says nothing turns exactly as it
+    // did. Degrees in memory as well as in the file, because every other `turnRate` an author writes
+    // in this vocabulary is degrees and a value that round-tripped through radians would not come
+    // back bit for bit.
+    float turnRate = 0.0f;
+    // Metres: the circle this body turns on while it keeps walking. **0 is the old mover**, which
+    // turns toward its heading at `turnRate` and travels at the cosine of what is left -- so any turn
+    // over 90 degrees is a dead stop and a pivot on the spot, the pattern the GV3 audit traced to this
+    // one line. Above 0 a moving body turns no faster than speed / radius, keeps at least
+    // `kTurnKeep` of its pace through the turn, and pivots only from rest (`turnCap`, `turnPace`).
+    float turnRadius = 0.0f;
+    // Metres from the pivot to the feet that step round it, for a body turning on the spot with no
+    // clip of its own to turn with (ADR-908, see `playbackRate`). A body turning at w rad/s moves its
+    // feet at w * pivotRadius, and its locomotion cycle plays at that speed over `walkSpeed`. 1 m is
+    // about half a farm animal at the Glowmere cast scale; a scene can say what its bodies are.
+    float pivotRadius = 1.0f;
+
     // So a writer can tell "the author set nothing" from "the author set the defaults" and emit
     // nothing in the first case.
     friend bool operator==(const GaitSettings&, const GaitSettings&) = default;
 };
+
+// ---- walk-through turns (ADR-908) -----------------------------------------------------------------
+//
+// The rule every mover that honours a turn radius shares. It is three questions, and it is written
+// once so a wandering animal and an alien on an errand cannot turn by two different rules. A mover
+// asks them in this order each step: the pace first, from the heading error it has, then the turn,
+// capped by the pace it had and the pace it now has.
+//
+//   * **how much of its pace does it keep** (`turnPace`): at rest, the cosine of what is left to
+//     turn -- so from rest it turns in place until the way is within 90 degrees and then walks out
+//     of the turn. Moving, never less than `kTurnKeep` of it: it slows into a sharp turn and never
+//     stops for one. That floor is the whole difference from the old mover, whose pace was the
+//     cosine everywhere and which therefore stopped dead for every turn over 90 degrees.
+//   * **can it get there at all** (`insideTurn`): a point `d` metres away and `e` radians off the
+//     heading lies inside the circle the body turns on when d < 2 R |sin e|. Walking on, the body
+//     would orbit it for ever. The caller decides what that means: a wander's destination was only
+//     ever somewhere to walk toward, and it counts as reached; an errand's target is the point of
+//     the errand, and the mover brakes to rest and pivots once.
+//   * **how fast may it turn** (`turnCap`): a body that will be at rest this step may pivot, at
+//     `rate`. One that will be moving turns no faster than the slower of its two paces over the
+//     radius -- which is what a circle of that radius at that pace *is* -- so it traces a turn at
+//     least `radius` wide whether it is speeding up or slowing down, and a body that wants to turn
+//     tighter has to come to rest first. A body leaving rest toward a way within 90 degrees is
+//     already moving on the step it leaves, so it walks out on the circle rather than pivoting a
+//     sliver first.
+//
+// With `radius` 0 every answer is the old mover's: `rate`, the cosine, never inside.
+struct TurnSettings {
+    float rate = 0.0f;   // rad/s
+    float radius = 0.0f; // metres; 0 = pivot and go
+};
+// m/s below which a body is at rest for the purpose of turning: it may pivot.
+inline constexpr float kTurnRestSpeed = 0.05f;
+// The least fraction of its pace a moving body keeps through a turn.
+inline constexpr float kTurnKeep = 0.5f;
+[[nodiscard]] float turnPace(const TurnSettings& turning, float pace, float error);
+[[nodiscard]] bool insideTurn(const TurnSettings& turning, float pace, float distance, float error);
+// `before` is the pace the body had coming into the step, `after` the pace it has leaving it.
+[[nodiscard]] float turnCap(const TurnSettings& turning, float before, float after);
 
 [[nodiscard]] bool gaitLocomotor(Activity activity);
 
@@ -125,8 +185,10 @@ public:
                                   float turnRate, double dt);
 
     // Clip seconds per timeline second for `activity` at `speed`. 1 when the settings do not ask
-    // for rate matching, or when the gait has no authored speed to match against.
-    [[nodiscard]] static float playbackRate(const GaitSettings& settings, Activity activity, float speed);
+    // for rate matching, or when the gait has no authored speed to match against. `turnRate` (rad/s,
+    // signed) is read only for a body turning on the spot with no idle clip to turn with (ADR-908).
+    [[nodiscard]] static float playbackRate(const GaitSettings& settings, Activity activity, float speed,
+                                            float turnRate = 0.0f);
 
     // How far the feet are from the ground they are crossing, as a ratio: 1 means the clip is being
     // played at exactly the speed it was authored for, 3 means the body is covering three metres for

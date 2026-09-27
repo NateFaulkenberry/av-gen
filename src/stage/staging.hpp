@@ -261,6 +261,10 @@ struct StepDesc {
     std::string name; // a label, for the report and for a test to assert on
     std::string role; // whose body this acts on; "" = the cue's own role
     Value duration;   // seconds; 0 = until the step's own completion test passes
+    // `Set` / `Show` / `Hide` (ADR-928): which component of the parameter the step writes. A beam's
+    // colour is `particles/<beam>/colorStart`, an RGBA vector, and a step that could only write
+    // component 0 could only ever make it redder. 0 -- the default -- is what every step wrote.
+    int component = 0;
 
     // ---- where (MoveTo / Follow / LookAt) ----
     // The destination is `resolve(toRole) + point`, or just `point` when `toRole` is empty. So a
@@ -379,6 +383,20 @@ struct BeatDesc {
     // so it is the speed the body actually travelled and not a speed anything claimed. The default
     // is deliberately tight: a craft the director has parked reads exactly 0.
     Value stillSpeed = literal(0.05f);
+
+    // ---- the clock: this beat does not begin before this timeline second (ADR-928) ---------------
+    //
+    // A beat hand-off costs a frame and a step's end is quantised up to the frame grid, so a moment
+    // placed by adding durations drifts a frame or two per beat -- GV3's abduction measured its
+    // dissolve with `avgen_cast_trace` and re-tuned `abductSeconds` by hand to land it on the drop.
+    // A beat that begins on the first frame at or after a timeline second is a pure function of time
+    // (ADR-089): whatever the beats before it cost, it is entered -- and its world event raised --
+    // on that frame, in a play and in a seek's replay alike. Until then the scenario holds between
+    // beats and every body keeps the station the last step gave it.
+    //
+    // 0, the default, is no constraint: every beat written before this began when the last one
+    // ended, and still does.
+    Value startAt = literal(0.0f);
 };
 
 // A director parameter. Registered under `<prefix><scenario>/<name>`.
@@ -387,6 +405,9 @@ struct ScenarioParam {
     float value = 0.0f;
     float min = 0.0f;
     float max = 1.0f;
+    // What the Parameters panel calls it (ADR-928), when `name` is a word only the scenario's author
+    // would read: "hover height above the ground (m)" rather than "hoverHeight". Empty = the name.
+    std::string label;
 };
 
 struct ScenarioDesc {
@@ -399,6 +420,12 @@ struct ScenarioDesc {
     // OSC and MIDI message under a name. A scenario that starts on "audio.beat" starts on the beat;
     // one that starts on a sequencer event starts when the sequencer publishes it. Edge-triggered:
     // `startOn` only starts a scenario that is not running, and only on the frame the event fires.
+    //
+    // ADR-930: a name of the form `<scenario>/<beat>` -- "setpiece/east-field/beam" -- is also the
+    // frame after that scenario entered that beat, read from this director's own record of the last
+    // frame rather than from the bus. The bus is not replayed by every seek (ADR-870), and this
+    // director is: so a scenario that starts when another one's beam lights starts on the same step
+    // in a play and in a scrub.
     std::string startOn;
     std::string stopOn;
     int maxCycles = 0;             // 0 = for ever. The brief's "Maximum Abductions".
@@ -574,6 +601,9 @@ public:
         bool live = false;  // true: observed being written. false: read off the description.
     };
     [[nodiscard]] std::vector<PathWriter> writersOf(std::string_view path) const;
+    // Whether this director has written `path`'s base since its last reset (ADR-929). The cheap half
+    // of `writersOf`, for a caller asking of every parameter.
+    [[nodiscard]] bool wrote(std::string_view path) const;
 
     // ---- the API the sequencer calls -------------------------------------------------------------
     //
@@ -783,7 +813,7 @@ private:
     [[nodiscard]] std::string parameterPath(const Run& run, std::string_view role,
                                             std::string_view target, const StageContext& ctx) const;
     void writeParameter(const Run& run, std::string_view role, const std::string& path,
-                        float value, const StageContext& ctx);
+                        float value, const StageContext& ctx, int component = 0);
     void bindRole(Run& run, const std::string& role, const std::string& entity,
                   const std::string& actor);
     void releaseClaims(const Run& run);
@@ -834,6 +864,15 @@ private:
     mutable bool warnedNoDrawn_ = false;
 
     std::vector<StageEvent> events_;
+    // ADR-930: the beats entered in the previous update, as "<scenario>/<beat>", so a `startOn` or
+    // `stopOn` naming one fires the frame after -- the same frame a bus event raised from it would --
+    // without depending on a bus a seek may not replay. A member, so a checkpoint carries it.
+    std::vector<std::string> lastBeats_;
+    // The bus the scenarios' cached `startId` / `stopId` were resolved against. A seek's replay hands
+    // the director its own bus (ADR-870), whose ids agree with the live one's only over the frame
+    // signals they share; an id cached against one and read against the other reads a different
+    // signal, or past the end. So a different bus drops the cache.
+    const signals::SignalBus* idsFor_ = nullptr;
     std::vector<StageEvent> log_;
     std::size_t logLimit_ = 4096;
     std::vector<std::string> problems_;

@@ -30,7 +30,10 @@ You are one of several engineering agents working in parallel on AV Gen: C++23, 
    - Do not merge, rebase onto another branch, or push. The coordinator merges.
 2. **One GPU, shared.**
    - Run anything that uses the GPU (`avgen_render_tests`, renders, GPU tools) through `/Users/natefaulkenberry/Documents/GitHub/<your worktree>/tools/gpu-lock.sh <command...>`.
-   - Never put a CPU-only run under the lock.
+   - Never put a CPU-only run under the lock. The lock serialises GPU work; with several agents, locking
+     CPU suites too would stall everyone for hours. `docs/testing.md` #29 is still right that a CPU suite
+     is contention for a GPU bit-identity check. So a GPU suite you offer as evidence runs when no CPU
+     suite is running (check `ps` first), and your report says whether it did. (Settled 2026-09-27.)
    - Never kill processes you did not start. `pkill -f avgen_tests` kills other agents' suites.
    - Treat GPU timing failures as contention until you prove otherwise by re-running.
    - Shaders load from the source tree at runtime, so a `.wgsl` edit affects only your own worktree's binaries.

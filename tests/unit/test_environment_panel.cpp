@@ -49,7 +49,10 @@ TEST_CASE("Every path the Environment panel asks for exists", "[ui][panels][para
     scene::Composition comp(registry, "composition");
     comp.attach(params, modulator);
 
-    for (const char* path : {"scene/volumeDensity", "scene/fogHeight", "scene/fogHeightFalloff",
+    for (const char* path : {"scene/volumeDensity",
+                             // ADR-918: the fog's colour from the sky, drawn under the density.
+                             "scene/fogSky", "scene/fogSkyDistance",
+                             "scene/fogHeight", "scene/fogHeightFalloff",
                              // ADR-568 (§7): drawn beside the falloff, so they are asked for here.
                              "scene/fogUpperDensity", "scene/fogHeightCurve",
                              // ADR-715: the layer follows the terrain, drawn beside them.

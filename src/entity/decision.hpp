@@ -62,6 +62,46 @@ namespace avgen::entity {
 // knobs on different stages and a character may sense four times a second while deciding twice.
 [[nodiscard]] std::uint64_t decideTick(double time, float hertz, std::uint32_t seed);
 
+// ---- the pace of an errand (ADR-909) -------------------------------------------------------------
+//
+// The GV3 audit: every alien moved at exactly 3.07 m/s for the whole film, because no considerer
+// set `ActionDesc::speed` and a `move` with none walks at the gait's walk speed. `speedRange` on a
+// considerer is a pair of multiples of that walk speed; each option draws its own pace from it,
+// once per decision, as a hash of (seed, tick, option) -- D2's rule, so a scrub draws the pace the
+// play drew and one extra option does not re-cast the others. Absent, it is 0: the walk speed, as
+// before.
+struct SpeedRange {
+    float lo = 0.0f;
+    float hi = 0.0f;
+    [[nodiscard]] bool set() const { return hi > 0.0f; }
+    // Reads `"speedRange": [lo, hi]`; anything else leaves it unset.
+    [[nodiscard]] static SpeedRange fromJson(const nlohmann::json* settings);
+    // The range between two multiples, in either order. Both 0 (or less) is unset; one end at 0 is
+    // the walk speed (1), so "from 0 to 1.5" is a walk to one and a half times a walk.
+    [[nodiscard]] static SpeedRange of(float a, float b);
+    // A multiple of the walk speed for the option named `identity` at this decision: in [lo, hi],
+    // or 1 when unset.
+    [[nodiscard]] float draw(const DecisionContext& ctx, std::string_view identity) const;
+};
+
+// The two ends of a considerer's `speedRange` as registered parameters (the UI reach rule): the
+// file's pair is their default, and the live pair is what an option draws from. Registered as
+// `<considerer>/paceFrom` and `<considerer>/paceTo`, "slowest pace" and "fastest pace" in the
+// Parameters panel.
+struct SpeedRangeParams {
+    SpeedRange authored{};
+    params::Parameter<float>* from = nullptr;
+    params::Parameter<float>* to = nullptr;
+    std::string fromPath;
+    std::string toPath;
+    void registerParameters(params::ParameterSet& params, const std::string& prefix);
+    void collectParameterPaths(std::vector<std::string>& out) const;
+    [[nodiscard]] SpeedRange live() const;
+};
+// The gait walk speed of the body deciding, which a `speedRange` multiplies: 0 when it cannot be
+// found, which a `move` reads as "the walk speed" anyway.
+[[nodiscard]] float walkSpeedOf(const DecisionContext& ctx);
+
 // ---- the selector ------------------------------------------------------------------------------
 
 struct SelectorSettings {
@@ -357,6 +397,13 @@ private:
     std::string post_;      // "" = the body's own anchor
     std::string activity_;  // what it plays while standing the post
     float tolerance_ = 1.5f;
+    // ADR-909: seconds the pose at the post lasts. 0 -- the default, a sentry -- stands until
+    // something else wins. A post a character only drifts back to between errands wants a length,
+    // so the errand is over and the decider chooses again rather than standing on the spot. A
+    // registered parameter ("hold duration"), so an artist can find and drive it.
+    float durationDefault_ = 0.0f;
+    params::Parameter<float>* duration_ = nullptr;
+    std::string durationPath_;
     // How much a metre away from the post adds to the score. The knob that decides whether a guard
     // strolls back or runs back, and whether it can be pulled away at all once it has been.
     float pullDefault_ = 0.08f;
@@ -470,6 +517,7 @@ private:
     std::string activity_;
     float approach_ = 0.0f;
     double dwell_ = 0.0;
+    SpeedRangeParams pace_{}; // ADR-909
     mutable std::vector<ActionDesc> actions_;
     mutable std::vector<GoalCandidate> scratch_;
     mutable std::vector<std::string> names_;
@@ -647,6 +695,14 @@ private:
     // How strongly each trait bends each response. Exponents on `(0.5 + trait)`.
     float curiosityPull_ = 2.0f;
     float cautionPull_ = 2.0f;
+    // ADR-909: the pace of the response. `speedRange` as `interest` has it, and `urgentSpeed` the
+    // multiple of that pace an event at full urgency adds on top: 1 at urgency 0, `urgentSpeed` at
+    // urgency 1. A body that hears the beam hurries toward it, or away, by how loud it was. Both
+    // registered parameters, so an artist can find and drive them.
+    SpeedRangeParams pace_{};
+    float urgentSpeedDefault_ = 1.5f;
+    params::Parameter<float>* urgentSpeed_ = nullptr;
+    std::string urgentSpeedPath_;
     mutable std::string approachName_;
     mutable std::string fleeName_;
     mutable std::vector<ActionDesc> approachActions_;

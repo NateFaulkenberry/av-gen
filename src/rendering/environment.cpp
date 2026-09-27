@@ -287,6 +287,8 @@ Result<IblResources> EnvironmentProcessor::filterCube(const CubeTexture& sourceC
     out.prefiltered = prefiltered->cubeView;
     out.brdfLut = brdf_.view;
     out.prefilteredMips = settings.prefilteredMips;
+    out.sourceCubeSize = sourceCube.size;
+    out.prefilteredSize = settings.prefilteredSize;
     out.valid = context_.errorCount() == 0;
     // The textures stay alive through the views the caller holds (a wgpu::TextureView keeps a
     // reference to its texture), exactly as the pre-ADR-036 code relied on.

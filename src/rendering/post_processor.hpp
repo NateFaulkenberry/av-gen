@@ -87,6 +87,16 @@ struct PostStats {
     std::uint32_t bloomLevels = 0;
     std::uint32_t halationLevels = 0;
     std::uint32_t anamorphicTaps = 0; // taps a side the streak spent; 0 when it did not run
+    // ADR-917: what the chain did with the frame's size. `pixelScale` is height / referenceHeight;
+    // the rest are the numbers it produced, in this frame's pixels, so a test can read that a
+    // setting reached the pass rather than infer it from the picture alone.
+    float pixelScale = 1.0f;
+    float anamorphicReach = 0.0f;       // the streak's reach in quarter-resolution texels (0 = off)
+    std::uint32_t motionBlurTile = 0;   // velocity tile edge in pixels (0 = motion blur did not run)
+    float motionBlurRadius = 0.0f;      // the smear's clamp in pixels
+    std::uint32_t lookOctaves = 0;      // extra octaves the look stage's low-pass was taken down
+    std::uint32_t pyramidBoxOctaves = 0; // whole octaves the frame was box-filtered by before the
+                                         // bloom and halation pyramids read it (the reference's size)
     float exposureScale = 1.0f;      // the linear scale applied before bloom
     float exposureEv100 = 0.0f;      // the EV in force (scene-referred; see scene/camera.hpp)
     float meteredLuminance = -1.0f;  // the previous frame's centre-weighted luminance (-1 = none)
@@ -198,12 +208,23 @@ private:
     // Encodes the metering reduction of the pre-exposure image and the readback copy.
     void encodeMetering(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool,
                         const Uniforms& base);
-    // Downsample/upsample pyramid over an already-prefiltered base; returns its finest level.
-    // `tier` names the pyramid for a diagnostic capture ("bloom" / "halation") and is unused
-    // otherwise.
-    wgpu::TextureView buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool, const Uniforms& base,
-                                   std::vector<gpu::TransientTexture>& down, float spread, float blend,
-                                   const char* tier);
+    // The assembled pyramid: the finest level that carries weight, and its size. Its consumers
+    // sample it by UV through a linear sampler, so it may be coarser than the pyramid's first level.
+    struct PyramidResult {
+        wgpu::TextureView view;
+        std::uint32_t width = 0;
+    };
+    // Downsample/upsample pyramid over an already-prefiltered base (`scene::planPyramid`, ADR-917,
+    // gives each step its blend). The upsample stops at the finest level with any weight: a frame
+    // finer than the reference builds levels below that which exist only as downsample steps, and
+    // upsampling through them would add nothing but blur -- a tent each, at the texel of the level
+    // below, which is exactly what made the glow at 4x the reference softer than its preview's.
+    // At or below the reference level 0 always carries weight (1 - blend >= 0.05), so the chain
+    // there is the pre-ADR-917 chain. `tier` names the pyramid for a diagnostic capture ("bloom" /
+    // "halation") and is unused otherwise.
+    PyramidResult buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool, const Uniforms& base,
+                               std::vector<gpu::TransientTexture>& down, float spread, const scene::PyramidPlan& plan,
+                               const char* tier);
     // Records one intermediate when a capture is armed; a no-op otherwise.
     void captureStage(std::string name, const gpu::TransientTexture& texture);
     // The usage the pyramid and wide textures are allocated with: CopySrc only while capturing.
@@ -236,6 +257,11 @@ private:
     wgpu::RenderPipeline lookAtmos_;
     wgpu::RenderPipeline lookBlur_;
     wgpu::RenderPipeline look_;
+    // ADR-917; appended, never inserted. A 2x2 box for the pyramid levels finer than the
+    // reference's first, and the tile maximum in two passes for tiles past the single pass's 40 px.
+    wgpu::RenderPipeline boxDown_;
+    wgpu::RenderPipeline velocityTileMaxRows_;
+    wgpu::RenderPipeline velocityTileMaxColumns_;
     wgpu::Sampler sampler_;
     wgpu::Buffer uniforms_;
     std::uint32_t slot_ = 0;
@@ -260,6 +286,10 @@ private:
     float measuredLuminance_ = 0.0f;
     scene::ExposureState exposureState_;
     PostStats stats_;
+    // ADR-917: the chain height and reference the scale was last reported for, so a resize is said
+    // once rather than every frame.
+    std::uint32_t loggedScaleHeight_ = 0;
+    float loggedScaleReference_ = 0.0f;
     wgpu::Texture output_;
     bool capturing_ = false;
     PostCapture capture_;

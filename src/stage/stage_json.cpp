@@ -257,6 +257,14 @@ namespace {
         s.hasFrom = true;
     }
     s.ease = readBool(j, "ease", false);
+    // ADR-928. Absent is what every step written before this existed meant.
+    if (j.contains("component")) {
+        if (!j.at("component").is_number_integer() || j.at("component").get<int>() < 0 ||
+            j.at("component").get<int>() > 3) {
+            return fail("a step's `component` must be an integer from 0 to 3");
+        }
+        s.component = j.at("component").get<int>();
+    }
     if (j.contains("actions")) {
         auto actions = entity::actionsFromJson(j.at("actions"));
         if (!actions) return std::unexpected(actions.error());
@@ -295,6 +303,7 @@ namespace {
     }
     if (s.hasFrom) j["from"] = valueToJson(s.from);
     if (s.ease) j["ease"] = true;
+    if (s.component != 0) j["component"] = s.component;
     if (!s.actions.empty()) j["actions"] = entity::actionsToJson(s.actions);
     return j;
 }
@@ -354,6 +363,10 @@ namespace {
     if (auto r = readValue(j, "stillSpeed", b.stillSpeed, "a beat's stillSpeed"); !r) {
         return std::unexpected(r.error());
     }
+    // ADR-928: the beat's clock. Absent is no constraint, which is what every beat meant before.
+    if (auto r = readValue(j, "startAt", b.startAt, "a beat's startAt"); !r) {
+        return std::unexpected(r.error());
+    }
     if (j.contains("find")) {
         if (!j.at("find").is_array()) {
             return fail("beat '{}': `find` must be an array", b.name);
@@ -399,6 +412,7 @@ namespace {
         j["stillRoles"] = b.stillRoles;
         j["stillSpeed"] = valueToJson(b.stillSpeed);
     }
+    writeValue(j, "startAt", b.startAt, 0.0f);
     return j;
 }
 
@@ -482,6 +496,7 @@ Result<ScenarioDesc> scenarioFromJson(const nlohmann::json& j) {
             if (item.contains("value")) p.value = item.at("value").get<float>();
             if (item.contains("min")) p.min = item.at("min").get<float>();
             if (item.contains("max")) p.max = item.at("max").get<float>();
+            p.label = readString(item, "label");
             if (p.min == 0.0f && p.max == 0.0f) {
                 // A parameter with no declared range gets one wide enough not to clamp what the
                 // author wrote. A hard range of [0, 0] would silently zero every value.
@@ -515,8 +530,11 @@ nlohmann::json scenarioToJson(const ScenarioDesc& s) {
     if (!s.params.empty()) {
         nlohmann::json params = nlohmann::json::array();
         for (const ScenarioParam& p : s.params) {
-            params.push_back(nlohmann::json{
-                {"name", p.name}, {"value", p.value}, {"min", p.min}, {"max", p.max}});
+            nlohmann::json one{{"name", p.name}, {"value", p.value}, {"min", p.min}, {"max", p.max}};
+            if (!p.label.empty()) {
+                one["label"] = p.label; // written only when set: an authored scenario keeps its bytes
+            }
+            params.push_back(std::move(one));
         }
         j["params"] = std::move(params);
     }

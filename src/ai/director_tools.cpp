@@ -4,8 +4,10 @@
 #include "app/directing_context.hpp"
 #include "app/engine.hpp"
 #include "directing/compiler.hpp"
+#include "directing/evaluation.hpp"
 #include "directing/plan.hpp"
 #include "directing/resolver.hpp"
+#include "directing/setpieces.hpp"
 #include "directing/validator.hpp"
 
 #include <fmt/format.h>
@@ -236,7 +238,9 @@ void registerDirectorTools(ToolRegistry& registry) {
             const directing::SceneFacts facts = app::sceneFactsFor(ctx.engine());
             const std::string subject = args.value("subject", std::string{});
             if (subject.empty()) {
-                return ToolResult::ok(facts.capabilities.toJson(), "the whole registry");
+                json out = facts.capabilities.toJson();
+                out["setPieces"] = directing::setPieceCatalog(facts); // ADR-929: what a plan's setPieces may ask for
+                return ToolResult::ok(out, "the whole registry");
             }
             const directing::CharacterCard* card = facts.capabilities.character(subject);
             if (card == nullptr) {
@@ -386,6 +390,140 @@ void registerDirectorTools(ToolRegistry& registry) {
             ctx.deferResult(std::move(*handle));
             return ToolResult::ok(json{{"watching", true}, {"untilSeconds", until}}, "watching");
         });
+    // ADR-931: the evaluator in the Director's loop -- revise, render representative spans, evaluate,
+    // find concrete weaknesses, revise, compare (brief §15). The autonomy policy: a candidate is
+    // compiled into a SCRATCH copy and rendered there, never proposed and never installed, so the
+    // assistant can try several and propose only the one that won -- one approval, not one per try.
+    ToolAnnotations evaluates;
+    evaluates.readOnly = false;       // it keeps a record: the report, beside the plans
+    evaluates.mutatesSession = true;  // ...outside the project's content and its undo history
+    evaluates.expensive = true;       // a render and an evaluation: seconds to minutes
+    evaluates.idempotent = false;
+    add(registry, "director.evaluate", "Evaluate a plan with the quality evaluator",
+        "Render a span of the film with a plan in it -- a candidate you have not proposed (\"plan\"), or a "
+        "revision the project already holds (\"planId\") -- on a scratch copy, and ask the Creative Critic "
+        "about it. Nothing in the project changes and nothing is proposed: evaluate several candidates, "
+        "director.compare them, and director.propose_plan only the one that won. Returns the evaluator's "
+        "headline, dimension scores and findings, each finding keyed by the plan items its time span "
+        "overlaps; the report is kept with the plan's evaluations. Minutes, not seconds: render the span "
+        "that matters (a set piece, a section), not the film.",
+        schema::object({{"plan", planArgument()},
+                        {"planId", schema::string("A plan the project holds, evaluated as it is (instead of \"plan\")")},
+                        {"from", {{"type", "number"}, {"description", "film seconds the span starts at"}}},
+                        {"until", {{"type", "number"}, {"description", "film seconds it ends at (at most 60 s after from)"}}},
+                        {"mode", schema::string("fast | preview (default) | deep: the evaluator's depth")},
+                        {"label", schema::string("What to call this iteration in comparisons, e.g. \"lower hover\"")}},
+                       {"from", "until"}),
+        evaluates, [](const json& args, ToolContext& ctx) -> ToolResult {
+            if (!ctx.evaluationHook()) {
+                return ToolResult::failure(ToolErrorCode::Unavailable,
+                                           "evaluation is not available in this session: the host installed no evaluator "
+                                           "(start AV Gen with --critic <path to the critic CLI>, or set AVGEN_CRITIC)");
+            }
+            ai::EvaluationRequest request;
+            request.from = args.value("from", 0.0);
+            request.until = args.value("until", 0.0);
+            request.mode = args.value("mode", std::string("preview"));
+            request.label = args.value("label", std::string());
+            if (request.mode != "fast" && request.mode != "preview" && request.mode != "deep") {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("mode '{}' is not one of fast, preview, deep", request.mode));
+            }
+            const double duration = app::musicalContextFor(ctx.engine()).durationSeconds;
+            if (!(request.until > request.from) || request.from < 0.0 || request.until - request.from > 60.0 ||
+                (duration > 0.0 && request.until > duration + 1e-6)) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("the span {:.3f}..{:.3f} s is not one to render: from < until, at "
+                                                       "most 60 s long, inside the piece ({:.3f} s)",
+                                                       request.from, request.until, duration));
+            }
+            json out;
+            if (args.contains("plan")) {
+                std::optional<directing::Plan> plan = readPlan(args, out);
+                if (!plan) {
+                    return ToolResult::ok(out, "the plan is not well formed; nothing evaluated");
+                }
+                attachObservation(*plan, ctx);
+                const directing::Compilation c = directing::compilePlan(*plan, app::sceneFactsFor(ctx.engine()));
+                if (!c.changesAnything()) {
+                    out["issues"] = issuesJson(c.validation.issues);
+                    return ToolResult::ok(out, "nothing in this plan can be built; nothing evaluated");
+                }
+                request.plan = plan->toJson();
+                request.planId = c.plan.id;
+                request.revision = c.plan.revision;
+                request.candidate = directing::fingerprint(request.plan);
+            } else if (args.contains("planId")) {
+                const std::string id = args.value("planId", std::string());
+                const auto& plans = ctx.engine().directingPlans();
+                const auto it = std::find_if(plans.begin(), plans.end(), [&](const directing::Plan& p) { return p.id == id; });
+                if (it == plans.end()) {
+                    return ToolResult::failure(ToolErrorCode::NotFound, fmt::format("the project holds no plan '{}'", id),
+                                               "director.inspect_scene lists the plans this project holds");
+                }
+                request.plan = it->toJson();
+                request.planId = it->id;
+                request.revision = it->revision;
+                request.candidate = directing::fingerprint(request.plan);
+                request.installed = true;
+            } else {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "evaluate what? give \"plan\" or \"planId\"");
+            }
+            auto handle = ctx.evaluationHook()(ctx.engine(), request);
+            if (!handle) {
+                return ToolResult::failure(ToolErrorCode::Internal, "the evaluation did not start: " + handle.error().message);
+            }
+            ctx.deferResult(std::move(*handle));
+            return ToolResult::ok(json{{"evaluating", true}, {"planId", request.planId}, {"revision", request.revision},
+                                       {"from", request.from}, {"until", request.until}},
+                                  "evaluating");
+        });
+
+    add(registry, "director.compare", "Compare two evaluations of a plan",
+        "Diff two of a plan's kept evaluations (director.evaluate): dimension scores up and down, findings "
+        "resolved, new and persisting (matched by the evaluator's stable keys), and the issues per plan "
+        "item in each. Name them by label or by revision (\"revision 3\"); omit both for the last two.",
+        schema::object({{"planId", schema::string("The plan whose evaluations to compare")},
+                        {"a", schema::string("The baseline: a label, or \"revision N\"; default the second-last")},
+                        {"b", schema::string("The candidate: a label, or \"revision N\"; default the last")}},
+                       {"planId"}),
+        inspect(), [](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string id = args.value("planId", std::string());
+            std::vector<const directing::EvaluationReport*> mine;
+            for (const directing::EvaluationReport& e : ctx.engine().directingEvaluations()) {
+                if (e.planId == id) {
+                    mine.push_back(&e);
+                }
+            }
+            const auto pick = [&](const char* key, std::size_t fromEnd) -> const directing::EvaluationReport* {
+                const std::string name = args.value(key, std::string());
+                if (name.empty()) {
+                    return mine.size() >= fromEnd ? mine[mine.size() - fromEnd] : nullptr;
+                }
+                for (auto it = mine.rbegin(); it != mine.rend(); ++it) {
+                    if ((*it)->label == name || fmt::format("revision {}", (*it)->revision) == name) {
+                        return *it;
+                    }
+                }
+                return nullptr;
+            };
+            const directing::EvaluationReport* a = pick("a", 2);
+            const directing::EvaluationReport* b = pick("b", 1);
+            if (a == nullptr || b == nullptr) {
+                json kept = json::array();
+                for (const directing::EvaluationReport* e : mine) {
+                    kept.push_back({{"label", e->label}, {"revision", e->revision}, {"from", e->from}, {"until", e->until},
+                                    {"headline", e->headline}});
+                }
+                return ToolResult::failure(ToolErrorCode::NotFound,
+                                           fmt::format("plan '{}' has {} kept evaluation(s) and not the two asked for: {}",
+                                                       id, mine.size(), kept.dump()),
+                                           "director.evaluate the plan (or a candidate of it) first");
+            }
+            const directing::EvaluationComparison c = directing::compareEvaluations(*a, *b);
+            return ToolResult::ok(c.toJson(), c.summary);
+        });
+
     add(registry, "director.propose_plan", "Propose a Director Plan",
         "Compile a plan against the scene WITHOUT changing it, and put the result in front of the person: "
         "what will be added or replaced, and every finding. Nothing is applied until they approve; the "

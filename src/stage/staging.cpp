@@ -397,6 +397,9 @@ Result<void> Staging::setDesc(StagingDesc desc) {
             if (auto r = resolveValue(beat.stillSpeed, scenario, "a beat's stillSpeed"); !r) {
                 return r;
             }
+            if (auto r = resolveValue(beat.startAt, scenario, "a beat's startAt"); !r) {
+                return r;
+            }
             for (QueryDesc& q : beat.find) {
                 if (!q.valid()) {
                     return fail("scenario '{}', beat '{}': a find binds no role", scenario.name,
@@ -486,6 +489,7 @@ void Staging::clear() {
     searchTags_.clear();
     written_.clear();
     events_.clear();
+    lastBeats_.clear();
     log_.clear();
     problems_.clear();
     report_ = StageReport{};
@@ -510,7 +514,8 @@ void Staging::registerParameters(params::ParameterSet& params, const std::string
                 .path = path,
                 .defaultValue = std::clamp(p.value, lo, hi),
                 .hardMin = lo,
-                .hardMax = hi}));
+                .hardMax = hi,
+                .label = p.label}));
             registered_.push_back(path);
         }
     }
@@ -1114,7 +1119,7 @@ std::string Staging::parameterPath(const Run& run, std::string_view role, std::s
 }
 
 void Staging::writeParameter(const Run& run, std::string_view role, const std::string& path,
-                             float v, const StageContext& ctx) {
+                             float v, const StageContext& ctx, int component) {
     if (ctx.params == nullptr || path.empty()) {
         return;
     }
@@ -1147,10 +1152,25 @@ void Staging::writeParameter(const Run& run, std::string_view role, const std::s
         w.entity = resolveName(run, role);
         written_.push_back(std::move(w));
     }
-    p->setBaseComponent(0, v);
+    // ADR-928: one component, the one the step names. Out of range is refused rather than clamped
+    // onto component 0 -- a colour step that wrote red when it asked for blue would be a beam that
+    // is the wrong colour for a reason nobody could find.
+    if (component < 0 || static_cast<std::size_t>(component) >= p->componentCount()) {
+        const std::string message = fmt::format("staging: '{}' has no component {}", path, component);
+        if (std::find(problems_.begin(), problems_.end(), message) == problems_.end()) {
+            problems_.push_back(message);
+            log::warn("{}", message);
+        }
+        return;
+    }
+    p->setBaseComponent(static_cast<std::size_t>(component), v);
 }
 
 // ---- "why is this parameter moving?" --------------------------------------------------------------
+
+bool Staging::wrote(std::string_view path) const {
+    return std::any_of(written_.begin(), written_.end(), [&](const Written& w) { return w.path == path; });
+}
 
 std::vector<Staging::PathWriter> Staging::writersOf(std::string_view path) const {
     std::vector<PathWriter> out;
@@ -1322,6 +1342,25 @@ void Staging::leaveBeat(Run& run, const StageContext& ctx) {
     run.beat = 0;
 }
 
+namespace {
+
+// ADR-928: whether a step that began `elapsed` seconds ago has run its `duration`, allowing for the
+// noise of how an instant is computed and for nothing else. A frame's instant is computed three ways
+// -- `i * dt` by a trace, `k / fps` by a render's clock, `target - m * dt` counted back by a seek's
+// replay (`EntityWorld::seek`) -- and they differ in the last bits, a few 1e-13 s even twenty minutes
+// in. So a duration that is exactly a whole number of frames (3.5 s is 210, and 3.5 is exact as a
+// float) sat on a frame boundary and the noise decided which side: the set piece lab's second
+// abduction entered `depart` at 66.083 s in a play and 66.067 s after a seek to 115 s.
+//
+// The tolerance is 1e-10 s: a thousand times the noise, and below the rounding of any duration stored
+// as a float that is not exact (0.8f is 0.8 + 1.2e-8, 2.4f is 2.4 + 9.5e-8, 1.4f is 1.4 - 2.4e-8), so
+// those end on exactly the frame they always ended on. The first version allowed a microsecond, which
+// swallowed that rounding and moved every such step a frame earlier -- Glowmere Valley 2's 0.8 s aim
+// among them, which the ADR-623 trace digest caught.
+bool reached(double elapsed, double duration) { return elapsed + 1e-10 >= duration; }
+
+} // namespace
+
 Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
                                      const StepDesc& step, const StageContext& ctx) {
     const std::string_view role = step.role.empty() ? std::string_view(desc.role)
@@ -1332,7 +1371,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
 
     switch (step.kind) {
     case StepKind::Wait:
-        return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+        return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
 
     case StepKind::MoveTo: {
         if (self == nullptr) {
@@ -1399,9 +1438,14 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             const auto cap = static_cast<float>(1.0 / duration);
             rate = rate > 0.0f ? std::min(rate, cap) : cap;
         }
-        if (rate <= 0.0f) {
+        const bool put = rate <= 0.0f;
+        if (put) {
             rate = 1.0e9f; // neither was set: put it there
         }
+        // ADR-911 (amended 2026-09-27): and "put it there" is a PLACEMENT, on the step it lands --
+        // declared below, where the body is given its position -- so nothing that watches the body
+        // (a follow camera's filtered reference) reads it as a move from where it was.
+        const bool placing = put && cue.progress < 1.0f && ctx.dt > 0.0 && cue.span > 0.0f;
         cue.progress = std::min(1.0f, cue.progress + static_cast<float>(ctx.dt) * rate);
         const float eased = smoothstep(cue.progress);
         glm::vec3 p = glm::mix(cue.from, goal, eased);
@@ -1526,6 +1570,9 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             motion.speed = gaitSpeed;
             motion.hasSpeed = true;
         }
+        if (placing) {
+            self->markPlaced();
+        }
         self->setDirectorMotion(motion);
         return cue.progress >= 1.0f ? StepStatus::Done : StepStatus::Running;
     }
@@ -1590,7 +1637,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             motion.hasSpeed = true;
         }
         self->setDirectorMotion(motion);
-        return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+        return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
     }
 
     case StepKind::LookAt: {
@@ -1622,7 +1669,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         self->setDirectorMotion(motion);
         const bool aimed = std::abs(delta) < 0.05f;
         if (duration > 0.0) {
-            return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+            return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
         }
         return aimed ? StepStatus::Done : StepStatus::Running;
     }
@@ -1645,7 +1692,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (duration <= 0.0) {
             return StepStatus::Done;
         }
-        return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+        return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
     }
 
     case StepKind::Show:
@@ -1654,7 +1701,20 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (path.empty()) {
             return StepStatus::Failed;
         }
-        writeParameter(run, role, path, step.kind == StepKind::Show ? 1.0f : 0.0f, ctx);
+        // ADR-911 (amended 2026-09-27): a body shown again after it was hidden is PLACED. It
+        // re-enters the picture where it now is, and nothing it did out of sight -- GV3's saucer
+        // reaching its flyby's entry point in three frames, an animal set down after it was retired
+        // -- is motion anyone saw. The role's own visibility only (a show aimed at another of its
+        // parameters places nothing), and only from hidden: showing what is already drawn places
+        // nothing.
+        if (step.kind == StepKind::Show && self != nullptr && (step.target.empty() || step.target == "visible") &&
+            ctx.params != nullptr) {
+            if (const params::IParameter* shown = ctx.params->find(path);
+                shown != nullptr && shown->baseComponent(0) < 0.5f) {
+                self->markPlaced();
+            }
+        }
+        writeParameter(run, role, path, step.kind == StepKind::Show ? 1.0f : 0.0f, ctx, step.component);
         return StepStatus::Done;
     }
 
@@ -1665,7 +1725,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         }
         const float to = value(run, step.to);
         if (duration <= 0.0) {
-            writeParameter(run, role, path, to, ctx);
+            writeParameter(run, role, path, to, ctx, step.component);
             return StepStatus::Done;
         }
         if (!cue.started) {
@@ -1674,13 +1734,15 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
                 cue.span = value(run, step.from);
             } else if (ctx.params != nullptr) {
                 const params::IParameter* p = ctx.params->find(path);
-                cue.span = p != nullptr ? p->baseComponent(0) : to;
+                const auto c = static_cast<std::size_t>(std::max(step.component, 0));
+                cue.span = p != nullptr && c < p->componentCount() ? p->baseComponent(c) : to;
             } else {
                 cue.span = to;
             }
         }
         const auto u = static_cast<float>(std::clamp(elapsed / duration, 0.0, 1.0));
-        writeParameter(run, role, path, glm::mix(cue.span, to, step.ease ? smoothstep(u) : u), ctx);
+        writeParameter(run, role, path, glm::mix(cue.span, to, step.ease ? smoothstep(u) : u), ctx,
+                       step.component);
         return u >= 1.0f ? StepStatus::Done : StepStatus::Running;
     }
 
@@ -1694,7 +1756,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             return StepStatus::Running;
         }
         if (self->actions().pending(entity::Authority::Director) > 0) {
-            if (duration > 0.0 && elapsed >= duration) {
+            if (duration > 0.0 && reached(elapsed, duration)) {
                 self->actions().cancel(entity::Authority::Director, ctx.time);
                 return StepStatus::Done;
             }
@@ -1843,9 +1905,24 @@ void Staging::rememberPositions(const Run& run, const StageContext& ctx) {
 }
 
 void Staging::update(const StageContext& ctx) {
+    // ADR-930: the beats the previous update entered, taken before this one forgets them, so a
+    // scenario cued on another's beat hears it now.
+    lastBeats_.clear();
+    for (const StageEvent& e : events_) {
+        if (e.kind == StageEventKind::Beat) {
+            lastBeats_.push_back(e.scenario + "/" + e.beat);
+        }
+    }
     events_.clear();
     if (desc_.scenarios.empty() || ctx.world == nullptr) {
         return;
+    }
+    if (ctx.bus != idsFor_) {
+        for (Run& run : runs_) {
+            run.startId.reset();
+            run.stopId.reset();
+        }
+        idsFor_ = ctx.bus;
     }
     // One published state per scenario, every frame, whether it runs or not -- an overlay that had
     // to distinguish "not running" from "the director did not get as far as saying" would be an
@@ -1869,12 +1946,20 @@ void Staging::update(const StageContext& ctx) {
         }
         // The signal seam. Read before the cues run, so a scenario cued on the beat starts on the
         // frame the beat fired rather than the one after it.
-        if (ctx.bus != nullptr) {
+        {
             // Names resolved once and cached, the same way a behaviour resolves a signal: the bus
             // is an id-indexed array and a name lookup per scenario per frame would be paying for
             // a string hash to read a byte.
             const auto fired = [&](const std::string& name, std::optional<signals::SignalId>& id) {
                 if (name.empty()) {
+                    return false;
+                }
+                // ADR-930: another scenario's beat, from this director's own last frame -- exact in
+                // a seek's replay, which a bus event is not guaranteed to be.
+                if (std::find(lastBeats_.begin(), lastBeats_.end(), name) != lastBeats_.end()) {
+                    return true;
+                }
+                if (ctx.bus == nullptr) {
                     return false;
                 }
                 if (!id.has_value()) {
@@ -1883,7 +1968,7 @@ void Staging::update(const StageContext& ctx) {
                         return false;
                     }
                 }
-                return ctx.bus->event(*id);
+                return *id < ctx.bus->size() && ctx.bus->event(*id);
             };
             if (runs_[i].running && fired(s.stopOn, runs_[i].stopId)) {
                 stop(s.name, ctx.time);
@@ -1919,6 +2004,18 @@ void Staging::update(const StageContext& ctx) {
         // bound is the beat count: a scenario cannot visit more beats in one frame than it has.
         std::size_t guard = scenario.beats.size() + 1;
         while (run.running && !run.entered && guard-- > 0) {
+            // ADR-928: a beat with a clock waits for it. Checked here, at the one place a beat is
+            // entered, so `start`, `trigger`, `then` and `otherwise` all respect it. The microsecond
+            // is float noise on a frame instant computed as `i / fps`: it can only let a beat in on
+            // the frame whose instant IS the second asked for, never a frame before it.
+            if (run.beat < scenario.beats.size()) {
+                const BeatDesc& next = scenario.beats[run.beat];
+                if (next.startAt.bound() || next.startAt.literal > 0.0f) {
+                    if (ctx.time + 1e-6 < static_cast<double>(value(run, next.startAt))) {
+                        break;
+                    }
+                }
+            }
             enterBeat(run, ctx);
         }
         if (!run.running || !run.entered) {
@@ -2145,6 +2242,7 @@ void Staging::reset(entity::EntityWorld* world, params::ParameterSet* params) {
     claims_.clear();
     retired_.clear();
     events_.clear();
+    lastBeats_.clear();
     log_.clear();
     problems_.clear();
     report_ = StageReport{};
