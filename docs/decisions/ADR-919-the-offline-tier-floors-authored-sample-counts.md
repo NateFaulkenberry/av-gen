@@ -70,4 +70,15 @@ above them.** A floor changes how finely the picture is sampled, never what it i
   revision turns the march on, which the audit recommends (220 m). Its textures and its sky take the
   other two floors in every offline render, previews included, because its project renders at the
   offline tier.
-- **Measured** (`test_offline_floors_gpu.cpp`): recorded below.
+- **Measured** (`test_offline_floors_gpu.cpp`):
+  - The march: a scene authoring GV3's 12 steps marches 32 at offline (`VolumeStats::authoredSteps`
+    12, `steps` 32) and 12 at realtime; one authoring 48 keeps 48 at offline.
+  - Anisotropy: a checkerboard floor at a grazing angle, one tier, only the setting moved: 16x
+    changes 3666 of 64000 pixels against 8x, and 8x twice is the same picture to the byte.
+  - The sky: a column through the horizon band at a 2160-line x2 frame's pixel density (4.75
+    degrees over 512 px), against the analytic sky it was built from, after dividing out the common
+    scale -- worst deviation **0.171 at 128 px a face, 0.00199 at 1024** (86x), RMS 0.0322 and
+    0.000586 (55x). The coarse cube's error is a row of arches between texel centres, the shape an
+    8-bit gradient shows as bands. (The first version of this test also scored the column's slope
+    jumps; at this gradient that statistic was RGBA16F quantisation, 1.74 and 1.39, and it was
+    replaced.)
