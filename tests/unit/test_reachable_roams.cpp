@@ -338,3 +338,50 @@ TEST_CASE("a move across a channel it shares a region with walks round the head,
     WARN("ADR-936, across a channel in one region: now " << describe(now) << "; the straight line "
                                                           << describe(before));
 }
+
+TEST_CASE("a scrub part way round the head lands where the play did", "[entity][action][route][adr936][seek]") {
+    // The route round is decided on the move's first step and walked a corner at a time; a seek replays
+    // the same steps and must land on the same leg, at the same place, at the same pace.
+    const world::WorldMap map = riverWorld(40.0f);
+    world::Ecology ecology;
+    const entity::Navigator nav = wader(map, ecology);
+    const auto order = [](entity::EntityWorld& world) {
+        return [&world](double now) {
+            if (now < 1e-6) {
+                entity::ActionDesc go;
+                go.kind = entity::ActionKind::Move;
+                go.name = "across";
+                go.target.kind = entity::TargetKind::Point;
+                go.target.point = glm::vec3(40.0f, 0.0f, 0.0f);
+                world.find("walker")->actions().override(std::vector<entity::ActionDesc>{go},
+                                                         entity::Authority::Action, now);
+            }
+        };
+    };
+    CastMember m;
+    m.name = "walker";
+    m.seed = 4242;
+    m.gait.walkSpeed = 2.0f;
+    m.behaviors.push_back(testsupport::behavior("ground", {{"bodyRadius", 0.5}}));
+    for (const double at : {20.0, 33.0, 45.0}) { // the first leg, across the head, down the far bank
+        CastWorld played({m}, &nav);
+        played.director = order(played.world);
+        played.play(at);
+        CastWorld sought({m}, &nav);
+        const auto director = order(sought.world);
+        sought.director = director;
+        sought.step();
+        entity::EntityWorld::SeekHooks hooks;
+        hooks.before = [&director](double now, double) { director(now); };
+        sought.world.seek(played.time() - CastWorld::kStep, &sought.params, &sought.bus, CastWorld::kStep, {}, &hooks);
+        const entity::Entity& a = played.body("walker");
+        const entity::Entity& b = sought.body("walker");
+        INFO("at " << at << " s: played (" << a.state().position().x << ", " << a.state().position().z << ") sought ("
+                   << b.state().position().x << ", " << b.state().position().z << ")");
+        // Mid-detour: nowhere near the straight line's channel crossing.
+        CHECK(a.state().speed > 1.0f);
+        CHECK(glm::length(a.state().position() - b.state().position()) < 1e-3f);
+        CHECK(a.state().speed == Approx(b.state().speed).margin(1e-4));
+        CHECK(a.state().yaw == Approx(b.state().yaw).margin(1e-4));
+    }
+}
