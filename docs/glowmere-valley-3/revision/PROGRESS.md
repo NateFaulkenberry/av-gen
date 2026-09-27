@@ -71,6 +71,14 @@ Targeted tests on the three-stream build all pass: routes 57, signals and emissi
 - **Characters:** its finisher had just begun. Resumed (`a0e273bebdc7d7224`).
 - **Left after these:** water, setpieces, render.
 
+**MERGED (01:50): main is `bc89ce3d`,** now also with song (ADR-920–923) and camera (ADR-911–913). Main was merged into `gv3/production` (`38305a09`).
+- **Suites on the integration:** GPU 520 cases, 519 passed, 1 skipped, exit 0. CPU `ctest -L unit -j 4`: 3,664 of 3,664 passed, exit 0.
+- **Camera's finisher** died at the limit after committing its UI reach, so it wrote no final report. What it left:
+  - the follow knobs are in the Cameras panel under plain names (`6f0832c9`);
+  - a knob set there survives a project save (`a32e52ff`);
+  - its GV3 guidance is in [stream-reports/checkpoints.md](stream-reports/checkpoints.md) § Camera and ADR-913.
+- **5 of 10 streams are merged.** Left: reactivity and characters (running), then water, setpieces and render.
+
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
 2. emission finisher + camera finisher.
