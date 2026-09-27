@@ -384,3 +384,29 @@ characters, setpieces, and checkpoints (camera).
 - **UI reach:** only behaviour changes. If you add a parameter (a retry limit, say), label it in words under the character's decide or react group.
 - **Suites:** the full CPU suite, via `ctest --test-dir <wt>/build/release -L unit -j 4`. Run the GPU suite only if you touch rendering.
 - **How GV3 should use it:** whether E5's reaction can go back to "go and see", and what else changes for GV3.
+
+### behave (ADRs 935–936): no walking on the spot, and no roam targets that cannot be reached
+- **Worktree:** `~/Documents/GitHub/av-gen-behave`, branch `agent/behave`, from `integrate/revision` `983221a9` (main `876a11e2` plus navfix, ADR-932–934). Assets are linked; build it yourself.
+- **Read:** `stream-reports/characters.md`; ADR-907–910 and ADR-932–934; navfix's report (its "Defects found, not fixed", in PROGRESS.md § "OPEN ITEMS" and `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/navfix-work/navfix-before-after.md`).
+- **Deliverables:**
+  1. **ADR-935: a body that is not travelling does not walk.** On GV3, rook plays its walk clip in place for 6.5 s from 195.45 s at (−66, −5), with no body within 12 m. A `holdPost` `range -> range` keeps it publishing about 0.5 m/s with no travel. ADR-910's stuck time is 6.7 s before navfix and 8.5 s after. Find the cause, and fix it so a body that is not moving publishes no walking speed and plays no walk. Add a control arm. Measure ADR-910's stuck time on GV3 and GV2 multicam, before and after.
+  2. **ADR-936: roam targets must be reachable.**
+     - `interest` (roam) still offers destinations across a divide, and each now ends at the bank: ember tried 3 of them in 22–52 s on GV3. Filter them the way the `route` considerer already does.
+     - Bloom hero parts are offered as roam targets and fail "unreachable" at once: ember, 4 in a row, at 31–36 s.
+     - A same-region goal whose straight line crosses water still wades in, and the stuck clock counts creeping deeper as progress (14.9 s to give up in navfix's fixture). Route round the water, or fail fast.
+     - Each change needs a control arm.
+- **Measure** GV3 and GV2 multicam before and after with `avgen_cast_trace --decisions` and `avgen_character_quality`: stuck, reversals, the pacing run, and the failed-errand count. For GV3, generate `gv3/production` into a scratch copy under your `build/`; never edit it in place.
+- **UI reach:** behaviour only. Any new knob gets a words label under the character's decide or roam group.
+- **Suites:** the full CPU suite; GPU only if you touch rendering.
+
+### uireach (ADRs 937–939): what the artist sees, the artist can change
+- **Worktree:** `~/Documents/GitHub/av-gen-uireach`, branch `agent/uireach`, from `integrate/revision` `983221a9`. Assets are linked; build it yourself.
+- **Read:** the owner's standing rule in ENGINEERING-RULES § "UI reach", and the memory it came from. It is quoted in PROGRESS.md: "anything visible is controllable, under viewer-word labels".
+- **Four gaps, each found this week, where the picture shows something the app cannot change:**
+  1. **ADR-937: custom section treatments cannot be edited in the app.** GV3's treatments appear by name in the Sequence panel's picker, but their settings cannot be edited there (found by gv3-cut). Make a custom treatment's settings editable where it is chosen, and make the edit survive a project save.
+  2. **ADR-938: per-species wind sway is not a parameter.** A scatter layer's wind response (tip, stiffness, mass, sensitivity) is scene data only. Expose it per layer, under a name that says what the viewer sees (for example "how the ferns sway"). gv3-look found it: the fan plants moved 0.9 cm in a gust until the scene data changed.
+  3. **ADR-939: the aurora's "Audio response" is not the master it reads as.** Turning it off leaves "Spectrum shape" and the glints following the audio (gv3-look's first iteration: the sky still pulsed +12–16% per beat). Make "Audio response" gate every audio-driven part of the aurora, or regroup and relabel the controls so each says what it does.
+     - **GV3 depends on it:** GV3 runs with audio response off, spectrum shape 0 and a fixed glint amount of 0.3. The base glints must still render. Prove GV3's sky is unchanged, or re-baseline with evidence.
+  4. **`mind.memory.failSeconds`** (ADR-933's retry memory) is JSON-only. Expose it with a words label under the character's decide group. Record it as an ADR-933 amendment, not a new ADR.
+- **Verification:** never run the windowed app. Prove reach with CPU tests on the registry and the panels' grouping code (ADR-387's `ui::parameterSubGroup`). Prove each control reaches the output: a GPU difference image for the aurora and the sway, a round-trip test for the treatments.
+- **Suites:** the full CPU suite, and the GPU suite if you touch rendering or shaders, under the lock in a quiet window.
