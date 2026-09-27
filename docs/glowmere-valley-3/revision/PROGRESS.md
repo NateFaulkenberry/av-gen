@@ -8,6 +8,22 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **19:40: cihealth is DONE** (final `423e231d`) and **merged into `integrate/revision`** (`bea0ef33`). The suites
+  will run once with behave and uireach.
+  - **ADR-940: the bolt flake was three padding bytes in `RibbonStrip`.** Nothing wrote them; CI's compiler (Xcode
+    26.6) left a reused heap block's bytes there; the test compares strips byte for byte. Proven on CI's own binary
+    in CI's order (5 of 5 after the polluter; 3 of 3 alone). Fix: a named, zeroed `reserved` field and
+    `static_assert`s.
+  - **ADR-941: the packComet UBSan was a test helper** returning a record into its own dead stack frame. The
+    multicam link was log adjacency.
+  - **Neither reaches the app;** no frame changes.
+  - **The sanitizer run is re-partitioned** into 5 jobs of 3 processes (`tools/ci/sanitizer-plan.txt`), expected
+    4-5 h against 8.5-10.5 h. `catch2_run.py plan-check` guards it on every push. Not yet measured on CI.
+    - Two cases are skipped under ASan by name; no hosted job can finish them (the farm locomotion case, and the
+      five characters over two seeds).
+  - Its suite: 3,802 cases, 3,782 passed, 19 skipped, 1 expected; exit 0 (single process, 8,459 s).
+  - Its open items: the two skipped cases need sanitizer-sized variants; the film is the run's floor (245-300 of
+    330 min); other padded structs exist; keep `bin-release`/`bin-asan` for 3 days, not 1.
 - **19:05: behave's suite has one failure; the coordinator ruled "fix it here".** The failing test is "The
   multicam's five deciders move, and they do not walk through each other" (`test_glowmere_multicam.cpp:636`).
   behave's full CPU suite: 3,809 tests, 3,789 passed, 19 skipped, 1 failed.
