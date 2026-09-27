@@ -55,6 +55,29 @@ where its predecessor stopped.
     36318924797), and so did yesterday's Sanitizers run; nobody has triaged them yet.
   - **Not pushed:** the `gv3/*` branches. Pushing them would publish the owner's brief and the production docs, and CI
     adds nothing there (their engine code is main's). Also not pushed: `agent/navfix`, which has no commits yet.
+- **GPU LOCK RACE (13:00:24, found by gv3-cast). Two GPU jobs have been running at a time since.**
+  - `tools/gpu-lock.sh` wrote its pid with `echo $$ > pid`. A waiter that read the file in the instant between its
+    creation and the write saw it empty; `kill -0 ""` fails, so it reclaimed a live lock. Every holder's EXIT trap
+    then removed the lock unconditionally, including one another holder owned. So each job that ends lets the next
+    waiter in beside a job that is still running, until the queue drains.
+  - What was affected:
+    - gv3-look's pair F (166.63-177.71 s) overlapped gv3-cast's iter3 clips;
+    - gv3-world's 4K cost timing (`time -l`, from about 13:03) overlapped them too, so it is invalid as a cost figure.
+  - All three streams were told: keep the images, re-measure timings, and re-render anything whose finding hinges on
+    small pixel differences when `ps` shows no other avgen process.
+  - The classifier refused gv3-cast stopping its own job, and the coordinator will not stop it for it. The jobs are
+    preview renders, so the overlap drains by itself.
+  - **The fix, by the coordinator, on `integrate/render` after its CPU suite:**
+    - write the pid atomically (a temporary file, then `mv`);
+    - reclaim a pid-less lock only when it is older than 30 s (the 2026-09-20 wedge);
+    - re-check the dead pid just before removing the lock;
+    - a holder's trap removes the lock only when the pid file is its own.
+    Nothing may edit a `gpu-lock.sh` copy while an instance of that copy is running.
+  - **The integration's GPU suite runs only when `ps` shows no other GPU process,** not merely when the lock is held.
+  - **The lock's 3,600 s wait limit drops jobs.** gv3-look's pair C (74.33-89.10 s) timed out at 12:32 and was never
+    rendered. Any job queued behind this line can be dropped the same way (exit 75), so each stream checks its own.
+    gv3-look independently reached the same diagnosis and fix. It committed v4 (`8dc975a2`: a steady aurora, scored
+    claps, the elder at the plan's depth, the drop's hue held), based on pairs D, A and B.
 - **The GPU queue is long:** gv3-world's batch holds it; render's `full-2`, gv3-look's pair, gv3-world's stills and
   gv3-cut's 25-minute it2 film all wait.
 
