@@ -21,7 +21,10 @@ track per category (`idle`, `grounded`, `turns`, `ufo`).
 - **`tools/gv3/cast.py`** writes the cast into the scene (and into the project wherever the project
   restates a value, because the project's parameters are applied over the scene):
   - the aliens' habits, one set per alien: the longest it stands (`maxStillSeconds`), its range of
-    paces, a 1.5 m turning circle, its two unused clips as activities, and its ears for E3-E5;
+    paces, a 1.5 m turning circle, its two unused clips as activities, and its ears: E4 heard
+    nearby (go and see), E5 across the valley (stop and watch; vane weighted to watch it);
+  - the aliens' stride bob, a style choice: about 0.1 m at a walk (ember, vane 0.17, rook 0.18),
+    and no bass reaction lifting it;
   - every animal's slope limit (10°) and walk-through turns (`turnRadius`, `pivotRadius`), and the
     five flank animals re-homed onto the two flat meadows;
   - the `scout`: the saucer's model at 0.6 scale, with its own beam, entity and staging actor;
@@ -375,6 +378,24 @@ behaves" in the World panel). **To put the springier walk back, set the old valu
 The Critic's rule over the whole film (share of the track over 0.1 m): ember 32% → 11%, vane
 34% → 6%, rook 21% → 10%, sage 7%, tide 1%.
 
+**The Critic, like for like.** The first pass's clips are judged again with the Critic's adapter at
+`961e04c` (`before3`), and iteration 4's clips with the same adapter (label `iter4`). The iteration-4
+clips rendered alone on the GPU (a clean lock, no other `avgen`). Comparisons are in
+`build/gv3/cast/critic/iter4/<clip>/compare.json`:
+
+| clip | before (`before3`) | iteration 3 (old adapter) | iteration 4 |
+|---|---|---|---|
+| idle 44-60 s | `job_1a0e3f783c775be73`: ember floats **medium**; the bass route on vane "does not visibly move" | vane floats medium, ember low | `job_1a0e4170d71a75407`: vane floats **low** (55.3 s); route finding resolved |
+| e4 95-118 s | `job_1a0e3f78a1db376f7`: vane floats **medium**, sage low; both bass routes | vane floats medium | `job_1a0e417404de3b06f`: vane floats **low** (109.0 s); both route findings resolved |
+| e5 166-182 s | `job_1a0e3f7907306ee46`: ember, vane and horse-11 float **medium**; both bass routes | ember medium, vane low | `job_1a0e41773d44dd48d`: ember floats **low** (168.7 s); 7 findings resolved, among them "horse-11 out of frame for 50% of s32" |
+
+Every float finding is now low: a body's share of samples over 0.1 m is just above the rule's
+10% (the walk p90 sits at about 0.1 m), and the worst is under 0.2 m. The other findings in these
+clips are the cut's and the look's: s11's lost vane, answered by gv3-cut's cut; "ember is cut by
+the frame edge" and "outweighed" in s25, which gv3-cut is re-framing; the scout beam's and tide's
+routes. E5's "clipped highlights" (high, 175.76 s, s29) is new in both iteration 3 and 4. It is not
+the cast's: the horse's glow cues peak at the first pass's values (glow 3.0, rim 5.0).
+
 ## Open items that belong to others
 - **The Critic (not GV3):** its float check reads the traced root (`state.position + motion.position`,
   which carries the stride bob), not the drawn feet. The aliens carry ground-driven foot layers with
@@ -405,17 +426,26 @@ The Critic's rule over the whole film (share of the track over 0.1 m): ember 32%
 - **The Critic's adapter**: the trace's `atRetire` is taken after the retired body is dropped back to
   the ground (the horse 23 m up the beam reads 5.3 m); the adapter works round it.
 
-## Status and next steps (checkpoint, 2026-09-27 14:00)
-1. Iteration 4's three float clips (idle, e4, e5) wait for the GPU. Then the Critic on them against
-   the `before3` jobs (the first pass's clips, inputs rebuilt with the Critic's adapter at `961e04c`,
-   which stopped mapping the ember-cap mushroom to the alien Ember): idle `job_1a0e3f783c775be73`, e4
-   `job_1a0e3f78a1db376f7`, e5 `job_1a0e3f7907306ee46`. Their findings match `before2`'s.
-2. Evidence to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cast/`, and the final report.
-3. After navfix and gv3-world's river merge, the coordinator re-traces the whole film: re-read the
-   ADR-910 table and `watches` then (the aliens' paths will move; the set pieces will not).
-
-Critic jobs made before `961e04c` (the iteration-3 ones): discount any "ember out of frame" finding
-on a shot that frames the ember-cap; it is not about the alien.
+## Status (2026-09-27 14:30): iteration 4 is the stream's result
+- **Done:**
+  - the characters stream's recipe;
+  - E1-E5 as set pieces compiled by `ufo.py` (all five play, E4 on the meadow pair);
+  - the float found, fixed and verified (the bass reaction dropped; the bob lowered as a
+    reversible style call);
+  - vane watching E5;
+  - the watches in `ufo-beats.json` for the cut;
+  - the Critic before and after on four ranges.
+- **Evidence:** `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cast/` (README, clips,
+  before/after sheets).
+- **Waits on the engine:** ember's river-bank stands and pacing (ADR-932, 933) and the taken animals
+  that stay in the world (ADR-934), all navfix's.
+- **After navfix and gv3-world's river merge,** the coordinator re-traces the whole film. Re-read the
+  ADR-910 table and `watches` then: the aliens' paths will move, the set pieces will not.
+- **The `before3` jobs** (the first pass's clips, inputs rebuilt with the adapter at `961e04c`,
+  which stopped mapping the ember-cap mushroom to the alien Ember) match `before2`'s findings:
+  idle `job_1a0e3f783c775be73`, e4 `job_1a0e3f78a1db376f7`, e5 `job_1a0e3f7907306ee46`.
+- **Critic jobs made before `961e04c`** (the iteration-3 ones): discount any "ember out of frame"
+  finding on a shot that frames the ember-cap; it is not about the alien.
 
 **The iteration-3 clips rendered under GPU overlap from 13:00:24.** Waiting on `tools/gpu-lock.sh`,
 this stream's wrapper read an empty pid file (another wrapper's `mkdir` before its pid write) as a

@@ -4,7 +4,8 @@ The revision (the owner's brief §9-12; docs/glowmere-valley-3/revision/03-revis
 
   aliens    purposeful, never standing about for long, never walk -> stop -> turn round -> walk back.
             Each has its own longest pause, its own range of paces and a turning circle (ADR-907 to
-            909). Those near E4 go and see it; every alien stops to watch E5's beam (ADR-930).
+            909). Those near E4 go and see it; those who hear E5 stop to watch its beam where they
+            stand (ADR-930). Grounded: a stride bob of about 0.1 m at a walk, and none on the beat.
   animals   on flat valley ground, walking through their turns. Every animal keeps off ground
             steeper than 10 degrees and turns on a body-sized circle; the five whose homes were on
             17-25 degree flanks are re-homed onto the two flat meadows.
