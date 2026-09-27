@@ -334,7 +334,9 @@ struct Occurrence {
 std::vector<Occurrence> occurrencesOf(const Trigger& t, const TriggerContext& ctx,
                                       std::vector<std::string>& warnings, const std::string& id) {
     std::vector<Occurrence> out;
-    const auto everyNth = [&](std::span<const double> times, const char* what) {
+    // `first` is the index in `times` of number 0: for beats the meter's downbeat (ADR-896), so the
+    // index counts musical beats; bar times already start at bar 1.
+    const auto everyNth = [&](std::span<const double> times, const char* what, int first) {
         if (times.empty()) {
             warnings.push_back(fmt::format(
                 "event '{}' triggers on a {}, but the sequence carries no {} times -- run the "
@@ -344,11 +346,12 @@ std::vector<Occurrence> occurrencesOf(const Trigger& t, const TriggerContext& ct
         }
         const int every = std::max(1, t.every);
         for (std::size_t i = 0; i < times.size(); ++i) {
-            const int n = static_cast<int>(i) - t.index;
+            const int number = static_cast<int>(i) - first;
+            const int n = number - t.index;
             if (n < 0 || n % every != 0) {
                 continue;
             }
-            out.push_back(Occurrence{times[i], std::to_string(i)});
+            out.push_back(Occurrence{times[i], std::to_string(number)});
         }
     };
     switch (t.kind) {
@@ -356,10 +359,10 @@ std::vector<Occurrence> occurrencesOf(const Trigger& t, const TriggerContext& ct
         out.push_back(Occurrence{t.timeSeconds, t.name});
         break;
     case TriggerKind::Beat:
-        everyNth(ctx.beatTimes, "beat");
+        everyNth(ctx.beatTimes, "beat", ctx.downbeat);
         break;
     case TriggerKind::Bar:
-        everyNth(ctx.barTimes, "bar");
+        everyNth(ctx.barTimes, "bar", 0);
         break;
     case TriggerKind::Section: {
         bool found = false;

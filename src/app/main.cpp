@@ -1,4 +1,5 @@
 #include "app/application.hpp"
+#include "app/route_audit_cli.hpp"
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
 #include "core/log.hpp"
@@ -58,6 +59,12 @@ int main(int argc, char** argv) {
         return 0;
     }
     avgen::log::init(options->logLevel);
+    // ADR-902: the route audit runs before the application exists, so it needs no window and no GPU.
+    if (options->auditRoutes) {
+        return avgen::app::runRouteAuditCommand(options->project.value_or(std::filesystem::path{}),
+                                                *options->auditRoutes,
+                                                options->fpsGiven ? options->offlineFps : 0.0);
+    }
     avgen::log::info("avgen 0.1.0 starting ({} mode)", options->headless ? "headless" : "live");
 
     avgen::app::Application app;

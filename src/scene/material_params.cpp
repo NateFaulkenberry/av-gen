@@ -27,6 +27,13 @@ void copyValue(const MaterialProgramParameters& p, const std::string& rel, T& ta
 [[nodiscard]] std::string opPath(std::size_t index, MaterialOpKind kind) {
     return "op/" + std::to_string(index + 1) + "/" + materialOpKindName(kind) + "/";
 }
+// ADR-905: a layer's path, by index *and* name for ADR-232's reason -- a layer inserted in front of
+// "fireflies" moves its index, and a value saved against the old list then lands on a path nobody
+// registered (dropped with a warning) rather than on the wrong layer.
+[[nodiscard]] std::string layerPath(std::size_t index, const MaterialLayer& layer) {
+    return "layer/" + std::to_string(index + 1) + "/" + (layer.name.empty() ? std::string("layer") : layer.name) +
+           "/";
+}
 } // namespace
 
 MaterialProgramParameters registerMaterialProgramParameters(params::ParameterSet& params, const MaterialProgram& rest,
@@ -76,7 +83,29 @@ MaterialProgramParameters registerMaterialProgramParameters(params::ParameterSet
         d.group = group;
         p.all.push_back(&params.add(std::move(d)));
     };
-    p.emissionIntensity = addF("emissionIntensity", "emissionIntensity", rest.emissionIntensity, 0.0f, 100.0f, 0.0f, 8.0f);
+    // ADR-905: an intensity is registered only where it multiplies something. The program-level one
+    // scales the BASE's emission output and nothing else -- not a layer's, not the material's -- so on
+    // a program whose base writes no emission (the fireflies' crown and scaled programs, the painted
+    // grounds, the metals) it was a knob that moved nothing, and a key or a route on it bound in
+    // silence. Unregistered, the same key is reported at load as a target nobody has.
+    const auto emits = [](int r) { return r >= 0 && r < kMaterialRegisters; };
+    if (emits(rest.emissionRegister)) {
+        p.emissionIntensity =
+            addF("emissionIntensity", "emissionIntensity", rest.emissionIntensity, 0.0f, 100.0f, 0.0f, 8.0f);
+    }
+    // Each layer's own multiplier: how a program that keeps its glow in a layer (those same fireflies)
+    // is reached at all.
+    for (std::size_t i = 0; i < rest.layers.size(); ++i) {
+        if (!emits(rest.layers[i].emissionRegister)) {
+            continue;
+        }
+        // Labelled "glow": both panels head it with the layer's path, `layer/<i>/<name>`, which is
+        // where the layer is named -- the Parameters panel under "material/<program>", the Inspector
+        // as `1/fireflies/glow`.
+        const std::string path = layerPath(i, rest.layers[i]) + "emissionIntensity";
+        p.layerEmissionIntensity.push_back(
+            addF(path, "glow", rest.layers[i].emissionIntensity, 0.0f, 1000.0f, 0.0f, 32.0f));
+    }
     for (std::size_t i = 0; i < rest.ops.size(); ++i) {
         const MaterialOp& op = rest.ops[i];
         const std::string base = opPath(i, op.kind);
@@ -95,6 +124,9 @@ void applyMaterialProgramParameters(const MaterialProgramParameters& p, const Ma
                                     MaterialProgram& live) {
     live = rest;
     copyValue(p, "emissionIntensity", live.emissionIntensity);
+    for (std::size_t i = 0; i < live.layers.size(); ++i) {
+        copyValue(p, layerPath(i, live.layers[i]) + "emissionIntensity", live.layers[i].emissionIntensity);
+    }
     for (std::size_t i = 0; i < live.ops.size(); ++i) {
         const std::string base = opPath(i, live.ops[i].kind);
         copyValue(p, base + "value", live.ops[i].value);

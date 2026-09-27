@@ -154,7 +154,8 @@ std::string TransportBar::format(const app::TransportSnapshot& snapshot, double 
         return buffer;
     }
     case TimeFormat::Bars: {
-        std::string bars = app::formatBarsBeats(seconds, snapshot.tempoBpm, snapshot.beatsPerBar);
+        std::string bars =
+            app::formatBarsBeats(seconds, snapshot.tempoBpm, snapshot.beatsPerBar, snapshot.barOriginSeconds);
         // Falls back rather than showing nothing: a piece with no analyzed tempo still has a time,
         // and an empty readout looks like a broken panel rather than an absent tempo.
         return bars.empty() ? app::formatClockTime(seconds) : bars;

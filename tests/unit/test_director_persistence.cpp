@@ -40,6 +40,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <vector>
 
 using namespace avgen;
 using nlohmann::json;
@@ -290,7 +291,20 @@ TEST_CASE("the Rook/Umbra benchmark project loads cleanly and a save adds no cam
     INFO((loaded ? std::string() : loaded.error().message));
     REQUIRE(loaded.has_value());
     INFO("warnings: " << fmt::format("{}", fmt::join(engine.projectWarnings(), " | ")));
-    CHECK(engine.projectWarnings().empty());
+    // The one kind of warning this file is allowed: its stale meter keys. The owner's GV3 brief
+    // forbids modifying the original glowmere-valley-2-multicam project, so it keeps
+    // `control.phraseBars` and `control.sectionPhrases`, which ADR-896 no longer reads and which
+    // every load names. Anything else is a real problem with the load.
+    std::vector<std::string> other;
+    for (const std::string& w : engine.projectWarnings()) {
+        const bool staleMeterKey = w.find("is no longer read") != std::string::npos &&
+                                   w.find("(ADR-896)") != std::string::npos;
+        if (!staleMeterKey) {
+            other.push_back(w);
+        }
+    }
+    CHECK(other.empty());
+    CHECK(engine.projectWarnings().size() <= 2); // exactly the two keys, at most
     testsupport::stepFrames(engine, 2);
     const json doc = engine.projectDocument(project);
     // Its cameras live in its scene file, untouched, so nothing may be recorded over them -- in

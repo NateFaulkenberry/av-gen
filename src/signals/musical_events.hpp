@@ -62,9 +62,11 @@ struct MusicalFrame {
     float onsetStrength = 0.0f;
     bool beat = false;          // the beat clock ticked this frame
     int beatInBar = 0;          // 0 = downbeat
-    std::uint32_t barCount = 0;
-    std::uint32_t phraseCount = 0;
-    std::uint32_t sectionCount = 0;
+    // Bars, phrases and sections of the meter (ADR-896): 0 is the one starting on bar 1, and a
+    // pickup before bar 1 is -1.
+    std::int64_t barCount = 0;
+    std::int64_t phraseCount = 0;
+    std::int64_t sectionCount = 0;
 };
 
 // Thresholds, exposed because "what counts as a drop" is an artistic decision and the defaults are
@@ -206,9 +208,9 @@ private:
     double breakSince_ = 0.0;
     double breakEndedAt_ = 0.0;
     bool dropArmed_ = false;   // a break has ended and may still resolve into a drop
-    std::uint32_t lastBar_ = 0;
-    std::uint32_t lastPhrase_ = 0;
-    std::uint32_t lastSection_ = 0;
+    std::int64_t lastBar_ = 0;
+    std::int64_t lastPhrase_ = 0;
+    std::int64_t lastSection_ = 0;
     bool started_ = false;
     double lastTime_ = 0.0;
 };

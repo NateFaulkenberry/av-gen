@@ -1591,10 +1591,18 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     auto& modulator = engine.modulator();
 
     // ---- add route ----
+    // The picker shows each signal's name with what it is beside it (`ui::routeSourceItem`: "kick",
+    // "density", "section change"...); the route stores the name.
     std::vector<const char*> signalNames;
     signalNames.reserve(bus.size());
     for (const auto& info : bus.infos()) {
         signalNames.push_back(info.name.c_str());
+    }
+    const std::vector<std::string> sourceItems = ui::routeSourceItems(bus);
+    std::vector<const char*> sourceLabels;
+    sourceLabels.reserve(sourceItems.size());
+    for (const std::string& item : sourceItems) {
+        sourceLabels.push_back(item.c_str());
     }
     std::vector<const char*> targetNames;
     for (const auto* p : paramSet.ordered()) {
@@ -1615,8 +1623,8 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
               [](const char* a, const char* b) { return std::string_view(a) < std::string_view(b); });
     newRouteSource_ = std::clamp(newRouteSource_, 0, std::max(0, static_cast<int>(signalNames.size()) - 1));
     newRouteTarget_ = std::clamp(newRouteTarget_, 0, std::max(0, static_cast<int>(targetNames.size()) - 1));
-    ImGui::SetNextItemWidth(200);
-    ImGui::Combo("##src", &newRouteSource_, signalNames.data(), static_cast<int>(signalNames.size()));
+    ImGui::SetNextItemWidth(260);
+    ImGui::Combo("##src", &newRouteSource_, sourceLabels.data(), static_cast<int>(sourceLabels.size()));
     ImGui::SameLine();
     ImGui::TextUnformatted("->");
     ImGui::SameLine();
@@ -1641,6 +1649,28 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     static const char* envelopes[] = {"none", "peak hold", "linear fall"};
     int removeIndex = -1;
     auto& routes = modulator.routes();
+    // ADR-902: each route's liveness verdict, shown beside its header the way "[ignored]" is shown
+    // beside an inert parameter. Re-checked when a route changed, and once a second besides, because
+    // a rule also reads the scene; the rules sample the chain, so not every frame.
+    {
+        const double now = ImGui::GetTime();
+        bool stale = routeLiveness_.size() != routes.size() || now - routeLivenessCheckedAt_ > 1.0;
+        for (std::size_t i = 0; !stale && i < routes.size(); ++i) {
+            stale = routeLiveness_[i].signature != routeSignature(routes[i]);
+        }
+        if (stale) {
+            const scene::SceneLivenessFacts facts(engine.livenessInputs());
+            const auto& registry = liveness::Registry::standard();
+            const auto set = registry.checkSet(routes, engine.timeline().tracks());
+            routeLiveness_.assign(routes.size(), RouteLivenessRow{});
+            for (std::size_t i = 0; i < routes.size(); ++i) {
+                auto findings = registry.checkRoute(routes[i], facts);
+                findings.insert(findings.end(), set.routes[i].begin(), set.routes[i].end());
+                routeLiveness_[i] = RouteLivenessRow{routeSignature(routes[i]), routeBadge(findings)};
+            }
+            routeLivenessCheckedAt_ = now;
+        }
+    }
     for (std::size_t i = 0; i < routes.size(); ++i) {
         auto& route = routes[i];
         ImGui::PushID(static_cast<int>(i));
@@ -1661,10 +1691,25 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.78f, 0.35f, 1.0f));
         }
         const bool open = ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+        if (ImGui::IsItemHovered()) {
+            // What the source is, in words, for a route whose name alone does not say it.
+            if (const auto id = bus.find(route.source); id && !bus.info(*id).label.empty()) {
+                ImGui::SetTooltip("%s: %s", route.source.c_str(), bus.info(*id).label.c_str());
+            }
+        }
         if (focused) {
             ImGui::PopStyleColor();
             // After the item, so the scroll target is the row that was just laid out.
             ImGui::SetScrollHereY(0.35f);
+        }
+        if (i < routeLiveness_.size() && routeLiveness_[i].badge.show) {
+            const RouteBadge& badge = routeLiveness_[i].badge;
+            ImGui::SameLine();
+            ImGui::TextColored(badge.dead ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f) : ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s",
+                               badge.text.c_str());
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted(badge.tooltip.c_str());
+            }
         }
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
         ImGui::Checkbox("##on", &route.enabled);
@@ -1694,6 +1739,40 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(140);
             ImGui::SliderFloat("decay ms", &route.chain.decayMs, 0.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            // ADR-900: the delay stage and the depth source.
+            ImGui::SetNextItemWidth(140);
+            ImGui::SliderFloat("delay ms", &route.chain.delayMs, 0.0f, ProcessorChain::kMaxDelayMs, "%.0f",
+                               ImGuiSliderFlags_Logarithmic);
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted("The route reads its source as it was this long ago -- a stagger or an echo. "
+                                   "An event arrives whole, on the first frame at or after its delayed instant.");
+            }
+            ImGui::SameLine();
+            {
+                const std::vector<std::string> choices = depthSourceChoices(bus, route.depthSource);
+                std::vector<const char*> labels;
+                labels.reserve(choices.size());
+                for (const std::string& c : choices) {
+                    labels.push_back(c.c_str());
+                }
+                int depth = depthSourceIndex(choices, route.depthSource);
+                ImGui::SetNextItemWidth(170);
+                if (ImGui::Combo("depth", &depth, labels.data(), static_cast<int>(labels.size()))) {
+                    route.depthSource = depth == 0 ? std::string() : choices[static_cast<std::size_t>(depth)];
+                    engine.rebind(); // the depth signal is resolved at bind
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltipUnformatted("A signal that scales how far the route moves its target: depth = min + "
+                                       "(max - min) x signal. (none) is full depth, always.");
+                }
+            }
+            if (!route.depthSource.empty()) {
+                ImGui::SetNextItemWidth(100);
+                ImGui::SliderFloat("depth min", &route.depthMin, -1.0f, 2.0f);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(100);
+                ImGui::SliderFloat("depth max", &route.depthMax, -1.0f, 2.0f);
+            }
             int curve = static_cast<int>(route.chain.curve);
             ImGui::SetNextItemWidth(110);
             if (ImGui::Combo("curve", &curve, curves, 5)) {
@@ -1737,6 +1816,7 @@ void ControlPanel::drawSourcesTab(app::Engine& engine) {
     auto& bus = engine.signals();
     std::string removeKind;
     std::string removeName;
+    bool reattach = false;
     for (const auto& source : engine.sources().sources()) {
         ImGui::PushID(source.get());
         const std::string header = source->kind() + " " + source->name();
@@ -1761,10 +1841,28 @@ void ControlPanel::drawSourcesTab(app::Engine& engine) {
                     lfo->setShape(static_cast<signals::LfoShape>(shape));
                 }
             }
+            if (source->kind() == "timeline") {
+                // ADR-900: a timeline's keys are a curve, or each positive key is a hit -- a one-frame
+                // event an envelope source can be triggered by and no frame rate can miss.
+                auto* timeline = dynamic_cast<signals::TimelineSource*>(source.get());
+                int mode = static_cast<int>(timeline->mode());
+                static const char* modes[] = {"values (a curve)", "events (each key > 0 a hit)"};
+                ImGui::SetNextItemWidth(200);
+                if (ImGui::Combo("keys are", &mode, modes, 2)) {
+                    timeline->setMode(static_cast<signals::TimelineMode>(mode));
+                    reattach = true; // the bus learns the output is (or is no longer) an event
+                }
+                ImGui::SameLine();
+                ImGui::TextDisabled("%zu keys", timeline->keys().size());
+            }
             ImGui::TextDisabled("settings: Parameters window, group 'sources'");
             ImGui::TreePop();
         }
         ImGui::PopID();
+    }
+    if (reattach) {
+        engine.sources().attach(bus, engine.params());
+        engine.rebind();
     }
     if (!removeName.empty()) {
         engine.removeSource(removeKind, removeName);
@@ -2001,6 +2099,21 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "[A]");
             if (ImGui::IsItemHovered()) {
                 tooltip("automated by the timeline; the slider is the base value");
+            }
+        }
+        // ADR-896: a meter setting left on "detect" says what the analysis decided, so pinning it is
+        // a decision about a number you can see rather than a guess.
+        if (param->group() == "music") {
+            const analysis::Meter meter = engine.meter();
+            const app::Engine::MeterSource source = engine.meterSource();
+            const bool downbeat = param->path() == app::Engine::kBar1BeatPath;
+            const std::string note = ui::meterDetectNote(
+                param->path(), static_cast<int>(std::lround(param->baseComponent(0))),
+                downbeat ? meter.downbeat : meter.phraseBars,
+                downbeat ? source.downbeatDetected : source.phraseDetected, source.downbeatConfidence);
+            if (!note.empty()) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", note.c_str());
             }
         }
         // Not reaching the picture in the state the scene is in. Said next to the slider, in the

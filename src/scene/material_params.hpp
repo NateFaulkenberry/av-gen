@@ -1,8 +1,10 @@
 #pragma once
 
 // Parameters for a scene material program (ADR-030), rest/finals pattern: "<prefix>emissionIntensity"
-// and "<prefix>op/<i>/<kind>/value|constant|constant2|constant3|constant4|enabled" (i 1-based,
-// every op; kinds, registers, inputs and field names are structural and come from the file).
+// (the base's emission; registered only when the base writes one, ADR-905),
+// "<prefix>layer/<i>/<name>/emissionIntensity" (each emitting layer's, ADR-905) and
+// "<prefix>op/<i>/<kind>/value|constant|constant2|constant3|constant4|enabled" (i 1-based,
+// every base op; kinds, registers, inputs and field names are structural and come from the file).
 //
 // ADR-232: the op segment carries the op's *kind* as well as its index. A material program is a
 // file and a project is a table of values for it, and the two are edited apart -- inserting an op
@@ -23,6 +25,9 @@ struct MaterialProgramParameters {
     std::string prefix;
     std::vector<params::IParameter*> all;
     params::Parameter<float>* emissionIntensity = nullptr;
+    // ADR-905: "<prefix>layer/<i>/<name>/emissionIntensity", one per layer (i 1-based, the name
+    // in the path for ADR-232's reason).
+    std::vector<params::Parameter<float>*> layerEmissionIntensity;
     std::vector<params::Parameter<float>*> opValue;
 };
 [[nodiscard]] MaterialProgramParameters registerMaterialProgramParameters(params::ParameterSet& params,

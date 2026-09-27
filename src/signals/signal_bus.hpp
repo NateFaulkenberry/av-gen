@@ -21,6 +21,9 @@ struct SignalInfo {
     float minValue = 0.0f;
     float maxValue = 1.0f;
     bool isEvent = false; // events are pulses: value = strength for one frame, event flag set
+    // What the signal is, in words an artist would use ("kick (low-band onset)"), shown beside the
+    // name wherever a route's source is picked. Empty when the name says it already.
+    std::string label;
 };
 
 class SignalBus {
@@ -28,6 +31,12 @@ public:
     // Idempotent: declaring an existing name returns its id (range/event flags are not changed).
     SignalId declare(std::string name, float minValue = 0.0f, float maxValue = 1.0f, bool isEvent = false);
     [[nodiscard]] std::optional<SignalId> find(std::string_view name) const;
+    // Re-states whether a declared signal is an event -- for a producer whose kind changed after the
+    // name was first declared (a timeline source switched to event mode, ADR-900).
+    void setEventKind(SignalId id, bool isEvent);
+
+    // Gives a declared signal its readable label (see `SignalInfo::label`).
+    void setLabel(SignalId id, std::string label);
 
     void set(SignalId id, float value);
     // Sets an event signal: fired => value = strength and event flag; else value 0.

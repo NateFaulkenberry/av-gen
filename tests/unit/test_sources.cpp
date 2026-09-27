@@ -123,7 +123,7 @@ TEST_CASE("LFO free-running phase is a pure function of renderTime", "[sources][
     CHECK_THAT(d(f.signal("lfo.wobble")), WithinAbs(0.0, 1e-5));
 }
 
-TEST_CASE("LFO beat sync derives its phase from beatCount and beatPhase", "[sources][lfo]") {
+TEST_CASE("LFO beat sync derives its phase from the musical position", "[sources][lfo]") {
     Fixture f;
     LfoSource lfo("beat", LfoShape::Saw);
     lfo.attach(f.bus, f.params);
@@ -134,9 +134,9 @@ TEST_CASE("LFO beat sync derives its phase from beatCount and beatPhase", "[sour
 
     SourceContext ctx = at(99.0);
     ctx.tempoBpm = 120.0f;
-    ctx.beatCount = 3;
     ctx.beatPhase = 0.5f;
-    lfo.update(f.bus, ctx); // (3 + 0.5) / 1 -> phase 0.5
+    ctx.musicalBeats = 3.5; // ADR-896: beat 3.5 counted from beat 1 of bar 1
+    lfo.update(f.bus, ctx); // 3.5 / 1 -> phase 0.5
     CHECK_THAT(d(f.signal("lfo.beat")), WithinAbs(0.5, 1e-5));
 
     f.floatParam("sources/beat/beatsPerCycle").setBase(4.0f);

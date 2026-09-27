@@ -14,6 +14,10 @@
 #include "params/parameter_set.hpp"
 #include "spatial/field.hpp"
 
+namespace avgen::world {
+class TriggerClock;
+}
+
 #include <string>
 #include <vector>
 
@@ -41,5 +45,11 @@ struct FieldParameters {
 // Copies finals into `live` (name/kind/space/children/reference come from `rest`).
 void applyFieldParameters(const FieldParameters& p, const spatial::FieldSpec& rest, spatial::FieldSpec& live);
 void unregisterFieldParameters(params::ParameterSet& params, const FieldParameters& p);
+
+// ADR-906: every triggered field's clock for the frame -- the seconds since its trigger's latest
+// event at or before `seconds`, asked of the effects' own `TriggerClock`, whose answer is a pure
+// function of the second (so a seek lands where a play does, with nothing to replay). No clock, or
+// no event yet, leaves the field silent. Fields without a trigger are not touched.
+void resolveFieldTriggers(spatial::FieldSet& fields, const world::TriggerClock* clock, double seconds);
 
 } // namespace avgen::scene

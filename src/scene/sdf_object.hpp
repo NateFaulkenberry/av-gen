@@ -39,6 +39,9 @@ struct SdfObject {
     float epsilon = 0.002f;              // hit threshold (× distance for perspective)
     float stepScale = 0.9f;              // relaxation (displaced trees need < 1)
     float normalEpsilon = 0.002f;
+    // ADR-903: the owning node's `emissiveBoost`, applied by the lit shader after the material
+    // program. Runtime only (the Composition writes it every frame); 1 is the surface as authored.
+    float emissionGain = 1.0f;
     // Structural outputs
     std::uint64_t structureVersion = 0;
     std::uint64_t builtHash = 0;

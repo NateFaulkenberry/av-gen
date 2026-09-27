@@ -69,7 +69,7 @@ struct Sparkle {
 // second. Nothing here, and nothing in a consumer, keeps state: `age = t - t0` is recomputed every
 // frame from the answer.
 enum class TriggerSource : std::uint8_t {
-    Beat,           // every `everyN`th beat of the offline beat tracker, starting at beat `offset`
+    Beat,           // every `everyN`th musical beat of the offline beat tracker, from beat `offset`
     Onset,          // a peak-picked onset whose strength is at least `threshold`
     MusicEvent,     // a musical event (`drop`, `impact`, `build`, `downbeat`, ...) by `name`
     TimelineMarker, // a marker of the sequence (a cue, a section label, a beat marker) by `name`
@@ -82,7 +82,8 @@ enum class TriggerSource : std::uint8_t {
 struct Trigger {
     TriggerSource source = TriggerSource::Beat;
     int everyN = 1;          // Beat: fire on every Nth beat...
-    int offset = 0;          // ...counting from this beat index (0 = the first tracked beat)
+    int offset = 0;          // ...counting from this musical beat (0 = beat 1 of bar 1, ADR-896:
+                             // the beat `beat.count` reads 0 on and `music.downbeat` fires on)
     float threshold = 1.0f;  // Onset: the onset strength (flux over its adaptive threshold) to reach
     std::string name;        // MusicEvent: the event's name; TimelineMarker: the marker's name
     double period = 2.0;     // Repeat: seconds between firings

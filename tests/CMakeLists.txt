@@ -10,6 +10,8 @@ target_link_libraries(avgen_tests PRIVATE tinyexr::tinyexr PRIVATE avgen_quality
 target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+    # ADR-902: `avgen --audit-routes` -- an offline engine and a report, no GPU, so it is checked here.
+    "${CMAKE_SOURCE_DIR}/src/app/route_audit_cli.cpp"
     # The transport (ADR-102): the playback state machine and the frame arithmetic. Deliberately
     # engine-free and clock-free so the state machine can be checked without a device or a window.
     "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"

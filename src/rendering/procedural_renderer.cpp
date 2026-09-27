@@ -88,6 +88,21 @@ glm::vec3 safeNormalize(glm::vec3 v, glm::vec3 fallback) {
     return len2 > 1e-12f ? v / std::sqrt(len2) : fallback;
 }
 
+// The scene's material program called `name`, or null. The GPU table holds the first eight (see
+// MaterialPrograms), and a program past them never runs; asking about one is harmless, because the
+// question asked of it (ADR-904's chroma.w) only matters where the program does run.
+const scene::MaterialProgram* programNamed(const scene::Scene& scene, const std::string& name) {
+    if (name.empty()) {
+        return nullptr;
+    }
+    for (const scene::MaterialProgram& program : scene.materialPrograms) {
+        if (program.name == name) {
+            return &program;
+        }
+    }
+    return nullptr;
+}
+
 // Packs one scene deformer into its uniform slot (see procedural.wgsl DeformerUniform).
 // `fieldSlot` is the resolved slot of a Field deformer's field (-1 = unbound: the slot is
 // disabled so the shader skips it); `splineSlot` and `pathScale` are the resolved spline slot
@@ -1778,6 +1793,15 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             u.chroma = glm::vec4(mv.chromaDrift, wind::kTau / mv.chromaDriftScale,
                                  wind::kTau * mv.chromaDriftSpeed, 0.0f);
         }
+        // ADR-904: chroma.w switches on the vertex stage's reading of the instance's emission
+        // variation as a hue rotation and a gain -- the form the shader applies once, after a
+        // program that writes emission and leaves the variation to the engine. Uniform per draw, and
+        // off for everything else (no program, a program that keeps the material's emission, or one
+        // that reads the instance's emission itself), which is the vertex stage it always was.
+        if (const scene::MaterialProgram* program = programNamed(scene, object.material.program);
+            program != nullptr && program->writesEmission() && !program->emissionReadsInstance()) {
+            u.chroma.w = 1.0f;
+        }
         // Velocity needs the same chain evaluated at the previous frame's time (ADR-035); prevInfo.y
         // switches the Tier 1 lookup on, and is uniform across the draw.
         u.prevInfo = glm::vec4(static_cast<float>(time.renderTime - time.deltaTime),
@@ -1919,6 +1943,9 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         obj.baseColor = glm::vec4(m.baseColor, m.opacity);
         obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);
         obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
+        // ADR-903/905: the object's emission lane -- its node's boost, its part's gain, its scatter
+        // layer's gain and hue -- applied after the program to every instance of this draw.
+        obj.emission = glm::vec4(object.emissionGain, object.emissionHue, 0.0f, 0.0f);
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < scene.textures.size() && !scene.textures[ref.texture].isHdr();

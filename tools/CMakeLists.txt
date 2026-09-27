@@ -9,6 +9,12 @@ target_link_libraries(avgen_world_preview PRIVATE avgen_core)
 add_executable(avgen_help_lint help_lint.cpp)
 target_link_libraries(avgen_help_lint PRIVATE avgen_core)
 
+# What the analysis hears in a track -- tempo, meter estimate, band onsets, per-section profiles --
+# and, given a reference grid or kick list, how close it is (ADR-896..899). Links only the core, so it
+# measures exactly the analysis the engine runs.
+add_executable(avgen_music_report music_report.cpp)
+target_link_libraries(avgen_music_report PRIVATE avgen_core)
+
 
 # The viewport overlay, rasterised into a PNG with no window and no GPU (ADR-194).
 #

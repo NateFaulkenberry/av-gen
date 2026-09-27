@@ -44,7 +44,6 @@ private:
 
     struct RestState {
         Transform transform;
-        float emissiveIntensity = 0.0f;
         float roughness = 0.5f;
     };
     struct LightBinding {

@@ -2579,9 +2579,14 @@
           "srcA": 2
         },
         {
+          "constant": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
           "dst": 4,
-          "input": "instanceEmissive",
-          "kind": "input"
+          "kind": "constant"
         },
         {
           "constant": [
