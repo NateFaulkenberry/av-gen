@@ -230,8 +230,8 @@ What it found, and what I made of it:
 - **Events on screen at each moment** (`measurements.events.types`, the coordinator's check): E3's beam
   (35.1) and lift (37.1); E5's approach (81.1), beam (93.1), lift (94.1), departure and the horse taken
   (97.1); E1's approach, far, in the cold open. Off: E1's beam and sweep (the it1 render predates their
-  fix), E2's crossing at its first instant (the craft enters the frame a second later and crosses it
-  for 1.7 s), E3's animal taken (fixed in iteration 2: 39.1).
+  fix), E2's crossing at its first instant (the craft enters the frame 0.9 s later and is in it for
+  1.28 s), E3's animal taken (fixed in iteration 2: 39.1).
 - **Stability, and where the Critic and the pose track disagree.** The Critic's pixel classes: 3
   "shaky" and 5 "move with wobble" of 71 measured shots, against 5 and 3 of 38 in the same-engine
   before (10 and 2 of 38 in the first pass's 1080p final, on the older engine). Two of the three
@@ -298,8 +298,8 @@ moment plus 0.1 s and 1 s; the adapter also places each moment's event at the cr
 - **Off:**
   - E4's lift in 57.1: the scout is at the top edge (NDC y +1.11). The 50 mm aims 12 m below a craft
     44 m off, so the craft is 15 deg above centre with a 13.5 deg half-field.
-  - E2's crossing at its first instant: the craft is 14 deg outside the left edge and enters 0.45 s
-    later, then crosses the frame for 1.7 s.
+  - E2's crossing at its first instant: the craft is 13 deg outside the left edge; it enters 0.9 s
+    later (27.57 s) and is in frame for 1.28 s.
   - By choice: E1's and E3's approaches and departures, and E4's approach.
 
 ## Iteration 3: the framings the iteration-2 trace found wanting (`630ca638`)
@@ -333,10 +333,10 @@ searches in `build/gv3/cut/tools/search3.py`.
   0.107 deg on the hover kind (15 m from the aim point) by distance gives about 0.04 at 39 m. An
   estimate, to measure on gv3-cast's world.
 - **15.1, E2's flyby: panned 16 deg east** of the first pass's frame. The saucer comes in from the
-  east, slowly at first; it was 14 deg outside the frame when its crossing began. Now it is in frame
-  from that instant (x -0.90) and crosses for 1.85 s instead of 1.4, and the cap sits on the right
-  third (+0.36) with the sky it comes out of on the left. The owner's frame, moved: judged on the
-  clip below.
+  east, slowly at first; it was 13 deg outside the frame when its crossing began. Now it is in frame
+  from that instant (x -0.90; from 26.68 s) and for 1.92 s instead of 1.28 (every 60 fps frame of the
+  trace), and the cap sits on the right third (+0.36) with the sky it comes out of on the left. The
+  owner's frame, moved: judged on the clip below.
 
 ### Iteration 3, measured on its trace (engine `ec515c8b`)
 

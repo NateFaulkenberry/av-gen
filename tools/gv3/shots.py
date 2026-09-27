@@ -156,9 +156,9 @@ def e2_flyby(t0, t1, g):
     # [s07] E2, the flyby: from 112 m north of the elder looking south past it, a shape crosses the
     # frame over the cap while the music holds its breath -- the promise the drop keeps. Panned 16 deg
     # east of the first pass's frame (iteration 3): the saucer comes in from the east, slowly at first,
-    # and was 14 deg outside the frame when its crossing began; now it is in from that instant and
-    # crosses for 1.85 s instead of 1.4, and the cap sits on the right third with the sky it comes
-    # out of on the left.
+    # and was 13 deg outside the frame when its crossing began; now it is in from that instant and
+    # for 1.92 s instead of 1.28, and the cap sits on the right third with the sky it comes out of on
+    # the left.
     eye = g(-24, -58, 2.0)
     ahead = [-12.0 - eye[0], 110.7 * math.tan(math.radians(14.0)), 52.0 - eye[2]]
     pan = math.radians(16.0)
