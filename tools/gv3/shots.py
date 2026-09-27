@@ -317,10 +317,14 @@ def e3_lift(t0, t1, g):
 
 @at("38.1")
 def tide_sees_e3(t0, t1, g):
-    # The aliens react: Tide, in the north of the valley, turned toward the column.
-    r = follow(28.0, "tide", (3.0, 2.2, 5.0), (0.0, -10.0, 0.0), aim="scout", smoothing="fixed-target")
+    # The aliens react: Tide, in the north of the valley, turned toward the column. From 26 m behind her
+    # and 10 m up: over her shoulder at 2.2 m (r1) the frame was half a dark rock, and the lantern's cap,
+    # 25 m ahead of her on her bearing to the column 250 m away, hid the column; from up here the column
+    # clears the cap and the valley opens between them (gv3-int batch C, candidate c1).
+    r = follow(24.0, "tide", (4.5, 10.0, 25.6), (0.0, -26.0, 0.0), aim="scout", smoothing="fixed-target")
     return r, dict(lead="alien", purpose="Tide, and the column far up the valley beyond", subject="tide, E3 beyond",
-                   camera="28 mm over Tide's shoulder, looking at the scout", movement="follows", music="1 bar")
+                   camera="24 mm, 26 m behind Tide and 10 m up, looking at the scout", movement="follows",
+                   music="1 bar")
 
 
 @at("39.1")
@@ -534,10 +538,13 @@ def elder_from_the_north(t0, t1, g):
 # ==== 8 lead forward (bars 73-80): the aurora carries the lead ==========================================
 @at("73.1")
 def vane_aurora(t0, t1, g):
-    # [s20] One alien looks up: low behind Vane, the aurora beyond.
-    r = follow(20.0, "vane", (0.6, 1.7, 5.2), (0.0, 2.6, -1.0), clearance=1.0)
-    return r, dict(lead="alien", purpose="Low behind Vane, the aurora beyond", subject="vane and the aurora",
-                   camera="20 mm, 1.7 m", movement="follows", music="the lead comes forward on bar 73", effects="aurora")
+    # [s20] One alien looks up: behind Vane, the aurora beyond. 2.6 m up rather than 1.7 m: from 1.7 m a
+    # broad leaf covered the lower half of the frame by the shot's end (gv3-int r1); from 2.6 m the eye
+    # clears it and more of the valley shows under the aurora (batch C, candidate "hi"; the side and left
+    # candidates kept a leaf in the corner).
+    r = follow(20.0, "vane", (0.6, 2.6, 5.2), (0.0, 2.6, -1.0), clearance=1.0)
+    return r, dict(lead="alien", purpose="Behind Vane, the aurora beyond", subject="vane and the aurora",
+                   camera="20 mm, 2.6 m", movement="follows", music="the lead comes forward on bar 73", effects="aurora")
 
 
 @at("75.1")
@@ -551,11 +558,20 @@ def aurora_over_the_valley(t0, t1, g):
 
 @at("77.1")
 def valley_from_the_north(t0, t1, g):
-    # The whole valley from its north end, low: the river winding down to the elder under the sky.
-    r = moving(t0, t1, 50.0, g(-20, -290, 6.0), g(-18, -284, 6.0), [-10.0, 8.0, 60.0])
-    return r, dict(lead="world", purpose="The valley from its north end, the river winding to the elder",
-                   subject="the valley, the river, the elder far off", camera="50 mm, 6 m, the north end",
-                   movement="slow push", music="2 bars", effects="aurora")
+    # Across the valley to its west slope under the aurora, from 8 m up the east side, a cow grazing below.
+    # It used to look down the valley from its north end, 28 m up the new north head, and saw the south
+    # end as a flat shelf with the river's mouth a vertical-walled slot dead centre (world.py: an open end
+    # in 7 of 7 views, up to 17 of 96 columns): the edge of the world. gv3-world could not close the mouth
+    # in the terrain, and from the north end the elder and the mouth are on one bearing (1.3 and 2.8 deg
+    # east of south), so no view of the elder from there leaves the edge out. The low vantages by the
+    # river passed only because the near bank filled the frame, and turned round, the falls read as a flat
+    # panel (gv3-int batches A, D). Of four off-axis views with no open end (batch E) this has the depth:
+    # the cow, a lit mushroom and an alien in the middle distance, the slope, the aurora. 113.1 keeps the
+    # look down the valley, from the north-east ridge.
+    r = moving(t0, t1, 35.0, g(70, -40, 8.0), g(70, -34, 8.0), [-150.0, 40.0, -10.0])
+    return r, dict(lead="world", purpose="Across the valley to the west slope, under the aurora",
+                   subject="the valley and its west slope, the aurora over them", camera="35 mm, 8 m up the east side",
+                   movement="lateral truck, 6 m", music="2 bars", effects="aurora")
 
 
 @at("79.1")
@@ -746,10 +762,13 @@ def ember_looks_up(t0, t1, g):
 @at("104.1")
 def spire_lit(t0, t1, g):
     # The spire lit, close from the north-west (iteration 1's 17 m left it a speck), the eye swinging
-    # 20 deg round it and rising.
-    r = arc(t0, t1, 28.0, g, 62, -112, 1.5, [67.7, 14.0, -103.7], 20.0, rise=0.8)
+    # 10 deg round it and rising. Swinging 20 deg the other way (r1), a tree trunk crossed the spire in
+    # the middle of the shot; this way the trunk stays clear to its left for the whole swing (gv3-int
+    # batch C, candidate a, half its swing). Candidate b, from the west, was 31.1's frame over again: the
+    # same trunk, the spire, the moon over it.
+    r = arc(t0, t1, 28.0, g, 62, -112, 1.5, [67.7, 14.0, -103.7], -10.0, rise=0.8)
     return r, dict(lead="hero", purpose="The spire lit, from the north-west", subject="the spire mushroom",
-                   camera="28 mm, low, 10 m off", movement="truck round it, 20 deg", music="1 bar to the sub-phrase")
+                   camera="28 mm, low, 10 m off", movement="truck round it, 10 deg", music="1 bar to the sub-phrase")
 
 
 @at("105.1")
@@ -772,8 +791,9 @@ def veil_lit(t0, t1, g):
 
 @at("107.1")
 def scree_lit(t0, t1, g):
-    # The scree lit on the west slope, the eye swinging 14 deg round it (a 6 m push read as static).
-    r = arc(t0, t1, 35.0, g, -160, 80, 2.0, [-176.0, 25.0, 96.0], 14.0)
+    # The scree lit on the west slope, the eye swinging 14 deg round it (a 6 m push read as static). The
+    # other way round from r1's, where a trunk crossed the frame mid-swing (gv3-int batch C, candidate a).
+    r = arc(t0, t1, 35.0, g, -160, 80, 2.0, [-176.0, 25.0, 96.0], -14.0)
     return r, dict(lead="hero", purpose="The scree lit on the west slope", subject="the scree mushroom",
                    camera="35 mm", movement="truck round it, 14 deg", music="1 bar")
 
