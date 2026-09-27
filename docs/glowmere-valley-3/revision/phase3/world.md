@@ -249,6 +249,13 @@ it on the baseline trace and on v2a's (both on ec515c8b):
 - Every other shot's framing is identical.
 - No fixed or keyed camera moved, and no ground under a camera changed.
 
+**The saucer.** Over the closed world's ground, along its whole traced path (452 samples):
+- its lowest pass over edited ground is 100.1 m, at 149 s, over the sill;
+- its lowest point anywhere is still 23.4 m, at 175.5 s, over unchanged ground.
+
+From s22's camera, at 149 s it is about 15 degrees above the sill's crest, so "comes over the rim"
+still reads.
+
 ## W3: renders
 
 Batch 1, queued behind the gv3-cut stream's full-film render (the lock was held for 25+ minutes):
