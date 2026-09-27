@@ -8,6 +8,12 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **CI, 19:00: main `983221a9`'s push run.** CPU: 3,556 passed, 1 failed, 212 skipped, 28 needs-assets, 3,800 in
+  all, matching the local count. The one failure is the bolt test again (shard 1, seed 1790548209): 3 failures in 4
+  runs. The local wall-clock case passed on CI. The GPU job is informational and was still running.
+  - Sanitizers 36321265640 finished: main failed (packComet UBSan and a timeout), stage-0/1/5 timed out, and
+    stage-2/3/4 passed. The runs are at capacity; cihealth is rebalancing the partition.
+  - The new data point was passed to cihealth.
 - **MERGED (18:20): main is `983221a9`. ALL 11 ENGINE STREAMS ARE IN MAIN** (navfix: ADR-932-934 and the ADR-931
   amendment), plus the status index.
   - navfix integration suites: CPU 3,799 of 3,800 (the wall-clock case passes alone). GPU 544 cases, 543 passed,
