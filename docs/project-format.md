@@ -261,7 +261,7 @@ The smoothing keys filter whichever of `followNode` and `aimNode` the rig reads,
 gets look-at damping from them too. A rig reading more than 16 s of history (lag plus four of its
 longest constant) is refused at load.
 
-Each key is also a row in the **Cameras** panel: select the camera, and its section shows them
+Each key is also a row in the **Cameras** panel (View menu > Cameras): select the camera, and its section shows them
 under the lens slider, headed "following its subject" (`scene::followControls`). The panel's ranges
 (0-3 s for every time, 0-1 for the lead, 0-10 m for the clearance) always stay inside HIST's 16 s; a
 row that would do nothing on that camera -- a lead with no smoothing, turn smoothing without

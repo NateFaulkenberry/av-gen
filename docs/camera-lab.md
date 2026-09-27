@@ -379,7 +379,7 @@ by frame. The knobs these numbers tune are the follow rig's subject reference (A
 `followSmoothSeconds`, `followVerticalSmoothSeconds`, `followLead`, `followGround`,
 `followHeadingSmoothSeconds`, the soft `followClearance`); ADR-913 records GV3's before and after and
 the values recommended per kind of shot. Every one of them is adjustable in the app: the **Cameras**
-panel, the camera's own section, the rows headed "following its subject" under its lens slider --
+panel (View menu > Cameras), the camera's own section, the rows headed "following its subject" under its lens slider --
 "follow smoothing", "height smoothing", "keep up with the subject", "follow the ground", "follow
 lag", "stay behind as it turns", "turn smoothing", "ground clearance".
 

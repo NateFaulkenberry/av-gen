@@ -110,7 +110,8 @@ not parameters, so the Parameters panel cannot show them, and before this nothin
 nor the lag, clearance or `followLocal` that predate it. `scene::followControls()`, beside the fields
 in `camera_rig.hpp`, is a UI-free table of them (label, units, range, which cameras a row acts on,
 getter and setter); `ControlPanel::drawFollowControls` draws it in the selected camera's section of
-the **Cameras** panel, under its lens slider, headed "following its subject" with the node it follows
+the **Cameras** panel (View menu > Cameras; a camera picked in the viewport is selected there too),
+under its lens slider, headed "following its subject" with the node it follows
 named beneath:
 
 | Cameras panel row | key | range | acts on |

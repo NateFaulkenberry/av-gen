@@ -30,6 +30,7 @@
 #include "scene/composition.hpp"
 #include "scene/follow_reference.hpp"
 #include "signals/signal_bus.hpp"
+#include "support/project_round_trip.hpp"
 #include "world/effects/history_bank.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -1254,6 +1255,22 @@ TEST_CASE("each follow row moves the camera when installed the way the Cameras p
         const scene::CameraRig* rig = held.composition()->cameraDirection().find(2);
         REQUIRE(rig != nullptr);
         CHECK(c.get(*rig) == value);
+        // And the adjustment survives a project save and a reload -- the save writes the whole camera
+        // collection when it differs from the scene file's (ADR-751) -- so what an artist sets in the
+        // panel is what a render of the saved project reads.
+        auto trip = testsupport::saveAndReload(held, dir / "panel-project.json");
+        INFO((trip ? std::string() : trip.error().message));
+        REQUIRE(trip.has_value());
+        CHECK(trip->saved.contains("cameraDirection")); // control: the save did write the edit
+        const scene::CameraRig* reloaded = trip->reloaded->composition()->cameraDirection().find(2);
+        REQUIRE(reloaded != nullptr);
+        CHECK(c.get(*reloaded) == value);
+        // Every knob, not only this row's: a value at its default reads back the same whether or not
+        // it was written, so the prepared rig's non-default knobs are what make this bite every time.
+        for (const scene::FollowControl& any : scene::followControls()) {
+            INFO("after the reload, '" << any.label << "'");
+            CHECK(any.get(*reloaded) == any.get(*rig));
+        }
     }
     fs::remove_all(dir);
 }
