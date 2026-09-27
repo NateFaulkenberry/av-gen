@@ -110,10 +110,12 @@ void CharacterQualityRecorder::closeStop(Track& t, glm::vec2 here) const {
     const double turned = degreesBetween(t.headingIn, out);
     if (turned > 90.0) {
         ++b.turnsOver90;
-    }
-    if (turned > static_cast<double>(thresholds_.reversalDegrees)) {
-        ++b.reversals;
-        // ADR-933: a reversal after a reversal is pacing; anything walked on out of breaks the run.
+        // ADR-933: a stop walked out of back the way it came, after another, is pacing; one walked on
+        // out of breaks the run. Over 90 degrees rather than a reversal's 150: a body that walks
+        // through its turns (ADR-908) and turns right round at a stop leaves it on a curve, and over
+        // the first 1.5 m that measures 116-129 degrees -- GV3's ember, back and forth on a river bank,
+        // turned 121, 172, 116, 173, 129 and 176 degrees at six stops running and made one reversal
+        // run of one.
         if (t.pacingRun == 0) {
             t.pacingFrom = t.pendingStopAt;
         }
@@ -125,6 +127,9 @@ void CharacterQualityRecorder::closeStop(Track& t, glm::vec2 here) const {
         }
     } else {
         t.pacingRun = 0;
+    }
+    if (turned > static_cast<double>(thresholds_.reversalDegrees)) {
+        ++b.reversals;
     }
 }
 

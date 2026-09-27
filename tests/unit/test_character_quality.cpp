@@ -481,13 +481,14 @@ Pose tour(const std::vector<glm::vec2>& points, double t) {
 
 TEST_CASE("walking back and forth between two places is pacing; a round of places is not",
           "[motion][quality][adr933]") {
-    // ADR-933. GV3's ember walked to a river bank and back eight times in 40 s: reversals, one after
-    // another. The run is the pattern; one reversal on its own is a change of mind.
+    // ADR-933. GV3's ember walked to a river bank and back, again and again: stops walked out of back
+    // the way they were walked into, one after another. The run is the pattern; one on its own is a
+    // change of mind.
     const glm::vec2 A(0.0f, 0.0f);
     const glm::vec2 B(10.0f, 0.0f);
-    const glm::vec2 C(0.0f, 10.0f);
+    const glm::vec2 C(-10.0f, 3.0f);
     // A -> B -> A -> B -> A, then on to C. The stops at B (7 s), A (14 s) and B (21 s) are walked out
-    // of the way they were walked into; the one at A at 28 s is walked out of at 90 degrees.
+    // of the way they were walked into; the one at A at 28 s is walked on out of, 17 degrees round.
     const auto pacing = script("pacer", 40.0, [&](double t) { return tour({A, B, A, B, A, C}, t); });
     const auto& p = only(pacing);
     CHECK(p.behaviour.reversals == 3);
@@ -495,14 +496,27 @@ TEST_CASE("walking back and forth between two places is pacing; a round of place
     CHECK(p.behaviour.longestPacingFrom == Approx(7.0).margin(0.05));
     CHECK(p.behaviour.longestPacingSeconds == Approx(14.0).margin(0.05));
 
-    // The control: the same legs round a square. Every stop turns, none reverses, nothing paces.
-    const glm::vec2 D(10.0f, 10.0f);
-    const auto round = script("rounder", 40.0, [&](double t) { return tour({A, B, D, C, A, B}, t); });
+    // Turned back at 120 degrees each time -- what a turnaround measures when the body walks through
+    // it (ADR-908: ember's measured 116-129) -- is pacing too, though it is never a reversal.
+    const glm::vec2 T(5.0f, 8.6602540f);
+    const auto curved = script("curved", 40.0, [&](double t) { return tour({A, B, T, A, B}, t); });
+    CHECK(only(curved).behaviour.reversals == 0);
+    CHECK(only(curved).behaviour.turnsOver90 == 3);
+    CHECK(only(curved).behaviour.longestPacing == 3);
+
+    // The control: the same legs round a pentagon. Every stop turns 72 degrees; none turns back.
+    std::vector<glm::vec2> pentagon;
+    for (int k = 0; k < 6; ++k) {
+        const float a = 1.2566371f * static_cast<float>(k); // 72 degrees a side
+        pentagon.push_back(pentagon.empty() ? A : pentagon.back() + glm::vec2(std::cos(a), std::sin(a)) * 10.0f);
+    }
+    const auto round = script("rounder", 50.0, [&](double t) { return tour(pentagon, t); });
+    CHECK(only(round).behaviour.measuredStops >= 4);
     CHECK(only(round).behaviour.reversals == 0);
     CHECK(only(round).behaviour.longestPacing == 0);
     CHECK(only(round).behaviour.longestPacingSeconds == 0.0);
 
-    // A reversal, a turn, a reversal: two changes of mind with a real walk between them, not a run.
+    // A turn back, a walk on, a turn back: two changes of mind with a real walk between them, not a run.
     const auto broken = script("broken", 40.0, [&](double t) { return tour({A, B, A, C, A, B}, t); });
     CHECK(only(broken).behaviour.reversals == 2);
     CHECK(only(broken).behaviour.longestPacing == 1);

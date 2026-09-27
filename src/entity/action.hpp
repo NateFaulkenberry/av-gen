@@ -392,6 +392,20 @@ public:
         return drained_[static_cast<std::size_t>(authority)];
     }
 
+    // ADR-933: how the list a tier holds is going, before it drains -- for a decider that must know
+    // whether an errand it is about to set aside was getting anywhere. A list's failure is recorded
+    // when it happens (`Drained` says so only once the whole list is over, and a list that is
+    // replaced first never drains), and a `move` that has not got nearer its goal for a while is a
+    // walk that has stalled even if it has not yet given up.
+    struct Standing {
+        std::uint64_t serial = 0;    // the list the tier holds
+        bool failed = false;         // an action in it has failed
+        std::string_view reason;     // the first failure's reason; valid until the next update
+        bool moving = false;         // a `move` is running
+        double stalledSeconds = 0.0; // ...and has not got nearer its goal for this long
+    };
+    [[nodiscard]] Standing standing(Authority authority) const;
+
     void setListener(Listener listener) { listener_ = std::move(listener); }
     // Where an event goes when there is no ActionContext to carry it -- a cancellation raised from
     // outside an update. Borrowed; the caller keeps it alive and names the entity for it, because

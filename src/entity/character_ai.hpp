@@ -394,6 +394,10 @@ struct Option {
     // decider's own habits (walking back to where it just left, standing about) are its own to
     // refuse; an order is not, so a directed option is never discounted for either.
     bool directed = false;
+    // ADR-933: set by the selector on an urgent option whose subject already sent this body
+    // somewhere it failed to get (`DecisionContext::attempts`). Its exemption from ADR-909's habits
+    // was for the first attempt; this one is held to them like anything else.
+    bool retry = false;
     // The terms the score is the sum or product of, largest first by convention. Fixed storage: an
     // option is copied into the selector's list every tick and must not allocate.
     std::array<ScoreFactor, 6> factors{};
@@ -409,6 +413,17 @@ struct Option {
 // back to where it just was -- the owner's "walk to a point, turn round, walk back".
 struct Departure {
     glm::vec2 place{0.0f};
+    double time = 0.0;
+};
+
+// ADR-933: an urgent errand -- a reaction, a flinch -- that did not get where it was going: its walk
+// failed, or was given up stalled. What it was about, where it was going, how near counted as there,
+// and when. While it is remembered, the same subject cannot send the body back to that place, and
+// sends it anywhere else only under the habits every other option keeps.
+struct Attempt {
+    std::uint64_t subject = 0;
+    glm::vec2 place{0.0f};
+    float tolerance = 0.0f;
     double time = 0.0;
 };
 
@@ -463,6 +478,11 @@ struct DecisionContext {
     // The body has stood longer than it is allowed to (`maxStillSeconds`): an option that does not
     // take it anywhere is not on offer until one that does has been chosen.
     bool restless = false;
+    // ADR-933: the urgent errands this body failed at, still remembered (the mind's `failSeconds`).
+    // Applied by the selector: an urgent option keeps its exemption from the habits above for its
+    // first attempt at a subject, and not for a second; and it may not send the body back to where
+    // the first one failed at all. Empty for a decider with no `mind`, which has no urgent options.
+    std::span<const Attempt> attempts;
 };
 
 // Scores options. One instance per *kind* of character, shared across every character of that kind:

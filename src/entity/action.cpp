@@ -436,6 +436,18 @@ std::size_t ActionQueue::routeLeg() const {
     return top < 0 ? 0 : layers_[static_cast<std::size_t>(top)].progress.waypoint;
 }
 
+ActionQueue::Standing ActionQueue::standing(Authority authority) const {
+    const Layer& layer = layers_[static_cast<std::size_t>(authority)];
+    Standing out;
+    out.serial = layer.serial;
+    out.failed = layer.anyFailed;
+    out.reason = layer.failReason;
+    const ActionDesc* action = current(authority);
+    out.moving = action != nullptr && action->kind == ActionKind::Move && layer.started;
+    out.stalledSeconds = out.moving ? layer.progress.sinceProgress : 0.0;
+    return out;
+}
+
 double ActionQueue::elapsed() const {
     const int top = topLayer();
     return top < 0 ? 0.0 : layers_[static_cast<std::size_t>(top)].elapsed;

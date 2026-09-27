@@ -179,11 +179,9 @@ std::uint32_t nameHash(std::string_view name) {
     return h;
 }
 
-// ADR-909: where an option's walk ends, and how close counts as there -- the last `move` to a point
-// in its list, which for an errand of several legs is the far end. False for an option that walks
-// nowhere, or only after a body that moves (a greeting); `goes` says whether the walk leaves the
-// spot the body stands on at all, which a stand-off of a thing already within reach does not.
-bool destinationOf(const Option& o, glm::vec3 here, glm::vec2& end, float& tolerance, bool& goes) {
+} // namespace
+
+bool optionDestination(const Option& o, glm::vec3 here, glm::vec2& end, float& tolerance, bool& goes) {
     goes = false;
     for (auto a = o.actions.rbegin(); a != o.actions.rend(); ++a) {
         if (a->kind != ActionKind::Move) {
@@ -200,8 +198,6 @@ bool destinationOf(const Option& o, glm::vec3 here, glm::vec2& end, float& toler
     }
     return false;
 }
-
-} // namespace
 
 // ---- the pace of an errand (ADR-909) -------------------------------------------------------------
 
@@ -377,8 +373,45 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
     //   * **Standing too long.** When the body is `restless` -- it has stood `maxStillSeconds` --
     //     an option that takes it nowhere is not on offer, so what wins walks.
     //
-    // None of them touches an order (`directed`) or an option with urgency -- a reaction, a flinch
-    // out of someone's way -- which are not habits.
+    // None of them touches an order (`directed`). An option with urgency -- a reaction, a flinch
+    // out of someone's way -- is not a habit either, for its FIRST attempt at its subject (ADR-933):
+    //
+    //   * **Not back where it failed.** An urgent option whose subject already sent the body
+    //     somewhere it did not get -- the walk failed, or was given up stalled (`ctx.attempts`, kept
+    //     by `Decide`) -- and whose walk ends within `loopRadius` (plus the larger of the two arrival
+    //     tolerances) of that place, is not on offer while the failure is remembered. GV3's ember
+    //     heard E5's beam across the river, walked in to its wade limit, stalled, walked back when its
+    //     post pulled harder, and was sent again: walk, stop, turn round, walk back, again and again.
+    //   * **And a second attempt anywhere else is a habit like any other**: the rules below apply to
+    //     it (`Option::retry`). A creature that could not get to something tries another way, or
+    //     not at all; it does not turn round mid-walk for it, or walk straight back to where it set
+    //     out from.
+    //
+    // A first attempt keeps the exemption, so a flinch out of someone's way still happens whatever
+    // the habits would say about where it steps to.
+    if (!ctx.attempts.empty()) {
+        const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
+        for (Option& o : options_) {
+            if (o.score <= 0.0f || o.directed || !(o.urgency > 0.0f) || o.subject == 0) {
+                continue;
+            }
+            glm::vec2 end(0.0f);
+            float tolerance = 0.0f;
+            bool goes = false;
+            const bool named = optionDestination(o, here, end, tolerance, goes);
+            for (const Attempt& a : ctx.attempts) {
+                if (a.subject != o.subject) {
+                    continue;
+                }
+                o.retry = true;
+                if (named && goes && glm::length(end - a.place) < ctx.loopRadius + std::max(tolerance, a.tolerance)) {
+                    o.score = 0.0f;
+                    o.addFactor("tried", 0.0f);
+                    break;
+                }
+            }
+        }
+    }
     const bool looping = ctx.loopSeconds > 0.0;
     const bool walking = looping && ctx.state != nullptr && ctx.state->speed > 0.3f && !current_.empty();
     if (ctx.restless || (looping && (walking || !ctx.departures.empty()))) {
@@ -388,13 +421,13 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
                                       ? glm::vec2(std::sin(ctx.state->yaw), std::cos(ctx.state->yaw))
                                       : glm::vec2(0.0f, 1.0f);
         for (Option& o : options_) {
-            if (o.score <= 0.0f || o.directed || o.urgency > 0.0f) {
+            if (o.score <= 0.0f || o.directed || (o.urgency > 0.0f && !o.retry)) {
                 continue;
             }
             glm::vec2 end(0.0f);
             float tolerance = 0.0f;
             bool goes = false;
-            const bool named = destinationOf(o, here, end, tolerance, goes);
+            const bool named = optionDestination(o, here, end, tolerance, goes);
             if (ctx.restless && !goes) {
                 o.score = 0.0f;
                 o.addFactor("restless", 0.0f);
