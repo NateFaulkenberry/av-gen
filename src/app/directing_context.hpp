@@ -205,9 +205,21 @@ namespace avgen::app {
     // Fingerprints of the content AS INSTALLED, not as compiled. Installing is not the identity:
     // an effect's window start becomes a float parameter (118.645 -> 118.64499...), and a fingerprint
     // of the compiled value would read as a hand edit on the very next revision.
+    //
+    // Except content a person edited by hand, which this revision kept as they left it: it keeps the
+    // fingerprint the plan recorded, so the next revision still sees the edit. Re-taking it here would
+    // adopt the edit as the plan's own, and the revision after next would overwrite it (found by
+    // ADR-924's revision test on a planned route; the same held for every domain).
     directing::Plan stored = compilation.plan;
     const directing::Staging installed = sceneFactsFor(engine).staged;
+    const auto handEdited = [&](const std::string& item) {
+        return std::any_of(compilation.validation.issues.begin(), compilation.validation.issues.end(),
+                           [&](const directing::Issue& i) { return i.code == directing::IssueCode::HandEdited && i.item == item; });
+    };
     for (directing::ContentRef& ref : stored.produced) {
+        if (handEdited(ref.item)) {
+            continue;
+        }
         if (const auto content = directing::contentOf(ref, installed)) {
             ref.fingerprint = directing::fingerprint(*content);
         }
