@@ -692,6 +692,10 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the UFO beams' pulse visible.** When a pulse causes a
   problem, tame it (depth, a peak cap, timing); never delete it. A route the Critic calls inert is to be made
   visible, not dropped.
+- **(2026-09-27) The tiny glowing mushrooms all over Glowmere pulse to the beat, visibly.** The owner asked
+  directly: "can we make those pulse to the beat". It is valley-wide, staggered per layer so it stays organic, and
+  strong enough to read in the wides. It overrides the brief's "not everything pulses to the beat" caution for
+  this layer.
 - **Audio reactivity is the highest priority.** It must be visible and meaningful, not just configured, and not "everything pulses to the beat". Hierarchical (micro/meso/macro), correlated but not identical.
 - **Hero effects throughout,** with different timing and amplitude per hero. Use the small coloured mushrooms: waves, grouped or staggered responses, colour evolving by section.
 - **Subtle continuous wind.**
