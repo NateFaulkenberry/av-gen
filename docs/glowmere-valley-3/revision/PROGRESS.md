@@ -8,6 +8,51 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **15:40: THREE MORE STREAMS DONE.**
+  - **gv3-cut: merged** (`a38487e1`; final `8428c18d`). 73 Director spans; aliens lead 13.1%. Every E1-E5 moment is
+    on screen, and 21 of 22 follow rigs pass the bar on the merged project. Whole-film iteration 2: 0 criticals,
+    composition 0.637 -> 0.763.
+    - **Keep the recorded cut** (`tools/gv3/song_cut.json`); never `--recut` the merged project.
+  - **gv3-look: merged** (`3f281e96`; final `db38085d`). 93/93 routes and 42/42 tracks live on engine-3. The elder's
+    kick is "configured and observed" (drop +12%). The aurora is steady (frame change 6.8% -> 1.4%). The drop is
+    carried by the world with the hue held (2.25-3.03 degrees). Render's values are in `look.BASE`.
+  - The generator parses after both merges: `write_sections` and `install_cut` (cut), and `apply_base(project, scene)`
+    and `apply_motifs(project, scene)` (look).
+  - **navfix: DONE** (`a7774045`). Its CPU suite: 3,793 tests, 3,774 passed, 19 skipped, 0 failed. With go-and-see
+    restored, ember's reversals go 3 -> 0 and its turn-back run 6 -> 2. Abducted animals' unseen walking is 0.
+    - **Integrating** on `integrate/revision` (the merge is textually clean). Building, then the CPU and GPU suites.
+  - **Left: gv3-world** (its closure redone low; last commit 15:21).
+- **OPEN ITEMS for the Phase 3 integration (collected from the hand-backs):**
+  - **GV3 data:**
+    - After navfix is in main, set E5 back to "go and see": `cast.py` `REACTIONS["centrepiece"]` `approach` 250 -> 18.
+    - The moon reads as a flat grey ellipse in 8 shots (E2 included).
+    - Check the horse glow's clipping at 95.3 and s29. The s29 clipping is mostly the saucer beam's core, which
+      rides `audio.rms`.
+    - Shots 29.1 (trees hide the elder behind Vane) and 31.1 (the spire reads weakly) need a render and a look.
+    - Render the whole final cut, then run `trim.py` on its Critic job.
+    - gv3-look's proposals: a bloom threshold pair on s27, the ecology light's colour, rings that read, the aurora
+      tops' wave amplitude 0.55, fan plants at 1080p, and the drop's spores on a whole-film render.
+  - **UI-reach defects (the owner's standing rule), which need engine work:**
+    - a custom treatment's settings cannot be edited in the app;
+    - the scatter layers' wind response (tip, stiffness, mass, sensitivity) is not a parameter;
+    - the aurora's "Audio response" does not switch off the spectrum shape or the glints;
+    - `mind.memory.failSeconds` is JSON-only.
+  - **Engine defects:**
+    - rook walks on the spot for 6.5 s: a `holdPost` range->range publishes 0.5 m/s with no travel (navfix found
+      it; it is not the invisible cows);
+    - `interest` offers destinations across a divide;
+    - a same-region straight line through water wades in;
+    - bloom hero parts are offered as roam targets and fail;
+    - Song Mode's lengths depend on the Director's own camera subject;
+    - the planner maps clap to `onsetMid` without a rate check;
+    - the ecology light ignores the emissive field;
+    - `groundGlow` has no effect.
+  - **Critic:**
+    - its camera model ignores the ADR-911 smoothing;
+    - pixel stability calls steady walker-follows shaky;
+    - it rewards sky flicker;
+    - its float check reads the root;
+    - the adapter's `atRetire` workaround can go now that ADR-934 fixed the trace.
 - **HOUSEKEEPING (15:20), on the owner's answers:**
   - The owner's answers were: "Watch may run GH run commands"; "Only push main, and/or necessary branches, delete
     old branches / work trees".
