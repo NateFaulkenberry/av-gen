@@ -165,6 +165,11 @@ constexpr PhaseRateEntry kPhaseRates[] = {
     {"nodes/*/water/tears/stretch", "", "water.wgsl tearAt: seam stretch of a drifting coordinate", "drift"},
     {"nodes/*/water/tears/direction", "", "water.wgsl tearAt: direction of a drifting coordinate", "drift"},
     {"scene/windDirection", "", "water.wgsl tearAt (ADR-916): seams that follow the wind drift along it by drift * t", {}, false, true},
+    // ADR-938: a scatter layer's flutter rings at its resonance, sqrt(stiffness / mass), times the whole
+    // render time. Neither is modulatable -- a route to one is refused -- so what meets these rows is a
+    // timeline track that keys one.
+    {"nodes/*/scatter/*/sway/stiffness", "", "wind_field.wgsl windBend: flutter at sqrt(stiffness / mass) * t"},
+    {"nodes/*/scatter/*/sway/mass", "", "wind_field.wgsl windBend: flutter at sqrt(stiffness / mass) * t"},
     // particles
     {"particles/*/pulseRate", "", "particles.wgsl pulseGain: phase = renderTime * pulseRate"},
     {"particles/*/pauseRate", "", "particles.wgsl: fract(t * pauseRate + ...)"},
