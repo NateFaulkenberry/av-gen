@@ -45,7 +45,7 @@ Leftover processes from the old session may still be running (suites, renders, t
 | gv3-look | `av-gen-gv3-look` / `gv3/look` | `look.py`, `directives.py`, `reactivity.py`, the water and wind blocks | reactivity installing and tuning (the riser's roll drives the small fungi); see its `phase3/look.md` |
 | gv3-cut | `av-gen-gv3-cut` / `gv3/cut` | `shots.py`, `rig.py`, `cuts.py`, `framing.py`, `review.py`, `install_cut`, `autoDirector` and a new `songcut.py` | **checkpoint `c6e3a646`.** The cut's spans come from the Director (`songcut.py` runs `avgen_song_cut`, records `song_cut.json`, `--recut` adopts a new one): 73 spans, CV 0.53, the riser 4-4-2-2-2-1-1 beats, the drop its own 2-bar shot. Every span authored. Aliens lead 13% (the generator refuses more than 20%). 18 of 22 follow rigs pass the stability bar (first pass: 5 of 16). Next: the it1 render, the Critic jobs, novelty trims (`trim.py`), composition fixes, before/after sheets. See `phase3/cut.md` |
 | gv3-world | `av-gen-gv3-world` / `gv3/world` | `world.py`, `offline.py` | the world edge and `offline.py` behind `--final`; see `phase3/world.md` |
-| gv3-cast | `av-gen-gv3-cast` / `gv3/cast` | `cast.py`, `ufo.py` and the plan | the characters settings and the scout applied; E1–E5 via the plan; the alien float to check; see `phase3/cast.md` |
+| gv3-cast | `av-gen-gv3-cast` / `gv3/cast` | `cast.py`, `ufo.py` and `ufo.plan.json` | **checkpoint `0ff69eea` (WIP, iteration 2 being measured).** `cast.py` carries the characters recipe, the re-homing, the scout (hero radius 4.92 m), and removes the hand-written scenario and horse keys. `ufo.py` compiles E1–E5 with `avgen_cast_trace --plan --save-project` and splices in only the plan's products, because a headless save photographs 745 parameters, clamps rippleScale 5.2 to 4.0 and drops 9. Iteration 1: aliens' longest still stretch 3.2–10.3 s; animals 0 reversals, 5 turns over 90°, 5.2 s on steep ground, 0 s facing uphill. Beats: E1 beam 13.900 s; E2 cross 26.650 s; E3 lift 66.967 s; E5 beam 170.350 s, lift 172.783 s, horse gone 177.717 s. E4 moved to (−69, 6) radius 20 on cow-12 and cow-23, re-trace running. See `phase3/cast.md` |
 
 - Each stream's own notes, `docs/glowmere-valley-3/revision/phase3/<topic>.md`, hold its iterations and next steps.
 - The streams never commit generated project files. After merging, regenerate with `python3 tools/make_glowmere_valley_3.py`.
@@ -56,7 +56,7 @@ Leftover processes from the old session may still be running (suites, renders, t
 **Relaunch prompt for render:** the rules, briefs.md § "render (ADRs 917–919)", and "inspect `git log main..HEAD` and `git status` in `~/Documents/GitHub/av-gen-render`, read `docs/development/render-design-notes.md`, finish, run the suites, and report".
 
 ### 4. What remains, in order
-1. **Finish the engine:** characters into main (above), then render (merge, suites, fast-forward). Then an engine build at the final main for the GV3 streams.
+1. **Finish the engine:** characters into main (above), then render (merge, suites, fast-forward). Launch the two engine fixes in §5, navigation regions with the loop veto and the stride-bob excess, as focused streams from main. Merge them through `integrate/revision`, then build the engine at the final main for the GV3 streams.
 2. **Finish the Phase 3 streams**, each with its evaluator evidence.
 3. **Merge Phase 3:** merge each `gv3/<topic>` into `gv3/production` and regenerate the project.
    - Resolve cross-stream issues. For example, gv3-cut frames E1–E5 at the beat times gv3-cast measures, and the Song Mode events come from gv3-cast's trace.
@@ -68,6 +68,13 @@ Leftover processes from the old session may still be running (suites, renders, t
 6. **The deliverables** (brief DELIVERABLES and §18): the revision report, before/after evidence per category, and the Director's self-critique. Review material goes in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/`.
 
 ### 5. Known open issues
+- **ENGINE DEFECT, which breaks the owner's hard requirement (walk → stop → 180° → back).** Found by gv3-cast; the next engine fix to launch.
+  - `NavigatorPath::route` (`src/entity/action.cpp`) ignores the navigation grid's connected regions, so a goal across the river reads "Ready".
+  - After hearing E5's beam, ember paced the river bank walk → stop → 180° → back 8 times in 40 s (176–216 s).
+  - Urgent reactions are exempt from ADR-909's loop veto.
+  - It is worked round in GV3's data for now (E5's reaction is "stop and watch where you stand"). The engine needs: routes that respect connected regions (a goal in another region gets the nearest reachable point, or is refused), and the loop veto applying to urgent reactions. Each needs a control arm.
+- **ENGINE DEFECT (the alien float):** the stride bob. rook and tide match ADR-895's formula; ember and vane rise about 2.4× more (walk p90 0.35 m, max 0.45–0.71 m). The cause of the extra factor is not found; gv3-cast ran a bounce-0 control. Fix it in the engine, not in data.
+- **A headless save photographs the run** (see the memory note on project vs scene state). On GV3 it wrote 745 parameters, clamped rippleScale 5.2 to 4.0 and dropped 9, so `ufo.py` splices in only the plan's products. Never adopt a headless-saved GV3 project wholesale.
 - **Four aliens float 0.2–0.5 m while walking** (measured on engine `040d6644`); gv3-cast is checking it on engine-2. If it is an engine defect, it needs an engine fix, not data.
 - **E4 cannot play on the tuned cast** (gv3-cut measured it): the re-homed cows graze 35–40 m north of E4's region (−55, 40), radius 30. Move the region to about (−70, 8), or name cow-12 and cow-23 (gv3-cast was told).
 - **E1–E4 were off screen** in the first-pass cut; gv3-cut frames them. Check `framing[].on_screen` in the Critic's report.
