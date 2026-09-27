@@ -1,6 +1,6 @@
 # GV3 revision: progress and state
 
-This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:10, at a session handoff.
+This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:20, at a session handoff.
 
 ## CURRENT STATE: SESSION HANDOFF (2026-09-27 12:00). Read this before anything else
 This section supersedes every dated note below it, which are history. The session that wrote it is
@@ -32,7 +32,7 @@ Leftover processes from the old session may still be running (suites, renders, t
   - **The CPU suite was running at handoff** (12:07: 27 of about 3,760 tests done, 0 failed; ctest runs the longest first). Log: `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/004befa7-093f-41d0-b2da-3d5e53a50a3a/scratchpad/coord-integrate5-cpu-full.log`. It may be gone with the old session's scratchpad; if so, re-run `ctest --test-dir build/release -L unit -j 4` there.
   - **If it passes:** `git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision` (check that the owner's checkout is clean and on `main`), then merge main into `gv3/production`.
   - **Expected, harmless:** "Glowmere Valley 2 from several viewpoints" is intermittent, and the event-driven agent test's 180 s wall-clock limit fails under heavy load (it passes alone).
-- **Render** (`agent/render` in `av-gen-render`, the last engine stream): head `45d5e02f`, clean. ADR-917–919 are committed and measured on GV3 (`8e25b8d1`, `bfcc380b`: GV3's density arc runs 0.015–0.036, so its automatic fog distance is 208–500 m). Its final suites and report were pending; it had not answered the checkpoint request at 12:07. When done, merge it into `integrate/revision`, build, run the full suites, and fast-forward main. It merged main `3f720bfa`, so expect conflicts with setpieces and characters.
+- **Render** (`agent/render` in `av-gen-render`, the last engine stream) is **done: `39388364`, report in [stream-reports/render.md](stream-reports/render.md).** CPU 3,686 of 3,706 passed (the 1 failure is the load-sensitive 180 s agent test, which passes alone). **Its full GPU suite on the final code has not run.** Run `AVGEN_AGENT=render tools/gpu-lock.sh build/render-gpu-full.sh full-3` in `av-gen-render` when the lock is free. Then merge it into `integrate/revision` after characters, build, run the full suites, and fast-forward main. **For GV3** (preview and final alike): `post/referenceHeight` 1080, `post/motionBlur/maxRadius` 60, `post/motionBlur/samples` 32, `scene/fogSky` 1.0, `scene/fogSkyDistance` 0. Keep bloom levels 6, stretch 10.386 and tile 20. **The 4K ×2 final costs about 0.34 s a frame, about 77–80 minutes for the film.** **Defect:** `avgen --render` renders bare sky and exits 0 when the scene fails to load, so check every GV3 render log for scene-load warnings. When done, merge it into `integrate/revision`, build, run the full suites, and fast-forward main. It merged main `3f720bfa`, so expect conflicts with setpieces and characters.
 - **Two shared engine builds for GV3 worktrees** (each worktree symlinks `build/release` to one):
   - `~/Documents/GitHub/av-gen-engine` = `040d6644`;
   - `~/Documents/GitHub/av-gen-engine-2` = `ec515c8b` (with characters). Both are `BUILD-READY`.
