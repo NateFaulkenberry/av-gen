@@ -95,6 +95,12 @@ Targeted tests on the three-stream build all pass: routes 57, signals and emissi
 **MERGED (07:30): main is `3f720bfa`,** now also with water (ADR-914–916). The branch already contained main, so the merged tree is the one its suites ran on: GPU 532 cases, 531 passed, 1 skipped; CPU 3,699 tests, all passing except a wall-clock limit under load that passed alone. Report in [stream-reports/water.md](stream-reports/water.md). Main was merged into `gv3/production` (`784061f7`). **7 of 10 streams are merged.**
 - **Launched: the render finisher** (`abb3faba9bb55470e`). It merges main first. Running: characters (on its last suites), setpieces, render.
 
+**Characters is done, but held (08:05).** Report in [stream-reports/characters.md](stream-reports/characters.md); recipe in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/characters-work/`.
+- **On GV3 with its settings:** animals have 0 reversals (from 27) and 5 s on steep ground (from 480 s); aliens' longest stand is 3–7 s (sage 14.8 s, from 67 s).
+- **One CPU failure, #1712.** A performance teleports rook 21.8 m, and ADR-911's follow filter smooths across the jump. That is a latent camera defect the stream exposed.
+- **A fix agent** (`a63c21b31dd7a0f6b`) works on `agent/characters` itself: it merges main `3f720bfa`, then makes the follow reference restart when a subject is teleported, with an ADR-911 amendment. **Merge characters only after that passes the full suites.**
+- Running: setpieces, render, followfix.
+
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
 2. emission finisher + camera finisher.
