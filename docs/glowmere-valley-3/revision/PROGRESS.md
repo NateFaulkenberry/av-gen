@@ -8,6 +8,23 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **CI WATCHER, interim (16:00).** Its notes are `ci-watch-notes.md` in the coordinator's scratchpad.
+  - **Clean:** main `ec515c8b`'s push run 36335160280: CPU 3,538 passed, 0 failed, 212 skipped, 28 needs-assets
+    (all in the exceptions list), 38 min. The GPU job is informational and crashed as usual on the hosted VM.
+  - **Three pre-existing defects**, none caused by today's work and none affecting a GV3 frame. **Queued as a
+    "cihealth" stream**, to start when the navfix integration suite frees the CPU:
+    1. **An order-dependent play/scrub failure.** "a triggered Lightning and Discharge on a moving owner are the same
+       played and scrubbed" (`test_bolt_path.cpp:565`) failed the old main's nightly (run 36318924797, shard 2,
+       seed 1790512056). It passes alone, even with that seed, so global state is leaking between tests. The code
+       is unchanged on today's main. Bisect by test order, not in isolation.
+    2. **UBSan: an invalid `bool` (240) read** in `packComet` (`src/world/atmospherics.cpp:698`,
+       `c.sparkle.enabled`) while GV2 multicam is evaluated (Sanitizers 36241405408). Neither GV2 multicam nor GV3
+       has a comet, so an unused slot is probably packed from uninitialised memory. It is still present on
+       today's main.
+    3. **Sanitizer parts time out.** stage-0/1/2 are killed at the 330-minute ceiling, and today's new `[stage]` tests
+       (`test_setpiece_templates.cpp`, `test_staging.cpp`) will make it worse. `sanitizers.yml` needs another
+       part, a higher ceiling, or those files carved out.
+  - Still being watched: main `876a11e2`'s push run 36341601980, and Sanitizers 36321265640.
 - **15:40, on the owner's "best recommendations by you":**
   - **The Critic daemon was restarted** on creative-critic `f1b5e5b`, which has every fix: the ember-cap alias, the
     camera guard, the scout alias and engine-3. It was idle when restarted; the new pid is 31482.
