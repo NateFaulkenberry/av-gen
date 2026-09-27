@@ -273,20 +273,72 @@ scratchpad's `world/mirror.py`.
 Verified in the generated project: every value lands. The 17 shadow-range keys fall exactly on the
 installed cut times, which already include the one-frame lead.
 
-## F2: 4K ranges, the log lines and the cost (not yet run)
+## F2: 4K ranges, the log lines, the cost (engine ec515c8b)
 
-Batch `build/gv3w/k4jobs.txt` is 3840x2160 x2, prores422, `AVGEN_SHADOW_STATS=1`:
-- v1final at 76-78 s (s14), 108-110 s (s18) and 178-180 s (s33);
-- v1, the preview configuration forced to 4K, at 76-78 s, as the cost baseline.
+All ranges are 3840x2160 x2, ProRes 422, with `AVGEN_SHADOW_STATS=1`, rendered under the GPU lock:
+- v2afinal: the closed world with `offline.py` as committed;
+- v2a: the preview configuration forced to the same size, the cost baseline.
 
-The lines to read:
-- "render scale 2.00: scene target 7680x4320 -> output 3840x2160";
-- "LOD rungs kept";
-- "rate-limited 0";
-- the shadow lines' range 160/300 m and 4 cascades.
+**The log lines render-post.md names**:
 
-For "no pop-in": the procedural LOD ladder switches rungs with hysteresis, by projected size, and
-does not cross-fade. Check frame differences in the far field of s14's truck.
+| Line | v2afinal | Verdict |
+|---|---|---|
+| render scale | "render scale 2.00: scene target 7680x4320 -> output 3840x2160" | as specified |
+| limits | "procedural distance cull off, **LOD rungs kept**, rig pose rate off, entity behaviour bands off" | as specified (ADR-191's offline default) |
+| shadows | "4 view(s) (4 cascade) at 4096x4096; range 300.00 m, fade from 246.00 m, coarsest texel 0.0796 m" on s14; 0.104 m on s18; 0.139 m on s33 | 4 cascades; 300 m reached on the wides. The preview configuration logs "range 77.28 m" |
+| entities | "full 19, coarse 0, skipped 0" | every body at full rate |
+| rigs | "posed 17, rate-limited 17" | **cannot say 0 on a range render** (below) |
+
+**Rigs.** The counter is the worst frame of the job. The job's first frame re-evaluates every rig at
+the time the warm-up tick already posed, so it holds, and a range render always reports
+"rate-limited N" once, whatever `updateHz` is. The 1080p still shows it bare: its one frame reported
+"posed 0, rate-limited 17". With the rate ladder lifted, `SkinnedRig::rateFor(0)` is `updateHz` 0,
+and `sampleTime` then advances every frame (`animation.cpp`). So the rigs are posed every frame, but
+this counter cannot show it. render-post's "rate-limited 0" is not an observable check for a range.
+
+**Pop-in.** In s14's slow truck, I measured the frame-to-frame change of the far field, with the elder
+masked out:
+- final: median 0.529, p95 0.850;
+- preview configuration: median 0.573, p95 1.003;
+- spikes: both have them on the same frames (38, 52, 66, 68, 93: the beat's pulses), none in the
+  final alone.
+
+No pop-in; the far field is steadier with the LOD ladder kept.
+
+**Cost** (render time per frame; the whole job adds 12-20 s of load):
+
+| Range | Configuration | s/frame | Peak memory footprint |
+|---|---|---|---|
+| s14 wide, 76-78 s | final | 1.516 | 9.17 GiB |
+| s18 grove follow, 108-110 s | final | 1.863 | 9.11 GiB |
+| s33 drop, 178-180 s | final | 1.638 | 9.37 GiB |
+| s14 wide, 76-78 s | preview configuration at 4K | 0.524 | 9.08 GiB |
+
+The final is GPU-bound: the render thread waited 145-207 s of each range for the GPU. At its mean,
+1.67 s per frame, the whole film (13,530 frames) is **about 6.3 hours**. The preview configuration at
+4K would be about 2.0 hours, which is 3.4x the first pass's 1080p x2 final (152 ms per frame) for 4x
+the pixels.
+
+**The fog march is not a quality setting in this scene: it halves the picture.** The same instant
+of s14, in the closed world at 1080p:
+
+| Region mean luma | no march | 220 m march, scattering 0.25 | 0.5 | 1.0 |
+|---|---|---|---|---|
+| whole frame | 51.8 | 26.0 | 28.3 | 33.0 |
+| walls | 45 | 23 | 25 | 29 |
+| mid valley | 58.9 | 21.1 | 24.4 | 31.3 |
+
+The Critic, comparing the two 4K clips (`cmp_1a0e3c773be264b12`, session gv3-world, track final-4k):
+- mean luma 0.202 -> 0.109 (-46%);
+- contrast -22%;
+- mean delta E 16, with 97% of pixels changed by more than 5;
+- jitter +27%, shimmer +11%.
+
+**Why.** The closed form (the previews) fills distance with `fogColor`, which is navy:
+`lit * T + fogColor * (1 - T)`. The march fills its 220 m with in-scattered moonlight instead, which is
+far darker. It also runs over the sky, which the closed form never fogs (`applyFog` is called for
+surfaces only). Raising the scattering cannot match the previews without turning the air the moon's
+colour.
 
 ## Open questions
 - **The alien divergence (W2b):** find the coupling before this merges. If it is the nav grid's
