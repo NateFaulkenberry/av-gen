@@ -121,6 +121,15 @@ REACTION_DROPS = {
     # saucer's own beam carries the reactive beam, close, in E5; the scout's reads as an event by its
     # shape and its motion. As copies they also put two beams on the same four sources.
     "scout-beam": (None, "a far craft's beam reads by its shape; the saucer's beam carries the music in E5"),
+    # The saucer's beam in E5 does not carry the music either. Judged whole (gv3-int r1b, the routes
+    # mapped to their bodies), none of its four links shows a response over 1,015 on-screen frames: bass ->
+    # rate z 1.0, level -> emission z 0.1, onset -> size z 0.1, low-mid -> speed z 1.2. What the level link
+    # does do is brighten it: +1.5 on the set piece's own brightness of 0.7, so through the loud riser the
+    # beam ran at two to three times its base, and 95.3's horse, seen through it, was a pale ghost in a
+    # clipped cyan fog (12.7% of the frame). The beam's brightness, density and width are the set piece's
+    # own, steady ("beam brightness (x)" in the Director panel's UFO set-piece rows); the riser's music is
+    # carried by the cutting, the roll on the fungi and the elder.
+    "visitor-beam": (None, "no visible response in the film; its level link overexposed the riser's beam"),
     # An idle alien swaying with the low-mid reads as dancing, which the aliens' behaviour (brief
     # section 10) does not ask for, and no framing the cut gives tide shows it (the evaluator, before
     # and after gv3-cast). The aliens keep their other musical links, on what they decide rather than

@@ -102,6 +102,15 @@ BASE = {
     # and no cue keys it, so halving it halves the peak and keeps the lift -- when it rises, how long it
     # holds, its colour.
     "fx/horse-light/gain": 0.5,
+    # One moon. The sky's rotation is the HDRI's, and GV3 has no HDRI: the source (GV2) restated -0.568 rad
+    # over the scene's 0. The visible procedural sky is looked up through it (sky_background.wgsl,
+    # envRotate), but the skybox's crisp moon is drawn at the sky's own sun direction, un-rotated
+    # (skybox.wgsl), so the film had two moons 32.5 deg apart: both in frame in 17.1, 59.1 and 93.1, the soft
+    # one alone in seven more shots -- 123 px behind the rising horse in 95.3 (gv3-int r1, moon.py). At 0 the
+    # soft disc and its glow sit under the crisp one. What else reads the rotation (the water's and glossy
+    # surfaces' reflections of the sky: water.wgsl, pbr_shade.wgsl) reads the same sky, so its moon moves
+    # with it; GV3 has no HDRI and `env/lightFromEnvironment` is off, so nothing is lit differently.
+    "env/rotation": 0.0,
 }
 
 # Effects the film does not use, and why.
