@@ -349,8 +349,9 @@ struct FrameUniforms {
     glm::vec4 starsB{0.0f}; // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
     glm::vec4 starsC{0.0f}; // x = band, y = band tilt, z = daylight hiding, w = seconds (wrapped)
     // ADR-918: the surface fog's colour from the sky. x = `Environment::fogSky` (0 = the constant
-    // fog colour, and the shader does not touch the sky map), yzw = 0. Appended last, for the reason
-    // every block above was.
+    // fog colour, and the shader does not touch the sky map), y = the sky is drawn behind the world,
+    // z = the distance at which the fog is fully the sky's colour (metres, > 0), w = 0. Appended
+    // last, for the reason every block above was.
     glm::vec4 fogSky{0.0f};
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 8x144 surface waves. The middle

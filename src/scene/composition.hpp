@@ -1692,6 +1692,7 @@ private:
     // for its omission was tested and turned out to be false about its own code.
     params::Parameter<float>* fogHeightAmount_ = nullptr;
     params::Parameter<float>* fogSky_ = nullptr; // ADR-918
+    params::Parameter<float>* fogSkyDistance_ = nullptr; // ADR-918: where the fog is all sky colour
     params::Parameter<float>* volumeJitter_ = nullptr; // ADR-461
     // How far the directional shadow cascades reach; 0 = ADR-112's automatic range. See
     // `Environment::shadowRange` for why a scene is allowed an opinion about this one.

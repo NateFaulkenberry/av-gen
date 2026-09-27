@@ -261,3 +261,47 @@ TEST_CASE("the fog's sky map is a pure function of the frame", "[gpu][fog][fogsk
     CHECK(std::memcmp(first.map.rgba.data(), second.map.rgba.data(), first.map.rgba.size() * sizeof(float)) == 0);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("near air keeps the fog colour, and the sky's colour takes over with distance", "[gpu][fog][fogsky]") {
+    // The first GV3 render with fog from the sky lit its ground mist, a few metres from the camera,
+    // with the horizon's brightness: the fog took the sky's radiance at every distance. It now blends
+    // towards the sky with distance, fully at `fogSkyDistance` (0 = automatic: three of the fog's
+    // extinction lengths, 300 m in this air). A dark wall 20 m out sits in the same frame as the far
+    // ridge; the control arm is the sky's colour at every distance (a 1 m distance), which is what
+    // the fog did before the blend -- and the parameter reaching the output, both in one arm.
+    auto ctx = testsupport::gpuContextOrSkip();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto shot = [&](float fogSky, float distance) {
+        scene::Scene s = ridgeShot(true);
+        const auto mesh = s.addMesh(scene::makeCube(1.0f));
+        auto& wall = s.addEntity("near wall", mesh);
+        wall.transform.position = {0.0f, 3.0f, -20.0f}; // rows 0.80-0.90 of the frame, full width
+        wall.transform.scale = {40.0f, 2.0f, 0.5f};
+        wall.material.baseColor = glm::vec3(0.02f);
+        wall.material.roughness = 1.0f;
+        s.environment.fogSky = fogSky;
+        s.environment.fogSkyDistance = distance;
+        return render(*ctx, shaders, s);
+    };
+    const Shot constant = shot(0.0f, 0.0f);
+    const Shot automatic = shot(1.0f, 0.0f);
+    const Shot everywhere = shot(1.0f, 1.0f); // the control: the sky's colour at every distance
+    constexpr double kNearTop = 0.82;
+    constexpr double kNearBottom = 0.88;
+    const double nearAutomatic = bandDifference(automatic.image, constant.image, kNearTop, kNearBottom);
+    const double nearEverywhere = bandDifference(everywhere.image, constant.image, kNearTop, kNearBottom);
+    const double farAutomatic = bandDifference(automatic.image, everywhere.image, kRidgeTop, kRidgeBottom);
+    WARN("the near wall against the constant colour: automatic distance " << nearAutomatic
+                                                                          << ", the sky's colour everywhere "
+                                                                          << nearEverywhere
+                                                                          << "; the far ridge, automatic against everywhere "
+                                                                          << farAutomatic);
+    // At 20 m of a 300 m ramp the sky has smoothstep(0.067) = 1.3% of the fog's colour, so the wall
+    // is nearly the constant-colour wall; everywhere, it is the sky's -- the wash.
+    CHECK(nearEverywhere > 0.5);
+    CHECK(nearAutomatic < 0.05 * nearEverywhere);
+    // And the far ridge, where the ramp has arrived, is the everywhere arm's to within a few
+    // thousandths: the rim still dissolves into the sky behind it.
+    CHECK(farAutomatic < 0.01);
+    CHECK(ctx->errorCount() == 0);
+}

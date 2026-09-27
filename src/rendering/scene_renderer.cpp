@@ -3043,7 +3043,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         drawFogSky_ = amount > 0.0f && frame.fogParams.w > 0.0f && fogSkyPipeline_ != nullptr;
         const bool skyDrawn =
             scene::skyBackgroundFor(scene.environment, ibl, skyIbl) != scene::SkyBackground::FlatColour;
-        frame.fogSky = glm::vec4(drawFogSky_ ? amount : 0.0f, skyDrawn ? 1.0f : 0.0f, 0.0f, 0.0f);
+        // z: the distance at which the fog is fully the sky's colour -- the scene's, or three of
+        // the fog's extinction lengths (a level ray 95% fog there).
+        const float extinction = frame.fogParams.w;
+        const float automatic = extinction > 0.0f ? 3.0f / extinction : 0.0f;
+        const float fullAt = scene.environment.fogSkyDistance > 0.0f ? scene.environment.fogSkyDistance : automatic;
+        frame.fogSky = glm::vec4(drawFogSky_ ? amount : 0.0f, skyDrawn ? 1.0f : 0.0f, std::max(fullAt, 1e-3f), 0.0f);
         stats_.fogSkyMap = drawFogSky_;
     }
     // Effect Library Wave 2: the Stars effect's field. All zero with no live instance, which the

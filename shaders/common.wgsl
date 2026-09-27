@@ -156,7 +156,8 @@ struct FrameUniforms {
     starsB: vec4<f32>,              // x = colour spread, y = twinkle, z = twinkle rate, w = horizon fade
     starsC: vec4<f32>,              // x = band, y = band tilt, z = daylight hiding, w = seconds
     // ADR-918: x = how much of the surface fog's colour is the sky's radiance along the ray
-    // (0 = the constant fogParams.rgb, and `fogSkyTex` is never read), yzw = 0. Mirrors FrameUniforms.
+    // (0 = the constant fogParams.rgb, and `fogSkyTex` is never read), y = the sky is drawn behind
+    // the world, z = the distance at which the fog is fully the sky's colour. Mirrors FrameUniforms.
     fogSky: vec4<f32>,
 };
 
@@ -635,13 +636,16 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
         depth = depth * (1.0 + horizon * (start + dist) * 0.0005);
     }
     let f = exp(-depth);
-    // ADR-918: aerial perspective. The colour the air fades towards is the sky's own radiance in the
-    // ray's direction, as far as `fogSky` says -- so a far ridge dissolves into the sky behind it,
-    // aurora and all, instead of fading to one colour. At 0 the map is never read and this is the
-    // constant-colour fog every scene had before, to the bit.
+    // ADR-918: aerial perspective. The colour the air fades towards becomes the sky's own radiance in
+    // the ray's direction with distance, as far as `fogSky` says -- fully so at `frame.fogSky.z` and
+    // beyond -- so a far ridge dissolves into the sky behind it, aurora and all, while the air near
+    // the camera keeps the fog colour it was tuned with. Taking the sky's colour at every distance
+    // lit a few metres of GV3's ground mist with the horizon's brightness. At 0 the map is never read
+    // and this is the constant-colour fog every scene had before, to the bit.
     var fogColour = frame.fogParams.rgb;
     if (frame.fogSky.x > 0.0) {
-        fogColour = mix(fogColour, fogSkyRadiance(worldPos - frame.cameraPos.xyz), frame.fogSky.x);
+        let towardsSky = smoothstep(0.0, frame.fogSky.z, dist);
+        fogColour = mix(fogColour, fogSkyRadiance(worldPos - frame.cameraPos.xyz), frame.fogSky.x * towardsSky);
     }
     return mix(fogColour, color, f);
 }

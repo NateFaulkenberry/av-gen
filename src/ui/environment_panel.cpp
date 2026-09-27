@@ -111,6 +111,8 @@ void drawEnvironmentPanel(app::Engine& engine) {
         slider(engine, "scene/fogSky", "Fog takes the sky's colour", "%.2f");
         if (params::IParameter* p = engine.params().find("scene/fogSky"); p != nullptr && p->baseComponent(0) > 0.0f) {
             ImGui::TextColored(kMuted, "  the far distance fades into the sky behind it, aurora included");
+            // Where it has become the sky: nearer air keeps the fog colour. 0 is automatic.
+            slider(engine, "scene/fogSkyDistance", "  ...all sky colour from", "%.0f m (0 = where the fog is thick)");
         }
         slider(engine, "scene/fogHeight", "Fog height", "%.1f m");
         slider(engine, "scene/fogHeightFalloff", "Horizon falloff", "%.2f");

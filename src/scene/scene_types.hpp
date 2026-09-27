@@ -581,6 +581,14 @@ struct Environment {
     // holds the horizon's own radiance: looking down into a valley, the air between is lit by the
     // sky, not by the ground colour the sky draws beneath its horizon.
     float fogSky = 0.0f;
+    // ...and HOW FAR AWAY the fog is fully the sky's colour, in metres. Nearer air keeps `fogColor`,
+    // blending smoothly towards the sky's radiance with distance (`smoothstep(0, distance, d)`), the
+    // shape production engines use for directional in-scattering: the far rim matches the sky
+    // behind it, while ground mist in front of the camera stays the colour it was tuned as instead of
+    // glowing with the horizon's brightness. 0 (the default) is automatic: three of the fog's own
+    // extinction lengths, where a level ray through the base density is 95% fog -- which is where a
+    // far ridge would otherwise have been a cut-out.
+    float fogSkyDistance = 0.0f;
     // ADR-058: how much of the volumetric's mist layer the *surface* fog sees. At 0 the distance
     // above is uniform, which is what it has always been; at 1 the view ray is integrated through
     // the same flat-topped layer the volumetric marches (uniform up to `fogHeight`, thinning by
