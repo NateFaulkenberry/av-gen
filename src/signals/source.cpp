@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <numbers>
 #include <string_view>
@@ -84,6 +85,8 @@ constexpr std::array<EnumName<LfoShape>, 5> kShapeNames{{{LfoShape::Sine, "sine"
 constexpr std::array<EnumName<KeyInterpolation>, 3> kInterpNames{{{KeyInterpolation::Step, "step"},
                                                                   {KeyInterpolation::Linear, "linear"},
                                                                   {KeyInterpolation::Smooth, "smooth"}}};
+constexpr std::array<EnumName<TimelineMode>, 2> kTimelineModeNames{
+    {{TimelineMode::Value, "value"}, {TimelineMode::Event, "event"}}};
 
 template <typename E, std::size_t N>
 std::string_view enumToString(const std::array<EnumName<E>, N>& table, E value) {
@@ -202,14 +205,18 @@ void LfoSource::detach(ParameterSet& params) {
 }
 
 void LfoSource::update(SignalBus& bus, const SourceContext& context) {
+    sample(bus, context);
+}
+
+void LfoSource::sample(SignalBus& bus, const SourceContext& context) const {
     if (rate_ == nullptr) {
         return;
     }
     const auto offset = static_cast<double>(phase_->value());
     double position = 0.0;
     if (beatSync_->value() && context.tempoBpm > 0.0f) {
-        const double beats = static_cast<double>(context.beatCount) + static_cast<double>(context.beatPhase);
-        position = beats / static_cast<double>(std::max(beatsPerCycle_->value(), 0.25f)) + offset;
+        // ADR-896: the musical position, so a cycle of beatsPerBar beats begins on a downbeat.
+        position = context.musicalBeats / static_cast<double>(std::max(beatsPerCycle_->value(), 0.25f)) + offset;
     } else {
         position = context.time.renderTime * static_cast<double>(rate_->value()) + offset;
     }
@@ -431,6 +438,10 @@ void NoiseSource::detach(ParameterSet& params) {
 }
 
 void NoiseSource::update(SignalBus& bus, const SourceContext& context) {
+    sample(bus, context);
+}
+
+void NoiseSource::sample(SignalBus& bus, const SourceContext& context) const {
     if (rate_ == nullptr) {
         return;
     }
@@ -568,7 +579,11 @@ TimelineSource::TimelineSource(std::string name)
     : Source(std::move(name)) {}
 
 void TimelineSource::attach(SignalBus& bus, ParameterSet& params) {
-    output_ = bus.declare("timeline." + name_, 0.0f, 1.0f);
+    const bool event = mode_ == TimelineMode::Event;
+    output_ = bus.declare("timeline." + name_, 0.0f, 1.0f, event);
+    // `declare` keeps the kind a name was first declared with; a source whose mode has changed since
+    // (a reload, an edit) re-states it, so everything that asks the bus what an event is agrees.
+    bus.setEventKind(output_, event);
     const std::string prefix = parameterPrefix();
     offset_ = addFloat(params, prefix + "offset", 0.0f, -3600.0f, 3600.0f, -60.0f, 60.0f);
     scale_ = addFloat(params, prefix + "scale", 1.0f, 0.01f, 100.0f);
@@ -579,13 +594,170 @@ void TimelineSource::detach(ParameterSet& params) {
     removeParam(params, scale_);
 }
 
-void TimelineSource::update(SignalBus& bus, const SourceContext& context) {
+double TimelineSource::sourceTime(double pieceTime) const {
+    const double offset = offset_ != nullptr ? static_cast<double>(offset_->value()) : 0.0;
+    const double scale = scale_ != nullptr ? static_cast<double>(scale_->value()) : 1.0;
+    return (pieceTime + offset) * scale;
+}
+
+void TimelineSource::publish(SignalBus& bus, const SourceContext& context, bool inclusive) const {
     if (offset_ == nullptr) {
         return;
     }
-    const double time = (context.time.renderTime + static_cast<double>(offset_->value())) *
-                        static_cast<double>(scale_->value());
-    bus.set(output_, evaluate(time));
+    const double to = sourceTime(context.time.renderTime);
+    if (mode_ == TimelineMode::Value) {
+        bus.set(output_, evaluate(to));
+        return;
+    }
+    // ADR-900: a hit fires on the frame whose interval (previous instant, this instant] holds it. A
+    // frame with no interval (dt = 0) is the first after a reset, where the instant itself counts.
+    const double from = sourceTime(context.time.renderTime - context.time.deltaTime);
+    const auto hit = hitBetween(from, to, inclusive && !(context.time.deltaTime > 0.0));
+    bus.setEvent(output_, hit.has_value(), hit.value_or(0.0f));
+}
+
+void TimelineSource::update(SignalBus& bus, const SourceContext& context) {
+    publish(bus, context, fresh_);
+    fresh_ = false;
+}
+
+void TimelineSource::sample(SignalBus& bus, const SourceContext& context) const {
+    // A replay's one frame without an interval is its first (step 0, dt = 0), which is a fresh start.
+    publish(bus, context, true);
+}
+
+std::optional<float> TimelineSource::hitBetween(double from, double to, bool inclusive) const {
+    if (keys_.empty()) {
+        return std::nullopt;
+    }
+    constexpr double kEps = 1e-9;
+    std::optional<float> best;
+    // Keys with time in (a, b], or [a, b] when `closedLow`; only a positive value is a hit.
+    const auto scan = [&](double a, double b, bool closedLow) {
+        auto it = std::lower_bound(keys_.begin(), keys_.end(), a - kEps,
+                                   [](const Keyframe& k, double t) { return k.time < t; });
+        for (; it != keys_.end() && it->time <= b + kEps; ++it) {
+            if (!closedLow && it->time <= a + kEps) {
+                continue;
+            }
+            if (it->value > 0.0f) {
+                best = best ? std::max(*best, it->value) : it->value;
+            }
+        }
+    };
+    const bool instant = !(to > from);
+    if (instant && !inclusive) {
+        return std::nullopt;
+    }
+    if (loopLength_ <= 0.0) {
+        if (instant) {
+            scan(to, to, true);
+        } else {
+            scan(from, to, false);
+        }
+        return best;
+    }
+    const double length = loopLength_;
+    const auto local = [length](double t) {
+        const double r = std::fmod(t, length);
+        return r < 0.0 ? r + length : r;
+    };
+    if (instant) {
+        scan(local(to), local(to), true);
+        return best;
+    }
+    const double c0 = std::floor(from / length);
+    const double c1 = std::floor(to / length);
+    if (c1 - c0 >= 2.0) {
+        // An interval longer than a whole loop crosses every hit in it at least once.
+        scan(0.0, length, true);
+        return best;
+    }
+    for (double c = c0; c <= c1; c += 1.0) {
+        const double start = c * length;
+        const bool first = c == c0;
+        const double a = first ? from - start : 0.0;
+        const double b = std::min(to, start + length) - start;
+        if (b >= a) {
+            scan(a, b, !first);
+        }
+    }
+    return best;
+}
+
+std::vector<std::pair<double, double>> TimelineSource::positiveSpans(double start, double end) const {
+    std::vector<std::pair<double, double>> spans;
+    if (keys_.empty() || !(end > start)) {
+        return spans;
+    }
+    const double scale = scale_ != nullptr ? static_cast<double>(scale_->value()) : 1.0;
+    const double offset = offset_ != nullptr ? static_cast<double>(offset_->value()) : 0.0;
+    const auto toPiece = [&](double s) { return s / scale - offset; };
+    const double s0 = sourceTime(start);
+    const double s1 = sourceTime(end);
+    const auto add = [&](double a, double b) {
+        a = std::max(a, s0);
+        b = std::min(b, s1);
+        if (!(b > a)) {
+            return;
+        }
+        const double pa = toPiece(a);
+        const double pb = toPiece(b);
+        if (!spans.empty() && std::abs(spans.back().second - pa) <= 1e-9) {
+            spans.back().second = pb; // continuous with the span before it
+        } else {
+            spans.emplace_back(pa, pb);
+        }
+    };
+    // Where the curve crosses zero between two keys (local times): bisected on the curve itself,
+    // so Smooth segments are placed as exactly as Linear ones.
+    const auto crossing = [this](double a, double b, bool rising) {
+        for (int i = 0; i < 48; ++i) {
+            const double m = 0.5 * (a + b);
+            if ((evaluate(m) > 0.0f) == rising) {
+                b = m;
+            } else {
+                a = m;
+            }
+        }
+        return 0.5 * (a + b);
+    };
+    // One pass over the keys, shifted by `base`; `lo`/`hi` bound the holds before the first key and
+    // after the last (a loop's own extent, or unbounded).
+    const auto pass = [&](double base, double lo, double hi) {
+        if (keys_.front().value > 0.0f) {
+            add(base + lo, base + keys_.front().time);
+        }
+        for (std::size_t i = 0; i + 1 < keys_.size(); ++i) {
+            const Keyframe& k = keys_[i];
+            const Keyframe& n = keys_[i + 1];
+            const bool pk = k.value > 0.0f;
+            const bool pn = n.value > 0.0f;
+            if (k.interpolation == KeyInterpolation::Step || (pk && pn)) {
+                if (pk) {
+                    add(base + k.time, base + n.time);
+                }
+            } else if (pk) {
+                add(base + k.time, base + crossing(k.time, n.time, false));
+            } else if (pn) {
+                add(base + crossing(k.time, n.time, true), base + n.time);
+            }
+        }
+        if (keys_.back().value > 0.0f) {
+            add(base + keys_.back().time, base + hi);
+        }
+    };
+    constexpr double kInf = std::numeric_limits<double>::infinity();
+    if (loopLength_ <= 0.0) {
+        pass(0.0, -kInf, kInf);
+        return spans;
+    }
+    const double first = std::floor(s0 / loopLength_);
+    const double last = std::floor(s1 / loopLength_);
+    for (double c = first; c <= last && c - first < 100000.0; c += 1.0) {
+        pass(c * loopLength_, 0.0, loopLength_);
+    }
+    return spans;
 }
 
 void TimelineSource::addKey(Keyframe key) {
@@ -643,7 +815,9 @@ json TimelineSource::settingsToJson() const {
                             {"value", static_cast<double>(key.value)},
                             {"interp", enumToString(kInterpNames, key.interpolation)}});
     }
-    return json{{"keys", std::move(keys)}, {"loopLength", loopLength_}};
+    return json{{"keys", std::move(keys)},
+                {"loopLength", loopLength_},
+                {"mode", enumToString(kTimelineModeNames, mode_)}};
 }
 
 Result<void> TimelineSource::settingsFromJson(const json& j) {
@@ -652,6 +826,10 @@ Result<void> TimelineSource::settingsFromJson(const json& j) {
     }
     std::vector<Keyframe> keys = keys_;
     double loopLength = loopLength_;
+    TimelineMode mode = mode_;
+    if (auto r = readEnum(j, "mode", kTimelineModeNames, mode); !r) { // ADR-900; absent = value
+        return fail("timeline '{}': {}", name_, r.error().message);
+    }
     if (const auto it = j.find("keys"); it != j.end()) {
         if (!it->is_array()) {
             return fail("timeline '{}': 'keys' must be an array", name_);
@@ -684,6 +862,7 @@ Result<void> TimelineSource::settingsFromJson(const json& j) {
     keys_ = std::move(keys);
     sortKeys();
     loopLength_ = loopLength;
+    mode_ = mode;
     return {};
 }
 
@@ -1029,8 +1208,28 @@ void SourceRack::update(SignalBus& bus, const SourceContext& context) {
     if (params_ == nullptr) {
         return;
     }
+    // ADR-900: publishers first, then the sources that read their events, so an envelope listed
+    // before the event-mode timeline that triggers it still sees this frame's hit.
     for (auto& source : sources_) {
-        source->update(bus, context);
+        if (!source->readsTriggers()) {
+            source->update(bus, context);
+        }
+    }
+    for (auto& source : sources_) {
+        if (source->readsTriggers()) {
+            source->update(bus, context);
+        }
+    }
+}
+
+void SourceRack::sample(SignalBus& bus, const SourceContext& context) const {
+    if (params_ == nullptr) {
+        return;
+    }
+    for (const auto& source : sources_) {
+        if (source->pureInTime()) {
+            source->sample(bus, context);
+        }
     }
 }
 

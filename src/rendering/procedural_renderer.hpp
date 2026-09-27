@@ -185,6 +185,8 @@ struct ProceduralUniforms {
                              // w = per-instance amplitude variance
     // ADR-057: the living chromatic field. x = hue swing in turns (0 disables the whole path and
     // is uniform across a draw, so a rock pays nothing), y = 1/metres, z = radians per second.
+    // ADR-904: w = 1 when the draw's program writes emission and leaves the instance's variation to
+    // the engine, which then reads that variation as a hue rotation and a gain (0 everywhere else).
     glm::vec4 chroma;
     // Step 1 of the transform chain (procedural.hpp): the source mesh's own placement, applied
     // before the deformer stack so it matches ProceduralGeometry::instanceMatrix() on the CPU.

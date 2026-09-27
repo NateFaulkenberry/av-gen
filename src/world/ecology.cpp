@@ -714,12 +714,21 @@ Result<Ecology> ecologyFromJson(const json& j) {
                                Field{"chromaDrift", &l.chromaDrift},
                                Field{"chromaDriftScale", &l.chromaDriftScale},
                                Field{"chromaDriftSpeed", &l.chromaDriftSpeed},
-                               Field{"emissiveSparsity", &l.emissiveSparsity}}) {
+                               Field{"emissiveSparsity", &l.emissiveSparsity},
+                               Field{"emissionGain", &l.emissionGain},
+                               Field{"hueOffset", &l.hueOffset},
+                               Field{"emissiveFieldAmount", &l.emissiveFieldAmount}}) {
             auto v = readFloat(e, f.key, *f.target);
             if (!v) {
                 return fail("scatter '{}': {}", l.name, v.error().message);
             }
             *f.target = *v;
+        }
+        if (e.contains("emissiveField")) {
+            if (!e.at("emissiveField").is_string()) {
+                return fail("scatter '{}': 'emissiveField' must be the name of a field", l.name);
+            }
+            l.emissiveField = e.at("emissiveField").get<std::string>();
         }
         if (e.contains("motion")) {
             if (!e.at("motion").is_object()) {
@@ -882,6 +891,20 @@ json ecologyToJson(const Ecology& ecology) {
                                         {"maxDistance", l.proximity->maxDistance},
                                         {"fade", l.proximity->fade},
                                         {"strength", l.proximity->strength}};
+        }
+        // ADR-905: the layer's emission lane, written only when the author set it, so every scene
+        // written before it existed round-trips byte-identically.
+        if (l.emissionGain != 1.0f) {
+            out.back()["emissionGain"] = l.emissionGain;
+        }
+        if (l.hueOffset != 0.0f) {
+            out.back()["hueOffset"] = l.hueOffset;
+        }
+        if (!l.emissiveField.empty()) {
+            out.back()["emissiveField"] = l.emissiveField;
+        }
+        if (l.emissiveFieldAmount != 0.0f) {
+            out.back()["emissiveFieldAmount"] = l.emissiveFieldAmount;
         }
     }
     return out;

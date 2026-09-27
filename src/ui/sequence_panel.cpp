@@ -9,15 +9,18 @@
 #include <chrono>
 
 #include "analysis/analysis_track.hpp"
+#include "analysis/span_profile.hpp"
 #include "analysis/structure.hpp"
 #include "core/log.hpp"
 #include "app/edit_system.hpp"
+#include "app/song_director.hpp"
 #include "scene/composition.hpp"
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
 #include "seq/section_performance.hpp"
 #include "seq/song_structure.hpp"
 #include "song/from_analysis.hpp"
+#include "song/section_cue.hpp"
 
 #include <glm/trigonometric.hpp> // degrees/radians for the drift control
 
@@ -2773,6 +2776,52 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
             tooltip("What this section should look like. 'default' follows the type, so "
                               "changing the type changes the treatment too.");
         }
+        // ADR-921: what the treatment does to the cutting, said where the treatment is chosen -- the
+        // one place an accelerating riser or a held suspension can be traced to from the picture.
+        const song::ShotIntent& treatment = piece.shotLanguage.intentFor(section);
+        ImGui::TextDisabled("cuts: %s", app::arcCutNote(treatment.arc));
+        if (ImGui::IsItemHovered()) {
+            tooltip("How Song Mode paces this section's shots, from its treatment's arc. The\n"
+                    "Auto-director panel's 'shortest shot', 'shortest build' and 'longest shot'\n"
+                    "set the range; the treatment's cut rate and the music's density set where\n"
+                    "in it this section sits. Every cut lands on a beat.");
+        }
+        // ...and how far the arc carries the cut rate across this section, read through the cue --
+        // the treatment with its arc applied at a second, the same arithmetic the director's
+        // `SongPlanSection::intentAt` uses (ADR-920).
+        if (treatment.arc != song::Arc::Steady) {
+            const std::vector<song::SectionCue> cues = song::cueSheet(piece.sectionTimeline, piece.shotLanguage);
+            if (index < cues.size()) {
+                const song::SectionCue& cue = cues[index];
+                ImGui::TextDisabled("cut rate %.0f%% at its start, %.0f%% at its end",
+                                    static_cast<double>(cue.intentAt(cue.startSeconds).cutFrequency) * 100.0,
+                                    static_cast<double>(cue.intentAt(cue.endSeconds).cutFrequency) * 100.0);
+            }
+        }
+    }
+
+    // ADR-899: the number `section.energy` publishes while the playhead is in this section -- what a
+    // route keyed to it reads -- and what the audio under the span measures (level-free), so a
+    // section's sound can be read where the section is. Read-only: the energy is the timeline's
+    // (detected, or typed into the project), the profile is the track's.
+    ImGui::TextDisabled("section.energy %.2f", static_cast<double>(section.energy));
+    if (ImGui::IsItemHovered()) {
+        tooltip("What the section.energy signal carries in this section -- route it to scale anything\n"
+                "by the section. Detected sections carry the analysis's energy; authored ones what\n"
+                "their author typed.");
+    }
+    if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr && !track->empty()) {
+        const analysis::SpanProfile p = analysis::profileSpan(*track, section.startSeconds, section.endSeconds);
+        if (p.measured()) {
+            ImGui::TextDisabled("measured: energy %.2f, %.1f hits/s (kick %.1f), brightness %.0f Hz",
+                                static_cast<double>(p.energy), static_cast<double>(p.onsetRate),
+                                static_cast<double>(p.kickRate), static_cast<double>(p.brightnessHz));
+            if (ImGui::IsItemHovered()) {
+                tooltip("The audio under this section, measured independently of loudness: the energy\n"
+                        "composite (audio.energy), percussive hits per second (audio.onsetRate), kicks\n"
+                        "per second (audio.onsetLow) and the mean spectral centroid.");
+            }
+        }
     }
 
     // **Making a type, which until now had to be done by editing the project file.**
@@ -3897,16 +3946,11 @@ double SequencePanel::snapSection(const app::Engine& engine, double seconds) con
     if (sectionSnap_ == 1) {
         return seq::snapTime(seconds, seq::SnapMode::Beats, beats);
     }
-    // Bars: every fourth beat, which is the same assumption `seq::BakeOptions::beatsPerBar` makes
-    // and is stated in one place there. It is now *read* from there rather than restated as a 4 --
-    // the comment promised one place and there were two, and the arrow keys' bar step (ADR-357)
-    // would have made it three. The returned value is still a beat's own time.
-    const auto perBar = static_cast<std::size_t>(std::max(1, seq::BakeOptions{}.beatsPerBar));
-    std::vector<double> bars;
-    bars.reserve(beats.size() / perBar + 1);
-    for (std::size_t i = 0; i < beats.size(); i += perBar) {
-        bars.push_back(beats[i]);
-    }
+    // Bars: the engine's meter (ADR-896), the one every bar in the engine is counted by -- so a
+    // section boundary snapped to "a bar" lands on the downbeat `music.downbeat` fires on, not on
+    // every fourth beat from whichever beat the tracker happened to find first. The returned value
+    // is still a beat's own time.
+    const std::vector<double> bars = engine.meter().barTimes(beats);
     return seq::snapTime(seconds, seq::SnapMode::Beats, bars);
 }
 

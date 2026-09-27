@@ -32,6 +32,7 @@
 #include "ui/editor_layout.hpp"
 #include "ui/output_preview.hpp"
 #include "ui/theme.hpp"
+#include "ui/route_row_logic.hpp"
 #include "ui/ui_logic.hpp"
 
 #include <algorithm>
@@ -443,8 +444,15 @@ private:
     // things the multi-camera brief asks for -- make a camera, put it where the viewport is looking,
     // see which one is live, give it to the Auto-director, put it on the timeline, delete it -- with
     // everything past that reachable through the ordinary Parameters and Sequence panels, because a
-    // camera's channels are ordinary parameters and its shots are ordinary spans.
+    // camera's channels are ordinary parameters and its shots are ordinary spans. The one exception
+    // is how a follow camera moves (ADR-911), which is rig settings rather than parameters and so
+    // has no other home: drawn from `scene::followControls()` under the selected camera's lens.
     void drawCameras(app::Engine& engine);
+    // The selected rig's follow rows. Edits `rig` (the section's working copy), sets `changed` and
+    // an undo label, and opens `rigSliderDrag_` on a slider press, exactly as the lens slider does;
+    // `drawCameras` installs the result.
+    void drawFollowControls(scene::CameraRig& rig, bool haveTerrain, app::Engine& engine, bool& changed,
+                            std::string& editLabel);
     // The camera the library has selected, by id. Not the *active* camera, which is the engine's
     // (`Engine::activeCamera`) and is never decided here: an editor selection and a director's
     // choice are different questions and conflating them is the mistake this whole ADR is about.
@@ -460,9 +468,9 @@ public:
 
 private:
     std::string cameraProblem_;
-    // The lens slider's drag, measured from press to release so a drag is one undo step rather
-    // than sixty (ADR-752). Open only while the slider is held.
-    app::EditCapture lensDrag_;
+    // A rig slider's drag -- the lens, or a follow setting -- measured from press to release so a
+    // drag is one undo step rather than sixty (ADR-752). Open only while a slider is held.
+    app::EditCapture rigSliderDrag_;
     void drawControlTab(app::Engine& engine);
     void drawOutputsTab(app::Engine& engine);
     void drawWorldWindow(app::Engine& engine);
@@ -547,6 +555,14 @@ private:
     char assetSearch_[96] = "";
     int newRouteSource_ = 0;
     int newRouteTarget_ = 0;
+    // ADR-902: each route row's liveness badge, re-checked when that route changed and once a second
+    // besides (a rule also reads the scene). The rules sample the route's chain, so not every frame.
+    struct RouteLivenessRow {
+        std::uint64_t signature = 0;
+        RouteBadge badge;
+    };
+    std::vector<RouteLivenessRow> routeLiveness_;
+    double routeLivenessCheckedAt_ = -1.0;
     int newSourceKind_ = 0;
     char newSourceName_[64] = "wobble";
     char presetName_[64] = "preset";

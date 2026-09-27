@@ -113,6 +113,8 @@ struct TransportSnapshot {
     std::int64_t frame = 0;
     double tempoBpm = 0.0;
     int beatsPerBar = 4;
+    // ADR-896: the second beat 1 of bar 1 falls on, which the bars readout counts from.
+    double barOriginSeconds = 0.0;
     TransportLoop loop{};
     // Bumped by every change. A view that caches derived text refreshes when this moves and not
     // otherwise; a test asserts that a command that changed nothing did not bump it.
@@ -140,9 +142,12 @@ public:
     void setFrameRate(FrameRate rate);
     [[nodiscard]] FrameRate frameRate() const { return frameRate_; }
     // For the bars/beats display and for beat stepping when there is no analyzed beat grid.
-    void setTempo(double bpm, int beatsPerBar = 4);
+    // `barOriginSeconds` is where bar 1 begins (ADR-896): "Rebuild"'s first downbeat is at 0.48 s,
+    // and a readout counting bars from 0 s showed its drop as bar 97 beat 2.
+    void setTempo(double bpm, int beatsPerBar = 4, double barOriginSeconds = 0.0);
     [[nodiscard]] double tempoBpm() const { return tempoBpm_; }
     [[nodiscard]] int beatsPerBar() const { return beatsPerBar_; }
+    [[nodiscard]] double barOriginSeconds() const { return barOrigin_; }
     void setMode(TransportMode mode);
     [[nodiscard]] TransportMode mode() const { return mode_; }
 
@@ -231,6 +236,7 @@ private:
     FrameRate frameRate_{};
     double tempoBpm_ = 0.0;
     int beatsPerBar_ = 4;
+    double barOrigin_ = 0.0;
     TransportLoop loop_{};
     std::uint64_t revision_ = 1;
     std::uint64_t discontinuityRevision_ = 1;
@@ -249,8 +255,10 @@ private:
 // broadcast timecode to match. Drop-frame is a thing to add the day something needs it, and doing it
 // wrong is worse than not doing it.
 [[nodiscard]] std::string formatTimecode(double seconds, FrameRate rate);
-// "17.3" -- bar.beat, one-based, from a tempo. Empty when there is no tempo, because "1.1" printed
-// against no known tempo is a claim rather than a reading.
-[[nodiscard]] std::string formatBarsBeats(double seconds, double tempoBpm, int beatsPerBar);
+// "17.3" -- bar.beat, one-based, from a tempo, counted from `originSeconds` (bar 1 beat 1; ADR-896).
+// Before the origin the bars count down through 0 and below, as a pickup's do. Empty when there is
+// no tempo, because "1.1" printed against no known tempo is a claim rather than a reading.
+[[nodiscard]] std::string formatBarsBeats(double seconds, double tempoBpm, int beatsPerBar,
+                                          double originSeconds = 0.0);
 
 } // namespace avgen::app

@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Generates a deterministic synthetic test track (120 BPM: kick, snare, hats, bass, pad).
 
-Usage: make_test_audio.py OUT.wav [--seconds 24] [--rate 48000]
+Usage: make_test_audio.py OUT.wav [--seconds 24] [--rate 48000] [--bpm 120] [--pickup-beats N]
 Pure standard library so it runs anywhere; ~10 s for 24 s of audio.
+
+`--pickup-beats N` (ADR-896) puts bar 1 N beats after the first kick (0.5 s): the kick still plays
+every beat from 0.5 s, but the snare's beats 2 and 4, the bass's note changes and the pad's chords
+are counted from bar 1, so the first beat heard is not the downbeat unless N is 0. Without the flag
+the grid is the original one (bar 1 at 0 s, so the first kick is beat 2) and the output is unchanged.
+The script prints the first audible downbeat, which is what a downbeat estimate should find. The
+engine's own tests build the same instruments in memory (tests/support/groove.hpp).
 """
 import argparse
 import array
@@ -17,6 +24,7 @@ def main() -> None:
     parser.add_argument("--seconds", type=float, default=24.0)
     parser.add_argument("--rate", type=int, default=48000)
     parser.add_argument("--bpm", type=float, default=120.0)
+    parser.add_argument("--pickup-beats", type=int, default=None)
     args = parser.parse_args()
 
     rate = args.rate
@@ -31,10 +39,13 @@ def main() -> None:
     pad_chords = [(220.0, 261.63, 329.63), (196.0, 246.94, 293.66)]  # Am, G
 
     two_pi = 2.0 * math.pi
+    # The bar grid: bar 1 at 0 s (the original track), or the first kick (0.5 s) plus the pickup.
+    origin = 0.0 if args.pickup_beats is None else 0.5 + args.pickup_beats * beat
     for i in range(frames):
         t = i / rate
-        bar_index = int(t / bar)
-        beat_in_bar = (t % bar) / beat
+        t_bar = t - origin + 2 * bar  # kept positive: bar indices below are offset by 2
+        bar_index = int(t_bar / bar) - 2
+        beat_in_bar = (t_bar % bar) / beat
         in_break = 8 <= bar_index < 10  # bars 8-9: no kick/snare (dynamics test)
         s = 0.0
 
@@ -89,7 +100,11 @@ def main() -> None:
         w.setsampwidth(2)
         w.setframerate(rate)
         w.writeframes(inter.tobytes())
-    print(f"wrote {args.out}: {args.seconds}s stereo {rate} Hz, {args.bpm} BPM")
+    first_downbeat = origin
+    while first_downbeat < 0.5 - 1e-9:
+        first_downbeat += bar
+    print(f"wrote {args.out}: {args.seconds}s stereo {rate} Hz, {args.bpm} BPM, "
+          f"first audible downbeat at {first_downbeat:.3f} s")
 
 
 if __name__ == "__main__":

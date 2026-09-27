@@ -182,6 +182,10 @@ std::string usageText() {
            "  --shader <file>     add a user shader layer behind the scene (repeatable)\n"
            "  --post <file>       add a user shader layer as a post effect (repeatable)\n"
            "  --project <file>    load a project (parameters, routes, sources, presets, shaders) at start-up\n"
+           "  --audit-routes <f>  with --project: write every route, timeline track, effect default\n"
+           "                      route and effect with a verdict (live / dead / hazard) and the\n"
+           "                      reason to <f> as JSON (\"-\" = stdout), and exit. Headless, no GPU;\n"
+           "                      --fps overrides the frame rate the event rules sample at (ADR-902)\n"
            "  --generate <file>   compose a world from a recipe (see examples/recipes/) at start-up\n"
            "  --direct            cut the camera to the loaded track: folds the audio into\n"
            "                      musical sections and shoots the world's heroes\n"
@@ -189,7 +193,10 @@ std::string usageText() {
            "                      mode=continuous|edited|song, autonomy=locked|guided|expressive,\n"
            "                      minShot, minBuildShot, maxShot (s), maxSpeed (m/s),\n"
            "                      maxSwing (deg/s), dwell (shots), seed\n"
-           "  --song-plan <file>  load a song plan (sections and shot intents) for mode=song\n"
+           "  --song-plan <file>  load a song plan (sections and shot intents) for mode=song; for\n"
+           "                      this run it is cut instead of the project's own sections\n"
+           "  --cut-report <f>    after a mode=song --direct, write the cut as JSON: every shot's span,\n"
+           "                      subject, arc and the reason for its duration (ADR-923)\n"
            "  --save-project <f>  write the project on exit\n"
            "  --save-scene <f>    write the scene on exit (the camera collection and its shot\n"
            "                      track live here, not in the project)\n"
@@ -495,6 +502,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             if (!v) return std::unexpected(v.error());
             options.project = *v;
             ++i;
+        } else if (arg == "--audit-routes") {
+            auto v = need(i, "--audit-routes");
+            if (!v) return std::unexpected(v.error());
+            options.auditRoutes = *v;
+            ++i;
         } else if (arg == "--direct") {
             options.directCamera = true;
         } else if (arg == "--director") {
@@ -507,6 +519,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--song-plan");
             if (!v) return std::unexpected(v.error());
             options.songPlan = *v;
+            ++i;
+        } else if (arg == "--cut-report") {
+            auto v = need(i, "--cut-report");
+            if (!v) return std::unexpected(v.error());
+            options.cutReport = *v;
             ++i;
         } else if (arg == "--generate") {
             auto v = need(i, "--generate");
@@ -876,6 +893,10 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
     if (!options.postStages.empty() && !options.render && !options.queue) {
         return fail("--post-stages needs --render (or --queue): the capture is part of an offline "
                     "render job and there is nothing to arm without one");
+    }
+    // ADR-923, the same rule: a report of a cut nobody asked for would be written by nothing.
+    if (options.cutReport && !options.directCamera) {
+        return fail("--cut-report needs --direct or --director mode=song: it reports the cut that run makes");
     }
     return options;
 }
@@ -2685,7 +2706,8 @@ Result<void> Application::captureFrame(const FrameTime& time, const std::filesys
     const std::uint32_t w = window_ ? window_->pixelWidth() : 1280;
     const std::uint32_t h = window_ ? window_->pixelHeight() : 720;
     const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                    engine_->barPhase()};
     auto image = renderer_->renderToImage(engine_->scene(), time, w, h, &shaderInputs);
     if (!image) {
         return std::unexpected(image.error());
@@ -3416,11 +3438,11 @@ void Application::nudgePlayhead(int direction, bool coarse) {
     const int snapMode = panel_ != nullptr ? panel_->sequence.snapMode()
                                            : static_cast<int>(seq::SnapMode::Frames);
     const double viewSpan = panel_ != nullptr ? panel_->sequence.visibleSpanSeconds() : 0.0;
-    // `beatsPerBar` from the bake options rather than a literal 4, so the day time-signature
-    // detection lands there is one default to change and this follows it.
+    // `beatsPerBar` from the engine's meter (ADR-896) rather than a literal 4, so the day
+    // time-signature detection lands there is one place to change and this follows it.
     const ui::Nudge nudge =
         ui::arrowNudge(snapMode, direction, coarse, engine_->renderSettings().fps, viewSpan,
-                       seq::BakeOptions{}.beatsPerBar);
+                       engine_->meter().beatsPerBar);
     switch (nudge.unit) {
     case ui::NudgeUnit::Frames:
         engine_->stepFrames(nudge.count);
@@ -3879,85 +3901,6 @@ void Application::serviceViewportPick() {
 }
 
 
-namespace {
-
-// `--director mode=continuous,maxShot=6.8,maxSpeed=0.4`. Unknown keys are refused rather than
-// ignored: a typo in a measurement's arguments that silently measures the default is worse than no
-// flag at all, and this flag exists to make measurements reproducible.
-Result<void> applyDirectorArgs(AutoDirectorSettings& s, std::string_view spec) {
-    std::size_t at = 0;
-    while (at <= spec.size()) {
-        const std::size_t comma = spec.find(',', at);
-        std::string_view item = spec.substr(at, comma == std::string_view::npos ? comma : comma - at);
-        at = comma == std::string_view::npos ? spec.size() + 1 : comma + 1;
-        if (item.empty()) {
-            continue;
-        }
-        const std::size_t eq = item.find('=');
-        if (eq == std::string_view::npos) {
-            return fail("--director: '{}' is not key=value", item);
-        }
-        const std::string key(item.substr(0, eq));
-        const std::string value(item.substr(eq + 1));
-        const auto number = [&](double& out) -> Result<void> {
-            try {
-                std::size_t used = 0;
-                out = std::stod(value, &used);
-                if (used != value.size()) {
-                    return fail("--director: '{}' is not a number for '{}'", value, key);
-                }
-            } catch (const std::exception&) {
-                return fail("--director: '{}' is not a number for '{}'", value, key);
-            }
-            return {};
-        };
-        double v = 0.0;
-        if (key == "mode") {
-            // Through the same table the panel and the project file use, so one setting has one
-            // spelling however it arrives.
-            const auto parsed = directorModeFromName(value);
-            if (!parsed) {
-                return fail("--director: mode must be 'continuous', 'edited' or 'song', got '{}'",
-                            value);
-            }
-            s.mode = *parsed;
-            continue;
-        }
-        if (key == "autonomy") {
-            const auto parsed = autonomyFromName(value);
-            if (!parsed) {
-                return fail("--director: autonomy must be 'locked', 'guided' or 'expressive', got "
-                            "'{}'",
-                            value);
-            }
-            s.autonomy = *parsed;
-            continue;
-        }
-        if (auto ok = number(v); !ok) {
-            return std::unexpected(ok.error());
-        }
-        if (key == "minShot") {
-            s.minShotSeconds = v;
-        } else if (key == "minBuildShot") {
-            s.minBuildShotSeconds = v;
-        } else if (key == "maxShot") {
-            s.maxShotSeconds = v;
-        } else if (key == "maxSpeed") {
-            s.maxCameraSpeed = static_cast<float>(v);
-        } else if (key == "maxSwing") {
-            s.maxViewRate = static_cast<float>(v);
-        } else if (key == "dwell") {
-            s.dwellShots = static_cast<int>(v);
-        } else if (key == "seed") {
-            s.seed = static_cast<std::uint32_t>(std::max(0.0, v));
-        } else {
-            return fail("--director: unknown setting '{}'", key);
-        }
-    }
-    return s.validate();
-}
-
-} // namespace
 
 Result<void> Application::directCameraFromTrack() {
     if (engine_ == nullptr || engine_->composition() == nullptr) {
@@ -3972,6 +3915,12 @@ Result<void> Application::directCameraFromTrack() {
     // loaded, and `--project` has already run by the time this is called -- so a plan on the command
     // line replaces the project's rather than being replaced by it, which is the way round a person
     // typing one expects.
+    //
+    // ADR-923: and it is *directed*, not merely stored. `songPlanForEngine` puts the film's own
+    // sections first, so for any project with a section timeline -- Glowmere Valley 3's has
+    // thirteen -- a plan on the command line was saved and never cut. It is handed to the director
+    // explicitly for this run; the project keeps it as its saved plan, under the usual precedence.
+    std::optional<SongPlan> commandLinePlan;
     if (options_.songPlan) {
         std::ifstream in(*options_.songPlan);
         if (!in) {
@@ -3989,7 +3938,12 @@ Result<void> Application::directCameraFromTrack() {
         }
         log::info("song plan: {} section(s) from {}", plan->sections.size(),
                   options_.songPlan->string());
+        commandLinePlan = *plan;
         engine_->songPlan() = std::move(*plan);
+        // Once. This function is also every interactive re-cut (Enable, a section edit), and the
+        // plan on the command line was for the run's first cut: afterwards the project holds it as
+        // its saved plan and a person's edits to the film's sections take over, as they always do.
+        options_.songPlan.reset();
     }
     // Heroes come from whichever source the world has one. An authored scene declares them
     // (ADR-074); a generated world's composer places them (ADR-072). Preferring the scene's own is
@@ -4008,11 +3962,28 @@ Result<void> Application::directCameraFromTrack() {
     // re-cut, and the *first* cut -- the one the Enable button makes, and the one a settings change
     // re-triggers -- silently took `AutoDirectorSettings{}`. Every control in the panel was bound to
     // a struct nothing on this path read.
-    auto installed = directEngine(*engine_, heroes, cameraDirection_.settings);
+    const bool song = cameraDirection_.settings.mode == DirectorMode::Song;
+    SongDirection cut;
+    auto installed = directEngine(*engine_, heroes, cameraDirection_.settings,
+                                  song && commandLinePlan ? &*commandLinePlan : nullptr,
+                                  song ? &cut : nullptr);
     if (!installed) {
         return std::unexpected(installed.error());
     }
     log::info("direct: {} camera track(s) from {} hero(es)", *installed, heroes.size());
+    if (options_.cutReport) {
+        // Refused rather than written empty: a report of a mode that has no cut report would read as
+        // a film with no shots.
+        if (!song) {
+            return fail("--cut-report reports a Song Mode cut; direct with --director mode=song");
+        }
+        std::ofstream report(*options_.cutReport);
+        if (!report) {
+            return fail("--cut-report: cannot write {}", options_.cutReport->string());
+        }
+        report << cut.report().dump(2) << "\n";
+        log::info("cut report: {} shot(s) written to {}", cut.decisions.size(), options_.cutReport->string());
+    }
     if (panel_ != nullptr) {
         panel_->directorSummary = lastDirectionSummary();
     }
@@ -4879,7 +4850,8 @@ int Application::runLive() {
                                           &transformHistory_, &lodLevels, renderer_->shadows().views());
         }
         const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                        engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                        engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                        engine_->barPhase()};
         // ADR-364. `drawUi` is deliberately not consulted here: the interface is drawn
         // unconditionally a few lines below, and the field exists so that invariant is written down
         // rather than being true by accident. What this skips is the world -- the scene pass, the
@@ -5941,7 +5913,8 @@ int Application::runHeadless() {
                                               nullptr, &lodLevels, renderer_->shadows().views());
             }
             const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
-                                                            engine_->hasFrame() ? &engine_->latestFrame() : nullptr};
+                                                            engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                            engine_->barPhase()};
             // Pixels are only pulled back on the frames something reads them: the captured frame, or
             // every frame when debug logging wants a determinism hash. The rest render and submit and
             // stop there, as the live path does.

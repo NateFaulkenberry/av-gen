@@ -47,6 +47,20 @@ namespace avgen::color {
 [[nodiscard]] float livingChromaTurns(const glm::vec3& p, float t, float amount, float invScale,
                                       float speed);
 
+// ADR-904: an instance's emission variation, read back as (hue rotation in turns, gain).
+//
+// A procedural instance carries its variation as a per-channel multiplier `mult` of the material's
+// emissive colour `base` (ADR-054): rotate(base, h) * g / base. That is exact for the material's own
+// colour and meaningless for any other -- multiply it into a program's cyan-green and the hue lands
+// wherever the ratios happen to push it. So where a program writes the emission, the variation is
+// read back as what it was made from and applied as a rotation and a gain of the colour actually
+// displayed. OKLCH rotation keeps L and C, and a gain g scales OKLab L by cbrt(g), so
+// g = (L(base * mult) / L(base))^3 and h = hue(base * mult) - hue(base), both exact for a multiplier
+// made by `hueRotationMultiplierOklab` below its clamp. `base` takes the same 1e-3 floor the
+// multiplier was made against. An achromatic base carries no hue to read back (rotating grey does
+// nothing), so its h is 0. The CPU reference of `emissionVariationOf` in shaders/chroma.wgsl.
+[[nodiscard]] glm::vec2 emissionVariationOf(const glm::vec3& base, const glm::vec3& mult);
+
 // Cosine palette (Quilez): a + b * cos(2π (c t + d)).
 struct CosinePalette {
     glm::vec3 a{0.5f}, b{0.5f}, c{1.0f}, d{0.0f, 0.33f, 0.67f};

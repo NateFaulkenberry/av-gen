@@ -56,13 +56,26 @@ This document is the reference both the CPU implementation (`src/scene/material_
 | `instanceId` | `(id, id, id, id)` | broadcast |
 | `instanceRandom` | `(r0, r1, r2, r3)` | the instance record's four randoms |
 | `instanceColor` | `(r, g, b, a)` | per-instance colour multiplier |
-| `instanceEmissive` | `(r, g, b, a)` | per-instance emissive multiplier |
+| `instanceEmissive` | `(r, g, b, a)` | per-instance emissive multiplier: a per-channel ratio against the *material's* emissive colour (ADR-054), not a colour. A program whose emission reads it has applied the instance's variation itself, and the engine does not apply it again (ADR-904) |
 | `time` | `(t, t, t, t)` | seconds, broadcast |
 | `audio` | `(rms, bass, mid, treble)` | |
 | `audioBands` | `(lowMid, highMid, centroid, flux)` | |
 | `beatPhase` | `(phase, pulse, onset, bar)` | |
 | `viewDirection` | `(x, y, z, 0)` | unit vector from the fragment to the camera |
 | `depth` | `(d, d, d, d)` | distance to the camera, broadcast |
+| `materialEmission` | `(r, g, b, 1)` | ADR-904: the material's own emission as this instance shows it with no program -- emissive colour x intensity x the instance's multiplier. Reading it counts as reading `instanceEmissive` |
+
+**The instance's variation is applied exactly once (ADR-904).** A procedural instance's emissive
+variation (`hueField`, `hueRandom`, `emissiveRandom`, sparsity, the living chroma) is carried as a
+multiplier of the material's emissive colour. With no program, or a program that keeps the
+material's emission, it multiplies that emission as it always has. A program that *writes*
+emission owns its colour (ADR-179), so the multiplier is not applied to it; instead the engine reads
+the variation back as the hue rotation and gain it was made from and applies them to the program's
+emission, after the program -- so a hue offset rotates the colour the program shows. A program
+whose emission depends on `instanceEmissive` or `materialEmission` (followed through the ops' data
+flow, `MaterialProgram::emissionReadsInstance`) has applied the variation itself and gets neither.
+Do not multiply `instanceEmissive` into an asserted colour: that turns a ratio made against one
+colour into a colour change of another.
 
 The **geometric inputs** (ADR-036) come from screen-space derivatives of the shading normal and
 position, and from the GTAO target. They are broadcast scalars unless the layout says otherwise;
@@ -255,10 +268,11 @@ written against ADR-030 still loads, still validates and still evaluates to the 
 | 32 | `emissionIntensityPad` (vec4) | emissionIntensity, gate `below`, gate `near`, gate `far` |
 | 48 | `aux` (ivec4) | normal, occlusion, height registers, total packed op count |
 | 64 | `fieldSlots` (ivec4) | the FieldBlock slot of each distinct field the program names, -1 = unused (ADR-050) |
-| 80 | `layers[4]` | 64 bytes each: `outputs` (baseColor, metallic, roughness, emission), `aux` (normal, occlusion, mask, height), `range` (firstOp, opCount, 0, 0), `params` (emissionIntensity, blendRange, 0, 0) |
-| 336 | `ops[48]` | 112 bytes each |
+| 80 | `flags` (ivec4) | ADR-904: x = 1 when the program writes emission, + 2 when that emission reads the instance's; yzw = 0 |
+| 96 | `layers[4]` | 64 bytes each: `outputs` (baseColor, metallic, roughness, emission), `aux` (normal, occlusion, mask, height), `range` (firstOp, opCount, 0, 0), `params` (emissionIntensity, blendRange, 0, 0) |
+| 352 | `ops[48]` | 112 bytes each |
 
-A program is 5,712 bytes and the block of eight is 45,712, which is past the uniform-buffer size
+A program is 5,728 bytes and the block of eight is 45,840, which is past the uniform-buffer size
 limit — hence the move to a **read-only storage buffer** (ADR-036). Nothing else about the binding
 changed.
 
@@ -379,7 +393,7 @@ per material, so the procedural and SDF renderers need no plumbing of their own:
 | Binding | Contents |
 |---|---|
 | 0..5 | sampler + the five glTF textures (unchanged) |
-| 6 | `MaterialProgramBlock`: `count` + `array<MaterialProgramGpu, 8>` (45,584 bytes, **read-only storage** since ADR-036) |
+| 6 | `MaterialProgramBlock`: `count` + `array<MaterialProgramGpu, 8>` (45,840 bytes, **read-only storage** since ADR-036) |
 | 7 | `MaterialSelect`: `program: i32` — a 16-byte slice naming the slot this material runs |
 | 8 | `FieldBlock` — the entity pass only; `procedural.wgsl` and `sdf_raymarch.wgsl` bind their own at group 1 binding 3 |
 

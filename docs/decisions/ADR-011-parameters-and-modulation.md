@@ -1,6 +1,7 @@
 # ADR-011: Parameter and modulation model
 
 - Status: Accepted (2026-09-08); extended in milestone 0.3 with sources (LFO, envelope, noise, random, timeline, macro), route polarity, presets and the v2 project format
+- **Amended by ADR-900 (2026-09-26):** the chain has a `delay` stage first, an event is held through its attack instead of being smoothed like any sample, and a route can take its depth from a signal (`depthSource`)
 - Research: `docs/research/audiovisual-systems.md` §20-21, `docs/research/audio-analysis.md` §5
 
 ## Problem

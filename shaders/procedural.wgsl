@@ -370,6 +370,8 @@ struct ProcVertexOut {
     @location(6) instRandom: vec4<f32>,
     @location(7) instIndex: f32,          // normalised instance index in [0, 1]
     @location(8) prevClip: vec4<f32>,     // last frame's clip position, for the velocity target
+    // ADR-904: the instance's emission variation as (hue turns, gain), constant across an instance.
+    @location(9) @interpolate(flat) variation: vec2<f32>,
 };
 
 @vertex
@@ -384,14 +386,23 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
     // ADR-057: the hue drifts where this specimen stands, sampled once per vertex at the root so
     // it is constant across the instance and interpolates exactly.
     var instEmissive = inst.emissive;
+    // ADR-904: for a program that writes emission and leaves the variation to the engine
+    // (proc.chroma.w, uniform per draw), the multiplier read back as the rotation and gain it was
+    // made from. Everything else keeps (0, 1) and pays nothing.
+    var variation = vec2<f32>(0.0, 1.0);
+    if (proc.chroma.w > 0.5) {
+        variation = emissionVariationOf(object.emissive.rgb, inst.emissive.rgb);
+    }
     if (proc.chroma.x > 0.0) {
         let chromaRoot = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
         let turns = livingChromaTurns(chromaRoot, proc.timeInfo.x, proc.chroma.x, proc.chroma.y,
                                       proc.chroma.z);
         instEmissive = vec4<f32>(
             livingChromaMultiplier(object.emissive.rgb, instEmissive.rgb, turns), instEmissive.w);
+        variation.x = variation.x + turns;
     }
     out.instEmissive = instEmissive;
+    out.variation = variation;
     out.localPos = in.position;
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;
@@ -516,12 +527,16 @@ fn vs_proc(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVer
 
 @fragment
 fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
-    var emissiveMul = in.instEmissive.rgb;
+    let emissiveMul = in.instEmissive.rgb;
+    var info: MaterialInstanceInfo;
+    // ADR-905: the emissive field is a gain on everything the surface emits, after its program --
+    // the lane, not the per-channel multiplier a program's emission drops.
+    info.emissionField = 1.0;
     let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
     if (emissiveSlot >= 0) {
-        emissiveMul = emissiveMul * (1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos));
+        info.emissionField = 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos);
     }
-    var info: MaterialInstanceInfo;
+    info.variation = in.variation;
     info.localPosition = in.localPos;
     info.objectId = pickIndex(object.ids.x);
     info.instanceIndex = in.instIndex;

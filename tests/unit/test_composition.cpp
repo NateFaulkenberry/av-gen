@@ -346,9 +346,12 @@ TEST_CASE("Composition registers parameters that drive instances, materials and 
         comp.update(FrameTime{});
         CHECK_FALSE(sc.entities[1].visible);
         CHECK(sc.entities[0].visible);
-        CHECK_THAT(static_cast<double>(sc.entities[0].material.emissiveIntensity), WithinAbs(3.0, 1e-6));
+        // ADR-903: the boost is the entity's emission lane, applied after any material program; the
+        // material's own intensity is left as the asset made it (a program would discard it).
+        CHECK_THAT(static_cast<double>(sc.entities[0].emissionGain), WithinAbs(3.0, 1e-6));
+        CHECK(sc.entities[0].material.emissiveIntensity == 1.0f);
         CHECK_THAT(static_cast<double>(sc.entities[0].material.roughness), WithinAbs(0.3, 1e-6));
-        CHECK(sc.entities[1].material.emissiveIntensity == 1.0f);
+        CHECK(sc.entities[1].emissionGain == 1.0f);
         CHECK_FALSE(comp.findNode("b")->visible);
     }
     SECTION("an asset's lights are scaled, tinted and moved by the node that brought them") {
@@ -1892,8 +1895,12 @@ TEST_CASE("A multi-material asset is drawn with all of its materials", "[composi
         (*comp)->update(FrameTime{});
         CHECK(parts[0]->material.baseColor == firstColor);
         CHECK(parts[1]->material.baseColor == secondColor * glm::vec3(0.25f, 0.7f, 0.9f));
-        CHECK(parts[0]->material.emissiveIntensity == 0.0f);
-        CHECK(parts[1]->material.emissiveIntensity == 6.0f);
+        // ADR-903: a part's gain is its emission lane, after any program; the shared intensity is
+        // what the material says. What the part emits is the product, and it is still 0 and 6.
+        CHECK(parts[0]->material.emissiveIntensity == 2.0f);
+        CHECK(parts[1]->material.emissiveIntensity == 2.0f);
+        CHECK(parts[0]->material.emissiveIntensity * parts[0]->emissionGain == 0.0f);
+        CHECK(parts[1]->material.emissiveIntensity * parts[1]->emissionGain == 6.0f);
         CHECK(parts[0]->material.baseColorTexture.texture != parts[1]->material.baseColorTexture.texture);
         REQUIRE(parts[0]->instances.size() == parts[1]->instances.size());
     }

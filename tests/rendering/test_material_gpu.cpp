@@ -7,6 +7,7 @@
 // The harness compares the five program outputs (base colour, metallic, roughness, emission,
 // opacity). Emission is the unclamped lane: it carries a register's rgb through untouched, so a
 // negative or above-one result still shows up as a difference.
+#include "analysis/analyzer.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
 #include "gpu/context.hpp"
@@ -110,6 +111,7 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     ctx.normalVariance = contexts[b + 12u].x;
     ctx.footprint = contexts[b + 12u].y;
     ctx.materialId = contexts[b + 12u].z;
+    ctx.materialEmission = contexts[b + 13u]; // ADR-904
 
     var base = materialResultZero();
     base.baseColor = vec3<f32>(0.8, 0.7, 0.6);
@@ -200,6 +202,7 @@ public:
             p[10] = glm::vec4(c.viewDirection, static_cast<float>(cases[i].program));
             p[11] = glm::vec4(c.curvature, c.cavity, c.occlusion, c.height);
             p[12] = glm::vec4(c.normalVariance, c.footprint, c.materialId, 0.0f);
+            p[13] = c.materialEmission; // ADR-904
         }
 
         const auto& device = ctx_.device();
@@ -365,6 +368,7 @@ std::vector<scene::MaterialContext> makeContexts() {
         c.normalVariance = t * 0.011f;
         c.footprint = t * 0.004f;
         c.materialId = std::fmod(t, 4.0f);
+        c.materialEmission = {0.35f + t * 0.02f, 0.1f + t * 0.05f, 0.9f - t * 0.03f, 1.0f}; // ADR-904
         out.push_back(c);
     }
     return out;
@@ -516,6 +520,8 @@ TEST_CASE("material program inputs match the CPU interpreter", "[material][gpu]"
                  build("beatPhase", MaterialInput::BeatPhase), build("viewDirection", MaterialInput::ViewDirection),
                  build("depth", MaterialInput::Depth)},
                 noFields, 0.0);
+    // ADR-904: the material's own emission as the instance shows it.
+    checkParity(harness, {build("materialEmission", MaterialInput::MaterialEmission)}, noFields, 0.0);
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -1359,4 +1365,54 @@ TEST_CASE("Material program throughput", "[.perf][material]") {
         WARN("material 1080p, " << g.instances.size() << " instances, " << names[cfg] << ": GPU " << ms << " ms/frame"
                                 << (cfg == 0 ? std::string() : " (+" + std::to_string(ms - base) + " ms)"));
     }
+}
+
+// ADR-896: the bar lane of a material program's `beatPhase` input (its w) is the engine's bar phase,
+// handed over in `ShaderFrameInputs::barPhase` -- not a count the renderer derived from the analysis
+// frame, which took the first tracked beat as beat 1 of the count and put every bar on beat 4.
+TEST_CASE("a material program's bar input is the engine's bar phase", "[material][gpu][meter]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    if (auto init = renderer.init(); !init) {
+        FAIL(init.error().message);
+    }
+    // base colour = beatPhase.www: the bar phase painted straight onto an unlit wall.
+    MaterialProgram program;
+    program.name = "barPhase";
+    program.ops.push_back(inputOp(MaterialInput::BeatPhase, 0));
+    MaterialOp swizzle = op(MaterialOpKind::Swizzle, 1, 0);
+    swizzle.constant = {3.0f, 3.0f, 3.0f, 3.0f};
+    program.ops.push_back(swizzle);
+    program.baseColorRegister = 1;
+    scene::Scene s = baseScene();
+    s.camera.position = {0.0f, 0.0f, 12.0f};
+    s.materialPrograms.push_back(program);
+    scene::ProceduralGeometry wall = boxWall();
+    wall.material.program = "barPhase";
+    s.procedurals.push_back(wall);
+
+    // The analysis frame says "one beat has landed, at its start" -- under the old derivation
+    // frac((beatCount + beatPhase) / 4) that is a bar phase of 0.25 whatever the engine thought.
+    analysis::AnalysisFrame af;
+    af.bandCount = 5;
+    af.beatCount = 1;
+    af.beatPhase = 0.0f;
+    const auto grey = [&](float barPhase) {
+        const rendering::ShaderFrameInputs inputs{nullptr, &af, barPhase};
+        FrameTime t{};
+        auto img = renderer.renderToImage(s, t, 160, 160, &inputs);
+        REQUIRE(img.has_value());
+        return static_cast<int>(img->pixel(80, 80)[1]);
+    };
+    const int early = grey(0.1f);
+    const int late = grey(0.8f);
+    const int quarter = grey(0.25f);
+    INFO("bar phase 0.1 -> " << early << ", 0.25 -> " << quarter << ", 0.8 -> " << late);
+    CHECK(ctx->errorCount() == 0);
+    // The pixels follow the value passed in...
+    CHECK(late > quarter + 40);
+    CHECK(quarter > early + 10);
+    // ...and not the frame's own beat count: with the old derivation all three were the 0.25 image.
+    CHECK(late != quarter);
 }

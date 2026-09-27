@@ -137,6 +137,11 @@ std::vector<Influence> directInfluencesOf(app::Engine& engine, const std::string
         Influence i;
         i.kind = Influence::Kind::Route;
         i.source = r.source;
+        // "audio.onsetLow  -  kick (low-band onset)": the name the route stores and what it is, as
+        // the Modulation panel's picker lists it, so "why is this moving?" answers in words.
+        if (const auto id = engine.signals().find(r.source)) {
+            i.source = routeSourceItem(engine.signals().info(*id));
+        }
         i.detail = "amount " + std::to_string(r.amount);
         i.value = r.lastOutput;
         i.routeSource = r.source;
@@ -520,7 +525,10 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
         }
         const auto row = [&](params::IParameter* param, std::size_t cut) {
             ImGui::PushID(param->path().c_str());
-            const std::string rel = param->path().substr(cut);
+            // The path below the heading, its leaf said in words where the parameter was given a
+            // label for what the viewer sees (ADR-905: `fungi/light wave`, not
+            // `fungi/emissiveFieldAmount`).
+            const std::string rel = ui::inspectorRowLabel(param->path(), cut, param->label());
             drawParameterValue(*param, rel.c_str());
             if (ImGui::BeginPopupContextItem("reset")) {
                 if (ImGui::MenuItem("Reset to default")) {

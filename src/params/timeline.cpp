@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <utility>
 
@@ -406,6 +407,50 @@ std::size_t Track::keyedComponents() const {
         return 1;
     }
     return std::min(param->componentCount(), kMaxComponents);
+}
+
+bool Track::jumpsWithin(double t0, double t1, double rampSeconds) const {
+    if (timeBase != TimeBase::Seconds || loopLength > 0.0 || keys.size() < 2 || !(t1 > t0)) {
+        return false;
+    }
+    // The largest component change across a segment, and its rate. All components, so an unbound
+    // track (which reports one keyed component) still sees every one it holds.
+    const auto change = [&](std::size_t i) {
+        float d = 0.0f;
+        for (std::size_t c = 0; c < kMaxComponents; ++c) {
+            d = std::max(d, std::abs(keys[i + 1].value[c] - keys[i].value[c]));
+        }
+        return static_cast<double>(d);
+    };
+    const auto rate = [&](std::size_t i) {
+        const double span = keys[i + 1].time - keys[i].time;
+        return span > 1e-9 ? change(i) / span : std::numeric_limits<double>::infinity();
+    };
+    constexpr double kStill = 1e-5; // a change below this is rounding, not a move
+    for (std::size_t i = 0; i + 1 < keys.size(); ++i) {
+        const double lands = keys[i + 1].time;
+        if (lands <= t0) {
+            continue;
+        }
+        if (keys[i].time > t1) {
+            break;
+        }
+        if (lands > t1 || change(i) <= kStill) {
+            continue;
+        }
+        if (keys[i].interp == KeyInterp::Step) {
+            return true;
+        }
+        if (lands - keys[i].time <= rampSeconds) {
+            const double self = rate(i);
+            const double before = i > 0 && change(i - 1) > kStill ? rate(i - 1) : 0.0;
+            const double after = i + 2 < keys.size() && change(i + 1) > kStill ? rate(i + 1) : 0.0;
+            if (self > 20.0 * std::max(before, after)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 double Track::localTime(double time) const {

@@ -35,7 +35,8 @@ namespace avgen::app {
     // The piece is bounded by its audio. With none, the transport's duration is only the extent of
     // whatever is already on the timeline -- which is exactly what a plan may be extending -- so it
     // is no bound at all (0 = unknown).
-    return directing::musicalContextFrom(engine.sequence(), beats, tempo, engine.audioDurationSeconds());
+    return directing::musicalContextFrom(engine.sequence(), beats, tempo, engine.audioDurationSeconds(),
+                                         engine.track(), engine.meter());
 }
 
 // Everything in the scene a plan can name, plus every parameter path (by exact path only).
