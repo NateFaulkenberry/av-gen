@@ -478,22 +478,54 @@ E1-E5 moment the cut shows is on screen on both (`build/gv3/cut/castworld/`).
 - **29.1:** Vane crosses the east meadow; the lens rides 11 m north-east of her and 6 m up, looking
   south-west past her to the elder's cap on the horizon. Nearest animal 6.7 m from the lens, none in
   front of her, on both casts (her path is the same on both).
-- **91.1:** a fixed eye 22 m up the west bank behind Ember, 4 m up, a live aim at her led 15% toward the
-  saucer: both in frame for the whole shot on both casts, where she walks different ways 26 m apart
-  (on gv3-cast's, iteration 2's rig lost her entirely). She is small (0.11-0.13 of the frame): a figure
-  on the bank under the saucer's light.
+- **91.1:** a fixed eye 18 m up the west bank behind Ember, 3 m up, 32 mm, a live aim at her led 15%
+  toward the saucer: both in frame for the whole shot on both casts, where she walks different ways
+  26 m apart (on gv3-cast's, iteration 2's rig lost her entirely). She is 0.19-0.25 of the frame's
+  height, a figure on the bank; the saucer settles beside the elder, which any view of it from the
+  west holds too, so the subject names all three.
 - **111.1:** Tide, not Vane, walks the north end toward the lit spire: a chase 5 m behind her, 3.4 m
   up, 24 mm, on her own path 76% of the shot. Her path is the same on both casts; Vane's is not, and on
   neither did Vane walk toward the horse's place.
-- **57.1:** from 4 m over the river 42 m east of the station (no undergrowth over water), 35 mm aimed
-  10 m below the scout: the scout's top at +0.72 and the pair's feet at -0.86 (+0.66 and -0.73 on
-  gv3-cast's) at the lift.
+- **57.1:** from 4 m over the river 42 m east of the station (no undergrowth over water), 28 mm aimed
+  10 m below the scout: the whole column in frame at the lift on both casts, even with the saucer's
+  larger bounds the adapter takes for a scout with no hero record (the preview world has none).
 - The aliens lead 13.1% still: Vane 3 shots, Tide 3, Ember 2, Rook 1, Sage 1.
 
-## State (2026-09-27, about 14:30)
+**Moves that change the picture, and no repeated framings** (`d9e4bf35`):
+- `arc()`: a truck round a still subject, the eye swinging about the vertical through it at its own
+  distance, the target held. For the heroes whose few-metre pushes read as static: 31.1 (14 deg),
+  43.1 (a 6.5 m truck across the wide), 46.1 (16), 47.1 (25, rising round the stem), 53.1 (6), 65.1
+  (8, rising), 104.1 (20, rising), 107.1 (14). 75.1 cranes up 4.5 m from the ferns, tilting up to the
+  aurora. 89.1 swings 30 deg round the elder's stem with its live aim, so the saucer slides out from
+  behind the rim.
+- 9.1 from the north-east (the horse lower left, the elder's whole cap right of centre): from the
+  south-east it repeated the east-bank travel (26.1) and the orbit (49.1).
+- 113.1 from 12 m up the north-east slope, a 10 m truck, the line of sight to the elder's stem and cap
+  clear of the ground from both ends: from the north it repeated 77.1.
+- 57.1 at 28 mm, 91.1 larger (above); 113.1's label no longer says "ridge", which the adapter reads as
+  the ridge mushroom (a critical for one scene job).
+
+**On the scene** (fast jobs, inputs from the adapter at `44d1111`):
+
+| | it3 (`job_1a0e3f09cc6ad3a9b`) | it4 (`job_1a0e41d4c4ede104e`) |
+|---|---|---|
+| issues (critical / high / medium) | 78 (0 / 3 / 16) | 35 (0 / 2 / 13) |
+| shots with a push-in | 38 of 73 | 28 of 73 |
+| repeated framings | 3 (one the rhyme) | 1 (the rhyme) |
+| abrupt camera accelerations | 39 | 1 |
+| cinematography | 0.722 | 0.951 |
+| composition | 0.829 | 0.843 |
+| visual hierarchy | 0.912 | 0.918 |
+| pacing | 0.984 | 1.000 |
+
+Left as designed: 81.1's saucer small and far, 89.1's saucer behind the rim at the swing's start; 9.1's
+"horse partly hidden by the elder" is the cap's bounding box (which reaches the ground), not the stem,
+23 deg clear of the horse from this eye.
+
+## State (2026-09-27, about 15:00)
 
 **Commits on `gv3/cut`** since the checkpoint: iteration 2 `dd2306b2`; iteration 3 `630ca638`,
-`6589a152`; iteration 4 `d7c57449`, `e1cac9a6`, `4442ca71`; and this log.
+`6589a152`; iteration 4 `d7c57449`, `e1cac9a6`, `4442ca71`, `d9e4bf35`; and this log.
 
 **The Director's cut in use:** `tools/gv3/song_cut.json`, 73 spans, settings `songcut.SETTINGS`
 (song, expressive, 1.8 / 7.5 / 0.45 s, seed 1), GV3's treatments `songcut.TREATMENTS`. Every span has
@@ -509,10 +541,8 @@ an authored composition in `tools/gv3/shots.py`; `python3 tools/make_glowmere_va
 - The adapter: "scout" has no subject alias (54.1's hierarchy finding).
 
 **Next steps, in order:**
-1. Iteration 4, CPU: the repeated framings (113.1 against 77.1, 26.1 and 49.1 against 9.1), and moves
-   that change the picture for the static-held heroes (89.1, 65.1, 47.1, 107.1, 31.1), with fewer
-   push-ins.
-2. Iteration 4's changed spans as clips through the lock (one hold each), judged against the before on
-   the clip tracks, with inputs regenerated by the fixed adapter.
-3. Before/after stills and sheets to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`.
-4. The final report (briefs.md: common rules, and gv3-cut).
+1. Iteration 4's changed spans as clips (`render-it4.sh`: nine ranges, one lock hold each), judged
+   against the before's same ranges (`critic-it4.sh`, befores and afters from one adapter), and its
+   trace (`cast-it4.json`) for the follow rigs' stability.
+2. Before/after stills and sheets to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`.
+3. The final report (briefs.md: common rules, and gv3-cut).
