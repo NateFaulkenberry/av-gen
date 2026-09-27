@@ -84,6 +84,16 @@ where its predecessor stopped.
     values), and five inert routes (the scout beam's four audio routes and tide's sway).
   - **After navfix and gv3-world merge, re-trace the whole film.** The aliens' paths will move; the set pieces
     will not.
+- **Phase 3 merge notes (collect here; apply at each merge):**
+  - `gv3/look` changes `tools/make_glowmere_valley_3.py`, outside its own files: `look.apply_base(project, scene)`
+    and `look.apply_motifs(project, scene)`. Reconcile this with any other stream's edits to the generator.
+  - gv3-look `c0fa4c3c` took gv3-cast's two items:
+    - `look.BASE` sets `fx/horse-light/gain` to 0.5, halving the glow's peak; the cues keep their timing and gold.
+      s29 still needs checking at 1080p, because the horse read pale white on 25.7% clipped pixels.
+    - `reactivity.py` `REACTION_DROPS` removes the scout beam's four copied reactions and tide's sway route, each
+      with a reason. It needs gv3/cast's scout, which is now merged.
+  - gv3-look also moved the wind back to 0.62 rad, the direction the water stream placed the tears for (s08's seam
+    is back at 1080p). It calibrated the aurora, and the scored claps skip the gap beats.
 - **NEW ENGINE DEFECT (13:10), assigned to navfix as ADR-934: a retired body stays in the world.** A set piece's
   taken animals keep walking invisibly, and they still block the aliens and draw their attention. `StepKind::Retire`
   only hides the body; the crowd and body index take every active entity. On GV3, rook walked in place for 5.25 s
