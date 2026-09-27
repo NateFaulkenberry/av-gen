@@ -283,6 +283,22 @@ so v3 and v4 differ only in the film):
   tan instead of white. In my branch's framing (the first pass's staging, the camera inside the beam)
   the clipped disk is mostly the beam's core, whose emission also rides `audio.rms` (+1.5, the
   saucer beam's own link, kept); gv3-cast's staging frames E5 differently.
+- **The re-baseline on the merged state** (v8 = gv3/production `274fe408` merged, engine-3; clips
+  rendered alone; Critic inputs from a fresh whole-film cast trace of v8 through the adapter at
+  creative-critic `f1b5e5b`, 31 entities and 21 set-piece events; these jobs start a new series and
+  are not comparable with the engine-2 ones):
+
+  | clip | job | sync | effects | coherence | observed routes | high findings |
+  |---|---|---|---|---|---|---|
+  | D 177.71-192.48 | job_1a0e4530ce7563f3a | 0.72 | 0.85 | 1.00 | the elder's kick: underside, practical light; gills weak (z 3.4) | none |
+  | A 0-18.94 | job_1a0e45332f3f5ef47 | 0.69 | 0.83 | 1.00 | the elder's kick: gills z 5.0, underside z 5.4 | none |
+  | E 93-100 | job_1a0e4535a8587ab19 | 0.61 | 0.78 | 1.00 | none | none |
+
+  The heartbeat on the gold (kick-locked): s01 +6.1%, s02 +4.0%, s33 +12.0% (the first pass's +11.7%
+  in the drop; v4 +8.6%). The fog now takes the sky's radiance: a teal air in the middle distance;
+  the drop's mean luma 0.157 (v7 0.143), the plateau's 0.203. Hue, plateau -> drop, on engine-3:
+  3.03 degrees (inside the plateau's 4.5-5.3). The render log reads "post chain 1080 lines at
+  reference height 1080 ... 1.00x", 0 unknown parameters.
 - The Critic, v3n -> v4 on the open (A): musical_synchronization 0.81 -> 0.76, effects 0.90 -> 0.87,
   because its grid no longer finds v3's per-frame sky response (spectrum shape was still 0.75 in
   v3) -- the same disagreement as in iteration 2: the plan gives the aurora the lead, slowly.
