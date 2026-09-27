@@ -109,7 +109,8 @@ struct ReactiveTarget {
     std::string field;                          // a wave's: the field its owner names
     bool fieldTriggered = false;                // ...whose clock starts at a musical event (ADR-906)
     bool keyed = false;                         // the author keys it (a timeline track)
-    std::vector<std::string> drivenBy;          // sources of the authored routes already on it
+    std::vector<std::string> drivenBy;          // sources of the routes a person made that are already on it
+    std::vector<std::string> plannedBy;         // the Director plan items whose routes are on it ("<plan>/<key>")
     std::vector<params::liveness::Finding> hazards; // liveness hazards that did not exclude it
 };
 

@@ -137,6 +137,17 @@ struct Builder {
             used.insert(t.path);
             return false;
         }
+        // Another plan's route is that plan's to revise; this plan's own previous revision is not in the
+        // way -- a revision replaces it.
+        const std::string mine = options.planId + "/";
+        for (const std::string& item : t.plannedBy) {
+            if (!item.starts_with(mine)) {
+                notes.push_back(fmt::format("{} ({}) is left alone: Director plan item '{}' already routes it", t.label,
+                                            t.path, item));
+                used.insert(t.path);
+                return false;
+            }
+        }
         if (options.skipAuthored && !t.drivenBy.empty()) {
             std::string sources;
             for (const std::string& s : t.drivenBy) {

@@ -52,7 +52,8 @@ inline std::string gladeSceneJson(const std::filesystem::path& scatterAsset, con
                         const std::string& extra = {}) {
         return fmt::format(R"({{ "name": "{}", "kind": "procedural", "position": [{}, {}, {}], "procedural": {{
             "source": {{ "kind": "box", "size": [{}, {}, {}] }}, "distribution": {{ "kind": "single" }},
-            "material": {}{} }} }})",
+            "material": {}, "motion": {{ "stiffness": 0.4, "mass": 0.4, "windSensitivity": 1.0, "bendLimit": 0.3,
+            "tipAmplitude": 0.25 }}{} }} }})",
                            name, x, y, z, s, s * 0.6f, s, material, extra);
     };
     const char* cap = R"({ "program": "capglow", "baseColor": [0.02, 0.02, 0.05], "roughness": 0.5 })";
@@ -72,13 +73,13 @@ inline std::string gladeSceneJson(const std::filesystem::path& scatterAsset, con
         heroes += ",\n      " + box(h.cap, h.x, h.size * 1.2f, h.z, h.size, cap);
         // The smallest hero's gills take the wave too: a node's light wave (procedural emissiveField).
         const bool wavy = options.wave && std::string_view(h.gills) == "moss-gills";
-        heroes += ",\n      " + box(h.gills, h.x, h.size * 0.7f, h.z, h.size * 0.8f, gills,
+        heroes += ",\n      " + box(h.gills, h.x, h.size * 0.55f, h.z, h.size * 1.35f, gills,
                                     wavy ? R"(, "emissiveField": "ripple", "emissiveFieldAmount": 3.0)" : "");
     }
     heroes += ",\n      " + box("elder-stem", 0.0f, 1.0f, 0.0f, 1.0f, stem);
     return R"({
       "format": "avgen-scene", "version": 1, "name": "glade",
-      "camera": { "mode": 1, "position": [0, 16, 46], "target": [0, 1.5, 0], "fov": 55.0 },
+      "camera": { "mode": 1, "position": [0, 7.5, 24], "target": [0, 2.0, 2.0], "fov": 55.0 },
       "environment": { "background": [0.004, 0.006, 0.014], "intensity": 0.15, "stylized": true,
         "volumeDensity": 0.004, "volumeScattering": 0.5, "volumeSteps": 12, "volumeMaxDistance": 160.0,
         "fogColor": [0.10, 0.18, 0.32], "ecologyLight": 1.4, "ecologyLightRange": 200.0,
@@ -106,25 +107,27 @@ inline std::string gladeSceneJson(const std::filesystem::path& scatterAsset, con
           "activation": "always" } ],
       "nodes": [
         { "name": "meadow", "kind": "terrain",
-          "world": { "name": "glade", "size": [120, 120], "features": [
-            { "name": "pond", "kind": "river", "path": [[-30, 0.0, 16], [-16, 0.0, 22]], "width": 12.0,
+          "world": { "name": "glade", "size": [120, 120], "baseHeight": 0.0, "seaLevel": -100.0, "layers": [], "features": [
+            { "name": "pond", "kind": "river", "path": [[-9, 0.0, 11], [1, 0.0, 13]], "width": 10.0,
               "amplitude": 2.0, "flatten": 1.0, "water": true, "waterDepth": 0.8 } ] },
           "terrain": { "chunkSize": 60.0, "resolution": 24, "lodLevels": 1, "viewDistance": 300.0,
-                       "water": { "enabled": true, "glow": 0.4, "sparkle": 1.0, "swell": 0.02 } },
+                       "water": { "enabled": true, "glow": 1.0, "glowColor": [0.1, 0.8, 0.6], "sparkle": 2.0,
+                                  "swell": 0.02 } },
           "material": { "baseColor": [0.18, 0.2, 0.16], "roughness": 0.9 },
           "scatter": [
-            { "name": "fungi", "asset": ")" + asset + R"(", "densities": { "meadow": 0.12, "forest": 0.12 },
-              "height": 0.3, "emissiveIntensity": 6.0, "emissiveColor": [0.34, 0.08, 1.0],
+            { "name": "fungi", "asset": ")" + asset + R"(", "densities": { "marsh": 0.3, "meadow": 0.3, "forest": 0.3 },
+              "height": 0.3, "minScreenRadius": 0.3, "emissiveIntensity": 6.0, "emissiveColor": [0.34, 0.08, 1.0],
               "materialProgram": "tissue", "castsShadow": false )" + fungiWave + R"( },
-            { "name": "shelf", "asset": ")" + asset + R"(", "densities": { "meadow": 0.03, "forest": 0.03 },
-              "height": 0.55, "emissiveIntensity": 4.0, "emissiveColor": [0.05, 1.0, 0.62],
+            { "name": "shelf", "asset": ")" + asset + R"(", "densities": { "marsh": 0.03, "meadow": 0.03, "forest": 0.03 },
+              "height": 0.55, "minScreenRadius": 0.3, "emissiveIntensity": 4.0, "emissiveColor": [0.05, 1.0, 0.62],
               "materialProgram": "tissue", "castsShadow": false },
-            { "name": "lamps", "asset": ")" + asset + R"(", "densities": { "meadow": 0.004, "forest": 0.004 },
-              "height": 1.5, "emissiveIntensity": 6.0, "emissiveColor": [0.06, 0.82, 1.0],
+            { "name": "lamps", "asset": ")" + asset + R"(", "densities": { "marsh": 0.004, "meadow": 0.004, "forest": 0.004 },
+              "height": 1.5, "minScreenRadius": 0.3, "emissiveIntensity": 6.0, "emissiveColor": [0.06, 0.82, 1.0],
               "materialProgram": "tissue", "castsShadow": false },
-            { "name": "grass", "asset": ")" + asset + R"(", "densities": { "meadow": 0.2, "forest": 0.1 },
-              "height": 0.6, "emissiveIntensity": 0.3, "emissiveColor": [0.05, 1.0, 0.55], "castsShadow": false },
-            { "name": "stones", "asset": ")" + asset + R"(", "densities": { "meadow": 0.01, "forest": 0.01 },
+            { "name": "grass", "asset": ")" + asset + R"(", "densities": { "marsh": 0.2, "meadow": 0.2, "forest": 0.1 },
+              "height": 0.6, "emissiveIntensity": 0.3, "emissiveColor": [0.05, 1.0, 0.55], "castsShadow": false,
+              "motion": { "stiffness": 0.3, "mass": 0.3, "windSensitivity": 1.0, "bendLimit": 0.5, "tipAmplitude": 0.35 } },
+            { "name": "stones", "asset": ")" + asset + R"(", "densities": { "marsh": 0.01, "meadow": 0.01, "forest": 0.01 },
               "height": 0.5, "castsShadow": false } ] },
         { "name": "spores", "kind": "particles", "position": [-6, 3, 24], "particles": { "position": [0, 0, 0], "shape": "disc", "seed": 17,
             "extent": [18, 2, 18], "capacity": 1024, "spawnRate": 60.0, "lifetimeMin": 6.0, "lifetimeMax": 9.0,
@@ -133,8 +136,8 @@ inline std::string gladeSceneJson(const std::filesystem::path& scatterAsset, con
             "emissive": 3.0 } },
         { "name": "elder-spores", "kind": "particles", "parent": "elder-cap", "position": [0, 2, 0],
           "particles": { "position": [0, 0, 0], "shape": "disc", "seed": 23, "extent": [4, 0.2, 4], "capacity": 512,
-            "spawnRate": 40.0, "lifetimeMin": 5.0, "lifetimeMax": 7.0, "speedMin": 0.1, "speedMax": 0.2,
-            "direction": [0, -1, 0], "spread": 0.3, "sizeStart": 0.15, "sizeEnd": 0.06, "blend": "additive",
+            "spawnRate": 90.0, "lifetimeMin": 5.0, "lifetimeMax": 7.0, "speedMin": 0.1, "speedMax": 0.2,
+            "direction": [0, -1, 0], "spread": 0.3, "sizeStart": 0.3, "sizeEnd": 0.12, "blend": "additive",
             "colorStart": [1.0, 0.47, 0.15, 1.0], "colorEnd": [1.0, 0.47, 0.15, 0.0], "emissive": 3.5 } },
         { "name": "walker", "kind": "gltf", "asset": ")" + characterAsset.generic_string() + R"(",
           "position": [6, 0, 12], "scale": [1.5, 1.5, 1.5] })" + heroes + field + R"(

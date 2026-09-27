@@ -819,6 +819,9 @@ json ReactiveCatalog::toJson() const {
         if (!t.drivenBy.empty()) {
             o["drivenBy"] = t.drivenBy;
         }
+        if (!t.plannedBy.empty()) {
+            o["plannedBy"] = t.plannedBy;
+        }
         if (!t.hazards.empty()) {
             json hazards = json::array();
             for (const params::liveness::Finding& f : t.hazards) {
@@ -977,7 +980,7 @@ ReactiveCatalog buildReactiveCatalog(const ReactiveInputs& in) {
         t.keyed = std::find(in.keyedTargets.begin(), in.keyedTargets.end(), path) != in.keyedTargets.end();
         for (const params::ModRoute& r : in.routes) {
             if (r.enabled && r.target == path) {
-                addTo(t.drivenBy, r.source);
+                addTo(r.planItem.empty() ? t.drivenBy : t.plannedBy, r.planItem.empty() ? r.source : r.planItem);
             }
         }
     }
