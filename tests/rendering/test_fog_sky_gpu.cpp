@@ -195,7 +195,8 @@ TEST_CASE("a far ridge fogged towards the sky dissolves into the sky behind it",
                                                << bandLuminance(skyOnly.image, kRidgeTop, kRidgeBottom));
     // About 5% of the ridge survives 300 m of this air, and the map is a low-pass of the sky, so the
     // treatment is the sky to within a few tenths of that; the control is most of the sky away.
-    CHECK(treatmentGap < 0.15);
+    // Measured: fog from the sky 0.054, the constant colour 0.865.
+    CHECK(treatmentGap < 0.1);
     CHECK(controlGap > 0.6);
 
     // The option reaches the map and the map reaches the output: it was built in the treatment and
@@ -233,14 +234,15 @@ TEST_CASE("the fog carries the aurora into the air in front of it", "[gpu][fog][
     const double withConstant = bandDifference(auroraConstant.image, plainConstant.image, kRidgeTop, kRidgeBottom);
     WARN("the aurora's effect on the fogged ridge: fog from the sky " << withSky << ", constant fog colour "
                                                                                 << withConstant);
-    CHECK(withSky > 0.05);
+    // Measured: 0.92 through the sky, exactly 0 through the constant colour.
+    CHECK(withSky > 0.3);
     CHECK(withConstant < 0.01);
 
     // It gets there through the map: the map's horizon rows carry the aurora's light.
     const double mapPlain = bandLuminance(plainFromSky.map, 0.0, 0.25);
     const double mapAurora = bandLuminance(auroraFromSky.map, 0.0, 0.25);
     WARN("the map's horizon rows: plain sky " << mapPlain << ", with the aurora " << mapAurora);
-    CHECK(mapAurora > mapPlain * 1.05);
+    CHECK(mapAurora > mapPlain * 1.5); // measured 0.948 against 0.389
     CHECK(ctx->errorCount() == 0);
 }
 

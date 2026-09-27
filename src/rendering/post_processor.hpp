@@ -95,6 +95,8 @@ struct PostStats {
     std::uint32_t motionBlurTile = 0;   // velocity tile edge in pixels (0 = motion blur did not run)
     float motionBlurRadius = 0.0f;      // the smear's clamp in pixels
     std::uint32_t lookOctaves = 0;      // extra octaves the look stage's low-pass was taken down
+    std::uint32_t pyramidBoxOctaves = 0; // whole octaves the frame was box-filtered by before the
+                                         // bloom and halation pyramids read it (the reference's size)
     float exposureScale = 1.0f;      // the linear scale applied before bloom
     float exposureEv100 = 0.0f;      // the EV in force (scene-referred; see scene/camera.hpp)
     float meteredLuminance = -1.0f;  // the previous frame's centre-weighted luminance (-1 = none)

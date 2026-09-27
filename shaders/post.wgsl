@@ -189,13 +189,12 @@ fn fs_downsample(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(sum, 1.0);
 }
 
-// ADR-917: a 2x2 box. A frame finer than the post chain's reference height builds pyramid levels
-// finer than the reference's first, and those carry no weight: they are how the chain gets from
-// the frame to the reference's first level. Both prefilters are boxes of the frame (fs_prefilter's
-// four taps a 2x2, fs_halation_prefilter's a 4x4), so boxes are what carry the frame there with the
-// reference's footprint; the 13-tap above would soften it by about a texel every octave. One
-// bilinear tap at this texel's centre, which in a target half the source's size lands on the corner
-// of four source texels and so is exactly their mean.
+// ADR-917: a 2x2 box. A frame whole octaves finer than the post chain's reference height is
+// box-filtered down by them, colour and emission alike, before the bloom and halation pyramids read
+// it -- the relation between a supersampled final and the preview it was tuned on -- so both
+// prefilters threshold the boxes of the picture the reference's do. One bilinear tap at this texel's
+// centre, which in a target half the source's size lands on the corner of four source texels and so
+// is exactly their mean.
 @fragment
 fn fs_box_down(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb, 1.0);

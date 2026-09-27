@@ -205,5 +205,12 @@ TEST_CASE("post/referenceHeight is registered, round-trips and reaches the setti
     const std::string line = scene::describePostScale(back, 4320);
     INFO(line);
     CHECK(line.find("4.00x") != std::string::npos);
-    CHECK(line.find("+2.00 octaves") != std::string::npos);
+    CHECK(line.find("box-filtered 2 octave(s) down, then 6 levels +0.00 octaves") != std::string::npos);
+    // A preview at its reference boxes nothing; a 1080p frame against the default 720 is a fraction
+    // of an octave the plan shares between levels.
+    CHECK(scene::describePostScale(back, 1080).find("box-filtered 0 octave(s) down, then 6 levels +0.00") !=
+          std::string::npos);
+    back.referenceHeight = 720.0f;
+    CHECK(scene::describePostScale(back, 1080).find("box-filtered 0 octave(s) down, then 6 levels +0.58") !=
+          std::string::npos);
 }

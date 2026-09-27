@@ -304,21 +304,33 @@ TEST_CASE("bloom, halation and the anamorphic streak keep their look across a fo
     WARN("streak    treatment " << streak.treatment << " (r90 x" << streak.treatmentR90 << ")  control "
                                 << streak.control << " (r90 x" << streak.controlR90 << ")");
 
-    // What reached the chain at four times the reference height: two more pyramid levels, a streak
-    // four times as many quarter-resolution texels long. The halation pyramid starts at a quarter of
-    // the frame, so at both sizes its last authored level would be one texel tall and is not built
-    // (5 of 6 at 180 lines, 7 of 8 at 720): the same level lost at both, which is the point.
+    // What reached the chain at four times the reference height: the frame boxed down two octaves
+    // to the reference's size, then the reference's own pyramids -- six bloom levels, and five of
+    // six halation levels at both sizes (its last authored level would be one texel tall at 180
+    // lines, and is not built at either) -- and a streak four times as many quarter-resolution
+    // texels long.
     CHECK(bloom.highStats.pixelScale == 4.0f);
-    CHECK(bloom.highStats.bloomLevels == 8u);
-    CHECK(halation.highStats.halationLevels == 7u);
+    CHECK(bloom.highStats.pyramidBoxOctaves == 2u);
+    CHECK(bloom.highStats.bloomLevels == 6u);
+    CHECK(halation.highStats.halationLevels == 5u);
     CHECK(streak.highStats.anamorphicReach == 8.0f * 8.0f * 4.0f);
 
+    // Measured on the first run with the frame boxed to the reference before the pyramids (M-series,
+    // 2026-09-27): relative L1 bloom 0.073, halation 0.136, streak 0.051 against the unscaled
+    // chain's 0.498, 0.782 and 1.439; the warm emitter's reach x1.003, x1.005 and x1.000 against
+    // x0.286, x0.295 and x0.325. What remains is rasterisation: a box 5 px across at 180 lines is
+    // drawn with a stair at its edge that the 720-line frame resolves. The bars leave that headroom
+    // and sit far below every control.
     CHECK(bloom.treatment < 0.15);
-    CHECK(halation.treatment < 0.15);
+    CHECK(halation.treatment < 0.2);
     CHECK(streak.treatment < 0.15);
     CHECK(bloom.control > 0.4);
     CHECK(halation.control > 0.4);
     CHECK(streak.control > 0.4);
+    for (const Arms* arms : {&bloom, &halation, &streak}) {
+        CHECK(std::abs(arms->treatmentR90 - 1.0) < 0.05); // the same reach, as a fraction of the frame
+        CHECK(arms->controlR90 < 0.5);                     // the unscaled chain's: under half of it
+    }
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -420,8 +432,10 @@ TEST_CASE("motion blur keeps its smear across a fourfold resolution change", "[g
     // pixels.
     CHECK(highStats.motionBlurTile == 80u);
     CHECK(highStats.motionBlurRadius == 120.0f);
-    CHECK(error[0] < 0.25);
-    CHECK(error[1] > 2.0 * error[0]);
+    // Measured: treatment 0.094, control 0.355. The separable tile maximum that takes the 80 px
+    // tiles gave the single pass's error to all twelve printed digits (a throwaway build, ADR-917).
+    CHECK(error[0] < 0.15);
+    CHECK(error[1] > 2.5 * error[0]);
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -435,6 +449,7 @@ TEST_CASE("post/referenceHeight moves the glow's reach at a fixed frame size", "
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
     double r90[2] = {0.0, 0.0};
     std::uint32_t levels[2] = {0, 0};
+    std::uint32_t boxed[2] = {0, 0};
     for (int i = 0; i < 2; ++i) {
         scene::Scene off = glowShot(true); // one source, so every pixel of the sum is its glow
         off.post.referenceHeight = i == 0 ? 720.0f : 360.0f;
@@ -445,11 +460,16 @@ TEST_CASE("post/referenceHeight moves the glow's reach at a fixed frame size", "
         const glm::dvec2 at = centroid(without.image);
         r90[i] = energyRadius(minus(withBloom.image, without.image), at.x, at.y, 0.9);
         levels[i] = withBloom.post.bloomLevels;
+        boxed[i] = withBloom.post.pyramidBoxOctaves;
     }
     WARN("r90 at reference 720: " << r90[0] << ", at reference 360: " << r90[1]);
+    // At reference 360 the 720-line frame is an octave finer: boxed down one octave, then the
+    // reference's six levels, which now reach twice as far across the frame.
     CHECK(levels[0] == 6u);
-    CHECK(levels[1] == 7u);
-    CHECK(r90[1] > 1.4 * r90[0]);
+    CHECK(boxed[0] == 0u);
+    CHECK(levels[1] == 6u);
+    CHECK(boxed[1] == 1u);
+    CHECK(r90[1] > 1.6 * r90[0]); // measured x1.81
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -619,7 +639,9 @@ TEST_CASE("the look stage's local mean keeps its radius where its tap budget run
                                                                              << control);
     CHECK(lowOctaves == 0u);  // 6 texels of sigma at 270 lines: within the budget, nothing changes
     CHECK(highOctaves == 2u); // 24 at 1080: two octaves down to 6
-    CHECK(treatment < 0.2);
+    // Measured: 0.029 with the octave descent; 0.310 from a throwaway build of the chain before it
+    // (the gaussian truncated at the tap budget), which fails this bar; 0.540 for the half-radius arm.
+    CHECK(treatment < 0.08);
     CHECK(control > 2.0 * treatment);
     CHECK(bench.ctx->errorCount() == 0);
 }

@@ -68,9 +68,9 @@ constexpr std::uint32_t kMaxMotionBlurTile = 160;
 // Larger tiles are taken separably (rows, then columns).
 constexpr std::uint32_t kSinglePassMotionBlurTile = 40;
 
-// ADR-917: the finest pyramid level that carries weight. Level 0 at or below the reference (it
-// keeps 1 - blend >= 0.05); in a frame finer than the reference, the levels below it are downsample
-// steps only.
+// ADR-917: the finest pyramid level that carries weight. Level 0 whenever the plan's octaves are
+// below one (it keeps 1 - blend >= 0.05), which the box before the pyramids makes every case but a
+// frame too small to box.
 std::uint32_t firstWeightedLevel(const scene::PyramidPlan& plan) {
     std::uint32_t first = 0;
     while (first + 1 < plan.levels && plan.weight[first] <= 0.0f) {
@@ -483,11 +483,11 @@ PostProcessor::PyramidResult PostProcessor::buildPyramid(wgpu::CommandEncoder& e
     if (down.empty()) {
         return {};
     }
-    // ADR-917: the finest level with any weight. Every level finer than it is weightless -- it exists
-    // so the downsample can reach the reference's levels -- and an upsample step through it would
-    // be a tent of the result below with nothing of its own added: blur, and nothing else. So the
-    // chain stops there and the consumers magnify that level bilinearly, as they magnify level 0
-    // at the reference.
+    // ADR-917: the finest level with any weight. The chain boxes whole octaves away before the
+    // pyramid (run() above), so this is level 0 unless a frame was too small to box; a level finer
+    // than it would be weightless, and an upsample step through it a tent of the result below with
+    // nothing of its own added -- blur, and nothing else. So the chain stops there and the
+    // consumers magnify that level bilinearly, as they magnify level 0.
     const std::size_t first = std::min<std::size_t>(firstWeightedLevel(plan), down.size() - 1);
     PyramidResult acc{down.back().view, down.back().width};
     for (int level = static_cast<int>(down.size()) - 2; level >= static_cast<int>(first); --level) {
@@ -701,40 +701,76 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     // the prefiltered image's mean whatever the level count (energy-conserving upsample, ADR-039).
     const float blend = std::clamp(s.bloomRadius * 0.5f, 0.05f, 0.95f);
 
+    // ---- ADR-917: the pyramids see the frame at the reference's size ------------------------------
+    //
+    // A frame whole octaves finer than the reference is box-filtered down by them before either
+    // pyramid reads it, and its emission target with it -- which is exactly the relation between a
+    // supersampled final and the preview it was tuned on. So both prefilters threshold the same
+    // boxes of the picture the reference's do (bloom's a 2x2 of the frame, halation's a 4x4), and
+    // every level after is the reference's own. Building the extra octaves as pyramid levels
+    // instead -- thresholding boxes a quarter or a sixteenth of the size, and filtering the result
+    // down -- measurably moved the look: a subtractive threshold takes a larger share from the edge
+    // of a small source when its boxes are coarse, so the finer frame's halo carried 1.4x the
+    // energy, and at 4x the reference the halation's core came out twice as wide. What is left,
+    // less than an octave, the plan shares between the two levels that bracket it.
+    wgpu::TextureView pyramidSource = current;
+    wgpu::TextureView pyramidEmission = in.emission;
+    std::uint32_t pyramidWidth = in.width;
+    std::uint32_t pyramidHeight = in.height;
+    std::vector<gpu::TransientTexture> boxed;
+    if (pyramidOn || halationOn) {
+        const auto whole = static_cast<std::uint32_t>(std::max(0.0f, std::floor(octaves + 1e-4f)));
+        for (std::uint32_t k = 0; k < whole && pyramidWidth >= 4 && pyramidHeight >= 4; ++k) {
+            pyramidWidth /= 2;
+            pyramidHeight /= 2;
+            stage_ = pyramidOn ? "post/bloom" : "post/halation";
+            auto colour = pool.acquire(pyramidWidth, pyramidHeight, kHdrFormat, pyramidUsage(), "pyramid-box");
+            runPass(encoder, boxDown_, colour.view, pyramidSource, nullptr, nullptr, base);
+            captureStage("pyramid/box" + std::to_string(k + 1), colour);
+            pyramidSource = colour.view;
+            boxed.push_back(colour);
+            if (pyramidOn && pyramidEmission) {
+                auto emission =
+                    pool.acquire(pyramidWidth, pyramidHeight, kHdrFormat, pyramidUsage(), "pyramid-box-emission");
+                runPass(encoder, boxDown_, emission.view, pyramidEmission, nullptr, nullptr, base);
+                pyramidEmission = emission.view;
+                boxed.push_back(emission);
+            }
+            ++stats_.pyramidBoxOctaves;
+        }
+    }
+    const float pyramidOctaves = octaves - static_cast<float>(stats_.pyramidBoxOctaves);
+    const glm::vec2 pyramidTexel =
+        1.0f / glm::vec2(static_cast<float>(pyramidWidth), static_cast<float>(pyramidHeight));
+
     wgpu::TextureView bloom;
     std::uint32_t bloomWidth = 0; // the assembled bloom's own width, for the streak's source choice
     std::vector<gpu::TransientTexture> down;
     if (pyramidOn) {
-        // ADR-917: the authored depth is the depth at the reference height. A finer frame builds
-        // the extra levels at the fine end and gives them no weight, so the coarsest level -- the
-        // glow's reach -- is the same fraction of the frame at every size (scene::planPyramid).
-        std::uint32_t w = std::max(1u, in.width / 2);
-        std::uint32_t h = std::max(1u, in.height / 2);
-        const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, octaves, w, h);
-        const std::uint32_t first = firstWeightedLevel(plan);
+        // ADR-917: the authored depth is the depth at the reference height, and the plan shares
+        // the fraction of an octave left after the box between the levels that bracket it, so the
+        // coarsest level -- the glow's reach -- is the same fraction of the frame at every size
+        // (scene::planPyramid).
+        std::uint32_t w = std::max(1u, pyramidWidth / 2);
+        std::uint32_t h = std::max(1u, pyramidHeight / 2);
+        const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, pyramidOctaves, w, h);
         for (std::uint32_t level = 0; level < plan.levels; ++level) {
             auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "bloom-down");
             Uniforms u = base;
             if (level == 0) {
-                u.texelSize = 1.0f / base.outputSize;
+                u.texelSize = pyramidTexel;
                 u.params0 = glm::vec4(s.bloomThreshold, s.bloomKnee, std::clamp(s.bloomEmissionWeight, 0.0f, 1.0f),
-                                      in.emission ? 1.0f : 0.0f);
+                                      pyramidEmission ? 1.0f : 0.0f);
                 // The exposure the scene has already been scaled by. The emission target is written
                 // by the scene pass, *before* exposure; `source` here is after it. Without this the
                 // ratio of the two is off by the exposure factor -- which at ev-2 suppresses the
                 // glow on the very lights the mask exists to keep.
                 u.params1 = glm::vec4(exposure, 0.0f, 0.0f, 0.0f);
                 PassTextures textures;
-                textures.source = current;
-                textures.emission = in.emission;
+                textures.source = pyramidSource;
+                textures.emission = pyramidEmission;
                 stage_ = "post/bloom";
                 runPass(encoder, prefilter_, target.view, textures, u);
-            } else if (level <= first) {
-                // ADR-917: into and through the levels finer than the reference's first, a plain
-                // 2x2 box -- the prefilter's own filter -- so the first weighted level is a box of
-                // the frame, as the reference's level 0 is; the 13-tap would soften it by a texel
-                // an octave.
-                runPass(encoder, boxDown_, target.view, down.back().view, nullptr, nullptr, u);
             } else {
                 u.texelSize =
                     1.0f / glm::vec2(static_cast<float>(down.back().width), static_cast<float>(down.back().height));
@@ -751,27 +787,22 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         bloomWidth = assembled.width;
     }
 
-    // Halation: its own, coarser pyramid over a warm-weighted threshold (ADR-039), planned the same
-    // way as bloom's so its halo holds its size too (ADR-917).
+    // Halation: its own, coarser pyramid over a warm-weighted threshold (ADR-039), reading the same
+    // boxed frame and planned the same way as bloom's, so its halo holds its size too (ADR-917).
     wgpu::TextureView halation;
     if (halationOn) {
         std::vector<gpu::TransientTexture> hdown;
-        std::uint32_t w = std::max(1u, in.width / 4);
-        std::uint32_t h = std::max(1u, in.height / 4);
-        const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, octaves, w, h);
-        const std::uint32_t first = firstWeightedLevel(plan);
+        std::uint32_t w = std::max(1u, pyramidWidth / 4);
+        std::uint32_t h = std::max(1u, pyramidHeight / 4);
+        const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, pyramidOctaves, w, h);
         for (std::uint32_t level = 0; level < plan.levels; ++level) {
             auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "halation-down");
             Uniforms u = base;
             if (level == 0) {
-                u.texelSize = 1.0f / base.outputSize;
+                u.texelSize = pyramidTexel;
                 u.params0 = glm::vec4(s.halationThreshold, s.bloomKnee, std::clamp(s.halationWarmth, 0.0f, 1.0f), 0.0f);
                 stage_ = "post/halation";
-                runPass(encoder, halationPrefilter_, target.view, current, nullptr, nullptr, u);
-            } else if (level <= first) {
-                // ADR-917: as bloom's -- the halation prefilter is a 4x4 box, so boxes carry it to
-                // the reference's first level.
-                runPass(encoder, boxDown_, target.view, hdown.back().view, nullptr, nullptr, u);
+                runPass(encoder, halationPrefilter_, target.view, pyramidSource, nullptr, nullptr, u);
             } else {
                 u.texelSize =
                     1.0f / glm::vec2(static_cast<float>(hdown.back().width), static_cast<float>(hdown.back().height));
@@ -785,6 +816,9 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         }
         stats_.halationLevels = static_cast<std::uint32_t>(hdown.size());
         halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, plan, "halation").view;
+    }
+    for (const gpu::TransientTexture& t : boxed) {
+        pool.release(t); // both prefilters have read them
     }
 
     // The wide tier: halation tinted and the anamorphic streak, in one texture the composite adds.

@@ -464,12 +464,16 @@ std::string describePostScale(const PostSettings& s, std::uint32_t frameHeight) 
     const float scale = postPixelScale(s, frameHeight);
     const std::uint32_t levels = std::clamp<std::uint32_t>(s.bloomLevels, 1u, kMaxAuthoredPyramidLevels);
     const std::uint32_t tile = std::clamp<std::uint32_t>(s.motionBlurTileSize, 4u, 40u);
+    // The renderer boxes the frame down by the whole octaves first (PostProcessor::run), and the
+    // pyramid plan takes what is left.
+    const float octaves = std::log2(scale);
+    const float boxed = std::max(0.0f, std::floor(octaves + 1e-4f));
     return fmt::format("post chain {} lines at reference height {:.0f}: every glow, streak, halo and blur is "
                        "{:.2f}x its authored pixel size, so it covers the same part of the picture -- "
-                       "bloom and halation pyramids {} levels {:+.2f} octaves, anamorphic reach {:.0f} -> "
-                       "{:.0f} quarter-res texels, motion-blur tile {} -> {:.0f} px and radius {:.0f} -> "
-                       "{:.0f} px",
-                       frameHeight, s.referenceHeight, scale, levels, std::log2(scale),
+                       "bloom and halation read the frame box-filtered {:.0f} octave(s) down, then {} levels "
+                       "{:+.2f} octaves, anamorphic reach {:.0f} -> {:.0f} quarter-res texels, motion-blur tile "
+                       "{} -> {:.0f} px and radius {:.0f} -> {:.0f} px",
+                       frameHeight, s.referenceHeight, scale, boxed, levels, octaves - boxed,
                        8.0f * s.anamorphicStretch, 8.0f * s.anamorphicStretch * scale, tile,
                        static_cast<float>(tile) * scale, s.motionBlurMaxRadius, s.motionBlurMaxRadius * scale);
 }

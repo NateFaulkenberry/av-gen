@@ -9,7 +9,8 @@ energy-conserving pyramid, halation and anamorphic), ADR-040 (tile-based motion 
 (engine gap 3; "Post stack" 2, 4, 5 and 6)
 **Implemented by:** `PostSettings::referenceHeight` and `post/referenceHeight`, `postPixelScale`,
 `planPyramid`, `describePostScale` (`src/scene/post_settings.{hpp,cpp}`); `PostProcessor::run` and
-`buildPyramid` (`src/rendering/post_processor.cpp`); the render log line (`src/app/render_job.cpp`)
+`buildPyramid` (`src/rendering/post_processor.cpp`); `fs_box_down`, `fs_velocity_tile_max_rows` and
+`fs_velocity_tile_max_columns` (`shaders/post.wgsl`); the render log line (`src/app/render_job.cpp`)
 **Tests:** `tests/unit/test_post_resolution.cpp` (`[post][resolution]`, CPU);
 `tests/rendering/test_post_resolution_gpu.cpp` (`[gpu][post][resolution]`)
 
@@ -48,34 +49,52 @@ supersampling counts: a 960x540 preview at supersample 2 is a 1080-line chain.
 
 - **The default is 720,** the height the already-scaled radii were expressed at, so every one of
   them keeps its meaning exactly. The scale is also what they were already multiplied by.
-- **The pyramids** (bloom and halation) are planned by `planPyramid`:
-  - At the reference, level k of the authored pyramid carries weight (1 - b) b^k and the coarsest
-    level the rest, b being the upsample blend.
-  - A frame `octaves` = log2(scale) finer has every level that many octaves smaller, so each
-    authored weight moves that many levels towards the coarse end. A fractional shift shares a
-    weight between the two levels that bracket its size, which keeps the total at 1 and the weighted
-    mean octave exact.
-  - The levels finer than the reference's first get no weight: they are downsample steps, and their
-    upsample passes are a plain tent (blend 1).
-  - A frame coarser than the reference folds the weight of the levels it is too small to have into
-    its first.
-  - The blends are derived from the weights through suffix sums accumulated from the coarse end, so
-    **at a whole-octave shift every step's blend is the authored one to the bit**, and at the
-    reference the chain is the pre-ADR-917 chain: the same level count and the same blend on every
-    step.
+- **The pyramids** (bloom and halation) see the frame at the reference's size:
+  - **A frame whole octaves finer than the reference is box-filtered down by them first,** colour
+    and emission target alike (`fs_box_down`, one bilinear tap a texel, exactly the mean of four).
+    That is the relation between a supersampled final and the preview it was tuned on. Both
+    prefilters are boxes of the frame followed by a soft threshold (bloom's a 2x2, halation's a
+    4x4), so after the box they threshold the same boxes of the picture the reference's do, and
+    every level after is the reference's own: the same count, the same blends, the same sizes.
+  - **The fraction of an octave that is left** (and any shift of a frame coarser than the
+    reference) is planned by `planPyramid`. At the reference, level k carries weight (1 - b) b^k and
+    the coarsest level the rest, b being the upsample blend; a shift moves each authored weight that
+    many levels towards the coarse end, a fractional one sharing it between the two levels that
+    bracket its size, which keeps the total at 1 and the weighted mean octave exact. A coarser frame
+    folds the weight of the levels it is too small to have into its first. The blends come from the
+    weights through suffix sums accumulated from the coarse end, so at the reference -- and at any
+    whole-octave shift -- every step's blend is the authored one to the bit.
+  - At the reference the chain is therefore the pre-ADR-917 chain: no box, the same level count and
+    the same blend on every step.
+  - Rejected, after measuring it: building the extra octaves as pyramid levels (weightless fine
+    levels, downsampled and upsampled through). Upsampling through a weightless level is a tent and
+    nothing else, and a subtractive threshold takes a larger share from the edge of a small source
+    when its boxes are coarse, so the finer frame's halo carried 1.4x the energy and at 4x the
+    reference the halation's core was twice as wide as its preview's (relative L1 0.85, worse than
+    the unscaled chain's 0.78). Boxing first brought it to 0.136 (the measurements below).
 - **The anamorphic streak's reach** is `8 * stretch * scale` quarter-resolution texels. The tap
   count and the source level are chosen from the scaled reach by the existing comb rule, so a long
   streak at 4K reads the same pyramid level, the same fraction of the frame, as in its preview.
 - **The motion-blur tiles** are `tileSize * scale` pixels, capped at 160, alongside the radius they
-  gather.
+  gather. The reconstruction (McGuire 2012) gathers along the velocity of a pixel's 3x3 tile
+  neighbourhood, so a pixel more than a tile or two from a moving object never learns it moved:
+  tiles that stayed 20 px while the radius grew to 240 cut every long smear short.
+  - **Tiles past 40 px** (the parameter's old hard maximum) are reduced in two passes, the longest
+    velocity along each tile-wide run of a row and then the longest of those down each tile-tall
+    column. The single pass reads a tile's area serially per texel: at 80 px it took the motion blur
+    from 13.8 to 47.8 ms a frame at 7680x4320. The two passes find the same vector (the runs are
+    kept at the tiles' RG16F, so they could differ only in a tie within half-float precision; the
+    measured image did not differ, below). 40 px and under keep the single pass, so every chain at or
+    below twice its reference is unchanged.
 - **The look stage's low-pass,** when +-3 sigma exceeds its 32-tap budget, is taken down an octave
   (the same 13-tap downsample) and sigma halved, instead of truncating the gaussian at a fraction of
   a sigma. At the reference nothing changes there.
-- **What reached the chain is reported:** `PostStats` gains `pixelScale`, `anamorphicReach`,
-  `motionBlurTile`, `motionBlurRadius` and `lookOctaves`. A render logs one line at info saying what
-  the scale did, for example "post chain 4320 lines at reference height 1080: every glow, streak,
-  halo and blur is 4.00x its authored pixel size... bloom and halation pyramids 6 levels +2.00
-  octaves".
+- **What reached the chain is reported:** `PostStats` gains `pixelScale`, `pyramidBoxOctaves`,
+  `anamorphicReach`, `motionBlurTile`, `motionBlurRadius` and `lookOctaves`. A render logs one line
+  at info saying what the scale did, for example "post chain 4320 lines at reference height 1080:
+  every glow, streak, halo and blur is 4.00x its authored pixel size... bloom and halation read the
+  frame box-filtered 2 octave(s) down, then 6 levels +0.00 octaves, anamorphic reach 83 -> 332
+  quarter-res texels, motion-blur tile 20 -> 80 px and radius 60 -> 240 px".
 - **Where it is set:** `post/referenceHeight` is a direct row at the top of the Parameters panel's
   `post` group, above every section whose sizes it governs. A scene's own `post` block carries it
   as `referenceHeight`.

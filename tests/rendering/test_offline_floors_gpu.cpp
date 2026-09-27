@@ -156,7 +156,7 @@ TEST_CASE("the offline tier's anisotropy floor reaches the picture", "[gpu][qual
     }
     WARN("pixels that 16x anisotropy changes against 8x: " << changed << " of " << eight.rgba.size() / 4);
     CHECK(repeatChanged == 0); // the control: the same setting twice is the same picture
-    CHECK(changed > 100);      // and the floor's setting is a different one
+    CHECK(changed > 1000);     // and the floor's setting is a different one (measured 3666 of 64000)
     CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Offline).textureAnisotropy == 16u);
     CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Realtime).textureAnisotropy == 8u);
     CHECK(ctx->errorCount() == 0);
@@ -277,6 +277,8 @@ TEST_CASE("the offline sky floor takes the banding out of the visible sky at 4K"
     WARN("deviation from the analytic sky, worst / RMS: 128 px faces " << before.worst << " / " << before.rms
                                                                       << ", 1024 px faces " << after.worst << " / "
                                                                       << after.rms);
+    // Measured: worst 0.171 and RMS 0.0322 at 128 px a face; 0.00199 and 0.000586 at 1024 -- 86x
+    // and 55x less.
     CHECK(before.worst > 0.05); // the control can fail: the coarse sky is measurably the wrong shape
     CHECK(after.worst < before.worst / 20.0);
     CHECK(after.rms < before.rms / 20.0);
