@@ -16,7 +16,7 @@ This section supersedes the dated notes further down, which are history.
 **Integration** (`integrate/revision`, in the worktree `~/Documents/GitHub/av-gen-signals`):
 - `ec515c8b` = main + **characters**, with the follow-placement fix.
   - Two conflicts were resolved: in `staging.cpp` both kept (the placement check plus `step.component`); in `ui_logic.hpp` both comments kept, with `staging/` on the beginner list.
-  - It builds. **Targeted tests are running** (`[stage]`, follow camera, set-piece film and reach, character reach, chase test).
+  - It builds. Targeted tests pass: `[stage]` 79 cases; follow camera, set pieces and reach 36; the chase test. **The full suites are running** (logs `scratchpad/coord-integrate5-{gpu,cpu}-full.log`).
 - **Next:** run the full suites (GPU when no CPU suite runs, then CPU via ctest), then `git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision`, then merge main into `gv3/production`.
 - **Then render,** when its finisher reports.
 
@@ -25,7 +25,7 @@ This section supersedes the dated notes further down, which are history.
 | Worktree | Commit | Contents | State | Used by |
 |---|---|---|---|---|
 | `~/Documents/GitHub/av-gen-engine` | `040d6644` | main with setpieces | BUILD-READY | gv3-look, gv3-cut, gv3-world |
-| `~/Documents/GitHub/av-gen-engine-2` | `ec515c8b` | plus characters | building; `BUILD-READY` is written when done | gv3-cast |
+| `~/Documents/GitHub/av-gen-engine-2` | `ec515c8b` | plus characters | **BUILD-READY** (11:11) | gv3-cast; gv3-look, gv3-cut and gv3-world were told to switch at their next iteration boundary |
 
 When the characters integration passes, tell gv3-look, gv3-cut and gv3-world to re-point their symlink at `av-gen-engine-2`, so their renders get characters' behaviour.
 
