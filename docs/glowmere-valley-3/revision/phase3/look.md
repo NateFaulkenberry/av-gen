@@ -189,6 +189,40 @@ of E (93-100) at 960×540 for the Critic and the hue check; at 1920×1080, s33 (
 two bars of s39 (bars 115-116: the elder's rings in the last wide) and s08 (33.2-34.4: the tears).
 They render `v4.json`, the snapshot of `8dc975a2`.
 
+**Measured** (13:42-13:55; D rendered while one other render was running, the rest alone; the
+Critic's inputs regenerated with the fixed adapter `961e04c` -- "ember-cap" was mapped to the alien
+Ember -- into `build/gv3/look/critic/adapter-961e04c/`, and v3's D and A re-scored on them as `v3n`
+so v3 and v4 differ only in the film):
+- **The sky.** The aurora is back: s33's sky band 0.061 (v3) -> 0.076 (first pass 0.081); in s39 at
+  1080p the sky matches the first pass's final to within +26%/-19% by height band (the curtains a
+  little taller, the horizon band a little dimmer: the drop's intensity keys 2.4, the first pass's
+  style shift 3.2). Frame-to-frame change in s39's top 30%: median 6.8% (first pass) -> 1.4% (v4),
+  p99 36% -> 9.5%. The beat-locked pulse in the drop's sky: s36 +66.5% (first pass), +19.5% (v3),
+  +2.5% (v4); s33 keeps +11% (the elder's cap reaches into that band, and its kick is x2.0 there).
+- **The heartbeat** (gold pixels only, detrended, averaged on the kicks, peak 17-67 ms after them;
+  noise 0.1-0.7%): s01 +7.7% / +3.8% / +6.1% (first pass / v3 / v4), s02 +4.6 / +2.4 / +4.2,
+  s17 +6.4 / +4.4 / +4.9, s33 +11.7 / +5.6 / +8.6. v4 is 0.74-0.91 of the first pass's (v3 was about
+  half). The Critic's box-based number fell in A (+2.3% -> +1.3%) because the restored aurora behind
+  the elder dilutes its box; the gold itself rose.
+- **The lantern** on the scored claps: A "weak response (uncertain)", z 2.9, +2.0% in s01 (v3n: no
+  measurable response, z 0.9). In s04 and the drop too few claps fall inside a shot at these
+  lengths for the route-locked check.
+- **The drop's colour.** Plateau (s17) against drop (s33-s36), pooled hue distance: 2.84 degrees
+  (first pass), 1.67 (v3), 2.06 (v4), inside the plateau's own 4.5-5.3. Luma: plateau 0.186, drop
+  0.146 (v3 0.175/0.132); the drop is a new state in light and activity, not in hue. The small
+  mushrooms that are bluer than the first pass's at the same spots are the lowered `hueField`
+  (0.16 -> 0.07, which moves single mushrooms both ways and is the same in every section), not the drop.
+- **The Critic, v3n -> v4 on D:** musical_synchronization 0.55 -> 0.61, effects 0.74 -> 0.78;
+  visual_coherence 1.00 -> 0.98 and pacing -2.2, both from one low finding that s35 now repeats s34's
+  layout and colour (0.94 similarity, the aurora in both): a cut matter, noted for gv3-cut.
+- **The rings and the drop's ring are not demonstrated.** At 1080p neither the elder's rings (two
+  bars of s39, the elder 150 m away) nor the drop's ring (s33) reads as a travelling front: the fungi
+  are specks at that distance, and the frames show no band moving outward. Their configuration is
+  live (the audit); their meaningful tier is open.
+- **The water at 1080p.** The base ripple (0.1 at 2.6) covers the near river with bold ripples, as
+  in the owner's reference; but no seam crosses s08's glint any more, where the water stream placed
+  one: the seams are laid in the frame of the wind's direction, which iteration 1 turned (below).
+
 **After the snapshot** (not in the v4 renders):
 - `fd8cbc5a`: the scored claps leave out the four kick-gap beats (219 claps): the clap plays there,
   but that beat is the valley's held breath, and the lantern flaring through it would break the one
@@ -198,13 +232,20 @@ They render `v4.json`, the snapshot of `8dc975a2`.
   oscillator a 2 m plant swung 0.9 cm in a gust. Now tip 0.20, sensitivity 0.9, stiffness 2.4 and
   mass 1.2 (the same 0.225 Hz resonance), gust response 1.2: about 4.6 cm of gust swing and 2.8 cm of
   flutter, a third of the ferns' 13 cm. To verify on the static s34.
+- `4fce79f5`: the wind keeps the source's direction, 0.62 rad, which the tears were placed for
+  (water.wgsl lays the seams on a lattice in the frame of the wind's steady direction, so turning
+  the wind to 1.45 rad rotated every seam away from where the water stream put it). The rest of the
+  wind's retune stays. To verify on s08 at 1080p.
 
 **Open questions:**
-1. Do the elder's rings read (fungi within 45 m of the elder, every bar from groove 2)? Judge on the
-   1080p s39 slice; raise the speed or the fade radius if they are too local to see.
-2. Does the drop's ring read in s33 at 1080p (beacons and heroes lighting outward at 40 m/s)?
-3. The tears after the wind was turned down the valley (1.45 rad; the water stream tuned them at
-   0.62 rad): judge on the 1080p s08 slice.
+1. The elder's rings do not read in the shots that show the elder from afar (s39 at 1080p). They
+   need a shot near the elder's feet with the fungi in the foreground (s16, s17's low passes, s40),
+   judged at 1080p; or a larger fade radius and brighter crest if they are to read in wides.
+2. The drop's ring does not read as a front in s33 at 1080p. Candidates: carry it on the heroes and
+   the beacons only where they are large in frame, or make it the ecology light's (the light the
+   layers cast follows their `emissionGain`, not their `emissiveField`, so the ring lights the
+   mushrooms but not the ground around them).
+3. The tears with the wind back at 0.62 rad: verify the s08 glint seam at 1080p (queued, v5).
 4. The slow level routes on the specks (spire on the lead, veil on the bass level) read as
    "configured but no measurable response" everywhere; keep (background life) or drop.
 5. The wind's most visible plants, the fan plants, keep the source's stiffness (tip 0.08). A
