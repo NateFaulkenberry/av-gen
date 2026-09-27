@@ -469,13 +469,23 @@ void validateReactivity(Plan& plan, const SceneFacts& facts, Validation& v) {
         issue.details = {{"routes", live.size()}, {"lagMs", lag(live.front())}};
     }
 
-    // Entities answering too many signals, counting the project's own routes beside the plan's.
+    // Entities pulsing to too many signals, counting the project's own routes beside the plan's. A
+    // pulse is an event, a scored pulse (a value timeline written as short spans) or an LFO; a slow
+    // arc -- the section's energy, a band's level, a timeline keyed by section -- sets the level the
+    // pulses ride on and is not something else competing for the eye.
+    const auto pulses = [&](const std::string& source) {
+        if (startsWith(source, "lfo.")) {
+            return true;
+        }
+        const SignalFacts f = signalFacts.signal(source);
+        return f.isEvent || !f.pulses.empty();
+    };
     std::map<std::string, std::set<std::string>> sourcesOf;
     std::set<std::string> touched;
     for (std::size_t i = 0; i < standing.size(); ++i) {
         const params::ModRoute& r = standing[i];
         const bool mine = i >= authored;
-        if (!r.enabled || (mine && v.isBlocked(plan.routes[i - authored].key))) {
+        if (!r.enabled || (mine && v.isBlocked(plan.routes[i - authored].key)) || !pulses(r.source)) {
             continue;
         }
         for (const std::string& owner : targetOwners(catalog, r.target)) {
@@ -492,8 +502,8 @@ void validateReactivity(Plan& plan, const SceneFacts& facts, Validation& v) {
         const std::set<std::string>& sources = sourcesOf[owner];
         if (sources.size() > kSaturatedSources) {
             Issue& issue = add(Severity::Warning, IssueCode::OverSaturated, {}, "/routes",
-                               fmt::format("'{}' answers {} different signals ({}): it cannot read as answering any "
-                                           "one; give it one layer of the music, two at most",
+                               fmt::format("'{}' pulses to {} different signals ({}): it cannot read as answering "
+                                           "any one; give it one layer of the music, two at most",
                                            owner, sources.size(), fmt::join(sources, ", ")));
             issue.subject = owner;
             issue.details = {{"owner", owner}, {"sources", std::vector<std::string>(sources.begin(), sources.end())}};

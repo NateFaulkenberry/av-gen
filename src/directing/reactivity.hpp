@@ -15,9 +15,11 @@
 //   * ONE_SOURCE     three or more routes, and 60% or more of them follow one signal;
 //   * ONE_PHASE      three or more routes that share a source reach their targets at one instant
 //                    (the same delay plus attack), or every route of the plan does;
-//   * OVER_SATURATED one entity (a hero, a layer, a particle system) answers more than three signals
-//                    -- it cannot read as answering any one -- or the routes stacked on one target can
-//                    push it past its safe range (the reactive catalogue's, ADR-925).
+//   * OVER_SATURATED one entity (a hero, a layer, a particle system) pulses to more than two signals --
+//                    events, scored pulses, LFOs; it cannot read as answering any one -- or the routes
+//                    stacked on one target can push it past its safe range (the reactive catalogue's,
+//                    ADR-925). A slow arc (section.energy, a band's level, a timeline keyed by section)
+//                    sets the level the pulses ride on and does not count.
 //
 // A plan source must be pure in time (LFO, noise, timeline), so a seek replays every route that reads
 // it (ADR-901); an envelope or a random source is refused (NON_DETERMINISTIC). A route that reads a
@@ -45,7 +47,7 @@ namespace avgen::directing {
 inline constexpr std::size_t kOneSourceMinimumRoutes = 3;
 inline constexpr float kOneSourceShare = 0.6f;
 inline constexpr std::size_t kOnePhaseMinimumRoutes = 3;
-inline constexpr std::size_t kSaturatedSources = 3; // more distinct signals than this on one entity
+inline constexpr std::size_t kSaturatedSources = 2; // more distinct pulse signals than this on one entity
 
 // Checks the plan's routes and sources and adds what it finds to `v` (blocking refused items).
 // Called by `validatePlan` after the subjects and times are resolved.
