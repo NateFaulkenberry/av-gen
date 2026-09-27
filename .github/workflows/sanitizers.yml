@@ -97,9 +97,10 @@ jobs:
     # shards for everything else. Every case runs exactly once (`catch2_run.py plan-check`, run by
     # every push), except two the plan skips because no hosted job can finish them.
     # docs/development/ci.md, "The sanitizer partition", has the measurements. Expected per job:
-    #   heavy-1     : the sequence film (one process, the floor), and two pairs of long cases  ~4-5 h
-    #   heavy-2     : the fade film, the director's own 30 s, two abduction scenarios          ~3.2-3.7 h
-    #   rest-a/b/c  : every other default case, 9 Catch2 shards, 3 per job                     ~2.4 h (p95 3.8 h)
+    #   heavy-1   : the sequence film (one process, the floor), and two processes of long cases  ~4-5 h
+    #   heavy-2   : the fade film, the director's own 30 s, two abduction scenarios            ~3.2-3.7 h
+    #   heavy-3   : two abduction simulations, four half-hour cases, and rest shard 1 of 7      ~3.2-3.8 h
+    #   rest-a/b  : rest shards 2-4 and 5-7 of 7 (every other default case, none over ~26 min)  ~2-2.5 h
     # Five jobs: one wave of the account's five macOS slots, not two.
     name: ASan/UBSan tests (${{ matrix.job }})
     needs: asan-build
@@ -109,12 +110,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # `shards` rest shards, global `first` onwards of `total`; the plan gives `rest` its filter.
+          # `part`: whose named processes the job runs (none: ""). `shards` rest shards, global `first`
+          # onwards of `total`, over the plan's rest filter. Three processes per job: the runner has 3 vCPUs.
           - { job: heavy-1, part: heavy-1, shards: 0, total: 0, first: 0 }
           - { job: heavy-2, part: heavy-2, shards: 0, total: 0, first: 0 }
-          - { job: rest-a,  part: rest,    shards: 3, total: 9, first: 0 }
-          - { job: rest-b,  part: rest,    shards: 3, total: 9, first: 3 }
-          - { job: rest-c,  part: rest,    shards: 3, total: 9, first: 6 }
+          - { job: heavy-3, part: heavy-3, shards: 1, total: 7, first: 0 }
+          - { job: rest-a,  part: "",      shards: 3, total: 7, first: 1 }
+          - { job: rest-b,  part: "",      shards: 3, total: 7, first: 4 }
     env:
       # Gate: --gate sanitizer. Only a sanitizer report, a crash, a timeout or an unexercised case
       # fails this job. Assertion failures under Debug+ASan are listed, not gated: in run
@@ -157,9 +159,13 @@ jobs:
                 --expected-label "FILTERED $TEST_FILTER: not the full suite"
             exit $?
           fi
+          label="tools/ci/sanitizer-plan.txt: ${PART:-no named processes}"
+          if [ "$SHARDS" -gt 0 ]; then
+            label="$label; rest shards $((SHARD_FIRST + 1))-$((SHARD_FIRST + SHARDS)) of $SHARD_TOTAL"
+          fi
           python3 tools/ci/catch2_run.py run "${common[@]}" --plan tools/ci/sanitizer-plan.txt --part "$PART" \
               --shards "$SHARDS" --shard-total "$SHARD_TOTAL" --shard-first "$SHARD_FIRST" \
-              --expected-label "part $PART of tools/ci/sanitizer-plan.txt"
+              --expected-label "$label"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

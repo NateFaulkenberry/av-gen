@@ -150,7 +150,7 @@ the commit message.
 - **TSan:** `--preset tsan` over the concurrency subset (below). Runs weekly (Sunday) and on dispatch.
 - **Capacity:** a sanitizer run's five test jobs take the whole free-account macOS concurrency (5
   jobs) for 4-5 h, so push CI queues behind it; on Sundays TSan is a sixth job and waits for a
-  slot. The three rest jobs finish in about 2.5-4 h and hand their slots back while the film job
+  slot. The other four jobs finish in about 2-4 h and hand their slots back while the film job
   runs on. That is why it runs at night (07:17 UTC), and why a dispatch during working hours will
   delay everyone's pushes.
 
@@ -347,27 +347,35 @@ The ASan/UBSan run covers the default CPU set, the same set as the per-push job,
 - two cases that no hosted job can finish under ASan, skipped by name (below).
 
 Where every case runs is decided by one file, `tools/ci/sanitizer-plan.txt`, read by
-`tools/ci/catch2_run.py run --plan <file> --part <part>`:
+`tools/ci/catch2_run.py run --plan <file>`. A job runs one part's named processes (`--part`)
+and/or some of the rest's shards (`--shards`, `--shard-total`, `--shard-first`). Each job runs three
+processes, one per vCPU:
 
 | Job | What runs | Expected (Debug + ASan, hosted runner) |
 |---|---|---|
-| `heavy-1` | `film`: the eleven cases that read `film()` in `test_abduction_sequence.cpp`, in one process; `delete`: deleting animals, the engine's writeback; `pre262`: the pre-ADR-262 scenario, the slowed benchmark run | 4.1-5.0 h. The film: 245-300 min measured. The other two processes: about 3-3.5 h each |
+| `heavy-1` | `film`: the eleven cases that read `film()` in `test_abduction_sequence.cpp`, in one process; `delete`: deleting animals, the engine's writeback, the wandering animals; `pre262`: the pre-ADR-262 scenario, the slowed benchmark run, the beam's particles | 4.1-5.0 h. The film: 245-300 min measured. The other two: about 245-250 min each at the slowest measurements |
 | `heavy-2` | `fade`: the three cases that read the fade film in `test_abduction_fade.cpp`; `director`: the director's own 30 s, the lab; `abduct`: the UFO abducting several animals, the animal inside the beam | 3.2-3.7 h. Measured: fade 190-216 min, director 154 + 36, abduct 147 + 71 at worst |
-| `rest-a`, `rest-b`, `rest-c` | every other default case (`~[.]`, minus every case the plan names), 9 Catch2 shards, 3 per job | 2.4 h median, 3.8 h at the 95th percentile, per job |
+| `heavy-3` | `hidden`: the already-hidden animal, the same scene and seed; `lights`: the lit-up animal and three half-hour cases; rest shard 1 of 7 | 3.2-3.8 h. Measured: hidden 119 + 106, lights 83 + 33 + 31 + 32 at worst |
+| `rest-a`, `rest-b` | rest shards 2-4 and 5-7 of 7: every other default case (`~[.]`, minus every case the plan names), none measured over 26 min | about 2-2.5 h per job |
 
 All five run at once, so the run takes about 4-5 h after the 5-38 min build, against 8.5-10.5 h for
 the seven parts it replaces. Every job has the same 330 min ceiling (`--timeout-min`, inside the
 job's 355 min cap), and the thinnest margin is the film: 300 min at its worst against 330.
 
 **How it was measured.** Runs 36241405408 (2026-09-26) and 36321265640 (2026-09-27), both at main
-83a12334, three processes per 3-vCPU runner. Per case, ASan took a median 57x its Release time
-(p90 114x, over 110 cases that take over 1 s in Release). Cases never run under ASan are estimated
-from Release at 57x. The rest figures come from 4,000 random orders cut the way Catch2 cuts them
-into 9 shards, taking each case at the slowest time it was ever measured, which is pessimistic.
-Over the same orders, the slowest of all nine shards is 3.2 h median, 4.3 h at p95 and 4.9 h at p99.
-The same case can differ by up to half between runs (the UFO case: 95 min, then 147), so these
-are ranges, not promises: if a part times out, the TIMEOUT block names its process and the case it
-was running.
+83a12334, all 14 parts, three processes per 3-vCPU runner.
+
+- Per case, ASan took a median 56x its Release time (p90 109x, over 114 cases that take over 1 s in
+  Release). Cases never run under ASan are estimated from Release at 56x.
+- **The abduction simulations run far past that median:** "an animal that is already hidden..."
+  took 119 min for 46 s in Release (155x). So every case measured at 29 min or more is placed, and
+  the rest is left with nothing over 26 min.
+- The rest figures come from 4,000 random orders cut the way Catch2 cuts them into 7 shards, taking
+  each case at the slowest time it was ever measured, which is pessimistic. One rest shard: 1.4 h
+  median, 2.1 h at p95. The slowest of all seven: 2.0 h median, 2.8 h at p99, 3.3 h at worst.
+- The same case can differ by up to half between runs (the UFO case: 95 min, then 147), so these are
+  ranges, not promises. If a job times out, the TIMEOUT block names the process and the case it was
+  running.
 
 **Why a plan, and not more shards.** The old split ran `[stage]` in 18 random shards over six
 jobs, and five of the seven parts hit the ceiling. The time was not in the cases themselves:
@@ -387,8 +395,8 @@ jobs, and five of the seven parts hit the ceiling. The time was not in the cases
   the multicam's walking) runs under ASan in lighter cases, but those two paths through it do not.
   They need a sanitizer-sized variant, a shorter film when `__has_feature(address_sanitizer)`,
   before they can come back; that is their owners' change.
-- **Cases over about an hour** each get a named process, alone or with one more, so two of them
-  can never meet in one random shard.
+- **Cases over about half an hour** each get a named process with a few others, packed to about
+  250 min at their slowest measurements, so two of them can never meet in one random shard.
 
 The plan also fixes a quiet over-selection. `[stage]` also matches a hidden probe, "probe: the
 animal, the beam and the lag" (`[.][beam][probe][stage]`), which no default run includes, and the
@@ -400,7 +408,7 @@ seconds). It counts, with the binary's own `--list-tests`, that placed + skipped
 default set, and it fails on any plan name that matches no case or more than one:
 
 ```
-3786 cases: 22 placed + 2 skipped + 3762 in the rest of ~[.] = 3786     (main 876a11e2)
+3786 cases: 30 placed + 2 skipped + 3754 in the rest of ~[.] = 3786     (main 876a11e2)
 ```
 
 A name that goes stale on the nightly anyway is a `Sanitizer plan` warning in that job's summary,
@@ -516,8 +524,8 @@ such.
   - runs a Catch2 binary in shards and reads its XML and exit codes;
   - writes `result.json` and `summary.md`, emits annotations, and fails the step on any failure,
     crash, timeout, sanitizer report or unexercised case;
-  - `run --plan <file> --part <part>` runs one part of the sanitizer plan: its named processes,
-    then its rest shards (`--shards`, `--shard-total`, `--shard-first`);
+  - `run --plan <file>` runs one job of the sanitizer plan: a part's named processes (`--part`)
+    and/or rest shards (`--shards`, `--shard-total`, `--shard-first`);
   - its `plan-check` subcommand proves a plan runs every case of a binary exactly once;
   - its `report` subcommand builds the run summary.
 

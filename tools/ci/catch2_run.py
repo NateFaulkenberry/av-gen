@@ -107,14 +107,14 @@ def quote_name(name: str) -> str:
 
 def load_plan(path: str) -> dict:
     """tools/ci/sanitizer-plan.txt: {'parts': {part: {process: [case names]}}, 'skip': {name: reason},
-    'rest': {part: Catch2 filter}}.
+    'rest': Catch2 filter}.
 
     A case may be named once. `part | process | name` runs it in that part's process of that name;
-    `skip | reason | name` does not run it; `rest | part | filter` gives a part rest shards over that
-    filter, minus every case the plan names (see docs/development/ci.md, "The sanitizer partition")."""
+    `skip | reason | name` does not run it; the one `rest | label | filter` line is what rest shards
+    run, minus every case the plan names (see docs/development/ci.md, "The sanitizer partition")."""
     parts: dict = {}
     skip: dict = {}
-    rest: dict = {}
+    rest = ""
     where: dict = {}
     for raw in Path(path).read_text().splitlines():
         line = raw.strip()
@@ -125,9 +125,9 @@ def load_plan(path: str) -> dict:
             raise SystemExit(f"{path}: expected 'part | process | case name' in: {raw}")
         part, group, name = fields
         if part == "rest":
-            if group in rest:
-                raise SystemExit(f"{path}: part '{group}' has two rest filters")
-            rest[group] = name
+            if rest:
+                raise SystemExit(f"{path}: two rest filters; the rest is one filter, cut into shards")
+            rest = name
             continue
         if name in where:
             raise SystemExit(f"{path}: '{name}' is named twice ({where[name]}, and {part} | {group}); "
@@ -153,22 +153,22 @@ def rest_spec(user_filter: str, hosted_excluded: list[str], plan: dict) -> str:
 
 
 def plan_processes(args, hosted_excluded: list[str]) -> tuple[list[dict], list[dict], list[str]]:
-    """One part of a plan, as processes: one per named process, running exactly its cases, then
-    `--shards` rest shards over the part's rest filter -- global shards `--shard-first` onwards of
-    `--shard-total`, so one part's rest can be spread over several jobs. Returns (processes, skipped
-    cases, warnings)."""
+    """One job of a plan, as processes: one per named process of `--part` (if any), running exactly
+    its cases, then `--shards` rest shards -- global shards `--shard-first` onwards of `--shard-total`
+    over the plan's rest filter, so the rest can be spread over several jobs. Returns (processes,
+    skipped cases, warnings)."""
     plan = load_plan(args.plan)
     neg = "".join(f'~"{n}"' for n in hosted_excluded)
     processes, warnings = [], []
-    groups = plan["parts"].get(args.part, {})
-    rest_filter = plan["rest"].get(args.part, "")
-    if bool(rest_filter) != bool(args.shards):
-        raise SystemExit(f"{args.plan}: part '{args.part}' has rest filter '{rest_filter}' and --shards "
-                         f"{args.shards}; a part runs rest shards exactly when the plan gives it a filter")
+    if args.part and args.part not in plan["parts"]:
+        raise SystemExit(f"{args.plan}: no part '{args.part}'")
+    groups = plan["parts"].get(args.part, {}) if args.part else {}
+    rest_filter = plan["rest"] if args.shards else ""
+    if args.shards and not plan["rest"]:
+        raise SystemExit(f"{args.plan}: --shards {args.shards}, but the plan has no rest filter")
     if not groups and not rest_filter:
-        raise SystemExit(f"{args.plan}: part '{args.part}' names no process and has no rest filter")
-    # A part's rest may be spread over several jobs; its named processes run in the first of them only.
-    for group, names in (groups.items() if args.shard_first == 0 else []):
+        raise SystemExit(f"{args.plan}: this job names no part with processes and runs no rest shard")
+    for group, names in groups.items():
         present = []
         for n in names:
             count = list_case_count(args.binary, [quote_name(n)])
@@ -190,8 +190,8 @@ def plan_processes(args, hosted_excluded: list[str]) -> tuple[list[dict], list[d
                               "listed": list_case_count(args.binary, [spec, *shard])})
     skipped = []
     if rest_filter and args.shard_first == 0:
-        # A skipped case is reported once: by the job running the first shard of the part whose rest
-        # would otherwise have run it.
+        # A skipped case is reported once: by the job running the rest's first shard, which is where
+        # it would otherwise have run.
         for n, reason in plan["skip"].items():
             if list_case_count(args.binary, [",".join(t + quote_name(n) for t in rest_filter.split(","))]):
                 skipped.append({"name": n, "reason": f"sanitizer plan, not run under ASan: {reason}"})
@@ -710,7 +710,7 @@ def cmd_run(args) -> int:
     # A stale one is reported, not silently kept.
     # A plan part selects by its rest filter; a part of named processes only selects nothing an
     # exclusion could leave out, so none is listed against it.
-    selection = load_plan(args.plan)["rest"].get(args.part, "") if args.plan else args.filter
+    selection = (load_plan(args.plan)["rest"] if args.shards else "") if args.plan else args.filter
     excluded = []
     for name in exceptions["exclude"]:
         n = list_case_count(args.binary, [f'"{name}"'])
@@ -812,7 +812,7 @@ def cmd_plan_check(args) -> int:
             problems.append(f"skip: '{n}' matches {count} cases")
         else:
             skipped += 1
-    rest = {f: list_case_count(args.binary, [rest_spec(f, hosted, plan)]) or 0 for f in plan["rest"].values()}
+    rest = {plan["rest"]: list_case_count(args.binary, [rest_spec(plan["rest"], hosted, plan)]) or 0} if plan["rest"] else {}
     print(f"{total} cases: {placed} placed + {skipped} skipped + "
           + " + ".join(f"{n} in the rest of {f}" for f, n in rest.items())
           + f" = {placed + skipped + sum(rest.values())}")
@@ -926,8 +926,8 @@ def main() -> int:
     r.add_argument("--exceptions", default="", help="tools/ci/hosted-runner-exceptions.txt")
     r.add_argument("--plan", default="",
                    help="tools/ci/sanitizer-plan.txt: run --part's named processes, then --shards rest shards "
-                        "over the part's rest filter minus every case the plan names")
-    r.add_argument("--part", default="", help="the plan part this job runs")
+                        "(of --shard-total, from --shard-first) over the plan's rest filter minus every case it names")
+    r.add_argument("--part", default="", help="the plan part whose named processes this job runs (may be empty)")
     r.add_argument("--cwd", default="")
     rp = sub.add_parser("report")
     rp.add_argument("--results-dir", required=True)
