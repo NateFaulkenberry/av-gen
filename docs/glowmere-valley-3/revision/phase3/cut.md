@@ -233,14 +233,18 @@ What it found, and what I made of it:
   fix), E2's crossing at its first instant (the craft enters the frame a second later and crosses it
   for 1.7 s), E3's animal taken (fixed in iteration 2: 39.1).
 - **Stability, and where the Critic and the pose track disagree.** The Critic's pixel classes: 3
-  "shaky" and 5 "move with wobble" of 73, against 10 and 2 of 40 in the baseline job. Two of the three
+  "shaky" and 5 "move with wobble" of 71 measured shots, against 5 and 3 of 38 in the same-engine
+  before (10 and 2 of 38 in the first pass's 1080p final, on the older engine). Two of the three
   "shaky" (66.3 Sage, 111.1 Vane) are walker follows the pose track measures as steady (eye height HF
   0.84 and 0.89 cm, pitch HF 0.002 and 0.000 deg), and 111.1's pixel measure is identical to the first
   pass's s38 (0.00211) although its camera's pitch HF fell from 0.225 deg to 0.000. The image's global
   motion is contaminated by a large walking subject bobbing in a steady frame; the pose track, which
   reads the camera itself, is the measure of the camera. The Critic's scene-side "camera path jitter"
   (s35, s50, s69) comes from the adapter's own model of the rigs, which does not implement ADR-911's
-  filter.
+  filter: `avgen_adapter.py` puts a follow rig's eye at the raw node plus the offset (lagged by
+  `followLagSeconds` only) and its aim at the raw aim node, so a walker's stride is in the modelled
+  camera and not in the engine's. The cast trace's `--camera` track has the engine's own eye and
+  target at every frame; the adapter could read them (for the critic-adapter stream).
 - **Not this stream's, recorded:** the aliens' bases float up to 0.53 m off the ground for 24-49% of
   their tracks (grounding, ember, vane, rook), and three alien liveliness routes show no response
   (gv3-cast and gv3-look).
