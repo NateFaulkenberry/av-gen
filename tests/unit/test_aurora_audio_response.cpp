@@ -12,6 +12,7 @@
 #include "world/effects/effect_instance.hpp"
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_registry.hpp"
+#include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -25,6 +26,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 using namespace avgen;
 using Catch::Matchers::WithinAbs;
@@ -215,4 +217,45 @@ TEST_CASE("UI reach: every audio-driven part of the aurora has a control on its 
     auto legacy = world::EffectInstance::fromJson(old);
     REQUIRE(legacy.has_value());
     CHECK(legacy->aurora.audio.glints == 1.0f);
+}
+
+TEST_CASE("UI reach: an effect's card names the routes that move it, which its audio response does not gate",
+          "[world][atmospherics][aurora][ui][adr939]") {
+    // "+ Add aurora" installs six audio routes onto the new aurora's parameters (ADR-230's defaults).
+    // They are the project's, so "Audio response" at 0 leaves them moving it -- which is right (GV3
+    // answers the lead slowly through a route with audio response 0) and was invisible from the aurora:
+    // nothing on its card said anything but "Beat response" was driven. The card now lists them, each
+    // as its source and the row it moves.
+    const world::EffectSchema* schema = world::effectSchema(world::EffectKind::Aurora);
+    REQUIRE(schema != nullptr);
+    const world::EffectInstance e = world::glowmereAurora("sky");
+    std::vector<params::ModRoute> routes = world::defaultEffectRoutes(e.id, e.kind);
+    REQUIRE(routes.size() == 6);
+    params::ModRoute other; // a route onto another effect whose id begins the same way
+    other.source = "audio.rms";
+    other.target = "fx/skyline/intensity";
+    routes.push_back(other);
+    params::ModRoute planned;
+    planned.source = "lead.aurora";
+    planned.target = world::effectParameterPrefix(e.id) + "intensity";
+    planned.planItem = "gv3-look/lead.aurora";
+    planned.enabled = false;
+    routes.push_back(planned);
+
+    const std::vector<ui::EffectRouteLine> lines = ui::effectRoutesOn(routes, e, *schema);
+    std::vector<std::string> texts;
+    for (const ui::EffectRouteLine& l : lines) {
+        texts.push_back(l.text);
+    }
+    const std::vector<std::string> expected{
+        "audio.bass -> Height",        "audio.rms -> Brightness", "audio.lowMid -> Wave amount",
+        "audio.mid -> Turbulence",     "audio.treble -> Filaments", "beat.pulse -> Edge brightness",
+        "lead.aurora -> Brightness"};
+    CHECK(texts == expected);
+    REQUIRE(lines.size() == 7);
+    CHECK(lines.back().planned);
+    CHECK_FALSE(lines.back().enabled);
+    CHECK(lines.front().enabled);
+    // The control: an effect nothing routes to lists nothing.
+    CHECK(ui::effectRoutesOn(std::span<const params::ModRoute>(routes).subspan(6, 1), e, *schema).empty());
 }
