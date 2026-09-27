@@ -8,6 +8,18 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **15:40, on the owner's "best recommendations by you":**
+  - **The Critic daemon was restarted** on creative-critic `f1b5e5b`, which has every fix: the ember-cap alias, the
+    camera guard, the scout alias and engine-3. It was idle when restarted; the new pid is 31482.
+  - **The status index is committed**, verbatim, as `docs/development/STATUS-2026-09-25.md` on `integrate/revision`
+    (`983221a9`). It reaches main with navfix. Its worktree and `docs/status-2026-09-25` branch are removed.
+  - **navfix's integration:** `90158678` + `983221a9` is built and settled (a true no-op). **The full CPU suite is
+    running** (log `coord-navfix-int-cpu-full.log`). Then the GPU suite in a quiet window, then main.
+  - **Launched from `983221a9`:**
+    - **behave** (ADR-935–936): rook's walk on the spot, and unreachable roam targets;
+    - **uireach** (ADR-937–939, and an ADR-933 amendment): editable treatments, per-species wind sway, a real aurora
+      audio master, `failSeconds`.
+    Briefs are in [briefs.md](briefs.md); worktrees are `av-gen-behave` and `av-gen-uireach`.
 - **15:40: THREE MORE STREAMS DONE.**
   - **gv3-cut: merged** (`a38487e1`; final `8428c18d`). 73 Director spans; aliens lead 13.1%. Every E1-E5 moment is
     on screen, and 21 of 22 follow rigs pass the bar on the merged project. Whole-film iteration 2: 0 criticals,
