@@ -97,8 +97,10 @@ ALIEN_CONSIDERERS = {
     # tide: no errand to its own feet, and shorter looks
     "tide": {"roam": {"minRange": 14.0, "dwell": 3.5}},
     # sage: the grove is a place it drifts back to, not a leash; 19 m (the audit's tolerance + 10)
-    # left `graze` nothing to choose near the grove, 30 m does
-    "sage": {"grove": {"weight": 0.1, "duration": 4.0}, "graze": {"homeRadius": 30.0}},
+    # left `graze` nothing to choose near the grove, 30 m does. Its looks are the longest of the five
+    # but not vigils: a 6 s look, decided on at 0.6 Hz, ended five of sage's stands at its 8 s cap
+    # (7.2-8.2 s, iteration 2); 4.5 s leaves the next decision inside it.
+    "sage": {"grove": {"weight": 0.1, "duration": 4.0}, "graze": {"homeRadius": 30.0, "dwell": 4.5}},
     # vane: shorter looks, at nearer things
     "vane": {"watch": {"dwell": 3.5, "maxRange": 60.0}},
 }
@@ -106,6 +108,17 @@ ALIEN_CONSIDERERS = {
 # fastest walk plus a hurry, and tide's (3.02) below its plain walk -- the audit's "tide plays Running
 # at 0.41x". Both to the band the other three use.
 ALIEN_RUN_BAND = {"sage": (4.8, 3.1), "tide": (4.8, 3.1)}
+
+# The stride bob answers the bass on two aliens. The multicam gives ember and vane an entity reaction
+# `audio.bass -> liveliness/bounce` (+0.45 on a 0.32 bounce, a 60 ms attack): every bass note lifts the
+# drawn body higher off the ground. Measured on iteration 1's film, ember and vane walked 0.18 m
+# above the ground on average and up to 0.45 m (0.71 m hurrying) -- about 2.4x their own authored
+# bob -- which the evaluator reads, rightly, as floating; with the bounce itself at 0 the reaction
+# alone still lifted them 0.22 m at a walk (0.27 m hurrying; build/gv3/cast/float, the `bob0` arm).
+# It is the "everything pulses to the beat" the brief's research warns against, on the characters.
+# The authored bounce stays: a bob of 0.18 m at a walk. The aliens' other musical reactions (on
+# their interests' weights, their decision rate and tide's sway) stay too.
+ALIEN_REACTIONS_DROPPED = ("liveliness/bounce",)
 
 # ---- what the aliens hear --------------------------------------------------------------------------
 # The UFO events the aliens react to (ADR-930: every set-piece moment is a world event), how far each
@@ -368,6 +381,7 @@ def aliens(project, scene):
                 c[key] = value
                 _set(project, name, f"decide/{considerer}/{key}", value)
         e["clips"].update(ALIEN_CLIPS)
+        e["reactions"] = [r for r in e.get("reactions", []) if r.get("target") not in ALIEN_REACTIONS_DROPPED]
 
     sage = next(b for b in ents["sage"]["behaviors"] if b["kind"] == "interest")
     for key, value in SAGE_INTEREST.items():
