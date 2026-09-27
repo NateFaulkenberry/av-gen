@@ -79,7 +79,12 @@ under the World's section, where they can be removed.
 Inside a card: **Preset** sets the look in one go and leaves every value editable; the main
 controls; **Ground glow** (off, subtle or strong) for the types that light the ground below them;
 **Beat response**, a slider that writes an ordinary `beat.pulse` modulation route onto the effect —
-visible, editable and deletable in the Modulation panel, and saved with the project; **Source** and
+visible, editable and deletable in the Modulation panel, and saved with the project; below it, **moved
+by N routes**, every modulation route onto the effect's controls as its source and the control it moves
+(*audio.rms -> Brightness*), marked *(off)* or *[plan]* where that applies — the ones **+ Add Effect** or
+a Director plan installed included. Routes are separate from an effect's own response to the music: an
+aurora's **Audio response** at 0 stops everything the aurora does with the music by itself, and leaves
+its routes moving it. **Source** and
 **Target** pickers for the types that start from, or point at, a thing in the scene. **Advanced** holds
 the rest, including **Follows** (the spatial field the effect's motion answers to) and **Anchored
 to** for sky effects. **Timing** holds the activation and the delay, fades, lifetime and repeat.
