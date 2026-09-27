@@ -395,12 +395,15 @@ def bloom_far_bank(t0, t1, g):
 
 @at("54.1")
 def e4_arrives(t0, t1, g):
-    # E4. The scout comes down over the west meadow and its beam lights (bar 56.3). Locked off on the
-    # region, from over the river south of the elder, with a slow push: the scout flies in at the upper
-    # left and settles upper centre, the elder at the right of the frame. The whole region is in frame
-    # at the station's height, so the station may be wherever its animals are. (Iteration 2 chased the
-    # scout with a live aim: its approach and stop into the station read as 0.20 deg of yaw HF.)
-    r = moving(t0, t1, 28.0, g(-24, 120, 3.0), g(-24, 115, 3.0), E4_PLACE)
+    # E4. The scout comes down over the west meadow and its beam lights (bar 56.3). Locked off, from
+    # over the river south of the elder, with a slow push, aimed a quarter of the way from E4's region
+    # toward the elder: the scout flies in at the upper left and settles just left of centre, and the
+    # elder stands whole at the right (aimed at the region itself, its cap crossed the frame's edge).
+    # The whole region is in frame at the station's height, so the station may be wherever its animals
+    # are. (Iteration 2 chased the scout with a live aim: its approach and stop into the station read
+    # as 0.20 deg of yaw HF.)
+    aim = [p + 0.25 * (q - p) for p, q in zip(E4_PLACE, ELDER_CAP)]
+    r = moving(t0, t1, 28.0, g(-24, 120, 3.0), g(-24, 115, 3.0), aim)
     return r, dict(lead="event", purpose="E4: the scout settles over the meadow beyond the elder",
                    subject="the scout (E4), the elder at the right", camera="28 mm, 3 m, from the south, locked on the region",
                    movement="slow push", music="3 bars; the beam at bar 56.3", effects="the scout's beam (E4)")
