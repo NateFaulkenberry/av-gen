@@ -105,11 +105,16 @@ heap is exactly what depends on test order and seed, and on the allocator's per-
   - `RibbonRenderer` reads `firstVertex`, `vertexCount` and `blend`, and never the other bytes.
   - The vertices (four `vec4`s) are uploaded and have no padding. `sizeof` is unchanged.
   - Nothing hashes, digests or compares `scene.ribbons`. The garbage reached only the test's `memcmp`.
-- **Evidence limit.** CI's compiler is not installed here, so the after-state is proved:
-  - on the local compiler, by the control arm;
-  - on both, by the language's guarantee: `reserved` is a value, so any compiler must store it.
+- **The fix's effect, on CI's own binary.** CI's compiler is not installed here, so this change
+  cannot be rebuilt with it. Instead its effect was applied to CI's binary by hand:
+  - its two `strb w24, [..., #8]` became `str w24`. `w24` holds `blend` zero-extended, so bytes
+    9-11 are written 0, which is what `reserved{}` does;
+  - the polluter pair then passes **5 of 5**, where the unpatched binary fails 2 of 2 in the same
+    session;
+  - the whole 128-case CI prefix passes.
 
-  The pair repro on CI's binary is the before; the next CI run is the after.
+  So the three bytes are the whole cause on CI's compiler too. A binary rebuilt with this change
+  comes from the next CI run.
 - **Method, for the next order-dependent failure** (`docs/testing.md` entry 42): when a case fails in
   CI's company and passes in yours, replay CI's own binary in CI's order before bisecting on a local
   build. A different compiler can be a different defect.
