@@ -27,6 +27,7 @@
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -96,6 +97,7 @@ struct StandIns {
     fs::path critic;
     fs::path avgen;
     fs::path trace;
+    fs::path worldPreview;
     fs::path log;
 
     explicit StandIns(int exitCode = 0) {
@@ -127,6 +129,10 @@ struct StandIns {
         trace = dir / "build/tools/avgen_cast_trace";
         writeScript(trace, record + "while [ $# -gt 0 ]; do if [ \"$1\" = --out ]; then out=$2; fi; shift; done\n"
                                     "echo '{\"entities\": {}}' > \"$out\"\n");
+        // ADR-931, amended: the ground probe the adapter is handed, beside the tracer. The adapter
+        // stand-in never runs it; its path on the adapter's command line is what is checked.
+        worldPreview = dir / "build/tools/avgen_world_preview";
+        writeScript(worldPreview, record);
         // A render prefix, as tools/gpu-lock.sh is one: it records itself and runs the rest.
         writeScript(dir / "lock.sh", record + "exec \"$@\"\n");
     }
@@ -189,6 +195,57 @@ TEST_CASE("a missing Critic is a clear error, never a silent pass", "[evaluate][
     CHECK(ok->adapter == standIns.repo / "adapters/avgen/avgen_adapter.py");
     CHECK(ok->python == standIns.repo / ".venv/bin/python");
     CHECK(ok->castTrace == standIns.trace);
+    CHECK(ok->worldPreview == standIns.worldPreview); // ADR-931, amended
+}
+
+TEST_CASE("the Critic's adapter is handed the engine's ground probe when the scene has ground (ADR-931, amended)",
+          "[evaluate][adr931]") {
+    // The Critic's adapter report (GV3 revision, 2026-09-27): `--world-preview` probes the engine's own
+    // ground under every body's path, and the Director's hook called the adapter without it -- so its
+    // evaluations judged no body's grounding at all.
+    StandIns standIns;
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(labProject()).has_value());
+    auto copy = app::writeRecordingCopy(engine, standIns.dir.path());
+    REQUIRE(copy.has_value());
+    app::EvaluatorOptions options = standIns.options();
+    options.keepFiles = true;
+    auto report = app::evaluateFromCopy(*copy, candidate(engine, westPlan()), options);
+    INFO((report ? std::string() : report.error().message));
+    REQUIRE(report.has_value());
+    const std::string calls = readText(standIns.log);
+    INFO(calls);
+    // The adapter's line, and on it the probe the build made, beside the tracer.
+    const std::size_t adapter = calls.find("avgen_adapter.py");
+    REQUIRE(adapter != std::string::npos);
+    const std::string line = calls.substr(adapter, calls.find('\n', adapter) - adapter);
+    CHECK_THAT(line, ContainsSubstring("--world-preview " + standIns.worldPreview.string()));
+    // It is the lab's terrain that asked for it: the saved scene is the file the adapter reads.
+    const fs::path saved = copy->parent_path() / (copy->stem().string() + "-evaluate") / "scene.json";
+    REQUIRE(fs::is_regular_file(saved));
+    CHECK(app::sceneHasTerrainWorld(saved));
+
+    // Control: a scene with no terrain is not handed the flag -- the adapter refuses it there ("the
+    // scene has no terrain node with a 'world' block") and the evaluation would fail for nothing.
+    const fs::path flat = standIns.dir / "no-terrain.scene.json";
+    std::ofstream(flat) << json{{"nodes", json::array({{{"kind", "mesh"}, {"name", "rock"}},
+                                                       {{"kind", "terrain"}, {"name", "painted"}}})}}.dump();
+    CHECK_FALSE(app::sceneHasTerrainWorld(flat));
+    const auto without = app::criticAdapterCommand(*app::resolveEvaluatorOptions(options), "p.json", flat, "s.json",
+                                                   "c.json", "clip.mov", "1:2", "out", false);
+    CHECK(std::find(without.begin(), without.end(), "--world-preview") == without.end());
+    const auto with = app::criticAdapterCommand(*app::resolveEvaluatorOptions(options), "p.json", saved, "s.json",
+                                                "c.json", "clip.mov", "1:2", "out", true);
+    CHECK(std::find(with.begin(), with.end(), "--world-preview") != with.end());
+
+    // And a build with no probe is a clear error, as a build with no tracer is, never a quiet
+    // evaluation that judged nobody's feet.
+    app::EvaluatorOptions noProbe = standIns.options();
+    noProbe.worldPreview = standIns.dir / "build/tools/absent_world_preview";
+    auto refused = app::resolveEvaluatorOptions(noProbe);
+    REQUIRE_FALSE(refused.has_value());
+    CHECK_THAT(refused.error().message, ContainsSubstring("avgen_world_preview is not at"));
+    CHECK_THAT(refused.error().message, ContainsSubstring("AVGEN_WORLD_PREVIEW"));
 }
 
 TEST_CASE("a child process: its output, its exit code, and cancellation", "[evaluate][adr931]") {
