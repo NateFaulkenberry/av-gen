@@ -239,6 +239,16 @@ exactly. Each variant below is compared with the baseline:
   explores. It is the same class as the scatter's index-keyed glow (W1, point 4).
 - **Not fixed here:** the draw lives in `src/entity/`, outside this stream's files.
 
+**Which shots it breaks.** `tools/gv3/framing.py` projects each shot's subject through its rig. I ran
+it on the baseline trace and on v2a's (both on ec515c8b):
+- **s25, "Ember watches from across the water": Ember is out of frame for the whole shot.** In the
+  baseline she was in frame 100% of it, at (-0.47, -0.79), already in the corner. The rig rides
+  behind Ember but looks at a fixed point, the saucer's station, so a different route puts her
+  outside the lens. **s25 needs moving** (gv3-cut's rig, against a closed-world trace).
+- s13, s19 and s38 keep their subjects in frame; the subject moves by 0.01-0.06 of the frame.
+- Every other shot's framing is identical.
+- No fixed or keyed camera moved, and no ground under a camera changed.
+
 ## W3: renders
 
 Batch 1, queued behind the gv3-cut stream's full-film render (the lock was held for 25+ minutes):
