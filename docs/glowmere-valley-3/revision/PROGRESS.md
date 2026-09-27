@@ -1,8 +1,40 @@
 # GV3 revision: progress and state
 
-This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:20, at a session handoff.
+This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:45.
 
-## CURRENT STATE: SESSION HANDOFF (2026-09-27 12:00). Read this before anything else
+## SINCE THE HANDOFF (2026-09-27, from 12:20). Read this first, then the handoff below
+The coordinator restarted after the old account's session limit (the owner switched accounts). Same process, so
+two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-cut** was resumed from its transcript.
+**gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
+where its predecessor stopped.
+
+- **Characters: CPU suite PASSED** on `integrate/revision` `ec515c8b`: 3,781 of 3,781, 0 failed, 3,233 s. The GPU
+  suite passed earlier (533 cases, 532 passed, 1 skipped).
+- **Main's fast-forward is waiting on the owner.** The auto-mode classifier refused the coordinator's
+  `merge --ff-only` in the owner's checkout. The owner runs: `git -C ~/Documents/GitHub/av-gen merge --ff-only ec515c8b`,
+  naming the commit and not the branch (see the render integration below). Then merge main into `gv3/production`.
+- **Render is integrating** on a new branch, **`integrate/render`**, in `~/Documents/GitHub/av-gen-signals`: `776b1a87` =
+  `ec515c8b` + `agent/render`. The merge was textually clean (the handoff expected conflicts; none). `integrate/revision`
+  stays at the tested `ec515c8b`.
+  - Next: build (CMake reconfigured for the new test files), targeted tests, the full CPU suite, then the full GPU
+    suite in a window with no CPU suite. Then fast-forward `integrate/revision` to it, and main after the owner allows.
+  - Render's own full GPU suite (`full-2`, on its final code) is still queued on the lock.
+- **The alien float's cause is found. It is data, not the engine.** gv3-cast found that the multicam gives ember and
+  vane an entity reaction `audio.bass -> liveliness/bounce` (+0.45 on a 0.32 bounce, 60 ms attack). With the authored
+  bounce at 0, the reaction alone still lifted them (p90 0.16-0.17 m, max 0.22-0.23 m). Rook and tide match ADR-895.
+  GV3 drops the reaction (`ALIEN_REACTIONS_DROPPED` in `cast.py`); gv3-cast verifies it on a trace. **No stride-bob
+  engine stream.**
+- **The world closure's alien reroute is explained and fixed in data** (gv3-world W2c, `7259efad`): ending the river
+  in a pool joined its banks for the navigator. The river now runs edge to edge, with its head bent 45° east.
+- **Launched: navfix** (ADRs 932-933, plus an ADR-931 amendment) in `~/Documents/GitHub/av-gen-navfix`, branch
+  `agent/navfix`, from `ec515c8b`. Brief: [briefs.md](briefs.md) § "Engine follow-ups found in Phase 3". It covers
+  routes that respect connected regions, no pacing on urgent reactions, and the evaluator hook passing `--world-preview`.
+- **gv3-cast iteration 2 played all five events,** E4 included (cow-23 and cow-12 at 111.917 s). Its ADR-910 metrics
+  are on disk; the relaunched agent reads and records them.
+- **The GPU queue is long:** gv3-world's batch holds it; render's `full-2`, gv3-look's pair, gv3-world's stills and
+  gv3-cut's 25-minute it2 film all wait.
+
+## SESSION HANDOFF (2026-09-27 12:00)
 This section supersedes every dated note below it, which are history. The session that wrote it is
 ending. **Its agents end with it: a new session cannot message them.** It relaunches fresh agents
 from each worktree (prompts below).
