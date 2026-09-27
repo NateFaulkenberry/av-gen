@@ -120,9 +120,14 @@ WATER_DEAD_KEYS = ("shoreFade",)
 # every 9.5 s and a centimetre of flutter: shape, not motion (the audit's replica of wind.cpp). The
 # brief asks for subtle, continuous motion with a direction, gusts and variation, and no storm.
 WIND = {
-    # Down the valley, the way the river runs (the corridor runs along +Z, north to south): a night
-    # valley drains its cold air downhill. 0 blows toward +X, pi/2 toward +Z.
-    "direction": 1.45,
+    # The source's direction (0 blows toward +X, pi/2 toward +Z), which the water's tears are laid
+    # out on: the seams sit on a lattice in the frame of the wind's steady direction (water.wgsl
+    # tearAt), and the water stream placed them for this one -- a seam across the moon's glint by the
+    # boat in s08 (3.98% of the frame), a combed band in s12. Iteration 1 turned the wind down the
+    # valley (1.45, cold air draining downhill), which rotated the whole lattice about the origin:
+    # s08's glint had no seam left in it at 1080p (v4). The tears must follow the wind and read where
+    # they were placed, so the wind keeps the direction they were placed for.
+    "direction": 0.62,
     # A front every 3.25 s (26 m apart at 8 m/s): quicker than the old 9.5 s, and not the two-bar
     # breath's 3.69 s, so the breath that lifts the gusts (the proposal's gust route) drifts across
     # the fronts instead of pinning strong gusts to fixed lines on the ground.
