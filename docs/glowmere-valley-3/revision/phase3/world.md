@@ -456,27 +456,59 @@ configuration acts:
 
 The same picture, finer (`build/gv3w/k4/diff-preview-vs-final2-77.png`).
 
-## Open questions
-- **The alien divergence (W2b):** find the coupling before this merges. If it is the nav grid's
-  connectivity, the fix may belong in the engine, not here.
-- **The fog march (F2, F3):** left out of the final. Whether GV3 wants a marched atmosphere at all is
-  gv3-look's decision, taken in the previews.
-- **The ecology-light options** (`ecologyGlowCell` 14, `ecologyLightRange` 250) re-cluster the glow
-  spill in every shot, near ones included. Left out of `offline.py` unless an evaluation supports
-  them.
-- **The bare south crest:** scatter only covers the world's own [-320, 320], so the sill's crest at
-  z 328-342 grows nothing. Judge it on the stills.
+## For the coordinator and the other streams
 
-## Next steps (exact)
-1. Run batch 1's remaining stills, then batch 2
-   (`tools/gpu-lock.sh build/gv3w/batch.sh build/gv3w/jobs2.txt`). Make before/after sheets in
-   `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/world/`, and submit both sets to the Critic
-   (session gv3-world, track world-edge, labels base and v1).
-2. Isolate the divergence. Trace a north-only and a south-only variant (CPU, 24 min each, can run
-   together), then, within the guilty end, the ridge features against the path edits. Read the nav
-   grid log lines of each.
-3. Calibrate `MARCH_SCATTERING` on the batch 2 stills, by mean luma in depth bands (terrain depth
-   from `world.Field`).
-4. Run the 4K batch (`tools/gpu-lock.sh build/gv3w/k4.sh build/gv3w/k4jobs.txt`). Record the log
-   lines, the ms per frame, the peak memory (`/usr/bin/time -l`), and the whole film's estimate
-   (13,530 frames).
+**Order of merging**
+- The closed world changes the aliens' routes from 13.5 s (W2d). **Trace the cast, and frame the
+  alien follow shots, on a build that includes this branch.**
+- **s25 needs moving:** Ember leaves its frame.
+- gv3-cast's re-homing will re-deal the cast anyway, so the two only have to meet once, before
+  gv3-cut settles its follow rigs.
+- After any change to the cut, run `python3 tools/gv3/world.py --check --trace <a cast trace of that
+  cut>`. It asserts four things:
+  - no open end in any view;
+  - the survey held;
+  - the filmed ground unchanged;
+  - the river's divide.
+
+**The final render**
+- Generate with `python3 tools/make_glowmere_valley_3.py --final --final-trace <cast trace of the
+  final cut>`. The trace lets followed shots get the 300 m shadows too; without it they keep 160 m.
+- It writes `build/gv3/final/glowmere-valley-3-2160p.mov`.
+- Check the log for:
+  - "render scale 2.00: scene target 7680x4320 -> output 3840x2160";
+  - "LOD rungs kept";
+  - "4 view(s) (4 cascade) at 4096x4096; range 300.00 m" on the wides, 160 m elsewhere.
+- Ignore "rate-limited N" (F2).
+
+**For gv3-look**
+- Nothing in `offline.py` changes the look. The fog, the post and the exposure are what the previews
+  have.
+- A marched atmosphere is a decision for the previews (F3): `scene/volumeEmission` =
+  `scene/volumeAbsorption` for the ground to match. The sky still gets veiled.
+
+**For the render stream**
+- Its reference-height post radii (ADR-917) are what keep bloom and anamorphic reach the same from
+  the previews to 4K x2.
+- Until they land, bloom levels, the anamorphic stretch and the motion-blur tiles differ at 4K x2
+  (render-post.md, item 6), and so do the water's pixel-scaled fades (07-technical §7.10).
+
+## Defects found, not fixed (outside this stream's files)
+1. **Explore's destination draw is world-global** (`behaviors.cpp` `pickGoal`, `nav_grid.cpp`
+   `extractInterestPoints`). Any edit that moves a shore or vista point anywhere can re-route every
+   exploring character.
+2. **Scatter variation is keyed on the index in the layer** (`procedural.cpp`). Any change to an
+   upstream row's count re-deals every later plant's glow, brightness, hue jitter and dark/lit
+   lottery.
+3. **The render job's "rate-limited" counter** includes the job's first frame, which always holds
+   (the warm-up already posed that time). So every range render warns "the rig ladder reached the
+   deliverable" even with `updateHz` 0.
+4. **The march fogs the sky, and the closed form never does** (ADR-705's one law, but only for
+   surfaces). With `volumeEmission` 0 the march also has no `fogColor` fill. Switching the march on
+   therefore changes a night scene's look drastically.
+5. **World features have no editor in the app.** The walls, rims, river and the new head and sill can
+   only be changed in the scene file (the owner's visible-means-controllable rule).
+6. **Scatter covers only the WorldMap's square**, while the mesh runs 32 m past it on +x and +z. The
+   south sill's crest (z 328-342) and the east edge grow nothing.
+7. **The GPU-lock race from 13:00** (the coordinator knows). My exclusivity guard counts lock
+   *wrappers* as GPU users, which is conservative but slow.
