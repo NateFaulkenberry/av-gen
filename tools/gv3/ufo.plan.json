@@ -7,6 +7,14 @@
   {
    "alias": "horse",
    "text": "horse-11"
+  },
+  {
+   "alias": "east-cow",
+   "text": "cow-12"
+  },
+  {
+   "alias": "west-cow",
+   "text": "cow-23"
   }
  ],
  "setPieces": [
@@ -93,6 +101,10 @@
      "radius": 20
     }
    },
+   "animals": [
+    "east-cow",
+    "west-cow"
+   ],
    "set": {
     "animals": 2,
     "approachSeconds": 7,
@@ -103,7 +115,7 @@
     "fadeSeconds": 1.6,
     "gatherRadius": 25,
     "stackRadius": 4.0,
-    "stackStagger": 3.0,
+    "stackStagger": 4.0,
     "beamSize": 1.8
    },
    "framingMetres": 70

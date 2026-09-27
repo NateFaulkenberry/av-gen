@@ -13,7 +13,13 @@ music, building to the riser's centrepiece. The five are a Director plan in the 
                  leaves on bar 13, the riff's phrase end
   E2  flyby      the saucer crosses the sky in the first pull-back (bar 15 + 0.3 s)
   E3  abduction  the scout lifts one animal far up the valley, at the top of the lift's crane (bar 37)
-  E4  abduction  the scout lifts two animals together in the meadow west of the river (bar 57)
+  E4  abduction  the scout lifts two animals together in the meadow west of the river (bar 57): the
+                 two cows it finds there, named (`east-cow` cow-12 first, `west-cow` cow-23), because
+                 the engine lays a pair out along +x/-x in the order it takes them, and taking the
+                 western cow first sent each across the other's path mid-lift -- one body through the
+                 other at 107.0 s, the owner's "two cows stuck together, abducted as one" (gv3-int
+                 r2b) -- and 4 m apart in height, since 57.1 looks along that axis and sees them one
+                 above the other
   E5  abduction  the centrepiece: the saucer takes the elder's own horse -- the beam on bar 93, the
                  horse gone on the drop, its gold glow riding the lift (two cues on E5's lift)
 
