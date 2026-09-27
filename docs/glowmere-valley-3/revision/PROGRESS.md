@@ -28,8 +28,17 @@ where its predecessor stopped.
     - `f24104be` merges render's docs-only `d2eb2d53`;
     - `876a11e2` is the **gpu-lock fix** with `tools/gpu-lock-selftest.sh`. The self-test fails 3 of 6 checks on the
       old script and passes all 6 on the new one; `[hygiene]` passes.
-  - **The GPU suite is queued (13:55),** `build/coord-gpu-full.sh full` in `av-gen-signals`, log
-    `build/coord-gpu-full.log`.
+  - **A three-way deadlock (13:52-14:02), fixed on the coordinator's side.**
+    - The first runner held the lock and counted any lock job running a script as busy, so it waited on gv3-world's
+      idle cost job `k4x.sh`.
+    - `k4x.sh` waits while any command line names `src/avgen`, and gv3-cut's sleeping lock waiter's does.
+    - That waiter waited for the lock.
+    - gv3-world diagnosed it and asked the coordinator to stop its job. The coordinator declined: stopping another
+      stream's process is the owner's call. It stopped its own runner instead.
+    - **The rule for any quiet-window runner:** detect work by executable name (`ps -axo pid=,comm=`), never by
+      command line, because a waiter's command line names the binary it will run.
+  - **The GPU suite is queued again (14:03),** `build/coord-gpu-full2.sh full2` in `av-gen-signals`, log
+    `build/coord-gpu-full2.log`. The detector matches running binaries by name and needs 90 s of quiet.
     - It holds the lock, then waits until no other lock job is running a command (a batch between renders counts)
       and no GPU binary or CPU suite runs.
     - It re-queues if an old script's trap takes the lock before it starts.
