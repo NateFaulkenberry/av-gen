@@ -83,7 +83,8 @@ void dump(const std::string& name, const gpu::Image8& a, const gpu::Image8& b) {
 }
 
 // Ferns on a flat meadow in a breeze, their response the GV3 fan plants' before gv3-look retuned them
-// (tip 0.08, catching 0.65 of the wind, stiffness 2.4 and a 1.2 kg tip).
+// (tip 0.08, catching 0.65 of the wind, stiffness 2.4 and a 1.2 kg tip). No skybox: its stars twinkle
+// with time, and the "stands still" arm compares two seconds.
 struct Meadow {
     fs::path path;
     assets::AssetRegistry registry{testsupport::processTempDir()};
@@ -97,7 +98,7 @@ struct Meadow {
           "camera": { "mode": 1, "position": [0.0, 2.0, 7.5], "target": [0.0, 0.5, 0.0], "fov": 42.0 },
           "lights": [ { "name": "key", "type": "directional", "role": "key", "direction": [0.35, -0.8, -0.45],
                         "color": [1.0, 0.95, 0.85], "intensity": 2.4 } ],
-          "environment": { "background": [0.02, 0.03, 0.05] },
+          "environment": { "background": [0.02, 0.03, 0.05], "skybox": false },
           "wind": { "enabled": true, "direction": 0.0, "speed": 1.2, "gustAmount": 0.8, "gustScale": 24.0,
                     "gustSpeed": 5.0, "turbulence": 0.35, "regionAmount": 0.3 },
           "nodes": [

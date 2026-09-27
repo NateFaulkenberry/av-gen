@@ -71,6 +71,7 @@
         "audio": {
           "bass": 0.8500000238418579,
           "beat": 0.3499999940395355,
+          "glints": 1.0,
           "high": 0.699999988079071,
           "lowMid": 0.550000011920929,
           "mid": 0.44999998807907104,
@@ -3555,6 +3556,7 @@
     "env/skybox": true,
     "fx/aurora/audioBass": 0.8500000238418579,
     "fx/aurora/audioBeat": 0.3499999940395355,
+    "fx/aurora/audioGlints": 1.0,
     "fx/aurora/audioHigh": 0.699999988079071,
     "fx/aurora/audioLowMid": 0.550000011920929,
     "fx/aurora/audioMid": 0.44999998807907104,
