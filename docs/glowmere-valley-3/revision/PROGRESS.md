@@ -8,6 +8,23 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **HOUSEKEEPING (15:20), on the owner's answers:**
+  - The owner's answers were: "Watch may run GH run commands"; "Only push main, and/or necessary branches, delete
+    old branches / work trees".
+  - **The CI watcher is running** (Sonnet). It triages the failed nightly CI and Sanitizers runs, watches main's
+    push runs for `ec515c8b` and `876a11e2`, and reports to the coordinator.
+  - **Push policy:** push only `main`, plus a branch that genuinely needs CI. The `gv3/*` branches stay local.
+  - **Removed 13 worktrees,** each merged, clean and idle (checked with `lsof`): camera, characters, director,
+    emission, motion, reactivity, render, routes, setpieces, song, water, `av-gen-engine` (040d6644) and
+    `av-gen-engine-2` (ec515c8b).
+  - **Deleted 22 merged local branches** (`git branch -d`) and **3 merged remote branches**: `agent/ci`,
+    `fix/ci-assets-director` and `integrate/render`. The remote now holds only `main`.
+  - **Engine-3 is the one shared build.** It has `BUILD-READY`. The Critic's INTEGRATION_GUIDE, README and
+    real-tools test now point at it (creative-critic `f1b5e5b`; the real-tools test passes against it). gv3-cast's
+    `build/release` and helper scripts point at it too.
+  - **Kept:** main, engine-3, the gv3 worktrees, navfix, and `av-gen-signals` (the integration branch). Also kept
+    is **`av-gen-status`**, because its `docs/development/STATUS-2026-09-25.md` (the index of where the paused
+    engine workstreams left off) is untracked and exists nowhere in git. The owner decides what happens to it.
 - **MERGED (14:50): main is `876a11e2`,** now also with **render** (ADR-917–919) and the **gpu-lock fix**. **10 of 11
   engine streams are in main**; navfix (ADR-932–934) is the last.
   - The render integration's suites: CPU 3,788 of 3,788, 0 failed (at `776b1a87`; later commits are docs and
