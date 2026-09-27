@@ -253,6 +253,23 @@ so v3 and v4 differ only in the film):
     sky and particles in both; the lower frame changed less in v5 (2.15 against 2.65 x1e-3), but the
     two renders start at different times (particles and animals differ) and the wind now runs closer
     to the line of sight. A 4.6 cm swing is about a pixel there. Kept as computed.
+- **The aurora, v5 against the first pass** (rendered alone): s04's sky (top 30%) 0.0436, x1.37 of
+  the first pass (v4 x1.75), frame-to-frame median 0.43% (first pass 2.27%), p99 4.6% (17.0%), the
+  off-beat glints +2.45% (+12.2%). s39 at 1080p: every height band 0.79-0.85 of the first pass's
+  final, the same vertical shape (v4's curtains were too tall: x1.26 at the top, x0.81 at the
+  horizon); the uniform 0.82 is the drop's intensity key (2.4 against the first pass's 3.2). Left:
+  the curtain tops form a regular row where the first pass's varied by bearing (a larger wave
+  amplitude would vary them).
+- **gv3-cast's handed-over items** (`c0fa4c3c`): the horse's Glow `gain` 0.5 (its cues peak at the
+  first pass's glow 3 and rim 5, and s29 clips 25.7% of its pixels with the horse washed white: in
+  my render the clipped disk is the beam's core behind the pale horse; the gain halves what the glow
+  adds and keeps the lift); `REACTION_DROPS` in reactivity.py drops the scout beam's four copied
+  audio links and tide's `audio.lowMid -> liveliness/sway`, each with its reason (the audit: 86
+  routes, tide's gone; the scout's applies once gv3-cast's recipe is merged).
+- **The drop's world** (`62c60aa8`): light 1.6 -> 2.0, aurora 2.4 -> 2.8, sparkle 1.5 -> 2.0; the
+  grade still held. v4's drop was darker than the plateau (0.146 against 0.186), its sky 0.82 of the
+  first pass's, the spores round the elder thin; the first pass raised these with its grade (light
+  2.1, aurora 3.2, sparkle 1.7). To verify on the drop's clip.
 - The Critic, v3n -> v4 on the open (A): musical_synchronization 0.81 -> 0.76, effects 0.90 -> 0.87,
   because its grid no longer finds v3's per-frame sky response (spectrum shape was still 0.75 in
   v3) -- the same disagreement as in iteration 2: the plan gives the aurora the lead, slowly.
