@@ -101,6 +101,10 @@ Targeted tests on the three-stream build all pass: routes 57, signals and emissi
 - **A fix agent** (`a63c21b31dd7a0f6b`) works on `agent/characters` itself: it merges main `3f720bfa`, then makes the follow reference restart when a subject is teleported, with an ADR-911 amendment. **Merge characters only after that passes the full suites.**
 - Running: setpieces, render, followfix.
 
+**Setpieces is done (08:30).** Report in [stream-reports/setpieces.md](stream-reports/setpieces.md); the GV3 plan (E1–E5) is in `audit/data/setpieces/gv3-ufo.plan.json`. Its own suites: CPU 3,739 tests with 0 failed; GPU 522 cases, 521 passed, 1 skipped. It is merged into `integrate/revision` with no conflicts. **The full suites are running**; then fast-forward main.
+- **Still to do for the Critic:** its adapter must read the cast trace's `setPieces` instead of GV3's hard-coded beats. The code is in the report. Do it in Phase 3, when GV3's inputs are regenerated.
+- Running: render, followfix.
+
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
 2. emission finisher + camera finisher.
