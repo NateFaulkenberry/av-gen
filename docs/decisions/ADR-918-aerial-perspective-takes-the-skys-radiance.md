@@ -94,7 +94,8 @@ sky behind it, while the air near the camera keeps the fog colour it was tuned w
 
 - **No existing scene changes.** The default is 0 and no tracked scene or project sets it.
 - **GV3** should set `scene/fogSky` 1.0 and leave `scene/fogSkyDistance` at 0 (automatic: 375 m
-  at its base density, 313-417 m over its density arc of 0.024-0.018). The rim then reads as air
+  at its base density of 0.02, and 208-500 m as its timeline's density arc runs from 0.036 to
+  0.015: thicker air takes the sky's colour nearer). The rim then reads as air
   against the aurora rather than as a navy cut-out, and the near air keeps its navy. Its density
   need not come down for the rim's sake; the audit's 0.009-0.012 remains a look choice, not a fix.
   Measured on a snapshot of GV3 (960x540 x2, offline):
