@@ -214,6 +214,7 @@ std::optional<ModOp> modOpFromName(std::string_view name) {
 
 json chainToJson(const ProcessorChain& chain) {
     json j;
+    j["delayMs"] = static_cast<double>(chain.delayMs); // ADR-900: the first stage
     j["gain"] = static_cast<double>(chain.gain);
     j["offset"] = static_cast<double>(chain.offset);
     j["curve"] = enumToString(kCurveNames, chain.curve);
@@ -241,7 +242,8 @@ Result<ProcessorChain> chainFromJson(const json& j) {
         return fail("processor chain must be a JSON object");
     }
     ProcessorChain chain;
-    std::array<Result<void>, 19> results{
+    std::array<Result<void>, 20> results{
+        readFloat(j, "delayMs", chain.delayMs), // ADR-900; absent = no delay
         readFloat(j, "gain", chain.gain),
         readFloat(j, "offset", chain.offset),
         readEnum(j, "curve", kCurveNames, chain.curve),
@@ -267,6 +269,9 @@ Result<ProcessorChain> chainFromJson(const json& j) {
             return fail("processor chain: {}", r.error().message);
         }
     }
+    if (chain.delayMs < 0.0f) {
+        return fail("processor chain: 'delayMs' must be >= 0, got {:g}", chain.delayMs);
+    }
     return chain;
 }
 
@@ -280,6 +285,17 @@ json routeToJson(const ModRoute& route) {
     j["polarity"] = enumToString(kPolarityNames, route.polarity);
     j["enabled"] = route.enabled;
     j["chain"] = chainToJson(route.chain);
+    // ADR-900. Written only when set: a route with no depth source is a route at full depth, and a
+    // key that always said so would be a line of noise in every route of every project.
+    if (!route.depthSource.empty()) {
+        j["depthSource"] = route.depthSource;
+        j["depthMin"] = static_cast<double>(route.depthMin);
+        j["depthMax"] = static_cast<double>(route.depthMax);
+    }
+    // ADR-924, the same rule: only a route a Director plan made says which item made it.
+    if (!route.planItem.empty()) {
+        j["planItem"] = route.planItem;
+    }
     return j;
 }
 
@@ -294,13 +310,27 @@ Result<ModRoute> routeFromJson(const json& j) {
     if (auto r = readString(j, "target", route.target); !r) {
         return fail("route: {}", r.error().message);
     }
-    std::array<Result<void>, 5> results{
+    std::array<Result<void>, 7> results{
         readInt(j, "component", route.component),
         readFloat(j, "amount", route.amount),
         readEnum(j, "op", kOpNames, route.op),
         readEnum(j, "polarity", kPolarityNames, route.polarity), // absent (v1) = unipolar
         readBool(j, "enabled", route.enabled),
+        readFloat(j, "depthMin", route.depthMin), // ADR-900
+        readFloat(j, "depthMax", route.depthMax),
     };
+    if (const auto it = j.find("depthSource"); it != j.end()) {
+        if (!it->is_string()) {
+            return fail("route {} -> {}: 'depthSource' must be a string", route.source, route.target);
+        }
+        route.depthSource = it->get<std::string>();
+    }
+    if (const auto it = j.find("planItem"); it != j.end()) {
+        if (!it->is_string()) {
+            return fail("route {} -> {}: 'planItem' must be a string", route.source, route.target);
+        }
+        route.planItem = it->get<std::string>();
+    }
     for (const auto& r : results) {
         if (!r) {
             return fail("route {} -> {}: {}", route.source, route.target, r.error().message);

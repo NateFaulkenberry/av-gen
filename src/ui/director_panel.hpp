@@ -85,6 +85,10 @@ public:
     [[nodiscard]] bool recording() const { return recording_.running(); }
 
 private:
+    // "Plans in this project": each plan's provenance, and (ADR-924) its reactivity -- its route items,
+    // micro to macro, each with its reason and whether the route it made is still as made. Drawn with
+    // or without the assistant: the plans are the project's, not the assistant's.
+    void drawProjectPlans(app::Engine& engine);
     // The proposal's dry run, recompiled only when the proposal or the project changed.
     void refresh(app::Engine& engine, const std::shared_ptr<avgen::ai::AgentTask>& task);
     bool endPreview(app::Engine& engine);

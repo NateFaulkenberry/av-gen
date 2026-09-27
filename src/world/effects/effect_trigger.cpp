@@ -125,7 +125,10 @@ Result<void> Trigger::validate() const {
 
 // ---- the clock -------------------------------------------------------------------------------------
 
-void TriggerClock::setBeats(std::span<const double> ascending) { beats_.assign(ascending.begin(), ascending.end()); }
+void TriggerClock::setBeats(std::span<const double> ascending, int downbeat) {
+    beats_.assign(ascending.begin(), ascending.end());
+    downbeat_ = downbeat;
+}
 void TriggerClock::setOnsets(std::span<const TriggerOnset> ascending) { onsets_.assign(ascending.begin(), ascending.end()); }
 void TriggerClock::setMusicEvents(std::span<const TriggerMoment> ascending) {
     moments_.assign(ascending.begin(), ascending.end());
@@ -152,22 +155,21 @@ void TriggerClock::setFrame(double seconds) {
 }
 
 void TriggerClock::bind(const analysis::AnalysisTrack* track, std::span<const seq::Marker> markers,
-                        const HistoryBank* history, double seconds, int phraseBars, int sectionPhrases) {
+                        const HistoryBank* history, double seconds, const analysis::Meter& meter) {
     history_ = history;
     setFrame(seconds);
 
     const std::size_t frames = track != nullptr ? track->frames().size() : 0;
     const std::size_t beatCount = track != nullptr ? track->beats().beatTimes.size() : 0;
-    if (track != boundTrack_ || frames != boundFrames_ || beatCount != boundBeats_ ||
-        phraseBars != boundPhraseBars_ || sectionPhrases != boundSectionPhrases_) {
+    if (track != boundTrack_ || frames != boundFrames_ || beatCount != boundBeats_ || !(meter == boundMeter_)) {
         boundTrack_ = track;
         boundFrames_ = frames;
         boundBeats_ = beatCount;
-        boundPhraseBars_ = phraseBars;
-        boundSectionPhrases_ = sectionPhrases;
+        boundMeter_ = meter;
         beats_.clear();
         onsets_.clear();
         moments_.clear();
+        downbeat_ = meter.downbeat;
         if (track != nullptr) {
             beats_ = track->beats().beatTimes;
             std::sort(beats_.begin(), beats_.end());
@@ -179,7 +181,7 @@ void TriggerClock::bind(const analysis::AnalysisTrack* track, std::span<const se
                 if (frame.onset) {
                     onsets_.push_back(TriggerOnset{frame.timeSeconds, frame.onsetStrength});
                 }
-                runtime.consume(frame, phraseBars, sectionPhrases);
+                runtime.consume(frame, meter);
                 for (const signals::MusicalMoment& m : runtime.lastMoments()) {
                     moments_.push_back(TriggerMoment{m.timeSeconds, static_cast<std::uint8_t>(m.event)});
                 }
@@ -224,21 +226,31 @@ std::size_t TriggerClock::lastTriggers(const Trigger& trig, std::string_view own
     std::size_t n = 0;
     switch (trig.source) {
     case TriggerSource::Beat: {
-        const std::size_t every = static_cast<std::size_t>(std::max(trig.everyN, 1));
-        const std::size_t first = static_cast<std::size_t>(std::max(trig.offset, 0));
-        std::size_t end = upperIndex<double>(beats_, t, [](double v) { return v; });
-        if (end == 0 || end - 1 < first) {
+        // Musical beats (ADR-896): tracked beat i is musical beat i - downbeat_, so offset 0 is
+        // beat 1 of bar 1 and "every 4th from 0" is every downbeat -- the beats `beat.count` numbers.
+        const auto every = static_cast<std::int64_t>(std::max(trig.everyN, 1));
+        const auto first = static_cast<std::int64_t>(std::max(trig.offset, 0));
+        const std::size_t end = upperIndex<double>(beats_, t, [](double v) { return v; });
+        if (end == 0) {
             return 0;
         }
-        // The newest qualifying index at or below end - 1, then every `every` below it.
-        std::size_t i = end - 1;
-        i -= (i - first) % every;
+        // The newest qualifying musical beat at or below the newest tracked beat, then every
+        // `every` below it, while the tracked beat exists.
+        std::int64_t musical = static_cast<std::int64_t>(end - 1) - downbeat_;
+        if (musical < first) {
+            return 0;
+        }
+        musical -= (musical - first) % every;
         while (n < out.size()) {
-            n = put(out, n, beats_[i]);
-            if (i < first + every) {
+            const std::int64_t index = musical + downbeat_;
+            if (index < 0) {
                 break;
             }
-            i -= every;
+            n = put(out, n, beats_[static_cast<std::size_t>(index)]);
+            if (musical < first + every) {
+                break;
+            }
+            musical -= every;
         }
         return n;
     }

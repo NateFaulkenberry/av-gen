@@ -44,6 +44,7 @@
 //   * Anything vendor-specific: `provenance.source` is a free string, and nothing reads it.
 
 #include "directing/issue.hpp"
+#include "directing/plan_route.hpp"
 #include "directing/time_ref.hpp"
 
 #include <nlohmann/json.hpp>
@@ -81,6 +82,8 @@ enum class PerformanceMode : std::uint8_t { Scripted, Directed, Goal };
 enum class ContentDomain : std::uint8_t {
     SequenceShot, SequenceMarker, SequenceActor, SequenceEvent, SequenceTrack,
     CameraRig, CameraShot, TimelineTrack, EffectInstance,
+    ModRoute,  // ADR-924: a route in the project's route list, by its `planItem` ("<planId>/<key>")
+    ModSource, // ADR-924: a source in the project's rack, by its signal ("timeline.mushroom-hue")
     StagingScenario, // ADR-929: a set piece's `stage::ScenarioDesc`, by scenario name
 };
 
@@ -279,6 +282,10 @@ struct Plan {
     std::vector<PlanPerformance> performances;
     std::vector<PlanCue> cues;
     std::vector<PlanRetime> retimes;
+    // ADR-924: routes the plan asks for, and the sources they need (plan_route.hpp). Written to the
+    // plan's JSON only when present, so a plan without them keeps its bytes.
+    std::vector<PlanRoute> routes;
+    std::vector<PlanSource> sources;
     std::vector<PlanSetPiece> setPieces; // ADR-929
     std::vector<ContentRef> produced;
     // ADR-767: what a watched play of the project raised, when this plan places items on events

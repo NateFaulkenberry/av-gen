@@ -61,15 +61,31 @@ void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, 
     time.playing = bus.declare("time.playing");
     time.beatPhase = bus.declare("beat.phase");
     time.beatPulse = bus.declare("beat.pulse", 0.0f, 1.0f, true);
-    time.beatCount = bus.declare("beat.count", 0.0f, 100000.0f);
+    // ADR-896: counted from beat 1 of bar 1, so a pickup before it is negative.
+    time.beatCount = bus.declare("beat.count", -100000.0f, 100000.0f);
     time.bpm = bus.declare("beat.bpm", 0.0f, 300.0f);
     time.barPhase = bus.declare("beat.bar");
     time.phrasePhase = bus.declare("beat.phrase");
-    time.phraseCount = bus.declare("beat.phraseCount", 0.0f, 100000.0f);
+    time.phraseCount = bus.declare("beat.phraseCount", -100000.0f, 100000.0f);
     time.phrasePulse = bus.declare("beat.phrasePulse", 0.0f, 1.0f, true);
     time.sectionPhase = bus.declare("beat.section");
-    time.sectionCount = bus.declare("beat.sectionCount", 0.0f, 100000.0f);
+    time.sectionCount = bus.declare("beat.sectionCount", -100000.0f, 100000.0f);
     music.declare(bus); // music.beat ... music.impact (ADR-073)
+    // ADR-899: the sequence's authored section timeline, on the bus a seek replays.
+    time.timelineSection = bus.declare("section.index", -1.0f, 1024.0f);
+    time.timelineProgress = bus.declare("section.progress");
+    time.timelineEnergy = bus.declare("section.energy");
+    time.timelineChange = bus.declare("section.change", 0.0f, 1.0f, true);
+    // What the route-source picker shows beside the names whose meaning changed (ADR-896) or is new
+    // (ADR-899).
+    bus.setLabel(time.beatCount, "beat number (0 = bar 1, beat 1)");
+    bus.setLabel(time.barPhase, "position in the bar (0 = the downbeat)");
+    bus.setLabel(time.phrasePhase, "position in the phrase");
+    bus.setLabel(time.sectionPhase, "position in the counted section (bars x phrases)");
+    bus.setLabel(time.timelineSection, "section number (Sequence section timeline, -1 = none)");
+    bus.setLabel(time.timelineProgress, "progress through the current section");
+    bus.setLabel(time.timelineEnergy, "energy of the current section");
+    bus.setLabel(time.timelineChange, "section change (a new section begins)");
 }
 
 } // namespace
@@ -86,19 +102,36 @@ void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, 
 // scene states (`state.*`) and the entity-derived signals -- the first two are not functions of
 // time, the last is the entity world's own output. The replay's bodies read them as absent, as
 // every replay before this read everything.
+//
+// ADR-901: and the project's own routes ride along. A route's chain is history -- its smoothing,
+// its envelope, and since ADR-900 its delay line -- and a seek used to reset it, so every route with
+// an attack, a decay or a delay landed somewhere a play never was. Each replayed step now also
+// builds the signals those routes read (this bus, plus every pure-in-time source sampled at the
+// step's instant, on a scratch bus laid out like the engine's) and advances their chains without
+// writing their targets; the chain states ride in the checkpoints. A route whose source is not a
+// function of time (control, state, entity, envelope and random sources) is not replayed and is
+// reset by the seek as before. Reactions (ADR-870) are advanced by the composition, which also
+// applies them, and are left alone here.
 class Engine::ReplaySignals final : public entity::ReplaySignalSource {
 public:
-    explicit ReplaySignals(const Engine& engine) : engine_(engine) {
+    explicit ReplaySignals(Engine& engine) : engine_(engine) {
         signals::AudioSignals audio;
         Engine::TimeSignals time;
         declareFrameSignals(zeroBus_, audio, time, zero_.music);
         bus_ = zeroBus_;
     }
 
-    // What this seek's frames read that the pipeline does not carry, fixed for the seek.
+    // What this seek's frames read that the pipeline does not carry, fixed for the seek -- and none
+    // of where the last seek landed. ADR-901: the seek has just reset the routes' chains in the
+    // modulator, so a landing is only good for the seek that made it. `exactAt` must mean that this
+    // seek's replay stands at the target; the first version kept the last landing, and a second seek
+    // to the same instant with no composition to drive the replay skipped it and left every
+    // replayed route reset (a render job seeks twice to its first frame: its warm-up, then for real).
     void begin(bool playing, double duration) {
         playing_ = playing;
         duration_ = duration;
+        lastBuilt_ = -1.0;
+        prepareRoutes();
     }
 
     [[nodiscard]] const signals::SignalBus& bus() const override { return bus_; }
@@ -109,6 +142,9 @@ public:
         started_ = false;
         exact_ = true;
         lastBuilt_ = -1.0;
+        if (replaysRoutes_) {
+            engine_.modulator_.resetChainStates(pick());
+        }
     }
 
     void build(double now, double dt) override {
@@ -126,13 +162,17 @@ public:
         in.position = now; // the offline transport sits at the frame's instant
         in.duration = duration_;
         in.playing = playing_;
-        engine_.advanceClock(state_, bus_, time, fresh, in);
+        const bool pulse = engine_.advanceClock(state_, bus_, time, fresh, in);
         lastBuilt_ = now;
+        if (replaysRoutes_) {
+            advanceRoutes(time, in.bpm, pulse);
+        }
     }
 
     struct Checkpoint final : entity::HostCheckpoint {
         SignalClock clock;
         std::vector<float> values; // the bus: continuous values persist between analysis frames
+        std::vector<params::ProcessorChain::State> routes; // ADR-901: the replayed routes' chains
         std::size_t measured = 0;
         [[nodiscard]] std::size_t bytes() const override { return measured; }
     };
@@ -144,7 +184,14 @@ public:
         for (std::size_t i = 0; i < bus_.size(); ++i) {
             c->values[i] = bus_.value(static_cast<signals::SignalId>(i));
         }
-        c->measured = sizeof(Checkpoint) + c->values.size() * sizeof(float) +
+        std::size_t routeBytes = 0;
+        if (replaysRoutes_) {
+            c->routes = engine_.modulator_.chainStates(pick());
+            for (const auto& s : c->routes) {
+                routeBytes += sizeof(s) + s.history.capacity() * sizeof(params::ProcessorChain::DelaySample);
+            }
+        }
+        c->measured = sizeof(Checkpoint) + c->values.size() * sizeof(float) + routeBytes +
                       (c->clock.latest.magnitude.size() + c->clock.latest.spectrum.size()) * sizeof(float);
         return c;
     }
@@ -155,11 +202,19 @@ public:
         for (std::size_t i = 0; i < c.values.size() && i < bus_.size(); ++i) {
             bus_.set(static_cast<signals::SignalId>(i), c.values[i]);
         }
+        if (replaysRoutes_) {
+            engine_.modulator_.restoreChainStates(pick(), c.routes);
+        }
         started_ = true;
         exact_ = true; // only an exact replay records checkpoints
     }
 
-    [[nodiscard]] std::uint64_t inputKey() const override { return engine_.replaySignalKey(playing_); }
+    // ADR-901: the replayed routes and the sources they sample are inputs too, so an edited route or
+    // score drops the checkpoints its chain states were recorded under.
+    [[nodiscard]] std::uint64_t inputKey() const override {
+        const std::uint64_t key = engine_.replaySignalKey(playing_);
+        return replaysRoutes_ ? key ^ (routesKey_ + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2)) : key;
+    }
 
     // Whether the pipeline now stands where a play from zero stands after its frame at `target`.
     [[nodiscard]] bool exactAt(double target) const {
@@ -189,8 +244,110 @@ public:
 
     [[nodiscard]] const SignalClock& state() const { return state_; }
 
+    // ADR-901: whether this seek replays any of the project's routes (tests and the log ask).
+    [[nodiscard]] bool replaysRoutes() const { return replaysRoutes_; }
+
 private:
-    const Engine& engine_;
+    // Which signals a replayed step can rebuild -- this pipeline's prefix of the engine's bus, and
+    // the outputs of every pure-in-time source -- and so which routes can be replayed. Recomputed
+    // per seek: routes, sources and the bus all change between seeks.
+    void prepareRoutes() {
+        // Sources read their parameters' finals, which a play rebuilds from the bases every frame --
+        // but only once a frame has run: a value a load or an edit has just set is in the base, and the
+        // final still holds the old one. The replay samples the sources, so it (and the landing frame
+        // after it) reads the bases, which is what every played frame after the first reads.
+        for (params::IParameter* p : engine_.params_.ordered()) {
+            if (p->path().starts_with("sources/")) {
+                p->resetFinal();
+            }
+        }
+        const signals::SignalBus& live = engine_.bus_;
+        samplable_.assign(live.size(), 0);
+        for (std::size_t i = 0; i < bus_.size() && i < samplable_.size(); ++i) {
+            samplable_[i] = 1;
+        }
+        std::uint64_t h = 0x7e4c0ffee0dd5eedull;
+        const auto mix = [&h](std::uint64_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+        const auto bits = [](float f) {
+            std::uint32_t u = 0;
+            std::memcpy(&u, &f, sizeof u);
+            return static_cast<std::uint64_t>(u);
+        };
+        for (const auto& source : engine_.sources_.sources()) {
+            if (!source->pureInTime()) {
+                continue;
+            }
+            for (const std::string& name : source->outputs()) {
+                if (const auto id = live.find(name); id && *id < samplable_.size()) {
+                    samplable_[*id] = 1;
+                }
+            }
+            mix(std::hash<std::string>{}(source->kind() + "/" + source->name() + "/" + source->settingsToJson().dump()));
+        }
+        replaysRoutes_ = false;
+        for (const params::ModRoute& r : engine_.modulator_.routes()) {
+            if (!replayed(r)) {
+                continue;
+            }
+            replaysRoutes_ = true;
+            mix(std::hash<std::string>{}(r.source));
+            mix(std::hash<std::string>{}(r.target));
+            mix(static_cast<std::uint64_t>(r.component + 1));
+            mix(static_cast<std::uint64_t>(r.polarity));
+            const params::ProcessorChain& c = r.chain;
+            for (const float f : {c.delayMs, c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
+                                  c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
+                                  c.remapInMax, c.remapOutMin, c.remapOutMax}) {
+                mix(bits(f));
+            }
+            mix(static_cast<std::uint64_t>(c.curve) | (static_cast<std::uint64_t>(c.threshold) << 8u) |
+                (static_cast<std::uint64_t>(c.envelope) << 16u) | (c.clampEnabled ? 1ull << 24u : 0u) |
+                (c.remapEnabled ? 1ull << 25u : 0u));
+        }
+        routesKey_ = h;
+        if (replaysRoutes_) {
+            sampling_ = live; // the engine's layout: every id a route or a source holds is valid on it
+        }
+    }
+
+    [[nodiscard]] bool replayed(const params::ModRoute& r) const {
+        return !r.fromEntity && r.enabled && r.targetParam != nullptr && r.sourceId < samplable_.size() &&
+               samplable_[r.sourceId] != 0;
+    }
+
+    [[nodiscard]] std::function<bool(const params::ModRoute&)> pick() const {
+        return [this](const params::ModRoute& r) { return replayed(r); };
+    }
+
+    // One replayed instant for the routes: the pipeline's bus copied onto the engine-shaped scratch
+    // bus, the pure sources sampled at the instant (with the beat clock this step left), and every
+    // replayed chain advanced on it.
+    void advanceRoutes(const FrameTime& time, double bpm, bool pulse) {
+        sampling_.clearEvents();
+        for (std::size_t i = 0; i < bus_.size() && i < sampling_.size(); ++i) {
+            const auto id = static_cast<signals::SignalId>(i);
+            if (bus_.event(id)) {
+                sampling_.setEvent(id, true, bus_.value(id));
+            } else {
+                sampling_.set(id, bus_.value(id));
+            }
+        }
+        signals::SourceContext ctx;
+        ctx.time = time;
+        ctx.audioPosition = time.renderTime;
+        ctx.audioDuration = duration_;
+        ctx.playing = playing_;
+        ctx.beatPhase = static_cast<float>(state_.beatPhase);
+        // Exactly as the play path fills it (ADR-896): the musical position in beats, from this
+        // replay's own beat clock through the engine's meter.
+        ctx.musicalBeats = state_.haveClockBeats ? engine_.meter().beats(state_.clockBeats) : 0.0;
+        ctx.tempoBpm = static_cast<float>(bpm);
+        ctx.beatEvent = pulse;
+        engine_.sources_.sample(sampling_, ctx);
+        engine_.modulator_.advanceChains(sampling_, time.deltaTime, pick());
+    }
+
+    Engine& engine_;
     SignalClock zero_;
     signals::SignalBus zeroBus_;
     SignalClock state_;
@@ -200,6 +357,11 @@ private:
     bool started_ = false;
     bool exact_ = true;
     double lastBuilt_ = -1.0;
+    // ADR-901
+    std::vector<std::uint8_t> samplable_;
+    signals::SignalBus sampling_;
+    bool replaysRoutes_ = false;
+    std::uint64_t routesKey_ = 0;
 };
 
 bool Engine::seekReplaysSignals() const {
@@ -221,10 +383,123 @@ std::uint64_t Engine::replaySignalKey(bool playing) const {
     mix(embeddedTempo_.available ? 1u : 0u);
     mix(bits(embeddedTempo_.available ? embeddedTempo_.bpm : 0.0));
     mix(bits(durationSeconds()));
-    mix(static_cast<std::uint64_t>(phraseBars_));
-    mix(static_cast<std::uint64_t>(sectionPhrases_));
+    // ADR-896: the meter every bar, phrase and section on the bus is divided by.
+    const analysis::Meter m = meter();
+    mix(static_cast<std::uint64_t>(m.beatsPerBar));
+    mix(static_cast<std::uint64_t>(m.phraseBars));
+    mix(static_cast<std::uint64_t>(m.sectionPhrases));
+    mix(static_cast<std::uint64_t>(static_cast<std::int64_t>(m.downbeat)));
+    // ADR-899: section.* reads the section timeline.
+    for (const song::Section& section : sequence_.sectionTimeline.sections) {
+        mix(bits(section.startSeconds));
+        mix(bits(section.endSeconds));
+        mix(bits(static_cast<double>(section.energy)));
+    }
     mix(playing ? 1u : 0u);
     return h;
+}
+
+Engine::MeterSettings Engine::meterSettings() const {
+    // The parameters when they are registered -- they are what the Parameters panel edits and what
+    // the project file restores -- and the held values in the moment between a parameter-set clear
+    // and the re-registration.
+    MeterSettings out = meterSettings_;
+    if (bar1BeatParam_ != nullptr) {
+        out.bar1Beat = bar1BeatParam_->base();
+    }
+    if (phraseBarsParam_ != nullptr) {
+        out.phraseBars = phraseBarsParam_->base();
+    }
+    if (sectionPhrasesParam_ != nullptr) {
+        out.sectionPhrases = sectionPhrasesParam_->base();
+    }
+    return out;
+}
+
+void Engine::setMeterSettings(const MeterSettings& settings) {
+    meterSettings_ = settings;
+    if (bar1BeatParam_ != nullptr) {
+        bar1BeatParam_->setBase(settings.bar1Beat);
+    }
+    if (phraseBarsParam_ != nullptr) {
+        phraseBarsParam_->setBase(settings.phraseBars);
+    }
+    if (sectionPhrasesParam_ != nullptr) {
+        sectionPhrasesParam_->setBase(settings.sectionPhrases);
+    }
+    refreshTransport(); // the bars readout counts from bar 1
+}
+
+void Engine::registerMeterParameters() {
+    // ADR-896: the meter's three settings, exposed where an artist looks for settings -- the
+    // Parameters panel's "music" group, "meter" section -- with labels that say what each one does
+    // and what its "detect" value is. Not modulatable: a bar line that moved with the audio would
+    // be no bar line at all.
+    const params::ParamFlags flags{.exposed = true, .modulatable = false, .serialized = true};
+    const MeterSettings held = meterSettings_;
+    if (params_.find(kBar1BeatPath) == nullptr) {
+        bar1BeatParam_ = &params_.add(params::ParamDesc<int>{.path = kBar1BeatPath,
+                                                            .defaultValue = -1,
+                                                            .hardMin = -1,
+                                                            .hardMax = 63,
+                                                            .label = "bar 1 starts on beat (-1 = detect)",
+                                                            .flags = flags});
+        bar1BeatParam_->setBase(held.bar1Beat);
+    }
+    if (params_.find(kPhraseBarsPath) == nullptr) {
+        phraseBarsParam_ = &params_.add(params::ParamDesc<int>{.path = kPhraseBarsPath,
+                                                              .defaultValue = 0,
+                                                              .hardMin = 0,
+                                                              .hardMax = 64,
+                                                              .label = "bars per phrase (0 = detect)",
+                                                              .flags = flags});
+        phraseBarsParam_->setBase(held.phraseBars);
+    }
+    if (params_.find(kSectionPhrasesPath) == nullptr) {
+        sectionPhrasesParam_ = &params_.add(params::ParamDesc<int>{.path = kSectionPhrasesPath,
+                                                                  .defaultValue = 4,
+                                                                  .hardMin = 1,
+                                                                  .hardMax = 64,
+                                                                  .label = "phrases per section",
+                                                                  .flags = flags});
+        sectionPhrasesParam_->setBase(held.sectionPhrases);
+    }
+}
+
+analysis::Meter Engine::meter() const { return resolveMeter(nullptr); }
+
+Engine::MeterSource Engine::meterSource() const {
+    MeterSource source;
+    static_cast<void>(resolveMeter(&source));
+    return source;
+}
+
+analysis::Meter Engine::resolveMeter(MeterSource* source) const {
+    const MeterSettings settings = meterSettings();
+    analysis::Meter m;
+    m.sectionPhrases = settings.sectionPhrases;
+    const analysis::MeterEstimate* estimate =
+        track_ != nullptr && track_->meterEstimate().valid ? &track_->meterEstimate() : nullptr;
+    MeterSource from;
+    // A MIDI clock's beat 0 is its own downbeat: the analysis's estimate is about tracked beats and
+    // says nothing about it. A pinned offset is the person's word and applies to either clock.
+    if (settings.bar1Beat >= 0) {
+        m.downbeat = settings.bar1Beat;
+    } else if (estimate != nullptr && !midiClockActive_) {
+        m.downbeat = estimate->downbeat;
+        from.downbeatDetected = true;
+        from.downbeatConfidence = estimate->downbeatConfidence;
+    }
+    if (settings.phraseBars > 0) {
+        m.phraseBars = settings.phraseBars;
+    } else if (estimate != nullptr && estimate->phraseBars > 0) {
+        m.phraseBars = estimate->phraseBars;
+        from.phraseDetected = true;
+    }
+    if (source != nullptr) {
+        *source = from;
+    }
+    return m.sanitized();
 }
 
 const char* tempoSourceName(TempoSource source) {
@@ -380,6 +655,7 @@ void Engine::installController(std::unique_ptr<scene::SceneController> controlle
                                                             .softMin = 0.0f,
                                                             .softMax = 4.0f});
     }
+    registerMeterParameters(); // ADR-896
     if (params_.find("post/bloom/intensity") == nullptr) {
         scene::PostSettings keep = post_;
         postParams_ = scene::registerPostParameters(params_, keep);
@@ -449,6 +725,7 @@ Result<seq::InstallReport> Engine::installSequence() {
     // dive through the lake on its way -- a shot from under water is a decision, not a side effect.
     // Null when the scene has no terrain, which the bake reports rather than silently ignoring.
     seq::BakeOptions options;
+    options.meter = meter(); // ADR-896: the sequence's Bar and Beat events count with the bus
     if (scene::Composition* comp = composition()) {
         if (const world::TerrainQuery ground = comp->terrainQuery(); ground.valid()) {
             options.groundHeightAt = [ground](float x, float z) {
@@ -477,6 +754,12 @@ Result<seq::InstallReport> Engine::installSequence() {
         }
     }
     auto report = seq::install(sequence_, timeline_, params_, sink, sequenceTargets_, options);
+    // Recorded whether or not the install succeeded: a failed one retried every frame for a meter
+    // it already tried would only repeat its error.
+    installedMeter_ = options.meter;
+    installedEventsUseMeter_ = std::any_of(sequence_.events.begin(), sequence_.events.end(), [](const seq::SequenceEvent& e) {
+        return e.when.kind == seq::TriggerKind::Beat || e.when.kind == seq::TriggerKind::Bar;
+    });
     if (scene::Composition* comp = composition()) {
         std::vector<scene::Composition::Performer> performers;
         if (report) {
@@ -640,6 +923,7 @@ void Engine::clearSequence() {
     seq::uninstall(timeline_, params_, sink, sequenceTargets_);
     sequenceTargets_.clear();
     sequenceReport_ = seq::InstallReport{};
+    installedEventsUseMeter_ = false;
     sequenceEvents_.clear();
     firedEvents_.clear();
     sequence_ = seq::Sequence{};
@@ -932,9 +1216,20 @@ void Engine::rebind() {
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels must exist on the bus first
     }
-    if (auto r = modulator_.bind(bus_, params_); !r) {
-        log::warn("modulation bind: {}", r.error().message);
-        noteBindingProblem(fmt::format("modulation: {}", r.error().message));
+    // ADR-902: the bind checks every route it resolves against the scene's facts -- unless a project
+    // is half-loaded, when it checks against the bus and parameters alone and the load reports the
+    // rest once the scene is whole (reportRouteLiveness).
+    {
+        scene::LivenessInputs inputs = livenessInputs();
+        inputs.judgeSilence = false; // "no audio yet" is the load's question, not the bind's
+        const scene::SceneLivenessFacts facts(inputs);
+        modulator_.setLivenessFacts(livenessReady_ ? &facts : nullptr);
+        const auto bound = modulator_.bind(bus_, params_);
+        modulator_.setLivenessFacts(nullptr);
+        if (!bound) {
+            log::warn("modulation bind: {}", bound.error().message);
+            noteBindingProblem(fmt::format("modulation: {}", bound.error().message));
+        }
     }
     if (auto r = timeline_.bind(params_); !r) {
         log::warn("{}", r.error().message);
@@ -955,6 +1250,80 @@ void Engine::noteBindingProblem(std::string message) {
         return;
     }
     projectWarnings_.push_back(std::move(message));
+}
+
+// ---- route and parameter liveness (ADR-902) ---------------------------------------------------
+
+scene::LivenessInputs Engine::livenessInputs() const {
+    scene::LivenessInputs in;
+    in.bus = &bus_;
+    in.params = &params_;
+    in.sources = &sources_;
+    in.composition = composition();
+    in.effects = effects_;
+    in.shots = shotSpans_;
+    in.track = track_.get();
+    in.markers = sequence_.markers;
+    in.history = &historyBank_;
+    in.meter = meter();
+    in.durationSeconds = durationSeconds();
+    in.frameRate = render_.fps > 0.0 ? render_.fps : 60.0;
+    // An analysed track, or a live input whose analysis runs as it plays: either moves audio.*.
+    in.hasAudio = (track_ != nullptr && !track_->empty()) || input_ != nullptr;
+    in.hasTempo = in.hasAudio || tempoOverride_.available || embeddedTempo_.available;
+    in.offline = mode_ == EngineMode::Offline;
+    return in;
+}
+
+scene::RouteAudit Engine::auditRoutes() const {
+    return scene::auditProject(livenessInputs(), modulator_, timeline_);
+}
+
+void Engine::reportRouteLiveness() {
+    const scene::RouteAudit audit = auditRoutes();
+    std::size_t dead = 0;
+    std::size_t hazard = 0;
+    const auto report = [&](const char* what, const std::vector<scene::AuditEntry>& entries) {
+        for (const scene::AuditEntry& entry : entries) {
+            for (const params::liveness::Finding& f : entry.findings) {
+                if (f.verdict == params::liveness::Verdict::Live) {
+                    continue;
+                }
+                const bool isDead = f.verdict == params::liveness::Verdict::Dead;
+                (isDead ? dead : hazard) += 1;
+                // The same key the modulator's bind logs under, so a route logged there is not logged
+                // again here.
+                const std::string key =
+                    std::string(what) == "route"
+                        ? fmt::format("{}|{}|{}|{}", f.rule, entry.detail.value("source", std::string()),
+                                      entry.detail.value("target", std::string()), entry.detail.value("component", -1))
+                        : fmt::format("{}|{}|{}", what, f.rule, entry.label);
+                if (modulator_.firstReport(key)) {
+                    log::warn("{} {} ({}) is {}: {} [{}]", what, entry.index, entry.label,
+                              params::liveness::verdictName(f.verdict), f.reason, f.rule);
+                }
+                // Into the warnings a person reads, the dead ones -- except what the binds already put
+                // there (a route or track that did not resolve), what somebody chose (disabled), and
+                // what is about this session rather than the project (no audio loaded yet).
+                static constexpr std::array<std::string_view, 8> kReportedElsewhere{
+                    "disabled",        "unknown-source",         "unknown-depth-source", "unknown-target",
+                    "not-modulatable", "component-out-of-range", "silent-source",        "live-only-source"};
+                if (isDead && std::find(kReportedElsewhere.begin(), kReportedElsewhere.end(), f.rule) ==
+                                  kReportedElsewhere.end()) {
+                    noteBindingProblem(fmt::format("{} {} ({}) does nothing: {} [{}]", what, entry.index,
+                                                   entry.label, f.reason, f.rule));
+                }
+            }
+        }
+    };
+    report("route", audit.routes);
+    report("track", audit.tracks);
+    report("effect", audit.effects);
+    if (dead > 0 || hazard > 0) {
+        log::info("route liveness: {} dead and {} hazardous finding(s) over {} route(s), {} track(s) and {} "
+                  "effect(s) (avgen --audit-routes writes the whole report)",
+                  dead, hazard, audit.routes.size(), audit.tracks.size(), audit.effects.size());
+    }
 }
 
 // ADR-702. The one entry point that changes which effects exist.
@@ -1073,6 +1442,12 @@ Result<std::size_t> Engine::renameEffectOwner(const world::EffectOwner& from, co
 }
 
 void Engine::detachSceneParameters() {
+    // ADR-896: the meter's parameters are about to go with the rest of the set; hold their values so
+    // the re-registration carries them over.
+    meterSettings_ = meterSettings();
+    bar1BeatParam_ = nullptr;
+    phraseBarsParam_ = nullptr;
+    sectionPhrasesParam_ = nullptr;
     if (auto* comp = composition()) {
         comp->detach();
     }
@@ -1648,7 +2023,6 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
                                  {"end", span.end},
                                  {"travel", span.travel},
                                  {"spotlight", span.spotlight},
-                                 {"emphasis", span.emphasis},
                                  {"subject", span.subject},
                                  {"subjectPosition",
                                   {span.subjectPosition.x, span.subjectPosition.y, span.subjectPosition.z}},
@@ -2026,8 +2400,9 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
         doc["outputs"] = outputs_;
     }
     doc["control"]["tempoSource"] = tempoSourceName(tempoSource_);
-    doc["control"]["phraseBars"] = phraseBars_;
-    doc["control"]["sectionPhrases"] = sectionPhrases_;
+    // ADR-896: the meter's settings (bar 1's beat, bars per phrase, phrases per section) are
+    // parameters now and are saved in `parameters` with the rest; their "detect" values are saved as
+    // such, so a measurement is never written down as a decision.
     nlohmann::json assets = nlohmann::json::object();
     // One plain clip is written as it always was -- `assets.audio`, a single reference -- so every
     // project made before arrangements existed round-trips byte for byte. Anything richer is a clip
@@ -2256,6 +2631,13 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     stage(1);
     const auto dir = std::filesystem::absolute(path).parent_path();
     projectWarnings_.clear();
+    // ADR-902: binds in the middle of the load check routes against the bus and parameters alone;
+    // the scene's facts are read once the scene is whole. Restored on every way out.
+    livenessReady_ = false;
+    struct LivenessReady {
+        bool& ready;
+        ~LivenessReady() { ready = true; }
+    } livenessGuard{livenessReady_};
     // Back to factory before anything of this project's is applied.
     //
     // Opening a project is a *replacement*, not a merge: a parameter the document does not mention
@@ -2282,6 +2664,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     lens_ = scene::LensSettings{};
     exposure_ = scene::ExposureSettings{};
     focus_ = scene::FocusSettings{};
+    meterSettings_ = MeterSettings{}; // ADR-896: the loop above reset the parameters; this, what they re-register from
     auto warn = [&](std::string message) {
         log::warn("project: {}", message);
         projectWarnings_.push_back(std::move(message));
@@ -2611,8 +2994,16 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
         } else {
             return fail("control.tempoSource '{}' unknown (analysis|midi)", tempo);
         }
-        setPhraseBars(doc["control"].value("phraseBars", 4));
-        setSectionPhrases(doc["control"].value("sectionPhrases", 4));
+        // ADR-896: the meter moved to the `music/meter/*` parameters and these keys are not read.
+        // Said, not silently dropped -- a phrase length that loads without a word and does nothing is
+        // the no-op family -- and not aliased either (ADR-442): the tracked projects were stripped.
+        for (const char* stale : {"phraseBars", "sectionPhrases"}) {
+            if (doc["control"].contains(stale)) {
+                warn(fmt::format("control.{} is no longer read; the meter's settings are the parameters "
+                                 "music/meter/phraseBars and music/meter/sectionPhrases (ADR-896)",
+                                 stale));
+            }
+        }
     } else {
         controlHub_.setMap(control::ControlMap{});
         setTempoSource(TempoSource::Analysis);
@@ -2760,7 +3151,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
                 span.end = entry.value("end", 0.0);
                 span.travel = entry.value("travel", false);
                 span.spotlight = entry.value("spotlight", false);
-                span.emphasis = entry.value("emphasis", 0.0f);
+                // ADR-922: a span's `emphasis` is no longer a field. Files written before carry the
+                // key and it is not read -- it never was, by anything but this loader.
                 span.subject = entry.value("subject", std::string{});
                 const auto readVec = [&entry](const char* key, glm::vec3& out) {
                     if (entry.contains(key) && entry[key].is_array() && entry[key].size() == 3) {
@@ -2906,6 +3298,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     if (scene::Composition* comp = composition(); comp != nullptr) {
         comp->installEntities();
     }
+    livenessReady_ = true; // the scene is whole: this bind reads its facts
     rebind();
     modulator_.resetState();
     // The sequence goes on last, after every parameter a bake could possibly name exists: the
@@ -2928,6 +3321,9 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             noteBindingProblem(fmt::format("sequence: {}", r.error().message));
         }
     }
+    // ADR-902: every route, track and effect, now that everything a rule reads exists -- the shot
+    // spans, the sequence's markers, the scene's programs and nodes.
+    reportRouteLiveness();
     finishTimings();
     projectPath_ = path;
     // A loaded project is a different piece. The transport stops and parks at its start rather than
@@ -2985,6 +3381,8 @@ void Engine::newProject() {
     controlHub_.setMap(control::ControlMap{});
     outputs_ = nlohmann::json::array();
     setTempoSource(TempoSource::Analysis);
+    // The meter's settings belong to a piece (ADR-896); a new one starts detected.
+    setMeterSettings(MeterSettings{});
     ensureControlSource();
     sources_.attach(bus_, params_);
     modulator_.masterGain = 1.0f;
@@ -3817,6 +4215,12 @@ void Engine::seekSeconds(double seconds) {
         clock_.music.reset();
         clock_.beatPhase = 0.0;
         clock_.lastAnalysisBeatCount = 0;
+        // Nor is a jump a beat, a phrase boundary or a section change (ADR-896/899): the first frame
+        // after it has no previous frame to have crossed anything since.
+        clock_.haveClockBeats = false;
+        clock_.lastPhraseIndex = SignalClock::kNoIndex;
+        clock_.lastSectionIndex = SignalClock::kNoIndex;
+        clock_.liveOverlaySeconds = -1.0;
     }
     ReplaySignals* signalReplay = nullptr;
     if (replaySignals) {
@@ -3859,14 +4263,10 @@ void Engine::seekSeconds(double seconds) {
         // every character that perceives them exactly where a play from zero puts them. The
         // reset is inside `seekWithDirector`; what ADR-209 called "picks up again on the next
         // frame" is now "is where it would have been".
-        // ADR-217: and the camera's hold on it, for the same reason. The hold is derived from the
-        // scenario's state, and the scenario has just been put back to the top -- a hold left armed
-        // across the seek would keep the camera on a shot the new second is nowhere near.
-        composition->clearAimFollowState();
-        // ADR-245: and the camera director's view of what has happened, for exactly the same
-        // reason. An event span observed before the jump describes a run of a scenario that the
-        // seek has just abolished; carrying it over would cut to an event camera for an event that
-        // is no longer happening.
+        // ADR-245: and the camera director's view of what has happened, for the same reason. An
+        // event span observed before the jump describes a run of a scenario that the seek has just
+        // abolished; carrying it over would cut to an event camera for an event that is no longer
+        // happening.
         composition->clearCameraEventState();
         // No camera position and no distance-detail flag: a seek that culled by distance was a
         // function of where the camera happened to be, and ADR-267 measured that at 50.263 m over
@@ -3917,7 +4317,22 @@ void Engine::seekSeconds(double seconds) {
             }
         }
         stats_.analysisFrames = clock_.analysisCursor;
+    } else if (mode_ == EngineMode::Offline) {
+        // ADR-901: offline with no analysed track there is no signal replay to ride (ADR-870's
+        // scope), but a route on a pure-in-time source -- an LFO, a scored timeline -- is still a
+        // function of time: replay the routes on the pipeline alone, from zero, and leave the live
+        // pipeline reset as it always was. Live mode is not replayed: its signals are not.
+        if (!replaySignals_) {
+            replaySignals_ = std::make_unique<ReplaySignals>(*this);
+        }
+        replaySignals_->begin(isPlaying(), durationSeconds());
+        if (replaySignals_->replaysRoutes()) {
+            replaySignals_->runTo(seconds);
+        }
     }
+    // ADR-912: nothing to scan for a keyed cut across a jump; the renderer drops its history for the
+    // jump itself.
+    cutScanFrom_ = std::numeric_limits<double>::quiet_NaN();
     // A live event belongs to the moment it happened and the moment is gone; the scheduled tier is
     // rebased rather than cleared, so the next frame restores the standing intents at the new
     // playhead instead of replaying everything between here and there (ADR-098).
@@ -4079,8 +4494,14 @@ void Engine::refreshTransport() {
     transport_.setDuration(duration);
     // The tempo is for the bars/beats readout and for beat stepping with no analyzed grid. It comes
     // from wherever the beat clock came from this frame, so the display cannot disagree with the
-    // signals.
-    transport_.setTempo(resolvedTempo().second, 4);
+    // signals -- and so does where bar 1 begins (ADR-896): the second the meter's downbeat falls on.
+    const analysis::Meter m = meter();
+    double origin = 0.0;
+    if (track_ != nullptr && !track_->beats().beatTimes.empty()) {
+        origin = analysis::secondsAtClockBeats(track_->beats().beatTimes, track_->beatSeconds(),
+                                               static_cast<double>(m.downbeat));
+    }
+    transport_.setTempo(resolvedTempo().second, m.beatsPerBar, origin);
     // The project's frame rate *is* the render settings' frame rate. Not a second one: the frames a
     // person steps through have to be the frames the project exports, and two numbers that are
     // nearly always equal are two numbers that will one day not be.
@@ -4257,6 +4678,8 @@ Result<void> Engine::useAudioInput(const std::string& deviceName) {
     clock_.beatPhase = 0.0;
     clock_.beatCount = 0;
     clock_.lastAnalysisBeatCount = 0;
+    clock_.haveClockBeats = false;
+    clock_.lastPhraseIndex = SignalClock::kNoIndex;
     log::info("live audio input '{}' at {} Hz", input_->deviceName(), input_->sampleRate());
     return {};
 }
@@ -4311,11 +4734,18 @@ FrameTime Engine::tick(FrameClock& clock) {
 
 void Engine::publishFrame(SignalClock& clock, signals::SignalBus& bus, const analysis::AnalysisFrame& frame) const {
     clock.latest = frame;
+    // ADR-896/898: live playback of a loaded file takes the whole-track analysis's beat and band
+    // onsets at the same position, so the editor hears what a render of the same second hears. Live
+    // INPUT has no track and keeps the causal tracker's answers.
+    if (track_ != nullptr && input_ == nullptr && !track_->empty()) {
+        clock.liveOverlaySeconds = analysis::overlayTrackFields(clock.latest, *track_, clock.liveOverlaySeconds);
+    }
+    const analysis::AnalysisFrame& published = clock.latest;
     clock.hasFrame = true;
-    audioSignals_.publish(bus, frame);
+    audioSignals_.publish(bus, published);
     // Live, this is every analysis frame the render thread sees. Offline it is the last of the
     // batch update() already walked, which consume() recognises by frame index and ignores.
-    clock.music.consume(frame, phraseBars_, sectionPhrases_);
+    clock.music.consume(published, meter());
 }
 
 bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double renderTime) const {
@@ -4323,22 +4753,43 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
         audioSignals_.publishSilence(bus);
         return false;
     }
-    // Consume every analysis frame whose centre lies at or before renderTime so onsets that
-    // fall between two render frames are not lost at low frame rates.
+    // Consume every analysis frame whose centre lies at or before renderTime so events that fall
+    // between two render frames are not lost at low frame rates: the broadband onset, the tracked
+    // beat, and the three band onsets (ADR-898) are each OR-ed across the batch with their
+    // strongest strength. Before ADR-898 only the onset was, and `audio.beat` lost about a third of
+    // its beats at 60 fps (a beat on any but the batch's last analysis frame).
     const auto& frames = track_->frames();
+    const analysis::Meter m = meter();
     bool onset = false;
     float onsetStrength = 0.0f;
+    bool beat = false;
+    bool low = false, mid = false, high = false;
+    float lowStrength = 0.0f, midStrength = 0.0f, highStrength = 0.0f;
     std::size_t cursor = clock.analysisCursor;
     while (cursor < frames.size() && frames[cursor].timeSeconds <= renderTime) {
-        if (frames[cursor].onset) {
+        const analysis::AnalysisFrame& f = frames[cursor];
+        if (f.onset) {
             onset = true;
-            onsetStrength = std::max(onsetStrength, frames[cursor].onsetStrength);
+            onsetStrength = std::max(onsetStrength, f.onsetStrength);
+        }
+        beat = beat || f.beat;
+        if (f.lowOnset) {
+            low = true;
+            lowStrength = std::max(lowStrength, f.lowOnsetStrength);
+        }
+        if (f.midOnset) {
+            mid = true;
+            midStrength = std::max(midStrength, f.midOnsetStrength);
+        }
+        if (f.highOnset) {
+            high = true;
+            highStrength = std::max(highStrength, f.highOnsetStrength);
         }
         // The classifier is fed here rather than from publishFrame() below, which only ever
         // sees the last frame of the batch: at 30 fps that is one analysis frame in three, and
         // a detector that samples the music at the frame rate is a detector whose answers
         // depend on the frame rate (ADR-073).
-        clock.music.consume(frames[cursor], phraseBars_, sectionPhrases_);
+        clock.music.consume(f, m);
         ++cursor;
     }
     if (cursor > clock.analysisCursor) {
@@ -4349,15 +4800,22 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
         if (onset) {
             clock.latest.onsetStrength = onsetStrength;
         }
+        clock.latest.beat = beat;
+        clock.latest.lowOnset = low;
+        clock.latest.lowOnsetStrength = lowStrength;
+        clock.latest.midOnset = mid;
+        clock.latest.midOnsetStrength = midStrength;
+        clock.latest.highOnset = high;
+        clock.latest.highOnsetStrength = highStrength;
         clock.hasFrame = true;
         audioSignals_.publish(bus, clock.latest);
-        clock.music.consume(clock.latest, phraseBars_, sectionPhrases_); // a repeat: ignored by index
+        clock.music.consume(clock.latest, m); // a repeat: ignored by index
         clock.analysisCursor = cursor;
         return true;
     }
     if (clock.hasFrame) {
-        // No new analysis this render frame: keep continuous values, drop the event pulse.
-        bus.setEvent(audioSignals_.onset, false);
+        // No new analysis this render frame: keep continuous values, drop the event pulses.
+        audioSignals_.clearEvents(bus);
     } else {
         audioSignals_.publishSilence(bus);
     }
@@ -4366,16 +4824,36 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
 
 bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const FrameTime& time,
                           bool newAnalysisFrame, const ClockInputs& in) const {
-    double bpm = in.bpm;
+    const double bpm = in.bpm;
+    // ADR-896: the one meter, resolved once for the frame, that every count below is divided by.
+    const analysis::Meter m = meter();
     bool pulse = false;
+    bool running = true;
+    double clockBeats = 0.0;
+    // An analysed grid is the clock whenever there is one and nothing else owns the beat: a file is
+    // loaded (not live input) and no MIDI clock is running. In both engine modes, so the editor's
+    // bars are the render's bars.
+    const std::vector<double>* grid =
+        !in.midi && track_ != nullptr && input_ == nullptr && !track_->beats().beatTimes.empty()
+            ? &track_->beats().beatTimes
+            : nullptr;
     if (in.midi) {
         // The MIDI clock owns the beat clock: phase and count come straight from the tracker
-        // (already extrapolated to this frame by the hub).
+        // (already extrapolated to this frame by the hub). Its beat 0 is the song's first beat.
         clock.beatPhase = in.midiPhase;
         clock.beatCount = in.midiCount;
         pulse = in.midiPulse;
+        clockBeats = static_cast<double>(in.midiCount) + in.midiPhase;
+    } else if (grid != nullptr) {
+        // ADR-896: a pure function of the second -- interpolated between tracked beats, extrapolated
+        // at the track's tempo outside them -- so a seek lands on the beat a play reaches, at any
+        // frame rate. The pulse is the frame on which the clock passes a whole beat.
+        clockBeats = analysis::clockBeatsAt(*grid, track_->beatSeconds(), time.renderTime);
+        pulse = clock.haveClockBeats && std::floor(clockBeats) > std::floor(clock.clockBeats);
+        clock.beatPhase = clockBeats - std::floor(clockBeats);
     } else if (bpm > 0.0) {
-        // Advance the per-frame beat clock; re-sync to the analyzer whenever it reports a beat.
+        // Live input: advance the per-frame beat clock; re-sync to the analyzer whenever it reports
+        // a beat.
         clock.beatPhase += time.deltaTime * bpm / 60.0;
         if (newAnalysisFrame && clock.latest.beatCount != clock.lastAnalysisBeatCount) {
             clock.beatPhase = static_cast<double>(clock.latest.beatPhase);
@@ -4387,33 +4865,65 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
             ++clock.beatCount;
             pulse = true;
         }
+        // Resynchronised to a tracker, `beatCount` counts the beats that have landed, so the beat
+        // this frame is in is one less. Free-running from the first frame with no tracked beat yet
+        // (a tempo with no audio), the count started at 0 on the first beat and already is it.
+        const double landed = clock.lastAnalysisBeatCount > 0 ? 1.0 : 0.0;
+        clockBeats = static_cast<double>(clock.beatCount) - landed + clock.beatPhase;
     } else {
         clock.beatPhase = 0.0;
+        running = false;
     }
+    clock.clockBeats = clockBeats;
+    clock.haveClockBeats = running;
+    // The musical position: 0.0 on beat 1 of bar 1. With no clock at all everything sits at zero.
+    const double musical = running ? m.beats(clockBeats) : 0.0;
+
     const double duration = in.duration;
     bus.set(timeSignals_.seconds, static_cast<float>(time.renderTime));
     bus.set(timeSignals_.progress, duration > 0.0 ? static_cast<float>(std::clamp(in.position / duration, 0.0, 1.0)) : 0.0f);
     bus.set(timeSignals_.playing, in.playing ? 1.0f : 0.0f);
     bus.set(timeSignals_.beatPhase, static_cast<float>(clock.beatPhase));
     bus.setEvent(timeSignals_.beatPulse, pulse, 1.0f);
-    bus.set(timeSignals_.beatCount, static_cast<float>(clock.beatCount));
+    bus.set(timeSignals_.beatCount, static_cast<float>(std::floor(musical)));
     bus.set(timeSignals_.bpm, static_cast<float>(bpm));
-    bus.set(timeSignals_.barPhase, static_cast<float>((clock.beatCount % 4 + clock.beatPhase) / 4.0));
+    bus.set(timeSignals_.barPhase, static_cast<float>(m.barPhase(musical)));
     {
         // Phrases and sections from the beat clock: continuous phases plus an event at each phrase
         // boundary, so a state machine can escalate over musical structure rather than per beat.
-        const double beatsPerBar = 4.0;
-        const double beats = static_cast<double>(clock.beatCount) + clock.beatPhase;
-        const double bars = beats / beatsPerBar;
-        const double phrases = bars / static_cast<double>(phraseBars_);
-        const double sections = phrases / static_cast<double>(sectionPhrases_);
-        const auto phraseIndex = static_cast<std::uint32_t>(phrases < 0.0 ? 0.0 : phrases);
+        const double phrases = musical / static_cast<double>(m.beatsPerPhrase());
+        const double sections = musical / static_cast<double>(m.beatsPerSection());
+        const auto phraseIndex = static_cast<std::int64_t>(std::floor(phrases));
         bus.set(timeSignals_.phrasePhase, static_cast<float>(phrases - std::floor(phrases)));
         bus.set(timeSignals_.phraseCount, static_cast<float>(phraseIndex));
-        bus.setEvent(timeSignals_.phrasePulse, phraseIndex != clock.lastPhraseIndex, 1.0f);
+        bus.setEvent(timeSignals_.phrasePulse,
+                     clock.lastPhraseIndex != SignalClock::kNoIndex && phraseIndex != clock.lastPhraseIndex, 1.0f);
         clock.lastPhraseIndex = phraseIndex;
         bus.set(timeSignals_.sectionPhase, static_cast<float>(sections - std::floor(sections)));
-        bus.set(timeSignals_.sectionCount, static_cast<float>(static_cast<std::uint32_t>(sections < 0.0 ? 0.0 : sections)));
+        bus.set(timeSignals_.sectionCount, static_cast<float>(std::floor(sections)));
+    }
+    {
+        // ADR-899: the authored section timeline -- which section the transport is in, how far
+        // through it, the energy its author (or the analysis) gave it, and an event on the frame it
+        // changes. A function of the position, so a replay rebuilds it exactly.
+        const song::SectionTimeline& timeline = sequence_.sectionTimeline;
+        std::int64_t index = -1;
+        float progress = 0.0f;
+        float energy = 0.0f;
+        if (const auto found = timeline.indexAt(in.position)) {
+            const song::Section& section = timeline.sections[*found];
+            index = static_cast<std::int64_t>(*found);
+            const double span = section.endSeconds - section.startSeconds;
+            progress = span > 0.0 ? static_cast<float>(std::clamp((in.position - section.startSeconds) / span, 0.0, 1.0))
+                                  : 0.0f;
+            energy = section.energy;
+        }
+        bus.set(timeSignals_.timelineSection, static_cast<float>(index));
+        bus.set(timeSignals_.timelineProgress, progress);
+        bus.set(timeSignals_.timelineEnergy, energy);
+        bus.setEvent(timeSignals_.timelineChange,
+                     clock.lastSectionIndex != SignalClock::kNoIndex && index != clock.lastSectionIndex, 1.0f);
+        clock.lastSectionIndex = index;
     }
     // The classifier's events, after the clock as they always were. Unconditional: no audio
     // consumed means every music.* signal is false.
@@ -4446,7 +4956,7 @@ void Engine::updateTimeSignals(const FrameTime& time, bool newAnalysisFrame) {
     sourceContext_.audioDuration = in.duration;
     sourceContext_.playing = in.playing;
     sourceContext_.beatPhase = static_cast<float>(clock_.beatPhase);
-    sourceContext_.beatCount = clock_.beatCount;
+    sourceContext_.musicalBeats = clock_.haveClockBeats ? meter().beats(clock_.clockBeats) : 0.0;
     sourceContext_.tempoBpm = static_cast<float>(in.bpm);
     sourceContext_.beatEvent = pulse;
 }
@@ -4520,7 +5030,9 @@ void Engine::updateTimelineClock(const FrameTime& time) {
     // the wav however long the sequence was.
     static_cast<void>(time);
     timelineClock_.seconds = transport_.positionSeconds();
-    timelineClock_.beats = static_cast<double>(clock_.beatCount) + clock_.beatPhase;
+    // ADR-896: the musical position, so a key at beat 0 lands on beat 1 of bar 1 and one at beat 4
+    // on bar 2 -- the same numbering the bus, the LFOs and the triggers use.
+    timelineClock_.beats = sourceContext_.musicalBeats;
 }
 
 void Engine::applyCues() {
@@ -4992,7 +5504,7 @@ world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene)
     ctx.spectrum = auroraSpectrum_;
     ctx.fieldBus = &fieldBus_;
     // Wave 2 (TRIGGER): beats and onsets from the offline track, the sequence's markers, HIST.
-    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, phraseBars_, sectionPhrases_);
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, ctx.seconds, meter());
     ctx.triggers = &triggerClock_;
     return ctx;
 }
@@ -5215,6 +5727,17 @@ void Engine::update(const FrameTime& time) {
         controller_->scene().detailLimits = detailLimits_;
     }
 
+    // ADR-896: a sequence's Beat and Bar events were resolved against the meter it was baked with. A
+    // meter changed since -- pinned in the Parameters panel, or a new track's estimate -- re-bakes
+    // it, so the editor's events land where a render of the saved project puts them. Only a
+    // sequence that has such events pays for it; a render never changes its meter mid-film.
+    if (installedEventsUseMeter_ && !(installedMeter_ == meter())) {
+        if (auto r = installSequence(); !r) {
+            log::warn("sequence: {}", r.error().message);
+            noteBindingProblem(r.error().message);
+        }
+    }
+
     if (mode_ == EngineMode::Offline) {
         // The offline position, taken from whatever clock produced this frame. No clamp, no loop and
         // no end rule: a render of 0..120 s against 30 s of audio renders 120 seconds, and a loop
@@ -5230,8 +5753,8 @@ void Engine::update(const FrameTime& time) {
             stats_.analysisHopMicros = runner_->averageHopMicros();
             stats_.analysisFrames = runner_->framesProduced();
         } else if (clock_.hasFrame) {
-            // No new analysis this render frame: keep continuous values, drop the event pulse.
-            bus_.setEvent(audioSignals_.onset, false);
+            // No new analysis this render frame: keep continuous values, drop the event pulses.
+            audioSignals_.clearEvents(bus_);
         } else {
             audioSignals_.publishSilence(bus_);
         }
@@ -5284,7 +5807,7 @@ void Engine::update(const FrameTime& time) {
         beat.onsetStrength = bus_.value(audioSignals_.onsetStrength);
         const double bpm = sourceContext_.tempoBpm > 1.0f ? static_cast<double>(sourceContext_.tempoBpm) : 120.0;
         beat.beatSeconds = 60.0 / bpm;
-        beat.barSeconds = beat.beatSeconds * 4.0;
+        beat.barSeconds = beat.beatSeconds * static_cast<double>(meter().beatsPerBar);
         states_.update(time.renderTime, time.deltaTime, bus_, beat, params_, presets_);
         bus_.set(stateProgressSignal_, states_.progress());
         bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
@@ -5339,10 +5862,19 @@ void Engine::update(const FrameTime& time) {
     // flatten below composes into their owners' transforms -- before it, so children, attachments,
     // effects reading the drawn view and `prevModel` all follow them.
     updateEffects(EffectPhase::BeforeScene);
+    // ADR-906: the trigger clock, bound to this frame's transport second before the flatten, which
+    // counts every triggered field's clock from it. Binding it again later in the frame is the same
+    // frame (`TriggerClock::setFrame`), and it binds here even when the project has no effects.
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter());
+    if (auto* comp = composition()) {
+        comp->setTriggerClock(&triggerClock_);
+    }
     controller_->update(time);
     // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects
     // read them -- so a Trail's head and its newest sample are the same instant.
     recordHistory();
+    // ADR-912: and whether the camera just cut, by the timeline's say-so.
+    markKeyedCameraCut();
     probeStage(probe2::frame().updControllerMs); // TEMPORARY: phase 2
     stats_.allocsController = allocsNow() - allocMark;
     scene::applyPostParameters(postParams_, post_);
@@ -5413,7 +5945,8 @@ void Engine::update(const FrameTime& time) {
         base.audio2[2] = clock_.hasFrame ? std::min(1.0f, f.onsetStrength / 2.0f) : 0.0f;
         base.audio2[3] = static_cast<float>(clock_.beatPhase);
         base.beat[0] = sourceContext_.tempoBpm;
-        base.beat[1] = static_cast<float>(clock_.beatCount);
+        // ADR-896: the musical beat and the bar phase, as the bus has them.
+        base.beat[1] = bus_.value(timeSignals_.beatCount);
         base.beat[2] = bus_.value(timeSignals_.barPhase);
         base.beat[3] = bus_.value(timeSignals_.progress);
         shaderLayers_.update(time, base);
@@ -5491,6 +6024,11 @@ void Engine::refreshHistorySubscriptions() {
         }
     }
     world::appendEffectHistoryNeeds(effects_, wanted); // Wave 2: Proximity triggers, a Shockwave's release point, a wake
+    // ADR-911: the camera rigs' subjects, for the lag and the smoothed reference -- recorded, replayed
+    // and checkpointed like any effect owner's, which is what makes the camera seek-exact.
+    if (comp != nullptr) {
+        comp->appendCameraHistoryNeeds(wanted);
+    }
     if (historyBank_.subscribe(wanted) || entitySignals_.size() != historyBank_.ringCount()) {
         // Signals of an entity nobody reads any more go quiet rather than holding their last value.
         for (const EntitySignalIds& old : entitySignals_) {
@@ -5516,6 +6054,47 @@ void Engine::refreshHistorySubscriptions() {
     }
     if (cameraSpeedSignal_ == signals::kInvalidSignal) {
         cameraSpeedSignal_ = bus_.declare("camera.speed", 0.0f, 50.0f);
+    }
+}
+
+void Engine::markKeyedCameraCut() {
+    const double now = timelineClock_.seconds;
+    const double from = cutScanFrom_;
+    cutScanFrom_ = now;
+    scene::Composition* comp = composition();
+    if (comp == nullptr || !std::isfinite(from) || !(now > from) || timeline_.tracks().empty()) {
+        return;
+    }
+    // The tracks that place the picture: the active camera's (and, mid-blend, the outgoing one's)
+    // eye, aim and lens. The main camera's channels are the legacy `camera/*` block.
+    const scene::ActiveCameraState active = comp->activeCamera();
+    const auto prefixOf = [&](scene::CameraId id) -> std::string {
+        const scene::CameraRig* rig = comp->cameraDirection().find(id);
+        return rig == nullptr || rig->id == scene::kMainCamera ? std::string("camera/")
+                                                                 : "cameras/" + rig->slug + "/";
+    };
+    static constexpr std::array<std::string_view, 8> kPose = {"position",     "target",       "fov",
+                                                              "focalLength",  "lens/focalLength",
+                                                              "followOffset", "aimOffset",    "splineOffset"};
+    const auto jumps = [&](const std::string& prefix) {
+        for (const params::Track& track : timeline_.tracks()) {
+            if (!track.enabled || !track.target.starts_with(prefix)) {
+                continue;
+            }
+            const std::string_view leaf = std::string_view(track.target).substr(prefix.size());
+            if (std::find(kPose.begin(), kPose.end(), leaf) == kPose.end()) {
+                continue;
+            }
+            // Two ramps' worth, so a key time that went through a file and came back a few ULPs
+            // longer than the bake wrote it still reads as the cut it is.
+            if (track.jumpsWithin(from, now, 2.0 * params::kCutRampSeconds)) {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (jumps(prefixOf(active.camera)) || (active.blending() && jumps(prefixOf(active.previous)))) {
+        comp->markCameraCut();
     }
 }
 

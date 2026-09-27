@@ -188,8 +188,8 @@ TEST_CASE("snapping moves the cut, and with snapping off it does not", "[ui][sli
     }
 
     SECTION("the section lane's bar grid moves the cut further than the beat grid does") {
-        // Bars are every fourth beat, which `snapSection` derives and `BakeOptions::beatsPerBar`
-        // states. At 120 bpm that is a bar every two seconds.
+        // Bars are every fourth beat from the meter's downbeat (ADR-896), which `snapSection` reads
+        // from the engine; here the first beat is the downbeat. At 120 bpm, a bar every two seconds.
         std::vector<double> bars;
         for (std::size_t i = 0; i < beats.size(); i += 4) {
             bars.push_back(beats[i]);

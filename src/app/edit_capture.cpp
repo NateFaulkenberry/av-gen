@@ -1,6 +1,7 @@
 #include "app/edit_capture.hpp"
 
 #include "app/engine.hpp"
+#include "app/source_document.hpp"
 #include "params/serialization.hpp"
 #include "scene/composition.hpp"
 
@@ -76,6 +77,7 @@ void EditCapture::begin(Engine& engine) {
     timelineJson_ = timeline_.toJson();
     routes_ = engine.modulator().routes();
     routesJson_ = routesJson(engine);
+    sources_ = sourcesDocument(engine);
     parents_ = captureParents(engine);
     plans_ = engine.directingPlans();
     staging_ = engine.composition() != nullptr ? engine.composition()->staging() : stage::StagingDesc{};
@@ -148,6 +150,8 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
     const nlohmann::json routesNow = routesJson(engine);
     const bool timelineMoved = timelineNow != timelineJson_;
     const bool routesMoved = routesNow != routesJson_;
+    const nlohmann::json sourcesNow = sourcesDocument(engine);
+    const bool sourcesMoved = sourcesNow != sources_; // ADR-924
 
     // ---- the camera collection ----------------------------------------------------------------
     // Decided on the collection as authored, recorded with the bases captured into it. A camera
@@ -199,7 +203,7 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
             command.automation = std::make_unique<ui::AutomationChange>();
         }
     }
-    if (routesMoved && !command.automation) {
+    if ((routesMoved || sourcesMoved) && !command.automation) {
         command.automation = std::make_unique<ui::AutomationChange>();
     }
     if (command.automation) {
@@ -210,6 +214,11 @@ ui::EditCommand EditCapture::finish(Engine& engine, std::string label) {
         if (routesMoved) {
             command.automation->routesBefore = std::move(routes_);
             command.automation->routesAfter = engine.modulator().routes();
+        }
+        command.automation->sourcesTouched = sourcesMoved;
+        if (sourcesMoved) {
+            command.automation->sourcesBefore = std::move(sources_);
+            command.automation->sourcesAfter = sourcesNow;
         }
     }
 

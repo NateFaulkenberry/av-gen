@@ -686,9 +686,10 @@ TEST_CASE("packMaterialProgram: layout, disabled ops skipped, field slots", "[ma
     CHECK(offsetof(MaterialOpGpu, constant) == 48);
     CHECK(offsetof(MaterialOpGpu, constant4) == 96);
     CHECK(offsetof(MaterialProgramGpu, fieldSlots) == 64);
-    CHECK(offsetof(MaterialProgramGpu, layers) == 80);
+    CHECK(offsetof(MaterialProgramGpu, flags) == 80); // ADR-904: the emission facts
+    CHECK(offsetof(MaterialProgramGpu, layers) == 96);
     CHECK(sizeof(MaterialLayerGpu) == 64);
-    CHECK(offsetof(MaterialProgramGpu, ops) == 336); // 80-byte header + 4 layer records (ADR-036/050)
+    CHECK(offsetof(MaterialProgramGpu, ops) == 352); // 96-byte header + 4 layer records (ADR-036/050/904)
 
     MaterialProgram p;
     MaterialOp in = inputOp(0, MaterialInput::Uv);

@@ -2,6 +2,7 @@
 
 #include "directing/compiler.hpp"
 #include "directing/performance.hpp"
+#include "directing/reactivity.hpp"
 #include "directing/setpieces.hpp"
 #include "directing/text.hpp"
 #include "seq/events.hpp"
@@ -224,6 +225,8 @@ std::string itemAt(const Plan& plan, std::string_view location) {
     if (auto i = index("/performances/"); i && *i < plan.performances.size()) return plan.performances[*i].key;
     if (auto i = index("/cues/"); i && *i < plan.cues.size()) return plan.cues[*i].key;
     if (auto i = index("/retimes/"); i && *i < plan.retimes.size()) return plan.retimes[*i].key;
+    if (auto i = index("/routes/"); i && *i < plan.routes.size()) return plan.routes[*i].key;   // ADR-924
+    if (auto i = index("/sources/"); i && *i < plan.sources.size()) return plan.sources[*i].key; // ADR-924
     if (auto i = index("/setPieces/"); i && *i < plan.setPieces.size()) return plan.setPieces[*i].key;
     return {};
 }
@@ -1171,6 +1174,9 @@ Validation validatePlan(Plan& plan, const SceneFacts& facts) {
             }
         }
     }
+
+    // ---- routes and their sources (ADR-924, ADR-926) -----------------------------------------------
+    validateReactivity(plan, facts, v);
     return v;
 }
 

@@ -1,5 +1,6 @@
 #include "directing/compiler.hpp"
 #include "directing/performance.hpp"
+#include "directing/reactivity.hpp"
 #include "directing/setpieces.hpp"
 
 #include "app/cinematic.hpp"
@@ -110,6 +111,8 @@ bool remove(const ContentRef& ref, Staging& staged) {
         return rig != cameras.cameras.end() && cameras.removeCamera(rig->id);
     }
     case ContentDomain::EffectInstance: return world::removeEffect(staged.effects, ref.id);
+    case ContentDomain::ModRoute:
+    case ContentDomain::ModSource: return removeReactivityContent(ref, staged); // ADR-924
     case ContentDomain::StagingScenario:
         return std::erase_if(staged.staging.scenarios, [&](const stage::ScenarioDesc& sc) { return sc.name == ref.id; }) > 0;
     case ContentDomain::SequenceTrack:
@@ -175,6 +178,8 @@ std::optional<nlohmann::json> contentOf(const ContentRef& ref, const Staging& st
             }
         }
         break;
+    case ContentDomain::ModRoute:
+    case ContentDomain::ModSource: return reactivityContent(ref, staged); // ADR-924
     case ContentDomain::StagingScenario:
         for (const stage::ScenarioDesc& sc : staged.staging.scenarios) {
             if (sc.name == ref.id) {
@@ -263,7 +268,20 @@ scene::CameraRig followRig(const std::string& name, const std::string& node, Cam
     const float distance = beat.distanceMetres.value_or(move == CameraMove::Chase ? 4.0f : 6.0f);
     rig.followOffset = glm::vec3(0.0f, height, -distance);
     rig.aimOffset = glm::vec3(0.0f, lowAngle ? 1.4f : 1.2f, 0.0f);
-    rig.followLagSeconds = move == CameraMove::Chase ? 0.25 : 0.0;
+    // ADR-911: the filtered subject reference rather than a lagged node. On GV3's walkers in the
+    // camera audit's four windows, the rig this replaced -- the raw node, its drawn rotation, 0.25 s
+    // of lag on the eye alone -- turned its view at 143-145 degrees a second at the 95th percentile,
+    // moved its eye at 10 m/s and nodded 0.4-1.3 degrees (HF RMS). These settings, measured in the
+    // engine on the same shots (ADR-913), turn at 48-97 degrees a second and nod at most 0.24
+    // degrees with the subject within 20% of centre; modelled, the eye moves at 3.1-5.3 m/s. A chase
+    // still trails: the heading's 1.2 s swings it round behind a turn, where the lag it replaces
+    // delayed the eye against its own aim.
+    rig.followLagSeconds = 0.0;
+    rig.followSmoothSeconds = 0.3;
+    rig.followVerticalSmoothSeconds = 0.8;
+    rig.followLead = 1.0f;
+    rig.followGround = true; // characters walk; a rig on something that flies is authored, not compiled
+    rig.followHeadingSmoothSeconds = 1.2;
     rig.followClearance = 0.2f;
     rig.focalLength = lowAngle ? 24.0f : 35.0f;
     return rig;
@@ -844,6 +862,13 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                          pc.rampSeconds > 0.0 ? fmt::format(", ramp {:.2f}s", pc.rampSeconds) : std::string(),
                          hold > 0.0 ? fmt::format(", back after {:.2f}s", hold) : std::string()));
     }
+
+    // ---- routes and the sources they need (ADR-924) ----------------------------------------------------
+    compileReactivity(plan, v, out.staged,
+                      ReactivityCompileSink{record, [&](char sign, const std::string& item, std::string text) {
+                                                line(sign, item, std::move(text));
+                                            },
+                                            [&](const std::string& item) { return removedLine(item); }});
 
     // Rigs a previous revision made that this one no longer uses.
     for (const auto& [item, slug] : reusableRigs) {

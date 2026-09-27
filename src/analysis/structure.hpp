@@ -122,10 +122,10 @@ struct SongSection {
     int repetitionGroup = -1;
     int occurrence = 0;
 
-    // Measured, not invented. Both are relative to the track's own distribution rather than absolute,
-    // because "loud" only means anything next to the rest of the piece.
-    float energy = 0.0f;  // 0..1, from RMS over the section against the track's range
-    float density = 0.0f; // 0..1, from onset rate over the section against the track's range
+    // Measured, not invented. Both are relative to the track's own largest rather than absolute,
+    // because "energetic" only means anything next to the rest of the piece (ADR-897).
+    float energy = 0.0f;  // 0..1: the level-free energy composite over the section / the piece's largest
+    float density = 0.0f; // 0..1: onsets per second over the section / the piece's largest
     //
     // There is deliberately no `tension` field. It was asked for, and there is no derivation for it
     // here that is not a formula dressed up as a measurement -- so it is absent rather than

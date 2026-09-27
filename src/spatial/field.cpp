@@ -36,6 +36,7 @@
 
 #include "core/noise.hpp"
 #include "spatial/detail.hpp"
+#include "world/effects/effect_trigger.hpp" // triggerToJson / triggerFromJson (ADR-906)
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -335,9 +336,13 @@ const GridField* boundGrid(const FieldSpec& f, const FieldSet* set) {
 }
 
 float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth) {
-    if (!f.enabled || depth > kMaxDepth) {
+    // ADR-906: a triggered field before its first event samples as a disabled one. `t` stays the
+    // transport clock for everything this calls (children keep their own clocks); only this field's
+    // own shape reads its clock.
+    if (!f.enabled || f.silent() || depth > kMaxDepth) {
         return 0.0f;
     }
+    const auto tf = static_cast<float>(f.clock(static_cast<double>(t)));
     if (f.kind == FieldKind::Grid) {
         const GridField* g = boundGrid(f, set);
         if (g != nullptr && g->mode == GridMode::Vector) {
@@ -370,7 +375,7 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* 
         }
         v = combineValues(f.combine, f.mix, values);
     } else {
-        v = scalarShape(f, q, t, f.speed * t + f.phase);
+        v = scalarShape(f, q, tf, f.speed * tf + f.phase);
     }
     if (f.invert) {
         v = 1.0f - v;
@@ -379,9 +384,10 @@ float scalarAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* 
 }
 
 glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth) {
-    if (!f.enabled || depth > kMaxDepth) {
+    if (!f.enabled || f.silent() || depth > kMaxDepth) { // ADR-906, as scalarAt
         return glm::vec3(0.0f);
     }
+    const auto tf = static_cast<float>(f.clock(static_cast<double>(t)));
     const Frame frame = frameOf(f);
     const glm::vec3 q = glm::vec3(frame.worldToLocal * glm::vec4(p, 1.0f));
     if (f.kind == FieldKind::Grid) {
@@ -419,7 +425,7 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
         break;
     }
     const float w = fieldWeight(f, q);
-    glm::vec3 dir = vectorShape(f, q, t, f.speed * t + f.phase);
+    glm::vec3 dir = vectorShape(f, q, tf, f.speed * tf + f.phase);
     if (f.invert) {
         dir = -dir;
     }
@@ -427,9 +433,10 @@ glm::vec3 vectorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldS
 }
 
 glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSet* set, int depth) {
-    if (!f.enabled || depth > kMaxDepth) {
+    if (!f.enabled || f.silent() || depth > kMaxDepth) { // ADR-906, as scalarAt
         return glm::vec4(0.0f);
     }
+    const auto tf = static_cast<float>(f.clock(static_cast<double>(t)));
     const glm::vec3 q = glm::vec3(f.worldToLocal() * glm::vec4(p, 1.0f));
     const float w = fieldWeight(f, q);
     if (f.kind == FieldKind::Grid) {
@@ -468,7 +475,7 @@ glm::vec4 colorAt(const FieldSpec& f, const glm::vec3& p, float t, const FieldSe
     }
     const glm::vec3 a = glm::vec3(f.invert ? f.colorB : f.colorA);
     const glm::vec3 b = glm::vec3(f.invert ? f.colorA : f.colorB);
-    return glm::vec4(colorShape(f, q, f.speed * t + f.phase, a, b), w);
+    return glm::vec4(colorShape(f, q, f.speed * tf + f.phase, a, b), w);
 }
 
 } // namespace
@@ -785,6 +792,18 @@ Result<void> FieldSpec::validate() const {
     if (name.empty()) {
         return fail("field needs a name");
     }
+    if (trigger) {
+        if (auto ok = trigger->validate(); !ok) {
+            return fail("field '{}': {}", name, ok.error().message);
+        }
+        // Refused rather than accepted and left silent: a proximity measures an owner's recorded
+        // path (HIST), and a field is not a body anything records.
+        if (trigger->source == world::TriggerSource::Proximity) {
+            return fail("field '{}': a field's trigger cannot be a proximity -- a field has no path to "
+                        "measure; use a beat, onset, musicEvent, marker or repeat",
+                        name);
+        }
+    }
     if (!(scale.x != 0.0f && scale.y != 0.0f && scale.z != 0.0f)) {
         return fail("field '{}': scale must be non-zero on every axis", name);
     }
@@ -876,6 +895,18 @@ std::uint64_t FieldSpec::structuralHash() const {
     h.u8(static_cast<std::uint8_t>(combine));
     h.f32(mix);
     h.str(reference);
+    // ADR-906: hashed only when present, so a field without one keeps the hash it always had.
+    if (trigger) {
+        h.u8(static_cast<std::uint8_t>(trigger->source));
+        h.u32(static_cast<std::uint32_t>(trigger->everyN));
+        h.u32(static_cast<std::uint32_t>(trigger->offset));
+        h.f32(trigger->threshold);
+        h.str(trigger->name);
+        h.f32(static_cast<float>(trigger->period));
+        h.f32(static_cast<float>(trigger->phase));
+        h.str(trigger->entity);
+        h.f32(trigger->radius);
+    }
     return h.value();
 }
 
@@ -925,6 +956,10 @@ json FieldSpec::toJson() const {
     j["combine"] = fieldCombineName(combine);
     j["mix"] = mix;
     j["reference"] = reference;
+    // ADR-906: written only when set, so every field file before it round-trips unchanged.
+    if (trigger) {
+        j["trigger"] = world::triggerToJson(*trigger);
+    }
     return j;
 }
 
@@ -994,6 +1029,15 @@ Result<FieldSpec> FieldSpec::fromJson(const json& root) {
             f.children.push_back(c.get<std::string>());
         }
     }
+    if (root.contains("trigger")) {
+        // ADR-906: the effects' own `trigger` block, parsed by the effects' own reader, so a field
+        // and an effect cannot come to disagree about what "every 4th beat" means.
+        auto trig = world::triggerFromJson(root.at("trigger"));
+        if (!trig) {
+            return fail("field '{}': trigger: {}", f.name, trig.error().message);
+        }
+        f.trigger = *trig;
+    }
     if (auto ok = f.validate(); !ok) {
         return std::unexpected(ok.error());
     }
@@ -1062,7 +1106,8 @@ float sampleWeight(const FieldSpec& field, const glm::vec3& p, double /*time*/) 
 // ================================================================================================
 
 FieldGpu packField(const FieldSpec& field, double time, const FieldSet* set) {
-    const auto t = static_cast<float>(time);
+    // ADR-906: the field's own clock -- the transport's, or its trigger's age.
+    const auto t = static_cast<float>(field.clock(time));
     const Frame frame = frameOf(field);
     FieldGpu g{};
     g.kind = static_cast<std::uint32_t>(field.kind);

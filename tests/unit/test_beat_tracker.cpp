@@ -420,11 +420,13 @@ TEST_CASE("AnalysisTrack stamps beat fields from the offline tracker", "[analysi
     CHECK(beats.beatTimes.size() >= 19);
     CHECK(beats.beatTimes.size() <= 21);
 
-    // Beat times are on the frames' clock (nearest frame centre) and near the clicks.
+    // Beat times are refined below the analysis hop (ADR-896), so each lies within half a hop of the
+    // frame it is stamped on -- the nearest frame centre -- rather than on it; and near the clicks.
+    const double halfHop = 0.5 * 512.0 / static_cast<double>(kRate);
     const auto clicks = clickTimes(120.0f, kSeconds);
     for (const double t : beats.beatTimes) {
         const auto& f = track.at(t);
-        CHECK(f.timeSeconds == t);
+        CHECK(std::fabs(f.timeSeconds - t) <= halfHop + 1e-9);
         CHECK(f.beat);
         INFO("beat at " << t);
         CHECK(std::fabs(signedNearestError(t, clicks)) <= 0.035);
@@ -442,7 +444,9 @@ TEST_CASE("AnalysisTrack stamps beat fields from the offline tracker", "[analysi
         if (f.beat) {
             ++beatFrames;
             CHECK(f.beatCount == lastCount + 1);
-            CHECK(f.beatPhase == 0.0f);
+            // The fraction of the beat already elapsed at the frame's centre: at most half a hop of
+            // it (0 when the centre is at or before the refined beat).
+            CHECK(f.beatPhase <= 0.5f * 512.0f / static_cast<float>(kRate) / 0.5f + 1e-6f);
         } else if (i > 0 && !frames[i - 1].beat && lastCount > 0 && f.beatCount < beats.beatTimes.size()) {
             CHECK(f.beatPhase >= frames[i - 1].beatPhase);
         }

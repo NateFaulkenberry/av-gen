@@ -1,4 +1,5 @@
 #include "ai/director_tools.hpp"
+#include "directing/reactivity_proposer.hpp"
 
 #include "app/directing_context.hpp"
 #include "app/engine.hpp"
@@ -125,8 +126,11 @@ void registerDirectorTools(ToolRegistry& registry) {
     add(registry, "director.inspect_scene", "Inspect the scene for directing",
         "What a plan can name and when things happen: every subject (characters, heroes, nodes, cameras, "
         "effects) by kind and id, the song's sections as they come round (\"chorus 2\" is the second "
-        "time the chorus comes back), the piece's length, and the plans this project already holds "
-        "(revise one by reusing its id). Prefer this over parameter-level inspection when directing.",
+        "time the chorus comes back) with what each one sounds like -- its own energy, and the audio "
+        "measured under it: a level-free energy, onsets per second (kick, snare, hat), brightness in "
+        "Hz and each band's level in dB -- the meter (which beat is bar 1, bars per phrase), the "
+        "piece's length, and the plans this project already holds (revise one by reusing its id). "
+        "Prefer this over parameter-level inspection when directing.",
         schema::object({{"kinds", schema::array(schema::string("entity|hero|node|camera|effect"),
                                                 "Only these subject kinds; omit for all")}}),
         inspect(), [](const json& args, ToolContext& ctx) -> ToolResult {
@@ -141,8 +145,22 @@ void registerDirectorTools(ToolRegistry& registry) {
             }
             json sections = json::array();
             for (const directing::SectionRun& s : facts.music.sections) {
-                sections.push_back({{"type", s.type}, {"occurrence", s.occurrence}, {"start", s.startSeconds},
-                                    {"end", s.endSeconds}});
+                json section = {{"type", s.type},         {"occurrence", s.occurrence}, {"start", s.startSeconds},
+                                {"end", s.endSeconds},    {"energy", s.energy},        {"density", s.density}};
+                // ADR-899: what the track measures under the section, next to the section's own
+                // numbers -- the latter may be a person's word, the former is the audio's.
+                if (s.audio.measured()) {
+                    section["audio"] = analysis::spanProfileToJson(s.audio);
+                }
+                sections.push_back(std::move(section));
+            }
+            // ADR-896: the meter every "bar N beat M" is resolved with.
+            json meter = {{"beatsPerBar", facts.music.beatsPerBar},
+                          {"phraseBars", facts.music.phraseBars},
+                          {"downbeatBeat", facts.music.downbeat}};
+            if (facts.music.downbeat >= 0 &&
+                static_cast<std::size_t>(facts.music.downbeat) < facts.music.beatTimes.size()) {
+                meter["firstDownbeatSeconds"] = facts.music.beatTimes[static_cast<std::size_t>(facts.music.downbeat)];
             }
             json plans = json::array();
             for (const directing::Plan& p : facts.plans) {
@@ -154,6 +172,7 @@ void registerDirectorTools(ToolRegistry& registry) {
                  {"sectionSource", facts.music.sectionSource},
                  {"durationSeconds", facts.music.durationSeconds},
                  {"tempoBpm", facts.music.tempoBpm},
+                 {"meter", std::move(meter)},
                  {"plans", std::move(plans)},
                  {"cameraMoves", directing::cameraMoveNames()}},
                 fmt::format("{} subject(s), {} section(s), {} plan(s)", facts.subjects.identities().size(),
@@ -225,6 +244,25 @@ void registerDirectorTools(ToolRegistry& registry) {
                                            "director.inspect_subject resolves a name to an id");
             }
             return ToolResult::ok(card->toJson(), fmt::format("{}'s capabilities", subject));
+        });
+
+    add(registry, "director.propose_reactivity", "The default audio-reactivity plan",
+        "The Director's default audio-reactivity plan for this scene (ADR-927), from the reactive catalogue "
+        "(director.inspect_capabilities, \"reactive\"): routes at three levels -- hats and claps on small "
+        "things, the kick and the bar on the heroes (each hero its own layer, timing and amplitude), the "
+        "section on the world's light, fog, wind and colour -- with staggered delays and depth that follows "
+        "the section. Returns the plan (its \"routes\" and \"sources\"), the music's layers, a summary and "
+        "what was left alone and why. Changes nothing: edit the plan if the request asks for something else, "
+        "then director.propose_plan it for the person's approval.",
+        schema::object({{"id", schema::string("The plan's id; default \"reactivity\". Reuse an existing id to revise it")}}),
+        inspect(), [](const json& args, ToolContext& ctx) -> ToolResult {
+            const directing::SceneFacts facts = app::sceneFactsFor(ctx.engine());
+            directing::ReactivityOptions options;
+            options.planId = args.value("id", options.planId);
+            const directing::ReactivityProposal p =
+                directing::proposeReactivity(facts.capabilities.reactive(), facts.music, options);
+            return ToolResult::ok(json{{"plan", p.plan.toJson()}, {"summary", p.summaryJson()}},
+                                  fmt::format("{} route(s), {} source(s)", p.plan.routes.size(), p.plan.sources.size()));
         });
 
     add(registry, "director.resolve_time", "Resolve a musical time",

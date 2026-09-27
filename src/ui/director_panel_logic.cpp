@@ -1,5 +1,8 @@
 #include "ui/director_panel_logic.hpp"
 
+#include "directing/reactivity.hpp"
+#include "params/serialization.hpp"
+
 #include <fmt/format.h>
 
 #include <algorithm>
@@ -43,6 +46,14 @@ std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directi
     for (const directing::PlanRetime& r : plan.retimes) {
         add(r.key, "retime", fmt::format("{} at {:.2f}x", r.performance, r.factor));
     }
+    for (const directing::PlanSource& s : plan.sources) {
+        add(s.key, "source", fmt::format("{} ({})", s.signal(), s.kind));
+    }
+    for (const directing::PlanRoute& r : plan.routes) {
+        add(r.key, "route",
+            fmt::format("{} {}: {} -> {}", directing::reactiveLevelName(r.level), r.layer.empty() ? r.route.source : r.layer,
+                        r.route.source, r.route.target));
+    }
     PlanItemRow planWide{"", "plan", plan.title.empty() ? plan.id : plan.title, ItemMark::Ok, {}};
 
     for (PlanItemRow& row : rows) {
@@ -83,6 +94,50 @@ std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directi
         rows.insert(rows.begin(), std::move(planWide));
     }
     return rows;
+}
+
+std::vector<ReactivityRow> reactivityRows(const directing::Plan& plan, const std::vector<params::ModRoute>& routes) {
+    std::vector<ReactivityRow> rows;
+    for (const directing::ReactiveLevel level :
+         {directing::ReactiveLevel::Micro, directing::ReactiveLevel::Meso, directing::ReactiveLevel::Macro}) {
+        for (const directing::PlanRoute& item : plan.routes) {
+            if (item.level != level) {
+                continue;
+            }
+            ReactivityRow row;
+            row.key = item.key;
+            row.level = directing::reactiveLevelName(item.level);
+            row.what = fmt::format("{}: {}", item.layer.empty() ? item.route.source : item.layer,
+                                   directing::describeRoute(item.route));
+            row.reason = item.reason;
+            const std::string id = directing::planItemId(plan.id, item.key);
+            const auto live = std::find_if(routes.begin(), routes.end(), [&](const params::ModRoute& r) { return r.planItem == id; });
+            const auto made = std::find_if(plan.produced.begin(), plan.produced.end(), [&](const directing::ContentRef& ref) {
+                return ref.domain == directing::ContentDomain::ModRoute && ref.id == id;
+            });
+            if (live == routes.end()) {
+                row.state = "not in the project";
+            } else if (made != plan.produced.end() && !made->fingerprint.empty() &&
+                       directing::fingerprint(params::routeToJson(*live)) != made->fingerprint) {
+                row.state = "edited by hand";
+            } else {
+                row.state = "as made";
+            }
+            rows.push_back(std::move(row));
+        }
+    }
+    return rows;
+}
+
+std::string reactivityHeading(const directing::Plan& plan) {
+    std::size_t micro = 0;
+    std::size_t meso = 0;
+    std::size_t macro = 0;
+    for (const directing::PlanRoute& r : plan.routes) {
+        (r.level == directing::ReactiveLevel::Micro ? micro : r.level == directing::ReactiveLevel::Meso ? meso : macro) += 1;
+    }
+    return fmt::format("{} route{}: micro {}, meso {}, macro {}", plan.routes.size(), plan.routes.size() == 1 ? "" : "s",
+                       micro, meso, macro);
 }
 
 std::vector<ChangeGroup> changeGroups(const std::vector<directing::DiffLine>& diff) {

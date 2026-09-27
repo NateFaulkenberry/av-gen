@@ -150,14 +150,14 @@ TEST_CASE("The same analysis frame delivered twice is classified once", "[app][m
     runtime.declare(bus);
     const auto beatSignal = runtime.signal(signals::MusicalEvent::Beat);
 
-    runtime.consume(frameAt(0, 0.0), 4, 4); // primes the detector; emits nothing by design
+    runtime.consume(frameAt(0, 0.0), analysis::Meter{}); // primes the detector; emits nothing by design
     runtime.publish(bus);
     CHECK(!bus.event(beatSignal));
 
     auto beat = frameAt(512, 0.5);
     beat.beat = true;
     beat.beatCount = 1;
-    runtime.consume(beat, 4, 4);
+    runtime.consume(beat, analysis::Meter{});
     runtime.publish(bus);
     CHECK(bus.event(beatSignal));
     const double when = runtime.lastEventTime(signals::MusicalEvent::Beat);
@@ -167,7 +167,7 @@ TEST_CASE("The same analysis frame delivered twice is classified once", "[app][m
     // The engine hands the same frame over twice -- the offline catch-up loop walks it, then
     // publishFrame() publishes the last of the batch. Without the frame-index guard the detector
     // sees a second beat at dt = 0 and fires again.
-    runtime.consume(beat, 4, 4);
+    runtime.consume(beat, analysis::Meter{});
     runtime.publish(bus);
     CHECK(!bus.event(beatSignal));
     CHECK(runtime.consumedFrames() == 2);

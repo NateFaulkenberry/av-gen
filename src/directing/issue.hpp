@@ -51,6 +51,13 @@ enum class IssueCode : std::uint8_t {
     UnknownEvent,             // a cue waits on a plan event nothing emits
     HandEdited,               // content this plan made was since edited by hand; a revision will not overwrite it
     Blocked,                  // cannot happen because something it depends on cannot
+    // ---- reactivity (ADR-926) ----
+    DeadTarget,               // a route that cannot reach the picture (a liveness rule says so): refused
+    OneSource,                // most of the plan's routes follow one signal: everything pulses to one beat
+    OnePhase,                 // routes that share a source (or the whole plan) move at one instant
+    OverSaturated,            // one entity answers too many things, or its routes push it past its safe range
+    PhaseRateTrap,            // a route moves a rate whose phase is time x rate: the pattern jumps
+    RouteHazard,              // reaches the picture, in a way that is almost certainly not what was meant
     // ---- quality ----
     Repetition,               // ADR-929: two items would read as the same moment (a set piece at the same place)
 };

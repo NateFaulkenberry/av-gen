@@ -16,6 +16,8 @@
 // its shots can differ. "The second chorus" means the second time the chorus *comes round*, not the
 // second entry, so consecutive entries of one type are one occurrence (ADR-755).
 
+#include "analysis/meter.hpp"
+#include "analysis/span_profile.hpp"
 #include "directing/issue.hpp"
 
 #include <nlohmann/json.hpp>
@@ -84,6 +86,14 @@ struct SectionRun {
     double startSeconds = 0.0;
     double endSeconds = 0.0;
     int occurrence = 1; // 1-based among runs of this type
+    // ADR-899. The section's own energy and density (0..1), as the timeline or structure carries
+    // them -- authored or detected -- averaged by duration over merged entries.
+    float energy = 0.0f;
+    float density = 0.0f;
+    // What the audio under the run measures, level-free: energy composite, onsets per second (kick /
+    // snare / hat apart), brightness in Hz, band levels, stereo width. `audio.measured()` is false
+    // when the context was built without the analysed track.
+    analysis::SpanProfile audio;
 };
 
 // One thing that happened in a watched play (ADR-767): a world event, when, and who raised it.
@@ -99,6 +109,10 @@ struct ObservedEvent {
 struct MusicalContext {
     std::vector<double> beatTimes; // ascending; the analysed grid
     int beatsPerBar = 4;
+    // ADR-896: `beatTimes[downbeat]` is bar 1 beat 1 -- the engine's meter, so "bar 97" is the bar
+    // the bus, the triggers and the sequencer call bar 97. And the meter's phrase length.
+    int downbeat = 0;
+    int phraseBars = 4;
     double tempoBpm = 0.0;          // for a constant-tempo fallback when there is no grid
     double firstBeatSeconds = 0.0;  // ...and its origin
     std::vector<SectionRun> sections;
@@ -117,8 +131,13 @@ struct MusicalContext {
 // analyser's structure (function names), merged into runs. The beat grid and tempo come from the host
 // (the engine's analysis track), because a `seq::Sequence` carries beat *markers* only when somebody
 // asked for them.
+//
+// With `track`, every run also carries the measured profile of the audio under it (ADR-899); with
+// `meter`, bars are counted from its downbeat (ADR-896) -- both are what the engine passes.
 [[nodiscard]] MusicalContext musicalContextFrom(const seq::Sequence& sequence, std::span<const double> beatTimes,
-                                                double tempoBpm, double durationSeconds);
+                                                double tempoBpm, double durationSeconds,
+                                                const analysis::AnalysisTrack* track = nullptr,
+                                                const analysis::Meter& meter = {});
 
 struct TimeResolution {
     std::optional<double> seconds;

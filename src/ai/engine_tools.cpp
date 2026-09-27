@@ -2974,9 +2974,11 @@ void registerAudioTools(ToolRegistry& registry) {
         });
 
     add(registry, "audio.get_analysis", "Audio analysis",
-        "What the analyzer currently hears: loudness, the five frequency bands, spectral centroid, "
-        "onset, tempo and beat position, plus when each musical event (beat, downbeat, build, "
-        "break, drop, impact) last fired. This is the state audio-reactive work is built on.",
+        "What the analyzer currently hears: loudness, the five frequency bands (auto-gained, and as "
+        "long-term levels), spectral centroid, a loudness-independent energy, the onset rate, stereo "
+        "width, onset and the kick/snare/hat onsets, tempo and beat position in musical time (which "
+        "beat of which bar), plus when each musical event (beat, downbeat, build, break, drop, "
+        "impact) last fired. This is the state audio-reactive work is built on.",
         noArgs(), readOnly(),
         [](const json&, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
@@ -3004,6 +3006,25 @@ void registerAudioTools(ToolRegistry& registry) {
             out["tempoConfidence"] = f.tempoConfidence;
             out["beatCount"] = f.beatCount;
             out["beatPhase"] = f.beatPhase;
+            // ADR-896: where the playhead is in musical time -- the meter every bar is counted by.
+            const analysis::Meter meter = engine.meter();
+            out["musical"] = json{{"beats", engine.musicalBeats()},
+                                  {"barPhase", engine.barPhase()},
+                                  {"beatsPerBar", meter.beatsPerBar},
+                                  {"phraseBars", meter.phraseBars},
+                                  {"downbeatBeat", meter.downbeat}};
+            // ADR-897 / 898: the level-free measures and the band onsets.
+            json levels = json::array();
+            for (std::uint32_t i = 0; i < f.bandCount && i < analysis::kMaxBands; ++i) {
+                levels.push_back(f.bandLevels[i]);
+            }
+            out["bandLevels"] = std::move(levels);
+            out["energy"] = f.energy;
+            out["onsetRate"] = f.onsetRate;
+            if (f.stereo) {
+                out["width"] = f.width;
+            }
+            out["onsets"] = json{{"low", f.lowOnset}, {"mid", f.midOnset}, {"high", f.highOnset}};
             json events = json::object();
             for (std::size_t i = 0; i < engine.music().eventCount(); ++i) {
                 const auto event = static_cast<signals::MusicalEvent>(i);
@@ -3019,7 +3040,7 @@ void registerAudioTools(ToolRegistry& registry) {
         "Every named control signal on the bus and its current value: audio bands, tempo, beat "
         "phase, musical events, time, MIDI/OSC control channels and any LFO or macro sources. "
         "These are the sources a modulation route can be built from -- use the exact names here.",
-        schema::object({{"query", schema::string("Case-insensitive name fragment, e.g. 'bass'")},
+        schema::object({{"query", schema::string("Case-insensitive fragment of a name or label, e.g. 'bass', 'kick'")},
                         {"eventsOnly", schema::boolean("Only momentary event signals")},
                         {"limit", schema::integer("Maximum results", 1, kMaxLimit)}}),
         readOnly(),
@@ -3035,16 +3056,21 @@ void registerAudioTools(ToolRegistry& registry) {
                 if (eventsOnly && !info.isEvent) {
                     continue;
                 }
-                if (!containsNoCase(info.name, query)) {
+                // The query matches what a signal is called and what it is ("kick", "density").
+                if (!containsNoCase(info.name, query) && !containsNoCase(info.label, query)) {
                     continue;
                 }
                 ++matched;
                 if (list.size() < limit) {
-                    list.push_back(json{{"name", info.name},
-                                        {"value", bus.value(id)},
-                                        {"min", info.minValue},
-                                        {"max", info.maxValue},
-                                        {"isEvent", info.isEvent}});
+                    json entry{{"name", info.name},
+                               {"value", bus.value(id)},
+                               {"min", info.minValue},
+                               {"max", info.maxValue},
+                               {"isEvent", info.isEvent}};
+                    if (!info.label.empty()) {
+                        entry["label"] = info.label;
+                    }
+                    list.push_back(std::move(entry));
                 }
             }
             json out;

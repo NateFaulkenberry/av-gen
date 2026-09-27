@@ -43,7 +43,7 @@ TEST_CASE("Beats: Shift moves a bar, and a bar is beatsPerBar beats", "[ui][nudg
 
     SECTION("and it is not a hard-coded four") {
         // The point of taking `beatsPerBar` rather than spelling 4: the day time-signature detection
-        // arrives, `seq::BakeOptions` changes and this follows. A test that only ever passed 4 could
+        // arrives, the engine's meter (ADR-896) changes and this follows. A test that only ever passed 4 could
         // not tell the difference between reading the parameter and ignoring it.
         CHECK(ui::arrowNudge(kBeats, 1, true, kFps, kView, /*beatsPerBar=*/3).count == 3);
         CHECK(ui::arrowNudge(kBeats, 1, true, kFps, kView, /*beatsPerBar=*/7).count == 7);

@@ -62,16 +62,18 @@ constexpr Table<CameraMove, 13> kMoves{{
 constexpr Table<PerformanceMode, 3> kModes{{
     {PerformanceMode::Scripted, "scripted"}, {PerformanceMode::Directed, "directed"}, {PerformanceMode::Goal, "goal"},
 }};
-constexpr Table<ContentDomain, 10> kDomains{{
+constexpr Table<ContentDomain, 12> kDomains{{
     {ContentDomain::SequenceShot, "sequence.shot"}, {ContentDomain::SequenceMarker, "sequence.marker"},
     {ContentDomain::SequenceActor, "sequence.actor"}, {ContentDomain::SequenceEvent, "sequence.event"},
     {ContentDomain::SequenceTrack, "sequence.track"}, {ContentDomain::CameraRig, "camera.rig"},
     {ContentDomain::CameraShot, "camera.shot"}, {ContentDomain::TimelineTrack, "timeline.track"},
-    {ContentDomain::EffectInstance, "effect.instance"}, {ContentDomain::StagingScenario, "staging.scenario"},
+    {ContentDomain::EffectInstance, "effect.instance"}, {ContentDomain::ModRoute, "modulation.route"},
+    {ContentDomain::ModSource, "modulation.source"}, {ContentDomain::StagingScenario, "staging.scenario"},
 }};
 static_assert(kSubjectKinds.back().first == SubjectKind::World);
 static_assert(kMoves.back().first == CameraMove::LowAngle);
 static_assert(kDomains.back().first == ContentDomain::StagingScenario);
+static_assert(kDomains.size() == static_cast<std::size_t>(ContentDomain::StagingScenario) + 1);
 
 // ---- a reader that reports rather than throws ---------------------------------------------------
 //
@@ -418,6 +420,21 @@ json Plan::toJson() const {
                                {"until", r.until.toJson()}, {"factor", r.factor}});
     }
     j["retimes"] = std::move(retimesJson);
+    // ADR-924: present only when the plan has them, so every plan written before keeps its bytes.
+    if (!routes.empty()) {
+        json routesJson = json::array();
+        for (const PlanRoute& r : routes) {
+            routesJson.push_back(planRouteToJson(r));
+        }
+        j["routes"] = std::move(routesJson);
+    }
+    if (!sources.empty()) {
+        json sourcesJson = json::array();
+        for (const PlanSource& s : sources) {
+            sourcesJson.push_back(planSourceToJson(s));
+        }
+        j["sources"] = std::move(sourcesJson);
+    }
 
     // ADR-929. Written only when there is one, so a plan that never placed a set piece serialises to
     // the bytes it always did -- and fingerprints the same.
@@ -689,6 +706,27 @@ PlanParse parsePlan(const json& document) {
             plan.retimes.push_back(std::move(retime));
         });
 
+        // ADR-924: routes and the sources they need, read by their own readers (plan_route.cpp).
+        for (const char* list : {"routes", "sources"}) {
+            const json* items = r.array(list);
+            if (items == nullptr) {
+                continue;
+            }
+            for (std::size_t i = 0; i < items->size(); ++i) {
+                const std::string at = fmt::format("/{}/{}", list, i);
+                if (std::string_view(list) == "routes") {
+                    if (auto item = planRouteFromJson((*items)[i], at, issues)) {
+                        plan.routes.push_back(std::move(*item));
+                    } else {
+                        ok = false;
+                    }
+                } else if (auto item = planSourceFromJson((*items)[i], at, issues)) {
+                    plan.sources.push_back(std::move(*item));
+                } else {
+                    ok = false;
+                }
+            }
+        }
         // ADR-929: set pieces. Their shape only -- the template's slots, the craft, clear air and
         // the craft's timeline are the validator's, which knows the scene.
         forEach(r, "setPieces", issues, [&](Reader& sp, std::size_t) {
@@ -829,6 +867,12 @@ PlanParse parsePlan(const json& document) {
     for (std::size_t i = 0; i < plan.retimes.size(); ++i) {
         key(plan.retimes[i].key, fmt::format("/retimes/{}/key", i));
     }
+    for (std::size_t i = 0; i < plan.routes.size(); ++i) {
+        key(plan.routes[i].key, fmt::format("/routes/{}/key", i));
+    }
+    for (std::size_t i = 0; i < plan.sources.size(); ++i) {
+        key(plan.sources[i].key, fmt::format("/sources/{}/key", i));
+    }
     for (std::size_t i = 0; i < plan.setPieces.size(); ++i) {
         key(plan.setPieces[i].key, fmt::format("/setPieces/{}/key", i));
         // The key is a path segment of the scenario, its parameters and its events.
@@ -950,6 +994,8 @@ json planSchema() {
                                  {"field", "the effect's field; omit to activate it"}, {"at", time}, {"on", "a plan event"},
                                  {"until", time}, {"holdSeconds", "number"}, {"value", "number"}, {"rampSeconds", "number"}}})},
           {"retimes", json::array({{{"key", "unique"}, {"performance", "key"}, {"from", time}, {"until", time}, {"factor", "> 0"}}})},
+          {"routes", planRouteSchema()},
+          {"sources", planSourceSchema()},
           {"setPieces",
            json::array({{{"key", "unique; no '/' or spaces: the scenario is setpiece/<key>, its events setpiece/<key>/<moment>"},
                          {"template", "abduction | survey | flyby"},
@@ -974,7 +1020,10 @@ json planSchema() {
           "vary set pieces -- place, bearing, height, animal count, framing, relation to the music; the validator "
           "warns when two share a place or a framing distance",
           "never ask for a capability the subject does not list; the validator refuses it and says what exists",
-          "a baked plan may not depend on directed or goal performances"}}};
+          "a baked plan may not depend on directed or goal performances",
+          "a route's target must be live (the reactive catalogue lists live targets); dead targets are refused",
+          "give each hero its own source, delay and amount; never put everything on one signal or one instant",
+          "key a colour (hue) by section through a timeline source; never drive a hue from audio"}}};
 }
 
 std::string mintPlanId(std::string_view title, const std::vector<std::string>& taken) {

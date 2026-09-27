@@ -85,6 +85,12 @@ struct Camera {
     float farPlane = 200.0f;
     LensSettings lens;
     ExposureSettings exposure;
+    // ADR-912: changes whenever this frame's picture does not continue the previous frame's -- a
+    // hard cut to another camera, or a keyed jump -- and the renderer drops its motion history when
+    // it sees a new value (the previous view-projection and models, the temporal rings), so a new
+    // shot's first frame is drawn as a first frame: no motion blur, no smear from the old camera.
+    // Its value means nothing; only a change does.
+    std::uint32_t cutSerial = 0;
     [[nodiscard]] glm::mat4 view() const;
     [[nodiscard]] glm::mat4 projection(float aspect) const; // depth 0..1 (WebGPU/Metal)
     [[nodiscard]] float effectiveFovY() const; // lens or explicit, per lens.useExplicitFov
@@ -385,6 +391,13 @@ struct Entity {
         [[nodiscard]] bool active() const { return intensity > 0.0f || shimmer > 0.0f; }
     };
     TreeEnergy energy;
+    // ADR-903: the entity's emission gain, applied by the lit shader AFTER the material program (and
+    // after every FXL lane) to everything the surface emits -- its own emission, its emissive
+    // texture, its rim and its tree energy. The owning node's `emissiveBoost` writes it every frame;
+    // 1, the default, is the surface exactly as its material and program make it. A multiplier on
+    // `Material::emissiveIntensity` cannot do this job: a program that asserts emission discards
+    // that lane (ADR-179). Runtime only: never authored, never serialised.
+    float emissionGain = 1.0f;
 };
 
 // ---- lights ---------------------------------------------------------------------------------

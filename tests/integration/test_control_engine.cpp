@@ -8,6 +8,8 @@
 #include "core/time.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <array>
@@ -263,7 +265,7 @@ TEST_CASE("MIDI clock drives the beat clock when it is the tempo source", "[inte
     // tempo is known yet and the analyzer (silent) still owns that frame.
     CHECK(pulses == 7);
     CHECK_THAT(engine.sourceContext().tempoBpm, WithinAbs(120.0, 0.5));
-    CHECK(engine.sourceContext().beatCount == 7);
+    CHECK(std::floor(engine.sourceContext().musicalBeats) == 7.0); // a MIDI clock's beat 0 is bar 1 beat 1
     CHECK_THAT(engine.timelineClock().beats, WithinAbs(7.0 + static_cast<double>(engine.sourceContext().beatPhase), 1e-4));
     const auto status = engine.control().status();
     CHECK(status.unmatched == 0); // clock messages never count as unmatched
