@@ -388,9 +388,12 @@ The Critic's rule over the whole film (share of the track over 0.1 m): ember 32%
   checks: the scout beam's four (copied from the saucer's beam; weak in E4, invisible at E1's
   320 m) and tide's `audio.lowMid -> liveliness/sway` (before and after). Judge them with the film's
   other routes.
-- **gv3-cut:** s11 "Vane by the river, watching the elder" (52.2-59.5 s) has lost vane (critical
-  in the Critic's idle clip); the aliens' watches of each beam are in `build/gv3/ufo-beats.json`
-  (`watches`) for the reaction shots (s28 "Vane sees it").
+- **gv3-cut (answered):** s11 "Vane by the river, watching the elder" (52.2-59.5 s) lost vane
+  (critical in the Critic's idle clip), but s11 is the first pass's cut; gv3-cut's cut replaces that
+  span with a live follow of vane that holds her in frame on this stream's cast and its own. It
+  frames E4's watcher as sage (107.56-111.25 s, inside sage's measured 108.30-112.45) and E5's
+  reaction from `watches` (vane faces the beam from 172.2 s), and re-reads `watches` after the
+  merged re-trace.
 - **Tooling:** `tools/gpu-lock.sh` took a lock whose pid file was still being written (13:00:24);
   the coordinator is fixing it.
 
