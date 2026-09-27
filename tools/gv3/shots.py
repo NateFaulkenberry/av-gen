@@ -70,6 +70,19 @@ def moving(t0, t1, focal, eye0, eye1, target0, target1=None, interp="linear"):
     return r
 
 
+def arc(t0, t1, focal, g, x, z, h, target, degrees, rise=0.0):
+    """A truck around a still subject: the eye, `h` m over the ground at (x, z), swings `degrees` about
+    the vertical through `target` (positive: counter-clockwise seen from above), keeping its distance
+    and rising `rise` metres; the target stays put. The parallax changes the whole frame for the
+    whole shot, which a push of a few metres toward a subject 20-40 m off does not (iteration 2: the
+    Critic's novelty read such pushes as static from the first frame, and 38 of 73 shots pushed in)."""
+    a = math.radians(degrees)
+    dx, dz = x - target[0], z - target[2]
+    x1 = target[0] + dx * math.cos(a) - dz * math.sin(a)
+    z1 = target[2] + dx * math.sin(a) + dz * math.cos(a)
+    return moving(t0, t1, focal, g(x, z, h), g(x1, z1, h + rise), target)
+
+
 def aim_at(focal, eye, node, offset, smoothing):
     return Rig("", focal, position=eye, aim=node, aim_offset=offset, smoothing=smoothing)
 
@@ -115,10 +128,14 @@ def e1_far_survey(t0, t1, g):
 
 @at("9.1")
 def horse_grazing(t0, t1, g):
-    # [s05] The white horse -- what the valley will lose -- under the whole of the elder's cap.
-    r = aim_at(30.0, g(22, 78, 3.0), "horse-11", (0.0, 8.6, 0.0), "still")
-    return r, dict(lead="animal", purpose="The white horse grazing, the elder behind it",
-                   subject="horse-11 (what the valley will lose)", camera="30 mm, 3 m, fixed eye, live aim",
+    # [s05] The white horse -- what the valley will lose -- grazing under the elder, from the
+    # north-east: the horse on the lower-left third, the whole of the elder's cap right of centre
+    # (aimed 60% of the way from the horse to the cap). Iteration 2 framed it from the south-east,
+    # the heading of the east-bank travel (26.1) and the orbit (49.1): the Critic found both
+    # "nearly the same framing". Its path here is the same on both casts.
+    r = aim_at(35.0, g(8, 42, 2.5), "horse-11", (-4.89, 6.3, -3.92), "still")
+    return r, dict(lead="animal", purpose="The white horse grazing under the elder",
+                   subject="horse-11 (what the valley will lose)", camera="35 mm, 2.5 m, north-east, fixed eye, live aim",
                    movement="still", music="2 bars")
 
 
@@ -244,11 +261,12 @@ def vane_watches(t0, t1, g):
 
 @at("31.1")
 def spire_east_bank(t0, t1, g):
-    # A hero the first pass never showed: the spire on the east bank, trucking past it for parallax
-    # (a 2 m push showed nothing new after its first frame).
-    r = moving(t0, t1, 35.0, g(52, -86, 2.0), g(58, -91, 2.0), [68.0, 14.5, -104.0])
+    # A hero the first pass never showed: the spire on the east bank, the eye swinging 14 deg round
+    # it at 24 m so the bank slides behind it (iteration 2's 8 m diagonal toward it read as a push,
+    # static after 0.9 s).
+    r = arc(t0, t1, 35.0, g, 52, -86, 2.0, [68.0, 14.5, -104.0], 14.0)
     return r, dict(lead="hero", purpose="The spire on the east bank", subject="the spire mushroom",
-                   camera="35 mm, 2 m, south-west of it", movement="lateral truck, 8 m", music="2 bars to the lift")
+                   camera="35 mm, 2 m, south-west of it", movement="truck round it, 14 deg", music="2 bars to the lift")
 
 
 # ==== 5 lift (bars 33-40): E3 ==========================================================================
@@ -321,10 +339,11 @@ def first_grand_wide(t0, t1, g):
 
 @at("43.1")
 def valley_floor_lit(t0, t1, g):
-    # Down among it: the valley floor lit, low and wide, the mushrooms turning toward cyan.
-    r = moving(t0, t1, 24.0, g(60, 140, 2.0), g(57, 137, 2.0), [-30.0, 8.0, 20.0])
+    # Down among it: the valley floor lit, low and wide, the mushrooms turning toward cyan; a truck of
+    # 6.5 m across the view, so the near ferns slide past the far walls.
+    r = arc(t0, t1, 24.0, g, 60, 140, 2.0, [-30.0, 8.0, 20.0], 2.5)
     return r, dict(lead="world", purpose="The valley floor lit, low and wide", subject="the valley floor, the far walls",
-                   camera="24 mm, 2 m, south-east of the elder", movement="slow push", music="2 bars")
+                   camera="24 mm, 2 m, south-east of the elder", movement="lateral truck, 6.5 m", music="2 bars")
 
 
 @at("45.1")
@@ -337,19 +356,21 @@ def bloom_spores(t0, t1, g):
 
 @at("46.1")
 def veil_at_the_water(t0, t1, g):
-    # The veil at the water's edge, close enough to read (iteration 1: tiny behind the ferns).
-    r = moving(t0, t1, 35.0, g(88, 207, 1.5), g(85, 205, 1.5), [77.5, 3.2, 198.7])
+    # The veil at the water's edge, close enough to read (iteration 1: tiny behind the ferns), the eye
+    # swinging 16 deg round it so the water behind it turns.
+    r = arc(t0, t1, 35.0, g, 88, 207, 1.5, [77.5, 3.2, 198.7], 16.0)
     return r, dict(lead="hero", purpose="The veil at the water's edge", subject="the veil mushroom",
-                   camera="35 mm, 1.5 m, 13 m south-east of it", movement="push, 3.6 m", music="1 bar")
+                   camera="35 mm, 1.5 m, 13 m south-east of it", movement="truck round it, 16 deg", music="1 bar")
 
 
 @at("47.1")
 def gold_gills(t0, t1, g):
-    # [s16] Under the elder: the gold gills, craning up the stem so the frame changes in its one bar
-    # (the first pass's two static bars showed nothing new after their first frame).
-    r = moving(t0, t1, 18.0, g(-15, 59, 1.0), g(-14.5, 58, 2.4), [-12.0, 15.0, 51.0])
+    # [s16] Under the elder: the gold gills, the eye circling 25 deg round the stem as it rises, so the
+    # gills wheel overhead in the one bar (a straight crane of 1.4 m still read as static).
+    r = arc(t0, t1, 18.0, g, -15, 59, 1.0, [-12.0, 15.0, 51.0], 25.0, rise=1.2)
     return r, dict(lead="hero", purpose="Under the elder: the gold gills", subject="the elder's gills",
-                   camera="18 mm, from the stem's foot", movement="crane up 1.4 m", music="1 bar", modulation="heartbeat")
+                   camera="18 mm, from the stem's foot", movement="circling up the stem, 25 deg", music="1 bar",
+                   modulation="heartbeat")
 
 
 @at("48.1")
@@ -388,9 +409,10 @@ def herd_west_meadow(t0, t1, g):
 
 @at("53.1")
 def bloom_far_bank(t0, t1, g):
-    r = moving(t0, t1, 50.0, g(-35, 150, 2.0), g(-36, 148, 2.0), [-59.0, 9.0, 118.0])
+    # The bloom from across the river, the eye swinging 6 deg round it at 40 m (a 2 m drift).
+    r = arc(t0, t1, 50.0, g, -35, 150, 2.0, [-59.0, 9.0, 118.0], 6.0)
     return r, dict(lead="hero", purpose="The bloom from across the river", subject="the bloom mushroom",
-                   camera="50 mm, 2 m, south-east of it", movement="slow drift", music="1 bar")
+                   camera="50 mm, 2 m, south-east of it", movement="truck round it, 6 deg", music="1 bar")
 
 
 @at("54.1")
@@ -414,12 +436,13 @@ def e4_pair_lifted(t0, t1, g):
     # E4's lift, on the sub-phrase line: two animals rising together in one column, seen from 4 m over
     # the river 42 m east of the station, looking west across the water. A 35 mm aimed 10 m below the
     # scout holds the whole column on both casts: the scout's top at +0.72 (+0.66 on gv3-cast's) and the
-    # pair's feet at -0.86 (-0.73), the pair centred. Over water, so no undergrowth can stand in the
+    # pair's feet at -0.86 (-0.73) through a 35 mm; a 28 mm, so the column stays whole even where the
+    # scout has no hero record and the Critic takes the saucer's larger bounds. Over water, so no undergrowth can stand in the
     # lens: iteration 3's eye on the dry ground north-east of the meadow was inside a plant whose
     # leaves filled the frame (and its 40 mm cut the scout's top).
-    r = aim_at(35.0, g(-27, 17, 4.0), "scout", (0.0, -10.0, 0.0), "hover")
+    r = aim_at(28.0, g(-27, 17, 4.0), "scout", (0.0, -10.0, 0.0), "hover")
     return r, dict(lead="event", purpose="E4: two animals lifted together", subject="the scout's beam and the pair (E4)",
-                   camera="35 mm, 4 m over the river 42 m east, live aim", movement="still", music="the lift on bar 57",
+                   camera="28 mm, 4 m over the river 42 m east, live aim", movement="still", music="the lift on bar 57",
                    effects="the scout's beam")
 
 
@@ -456,10 +479,11 @@ def umbra_listening(t0, t1, g):
 
 @at("65.1")
 def elder_spores(t0, t1, g):
-    # The elder's spores drifting in its gold: a real push now (1 m showed nothing new).
-    r = moving(t0, t1, 50.0, g(-36, 70, 2.5), g(-31, 66, 2.7), [-12.0, 12.0, 52.0])
+    # The elder's spores drifting in its gold: the eye swinging 8 deg round the elder at 30 m and
+    # rising half a metre, so the spores cross the cap (a 6 m push read as static from the first frame).
+    r = arc(t0, t1, 50.0, g, -36, 70, 2.5, [-12.0, 12.0, 52.0], 8.0, rise=0.5)
     return r, dict(lead="hero", purpose="The elder's spores drifting in its gold", subject="the elder",
-                   camera="50 mm, 2.5 m, south-west", movement="push, 6 m", music="a bar and a half")
+                   camera="50 mm, 2.5 m, south-west", movement="truck round it, 8 deg", music="a bar and a half")
 
 
 @at("66.3")
@@ -497,10 +521,11 @@ def vane_aurora(t0, t1, g):
 
 @at("75.1")
 def aurora_over_the_valley(t0, t1, g):
-    # [s21] The aurora over the valley, pushing north.
-    r = moving(t0, t1, 28.0, g(-30, 150, 2.5), g(-27, 135, 2.5), [-10.0, 40.0, -80.0])
+    # [s21] The aurora over the valley: a crane up from the ferns, tilting up the valley to the sky
+    # (iteration 2 pushed north: one more push-in).
+    r = moving(t0, t1, 28.0, g(-30, 150, 2.0), g(-30, 150, 6.5), [-10.0, 22.0, -80.0], [-10.0, 46.0, -80.0])
     return r, dict(lead="world", purpose="The aurora over the valley", subject="the sky up the valley",
-                   camera="28 mm, low", movement="slow push north", music="2 bars", effects="aurora")
+                   camera="28 mm, from the ferns", movement="crane up 4.5 m, tilting up", music="2 bars", effects="aurora")
 
 
 @at("77.1")
@@ -548,13 +573,19 @@ def e5_beyond_the_cap(t0, t1, g):
 # ==== 10 submerged break (bars 89-92) ====================================================================
 @at("89.1")
 def e5_under_the_cap(t0, t1, g):
-    # [s24] From under the elder: the saucer settling over its rim. Pushing 5 m: the first pass's
-    # fixed frame, and iteration 1's 2 m push, showed nothing new after the first frame.
+    # [s24] From beside the elder's stem: the saucer settling over its rim. The eye swings 30 deg round
+    # the stem, 11 m out, with a live aim at the saucer, so the rim slides off it: the saucer starts
+    # behind the rim's edge and ends clear of it (a 5 m push read as static from the first frame).
+    x, z = -19.0, 43.0
+    a = math.radians(-30.0)
+    x1 = -12.0 + (x + 12.0) * math.cos(a) - (z - 52.0) * math.sin(a)
+    z1 = 52.0 + (x + 12.0) * math.sin(a) + (z - 52.0) * math.cos(a)
     r = Rig("", 20.0, aim="visitor", aim_offset=(0.0, -4.0, 0.0), smoothing="craft")
-    r.move(t0, t1, g(-19, 43, 1.5), g(-15.5, 46.5, 1.9))
+    r.move(t0, t1, g(x, z, 1.5), g(x1, z1, 1.9))
     return r, dict(lead="event", purpose="From under the elder: the saucer over its rim",
-                   subject="the saucer, the elder's gills", camera="20 mm, under the cap, live aim",
-                   movement="push, 5 m", music="the low-pass break on bar 89", modulation="light low, fog up")
+                   subject="the saucer, the elder's gills", camera="20 mm, beside the stem, live aim",
+                   movement="swing round the stem, 30 deg", music="the low-pass break on bar 89",
+                   modulation="light low, fog up")
 
 
 @at("91.1")
@@ -562,14 +593,15 @@ def ember_watches(t0, t1, g):
     # [s25] Ember on the west bank as the saucer settles across the water: a fixed eye up the bank
     # behind her, 4 m over the ground, with a live aim at Ember led 15% of the way toward the saucer
     # (the offset, the same to a metre on both casts), so she walks the lower frame and the saucer
-    # hangs above the far bank. Searched on both casts, where Ember walks different ways 26 m apart:
+    # hangs above the far bank, beside the elder: 0.19-0.25 of the frame's height, 32 mm from 3 m up. Searched on both casts, where Ember walks different ways 26 m apart:
     # both in frame the whole shot in each. (Iteration 2 rode over her shoulder with a fixed target:
     # she stood in the bottom corner behind the ferns, and on gv3-cast's cast out of frame; an
     # over-the-shoulder that holds the saucer puts the eye on the rising bank behind her.)
-    r = aim_at(28.0, g(-110, 38, 4.0), "ember", (13.0, 5.0, 6.0), "walker")
-    return r, dict(lead="alien", purpose="Ember on the west bank, the saucer settling across the water",
-                   subject="ember, the saucer beyond", camera="28 mm, up the west bank 22 m behind her, live aim",
-                   movement="still", music="2 bars to the riser")
+    r = aim_at(32.0, g(-106, 36, 3.0), "ember", (13.0, 5.0, 6.0), "walker")
+    return r, dict(lead="alien", purpose="Ember on the west bank, the saucer settling over the elder beyond",
+                   subject="ember on the west bank, the saucer settling over the elder beyond",
+                   camera="32 mm, up the west bank 18 m behind her, live aim", movement="still",
+                   music="2 bars to the riser")
 
 
 # ==== 11 riser (bars 93-96): E5's lift; the cutting compresses with the roll ================================
@@ -688,10 +720,11 @@ def ember_looks_up(t0, t1, g):
 
 @at("104.1")
 def spire_lit(t0, t1, g):
-    # The spire lit, close from the north-west (iteration 1's 17 m left it a speck).
-    r = moving(t0, t1, 28.0, g(62, -112, 1.5), g(64, -109.5, 1.6), [67.7, 14.0, -103.7])
+    # The spire lit, close from the north-west (iteration 1's 17 m left it a speck), the eye swinging
+    # 20 deg round it and rising.
+    r = arc(t0, t1, 28.0, g, 62, -112, 1.5, [67.7, 14.0, -103.7], 20.0, rise=0.8)
     return r, dict(lead="hero", purpose="The spire lit, from the north-west", subject="the spire mushroom",
-                   camera="28 mm, low, 10 m off", movement="push, 3 m", music="1 bar to the sub-phrase")
+                   camera="28 mm, low, 10 m off", movement="truck round it, 20 deg", music="1 bar to the sub-phrase")
 
 
 @at("105.1")
@@ -712,9 +745,10 @@ def veil_lit(t0, t1, g):
 
 @at("107.1")
 def scree_lit(t0, t1, g):
-    r = moving(t0, t1, 35.0, g(-160, 80, 2.0), g(-163, 85, 2.0), [-176.0, 25.0, 96.0])
+    # The scree lit on the west slope, the eye swinging 14 deg round it (a 6 m push read as static).
+    r = arc(t0, t1, 35.0, g, -160, 80, 2.0, [-176.0, 25.0, 96.0], 14.0)
     return r, dict(lead="hero", purpose="The scree lit on the west slope", subject="the scree mushroom",
-                   camera="35 mm", movement="push, 6 m", music="1 bar")
+                   camera="35 mm", movement="truck round it, 14 deg", music="1 bar")
 
 
 @at("108.1")
@@ -751,11 +785,13 @@ def tide_to_the_spire(t0, t1, g):
 
 @at("113.1")
 def valley_rebuilt_from_the_north(t0, t1, g):
-    # The valley rebuilt, from the north-west, 6 m up: over the foreground plants, clear of the tree
-    # that stood in front of the elder in iteration 1's frame.
-    r = moving(t0, t1, 35.0, g(-30, -130, 6.0), g(-28, -121, 6.2), [-12.0, 10.0, 52.0], interp="easeInOut")
-    return r, dict(lead="world", purpose="The valley rebuilt, from the north", subject="the valley, the river, the elder",
-                   camera="35 mm, 6 m, 185 m north of the elder", movement="slow push (9 m)",
+    # The valley rebuilt, from the north-east ridge 12 m up, 115 m from the elder: a 10 m truck along
+    # the ridge, the elder held, the lit valley sliding under it. (Iteration 2 looked south from the
+    # north end, as 77.1 does: the Critic found the two the same composition. The line of sight to the
+    # elder's stem and cap is clear of the ground from both ends of the truck.)
+    r = moving(t0, t1, 35.0, g(65.4, -37.4, 12.0), g(72.6, -30.6, 12.0), [-12.0, 10.0, 52.0])
+    return r, dict(lead="world", purpose="The valley rebuilt, from high on the north-east slope", subject="the valley, the river, the elder",
+                   camera="35 mm, 12 m up the north-east slope", movement="lateral truck, 10 m",
                    music="the final phrase, slightly thinner, bar 113")
 
 
