@@ -162,6 +162,14 @@ jobs:
           [ -n "$RNG_SEED" ] && args+=(--seed "$RNG_SEED")
           [ -n "$TEST_FILTER" ] && args+=(--filter "$TEST_FILTER" --expected-label "FILTERED $TEST_FILTER: not the full suite")
           python3 tools/ci/catch2_run.py run "${args[@]}"
+      - name: The sanitizer partition runs every case exactly once
+        # tools/ci/sanitizer-plan.txt places the nightly ASan run's heavy cases by name. A rename would
+        # quietly move a four-hour case into a rest shard and time the night out, so it fails here, in
+        # the push that made it. Listing only, a few seconds (docs/development/ci.md, "The sanitizer partition").
+        if: always()
+        run: |
+          python3 tools/ci/catch2_run.py plan-check --binary build/release/bin/avgen_tests \
+              --plan tools/ci/sanitizer-plan.txt --exceptions tools/ci/hosted-runner-exceptions.txt
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

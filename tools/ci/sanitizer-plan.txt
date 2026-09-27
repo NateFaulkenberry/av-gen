@@ -1,0 +1,66 @@
+# The ASan/UBSan partition: where the heavy cases run (docs/development/ci.md, "The sanitizer partition").
+#
+#   part | process | case name, exactly as `avgen_tests --list-tests` prints it
+#   rest | part    | Catch2 filter                  (that part's rest shards: the filter, minus every case named here)
+#   skip | reason  | case name                      (not run under ASan at all; named in every summary)
+#
+# Read by `tools/ci/catch2_run.py run --plan` (.github/workflows/sanitizers.yml). Each `part` is one job;
+# each `process` in it is one avgen_tests process that runs exactly the cases listed for it. A part with
+# a `rest` filter also runs that filter, minus every case named anywhere in this file, in Catch2 shards.
+# So a case named here runs in its process and nowhere else, and any other case runs in a rest shard.
+# The rest filters must cover the default set between them without overlapping: `catch2_run.py
+# plan-check`, which every push runs, counts it and fails on a name that matches no case (a rename)
+# or on a partition that does not add up.
+
+rest | main  | ~[stage]
+# `[.]` because `[stage]` alone also selects the hidden probe "probe: the animal, the beam and the lag"
+# ([.][beam][probe][stage]), which the old [stage] parts ran for 94 min although no default run has it.
+rest | stage | [stage]~[.]
+#
+# Why a case is placed rather than left to Catch2's random shards (minutes are Debug + ASan on the
+# hosted runner, three processes per 3-vCPU runner, runs 36241405408 and 36321265640):
+#
+#   * Cases that share a process-wide fixture run in ONE process, so the fixture is built once. The film
+#     in test_abduction_sequence.cpp (`film()`: 90 s of Glowmere Valley 2 at 60 Hz) costs 240-300 min
+#     under ASan, and random shards spread its eleven readers over up to eleven processes, each paying
+#     it again -- most of the old 18 [stage] shards spent 4-5 h rebuilding the same film.
+#   * Cases over about an hour get a process of their own, or share one with another, so two of them
+#     can never land in the same random shard.
+#   * Cases that cannot finish in a hosted job at all are skipped, with the measurement that says so.
+
+# ---- heavy-1: the sequence film, and two long main cases alongside it ------------------------------
+# film: one build of `film()` (240-300 min), then eleven cases that read it (seconds each). The floor
+# of the whole run: nothing else takes as long, and nothing can shorten it but a shorter film.
+heavy-1 | film | the film runs five complete abduction cycles
+heavy-1 | film | the beam never deploys under a moving craft
+heavy-1 | film | the craft holds station from beam to beam-complete
+heavy-1 | film | the craft does not depart under a live beam
+heavy-1 | film | the craft never teleports
+heavy-1 | film | the rate-limited clearance floor still clears the ground
+heavy-1 | film | a camera cut never moves the craft
+heavy-1 | film | the abducted animal fades out before it is hidden
+heavy-1 | film | the abducted animal is most of the way up before it starts to dissolve
+heavy-1 | film | the beam is out within a moment of the abduction ending
+heavy-1 | film | the fade reaches the flattened scene and is given back
+# 127 min (36241405408).
+heavy-1 | delete | deleting animals while the scene runs does not crash
+# 64-72 min, and 44 s in Release (about 45-75 min under ASan; new since the last sanitizer run).
+heavy-1 | writeback | the engine's own writeback does not dirty an untouched project
+heavy-1 | writeback | on the benchmark, a slowed run stays a run, slowed
+
+# ---- heavy-2: the fade film, and the sequence file's other long simulations -------------------------
+# fade: test_abduction_fade.cpp's `static const Film f` (52 s at 60 Hz): 190-216 min, built once.
+heavy-2 | fade | the abducted animal's own meshes fade to nothing by the top of the lift
+heavy-2 | fade | the abducted animal still casts a shadow while it is fading
+heavy-2 | fade | a seek into the fade lands on the same opacity a play does
+# Its own 30 s of the film project, not `film()`: 147-172 s in Release, so about 2.5-3.8 h here.
+heavy-2 | director | the director publishes the state an overlay needs
+# 95 and 88 min.
+heavy-2 | abduct | the UFO abducts several animals, choosing each one from the scene
+heavy-2 | abduct | The pre-ADR-262 scenario fails every one of those checks
+
+# ---- not run under ASan ----------------------------------------------------------------------------
+# Each is one long simulation that no partition can split, and each is killed at the 330 min ceiling
+# before it ends. Their code runs under ASan in lighter cases; see ci.md for what that does not cover.
+skip | 1122 s in Release on the runner; killed after 311 min under ASan (36241405408), before it ended | the farm animals travel the way they are drawn facing, at the speed their clips say
+skip | 512 s in Release (two 150 s films); killed after 299 min under ASan (36321265640), before it ended | The film's five characters all walk, at more than one seed

@@ -90,12 +90,17 @@ jobs:
           retention-days: 7
 
   asan-tests:
-    # Debug -O0 + ASan is slow in a very uneven way (run 36060803359): the median case took 4 ms,
-    # while the 66 `[stage]` simulation cases take up to 2 h EACH and were 97% of the time. So
-    # the suite is split in two, and nothing is left out:
-    #   main       : everything except [stage], 3 shards on one runner (~3.9 h)
-    #   stage-0..5 : the [stage] cases, 18 shards over 6 runners. With 12 shards over 4, the
-    #                heaviest part took 5.0 h of the 6 h limit (run 36087867052).
+    # Debug -O0 + ASan is slow in a very uneven way: most cases take milliseconds, a few take hours,
+    # and the worst cost is SHARED -- two films that a test file simulates once per process and
+    # that random shards made every shard simulate again. So the partition is a plan,
+    # tools/ci/sanitizer-plan.txt: named processes for the heavy and fixture-sharing cases, and rest
+    # shards for everything else. Every case runs exactly once (`catch2_run.py plan-check`, run by
+    # every push), except two the plan skips because no hosted job can finish them.
+    # docs/development/ci.md, "The sanitizer partition", has the measurements. Expected per part:
+    #   heavy-1 : the sequence film (one process), deleting animals, the writeback pair   ~4-5 h
+    #   heavy-2 : the fade film, the director's own film, two abduction scenarios         ~3.5-4 h
+    #   main    : rest ~[stage], minus the plan's cases, 3 shards                        ~2.5-3 h
+    #   stage   : rest [stage]~[.], minus the plan's cases, 3 shards                     ~2-4 h
     name: ASan/UBSan tests (${{ matrix.part }})
     needs: asan-build
     runs-on: macos-26
@@ -104,13 +109,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { part: main,    filter: "~[stage]", total: 3,  first: 0 }
-          - { part: stage-0, filter: "[stage]",  total: 18, first: 0 }
-          - { part: stage-1, filter: "[stage]",  total: 18, first: 3 }
-          - { part: stage-2, filter: "[stage]",  total: 18, first: 6 }
-          - { part: stage-3, filter: "[stage]",  total: 18, first: 9 }
-          - { part: stage-4, filter: "[stage]",  total: 18, first: 12 }
-          - { part: stage-5, filter: "[stage]",  total: 18, first: 15 }
+          # `shards`: how many rest shards; the plan gives the parts that have them their filter.
+          - { part: heavy-1, shards: 0 }
+          - { part: heavy-2, shards: 0 }
+          - { part: main,    shards: 3 }
+          - { part: stage,   shards: 3 }
     env:
       # Gate: --gate sanitizer. Only a sanitizer report, a crash, a timeout or an unexercised case
       # fails this job. Assertion failures under Debug+ASan are listed, not gated: in run
@@ -133,23 +136,25 @@ jobs:
       - name: Run avgen_tests under ASan/UBSan
         env:
           TEST_FILTER: ${{ inputs.test_filter }}
-          PART_FILTER: ${{ matrix.filter }}
-          SHARD_TOTAL: ${{ matrix.total }}
-          SHARD_FIRST: ${{ matrix.first }}
+          SHARDS: ${{ matrix.shards }}
           PART: ${{ matrix.part }}
         run: |
           chmod +x build/asan/tests/avgen_tests
-          if [ -n "$TEST_FILTER" ] && [ "$PART" != main ]; then
-            echo "A test_filter dispatch runs on the 'main' part only."; exit 0
-          fi
-          filter="${TEST_FILTER:-$PART_FILTER}"
-          # One seed for the whole matrix, so the 12 [stage] shards partition the same order.
+          # One seed for the whole matrix; a rest part's shards must partition the same order.
           seed=$(( GITHUB_RUN_ID % 2147483647 ))
-          python3 tools/ci/catch2_run.py run --binary build/asan/tests/avgen_tests --name "asan-$PART" \
-              --label "ASan/UBSan: $PART" --out "$RESULTS/asan-$PART" --shards 3 \
-              --shard-total "$SHARD_TOTAL" --shard-first "$SHARD_FIRST" --seed "$seed" \
-              --timeout-min 330 --exceptions tools/ci/hosted-runner-exceptions.txt --gate sanitizer \
-              --filter "$filter" --expected-label "selection: $filter"
+          common=(--binary build/asan/tests/avgen_tests --name "asan-$PART" --label "ASan/UBSan: $PART"
+                  --out "$RESULTS/asan-$PART" --seed "$seed" --timeout-min 330
+                  --exceptions tools/ci/hosted-runner-exceptions.txt --gate sanitizer)
+          if [ -n "$TEST_FILTER" ]; then
+            if [ "$PART" != main ]; then
+              echo "A test_filter dispatch runs on the 'main' part only."; exit 0
+            fi
+            python3 tools/ci/catch2_run.py run "${common[@]}" --shards 3 --filter "$TEST_FILTER" \
+                --expected-label "FILTERED $TEST_FILTER: not the full suite"
+            exit $?
+          fi
+          python3 tools/ci/catch2_run.py run "${common[@]}" --plan tools/ci/sanitizer-plan.txt --part "$PART" \
+              --shards "$SHARDS" --expected-label "part $PART of tools/ci/sanitizer-plan.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -184,7 +189,7 @@ jobs:
         run: |
           cat > jobs.json <<EOF
           {"ASan/UBSan build": "${{ needs.asan-build.result }}",
-           "ASan/UBSan tests (main + 6 stage parts)": "${{ needs.asan-tests.result }}",
+           "ASan/UBSan tests (4 parts, tools/ci/sanitizer-plan.txt)": "${{ needs.asan-tests.result }}",
            "TSan (concurrency subset)": "${{ needs.tsan.result }}"}
           EOF
           python3 tools/ci/catch2_run.py report --results-dir results --job-results jobs.json
