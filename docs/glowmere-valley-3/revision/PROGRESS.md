@@ -43,7 +43,7 @@ Leftover processes from the old session may still be running (suites, renders, t
 | Stream | Worktree / branch | Owns | State at handoff |
 |---|---|---|---|
 | gv3-look | `av-gen-gv3-look` / `gv3/look` | `look.py`, `directives.py`, `reactivity.py`, the water and wind blocks | reactivity installing and tuning (the riser's roll drives the small fungi); see its `phase3/look.md` |
-| gv3-cut | `av-gen-gv3-cut` / `gv3/cut` | `shots.py`, `rig.py`, `cuts.py`, `framing.py`, `review.py`, `install_cut` and `autoDirector` | the Director's cut with authored spans; E1's wide framed; see `phase3/cut.md` |
+| gv3-cut | `av-gen-gv3-cut` / `gv3/cut` | `shots.py`, `rig.py`, `cuts.py`, `framing.py`, `review.py`, `install_cut`, `autoDirector` and a new `songcut.py` | **checkpoint `c6e3a646`.** The cut's spans come from the Director (`songcut.py` runs `avgen_song_cut`, records `song_cut.json`, `--recut` adopts a new one): 73 spans, CV 0.53, the riser 4-4-2-2-2-1-1 beats, the drop its own 2-bar shot. Every span authored. Aliens lead 13% (the generator refuses more than 20%). 18 of 22 follow rigs pass the stability bar (first pass: 5 of 16). Next: the it1 render, the Critic jobs, novelty trims (`trim.py`), composition fixes, before/after sheets. See `phase3/cut.md` |
 | gv3-world | `av-gen-gv3-world` / `gv3/world` | `world.py`, `offline.py` | the world edge and `offline.py` behind `--final`; see `phase3/world.md` |
 | gv3-cast | `av-gen-gv3-cast` / `gv3/cast` | `cast.py`, `ufo.py` and the plan | the characters settings and the scout applied; E1–E5 via the plan; the alien float to check; see `phase3/cast.md` |
 
@@ -69,7 +69,7 @@ Leftover processes from the old session may still be running (suites, renders, t
 
 ### 5. Known open issues
 - **Four aliens float 0.2–0.5 m while walking** (measured on engine `040d6644`); gv3-cast is checking it on engine-2. If it is an engine defect, it needs an engine fix, not data.
-- **E4 must find two animals within reach** after the meadow re-homing (gv3-cast).
+- **E4 cannot play on the tuned cast** (gv3-cut measured it): the re-homed cows graze 35–40 m north of E4's region (−55, 40), radius 30. Move the region to about (−70, 8), or name cow-12 and cow-23 (gv3-cast was told).
 - **E1–E4 were off screen** in the first-pass cut; gv3-cut frames them. Check `framing[].on_screen` in the Critic's report.
 - **The Director's evaluator hook** (ADR-931) calls the adapter without `--world-preview`, so it has no ground data. A small engine follow-up.
 - **`scout` needs a hero record** (radius about 4.9 m) for the Critic.
