@@ -9,11 +9,14 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 where its predecessor stopped.
 
 - **18:10: THE OWNER'S FEEDBACK ON r1** (sent to gv3-int; standing for GV3):
-  - **"Restore the hero pulses in the mushrooms and the camera beam".** "Camera beam" is read as the UFO tractor
-    beam; confirm with the owner if in doubt. Only the elder's kick and the lantern's clap still read. The saucer
-    beam's audio links were dropped (gv3-int `e1bc1c49`, for the horse's washout), and so were the scout beam's
-    reactions (gv3-look `REACTION_DROPS`, "inert"). **Rule: tame a pulse, never delete it**; the memory note is
-    `av-gen-gv3-keep-the-pulses`.
+  - **"Restore the hero pulses in the mushrooms and the camera beam".** Only the elder's kick and the lantern's clap
+    still read. **Rule: tame a pulse, never delete it**; the memory note is `av-gen-gv3-keep-the-pulses`.
+  - **The owner's correction: "the camera beam" is the Camera Travel Beam, not the UFO beam.** That is the world
+    effect "that swept across the world during camera changes": travelBeam, ADR-207/702, from the camera toward
+    the hero the cut hands off to.
+    - GV2 multicam has it (`effects[]` `camera-travel-beam`, with `beat.pulse -> fx/camera-travel-beam/intensity`
+      at 8.0). GV3's first pass carried over only the aurora and the horse's light.
+    - gv3-int restores it through the generator. The UFO beams' audio links stay dropped (`e1bc1c49`).
   - **"At 1:45 there are two cows stuck together that get abducted together as one"** (E4):
     - cow-12 and cow-23 stand 3.21 m apart at the beam (102-104 s), so their bodies touch at 1.94x scale;
     - the lift draws them to 1.34 m (107-109 s).
@@ -689,7 +692,7 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **Pixel-based fades** (water ripples, bloom levels, motion-blur tiles) differ between 540p previews and 1080p/4K finals. Check final-resolution stills before a final render.
 
 ## Owner requirements and creative direction (do not lose)
-- **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the UFO beams' pulse visible.** When a pulse causes a
+- **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the Camera Travel Beam (the light sweep on camera changes) visible.** When a pulse causes a
   problem, tame it (depth, a peak cap, timing); never delete it. A route the Critic calls inert is to be made
   visible, not dropped.
 - **(2026-09-27) The tiny glowing mushrooms all over Glowmere pulse to the beat, visibly.** The owner asked
