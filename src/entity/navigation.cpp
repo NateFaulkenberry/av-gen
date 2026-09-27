@@ -217,8 +217,8 @@ bool Navigator::pickDestination(Rng& rng, glm::vec2 from, const DestinationReque
     const float hi = std::max(lo, request.maxRadius);
     const float spread = std::clamp(request.spread, 0.0f, kPi);
     const float fromHome = glm::length(from - request.home);
-    // The gentlest navigable candidate that missed only the slope limit, kept in case nothing
-    // honours the limit at all: see `DestinationRequest::maxSlopeDegrees`.
+    // The navigable candidate with the gentlest ground to stand on among those that missed only the
+    // slope limit, kept in case nothing honours the limit at all: see `gentlestFallback`.
     glm::vec2 gentlest(0.0f);
     float gentlestSlope = std::numeric_limits<float>::max();
     for (int i = 0; i < std::max(request.attempts, 1); ++i) {
@@ -246,9 +246,12 @@ bool Navigator::pickDestination(Rng& rng, glm::vec2 from, const DestinationReque
         if (request.maxSlopeDegrees > 0.0f) {
             const float steepest = routeSlopeDegrees(from, candidate);
             if (steepest > request.maxSlopeDegrees) {
-                if (steepest < gentlestSlope) {
-                    gentlestSlope = steepest;
-                    gentlest = candidate;
+                if (request.gentlestFallback) {
+                    const float standing = slopeDegrees(candidate);
+                    if (standing <= request.fallbackCeilingDegrees && standing < gentlestSlope) {
+                        gentlestSlope = standing;
+                        gentlest = candidate;
+                    }
                 }
                 continue;
             }
@@ -263,6 +266,11 @@ bool Navigator::pickDestination(Rng& rng, glm::vec2 from, const DestinationReque
     return false;
 }
 
+float Navigator::slopeDegrees(glm::vec2 p) const {
+    const float up = std::clamp(groundNormal(p, 1.0f).y, -1.0f, 1.0f);
+    return std::acos(up) * kDegrees;
+}
+
 float Navigator::routeSlopeDegrees(glm::vec2 a, glm::vec2 b, float spacing) const {
     const float distance = glm::length(b - a);
     const float step = std::max(spacing, 0.25f);
@@ -270,8 +278,7 @@ float Navigator::routeSlopeDegrees(glm::vec2 a, glm::vec2 b, float spacing) cons
     float steepest = 0.0f;
     for (int i = 1; i <= steps; ++i) {
         const glm::vec2 p = a + (b - a) * (static_cast<float>(i) / static_cast<float>(steps));
-        const float up = std::clamp(groundNormal(p, 1.0f).y, -1.0f, 1.0f);
-        steepest = std::max(steepest, std::acos(up) * kDegrees);
+        steepest = std::max(steepest, slopeDegrees(p));
     }
     return steepest;
 }

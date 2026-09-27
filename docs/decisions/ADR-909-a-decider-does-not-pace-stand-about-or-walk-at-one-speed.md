@@ -62,7 +62,11 @@ remains for an author who wants the soft rule.
 plan unless it was beaten. This change made "nothing on offer" reachable: an errand's own option drops
 out of the list inside the considerer's `minRange` while every other option is behind the body. In that
 case the selector used to clear the commitment, which lifted the turn-back rule on the next tick and
-turned the body round 4 m short of its goal. Without a held plan, nothing is committed to, as before.
+turned the body round 4 m short of its goal. A plan is in progress while Phase D holds it *or* while the
+body is still walking it (over 0.3 m/s with a commitment in hand): the second is the same errand for a
+decider with no `mind` block, and without it such a body turned round 6.5 m short of its errand the
+moment a walk home came back on offer (found by the loop-firmness case's probe). A body that has
+stopped with nothing on offer is committed to nothing, as before.
 
 **3. The still clock** (`maxStillSeconds`, off by default). A body that has not moved `stallDistance`
 in that long has its committed option set aside for as long again. Until it chooses something that
@@ -100,7 +104,11 @@ and watches the walks back appear.
 - **Reaction urgency is on.** A flee at a stroll was never the intent.
 - **`maxStillSeconds`, `duration` and `speedRange` are opt-in.** Standing is a legitimate thing for a
   character to have been authored to do (a sentry, a beat in a shot), and only the scene knows which of
-  its characters may. Pace variety is a matter of casting.
+  its characters may. The Character Intelligence Lab's case 14 is the concrete reason: its `sentry` is
+  `holdPost + investigate + idle` and is *meant* to stand its post; a default limit would turn it into a
+  patrol. The cost is measured, not assumed: GV2-multicam's file is frozen and cannot opt in, and its
+  `sage` still stands about 100 s at its grove after this ADR (ADR-910's table). GV3 opts in (the stream
+  report's recommendations). Pace variety is a matter of casting.
 - **`holdPost`'s half-tolerance return is on**, because walking to the edge of the ring was the defect.
 
 ## Consequences

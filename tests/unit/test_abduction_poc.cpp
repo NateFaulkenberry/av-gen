@@ -436,9 +436,32 @@ TEST_CASE("the animals wander their own territories without getting stuck",
     }
     REQUIRE(pauseMax > 0.0); // the settings were found; a zero here would make both bounds vacuous
     INFO(fmt::format("authored pauses {:.0f}-{:.0f} s", pauseMin, pauseMax));
-    // One pause, not two. The 6% is sampling: a pause is timed from the frame the body stops, and
-    // the stretch is counted in frames.
-    CHECK(run.longestStill < pauseMax * 1.06);
+    // One pause, not two -- and the turn out of it. The 6% is sampling: a pause is timed from the
+    // frame the body stops, and the stretch is counted in frames. The turn is ADR-907/908's: a
+    // wanderer whose way ahead is a dead end (a bank, a flank steeper than its slope limit) turns on
+    // the spot until its way is within 90 degrees and walks out on a curve, and turning on the spot
+    // does not move the body, so it is part of the stretch. Measured with a probe of this run: the
+    // longest stretch, sheep-4's 6.65 s, held 86.1 degrees of turning -- 0.92 s at its 93.8 deg/s --
+    // after one pause of its 5.68 s maximum. So the bound is the stillest animal's own `pauseMax`
+    // and 90 degrees at its own `turnRate`, both read from the scene.
+    double stillestPause = pauseMax;
+    double stillestTurnRate = 0.0;
+    for (const entity::EntityDesc& e : run.comp->entities()) {
+        if (e.name != run.stillest) {
+            continue;
+        }
+        for (const entity::BehaviorDesc& b : e.behaviors) {
+            if (b.kind == "wander") {
+                stillestPause = b.settings.value("pauseMax", pauseMax);
+                stillestTurnRate = b.settings.value("turnRate", 140.0);
+            }
+        }
+    }
+    REQUIRE(stillestTurnRate > 0.0); // the stillest body is a wanderer whose settings were found
+    const double turnOut = 90.0 / stillestTurnRate;
+    INFO(fmt::format("{}: pauseMax {:.2f} s, and 90 degrees at {:.1f} deg/s is {:.2f} s", run.stillest,
+                     stillestPause, stillestTurnRate, turnOut));
+    CHECK(run.longestStill < stillestPause * 1.06 + turnOut);
     // A sanity ceiling derived from the duty cycle the settings imply, not a tuned number: a body
     // that pauses for a mean of (pauseMin+pauseMax)/2 and then crosses a territory of `maxRange`
     // spends roughly that fraction of its life still. Loose by design -- it is here to catch every

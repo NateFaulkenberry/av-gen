@@ -330,6 +330,79 @@ TEST_CASE("the loop memory is on by default, and its window is a parameter", "[d
     auto* still = w.params.findAs<float>("entity/poster/decide/maxStillSeconds");
     REQUIRE(still != nullptr);
     CHECK(still->value() == 0.0f); // standing is the scene's to limit: off unless it asks
+    // What "back where it was" means and how firmly a walk back is refused are parameters too.
+    auto* radius = w.params.findAs<float>("entity/poster/decide/loopRadius");
+    auto* penalty = w.params.findAs<float>("entity/poster/decide/loopPenalty");
+    REQUIRE(radius != nullptr);
+    REQUIRE(penalty != nullptr);
+    CHECK(radius->value() == 4.0f);
+    CHECK(penalty->value() == 0.0f);
+}
+
+TEST_CASE("the loop rule's firmness, moved as a parameter, reaches the choice", "[decide][adr909][loop]") {
+    // `loopPenalty` read from the parameter the Inspector and the Parameters panel draw, not only from
+    // the file. The fixture is the one place the departure rule alone decides: a post, and one place
+    // 16 m out. The body walks out to it, looks, and -- standing there, so the turn-back rule has
+    // nothing to say -- its best and only option is home, where it set out from moments ago. Refused
+    // (the default), home is not on offer until 20 s after it set out and it waits where it is;
+    // allowed (the parameter at 1, a walk straight back worth all of its score), it turns straight
+    // round. Measured as the seconds from leaving home to being back.
+    const auto roundTrip = [](float firmness) {
+        nlohmann::json decide = {
+            {"hertz", 2.0},
+            {"dwellTicks", 1.0},
+            {"margin", 0.05},
+            {"visitedCapacity", 0.0},
+            {"considerers",
+             {{{"kind", "holdPost"}, {"name", "post"}, {"weight", 0.5}, {"tolerance", 3.0}, {"pull", 0.3},
+               {"duration", 1.0}},
+              {{"kind", "interest"}, {"name", "graze"}, {"source", "omniscient"}, {"weight", 2.0},
+               {"weights", {{"landmark", 1.0}}}, {"minRange", 8.0}, {"maxRange", 60.0}, {"approach", 2.0},
+               {"dwell", 1.0}, {"activity", "observe"}, {"noveltyPenalty", 1.0}}}},
+        };
+        CastMember m;
+        m.name = "homebody";
+        m.seed = 2718;
+        m.gait.walkSpeed = 2.0f;
+        m.behaviors.push_back(behavior("decide", decide));
+        CastWorld w({m});
+        entity::InterestPoint place;
+        place.name = "place";
+        place.position = glm::vec3(16.0f, 0.0f, 0.0f);
+        place.kind = entity::InterestKind::Landmark;
+        place.weight = 1.0f;
+        w.world.setExtraInterestPoints({place});
+        auto* penalty = w.params.findAs<float>("entity/homebody/decide/loopPenalty");
+        REQUIRE(penalty != nullptr);
+        penalty->setBase(firmness);
+        double left = -1.0;
+        double back = -1.0;
+        bool wentOut = false;
+        w.play(90.0, [&] {
+            const glm::vec3 p = w.body("homebody").state().position();
+            const float fromHome = glm::length(glm::vec2(p.x, p.z));
+            if (left < 0.0 && fromHome > 3.0f) {
+                left = w.time();
+            }
+            wentOut = wentOut || fromHome > 12.0f;
+            if (wentOut && back < 0.0 && fromHome < 3.0f) {
+                back = w.time();
+            }
+        });
+        REQUIRE(left >= 0.0);
+        REQUIRE(back >= 0.0); // it went out, and it came home
+        return back - left;
+    };
+    const double refused = roundTrip(0.0f);
+    const double allowed = roundTrip(1.0f);
+    WARN(fmt::format("out to the place and home again: {:.1f} s with loopPenalty 0 (the default), {:.1f} s "
+                     "with the parameter at 1",
+                     refused, allowed));
+    // Allowed, home inside the 20 s window; refused, not inside it. (Measured 11.2 s and 24.2 s: the
+    // refused body stands at the place until the window, counted from when it set out, is over, and
+    // then walks the 11.5 m home.)
+    CHECK(allowed < 20.0);
+    CHECK(refused > 20.0);
 }
 
 TEST_CASE("a decider that has stood maxStillSeconds is sent on its way", "[decide][adr909][still]") {

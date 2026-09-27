@@ -250,6 +250,90 @@ TEST_CASE("a slope limit keeps a wanderer, standing and walking, off ground stee
     CHECK(walkedDefault < 12.0f + 3.0f);
 }
 
+TEST_CASE("a wanderer put on a flank walks down or along it, never up it",
+          "[wander][adr907][slope]") {
+    // The case the first slope fallback got wrong, found on GV2-multicam's four flank-anchored
+    // animals: from a flank every straight walk starts on steep ground, so no destination passes
+    // the slope rule, and ranking the rest by their walk's steepest point ranked them all the same
+    // -- the pick fell behind the body as often as ahead, and the animals paced between a few spots.
+    // Now the rest are ranked by the ground the body would stand on, ahead first, and never steeper
+    // than where it stands while anything else is on offer.
+    RidgeBed bed;
+    // Start part-way up the west flank, facing along it (north), where the slope is a hillside.
+    float startX = 0.0f;
+    for (float x = -8.0f; x <= 12.0f; x += 0.5f) {
+        const float s = bed.slopeAt({x, 0.0f});
+        if (s > 15.0f && s < 25.0f) {
+            startX = x;
+            break;
+        }
+    }
+    const float startSlope = bed.slopeAt({startX, 0.0f});
+    INFO("starting at x = " << startX << " on a " << startSlope << "-degree flank");
+    REQUIRE(startSlope > 15.0f);
+
+    struct Run {
+        entity::CharacterQuality q;
+        float steepestStood = 0.0f;  // the steepest ground it came to a stop on
+        float highestClimb = 0.0f;   // metres above its starting ground it ever stood
+        double onFlatFrom = -1.0;    // when it first stood on ground under 6 degrees
+    };
+    const auto run = [&](float home, float limit) {
+        CastMember m = grazer({{"homeRadius", home}, {"maxRange", 12.0}, {"maxSlope", limit}});
+        m.at = glm::vec3(startX, 0.0f, 0.0f);
+        m.behaviors.push_back(behavior("ground", {{"slopeAlign", 0.55}}));
+        CastWorld w({m}, &bed.nav);
+        Run out;
+        const float startHeight = bed.nav.groundHeight({startX, 0.0f});
+        w.play(300.0, [&] {
+            const entity::Entity& e = w.body("grazer");
+            if (e.state().speed < 0.1f) {
+                const glm::vec3 p = e.state().position();
+                const float s = bed.slopeAt({p.x, p.z});
+                out.steepestStood = std::max(out.steepestStood, s);
+                out.highestClimb = std::max(out.highestClimb, bed.nav.groundHeight({p.x, p.z}) - startHeight);
+                if (out.onFlatFrom < 0.0 && s < 6.0f) {
+                    out.onFlatFrom = w.time();
+                }
+            }
+        });
+        out.q = w.quality("grazer");
+        return out;
+    };
+
+    // Flat ground within its territory: it walks down to it, and from there the slope rule holds.
+    const Run down = run(40.0f, 12.0f);
+    WARN(fmt::format("flank start, flat within reach: first stood on the flat at {:.1f} s; steepest stop {:.1f} "
+                     "deg; climbed at most {:.2f} m; {} stops, {} reversals, {} A->B->A",
+                     down.onFlatFrom, down.steepestStood, down.highestClimb, down.q.behaviour.stops,
+                     down.q.behaviour.reversals, down.q.behaviour.revisits));
+    REQUIRE(down.onFlatFrom >= 0.0);
+    CHECK(down.onFlatFrom < 60.0);
+    CHECK(down.steepestStood < startSlope + 1.0f);
+    CHECK(down.highestClimb < 0.5f);
+    CHECK(down.q.behaviour.reversals == 0);
+
+    // Leashed to the flank, with nothing gentle in its territory: it grazes along the hill and never
+    // climbs it. (It does walk back and forth: a 6 m leash on a contour is a strip about 12 m long,
+    // and a strip has two directions. That is the scene's to fix -- home an animal on the flat, as
+    // GV3's recommendations do -- and not something a destination rule can.)
+    const Run along = run(6.0f, 12.0f);
+    WARN(fmt::format("leashed to the flank: steepest stop {:.1f} deg (started on {:.1f}); climbed at most {:.2f} "
+                     "m; {} stops, {} reversals, {} A->B->A, {:.0f} m travelled",
+                     along.steepestStood, startSlope, along.highestClimb, along.q.behaviour.stops,
+                     along.q.behaviour.reversals, along.q.behaviour.revisits, along.q.motion.travelMetres));
+    REQUIRE(along.q.behaviour.stops > 10);
+    CHECK(along.steepestStood < startSlope + 1.5f);
+    CHECK(along.highestClimb < 1.0f);
+
+    // The control: `maxSlope` 0 -- the world's cliff rule and nothing else. The same body from the
+    // same spot wanders up the flank as readily as down it.
+    const Run free = run(40.0f, 0.0f);
+    WARN(fmt::format("maxSlope 0: steepest stop {:.1f} deg, climbed {:.2f} m", free.steepestStood,
+                     free.highestClimb));
+    CHECK(free.highestClimb > 2.0f);
+}
+
 TEST_CASE("a wanderer eases into and out of its stops at its own gait's rates",
           "[wander][adr907][gait]") {
     const auto run = [](float accel, float decel) {

@@ -9,7 +9,7 @@ ADR-826 (the character quality analyzer), ADR-375 and ADR-387 (layers and the In
 `BehaviorContext::gait` (`src/entity/behavior.hpp`, set on both the play and replay paths in
 `src/entity/entity.cpp`); `Gait::select`'s passthrough (`src/entity/gait.cpp`); the World panel Inspector's
 character section and the `entity/` layer entry (`src/ui/world_panel.cpp`, `src/ui/ui_logic.hpp`)
-**Tests:** `tests/unit/test_forward_wander.cpp` (five cases, each with a control arm); the seek case in
+**Tests:** `tests/unit/test_forward_wander.cpp` (six cases, each with a control arm); the seek case in
 `tests/unit/test_decider_habits.cpp`; `tests/unit/test_character_controls_reach.cpp` (where each control is found)
 
 ## Context
@@ -56,10 +56,21 @@ further out. The old rule allowed a body to stray up to twice its home radius.
   more.
 
 **5. The fall-back order when a cone comes up empty** (a river bank, the world's edge, a flank):
-- first the whole circle with the slope limit still strict;
-- then, with nothing gentle anywhere in reach, the gentlest navigable ground on offer, so a body put on
-  a hillside walks down it rather than standing there;
+- first the whole circle with the slope limit still strict (the walk out of a dead end may start with
+  a pivot);
+- then, with nothing gentle anywhere in reach -- a body standing on a flank, where every walk starts on
+  steep ground -- the candidate with the **gentlest ground to stand on**: ahead on its circle and no
+  steeper than where it stands; then anywhere, no steeper than where it stands; then anywhere. So a body
+  put on a hillside walks down it, or along it, and never up it while any other way is on offer;
 - only then is the body boxed in.
+
+The first cut ranked those last candidates by their walk's steepest point, from the whole circle. On
+GV2-multicam's four flank-anchored animals that ranked them all alike -- every walk off a flank is as
+steep as the flank -- so the pick fell behind the body as often as ahead, and they paced between a few
+spots: horse-2's A->B->A revisits went from 5 to 10 and cow-23's turns over 90 degrees at a stop from 13
+to 17, while they stood on the flank as long as before. `DestinationRequest::fallbackCeilingDegrees`
+and `Navigator::slopeDegrees` are the second cut, and the flank case in `test_forward_wander.cpp` is
+its gate.
 
 **6. The pace is eased.** Wander keeps the pace it actually walks at (`pace_`, a behaviour member, so
 ADR-700's checkpoints carry it). It is eased by the body's own gait: up at `accel`, down at `decel`,

@@ -983,10 +983,21 @@ private:
     //
     // A cone can come up empty where a whole circle would not: a body facing a river bank, the
     // world's edge, a cliff, a flank steeper than `maxSlope`. Then the whole circle is asked, with
-    // no turning circle -- the walk out of a dead end is allowed to start with a pivot. With a slope
-    // limit and nothing gentle anywhere in reach, the gentlest ground on offer is taken last, so a
-    // body put on a hillside walks down it rather than standing there; only when even that is
-    // empty is the body boxed in.
+    // no turning circle -- the walk out of a dead end is allowed to start with a pivot.
+    //
+    // With a slope limit and nothing gentle anywhere in reach -- a body standing on a flank, where
+    // every walk starts on steep ground -- it settles for the gentlest ground to stand on
+    // (`DestinationRequest::gentlestFallback`), in this order:
+    //   * ahead, on its circle, and no steeper than where it stands: it keeps walking, down or along
+    //     the hill, and never up it;
+    //   * anywhere, no steeper than where it stands: the way down is behind it, and it turns;
+    //   * anywhere at all: somewhere steeper is the only way on, which is rare.
+    // Only when even that is empty is the body boxed in. The first cut asked the whole circle for
+    // the gentlest *walk* straight away: on GV2-multicam's four flank-anchored animals, every walk
+    // off a flank is as steep as the flank, so the pick was at random -- behind the body as often as
+    // ahead -- and they paced between the same few spots (horse-2's A->B->A revisits went from 5 to
+    // 10, cow-23's turns over 90 degrees at a stop from 13 to 17) while standing on the flank as
+    // long as before.
     bool pick(const BehaviorContext& ctx, const EntityState& state, glm::vec2 flat, const TurnSettings& turning) {
         if (ctx.nav == nullptr || ctx.rng == nullptr) {
             return false;
@@ -1016,6 +1027,7 @@ private:
         if (ctx.nav->pickDestination(*ctx.rng, flat, request, destination_)) {
             return true;
         }
+        const float cone = request.spread;
         request.turnRadius = 0.0f;
         if (request.spread < kPiF) {
             request.spread = kPiF;
@@ -1026,7 +1038,24 @@ private:
         if (request.maxSlopeDegrees <= 0.0f) {
             return false;
         }
+        // Nothing gentle anywhere in reach: the gentlest ground to stand on, ahead first, and never
+        // up the hill while any other way is on offer. Half a degree of allowance so the contour of
+        // a hill counts as level with the spot the body is standing on.
         request.gentlestFallback = true;
+        request.fallbackCeilingDegrees = ctx.nav->slopeDegrees(flat) + 0.5f;
+        if (cone < kPiF) {
+            request.spread = cone;
+            request.turnRadius = turning.radius;
+            if (ctx.nav->pickDestination(*ctx.rng, flat, request, destination_)) {
+                return true;
+            }
+            request.spread = kPiF;
+            request.turnRadius = 0.0f;
+        }
+        if (ctx.nav->pickDestination(*ctx.rng, flat, request, destination_)) {
+            return true;
+        }
+        request.fallbackCeilingDegrees = std::numeric_limits<float>::infinity();
         return ctx.nav->pickDestination(*ctx.rng, flat, request, destination_);
     }
 

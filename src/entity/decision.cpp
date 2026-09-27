@@ -440,8 +440,13 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
         // drops out of the list as the body nears it (inside the considerer's `minRange`), with
         // every other option behind the body and so not on offer -- and clearing the commitment
         // then lifted the turn-back rule on the next tick and turned the body round 4 m short of
-        // where it was going. Without a held plan, nothing is committed to, as before.
-        if (!hold_) {
+        // where it was going. A plan is in progress while it is held (Phase D's awareness) *or*
+        // while the body is still walking it: the second is the same errand for a decider with no
+        // `mind`, and without it such a body turned round 6.5 m short of its errand the moment a
+        // walk home came back on offer (the loop-firmness case in test_decider_habits.cpp). A body
+        // that has stopped with nothing on offer is committed to nothing, as before.
+        const bool walkingOn = ctx.state != nullptr && ctx.state->speed > 0.3f && !current_.empty();
+        if (!hold_ && !walkingOn) {
             current_.clear();
             currentSubject_ = 0;
         }

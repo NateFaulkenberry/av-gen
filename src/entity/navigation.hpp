@@ -27,6 +27,7 @@
 
 #include <glm/glm.hpp>
 
+#include <limits>
 #include <memory>
 #include <span>
 #include <vector>
@@ -174,11 +175,18 @@ struct DestinationRequest {
     // The steepest ground, in degrees, the destination and the straight walk to it may cross. 0 =
     // the navigator's own cliff rule and nothing more.
     float maxSlopeDegrees = 0.0f;
-    // When no candidate honours `maxSlopeDegrees`, return the gentlest navigable one rather than
-    // nothing: a body standing on a flank walks toward the flat instead of standing on the flank
-    // for ever. Off by default, because a caller that can ask again more widely -- a whole circle
-    // after a cone -- should, before it settles for steep ground.
+    // When no candidate honours `maxSlopeDegrees`, return the navigable one with the gentlest
+    // *ground to stand on* rather than nothing: a body standing on a flank walks toward the flat
+    // instead of standing on the flank for ever. Ranked by the destination and not by the walk,
+    // because every walk off a flank starts on the flank -- the steepest point of each route is the
+    // flank itself, the same for all of them, and ranking by it picks at random, behind the body as
+    // often as ahead. Off by default, because a caller that can ask again more widely -- a whole
+    // circle after a cone -- should, before it settles for steep ground.
     bool gentlestFallback = false;
+    // With `gentlestFallback`, a fallback candidate is offered only when the ground it would stand on
+    // is no steeper than this, in degrees: a body on a hillside with nothing flatter ahead keeps to
+    // the contour rather than climbing. Infinity (the default) is no ceiling.
+    float fallbackCeilingDegrees = std::numeric_limits<float>::infinity();
     // A leash. With `homeRadius` > 0, a candidate farther than that from `home` is offered only
     // when it is no farther from home than `from` already is -- so a body inside its territory
     // stays in it and a body outside it never walks further out.
@@ -261,6 +269,8 @@ public:
     // already stands on, which it cannot help. The normal is taken a metre either side, about a
     // body's length, so a pebble's slope is not a hill's.
     [[nodiscard]] float routeSlopeDegrees(glm::vec2 a, glm::vec2 b, float spacing = 2.0f) const;
+    // The slope of the ground at `p`, in degrees, with the same metre-wide normal.
+    [[nodiscard]] float slopeDegrees(glm::vec2 p) const;
 
     // How many cells of margin `gridTrustMetres` asks for on this grid. At least 1.
     [[nodiscard]] int gridTrustCells(const NavGrid& grid) const;
