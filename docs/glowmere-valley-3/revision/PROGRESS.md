@@ -17,8 +17,25 @@ where its predecessor stopped.
   - **Building `av-gen-engine-4`** at `983221a9`. When it is ready, gv3-int switches to it and applies E5's "go and
     see".
   - Still in flight: behave (ADR-935-936), uireach (ADR-937-939), cihealth (ADR-940-941 and the partition).
-    Queued for the next engine round: two moons and the moon's controls; a multi-animal lift keeps its animals
-    apart; the world closure's features have no editor.
+    Queued for the next engine round:
+    - two moons, and the moon's controls;
+    - a lift's stack spacing should default from the animals' body size. gv3-int found E4's cows drawn together by
+      the template's stackRadius 1.6 m and stackStagger 1.2 m, and fixes it in `ufo.plan.json`;
+    - the world closure's features have no editor;
+    - `cameraTravel` activation ignores an authored cut, because it needs Song-mode spans. GV3 fires the restored
+      Camera Travel Beam on "cut" markers at phrase-start cuts instead, about every 7 s.
+- **gv3-int's round-2 plan** (18:25), for the owner's items:
+  - **Heroes:** scored lanes (kick, clap, off-beat, downbeat, beat 3) across all ten heroes. Peaks go to x4-6, the
+    depth floor 0.19 -> 0.5, and resting `emissiveBoost` down to 0.4-0.5. A 5 ms attack and a 250-350 ms tail;
+    spill from the practical lights; bloom crossings.
+    - Root cause: the gold gills sit at the tone curve's shoulder, a flat peach with no headroom. The AgX A/B
+      decides the peaks' detail.
+  - **Small mushrooms:** staggered scored routes onto the fungi, shelf-fungi and beacons layers, with ecology-light
+    spill.
+  - **The travel beam:** restored through the generator. `look.REMOVED_EFFECTS` had dropped it.
+  - **E4:** wider stack spacing.
+  - **Re-framings:** 29.1, 59.1, 31.1, 77.1 (turned north to the falls), 38.1, 73.1, 104.1 and 107.1; the post
+    and air A/Bs.
 - **18:10: THE OWNER'S FEEDBACK ON r1** (sent to gv3-int; standing for GV3):
   - **"Restore the hero pulses in the mushrooms and the camera beam".** Only the elder's kick and the lantern's clap
     still read. **Rule: tame a pulse, never delete it**; the memory note is `av-gen-gv3-keep-the-pulses`.
