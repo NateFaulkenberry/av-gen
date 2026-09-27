@@ -4,9 +4,10 @@
 **Date:** 2026-09-27
 **Follows:** ADR-703 (RIBBON: the frame block the effects write and the renderer reads), and Effect
 Library Wave 3's play = scrub proof for triggered bolts
-**Found by:** main's CI. The nightly 36318924797 (seed 1790512056, shard 2) and main 876a11e2's push
-36341601980 (seed 1790536064, shard 0) failed; ec515c8b's push 36335160280 passed. This is the GV3
-revision's cihealth brief, item 1.
+**Found by:** main's CI, in 3 of 4 runs: the nightly 36318924797 (seed 1790512056, shard 2), main
+876a11e2's push 36341601980 (seed 1790536064, shard 0) and 983221a9's push 36354090309 (seed
+1790548209, shard 1) failed; ec515c8b's push 36335160280 passed. This is the GV3 revision's cihealth
+brief, item 1.
 **Implemented by:** `RibbonStrip::reserved` and two `static_assert`s (`src/world/effects/ribbon_frame.hpp`)
 **Tests:** `tests/unit/test_bolt_path.cpp`:
 - "a ribbon strip's bytes are its value, whatever the memory it was built in last held" (new; the
@@ -17,7 +18,7 @@ revision's cihealth brief, item 1.
 ## Context
 
 The proof plays one `Engine` to frames 331, 337 and 407, and seeks a second one there. It then
-compares the two frames' ribbons byte for byte. On CI it failed in 2 runs of 3, always the same way:
+compares the two frames' ribbons byte for byte. On CI it failed in 3 runs of 4, always the same way:
 
 - `CHECK(sameVector(a.ribbons.strips, b.ribbons.strips))` was false at all three frames;
 - the vertices, every effect's status and the flash lights matched;
@@ -72,6 +73,32 @@ them padding that nothing writes.
 So no global state reached the simulation: the two engines computed the same frame. What leaked was
 memory contents, through three bytes that are nobody's value. Which earlier work left what in the
 heap is exactly what depends on test order and seed, and on the allocator's per-CPU magazines.
+
+**Why a different case each time, and why only one failure reproduces here.** The three failures came
+in three shards and three orders, and there is no single polluter to find, because the defect is not
+in one earlier case: it is three bytes that take whatever the heap held. Any earlier case can be the
+one that left the bytes that one engine's strips then got. In each failure, whichever it was, the
+evidence says the bytes that differ are those three:
+
+- **By elimination, in every failure.** All three report line 565 (`strips`) three times, and none
+  report line 566 (`vertices`). Equal vertex arrays mean equal strips in every field:
+  - `firstVertex` and `vertexCount` are how the same vertices were cut into strips. Each strip is
+    written contiguously, and core, glow and spark strips differ in their vertices' profile lane, so
+    a different cut would change vertex bytes;
+  - every strip in this proof is `Additive`;
+  - a missing or extra strip would change the vertex count.
+
+  That leaves bytes 9-11.
+- **The same code in every failing binary.** 983221a9's CI binary stores `blend` with the same
+  1-byte `strb` and never writes those bytes.
+- **Reproduced on one, not on the other.** 876a11e2's failure is a two-case pair here (5 of 5), and
+  the patched binary cures it. 983221a9's (bolt case at index 924 of shard 1) passed here: once
+  replaying CI's exact shard command with its binary, once with its preceding cases, and once with
+  `MallocScribble=1`.
+  - Over a 924-case history, which freed block each engine's storage lands in depends on the
+    machine. macOS's allocator keeps a magazine per CPU, and the runner has 3 vCPUs to this Mac's 12.
+  - The fix does not depend on finding that case: once the bytes are a value, no earlier case can
+    change them.
 
 ## Decision
 

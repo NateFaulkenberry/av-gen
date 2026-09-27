@@ -1198,7 +1198,7 @@ a wound.
 42. **A byte comparison compared bytes nobody wrote, so the verdict depended on what ran before.**
 
    The triggered-bolt play = scrub proof (`test_bolt_path.cpp`) `memcmp`s two frames' ribbon
-   strips. On CI it failed in 2 of 3 runs and passed alone, even with the failing seed: entry 40's
+   strips. On CI it failed in 3 of 4 runs and passed alone, even with the failing seed: entry 40's
    tell. **But nothing global had leaked.** The two engines computed the same frame, and the strips
    differed only in the three padding bytes of `RibbonStrip {u32, u32, u8}`, which nothing writes.
 
@@ -1220,6 +1220,11 @@ a wound.
        keeps CI's relative order, and `--list-tests` proves it.
      - The binary bakes the runner's checkout path. Rewrite it to a same-length relative path, re-sign
        ad hoc, and run from a `git archive` of the commit.
+
+   **A failure that depends on heap history may not replay on another machine at all.** The 876a11e2
+   failure was a two-case pair here, 5 of 5; the 983221a9 one, 924 cases deep, passed here even
+   run as CI's exact command. There, the elimination (which bytes *could* differ) is the evidence,
+   not a replay.
 
    ADR-941 is the same lesson from the other side. A test helper returned a record pointing into its
    own dead frame, and **Release passed on whatever the frame still held.** Only UBSan's bool check
