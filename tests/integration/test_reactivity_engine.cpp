@@ -11,6 +11,9 @@
 //     sources;
 //   * the panels' own logic reads it: the Modulation panel's plan note, the Director panel's rows.
 
+#include "ai/director_tools.hpp"
+#include "ai/tool_api.hpp"
+#include "ai/tool_context.hpp"
 #include "app/directing_apply.hpp"
 #include "app/directing_context.hpp"
 #include "app/engine.hpp"
@@ -287,4 +290,25 @@ TEST_CASE("The Director panel lists a proposal's route and source items, and the
     const std::string heading = ui::reactivityHeading(c.plan);
     CHECK(heading.find("micro") != std::string::npos);
     CHECK(heading.find("macro") != std::string::npos);
+}
+
+TEST_CASE("The assistant reaches the proposer: director.propose_reactivity returns a plan director.validate_plan accepts",
+          "[directing][reactivity][ai][adr927]") {
+    Glade glade;
+    ai::ToolRegistry registry;
+    ai::registerDirectorTools(registry);
+    ai::ToolContext ctx(glade.engine);
+    const ai::Tool* tool = registry.find("director.propose_reactivity");
+    REQUIRE(tool != nullptr);
+    CHECK_FALSE(tool->definition.annotations.mutatesProject); // it only looks; approval is the person's
+    const ai::ToolResult proposed = registry.invoke("director.propose_reactivity", json::object(), ctx);
+    REQUIRE(proposed.success);
+    const json& plan = proposed.value.at("plan");
+    CHECK(plan.at("id") == "reactivity");
+    CHECK(plan.at("routes").size() >= 15);
+    CHECK(proposed.value.at("summary").at("byLevel").size() == 3);
+    const ai::ToolResult checked = registry.invoke("director.validate_plan", json{{"plan", plan}}, ctx);
+    REQUIRE(checked.success);
+    CHECK(checked.value.at("accepted") == true);
+    CHECK(checked.value.at("blocked").empty());
 }
