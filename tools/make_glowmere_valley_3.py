@@ -305,7 +305,7 @@ def main():
         report.append(f"look: {arc} arc track(s), {motifs} motif route(s)")
         # The spans are the Director's, cut from this project as it now stands (songcut.py).
         spans, director, note = songcut.direct(project, scene, recut=args.recut)
-        shots = film.build(ground, spans)
+        shots = film.build(ground, spans, lead=CUT_LEAD)
         st = director["stats"]
         report.append(f"cut: {note}: {st['shots']} spans, {st['cutsOnDownbeat']} of {st['cuts']} cuts on a "
                       f"downbeat, lengths {st['min']:.2f}-{st['max']:.2f} s (cv {st['cv']:.2f})")

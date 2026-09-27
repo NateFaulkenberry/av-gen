@@ -230,16 +230,16 @@ def east_bank_travel(t0, t1, g):
 
 @at("29.1")
 def vane_watches(t0, t1, g):
-    # [s11] Vane walking in the east of the valley, the elder's gold beyond: riding 7.5 m east of Vane
-    # and aiming 8 m west of it, so the lens looks west past Vane toward the elder. (Iteration 1 rode
-    # behind a Vane standing by the river, as the first pass's cast did; the tuned cast's Vane walks
-    # the east meadow here, and the old offset looked away from it.)
-    # The offset and aim were searched on the tuned cast's trace so Vane holds the right third and
-    # the elder the left third for the whole span (build/gv3/cut, iteration 2).
-    r = follow(28.0, "vane", (9.0, 2.4, 5.0), (-12.0, 1.2, 2.0))
-    return r, dict(lead="alien", purpose="Vane in the east of the valley, the elder beyond", subject="vane, the elder beyond",
-                   camera="28 mm, riding 10 m south-east of Vane, looking west past it", movement="follows",
-                   music="2 bars")
+    # [s11] Vane crosses the east meadow through the grazing herd, the elder's gold on the horizon:
+    # riding 11 m north-east of her and 6 m up, looking south-west past her. Vane walks the left third,
+    # the elder's cap stands upper right. (Iteration 2 rode 10 m south-east of her at 2.4 m, and
+    # horse-20 walked past the lens and filled half the frame: the herd grazes within 5-8 m of her
+    # path. Searched on both casts, gv3-cut's preview world and gv3-cast's, where her path is the
+    # same: no animal nearer the lens than 6.7 m or in front of her, the eye 5.8 m over the ground.)
+    r = follow(35.0, "vane", (7.07, 6.0, -8.43), (-12.0, 1.2, 2.0))
+    return r, dict(lead="alien", purpose="Vane crosses the east meadow, the elder beyond", subject="vane, the elder beyond",
+                   camera="35 mm, riding 11 m north-east of Vane and 6 m up, looking south-west past it",
+                   movement="follows", music="2 bars")
 
 
 @at("31.1")
@@ -412,12 +412,12 @@ def e4_arrives(t0, t1, g):
 @at("57.1")
 def e4_pair_lifted(t0, t1, g):
     # E4's lift, on the sub-phrase line: two animals rising together in one column, from 40-50 m off
-    # on the dry ground north-east of the meadow. A 40 mm, so the scout is in the top of the frame and
-    # the pair on the ground at the bottom when it lifts them (iteration 2's 50 mm put the scout just
-    # above the frame).
-    r = aim_at(40.0, g(-35, -15, 2.5), "scout", (0.0, -12.0, 0.0), "hover")
+    # on the dry ground north-east of the meadow. A 35 mm aimed 11 m below the scout, so the whole
+    # column is in frame: the scout's top at +0.85 and the pair's feet at -0.82 when it lifts them, on
+    # both casts. (Iteration 2's 50 mm put the scout above the frame; iteration 3's 40 mm cut its top.)
+    r = aim_at(35.0, g(-35, -15, 2.5), "scout", (0.0, -11.0, 0.0), "hover")
     return r, dict(lead="event", purpose="E4: two animals lifted together", subject="the scout's beam and the pair (E4)",
-                   camera="40 mm, about 45 m off, live aim", movement="still", music="the lift on bar 57",
+                   camera="35 mm, about 45 m off, live aim", movement="still", music="the lift on bar 57",
                    effects="the scout's beam")
 
 
@@ -557,16 +557,17 @@ def e5_under_the_cap(t0, t1, g):
 
 @at("91.1")
 def ember_watches(t0, t1, g):
-    # [s25] Ember watches from across the water: riding 7 m behind and 4.8 m over Ember (ADR-913),
-    # looking at the ground under the saucer, as the first pass's frame did, so Ember sits low in the
-    # frame and the saucer high. (Iteration 1 aimed at the craft itself and tilted Ember out of the
-    # bottom of the frame.)
-    # A fixed target on the ground under E5's station (-1, 74 on the tuned cast), through a 24 mm, so Ember's
-    # shoulders sit lower left and the settling saucer upper centre.
-    r = Rig("", 24.0, follow="ember", follow_offset=(-7.0, 4.8, 2.5), target=[-1.0, 4.0, 74.0], clearance=1.2,
-            smoothing="fixed-target")
-    return r, dict(lead="alien", purpose="Ember watches from across the water", subject="ember, the saucer beyond",
-                   camera="24 mm over the shoulder, riding with Ember", movement="follows", music="2 bars to the riser")
+    # [s25] Ember on the west bank as the saucer settles across the water: a fixed eye up the bank
+    # behind her, 4 m over the ground, with a live aim at Ember led 15% of the way toward the saucer
+    # (the offset, the same to a metre on both casts), so she walks the lower frame and the saucer
+    # hangs above the far bank. Searched on both casts, where Ember walks different ways 26 m apart:
+    # both in frame the whole shot in each. (Iteration 2 rode over her shoulder with a fixed target:
+    # she stood in the bottom corner behind the ferns, and on gv3-cast's cast out of frame; an
+    # over-the-shoulder that holds the saucer puts the eye on the rising bank behind her.)
+    r = aim_at(28.0, g(-110, 38, 4.0), "ember", (13.0, 5.0, 6.0), "walker")
+    return r, dict(lead="alien", purpose="Ember on the west bank, the saucer settling across the water",
+                   subject="ember, the saucer beyond", camera="28 mm, up the west bank 22 m behind her, live aim",
+                   movement="still", music="2 bars to the riser")
 
 
 # ==== 11 riser (bars 93-96): E5's lift; the cutting compresses with the roll ================================
@@ -734,11 +735,16 @@ def crane_over_the_valley(t0, t1, g):
 
 
 @at("111.1")
-def vane_where_the_horse_was(t0, t1, g):
-    # [s38] Vane walks to where the horse was taken, as the mids lift for the last push.
-    r = follow(35.0, "vane", (-5.0, 2.4, 4.0), (0.0, 2.2, 0.0))
-    return r, dict(lead="alien", purpose="Vane walks to where the horse was taken", subject="vane",
-                   camera="35 mm follow", movement="tracks", music="the last push, bar 111")
+def tide_to_the_spire(t0, t1, g):
+    # [s38] As the mids lift for the last push, Tide walks the north end toward the lit spire: a chase
+    # 4 m behind her and 3 m up, looking past her at it. Tide left of centre, the spire upper right.
+    # Her path here is the same on both casts, and the eye runs where she has just walked (84% of
+    # the shot), clear of the undergrowth. (Iteration 2 followed Vane from beside her path, and the
+    # lens went through a plant for two thirds of the shot; nor did Vane walk toward the horse's
+    # place on either cast.)
+    r = follow(28.0, "tide", (-3.46, 3.0, 2.0), (8.0, 1.2, -3.0))
+    return r, dict(lead="alien", purpose="Tide walks the north end toward the lit spire", subject="tide, the spire beyond",
+                   camera="28 mm chase, 4 m behind and 3 m up", movement="tracks", music="the last push, bar 111")
 
 
 @at("113.1")
@@ -774,8 +780,14 @@ def elder_alone(t0, t1, g):
 
 
 # ---- the cut ------------------------------------------------------------------------------------------
-def build(ground, spans):
-    """A Shot for each of the Director's spans, from the composition written for it."""
+def build(ground, spans, lead=0.0):
+    """A Shot for each of the Director's spans, from the composition written for it.
+
+    `lead` is how far ahead of its beat the cut is placed (make_glowmere_valley_3.CUT_LEAD). Each
+    composition is given its span as it is on screen, from the led start to the led end, so a keyed
+    move runs for the whole shot. Keyed from the beat instead, every move held still for the shot's
+    first frame and then set off at full speed: invisible at a cut, but 39 "abrupt camera
+    acceleration" findings in the Critic's iteration-2 job."""
     g = ground.above
     missing = [s.label for s in spans if s.label not in COMPOSITIONS]
     unused = sorted(set(COMPOSITIONS) - {s.label for s in spans})
@@ -784,7 +796,9 @@ def build(ground, spans):
                            f"{missing}; compositions no span uses {unused}")
     shots = []
     for i, span in enumerate(spans):
-        rig, notes = COMPOSITIONS[span.label](span.start, span.end, g)
+        t0 = span.start if span.start <= 0.0 else span.start - lead
+        t1 = span.end if i == len(spans) - 1 else span.end - lead
+        rig, notes = COMPOSITIONS[span.label](t0, t1, g)
         # Named s01, s02, ... in cut order, as the engine's evaluator hook and the Critic's adapter name
         # the scene's shots (directing_evaluate.cpp), so every report agrees on which shot is which. The
         # first pass's ids named a different cut; the docs name a span by its bar and beat instead.
