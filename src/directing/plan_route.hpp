@@ -67,6 +67,7 @@ struct PlanSource {
     // Values of the source's own parameters, by leaf under "sources/<name>/" ("beatSync", ...), in the
     // order written. A bool parameter takes 0 or 1.
     std::vector<std::pair<std::string, float>> parameters;
+    // The signal it publishes: "<kind>.<name>" for the three kinds a plan may make.
     [[nodiscard]] std::string signal() const { return kind + "." + name; }
     friend bool operator==(const PlanSource&, const PlanSource&) = default;
 };

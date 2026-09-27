@@ -215,11 +215,16 @@ void validateReactivity(Plan& plan, const SceneFacts& facts, Validation& v) {
         const PlanSource& src = plan.sources[i];
         const std::string at = fmt::format("/sources/{}", i);
         const std::string signal = src.signal();
+        std::unique_ptr<signals::Source> made = signals::SourceRack::create(src.kind, src.name);
+        // What it would publish, by the source's own names ("env.<name>" for an envelope): a route
+        // reading any of them is blocked with it.
+        const std::vector<std::string> outputs = made != nullptr ? made->outputs() : std::vector<std::string>{signal};
         const auto refuse = [&](IssueCode code, std::string message) -> Issue& {
-            blockedSignals[signal] = src.key;
+            for (const std::string& o : outputs) {
+                blockedSignals[o] = src.key;
+            }
             return add(Severity::Error, code, src.key, at, std::move(message));
         };
-        std::unique_ptr<signals::Source> made = signals::SourceRack::create(src.kind, src.name);
         if (made == nullptr) {
             Issue& i2 = refuse(IssueCode::SchemaInvalid, fmt::format("'{}' is not a source kind", src.kind));
             i2.suggestions = {"lfo", "noise", "timeline"};
