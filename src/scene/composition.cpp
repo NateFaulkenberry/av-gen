@@ -1,6 +1,10 @@
 #include "scene/composition.hpp"
 
+#include "scene/follow_reference.hpp"
+
 #include "params/timeline.hpp"
+
+#include "core/color.hpp"
 
 #include "core/json_keys.hpp"
 #include "core/log.hpp"
@@ -18,6 +22,7 @@
 #include "scene/sky.hpp"
 #include "world/effects/effect_lights.hpp"
 #include "world/effects/effect_stack.hpp"
+#include "world/effects/effect_trigger.hpp"
 #include "spatial/detail.hpp"
 
 #include <glm/gtc/quaternion.hpp>
@@ -1193,6 +1198,14 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
     return {};
 }
 
+std::vector<world::HeroPoint> Composition::authoredHeroes() const {
+    std::vector<world::HeroPoint> out = heroes_;
+    for (std::size_t i = 0; i < out.size() && i < heroBasePositions_.size(); ++i) {
+        out[i].position = heroBasePositions_[i];
+    }
+    return out;
+}
+
 // A hero describes an object that is already placed (ADR-074), so moving the object has to move the
 // description with it. Before this it did not: the position was a snapshot taken at declaration, so
 // dragging a hero's object left the director framing the empty space it used to occupy, and the
@@ -1206,123 +1219,6 @@ Result<void> Composition::setHeroes(std::vector<world::HeroPoint> heroes) {
 //
 // A hero that names an assembly rather than a node has no anchor and is left alone; there is no one
 // object whose movement would be the assembly's.
-void Composition::recordFollowTrails() {
-    // What has to be remembered, and for how long. Collected from the rigs each frame rather than
-    // cached, because a rig's lag is a parameter somebody can change mid-session and a trail sized
-    // against a stale lag is a chase that silently stops lagging.
-    double longest = 0.0;
-    std::vector<const std::string*> wanted;
-    for (const CameraRig& rig : cameraDirection_.cameras) {
-        if (rig.followNode.empty() || rig.followLagSeconds <= 0.0) {
-            continue;
-        }
-        longest = std::max(longest, rig.followLagSeconds);
-        if (std::none_of(wanted.begin(), wanted.end(),
-                         [&](const std::string* n) { return *n == rig.followNode; })) {
-            wanted.push_back(&rig.followNode);
-        }
-    }
-    if (wanted.empty()) {
-        // Nothing chases anything. Release rather than leave, so switching a chase off stops paying
-        // for it immediately instead of at the next scene load.
-        followTrails_.clear();
-        return;
-    }
-
-    // A margin over the longest lag, so a query lands inside the samples rather than on the oldest
-    // one; and a ceiling, because a lag of an hour is a typo and not a request.
-    const double keep = std::min(longest + 1.0, 60.0);
-
-    for (const std::string* name : wanted) {
-        auto it = std::find_if(followTrails_.begin(), followTrails_.end(),
-                               [&](const FollowTrail& t) { return t.node == *name; });
-        if (it == followTrails_.end()) {
-            followTrails_.push_back(FollowTrail{.node = *name, .samples = {}});
-            it = std::prev(followTrails_.end());
-        }
-        const CompositionNode* node = findNode(*name);
-        if (node == nullptr) {
-            continue; // a chase whose subject left the scene keeps the trail it had
-        }
-        const Transform world = nodeWorldTransform(*node);
-        // A seek is a discontinuity in a record of *when things were*, not a gap to interpolate
-        // across: time going backwards, or forwards by more than a long frame, means the samples
-        // after it do not describe the same play-through as the ones before. Dropping the old ones
-        // is what stops a chase interpolating the subject across a cut in time.
-        if (!it->samples.empty()) {
-            const double last = it->samples.back().seconds;
-            if (currentTime_ < last || currentTime_ - last > 0.5) {
-                it->samples.clear();
-                followTrailShortReported_ = false;
-            }
-        }
-        it->samples.push_back(FollowTrail::Sample{.seconds = currentTime_,
-                                                  .position = world.position,
-                                                  .rotation = world.rotation});
-        const auto stale = std::find_if(it->samples.begin(), it->samples.end(),
-                                        [&](const FollowTrail::Sample& sm) {
-                                            return sm.seconds >= currentTime_ - keep;
-                                        });
-        if (stale != it->samples.begin()) {
-            // One sample before the window is kept deliberately: a query at exactly the window's
-            // edge needs something on both sides of it to interpolate between.
-            it->samples.erase(it->samples.begin(), std::prev(stale));
-        }
-    }
-
-    // Trails nobody chases any more.
-    std::erase_if(followTrails_, [&](const FollowTrail& t) {
-        return std::none_of(wanted.begin(), wanted.end(),
-                            [&](const std::string* n) { return *n == t.node; });
-    });
-}
-
-FollowTrail::Sample Composition::followTrailAt(const std::string& node, double seconds,
-                                               const FollowTrail::Sample& fallback) const {
-    const auto trail = std::find_if(followTrails_.begin(), followTrails_.end(),
-                                    [&](const FollowTrail& t) { return t.node == node; });
-    if (trail == followTrails_.end() || trail->samples.empty()) {
-        return fallback;
-    }
-    const std::vector<FollowTrail::Sample>& s = trail->samples;
-    if (seconds <= s.front().seconds) {
-        // Before anything this play-through has seen. The camera runs un-lagged rather than
-        // pretending, and says so once -- an un-lagged chase looks exactly like a working one, so
-        // nothing but a log line distinguishes "the lag is not ready" from "the lag is zero".
-        if (!followTrailShortReported_) {
-            followTrailShortReported_ = true;
-            log::info("chase: '{}' has no trail back to {:.2f}s yet; the camera runs un-lagged "
-                      "until it does (the head of a render, or just after a seek)",
-                      node, seconds);
-        }
-        return fallback;
-    }
-    if (seconds >= s.back().seconds) {
-        return s.back();
-    }
-    const auto after = std::lower_bound(s.begin(), s.end(), seconds,
-                                        [](const FollowTrail::Sample& sm, double t) {
-                                            return sm.seconds < t;
-                                        });
-    const FollowTrail::Sample& b = *after;
-    const FollowTrail::Sample& a = *std::prev(after);
-    const double span = b.seconds - a.seconds;
-    const float u = span > 1e-9 ? static_cast<float>((seconds - a.seconds) / span) : 0.0f;
-    FollowTrail::Sample out;
-    out.seconds = seconds;
-    out.position = glm::mix(a.position, b.position, u);
-    out.rotation = glm::slerp(a.rotation, b.rotation, u);
-    return out;
-}
-
-std::vector<world::HeroPoint> Composition::authoredHeroes() const {
-    std::vector<world::HeroPoint> out = heroes_;
-    for (std::size_t i = 0; i < out.size() && i < heroBasePositions_.size(); ++i) {
-        out[i].position = heroBasePositions_[i];
-    }
-    return out;
-}
-
 void Composition::syncHeroesToNodes() {
     if (heroes_.empty()) {
         return;
@@ -1435,7 +1331,6 @@ void Composition::applyDirectedAim() {
     // are read from where the heroes are *now*, so this stays a function of the playhead and the
     // world: a scrub lands on the same aim a play does, with no memory of the frame before.
     std::optional<glm::vec3> raw;
-    bool joining = false;
     if (active != nullptr) {
         raw = walkedSinceCut(*active);
         const double into = currentTime_ - active->startSeconds;
@@ -1448,7 +1343,6 @@ void Composition::applyDirectedAim() {
                 }
             }
             raw = glm::mix(from, raw.value_or(glm::vec3(0.0f)), ease(into / active->joinInSeconds));
-            joining = true;
         }
     } else {
         // Between follow entries: a shot that aims down its move rather than at a subject. After
@@ -1458,56 +1352,26 @@ void Composition::applyDirectedAim() {
             if (shot.joinOutSeconds > 0.0 && after >= 0.0 && after < shot.joinOutSeconds) {
                 if (const auto walked = walkedSinceCut(shot)) {
                     raw = *walked * (1.0f - ease(after / shot.joinOutSeconds));
-                    joining = true;
                 }
                 break;
             }
         }
     }
-    if (active != aimFollowLast_) {
-        // A cut. The delta is zero by definition at the start of a shot -- the hero is at
-        // `heroAtCut` -- so the filter starts from zero rather than from the last shot's offset,
-        // which would open the new shot pointing at where the previous hero had got to. A join is
-        // not a cut, and the filter carries straight across it.
-        if (!joining) {
-            aimFollowSmoothed_ = glm::vec3(0.0f);
-            aimFollowPrimed_ = false;
-        }
-        aimFollowLast_ = active;
-    }
     if (raw.has_value()) {
-        glm::vec3 delta = *raw;
-        if (aimFollowSmoothingMs_ > 1e-3f) {
-            // ADR-245. Framed in seconds of the *timeline* rather than of the wall clock, so an
-            // offline render and live playback filter identically -- the same rule every other
-            // smoother in this file follows.
-            const double dt = std::max(currentTime_ - aimFollowPrevTime_, 0.0);
-            if (!aimFollowPrimed_) {
-                // The first frame of a shot has no previous sample to move away from, and the
-                // honest starting value is the delta itself: at a cut that is zero, and after a
-                // seek it is wherever the hero actually is. Starting at zero instead would make
-                // the camera crawl to its subject over the filter's constant, every seek.
-                aimFollowSmoothed_ = *raw;
-                aimFollowPrimed_ = true;
-            } else if (dt > 0.0) {
-                const double tau = static_cast<double>(aimFollowSmoothingMs_) / 1000.0;
-                const auto rate = static_cast<float>(1.0 - std::exp(-dt / std::max(tau, 1e-6)));
-                aimFollowSmoothed_ += (*raw - aimFollowSmoothed_) * rate;
-            }
-            delta = aimFollowSmoothed_;
-        }
-        // ADR-890: the nudge belongs to the film's main camera, so it lands only on a frame
-        // that *is* the film's. This runs after `applyViewportView` (it has to: the hero has
-        // only just moved), which put the editor's viewpoint or a looked-through rig on screen
-        // if the person asked for one -- and adding the hero's walk to that is the director
-        // steering a camera it does not own: "I have control of the camera and it is still
-        // moved by the director". The smoother above keeps running either way, so going back
-        // to the film mid-shot lands on the filtered offset rather than restarting it.
+        // ADR-890: the nudge belongs to the film's main camera, so it lands only on a frame that
+        // *is* the film's. This runs after `applyViewportView` (it has to: the hero has only just
+        // moved), which put the editor's viewpoint or a looked-through rig on screen if the person
+        // asked for one -- and adding the hero's walk to that is the director steering a camera it
+        // does not own: "I have control of the camera and it is still moved by the director".
+        //
+        // ADR-911: unfiltered. The one-pole smoother that sat here (ADR-245's
+        // `aimFollowSmoothingMs`) integrated across frames, so it was not seek-exact, and nothing
+        // could reach it: its constant defaulted to 0 and no file, tool or panel ever set it. It
+        // was removed rather than kept as a knob nobody can turn.
         if (!viewportOwnsFrame_) {
-            scene_.camera.target += delta;
+            scene_.camera.target += *raw;
         }
     }
-    aimFollowPrevTime_ = currentTime_;
 }
 
 // The two halves of the debounce, shared by "a hero followed its object" and "somebody edited one".
@@ -3386,8 +3250,12 @@ std::uint64_t withSignalKey(std::uint64_t key, const entity::ReplaySignalSource*
             mix(static_cast<std::uint64_t>(r.polarity));
             mix(r.enabled ? 1u : 0u);
             mix(bits(r.spatialGain));
+            // ADR-900: the depth changes what a reaction writes, and the delay is chain state.
+            mix(std::hash<std::string>{}(r.depthSource));
+            mix(bits(r.depthMin));
+            mix(bits(r.depthMax));
             const params::ProcessorChain& c = r.chain;
-            for (const float f : {c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
+            for (const float f : {c.delayMs, c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
                                   c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
                                   c.remapInMax, c.remapOutMin, c.remapOutMax}) {
                 mix(bits(f));
@@ -3737,8 +3605,7 @@ Result<void> Composition::setParent(const std::string& name, const std::string& 
 
 // ---- ADR-703: HIST ---------------------------------------------------------------------------------
 
-void Composition::recordHistory(world::HistoryBank& bank, double seconds,
-                                const world::HistoryAutomation* automation) const {
+Transform Composition::rootFold() const {
     // The root fold `applyParameters` and `ReplayPlacement::capture` put every node through, with
     // the same arithmetic, so a played sample and a replayed one are the same number.
     const float rootScale = (rootScale_ != nullptr ? rootScale_->value() : 1.0f) +
@@ -3747,6 +3614,12 @@ void Composition::recordHistory(world::HistoryBank& bank, double seconds,
     root.rotation = glm::angleAxis(rootAngle_, glm::vec3(0.0f, 1.0f, 0.0f));
     root.scale = glm::vec3(rootScale);
     root.position = center_ - root.rotation * (center_ * rootScale);
+    return root;
+}
+
+void Composition::recordHistory(world::HistoryBank& bank, double seconds,
+                                const world::HistoryAutomation* automation) const {
+    const Transform root = rootFold();
     for (std::size_t ring = 0; ring < bank.ringCount(); ++ring) {
         // The node's index, cached in the bank and checked by name: a replay is thirteen thousand
         // steps and a name search of every node at each is not free.
@@ -3769,6 +3642,74 @@ void Composition::recordHistory(world::HistoryBank& bank, double seconds,
         const Transform full = compose(root, local);
         bank.record(ring, seconds, full.position, full.rotation, full.scale);
     }
+}
+
+// ---- ADR-911: the camera's subjects in HIST -----------------------------------------------------------
+
+void Composition::appendCameraHistoryNeeds(std::vector<world::HistorySubscription>& out) const {
+    for (const CameraRig& rig : cameraDirection_.cameras) {
+        if (rig.id == kMainCamera || !rig.readsSubjectHistory()) {
+            continue;
+        }
+        const auto seconds = static_cast<float>(rig.subjectHistorySeconds());
+        if (!rig.followNode.empty()) {
+            out.push_back(world::HistorySubscription{rig.followNode, seconds});
+        }
+        // The aim reads the reference at t, never at t - lag: it needs the kernel's reach only. The
+        // bank merges the two when the nodes are one, keeping the deeper.
+        if (!rig.aimNode.empty() && (rig.followSmoothSeconds > 0.0 || rig.followVerticalSmoothSeconds > 0.0)) {
+            CameraRig aimOnly = rig;
+            aimOnly.followLagSeconds = 0.0;
+            out.push_back(world::HistorySubscription{rig.aimNode, static_cast<float>(aimOnly.subjectHistorySeconds())});
+        }
+    }
+}
+
+world::HistorySample Composition::subjectHead(const CompositionNode& node) const {
+    const Transform full = compose(rootFold(), nodeWorldTransform(node));
+    world::HistorySample head;
+    head.t = currentTime_;
+    head.position = full.position;
+    head.rotation = full.rotation;
+    head.scale = full.scale;
+    return head;
+}
+
+std::size_t Composition::subjectRing(const std::string& node, bool needed) const {
+    if (historyBank_ == nullptr) {
+        if (needed && std::ranges::find(cameraHistoryMissing_, node) == cameraHistoryMissing_.end()) {
+            cameraHistoryMissing_.push_back(node);
+            log::warn("camera: a rig smooths or lags '{}' but this composition has no transform history "
+                      "(HIST) attached, so it follows the raw node",
+                      node);
+        }
+        return 0;
+    }
+    const std::size_t ring = historyBank_->find(node);
+    if (ring >= historyBank_->ringCount() && needed &&
+        std::ranges::find(cameraHistoryMissing_, node) == cameraHistoryMissing_.end()) {
+        cameraHistoryMissing_.push_back(node);
+        log::warn("camera: a rig smooths or lags '{}' but HIST records no history for it (the host did "
+                  "not subscribe `appendCameraHistoryNeeds`), so it follows the raw node",
+                  node);
+    }
+    return ring;
+}
+
+void Composition::holdRigsForCut() {
+    for (SkinnedRig& rig : scene_.rigs) {
+        rig.hold();
+    }
+}
+
+void Composition::markCameraCut() {
+    if (cameraCutThisFrame_) {
+        return; // the frame is a cut already, and its rigs are held
+    }
+    cameraCutThisFrame_ = true;
+    ++cameraCutSerial_;
+    scene_.camera.cutSerial = cameraCutSerial_;
+    holdRigsForCut();
 }
 
 Transform Composition::automatedWorldTransform(const CompositionNode& node, const world::HistoryAutomation& automation,
@@ -4343,10 +4284,23 @@ void MaterialPartParameters::apply(Material& material) const {
             material.emissiveIntensity = 1.0f;
         }
     }
-    if (emissiveGain != nullptr) material.emissiveIntensity *= emissiveGain->value();
+    // `emissiveGain` is not applied here since ADR-903: it is the part's emission lane, after the
+    // material program (see `partEmissiveGain`), because a multiplier on `emissiveIntensity` is
+    // discarded by a program that writes emission (ADR-179).
     if (roughnessScale != nullptr) material.roughness = std::clamp(material.roughness * roughnessScale->value(), 0.0f, 1.0f);
     if (opacityScale != nullptr) material.opacity = std::clamp(material.opacity * opacityScale->value(), 0.0f, 1.0f);
 }
+
+namespace {
+// ADR-903: part `index`'s `emissiveGain` (procedural/<node>/parts/<index>/emissiveGain), or 1 for a
+// node whose parts carry no parameters. It multiplies the part's emission lane with the node's boost.
+float partEmissiveGain(const CompositionNode& node, std::size_t index) {
+    if (index < node.materialPartParams.size() && node.materialPartParams[index].emissiveGain != nullptr) {
+        return node.materialPartParams[index].emissiveGain->value();
+    }
+    return 1.0f;
+}
+} // namespace
 
 float Composition::fitDistance() const {
     return radius_ / std::tan(kFitFovRadians * 0.5f) * 1.15f;
@@ -4500,6 +4454,14 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     brightness_ = &params.add(floatDesc(prefix_ + "scene/brightness", 1.0f, 0.0f, 8.0f, 0.0f, 3.0f));
     stylized_ = &params.add(boolDesc(prefix_ + "scene/stylized", stylizedSetting_));
     keyLight_ = &params.add(floatDesc(prefix_ + "scene/keyLight", 1.0f, 0.0f, 10.0f, 0.0f, 3.0f));
+    // ADR-905: the light a glowing ecology casts on what grows around it (ADR-053), as a parameter.
+    // The file's `ecologyLight` is its default; the per-frame pass reads the final, so a route or a
+    // key moves the light the mushrooms throw with the mushrooms. 0 makes no lights at all.
+    {
+        params::ParamDesc<float> d = floatDesc(prefix_ + "scene/ecologyLight", ecologyLightGain_, 0.0f, 50.0f, 0.0f, 4.0f);
+        d.label = "light cast by glowing plants and fungi"; // what it looks like: pools on the ground
+        ecologyLight_ = &params.add(std::move(d));
+    }
     // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only
     // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
     // active() is false", reading the gate as speed alone, which is how a field nobody could switch
@@ -5207,8 +5169,12 @@ void Composition::registerNodeParameters(CompositionNode& node) {
     node.scaleParam =
         &params_->add(vec3Desc(base + "scale", node.transform.scale, 0.001f, 100.0f, 0.01f, 5.0f));
     node.visibleParam = &params_->add(boolDesc(base + "visible", node.visible));
-    node.emissiveParam =
-        &params_->add(floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f));
+    {
+        // ADR-903: the node's glow, after any material program, on everything it draws.
+        params::ParamDesc<float> d = floatDesc(base + "emissiveBoost", node.emissiveBoost, 0.0f, 50.0f, 0.0f, 8.0f);
+        d.label = "glow boost";
+        node.emissiveParam = &params_->add(std::move(d));
+    }
     node.roughnessParam =
         &params_->add(floatDesc(base + "roughnessScale", node.roughnessScale, 0.0f, 2.0f, 0.0f, 2.0f));
     // ADR-385: the whole-node fade. Hard range [0,1] so nothing can ramp it past opaque.
@@ -5292,6 +5258,35 @@ void Composition::registerNodeParameters(CompositionNode& node) {
         node.sdfParams = registerSdfParameters(*params_, node.sdfRest, "sdf/" + sanitise(prefix_) + node.name + "/");
     }
     if (node.kind == NodeKind::Terrain) {
+        // ADR-905: every scatter layer's emission lane, by the layer's name. The gain and hue act
+        // after the material program on every part of the layer, so they reach the mushrooms that
+        // `glowmereTissue` lights as surely as a plain emissive layer; the field amount is the
+        // depth of the layer's `emissiveField`. Stable names -- a layer added in front of "fungi"
+        // does not move what `scatter/fungi/emissionGain` means.
+        // Labelled for what a viewer sees rather than what the lane is called: the panel shows
+        // "<terrain> / scatter / fungi" as the heading, then "glow", "hue shift" and "light wave".
+        node.scatterParams.clear();
+        const auto labelled = [](params::ParamDesc<float> d, const char* label) {
+            d.label = label;
+            return d;
+        };
+        for (const world::ScatterLayer& layer : node.ecology.layers) {
+            const std::string s = base + "scatter/" + layer.name + "/";
+            CompositionNode::ScatterLayerParameters p;
+            p.emissionGain = &params_->add(
+                labelled(floatDesc(s + "emissionGain", layer.emissionGain, 0.0f, 50.0f, 0.0f, 4.0f), "glow"));
+            // Turns of hue. The soft range is half a turn each way; the hard range lets a key spin it.
+            p.hueOffset = &params_->add(
+                labelled(floatDesc(s + "hueOffset", layer.hueOffset, -4.0f, 4.0f, -0.5f, 0.5f), "hue shift"));
+            // The depth of the layer's `emissiveField`: how strongly a travelling ring (or any field)
+            // lights the layer as it passes.
+            p.emissiveFieldAmount = &params_->add(labelled(
+                floatDesc(s + "emissiveFieldAmount", layer.emissiveFieldAmount, 0.0f, 100.0f, 0.0f, 8.0f),
+                "light wave"));
+            node.scatterParams.push_back(p);
+        }
+    }
+    if (node.kind == NodeKind::Terrain) {
         // Four knobs, all of them for looking at the thing rather than art-directing it: turn LOD
         // off to see whether a shading artefact is a level boundary, turn culling off to see what
         // culling was removing, and pull the two distances to find where the budget goes.
@@ -5342,11 +5337,76 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             &params_->add(vec3Desc(base + "water/shallowColor", w.shallowColor, 0.0f, 8.0f, 0.0f, 1.0f));
         node.waterDeepColorParam =
             &params_->add(vec3Desc(base + "water/deepColor", w.deepColor, 0.0f, 8.0f, 0.0f, 1.0f));
+        // ADR-916: the tears, every one of them a control, under their own heading -- the Parameters
+        // panel shows "<terrain>/water/tears", the World panel's Inspector "tears/..." under "water" --
+        // each labelled for what it does to the picture.
+        //
+        // The amount, shear and coverage are routable. Past its first quarter the amount only adds
+        // slope along the seams, so a fast route (audio.bass, say) flashes them and moves nothing
+        // (below it the shear grows in with it); the shear and the coverage move the ripples inside a
+        // seam as they change, so they want slow chains (a second or more). The other seven refuse
+        // routes: WaterSettings says why.
+        {
+            const std::string t = base + "water/tears/";
+            const auto control = [](auto desc, const char* label, bool routable) {
+                desc.label = label;
+                desc.flags.modulatable = routable;
+                return desc;
+            };
+            CompositionNode::WaterTearParameters& p = node.waterTearParams;
+            p.amount = &params_->add(control(floatDesc(t + "amount", w.tears, 0.0f, 20.0f, 0.0f, 2.0f), "amount", true));
+            p.shear = &params_->add(control(floatDesc(t + "shear", w.tearShear, 0.0f, 8.0f, 0.0f, 8.0f), "shear (m)", true));
+            p.coverage = &params_->add(
+                control(floatDesc(t + "coverage", w.tearCoverage, 0.0f, 1.0f, 0.0f, 1.0f), "coverage", true));
+            p.cell = &params_->add(
+                control(floatDesc(t + "cell", w.tearCell, 0.05f, 50.0f, 0.3f, 6.0f), "step size (m)", false));
+            p.spacing = &params_->add(
+                control(floatDesc(t + "spacing", w.tearSpacing, 0.1f, 2000.0f, 2.0f, 120.0f), "spacing (m)", false));
+            p.stretch = &params_->add(
+                control(floatDesc(t + "stretch", w.tearStretch, 0.25f, 20.0f, 0.5f, 8.0f), "stretch", false));
+            p.followWind =
+                &params_->add(control(boolDesc(t + "followWind", w.tearFollowsWind), "follow the wind", false));
+            p.direction = &params_->add(control(floatDesc(t + "direction", w.tearAngle, -6.2832f, 6.2832f, -3.1416f, 3.1416f),
+                                                "direction (radians, if not following the wind)", false));
+            p.drift = &params_->add(
+                control(floatDesc(t + "drift", w.tearDrift, -20.0f, 20.0f, -2.0f, 2.0f), "drift (m per second)", false));
+            p.wind = &params_->add(
+                control(floatDesc(t + "wind", w.tearWind, 0.0f, 1.0f, 0.0f, 1.0f), "wind (gusts tighten the seams)", false));
+        }
     }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
     }
 }
+
+namespace {
+
+// Every cached water parameter pointer of a terrain node, in one place, for the two paths that have to
+// drop them all: an unregister and a detach. They were two hand-kept lists of seven, and both missed
+// ADR-350's ten -- `detach` then left ten pointers into a set the composition had left, which the next
+// `updateWaterSurfaces` read.
+void nullWaterParameters(CompositionNode& node) {
+    node.waterGlowParam = nullptr;
+    node.waterSparkleParam = nullptr;
+    node.waterRippleParam = nullptr;
+    node.waterFlowSpeedParam = nullptr;
+    node.waterSwellParam = nullptr;
+    node.waterFoamParam = nullptr;
+    node.waterGlowColorParam = nullptr;
+    node.waterClarityParam = nullptr;
+    node.waterMaxOpacityParam = nullptr;
+    node.waterFresnelParam = nullptr;
+    node.waterReflectionParam = nullptr;
+    node.waterRoughnessParam = nullptr;
+    node.waterRefractionParam = nullptr;
+    node.waterRippleScaleParam = nullptr;
+    node.waterShallowDepthParam = nullptr;
+    node.waterShallowColorParam = nullptr;
+    node.waterDeepColorParam = nullptr;
+    node.waterTearParams = {};
+}
+
+} // namespace
 
 void Composition::unregisterNodeParameters(CompositionNode& node) {
     if (params_ != nullptr) {
@@ -5388,24 +5448,38 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
             node.windFlutterParam = nullptr;
             node.windLagParam = nullptr;
         }
+        // ADR-905: the scatter layers' lanes, by the exact paths they were registered at.
+        for (const CompositionNode::ScatterLayerParameters& p : node.scatterParams) {
+            for (const params::IParameter* parameter :
+                 std::array<const params::IParameter*, 3>{p.emissionGain, p.hueOffset, p.emissiveFieldAmount}) {
+                if (parameter != nullptr) {
+                    const std::string path = parameter->path(); // copied: remove() destroys the owner
+                    params_->remove(path);
+                }
+            }
+        }
+        node.scatterParams.clear();
         if (node.kind == NodeKind::Terrain) {
+            // ADR-350's ten were registered and never on this list, so a removed terrain node left
+            // them behind and a node re-added under the same name was handed the dead one's values
+            // (`ParameterSet::add` returns an existing path as it is). test_water_parameters.cpp
+            // sweeps every `water/` path rather than naming these, so the next one is caught too.
             for (const char* suffix :
                  {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance",
                   "water/glow", "water/sparkle", "water/ripple", "water/flowSpeed", "water/swell",
-                  "water/foam", "water/glowColor"}) {
+                  "water/foam", "water/glowColor", "water/clarity", "water/maxOpacity", "water/fresnel",
+                  "water/reflection", "water/roughness", "water/refraction", "water/rippleScale",
+                  "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/tears/amount",
+                  "water/tears/shear", "water/tears/coverage", "water/tears/cell", "water/tears/spacing",
+                  "water/tears/stretch", "water/tears/followWind", "water/tears/direction",
+                  "water/tears/drift", "water/tears/wind"}) {
                 params_->remove(base + suffix);
             }
             node.terrainLodParam = nullptr;
             node.terrainCullParam = nullptr;
             node.terrainLodDistanceParam = nullptr;
             node.terrainViewDistanceParam = nullptr;
-            node.waterGlowParam = nullptr;
-            node.waterSparkleParam = nullptr;
-            node.waterRippleParam = nullptr;
-            node.waterFlowSpeedParam = nullptr;
-            node.waterSwellParam = nullptr;
-            node.waterFoamParam = nullptr;
-            node.waterGlowColorParam = nullptr;
+            nullWaterParameters(node);
         }
         forEachParticleParam(node.particleParams, [&](auto* p) {
             if (p != nullptr) {
@@ -5508,15 +5582,10 @@ void Composition::detach() {
         node->terrainCullParam = nullptr;
         node->terrainLodDistanceParam = nullptr;
         node->terrainViewDistanceParam = nullptr;
-        node->waterGlowParam = nullptr;
-        node->waterSparkleParam = nullptr;
-        node->waterRippleParam = nullptr;
-        node->waterFlowSpeedParam = nullptr;
-        node->waterSwellParam = nullptr;
-        node->waterFoamParam = nullptr;
-        node->waterGlowColorParam = nullptr;
+        nullWaterParameters(*node);
         node->particleParams = {};
         node->materialPartParams.clear(); // see the note at the end of this function
+        node->scatterParams.clear();      // ADR-905, and for the same reason
         if (node->child) {
             node->child->detach();
         }
@@ -5594,6 +5663,7 @@ void Composition::detach() {
     fogSky_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
+    ecologyLight_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
     rootRotationSpeed_ = nullptr;
@@ -5725,6 +5795,24 @@ bool Composition::nodeVisible(const CompositionNode& node) const {
         n = findNode(n->parent);
     }
     return true;
+}
+
+float Composition::nodeEmissiveBoost(const CompositionNode& node) const {
+    float boost = node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
+    // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
+    // Multiplying the boost rather than replacing it is what keeps the authored per-layer
+    // intensities independently controllable, which the brief asks for explicitly.
+    if (dayNight_.enabled) {
+        const auto named = [&node](const std::vector<std::string>& names) {
+            return std::find(names.begin(), names.end(), node.name) != names.end();
+        };
+        if (named(dayNight_.starNodes)) {
+            boost *= dayNightState_.starBrightness;
+        } else if (named(dayNight_.glowNodes)) {
+            boost *= dayNightState_.glowScale;
+        }
+    }
+    return boost;
 }
 
 void Composition::ensureBuilt() {
@@ -6144,7 +6232,6 @@ void Composition::rebuild() {
                 e.visible = visible && src.visible;
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
-                range.restEmissive.push_back(src.material.emissiveIntensity);
                 range.restRoughness.push_back(src.material.roughness);
             }
             range.firstLight = scene_.lights.size();
@@ -6178,7 +6265,6 @@ void Composition::rebuild() {
             orb.transform = nodeT;
             orb.visible = visible;
             range.restTransforms.emplace_back();
-            range.restEmissive.push_back(orb.material.emissiveIntensity);
             range.restRoughness.push_back(orb.material.roughness);
             break;
         }
@@ -6196,7 +6282,6 @@ void Composition::rebuild() {
             grid.transform = nodeT;
             grid.visible = visible;
             range.restTransforms.emplace_back();
-            range.restEmissive.push_back(0.0f);
             range.restRoughness.push_back(0.5f);
             break;
         }
@@ -6315,17 +6400,18 @@ void Composition::rebuild() {
             // new kind of drawable.
             std::vector<world::GlowCluster> nodeGlow;
             std::unordered_map<std::string, std::shared_ptr<spatial::PointCloud>> habitats;
-            // Everything this terrain produces is a pure function of these six -- the water settings
+            // Everything this terrain produces is a pure function of these five -- the water settings
             // among them since ADR-099, because the surface mesh bakes its flow lanes into the
             // vertices, so a flow an author retunes has to move the key. A rebuild caused by
             // anything else -- a node placed, a material program added, an HDR swapped -- reuses
             // what the last one made (ADR-092); a change to any of them moves the key and the
-            // terrain is built again, with nothing to remember to invalidate.
+            // terrain is built again, with nothing to remember to invalidate. The ecology light's
+            // gain is not one of them since ADR-905: it is a per-frame parameter, and the glow it
+            // scales is reduced whether or not it is zero.
             CompositionNode& mutableNode = *nodePtr;
             const std::uint64_t terrainKey =
                 node.worldMap.structuralHash() ^ (node.terrain.structuralHash() * 0x9E3779B97F4A7C15ull) ^
                 (node.ecology.structuralHash() * 0xC2B2AE3D27D4EB4Full) ^
-                (static_cast<std::uint64_t>(ecologyLightGain_ * 1024.0f) * 0x165667B19E3779F9ull) ^
                 (static_cast<std::uint64_t>(ecologyGlowCell_ * 1024.0f) * 0x27D4EB2F165667C5ull) ^
                 (node.waterFlow.structuralHash() * 0x85EBCA77C2B2AE63ull);
             // AVGEN_NO_TERRAIN_CACHE=1 turns the reuse off, so the claim "placing a node used to
@@ -6460,6 +6546,13 @@ void Composition::rebuild() {
                     pg.material.program = prefixed(sanitise(prefix_), layer.materialProgram);
                 }
                 pg.materialVariation.perceptualHue = true;
+                // ADR-905: the layer's emission lane. Its authored values are the starting point; the
+                // per-frame pass writes the parameters' finals over them (applyParameters), and the
+                // field name carries the prefix every other reference in this scene does.
+                pg.emissionGain = layer.emissionGain;
+                pg.emissionHue = layer.hueOffset;
+                pg.emissiveField = prefixed(sanitise(prefix_), layer.emissiveField);
+                pg.emissiveFieldAmount = layer.emissiveFieldAmount;
                 // ADR-055: how this species answers the wind, straight through. Nothing else in the
                 // scatter path changes -- Tier 0 is a vertex-stage deformation over instances that
                 // already exist, so there is no new buffer, no new pass and no new draw.
@@ -6485,9 +6578,15 @@ void Composition::rebuild() {
                         pg.sourceTransform.scale = glm::vec3(layer.height / authored);
                     }
                 }
-                if (layer.emissiveIntensity > 0.0f && ecologyLightGain_ > 0.0f && !reuseTerrain) {
+                // Reduced whenever the layer emits, whatever `scene/ecologyLight` is: the gain is a
+                // parameter (ADR-905) and a route may raise it from zero, which a light that was
+                // never built cannot answer. A gain of zero makes no lights (updateEcologyLights).
+                if (layer.emissiveIntensity > 0.0f && !reuseTerrain) {
                     auto clusters = world::aggregateGlow(*cloud, layer, ecologyGlowCell_,
                                                          pg.variation.seed);
+                    for (world::GlowCluster& cluster : clusters) {
+                        cluster.layer = static_cast<std::uint32_t>(layerIndex - 1);
+                    }
                     log::info("terrain '{}': scatter '{}' glow reduced to {} emitters", node.name,
                               layer.name, clusters.size());
                     nodeGlow.insert(nodeGlow.end(), clusters.begin(), clusters.end());
@@ -6521,6 +6620,8 @@ void Composition::rebuild() {
                     }
                     subs.push_back(std::move(sub));
                 }
+                range.ecologyLayers.push_back(
+                    {layerIndex - 1, scene_.procedurals.size(), 1 + subs.size()});
                 scene_.procedurals.push_back(std::move(pg));
                 for (ProceduralGeometry& sub : subs) {
                     scene_.procedurals.push_back(std::move(sub));
@@ -6674,7 +6775,6 @@ void Composition::rebuild() {
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();
-                range.restEmissive.push_back(node.terrainMaterial.emissiveIntensity);
                 range.restRoughness.push_back(node.terrainMaterial.roughness);
             }
             // Water second, so it draws after the ground it sits in: the surface is translucent at
@@ -6700,7 +6800,6 @@ void Composition::rebuild() {
                 e.transform = nodeT;
                 e.visible = visible;
                 range.restTransforms.emplace_back();
-                range.restEmissive.push_back(0.0f);
                 range.restRoughness.push_back(node.terrain.water.roughness);
             }
             // ADR-099: every water body's centreline, published as a scene spline named
@@ -6944,7 +7043,6 @@ void Composition::rebuild() {
                 e.visible = visible && src.visible;
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
-                range.restEmissive.push_back(src.material.emissiveIntensity);
                 range.restRoughness.push_back(src.material.roughness);
             }
             for (const PunctualLight& src : cs.lights) {
@@ -7213,6 +7311,7 @@ void Composition::update(const FrameTime& time) {
     if (cameraOrbitSpeed_ != nullptr) {
         cameraAngle_ += cameraOrbitSpeed_->value() * dt;
     }
+    cameraCutThisFrame_ = false; // ADR-912: `applyParameters` says whether this frame is a cut
     applyParameters();
     // ADR-346: after `applyParameters`, not before it. The day/night cycle asks for the map swap
     // from inside that call, so resolving first meant the swap landed a frame late -- and in a
@@ -7224,9 +7323,6 @@ void Composition::update(const FrameTime& time) {
     // After the parameters, because a node's position is one of them: a hero follows the object it
     // describes, and where that object is has only just been decided for this frame.
     syncHeroesToNodes();
-    // The chase trails, recorded at the same moment and for the same reason: this is the frame at
-    // which where a node *is* has stopped being a question.
-    recordFollowTrails();
     // And after *that*, because the aim follows where the hero is now. Putting it inside
     // `applyParameters` would have aimed at last frame's position, which is a lag nobody would ever
     // see and a wrongness anybody could later trip over.
@@ -7236,6 +7332,10 @@ void Composition::update(const FrameTime& time) {
     // frame's -- a raft that has moved out of frame must be culled on where it is now.
     updateFloaters(time.renderTime);
     updateCharacters(time);
+    // ADR-912: after the rigs are posed, so a cut's frame draws no joint motion across it either.
+    if (cameraCutThisFrame_) {
+        holdRigsForCut();
+    }
     cullEntityNodes();
 }
 
@@ -7456,6 +7556,24 @@ CameraPose Composition::evaluateMainCamera() const {
     return pose;
 }
 
+namespace {
+
+// ADR-911: the terrain a walking subject stands on, for `CameraRig::followGround` -- the navigator's
+// ground (`WorldMap::height`), which is what entities are grounded on.
+class TerrainFollowGround final : public FollowGround {
+public:
+    explicit TerrainFollowGround(const world::TerrainQuery& terrain) : terrain_(terrain) {}
+    [[nodiscard]] float heightAt(glm::vec2 xz) const override { return terrain_.heightAt(xz); }
+
+private:
+    const world::TerrainQuery& terrain_;
+};
+
+// The surface the clearance floor stands on: water or ground, whichever is higher.
+float clearanceSurfaceAt(const world::TerrainQuery& terrain, glm::vec2 xz) { return terrain.surfaceAt(xz); }
+
+} // namespace
+
 CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const CameraChannels* channels) const {
     CameraPose pose;
     // The parameters when the composition is attached, the authored bases when it is not: the same
@@ -7484,51 +7602,80 @@ CameraPose Composition::evaluateAuthoredCamera(const CameraRig& rig, const Camer
         // A spline camera whose spline is not in the scene falls back to its free pose rather than
         // to the origin: a camera that silently jumps to (0,0,0) is a bug that looks like a cut.
     }
-    // A camera that watches something: resolved against where that node is *now*, which is what
-    // lets one camera cover an event that moves. The node not being there leaves the channels in
-    // charge rather than sending the camera to the origin.
+    // A camera that watches something: resolved against where that node is, which is what lets one
+    // camera cover an event that moves. The node not being there leaves the channels in charge
+    // rather than sending the camera to the origin.
+    //
+    // ADR-911: "where that node is" is the rig's subject REFERENCE -- the node's own past (HIST)
+    // through the rig's kernel, a pure function of the history, so a scrub lands where a play does.
+    // With every knob at 0 it is the node at this instant, exactly as before. The eye reads it at
+    // t - lag and the aim at t, and when the two nodes are one node they read one reference: an eye
+    // filtered differently from its aim is a nod.
+    FollowFilter filter;
+    filter.horizontalSeconds = rig.followSmoothSeconds;
+    filter.verticalSeconds = rig.followVerticalSmoothSeconds;
+    filter.headingSeconds = rig.followLocal ? rig.followHeadingSmoothSeconds : 0.0;
+    filter.lead = rig.followLead;
+    filter.ground = rig.followGround;
+    // The ground is read only by a rig that asks for it: `followGround`, or a clearance floor.
+    const world::TerrainQuery terrain =
+        (rig.followGround || rig.followClearance > 0.0f) ? terrainQuery() : world::TerrainQuery{};
+    const TerrainFollowGround ground(terrain);
+    const FollowGround* groundPtr = terrain.valid() && rig.followGround ? &ground : nullptr;
+    const bool smooths = rig.followSmoothSeconds > 0.0 || rig.followVerticalSmoothSeconds > 0.0;
+    // The follow node's reference at t, when the eye read it there: the aim of a rig that aims at
+    // what it follows is the same number, and need not run the kernel twice.
+    std::optional<glm::vec3> followReferenceNow;
+
     if (!rig.followNode.empty()) {
         if (const CompositionNode* node = findNode(rig.followNode); node != nullptr) {
-            const Transform now = nodeWorldTransform(*node);
-            // Where the subject is, or -- for a chase -- where it was. Both the position and the
-            // facing come from the same instant, so a camera behind a turning subject stays behind
-            // the heading it had then rather than snapping to the one it has now.
-            FollowTrail::Sample at{.seconds = currentTime_,
-                                   .position = now.position,
-                                   .rotation = now.rotation};
-            if (rig.followLagSeconds > 0.0) {
-                at = followTrailAt(rig.followNode, currentTime_ - rig.followLagSeconds, at);
+            const bool needsHistory = rig.readsSubjectHistory();
+            const SubjectTrail trail(historyBank_, subjectRing(rig.followNode, needsHistory), currentTime_,
+                                     subjectHead(*node));
+            const FollowReference ref =
+                followReference(trail, currentTime_ - std::max(rig.followLagSeconds, 0.0), filter, groundPtr);
+            if (!(rig.followLagSeconds > 0.0)) {
+                followReferenceNow = ref.position;
             }
             // World axes by default, which is every rig that existed before this; the subject's own
-            // frame when asked, which is what makes "behind" mean behind.
+            // frame when asked, which is what makes "behind" mean behind. ADR-911: its HEADING --
+            // the yaw alone, kernel-filtered -- not its drawn rotation, which also carries the sway,
+            // the nod and the slope tilt, and swung the camera through all three.
             const glm::vec3 authored =
                 channels != nullptr && channels->followOffset != nullptr ? channels->followOffset->value() : rig.followOffset;
-            const glm::vec3 offset = rig.followLocal ? at.rotation * authored : authored;
-            pose.position = at.position + offset;
+            const glm::vec3 offset =
+                rig.followLocal ? glm::angleAxis(ref.heading, glm::vec3(0.0f, 1.0f, 0.0f)) * authored : authored;
+            pose.position = ref.position + offset;
 
-            // The whole of camera collision: keep the eye above the surface. Applied after the
-            // offset rather than to the subject, because it is the camera that hits the hill.
+            // The whole of camera collision: keep the eye above the surface. Applied to the filtered
+            // eye, after the offset, because it is the camera that hits the hill.
             //
             // `surfaceAt` rather than `heightAt`, so the camera does not dive through a lake on its
             // way round a shoreline -- a shot from under water is a decision, not a side effect of
-            // chasing something downhill.
-            if (rig.followClearance > 0.0f) {
-                const world::TerrainQuery ground = terrainQuery();
-                if (ground.valid()) {
-                    const float floorY =
-                        ground.surfaceAt(glm::vec2(pose.position.x, pose.position.z)) +
-                        rig.followClearance;
-                    // Raised, never lowered. A clearance is a floor; a camera legitimately above
-                    // the hill it is crossing must not be dragged down onto it.
-                    pose.position.y = std::max(pose.position.y, floorY);
-                }
+            // chasing something downhill. ADR-911: a softplus rather than a `max`, so the eye's
+            // vertical velocity does not step where the floor takes hold or lets go.
+            if (rig.followClearance > 0.0f && terrain.valid()) {
+                const float floorY = clearanceSurfaceAt(terrain, glm::vec2(pose.position.x, pose.position.z)) +
+                                     rig.followClearance;
+                pose.position.y = softFloor(pose.position.y, floorY);
             }
         }
     }
     if (!rig.aimNode.empty()) {
         if (const CompositionNode* node = findNode(rig.aimNode); node != nullptr) {
-            pose.target = nodeWorldTransform(*node).position +
-                          (channels != nullptr && channels->aimOffset != nullptr ? channels->aimOffset->value() : rig.aimOffset);
+            glm::vec3 subject = subjectHead(*node).position;
+            if (smooths && followReferenceNow && rig.aimNode == rig.followNode) {
+                subject = *followReferenceNow;
+            } else if (smooths) {
+                // The aim reads the same kernel at t. Its heading is never used.
+                FollowFilter aim = filter;
+                aim.headingSeconds = 0.0;
+                const SubjectTrail trail(historyBank_, subjectRing(rig.aimNode, true), currentTime_,
+                                         subjectHead(*node));
+                subject = followReference(trail, currentTime_, aim, groundPtr).position;
+            }
+            pose.target = subject + (channels != nullptr && channels->aimOffset != nullptr ? channels->aimOffset->value()
+                                                                                             : rig.aimOffset);
         }
     }
     ensureDistinctAim(pose);
@@ -7689,29 +7836,16 @@ void Composition::applyParameters() {
         // (the simulation and HIST keep reading `nodeWorldTransform`; see `setEffectOffsets`).
         const Transform nodeT = nodeDrawnWorldTransform(node);
         bool visible = nodeVisible(node);
-        bool dayNightVisibleOverride = true;
-        float emissiveBoost =
-            node.emissiveParam != nullptr ? node.emissiveParam->value() : node.emissiveBoost;
-        // ADR-343: the cycle scales the nodes the scene named as stars and as Glowmere layers.
-        // Multiplying the boost rather than replacing it is what keeps the authored per-layer
-        // intensities independently controllable, which the brief asks for explicitly.
-        if (dayNight_.enabled) {
-            const auto named = [&node](const std::vector<std::string>& names) {
-                return std::find(names.begin(), names.end(), node.name) != names.end();
-            };
-            if (named(dayNight_.starNodes)) {
-                emissiveBoost *= dayNightState_.starBrightness;
-                // A star that has been faded to zero emission is not gone -- it is still geometry,
-                // and its base colour is black, so at noon the sky filled with small DARK squares
-                // instead of with nothing. Scaling emission is how a star dims; hiding it is how a
-                // star sets. Seen in a frame; no number in the cycle table showed it.
-                if (dayNightState_.starBrightness <= 1e-3f) {
-                    dayNightVisibleOverride = false;
-                }
-            } else if (named(dayNight_.glowNodes)) {
-                emissiveBoost *= dayNightState_.glowScale;
-            }
-            visible = visible && dayNightVisibleOverride;
+        // ADR-903: the boost every drawable of this node takes after its material program.
+        const float emissiveBoost = nodeEmissiveBoost(node);
+        // A star that has been faded to zero emission is not gone -- it is still geometry, and its
+        // base colour is black, so at noon the sky filled with small DARK squares instead of with
+        // nothing. Scaling emission is how a star dims; hiding it is how a star sets. Seen in a
+        // frame; no number in the cycle table showed it.
+        if (dayNight_.enabled && dayNightState_.starBrightness <= 1e-3f &&
+            std::find(dayNight_.starNodes.begin(), dayNight_.starNodes.end(), node.name) !=
+                dayNight_.starNodes.end()) {
+            visible = false;
         }
         const float roughnessScale =
             node.roughnessParam != nullptr ? node.roughnessParam->value() : node.roughnessScale;
@@ -7753,7 +7887,6 @@ void Composition::applyParameters() {
             // Nested parameters moved the child's entities: take its current state as the rest.
             for (std::size_t k = 0; k < range.entityCount; ++k) {
                 range.restTransforms[k] = child->entities[k].transform;
-                range.restEmissive[k] = child->entities[k].material.emissiveIntensity;
                 range.restRoughness[k] = child->entities[k].material.roughness;
             }
         }
@@ -7762,8 +7895,12 @@ void Composition::applyParameters() {
             Entity& e = scene_.entities[range.firstEntity + k];
             e.transform = compose(full, range.restTransforms[k]);
             e.visible = visible && (child == nullptr || child->entities[k].visible);
+            // ADR-903: the boost is the entity's emission lane, applied by the shader after any
+            // material program -- not a multiplier on `emissiveIntensity`, which a program that
+            // asserts emission discards (ADR-179). A nested scene's entity keeps its own node's
+            // boost and takes this one on top.
+            e.emissionGain = (child != nullptr ? child->entities[k].emissionGain : 1.0f) * emissiveBoost;
             if (e.style == MeshStyle::Lit) {
-                e.material.emissiveIntensity = range.restEmissive[k] * emissiveBoost;
                 e.material.roughness = std::clamp(range.restRoughness[k] * roughnessScale, 0.0f, 1.0f);
             }
             if (fading) {
@@ -7847,11 +7984,51 @@ void Composition::applyParameters() {
                 sub.distributionTransform =
                     Transform::fromMatrix(full.matrix() * sub.distributionTransform.matrix());
                 sub.visible = sub.visible && visible;
+                // ADR-903: the node's boost and this part's own gain, after the program.
+                sub.emissionGain = emissiveBoost * partEmissiveGain(node, k + 1);
+                sub.emissionHue = 0.0f;
             }
             if (!node.materialPartParams.empty()) {
                 node.materialPartParams[0].apply(pg.material);
             }
+            pg.emissionGain = emissiveBoost * partEmissiveGain(node, 0);
+            pg.emissionHue = 0.0f;
             // generated by rebuildProcedurals() once every object and spline has its finals
+        }
+        // ADR-905: a terrain's scatter layers. Each layer's gain and hue -- its parameters' finals,
+        // or the file's values for a composition nobody attached -- ride on the terrain's own boost,
+        // and reach every part of the layer.
+        if (node.kind == NodeKind::Terrain) {
+            // The bases back into the layers, as the node's own values are above, so a save keeps
+            // what the user set. None of the three is structural, so this moves no terrain key.
+            for (std::size_t l = 0; l < node.scatterParams.size() && l < node.ecology.layers.size(); ++l) {
+                const CompositionNode::ScatterLayerParameters& p = node.scatterParams[l];
+                world::ScatterLayer& layer = node.ecology.layers[l];
+                if (p.emissionGain != nullptr) layer.emissionGain = p.emissionGain->base();
+                if (p.hueOffset != nullptr) layer.hueOffset = p.hueOffset->base();
+                if (p.emissiveFieldAmount != nullptr) layer.emissiveFieldAmount = p.emissiveFieldAmount->base();
+            }
+            for (const NodeRange::EcologyLayerRun& run : range.ecologyLayers) {
+                if (run.layer >= node.ecology.layers.size()) {
+                    continue;
+                }
+                const world::ScatterLayer& layer = node.ecology.layers[run.layer];
+                const CompositionNode::ScatterLayerParameters* p =
+                    run.layer < node.scatterParams.size() ? &node.scatterParams[run.layer] : nullptr;
+                const auto value = [](const params::Parameter<float>* q, float authored) {
+                    return q != nullptr ? q->value() : authored;
+                };
+                const float gain = value(p != nullptr ? p->emissionGain : nullptr, layer.emissionGain);
+                const float hue = value(p != nullptr ? p->hueOffset : nullptr, layer.hueOffset);
+                const float field =
+                    value(p != nullptr ? p->emissiveFieldAmount : nullptr, layer.emissiveFieldAmount);
+                for (std::size_t q = run.first; q < run.first + run.count && q < scene_.procedurals.size(); ++q) {
+                    ProceduralGeometry& part = scene_.procedurals[q];
+                    part.emissionGain = emissiveBoost * gain;
+                    part.emissionHue = hue;
+                    part.emissiveFieldAmount = field;
+                }
+            }
         }
         if (node.kind == NodeKind::Spline && range.splineIndex >= 0 &&
             static_cast<std::size_t>(range.splineIndex) < scene_.splines.splines.size()) {
@@ -7877,6 +8054,7 @@ void Composition::applyParameters() {
             prefixFieldReferences(so, sanitise(prefix_));
             so.transform = compose(full, so.transform);
             so.visible = so.visible && visible;
+            so.emissionGain = emissiveBoost; // ADR-903
         }
         if (node.kind == NodeKind::Field && range.fieldIndex >= 0 &&
             static_cast<std::size_t>(range.fieldIndex) < scene_.fields.fields.size()) {
@@ -7901,6 +8079,9 @@ void Composition::applyParameters() {
             ps.sizeStart *= scale;
             ps.sizeEnd *= scale;
             ps.enabled = ps.enabled && visible;
+            // ADR-903: a particle node's boost is its particles' HDR emission multiplier; `ps` was
+            // reset from the rest above, so this does not compound.
+            ps.emissive *= emissiveBoost;
         } else if (child != nullptr && child->particles.size() == range.particleCount) {
             const float scale = lengthScale(full);
             const std::string childPrefix = nestedPrefix(node);
@@ -7915,6 +8096,7 @@ void Composition::applyParameters() {
                 ps.sizeStart = src.sizeStart * scale;
                 ps.sizeEnd = src.sizeEnd * scale;
                 ps.enabled = src.enabled && visible;
+                ps.emissive = src.emissive * emissiveBoost; // ADR-903
             }
         }
         if (child != nullptr && child->procedurals.size() == range.proceduralCount) {
@@ -7937,6 +8119,8 @@ void Composition::applyParameters() {
                 prefixFieldReferences(pg, childPrefix);
                 pg.distributionTransform = Transform::fromMatrix(full.matrix() * src.distributionTransform.matrix());
                 pg.visible = pg.visible && visible;
+                // ADR-903: the child's own lanes (copied with it) under this node's boost.
+                pg.emissionGain = src.emissionGain * emissiveBoost;
             }
         }
         if (child != nullptr && child->splines.splines.size() == range.splineCount) {
@@ -7965,6 +8149,7 @@ void Composition::applyParameters() {
                 prefixFieldReferences(so, childPrefix);
                 so.transform = compose(full, src.transform);
                 so.visible = src.visible && visible;
+                so.emissionGain = src.emissionGain * emissiveBoost; // ADR-903
             }
         }
         if (child != nullptr && child->materialPrograms.size() == range.materialCount) {
@@ -7991,6 +8176,10 @@ void Composition::applyParameters() {
             }
         }
     }
+    // ADR-906: a triggered field's clock for this frame, once every field -- a nested scene's
+    // included -- has its finals. The clock is the engine's, bound to this frame's transport second.
+    resolveFieldTriggers(scene_.fields, triggerClock_,
+                         triggerClock_ != nullptr ? triggerClock_->seconds() : currentTime_);
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -8148,6 +8337,13 @@ void Composition::applyParameters() {
                   activeCameraReasonName(activeCamera_.reason),
                   activeCamera_.eventName.empty() ? "" : " ", activeCamera_.eventName, currentTime_);
     }
+    // ADR-912: a change of camera with no blend in progress is a cut. A blend starts from the
+    // outgoing camera's own pose, so it is motion and keeps its history; a new shot on the same
+    // camera is the same rig evaluated at the same instant, so it is not a cut either.
+    if (activeCamera_.camera != cameraWas && !activeCamera_.blending()) {
+        cameraCutThisFrame_ = true;
+        ++cameraCutSerial_;
+    }
     const float fov0 = cameraFov_ != nullptr ? cameraFov_->value() : cameraFovSetting_;
     float fov = fov0;
     if (!cameraDirection_.directing() && activeCamera_.camera == kMainCamera) {
@@ -8219,6 +8415,8 @@ void Composition::applyParameters() {
     //
     // In `Film` mode this is a branch and a return, so every render is byte-for-byte what it was.
     applyViewportView(fov0);
+    // ADR-912: published every frame, so nothing that rebuilds the camera block can lose it.
+    scene_.camera.cutSerial = cameraCutSerial_;
     updateTerrainLod();
     updateWaterSurfaces();
     // Last frame's ecology lights come off before the rig block, which removes its own lights by
@@ -8558,6 +8756,13 @@ void Composition::updateEcologyLights() {
     if (!ecologyLightsEnabled_) {
         return;
     }
+    // ADR-905: the parameter's final -- a route or a key on `scene/ecologyLight` -- and the file's
+    // value for a composition nobody attached. Zero makes no lights, exactly as a scene that never
+    // asked for any has always had.
+    const float gain = ecologyLight_ != nullptr ? ecologyLight_->value() : ecologyLightGain_;
+    if (gain <= 0.0f) {
+        return;
+    }
     const std::size_t budget = kMaxEcologyLights > scene_.lights.size()
                                    ? kMaxEcologyLights - scene_.lights.size()
                                    : 0;
@@ -8569,6 +8774,7 @@ void Composition::updateEcologyLights() {
         const world::GlowCluster* cluster;
         float distanceSq;
         glm::vec3 position;
+        const CompositionNode* node;
     };
     std::vector<Candidate> candidates;
     const glm::vec3 eye = scene_.camera.position;
@@ -8584,7 +8790,7 @@ void Composition::updateEcologyLights() {
             if (d2 > ecologyLightRange_ * ecologyLightRange_) {
                 continue;
             }
-            candidates.push_back({&g, d2, world});
+            candidates.push_back({&g, d2, world, &node});
         }
     }
     if (candidates.empty()) {
@@ -8601,6 +8807,18 @@ void Composition::updateEcologyLights() {
 
     for (std::size_t i = 0; i < candidates.size(); ++i) {
         const world::GlowCluster& g = *candidates[i].cluster;
+        const CompositionNode& owner = *candidates[i].node;
+        // ADR-905: the light a layer casts follows the glow it shows -- the terrain's boost and the
+        // layer's own gain and hue, the same finals its surfaces take after their program.
+        float layerGain = 1.0f;
+        float layerHue = 0.0f;
+        if (g.layer < owner.ecology.layers.size()) {
+            const world::ScatterLayer& layer = owner.ecology.layers[g.layer];
+            const CompositionNode::ScatterLayerParameters* p =
+                g.layer < owner.scatterParams.size() ? &owner.scatterParams[g.layer] : nullptr;
+            layerGain = p != nullptr && p->emissionGain != nullptr ? p->emissionGain->value() : layer.emissionGain;
+            layerHue = p != nullptr && p->hueOffset != nullptr ? p->hueOffset->value() : layer.hueOffset;
+        }
         PunctualLight light;
         light.name = fmt::format("{}{}", kEcologyLightPrefix, i);
         // A point light, not a Sphere: a sphere emitter goes through the LTC area-light
@@ -8609,11 +8827,11 @@ void Composition::updateEcologyLights() {
         light.type = PunctualLight::Type::Point;
         light.role = PunctualLight::Role::Practical;
         light.position = candidates[i].position;
-        light.color = g.color;
+        light.color = layerHue != 0.0f ? color::hueShift(g.color, layerHue) : g.color;
         // The aggregate's power is a sum of emissive weights, not photometric candela. The scale
         // is the one free constant here: it sets how far a patch of glowing ecology throws light,
         // and it is authored per scene rather than guessed once.
-        light.intensity = g.power * ecologyLightGain_;
+        light.intensity = g.power * gain * nodeEmissiveBoost(owner) * std::max(layerGain, 0.0f);
         light.radius = std::max(g.radius, 0.25f);
         light.range = g.radius * 4.0f;
         light.castsShadow = false;   // hundreds of these; none of them can afford a shadow map
@@ -8663,6 +8881,19 @@ void Composition::updateWaterSurfaces() {
         if (node.waterShallowDepthParam != nullptr) w.shallow = node.waterShallowDepthParam->value();
         if (node.waterShallowColorParam != nullptr) w.shallowColor = node.waterShallowColorParam->value();
         if (node.waterDeepColorParam != nullptr) w.deepColor = node.waterDeepColorParam->value();
+        // ADR-916: every tear control. The seven a route cannot drive are copied the same way, so an
+        // edit in the panel or a project's saved value reaches the surface like any other.
+        const CompositionNode::WaterTearParameters& tp = node.waterTearParams;
+        if (tp.amount != nullptr) w.tears = tp.amount->value();
+        if (tp.shear != nullptr) w.tearShear = tp.shear->value();
+        if (tp.coverage != nullptr) w.tearCoverage = tp.coverage->value();
+        if (tp.cell != nullptr) w.tearCell = tp.cell->value();
+        if (tp.spacing != nullptr) w.tearSpacing = tp.spacing->value();
+        if (tp.stretch != nullptr) w.tearStretch = tp.stretch->value();
+        if (tp.followWind != nullptr) w.tearFollowsWind = tp.followWind->value();
+        if (tp.direction != nullptr) w.tearAngle = tp.direction->value();
+        if (tp.drift != nullptr) w.tearDrift = tp.drift->value();
+        if (tp.wind != nullptr) w.tearWind = tp.wind->value();
     }
 }
 
@@ -9211,8 +9442,11 @@ nlohmann::json Composition::toJson() const {
         environment["dayNight"] = std::move(d);
     }
     environment["skyBloom"] = skyBloomSetting_;
-    if (ecologyLightGain_ > 0.0f) {
-        environment["ecologyLight"] = ecologyLightGain_;
+    // ADR-905: the parameter's base, as the volumetric block below does, so a save keeps what the
+    // user set on `scene/ecologyLight` rather than the value the file was loaded with.
+    if (const float ecologyLight = ecologyLight_ != nullptr ? ecologyLight_->base() : ecologyLightGain_;
+        ecologyLight > 0.0f) {
+        environment["ecologyLight"] = ecologyLight;
         environment["ecologyLightRange"] = ecologyLightRange_;
         environment["ecologyGlowCell"] = ecologyGlowCell_;
     }
@@ -9809,7 +10043,17 @@ nlohmann::json Composition::toJson() const {
                                       {"glowDepth", ts.water.glowDepth},
                                       {"sparkle", ts.water.sparkle},
                                       {"sparkleColor", vecToJson(ts.water.sparkleColor)},
-                                      {"swell", ts.water.swell}}}};
+                                      {"swell", ts.water.swell},
+                                      {"tears", ts.water.tears},
+                                      {"tearShear", ts.water.tearShear},
+                                      {"tearCoverage", ts.water.tearCoverage},
+                                      {"tearCell", ts.water.tearCell},
+                                      {"tearSpacing", ts.water.tearSpacing},
+                                      {"tearStretch", ts.water.tearStretch},
+                                      {"tearDirection", ts.water.tearFollowsWind ? json("wind")
+                                                                                 : json(ts.water.tearAngle)},
+                                      {"tearDrift", ts.water.tearDrift},
+                                      {"tearWind", ts.water.tearWind}}}};
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -11593,12 +11837,33 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                               TerrainFloat{"glowScale", &w.glowScale},
                               TerrainFloat{"glowCoverage", &w.glowCoverage},
                               TerrainFloat{"glowDepth", &w.glowDepth},
-                              TerrainFloat{"sparkle", &w.sparkle}, TerrainFloat{"swell", &w.swell}}) {
+                              TerrainFloat{"sparkle", &w.sparkle}, TerrainFloat{"swell", &w.swell},
+                              TerrainFloat{"tears", &w.tears}, TerrainFloat{"tearShear", &w.tearShear},
+                              TerrainFloat{"tearCoverage", &w.tearCoverage},
+                              TerrainFloat{"tearCell", &w.tearCell},
+                              TerrainFloat{"tearSpacing", &w.tearSpacing},
+                              TerrainFloat{"tearStretch", &w.tearStretch},
+                              TerrainFloat{"tearDrift", &w.tearDrift}, TerrainFloat{"tearWind", &w.tearWind}}) {
                             auto v = readFloat(wj, f.key, *f.target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
                             }
                             *f.target = *v;
+                        }
+                        // ADR-916: "wind" (the seams run along the scene wind) or an angle in radians
+                        // about +Y, the wind's own convention (0 = +X, pi/2 = +Z).
+                        if (wj.contains("tearDirection")) {
+                            const json& d = wj.at("tearDirection");
+                            if (d.is_string() && d.get<std::string>() == "wind") {
+                                w.tearFollowsWind = true;
+                            } else if (d.is_number()) {
+                                w.tearFollowsWind = false;
+                                w.tearAngle = d.get<float>();
+                            } else {
+                                return fail("node '{}': water 'tearDirection' must be \"wind\" or an angle in "
+                                            "radians",
+                                            node.name);
+                            }
                         }
                         for (const auto& [key, target] : {std::pair{"shallowColor", &w.shallowColor},
                                                           std::pair{"deepColor", &w.deepColor},

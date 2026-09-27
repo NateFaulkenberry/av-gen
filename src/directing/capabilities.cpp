@@ -346,8 +346,12 @@ nlohmann::json CapabilityRegistry::toJson() const {
     for (const CharacterCard& c : characters_) {
         chars.push_back(c.toJson());
     }
-    return {{"characters", std::move(chars)}, {"cameras", cameras_.toJson()}, {"events", events_.toJson()},
-            {"effects", effects_.toJson()}};
+    nlohmann::json out{{"characters", std::move(chars)}, {"cameras", cameras_.toJson()}, {"events", events_.toJson()},
+                       {"effects", effects_.toJson()}};
+    if (!reactive_.empty()) {
+        out["reactive"] = reactive_.toJson(); // ADR-925; absent until a host set it
+    }
+    return out;
 }
 
 } // namespace avgen::directing

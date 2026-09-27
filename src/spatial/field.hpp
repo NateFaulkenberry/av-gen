@@ -15,9 +15,18 @@
 //   Cross-type reads: scalar as vector = value * axis; vector as scalar = length; colour as
 //   scalar = luminance * alpha; scalar as colour = mix(colorA, colorB, value).
 // Time: tau = speed * t + phase (radians for waves / phase for noise animation).
+//
+// ADR-906: a field with a `trigger` keeps its own clock: t is the seconds since the most recent
+// event of that trigger at or before the frame's transport second (a beat, an onset, a musical
+// event, a timeline marker or a repeat; a proximity is refused, a field has no recorded path to
+// measure), resolved by the host each frame through the effects' `TriggerClock` into `triggerAge`.
+// Before the first event the field is silent -- it samples as a disabled field does. Everything else
+// about sampling is unchanged, so a wave field on a trigger is a front that leaves `waveOrigin` at
+// each event and travels out at `waveSpeed`.
 
 #include "core/error.hpp"
 #include "spatial/grid_field.hpp"
+#include "world/effects/effect_timing.hpp" // world::Trigger (ADR-906)
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -155,10 +164,21 @@ struct FieldSpec {
     float mix = 0.5f;
     // Grid: the name of the simulated grid it samples.
     std::string reference;
+    // ADR-906: what starts this field's clock. Absent -- every field before this -- is the transport
+    // clock. Authored as the same `trigger` block an effect instance carries (effect_trigger.hpp).
+    std::optional<world::Trigger> trigger;
+    // ADR-906, runtime only (not authored, serialised or hashed): the seconds since the trigger's
+    // latest event, written every frame by `scene::resolveFieldTriggers`; negative while none has
+    // fired, which is silence. Unused when `trigger` is absent.
+    double triggerAge = -1.0;
 
     [[nodiscard]] FieldType type() const { return fieldTypeOf(kind); }
     [[nodiscard]] glm::mat4 localToWorld() const;
     [[nodiscard]] glm::mat4 worldToLocal() const;
+    // ADR-906: the clock this field runs on at transport-clock `time`: `time` itself, or the trigger's
+    // age. `silent()` is a triggered field before its first event, which samples as zero.
+    [[nodiscard]] double clock(double time) const { return trigger ? triggerAge : time; }
+    [[nodiscard]] bool silent() const { return trigger.has_value() && triggerAge < 0.0; }
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;  // every field
     [[nodiscard]] nlohmann::json toJson() const;

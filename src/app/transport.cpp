@@ -93,14 +93,16 @@ void Transport::setFrameRate(FrameRate rate) {
     ++revision_;
 }
 
-void Transport::setTempo(double bpm, int beatsPerBar) {
+void Transport::setTempo(double bpm, int beatsPerBar, double barOriginSeconds) {
     const double clean = (bpm > 0.0 && std::isfinite(bpm)) ? bpm : 0.0;
     const int bars = std::clamp(beatsPerBar, 1, 32);
-    if (std::abs(clean - tempoBpm_) < 1e-4 && bars == beatsPerBar_) {
+    const double origin = std::isfinite(barOriginSeconds) ? barOriginSeconds : 0.0;
+    if (std::abs(clean - tempoBpm_) < 1e-4 && bars == beatsPerBar_ && std::abs(origin - barOrigin_) < 1e-9) {
         return;
     }
     tempoBpm_ = clean;
     beatsPerBar_ = bars;
+    barOrigin_ = origin;
     ++revision_;
 }
 
@@ -359,6 +361,7 @@ TransportSnapshot Transport::snapshot() const {
     out.frame = frameOf(position_);
     out.tempoBpm = tempoBpm_;
     out.beatsPerBar = beatsPerBar_;
+    out.barOriginSeconds = barOrigin_;
     out.loop = loop_;
     out.revision = revision_;
     return out;
@@ -433,14 +436,20 @@ std::string formatTimecode(double seconds, FrameRate rate) {
     return buffer;
 }
 
-std::string formatBarsBeats(double seconds, double tempoBpm, int beatsPerBar) {
+std::string formatBarsBeats(double seconds, double tempoBpm, int beatsPerBar, double originSeconds) {
     if (!(tempoBpm > 0.0) || beatsPerBar < 1) {
         return {};
     }
-    const double beats = seconds * tempoBpm / 60.0;
+    const double beats = (seconds - originSeconds) * tempoBpm / 60.0;
     const auto whole = static_cast<std::int64_t>(std::floor(beats));
-    const std::int64_t bar = whole / beatsPerBar;
-    const std::int64_t beat = whole % beatsPerBar;
+    // Floor division, so the pickup before the origin is bar 0 (and earlier ones below it) with
+    // beats still counting 1..beatsPerBar, rather than a bar -0 with a negative beat.
+    const std::int64_t per = beatsPerBar;
+    std::int64_t bar = whole / per;
+    if (whole % per != 0 && whole < 0) {
+        --bar;
+    }
+    const std::int64_t beat = whole - bar * per;
     char buffer[32];
     // One-based, the way every sequencer numbers bars: nobody counts from bar zero out loud.
     std::snprintf(buffer, sizeof(buffer), "%lld.%lld", static_cast<long long>(bar + 1),

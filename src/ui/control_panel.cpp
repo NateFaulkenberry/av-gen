@@ -1592,10 +1592,18 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     auto& modulator = engine.modulator();
 
     // ---- add route ----
+    // The picker shows each signal's name with what it is beside it (`ui::routeSourceItem`: "kick",
+    // "density", "section change"...); the route stores the name.
     std::vector<const char*> signalNames;
     signalNames.reserve(bus.size());
     for (const auto& info : bus.infos()) {
         signalNames.push_back(info.name.c_str());
+    }
+    const std::vector<std::string> sourceItems = ui::routeSourceItems(bus);
+    std::vector<const char*> sourceLabels;
+    sourceLabels.reserve(sourceItems.size());
+    for (const std::string& item : sourceItems) {
+        sourceLabels.push_back(item.c_str());
     }
     std::vector<const char*> targetNames;
     for (const auto* p : paramSet.ordered()) {
@@ -1616,8 +1624,8 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
               [](const char* a, const char* b) { return std::string_view(a) < std::string_view(b); });
     newRouteSource_ = std::clamp(newRouteSource_, 0, std::max(0, static_cast<int>(signalNames.size()) - 1));
     newRouteTarget_ = std::clamp(newRouteTarget_, 0, std::max(0, static_cast<int>(targetNames.size()) - 1));
-    ImGui::SetNextItemWidth(200);
-    ImGui::Combo("##src", &newRouteSource_, signalNames.data(), static_cast<int>(signalNames.size()));
+    ImGui::SetNextItemWidth(260);
+    ImGui::Combo("##src", &newRouteSource_, sourceLabels.data(), static_cast<int>(sourceLabels.size()));
     ImGui::SameLine();
     ImGui::TextUnformatted("->");
     ImGui::SameLine();
@@ -1642,6 +1650,28 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     static const char* envelopes[] = {"none", "peak hold", "linear fall"};
     int removeIndex = -1;
     auto& routes = modulator.routes();
+    // ADR-902: each route's liveness verdict, shown beside its header the way "[ignored]" is shown
+    // beside an inert parameter. Re-checked when a route changed, and once a second besides, because
+    // a rule also reads the scene; the rules sample the chain, so not every frame.
+    {
+        const double now = ImGui::GetTime();
+        bool stale = routeLiveness_.size() != routes.size() || now - routeLivenessCheckedAt_ > 1.0;
+        for (std::size_t i = 0; !stale && i < routes.size(); ++i) {
+            stale = routeLiveness_[i].signature != routeSignature(routes[i]);
+        }
+        if (stale) {
+            const scene::SceneLivenessFacts facts(engine.livenessInputs());
+            const auto& registry = liveness::Registry::standard();
+            const auto set = registry.checkSet(routes, engine.timeline().tracks());
+            routeLiveness_.assign(routes.size(), RouteLivenessRow{});
+            for (std::size_t i = 0; i < routes.size(); ++i) {
+                auto findings = registry.checkRoute(routes[i], facts);
+                findings.insert(findings.end(), set.routes[i].begin(), set.routes[i].end());
+                routeLiveness_[i] = RouteLivenessRow{routeSignature(routes[i]), routeBadge(findings)};
+            }
+            routeLivenessCheckedAt_ = now;
+        }
+    }
     for (std::size_t i = 0; i < routes.size(); ++i) {
         auto& route = routes[i];
         ImGui::PushID(static_cast<int>(i));
@@ -1662,10 +1692,33 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.78f, 0.35f, 1.0f));
         }
         const bool open = ImGui::TreeNodeEx(header.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowOverlap);
+        if (ImGui::IsItemHovered()) {
+            // What the source is, in words, for a route whose name alone does not say it.
+            if (const auto id = bus.find(route.source); id && !bus.info(*id).label.empty()) {
+                ImGui::SetTooltip("%s: %s", route.source.c_str(), bus.info(*id).label.c_str());
+            }
+        }
         if (focused) {
             ImGui::PopStyleColor();
             // After the item, so the scroll target is the row that was just laid out.
             ImGui::SetScrollHereY(0.35f);
+        }
+        if (i < routeLiveness_.size() && routeLiveness_[i].badge.show) {
+            const RouteBadge& badge = routeLiveness_[i].badge;
+            ImGui::SameLine();
+            ImGui::TextColored(badge.dead ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f) : ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s",
+                               badge.text.c_str());
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted(badge.tooltip.c_str());
+            }
+        }
+        // ADR-924: which Director plan item made this route, and why (the plan's reason on hover).
+        if (const RoutePlanNote note = routePlanNote(route, engine.directingPlans()); note.show) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.55f, 0.78f, 1.0f, 1.0f), "%s", note.text.c_str());
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted(note.tooltip.c_str());
+            }
         }
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
         ImGui::Checkbox("##on", &route.enabled);
@@ -1695,6 +1748,40 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(140);
             ImGui::SliderFloat("decay ms", &route.chain.decayMs, 0.0f, 5000.0f, "%.0f", ImGuiSliderFlags_Logarithmic);
+            // ADR-900: the delay stage and the depth source.
+            ImGui::SetNextItemWidth(140);
+            ImGui::SliderFloat("delay ms", &route.chain.delayMs, 0.0f, ProcessorChain::kMaxDelayMs, "%.0f",
+                               ImGuiSliderFlags_Logarithmic);
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted("The route reads its source as it was this long ago -- a stagger or an echo. "
+                                   "An event arrives whole, on the first frame at or after its delayed instant.");
+            }
+            ImGui::SameLine();
+            {
+                const std::vector<std::string> choices = depthSourceChoices(bus, route.depthSource);
+                std::vector<const char*> labels;
+                labels.reserve(choices.size());
+                for (const std::string& c : choices) {
+                    labels.push_back(c.c_str());
+                }
+                int depth = depthSourceIndex(choices, route.depthSource);
+                ImGui::SetNextItemWidth(170);
+                if (ImGui::Combo("depth", &depth, labels.data(), static_cast<int>(labels.size()))) {
+                    route.depthSource = depth == 0 ? std::string() : choices[static_cast<std::size_t>(depth)];
+                    engine.rebind(); // the depth signal is resolved at bind
+                }
+                if (ImGui::IsItemHovered()) {
+                    tooltipUnformatted("A signal that scales how far the route moves its target: depth = min + "
+                                       "(max - min) x signal. (none) is full depth, always.");
+                }
+            }
+            if (!route.depthSource.empty()) {
+                ImGui::SetNextItemWidth(100);
+                ImGui::SliderFloat("depth min", &route.depthMin, -1.0f, 2.0f);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(100);
+                ImGui::SliderFloat("depth max", &route.depthMax, -1.0f, 2.0f);
+            }
             int curve = static_cast<int>(route.chain.curve);
             ImGui::SetNextItemWidth(110);
             if (ImGui::Combo("curve", &curve, curves, 5)) {
@@ -1738,6 +1825,7 @@ void ControlPanel::drawSourcesTab(app::Engine& engine) {
     auto& bus = engine.signals();
     std::string removeKind;
     std::string removeName;
+    bool reattach = false;
     for (const auto& source : engine.sources().sources()) {
         ImGui::PushID(source.get());
         const std::string header = source->kind() + " " + source->name();
@@ -1762,10 +1850,28 @@ void ControlPanel::drawSourcesTab(app::Engine& engine) {
                     lfo->setShape(static_cast<signals::LfoShape>(shape));
                 }
             }
+            if (source->kind() == "timeline") {
+                // ADR-900: a timeline's keys are a curve, or each positive key is a hit -- a one-frame
+                // event an envelope source can be triggered by and no frame rate can miss.
+                auto* timeline = dynamic_cast<signals::TimelineSource*>(source.get());
+                int mode = static_cast<int>(timeline->mode());
+                static const char* modes[] = {"values (a curve)", "events (each key > 0 a hit)"};
+                ImGui::SetNextItemWidth(200);
+                if (ImGui::Combo("keys are", &mode, modes, 2)) {
+                    timeline->setMode(static_cast<signals::TimelineMode>(mode));
+                    reattach = true; // the bus learns the output is (or is no longer) an event
+                }
+                ImGui::SameLine();
+                ImGui::TextDisabled("%zu keys", timeline->keys().size());
+            }
             ImGui::TextDisabled("settings: Parameters window, group 'sources'");
             ImGui::TreePop();
         }
         ImGui::PopID();
+    }
+    if (reattach) {
+        engine.sources().attach(bus, engine.params());
+        engine.rebind();
     }
     if (!removeName.empty()) {
         engine.removeSource(removeKind, removeName);
@@ -2002,6 +2108,21 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "[A]");
             if (ImGui::IsItemHovered()) {
                 tooltip("automated by the timeline; the slider is the base value");
+            }
+        }
+        // ADR-896: a meter setting left on "detect" says what the analysis decided, so pinning it is
+        // a decision about a number you can see rather than a guess.
+        if (param->group() == "music") {
+            const analysis::Meter meter = engine.meter();
+            const app::Engine::MeterSource source = engine.meterSource();
+            const bool downbeat = param->path() == app::Engine::kBar1BeatPath;
+            const std::string note = ui::meterDetectNote(
+                param->path(), static_cast<int>(std::lround(param->baseComponent(0))),
+                downbeat ? meter.downbeat : meter.phraseBars,
+                downbeat ? source.downbeatDetected : source.phraseDetected, source.downbeatConfidence);
+            if (!note.empty()) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", note.c_str());
             }
         }
         // Not reaching the picture in the state the scene is in. Said next to the slider, in the
@@ -4015,7 +4136,9 @@ void ControlPanel::drawOutputsTab(app::Engine& /*engine*/) {
 // Deeper editing is not duplicated here on purpose. A camera's channels are ordinary parameters, so
 // keyframing one is the Sequence panel's job and tuning one is the Parameters panel's; a second set
 // of controls for the same values would be a second source of truth, which section 28 of the brief
-// forbids in as many words.
+// forbids in as many words. How a follow camera moves (ADR-911: its smoothing, lag, ground and
+// clearance) is the exception, because it is rig settings that no other panel shows: those rows are
+// drawn here, under the lens, by `drawFollowControls`, and this is their only home.
 //
 // **Unverified visually.** This agent cannot see ImGui; what is checked is the model underneath
 // (tests/integration/test_camera_multicam.cpp), not the drawing.
@@ -4180,16 +4303,17 @@ void ControlPanel::drawCameras(app::Engine& engine) {
                 float mm = rig.focalLength;
                 const bool lensMoved = ImGui::SliderFloat("lens (0 = use fov)", &mm, 0.0f, 200.0f, "%.0f mm");
                 if (ImGui::IsItemActivated()) {
-                    lensDrag_.begin(engine);
+                    rigSliderDrag_.begin(engine);
                 }
                 if (lensMoved) {
                     rig.focalLength = mm;
                     changed = true;
                 }
-                if (ImGui::IsItemDeactivated() && lensDrag_.open()) {
+                if (ImGui::IsItemDeactivated() && rigSliderDrag_.open()) {
                     // Pushed after this frame's install below has landed, by the block at the end.
                     editLabel = "Change lens of " + rig.name;
                 }
+                drawFollowControls(rig, comp->terrainQuery().valid(), engine, changed, editLabel);
             }
             if (ImGui::Checkbox("available to the Auto-director", &rig.autoDirectorEligible)) {
                 changed = true;
@@ -4317,11 +4441,12 @@ void ControlPanel::drawCameras(app::Engine& engine) {
         }
     }
 
-    // A lens drag in progress installs every frame but records nothing until release: its capture
-    // opened on press. Anything else is measured around its own install, here.
-    const bool dragging = lensDrag_.open() && editLabel.empty();
+    // A slider drag in progress -- the lens or a follow setting -- installs every frame but records
+    // nothing until release: its capture opened on press. Anything else is measured around its own
+    // install, here.
+    const bool dragging = rigSliderDrag_.open() && editLabel.empty();
     app::EditCapture single;
-    app::EditCapture& capture = lensDrag_.open() ? lensDrag_ : single;
+    app::EditCapture& capture = rigSliderDrag_.open() ? rigSliderDrag_ : single;
     if (changed && !capture.open()) {
         capture.begin(engine);
     }
@@ -4345,6 +4470,83 @@ void ControlPanel::drawCameras(app::Engine& engine) {
     }
     if (!cameraProblem_.empty()) {
         ImGui::TextUnformatted(cameraProblem_.c_str());
+    }
+}
+
+// How a follow camera moves, under the names of what it does to the picture (ADR-911: UI reach).
+//
+// The rows are `scene::followControls()`, the UI-free table beside the rig's fields, so what this
+// draws and what tests/unit/test_follow_camera.cpp walks are one list. They are rig settings, not
+// parameters -- nothing else in the app edits them -- so this is their one home. An edit rides the
+// section's single install at the end of `drawCameras` (`Engine::setCameraDirection`, one undo step,
+// a drag measured press to release), and that install re-subscribes HIST: smoothing turned on for a
+// camera that read no history records its subject from that frame on.
+//
+// A row that would do nothing on this camera is drawn greyed, with the reason in its tooltip, rather
+// than hidden or left live: a slider that silently does nothing is the defect this exists to stop,
+// and a row that vanishes cannot be found.
+void ControlPanel::drawFollowControls(scene::CameraRig& rig, bool haveTerrain, app::Engine& engine, bool& changed,
+                                      std::string& editLabel) {
+    if (!scene::followsSomething(rig)) {
+        ImGui::TextDisabled("Follows nothing, so it has no follow settings. A camera that follows or\n"
+                            "watches a subject (followNode / aimNode in the scene) has them here.");
+        return;
+    }
+    std::string subject;
+    if (!rig.followNode.empty()) {
+        subject = "follows '" + rig.followNode + "'";
+        if (rig.aimNode == rig.followNode) {
+            subject += " and looks at it";
+        } else if (!rig.aimNode.empty()) {
+            subject += ", looking at '" + rig.aimNode + "'";
+        }
+    } else {
+        subject = "stands still and watches '" + rig.aimNode + "'";
+    }
+    ImGui::SeparatorText("following its subject");
+    ImGui::TextDisabled("%s", subject.c_str());
+    for (const scene::FollowControl& control : scene::followControls()) {
+        const std::string label(control.label);
+        const std::string name(control.name());
+        const bool noTerrain = control.needsTerrain && !haveTerrain;
+        const bool applies = control.appliesTo(rig) && !noTerrain;
+        ImGui::BeginDisabled(!applies);
+        if (control.isToggle()) {
+            bool on = control.get(rig) >= 0.5f;
+            if (ImGui::Checkbox(label.c_str(), &on)) {
+                control.apply(rig, on ? 1.0f : 0.0f);
+                changed = true;
+                editLabel = (on ? "Turn on '" : "Turn off '") + name + "' for " + rig.name;
+            }
+        } else {
+            float value = control.get(rig);
+            const char* format = control.kind == scene::FollowControlKind::Seconds  ? "%.2f s"
+                                 : control.kind == scene::FollowControlKind::Metres ? "%.1f m"
+                                                                                   : "%.2f";
+            const bool moved = ImGui::SliderFloat(label.c_str(), &value, control.minimum, control.maximum, format,
+                                                  ImGuiSliderFlags_AlwaysClamp);
+            if (ImGui::IsItemActivated()) {
+                rigSliderDrag_.begin(engine);
+            }
+            if (moved) {
+                control.apply(rig, value);
+                changed = true;
+            }
+            if (ImGui::IsItemDeactivated() && rigSliderDrag_.open()) {
+                editLabel = "Change " + name + " of " + rig.name;
+            }
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            const std::string_view why =
+                noTerrain ? std::string_view("This scene has no terrain for it to read.") : control.whenNot;
+            std::string tip(control.tip);
+            if (!applies && !why.empty()) {
+                tip += "\n\n";
+                tip += why;
+            }
+            tooltipUnformatted(tip.c_str());
+        }
     }
 }
 
@@ -4379,9 +4581,9 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
             "Locked      one shot, one camera, framed exactly as the section asked.\n"
             "Guided      the intent is respected; the camera, the cuts and the framing are\n"
             "            the director's.\n"
-            "Expressive  ...and the director also reads the section's own loudness and\n"
-            "            busyness, so a loud section gets more coverage than a quiet one\n"
-            "            carrying the same intent.");
+            "Expressive  ...and the director also reads how busy the section's music\n"
+            "            measures -- hits per second and brightness, never loudness -- so a\n"
+            "            dense section cuts faster than a sparse one carrying the same intent.");
     }
     int autonomy = static_cast<int>(s.autonomy);
     bool first = true;
@@ -4430,6 +4632,12 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
 
     // The per-section rows. In a scrolling child, because a four-minute track is twenty of them and
     // the panel has eight other controls under this one.
+    // Only while it describes these sections: a cut made before the sections were edited is not.
+    std::vector<std::string> songCut =
+        engine.timeline().isAutomated("camera/position") ? app::lastSongCutSummary() : std::vector<std::string>{};
+    if (songCut.size() != plan->sections.size()) {
+        songCut.clear();
+    }
     const float rowHeight = ImGui::GetTextLineHeightWithSpacing();
     if (ImGui::BeginChild("song-sections", ImVec2(0.0f, std::min(9.0f, static_cast<float>(plan->sections.size()) + 0.5f) * rowHeight),
                           ImGuiChildFlags_Borders)) {
@@ -4465,12 +4673,17 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
                     "which applies to the whole film.");
             }
             ImGui::SameLine();
-            ImGui::Text("%5.1f  %s  --  %s", section.startSeconds,
+            // ADR-921: what the last cut made of this section, beside it -- "6 shots, 1.8-3.7 s,
+            // rising" -- so the pacing a person sees in the film has a row it belongs to.
+            const std::string lastCut = i < songCut.size() ? "  [" + songCut[i] + "]" : std::string();
+            ImGui::Text("%5.1f  %s  --  %s%s", section.startSeconds,
                         section.label.empty() ? "(unnamed)" : section.label.c_str(),
-                        section.intent.id.c_str());
+                        section.intent.id.c_str(), lastCut.c_str());
             if (ImGui::IsItemHovered()) {
                 tooltip("%s\n\nhero %.0f%%  distance %.0f%%  movement %.0f%%\n"
                                   "variation %.0f%%  cut rate %.0f%%  cameras %d\n"
+                                  "push %.0f%%  frame %.0f%% full\n"
+                                  "cuts: %s\n"
                                   "measured: energy %.0f%%, density %.0f%%\n"
                                   "pass %d over this material",
                                   section.intent.id.c_str(),
@@ -4480,6 +4693,9 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
                                   static_cast<double>(section.intent.variation) * 100.0,
                                   static_cast<double>(section.intent.cutRate) * 100.0,
                                   section.intent.cameras,
+                                  static_cast<double>(section.intent.energy) * 100.0,
+                                  static_cast<double>(section.intent.visualDensity) * 100.0,
+                                  app::arcCutNote(section.intent.arc),
                                   static_cast<double>(section.energy) * 100.0,
                                   static_cast<double>(section.density) * 100.0,
                                   section.occurrence + 1);
@@ -4628,6 +4844,10 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     "Not a shot list played back. Each section carries a shot *intent* -- how\n"
                     "close, how much movement, how much coverage -- and the same intent gives a\n"
                     "different film the second time it comes round.\n\n"
+                    "Cuts land on the song's beats and every section starts on its downbeat. How\n"
+                    "long each shot runs comes from the section's treatment (its cut rate, and\n"
+                    "its arc: a rising treatment cuts faster toward its end, a suspended one\n"
+                    "holds), how busy the music measures, and what the shot is of.\n\n"
                     "Uses every camera you have ticked 'available to the Auto-director'.\n\n"
                     "Needs only an analyzed song -- import audio, tick 'Analyze song structure',\n"
                     "and this has everything it needs. Performer actions are a separate, optional\n"
@@ -4666,26 +4886,30 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 }
             };
             seconds("shortest shot", s.minShotSeconds, 1.0, 30.0,
-                    "Below this a musical section is folded into its neighbour rather than "
-                    "given a cut of its own: a one-second shot reads as a glitch.");
-            // Disabled in Song Mode rather than hidden: a control that vanishes reads as a missing
-            // feature, and one that is live but read by nothing spends the user's trust -- which is
-            // the rule `AutoDirectorSettings` states about its own three absent knobs. Song Mode has
-            // no "build": it has an authored section carrying a cut rate, and the floor it runs into
-            // is `shortest shot`.
-            ImGui::BeginDisabled(song);
-            seconds("shortest build", s.minBuildShotSeconds, 0.5, 10.0,
-                    "A build is exempt from the minimum, because a build exists to end. This is "
-                    "how short it may get.");
-            ImGui::EndDisabled();
-            if (song && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                tooltip("Song Mode has no builds to exempt: a section's own cut rate sets "
-                                  "its shot length, and 'shortest shot' is the floor it stops at.");
-            }
+                    song ? "The shortest cut a section that does not accelerate may make, and the\n"
+                           "fast end of the pace every section's cut rate is read against. Cuts\n"
+                           "land on the song's beats, so a length is a whole number of beats."
+                         : "Below this a musical section is folded into its neighbour rather than "
+                           "given a cut of its own: a one-second shot reads as a glitch.");
+            // ADR-921: live in every mode again. Song Mode has builds now -- a section whose
+            // treatment accelerates (a rising or bursting arc) is the one kind of section allowed
+            // below `shortest shot`, and this is how short its cuts may get. It used to be disabled
+            // here, with a tooltip saying Song Mode had no builds, which was true until the arc
+            // reached the director.
+            seconds("shortest build", s.minBuildShotSeconds, 0.25, 10.0,
+                    song ? "How short a cut may get in a section whose treatment accelerates -- a\n"
+                           "rising arc (a build, a riser) or a burst (a drop, an impact). Those\n"
+                           "are the only sections that may cut below 'shortest shot'; a riser's\n"
+                           "shots shorten toward the drop down to this, and never below one beat."
+                         : "A build is exempt from the minimum, because a build exists to end. This is "
+                           "how short it may get.");
             seconds("longest shot", s.maxShotSeconds, 4.0, 60.0,
-                    "A passage longer than this becomes several shots inside one section, each "
-                    "cast separately -- so a thirty-second verse is the camera travelling "
-                    "between subjects rather than holding one for a third of the piece.");
+                    song ? "The slow end of the pace: a section cut at rate 0 aims at this length.\n"
+                           "A wide opener that establishes scale may hold up to 80% past it, and a\n"
+                           "suspended section holds for up to twice it."
+                         : "A passage longer than this becomes several shots inside one section, each "
+                           "cast separately -- so a thirty-second verse is the camera travelling "
+                           "between subjects rather than holding one for a third of the piece.");
 
             ImGui::Separator();
             ImGui::TextUnformatted("Pace");

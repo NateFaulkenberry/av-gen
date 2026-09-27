@@ -352,8 +352,6 @@
       "port": 9000,
       "prefix": "/avgen"
     },
-    "phraseBars": 4,
-    "sectionPhrases": 4,
     "tempoSource": "analysis"
   },
   "format": "avgen-project",

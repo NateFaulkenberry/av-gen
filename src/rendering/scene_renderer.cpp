@@ -2645,6 +2645,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         resetTemporalHistory();
         temporalScene_ = &scene;
     }
+    // ADR-912: a cut. The scene says so by changing `camera.cutSerial`, and a cut is a
+    // discontinuity of the PICTURE -- not of the world, so the particle pools stay -- which is
+    // exactly `resetScreenHistory`: the previous view-projection and models (so this frame's
+    // velocity is zero, and the blur with it), the AO history and the temporal ring. Without it the
+    // first frame of every shot was blurred along a "movement" from the old camera to the new one,
+    // at the blur's full length -- measured on GV3's final at 20-40% of its neighbours' sharpness.
+    if (!sceneChanged && scene.camera.cutSerial != lastCutSerial_) {
+        resetScreenHistory();
+        ++stats_.cameraCuts;
+    }
+    lastCutSerial_ = scene.camera.cutSerial;
     if (sceneChanged || time.renderTime < previousRenderTime_) {
         // A seek/reverse is a discontinuity, not motion. Reusing forward temporal history would
         // create false object/camera velocities and make the first reversed frame differ from a
@@ -3076,8 +3087,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const auto band = [&af](std::size_t i) { return i < af.bandCount ? af.bands[i] : 0.0f; };
         frame.audio = glm::vec4(af.rms, band(0), band(2), band(4));
         frame.audioBands = glm::vec4(band(1), band(3), af.centroidNorm, af.flux);
-        frame.beat = glm::vec4(af.beatPhase, 1.0f - af.beatPhase, std::min(1.0f, af.onsetStrength / 2.0f),
-                               std::fmod((static_cast<float>(af.beatCount) + af.beatPhase) * 0.25f, 1.0f));
+        frame.beat = glm::vec4(af.beatPhase, 1.0f - af.beatPhase, std::min(1.0f, af.onsetStrength / 2.0f), 0.0f);
+    }
+    // ADR-896: the bar phase is the engine's (its meter, its clock -- a MIDI clock with no audio has
+    // one too), not a count derived from the analysis frame here.
+    if (shaderInputs != nullptr) {
+        frame.beat.w = shaderInputs->barPhase;
     }
     // ---- ambient occlusion (ADR-034): sized here so the frame block can carry its resolution ----
     {
@@ -3408,6 +3423,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         obj.baseColor = glm::vec4(m.baseColor, m.opacity);
         obj.emissive = glm::vec4(m.emissiveColor, m.emissiveIntensity);
         obj.material = glm::vec4(m.roughness, m.metallic, m.normalScale, m.occlusionStrength);
+        // ADR-903: the owning node's emissiveBoost, applied after the program. No hue lane here.
+        obj.emission = glm::vec4(entity.emissionGain, 0.0f, 0.0f, 0.0f);
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < textures_.size() && textures_[ref.texture].valid();
@@ -4191,9 +4208,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // composite over the surface. Its own pipeline, so the branch it needs is not in the
         // shader every other entity in the world runs.
         if (!water.empty() && water_->ready()) {
-            rp.SetPipeline(water_->pipeline());
-            ++stats_.state.pipelineBinds;
+            // ADR-916: a material with tears and one without are drawn by two pipelines, so the bind
+            // follows the item -- once per frame for a scene whose waters agree.
+            const wgpu::RenderPipeline* bound = nullptr;
             for (const auto& item : water) {
+                const wgpu::RenderPipeline& pipeline = water_->pipeline(item.water);
+                if (&pipeline != bound) {
+                    rp.SetPipeline(pipeline);
+                    bound = &pipeline;
+                    ++stats_.state.pipelineBinds;
+                }
                 const GpuMesh& mesh = *item.geometry;
                 const std::uint32_t waterOffset = water_->offset(item.water);
                 rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);

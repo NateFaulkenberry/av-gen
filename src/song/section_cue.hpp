@@ -27,6 +27,7 @@
 // `FinalDrop`) because its vocabulary is closed; a boolean computed from position works for a custom
 // type nobody anticipated, which a fourth enumerator never could.
 
+#include "analysis/span_profile.hpp"
 #include "song/shot_intent.hpp"
 
 #include <cstddef>
@@ -56,11 +57,17 @@ struct SectionCue {
     // or an edit to the language, which is exactly the sort of thing a director does.
     ShotIntent intent;
 
-    // Measured from the audio under this span, 0..1 against the track's own range. The brief's
-    // "generic parameters -- section energy, beat density -- that shot intents consume", carried
-    // here rather than re-derived, because analysis is an offline job and a director runs live.
+    // The section's own numbers, 0..1: what the timeline carries -- detected against the track's own
+    // range, or typed by whoever authored the section. The brief's "generic parameters -- section
+    // energy, beat density -- that shot intents consume".
     float energy = 0.0f;
     float density = 0.0f;
+    // ADR-899: what the audio under this span measures, level-free (`analysis::SpanProfile`): the
+    // energy composite, onsets per second (all percussion, and kick / snare / hat apart), the
+    // brightness in Hz, each band's long-term level and the stereo width. Filled when the cue sheet
+    // is built with the analysed track; `audio.measured()` is false without one. Where `energy` is
+    // a person's word, this is the track's.
+    analysis::SpanProfile audio;
 
     int occurrence = 0;        // 0 the first time this type appears, 1 the second, ...
     bool finalOfKind = false;  // the last section of this type in the piece
@@ -78,12 +85,14 @@ struct SectionCue {
     [[nodiscard]] ShotIntent intentAt(double seconds) const;
 };
 
-// Projects a timeline into cues. One cue per section, in order.
+// Projects a timeline into cues. One cue per section, in order. With `track`, each cue also carries
+// the measured profile of the audio under its span (ADR-899).
 //
-// Pure: no clock, no randomness, no I/O. The same timeline and language give the same sheet on every
-// machine and every run, which is what lets a render reproduce a preview.
+// Pure: no clock, no randomness, no I/O. The same timeline, language and track give the same sheet
+// on every machine and every run, which is what lets a render reproduce a preview.
 [[nodiscard]] std::vector<SectionCue> cueSheet(const SectionTimeline& timeline,
-                                               const ShotLanguage& language);
+                                               const ShotLanguage& language,
+                                               const analysis::AnalysisTrack* track = nullptr);
 
 // The cue covering `seconds`, or null. Linear; a cue sheet is tens of entries, not thousands, and a
 // binary search here would be a micro-optimisation over a list that fits in a cache line or two.

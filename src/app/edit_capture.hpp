@@ -12,7 +12,8 @@
 //   parameters       base values of every parameter that existed at `begin` and still does
 //   sequence         the whole `seq::Sequence` (shots, actors, cues, markers, events, tracks)
 //   cameras          the camera collection and camera track, rigs carrying their current bases
-//   automation       the author timeline (tracks, keys, cues) and the modulation routes
+//   automation       the author timeline (tracks, keys, cues), the modulation routes and (ADR-924) the
+//                    modulation sources with their parameter bases, which a plan's routes can add
 //   nodes            nodes the operation ADDED (undo detaches them) and parent changes
 //   plans            the project's Director Plans (ADR-755), so provenance and content undo together
 //   effects          the effect list (ADR-702), every owner's, with the sliders' bases captured
@@ -78,6 +79,7 @@ private:
     nlohmann::json timelineJson_;
     std::vector<params::ModRoute> routes_;
     nlohmann::json routesJson_;
+    nlohmann::json sources_; // ADR-924: `app::sourcesDocument`
     std::map<std::string, std::string> parents_; // node -> parent, "" for a root
     std::vector<directing::Plan> plans_;
     nlohmann::json effectsAuthored_;                 // decides whether the list changed

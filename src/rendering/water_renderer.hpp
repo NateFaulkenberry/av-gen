@@ -13,7 +13,7 @@
 //
 // Bind groups are the scene's own, apart from group 2: group 0 is the frame group, group 1 is the
 // object uniforms (the terrain node's transform, by dynamic offset), group 3 is the IBL group.
-// Group 2 is this renderer's WaterUniforms -- one 192-byte record per water material, addressed by
+// Group 2 is this renderer's WaterUniforms -- one 240-byte record per water material, addressed by
 // dynamic offset, so a scene with two rivers of different colour is two writes and no extra
 // pipeline.
 //
@@ -29,8 +29,10 @@
 #include <glm/glm.hpp>
 #include <webgpu/webgpu_cpp.h>
 
+#include <array>
 #include <cstdint>
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace avgen::gpu {
@@ -56,8 +58,12 @@ struct WaterUniforms {
     glm::vec4 shore{0.0f};        // foamWidth, edgeFade, refraction, 0
     glm::vec4 life{0.0f};         // glowScale, glowCoverage, glowDepth, swell
     glm::vec4 params{0.0f};       // flow time, fastest body speed, linear depth valid, 0
+    // ADR-916, appended so no offset above moved.
+    glm::vec4 tears{0.0f};        // amount, shear (m), coverage, lattice cell (m)
+    glm::vec4 tearShape{0.0f};    // spacing (m), stretch, drift (m/s), wind coupling
+    glm::vec4 tearFrame{0.0f};    // seam direction x, z (in XZ), 1 when it follows the wind, 0
 };
-static_assert(sizeof(WaterUniforms) == 192);
+static_assert(sizeof(WaterUniforms) == 240);
 
 // How many distinct water materials one frame may carry. Uniform slots are cheap; the number is a
 // bound on the dynamic-offset buffer and nothing else.
@@ -69,6 +75,12 @@ inline constexpr std::uint32_t kMaxWaterMaterials = 8;
 // world, which is what the vertex's speed lane is a fraction of.
 [[nodiscard]] WaterUniforms waterUniformsFrom(const scene::WaterSettings& settings, float flowTime,
                                               float fastest, bool linearDepthValid);
+
+// ADR-916. `water.wgsl` with its tears compiled out: every line from a `---- tears (ADR-916) begin ----`
+// marker through the next `end` marker removed. A surface with no tears is drawn with a pipeline built
+// from this, so it runs exactly the shader it ran before the tears existed. Source with no markers comes
+// back unchanged; a block that never closes is an error.
+[[nodiscard]] Result<std::string> waterSourceWithoutTears(const std::string& source);
 
 class WaterRenderer {
 public:
@@ -91,25 +103,34 @@ public:
         return static_cast<std::uint32_t>(slot) * kStride;
     }
     [[nodiscard]] const wgpu::BindGroup& bindGroup() const { return bindGroup_; }
-    [[nodiscard]] const wgpu::RenderPipeline& pipeline() const { return pipeline_; }
-    [[nodiscard]] bool ready() const { return static_cast<bool>(pipeline_); }
+    // The pipeline slot `slot`'s material is drawn with (ADR-916): the one with the tear code when its
+    // `tears` is above 0, and otherwise the one with it compiled out -- so a surface without tears is
+    // byte-identical to the shader before them, which one shader with the code gated could not promise
+    // (the compiler builds the shared ripple path differently once the tear's data flows through it).
+    [[nodiscard]] const wgpu::RenderPipeline& pipeline(std::size_t slot) const {
+        return slot < torn_.size() && torn_[slot] ? pipeline_ : plainPipeline_;
+    }
+    [[nodiscard]] bool ready() const { return static_cast<bool>(pipeline_) && static_cast<bool>(plainPipeline_); }
     [[nodiscard]] std::uint32_t materialCount() const { return uploaded_; }
 
 private:
     // Dynamic uniform offsets must be a multiple of the device's minimum alignment, which is 256
-    // on every backend this runs on. 192 bytes of record, padded.
+    // on every backend this runs on. 240 bytes of record, padded.
     static constexpr std::uint32_t kStride = 256;
     static_assert(kStride % 256 == 0);
     static_assert(sizeof(WaterUniforms) <= kStride);
 
     [[nodiscard]] Result<void> createPipeline(gpu::ShaderLibrary& shaders);
+    [[nodiscard]] Result<wgpu::RenderPipeline> buildPipeline(const wgpu::ShaderModule& module, const char* label);
 
     gpu::Context* context_ = nullptr;
     wgpu::TextureFormat hdrFormat_ = wgpu::TextureFormat::RGBA16Float;
     wgpu::TextureFormat depthFormat_ = wgpu::TextureFormat::Depth32Float;
     wgpu::BindGroupLayout waterLayout_;
     wgpu::PipelineLayout pipelineLayout_;
-    wgpu::RenderPipeline pipeline_;
+    wgpu::RenderPipeline pipeline_;      // with the tears (ADR-916)
+    wgpu::RenderPipeline plainPipeline_; // with them compiled out
+    std::array<bool, kMaxWaterMaterials> torn_{};
     wgpu::Buffer uniforms_;
     wgpu::BindGroup bindGroup_;
     std::uint32_t uploaded_ = 0;

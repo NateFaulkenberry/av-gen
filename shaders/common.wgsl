@@ -199,6 +199,11 @@ struct ObjectUniforms {
     // The rest of an affected draw's state is its record in `entityFx` (pbr.wgsl), at index fxA.w.
     fxA: vec4<f32>,            // x = emission gain, y = bloom share, z = flags, w = record index
     fxB: vec4<f32>,            // rgb = tint on the material's own emission, w = 0
+    // ADR-903/905: the object's own emission lane -- x = gain, y = hue rotation in turns, zw = 0.
+    // Applied by pbr_shade.wgsl AFTER the material program and after the FXL lanes, to everything the
+    // surface emits: a node's emissiveBoost, a part's emissiveGain, a scatter layer's emissionGain and
+    // hueOffset. (1, 0) is the identity.
+    emission: vec4<f32>,
 };
 
 // ADR-703 (FXL): one owner's folded effect state, 16 lanes. Mirrors world::EntityFxRecord; the

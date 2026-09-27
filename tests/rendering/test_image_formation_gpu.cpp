@@ -457,7 +457,8 @@ TEST_CASE("The Hyperspace core frame is no longer blown out to white", "[gpu][po
         const FrameTime time = engine.tick(clock);
         engine.update(time);
         const rendering::ShaderFrameInputs inputs{&engine.shaderLayers(),
-                                                  engine.hasFrame() ? &engine.latestFrame() : nullptr};
+                                                  engine.hasFrame() ? &engine.latestFrame() : nullptr,
+                                                  engine.barPhase()};
         auto img = renderer.renderToImage(engine.scene(), time, 320, 180, &inputs);
         REQUIRE(img.has_value());
         frame = *img;

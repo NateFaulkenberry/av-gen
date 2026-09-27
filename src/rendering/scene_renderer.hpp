@@ -87,6 +87,10 @@ class EnvironmentProcessor;
 struct ShaderFrameInputs {
     const shaders::ShaderLayerSet* layers = nullptr;
     const analysis::AnalysisFrame* frame = nullptr; // for the audio spectrum texture (may be null)
+    // ADR-896: how far through the bar, 0..1, as the engine's meter has it (`Engine::barPhase`) --
+    // the `frame.beat.w` a material program reads. Not derived from the analysis frame's beat
+    // count here, which counted the first tracked beat as beat 1 and put every bar on beat 4.
+    float barPhase = 0.0f;
 };
 
 struct RenderStats {
@@ -188,6 +192,10 @@ struct RenderStats {
     std::uint32_t comets = 0;       // ADR-230: comets live in the frame block this frame
     std::uint32_t auroras = 0;      // ADR-230: auroras live in the frame block this frame
     bool fogSkyMap = false;         // ADR-918: the fog's sky map was rebuilt and read this frame
+    // ADR-912: the cuts this renderer has dropped its motion history for, over its life -- one per
+    // change of `Scene::camera.cutSerial`. Cumulative, not per frame, so a log or a test can read it
+    // after the fact.
+    std::uint32_t cameraCuts = 0;
 };
 
 constexpr std::uint32_t kMaxLights = 8; // the uniform fallback path (ADR-033); clustered has no such limit
@@ -417,8 +425,17 @@ struct ObjectUniforms {
     // byte-identical to one from before these existed.
     glm::vec4 fxA{0.0f}; // x = emission gain, y = bloom share, z = flags, w = record index in `entityFx`
     glm::vec4 fxB{0.0f}; // rgb = tint on the material's own emission, w = 0
+    // ADR-903/905: the object's own emission lane, the third of the padding vec4s. x = gain, y = hue
+    // rotation in turns, zw = 0. Applied by `pbr_shade.wgsl` AFTER the material program and after the
+    // FXL lanes, to everything the surface emits -- the one place a node's `emissiveBoost`, a part's
+    // `emissiveGain` and a scatter layer's `emissionGain`/`hueOffset` reach a surface, whatever kind
+    // of drawable it is (entity, procedural object and every part of it, SDF). Unlike `fxA` it is not
+    // the effect system's: FXL is rebuilt from effect instances every frame and gates on a flag,
+    // while this is the node's own value and is always on. (1, 0) is the identity, so a draw that
+    // keeps the default is the draw it was before this existed.
+    glm::vec4 emission{1.0f, 0.0f, 0.0f, 0.0f};
 };
-static_assert(sizeof(ObjectUniforms) == 448);
+static_assert(sizeof(ObjectUniforms) == 464);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);
@@ -433,6 +450,7 @@ static_assert(offsetof(ObjectUniforms, windTune) == 304);
 static_assert(offsetof(ObjectUniforms, energyB) == 400);
 static_assert(offsetof(ObjectUniforms, fxA) == 416);
 static_assert(offsetof(ObjectUniforms, fxB) == 432);
+static_assert(offsetof(ObjectUniforms, emission) == 448);
 
 struct TonemapUniforms {
     float exposure;
@@ -469,8 +487,10 @@ public:
     [[nodiscard]] Result<void> init();
     // (Re)creates the HDR target. Idempotent for equal sizes.
     [[nodiscard]] Result<void> resize(std::uint32_t width, std::uint32_t height);
-    // Invalidates camera/model/AO temporal state after an in-place scene reload or camera cut.
+    // Invalidates camera/model/AO temporal state after an in-place scene reload.
     // The next frame is treated as a new temporal sequence rather than as motion from the old one.
+    // (A camera cut needs no call: the scene says so through `Scene::camera.cutSerial`, and
+    // `render` takes the screen reset below for it, ADR-912.)
     // This is the *seek* reset: it also restarts the particle pools, because a seek moves the
     // world's clock and the pools are the world's state at that clock.
     void resetTemporalHistory();
@@ -903,6 +923,8 @@ private:
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};
     bool havePrevViewProj_ = false;
+    // ADR-912: the `Scene::camera.cutSerial` the last frame was drawn with; a different one is a cut.
+    std::uint32_t lastCutSerial_ = 0;
     double previousRenderTime_ = -std::numeric_limits<double>::infinity();
     // ADR-360: the previous frame's render time, captured before `previousRenderTime_` is
     // overwritten, so the wind's contribution to the velocity target is a real difference.

@@ -54,7 +54,9 @@ TEST_CASE("GltfScene imports, exposes parameters and applies the root transform"
     // Scaling about the bounds centre (x = 2.5): the node at x = 2 moves to 2.5 + (2 - 2.5) * 2 = 1.5.
     CHECK_THAT(static_cast<double>(e.transform.position.x), WithinAbs(1.5, 1e-4));
     CHECK_THAT(static_cast<double>(e.transform.scale.x), WithinAbs(2.0, 1e-5));
-    CHECK(e.material.emissiveIntensity == 3.0f);
+    // ADR-903: the boost is the entity's emission lane (after any program), not its material's intensity.
+    CHECK(e.emissionGain == 3.0f);
+    CHECK(e.material.emissiveIntensity == 1.0f);
     CHECK(gs.scene().lights[0].intensity == 1.0f);
     CHECK(gs.scene().camera.target.x == gs.boundsCenter().x);
     std::filesystem::remove(path);

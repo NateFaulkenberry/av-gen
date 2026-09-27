@@ -86,6 +86,10 @@ enum class MaterialInput : std::uint8_t {
     // the names ADR-036 uses; both spellings exist so a program reads the way the ADR is written.
     Curvature, Convexity, Concavity, Cavity, Occlusion, Height, NormalVariance, ObjectPosition,
     TriplanarWeights, CameraDistance, MaterialId, Footprint,
+    // ADR-904. Appended. The material's own emission as this instance shows it with no program:
+    // emissive colour x intensity x the instance's variation (rgb), w = 1. With it a program can shape
+    // the material's emission -- a mask, a ramp -- instead of asserting a colour of its own.
+    MaterialEmission,
 };
 [[nodiscard]] const char* materialInputName(MaterialInput input);
 [[nodiscard]] std::optional<MaterialInput> materialInputFromName(std::string_view name);
@@ -175,6 +179,16 @@ struct MaterialProgram {
     int heightRegister = -1;    // the surface height the layers blend against
     MaterialGate gate;
     [[nodiscard]] int totalOpCount() const; // base + every enabled layer
+    // ADR-904: the two facts the shader needs to apply an instance's emission variation exactly
+    // once. `writesEmission`: the base or an enabled layer names an emission register, so the
+    // program's emission replaces the material's (ADR-179). `emissionReadsInstance`: an emission the
+    // program writes depends -- through the ops' data flow, not merely somewhere in the program -- on
+    // the `instanceEmissive` or `materialEmission` input, which means the program has applied the
+    // instance's variation itself and the engine must not apply it again. A program that writes
+    // emission without reading either has the variation applied for it, after it, as a rotation of
+    // the displayed hue and a gain.
+    [[nodiscard]] bool writesEmission() const;
+    [[nodiscard]] bool emissionReadsInstance() const;
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
     [[nodiscard]] nlohmann::json toJson() const;
@@ -212,6 +226,8 @@ struct MaterialContext {
     float normalVariance = 0.0f;  // 0.5 (|dN/dx|^2 + |dN/dy|^2)
     float footprint = 0.0f;       // world units covered by one pixel
     float materialId = 0.0f;
+    // ADR-904: the material's emission with the instance's variation applied (rgb), w = 1.
+    glm::vec4 materialEmission{0.0f};
     // Field samples by name are resolved through this callback (null = zeros).
     const struct MaterialFieldSampler* fields = nullptr;
 };
@@ -249,7 +265,7 @@ struct MaterialResult {
 [[nodiscard]] MaterialResult evaluateMaterialProgram(const MaterialProgram& program, const MaterialContext& ctx,
                                                      const MaterialResult& base);
 
-// GPU packing (see shaders/material.wgsl): an 80-byte header, kMaxMaterialLayers 64-byte layer
+// GPU packing (see shaders/material.wgsl): a 96-byte header, kMaxMaterialLayers 64-byte layer
 // records and kMaxMaterialOps 112-byte ops.
 struct alignas(16) MaterialOpGpu {
     std::uint32_t kind;
@@ -280,10 +296,16 @@ struct alignas(16) MaterialProgramGpu {
     glm::vec4 emissionIntensityPad;
     glm::ivec4 aux;              // normal, occlusion, height registers, total op count
     glm::ivec4 fieldSlots;       // FieldBlock slot of each distinct field the program names, -1 = unused
+    // ADR-904: x = kMaterialWritesEmission | kMaterialEmissionReadsInstance, yzw = 0. The header had
+    // no lane to spare (the gate took the last ones), so the header grew by one vec4.
+    glm::ivec4 flags;
     std::array<MaterialLayerGpu, kMaxMaterialLayers> layers;
     std::array<MaterialOpGpu, kMaxMaterialOps> ops;
 };
-static_assert(sizeof(MaterialProgramGpu) == 80 + 64 * kMaxMaterialLayers + 112 * kMaxMaterialOps);
+static_assert(sizeof(MaterialProgramGpu) == 96 + 64 * kMaxMaterialLayers + 112 * kMaxMaterialOps);
+// The bits of `MaterialProgramGpu::flags.x` (MaterialProgram::writesEmission/emissionReadsInstance).
+inline constexpr std::int32_t kMaterialWritesEmission = 1;
+inline constexpr std::int32_t kMaterialEmissionReadsInstance = 2;
 static_assert(kMaxMaterialFields == 4); // fieldSlots is one ivec4
 // `fieldSlotOf` maps a field name to a GPU slot (-1 when unknown).
 template <typename SlotFn>

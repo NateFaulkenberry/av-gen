@@ -1,6 +1,6 @@
 // Procedural materials on the GPU (ADR-030, layered in ADR-036): the WGSL transliteration of
 // scene::evaluateMaterialProgram (src/scene/material_program.cpp). A packed MaterialProgramGpu
-// (5712 bytes: an 80-byte header, 4 layer records of 64 bytes and 48 ops of 112 bytes,
+// (5728 bytes: a 96-byte header, 4 layer records of 64 bytes and 48 ops of 112 bytes,
 // scene::packMaterialProgram) per slot in a *storage* MaterialProgramBlock;
 // evaluateMaterialProgram(slot, ctx, base) runs the base's ops over a register file of 8 vec4s
 // (all zero at entry), reads the outputs, then runs and composites each layer, with a register
@@ -45,11 +45,12 @@ struct MaterialProgramGpu {
     emissionIntensityPad: vec4<f32>,
     aux: vec4<i32>,               // normal, occlusion, height registers, total op count
     fieldSlots: vec4<i32>,        // FieldBlock slot of each distinct field named, -1 = unused
+    flags: vec4<i32>,             // ADR-904: x = MAT_FLAG_WRITES_EMISSION | MAT_FLAG_EMISSION_READS_INSTANCE
     layers: array<MaterialLayerGpu, 4>,
     ops: array<MaterialOpGpu, 48>,
 };
 
-// Mirrors rendering::MaterialProgramBlock (45712 bytes; a storage buffer since ADR-036).
+// Mirrors rendering::MaterialProgramBlock (45840 bytes; a storage buffer since ADR-036).
 struct MaterialProgramBlock {
     count: u32,
     pad0: u32,
@@ -128,6 +129,12 @@ const MAT_IN_TRIPLANAR_WEIGHTS: u32 = 24u;
 const MAT_IN_CAMERA_DISTANCE: u32 = 25u;
 const MAT_IN_MATERIAL_ID: u32 = 26u;
 const MAT_IN_FOOTPRINT: u32 = 27u;
+const MAT_IN_MATERIAL_EMISSION: u32 = 28u; // ADR-904
+
+// ADR-904: the bits of MaterialProgramGpu.flags.x (scene::kMaterialWritesEmission and
+// scene::kMaterialEmissionReadsInstance).
+const MAT_FLAG_WRITES_EMISSION: i32 = 1;
+const MAT_FLAG_EMISSION_READS_INSTANCE: i32 = 2;
 
 // The per-fragment inputs, exactly scene::MaterialContext.
 struct MaterialContext {
@@ -156,6 +163,9 @@ struct MaterialContext {
     normalVariance: f32,
     footprint: f32,
     materialId: f32,
+    // ADR-904: the material's emission as this instance shows it with no program -- emissive colour
+    // x intensity x the instance's multiplier (rgb), w = 1.
+    materialEmission: vec4<f32>,
 };
 
 // The material values a program reads from (`base`) and writes (scene::MaterialResult without
@@ -272,6 +282,7 @@ fn materialContextZero() -> MaterialContext {
     ctx.normalVariance = 0.0;
     ctx.footprint = 0.0;
     ctx.materialId = 0.0;
+    ctx.materialEmission = vec4<f32>(0.0);
     return ctx;
 }
 
@@ -447,6 +458,9 @@ fn materialInputValue(input: u32, ctx: MaterialContext) -> vec4<f32> {
     }
     if (input == MAT_IN_FOOTPRINT) {
         return vec4<f32>(ctx.footprint);
+    }
+    if (input == MAT_IN_MATERIAL_EMISSION) {
+        return ctx.materialEmission;
     }
     return vec4<f32>(0.0);
 }
@@ -691,6 +705,15 @@ fn materialRunOps(pi: u32, first: u32, count: u32, ctx: MaterialContext, regsIn:
         matSet(&regs, dst, materialEvalOp(pi, index, ctx, regs, fields));
     }
     return regs;
+}
+
+// ADR-904: the program's emission facts (MaterialProgramGpu.flags.x), 0 for no program -- the caller
+// asks this only where `materialProgramAdmits` let the program run.
+fn materialProgramFlags(programIndex: i32) -> i32 {
+    if (programIndex < 0 || programIndex >= MAT_MAX_PROGRAMS || u32(programIndex) >= materialPrograms.count) {
+        return 0;
+    }
+    return materialPrograms.programs[u32(programIndex)].flags.x;
 }
 
 // Evaluates the program in slot `programIndex` for `ctx`, starting from the material's own values

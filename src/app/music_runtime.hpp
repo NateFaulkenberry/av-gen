@@ -22,10 +22,11 @@
 // undoes the seconds-based smoothing ADR-063 was careful to build.
 //
 // **The metre comes from the analysis frame's own beat fields, not from the engine's beat clock.**
-// `Engine::updateTimeSignals` extrapolates beat phase forward by `deltaTime` between analysis
-// frames, so its bar and phrase counters step at slightly different moments at different frame
-// rates. `AnalysisFrame::beatCount` does not. Bars, phrases and sections are divided out of that
-// count here rather than read off the bus for exactly that reason.
+// The engine's clock is read at render frames, so its bar and phrase counters step at slightly
+// different moments at different frame rates. `AnalysisFrame::beatCount` does not. Bars, phrases
+// and sections are divided out of that count here rather than read off the bus for exactly that
+// reason -- through the same `analysis::Meter` the bus uses (ADR-896), so `music.downbeat` and
+// `beat.bar` agree about which beat is beat 1.
 //
 // **Events accumulate between publishes.** One render frame at 30 fps consumes about three
 // analysis frames, and an impact in the first must not be overwritten by the quiet in the third --
@@ -42,6 +43,7 @@
 // will not link.
 
 #include "analysis/analyzer.hpp"
+#include "analysis/meter.hpp"
 #include "signals/musical_events.hpp"
 #include "signals/signal_bus.hpp"
 
@@ -59,8 +61,6 @@ class MusicRuntime {
 public:
     // Room for the MusicalEvent enum to grow; the live count is discovered in declare().
     static constexpr std::size_t kMaxEvents = 16;
-    // The bar the metre is divided into, matching the beat clock in Engine::updateTimeSignals.
-    static constexpr std::uint32_t kBeatsPerBar = 4;
     // lastEventTime() for a kind that has not fired. Not 0.0: the detector primes on its first
     // frame and emits nothing, so no real moment can carry a time of zero, but a caller reading
     // "0.0" cannot tell "at the start" from "never" and one of them is a bug.
@@ -96,7 +96,7 @@ public:
     // engine hands frames over from two places (the offline catch-up loop walks every frame, then
     // publishFrame() publishes the last of them again) and duplicate delivery would otherwise
     // advance the detector's clock by zero seconds and double-count the frame's onset.
-    void consume(const analysis::AnalysisFrame& frame, int phraseBars, int sectionPhrases) {
+    void consume(const analysis::AnalysisFrame& frame, const analysis::Meter& meter) {
         if (haveFrame_ && frame.frameIndex == lastFrameIndex_) {
             return;
         }
@@ -115,10 +115,14 @@ public:
         // whole decay and fires an Impact on each hop the cooldown permits.
         mf.onsetStrength = frame.onset ? frame.onsetStrength : 0.0f;
         mf.beat = frame.beat;
-        mf.beatInBar = static_cast<int>(frame.beatCount % kBeatsPerBar);
-        mf.barCount = frame.beatCount / kBeatsPerBar;
-        mf.phraseCount = mf.barCount / static_cast<std::uint32_t>(std::max(1, phraseBars));
-        mf.sectionCount = mf.phraseCount / static_cast<std::uint32_t>(std::max(1, sectionPhrases));
+        // `beatCount` is how many tracked beats have landed, so the beat this frame is in is
+        // `beatCount - 1` on the clock (-1 before the first); the meter turns that into a musical
+        // beat, and a bar, phrase and section, with beat 1 of bar 1 on its downbeat (ADR-896).
+        const std::int64_t beat = meter.beat(static_cast<std::int64_t>(frame.beatCount) - 1);
+        mf.beatInBar = meter.beatInBar(beat);
+        mf.barCount = meter.bar(beat);
+        mf.phraseCount = meter.phrase(beat);
+        mf.sectionCount = meter.section(beat);
 
         // Kept, not only folded into the per-kind accumulators. Publishing needs the strongest of
         // each kind; folding a whole track into a structure needs every moment in order, and the

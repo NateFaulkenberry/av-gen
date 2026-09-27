@@ -554,7 +554,7 @@ TEST_CASE("the proof-of-concept score folds into sections the editor can cut to"
     // still a grid an author can snap to.
     CHECK(beats.beatTimes.size() > 60);
 
-    auto structure = app::structureOfTrack(*engine.track(), engine.phraseBars(), engine.sectionPhrases());
+    auto structure = app::structureOfTrack(*engine.track(), engine.meter());
     REQUIRE(structure.has_value());
     for (const signals::StructureSection& s : structure->sections) {
         WARN(fmt::format("{:7.2f}s {:7.2f}s  {:<12} intensity {:.2f}", s.startSeconds,

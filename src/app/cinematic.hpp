@@ -84,7 +84,10 @@ enum class MovementCurve : std::uint8_t {
 [[nodiscard]] std::optional<MovementCurve> movementCurveFromName(std::string_view name);
 
 // "This object is the point of this shot." The camera side of hero spotlighting and nothing more:
-// it says who and how strongly, and leaves framing, exposure and rim light to whatever reads it.
+// it says who and how strongly. What reads it: `Sequence::validate`'s coverage check (a spotlit
+// subject must fill some of the frame) and `spotlightAt` / `spotlightSpans`. ADR-922 cut the two
+// outputs nothing read -- the `camera/focus/emphasis` track the bake emitted and no build ever
+// registered, and `world::ShotSpan::emphasis` -- rather than keep a hierarchy no pixel honoured.
 // Kept on the shot rather than on the subject because the same object is a hero in one shot and
 // scenery in the next, which is the whole idea.
 struct Spotlight {
@@ -132,6 +135,11 @@ struct FocalTarget {
     // whichever hero happens to have open ground to its north and puts every other one's establishing
     // shot into a hillside.
     float preferredAzimuth = 0.0f;
+    // How much this subject moves on its own, 0..1 (ADR-921): 0 a prop that stands where it was put,
+    // 0.5 one that sways, hovers or spins in place, 1 one that travels (a walker, a staged craft).
+    // Song Mode holds a moving subject's shot longer than a still one's. Read off the scene by the
+    // engine (`songInputsForEngine`); 0 -- the default -- everywhere else.
+    float motion = 0.0f;
 };
 
 // Where the subject sits in the frame and how the lens treats it. Thirds are the default because
@@ -335,8 +343,8 @@ struct Sequence {
     // A travel shot is **not** also a hold: a shot whose whole purpose is to leave one subject for
     // another is not a shot holding either of them, and an effect gated on "the camera has landed"
     // must not fire while it is still on its way. A hold is any other shot with a subject --
-    // `Spotlight::emphasis` is carried alongside but does not decide it, because emphasis is how
-    // much of the *film* a subject owns and the director leaves it at zero for a whole intro.
+    // `Spotlight::emphasis` does not decide it, because emphasis is how much of the *film* a
+    // subject owns and the director leaves it at zero for a whole intro.
     [[nodiscard]] std::vector<world::ShotSpan> shotSpans() const;
 
     [[nodiscard]] nlohmann::json toJson() const;

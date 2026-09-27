@@ -96,6 +96,9 @@ struct AppOptions {
     // does not carry one. The same reason `--director` exists: a mode that can only be reached
     // through a GUI is a mode nobody can measure, reproduce or regression-test.
     std::optional<std::filesystem::path> songPlan;
+    // `--cut-report <file>`: after a Song Mode `--direct`, write the cut as JSON (ADR-923) -- every
+    // shot's span, subject, arc and the reason for its duration -- for a generator to read.
+    std::optional<std::filesystem::path> cutReport;
     std::optional<std::filesystem::path> saveProject;  // write on exit
     // `--save-scene <file>`: write the composition on exit, the symmetry `--save-project`
     // has always lacked. Needed by Song Mode (ADR-249), whose camera track lives in the
@@ -267,6 +270,12 @@ struct AppOptions {
     // the parser a case has become a project, a size, a tier and a set of arms.
     bool listLabs = false;
     std::optional<labs::LabCase> labCase;
+    // ADR-902: `--audit-routes <out.json>` loads --project headless (no window, no GPU), writes the
+    // route/track/effect liveness report to the file ("-" = stdout) and exits.
+    std::optional<std::filesystem::path> auditRoutes;
+    // ADR-927: `--propose-reactivity <out>`, with --project: the Director's default reactivity
+    // proposal as a document a generator can read, edit and install; headless, no GPU.
+    std::optional<std::filesystem::path> proposeReactivity;
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::optional<std::string> syphon; // --syphon <name>
     std::optional<std::string> example; // --example <name>

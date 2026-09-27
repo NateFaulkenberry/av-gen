@@ -34,7 +34,9 @@ void FieldUniforms::update(const spatial::FieldSet& fields, double time) {
     for (std::size_t i = 0; i < count; ++i) {
         const spatial::FieldSpec& field = fields.fields[i];
         spatial::FieldGpu& g = block_.fields[i];
-        if (field.enabled) {
+        // ADR-906: a triggered field before its first event is silent, and silence is exactly
+        // what a disabled field already packs to.
+        if (field.enabled && !field.silent()) {
             g = spatial::packField(field, time, &fields);
             slots_.emplace(field.name, static_cast<int>(i));
         } else {
