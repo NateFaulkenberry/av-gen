@@ -64,15 +64,31 @@ BASE = {
     "nodes/valley/water/sparkle": 0.06,
     "nodes/valley/water/foam": 0.06,
     "nodes/valley/water/shallowColor": [0.03, 0.1, 0.12],
-    # The aurora's own response to the spectrum (bass -> curtain height, low-mid -> waves, mid -> folds,
-    # high -> filaments) reads the raw bands every frame, unsmoothed: measured over the arrival's grand
-    # wide (s14, the top fifth of the frame) the sky's brightness jumped by up to 44% from one frame to
-    # the next, in the first pass's render and this one alike -- a flickering sky, the one thing in the
-    # frame that is biggest and should be calmest. It is switched off at its master ("audio response");
-    # the aurora answers the lead instead, slowly (the reactivity proposal's `lead.aurora`, x0.94-1.15
-    # over 0.4-1.6 s), and the arc keys its intensity with the sections. Its own flow still moves it.
+    # The aurora: a steady curtain that answers the music slowly, never frame by frame.
+    # Two things read the audio every frame, unsmoothed, inside the aurora's shader
+    # (atmosphere_fx.wgsl): the "audio response" terms (bass -> the curtain's lift, low-mid -> waves,
+    # mid -> folds, high -> filaments, from the analyser's per-frame bands) and the "spectrum shape"
+    # (each bearing's top follows one bin of the raw per-frame spectrum, engine.cpp
+    # updateAuroraSpectrum). Together they made the sky jump on every kick: up to 44% between two
+    # frames over the arrival's grand wide, on the beat at 76.634 s; +16% to +61% on the beat in the
+    # drop (the top fifth of s33 and s36, beat-locked, first pass).
+    # Iteration 2 switched off only the first ("audio response" 0). Measured in the drop, that left
+    # the kick in the sky (+12% to +16% on the beat, v3) and took away the curtain's brightness and
+    # height with it: the sky's mean over the drop fell by 25-57% and the aurora all but vanished
+    # (v3-D against before-D, the same engine). So the second goes too, and the average the first
+    # pass's audio terms gave is put back as fixed values: the spectrum held a top at about 0.8 of
+    # the curtain and the bass lifted it about 1.25x, so a flat top (spectrum shape 0) stands as tall;
+    # the high band tripled the filaments' base 0.4 on average (0.4 + 1.6 x 0.7 x ~0.5), so the
+    # filaments go 0.95 -> 2.3; the mid band's folds and the low-mid's waves likewise (turbulence
+    # 0.45 -> 0.68, wave amplitude 0.30 -> 0.38). The aurora answers the lead instead, slowly (the
+    # proposal's `lead.aurora`, x0.94-1.15 over 0.4-1.6 s), the arc keys it with the sections, and its
+    # own flow keeps it moving.
     "fx/aurora/audioBeat": 0.0,
     "fx/aurora/audioSensitivity": 0.0,
+    "fx/aurora/spectrumShape": 0.0,
+    "fx/aurora/filaments": 2.3,
+    "fx/aurora/turbulence": 0.68,
+    "fx/aurora/waveAmplitude": 0.38,
 }
 
 # Effects the film does not use, and why.
@@ -328,7 +344,8 @@ def apply_arc(project):
 # The film's reactivity is the Director's proposal (reactivity.py): one owner per musical layer, each
 # hero on its own, the small mushrooms on the fast layers, the world on the sections. What stays
 # authored here is what the score itself writes and a detector would place wrong: the crash, the four
-# kick gaps, and the kicks the elder's heartbeat keeps (the proposal's elder routes are pointed at them).
+# kick gaps, the kicks the elder's heartbeat keeps and the claps the lantern answers (the proposal's
+# elder and lantern routes are pointed at them), and the riser's roll.
 #
 # Every visual accent is led by LEAD_SECONDS: viewers forgive a picture a little late far more than
 # one late by a frame, and animators hit early for the same reason (research principle 17).
@@ -356,6 +373,23 @@ def _pulses(name, times, width=1.0 / 60.0):
     return {"kind": "timeline", "name": name, "settings": {"loopLength": 0.0, "mode": "event", "keys": keys}}
 
 
+def claps():
+    """The clap, as the track plays it: beats 2 and 4 of every bar with the groove (01-music.md
+    section 1.4), the four kick-gap beats included -- the kick drops out there, the clap does not.
+    None in the pull-back (bars 15-16), none in the break (89-92: the top is closed, and beats 2/4 are
+    no brighter than 1/3 above 8 kHz), none under the riser's roll (93-96, which the fungi carry).
+    Measured on the song: above 8 kHz, beats 2/4 rise 5-19 dB more than 1/3 in every groove section.
+    Scored, because the analyser's snare band (audio.onsetMid, 2-6 kHz) is the clap only where the
+    groove is bare: it fires 1.0-1.1 times a second in the cold open, the riff, groove 2, the lead and
+    the suspension (the claps' own 1.08), but 3.4-3.8 in the lift, the arrival, the plateau and the
+    drop, where the 16th shakers and the mid synth play (the planner's section profiles), and 1.9-3.0
+    in the break and the riser, where there is no clap at all. On that band the lantern flickered at
+    3.6 Hz through the film's biggest sections instead of answering the clap."""
+    silent = set(range(15, 17)) | set(range(89, 97))
+    return [music.beat(b, n) for b in range(1, 123) if b not in silent for n in (2, 4)
+            if music.beat(b, n) <= music.LAST_HIT + 1e-3]
+
+
 def roll():
     """The roll into the drop, as the track plays it (01-music.md section 1.4): 8ths through bars 93-94,
     16ths through 95 and the first three beats of 96, about 32nds on its last beat. The analyser's low
@@ -376,6 +410,8 @@ def apply_motifs(project, scene):
         _pulses("gap", music.KICK_GAPS),
         # Every kick the track plays, as scored (music.kicks): the elder's heartbeat.
         _pulses("kick", music.kicks(), width=1.5 / 60.0),
+        # Every clap, as scored: the lantern's flare and the beacons' echo (reactivity.EDITS).
+        _pulses("clap", claps()),
         # The riser's roll: the small fungi flicker with it, faster and faster into the drop.
         _pulses("roll", roll()),
     ]

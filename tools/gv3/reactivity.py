@@ -162,14 +162,33 @@ EDITS = [
     # break, 20 ms ahead of each hit -- rather than the detector's low onsets, which fire 0-18 ms late
     # and add four false hits on the gap beats, the valley's held breaths. A short fall, as the first
     # pass measured it working: gone within the beat, the next kick lands on a dark gill.
-    ("kick.elder-2-gills", {"source": "timeline.kick", "chain": {"decayMs": 140.0}},
-     "the scored kicks (20 ms lead, silent gaps), falling within the beat"),
-    ("kick.elder-2-under", {"source": "timeline.kick", "chain": {"decayMs": 170.0}},
+    #
+    # And at the plan's strength: +60% in the grooves, up to +100% in the drop (plan section 5). The
+    # proposal's +0.60 is scaled by the section's depth (0.19-1.0), so it peaked at x1.23 in the cold
+    # open and x1.4 in the grooves -- half the first pass's measured heartbeat (x1.6 on every kick):
+    # +2.1% of the elder's region in the open where the first pass had +4.1%, and +1.7% in s08
+    # against +3.5%, which the evaluator no longer counted as a response (v3-A, v3-B). At 1.0 it
+    # peaks x1.39 in the cold open, x1.63-1.67 in the grooves, x1.92 at the arrival and x2.0 in the drop.
+    ("kick.elder-2-gills", {"source": "timeline.kick", "amount": 1.0, "chain": {"decayMs": 140.0}},
+     "the scored kicks (20 ms lead, silent gaps), falling within the beat, at the plan's +60% to +100%"),
+    ("kick.elder-2-under", {"source": "timeline.kick", "amount": 1.0, "chain": {"decayMs": 170.0}},
      "the scored kicks; the underside a little slower than the gills, so the pulse spreads"),
-    ("kick.elder-2-cap", {"source": "timeline.kick", "chain": {"decayMs": 200.0}},
+    ("kick.elder-2-cap", {"source": "timeline.kick", "amount": 1.0, "chain": {"decayMs": 200.0}},
      "the scored kicks; the cap last and slowest"),
     ("kick.elder-2-spores", {"source": "timeline.kick"}, "the scored kicks"),
     ("kick.elder-practical", {"source": "timeline.kick"}, "the scored kicks: the light the elder throws echoes its heartbeat"),
+    # The clap, the lantern's layer (plan section 5: "a short emissive flare, its own colour"), on the
+    # claps the track plays (look.claps) rather than the analyser's snare band, which is the clap only
+    # in the bare sections and a 3.4-3.8 Hz flicker of shakers and synth in the lift, the arrival, the
+    # plateau and the drop. Stronger than proposed (+0.465): the lantern's close-ups are medium shots
+    # (6% of s04's frame), and at x1.29 in the riff it did not register there (v3-A); at 0.75 it
+    # flares x1.47 in the riff and x1.75 in the drop, under the elder's heartbeat.
+    ("clap.lantern-gills", {"source": "timeline.clap", "amount": 0.75}, "the scored claps, a clear flare"),
+    ("clap.lantern-under", {"source": "timeline.clap", "amount": 0.75}, "the scored claps, 35 ms after the gills"),
+    ("clap.lantern-cap", {"source": "timeline.clap", "amount": 0.75}, "the scored claps, 70 ms after the gills"),
+    ("clap.lantern-spores", {"source": "timeline.clap"}, "the scored claps"),
+    # The beacons echo the lantern's clap 60 ms later, across the valley.
+    ("clap.beacons", {"source": "timeline.clap"}, "the scored claps: the lamps echo the lantern"),
     # The seams thin in the quiet sections but never vanish: the proposal's x0.70 floor took the tears
     # below their safe range (the validator's OVER_SATURATED warning); x0.80 keeps 0.28.
     ("section.water-tears", {"chain": {"remapOutMin": 0.8}}, "the quiet sections' floor held inside the tears' safe range"),
@@ -210,6 +229,14 @@ ADDS = [
       "chain": {"attackMs": 5.0, "decayMs": 70.0}},
      "the riser's scored roll on the small fungi: their flicker quickens with it"),
 ]
+# The planner's section hues for the glowing plants (its timeline source), held where the story needs
+# them held. The drop keeps the plateau's colours (plan section 2: "the drop may differ in brightness
+# and activity, not in hue"): the proposal turned the mushrooms -0.08 of a turn there, teal toward
+# green and magenta toward blue-violet, and the drop's pink and magenta accents went blue (v3-D against
+# before-D, s33 and s36). The rest of its hues stay: a little bluer before the arrival (+0.03) and in
+# the drained sections (+0.06), the plateau's own from the arrival.
+HUE_SOURCE = "glowing-plants-hue-by-section"
+HUE_HELD = {"drop": 0.0}
 # Parameters of the planner's sources, merged over its own.
 SOURCE_PARAMETERS = {
     # beat-synced: position = beats / 8 + phase, a sine 0.5 - 0.5 cos(2 pi position) peaking at 0.5;
@@ -226,6 +253,27 @@ def _edit(route, change):
         else:
             route[k] = v
     return route
+
+
+def hold_hues(sources, notes):
+    """HUE_HELD applied to the planner's hue source. The planner steps a section's hue as a ramp over
+    the section's first bar, and the ramp's first key (at the next section's start) carries the held
+    section's value: so the keys after the section's start, up to and including the next section's
+    first, are the section's."""
+    src = next((s for s in sources if s.get("name") == HUE_SOURCE), None)
+    if src is None:
+        notes.append(f"hue hold: the planner proposed no '{HUE_SOURCE}' source")
+        return
+    for segment, value in HUE_HELD.items():
+        start, end = music.segment(segment)
+        held = [k for k in src["settings"]["keys"] if start + 1e-3 < k["time"] <= end + 1e-3]
+        if not held:
+            notes.append(f"hue hold: no key of '{HUE_SOURCE}' in the {segment}")
+        for k in held:
+            k["value"] = value
+    if "reason" in src:  # the plan's record of the source: say why it differs from the proposal
+        held = ", ".join(f"the {s} at {v:+g}" for s, v in HUE_HELD.items())
+        src["reason"] = f"{src['reason']} GV3 edit: {held}, the plateau's colours (the drop changes light, not hue)."
 
 
 def tune(proposal):
@@ -263,6 +311,8 @@ def tune(proposal):
     # The plan's record of what it produced: a dropped item produced nothing. An edited item keeps
     # its record, so the Director panel knows the production changed it and a revision keeps it.
     plan["produced"] = [p for p in plan["produced"] if p.get("item") not in dropped]
+    hold_hues(install["sources"], notes)
+    hold_hues(plan.get("sources", []), notes)
     parameters = dict(install["parameters"])
     parameters.update(SOURCE_PARAMETERS)
     added = [copy.deepcopy(route) for route, _ in ADDS]
