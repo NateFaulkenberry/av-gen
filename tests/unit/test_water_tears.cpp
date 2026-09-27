@@ -2,22 +2,32 @@
 // reaches the picture, that the seams are what they claim to be -- is test_water_tears_gpu.cpp.
 //
 // What is checked here is that an authored tear survives the round trip a scene file takes, that
-// nonsense is refused with a message naming the key, and that exactly the three routable settings are
-// parameters and reach the surface the renderer reads.
+// nonsense is refused with a message naming the key, that every setting is a control under one
+// "tears" heading, labelled for what it does and reaching the surface the renderer reads, that a
+// route can drive exactly three of them, and that the liveness registry knows when a tear setting is
+// unread and when keying one is a phase-rate hazard.
 
 #include "assets/asset_registry.hpp"
 #include "core/time.hpp"
+#include "params/liveness.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "params/timeline.hpp"
 #include "scene/composition.hpp"
+#include "scene/route_liveness.hpp"
 #include "scene/water_surface.hpp"
+#include "signals/signal_bus.hpp"
+#include "ui/ui_logic.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <functional>
 #include <limits>
 #include <string>
+#include <vector>
 
 using namespace avgen;
 using json = nlohmann::json;
@@ -109,6 +119,7 @@ TEST_CASE("tear settings reject nonsense and say which key", "[unit][water][tear
     const Bad bad[] = {
         {{{"tearDirection", "north"}}, "tearDirection"},
         {{{"tearDirection", true}}, "tearDirection"},
+        {{{"tearDirection", 7.0}}, "tearDirection"}, // more than a turn: the control could not show it
         {{{"tearShear", 9.0}}, "tearShear"},
         {{{"tearCoverage", 1.5}}, "tearCoverage"},
         {{{"tearCell", 0.0}}, "tearCell"},
@@ -136,48 +147,218 @@ TEST_CASE("tear settings reject nonsense and say which key", "[unit][water][tear
     CHECK_FALSE(w.validate());
 }
 
-TEST_CASE("exactly the tears' amount, shear and coverage are parameters, and they reach the surface",
-          "[unit][water][tears][parameters]") {
+namespace {
+
+// A composition with the tears on and every setting off its default, attached to a parameter set.
+struct TornSea {
     assets::AssetRegistry registry;
-    auto loaded = scene::Composition::fromJson(
-        terrainWith({{"tears", 0.25}, {"tearShear", 2.0}, {"tearCoverage", 0.5}}), registry);
-    REQUIRE(loaded.has_value());
-    scene::Composition& comp = **loaded;
+    std::unique_ptr<scene::Composition> comp;
     params::ParameterSet params;
     params::Modulator modulator;
-    comp.attach(params, modulator);
-    comp.update(FrameTime{});
-    REQUIRE(comp.scene().waters.size() == 1);
 
-    auto* tears = params.findAs<float>("nodes/sea/water/tears");
-    auto* shear = params.findAs<float>("nodes/sea/water/tearShear");
-    auto* coverage = params.findAs<float>("nodes/sea/water/tearCoverage");
-    REQUIRE(tears != nullptr);
-    REQUIRE(shear != nullptr);
-    REQUIRE(coverage != nullptr);
-    // Registered with the authored values, so a project that never touches them keeps the scene's.
-    CHECK(tears->base() == 0.25f);
-    CHECK(shear->base() == 2.0f);
-    CHECK(coverage->base() == 0.5f);
+    explicit TornSea(json water = {{"tears", 0.25},       {"tearShear", 2.0},    {"tearCoverage", 0.5},
+                                   {"tearCell", 0.9},     {"tearSpacing", 22.0}, {"tearStretch", 2.2},
+                                   {"tearDirection", 1.1}, {"tearDrift", -0.2},   {"tearWind", 0.3}}) {
+        auto loaded = scene::Composition::fromJson(terrainWith(water), registry);
+        REQUIRE(loaded.has_value());
+        comp = std::move(*loaded);
+        comp->attach(params, modulator);
+        comp->update(FrameTime{});
+        REQUIRE(comp->scene().waters.size() == 1);
+    }
+    const scene::WaterSettings& drawn() {
+        params.resetFinals();
+        comp->update(FrameTime{});
+        return comp->scene().waters[0].settings;
+    }
+};
 
-    // Moved as a route or an edit would move them, they reach the settings the renderer reads.
-    tears->setBase(0.8f);
-    shear->setBase(5.0f);
-    coverage->setBase(0.9f);
-    params.resetFinals();
-    comp.update(FrameTime{});
-    const scene::WaterSettings& drawn = comp.scene().waters[0].settings;
-    CHECK(drawn.tears == 0.8f);
-    CHECK(drawn.tearShear == 5.0f);
-    CHECK(drawn.tearCoverage == 0.9f);
+// The ten controls: path leaf, the label a person reads, whether a route may drive it, the authored
+// value TornSea gives it, and an edit with the setting it must reach.
+struct TearControl {
+    const char* leaf;
+    const char* label;
+    bool routable;
+    float authored; // bool: 0/1
+    float edited;
+    std::function<float(const scene::WaterSettings&)> read;
+};
 
-    // The static ones are not parameters, on purpose: routing one would rescale or turn the whole seam
-    // lattice about the world origin, or multiply the timeline second. The control on the check is the
-    // three found above.
-    for (const char* leaf : {"tearCell", "tearSpacing", "tearStretch", "tearDirection", "tearAngle", "tearDrift",
-                             "tearWind"}) {
-        const std::string path = std::string("nodes/sea/water/") + leaf;
+const std::vector<TearControl>& tearControls() {
+    static const std::vector<TearControl> rows{
+        {"amount", "amount", true, 0.25f, 0.8f, [](const scene::WaterSettings& w) { return w.tears; }},
+        {"shear", "shear (m)", true, 2.0f, 5.0f, [](const scene::WaterSettings& w) { return w.tearShear; }},
+        {"coverage", "coverage", true, 0.5f, 0.9f, [](const scene::WaterSettings& w) { return w.tearCoverage; }},
+        {"cell", "step size (m)", false, 0.9f, 1.6f, [](const scene::WaterSettings& w) { return w.tearCell; }},
+        {"spacing", "spacing (m)", false, 22.0f, 35.0f, [](const scene::WaterSettings& w) { return w.tearSpacing; }},
+        {"stretch", "stretch", false, 2.2f, 4.0f, [](const scene::WaterSettings& w) { return w.tearStretch; }},
+        {"followWind", "follow the wind", false, 0.0f, 1.0f,
+         [](const scene::WaterSettings& w) { return w.tearFollowsWind ? 1.0f : 0.0f; }},
+        {"direction", "direction (radians, if not following the wind)", false, 1.1f, -0.7f,
+         [](const scene::WaterSettings& w) { return w.tearAngle; }},
+        {"drift", "drift (m per second)", false, -0.2f, 0.6f, [](const scene::WaterSettings& w) { return w.tearDrift; }},
+        {"wind", "wind (gusts tighten the seams)", false, 0.3f, 0.9f, [](const scene::WaterSettings& w) { return w.tearWind; }},
+    };
+    return rows;
+}
+
+bool hasRule(const std::vector<params::liveness::Finding>& findings, std::string_view rule) {
+    return std::any_of(findings.begin(), findings.end(), [&](const auto& f) { return f.rule == rule; });
+}
+
+} // namespace
+
+// UI reach (the owner's standing rule): anything visible must be findable and adjustable under a name
+// that says what it is. The tears are one heading -- the Parameters panel's "nodes" group shows the
+// sub-group "sea/water/tears", the World panel's Inspector shows "tears/<label>" rows under "water" --
+// computed here with the panels' own path functions (ui::parameterSubGroup, ui::inspectorRowLabel),
+// because a wrong path neither fails to compile nor throws: the section just renders somewhere else.
+TEST_CASE("every tear setting is a control under one 'tears' heading, labelled, and reaches the surface",
+          "[unit][water][tears][parameters][ui]") {
+    TornSea sea;
+    const std::string inspectorCut = "nodes/sea/water/";
+    for (const TearControl& row : tearControls()) {
+        const std::string path = std::string("nodes/sea/water/tears/") + row.leaf;
         INFO(path);
-        CHECK(params.find(path) == nullptr);
+        params::IParameter* p = sea.params.find(path);
+        REQUIRE(p != nullptr);
+        CHECK(p->label() == row.label);
+        CHECK(p->flags().exposed);
+        CHECK(p->flags().serialized);
+        CHECK(p->flags().modulatable == row.routable);
+        CHECK(ui::parameterSubGroup(path, "nodes") == "sea/water/tears");
+        CHECK(ui::inspectorRowLabel(path, inspectorCut.size(), p->label()) == std::string("tears/") + row.label);
+        // Registered with the authored value, so a project that never touches it keeps the scene's.
+        CHECK(p->baseComponent(0) == row.authored);
+        CHECK(row.read(sea.drawn()) == row.authored);
+        // Moved as an edit in either panel moves it, it reaches the settings the renderer reads.
+        p->setBaseComponent(0, row.edited);
+        CHECK(row.read(sea.drawn()) == row.edited);
+    }
+    // The spellings the work-in-progress used are gone, so nothing half-migrated can bind to them.
+    for (const char* stale : {"nodes/sea/water/tears", "nodes/sea/water/tearShear", "nodes/sea/water/tearCoverage",
+                              "nodes/sea/water/tearCell", "nodes/sea/water/tearDirection"}) {
+        INFO(stale);
+        CHECK(sea.params.find(stale) == nullptr);
+    }
+}
+
+// Three of the ten may be routed; the seven that rescale or turn the lattice about the world origin,
+// multiply the clock, or couple the wind refuse a route at bind -- the modulator's own refusal, which
+// the liveness registry reports as `not-modulatable`. The control is the three that bind.
+TEST_CASE("a route binds to the tears' amount, shear and coverage and is refused by the other seven",
+          "[unit][water][tears][parameters]") {
+    TornSea sea;
+    signals::SignalBus bus;
+    bus.declare("test.level");
+    const std::size_t first = sea.modulator.routes().size(); // after the composition's own routes
+    for (const TearControl& row : tearControls()) {
+        params::ModRoute route;
+        route.source = "test.level";
+        route.target = std::string("nodes/sea/water/tears/") + row.leaf;
+        route.amount = 0.1f;
+        sea.modulator.addRoute(route);
+    }
+    static_cast<void>(sea.modulator.bind(bus, sea.params)); // an error listing the seven refusals
+    const params::liveness::BusFacts facts(bus, sea.params);
+    std::size_t bound = 0;
+    for (std::size_t i = 0; i < tearControls().size(); ++i) {
+        const TearControl& row = tearControls()[i];
+        const params::ModRoute& route = sea.modulator.routes()[first + i];
+        INFO(route.target);
+        CHECK((route.targetParam != nullptr) == row.routable);
+        CHECK(hasRule(params::liveness::Registry::standard().checkRoute(route, facts), "not-modulatable") == !row.routable);
+        bound += route.targetParam != nullptr ? 1 : 0;
+    }
+    CHECK(bound == 3);
+}
+
+// ADR-902's registry, taught the tears (ADR-916):
+//   * `tear-setting-unread` (dead): a tear setting of a water whose amount is 0 with nothing to lift it
+//     is never read -- that water is drawn with the tear code compiled out -- and a fixed direction is
+//     never read while the seams follow the wind;
+//   * the phase-rate table: the lattice drifts at t * drift, its step size, spacing, stretch and
+//     direction scale or turn that drifting coordinate, and with the seams following the wind the
+//     scene wind's direction is theirs.
+TEST_CASE("the liveness registry knows when a tear setting is unread and when keying one jumps the seams",
+          "[unit][water][tears][liveness]") {
+    const auto& registry = params::liveness::Registry::standard();
+    TornSea sea({{"tears", 0.0}, {"tearDirection", "wind"}, {"tearDrift", 0.15}});
+    params::Timeline timeline;
+    scene::LivenessInputs in;
+    in.params = &sea.params;
+    in.composition = sea.comp.get();
+    in.modulator = &sea.modulator;
+    in.timeline = &timeline;
+    const auto target = [&](const std::string& leaf) {
+        const scene::SceneLivenessFacts facts(in);
+        return registry.checkTarget("nodes/sea/water/tears/" + leaf, -1, facts);
+    };
+    const auto windDirection = [&] {
+        const scene::SceneLivenessFacts facts(in);
+        return registry.checkTarget("scene/windDirection", -1, facts);
+    };
+    REQUIRE(registry.rule("tear-setting-unread") != nullptr);
+
+    // Off, and nothing lifts it: every setting but the amount is unread.
+    for (const char* leaf : {"shear", "coverage", "cell", "spacing", "stretch", "followWind", "direction", "drift", "wind"}) {
+        INFO(leaf);
+        CHECK(hasRule(target(leaf), "tear-setting-unread"));
+    }
+    CHECK_FALSE(hasRule(target("amount"), "tear-setting-unread"));
+    // Unknown -- no routes or tracks to look in -- is not a verdict.
+    in.modulator = nullptr;
+    CHECK_FALSE(hasRule(target("shear"), "tear-setting-unread"));
+    in.modulator = &sea.modulator;
+    // Nor is the seams' being off a hazard for the wind's direction.
+    CHECK_FALSE(hasRule(windDirection(), "phase-rate"));
+
+    // THE CONTROLS: a track that keys the amount above 0, a route that lifts it, a base above 0.
+    params::Track zeros;
+    zeros.target = "nodes/sea/water/tears/amount";
+    zeros.keys = {params::Key{.time = 0.0, .value = {0.0f}}, params::Key{.time = 8.0, .value = {0.0f}}};
+    timeline.addTrack(zeros);
+    CHECK(hasRule(target("shear"), "tear-setting-unread")); // keyed, but never above 0
+    params::Track rising = zeros;
+    rising.keys[1].value[0] = 0.5f;
+    timeline.addTrack(rising);
+    CHECK_FALSE(hasRule(target("shear"), "tear-setting-unread"));
+    timeline.clear();
+    CHECK(hasRule(target("shear"), "tear-setting-unread"));
+    params::ModRoute lift;
+    lift.source = "audio.bass";
+    lift.target = "nodes/sea/water/tears/amount";
+    lift.amount = 0.4f;
+    sea.modulator.addRoute(lift);
+    CHECK_FALSE(hasRule(target("shear"), "tear-setting-unread"));
+    sea.modulator.clearRoutes();
+    sea.params.find("nodes/sea/water/tears/amount")->setBaseComponent(0, 0.4f);
+    CHECK_FALSE(hasRule(target("shear"), "tear-setting-unread"));
+
+    // Showing, following the wind: the fixed direction is unread, and read once they stop following.
+    CHECK(hasRule(target("direction"), "tear-setting-unread"));
+    // Drifting and following the wind, the wind's direction is the lattice's: a phase rate.
+    CHECK(hasRule(windDirection(), "phase-rate"));
+    sea.params.find("nodes/sea/water/tears/followWind")->setBaseComponent(0, 0.0f);
+    CHECK_FALSE(hasRule(target("direction"), "tear-setting-unread"));
+    CHECK_FALSE(hasRule(windDirection(), "phase-rate")); // no longer theirs
+
+    // The lattice drifts at t * drift: the drift is a phase rate, and the scales of the drifting
+    // coordinate are while it drifts -- and not once it stops (the table's `whenNonZero`).
+    CHECK(hasRule(target("drift"), "phase-rate"));
+    for (const char* leaf : {"cell", "spacing", "stretch", "direction"}) {
+        INFO(leaf);
+        CHECK(hasRule(target(leaf), "phase-rate"));
+    }
+    sea.params.find("nodes/sea/water/tears/drift")->setBaseComponent(0, 0.0f);
+    sea.params.resetFinals();
+    for (const char* leaf : {"cell", "spacing", "stretch", "direction"}) {
+        INFO(leaf);
+        CHECK_FALSE(hasRule(target(leaf), "phase-rate"));
+    }
+    // The routable three are amplitudes and thresholds, not rates.
+    for (const char* leaf : {"amount", "shear", "coverage"}) {
+        INFO(leaf);
+        CHECK_FALSE(hasRule(target(leaf), "phase-rate"));
     }
 }

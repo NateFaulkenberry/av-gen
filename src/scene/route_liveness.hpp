@@ -66,6 +66,11 @@ struct LivenessInputs {
     // bind: the engine binds before a project's audio is installed, and an editor session binds with
     // no audio at all, so a bind asks with this off and a load's report and the audit with it on.
     bool judgeSilence = true;
+    // The project's routes and tracks, for the rules that ask whether anything drives a parameter a
+    // target depends on (ADR-916: a tear setting is read only while the water's tear amount can be
+    // above 0). Null = unknown, and those rules then say nothing rather than guess.
+    const params::Modulator* modulator = nullptr;
+    const params::Timeline* timeline = nullptr;
 };
 
 class SceneLivenessFacts final : public params::liveness::Facts {
@@ -101,16 +106,18 @@ private:
 // `path` is matched against the LAST segments of a parameter path (a nested composition prefixes
 // `nodes/<child>/`), and `*` matches any one segment. `kinds` narrows `sources/*/...` to source kinds
 // and `fx/*/...` to effect types, comma-separated (empty = any). `evidence` is where the
-// time x rate term is. Two conditions: `whenNonZero` names sibling leaves at least one of which must
+// time x rate term is. Three conditions: `whenNonZero` names sibling leaves at least one of which must
 // be non-zero for the trap to exist (a scale of a coordinate that only moves while a primary rate
-// does), and `windBodies` limits it to scenes with wind-body meshes (`scene/windSpeed` is a phase
-// rate only through their leaf flutter).
+// does), `windBodies` limits it to scenes with wind-body meshes (`scene/windSpeed` is a phase
+// rate only through their leaf flutter), and `windTears` to scenes with a water whose tears can show,
+// follow the wind and drift (ADR-916: the wind's direction is then the drifting seams' direction).
 struct PhaseRateEntry {
     std::string_view path;
     std::string_view kinds;
     std::string_view evidence;
     std::string_view whenNonZero = {};
     bool windBodies = false;
+    bool windTears = false;
 };
 [[nodiscard]] std::span<const PhaseRateEntry> phaseRateTable();
 

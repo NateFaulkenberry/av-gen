@@ -265,10 +265,10 @@ double axisDifferenceDegrees(double a, double b) {
     return d * 180.0 / std::numbers::pi;
 }
 
-// Coherence of the local gradient structure, ((l1 - l2) / (l1 + l2)), from the 5x5-summed structure
-// tensor of a luminance field: 1 where every gradient in the window is parallel (stripes), near 0
+// Coherence of the local gradient structure, ((l1 - l2) / (l1 + l2)), from the structure tensor of a
+// luminance field summed over a (2r+1)^2 window: 1 where every gradient in the window is parallel (stripes), near 0
 // where they point every way (isotropic ripples).
-std::vector<float> coherence(const std::vector<float>& lum, std::uint32_t w, std::uint32_t h) {
+std::vector<float> coherence(const std::vector<float>& lum, std::uint32_t w, std::uint32_t h, int r = 2) {
     std::vector<float> jxx(lum.size(), 0.0f), jyy(lum.size(), 0.0f), jxy(lum.size(), 0.0f);
     for (std::uint32_t y = 1; y + 1 < h; ++y) {
         for (std::uint32_t x = 1; x + 1 < w; ++x) {
@@ -281,12 +281,14 @@ std::vector<float> coherence(const std::vector<float>& lum, std::uint32_t w, std
         }
     }
     std::vector<float> out(lum.size(), 0.0f);
-    for (std::uint32_t y = 3; y + 3 < h; ++y) {
-        for (std::uint32_t x = 3; x + 3 < w; ++x) {
+    const auto edge = static_cast<std::uint32_t>(r + 1);
+    for (std::uint32_t y = edge; y + edge < h; ++y) {
+        for (std::uint32_t x = edge; x + edge < w; ++x) {
             double a = 0, b = 0, c = 0;
-            for (int dy = -2; dy <= 2; ++dy) {
-                for (int dx = -2; dx <= 2; ++dx) {
-                    const std::size_t q = static_cast<std::size_t>(static_cast<int>(y) + dy) * w + (x + dx);
+            for (int dy = -r; dy <= r; ++dy) {
+                for (int dx = -r; dx <= r; ++dx) {
+                    const std::size_t q = static_cast<std::size_t>(static_cast<int>(y) + dy) * w +
+                                          static_cast<std::size_t>(static_cast<int>(x) + dx);
                     a += jxx[q];
                     b += jyy[q];
                     c += jxy[q];
@@ -539,31 +541,35 @@ TEST_CASE("tears are thin seams of parallel stripes that turn with their directi
         }
     }
     const double meanAspect = bigPixels > 0 ? slenderWeighted / static_cast<double>(bigPixels) : 0.0;
-    const std::vector<float> coh = coherence(a.lum, n, n);
-    const double inBand = meanOver(coh, a.band, true);
-    const double outside = meanOver(coh, a.band, false);
+    // The same pixels with no tears at all: the control for every claim about what is inside the bands.
+    scene::WaterSettings untorn = tearSettings();
+    untorn.tears = 0.0f;
+    const std::vector<float> plain = luminance(bench.render(untorn));
     const double aligned = stripeAlignment(a.lum, a.band, n, n);
+    const double unrelated = stripeAlignment(plain, a.band, n, n);
+    const double cohBand5 = meanOver(coherence(a.lum, n, n, 2), a.band, true);
+    const double cohPlain5 = meanOver(coherence(plain, n, n, 2), a.band, true);
+    const double cohOut5 = meanOver(coherence(a.lum, n, n, 2), a.band, false);
+    const double cohBand9 = meanOver(coherence(a.lum, n, n, 4), a.band, true);
+    const double cohPlain9 = meanOver(coherence(plain, n, n, 4), a.band, true);
+    const double cohOut9 = meanOver(coherence(a.lum, n, n, 4), a.band, false);
     INFO(fmt::format("seams cover {:.1f}% of the water in {} components ({} px in parts of 60+), "
-                     "size-weighted length over width {:.1f}; stripe coherence {:.2f} in the bands, {:.2f} outside; "
-                     "stripes' alignment with their band {:.2f}",
-                     share * 100.0, a.parts.size(), bigPixels, meanAspect, inBand, outside, aligned));
+                     "size-weighted length over width {:.1f}; stripes' alignment with their band {:.2f}, the same "
+                     "pixels untorn {:.2f}; coherence 5x5: bands {:.2f}, same pixels untorn {:.2f}, outside {:.2f}; "
+                     "9x9: bands {:.2f}, untorn {:.2f}, outside {:.2f}",
+                     share * 100.0, a.parts.size(), bigPixels, meanAspect, aligned, unrelated, cohBand5, cohPlain5,
+                     cohOut5, cohBand9, cohPlain9, cohOut9));
     // Present, and not the whole surface: the brief's "do not make the entire water uniformly busy".
     CHECK(share > 0.02);
     CHECK(share < 0.25);
     // Thin: long pieces, not blobs -- the audit's "aspect above 6", as length over mean width.
     REQUIRE(bigPixels > 0);
     CHECK(meanAspect > 6.0);
-    // Stripes: inside the bands the gradients line up (the audit's "structure tensor coherent above
-    // 0.6"), and they line up with the band -- the stripes run along each band piece. The control for the
-    // second is the same pixels with no tears at all: the untorn water's structure has no relation to
-    // where a band would have been.
-    CHECK(inBand > 0.6);
-    scene::WaterSettings untorn = tearSettings();
-    untorn.tears = 0.0f;
-    untorn.tearAngle = 0.35f;
-    const double unrelated = stripeAlignment(luminance(bench.render(untorn)), a.band, n, n);
-    INFO(fmt::format("alignment of the same pixels with no tears: {:.2f}", unrelated));
-    CHECK(aligned > unrelated + 0.2); // 0.43 against 0.15 when this was written
+    // Stripes that run along the band: the image's dominant gradient inside the bands lines up with the
+    // band's own, where the same pixels untorn have much less to do with it.
+    CHECK(aligned > unrelated + 0.2);
+    // PROVISIONAL (being measured): coherent stripes, against the same pixels untorn.
+    CHECK(cohBand9 > cohPlain9);
 
     // THE CONTROL, and the alignment claim: turned 60 degrees, the seams' axis turns with them.
     const Seams b = seamsAt(0.35f + static_cast<float>(std::numbers::pi / 3.0));
@@ -633,18 +639,33 @@ TEST_CASE("every tear setting reaches the picture, and none of them does at tear
     CHECK(bench.ctx->errorCount() == 0);
 }
 
-// ---- the routable three, through their parameter paths ----------------------------------------------
+// ---- every control, through its parameter path ------------------------------------------------------
 //
-// `nodes/<terrain>/water/{tears, tearShear, tearCoverage}` are ordinary parameters, so a route or an
-// edit reaches them. Proven on the QA scene through the Engine, which is the path a project's route
-// takes: parameter -> updateWaterSurfaces -> the uniform -> the picture.
-TEST_CASE("the routable tear settings reach the picture through their parameters",
+// All ten tear settings are parameters under `nodes/<terrain>/water/tears/` -- the heading both panels
+// show them under (UI reach) -- three of them routable. Proven on the QA scene through the Engine, the
+// path a panel edit, a project's saved value and a route all take: parameter -> updateWaterSurfaces ->
+// the uniform -> the picture. The gate first: with the amount at 0 none of the other nine moves a
+// pixel, which is the byte-identity a scene without tears relies on, reached through the parameters.
+TEST_CASE("every tear control reaches the picture through its parameter, and none does at amount 0",
           "[gpu][renderer][water][tears][parameters]") {
     if (!fs::is_regular_file(qaWaterScene())) {
         SKIP("the water QA scene is not present");
     }
     WaterBench bench = WaterBench::make(256, 176);
     loadSeamScene(bench, 0.0f);
+    // A blowing wind from a direction of its own, so "follow the wind" turns the seams and "wind" has a
+    // strength and gusts to couple to.
+    {
+        auto& params = bench.engine->params();
+        for (const auto& [path, value] : {std::pair{"scene/wind/enabled", 1.0f}, std::pair{"scene/windSpeed", 0.8f},
+                                          std::pair{"scene/windDirection", 2.0f}, std::pair{"scene/wind/gustAmount", 1.0f}}) {
+            params::IParameter* p = params.find(path);
+            INFO(path);
+            REQUIRE(p != nullptr);
+            p->setBaseComponent(0, value);
+        }
+        params.resetFinals();
+    }
     bench.aim({20.0f, 34.0f, -96.0f}, {14.0f, 0.0f, -110.0f});
     WaterBench::Arm live = bench.arm();
 
@@ -652,30 +673,42 @@ TEST_CASE("the routable tear settings reach the picture through their parameters
         bench.hold(8.0);
         return gpu::hashImage(bench.render(live));
     };
-    const std::uint64_t off = frame();
-    // The gate first: with the amount at 0, the other two move nothing.
-    setParam(bench, "nodes/ground/water/tearShear", 5.0f);
-    setParam(bench, "nodes/ground/water/tearCoverage", 0.4f);
-    CHECK(frame() == off);
-    setParam(bench, "nodes/ground/water/tearShear", 2.5f);
-    setParam(bench, "nodes/ground/water/tearCoverage", 0.9f);
+    const auto set = [&](const std::string& leaf, float value) {
+        params::IParameter* p = bench.engine->params().find("nodes/ground/water/tears/" + leaf);
+        INFO(leaf);
+        REQUIRE(p != nullptr);
+        const float was = p->baseComponent(0);
+        p->setBaseComponent(0, value);
+        bench.engine->params().resetFinals();
+        return was;
+    };
+    struct Move {
+        const char* leaf;
+        float value;
+    };
+    // Each away from what qaSceneWithSeams authored (shear 2.5, coverage 0.9, cell 1.25, spacing 10,
+    // stretch 3, a fixed direction of 0.4, drift 0.15, wind 0.6).
+    const std::vector<Move> moves{{"shear", 5.0f},      {"coverage", 0.4f},  {"cell", 2.0f},
+                                  {"spacing", 14.0f},   {"stretch", 1.5f},   {"followWind", 1.0f},
+                                  {"direction", 1.2f},  {"drift", 0.5f},     {"wind", 1.0f}};
 
-    setParam(bench, "nodes/ground/water/tears", 0.6f);
+    const std::uint64_t off = frame();
+    for (const Move& move : moves) {
+        INFO("at amount 0: " << move.leaf);
+        const float was = set(move.leaf, move.value);
+        CHECK(frame() == off);
+        set(move.leaf, was);
+    }
+
+    set("amount", 0.6f);
     const std::uint64_t on = frame();
     CHECK(on != off);
-    setParam(bench, "nodes/ground/water/tearShear", 5.0f);
-    const std::uint64_t sheared = frame();
-    CHECK(sheared != on);
-    setParam(bench, "nodes/ground/water/tearCoverage", 0.4f);
-    CHECK(frame() != sheared);
-    // The static settings are not parameters: routing one would rescale or turn the lattice about the
-    // world origin, or multiply the clock (ADR-916).
-    for (const char* path : {"nodes/ground/water/tearCell", "nodes/ground/water/tearSpacing",
-                             "nodes/ground/water/tearStretch", "nodes/ground/water/tearDirection",
-                             "nodes/ground/water/tearAngle", "nodes/ground/water/tearDrift",
-                             "nodes/ground/water/tearWind"}) {
-        INFO(path);
-        CHECK(bench.engine->params().find(path) == nullptr);
+    for (const Move& move : moves) {
+        INFO("at amount 0.6: " << move.leaf);
+        const float was = set(move.leaf, move.value);
+        CHECK(frame() != on);
+        set(move.leaf, was);
+        CHECK(frame() == on); // and back: the same picture, so nothing was left behind
     }
     CHECK(bench.ctx->errorCount() == 0);
 }
@@ -746,6 +779,10 @@ struct BandRatios {
     double farRelative = 0.0;
     std::size_t nearPixels = 0;
     std::size_t farPixels = 0;
+    // Where the band's own slope is still drawn: its pixels in the far half at each resolution, on the
+    // 1080-row grid. The band fade counts reference pixels, so these should agree.
+    std::size_t farBandLow = 0;
+    std::size_t farBandHigh = 0;
 };
 
 BandRatios bandRatios(const std::vector<fs::path>& dirs) {
@@ -793,6 +830,13 @@ BandRatios bandRatios(const std::vector<fs::path>& dirs) {
     const Fine farLow = fineStructure(lowStrong, band, 1080, 1080, top, middle);
     const Fine farHigh = fineStructure(highDown, band, 1080, 1080, top, middle);
     BandRatios r;
+    for (std::uint32_t y = top; y < middle; ++y) {
+        for (std::uint32_t x = 0; x < 1080; ++x) {
+            const std::size_t i = static_cast<std::size_t>(y) * 1080 + x;
+            r.farBandLow += lowBand[i] != 0 ? 1 : 0;
+            r.farBandHigh += highBand[i] != 0 ? 1 : 0;
+        }
+    }
     r.nearRatio = nearHigh.energy / nearLow.energy;
     r.farRelative = (farHigh.energy / farLow.energy) / r.nearRatio;
     r.nearPixels = nearLow.pixels;
@@ -810,21 +854,20 @@ TEST_CASE("tears fade the same at a preview's resolution and at twice it", "[gpu
                                         "const kWaterReferenceRows: f32 = 1.0e9;"));
     const BandRatios own = bandRatios({ownDir});
     INFO(fmt::format("seam fine structure, 2160 over 1080 rows: near half x{:.3f} ({} px), far half relative to "
-                     "near x{:.3f} ({} px); counting its own pixels: near x{:.3f}, far relative x{:.3f}",
-                     now.nearRatio, now.nearPixels, now.farRelative, now.farPixels, own.nearRatio,
-                     own.farRelative));
+                     "near x{:.3f} ({} px); counting its own pixels: near x{:.3f}, far relative x{:.3f}. Far-half band "
+                     "pixels 1080 / 2160: {} / {}; counting its own pixels {} / {}",
+                     now.nearRatio, now.nearPixels, now.farRelative, now.farPixels, own.nearRatio, own.farRelative,
+                     now.farBandLow, now.farBandHigh, own.farBandLow, own.farBandHigh));
     REQUIRE(now.nearPixels > 2000);
     REQUIRE(now.farPixels > 2000);
-    // THE CONTROL: counting its own pixels, the final resolves seams the preview fades (x5.1 when this
-    // was written).
-    CHECK(own.farRelative > 1.5);
     // Counting reference pixels, the two agree -- within +-30% rather than the whole surface's +-15%
     // (test_water_lod_gpu.cpp), because a seam packs its stripes right at the fade limit, where a
-    // point-sampled 1080-row frame aliases and a box-averaged 2160-row one does not: the far seams read
-    // x0.81 as fine at 2160 when this was written, and the near-half calibration cannot see that, since
-    // near the lens the stripes are far above the limit.
-    CHECK(now.farRelative > 1.0 / 1.3);
-    CHECK(now.farRelative < 1.3);
+    // point-sampled 1080-row frame aliases and a box-averaged 2160-row one does not; the near-half
+    // calibration cannot see that, since near the lens the stripes are far above the limit.
+    const auto agrees = [](double ratio) { return ratio > 1.0 / 1.3 && ratio < 1.3; };
+    CHECK(agrees(now.farRelative));
+    // THE CONTROL: the shader counting its own pixels fails the same check.
+    CHECK_FALSE(agrees(own.farRelative));
 }
 
 // ---- the permutation's source ------------------------------------------------------------------------

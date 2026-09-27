@@ -96,8 +96,10 @@ Result<void> WaterSettings::validate() const {
     if (!(tearStretch >= 0.25f && tearStretch <= 20.0f)) {
         return fail("water: tearStretch must be in [0.25, 20]");
     }
-    if (!(std::fabs(tearAngle) <= 100.0f)) {
-        return fail("water: tearDirection's angle must be a finite number of radians");
+    // Within a turn either way, the range of the `water/tears/direction` control and of the scene
+    // wind's own direction, so a scene's angle is always one the control can show.
+    if (!(std::fabs(tearAngle) <= 6.2832f)) {
+        return fail("water: tearDirection's angle must be within one turn either way (|radians| <= 6.2832)");
     }
     if (!(tearDrift >= -20.0f && tearDrift <= 20.0f)) {
         return fail("water: tearDrift must be in [-20, 20] metres per second");

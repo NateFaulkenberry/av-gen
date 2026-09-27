@@ -5330,15 +5330,42 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             &params_->add(vec3Desc(base + "water/shallowColor", w.shallowColor, 0.0f, 8.0f, 0.0f, 1.0f));
         node.waterDeepColorParam =
             &params_->add(vec3Desc(base + "water/deepColor", w.deepColor, 0.0f, 8.0f, 0.0f, 1.0f));
-        // ADR-916: the tears' amount, shear and coverage. `tears` only adds slope along the seams, so a
-        // fast route (audio.bass, say) flashes them and moves nothing. `tearShear` and `tearCoverage`
-        // move the ripples beside a seam as they change, so they want slow chains (a second or more).
-        // The rest of the tear settings are never parameters: see WaterSettings.
-        node.waterTearsParam = &params_->add(floatDesc(base + "water/tears", w.tears, 0.0f, 20.0f, 0.0f, 2.0f));
-        node.waterTearShearParam =
-            &params_->add(floatDesc(base + "water/tearShear", w.tearShear, 0.0f, 8.0f, 0.0f, 8.0f));
-        node.waterTearCoverageParam =
-            &params_->add(floatDesc(base + "water/tearCoverage", w.tearCoverage, 0.0f, 1.0f, 0.0f, 1.0f));
+        // ADR-916: the tears, every one of them a control, under their own heading -- the Parameters
+        // panel shows "<terrain>/water/tears", the World panel's Inspector "tears/..." under "water" --
+        // each labelled for what it does to the picture.
+        //
+        // The amount, shear and coverage are routable. Past its first quarter the amount only adds
+        // slope along the seams, so a fast route (audio.bass, say) flashes them and moves nothing
+        // (below it the shear grows in with it); the shear and the coverage move the ripples inside a
+        // seam as they change, so they want slow chains (a second or more). The other seven refuse
+        // routes: WaterSettings says why.
+        {
+            const std::string t = base + "water/tears/";
+            const auto control = [](auto desc, const char* label, bool routable) {
+                desc.label = label;
+                desc.flags.modulatable = routable;
+                return desc;
+            };
+            CompositionNode::WaterTearParameters& p = node.waterTearParams;
+            p.amount = &params_->add(control(floatDesc(t + "amount", w.tears, 0.0f, 20.0f, 0.0f, 2.0f), "amount", true));
+            p.shear = &params_->add(control(floatDesc(t + "shear", w.tearShear, 0.0f, 8.0f, 0.0f, 8.0f), "shear (m)", true));
+            p.coverage = &params_->add(
+                control(floatDesc(t + "coverage", w.tearCoverage, 0.0f, 1.0f, 0.0f, 1.0f), "coverage", true));
+            p.cell = &params_->add(
+                control(floatDesc(t + "cell", w.tearCell, 0.05f, 50.0f, 0.3f, 6.0f), "step size (m)", false));
+            p.spacing = &params_->add(
+                control(floatDesc(t + "spacing", w.tearSpacing, 0.1f, 2000.0f, 2.0f, 120.0f), "spacing (m)", false));
+            p.stretch = &params_->add(
+                control(floatDesc(t + "stretch", w.tearStretch, 0.25f, 20.0f, 0.5f, 8.0f), "stretch", false));
+            p.followWind =
+                &params_->add(control(boolDesc(t + "followWind", w.tearFollowsWind), "follow the wind", false));
+            p.direction = &params_->add(control(floatDesc(t + "direction", w.tearAngle, -6.2832f, 6.2832f, -3.1416f, 3.1416f),
+                                                "direction (radians, if not following the wind)", false));
+            p.drift = &params_->add(
+                control(floatDesc(t + "drift", w.tearDrift, -20.0f, 20.0f, -2.0f, 2.0f), "drift (m per second)", false));
+            p.wind = &params_->add(
+                control(floatDesc(t + "wind", w.tearWind, 0.0f, 1.0f, 0.0f, 1.0f), "wind (gusts tighten the seams)", false));
+        }
     }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
@@ -5369,9 +5396,7 @@ void nullWaterParameters(CompositionNode& node) {
     node.waterShallowDepthParam = nullptr;
     node.waterShallowColorParam = nullptr;
     node.waterDeepColorParam = nullptr;
-    node.waterTearsParam = nullptr;
-    node.waterTearShearParam = nullptr;
-    node.waterTearCoverageParam = nullptr;
+    node.waterTearParams = {};
 }
 
 } // namespace
@@ -5437,8 +5462,10 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
                   "water/glow", "water/sparkle", "water/ripple", "water/flowSpeed", "water/swell",
                   "water/foam", "water/glowColor", "water/clarity", "water/maxOpacity", "water/fresnel",
                   "water/reflection", "water/roughness", "water/refraction", "water/rippleScale",
-                  "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/tears",
-                  "water/tearShear", "water/tearCoverage"}) {
+                  "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/tears/amount",
+                  "water/tears/shear", "water/tears/coverage", "water/tears/cell", "water/tears/spacing",
+                  "water/tears/stretch", "water/tears/followWind", "water/tears/direction",
+                  "water/tears/drift", "water/tears/wind"}) {
                 params_->remove(base + suffix);
             }
             node.terrainLodParam = nullptr;
@@ -8845,9 +8872,19 @@ void Composition::updateWaterSurfaces() {
         if (node.waterShallowDepthParam != nullptr) w.shallow = node.waterShallowDepthParam->value();
         if (node.waterShallowColorParam != nullptr) w.shallowColor = node.waterShallowColorParam->value();
         if (node.waterDeepColorParam != nullptr) w.deepColor = node.waterDeepColorParam->value();
-        if (node.waterTearsParam != nullptr) w.tears = node.waterTearsParam->value();
-        if (node.waterTearShearParam != nullptr) w.tearShear = node.waterTearShearParam->value();
-        if (node.waterTearCoverageParam != nullptr) w.tearCoverage = node.waterTearCoverageParam->value();
+        // ADR-916: every tear control. The seven a route cannot drive are copied the same way, so an
+        // edit in the panel or a project's saved value reaches the surface like any other.
+        const CompositionNode::WaterTearParameters& tp = node.waterTearParams;
+        if (tp.amount != nullptr) w.tears = tp.amount->value();
+        if (tp.shear != nullptr) w.tearShear = tp.shear->value();
+        if (tp.coverage != nullptr) w.tearCoverage = tp.coverage->value();
+        if (tp.cell != nullptr) w.tearCell = tp.cell->value();
+        if (tp.spacing != nullptr) w.tearSpacing = tp.spacing->value();
+        if (tp.stretch != nullptr) w.tearStretch = tp.stretch->value();
+        if (tp.followWind != nullptr) w.tearFollowsWind = tp.followWind->value();
+        if (tp.direction != nullptr) w.tearAngle = tp.direction->value();
+        if (tp.drift != nullptr) w.tearDrift = tp.drift->value();
+        if (tp.wind != nullptr) w.tearWind = tp.wind->value();
     }
 }
 

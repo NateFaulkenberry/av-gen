@@ -90,10 +90,14 @@ struct WaterSettings {
     // Thin, stepped seams across the surface in which the ripples are compressed into dense parallel
     // stripes. Off at 0, where the surface is byte-identical to one with no tears at all.
     //
-    // Only the first three are parameters (`nodes/<terrain>/water/{tears, tearShear, tearCoverage}`).
-    // The rest are never routed: `tearCell`, `tearSpacing` and `tearStretch` rescale the seam lattice
-    // about the world origin and `tearDirection` turns it there (at 350 m out, a 1% change moves a seam
-    // 3.5 m, so a route would make every seam jump), and `tearDrift` multiplies the timeline second.
+    // Every one is a control under `nodes/<terrain>/water/tears/` -- amount, shear, coverage, step
+    // size, spacing, stretch, follow the wind, direction, drift, wind -- but only the first three are
+    // routable. The rest are `modulatable = false`: `tearCell`, `tearSpacing` and `tearStretch` rescale
+    // the seam lattice about the world origin and the direction turns it there (at 350 m out, a 1%
+    // change moves a seam 3.5 m, so a route would make every seam jump); `tearDrift` multiplies the
+    // timeline second; and `tearWind` is how much the wind drives the seams, a choice rather than a
+    // signal -- to make the music move them through the wind, route the wind (`scene/windSpeed`,
+    // `scene/wind/gustAmount`), which moves the grass on the bank with them.
     float tears = 0.0f;          // ripple amplitude a seam adds on top of `ripple`; 0 = no tears
     float tearShear = 3.0f;      // metres of ripple packed into a seam's band (0..8)
     float tearCoverage = 0.35f;  // roughly the share of the seam network that shows (0..1)
@@ -101,7 +105,7 @@ struct WaterSettings {
     float tearSpacing = 40.0f;   // metres between neighbouring seams
     float tearStretch = 3.0f;    // how many times longer a seam runs along its direction than across
     bool tearFollowsWind = true; // the seams run along the scene wind ("tearDirection": "wind")...
-    float tearAngle = 0.0f;      // ...or along this, radians about +Y (0 = +X, pi/2 = +Z; a number)
+    float tearAngle = 0.0f;      // ...or along this, radians about +Y (0 = +X, pi/2 = +Z), within a turn
     float tearDrift = 0.15f;     // metres per second the seam lattice drifts along its direction
     float tearWind = 0.6f;       // how much the local wind's strength and gusts tighten the seams (0..1)
 

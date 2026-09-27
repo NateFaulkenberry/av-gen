@@ -105,28 +105,38 @@ surface is drawn by a pipeline with the tear code compiled out, byte-identical t
            "tearDirection": "wind", "tearDrift": 0.15, "tearWind": 0.6 }
 ```
 
-| key | what it does | parameter? |
+Every setting is a control. In the app they sit under one heading, **tears**: the Parameters panel's
+**nodes** group, sub-group **`<terrain>/water/tears`**, and the World panel's Inspector with the terrain
+selected, **water** > **`tears/...`**. Each row is labelled for what it does to the picture.
+
+| key | what it does | control (`nodes/<terrain>/water/tears/...`, label) |
 |---|---|---|
-| `tears` | ripple amplitude a seam adds on top of `ripple`; 0 = no tears. Its first 0.25 also brings the shear in, so a route off 0 grows the seams rather than snapping them | `water/tears` |
-| `tearShear` | metres of ripple packed into a band (0-8). `tearShear / tearCell` is the compression and `tearShear * rippleScale` the stripe count: the reference is about 3x and ten stripes | `water/tearShear`, slow chains only |
-| `tearCoverage` | roughly the share of the seam network that shows (0 none, 1 all) | `water/tearCoverage`, slow chains only |
-| `tearCell` | metres: the lattice the seams step along. A band is one cell wide and steps along the lattice's axes and diagonal, as the accident stepped along the water mesh | never |
-| `tearSpacing` | metres between neighbouring seams (at least two cells) | never |
-| `tearStretch` | how many times longer a seam runs along its direction than across (0.25-20) | never |
-| `tearDirection` | `"wind"` (the scene wind's steady direction) or an angle in radians about +Y (0 = +X, pi/2 = +Z) | never |
-| `tearDrift` | metres per second the whole lattice drifts along its direction | never |
-| `tearWind` | how much the local wind's strength and gust envelope tighten the seams (0-1); inert with no scene wind | never |
+| `tears` | ripple amplitude a seam adds on top of `ripple`; 0 = no tears. Its first 0.25 also brings the shear in, so a route off 0 grows the seams rather than snapping them | `amount`, "amount"; routable |
+| `tearShear` | metres of ripple packed into a band (0-8). `tearShear / tearCell` is the compression and `tearShear * rippleScale` the stripe count: the reference is about 3x and ten stripes | `shear`, "shear (m)"; routable, slow chains only |
+| `tearCoverage` | roughly the share of the seam network that shows (0 none, 1 all) | `coverage`, "coverage"; routable, slow chains only |
+| `tearCell` | metres: the lattice the seams step along. A band is one cell wide and steps along the lattice's axes and diagonal, as the accident stepped along the water mesh | `cell`, "step size (m)" |
+| `tearSpacing` | metres between neighbouring seams (at least two cells) | `spacing`, "spacing (m)" |
+| `tearStretch` | how many times longer a seam runs along its direction than across (0.25-20) | `stretch`, "stretch" |
+| `tearDirection` | `"wind"` (the scene wind's steady direction) or an angle in radians about +Y (0 = +X, pi/2 = +Z), within a turn either way | `followWind`, "follow the wind", and `direction`, "direction (radians, if not following the wind)" |
+| `tearDrift` | metres per second the whole lattice drifts along its direction | `drift`, "drift (m per second)" |
+| `tearWind` | how much the local wind's strength and gust envelope tighten the seams (0-1); inert with no scene wind | `wind`, "wind (gusts tighten the seams)" |
 
-**Why most of them are never parameters.** The lattice is anchored at the world origin, so changing
-`tearCell`, `tearSpacing` or `tearStretch` rescales it about the origin and changing `tearDirection`
-turns it there: 350 m out, a 1% change moves a seam 3.5 m, and a route would make every seam jump.
-`tearDrift` multiplies the timeline second. For the same reason, do not route `scene/windDirection`
-while the tears follow the wind.
+**Why only three are routable.** The other seven are controls a route cannot drive
+(`modulatable = false`; a route to one is refused at bind). The lattice is anchored at the world
+origin, so changing the step size, spacing or stretch rescales it about the origin and changing the
+direction turns it there: 350 m out, a 1% change moves a seam 3.5 m, and a route would make every seam
+jump. The drift multiplies the timeline second. The wind coupling is a choice, not a signal: to make
+the music move the seams through the wind, route the wind (below). A timeline track can still key
+any of them; `avgen --audit-routes` then reports a varying key on the drift, or on the others while
+the lattice drifts, as a `phase-rate` hazard, and for the same reason reports `scene/windDirection` as
+one while drifting seams follow the wind (ADR-902's registry). A tear setting of a water whose amount
+is 0 with nothing to lift it, and the fixed direction of seams that follow the wind, are reported as
+`tear-setting-unread`: those draws never read them.
 
-**Routing.** `water/tears` only adds slope along the seams, so a fast route (audio.bass, a 100 ms
-attack) flashes them and moves nothing -- give it a non-zero base so the shear is already in.
-`water/tearShear` and `water/tearCoverage` change what is packed into a band, so they want chains of a
-second or more. The wind reaches the tears without a route: with `tearWind` above 0, a gust front
+**Routing.** Past its first quarter `water/tears/amount` only adds slope along the seams, so a fast
+route (audio.bass, a 100 ms attack) flashes them and moves nothing -- give it a base of at least 0.25
+so the shear is already in. `water/tears/shear` and `water/tears/coverage` change what is packed into a
+band, so they want chains of a second or more. The wind reaches the tears without a route: with `tearWind` above 0, a gust front
 crossing the water tightens the seams it crosses, in step with the grass on the bank; routing
 `scene/windSpeed` or `scene/wind/gustAmount` therefore reaches them too.
 
@@ -228,15 +238,16 @@ nodes/<terrain>/water/sparkle     treble: glints, fast in and fast out
 nodes/<terrain>/water/foam        energy: more surf at the banks
 nodes/<terrain>/water/flowSpeed   how fast the ripple pattern travels
 nodes/<terrain>/water/glowColor   the colour of what is glowing underneath
-nodes/<terrain>/water/tears       bass: the seams flash (keep a non-zero base; see Tears)
-nodes/<terrain>/water/tearShear   sections, slowly: how much a seam packs
-nodes/<terrain>/water/tearCoverage  sections, slowly: how many seams show
+nodes/<terrain>/water/tears/amount    bass: the seams flash (keep a base of 0.25 or more; see Tears)
+nodes/<terrain>/water/tears/shear     sections, slowly: how much a seam packs
+nodes/<terrain>/water/tears/coverage  sections, slowly: how many seams show
 ```
 
 ADR-350 made ten more of them parameters (`clarity`, `maxOpacity`, `fresnel`, `reflection`,
 `roughness`, `refraction`, `rippleScale`, `shallowDepth`, `shallowColor`, `deepColor`). Routing
 `flowSpeed` or `rippleScale` makes the ripples jump -- the first shifts the pattern by the change times
-a cycle's travel, the second rescales it about the world origin -- so move them only with slow chains.
+a cycle's travel (at most 8 s of it since ADR-914), the second rescales it about the world origin -- so
+move them only with slow chains; the route audit reports both as `phase-rate` hazards.
 
 Glowmere's amounts are in `examples/world/glowmere-stylized.json` and are deliberately small. The
 swell is 5.5 cm on the beat: a river that pumps on every kick has stopped being water.

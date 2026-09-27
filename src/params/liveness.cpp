@@ -11,7 +11,7 @@ namespace avgen::params::liveness {
 namespace {
 
 // THE table. Ids are stable: an evaluator ingests them and a validator refuses by them.
-constexpr std::array<RuleInfo, 23> kRules{{
+constexpr std::array<RuleInfo, 24> kRules{{
     {"disabled", "route|track", "dead", "The route or track is switched off (or the whole timeline is)."},
     {"unknown-source", "route", "dead", "The source is not a signal on the bus, so the route never binds."},
     {"unknown-depth-source", "route", "dead", "The depth source is not a signal on the bus, so the route never binds."},
@@ -60,6 +60,10 @@ constexpr std::array<RuleInfo, 23> kRules{{
      "The effect's activation cannot open in this project (hero focus or camera travel with no matching shot "
      "span, a trigger with no events, a window outside the piece, an owner the scene does not have), so it "
      "and every route to it do nothing."},
+    {"tear-setting-unread", "route|track", "dead",
+     "nodes/<terrain>/water/tears/<setting> on a water that draws no tears -- its amount is 0 and no route or "
+     "track lifts it, so the surface is drawn by the pipeline with the tear code compiled out -- or the fixed "
+     "`direction` of seams that follow the wind (ADR-916)."},
 }};
 
 std::string componentText(int component) {

@@ -500,11 +500,24 @@ struct CompositionNode {
     params::Parameter<glm::vec3>* waterShallowColorParam = nullptr;
     params::Parameter<glm::vec3>* waterDeepColorParam = nullptr;
     params::Parameter<glm::vec3>* waterGlowColorParam = nullptr;
-    // ADR-916: the three tear settings a route may move. The lattice's cell, spacing, stretch and
-    // direction and its drift are deliberately not parameters (WaterSettings says why).
-    params::Parameter<float>* waterTearsParam = nullptr;
-    params::Parameter<float>* waterTearShearParam = nullptr;
-    params::Parameter<float>* waterTearCoverageParam = nullptr;
+    // ADR-916: the water's tears, all under `nodes/<terrain>/water/tears/`, so both panels head them
+    // "tears" and label each for what it does to the picture. The amount, shear and coverage are
+    // routable. The other seven are controls a route cannot drive (`modulatable = false`); why, is in
+    // WaterSettings. A timeline track can still key them, and the liveness registry says when that is
+    // a hazard (ADR-902's phase-rate table) or does nothing (`tear-setting-unread`).
+    struct WaterTearParameters {
+        params::Parameter<float>* amount = nullptr;    // "amount"           tears
+        params::Parameter<float>* shear = nullptr;     // "shear"            tearShear
+        params::Parameter<float>* coverage = nullptr;  // "coverage"         tearCoverage
+        params::Parameter<float>* cell = nullptr;      // "step size"        tearCell
+        params::Parameter<float>* spacing = nullptr;   // "spacing"          tearSpacing
+        params::Parameter<float>* stretch = nullptr;   // "stretch"          tearStretch
+        params::Parameter<bool>* followWind = nullptr; // "follow the wind"  tearDirection "wind"
+        params::Parameter<float>* direction = nullptr; // "direction"        tearDirection, radians
+        params::Parameter<float>* drift = nullptr;     // "drift"            tearDrift
+        params::Parameter<float>* wind = nullptr;      // "wind"             tearWind
+    };
+    WaterTearParameters waterTearParams;
     // Terrain (ADR-905): each scatter layer's emission lane, registered by the layer's NAME --
     // `nodes/<terrain>/scatter/<layer>/{emissionGain, hueOffset, emissiveFieldAmount}` -- so a route
     // written against "fungi" still means fungi after a layer is added in front of it. One entry per
