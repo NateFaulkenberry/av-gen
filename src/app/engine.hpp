@@ -53,6 +53,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <utility>
 #include <memory>
 #include <optional>
@@ -1134,6 +1135,14 @@ private:
     void refreshHistorySubscriptions();
     void publishEntitySignals();
     void recordHistory();
+    // ADR-912: the cuts a composition cannot see. A baked sequence cuts the main camera with a
+    // millisecond ramp between two keys, and a hand-keyed rig can step; either is a jump in the
+    // timeline driving the camera on screen, and the timeline is the engine's. After each update,
+    // the active camera's pose tracks are asked whether they jumped between the previous update's
+    // second and this one's, and a jump is marked as a cut on the composition. NaN after a seek,
+    // which the renderer treats as a discontinuity of its own.
+    double cutScanFrom_ = std::numeric_limits<double>::quiet_NaN();
+    void markKeyedCameraCut();
     scene::PostParameters postParams_;
     // ADR-410. Registered beside the post parameters and applied beside them, because the failure
     // this repo keeps paying for is a system that is built, tested and unreachable: a parameter

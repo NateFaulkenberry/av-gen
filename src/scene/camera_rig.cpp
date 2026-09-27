@@ -1,5 +1,8 @@
 #include "scene/camera_rig.hpp"
 
+#include "scene/follow_reference.hpp"
+#include "world/effects/history_bank.hpp"
+
 #include <array>
 
 #include <nlohmann/json.hpp>
@@ -106,6 +109,17 @@ std::string cameraSlug(std::string_view name) {
     return out;
 }
 
+double CameraRig::subjectHistorySeconds() const {
+    if (!readsSubjectHistory()) {
+        return 0.0;
+    }
+    const double heading = followLocal ? followHeadingSmoothSeconds : 0.0;
+    const double reach = followKernelReach(std::max({followSmoothSeconds, followVerticalSmoothSeconds, heading}));
+    // One tap for the lead's difference kernel, one of margin: HIST keeps one sample at or before its
+    // cut, so a read at exactly the reach is bracketed in a play and in a seek alike.
+    return std::max(followLagSeconds, 0.0) + reach + (2.0 * kFollowKernelStep);
+}
+
 std::string CameraRig::channelPrefix() const {
     // The main camera's channels are the ones every project already has. This single line is what
     // makes a pre-ADR-245 project render byte for byte as it did: nothing re-homes, nothing renames.
@@ -113,6 +127,156 @@ std::string CameraRig::channelPrefix() const {
         return "camera/";
     }
     return "cameras/" + slug + "/";
+}
+
+// ---- the follow controls (ADR-911: UI reach) ------------------------------------------------------
+
+bool followsSomething(const CameraRig& rig) {
+    return rig.id != kMainCamera && (!rig.followNode.empty() || !rig.aimNode.empty());
+}
+
+namespace {
+
+// Which rows mean anything on a camera, from what `Composition::evaluateAuthoredCamera` and
+// `followReference` actually read -- so a row is greyed exactly where it would do nothing.
+//
+// The eye follows a node: the lag, the offset's frame and the floor act on the eye alone.
+bool eyeFollows(const CameraRig& rig) { return followsSomething(rig) && !rig.followNode.empty(); }
+// The lead is `lead x T x velocity` of the horizontally smoothed path: nothing with no T.
+bool smoothsAcross(const CameraRig& rig) { return followsSomething(rig) && rig.followSmoothSeconds > 0.0; }
+// The ground term moves the height from the ground under one filtered path to the ground under
+// another; with no smoothing the two paths are one path and the term is zero.
+bool smoothsAtAll(const CameraRig& rig) {
+    return followsSomething(rig) && (rig.followSmoothSeconds > 0.0 || rig.followVerticalSmoothSeconds > 0.0);
+}
+bool turnsWithSubject(const CameraRig& rig) { return eyeFollows(rig) && rig.followLocal; }
+
+// A slider's float as the double the rig keeps, to the millisecond: 0.3f widened is
+// 0.30000001192092896, which a saved scene would otherwise carry for ever.
+double tidySeconds(float v) { return std::round(static_cast<double>(v) * 1000.0) / 1000.0; }
+
+constexpr std::string_view kOnlyWatches =
+    "Acts on a camera whose eye follows a subject; this one stands still and only turns to watch it.";
+
+} // namespace
+
+void FollowControl::apply(CameraRig& rig, float value) const {
+    if (kind == FollowControlKind::Toggle) {
+        set(rig, value >= 0.5f ? 1.0f : 0.0f);
+        return;
+    }
+    set(rig, std::isnan(value) ? minimum : std::clamp(value, minimum, maximum));
+}
+
+std::string_view FollowControl::name() const {
+    const std::size_t units = label.find(" (");
+    return units == std::string_view::npos ? label : label.substr(0, units);
+}
+
+std::span<const FollowControl> followControls() {
+    // The ranges: 3 s for every time, so a lag of 3 s plus four 3 s constants reads 15 s of history,
+    // inside HIST's 16 -- nothing the panel can reach is refused by `validate`. 10 m of clearance is
+    // five times the highest GV3 authors (2 m).
+    static constexpr FollowControl kRows[] = {
+        {.label = "follow smoothing (s)",
+         .key = "followSmoothSeconds",
+         .tip = "How gently the camera takes its subject's starts, stops and turns.\n"
+                "0 is welded on: every step is taken one to one and the world jerks behind\n"
+                "the subject. 0.3 suits a walking character. The camera trails by about this\n"
+                "long, which 'keep up with the subject' takes back.",
+         .kind = FollowControlKind::Seconds,
+         .minimum = 0.0f,
+         .maximum = 3.0f,
+         .appliesTo = &followsSomething,
+         .get = [](const CameraRig& r) { return static_cast<float>(r.followSmoothSeconds); },
+         .set = [](CameraRig& r, float v) { r.followSmoothSeconds = tidySeconds(v); }},
+        {.label = "height smoothing (s)",
+         .key = "followVerticalSmoothSeconds",
+         .tip = "How much of the subject's up-and-down the camera ignores: a walk's stride\n"
+                "bob, a hop. 0 bobs with every step. 1.0 suits a walking character. Leave it\n"
+                "at 0 where the rise is the shot (something lifted into the saucer).",
+         .kind = FollowControlKind::Seconds,
+         .minimum = 0.0f,
+         .maximum = 3.0f,
+         .appliesTo = &followsSomething,
+         .get = [](const CameraRig& r) { return static_cast<float>(r.followVerticalSmoothSeconds); },
+         .set = [](CameraRig& r, float v) { r.followVerticalSmoothSeconds = tidySeconds(v); }},
+        {.label = "keep up with the subject (0-1)",
+         .key = "followLead",
+         .tip = "Takes back the delay 'follow smoothing' adds, so the camera keeps pace with a\n"
+                "steady walk instead of trailing it; starts, stops and turns stay smoothed.\n"
+                "1 keeps up exactly, 0 trails by the smoothing time. Across only, never up\n"
+                "and down: that would bring the bob back.",
+         .kind = FollowControlKind::Fraction,
+         .minimum = 0.0f,
+         .maximum = 1.0f,
+         .appliesTo = &smoothsAcross,
+         .whenNot = "Acts with follow smoothing above 0: without it there is no delay to make up.",
+         .get = [](const CameraRig& r) { return r.followLead; },
+         .set = [](CameraRig& r, float v) { r.followLead = v; }},
+        {.label = "follow the ground",
+         .key = "followGround",
+         .tip = "For a subject that walks on the terrain: its height is smoothed relative to\n"
+                "the ground, so a walk down a hill is followed down it instead of leaving the\n"
+                "subject low in frame. Never for something that flies.",
+         .kind = FollowControlKind::Toggle,
+         .minimum = 0.0f,
+         .maximum = 1.0f,
+         .needsTerrain = true,
+         .appliesTo = &smoothsAtAll,
+         .whenNot = "Acts with follow smoothing or height smoothing above 0.",
+         .get = [](const CameraRig& r) { return r.followGround ? 1.0f : 0.0f; },
+         .set = [](CameraRig& r, float v) { r.followGround = v >= 0.5f; }},
+        {.label = "follow lag (s)",
+         .key = "followLagSeconds",
+         .tip = "The camera stands where its subject was this long ago, while still looking\n"
+                "at where it is now. Without height smoothing a lag makes the camera nod with\n"
+                "a walk's stride; GV3's walkers use none.",
+         .kind = FollowControlKind::Seconds,
+         .minimum = 0.0f,
+         .maximum = 3.0f,
+         .appliesTo = &eyeFollows,
+         .whenNot = kOnlyWatches,
+         .get = [](const CameraRig& r) { return static_cast<float>(r.followLagSeconds); },
+         .set = [](CameraRig& r, float v) { r.followLagSeconds = tidySeconds(v); }},
+        {.label = "stay behind as it turns",
+         .key = "followLocal",
+         .tip = "The camera's offset turns with the subject, so 'behind and above' stays\n"
+                "behind when it turns. Off, the offset is fixed to the world: the camera keeps\n"
+                "to one side however the subject faces.",
+         .kind = FollowControlKind::Toggle,
+         .minimum = 0.0f,
+         .maximum = 1.0f,
+         .appliesTo = &eyeFollows,
+         .whenNot = kOnlyWatches,
+         .get = [](const CameraRig& r) { return r.followLocal ? 1.0f : 0.0f; },
+         .set = [](CameraRig& r, float v) { r.followLocal = v >= 0.5f; }},
+        {.label = "turn smoothing (s)",
+         .key = "followHeadingSmoothSeconds",
+         .tip = "How slowly the camera swings round behind its subject after a turn. 0 whips\n"
+                "round with every turn; 1.2 is the Director's chase. Only the subject's\n"
+                "facing counts, never its sway or lean.",
+         .kind = FollowControlKind::Seconds,
+         .minimum = 0.0f,
+         .maximum = 3.0f,
+         .appliesTo = &turnsWithSubject,
+         .whenNot = "Acts when 'stay behind as it turns' is on.",
+         .get = [](const CameraRig& r) { return static_cast<float>(r.followHeadingSmoothSeconds); },
+         .set = [](CameraRig& r, float v) { r.followHeadingSmoothSeconds = tidySeconds(v); }},
+        {.label = "ground clearance (m)",
+         .key = "followClearance",
+         .tip = "Keeps the camera at least this far above the ground or water, easing onto\n"
+                "that floor rather than bumping into it. 0 leaves the camera's height alone.",
+         .kind = FollowControlKind::Metres,
+         .minimum = 0.0f,
+         .maximum = 10.0f,
+         .needsTerrain = true,
+         .appliesTo = &eyeFollows,
+         .whenNot = kOnlyWatches,
+         .get = [](const CameraRig& r) { return r.followClearance; },
+         .set = [](CameraRig& r, float v) { r.followClearance = v; }},
+    };
+    return kRows;
 }
 
 // ---- the collection -----------------------------------------------------------------------------
@@ -223,6 +387,21 @@ Result<void> CameraDirection::validate() const {
         if (rig.placement == CameraPlacement::Spline && rig.spline.empty() && rig.id != kMainCamera) {
             return fail("camera '{}' rides a spline but names none", rig.name);
         }
+        // ADR-911. Refused rather than clamped: a negative constant has no meaning, and a lead past 1
+        // puts the camera ahead of where its subject is going to be -- a typo, not a style.
+        if (rig.followLagSeconds < 0.0 || rig.followSmoothSeconds < 0.0 || rig.followVerticalSmoothSeconds < 0.0 ||
+            rig.followHeadingSmoothSeconds < 0.0 || rig.followClearance < 0.0f) {
+            return fail("camera '{}' has a negative follow lag, smoothing or clearance", rig.name);
+        }
+        if (!(rig.followLead >= 0.0f && rig.followLead <= 1.0f)) {
+            return fail("camera '{}' has a follow lead of {}; it is a fraction of the smoothing's delay, 0 to 1",
+                        rig.name, rig.followLead);
+        }
+        if (rig.subjectHistorySeconds() > static_cast<double>(world::HistoryBank::kMaxSeconds)) {
+            return fail("camera '{}' reads {:.1f} s of its subject's history (lag plus four smoothing constants); "
+                        "HIST holds at most {:.0f} s",
+                        rig.name, rig.subjectHistorySeconds(), world::HistoryBank::kMaxSeconds);
+        }
     }
     if (!cameras.empty() && ids.find(kMainCamera) == ids.end()) {
         return fail("the camera list has no main camera");
@@ -331,6 +510,25 @@ json CameraDirection::toJson() const {
                 if (rig.followClearance > 0.0f) {
                     c["followClearance"] = rig.followClearance;
                 }
+                if (rig.followHeadingSmoothSeconds > 0.0) {
+                    c["followHeadingSmoothSeconds"] = rig.followHeadingSmoothSeconds;
+                }
+            }
+            // ADR-911: the subject reference filters whichever nodes the rig reads, so an aim-only
+            // rig carries it too. Written only when set, for the same byte-identity.
+            if (!rig.followNode.empty() || !rig.aimNode.empty()) {
+                if (rig.followSmoothSeconds > 0.0) {
+                    c["followSmoothSeconds"] = rig.followSmoothSeconds;
+                }
+                if (rig.followVerticalSmoothSeconds > 0.0) {
+                    c["followVerticalSmoothSeconds"] = rig.followVerticalSmoothSeconds;
+                }
+                if (rig.followLead > 0.0f) {
+                    c["followLead"] = rig.followLead;
+                }
+                if (rig.followGround) {
+                    c["followGround"] = true;
+                }
             }
             if (rig.focalLength > 0.0f) {
                 c["focalLength"] = rig.focalLength;
@@ -403,6 +601,13 @@ Result<CameraDirection> CameraDirection::fromJson(const json& doc) {
                 rig.followLocal = c.value("followLocal", rig.followLocal);
                 rig.followLagSeconds = c.value("followLagSeconds", rig.followLagSeconds);
                 rig.followClearance = c.value("followClearance", rig.followClearance);
+                rig.followSmoothSeconds = c.value("followSmoothSeconds", rig.followSmoothSeconds);
+                rig.followVerticalSmoothSeconds =
+                    c.value("followVerticalSmoothSeconds", rig.followVerticalSmoothSeconds);
+                rig.followLead = c.value("followLead", rig.followLead);
+                rig.followGround = c.value("followGround", rig.followGround);
+                rig.followHeadingSmoothSeconds =
+                    c.value("followHeadingSmoothSeconds", rig.followHeadingSmoothSeconds);
                 rig.focalLength = c.value("focalLength", rig.focalLength);
                 rig.spline = c.value("spline", rig.spline);
                 rig.splineT = c.value("splineT", rig.splineT);
