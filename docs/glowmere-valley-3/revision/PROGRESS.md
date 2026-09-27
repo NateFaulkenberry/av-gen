@@ -1,6 +1,6 @@
 # GV3 revision: progress and state
 
-This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:00, at a session handoff.
+This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:10, at a session handoff.
 
 ## CURRENT STATE: SESSION HANDOFF (2026-09-27 12:00). Read this before anything else
 This section supersedes every dated note below it, which are history. The session that wrote it is
@@ -28,11 +28,11 @@ Leftover processes from the old session may still be running (suites, renders, t
   - Phase 4 (4K final, report, self-critique): not started.
 - **Main is `040d6644`:** signals, routes, emission, song, camera, reactivity, water and setpieces, each integrated and fully tested.
 - **The integration** branch `integrate/revision`, in the worktree `~/Documents/GitHub/av-gen-signals`, is **`ec515c8b` = main + characters,** with the ADR-911 follow-placement fix.
-  - The GPU suite **passed** (533 cases, 532 passed, 1 skipped).
-  - **The CPU suite was running at handoff.** Log: `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/004befa7-093f-41d0-b2da-3d5e53a50a3a/scratchpad/coord-integrate5-cpu-full.log`. It may be gone with the old session's scratchpad; if so, re-run `ctest --test-dir build/release -L unit -j 4` there.
+  - The GPU suite **passed** (533 cases, 532 passed, 1 skipped). It overlapped 4 other CPU suites, so its bit-identity passes are not clean evidence (the GPU-lock ruling). If a later run disagrees, re-run it in a quiet window.
+  - **The CPU suite was running at handoff** (12:07: 27 of about 3,760 tests done, 0 failed; ctest runs the longest first). Log: `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/004befa7-093f-41d0-b2da-3d5e53a50a3a/scratchpad/coord-integrate5-cpu-full.log`. It may be gone with the old session's scratchpad; if so, re-run `ctest --test-dir build/release -L unit -j 4` there.
   - **If it passes:** `git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision` (check that the owner's checkout is clean and on `main`), then merge main into `gv3/production`.
   - **Expected, harmless:** "Glowmere Valley 2 from several viewpoints" is intermittent, and the event-driven agent test's 180 s wall-clock limit fails under heavy load (it passes alone).
-- **Render** (`agent/render` in `av-gen-render`, the last engine stream): ADR-917–919 are committed, and it was finishing GPU tests, GV3 evidence and suites. When done, merge it into `integrate/revision`, build, run the full suites, and fast-forward main. It merged main `3f720bfa`, so expect conflicts with setpieces and characters.
+- **Render** (`agent/render` in `av-gen-render`, the last engine stream): head `45d5e02f`, clean. ADR-917–919 are committed and measured on GV3 (`8e25b8d1`, `bfcc380b`: GV3's density arc runs 0.015–0.036, so its automatic fog distance is 208–500 m). Its final suites and report were pending; it had not answered the checkpoint request at 12:07. When done, merge it into `integrate/revision`, build, run the full suites, and fast-forward main. It merged main `3f720bfa`, so expect conflicts with setpieces and characters.
 - **Two shared engine builds for GV3 worktrees** (each worktree symlinks `build/release` to one):
   - `~/Documents/GitHub/av-gen-engine` = `040d6644`;
   - `~/Documents/GitHub/av-gen-engine-2` = `ec515c8b` (with characters). Both are `BUILD-READY`.
