@@ -306,6 +306,14 @@ so v3 and v4 differ only in the film):
 
 ## Resuming (the exact next steps)
 
+**State at 15:05:** gv3/look has gv3/production `274fe408` merged in (main `876a11e2`: render
+ADR-917-919 and the gpu-lock fix; gv3/cast: the cast recipe, the scout, E1-E5). The engine is
+`av-gen-engine-3` (`build/release` links to it). The full generation is now
+`python3 tools/make_glowmere_valley_3.py && python3 tools/gv3/ufo.py` (the second compiles the set
+pieces; `--no-trace` skips its 15-minute whole-film trace). `v8` is the merged project's snapshot,
+rendered on engine-3 for the re-baseline (D, A), with Critic inputs from a fresh cast trace
+(`build/gv3/look/critic/cast-v8.json`) through the fixed adapter.
+
 Tools (in the worktree, not committed): `build/gv3/look/pair.sh` (several clips of one range under
 one lock acquisition), `render.sh`, `measure.py` (hue, region, lock, motion), `sheet.py` (pairs and
 strips), `chart.py`; scratch projects in `build/gv3/reactivity/examples/world/` (`v3.json` etc.,
