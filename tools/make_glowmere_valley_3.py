@@ -291,7 +291,7 @@ def main():
     report = []
     world.apply(project, scene, ground, report)
     cast.apply(project, scene)
-    look.apply_base(project)
+    look.apply_base(project, scene)
 
     if args.scout:
         from gv3 import scout
@@ -301,7 +301,7 @@ def main():
         from gv3 import shots as film
         end = FILM_END
         arc = look.apply_arc(project)
-        motifs = look.apply_motifs(project)
+        motifs = look.apply_motifs(project, scene)
         report.append(f"look: {arc} arc track(s), {motifs} motif route(s)")
         # The spans are the Director's, cut from this project as it now stands (songcut.py).
         spans, director, note = songcut.direct(project, scene, recut=args.recut)
