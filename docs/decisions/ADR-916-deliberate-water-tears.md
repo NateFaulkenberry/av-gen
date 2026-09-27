@@ -162,7 +162,8 @@ Rejected:
     combed band and a light slick line. The wides s14 and s39 show faint slick lines. s26 shows almost
     nothing with this lattice: no seam passes near its camera at 171 s.
   - Over a second of s08 the frame-to-frame change inside the seams is 0.0103, against 0.0122 for the
-    ripples they replace. The rest of the water is identical.
+    ripples they replace. The rest of the water is identical. On s26 (170.5-171.9 s, GV3's shimmer
+    measure on the bottom fifth), 0.0018 a frame with the tears and without, under the audit's 0.0029.
   - An optional bass accent: `audio.bass -> nodes/valley/water/tears/amount`, add 0.15, attack 120 ms,
     decay 900 ms. At its peak (0.5) it changes 1.3% of s08, inside the seams only.
   - The same settings serve the 960x540 previews and the 1080p and 4K finals.
