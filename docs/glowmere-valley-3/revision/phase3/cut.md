@@ -335,10 +335,29 @@ searches in `build/gv3/cut/tools/search3.py`.
   third (+0.36) with the sky it comes out of on the left. The owner's frame, moved: judged on the
   clip below.
 
-**Predicted from the iteration-2 trace:** every shot with a subject passes the stability bar except
-95.3 (ADR-913's exception), 21 of 22; every planned set-piece moment on screen at its instant,
-including E2's crossing and E4's lift (`build/gv3/cut/it3/cut-onscreen-it3-predicted.txt`). The
-iteration-3 trace is running to measure it.
+### Iteration 3, measured on its trace (engine `ec515c8b`)
+
+`avgen_cast_trace --camera` of the iteration-3 preview world (`build/gv3/cut/it3/cast-it3.json`).
+The cast is bit-identical to iteration 2's (every entity's every sample: largest difference 0.000000
+m), and so are the set pieces' beats and the animals taken: only the cameras changed.
+
+**Camera stability** (`build/gv3/cut/it3/stability-it3.json`): **21 of 22 shots with a subject
+pass** (the first pass on this engine: 5 of 16; iteration 1: 18 of 22; iteration 2: 19 of 23). The one
+failure is 95.3, the horse's rise, ADR-913's exception (pitch HF 1.31). As the model predicted:
+
+| Shot | iteration 2 (pitch / yaw HF, deg) | iteration 3 | |
+|---|---|---|---|
+| 54.1, E4 arrives (s33) | 0.092 / 0.204, fail | locked off: no subject | |
+| 57.1, E4's lift (s34) | 0.007 / 0.024 | 0.017 / 0.013 | the scout now in frame at the lift |
+| 59.1, the aliens watch (s35) | 0.098 / 0.242, fail | 0.003 / 0.028 | Sage, not Ember |
+| 94.1, up the beam (s52) | 0.020 / 0.102, fail | 0.011 / 0.071 | the hover kind |
+
+**On screen at each set-piece moment** (`build/gv3/cut/it3/cut-onscreen-it3.txt`, identical to the
+prediction): every moment the cut means to show is in frame at its instant: E1's beam and the start
+of its sweep (7.1; the sweep goes on after the cut to 9.1), E2's crossing from its first instant
+(15.1), E3's beam, lift and departure with the animal taken (35.1, 37.1, 39.1), E4's beam (54.1),
+lift (57.1) and departure (61.1), E5's approach, beam, lift and departure (81.1, 93.1, 94.1, 97.1).
+Off by choice: the approaches and departures of E1, E3 and E4, and E2's exit (the craft is gone).
 
 ## State (2026-09-27, about 12:50)
 
