@@ -16,7 +16,8 @@
 //   home         a home radius holds a body near its anchor without a reversal  |  control: an
 //                unleashed body walks away
 //   slope        on a ridge world, `maxSlope` keeps every standing body off steep ground and every
-//                walk off it too  |  control: without it the same body stands on the flank
+//                walk off it too, and its default (12 degrees) does with no key in the file  |
+//                control: `maxSlope` 0 (the world's cliff rule only) stands the same body on the flank
 //   eased        with an authored gait the measured acceleration never beats the gait's own
 //                numbers and the legs never walk on the spot  |  control: an absurd gait shows the
 //                numbers are what is being read
@@ -190,13 +191,18 @@ TEST_CASE("a slope limit keeps a wanderer, standing and walking, off ground stee
     REQUIRE(steepest > 25.0f);
 
     constexpr float kLimit = 10.0f;
-    const auto run = [&](float limit) {
-        CastMember m = grazer({{"homeRadius", 30.0}, {"maxRange", 16.0}, {"maxSlope", limit}});
+    // A negative limit leaves the key out of the file: the default's arm.
+    const auto run = [&](float limit, float steep = kLimit + 2.0f) {
+        nlohmann::json extra = {{"homeRadius", 30.0}, {"maxRange", 16.0}};
+        if (limit >= 0.0f) {
+            extra["maxSlope"] = limit;
+        }
+        CastMember m = grazer(extra);
         m.at = glm::vec3(-12.0f, 0.0f, 0.0f);
         // `ground` so the body reports the surface it stands on to the recorder.
         m.behaviors.push_back(behavior("ground", {{"slopeAlign", 0.55}}));
         entity::CharacterQualityThresholds th;
-        th.steepDegrees = kLimit + 2.0f; // steeper than the limit, with room for the footprint
+        th.steepDegrees = steep; // steeper than the limit, with room for the footprint
         CastWorld w({m}, &bed.nav, th);
         float walkedOn = 0.0f;
         w.play(600.0, [&] {
@@ -220,13 +226,28 @@ TEST_CASE("a slope limit keeps a wanderer, standing and walking, off ground stee
     // gentle places does not cross the flank. A degree of margin for sampling the line every 2 m.
     CHECK(walked < kLimit + 3.0f);
 
-    // The control: no limit. The same body on the same bed stands and walks on the flank.
+    // The control: `maxSlope` 0, the world's cliff rule and nothing more. The same body on the same
+    // bed stands and walks on the flank.
     const auto [walkedFree, free] = run(0.0f);
-    WARN(fmt::format("no maxSlope: walked on up to {:.1f} deg, {:.1f} s standing on steep ground, "
-                     "{:.1f} s of it facing uphill",
+    WARN(fmt::format("maxSlope 0 (the world's cliff rule only): walked on up to {:.1f} deg, {:.1f} s "
+                     "standing on steep ground, {:.1f} s of it facing uphill",
                      walkedFree, free.ground.steepSeconds, free.ground.facingUphillSeconds));
     CHECK(free.ground.steepSeconds > 5.0);
     CHECK(walkedFree > kLimit + 10.0f);
+
+    // And the default. A wanderer whose file says nothing about slope keeps off ground steeper than
+    // 12 degrees -- the line the analyzer calls steep -- standing and walking: the owner's "animals
+    // should avoid walking into steep slopes" (brief §11) as what a wanderer does unless told
+    // otherwise, not as a knob a scene has to know to turn. Measured as the first arm is: standing
+    // ground against the limit plus two degrees for the footprint, and walks against the limit plus
+    // three for sampling the line every 2 m.
+    const auto [walkedDefault, byDefault] = run(-1.0f, 14.0f);
+    WARN(fmt::format("maxSlope absent (the default, 12): walked on up to {:.1f} deg, {:.1f} s standing "
+                     "on ground over 14 deg, {:.1f} s facing uphill",
+                     walkedDefault, byDefault.ground.steepSeconds, byDefault.ground.facingUphillSeconds));
+    REQUIRE(byDefault.ground.stillSeconds > 60.0);
+    CHECK(byDefault.ground.steepSeconds == 0.0);
+    CHECK(walkedDefault < 12.0f + 3.0f);
 }
 
 TEST_CASE("a wanderer eases into and out of its stops at its own gait's rates",
@@ -252,7 +273,7 @@ TEST_CASE("a wanderer eases into and out of its stops at its own gait's rates",
     // The body's own ground speed never changes faster than the gait allows. The margin is the
     // part of an acceleration that is turning rather than speeding up: a body on a curve of radius
     // R at speed v accelerates at v^2 / R sideways, which the recorder measures too.
-    CHECK(eased.motion.largestAccel < kDecel + 1.5f);
+    CHECK(eased.motion.largestAccel < static_cast<double>(kDecel) + 1.5);
     // And the legs never walk on the spot: the published speed and the ground covered agree. Before
     // ADR-907 wander stopped the body dead while the ADR-620 limiter ramped the published speed
     // down, and the legs went on walking for about 0.4 s after every stop.

@@ -688,22 +688,37 @@ public:
           // ADR-907 and 908. See `update` for what each one changes and why its default is what
           // it is; every one of them is a registered parameter, so a scene can keyframe it.
           spreadDefault_(readFloat(s, "headingSpread", 60.0f)),
-          maxSlopeDefault_(readFloat(s, "maxSlope", 0.0f)),
+          // 12 degrees by default: the line ADR-910's analyzer calls steep, so a wanderer nobody
+          // tuned keeps its destinations and its walks off ground a viewer reads as a hillside (the
+          // owner's §11). 0 is the world's own cliff rule and nothing more, for a scene whose
+          // creatures climb.
+          maxSlopeDefault_(readFloat(s, "maxSlope", 12.0f)),
           radiusDefault_(readFloat(s, "turnRadius", 0.0f)),
           arrivalDefault_(readFloat(s, "arrival", 2.0f)) {}
 
     [[nodiscard]] std::string_view kind() const override { return "wander"; }
 
     void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
-        speed_ = &params.add(floatDesc(prefix + "speed", speedDefault_, 0.0f, 40.0f));
-        runSpeed_ = &params.add(floatDesc(prefix + "runSpeed", runSpeedDefault_, 0.0f, 60.0f));
-        turn_ = &params.add(floatDesc(prefix + "turnRate", turnDefault_, 1.0f, 1440.0f));
-        arrive_ = &params.add(floatDesc(prefix + "arrive", arriveDefault_, 0.05f, 20.0f));
-        minRange_ = &params.add(floatDesc(prefix + "minRange", minRangeDefault_, 0.0f, 500.0f));
-        maxRange_ = &params.add(floatDesc(prefix + "maxRange", maxRangeDefault_, 0.5f, 1000.0f));
-        pauseMin_ = &params.add(floatDesc(prefix + "pauseMin", pauseMinDefault_, 0.0f, 300.0f));
-        pauseMax_ = &params.add(floatDesc(prefix + "pauseMax", pauseMaxDefault_, 0.0f, 600.0f));
-        home_ = &params.add(floatDesc(prefix + "homeRadius", homeDefault_, 0.0f, 4000.0f));
+        // Every knob in words (the UI reach rule): these are what an artist watching an animal
+        // graze reaches for, and a slider reading "pauseMax" says nothing about the picture.
+        speed_ = &params.add(
+            floatDesc(prefix + "speed", speedDefault_, 0.0f, 40.0f, "walking speed (metres a second)"));
+        runSpeed_ = &params.add(
+            floatDesc(prefix + "runSpeed", runSpeedDefault_, 0.0f, 60.0f, "running speed (metres a second)"));
+        turn_ = &params.add(
+            floatDesc(prefix + "turnRate", turnDefault_, 1.0f, 1440.0f, "turn rate (degrees a second)"));
+        arrive_ = &params.add(
+            floatDesc(prefix + "arrive", arriveDefault_, 0.05f, 20.0f, "counts as arrived within (m)"));
+        minRange_ =
+            &params.add(floatDesc(prefix + "minRange", minRangeDefault_, 0.0f, 500.0f, "shortest walk (m)"));
+        maxRange_ =
+            &params.add(floatDesc(prefix + "maxRange", maxRangeDefault_, 0.5f, 1000.0f, "longest walk (m)"));
+        pauseMin_ = &params.add(
+            floatDesc(prefix + "pauseMin", pauseMinDefault_, 0.0f, 300.0f, "shortest pause between walks (s)"));
+        pauseMax_ = &params.add(
+            floatDesc(prefix + "pauseMax", pauseMaxDefault_, 0.0f, 600.0f, "longest pause between walks (s)"));
+        home_ = &params.add(
+            floatDesc(prefix + "homeRadius", homeDefault_, 0.0f, 4000.0f, "stays this near home (m, 0 = roams)"));
         spread_ = &params.add(floatDesc(prefix + "headingSpread", spreadDefault_, 0.0f, 180.0f,
                                         "how far off straight ahead it wanders (deg)"));
         maxSlope_ = &params.add(floatDesc(prefix + "maxSlope", maxSlopeDefault_, 0.0f, 89.0f,
