@@ -4,7 +4,7 @@ The revision (the owner's brief §9-12; docs/glowmere-valley-3/revision/03-revis
 
   aliens    purposeful, never standing about for long, never walk -> stop -> turn round -> walk back.
             Each has its own longest pause, its own range of paces and a turning circle (ADR-907 to
-            909), and each hears the UFO events it is near enough to see (ADR-930).
+            909). Those near E4 go and see it; every alien stops to watch E5's beam (ADR-930).
   animals   on flat valley ground, walking through their turns. Every animal keeps off ground
             steeper than 10 degrees and turns on a body-sized circle; the five whose homes were on
             17-25 degree flanks are re-homed onto the two flat meadows.
@@ -45,6 +45,8 @@ SCOUT_REST = [-140.0, 170.0, -360.0]   # beyond the north rim, where E1 and E3 h
 # A smaller craft is a lighter one (the research's sqrt-of-scale rule, which the saucer's calming
 # already follows): its sway is smaller in proportion and its rates quicker by 1/sqrt(scale).
 SCOUT_RATE = 1.0 / math.sqrt(SCOUT_SCALE)
+# The saucer's hero anchor sits this far below its node (the multicam's authored offset).
+HERO_OFFSET = 1.45
 
 # The horse's light (F24). The horse's glTF emits nothing, so an emissiveBoost ramp multiplies zero; a
 # Glow's self-glow and rim add light to a surface that has none (FXL, ADR-703). Gold, because it is the
@@ -75,7 +77,7 @@ ALIEN_HABITS = {
     #         longest still (s), the interest considerer, its pace range
     "rook":  {"still": 7.0,  "interest": "roam",  "pace": [0.9, 1.3]},
     "tide":  {"still": 8.0,  "interest": "roam",  "pace": [0.8, 1.2]},
-    "sage":  {"still": 10.0, "interest": "graze", "pace": [0.7, 1.05]},
+    "sage":  {"still": 8.0,  "interest": "graze", "pace": [0.7, 1.05]},
     "ember": {"still": 6.0,  "interest": "roam",  "pace": [0.9, 1.35]},
     "vane":  {"still": 9.0,  "interest": "watch", "pace": [0.8, 1.15]},
 }
@@ -106,16 +108,38 @@ ALIEN_CONSIDERERS = {
 ALIEN_RUN_BAND = {"sage": (4.8, 3.1), "tide": (4.8, 3.1)}
 
 # ---- what the aliens hear --------------------------------------------------------------------------
-# The UFO events the aliens react to (the `react` considerer "beam", ADR-930's world events), and how
-# far each carries. A body hears an event within `radius`, as loudly as it is near (intensity 1 at the
-# event, 0 at the radius); the beam of the centrepiece is heard across the valley (the characters
-# report's 250 m), the river pair's by the aliens around the meadow, E3's only by one that has
-# wandered up the valley. The far survey (E1) and the flyby (E2) are seen, not heard.
-HEARD = {
-    "e3-far-lift": 170.0,
-    "e4-river-pair": 150.0,
-    "e5-centrepiece": 250.0,
+# The UFO events the aliens react to (ADR-930: every set-piece moment is a world event), how far each
+# carries (intensity 1 at the event, 0 at the radius), and what hearing it makes them do. Two ways,
+# one `react` considerer each:
+#
+#   beam         go and see: walk to within `approach` of the craft, face it, watch. E4 happens on
+#                the aliens' own bank of the river, in the meadow they roam, and is heard by the ones
+#                near it (80 m: in iteration 1's film, ember, sage and tide).
+#   centrepiece  stop and watch where you stand: E5's beam is heard across the valley (the characters
+#                report's 250 m), and an `approach` that long means every alien that hears it is
+#                already "inside" it (standOff, decision.cpp) -- it faces the beam and watches, and a
+#                cautious one (sage) steps back first. Not "go and see": E5 is on the elder's bank and
+#                four aliens are across the river from it, and the engine's action-tier route
+#                (`NavigatorPath::route`) does not ask whether a goal is on the body's own piece of
+#                walkable ground. Iteration 1 sent ember at a goal across the river: it paced the bank
+#                for 40 s, walk -> stop -> turn 180 -> walk back eight times through the drop.
+#
+# E1 (the far survey), E2 (the flyby) and E3 (the far lift, 250-330 m from every alien) are seen, not
+# heard: nobody is near enough to walk to them, and walking 300 m to a light is not purposeful.
+REACTIONS = {
+    #              the set piece whose beam it hears, its radius (m), and the considerer's settings
+    "beam":        ("e4-river-pair", 80.0,
+                    {"approach": 18.0, "flee": 10.0, "dwell": 4.0, "fadeSeconds": 12.0, "weight": 1.5}),
+    "centrepiece": ("e5-centrepiece", 250.0,
+                    {"approach": 250.0, "flee": 10.0, "dwell": 6.0, "fadeSeconds": 10.0, "weight": 1.5,
+                     "activity": "observe"}),
 }
+
+# Sage's `interest` behaviour (not a considerer: it runs after the decider) stops the body's feet to
+# look about, every 1-3 s with some chance. The project restates its dwell as 1.2-3.4 s, but the
+# scene's 3-6 s is what runs (a headless save writes 3.0/6.0 back), and at 55 % it chains into
+# stands the decider's `maxStillSeconds` cannot break. A glance, not a vigil: brief looks, less often.
+SAGE_INTEREST = {"observeChance": 0.25, "minDwell": 1.2, "maxDwell": 3.4, "reactionCooldown": 15.0}
 
 # ---- the animals -----------------------------------------------------------------------------------
 # Every animal keeps to gentle ground (the analyser's "steep" is 12 degrees; 10 leaves a margin) and
@@ -211,7 +235,7 @@ def craft(project, scene):
     # keeps its authored offset from its node, so the anchor rode two hundred metres off it.
     for hero in project.get("heroes", []):
         if hero.get("name") == "visitor":
-            hero["position"] = [REST[0], REST[1] - 1.45, REST[2]]
+            hero["position"] = [REST[0], REST[1] - HERO_OFFSET, REST[2]]
 
     add_scout(project, scene)
 
@@ -266,6 +290,26 @@ def add_scout(project, scene):
     scene["staging"]["actors"].append(
         {"name": SCOUT, "body": SCOUT, "parts": [{"name": "beam", "entity": SCOUT_BEAM}]})
 
+    # A hero record, as the saucer has one: it is how the project declares a body's size and place to
+    # the Director and the evaluator (the Critic's adapter otherwise assumes the saucer's 8.2 m). The
+    # saucer's, scaled; less important than the saucer, whose story the film follows. Its anchor is
+    # where its node rests, less the saucer's own offset scaled (a hero keeps its authored offset).
+    def scout_hero(saucer):
+        hero = copy.deepcopy(saucer)
+        hero["name"] = SCOUT
+        hero["position"] = [SCOUT_REST[0], SCOUT_REST[1] - HERO_OFFSET * SCOUT_SCALE, SCOUT_REST[2]]
+        for key in ("radius", "height", "preferredCameraDistance"):
+            if key in hero:
+                hero[key] = round(hero[key] * SCOUT_SCALE, 3)
+        hero["importance"] = round(hero.get("importance", 0.4) * 0.5, 3)
+        return hero
+
+    for holder in (scene, project):
+        heroes = holder.get("heroes", [])
+        saucer = next((h for h in heroes if h.get("name") == "visitor"), None)
+        if saucer is not None and not any(h.get("name") == SCOUT for h in heroes):
+            heroes.insert(heroes.index(saucer) + 1, scout_hero(saucer))
+
     # The saucer's restated look, onto the scout's paths. Its motion restated too (hover, drift, bank),
     # scaled as the scene copy is.
     params = project["parameters"]
@@ -291,9 +335,8 @@ def add_scout(project, scene):
 
 # ---- the aliens ------------------------------------------------------------------------------------
 def aliens(project, scene):
-    """The characters stream's recommended settings, per alien, and the aliens' ears for E3-E5."""
+    """The characters stream's recommended settings, per alien, and the aliens' ears for E4 and E5."""
     ents = _entities(scene)
-    heard = [ufo.event_name(key, "beam") for key in HEARD]
     for name in ALIENS:
         e = ents[name]
         e["gait"].update(ALIEN_GAIT)
@@ -306,9 +349,19 @@ def aliens(project, scene):
         for c in d["considerers"]:
             if c["kind"] == "interest":
                 c["speedRange"] = list(habits["pace"])
-            elif c["kind"] == "react":
-                c["speedRange"] = list(REACT_PACE)
-                c["events"] = list(heard)
+        # The reactions: the scene's one `react` ("beam") becomes the pair above, each hearing one set
+        # piece. The new one goes where the old one was, so the considerers keep their order.
+        at = next(i for i, c in enumerate(d["considerers"]) if c["kind"] == "react")
+        template = d["considerers"][at]
+        reactions = []
+        for considerer, (key, _radius, settings) in REACTIONS.items():
+            c = copy.deepcopy(template)
+            c["name"] = considerer
+            c["events"] = [ufo.event_name(key, "beam")]
+            c["speedRange"] = list(REACT_PACE)
+            c.update(settings)
+            reactions.append(c)
+        d["considerers"][at:at + 1] = reactions
         for considerer, changes in ALIEN_CONSIDERERS.get(name, {}).items():
             c = _considerer(e, considerer)
             for key, value in changes.items():
@@ -316,10 +369,15 @@ def aliens(project, scene):
                 _set(project, name, f"decide/{considerer}/{key}", value)
         e["clips"].update(ALIEN_CLIPS)
 
+    sage = next(b for b in ents["sage"]["behaviors"] if b["kind"] == "interest")
+    for key, value in SAGE_INTEREST.items():
+        sage[key] = value
+        _set(project, "sage", f"interest/{key}", value)
+
     # How far each heard event carries. The first pass's `abduction/beam` belonged to the hand-written
     # scenario, which is gone; nothing raises it any more.
     events = [w for w in scene.get("worldEvents", []) if not w["name"].startswith("abduction/")]
-    for key, radius in HEARD.items():
+    for key, radius, _settings in REACTIONS.values():
         events.append({"name": ufo.event_name(key, "beam"), "radius": radius, "magnitude": 1.0})
     scene["worldEvents"] = events
 
