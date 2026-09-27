@@ -271,12 +271,17 @@ def vane_watches(t0, t1, g):
 
 @at("31.1")
 def spire_east_bank(t0, t1, g):
-    # A hero the first pass never showed: the spire on the east bank, the eye swinging 14 deg round
-    # it at 24 m so the bank slides behind it (iteration 2's 8 m diagonal toward it read as a push,
-    # static after 0.9 s).
-    r = arc(t0, t1, 35.0, g, 52, -86, 2.0, [68.0, 14.5, -104.0], 14.0)
+    # A hero the first pass never showed: the spire on the east bank. Low from the west through a 24 mm,
+    # 12 m off and looking up, the eye swinging 6 deg round it and rising 0.8 m: the spire stands large
+    # in the frame with its cyan underside over it. From 24 m south-west through a 35 mm (the merged film)
+    # it was one mushroom among many on the lit hillside (the brief's item; gv3-int batches A and D: from
+    # the south its cap left the frame, from up the east slope a tree stood in front of it).
+    x, z = 67.7 + (56 - 67.7) * math.cos(math.radians(-6.0)) - (-106 + 103.7) * math.sin(math.radians(-6.0)), \
+        -103.7 + (56 - 67.7) * math.sin(math.radians(-6.0)) + (-106 + 103.7) * math.cos(math.radians(-6.0))
+    r = arc(t0, t1, 24.0, g, x, z, 1.0, [67.7, 13.5, -103.7], -6.0, rise=0.8)
     return r, dict(lead="hero", purpose="The spire on the east bank", subject="the spire mushroom",
-                   camera="35 mm, 2 m, south-west of it", movement="truck round it, 14 deg", music="2 bars to the lift")
+                   camera="24 mm, 1 m, 12 m west of it, looking up", movement="truck round it, 6 deg, rising",
+                   music="2 bars to the lift")
 
 
 # ==== 5 lift (bars 33-40): E3 ==========================================================================
