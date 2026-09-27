@@ -79,4 +79,21 @@ sky's own radiance in the direction of the ray.** At 1 a far ridge fades into th
   march is off (`scene/volumeMaxDistance` 0).
 - **Cost.** One 4096-texel pass a frame while `fogSky` is above zero (16 sky and aurora evaluations
   a texel), and one bilinear fetch per fogged fragment.
-- **Measured** (`test_fog_sky_gpu.cpp`): see the numbers recorded below.
+- **Measured** (`test_fog_sky_gpu.cpp`, 320x200, a ridge 300 m out behind 0.01/m of fog, a warm
+  horizon against a navy fog colour):
+  - The ridge's band against the sky that stands there without it (relative L1 above the horizon):
+    **0.054 fogged towards the sky, 0.865 towards the constant colour.** Mean luminance: the sky
+    behind 0.429, the ridge 0.406 from the sky and 0.039 from the constant colour -- the cut-out.
+  - The open sky's rows are identical to the bit between the two arms (the sky is not fogged), and
+    the map is built only in the arm that asks for it.
+  - The aurora behind the ridge moves the fogged ridge by 0.92 (relative L1) when the fog takes the
+    sky's colour and by exactly 0 when it does not; the map's horizon rows read 0.948 with the
+    aurora against 0.389 without.
+  - Two fresh renderers draw the same frame and the same map to the bit (the determinism case).
+- **Tests re-baselined:** `test_terrain_fog_gpu.cpp`'s compute harness builds its own group-0
+  layout around `applyFog`; it now declares bindings 16 and 17 (a 1x1 placeholder that a zero lane
+  never reads). Without them the pipeline was invalid and the test compared zeros. No engine shader
+  was affected: every caller of `applyFog` binds the frame layout.
+- **The first run of this test measured nothing,** and is recorded because the failure shape is
+  this codebase's most common one: the ridge stood 300 m out behind the camera's default 200 m far
+  plane, so all three arms were the bare sky and every gap was 0. The fixture now reaches 2000 m.

@@ -137,5 +137,40 @@ Rejected:
   2160p x2 finals show the preview's look at 2x and 4x. `dof/maxRadius`, `tiltShift/maxRadius` and
   `look/localContrastRadius` are off in GV3 today; if they are turned on, their values are now
   pixels at 1080 lines.
-- **Tests re-baselined:** see the list recorded below.
-- **Cost at 4320 lines** (reference 1080, pixel scale 4): recorded below.
+- **Measured** (`test_post_resolution_gpu.cpp`): one shot's effect contribution -- the frame with
+  the effect minus the frame without it -- at 320x180 against 1280x720 box-filtered down 4x, with
+  the reference at 180 lines (the treatment), and with each frame its own reference plus the motion
+  blur's old height / 720 radius (the chain before ADR-917, the control):
+
+  | Effect | Relative L1, treatment | control | Reach (r90) ratio, treatment | control |
+  |---|---|---|---|---|
+  | bloom | 0.073 | 0.498 | x1.003 | x0.286 |
+  | halation | 0.136 | 0.782 | x1.005 | x0.295 |
+  | anamorphic streak | 0.051 | 1.439 | x1.000 | x0.325 |
+  | motion blur (smear saturated at the radius) | 0.094 | 0.355 | | |
+  | look stage (local mean at 4x its budget) | 0.029 | 0.310 (throwaway build: truncated gaussian) | | |
+
+  What remains in the treatment is rasterisation: a box 5 px across at 180 lines is drawn with a
+  stair at its edge that 720 lines resolves. At one frame size, halving the reference moves the
+  glow's reach from 0.034 to 0.062 frame heights (x1.81).
+- **The separable tile maximum** gave the single pass's motion-blur error to all twelve printed
+  digits (a throwaway build that took every tile in one pass), so the two find the same vectors.
+- **Cost at 4320 lines,** the post chain at 7680x4320 with GV3's settings (the hidden `perf:` case,
+  48 frames, median): **15.1 ms at reference 1080** (pixel scale 4: the frame boxed down two
+  octaves, 6 levels, streak 332 texels, 80 px tiles, the look stage two octaves down) against
+  **17.7 ms for the chain before ADR-917** at the same 240 px radius (6 levels at full size, 83
+  texels, 20 px tiles). Motion blur is most of either: 11.6 ms with 80 px tiles, 13.8 ms with 20 px.
+  With the single-pass tile maximum at 80 px the motion blur alone took 47.8 ms.
+- **Tests re-baselined** (a test that renders a small frame with bloom and asserts on it now meets
+  a reference of 720 lines):
+  - `test_image_look_gpu.cpp`, "post/bloom/levels reaches the pyramid from a project": at 192x128
+    the chain folds the levels a 128-line frame is too small for (six=4, two=1). Its reference is
+    pinned to its 128 lines, where six and two levels are what the test asks about.
+  - `test_post_artifact_forensics_gpu.cpp`: the comb measurements were taken at scale 1; at 288
+    lines against 720 every streak is 0.4x its authored texels and the lag the test watches no
+    longer describes it (0.023-0.042 against a bar of 0.02, with no isolated peaks and the
+    elongation intact). `glowmerePost()` pins the reference to 288.
+  - `test_particle_weather_gpu.cpp`: a lit-pixel count saw the default bloom's halo, planned 2.5
+    octaves tighter at 128 lines (3882 wrapped against 2908 free, where the test asks for 2x). The
+    fixture pins its 128 lines.
+  - Every other GPU test passed unchanged in the first full run on this branch (542 cases).
