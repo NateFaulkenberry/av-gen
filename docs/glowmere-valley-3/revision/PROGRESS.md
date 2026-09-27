@@ -8,6 +8,56 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **18:00: gv3-world is DONE** (final `60143f86`; the log-only tail merged as `6d5791b8`).
+  - The closure: 0 open ends in 453 views; the survey, the filmed ground and all 28 camera tracks are unchanged.
+  - **The river mouth cannot be closed by terrain** (its course holds the survey minimum), so gv3-int solves 77.1
+    and 106.1 in framing.
+  - **The 4K cost on engine-3 is still unmeasured.** A runner (`av-gen-gv3-world/build/gv3w/k4wait3h.sh`) waits
+    outside the lock for quiet until 20:41; results go to `build/gv3w/k4wait3h.out`. Until then, use render's
+    0.34 s/frame (77-80 min for the film).
+  - **UI reach gap:** the closure's head, falls, sill and shoulders, and `flow.speedOverride`, can be changed only in
+    the scene file. Add it to the engine's UI-reach list.
+  - **The final:** `python3 tools/make_glowmere_valley_3.py --final --final-trace <cast trace> && python3 tools/gv3/ufo.py`
+    (300 m shadows on 18 shots).
+- **The r1 preview is in the owner's review folder** (`revision/integrate/r1-preview-960x540.mov` and
+  `README-r1-preview.md`). It is a work in progress: new versus the first pass, the known issues, and two calls for
+  the owner's eye: the air (teal haze against navy night) and the river mouth. The review candidate r2 (round 2
+  plus navfix) is expected about 20:00-21:00.
+- **17:45: gv3-int round 1 is done.** The merged film is generated and audited (93/93 routes, 0 unknown parameters),
+  traced, rendered whole (13,530 frames, 0 GPU errors) and judged (`job_1a0e49f4c67b66a3b`, and
+  `job_1a0e4a50eaa6cabba` with the routes mapped).
+  - All five set pieces play; E3 takes bull-21 and is framed fine. 19 of 22 follow rigs pass.
+  - `world.py` fails on the cut's new cameras: 77.1 sees the south edge and the river mouth dead centre.
+  - 59.1's sage walks out of frame; it is re-framed on rook.
+  - 95.3's horse washed out in the beam, whose `audio.rms` link tripled it in the riser. The link is dropped.
+  - **Two moons (an engine defect, queued for the next engine round):** `skybox.wgsl` draws the crisp moon at the
+    un-rotated sun direction while the procedural sky is sampled through `env/rotation`. GV3 inherited -0.568 from
+    GV2, so the film had two moons 32.5 degrees apart in 11 shots; GV2 multicam has it too. The disc's colour and
+    radius are hard-coded, so it is visible and not controllable. GV3's workaround: `env/rotation` 0 (`e1bc1c49`).
+  - **The Critic adapter maps a hero's own node routes now** (creative-critic `cf63d64`; suite 53 passed). A
+    whole-film job had judged only 11 of 75 routes, never the elder's kick.
+  - **GPU policy change:** navfix's GPU suite held the lock for an hour waiting for the uireach, cihealth and behave
+    CPU runs, so gv3-int's clips were blocked. The runner is now `build/coord-gpu-full4.sh navfix2`: it waits only
+    for other GPU work and logs CPU overlap. Rationale: CPU contention makes GPU suites fail spuriously, not pass
+    spuriously, so a pass stands with its overlap on record, and a failure is re-run in a quiet window.
+- **16:35: ALL FOUR PHASE 3 STREAMS ARE MERGED into `gv3/production`.**
+  - **gv3/world** is merged as `be55dd43` (world `588fb792`). The one conflict, the generator's argparse block, was
+    resolved by keeping `--recut`, `--final` and `--final-trace`.
+  - **The closure is redone low:** a head of about 40 m in the north with the river at its foot and a 16 m falls;
+    in the south the rim with a low sill and a crest. The largest skyline rise is 6.6° (was 12°). Re-checked on a
+    whole-film trace of the closed film: 0 open ends. The water's speed is pinned at 0.4116 m/s; a closure had
+    slowed it 5%.
+  - **gv3-world is still measuring the 4K cost** in its own worktree. Merge its final commits when it reports.
+  - **What the closure changed for the other streams:**
+    - E3 takes bull-21, not bull-10;
+    - s13 at 70 s frames rook behind a fern;
+    - s18 at 110 s loses the E4 beam;
+    - s25 is now in frame;
+    - the river mouth's gorge shows sky in 84 views of s07, s13, s18 and s22–24.
+- **LAUNCHED: gv3-int, the Phase 3 integration** (brief in [briefs.md](briefs.md) § "Phase 3 integration"). Worktree
+  `av-gen-gv3-int`, branch `gv3/integrate` from `b74c3429`, on engine-3. It generates, re-validates, fixes the
+  cross-stream issues, renders the whole-film preview r1, evaluates it against iteration 0 and iterates. When navfix
+  is in main, build engine-4 and tell gv3-int; it then applies E5 "go and see".
 - **CI, 16:20: main `876a11e2`'s push run is RED on the bolt flake.** Run 36341601980: CPU 3,544 passed, 1 failed,
   212 skipped, 28 needs-assets, 3,788 in all (the local total). The failure is `test_bolt_path.cpp:565` again, now in
   shard 0 with seed 1790536064: 2 failures in 3 CI runs. The GPU job was still running.
@@ -39,8 +89,12 @@ where its predecessor stopped.
     camera guard, the scout alias and engine-3. It was idle when restarted; the new pid is 31482.
   - **The status index is committed**, verbatim, as `docs/development/STATUS-2026-09-25.md` on `integrate/revision`
     (`983221a9`). It reaches main with navfix. Its worktree and `docs/status-2026-09-25` branch are removed.
-  - **navfix's integration:** `90158678` + `983221a9` is built and settled (a true no-op). **The full CPU suite is
-    running** (log `coord-navfix-int-cpu-full.log`). Then the GPU suite in a quiet window, then main.
+  - **navfix's integration:** `90158678` + `983221a9` is built and settled (a true no-op).
+    - **CPU suite (15:37-16:38): 3,799 of 3,800.** The 1 failure is the 180 s wall-clock limit on "event-driven: the
+      assistant watches the film" (`test_directing_agent.cpp:392`), under a load average of about 100. Re-run
+      alone, it passes: 14 assertions, 142 s, exit 0.
+    - **The GPU suite is queued** (`build/coord-gpu-full2.sh navfix`, log `build/coord-gpu-navfix.log`). Then main,
+      engine-4, and the announcement to gv3-int.
   - **Launched from `983221a9`:**
     - **behave** (ADR-935–936): rook's walk on the spot, and unreachable roam targets;
     - **uireach** (ADR-937–939, and an ADR-933 amendment): editable treatments, per-species wind sway, a real aurora
