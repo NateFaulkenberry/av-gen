@@ -173,8 +173,10 @@ E4 lands one or two frames after the plan's nominal moments (lift 103.883 agains
    behaviours (`stage/staging.cpp`, `StepKind::Retire`); the crowd the bodies separate against and
    the perception index are built from every active entity, visible or not (`entity/entity.cpp`,
    the crowd build and `buildBodyIndex`). So a taken animal stays an obstacle and something to walk
-   up to and look at. An engine defect, **reported to the coordinator**; nothing in the scene can
-   remove a body at a moment only the set piece knows.
+   up to and look at. An engine defect, **open: ADR-934 in the navfix engine stream** (reported
+   2026-09-27; rook's stuck 0.4 → 6.7 s). Nothing in the scene can remove a body at a moment only
+   the set piece knows, so there is no data workaround; the coordinator re-traces the whole film for
+   ADR-910 when navfix lands.
 2. **Tide "walked" in place for 4.4 s** (211.80-216.25 s at (-36.1, -31.1), 0.37 m/s, no travel),
    on flat dry ground with no other body within 6 m. The move's own stuck clock (4 s without
    progress) ended it. Cause not found.
@@ -236,6 +238,93 @@ first 60 s traced; the same measurement, walking 0.1-3.3 m/s):
   the ground: "floats" when more than 10% of an on-screen body's track is over 0.1 m, "medium" when
   the worst is over 0.2 m. It reads the root, not the feet, so it may still flag ember, vane and
   rook for the authored bob.
+- **Verified in iteration 3** (below): the excess is gone, and the Critic still flags ember and vane
+  on the authored bob. Reported to the coordinator with the numbers and a data option.
+
+## Iteration 3: the bass reaction dropped; sage's look 4.5 s
+
+**What changed** (commit `ddb3ca2d`):
+- ember's and vane's `audio.bass -> liveliness/bounce` reaction dropped (`ALIEN_REACTIONS_DROPPED`);
+- sage's `graze` look 6 → 4.5 s.
+
+**Measured** (whole film at 60 fps: `ufo.py` 29 min at a load average of 150,
+`avgen_character_quality` on the frozen snapshot `build/gv3/cast/iter3/iter3.json`; trace, beats,
+quality and report beside it). Iteration 2 in brackets:
+
+| alien | longest still | still | stops (reversals, turns > 90°) | A→B→A | yaw on the spot | stuck |
+|---|---|---|---|---|---|---|
+| rook | 6.9 s [7.7], watching E5 | 20% [21] | 17 (0, 4) [19 (0, 2)] | 0 [0] | 19% [21] | 1.1 s [6.7] |
+| tide | 4.1 s [8.4] | 18% [25] | 15 (0, 3) [18 (1, 5)] | 1 [0] | 16% [20] | 1.9 s [7.0] |
+| sage | 7.8 s [8.2] | 28% [35] | 12 (2, 7) [14 (1, 5)] | 0 [0] | 29% [28] | 0.8 s [0.6] |
+| ember | 7.2 s [7.2] | 24% [27] | 24 (3, 9) [24 (1, 5)] | 3 [0] | 21% [16] | 3.8 s [3.3] |
+| vane | 4.2 s [4.2] | 20% [20] | 14 (0, 3) [14 (0, 3)] | 0 [0] | 13% [13] | 1.0 s [1.0] |
+
+Animals: 271 stops, **0 reversals, 6 turns over 90°, 5.2 s on ground over 12°, 0 s facing uphill**
+(unchanged). **The set pieces are frame for frame iteration 2's** (the staging does not depend on
+the aliens): E1 beam 13.900, E2 cross 26.650, E3 lift 66.967, E4 beam 102.533 and lift 103.883 with
+both cows taken at 111.917, E5 beam 170.350, lift 172.783, horse-11 taken 177.717.
+
+**The float, verified** (the drawn root above the ground while walking on dry ground, whole film;
+`build/gv3/cast/iter3/float.json` against `iter2/float.json`):
+
+| alien | iteration 2: mean / p90 / max | iteration 3 | the Critic's rule over the film (share over 0.1 m, max) |
+|---|---|---|---|
+| ember | +0.172 / +0.374 / +0.560 m | **+0.091 / +0.195 / +0.283 m** | 44% → 32%, 0.56 → 0.28 m |
+| vane | +0.172 / +0.347 / +0.477 m | **+0.087 / +0.176 / +0.248 m** | 49% → 34%, 0.48 → 0.25 m |
+| rook | +0.059 / +0.126 / +0.272 m | +0.061 / +0.123 / +0.238 m | 21% → 21% |
+| tide | +0.036 / +0.075 / +0.191 m | +0.035 / +0.074 / +0.158 m | 3% → 1% |
+| sage | +0.049 / +0.101 / +0.228 m | +0.047 / +0.099 / +0.193 m | 7% → 7% |
+
+Ember and vane now rise as ADR-895's formula says (0.184 m at the peak of a 3.07 m/s walk), as rook
+and tide always did. The fix is verified on the trace.
+
+**The Critic, before (first pass) and after (iteration 3)**, session `gv3-cast`; the before jobs
+are the regenerated ones; after jobs labelled `iter3`; comparisons in
+`build/gv3/cast/critic/iter3/<clip>/compare.json`:
+
+| clip | before | after | what moved |
+|---|---|---|---|
+| idle 44-60 s | `job_1a0e3a2ef6ddda6d0`: 7 issues (5 medium) | `job_1a0e3e4e5c5297a2f`: 9 (1 critical, 3 medium) | resolved: the bass-to-bounce route "does not visibly move vane"; ember floats medium → low, vane floats medium (new here); **critical: vane out of frame for all of s11** (52.2-59.5 s, "Vane by the river, watching the elder") |
+| e4 95-118 s | `job_1a0e3a2f166a5dbb7`: 10 (6 medium) | `job_1a0e3e51a232edafd`: 9 (8 medium) | E4 now plays in the clip (the first pass had none); resolved: both bass-to-bounce routes, sage floats; new: the scout beam's four audio routes "do not visibly move scout-beam" |
+| grounded 18.9-26.3 s | `job_1a0e3a2f362969799`: 2 (1 medium) | `job_1a0e3e553a1cca9ab`: 5 (4 medium) | the animals: no grounding or turning finding before or after; new: the scout beam's routes (E1's beam, 320 m away) and tide's sway route |
+| e5 166-182 s | `job_1a0e3a2f56977afcb`: 27 (5 high, 16 medium) | `job_1a0e3e5735dd7174b`: 23 (5 high, 11 medium) | resolved 7, among them "horse-11 out of frame for 50% of s32" and the bass-to-bounce route; ember floats medium, vane floats low |
+
+**The aliens' reactions:**
+- **E4:** sage (27 m) turned and watched 5.0 s (107.0-112.5 s); tide (53 m) turned to it and walked
+  on; ember (28-34 m) walked away; rook (62 m) and vane (78-90 m) carried on.
+- **E5:** rook watched 6.0 s (172.7-178.7 s), sage stepped back and watched 3.4 s, ember watched
+  2.1 s, walked 12 m toward it on its own bank and watched again 1.7 s. Tide (172 m) and **vane
+  (100 m, facing 102° away) did not**. Vane has not faced E5 in either run, and the cut's s28 at
+  174.0 s is "Vane sees it".
+
+**Found:**
+1. **The Critic still reads ember and vane as floating** (idle: vane medium, ember low; e4: vane
+   medium; e5: ember medium, vane low), now on the authored bob alone. Its rule reads the root; the
+   aliens' ground-driven foot layers (`bodyCompensation`, `maxDown` 0.3 model units) may keep the
+   drawn feet planted, and the film's own frames cannot settle it (grass hides the contact at
+   1080p). **Reported to the coordinator** with the data option: ember's and vane's bounce 0.32 →
+   0.17 and rook's 0.22 → 0.18 put every walk's peak at or under 0.1 m.
+2. **Ember paces the river bank again, at 206-221 s:** four stops turning 143-176° at
+   (-49..-52, 69..78), iteration 1's spot, after E5's pull has faded: `roam` targets across the
+   water. Its 3 reversals and 3 A→B→A revisits are these. The navfix engine stream (ADR-932) owns it.
+3. **Sage's two reversals are its designed reaction:** cautious, it steps back from E4's and E5's
+   beams and then turns to watch (107.0-112.4 s, 175.3-180.1 s); ADR-910 counts the turn back.
+4. **Which bodies meet is chaotic from run to run.** Rook's walk in place beside the invisible cows
+   (iteration 2) did not recur, nor tide's; single episodes move between iterations, and a setting's
+   effect shows in the counts across runs. ADR-934 stays open: the cows are still in the meadow.
+5. **For gv3-cut:** vane's path is the same in all three iterations (its figures do not move), so
+   s11's lost subject comes from the characters recipe and engine, not from this iteration.
+6. **The scout beam's routes:** a copy of the saucer beam's four audio routes. The Critic finds no
+   event-locked response on the scout's beam in E4 (luma z 2.2 over 259 on-screen frames,
+   confidence 0.45; the beam is partly behind sage) and in E1 (320 m away). For the reactivity
+   stream to judge with the rest of the film's routes; the saucer's own beam raises no such finding
+   in E5.
+
+**Decided (iteration 4, with the coordinator):** vane's `centrepiece` weight raised so it stops to
+watch E5 (its watch of the animals outscored the beam twice; the cut's s28 is "Vane sees it"); and,
+as the production's style call, the authored bounce lowered so no walk rises more than about 0.1 m
+(ember and vane 0.32 → 0.17, rook 0.22 → 0.18; sage and tide unchanged). The three float clips
+(idle, e4, e5) are rendered and judged again for a like-for-like before and after.
 
 ## For the other streams
 - **gv3-cut** (framing and Song Mode peaks): `build/gv3/ufo-beats.json` after each generation; the
@@ -255,6 +344,13 @@ first 60 s traced; the same measurement, walking 0.1-3.3 m/s):
 3. If the Critic still reads the aliens as floating after the drop, tell the coordinator with numbers.
 4. Evidence to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cast/`; the final report with
    the measured E1-E5 beats.
+
+**The iteration-3 clips rendered under GPU overlap from 13:00:24.** Waiting on `tools/gpu-lock.sh`,
+this stream's wrapper read an empty pid file (another wrapper's `mkdir` before its pid write) as a
+dead holder and took the lock, so the clips rendered alongside gv3-look's pair and then gv3-world's
+job. They are preview output (hashes, not evidence of bit identity); a clip whose Critic finding
+hinges on small pixel differences is re-rendered when `ps` shows no other `avgen`. The coordinator is
+fixing the lock (an empty pid file is "being written"; a holder's exit removes only its own lock).
 
 The helper scripts (`cast_report.py`, `clips.sh`, `float.py`, `stops.py`, `where.py`, and this
 session's `mstills.py`, `stuck.py`, `episode.py`, `reacts.py`, `pathmap.py`) are in

@@ -101,8 +101,12 @@ ALIEN_CONSIDERERS = {
     # but not vigils: a 6 s look, decided on at 0.6 Hz, ended five of sage's stands at its 8 s cap
     # (7.2-8.2 s, iteration 2); 4.5 s leaves the next decision inside it.
     "sage": {"grove": {"weight": 0.1, "duration": 4.0}, "graze": {"homeRadius": 30.0, "dwell": 4.5}},
-    # vane: shorter looks, at nearer things
-    "vane": {"watch": {"dwell": 3.5, "maxRange": 60.0}},
+    # vane: shorter looks, at nearer things. And E5 matters more to it than the animals do: the most
+    # event-sensitive of the five (0.95) never once faced E5's beam in two films (iterations 2-3,
+    # 100 m away), because its `watch` of the animals -- characters weighted 4.8, and the watch's
+    # weight raised by `audio.rms` through the loud riser -- outscored a centrepiece worth about
+    # weight x 1.04 to it (intensity 0.6 at 100 m, curiosity 1.74). The cut's s28 is "Vane sees it".
+    "vane": {"watch": {"dwell": 3.5, "maxRange": 60.0}, "centrepiece": {"weight": 6.0}},
 }
 # The run band. A faster errand must not cross into a run: sage's runEnter (3.66 m/s) sat below its
 # fastest walk plus a hurry, and tide's (3.02) below its plain walk -- the audit's "tide plays Running
@@ -116,9 +120,26 @@ ALIEN_RUN_BAND = {"sage": (4.8, 3.1), "tide": (4.8, 3.1)}
 # bob -- which the evaluator reads, rightly, as floating; with the bounce itself at 0 the reaction
 # alone still lifted them 0.22 m at a walk (0.27 m hurrying; build/gv3/cast/float, the `bob0` arm).
 # It is the "everything pulses to the beat" the brief's research warns against, on the characters.
-# The authored bounce stays: a bob of 0.18 m at a walk. The aliens' other musical reactions (on
-# their interests' weights, their decision rate and tide's sway) stay too.
+# The aliens' other musical reactions (on their interests' weights, their decision rate and tide's
+# sway) stay.
 ALIEN_REACTIONS_DROPPED = ("liveliness/bounce",)
+
+# The stride bob itself: a style choice, and a reversible one. `liveliness/bounce` is how far the
+# drawn body rises from ground contact at the crest of a normal walk (ADR-895: 0.5 (1 - cos 2phi) x
+# bounce x speed / stride). The multicam's values made ember and vane rise 0.18 m and rook 0.12 m at
+# every step of a 3.07 m/s walk -- measured on iteration 3's film, walking p90 +0.195 (ember), +0.176
+# (vane), +0.123 m (rook) -- and the evaluator, whose grounding check reads the drawn root, called
+# ember and vane floating in every clip they walk in. Grounded characters with the evaluator in the
+# loop is the owner's direction, so the production (the coordinator, 2026-09-27) lowered the three
+# springiest to a walk peak of about 0.1 m. Sage (0.18, peak 0.096 m) and tide (0.14, 0.075 m) were
+# already there. To put the springier walk back, restore these three values; nothing else depends on
+# them. (Old values: ember 0.32, vane 0.32, rook 0.22.)
+ALIEN_BOUNCE = {
+    #         bounce   walk peak at 3.07 m/s (stride)
+    "ember": 0.17,   # 0.098 m (5.35 m)
+    "vane":  0.17,   # 0.098 m (5.35 m)
+    "rook":  0.18,   # 0.096 m (5.78 m)
+}
 
 # ---- what the aliens hear --------------------------------------------------------------------------
 # The UFO events the aliens react to (ADR-930: every set-piece moment is a world event), how far each
@@ -382,6 +403,9 @@ def aliens(project, scene):
                 _set(project, name, f"decide/{considerer}/{key}", value)
         e["clips"].update(ALIEN_CLIPS)
         e["reactions"] = [r for r in e.get("reactions", []) if r.get("target") not in ALIEN_REACTIONS_DROPPED]
+        if name in ALIEN_BOUNCE:
+            _behaviour(e, "liveliness")["bounce"] = ALIEN_BOUNCE[name]
+            _set(project, name, "liveliness/bounce", ALIEN_BOUNCE[name])
 
     sage = next(b for b in ents["sage"]["behaviors"] if b["kind"] == "interest")
     for key, value in SAGE_INTEREST.items():
