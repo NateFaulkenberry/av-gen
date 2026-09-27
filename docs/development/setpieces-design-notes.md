@@ -1,32 +1,32 @@
-# Set pieces and the evaluator hook: design notes at the pause (2026-09-26)
+# Set pieces and the evaluator hook: design notes (2026-09-26, finished 2026-09-27)
 
 Stream `setpieces`, ADRs 928-931, worktree `av-gen-setpieces`, branch `agent/setpieces`, from main
-`0b623b88`. Brief: `av-gen-gv3/docs/glowmere-valley-3/revision/briefs.md`, "### setpieces". This file
-records where the work stopped and every decision already made, so the next agent can finish without
-re-deriving them. No ADR is written yet; the four planned are listed at the end.
+`0b623b88`, with `integrate/revision` (`a6598157`, reactivity ADR-924-927) merged in. Brief:
+`av-gen-gv3/docs/glowmere-valley-3/revision/briefs.md`, "### setpieces". The decisions are the ADRs:
 
-## Where it stopped
+- ADR-928 set-piece templates and the staging clock (`docs/decisions/ADR-928-*.md`);
+- ADR-929 a plan places set pieces, and the project keeps its staging;
+- ADR-930 a set piece's moments are world events and bus events, and a seek rebuilds both;
+- ADR-931 the Director evaluates in scratch, and proposes only the winner.
+
+This file keeps the working notes behind them: the reasoning each decision rests on, in more detail
+than an ADR carries.
+
+## State
 
 | Part | State |
 |---|---|
-| Staging primitives (`src/stage/staging.*`, `stage_json.cpp`) | **Done, tested.** `BeatDesc::startAt`, `StepDesc::component`, beat-named `startOn`/`stopOn`, the bus-id cache fix, `Staging::wrote()` |
-| Templates (`src/stage/setpiece.*`) | **Done, tested** (`tests/unit/test_setpiece_templates.cpp`) |
-| `PlanSetPiece` parse, schema, round trip (`src/directing/plan.*`) | **Done, tested** |
-| Validator and compiler (`src/directing/setpieces.*`, `validator.cpp`, `compiler.cpp`) | **Done, tested** (`tests/unit/test_directing_setpieces.cpp`) |
-| Engine: `setStaging`, `capturedStaging`, the project's `staging` key, staging bus events, `directingEvaluations` storage | **Compiled; exercised only through the directing tests' installs.** No engine-level test yet |
-| Undo: `ui::StagingChange`, `EditCapture` | **Compiled, not tested** |
-| `directing/evaluation.*` (EvaluationReport, reportFromCritic, compareEvaluations, planItemSpans) | **Compiled, not tested** |
-| `--plan` / `--plan-report` (`application.*`), `app/directing_plan_file.hpp`, `avgen_cast_trace --plan/--save-project` and its `setPieces` section | **Written, NOT COMPILED** (the app and the tool were not rebuilt; they are in the second, WIP commit) |
-| Evaluator hook (`director.evaluate`, `director.compare`, host hook, Critic runner) | **Not started** beyond the data types |
-| UI reach (coordinator's rule, added mid-stream) | **Not started.** Plan below |
-| Engine-level proof test, GPU beam-colour test | **Not started.** Plan below |
-| ADRs 928-931, README rows | **Not written** |
+| Staging primitives (`src/stage/staging.*`, `stage_json.cpp`) | Done, tested. `BeatDesc::startAt`, `StepDesc::component`, beat-named `startOn`/`stopOn`, the bus-id cache fix, `Staging::wrote()`, `ScenarioParam::label`, step completion within a microsecond (ADR-928) |
+| Templates (`src/stage/setpiece.*`) | Done, tested (`test_setpiece_templates.cpp`) |
+| `PlanSetPiece`, validator, compiler (`src/directing/*`) | Done, tested (`test_directing_setpieces.cpp`) |
+| Engine: `setStaging`, `capturedStaging`, the project's `staging`, undo | Done, tested (`test_setpiece_film.cpp`: save/reload, undo/redo) |
+| Bus events, the landing frame, route replay (`src/app/engine.cpp`) | Done, tested (`test_setpiece_film.cpp`, `[seek]`) |
+| `avgen --plan/--plan-report`, `avgen_cast_trace --plan/--save-project` | Done; exercised on the lab and on a scratch copy of GV3 |
+| UI reach: labels, `staging/` on the beginner layer, Director panel > UFO set pieces | Done, tested with the panels' own arithmetic (`test_setpiece_reach.cpp`) |
+| GPU: beam colour on pixels | `tests/rendering/test_setpiece_gpu.cpp` |
+| Evaluator hook (`director.evaluate`, `director.compare`, `src/app/directing_evaluate.*`) | Done, tested (`test_directing_evaluate.cpp`, `test_directing_evaluate_agent.cpp`); live smoke test in ADR-931 |
 
-Test status at the pause: `avgen_tests "[setpiece]"`: 23 cases, 660 assertions, all pass. A
-`[stage]` + `[directing]` regression run was started and had not reported when the pause came.
-The full CPU suite has not been run on this branch.
-
-## Decisions already made (keep them unless there is a reason)
+## The decisions, in working detail
 
 **One scenario per set piece, named `setpiece/<key>`.** All autostart and wait; each hides its craft
 at t = 0 (idempotent, and it keeps an instance's content independent of the set pieces before it, so
@@ -88,56 +88,29 @@ and reads it before `params::loadProject`. The seventh member of ADR-207's famil
 rule now strips the transforms of every animal a set piece's tag query could bind.
 
 **Bus (ADR-930).** Every scenario beat is a live-bus event `<scenario>/<beat>`, declared in `rebind`
-and fired the frame after, from the entity world's event record (replayed by seeks), so the frame
-after a seek carries what a play carries. Deliberately NOT published into the ADR-870 replay bus:
-the modulator binds reactions by live-bus index and that bus shares only the frame-signal prefix;
-publishing there would make other reactions misread. Staging's own `startOn` reads beats from its
-previous frame instead, which a seek replays exactly. Pre-existing hazard found and fixed: staging
-cached signal ids across the live and replay buses.
+and fired the frame after, from the entity world's event record (replayed by seeks). The frame a seek
+lands on (dt = 0) carries the beats of the step before it, on the replay's 1/60 s grid; the first
+version skipped dt = 0 frames and so disagreed with the play on exactly that frame. Not published into
+the ADR-870 replay bus (the modulator binds reactions by live-bus index and that bus shares only the
+frame-signal prefix); instead ADR-901's route replay treats the staging signals as replayable and
+rebuilds them at every replayed step on its engine-shaped scratch bus, so a route with memory on a
+beam is seek-exact. Staging's own `startOn` reads beats from its previous frame, which a seek replays
+exactly. Pre-existing hazard found and fixed: staging cached signal ids across the live and replay
+buses.
+
+**Step completion (ADR-928).** `elapsed + 1e-10 >= duration`. The three ways a frame's instant is
+computed (`i * dt` in a trace, `k / fps` in a render, `target - m * dt` in a seek's replay) differ in
+the last bits (~1e-13 s), so a duration that is exactly a whole number of frames sat on a frame
+boundary: the lab's second abduction (fade delay 3.5 s = 210 frames) entered `depart` a frame earlier
+after a seek than in the play. Found by the film proof's world-event comparison. A first try at 1e-6
+also swallowed float rounding of non-exact durations (0.8f = 0.8 + 1.2e-8) and moved every such step
+a frame; the ADR-623 digest caught it.
+
+**Clearance default (ADR-928).** The abduction's `targetClearance` is 6.5 m (GV2's). GV3's canopy field
+reads 3.2 m over the whole valley floor (the tallest meadow layer), 5.4 m in scrub, 7.1-8.0 m in the
+woods, so 3 m refused every animal on open ground, at plan time and at run time.
 
 **Undo.** `ui::StagingChange` (as-installed descriptions). `Engine::setStaging` validates on a scratch
 director, re-registers, rebinds, and `requestSeek`s the current second (deferred in the editor,
 immediate elsewhere). `EditCapture` skips parameter bases the director wrote (`Staging::wrote`), which
 that re-simulation rewrites.
-
-## Next steps, in order
-
-1. Build `avgen` and `avgen_cast_trace` (`cmake --build <wt>/build/release -j 6`), fix what the WIP
-   commit breaks, and run `[stage]`, `[directing]`, `[setpiece]`.
-2. **UI reach** (ENGINEERING-RULES.md "UI reach"): (a) add `label` to `stage::ScenarioParam` (JSON
-   "label", registered as `ParamDesc::label`) and fill it from the slot table ("hover height above the
-   ground (m)", "beam at (s)"); (b) add `"staging/"` to `ui::detail::kBeginnerPrefixes` (visible in
-   the picture, ADR-410's reasoning), with a test like `test_tree_energy_reach.cpp`; (c) the Director
-   panel: a "UFO set pieces" section listing every set piece in the project's plans in viewer words
-   (template, place, placed moment and time, animals, bearing, hover, colour, framing) with controls
-   that edit the PlanSetPiece and apply a revision through `app::applyCompilation` (one undo). Put
-   the decisions in `director_panel_logic` (`setPieceRows`, `editSetPiece`) with a CPU test.
-3. **Engine-level proof** (`tests/unit/test_setpiece_film.cpp`, lab scene
-   `tests/data/setpieces/setpiece-lab.*`): plan with west (12 s, point (-120,-60), 1 animal),
-   field (60 s, (62,22), 2 animals, coloured), south (110 s, region (150,180) r 30, 3 animals); play
-   0-126 s at 60 fps; assert all six animals retired and strays untouched, each beam beat entered
-   within a frame of its time, the craft holding station through beam and lift (drift <= craftWobble;
-   a craftWobble 0 arm gives speed exactly 0), the craft hidden between set pieces; seek to mid-lift of
-   each and compare craft/animal positions and beam state with the play; world events equal in play
-   and after a seek; a route from `setpiece/field/beam` reaches its target the frame after the beam,
-   in play and after a seek; save/reload plays the same; undo/redo of the install.
-4. **GPU**: `tests/rendering/test_setpiece_gpu.cpp`, lab scene at a beam moment, red vs default beam,
-   a difference in the beam's region (under `tools/gpu-lock.sh`).
-5. **Evaluator hook (ADR-931)**: `ai::EvaluationHook` in `tool_context.hpp` (a `DeferredResult`, plus
-   a main-thread `settle(engine, value)` so the report is stored in `Engine::directingEvaluations()`);
-   tools `director.evaluate {plan|planId, from, until, mode, label}` (compiles in scratch, never
-   proposes: the autonomy policy) and `director.compare {planId, a, b}` (`compareEvaluations`). Host
-   hook: scratch engine loads a project copy, installs the compilation, saves; renders the span with
-   `avgen --project copy --render clip.mov --range a:b --size WxH` (command prefix configurable, e.g.
-   `tools/gpu-lock.sh`); traces the cast; writes shots.json from the camera shots; runs
-   `adapters/avgen/avgen_adapter.py`; runs `critic --url U submit --inputs ... --video-start a --wait
-   --json --strict --no-autostart`; exit 4 = the Critic is not running (a clear error), 5 = partial
-   (report kept, `partial: true`). Critic path from `--critic` / `AVGEN_CRITIC`; missing = clear
-   error. Tests: stub hook; one ScriptedProvider test propose -> evaluate -> Modify -> compare; a fake
-   `critic` script for the runner's parsing and exit codes. Live smoke test on a private instance:
-   `CRITIC_PORT=<p> CRITIC_HOME=<scratch> critic start --daemon`, then stop it. Never touch :8765.
-   Adapter changes to report (do not edit the Critic repo): it hard-codes GV3's saucer beats as
-   events; it should read `setPieces` from the cast trace instead.
-6. ADRs: 928 set-piece templates and the staging clock; 929 PlanSetPiece and the project's staging;
-   930 staging events on the bus and in seek replay; 931 the evaluator hook. README rows. Full CPU
-   suite; GPU suite if shaders or rendering changed (they have not).
