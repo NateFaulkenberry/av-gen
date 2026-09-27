@@ -2955,6 +2955,15 @@ void Composition::applyPerformers(double now, double dt) {
                 motion.yaw = *pose.yawRadians;
                 motion.hasYaw = true;
             }
+            // ADR-911 (amended 2026-09-27): the step a performance takes the body without an entry
+            // blend PLACES it -- on its mark, wherever the simulation had left it, which on the
+            // multicam film was 21.8 m up a hillside -- and says so, so a camera following the body
+            // starts again from the mark rather than filtering its way down to it. "Takes" is the
+            // first step that finds the body not already performing: a second pass at the same
+            // instant (the frame a seek lands on) finds it performing and places nothing twice.
+            if (!(p.entrySeconds > 0.0f) && !(e->directorMotion().active && e->directorMotion().performance)) {
+                e->markPlaced();
+            }
             // ADR-820: an entry blend, from where the simulation had the body on the span's first
             // step to the authored performance. Captured into entity state (so a checkpoint carries
             // it) the first time a step lands inside the span; smoothstep, so the hand-over starts
@@ -3617,6 +3626,33 @@ Transform Composition::rootFold() const {
     return root;
 }
 
+std::uint32_t Composition::placementOf(const CompositionNode& node) const {
+    // Every body that moves the node: the one that drives it, and the ones that drive its parents,
+    // since a child is put wherever its parent is put. A sum, because only a change is read and
+    // every count only rises; the chain walked is `nodeWorldTransform`'s. A body never placed --
+    // nearly all of them -- costs one comparison and no name.
+    std::uint32_t sum = 0;
+    for (const auto& e : entityWorld_.entities()) {
+        if (e->placements() == 0) {
+            continue;
+        }
+        const std::string& driven = e->desc().node.empty() ? e->name() : e->desc().node;
+        const CompositionNode* current = &node;
+        for (std::size_t guard = 0; current != nullptr && guard <= nodes_.size(); ++guard) {
+            if (current->name == driven) {
+                sum += e->placements();
+                break;
+            }
+            if (current->parent.empty()) {
+                break;
+            }
+            const CompositionNode* parent = findNode(current->parent);
+            current = parent == &node ? nullptr : parent; // a cycle, edited in place: stop
+        }
+    }
+    return sum;
+}
+
 void Composition::recordHistory(world::HistoryBank& bank, double seconds,
                                 const world::HistoryAutomation* automation) const {
     const Transform root = rootFold();
@@ -3640,7 +3676,7 @@ void Composition::recordHistory(world::HistoryBank& bank, double seconds,
         const Transform local = automation != nullptr ? automatedWorldTransform(node, *automation, seconds)
                                                       : nodeWorldTransform(node);
         const Transform full = compose(root, local);
-        bank.record(ring, seconds, full.position, full.rotation, full.scale);
+        bank.record(ring, seconds, full.position, full.rotation, full.scale, placementOf(node));
     }
 }
 
@@ -3672,6 +3708,7 @@ world::HistorySample Composition::subjectHead(const CompositionNode& node) const
     head.position = full.position;
     head.rotation = full.rotation;
     head.scale = full.scale;
+    head.placement = placementOf(node); // how far back the trail may read (ADR-911, 2026-09-27)
     return head;
 }
 

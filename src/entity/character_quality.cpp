@@ -12,12 +12,55 @@ namespace avgen::entity {
 
 namespace {
 
+constexpr double kPi = 3.14159265358979323846;
+constexpr double kDegrees = 180.0 / kPi;
+
 bool travelling(Activity activity) { return activity == Activity::Walk || activity == Activity::Run; }
 
 // How far a slip ratio is from "the feet are where the ground is", symmetric in over- and
 // under-speed: 2.0 (moonwalking) and 0.5 (treading water) are equally wrong, which a plain
 // `|slip - 1|` would call 1.0 and 0.5.
 double slipDistance(double slip) { return std::abs(std::log(std::max(slip, 1e-6))); }
+
+// The smallest angle between two yaws, in radians, 0..pi.
+double yawGap(float a, float b) {
+    double d = std::fmod(static_cast<double>(b) - static_cast<double>(a) + kPi, 2.0 * kPi);
+    if (d < 0.0) {
+        d += 2.0 * kPi;
+    }
+    return std::abs(d - kPi);
+}
+
+// The angle between two directions in the plane, in degrees, 0..180.
+double degreesBetween(glm::vec2 a, glm::vec2 b) {
+    const double la = glm::length(a);
+    const double lb = glm::length(b);
+    if (la <= 1e-9 || lb <= 1e-9) {
+        return 0.0;
+    }
+    const double c = std::clamp(static_cast<double>(glm::dot(a, b)) / (la * lb), -1.0, 1.0);
+    return std::acos(c) * kDegrees;
+}
+
+// A value at fraction `q` of a sorted list, by linear interpolation between neighbours -- the same
+// rule the audit's `measure.py` uses, so a median here and a median there are the same median.
+double quantile(std::vector<float> values, double q) {
+    if (values.empty()) {
+        return 0.0;
+    }
+    std::sort(values.begin(), values.end());
+    const double k = (static_cast<double>(values.size()) - 1.0) * q;
+    const auto lo = static_cast<std::size_t>(std::floor(k));
+    const auto hi = static_cast<std::size_t>(std::ceil(k));
+    if (lo == hi) {
+        return values[lo];
+    }
+    return values[lo] + (values[hi] - values[lo]) * (k - static_cast<double>(lo));
+}
+
+// Metres of straight-line travel below which a heading is not a heading: a body that shuffled 20 cm
+// out of a stop and stopped again has no "way out" worth comparing, and the audit drops it too.
+constexpr float kHeadingFloor = 0.3f;
 
 } // namespace
 
@@ -39,9 +82,32 @@ void CharacterQualityRecorder::record(const EntityWorld& world, double time, dou
         s.grounded = e.locomotion().grounded;
         s.director = e.actions().running() && e.actions().authority() == Authority::Director;
         s.gait = e.desc().gait;
+        // ADR-910. The facing the animation layer is handed, and the surface `ground` last read under
+        // the body -- the one its feet and its lean are resolved against, not a fresh query of the
+        // terrain at a point, which could disagree with what the body is drawn standing on.
+        s.yaw = e.locomotion().yaw;
+        s.hasGround = e.state().hasGroundPlane;
+        s.groundNormal = e.state().groundNormal;
         scratch_.push_back(std::move(s));
     }
     record(std::span<const CharacterSample>(scratch_), time, dt);
+}
+
+void CharacterQualityRecorder::closeStop(Track& t, glm::vec2 here) const {
+    t.pendingOut = false;
+    const glm::vec2 out = here - t.stopExit;
+    if (!t.hasHeadingIn || glm::length(out) < kHeadingFloor) {
+        return; // walked in from nowhere measurable, or out to nowhere measurable
+    }
+    CharacterBehaviourMetrics& b = t.out.behaviour;
+    ++b.measuredStops;
+    const double turned = degreesBetween(t.headingIn, out);
+    if (turned > 90.0) {
+        ++b.turnsOver90;
+    }
+    if (turned > static_cast<double>(thresholds_.reversalDegrees)) {
+        ++b.reversals;
+    }
 }
 
 void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, double time, double dt) {
@@ -62,6 +128,7 @@ void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, 
         Track& t = tracks_[it->second];
         CharacterMotionMetrics& m = t.out.motion;
         CharacterBehaviourMetrics& b = t.out.behaviour;
+        CharacterGroundMetrics& g = t.out.ground;
         const glm::vec2 here{s.position.x, s.position.z};
 
         const float runSpeed = s.gait.runSpeed > 0.0f ? s.gait.runSpeed : thresholds_.fallbackRunSpeed;
@@ -93,6 +160,8 @@ void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, 
             t.lastPosition = here;
             t.hasPosition = true;
             t.hasVelocity = false;
+            t.lastYaw = s.yaw;
+            t.hasYaw = true;
             continue;
         }
 
@@ -151,6 +220,105 @@ void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, 
         if (!s.grounded) {
             b.airborneSeconds += dt;
         }
+
+        // ---- ADR-910: turning -------------------------------------------------------------------
+        //
+        // Measured off the yaw the body is drawn with and the ground it actually covered, so a mover
+        // that says it is walking a curve and a body that pivots on the spot cannot be mistaken for
+        // each other: the pivot turns while going nowhere, and that is the whole of what it is.
+        {
+            const double turned = t.hasYaw ? yawGap(t.lastYaw, s.yaw) : 0.0;
+            m.yawDegrees += turned * kDegrees;
+            if (speed < static_cast<double>(thresholds_.pivotSpeed)) {
+                m.pivotYawDegrees += turned * kDegrees;
+            }
+            // Radius on both ends of the step, so a body just setting off or just stopping -- whose
+            // speed over the step is half of what it was at one end -- is not a tight turn.
+            const double rate = turned / dt;
+            if (speed > static_cast<double>(thresholds_.turnSpeedMin) &&
+                t.lastSpeed > static_cast<double>(thresholds_.turnSpeedMin) &&
+                rate > static_cast<double>(thresholds_.turnRateMin)) {
+                t.radii.push_back(static_cast<float>(speed / rate));
+            }
+            t.lastYaw = s.yaw;
+            t.hasYaw = true;
+            t.lastSpeed = speed;
+        }
+
+        // ---- ADR-910: standing, stops, and where the body goes out of them -----------------------
+        const bool still = speed < static_cast<double>(thresholds_.stillSpeed);
+        if (still) {
+            t.stillRun += dt;
+            t.stillTotal += dt;
+            b.longestStillSeconds = std::max(b.longestStillSeconds, t.stillRun);
+            if (!t.inStop && t.stillRun >= thresholds_.stopSeconds) {
+                t.inStop = true;
+                ++b.stops;
+                // A stop that begins while the way out of the last one is still being measured ends
+                // that measurement with whatever travel it has.
+                if (t.pendingOut) {
+                    closeStop(t, here);
+                }
+                // The way in: straight-line travel from the oldest point of the trail to here.
+                t.hasHeadingIn = false;
+                if (!t.trail.empty()) {
+                    const glm::vec2 in = here - t.trail.front();
+                    if (glm::length(in) >= kHeadingFloor) {
+                        t.headingIn = in;
+                        t.hasHeadingIn = true;
+                    }
+                }
+                t.trail.clear();
+                // A->B->A: this stop against the one before the last.
+                if (t.stopPlaces.size() >= 2 &&
+                    glm::length(here - t.stopPlaces[t.stopPlaces.size() - 2]) < thresholds_.revisitRadius) {
+                    ++b.revisits;
+                }
+                t.stopPlaces.push_back(here);
+                if (t.stopPlaces.size() > 2) {
+                    t.stopPlaces.erase(t.stopPlaces.begin());
+                }
+            }
+            // The ground under a standing body. Only when something grounded it this step: a body
+            // with no `ground` behaviour, or one a beam is holding, reports no surface, and
+            // inventing flat ground for it would report "no slope" about a body on a cliff.
+            if (s.hasGround) {
+                const double up = std::clamp(static_cast<double>(s.groundNormal.y) /
+                                                 std::max(1e-9, static_cast<double>(glm::length(s.groundNormal))),
+                                             -1.0, 1.0);
+                const double slope = std::acos(up) * kDegrees;
+                g.stillSeconds += dt;
+                t.slopeSecondsWeighted += slope * dt;
+                g.slopeMaxDegrees = std::max(g.slopeMaxDegrees, slope);
+                if (slope > static_cast<double>(thresholds_.steepDegrees)) {
+                    g.steepSeconds += dt;
+                    // Uphill is against the normal's lean: a surface rising toward +x has a normal
+                    // leaning toward -x.
+                    const glm::vec2 uphill(-s.groundNormal.x, -s.groundNormal.z);
+                    const glm::vec2 facing(std::sin(s.yaw), std::cos(s.yaw));
+                    if (degreesBetween(facing, uphill) < static_cast<double>(thresholds_.uphillDegrees)) {
+                        g.facingUphillSeconds += dt;
+                    }
+                }
+            }
+        } else {
+            if (t.inStop) {
+                // Leaving a stop: the way out is measured from where it stood.
+                t.inStop = false;
+                t.pendingOut = true;
+                t.stopExit = t.stopPlaces.empty() ? here : t.stopPlaces.back();
+            }
+            t.stillRun = 0.0;
+            if (t.pendingOut && glm::length(here - t.stopExit) >= thresholds_.headingMetres) {
+                closeStop(t, here);
+            }
+            // The trail keeps the shortest recent stretch that still reaches `headingMetres` back
+            // from here, so the way into the next stop is read over that much travel and no more.
+            t.trail.push_back(here);
+            while (t.trail.size() > 2 && glm::length(here - t.trail[1]) >= thresholds_.headingMetres) {
+                t.trail.pop_front();
+            }
+        }
     }
 }
 
@@ -168,10 +336,20 @@ CharacterQualityReport CharacterQualityRecorder::report() const {
         }
         if (q.seconds > 0.0) {
             q.behaviour.activityChangesPerMinute = static_cast<double>(q.behaviour.activityChanges) * 60.0 / q.seconds;
+            q.behaviour.stillFraction = t.stillTotal / q.seconds;
         }
         if (q.motion.movingFrames > 0) {
             q.motion.slipOutOfBandFraction =
                 static_cast<double>(q.motion.slipOutOfBand) / static_cast<double>(q.motion.movingFrames);
+        }
+        if (q.motion.yawDegrees > 0.0) {
+            q.motion.pivotYawFraction = q.motion.pivotYawDegrees / q.motion.yawDegrees;
+        }
+        q.motion.turnSamples = static_cast<std::uint32_t>(t.radii.size());
+        q.motion.turnRadiusMedian = quantile(t.radii, 0.5);
+        q.motion.turnRadiusP10 = quantile(t.radii, 0.1);
+        if (q.ground.stillSeconds > 0.0) {
+            q.ground.slopeMeanDegrees = t.slopeSecondsWeighted / q.ground.stillSeconds;
         }
         r.characters.push_back(std::move(q));
     }
@@ -201,11 +379,22 @@ nlohmann::json toJson(const CharacterQualityReport& report) {
         {"stuckIntentSpeed", th.stuckIntentSpeed},
         {"stuckMeasuredSpeed", th.stuckMeasuredSpeed},
         {"oscillationWindow", th.oscillationWindow},
+        {"stillSpeed", th.stillSpeed},
+        {"stopSeconds", th.stopSeconds},
+        {"pivotSpeed", th.pivotSpeed},
+        {"reversalDegrees", th.reversalDegrees},
+        {"headingMetres", th.headingMetres},
+        {"revisitRadius", th.revisitRadius},
+        {"turnSpeedMin", th.turnSpeedMin},
+        {"turnRateMinDegrees", static_cast<double>(th.turnRateMin) * kDegrees},
+        {"steepDegrees", th.steepDegrees},
+        {"uphillDegrees", th.uphillDegrees},
     };
     json list = json::array();
     for (const CharacterQuality& q : report.characters) {
         const CharacterMotionMetrics& m = q.motion;
         const CharacterBehaviourMetrics& b = q.behaviour;
+        const CharacterGroundMetrics& g = q.ground;
         json e;
         e["name"] = q.name;
         e["frames"] = q.frames;
@@ -218,6 +407,9 @@ nlohmann::json toJson(const CharacterQualityReport& report) {
             {"velocityDiscontinuities", {{"count", m.velocityDiscontinuities}, {"largestAccel", m.largestAccel}}},
             {"footSlip", {{"movingFrames", m.movingFrames}, {"outOfBandFrames", m.slipOutOfBand},
                           {"outOfBandFraction", m.slipOutOfBandFraction}, {"worst", m.worstSlip}}},
+            {"turning", {{"yawDegrees", m.yawDegrees}, {"pivotYawDegrees", m.pivotYawDegrees},
+                         {"pivotYawFraction", m.pivotYawFraction}, {"turnSamples", m.turnSamples},
+                         {"turnRadiusMedian", m.turnRadiusMedian}, {"turnRadiusP10", m.turnRadiusP10}}},
         };
         e["behaviour"] = {
             {"stuckSeconds", b.stuckSeconds},
@@ -227,6 +419,17 @@ nlohmann::json toJson(const CharacterQualityReport& report) {
             {"oscillations", b.oscillations},
             {"directorSeconds", b.directorSeconds},
             {"airborneSeconds", b.airborneSeconds},
+            {"stillFraction", b.stillFraction},
+            {"longestStillSeconds", b.longestStillSeconds},
+            {"stops", {{"count", b.stops}, {"measured", b.measuredStops}, {"reversals", b.reversals},
+                       {"turnsOver90", b.turnsOver90}, {"revisits", b.revisits}}},
+        };
+        e["ground"] = {
+            {"stillSeconds", g.stillSeconds},
+            {"slopeMeanDegrees", g.slopeMeanDegrees},
+            {"slopeMaxDegrees", g.slopeMaxDegrees},
+            {"steepSeconds", g.steepSeconds},
+            {"facingUphillSeconds", g.facingUphillSeconds},
         };
         list.push_back(std::move(e));
     }

@@ -9,6 +9,14 @@ namespace avgen::entity {
 namespace {
 
 constexpr float kPi = 3.14159265358979323846f;
+constexpr float kDegrees = 180.0f / kPi;
+// The `move` verb's turn rate when the body authors none: ~140 deg/s, wander's default (ADR-908
+// made it a default rather than the only answer).
+constexpr float kMoveTurnRate = 2.45f;
+// The heading error, in radians (about 6 degrees), above which a walk-through mover checks the way it
+// is actually travelling before it walks it (ADR-908). Below it the heading is the way the steering
+// fan checked, to within the fan's own resolution.
+constexpr float kHeadingCheck = 0.1f;
 
 // Signed shortest angular distance from `from` to `to`, in radians.
 float angleDelta(float from, float to) {
@@ -248,6 +256,18 @@ glm::vec2 NavigatorPath::steer(glm::vec2 from, glm::vec2 to, float lookahead) co
 
 float NavigatorPath::groundHeight(glm::vec2 p) const {
     return nav_ == nullptr ? 0.0f : nav_->groundHeight(p);
+}
+
+bool NavigatorPath::clear(glm::vec2 from, glm::vec2 to) const {
+    return nav_ == nullptr || !nav_->valid() || nav_->pathClear(from, to);
+}
+
+bool NavigatorPath::walkable(glm::vec2 p) const {
+    return nav_ == nullptr || !nav_->valid() || nav_->navigable(p);
+}
+
+bool NavigatorPath::refuge(glm::vec2 from, glm::vec2& out) const {
+    return nav_ != nullptr && nav_->valid() && nav_->refuge(from, out);
 }
 
 // ---- the queue ---------------------------------------------------------------------------------
@@ -521,11 +541,18 @@ void applySets(const ActionContext& ctx, const std::vector<PropertySet>& sets, E
 } // namespace
 
 void ActionQueue::begin(Layer& layer, const ActionContext& ctx, EntityState& state) {
-    (void)state;
     layer.started = true;
     layer.elapsed = 0.0;
     layer.progress = Progress{};
     const ActionDesc& action = layer.actions[layer.index];
+    // ADR-908: a walk-through mover starts a walk at the pace the body already has. The old mover
+    // started every `move` from rest, which was harmless for it -- it pivoted before it went anyway
+    // -- and is the whole difference for one that turns on a circle: a decider that changes its
+    // mind mid-walk would otherwise stop the body dead, count it as "at rest", and pivot. Only
+    // where a turn radius is authored, so the old mover is the old mover exactly.
+    if (action.kind == ActionKind::Move && ctx.gait != nullptr && ctx.gait->turnRadius > 0.0f) {
+        layer.progress.speed = std::max(0.0f, state.speed);
+    }
     if (action.kind == ActionKind::Interact && ctx.world != nullptr) {
         Entity* prop = ctx.world->find(action.target.name);
         if (prop != nullptr && ctx.self != nullptr) {
@@ -696,7 +723,11 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             if (glm::length(to) > 1e-4f) {
                 const float wanted = std::atan2(to.x, to.y);
                 const float delta = angleDelta(state.yaw, wanted);
-                const float rate = action.speed > 0.0f ? action.speed : 2.5f; // rad/s
+                // rad/s. ADR-908: the body's own authored turn rate before the verb's old default,
+                // so a body an author slowed turns at that pace when it faces something too.
+                const float authored =
+                    ctx.gait != nullptr && ctx.gait->turnRate > 0.0f ? ctx.gait->turnRate / kDegrees : 0.0f;
+                const float rate = action.speed > 0.0f ? action.speed : (authored > 0.0f ? authored : 2.5f);
                 const float step2 = rate * static_cast<float>(ctx.dt);
                 const float applied = std::clamp(delta, -step2, step2);
                 state.yaw += applied;
@@ -771,11 +802,27 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             const float wantedSpeed = action.speed > 0.0f ? action.speed : gait.walkSpeed;
             glm::vec2 direction = waypoint - here;
             const float toWaypoint = glm::length(direction);
+            bool escaping = false; // walking back onto the walkable set before the errand (below)
             direction = toWaypoint > 1e-5f ? direction / toWaypoint : glm::vec2(0.0f);
             if (path != nullptr) {
-                const glm::vec2 steered = path->steer(here, waypoint, std::max(wantedSpeed * 1.5f, 2.0f));
+                // ADR-908: at least a turn and a half ahead for a body that turns on a circle, so
+                // it has room to walk round what the fan finds. `max` with 0 is the old lookahead.
+                const float lookahead = std::max(std::max(wantedSpeed * 1.5f, 2.0f), gait.turnRadius * 1.5f);
+                const glm::vec2 steered = path->steer(here, waypoint, lookahead);
+                glm::vec2 refuge(0.0f);
                 if (glm::length(steered) > 0.5f) {
                     direction = steered;
+                } else if (path->refuge(here, refuge) && glm::length(refuge - here) > 1e-3f) {
+                    // ADR-908: every way is blocked because the body is standing *off* the walkable
+                    // set -- the steering fan samples from the body outward, so from there no way
+                    // is ever clear (ADR-162) -- and not because the world is closed. `wander` has
+                    // walked back onto the set since ADR-240; a `move` failed "blocked", and the
+                    // decider's next errand failed the same way from the same spot, for ever.
+                    // Measured on GV3 with walk-through turns: rook turned onto such a spot at
+                    // 87.3 s and stood the other 139 s of the film, every errand "blocked". Now the
+                    // move walks to the nearest refuge first, and steers on from there.
+                    direction = glm::normalize(refuge - here);
+                    escaping = true;
                 } else {
                     failed = true;
                     reason = "blocked";
@@ -786,13 +833,48 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             // allows, then let the accel/decel model decide how much of that it may actually have.
             // The same order the wander behaviour uses, so a character driven by an action and a
             // character driven by a behaviour move identically.
+            //
+            // ADR-908: the rate is the body's own when it authors one. With no turn radius this is
+            // the old mover to the bit -- turn at the rate, travel at the cosine of what is left --
+            // and every turn over 90 degrees is a stop and a pivot. With one, the mover walks
+            // through the turn on a circle of that radius and pivots only from rest (gait.hpp).
             const float wantedYaw = std::atan2(direction.x, direction.y);
             const float delta = angleDelta(state.yaw, wantedYaw);
-            const float turnStep = 2.45f * static_cast<float>(ctx.dt); // ~140 deg/s, wander's default
-            const float applied = std::clamp(delta, -turnStep, turnStep);
-            state.yaw += applied;
-            state.turnRate = applied / std::max(static_cast<float>(ctx.dt), 1e-4f);
-            const float alignment = std::max(0.0f, std::cos(angleDelta(state.yaw, wantedYaw)));
+            const float turnRate = gait.turnRate > 0.0f ? gait.turnRate / kDegrees : kMoveTurnRate;
+            float alignment = 0.0f;
+            float error = 0.0f;
+            if (gait.turnRadius <= 0.0f) {
+                const float turnStep = turnRate * static_cast<float>(ctx.dt);
+                const float applied = std::clamp(delta, -turnStep, turnStep);
+                state.yaw += applied;
+                state.turnRate = applied / std::max(static_cast<float>(ctx.dt), 1e-4f);
+                alignment = std::max(0.0f, std::cos(angleDelta(state.yaw, wantedYaw)));
+            } else {
+                // The pace first, from the error it has; the turn after, once the pace is known
+                // (gait.hpp). A target inside the circle it turns on cannot be walked to -- it would
+                // orbit it -- so it brakes, and at rest `turnCap` lets it pivot onto the target.
+                // The errand's target is the point of the errand, so unlike a wander's it is not
+                // counted as reached.
+                const TurnSettings turning{turnRate, gait.turnRadius};
+                const float pace = layer.progress.speed;
+                error = delta;
+                alignment = insideTurn(turning, pace, toWaypoint, error) ? 0.0f : turnPace(turning, pace, error);
+                // The fan checked the way it offers, and a body walking through its turn travels
+                // along its *heading*, which is not that way until the turn is done. Where the heading
+                // is not clear for as far as the body needs to stop, the turn cannot be walked: it
+                // brakes, and at rest pivots onto the checked way (`turnCap`). This is how rook came
+                // to stand off the walkable set above -- a 1.5 m circle, walked at half pace, into
+                // ground the fan never looked at. Asked only of a body standing on the walkable set:
+                // it is there to keep a body from leaving it, and from off it every line fails, so a
+                // body walking back on would brake at the edge instead of stepping over it.
+                if (alignment > 0.0f && path != nullptr && std::abs(error) > kHeadingCheck && path->walkable(here)) {
+                    const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
+                    const float stopping = pace * pace / (2.0f * std::max(gait.decel, 0.1f));
+                    if (!path->clear(here, here + heading * std::max(1.0f, stopping + 0.5f))) {
+                        alignment = 0.0f;
+                    }
+                }
+            }
             // Slow into the goal rather than stopping dead on it: v = sqrt(2 a d) is the fastest
             // speed from which the remaining distance is still enough to decelerate in.
             const float arrival = std::sqrt(std::max(0.0f, 2.0f * gait.decel * std::max(0.0f, distance - tolerance)));
@@ -807,8 +889,18 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                 const float remaining = std::max(0.0f, distance - tolerance);
                 desired = std::min(desired, wantedSpeed * std::clamp(remaining / action.arrival, 0.2f, 1.0f));
             }
+            const float paceBefore = layer.progress.speed;
             layer.progress.speed =
                 Gait::approach(layer.progress.speed, desired, gait.accel, gait.decel, ctx.dt);
+            if (gait.turnRadius > 0.0f) {
+                const TurnSettings turning{turnRate, gait.turnRadius};
+                const float turnStep =
+                    turnCap(turning, paceBefore, layer.progress.speed) * static_cast<float>(ctx.dt);
+                const float applied = std::clamp(delta, -turnStep, turnStep);
+                state.yaw += applied;
+                state.turnRate = applied / std::max(static_cast<float>(ctx.dt), 1e-4f);
+                error = angleDelta(state.yaw, wantedYaw);
+            }
             const float travel =
                 std::min(layer.progress.speed, distance / std::max(static_cast<float>(ctx.dt), 1e-4f));
             const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
@@ -844,6 +936,12 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             if (distance < layer.progress.bestDistance - 0.05f) {
                 layer.progress.bestDistance = distance;
                 layer.progress.sinceProgress = 0.0;
+            } else if (std::abs(error) > 0.5f * kPi || escaping) {
+                // ADR-908: walking round a turn is not being stuck, and neither is walking back onto
+                // the walkable set, which may lead away from the goal first. A body turning back on a circle
+                // walks away from its goal before it walks toward it -- half a lap of radius R --
+                // and the clock waits until it is facing within 90 degrees of the way. `error` is 0
+                // for the old mover, which never walks away from its goal to turn.
             } else {
                 layer.progress.sinceProgress += ctx.dt;
                 if (layer.progress.sinceProgress >= kStuckSeconds) {
@@ -1434,6 +1532,15 @@ Result<GaitSettings> gaitFromJson(const nlohmann::json& j) {
     gait.rateMin = readFloat(j, "rateMin", gait.rateMin);
     gait.rateMax = readFloat(j, "rateMax", gait.rateMax);
     gait.idleRate = readFloat(j, "idleRate", gait.idleRate);
+    // ADR-908: how this body turns. Degrees per second and metres, as the keys say.
+    gait.turnRate = readFloat(j, "turnRate", gait.turnRate);
+    gait.turnRadius = readFloat(j, "turnRadius", gait.turnRadius);
+    gait.pivotRadius = readFloat(j, "pivotRadius", gait.pivotRadius);
+    if (gait.turnRate < 0.0f || gait.turnRadius < 0.0f || gait.pivotRadius < 0.0f) {
+        return fail("gait: 'turnRate' ({}), 'turnRadius' ({}) and 'pivotRadius' ({}) must not be negative; "
+                    "0 keeps the default",
+                    gait.turnRate, gait.turnRadius, gait.pivotRadius);
+    }
     // An exit above an enter is not hysteresis, it is a latch that never releases. Caught here
     // rather than discovered as a character that never stops running.
     if (gait.moveExit > gait.moveEnter) {
@@ -1473,6 +1580,17 @@ nlohmann::json gaitToJson(const GaitSettings& gait) {
         if (gait.idleRate != GaitSettings{}.idleRate) {
             j["idleRate"] = gait.idleRate;
         }
+    }
+    // ADR-908: written only when they are not the defaults, so every existing scene round-trips
+    // unchanged -- and a turn rate of 0 stays "not authored" rather than becoming an explicit 0.
+    if (gait.turnRate != GaitSettings{}.turnRate) {
+        j["turnRate"] = gait.turnRate;
+    }
+    if (gait.turnRadius != GaitSettings{}.turnRadius) {
+        j["turnRadius"] = gait.turnRadius;
+    }
+    if (gait.pivotRadius != GaitSettings{}.pivotRadius) {
+        j["pivotRadius"] = gait.pivotRadius;
     }
     return j;
 }

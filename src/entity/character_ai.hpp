@@ -390,6 +390,10 @@ struct Option {
     // lets a decider remember "I have been to three shorelines in a row" (§22's novelty, one level
     // up from the single place).
     std::uint8_t kind = 255;
+    // ADR-909: an option somebody above the character asked for -- a director's runtime goal. The
+    // decider's own habits (walking back to where it just left, standing about) are its own to
+    // refuse; an order is not, so a directed option is never discounted for either.
+    bool directed = false;
     // The terms the score is the sum or product of, largest first by convention. Fixed storage: an
     // option is copied into the selector's list every tick and must not allocate.
     std::array<ScoreFactor, 6> factors{};
@@ -399,6 +403,13 @@ struct Option {
             factors[factorCount++] = ScoreFactor{factor, value};
         }
     }
+};
+
+// ADR-909: a place this body set out from, and when. What lets a decider refuse to walk straight
+// back to where it just was -- the owner's "walk to a point, turn round, walk back".
+struct Departure {
+    glm::vec2 place{0.0f};
+    double time = 0.0;
 };
 
 struct MindView; // entity/mind.hpp
@@ -433,6 +444,25 @@ struct DecisionContext {
     // opt in**, which is every decider written before Phase D -- so a considerer must treat null as
     // "neutral personality, nothing remembered, nothing heard" and score exactly as it did.
     const MindView* mind = nullptr;
+
+    // ---- ADR-909 --------------------------------------------------------------------------------
+    // Which decision tick this is (`decideTick`), for a considerer that draws something per decision
+    // -- a pace from a `speedRange` -- as a (seed, tick, option) hash rather than from a stream (D2).
+    std::uint64_t tick = 0;
+    // Where this body recently set out from, and how long ago still counts. An option whose walk
+    // ends within `loopRadius` (plus its own arrival tolerance) of one of these, set out from less
+    // than `loopSeconds` ago, is an A->B->A loop and scores `loopPenalty` of itself -- 0, not on
+    // offer, unless an author softens it. While the body is walking an errand, an option that would
+    // turn it round is not on offer either. `loopSeconds` 0 switches both off. Applied by the
+    // selector, not by the considerers, so every considerer -- and one an author writes -- is held
+    // to it alike.
+    std::span<const Departure> departures;
+    double loopSeconds = 0.0;
+    float loopRadius = 4.0f;
+    float loopPenalty = 0.0f;
+    // The body has stood longer than it is allowed to (`maxStillSeconds`): an option that does not
+    // take it anywhere is not on offer until one that does has been chosen.
+    bool restless = false;
 };
 
 // Scores options. One instance per *kind* of character, shared across every character of that kind:

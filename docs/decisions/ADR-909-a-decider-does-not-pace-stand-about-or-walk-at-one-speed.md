@@ -1,0 +1,160 @@
+# ADR-909: A decider does not pace, stand about for ever, or walk every errand at one speed
+
+**Status:** Accepted
+**Date:** 2026-09-26
+**Follows:** ADR-269 and ADR-333 (the decider), ADR-351 (the stall breaker), Phase D §19–§23 (plans, the
+commitment boost, variety), ADR-907 and ADR-908
+**Implemented by:** `Selector::select`'s loop, turn-back and restless rules (`src/entity/decision.cpp`). The
+`DecisionContext` fields `tick`, `departures`, `loopSeconds`, `loopRadius`, `loopPenalty` and `restless`, and
+`Option::directed` (`src/entity/character_ai.hpp`). `Decide`'s still clock and departure memory (`src/entity/behaviors.cpp`).
+`HoldPostConsiderer`'s `duration` and its half-tolerance return. `SpeedRange` on `interest` and `react`, and
+`react`'s `urgentSpeed` (`src/entity/decision.{hpp,cpp}`).
+**Tests:** `tests/unit/test_decider_habits.cpp` (eleven cases, each with a control arm);
+`tests/unit/test_character_controls_reach.cpp` (where each control is found)
+
+## Context
+
+The owner's brief (§10 and the character animation assessment) asks that aliens not stand around
+doing almost nothing, not walk to a point and turn round and walk back, and not move like animated
+objects. The GV3 audit traced each to the decider:
+
+- **`sage` alternated between a glow patch and the ring of its post every 15 s for two minutes.**
+  `holdPost` scores higher the further the body is from its post, and walked it back only as far as
+  the ring (12 of 21 stops were exactly 9.0 m from a 9 m post). The next errand then pulled it straight
+  out again.
+- **`sage` then stood on the ring for 67.3 s, to the end of the film.** Nothing limits how long `idle`
+  or an open-ended pose may win. `holdPost`'s pose has no duration, and the ADR-351 stall breaker
+  watches only plans that are trying to move.
+- **Every alien moved at exactly 3.07 m/s**, because no considerer ever set a pace.
+- **A reaction hurried no more than a stroll.**
+
+Building the regression gate turned up a worse form of the first pattern, which the audit's trace
+had no way to show. Take an aware decider (every GV3 alien is one) with a post whose pull rises with
+distance and an errand whose pull rises with nearness. The two cross halfway, and the body paces
+between the crossings: out to 11.6 m, turn, back to 4.5 m, turn, every nine seconds for as long as the
+run lasts. Phase D's 1.25× commitment boost delays each flip but cannot stop a pull that grows linearly.
+
+## Decision
+
+**1. The loop memory** (on by default, `loopSeconds` 20). `Decide` remembers where the body set out on
+each errand that walks it somewhere (the last four departures, as members, so ADR-700's checkpoints
+carry them). The selector, not the considerers, applies two rules, so every considerer (including one
+an author writes) is held to them alike:
+
+- **A->B->A:** an option whose walk ends within `loopRadius` (4 m, plus its own arrival tolerance) of a
+  departure less than `loopSeconds` old scores `loopPenalty` of itself. That is 0 by default, meaning
+  not on offer. A departure the body is still standing on does not count.
+- **Turning back mid-walk:** while the body is walking an errand (speed over 0.3 m/s, a commitment in
+  hand), an option whose destination lies more than 120 degrees behind its heading is not on offer.
+  The errand in hand is exempt. A creature finishes (or fails) the walk it started before it walks
+  back; a `move` that cannot progress gives up on its own after 4 s.
+
+Neither rule touches an order (`Option::directed`, set by the `goal` considerer that ADR-824's runtime
+goals fill) or an option with urgency (a reaction, a flinch out of someone's way).
+
+A soft discount (0.2, then 0.1) was built first and did not hold. Phase D's variety term discounts the
+errand in hand along with its kind, so an errand could hold at a tenth of what it was chosen at. A post
+discounted to a tenth still cut its dwell short and took the body home: one A->B->A inside the window
+in 240 s, and four quick loops from a turn-back discount. The brief asks for none. `loopPenalty`
+remains for an author who wants the soft rule.
+
+**2. A plan in progress keeps its slot when nothing is on offer.** Phase D §20 already held a running
+plan unless it was beaten. This change made "nothing on offer" reachable: an errand's own option drops
+out of the list inside the considerer's `minRange` while every other option is behind the body. In that
+case the selector used to clear the commitment, which lifted the turn-back rule on the next tick and
+turned the body round 4 m short of its goal. A plan is in progress while Phase D holds it *or* while the
+body is still walking it (over 0.3 m/s with a commitment in hand): the second is the same errand for a
+decider with no `mind` block, and without it such a body turned round 6.5 m short of its errand the
+moment a walk home came back on offer (found by the loop-firmness case's probe). A body that has
+stopped with nothing on offer is committed to nothing, as before.
+
+**3. The still clock** (`maxStillSeconds`, off by default). A body that has not moved `stallDistance`
+in that long has its committed option set aside for as long again. Until it chooses something that
+walks, it is `restless`: an option that takes it nowhere is not on offer. An order (an `Action` or
+`Director` tier action running) restarts the clock, because a body a shot holds still is doing what it
+was told. `DecisionDebug` reports `stillBreaks` and `restless`.
+
+**3a. And when nothing on offer walks, it takes a walk of its own** (`stroll`): 6 to 14 m in the
+60-degree cone about the way it faces, on its turning circle (ADR-907's destination query), the whole
+circle if the cone is closed. Drawn from (seed, decision tick), a pure function of time, so a scrub takes
+the walk the play took; not while an order holds the body or it is already walking; where it set out
+from is a departure like any other. A choice that stands does not cut the walk short (that choice is
+what made the body restless); one that walks, an order or something urgent does. Found on GV3 with the
+recommended settings: `sage` reached its post, its 10 s limit made it restless, the post (reached) and
+`idle` were its only options and both stand, so nothing was chosen, and it stood 26 s. Without this the
+limit held only when a considerer happened to offer somewhere to go. `DecisionDebug::strolls` counts
+them.
+
+**4. `holdPost` walks back to half its tolerance, and takes an optional `duration`.**
+- Walking only to the edge of the ring left the body where one step out was "away from the post"
+  again. Half way in, it is at its post.
+- A `duration` ends the pose, so the errand is over and an aware decider chooses again. With no
+  duration it stands until beaten, which is a sentry.
+
+**5. Pace.** `speedRange: [lo, hi]` on `interest` and `react` gives each option its own pace, in
+multiples of the body's gait walk speed. It is drawn as a hash of (seed, decision tick, option) (D2), so
+the same decision draws the same pace, a scrub draws what the play drew, and one extra option does not
+re-cast the others. An end at 0 is the walk speed (`SpeedRange::of`), so a range of 0 to 1.5 -- one
+end left at its default, as an artist moving one slider leaves it -- is a walk to one and a half times a
+walk, never a crawl; both ends at 0 is unset. `react`'s moves also hurry by their urgency: `urgentSpeed`
+(default 1.5) multiplies the pace at urgency 1 and nothing at urgency 0. The approach's urgency is the
+event's intensity; the flee's is half as much again.
+
+**6. Every knob is a parameter with a plain label**, found in the Parameters panel under `entity` →
+`<name>/decide` (and `<name>/decide/<considerer>` for a considerer's own) and in the World panel
+Inspector's character section when the body is clicked (ADR-907 §8): "longest it stands still (s, 0 =
+no limit)", "won't walk back to where it just was for (s)", "counts as back where it was within (m)",
+"a walk straight back is worth (x its score, 0 = never)", "stays at its post for (s, 0 = until
+something better)", "slowest pace" and "fastest pace" (x walk speed), "hurries at full alarm (x its
+pace)". `loopRadius` and `loopPenalty` were first read once from the file; ADR-225 calls that a
+decoration, so they are registered like the rest, and a test moves `loopPenalty` through its parameter
+and watches the walks back appear.
+
+**On defaults.**
+- **The loop memory and its veto are on**, because walking straight back to where it just left is
+  nobody's authored intention. The guard fixture's sentry still leaves its post for what it notices and
+  comes back: every `[decision]` case, the guard's included, passes unchanged.
+- **Reaction urgency is on.** A flee at a stroll was never the intent.
+- **`maxStillSeconds`, `duration` and `speedRange` are opt-in.** Standing is a legitimate thing for a
+  character to have been authored to do (a sentry, a beat in a shot), and only the scene knows which of
+  its characters may. The Character Intelligence Lab's case 14 is the concrete reason: its `sentry` is
+  `holdPost + investigate + idle` and is *meant* to stand its post; a default limit would turn it into a
+  patrol. The cost is measured, not assumed: GV2-multicam's file is frozen and cannot opt in, and its
+  `sage` still stands about 100 s at its grove after this ADR (ADR-910's table). GV3 opts in (the stream
+  report's recommendations). Pace variety is a matter of casting.
+- **`holdPost`'s half-tolerance return is on**, because walking to the edge of the ring was the defect.
+
+## Consequences
+
+- **The pacing is gone.** On the ADR-909 fixture, 240 s:
+  - With the loop memory off, the body made 52 stops and 50 A->B->A round trips inside 20 s (the
+    halfway dither).
+  - With the default, it made 14 stops and 0 round trips inside 20 s. Every errand reached its target,
+    and home was reached by way of somewhere else.
+- **Standing is bounded where a scene asks.** An idle-weighted decider stood the whole 180 s. With
+  `maxStillSeconds` 6, its longest stand was 6.0 s, it broke 15 times and walked 180 m. A decider whose
+  only options stand (a reached post and `idle`) stood the whole 120 s; with the limit it took 6 walks
+  of its own, covered 93 m, and stood at most 6.4 s.
+- **The loop veto trades a walk back for a wait, where a scene has not asked for a limit.** A body
+  whose best option is the place it has just left, with nothing else that walks on offer, now waits
+  where it is until the window is over instead of walking straight back. On GV2-multicam, whose file
+  is frozen and cannot opt in, the aliens' A->B->A revisits went from 8 to 2 and their longest stand
+  overall from 97.9 s (sage) to 49.0 s -- but vane's longest stand went from 8.5 s to 27.2 s: an 8 s
+  observe, then the rest of the 20 s window. That is the owner's two hard requirements in conflict
+  in a scene that can set neither knob. `maxStillSeconds` resolves it: a restless body takes the
+  walk back at a tenth of its score only when nothing else that walks is on offer (GV3's tuned run,
+  ADR-910). Making the still clock a default was weighed and not done, for the sentry reason above.
+- **Paces vary per errand and per decision:** four candidates drew four different paces within
+  [0.6, 1.4] × walk, the same tick drew the same paces again, and the next tick drew others. A
+  reaction to a full-intensity event moves at 1.5× walk (both approach and flee); a faint one (0.4)
+  approaches at 1.2× and flees at 1.3×.
+- **A seek lands where the play did** with every new memory in use (loop memory, still clock, timed
+  post, paced errand, walk-through turns, eased wander): under 1 mm at 45 s.
+- **Every decided scene can decide differently**, because the loop memory and the veto are on:
+  - `glowmere-valley-2*`, GV3, the Character Intelligence Lab's decided fixtures, the autonomy demo;
+  - every `react` move is faster, and the valley's aliens hurry to the beam;
+  - every `holdPost` return ends half a tolerance nearer its post.
+
+  ADR-910 records the measured effect on GV2-multicam and GV3, and lists the tests re-baselined.
+- **`DecisionContext` and `Option` gained fields**, defaulted so every existing considerer and every
+  test that builds one by hand is unchanged.

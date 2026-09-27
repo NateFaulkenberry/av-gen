@@ -10,6 +10,8 @@
 //   arithmetic   hand-made samples through the plain-struct door: stuck time, slip, churn,
 //                oscillation, director and airborne seconds, each against a control
 //   schema       the JSON carries every documented field per entity and no aggregate score
+//   patterns     ADR-910: reversals out of a stop, A->B->A revisits, pivot yaw against a walked
+//                circle's radius, standing on and facing up a hillside -- each against a control
 
 #include "entity/character_quality.hpp"
 #include "entity/entity.hpp"
@@ -22,6 +24,8 @@
 #include <nlohmann/json.hpp>
 
 #include <cctype>
+#include <cmath>
+#include <functional>
 #include <span>
 #include <string>
 #include <vector>
@@ -286,8 +290,28 @@ TEST_CASE("The quality JSON has every documented field and no aggregate score", 
         CHECK(e["motion"]["footSlip"].contains(k));
     }
     for (const char* k : {"stuckSeconds", "idleFraction", "activityChanges", "activityChangesPerMinute",
-                          "oscillations", "directorSeconds", "airborneSeconds"}) {
+                          "oscillations", "directorSeconds", "airborneSeconds", "stillFraction",
+                          "longestStillSeconds", "stops"}) {
         CHECK(e["behaviour"].contains(k));
+    }
+    // ADR-910's patterns, where a reader of the file will look for them.
+    for (const char* k : {"count", "measured", "reversals", "turnsOver90", "revisits"}) {
+        CHECK(e["behaviour"]["stops"].contains(k));
+    }
+    REQUIRE(e["motion"].contains("turning"));
+    for (const char* k : {"yawDegrees", "pivotYawDegrees", "pivotYawFraction", "turnSamples",
+                          "turnRadiusMedian", "turnRadiusP10"}) {
+        CHECK(e["motion"]["turning"].contains(k));
+    }
+    REQUIRE(e.contains("ground"));
+    for (const char* k : {"stillSeconds", "slopeMeanDegrees", "slopeMaxDegrees", "steepSeconds",
+                          "facingUphillSeconds"}) {
+        CHECK(e["ground"].contains(k));
+    }
+    for (const char* k : {"stillSpeed", "stopSeconds", "pivotSpeed", "reversalDegrees", "headingMetres",
+                          "revisitRadius", "turnSpeedMin", "turnRateMinDegrees", "steepDegrees",
+                          "uphillDegrees"}) {
+        CHECK(j["thresholds"].contains(k));
     }
 
     // Individual metrics, never a combined one (ADR-826). Any key naming a score, a grade or a
@@ -304,4 +328,193 @@ TEST_CASE("The quality JSON has every documented field and no aggregate score", 
         CHECK(lower.find("grade") == std::string::npos);
         CHECK(lower.find("overall") == std::string::npos);
     }
+}
+
+// =================================================================================================
+// ADR-910: the patterns a viewer reads as a mechanism rather than a creature
+// =================================================================================================
+//
+// Hand-built bodies through the plain-struct door, each with a control that must read the opposite
+// (ADR-182). The paths are written as functions of time, sampled at the application's 60 Hz with
+// its zero-length first frame, so the arithmetic under test is the recorder's and nothing else's.
+
+namespace {
+
+// A scripted body: where it is and which way it faces at time t, and what it stands on.
+struct Pose {
+    glm::vec2 at{0.0f};
+    float yaw = 0.0f;
+    glm::vec3 normal{0.0f, 1.0f, 0.0f};
+    bool grounded = false;
+};
+
+entity::CharacterQualityReport script(const char* name, double seconds,
+                                      const std::function<Pose(double)>& path) {
+    entity::CharacterQualityRecorder rec;
+    const int frames = static_cast<int>(std::llround(seconds / kStep));
+    for (int i = 0; i <= frames; ++i) {
+        const double t = static_cast<double>(i) * kStep;
+        const Pose p = path(t);
+        entity::CharacterSample s;
+        s.name = name;
+        s.position = glm::vec3(p.at.x, 0.0f, p.at.y);
+        s.yaw = p.yaw;
+        s.groundNormal = p.normal;
+        s.hasGround = p.grounded;
+        rec.record(std::span<const entity::CharacterSample>(&s, 1), t, i == 0 ? 0.0 : kStep);
+    }
+    return rec.report();
+}
+
+constexpr float kHalfPi = 1.5707963f;
+
+// Walk `a` -> `b` at `speed`, facing the way it walks.
+Pose walking(glm::vec2 a, glm::vec2 b, double speed, double t) {
+    const glm::vec2 d = b - a;
+    const double len = glm::length(d);
+    const double s = std::min(1.0, speed * t / len);
+    return Pose{a + d * static_cast<float>(s), std::atan2(d.x, d.y)};
+}
+
+// Walk east 9 m at 1.5 m/s, stand three seconds turning to `outYaw`, then walk 9 m that way.
+Pose outAndOnward(double t, float outYaw) {
+    const double walk = 6.0; // 9 m at 1.5 m/s
+    if (t <= walk) {
+        return walking({0.0f, 0.0f}, {9.0f, 0.0f}, 1.5, t);
+    }
+    const glm::vec2 stop(9.0f, 0.0f);
+    if (t <= walk + 3.0) {
+        // Standing, turning toward the way out over the first second of the stand.
+        const float k = static_cast<float>(std::min(1.0, t - walk));
+        return Pose{stop, kHalfPi + (outYaw - kHalfPi) * k};
+    }
+    const glm::vec2 out(std::sin(outYaw), std::cos(outYaw));
+    return Pose{stop + out * static_cast<float>(1.5 * (t - walk - 3.0)), outYaw};
+}
+
+} // namespace
+
+TEST_CASE("walking out of a stop the way it came is a reversal; carrying on is not",
+          "[motion][quality][adr910]") {
+    // East is +x, which is yaw +pi/2 (forward = (sin yaw, cos yaw)).
+    const auto back = script("back", 16.0, [](double t) { return outAndOnward(t, -kHalfPi); });
+    const auto& b = only(back);
+    CHECK(b.behaviour.stops == 1);
+    CHECK(b.behaviour.measuredStops == 1);
+    CHECK(b.behaviour.reversals == 1);
+    CHECK(b.behaviour.turnsOver90 == 1);
+    // Three seconds standing, to the frame: the stand is 180 steps whose speed is zero.
+    CHECK(b.behaviour.longestStillSeconds == Approx(3.0).margin(kStep * 1.5));
+
+    // The control: the same stop, then on eastward. The stop is identical; the way out is not.
+    const auto onward = script("onward", 16.0, [](double t) { return outAndOnward(t, kHalfPi); });
+    const auto& o = only(onward);
+    CHECK(o.behaviour.stops == 1);
+    CHECK(o.behaviour.measuredStops == 1);
+    CHECK(o.behaviour.reversals == 0);
+    CHECK(o.behaviour.turnsOver90 == 0);
+    CHECK(o.behaviour.longestStillSeconds == Approx(b.behaviour.longestStillSeconds));
+
+    // And the threshold between them: out at 120 degrees from the way in is a turn over 90 and not a
+    // reversal; the recorder's 150 is the line, pinned from both sides.
+    const float at120 = kHalfPi + 2.0943951f; // 120 degrees round from east
+    const auto sharp = script("sharp", 16.0, [&](double t) { return outAndOnward(t, at120); });
+    CHECK(only(sharp).behaviour.turnsOver90 == 1);
+    CHECK(only(sharp).behaviour.reversals == 0);
+    const float at160 = kHalfPi + 2.7925268f; // 160 degrees round
+    const auto nearly = script("nearly", 16.0, [&](double t) { return outAndOnward(t, at160); });
+    CHECK(only(nearly).behaviour.reversals == 1);
+}
+
+TEST_CASE("a stop back where the body stood two stops ago is an A->B->A revisit",
+          "[motion][quality][adr910]") {
+    // Three legs with a two-second stand after each: A -> B -> back to A, and A -> B -> on to C.
+    const auto legs = [](glm::vec2 a, glm::vec2 b, glm::vec2 c, double t) {
+        const double walk = 10.0 / 2.0; // every leg is 10 m at 2 m/s
+        const double hold = 2.0;
+        const glm::vec2 points[] = {a, b, c};
+        for (int leg = 0; leg < 2; ++leg) {
+            const double start = static_cast<double>(leg) * (walk + hold) + hold;
+            if (t < start) {
+                return Pose{points[leg], 0.0f};
+            }
+            if (t < start + walk) {
+                return walking(points[leg], points[leg + 1], 2.0, t - start);
+            }
+        }
+        return Pose{c, 0.0f};
+    };
+    const glm::vec2 A(0.0f, 0.0f);
+    const glm::vec2 B(10.0f, 0.0f);
+    const auto aba = script("aba", 20.0, [&](double t) { return legs(A, B, A + glm::vec2(0.5f, 0.0f), t); });
+    CHECK(only(aba).behaviour.stops == 3);
+    CHECK(only(aba).behaviour.revisits == 1);
+
+    const auto abc = script("abc", 20.0, [&](double t) { return legs(A, B, B + glm::vec2(10.0f, 0.0f), t); });
+    CHECK(only(abc).behaviour.stops == 3);
+    CHECK(only(abc).behaviour.revisits == 0); // the control: the third stop is 20 m from the first
+}
+
+TEST_CASE("turning on the spot is pivot yaw; turning on a circle measures its radius",
+          "[motion][quality][adr910]") {
+    // A body standing still and turning half a revolution over two seconds.
+    const auto pivot = script("pivot", 3.0, [](double t) {
+        return Pose{{0.0f, 0.0f}, static_cast<float>(3.14159265 * std::min(1.0, t / 2.0))};
+    });
+    const auto& p = only(pivot);
+    CHECK(p.motion.yawDegrees == Approx(180.0).margin(0.01));
+    CHECK(p.motion.pivotYawDegrees == Approx(180.0).margin(0.01));
+    CHECK(p.motion.pivotYawFraction == Approx(1.0));
+    CHECK(p.motion.turnSamples == 0); // it never moved, so it never drew a radius
+
+    // A body walking a circle of radius 4 m at 2 m/s, facing along it.
+    constexpr double kRadius = 4.0;
+    constexpr double kSpeed = 2.0;
+    const auto circle = script("circle", 12.0, [&](double t) {
+        const double a = kSpeed * t / kRadius;
+        const glm::vec2 at(static_cast<float>(kRadius * std::cos(a)), static_cast<float>(kRadius * std::sin(a)));
+        // The tangent of (cos a, sin a) is (-sin a, cos a); as a yaw that is atan2(-sin a, cos a).
+        return Pose{at, static_cast<float>(std::atan2(-std::sin(a), std::cos(a)))};
+    });
+    const auto& c = only(circle);
+    CHECK(c.motion.pivotYawDegrees == 0.0);
+    REQUIRE(c.motion.turnSamples > 600);
+    // The chord of a step is a hair shorter than its arc, so the radius reads a hair low.
+    CHECK(c.motion.turnRadiusMedian == Approx(kRadius).epsilon(1e-3));
+    CHECK(c.motion.turnRadiusP10 == Approx(kRadius).epsilon(1e-3));
+}
+
+TEST_CASE("standing on a hillside facing up it is facing into the hill; across it is not",
+          "[motion][quality][adr910]") {
+    // A slope rising toward +x at 20 degrees: its normal leans toward -x.
+    const float k = std::tan(20.0f / 57.2957795f);
+    const glm::vec3 hill = glm::normalize(glm::vec3(-k, 1.0f, 0.0f));
+    const auto stand = [&](float yaw, glm::vec3 normal) {
+        return script("stand", 2.0, [=](double) { return Pose{{0.0f, 0.0f}, yaw, normal, true}; });
+    };
+    const auto up = stand(kHalfPi, hill); // facing +x, straight uphill
+    CHECK(only(up).ground.stillSeconds == Approx(2.0));
+    CHECK(only(up).ground.steepSeconds == Approx(2.0));
+    CHECK(only(up).ground.facingUphillSeconds == Approx(2.0));
+    CHECK(only(up).ground.slopeMaxDegrees == Approx(20.0).margin(1e-3));
+    CHECK(only(up).ground.slopeMeanDegrees == Approx(20.0).margin(1e-3));
+
+    const auto across = stand(0.0f, hill); // facing +z, along the contour
+    CHECK(only(across).ground.steepSeconds == Approx(2.0));
+    CHECK(only(across).ground.facingUphillSeconds == 0.0);
+
+    const auto down = stand(-kHalfPi, hill); // facing -x, downhill
+    CHECK(only(down).ground.facingUphillSeconds == 0.0);
+
+    // Gentle ground is not steep, whichever way the body faces.
+    const float g = std::tan(8.0f / 57.2957795f);
+    const auto gentle = stand(kHalfPi, glm::normalize(glm::vec3(-g, 1.0f, 0.0f)));
+    CHECK(only(gentle).ground.steepSeconds == 0.0);
+    CHECK(only(gentle).ground.facingUphillSeconds == 0.0);
+    CHECK(only(gentle).ground.slopeMaxDegrees == Approx(8.0).margin(1e-3));
+
+    // No surface reported is no surface measured: not flat ground, nothing.
+    const auto floating = script("floating", 2.0, [&](double) { return Pose{{0.0f, 0.0f}, kHalfPi, hill, false}; });
+    CHECK(only(floating).ground.stillSeconds == 0.0);
+    CHECK(only(floating).ground.steepSeconds == 0.0);
 }

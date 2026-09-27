@@ -11,6 +11,9 @@
 //   * the soft floor never lets the eye under the surface and puts no step in its velocity;
 //   * through a real composition: every knob reaches the picture, a scrub lands on the pose a play
 //     does (ADR-267's 0.000022 m), and a 30 fps play draws the same camera as a 60 fps one;
+//   * a subject that is placed -- a performance putting its body on a mark -- has the camera on it from
+//     that frame, played and scrubbed alike, because the trail reads back no further than the
+//     subject's last placement (the amendment of 2026-09-27);
 //   * a cut to another camera changes `Scene::camera.cutSerial` and holds the skinned rigs, while a
 //     blend, a new shot on the same camera and a steady frame do not; a keyed jump in the timeline
 //     is found by the engine;
@@ -855,6 +858,334 @@ TEST_CASE("a 30 fps play and a 60 fps play draw the same follow camera", "[camer
     CHECK(oneFrameLate > 0.03f);
     // And the filter is doing its job at both rates: the 18 cm bob is a couple of centimetres.
     CHECK(halfRange(bob60) < 0.035);
+    fs::remove_all(dir);
+}
+
+// ---- placements (ADR-911, amended 2026-09-27) -------------------------------------------------------
+//
+// A body that was put somewhere -- a performance on its mark, a staging placement, a body shown again
+// -- did not move there, and a reference that filtered across the change glided from where the body
+// was to where it was put. On the multicam film the compiled chase sat 8.6 m above Rook half a second
+// after a performance put him 21.8 m down a hillside, and 1.2 m above him two seconds later
+// (`test_directing_performance.cpp`, "a chase that rises over its character"). The placing system
+// declares it (`entity::Entity::markPlaced`), HIST records it with every sample, and the trail reads
+// back no further than its subject's last placement.
+
+namespace {
+
+// The HIST ring of a walk along +X at 1 m/s whose body is put 20 m up at t = 1, sampled from 0 up to,
+// not including, `now`, with the head at `now`. Undeclared is the defect as it was: the same samples
+// with nothing saying the body was placed.
+struct PlacedWalk {
+    world::HistoryBank bank;
+    world::HistorySample head;
+    PlacedWalk(double now, bool declared) {
+        const world::HistorySubscription subs[] = {{"subject", 16.0f}};
+        REQUIRE(bank.subscribe(subs));
+        for (long long k = 0;; ++k) {
+            const double t = static_cast<double>(k) * kStep;
+            if (t >= now - 1e-9) {
+                break;
+            }
+            bank.record(0, t, position(t), identity(), glm::vec3(1.0f), declared ? placement(t) : 0u);
+        }
+        head.t = now;
+        head.position = position(now);
+        head.placement = declared ? placement(now) : 0u;
+    }
+    static glm::vec3 position(double t) { return {static_cast<float>(t), t >= 1.0 - 1e-9 ? 20.0f : 0.0f, 0.0f}; }
+    static std::uint32_t placement(double t) { return t >= 1.0 - 1e-9 ? 1u : 0u; }
+    [[nodiscard]] scene::SubjectTrail trail(double now) const { return scene::SubjectTrail(&bank, 0, now, head); }
+};
+
+// The Director's compiled chase (`directing/compiler.cpp`, `followRig`), low-angle, 3 m behind.
+nlohmann::json compiledChase() {
+    return {{"followNode", "rook"},
+            {"aimNode", "rook"},
+            {"followLocal", true},
+            {"followOffset", {0, 0.4, -3}},
+            {"aimOffset", {0, 1.4, 0}},
+            {"followSmoothSeconds", 0.3},
+            {"followVerticalSmoothSeconds", 0.8},
+            {"followLead", 1.0},
+            {"followGround", true},
+            {"followHeadingSmoothSeconds", 1.2},
+            {"followClearance", 0.2}};
+}
+
+scene::FollowFilter compiledChaseFilter() {
+    scene::FollowFilter f;
+    f.horizontalSeconds = 0.3;
+    f.verticalSeconds = 0.8;
+    f.headingSeconds = 1.2;
+    f.lead = 1.0f;
+    f.ground = true; // read against no terrain here: a flat world, as the rig does
+    return f;
+}
+
+// The multicam film's case, small: a body the simulation moves (an orbit 25 m up) that a performance
+// takes at 4 s and puts on a mark 21 m below and 22 m aside, then walks on at 1.5 m/s -- followed by
+// the compiled chase.
+constexpr double kPlacedAt = 4.0;
+constexpr long long kPlacedFrame = 240;
+constexpr float kWalkSpeed = 1.5f;
+const glm::vec3 kMark(20.0f, 4.0f, -10.0f);
+
+std::string placedScene() {
+    nlohmann::json doc = nlohmann::json::parse(R"({ "format": "avgen-scene", "version": 1, "name": "mark",
+      "camera": { "mode": 1, "position": [0, 5, 30], "target": [0, 1, 0], "fov": 50 },
+      "nodes": [ { "kind": "orb", "name": "rook", "position": [0, 25, 0] } ],
+      "entities": [ { "name": "rook", "node": "rook", "seed": 7,
+                      "behaviors": [ { "kind": "orbit", "radius": 8.0, "rate": 12.0, "authority": "simulation" } ] } ] })");
+    nlohmann::json rig = compiledChase();
+    rig["id"] = 2;
+    rig["name"] = "Chase";
+    rig["slug"] = "chase";
+    rig["placement"] = "free";
+    rig["position"] = {0, 5, 30};
+    rig["target"] = {0, 1, 0};
+    rig["fov"] = 60.0;
+    doc["cameraDirection"] = {{"cameras", nlohmann::json::array({{{"id", 1}, {"name", "Main"}}, rig})},
+                              {"shots", nlohmann::json::array()},
+                              {"default", 2},
+                              {"nextId", 3}};
+    return doc.dump(2);
+}
+
+scene::Composition::Performer markPerformance() {
+    scene::Composition::Performer p;
+    p.entity = "rook";
+    p.from = kPlacedAt;
+    p.to = kPlacedAt + 6.0;
+    p.pose = [](double t) {
+        scene::Composition::PerformerPose pose;
+        pose.position = kMark + glm::vec3(kWalkSpeed * static_cast<float>(t - kPlacedAt), 0.0f, 0.0f);
+        pose.yawRadians = 0.5f * std::numbers::pi_v<float>; // facing +X, the way it walks
+        pose.speed = kWalkSpeed;
+        return pose;
+    };
+    p.signature = 0x6d61726bull;
+    return p;
+}
+
+// The subject as it stands, and where the chase puts the eye and the aim on it with nothing filtered.
+struct OnSubject {
+    world::HistorySample head;
+    glm::vec3 eye{0.0f};
+    glm::vec3 aim{0.0f};
+};
+
+OnSubject onSubject(const Stage& stage, double now) {
+    const scene::CompositionNode* node = stage.comp->findNode("rook");
+    REQUIRE(node != nullptr);
+    const scene::Transform t = stage.comp->nodeWorldTransform(*node); // the root fold is the identity here
+    OnSubject out;
+    out.head.t = now;
+    out.head.position = t.position;
+    out.head.rotation = t.rotation;
+    out.head.scale = t.scale;
+    const float yaw = scene::headingOf(t.rotation);
+    out.eye = t.position + (glm::angleAxis(yaw, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec3(0.0f, 0.4f, -3.0f));
+    out.aim = t.position + glm::vec3(0.0f, 1.4f, 0.0f);
+    return out;
+}
+
+// The control: the reference the chase would read at `now` from the same HIST ring with every
+// placement erased -- what the bank held before this amendment -- as its height above the subject.
+float undeclaredHeightAbove(const Stage& stage, double now) {
+    world::HistoryBank::Snapshot snapshot = stage.bank.snapshot();
+    for (world::HistorySample& s : snapshot.samples) {
+        s.placement = 0;
+    }
+    world::HistoryBank blind;
+    std::vector<world::HistorySubscription> needs;
+    stage.comp->appendCameraHistoryNeeds(needs);
+    REQUIRE(blind.subscribe(needs));
+    blind.restore(snapshot);
+    OnSubject at = onSubject(stage, now);
+    at.head.placement = 0;
+    const scene::SubjectTrail trail(&blind, blind.find("rook"), now, at.head);
+    return scene::followReference(trail, now, compiledChaseFilter(), nullptr).position.y - at.head.position.y;
+}
+
+} // namespace
+
+TEST_CASE("a trail reads back only as far as its subject's last placement", "[camera][follow][placement][adr911]") {
+    const PlacedWalk walk(2.0, true);
+    const scene::SubjectTrail trail = walk.trail(2.0);
+    REQUIRE(trail.hasHistory());
+    CHECK_THAT(trail.at(1.5).position.x, WithinAbs(1.5, 1e-5)); // inside the placement: the history
+    CHECK(trail.at(1.5).position.y == 20.0f);
+    // Before it: held where the body was put, as at the head of a film -- not the walk below.
+    CHECK(trail.at(0.5).position == PlacedWalk::position(1.0));
+    CHECK(trail.at(-3.0).position == PlacedWalk::position(1.0));
+    // A head placed this very frame has no history at all: every read is the head.
+    world::HistorySample placedNow = walk.head;
+    placedNow.placement = 2;
+    const scene::SubjectTrail fresh(&walk.bank, 0, 2.0, placedNow);
+    CHECK_FALSE(fresh.hasHistory());
+    CHECK(fresh.at(1.5).position == placedNow.position);
+
+    // What the chase reads, on the frame of the placement and after it. Declared, the height is on the
+    // mark from that frame on and the walk is a walk restarted from rest; undeclared -- the control, and
+    // the defect -- the height averages the walk below for more than a second.
+    scene::FollowFilter chase = compiledChaseFilter();
+    chase.ground = false;
+    chase.headingSeconds = 0.0;
+    for (const double now : {1.0, 1.0 + kStep, 1.0 + (2.0 * kStep), 1.5, 2.0, 3.0}) {
+        const PlacedWalk declared(now, true);
+        const PlacedWalk undeclared(now, false);
+        const glm::vec3 on = scene::followReference(declared.trail(now), now, chase, nullptr).position;
+        const glm::vec3 off = scene::followReference(undeclared.trail(now), now, chase, nullptr).position;
+        INFO("t " << now << " s, the subject at (" << now << ", 20): declared (" << on.x << ", " << on.y
+                  << "), undeclared (" << off.x << ", " << off.y << ")");
+        CHECK_THAT(on.y, WithinAbs(20.0, 1e-4));
+        CHECK_THAT(on.x, WithinAbs(now, 0.3)); // behind by less than its speed times T
+        if (now < 2.5) {
+            CHECK(off.y < 19.0f);
+        }
+    }
+}
+
+TEST_CASE("a performance that puts its body on a mark has the follow camera on it from that frame",
+          "[camera][follow][placement][adr911]") {
+    const fs::path dir = fixtureDir();
+    writeFile(dir / "mark.json", placedScene());
+    Stage stage(dir, "mark.json");
+    stage.comp->setPerformers({markPerformance()});
+    const entity::Entity* rook = stage.comp->entityWorld().find("rook");
+    REQUIRE(rook != nullptr);
+    const std::size_t ring = stage.bank.find("rook");
+    REQUIRE(ring < stage.bank.ringCount()); // the chase subscribed its subject
+
+    struct Frame {
+        double t = 0.0;
+        glm::vec3 eye{0.0f};
+        glm::vec3 aim{0.0f};
+        OnSubject ideal;
+        std::uint32_t placements = 0;
+    };
+    std::vector<Frame> frames;
+    float undeclaredHalf = 0.0f;
+    float undeclaredOne = 0.0f;
+    stage.play(kPlacedAt + 3.0, 60.0, [&](double t) {
+        frames.push_back({t, stage.camera().position, stage.camera().target, onSubject(stage, t), rook->placements()});
+        if (std::abs(t - (kPlacedAt + 0.5)) < 1e-9) {
+            undeclaredHalf = undeclaredHeightAbove(stage, t);
+        }
+        if (std::abs(t - (kPlacedAt + 1.0)) < 1e-9) {
+            undeclaredOne = undeclaredHeightAbove(stage, t);
+        }
+    });
+    REQUIRE(frames.size() == static_cast<std::size_t>(kPlacedFrame + 181));
+    const Frame& before = frames[kPlacedFrame - 1];
+    const Frame& placed = frames[kPlacedFrame];
+
+    // The performance declared the placement on its first step, and only then; the body did jump.
+    CHECK(before.placements == 0);
+    CHECK(placed.placements == 1);
+    CHECK(frames.back().placements == 1);
+    const float jump = glm::length(placed.ideal.head.position - before.ideal.head.position);
+    INFO("the performance put the body " << jump << " m from where the orbit had it");
+    CHECK(jump > 25.0f);
+    // HIST recorded it: the ring's samples change placement between the frame before and the mark.
+    std::uint32_t lastBefore = 99;
+    std::uint32_t firstAfter = 99;
+    for (std::size_t i = 0; i < stage.bank.sampleCount(ring); ++i) {
+        const world::HistorySample& s = stage.bank.sample(ring, i);
+        if (s.t < kPlacedAt - 1e-9) {
+            lastBefore = s.placement;
+        } else if (firstAfter == 99) {
+            firstAfter = s.placement;
+        }
+    }
+    CHECK(lastBefore == 0);
+    CHECK(firstAfter == 1);
+
+    // On the frame of the placement the camera is where the chase puts it on the subject as it stands:
+    // the eye and the aim read one reference, and that reference restarted on the mark.
+    INFO("eye " << glm::length(placed.eye - placed.ideal.eye) << " m and aim " << glm::length(placed.aim - placed.ideal.aim)
+                << " m from the chase on the subject, on the frame of the placement");
+    CHECK(glm::length(placed.eye - placed.ideal.eye) < 1e-3f);
+    CHECK(glm::length(placed.aim - placed.ideal.aim) < 1e-3f);
+    // And for the three seconds after it: 0.4 m over the body and aiming 1.4 m up it throughout (the walk
+    // is level), behind it by less than its speed times the horizontal constant -- a walk restarted from
+    // rest -- where it glided metres before.
+    float worstVertical = 0.0f;
+    float worstHorizontal = 0.0f;
+    float nextTwoFrames = 0.0f;
+    for (std::size_t i = kPlacedFrame; i < frames.size(); ++i) {
+        const Frame& f = frames[i];
+        worstVertical = std::max({worstVertical, std::abs(f.eye.y - f.ideal.eye.y), std::abs(f.aim.y - f.ideal.aim.y)});
+        const glm::vec2 eyeOff(f.eye.x - f.ideal.eye.x, f.eye.z - f.ideal.eye.z);
+        const glm::vec2 aimOff(f.aim.x - f.ideal.aim.x, f.aim.z - f.ideal.aim.z);
+        worstHorizontal = std::max({worstHorizontal, glm::length(eyeOff), glm::length(aimOff)});
+        if (i <= static_cast<std::size_t>(kPlacedFrame + 2)) {
+            nextTwoFrames = std::max(nextTwoFrames, glm::length(f.eye - f.ideal.eye));
+        }
+    }
+    INFO("after the placement: worst vertical " << worstVertical << " m, worst horizontal " << worstHorizontal
+                                                << " m, the two frames after it " << nextTwoFrames << " m");
+    CHECK(worstVertical < 0.01f);
+    CHECK(worstHorizontal < kWalkSpeed * 0.3f);
+    CHECK(nextTwoFrames < 0.06f); // the body's own two steps are 5 cm
+    // Control: the same ring with its placements erased -- the bank before this amendment -- puts the
+    // chase's reference metres over the body half a second after the mark and a second after it, the
+    // defect's own signature (8.6 m and 5.6 m on the film, after a 21.8 m drop; this one is 21 m).
+    INFO("undeclared, the reference is " << undeclaredHalf << " m over the body at +0.5 s and " << undeclaredOne
+                                         << " m at +1 s");
+    CHECK(undeclaredHalf > 5.0f);
+    CHECK(undeclaredOne > 2.0f);
+    fs::remove_all(dir);
+}
+
+TEST_CASE("a follow camera lands on the same pose played and scrubbed across a placement",
+          "[camera][follow][placement][seek][determinism][adr911]") {
+    // The placement is simulation state, so a scrub has to count it where a play did: on the replayed
+    // step the performance took the body, and in every checkpoint after it.
+    const fs::path dir = fixtureDir();
+    writeFile(dir / "mark.json", placedScene());
+    Stage played(dir, "mark.json");
+    played.comp->setPerformers({markPerformance()});
+    std::vector<scene::Camera> cameras;
+    played.play(kPlacedAt + 1.5, 60.0, [&](double) { cameras.push_back(played.camera()); });
+    REQUIRE(cameras.size() == static_cast<std::size_t>(kPlacedFrame + 91));
+
+    // Landing the frame before the placement, on it, the frame after it, and half a second after it.
+    for (const long long landing : {kPlacedFrame - 1, kPlacedFrame, kPlacedFrame + 1, kPlacedFrame + 30}) {
+        const double at = static_cast<double>(landing) / 60.0;
+        Stage scrubbed(dir, "mark.json");
+        scrubbed.comp->setPerformers({markPerformance()});
+        scrubbed.seekTo(at);
+        REQUIRE(scrubbed.comp->entityWorld().lastSeekWork().exact);
+        scrubbed.tickAt(at, 0.0, static_cast<std::uint64_t>(landing)); // a render's first frame after its seek
+        // The replay counted the placement where the play did -- once, on the mark's step -- and the
+        // landing frame, which runs the performance again at the same instant, did not count it twice.
+        const entity::Entity* rook = scrubbed.comp->entityWorld().find("rook");
+        REQUIRE(rook != nullptr);
+        CHECK(rook->placements() == (landing >= kPlacedFrame ? 1u : 0u));
+        const auto apart = [&](std::size_t f) {
+            return std::max(glm::length(scrubbed.camera().position - cameras[f].position),
+                            glm::length(scrubbed.camera().target - cameras[f].target));
+        };
+        const float atLanding = apart(static_cast<std::size_t>(landing));
+        // The control, where the landing reads the placed history: without the placement the scrubbed
+        // ring would put the reference metres from the one the play drew.
+        const float undeclared = landing > kPlacedFrame ? undeclaredHeightAbove(scrubbed, at) : 0.0f;
+        float worst = atLanding;
+        for (std::size_t f = static_cast<std::size_t>(landing) + 1; f < cameras.size(); ++f) {
+            scrubbed.tickAt(static_cast<double>(f) / 60.0, 1.0 / 60.0, f);
+            worst = std::max(worst, apart(f));
+        }
+        INFO("landing at frame " << landing << ": " << atLanding << " m apart there, " << worst
+                                 << " m at worst to 1.5 s after the placement; undeclared, the reference is "
+                                 << undeclared << " m over the body");
+        CHECK(worst <= kSeekExact);
+        CHECK(rook->placements() == 1u); // and a landing before the mark counted it when the play reached it
+        if (landing > kPlacedFrame) {
+            CHECK(undeclared > 5.0f);
+        }
+    }
     fs::remove_all(dir);
 }
 
