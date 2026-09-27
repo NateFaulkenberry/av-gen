@@ -81,3 +81,39 @@ and gv3-look's changes do not either.
   south end is a flat shelf with the river's mouth a rectangular, vertical-walled slot dead centre: it reads as
   the edge of the world. 106.1 shows the mouth as a slot at the left. In 81.1, 69.1 and 66.3 it reads as a
   distant pass; in 71.1 as a flat horizon behind the elder.
+
+**The Critic's pacing, checked against the picture.** r1's novelty reads 92.6 s held after the shots' last new
+information and 18 shots static from their first frame, where gv3-cut's it2 whole film (the same cut, the first
+pass's look) read 34.2 s and 8. Shot by shot the mean novelty fell 2-4x even where the camera's move did not
+change (s12 0.178 -> 0.069, s30 0.178 -> 0.060, s47 0.119 -> 0.074). What changed between the two is the look:
+the sky no longer follows the spectrum frame by frame (gv3-look: its frame-to-frame change 6.8% -> 1.4%), and the
+distance is a smooth fog. The open items already list the Critic's bias ("it rewards sky flicker"). Measured
+below the sky instead (`build/gv3/int/tools/groundmotion.py`: luma change over a third of a second in the frame's
+lower 65%), s04, s05, s12 and s30 move as much as most of the film; the slowest shots are the intentional stills
+(the half-bar glimpses 48.1 and 48.3, E2's night wide, the riser's locked frames) and 33.1's cairn (3.7 s). So
+`trim.py`'s 15 proposals on r1 are not applied: they include 81.1 cut to 4 beats (the suspension's locked-off
+wide the plan keeps) and 57.1 (E4's lift, where the pair rises through the frame).
+
+**The air.** Beside the first pass's final, r1's wides (41.1 at 76 s, 117.1 at 218 s) are veiled in a bright teal
+haze from the middle distance on, where the first pass's were a navy night with vivid emissives: the render
+stream's `scene/fogSky` 1.0 (the fog fades to the sky's radiance, the aurora included) that gv3-look took into
+`look.BASE`. It is the likeliest cause of the Critic's visual hierarchy 0.713 -> 0.645 ("bright areas away from the
+subject dominate", 15 findings, mostly wides) and of the palette drifting from GV2's. An A/B is queued.
+
+## Round 2: fixes in data, judged on clips
+
+**Film-wide, in the generator (`e1bc1c49`):** `env/rotation` 0 (one moon; `look.BASE`) and the saucer beam's
+four audio links dropped (`reactivity.REACTION_DROPS`). The generator's audit: 89/89 routes (93 less the four),
+42/42 tracks.
+
+**Judged on scratch variants of r1** (`build/gv3/int/tools/variants.py`: a shot's span divided among candidate
+rigs, so one range render shows them all; alien shots one candidate a variant, whole span):
+- batch A (`vA`): 19.1, 25.1, 31.1, 77.1 and 106.1, four or three candidates each, with the film-wide fixes; the
+  77.1 and 106.1 candidates were chosen with `world.py`'s own open-end test (0 columns over their whole paths:
+  77.1 low on the valley floor by the river instead of 28 m up the new north head; 106.1 from south of the veil,
+  looking away from the mouth);
+- batch B (`vB1-4`): 29.1 (Vane, 8-11 m up, where the canopy cannot stand between her and the elder) and 59.1
+  (Rook, who goes to see E4: a fixed eye up the west bank behind him, a live aim under the hovering scout);
+- the post pass (`vP`, brief §14, the audit's recipe in steps: AgX, the bloom, the filmic finish) and the air
+  (`vF`, `scene/fogSky` 1.0 / 0.5 / 1.0 at 600 m / 0), step-keyed inside quiet windows of nine and seven shots.
+All wait on the GPU behind the coordinator's navfix suite.
