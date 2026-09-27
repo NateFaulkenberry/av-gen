@@ -285,8 +285,8 @@ craft. ADR-912 refused a heuristic for the same reason.
 - "a trail reads back only as far as its subject's last placement". The trail holds at the
   placement's oldest sample, and a head placed this frame is read alone. The chase's constants on a
   walk that is put 20 m up keep the height on the mark (to 0.1 mm) from the frame of the placement.
-  Undeclared (the control), the height is 0.004 m on that frame and still under 19 m more than a
-  second later.
+  Undeclared (the control), the height is 0.004 m on that frame, 7.3 m half a second later and
+  14.4 m a second later.
 - "a performance that puts its body on a mark has the follow camera on it from that frame". A body
   orbiting 25 m up is taken by a performance and put 30.1 m away, followed by the compiled chase.
   - On the frame of the placement, the eye and the aim are 0 m from where the chase puts them on the
@@ -310,9 +310,13 @@ craft. ADR-912 refused a heuristic for the same reason.
 - "a staging placement says so: a move told to put the body there, and a hidden body shown again"
   (`test_staging.cpp`). The put and the show are each counted on their step. The hide, the 0.05 s
   entry, a timed flight and a show of what is already drawn are not. A reset zeroes the count.
-- The test that found it: `chase.up` is 0.573 (was 1.209), the rig's 0.4 m plus its clearance over
-  the hillside. `chase.along` is -3.00 (was -2.77), its 3 m. `over` and `ahead` are unchanged to
-  0.1 mm.
+- The test that found it: `chase.up` is 0.573 against its bar of 1.0 (was 1.209; the rig's own
+  height offset is 0.4 m). `chase.along` is -3.00 (was -2.77), the rig's 3 m. `over` moves by 0.1 mm
+  and `ahead` not at all.
+- The suites, on `agent/characters` with main 3f720bfa merged: the CPU suite
+  (`ctest -L unit -j 4`) 3733 of 3733 passed, 19 skipped for missing assets or tools, exit 0. The
+  GPU suite (`avgen_render_tests` under `tools/gpu-lock.sh`) 531 of 532 cases passed and 1 skipped,
+  619,105 assertions, exit 0.
 
 **Consequences:**
 - **The camera changes only where a rig that reads history follows or aims at a body that is
@@ -336,8 +340,8 @@ craft. ADR-912 refused a heuristic for the same reason.
   cut is, so there is no knob: the panel rows above are unchanged.
 - **The other readers of HIST are unchanged, and belong to the same family.** They read across a
   placement:
-  - `entity.<name>.speed`, `.velocity` and `.acceleration` read one step of about 1300 m/s at a
-    21.8 m placement;
+  - `entity.<name>.speed`, `.velocity` and `.acceleration` are one-step backward differences, so a
+    21.8 m placement reads as a step of about 1300 m/s;
   - a Trail's ribbon draws a streak from where the body was;
   - ADR-545's measured velocity, which the pose layers read, has the same one-step spike.
 
