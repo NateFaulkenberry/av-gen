@@ -14,8 +14,9 @@ where its predecessor stopped.
     1 skipped, 617,151 assertions, exit 0; its 49 overlap samples were all cihealth's CPU tests, no GPU.
   - Pushed (`876a11e2..983221a9`) and merged into `gv3/production` (`4b4c467d`). The CI watcher was resumed for the
     new push run and the pending runs.
-  - **Building `av-gen-engine-4`** at `983221a9`. When it is ready, gv3-int switches to it and applies E5's "go and
-    see".
+  - **`av-gen-engine-4` is BUILT** (18:21) at `983221a9`, with `BUILD-READY`. gv3-int was told to switch between
+    GPU jobs, merge `gv3/production`, apply E5's "go and see" (`approach` 250 -> 18) and re-check. Engine-3 stays
+    until gv3-int has switched; then remove it, and point the Critic docs at engine-4.
   - Still in flight: behave (ADR-935-936), uireach (ADR-937-939), cihealth (ADR-940-941 and the partition).
     Queued for the next engine round:
     - two moons, and the moon's controls;
