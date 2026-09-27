@@ -70,6 +70,20 @@ where its predecessor stopped.
   routes that respect connected regions, no pacing on urgent reactions, and the evaluator hook passing `--world-preview`.
 - **gv3-cast iteration 2 played all five events,** E4 included (cow-23 and cow-12 at 111.917 s). Ember's drop-time
   pacing is gone (the data workaround). Iteration 3's trace verifies the float fix.
+- **gv3-cast is DONE and MERGED into `gv3/production` (`c7d0a763`, 14:35).** Report: `phase3/cast.md` and the
+  agent's hand-back. Evidence: `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cast/`.
+  - **E1-E5 play on their beats:** E1 beam 13.900; E2 cross 26.650; E3 lift 66.967 (bull-10); E4 lift 103.883
+    (cow-23 and cow-12); E5 beam 170.350 and lift 172.783 (horse-11). Each alien's watch times are in
+    `build/gv3/ufo-beats.json`; vane watches 172.15-180.30, which covers s28.
+  - **The float is fixed.** Walking p90 is about 0.1 m for every alien, and the Critic's float findings went from
+    medium to low. To restore the springier walk, put the old values back in `ALIEN_BOUNCE`.
+  - **ADR-910, whole film:** alien stands are under 8 s except while watching E5. Animals: 0 reversals (from 27),
+    6 turns over 90° (from 129), 5.2 s on steep ground (from 480 s).
+  - **Left for navfix:** ember on the river bank (22-38 s and 206-221 s), and ADR-934.
+  - **Sent to gv3-look:** E5's clipped highlights at 175.76 s (the horse's glow cues peak at the first pass's
+    values), and five inert routes (the scout beam's four audio routes and tide's sway).
+  - **After navfix and gv3-world merge, re-trace the whole film.** The aliens' paths will move; the set pieces
+    will not.
 - **NEW ENGINE DEFECT (13:10), assigned to navfix as ADR-934: a retired body stays in the world.** A set piece's
   taken animals keep walking invisibly, and they still block the aliens and draw their attention. `StepKind::Retire`
   only hides the body; the crowd and body index take every active entity. On GV3, rook walked in place for 5.25 s
