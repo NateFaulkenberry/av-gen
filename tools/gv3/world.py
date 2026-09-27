@@ -183,6 +183,7 @@ GRID_LO, GRID_HI, GRID_STEP = -320.0, 352.0, 2.0  # the terrain mesh's chunk gri
 EDGE_BAND = 6.0      # metres inside the grid's boundary where a skyline counts as the edge
 OPEN_RISE = 0.2      # below this rise per metre, ground cut by the boundary reads as land running on
 OPEN_ELEVATION = 5.0 # ...and below this many degrees above the eye, as the sky meeting the land
+LOW_SKY = 0.5        # degrees: sky seen at or below this is sky where the land should have gone on
 SURVEY = 97          # WorldMap::prepare's survey, points a side
 
 
@@ -280,16 +281,34 @@ class Field:
                 continue
             ang = np.degrees(np.arctan2(h - eye[1], d))
             k = int(np.argmax(ang))
+            bottom = pitch - half_v * math.cos(math.radians(off))
+            top = pitch + half_v * math.cos(math.radians(off))
+            x, z = float(eye[0] + math.cos(yaw) * d[k]), float(eye[2] + math.sin(yaw) * d[k])
+            # Sky at or below the horizon: in a world that went on, land would fill it. The skyline can
+            # be anywhere, even below the frame (a gorge's slot seen over the near valley floor).
+            if max(float(ang[k]), bottom) <= LOW_SKY and ang[k] < top:
+                found.append((c, x, z, float(h[k]), float(ang[k])))
+                continue
             if d[k] < d[-1] - EDGE_BAND:
                 continue  # a crest inside the world: the edge is behind it
-            if not (pitch - half_v * math.cos(math.radians(off)) <= ang[k] <= pitch + half_v * math.cos(math.radians(off))):
+            if not (bottom <= ang[k] <= top):
                 continue  # the skyline is out of frame
             back = self.at(eye[0] + math.cos(yaw) * (d[k] - 20.0), eye[2] + math.sin(yaw) * (d[k] - 20.0))
             rise = (h[k] - float(back)) / 20.0
             if rise < OPEN_RISE and ang[k] < OPEN_ELEVATION:
-                found.append((c, float(eye[0] + math.cos(yaw) * d[k]), float(eye[2] + math.sin(yaw) * d[k]),
-                              float(h[k]), float(ang[k])))
+                found.append((c, x, z, float(h[k]), float(ang[k])))
         return found
+
+    def skyline(self, eye, target, vfov_deg, aspect=16 / 9, cols=64):
+        """The skyline's elevation in degrees, per column of the view."""
+        np = self.np
+        yaw0 = math.atan2(target[2] - eye[2], target[0] - eye[0])
+        half_h = math.degrees(math.atan(math.tan(math.radians(vfov_deg / 2)) * aspect))
+        out = []
+        for c in range(cols):
+            d, h = self.ray(eye, yaw0 + math.radians(half_h * (2 * (c + 0.5) / cols - 1)))
+            out.append(float(np.degrees(np.arctan2(h - eye[1], d)).max()) if len(d) else -90.0)
+        return np.array(out)
 
 
 def camera_poses(project, scene, per_shot=5):
@@ -375,6 +394,15 @@ def check(source_world, world, project, scene, trace=None):
                  f"views with an open end: {sum(v[1] for v in shots.values())}")
     for k, v in sorted(bad.items()):
         lines.append(f"  {k}: an open end in {v[1]} of {v[0]} views (up to {v[2]} of 96 columns)")
+    # 5. how much taller the world stands than before, per shot: a closure should raise the skyline
+    # where the valley ran out and nowhere else. Reported, not judged: the look is judged on stills.
+    rises = {}
+    for label, t, eye, target, vfov in poses:
+        r = float((after.skyline(eye, target, vfov) - before.skyline(eye, target, vfov)).max())
+        rises[label] = max(rises.get(label, 0.0), r)
+    top = sorted(rises.items(), key=lambda kv: -kv[1])[:6]
+    lines.append("largest skyline rise over the source world (degrees): " +
+                 ", ".join(f"{k} {v:.1f}" for k, v in top))
     return lines, ok
 
 
