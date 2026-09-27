@@ -599,7 +599,7 @@ def ember_watches(t0, t1, g):
     # both in frame the whole shot in each. (Iteration 2 rode over her shoulder with a fixed target:
     # she stood in the bottom corner behind the ferns, and on gv3-cast's cast out of frame; an
     # over-the-shoulder that holds the saucer puts the eye on the rising bank behind her.)
-    r = aim_at(32.0, g(-106, 36, 3.0), "ember", (13.0, 5.0, 6.0), "walker")
+    r = aim_at(32.0, g(-106, 36, 3.0), "ember", (13.0, 5.0, 6.0), "watch")
     return r, dict(lead="alien", purpose="Ember on the west bank, the saucer settling over the elder beyond",
                    subject="ember on the west bank, the saucer settling over the elder beyond",
                    camera="32 mm, up the west bank 18 m behind her, live aim", movement="still",

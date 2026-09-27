@@ -30,6 +30,11 @@ SMOOTHING = {
     # 0.071 (the model of the engine's kernel on the trace), and the aim trails the craft by under a
     # degree. Not for a craft on the move: the approach into a station trails by 18 deg at 1 s.
     "hover": (1.0, 1.5, 0.0, False),
+    # A fixed eye watching a walker 15-25 m off: only the aim moves, so the stride's sway reads as yaw
+    # with nothing else in the frame moving. The walker values gave 0.105 deg of yaw HF on 91.1 (gv3-
+    # cast's final cast); 0.6 s with half the lead gives 0.079 (0.019 on the preview cast), the aim
+    # trailing the walker by under 2 deg.
+    "watch": (0.6, 1.2, 0.5, True),
     "still": (0.0, 0.0, 0.0, False),      # an idle or static subject: nothing to smooth (s10, s17, s05)
     "lifted": (0.0, 0.0, 0.0, False),     # the subject's rise is the shot (s29)
 }
