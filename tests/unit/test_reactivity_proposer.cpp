@@ -333,3 +333,28 @@ TEST_CASE("A wave field on the transport clock is named, not routed: it would le
     const ReactivityProposal q = proposeReactivity(bare.facts().capabilities.reactive(), gladeMusic());
     CHECK(noteSays(q, "no glowing layer names a wave field"));
 }
+
+// ADR-916: the water's tears are proposed at the paths the water stream registers them under. Off (their
+// amount at 0, where the tear code is compiled out) nothing routes to any of them -- the control; on, the
+// amount follows the section, slowly, and the shear and coverage are left alone (they move the ripples
+// inside a seam as they change).
+TEST_CASE("The proposal lifts the water's tears with the section once they are on, and not while they are off",
+          "[directing][reactivity][proposer][adr927][tears]") {
+    Glade glade;
+    const std::string base = "nodes/meadow/water/tears/";
+    const ReactivityProposal off = proposeReactivity(glade.facts().capabilities.reactive(), gladeMusic());
+    for (const char* leaf : {"amount", "shear", "coverage"}) {
+        INFO(leaf);
+        CHECK(routesTo(off.plan, base + leaf).empty());
+    }
+    auto* amount = glade.engine.params().findAs<float>(base + "amount");
+    REQUIRE(amount != nullptr);
+    amount->setBase(0.4f);
+    const ReactivityProposal on = proposeReactivity(glade.facts().capabilities.reactive(), gladeMusic());
+    const PlanRoute& lift = only(on.plan, base + "amount");
+    CHECK(lift.route.source == "section.energy");
+    CHECK(lift.route.op == params::ModOp::Multiply);
+    CHECK(lift.route.chain.attackMs >= 1000.0f); // slowly
+    CHECK(routesTo(on.plan, base + "shear").empty());
+    CHECK(routesTo(on.plan, base + "coverage").empty());
+}
