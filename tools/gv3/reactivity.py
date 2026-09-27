@@ -217,8 +217,20 @@ def wave_tracks():
 # ember, ridge and scree only the section changes -- and even the elder's heartbeat did not read close
 # up: its gills rest at the tone curve's shoulder, a flat peach on and off the kick (the gold pixels'
 # luma x0.98-1.00 at 50 ms against 300 ms after a kick, in 121.1, 65.1 and 47.1), so +60-100% had no
-# headroom. So the undersides now rest darker (HERO_REST) and flare far higher: the boost is
+# headroom. So the undersides now rest darker (HERO_PULSE) and flare far higher: the boost is
 # rest + amount x depth x the hit, the depth the section's energy between HERO_DEPTH_MIN and 1.
+#
+# Calibrated on the picture (gv3-int round 2). The first attempt (rest 0.4, +2.2, falls of 260-340 ms)
+# moved the elder's gill pixels +1-3% (p90) and +7-11% (mean) in s01 and 9.1: two causes, both measured.
+# (1) A route's fall is a time constant, not a length: 260 ms leaves 32% of a hit 300 ms later and 18%
+# when the next kick lands 0.46 s after it, so the gills never came down between kicks. (2) The boost
+# does not reach the picture linearly: stepping each hero's gills and underside through x0.05-3.2 on
+# frames (the ladder variant `vL`, build/gv3/int/vL/ladder-sheet.png) put the elder's close-up gills at
+# p90 luma 0.47 at x0.1, 0.67 at x0.2 and 0.76 at x0.4 -- already the tone curve's shoulder, past which
+# they only turn peach and clip (15% of them at x0.8, 30% at x3.2). So each hero rests where it is lit
+# but dim and flares to where it is brightest before it clips, its own numbers because the heroes'
+# materials differ by 20x (the elder's gills emit 3.0, the veil's 0.22), and each lane's fall lets the
+# glow come down before its next hit.
 HERO_LANES = {
     #  hero        lane (a scored timeline source)   extra delay (ms)
     "elder-2": ("timeline.kick", 0.0),
@@ -232,37 +244,68 @@ HERO_LANES = {
     "ridge": ("timeline.clap", 80.0),
     "scree": ("timeline.kick", 90.0),
 }
-# Per part: (amount at full depth, the part's own stagger, the fall). The gills first and fastest, the
-# underside 35 ms later, the cap 70 ms later and gentler (it rests at 1: it is the mushroom's colour).
-HERO_PARTS = {"gills": (2.2, 0.0, 260.0), "under": (2.2, 35.0, 300.0), "cap": (0.9, 70.0, 340.0)}
-HERO_SPORES = (1.0, 90.0, 420.0)
-HERO_REST = {"gills": 0.4, "under": 0.4}   # the parts' resting emissiveBoost (was 1.0)
-HERO_DEPTH_MIN = 0.5                        # the quietest section still pulses at half (was 0.188)
+# The gills' and underside's emissiveBoost at rest and at a full-depth hit (the ladder: where each is
+# dim but lit, and where it is brightest short of clipping). The p90 luma of the lit pixels rest ->
+# peak on the ladder: elder 0.47 -> 0.76 (+60%, close-up), lantern 0.37 -> 0.63, bloom 0.27 -> 0.41,
+# umbra 0.38 -> 0.55, spire 0.31 -> 0.46, cairn 0.33 -> 0.65, veil 0.40 -> 0.56, ember 0.41 -> 0.69,
+# ridge 0.19 -> 0.35, scree 0.48 -> 0.71.
+HERO_PULSE = {
+    #  hero        rest   peak
+    "elder-2": (0.10, 0.60),
+    "lantern": (0.20, 3.2),
+    "bloom": (0.12, 3.2),
+    "umbra": (0.20, 3.2),
+    "spire": (0.20, 3.2),
+    "cairn": (0.20, 1.6),
+    "veil": (0.20, 3.2),
+    "ember": (0.20, 1.0),
+    "ridge": (0.20, 3.2),
+    "scree": (0.20, 1.6),
+}
+# Each lane's fall (the time constant, ms): the glow is down to 5% three of them after the hit, so a
+# kick every 0.46 s comes down in 0.3 s; the claps and off-beats (every 0.92 s) ring a little longer,
+# and the once-a-bar lanes longest -- the "250-350 ms tail" the owner asked for, as seen, not as typed.
+LANE_FALL = {"kick": 100.0, "clap": 150.0, "offbeat": 150.0, "beat3": 220.0, "downbeat": 220.0}
+# Per part: (the share of the hero's rise, its own stagger, the extra fall). The gills first and
+# fastest, the underside 35 ms later, the cap 70 ms later and gentler (it rests at 1: it is the
+# mushroom's colour, and adds a third of the hero's rise at most).
+HERO_PARTS = {"gills": (1.0, 0.0, 0.0), "under": (1.0, 35.0, 15.0), "cap": (0.3, 70.0, 30.0)}
+HERO_SPORES = (1.0, 90.0, 60.0)
+HERO_DEPTH_MIN = 0.7                        # the quietest section still pulses at 70% (was 0.188, then 0.5)
 # The elder's own light throws its heartbeat on the ground and the plants round it: the spill that
-# makes the pulse read in the wides, where the gills are a few pixels.
-ELDER_LIGHT = {"amount": 2.5, "decayMs": 320.0}
+# makes the pulse read in the wides, where the gills are a few pixels. It rests at half the rig's 3.0 and
+# flares to x5 on the kick.
+ELDER_LIGHT = {"rest": 1.5, "amount": 6.0}
 _DEPTH = {"depthSource": "section.energy", "depthMin": HERO_DEPTH_MIN, "depthMax": 1.0}
 _CHAIN = {"attackMs": 5.0, "envelope": "none", "remapEnabled": False, "curve": "linear", "threshold": "none"}
+
+
+def hero_rest(hero, part):
+    """A hero part's resting emissiveBoost: HERO_PULSE's rest for the gills and underside, 1 otherwise."""
+    return HERO_PULSE[hero][0] if part in ("gills", "under") else 1.0
 
 
 def _hero_edits():
     out = []
     for hero, (source, lane_delay) in HERO_LANES.items():
         lane = source.split(".", 1)[1]
-        for part, (amount, stagger, decay) in HERO_PARTS.items():
+        rest, peak = HERO_PULSE[hero]
+        for part, (share, stagger, fall) in HERO_PARTS.items():
+            amount = round(share * (peak - rest), 3)
             out.append((f"*.{hero}-{part}",
                         dict(_DEPTH, source=source, op="add", amount=amount, polarity="unipolar",
-                             chain=dict(_CHAIN, decayMs=decay, delayMs=lane_delay + stagger)),
-                        f"the {lane} lane, +{amount:g} at full depth over a resting {HERO_REST.get(part, 1.0):g}"))
-        amount, stagger, decay = HERO_SPORES
+                             chain=dict(_CHAIN, decayMs=LANE_FALL[lane] + fall, delayMs=lane_delay + stagger)),
+                        f"the {lane} lane, +{amount:g} at full depth over a resting {hero_rest(hero, part):g}"))
+        amount, stagger, fall = HERO_SPORES
         out.append((f"*.{hero}-spores",
                     dict(_DEPTH, source=source, op="multiply", amount=amount, polarity="unipolar",
-                         chain=dict(_CHAIN, decayMs=decay, delayMs=lane_delay + stagger)),
+                         chain=dict(_CHAIN, decayMs=LANE_FALL[lane] + fall, delayMs=lane_delay + stagger)),
                     f"the {lane} lane"))
     out.append(("kick.elder-practical",
                 dict(_DEPTH, source="timeline.kick", amount=ELDER_LIGHT["amount"],
-                     chain=dict(_CHAIN, decayMs=ELDER_LIGHT["decayMs"])),
-                "the scored kicks: the light the elder throws carries its heartbeat onto the ground round it"))
+                     chain=dict(_CHAIN, decayMs=LANE_FALL["kick"] + 10.0)),
+                f"the scored kicks: the light the elder throws carries its heartbeat onto the ground round it, "
+                f"x{(ELDER_LIGHT['rest'] + ELDER_LIGHT['amount']) / ELDER_LIGHT['rest']:g} at a full-depth kick"))
     return out
 
 
@@ -274,20 +317,24 @@ def _hero_edits():
 # +0.18-0.35 (which gv3-look found did not read at 540p) and the elder's rings, which fade out by 45 m.
 # The light the layers cast follows their gain (ADR-905), so the ground round them pulses with them.
 # The elder's rings and the drop's ring stay on top (their fields multiply the same emission).
+# Measured at +1.6 with a 260 ms fall (r2b): in 5.1 and 9.1 the violet fungi's pixels grew 22-26% at a
+# kick, their luma x1.01-1.12; in the grand wides the fog left 13-53 violet pixels in the whole frame to
+# pulse (the air at half brings back 83 in 41.1). So a bigger hit on each lane's fall (LANE_FALL), which
+# lets each come down before the next: the kick's fungi from a trough of about x1.5 to x1 between kicks.
 SCATTER_PULSES = {
-    #  item            lane                 amount  delay  fall
-    "kick.fungi": ("timeline.kick", 1.6, 60.0, 260.0),
-    "hats.shelf-fungi": ("timeline.offbeat", 1.5, 0.0, 220.0),
-    "clap.beacons": ("timeline.clap", 1.4, 60.0, 220.0),
-    "hats.flowers": ("timeline.offbeat", 0.6, 30.0, 200.0),
+    #  item            lane                 amount  delay
+    "kick.fungi": ("timeline.kick", 3.0, 60.0),
+    "hats.shelf-fungi": ("timeline.offbeat", 2.4, 0.0),
+    "clap.beacons": ("timeline.clap", 2.2, 60.0),
+    "hats.flowers": ("timeline.offbeat", 0.9, 30.0),
 }
 
 
 def _scatter_edits():
     return [(item, dict(_DEPTH, source=source, amount=amount, op="add", polarity="unipolar",
-                        chain=dict(_CHAIN, decayMs=decay, delayMs=delay)),
+                        chain=dict(_CHAIN, decayMs=LANE_FALL[source.split(".", 1)[1]], delayMs=delay)),
              f"the {source.split('.', 1)[1]} lane, +{amount:g} at full depth")
-            for item, (source, amount, delay, decay) in SCATTER_PULSES.items()]
+            for item, (source, amount, delay) in SCATTER_PULSES.items()]
 
 
 EDITS = _hero_edits() + _scatter_edits() + [
@@ -429,11 +476,14 @@ def install(project, tuned):
     project["sources"] = [s for s in project.get("sources", []) if (s["kind"], s["name"]) not in names] + \
         tuned["sources"]
     project.setdefault("parameters", {}).update(tuned["parameters"])
-    # The heroes' undersides rest darker, so each hit flares out of the dark (HERO_REST): the parameter
+    # The heroes' undersides rest darker, so each hit flares out of the dark (HERO_PULSE): the parameter
     # an artist sees as the part's emissive boost in the Parameters panel, under nodes/<hero>-<part>.
     for hero in HERO_LANES:
-        for part, rest in HERO_REST.items():
-            project["parameters"][f"nodes/{hero}-{part}/emissiveBoost"] = rest
+        for part in ("gills", "under"):
+            project["parameters"][f"nodes/{hero}-{part}/emissiveBoost"] = hero_rest(hero, part)
+    # And the elder's light rests lower, so its kick throws a ring of light round it (the Lights panel's
+    # elder-practical intensity; the rig's own 3.0 is GV2's, shared, and not edited).
+    project["parameters"]["lightrig/GlowmereValley/elder-practical/intensity"] = ELDER_LIGHT["rest"]
     plans = [p for p in project.get("directingPlans", []) if p.get("id") != tuned["plan"]["id"]]
     project["directingPlans"] = plans + [tuned["plan"]]
 
