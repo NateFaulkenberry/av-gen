@@ -4,15 +4,17 @@
 
 applies this, and nothing else does: without `--final` the project keeps its preview settings, so a
 preview renders as fast as it always did. What follows is docs/glowmere-valley-3/revision/audit/
-reports/render-post.md's recommended configuration, each value with the reason it is the one.
+reports/render-post.md's recommended configuration, each value with the reason it is the one, less
+its fog march, which measured as a different look rather than a better render (below).
 
 The engine's offline tier already lifts everything that is a *cost* (ADR-186/191: the procedural
 distance cull, the rig pose rate and the entity behaviour bands). What it leaves alone is what the
 engine treats as *composition*, and those the scene has to author (ADR-112, docs/rendering.md):
-how far shadows reach, how many cascades, how far terrain is drawn at full detail, whether the fog is
-marched. Raising a distance the tier already lifted changes nothing; these are the ones that do.
+how far shadows reach, how many cascades, how far terrain is drawn at full detail. Raising a distance
+the tier already lifted changes nothing; these are the ones that do.
 
-Post (tone map, bloom, grain and the rest) is not here: gv3-look and the render stream own it.
+Post (tone map, bloom, grain and the rest) and the atmosphere are not here: gv3-look and the render
+stream own them, and a final should show what the previews showed, only finer.
 """
 
 import math
@@ -48,18 +50,18 @@ SHADOW_CASCADES = 0
 # drawn at LOD 1-2, 15-26 px per quad at both 1080p and 4K: faceted ridgelines.
 TERRAIN_VIEW_DISTANCE = 1000.0
 
-# The fog march. The project's `scene/volumeMaxDistance` 0 switched the march off (ADR-705: 0 means
-# the closed form carries the whole ray), so the scene's noise, local lights and step count were all
-# inert. 220 m is ADR-705's flagship reach for Glowmere, 32 steps its offline count, jitter 0.5 the
-# ADR-461 value, and horizon density 1 the knob ADR-705 measured matching the far band's veil.
-MARCH = {"scene/volumeMaxDistance": 220.0, "scene/volumeSteps": 32, "scene/volumeJitter": 0.5,
-         "scene/horizonDensity": 1.0}
-# The march lights the air it covers, which the closed form never did. Per step its extinction is
-# density x volumeAbsorption and its in-scattering density x volumeScattering (shaders/volume.wgsl), so
-# the arc's density -- gv3-look's, keyed on the timeline, and every route onto it -- is left exactly as
-# the previews have it, which keeps the veil (the extinction) the same, and the light the march adds
-# is set here. Calibrated on 4K ranges against the preview (phase3/world.md).
-MARCH_SCATTERING = 0.5
+# The fog is left exactly as the previews have it: the closed form, no march. render-post.md
+# recommended marching it (220 m, 32 steps, jitter 0.5, horizon density 1), because with the project's
+# `scene/volumeMaxDistance` 0 the scene's noise, local lights and step count are inert. Measured on the
+# closed valley (phase3/world.md, F2), that march is not a quality setting in this scene:
+# - it halves the picture: s14's mean luma goes from 51.8 to 26-33 at scattering 0.25-1.0;
+# - the Critic compares the two 4K clips at -46% luma, a mean delta E of 16, and +27% jitter.
+# The closed form fills distance with `fogColor`, a navy that reads bright at night. The march fills
+# its reach with in-scattered moonlight, which is far darker, and it fogs the sky too, which the closed
+# form never does. It is a different look, not a finer render of this one, and it would be seen for
+# the first time in the final. If gv3-look wants a marched atmosphere, it belongs in the previews,
+# with `scene/volumeEmission` equal to `scene/volumeAbsorption`: the march then carries the closed
+# form's navy fill exactly, and its noise and local-light scattering come on top.
 
 
 def _set_track(project, target, keys):
@@ -150,14 +152,10 @@ def apply(project, scene, report, trace=None):
     params["scene/shadowRange"] = SHADOW_RANGE
     _set_track(project, "scene/shadowRange", keys)
 
-    params.update(MARCH)
-    params["scene/volumeScattering"] = MARCH_SCATTERING
-
     rigs = [n for n in scene["nodes"] if "animation" in n]
     for n in rigs:
         n["animation"]["updateHz"] = 0  # every frame: at 30 Hz in a 60 fps film distant bodies slid
     report.append(f"final: {RENDER['width']}x{RENDER['height']} x{RENDER['supersample']:g}, tier {RENDER['tier']}, "
                   f"limits {RENDER['limits']}, {RENDER['codec']}; shadows {SHADOW_RANGE:g} m "
                   f"({SHADOW_RANGE_WIDE:g} m on {len(wides)} wides: {', '.join(wides)}), terrain LOD 0 to "
-                  f"{TERRAIN_VIEW_DISTANCE:g} m, the fog marched to {MARCH['scene/volumeMaxDistance']:g} m at "
-                  f"scattering {MARCH_SCATTERING:g}, {len(rigs)} rigs posed every frame")
+                  f"{TERRAIN_VIEW_DISTANCE:g} m, the fog as previewed, {len(rigs)} rigs posed every frame")
