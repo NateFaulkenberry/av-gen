@@ -737,14 +737,14 @@ def crane_over_the_valley(t0, t1, g):
 @at("111.1")
 def tide_to_the_spire(t0, t1, g):
     # [s38] As the mids lift for the last push, Tide walks the north end toward the lit spire: a chase
-    # 4 m behind her and 3 m up, looking past her at it. Tide left of centre, the spire upper right.
-    # Her path here is the same on both casts, and the eye runs where she has just walked (84% of
-    # the shot), clear of the undergrowth. (Iteration 2 followed Vane from beside her path, and the
-    # lens went through a plant for two thirds of the shot; nor did Vane walk toward the horse's
-    # place on either cast.)
-    r = follow(28.0, "tide", (-3.46, 3.0, 2.0), (8.0, 1.2, -3.0))
+    # 5 m behind her and 3.4 m up, looking past her at it. Tide 0.6 of the frame's height, her head
+    # just right of centre, the spire clear of it upper right. Her path here is the same on both
+    # casts, and the eye runs where she has just walked (76% of the shot), clear of the undergrowth.
+    # (Iteration 2 followed Vane from beside her path, and the lens went through a plant for two
+    # thirds of the shot; nor did Vane walk toward the horse's place on either cast.)
+    r = follow(24.0, "tide", (-4.33, 3.4, 2.5), (8.0, 1.2, -6.0))
     return r, dict(lead="alien", purpose="Tide walks the north end toward the lit spire", subject="tide, the spire beyond",
-                   camera="28 mm chase, 4 m behind and 3 m up", movement="tracks", music="the last push, bar 111")
+                   camera="24 mm chase, 5 m behind and 3.4 m up", movement="tracks", music="the last push, bar 111")
 
 
 @at("113.1")
