@@ -36,7 +36,12 @@ SMOOTHING = {
     # trailing the walker by under 2 deg.
     "watch": (0.6, 1.2, 0.5, True),
     "still": (0.0, 0.0, 0.0, False),      # an idle or static subject: nothing to smooth (s10, s17, s05)
-    "lifted": (0.0, 0.0, 0.0, False),     # the subject's rise is the shot (s29)
+    # A lifted animal (95.3, the horse in E5's beam): its rise is the shot, so the height is not smoothed
+    # (vertical 0: ADR-913's exception, the pitch HF is the rise). Sideways it hangs under a craft that
+    # sways 0.3 m at 0.45 Hz on its station, which an 85 mm aim turned into 0.128 deg of yaw HF on the
+    # merged film (gv3-int r1); 0.5 s horizontally gives 0.069 (gv3-cut's model of the engine's kernel,
+    # which reproduces r1's aim to 0.01 m), the aim trailing the horse by under 0.9 deg.
+    "lifted": (0.5, 0.0, 0.0, False),
 }
 
 import math
