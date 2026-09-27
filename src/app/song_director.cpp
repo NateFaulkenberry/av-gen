@@ -1559,6 +1559,14 @@ Result<SongDirection> directSong(const SongPlan& plan, const DirectionBrief& bri
             }
             const double eventEnd = peakEvent == nullptr ? a : std::max(peakEvent->seconds, peakEvent->endSeconds);
             holdUntil = std::min(b, std::max(eventEnd, a + phraseSeconds));
+            // On the grid, the phrase ends on a bar line, not on eight median bars from the start:
+            // those land a few milliseconds past the tracked line, and a shot starting *on* the next
+            // phrase would count as inside this one.
+            if (gridded) {
+                if (const auto k = grid.nearestDownbeat(holdUntil, 0.5 * grid.barSeconds())) {
+                    holdUntil = std::min(b, grid.beatTimes[*k]);
+                }
+            }
         }
         std::vector<std::size_t> subjectIndex(shotCount, 0);
         std::vector<std::string> subjectReason(shotCount);
@@ -1567,7 +1575,7 @@ Result<SongDirection> directSong(const SongPlan& plan, const DirectionBrief& bri
             int heldFor = 0;
             bool holding = false;
             for (std::size_t k = 0; k < shotCount; ++k) {
-                if (peakSubject && (k == 0 || layout.cuts[k] < holdUntil - 1e-6)) {
+                if (peakSubject && (k == 0 || layout.cuts[k] < holdUntil - std::max(0.25 * beatSeconds, 1e-6))) {
                     subjectIndex[k] = *peakSubject;
                     subjectReason[k] = peakEvent != nullptr
                                            ? fmt::format("event '{}' at {:.2f} s (peak)", peakEvent->name, peakEvent->seconds)

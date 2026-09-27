@@ -1269,6 +1269,27 @@ TEST_CASE("A peak section goes to its event's subject, else to the film's hero",
     CHECK(heroSection.peak);
     CHECK(heroShot.subject == "elder");
 
+    // The hold ends on the first phrase line (4 bars, 8 s here): every shot that starts before it is
+    // the peak's subject, and a shot starting on it is the rotation's again.
+    {
+        auto d = app::directSong(planWith(1.0f), threeHeroBrief(), threeCameras(), gridded(grid));
+        REQUIRE(d.has_value());
+        const app::SongSectionCut& chorus = d->sections[1];
+        const double phraseEnd = chorus.startSeconds + 8.0;
+        bool afterPhrase = false;
+        for (std::size_t i = chorus.firstShot; i < chorus.firstShot + chorus.shotCount; ++i) {
+            const app::SongDecision& s = d->decisions[i];
+            INFO(s.line() << " -- " << s.subjectReason);
+            if (s.startSeconds >= phraseEnd - 1e-6) {
+                afterPhrase = true;
+                CHECK(s.subjectReason == "rotation");
+            } else {
+                CHECK(s.subjectReason != "rotation");
+            }
+        }
+        CHECK(afterPhrase);
+    }
+
     // Control: the same chorus with an ordinary push is no peak, and the event does not take it.
     app::SongPlan ordinary = planWith(0.4f);
     ordinary.events = withEvent.events;
