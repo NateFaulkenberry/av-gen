@@ -447,6 +447,44 @@ TEST_CASE("a decider that has stood maxStillSeconds is sent on its way", "[decid
     CHECK(walked.behaviour.longestStillSeconds < kLimit + 1.5);
 }
 
+TEST_CASE("a restless decider with nothing on offer that walks takes a walk of its own",
+          "[decide][adr909][still]") {
+    // GV3's `sage`, measured with the recommended settings: at its post, its limit made it restless,
+    // and the only options were the post (already reached, a stand) and `idle` -- both of which stand,
+    // so both were refused, nothing was chosen, and it stood 26 s against a limit of 10. Here the
+    // same shape with nothing else in the world: a post at its own anchor and an `idle`.
+    const auto run = [](double maxStill) {
+        nlohmann::json decide = {
+            {"hertz", 2.0},
+            {"maxStillSeconds", maxStill},
+            {"considerers",
+             {{{"kind", "holdPost"}, {"name", "post"}, {"weight", 0.5}, {"tolerance", 3.0}, {"duration", 2.0}},
+              {{"kind", "idle"}, {"name", "idle"}, {"weight", 0.2}}}},
+        };
+        CastMember m;
+        m.name = "keeper";
+        m.seed = 99;
+        m.gait.walkSpeed = 2.0f;
+        m.behaviors.push_back(behavior("decide", decide));
+        CastWorld w({m});
+        w.play(120.0);
+        return std::pair(w.quality("keeper"), debugOf(w.body("keeper")));
+    };
+    const auto [stood, stoodDebug] = run(0.0);
+    WARN(fmt::format("no limit: longest still {:.1f} s, {:.0f} m travelled", stood.behaviour.longestStillSeconds,
+                     stood.motion.travelMetres));
+    CHECK(stood.behaviour.longestStillSeconds > 110.0); // the control: nothing ever walks it anywhere
+    CHECK(stoodDebug.strolls == 0);
+
+    constexpr double kLimit = 6.0;
+    const auto [walked, walkedDebug] = run(kLimit);
+    WARN(fmt::format("maxStillSeconds {:.0f}: longest still {:.1f} s, {} walks of its own, {:.0f} m travelled",
+                     kLimit, walked.behaviour.longestStillSeconds, walkedDebug.strolls, walked.motion.travelMetres));
+    CHECK(walkedDebug.strolls > 3);
+    CHECK(walked.motion.travelMetres > 40.0);
+    CHECK(walked.behaviour.longestStillSeconds < kLimit + 1.5);
+}
+
 TEST_CASE("maxStillSeconds cuts a long look short, even in the middle of an aware plan",
           "[decide][adr909][still]") {
     // The other way a body stands: an aware decider (as every GV3 alien is) on an errand whose look

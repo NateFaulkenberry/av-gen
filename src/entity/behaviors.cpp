@@ -2,6 +2,7 @@
 
 #include "core/log.hpp"
 #include "core/noise.hpp"
+#include "core/rng.hpp"
 #include "entity/entity.hpp"
 #include "entity/airborne.hpp"
 #include "entity/grounding.hpp"
@@ -2640,6 +2641,7 @@ public:
         stillStarted_ = false;
         restless_ = false;
         stillBreaks_ = 0;
+        strolls_ = 0;
         departures_.clear();
         // Phase D. Everything the awareness layer and the trace hold is simulation state, so a seek
         // clears it and the replay rebuilds it (D4).
@@ -2893,19 +2895,32 @@ public:
         const std::uint64_t before = selector_.tick();
         const bool startedBefore = selector_.started();
         const bool changed = selector_.select(dctx, views_);
-        if (!startedBefore || selector_.tick() != before) {
+        const bool ticked = !startedBefore || selector_.tick() != before;
+        if (ticked) {
             publish();
         }
-        if (!changed) {
-            publishIntent(ctx, state);
-            return;
-        }
         const std::size_t chosen = selector_.chosen();
-        if (chosen >= selector_.options().size()) {
+        if (!changed || chosen >= selector_.options().size()) {
+            // ADR-909: restless, and this decision found nothing on offer that walks -- so the body
+            // takes a short walk of its own (`stroll`). Without it `maxStillSeconds` held only when
+            // a considerer happened to offer somewhere to go: measured on GV3 with the recommended
+            // settings, `sage` reached its post, its limit made it restless, the post (reached) and
+            // `idle` were the only options and both stand, and it stood 26 s against a limit of 10.
+            if (restless_ && ticked) {
+                stroll(ctx, state, dctx.seed, selector_.tick());
+            }
             publishIntent(ctx, state);
             return;
         }
         const Option& winner = selector_.options()[chosen];
+        // ADR-909: a walk of its own in progress (`stroll`) is not cut short for a choice that stands
+        // -- that choice is what made the body restless -- only for one that walks, or an order, or
+        // something urgent. The choice is forgotten, so it is asked again when the walk is over.
+        if (strolling(ctx) && winner.urgency <= 0.0f && !winner.directed && !walksAway(winner, state.position())) {
+            selector_.forget();
+            publishIntent(ctx, state);
+            return;
+        }
         // `override` rather than `push`: a new decision *replaces* the routine, and whatever the
         // routine was in the middle of is reported Cancelled rather than dropped in silence. A
         // push would queue the new errand behind the abandoned one, which is the opposite of
@@ -2948,6 +2963,7 @@ public:
         out.remembered = memory_.remembered();
         out.stalls = stalls_;
         out.stillBreaks = stillBreaks_;
+        out.strolls = strolls_;
         out.restless = restless_;
         out.intent = committed_.intent;
         out.subject = committed_.subjectName;
@@ -3233,6 +3249,67 @@ private:
         }
     }
 
+    // ADR-909: a restless body with nothing on offer that walks takes a short walk -- 6 to 14 m, in
+    // the 60-degree cone about the way it faces, on its turning circle (ADR-907's destination query),
+    // the whole circle if the cone is closed -- and is on its way, so the limit holds whatever its
+    // considerers offer. Drawn from (seed, decision tick), a pure function of time, so a scrub takes
+    // the walk the play took. Not while an order holds the body, and not while it is already walking
+    // somewhere. Where it set out from is a departure like any other, so it does not stroll straight
+    // back; the next thing it chooses, or the next time it has stood too long, moves it on.
+    void stroll(const BehaviorContext& ctx, const EntityState& state, std::uint32_t seed, std::uint64_t tick) {
+        if (ctx.nav == nullptr || ctx.actions == nullptr) {
+            return;
+        }
+        if (ctx.actions->running() && ctx.actions->authority() != Authority::Routine) {
+            return;
+        }
+        if (const ActionDesc* running = ctx.actions->current(Authority::Routine);
+            running != nullptr && running->kind == ActionKind::Move) {
+            return;
+        }
+        const glm::vec3 here = state.position();
+        const glm::vec2 flat(here.x, here.z);
+        Rng rng = Rng::forFrame(seed, tick, kStrollStream);
+        DestinationRequest request;
+        request.minRadius = 6.0f;
+        request.maxRadius = 14.0f;
+        request.heading = state.yaw;
+        request.spread = 60.0f / kDegrees;
+        request.turnRadius = ctx.gait != nullptr ? ctx.gait->turnRadius : 0.0f;
+        glm::vec2 to(0.0f);
+        bool found = ctx.nav->pickDestination(rng, flat, request, to);
+        if (!found) {
+            request.spread = kPi;
+            request.turnRadius = 0.0f;
+            found = ctx.nav->pickDestination(rng, flat, request, to);
+        }
+        if (!found) {
+            return; // boxed in: nothing a short walk can do
+        }
+        ActionDesc walk;
+        walk.kind = ActionKind::Move;
+        walk.name = "stroll";
+        walk.target.kind = TargetKind::Point;
+        walk.target.point = glm::vec3(to.x, ctx.nav->groundHeight(to), to.y);
+        walk.tolerance = 1.0f;
+        walk.arrival = 2.0f;
+        ctx.actions->override(std::vector<ActionDesc>{walk}, Authority::Routine, ctx.time);
+        departures_.push_back(Departure{flat, ctx.time});
+        while (departures_.size() > kDepartures) {
+            departures_.erase(departures_.begin());
+        }
+        restless_ = false;
+        stillFrom_ = here;
+        stillSince_ = ctx.time;
+        ++strolls_;
+    }
+
+    // Whether the routine the body is running is a walk of its own (`stroll`).
+    [[nodiscard]] static bool strolling(const BehaviorContext& ctx) {
+        const ActionDesc* running = ctx.actions != nullptr ? ctx.actions->current(Authority::Routine) : nullptr;
+        return running != nullptr && running->kind == ActionKind::Move && running->name == "stroll";
+    }
+
     // ADR-909: whether an option's actions walk the body anywhere -- a `move` to a point further off
     // than it counts as arrived, or one that follows another body. A stand-off of something already
     // within reach walks nowhere and is a stand, not a departure.
@@ -3274,6 +3351,8 @@ private:
     bool stillStarted_ = false;
     bool restless_ = false;
     std::size_t stillBreaks_ = 0;
+    std::size_t strolls_ = 0;
+    static constexpr std::uint64_t kStrollStream = 0x5357u; // the stroll's own draw (Rng::forFrame)
     std::vector<Departure> departures_;
     static constexpr std::size_t kDepartures = 4;
     std::uint16_t memoryCapacity_ = 8;

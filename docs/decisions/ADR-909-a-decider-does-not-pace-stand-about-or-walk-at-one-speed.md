@@ -9,7 +9,7 @@ commitment boost, variety), ADR-907 and ADR-908
 `Option::directed` (`src/entity/character_ai.hpp`). `Decide`'s still clock and departure memory (`src/entity/behaviors.cpp`).
 `HoldPostConsiderer`'s `duration` and its half-tolerance return. `SpeedRange` on `interest` and `react`, and
 `react`'s `urgentSpeed` (`src/entity/decision.{hpp,cpp}`).
-**Tests:** `tests/unit/test_decider_habits.cpp` (ten cases, each with a control arm);
+**Tests:** `tests/unit/test_decider_habits.cpp` (eleven cases, each with a control arm);
 `tests/unit/test_character_controls_reach.cpp` (where each control is found)
 
 ## Context
@@ -74,6 +74,17 @@ walks, it is `restless`: an option that takes it nowhere is not on offer. An ord
 `Director` tier action running) restarts the clock, because a body a shot holds still is doing what it
 was told. `DecisionDebug` reports `stillBreaks` and `restless`.
 
+**3a. And when nothing on offer walks, it takes a walk of its own** (`stroll`): 6 to 14 m in the
+60-degree cone about the way it faces, on its turning circle (ADR-907's destination query), the whole
+circle if the cone is closed. Drawn from (seed, decision tick), a pure function of time, so a scrub takes
+the walk the play took; not while an order holds the body or it is already walking; where it set out
+from is a departure like any other. A choice that stands does not cut the walk short (that choice is
+what made the body restless); one that walks, an order or something urgent does. Found on GV3 with the
+recommended settings: `sage` reached its post, its 10 s limit made it restless, the post (reached) and
+`idle` were its only options and both stand, so nothing was chosen, and it stood 26 s. Without this the
+limit held only when a considerer happened to offer somewhere to go. `DecisionDebug::strolls` counts
+them.
+
 **4. `holdPost` walks back to half its tolerance, and takes an optional `duration`.**
 - Walking only to the edge of the ring left the body where one step out was "away from the post"
   again. Half way in, it is at its post.
@@ -121,7 +132,9 @@ and watches the walks back appear.
   - With the default, it made 14 stops and 0 round trips inside 20 s. Every errand reached its target,
     and home was reached by way of somewhere else.
 - **Standing is bounded where a scene asks.** An idle-weighted decider stood the whole 180 s. With
-  `maxStillSeconds` 6, its longest stand was 6.0 s, it broke 15 times and walked 180 m.
+  `maxStillSeconds` 6, its longest stand was 6.0 s, it broke 15 times and walked 180 m. A decider whose
+  only options stand (a reached post and `idle`) stood the whole 120 s; with the limit it took 6 walks
+  of its own, covered 93 m, and stood at most 6.4 s.
 - **The loop veto trades a walk back for a wait, where a scene has not asked for a limit.** A body
   whose best option is the place it has just left, with nothing else that walks on offer, now waits
   where it is until the window is over instead of walking straight back. On GV2-multicam, whose file

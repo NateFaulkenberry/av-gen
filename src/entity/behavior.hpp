@@ -300,6 +300,8 @@ struct DecisionDebug {
     // still looking for somewhere to go.
     std::size_t stillBreaks = 0;
     bool restless = false;
+    // Short walks it took of its own because, restless, nothing on offer walked (ADR-909).
+    std::size_t strolls = 0;
 
     // ---- Phase D §40/§41: the rest of "why is this character doing that" -----------------------
     IntentType intent = IntentType::Custom;   // the committed option's intent
