@@ -62,6 +62,15 @@ def list_case_count(binary: str, filters: list[str]) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def cannot_list(binary: str) -> str | None:
+    """Why the binary cannot list its cases at all (a missing library, a crash), or None if it can.
+    Without this, a plan check against a binary that does not start blames every name in the plan."""
+    proc = subprocess.run([binary, "--list-tests"], capture_output=True, text=True)
+    if re.search(r"^(\d+) (?:matching )?test cases?", proc.stdout, re.M):
+        return None
+    return f"{binary} did not list its cases (exit {proc.returncode}): {oneline(proc.stderr or proc.stdout)}"
+
+
 def load_exceptions(path: str) -> dict:
     """tools/ci/hosted-runner-exceptions.txt: {'exclude': {name: reason}, 'needs-assets': {...}}."""
     out = {"exclude": {}, "needs-assets": {}}
@@ -692,6 +701,11 @@ def print_console(r: dict, out: Path) -> None:
 
 def cmd_run(args) -> int:
     exceptions = load_exceptions(args.exceptions)
+    if args.plan:
+        why = cannot_list(args.binary)
+        if why:
+            print(f"::error title=Cannot run the sanitizer plan::{why}")
+            return 2
     # Only exclusions that name exactly one case of this binary AND fall inside this selection.
     # A stale one is reported, not silently kept.
     # A plan part selects by its rest filter; a part of named processes only selects nothing an
@@ -774,6 +788,10 @@ def cmd_plan_check(args) -> int:
     that matches no case (renamed, deleted) or several is an error, so the plan cannot drift quietly."""
     plan = load_plan(args.plan)
     exceptions = load_exceptions(args.exceptions)
+    why = cannot_list(args.binary)
+    if why:
+        print(f"::error title=Sanitizer plan::{why}")
+        return 1
     hosted = [n for n in exceptions["exclude"] if list_case_count(args.binary, [f'"{n}"']) == 1]
     total = list_case_count(args.binary, build_spec("", hosted))
     problems = []
