@@ -117,3 +117,29 @@ rigs, so one range render shows them all; alien shots one candidate a variant, w
 - the post pass (`vP`, brief §14, the audit's recipe in steps: AgX, the bloom, the filmic finish) and the air
   (`vF`, `scene/fogSky` 1.0 / 0.5 / 1.0 at 600 m / 0), step-keyed inside quiet windows of nine and seven shots.
 All wait on the GPU behind the coordinator's navfix suite.
+
+### Batch A: judged (`vA`, rendered 17:38-17:44, alone on the GPU but for CPU suites; every clip exit 0, GPU errors 0)
+Sheets: `build/gv3/int/cand-<shot>.png` (r1's frames above each candidate's).
+- **19.1:** candidate b, a 4 m truck across the view at 1.3 m. The r1 push, the same push at 1.8 m, and a push
+  from further back all meet a fern; the higher, down-looking one grazes one at its end. Applied (`a2378178`).
+- **25.1:** candidate b, from the south-east at 17 m: the lantern whole, its cyan underside (where the clap reads)
+  over the frame, two aliens small below it. The low close-up under the cap (c) was the most striking, and cut
+  the cap at the edge. Applied.
+- **31.1:** candidate d, low from the west through a 24 mm, looking up: the spire's cap against the night sky and
+  the (now single) moon, where every other vantage put it against the lit hillside or a tree. Its first frames
+  start beside a big leaf, so the second half of its arc is being checked whole (batch D).
+- **77.1:** all four low vantages pass `world.py` only because the near bank fills the frame. From the north end
+  the elder and the south end are on one bearing (1.3 and 2.8° east of south), so no view of the elder from there
+  can leave the edge out. The shot is turned round (batch D): the valley's head, where the falls come down, under
+  the aurora -- 675 of 675 searched views north pass, and no shot in the cut shows the head.
+- **106.1:** candidate b, from the south-south-east: the veil whole under the aurora, no slot. Applied.
+- **The riser** (the beam's links dropped, one moon): the haze in 95.3 thins a little and the second moon is gone,
+  but the horse still fills an 85 mm frame through the beam's glow. The cause is the cast, not the beam: the tuned
+  cast moved E5's station 9.5 m, and the first pass's rig, kept by the cut, now sees the horse rise 13 m away
+  instead of 22. Beside the first pass's final (`cmp/riser-fp.png`) its s29 is the bounded column in the night
+  that the plan keeps. 95.3's eye moved back to 22 m (applied); it is judged on r2.
+
+**The heartbeat, looked at close** (the meaningful tier): in the tail (121.1), 65.1 and 47.1 the gold gills are a
+flat peach on and off the kick (the gold pixels' luma ×0.98-1.00 at 50 ms against 300 ms after it): they sit at
+the tone curve's shoulder, so the kick's +60-100% has no headroom close up. The Critic's +1% over the film comes
+from the wider framings. The post A/B's 47.1 window shows whether AgX's shoulder gives it back.
