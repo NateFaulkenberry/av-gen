@@ -402,6 +402,28 @@ the aurora, which confirms that it is a decision for gv3-look, taken in the prev
 The 4K cost of the final without a march is being re-measured with an exclusive GPU (the lock raced
 from 13:00; see the coordinator's note).
 
+## F4: the final as it now stands, against the preview, at 4K (s14, 77 s)
+
+The same instant, 3840x2160 x2:
+
+| Mean luma | preview configuration | final (`c350391b`) | final with the march (`e95db493`) |
+|---|---|---|---|
+| sky top | 47.9 | 47.9 | 36.5 |
+| walls | 44.7 | 44.7 | 24.3 |
+| the saddle in the V | 89.7 | 89.7 | 51.0 |
+| mid valley | 59.2 | 59.1 | 24.2 |
+| whole frame | 52.9 | 52.8 | 28.6 |
+
+The final now differs from the preview by 0.13 levels on average. 0.63% of its pixels change by more
+than 8 levels, all in the mid and far valley (rows 810-1620 of 2160), which is where the
+configuration acts:
+- the moon's shadows now fall there, since the log reads "4 view(s) (4 cascade) at 4096x4096; range
+  300.00 m";
+- the elder, 150 m out, gains a shadowed stem;
+- far plants go through the LOD ladder, where "limits unlimited" drew full meshes.
+
+The same picture, finer (`build/gv3w/k4/diff-preview-vs-final2-77.png`).
+
 ## Open questions
 - **The alien divergence (W2b):** find the coupling before this merges. If it is the nav grid's
   connectivity, the fix may belong in the engine, not here.
