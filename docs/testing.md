@@ -78,7 +78,7 @@ Synthetic signals live in `tests/support/synth.hpp` (sine, silence, seeded noise
 click track). Test WAV fixtures are generated at test time into the temp directory; no real
 recordings are needed.
 
-## Forty-one ways a green suite has lied
+## Forty-two ways a green suite has lied
 
 Every one of these has happened on this project, most of them on 2026-09-19/20 when several agents
 were building concurrently. They divide into **three** families, and the third is the one to read if
@@ -87,7 +87,7 @@ you are short of time, because it is the only one the exit code cannot save you 
 - **Family A — the run did not happen as you think** (entries 1-3, 12, 18, 31, 32, 34).
 - **Family B — the run happened and you read it wrong** (entries 4-8, 11).
 - **Family C — the scan, the filter or the control was looking where the effect could not reach**
-  (entries 13-17, 19, 33, 36, 37, 41; 9 and 10 are its older members, from before it had a name).
+  (entries 13-17, 19, 33, 36, 37, 41, 42; 9 and 10 are its older members, from before it had a name).
 - **Family D — the ask was malformed** (entries 20-21). Neither a bad measurement nor a bad reading:
   the instrument worked, the probe looked in the right place, and the answer was spoiled by the
   *form of the question* (20) or by the *size of the window* (21).
@@ -1194,6 +1194,36 @@ a wound.
    frames), then ask. And a `span` or a pointer into a container that the same function can grow is
    entry 38's family seen from memory: re-point it after every write, as `dctx.visited` already
    was two lines above the one that was not.
+
+42. **A byte comparison compared bytes nobody wrote, so the verdict depended on what ran before.**
+
+   The triggered-bolt play = scrub proof (`test_bolt_path.cpp`) `memcmp`s two frames' ribbon
+   strips. On CI it failed in 2 of 3 runs and passed alone, even with the failing seed: entry 40's
+   tell. **But nothing global had leaked.** The two engines computed the same frame, and the strips
+   differed only in the three padding bytes of `RibbonStrip {u32, u32, u8}`, which nothing writes.
+
+   Where those bytes come from depends on the compiler:
+   - **CI's** (Xcode 26.6) stores the fields straight into the vector, so the padding keeps the
+     reused heap block's old data. After one particular case had freed a block holding a float
+     (`00 00 3f`), the two engines disagreed.
+   - **The local one** (Xcode 27) copies the strip out of a stack slot it only half wrote. The
+     residue there was the same frame's floats, equal in both engines. **So the local binary could
+     not fail in any order,** and bisecting on it would have bisected nothing.
+
+   Two habits, from ADR-940:
+   - **A struct compared byte for byte must have no padding.** Name the bytes, zero them, and
+     `static_assert(std::has_unique_object_representations_v<T>)`; floats defeat that trait, so
+     `clang -Wpadded` is the census for float structs.
+   - **When a case fails only in CI's company, replay CI's own binary in CI's order** before
+     bisecting anything local. The run's `bin-release` artifact is kept for a day.
+     - Catch2's random order is a per-case hash salted by the seed, so `--rng-seed` plus a subset
+       keeps CI's relative order, and `--list-tests` proves it.
+     - The binary bakes the runner's checkout path. Rewrite it to a same-length relative path, re-sign
+       ad hoc, and run from a `git archive` of the commit.
+
+   ADR-941 is the same lesson from the other side. A test helper returned a record pointing into its
+   own dead frame, and **Release passed on whatever the frame still held.** Only UBSan's bool check
+   noticed, and only because the byte happened to be 240.
 
 ## The scratchpad is shared by every agent in a session
 
