@@ -8,6 +8,15 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **CI, 16:20: main `876a11e2`'s push run is RED on the bolt flake.** Run 36341601980: CPU 3,544 passed, 1 failed,
+  212 skipped, 28 needs-assets, 3,788 in all (the local total). The failure is `test_bolt_path.cpp:565` again, now in
+  shard 0 with seed 1790536064: 2 failures in 3 CI runs. The GPU job was still running.
+  - Sanitizers 36321265640 (old main): the packComet UBSan finding recurs byte for byte. The timeouts spread: the
+    main part, stage-1 (2 shards) and stage-5 (new).
+  - **Launched: cihealth** (ADR-940–941 and the sanitizer partition) in `av-gen-cihealth` from `983221a9`. It
+    investigates on engine-3's binary first.
+  - The CI watcher has paused. Resume it when main is next pushed, to report 36341601980's GPU job, Sanitizers
+    stage-0/2, and the new push run.
 - **CI WATCHER, interim (16:00).** Its notes are `ci-watch-notes.md` in the coordinator's scratchpad.
   - **Clean:** main `ec515c8b`'s push run 36335160280: CPU 3,538 passed, 0 failed, 212 skipped, 28 needs-assets
     (all in the exceptions list), 38 min. The GPU job is informational and crashed as usual on the hosted VM.
