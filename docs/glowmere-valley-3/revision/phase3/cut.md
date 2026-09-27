@@ -312,10 +312,13 @@ searches in `build/gv3/cut/tools/search3.py`.
   at a craft holding its station, and for an idle watcher's follow that aims at one (one filter serves
   both nodes). 94.1: 0.102 -> 0.071 deg of yaw HF, the aim trailing the saucer by under a degree.
   Not for a craft on the move: into its station the scout trails by 18 deg at 1 s.
-- **54.1, E4's arrival: locked off.** A slow linear push on E4's region, `E4_PLACE` = gv3-cast's
-  (-69, 6), 14 m up, through a 28 mm: the scout flies in from the upper left (-0.69, +0.92) and settles
-  upper centre (0.00, +0.31), the elder on the right (+0.78); the region's four compass points at the
-  station's height are all in frame, so the station may be anywhere in it. No subject, no HF.
+- **54.1, E4's arrival: locked off.** A slow linear push through a 28 mm, aimed a quarter of the way
+  from E4's region (`E4_PLACE` = gv3-cast's (-69, 6), 14 m up) toward the elder's cap (`6589a152`;
+  aimed at the region itself, the Critic found the cap crossing the frame's right edge): the scout
+  flies in from the upper left (-0.81, +0.92) and settles just left of centre (-0.10, +0.27), the
+  elder whole on the right (its modelled bounds within 0.84 of the edge); the region's four compass
+  points at the station's height are all in frame, so the station may be anywhere in it. No subject,
+  no HF.
 - **57.1, E4's lift:** the same eye, 40 mm for 50, on the hover kind: at the lift the scout is in the
   top of the frame (+0.89; the Critic's adapter projects the raw craft) and the pair on the ground at
   the bottom (-0.83); both animals are in frame for the whole rise. HF 0.016 pitch, 0.013 yaw.
@@ -358,6 +361,32 @@ of its sweep (7.1; the sweep goes on after the cut to 9.1), E2's crossing from i
 (15.1), E3's beam, lift and departure with the animal taken (35.1, 37.1, 39.1), E4's beam (54.1),
 lift (57.1) and departure (61.1), E5's approach, beam, lift and departure (81.1, 93.1, 94.1, 97.1).
 Off by choice: the approaches and departures of E1, E3 and E4, and E2's exit (the craft is gone).
+
+### Iteration 3, the Critic on the scene (no pixels yet)
+
+Inputs from the adapter on the iteration-3 project and trace (`build/gv3/cut/it3/critic/`: 73 shots,
+21 events from the 5 set pieces), judged `--mode fast`: job `job_1a0e3ebb032e98ec4` (track `scene`,
+label `it3b`; complete), 80 issues (2 critical, 3 high, 16 medium).
+
+- **The Critic's own event framing** (`measurements.events.types.*.framing[].on_screen`) agrees with
+  the projection above at every moment: on screen E1's approach, beam and sweep; E2's crossing (x
+  0.048: entering at the left edge); E3's beam, lift, departure and animal taken; E4's beam (54.1),
+  lift (57.1), departure and pair taken (61.1); E5's approach, beam, lift, departure and horse taken.
+  Off: E3's and E4's approaches, E1's and E2's departures.
+- **The two criticals are the adapter's, not the cut's:** "ember is out of frame for 100% of the shot"
+  in 48.3 and 101.1 (and in iteration 1's job, s29 = 48.3). Both shots frame the ember-cap mushroom
+  ("the ember-cap mushroom"), which is centred and lit in the frames (`it1/cut-it1.mov` at 88.6 s).
+  `avgen_adapter.py`'s `SUBJECT_ALIASES` has no alias for `ember-cap`: `\bember\b` maps the text to
+  the alien Ember, and `\bcap\b` to the elder's cap. The fix, for the critic-adapter stream: an
+  `(r"ember[- ]cap|ember mushroom", "ember-cap")` alias ahead of `\bember\b`, and `\bcap\b` not
+  matching after a hyphen. The labels stay what they are.
+- **54.1:** the one finding on iteration 3's changes that was the cut's (the elder's cap across the
+  frame's edge), fixed as above; the job before the fix, `job_1a0e3e7b8b77dc917`, had it.
+- **Left as designed:** "1 element outweighs the visitor" in 81.1 (the suspension's locked-off wide:
+  the saucer is small and 363 m away on purpose) and "the visitor partly hidden by the elder's cap" in
+  89.1 ("from under the elder: the saucer over its rim"); "1 element outweighs Vane" in 29.1 (Vane
+  watching the elder, which is the frame). The low "abrupt camera acceleration" findings fall on the
+  cut instants, where a linear move's keys begin and end.
 
 ## State (2026-09-27, about 12:50)
 
