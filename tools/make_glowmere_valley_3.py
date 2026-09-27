@@ -78,10 +78,17 @@ SECTION_FUNCTIONS = {
     "suspension": "break", "submerged-break": "breakdown", "riser": "build", "drop": "drop", "tail": "outro",
 }
 # Segment mean energy from the analysis (01-music.md §1.3), 0..1 with the riser crest at 1.
+# The film's energy arc, which the Director reads twice: Song Mode's pacing (ADR-921) and the
+# reactivity proposal's depth (ADR-927, `section.energy` as the depth source). The revision authors it.
+# The first pass carried 01-music.md's measured composite (0.29-0.87). That composite is right about
+# the music but flat as a shape: the cold open sat above the break, and the riser above the drop. The
+# authored arc keeps the music's ranking (drop > arrival > lift > groove; low points the pull-back,
+# the break and the tail) and the light's story (drained through the suspension and break, taken in
+# the riser, rebuilt at the drop). The cold open stays alive, at half.
 SEGMENT_ENERGY = {
-    "cold-open": 0.69, "riff-groove": 0.71, "first-pullback": 0.29, "groove-2": 0.73, "lift": 0.80,
-    "arrival": 0.81, "melodic-plateau": 0.81, "lead-forward": 0.76, "suspension": 0.74,
-    "submerged-break": 0.51, "riser": 0.87, "drop": 0.83, "tail": 0.41,
+    "cold-open": 0.50, "riff-groove": 0.55, "first-pullback": 0.25, "groove-2": 0.60, "lift": 0.70,
+    "arrival": 0.85, "melodic-plateau": 0.65, "lead-forward": 0.70, "suspension": 0.40,
+    "submerged-break": 0.20, "riser": 0.60, "drop": 1.00, "tail": 0.30,
 }
 
 FILM_END = 225.5  # the reverb dies at 225.38; the picture is black from the last hit
@@ -119,6 +126,14 @@ def strip_director_residue(project, scene):
     # Song mode would re-cut the camera from sections if anybody pressed Direct; say so in the panel's
     # own terms by leaving it off Song.
     project.setdefault("autoDirector", {})["mode"] = "edited"
+    # One musical time (ADR-896): the meter's settings are parameters. The source's control.phraseBars
+    # and control.sectionPhrases are no longer read; the hand-measured grid is pinned (bar 1 on the
+    # first tracked beat, 8-bar phrases), which the analysis also detects.
+    control = project.setdefault("control", {})
+    control.pop("phraseBars", None)
+    control.pop("sectionPhrases", None)
+    project["parameters"]["music/meter/bar1Beat"] = 0
+    project["parameters"]["music/meter/phraseBars"] = 8
 
 
 def write_sections(project):
