@@ -21,12 +21,16 @@
 //
 //   effects      `world::effectSchemas()` (types, the owners each may attach to, their fields) and the
 //                composition's effect list (ADR-702's instances, by id and owner)
+//   reactive     ADR-925: every target an audio-reactivity plan may move -- the registered parameter
+//                set, the composition and the effect list, each target put through the liveness
+//                registry (reactive_catalog.hpp). Built by the host, which holds the parameters.
 //
 // Semantic activity names ("run", "jump", "land") are the interface; clip names are carried as
 // information and never as the thing a plan asks for (spec §10).
 
 #include <nlohmann/json.hpp>
 
+#include "directing/reactive_catalog.hpp"
 #include "scene/clip_semantics.hpp"
 
 #include <cstdint>
@@ -181,6 +185,9 @@ public:
     [[nodiscard]] const CameraCatalog& cameras() const { return cameras_; }
     [[nodiscard]] const EventCatalog& events() const { return events_; }
     [[nodiscard]] const EffectCatalog& effects() const { return effects_; }
+    // ADR-925. Empty until the host sets it: the composition alone does not hold the parameters.
+    [[nodiscard]] const ReactiveCatalog& reactive() const { return reactive_; }
+    void setReactive(ReactiveCatalog catalog) { reactive_ = std::move(catalog); }
     [[nodiscard]] nlohmann::json toJson() const;
 
 private:
@@ -188,6 +195,7 @@ private:
     CameraCatalog cameras_;
     EventCatalog events_;
     EffectCatalog effects_;
+    ReactiveCatalog reactive_;
 };
 
 } // namespace avgen::directing

@@ -28,15 +28,32 @@ enum class ItemMark : std::uint8_t {
 
 struct PlanItemRow {
     std::string key;
-    std::string kind;  // "shot", "performance", "cue", "marker", "retime"
+    std::string kind;  // "shot", "performance", "cue", "marker", "retime", "route", "source"
     std::string label; // what the plan calls it: a shot's name, a performance's subject
     ItemMark mark = ItemMark::Ok;
     std::vector<std::string> lines; // the validator's messages for it, errors first
 };
 
-// One row per plan item, in plan order (shots, performances, markers, cues, retimes), plus a row
-// keyed "" for plan-wide findings when there are any.
+// One row per plan item, in plan order (shots, performances, markers, cues, retimes, then ADR-924's
+// sources and routes), plus a row keyed "" for plan-wide findings when there are any.
 [[nodiscard]] std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directing::Validation& validation);
+
+// ADR-924: a project plan's reactivity, as the panel lists it under "Plans in this project": one row
+// per route item, micro first, then meso, then macro -- what answers which layer of the music, how,
+// why, and whether the route it made is still the route it made.
+struct ReactivityRow {
+    std::string key;
+    std::string level;  // "micro" | "meso" | "macro"
+    std::string what;   // "kick -> elder-2-gills glow: add 0.60, delay 0 ms"
+    std::string reason; // the item's reason
+    // "as made"; "edited by hand" (a later revision leaves it alone); "not in the project" (deleted, or
+    // the plan was never installed here).
+    std::string state;
+};
+[[nodiscard]] std::vector<ReactivityRow> reactivityRows(const directing::Plan& plan,
+                                                        const std::vector<params::ModRoute>& routes);
+// "59 routes: micro 15, meso 31, macro 13" -- the heading of a plan's reactivity rows.
+[[nodiscard]] std::string reactivityHeading(const directing::Plan& plan);
 
 // The proposed changes, grouped by the item that makes them, in the order the diff lists them.
 // Findings ('!' lines) are the rows' business and are left out.

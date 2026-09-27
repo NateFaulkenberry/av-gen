@@ -442,6 +442,65 @@ std::optional<Finding> SceneLivenessFacts::deadTarget(std::string_view path, int
         return std::nullopt;
     }
 
+    // nodes/<terrain>/scatter/<layer>/emissionGain|hueOffset|emissiveFieldAmount (ADR-905, amended by
+    // ADR-926): every layer registers the three lanes, and on a layer that emits nothing -- no emissive
+    // colour, no program that writes emission -- each multiplies zero. The light-wave depth also needs
+    // a field to multiply: a layer that names none, or names one the scene does not have, moves nothing.
+    if (seg[0] == "nodes" && seg.size() == 5 && seg[2] == "scatter") {
+        const CompositionNode* terrain = comp->findNode(std::string(seg[1]));
+        if (terrain == nullptr || terrain->kind != NodeKind::Terrain) {
+            return std::nullopt;
+        }
+        for (const world::ScatterLayer& layer : terrain->ecology.layers) {
+            if (layer.name != seg[3]) {
+                continue;
+            }
+            bool emits = layer.emissiveIntensity > 0.0f && !colourIsBlack(layer.emissiveColor);
+            if (!emits && !layer.materialProgram.empty()) {
+                const MaterialProgram* p = findProgram(scene, layer.materialProgram);
+                emits = p != nullptr && p->writesEmission();
+            }
+            if (!emits) {
+                return make("layer-emits-nothing", Verdict::Dead,
+                            fmt::format("scatter layer '{}' emits nothing (no emissive colour, no program that writes "
+                                        "emission), so its {} multiplies zero",
+                                        seg[3], seg[4]));
+            }
+            if (seg[4] == "emissiveFieldAmount") {
+                if (layer.emissiveField.empty()) {
+                    return make("no-field-named", Verdict::Dead,
+                                fmt::format("scatter layer '{}' names no emissiveField, so its light-wave depth "
+                                            "multiplies nothing",
+                                            seg[3]));
+                }
+                if (scene.fields.find(layer.emissiveField) == nullptr) {
+                    return make("no-field-named", Verdict::Dead,
+                                fmt::format("scatter layer '{}' names field '{}', which the scene does not have", seg[3],
+                                            layer.emissiveField));
+                }
+            }
+            return std::nullopt;
+        }
+        return std::nullopt;
+    }
+    // procedural/<n>/emissiveFieldAmount: the same question for a procedural node's own field.
+    if (seg[0] == "procedural" && seg.size() == 3 && seg[2] == "emissiveFieldAmount") {
+        const CompositionNode* node = comp->findNode(std::string(seg[1]));
+        if (node == nullptr || node->kind != NodeKind::Procedural) {
+            return std::nullopt;
+        }
+        if (node->procedural.emissiveField.empty()) {
+            return make("no-field-named", Verdict::Dead,
+                        fmt::format("node '{}' names no emissiveField, so its light-wave depth multiplies nothing", seg[1]));
+        }
+        if (scene.fields.find(node->procedural.emissiveField) == nullptr) {
+            return make("no-field-named", Verdict::Dead,
+                        fmt::format("node '{}' names field '{}', which the scene does not have", seg[1],
+                                    node->procedural.emissiveField));
+        }
+        return std::nullopt;
+    }
+
     if (seg[0] != "procedural" && seg[0] != "nodes") {
         return std::nullopt;
     }
