@@ -40,6 +40,25 @@ float routeLeft(const Progress& progress, glm::vec2 from) {
     return left;
 }
 
+// ADR-944: how far short of its tolerance a walk holds behind a goal that is moving off. The move's
+// braking asks for no more speed than stops the body at `tolerance` from the goal (v = sqrt(2 a d)),
+// so behind a goal receding at v it settles v^2 / 2a short of it -- plus the step the goal takes
+// before the arrival test reads it -- and a walk after a body that is walking on, however slowly,
+// never arrives. `moved` is how far the goal went since the last step. The recession counts only up
+// to the walker's own pace, the fastest it could follow. A goal that is still, or coming nearer,
+// leaves no gap: every walk to a place, and to a body standing, arrives exactly as before.
+float trailingGap(glm::vec2 moved, glm::vec2 toGoal, float distance, float pace, float decel, double dt) {
+    if (dt <= 0.0 || distance <= 1e-4f) {
+        return 0.0f;
+    }
+    const float step = static_cast<float>(dt);
+    const float receding = std::min(glm::dot(moved, toGoal / distance) / step, pace);
+    if (receding <= 0.0f) {
+        return 0.0f;
+    }
+    return receding * receding / (2.0f * std::max(decel, 0.1f)) + receding * step;
+}
+
 // ADR-932: from a cell centre of the walker's region, straight on toward the goal it cannot reach,
 // every half metre for at most one cell, as far as the ground stays walkable -- and, with `dry`, dry
 // -- so the body walks to the water's edge rather than to the middle of the last dry cell, up to a
@@ -931,11 +950,15 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             // the goal rather than the place the goal was when the route was asked for -- unless the
             // route ends short of the goal (ADR-932), whose end is the nearest point the body can
             // reach and stays there.
+            const glm::vec2 goalWas =
+                layer.progress.waypoints.empty() || layer.progress.shortOf ? goal : layer.progress.waypoints.back();
             if (!layer.progress.waypoints.empty() && !layer.progress.shortOf) {
                 layer.progress.waypoints.back() = goal;
             }
             const glm::vec2 end = layer.progress.shortOf ? layer.progress.waypoints.back() : goal;
             const float distance = glm::length(end - here);
+            const GaitSettings gait = ctx.gait != nullptr ? *ctx.gait : GaitSettings{};
+            const float wantedSpeed = action.speed > 0.0f ? action.speed : gait.walkSpeed;
             // ADR-936: on a route round (several waypoints), the walk is over on its last leg only --
             // a goal across the water can be nearer than the tolerance while the walk round has most
             // of its way to go -- and what is left of it is the route's length, not the straight
@@ -943,7 +966,11 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             // of one waypoint, which is every route before ADR-936, `remaining` is `distance`.
             const bool lastLeg = layer.progress.waypoint + 1 >= layer.progress.waypoints.size();
             const float remaining = lastLeg ? distance : routeLeft(layer.progress, here);
-            if (lastLeg && distance <= tolerance) {
+            // ADR-944: arrived is within the tolerance of where the goal is now, and behind a goal
+            // moving off, within the gap the braking below holds behind it (`trailingGap`).
+            const float trailing =
+                trailingGap(goal - goalWas, end - here, distance, wantedSpeed, gait.decel, ctx.dt);
+            if (lastLeg && distance <= tolerance + trailing) {
                 state.speed = 0.0f;
                 movement = true;
                 if (layer.progress.shortOf) {
@@ -971,8 +998,6 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                 ++layer.progress.waypoint;
             }
 
-            const GaitSettings gait = ctx.gait != nullptr ? *ctx.gait : GaitSettings{};
-            const float wantedSpeed = action.speed > 0.0f ? action.speed : gait.walkSpeed;
             glm::vec2 direction = waypoint - here;
             const float toWaypoint = glm::length(direction);
             bool escaping = false; // walking back onto the walkable set before the errand (below)

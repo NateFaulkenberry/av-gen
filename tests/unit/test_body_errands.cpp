@@ -81,6 +81,28 @@ CastMember subject() {
     return m;
 }
 
+float apart(const entity::Entity& a, const entity::Entity& b);
+
+// The subject stands 30 m north until the watcher is within `when` of it, then walks on north at
+// `pace`: slower than the watcher walks, or faster.
+std::function<void(double)> movesOff(entity::EntityWorld& world, float when, float pace) {
+    return [&world, when, pace, started = false](double now) mutable {
+        entity::Entity* me = world.find("watcher");
+        entity::Entity* them = world.find("subject");
+        if (started || me == nullptr || them == nullptr || apart(*me, *them) > when) {
+            return;
+        }
+        started = true;
+        entity::ActionDesc walk;
+        walk.kind = entity::ActionKind::Move;
+        walk.name = "on";
+        walk.speed = pace;
+        walk.target.kind = entity::TargetKind::Point;
+        walk.target.point = glm::vec3(0.0f, 0.0f, 400.0f);
+        them->actions().override(std::vector<entity::ActionDesc>{walk}, entity::Authority::Action, now);
+    };
+}
+
 std::function<void(double)> intoLine(entity::EntityWorld& world) {
     return [&world](double now) {
         if (now < 1e-6) {
@@ -121,7 +143,7 @@ TEST_CASE("a walk to a body whose subject steps into its line and stops ends out
     float atArrival = -1.0f;
     w.play(14.0, [&] {
         closest = std::min(closest, apart(me, them));
-        if (arrivedAt > 0.0 && atArrival < 0.0) {
+        if (arrivedAt > 0.0 && atArrival < 0.0f) {
             atArrival = apart(me, them);
         }
         for (const auto& b : me.behaviors()) {
@@ -162,6 +184,83 @@ TEST_CASE("a walk to a body whose subject steps into its line and stops ends out
     WARN(fmt::format("ADR-944, a subject stepping into the line: closest {:.2f} m, the walk ended {:.2f} m from it; "
                      "the old errand {:.2f} m",
                      closest, atArrival, oldClosest));
+}
+
+TEST_CASE("a walk to a body that moves off slowly arrives within its approach, and stands", "[decide][adr944]") {
+    // The subject walks on at 0.4 m/s once the watcher is 12 m from it. The walk's braking asks for
+    // no more speed than stops the watcher at 7 m, so behind a body walking on it holds a few
+    // millimetres short of 7 m and never arrives: measured on GV2-multicam, rook 8.005 m behind a
+    // horse (approach 8) for 4.4 s, legs sliding, until its post called it home.
+    struct Run {
+        double arrivedAt = -1.0;
+        float atArrival = -1.0f;
+        float subjectPace = 0.0f;
+        float walkedAfter = 0.0f; // how far the watcher went in the 2 s after it arrived
+        float nearest = 1e9f;
+        double trailed = 0.0;     // seconds within half a metre of its approach, not arrived
+        float trailedAt = 0.0f;   // and the furthest it was behind the subject then
+        std::string gaveUp;       // the first failure of the walk, and when
+    };
+    const auto run = [](float pace) {
+        CastWorld w({watcher(), subject()});
+        w.director = movesOff(w.world, 12.0f, pace);
+        entity::Entity& me = w.body("watcher");
+        entity::Entity& them = w.body("subject");
+        Run r;
+        w.world.setActionListener([&](const entity::ActionEvent& e) {
+            if (e.entity == "watcher" && e.action == "subject" && e.result == entity::ActionResult::Completed &&
+                r.arrivedAt < 0.0) {
+                r.arrivedAt = e.time;
+            }
+            if (e.entity == "watcher" && e.action == "subject" && e.result == entity::ActionResult::Failed &&
+                r.gaveUp.empty()) {
+                r.gaveUp = fmt::format("{} at {:.2f} s", e.reason, e.time);
+            }
+        });
+        glm::vec3 there(0.0f);
+        w.play(24.0, [&] {
+            r.nearest = std::min(r.nearest, apart(me, them));
+            if (r.arrivedAt < 0.0 && apart(me, them) <= kApproach + 0.5f) {
+                r.trailed += CastWorld::kStep;
+                r.trailedAt = std::max(r.trailedAt, apart(me, them));
+            }
+            if (r.arrivedAt > 0.0 && r.atArrival < 0.0f) {
+                r.atArrival = apart(me, them);
+                r.subjectPace = them.state().speed;
+                there = me.state().position();
+            }
+            if (r.arrivedAt > 0.0 && w.time() <= r.arrivedAt + 2.0) {
+                r.walkedAfter = std::max(r.walkedAfter, glm::length(me.state().position() - there));
+            }
+        });
+        return r;
+    };
+    const Run slow = run(0.4f);
+    INFO("a subject walking on at 0.4 m/s: the walk ended at " << slow.arrivedAt << " s, " << slow.atArrival
+                                                                << " m from it, which was walking at "
+                                                                << slow.subjectPace << " m/s; then the watcher went "
+                                                                << slow.walkedAfter << " m in 2 s. Before it ended, "
+                                                                << slow.trailed << " s within half a metre of "
+                                                                << kApproach << " m, as far as " << slow.trailedAt
+                                                                << " m; nearest " << slow.nearest << " m; gave up: '"
+                                                                << slow.gaveUp << "'");
+    REQUIRE(slow.arrivedAt > 0.0);
+    CHECK(slow.subjectPace > 0.3f);                  // arrived while the subject was walking on
+    CHECK(slow.atArrival <= kApproach + 0.1f);       // within its approach, and the gap behind it
+    CHECK(slow.atArrival > 1.8f);                    // outside the two bodies
+    CHECK(slow.walkedAfter < 0.3f);                  // and stood, to look, rather than walking after it
+
+    // Control: a subject that walks on faster than the watcher walks (4.5 m/s against 3) is not
+    // arrived at. The watcher does not catch it, and the walk does not call it caught.
+    const Run fast = run(4.5f);
+    INFO("a subject walking on at 4.5 m/s: the watcher came within " << fast.nearest << " m; the walk ended at "
+                                                                      << fast.arrivedAt << " s; gave up: '" << fast.gaveUp
+                                                                      << "'");
+    CHECK(fast.arrivedAt < 0.0);
+    CHECK(fast.nearest > kApproach + 1.0f);
+    WARN(fmt::format("ADR-944, a subject walking on: at 0.4 m/s the walk ended {:.3f} m from it at {:.2f} s and stood "
+                     "({:.2f} m in 2 s); at 4.5 m/s it came no nearer than {:.2f} m and did not end",
+                     slow.atArrival, slow.arrivedAt, slow.walkedAfter, fast.nearest));
 }
 
 TEST_CASE("a body errand is judged where the body is, and a greeting still nowhere", "[decide][adr944]") {
