@@ -456,6 +456,28 @@ configuration acts:
 
 The same picture, finer (`build/gv3w/k4/diff-preview-vs-final2-77.png`).
 
+## F5: the final's cost, measured on an exclusive GPU
+
+The final as it now stands (`c350391b`, no march), 3840x2160 x2, ProRes 422.
+- The runner (`build/gv3w/k4x.sh`) waits for no other GPU process, watches through each render, and
+  marks any overlap. Its first try overlapped gv3-look's render and was discarded.
+- The three ranges below ran alone.
+
+| Range | s/frame | Whole job | Peak memory footprint |
+|---|---|---|---|
+| s14 wide, 76-78 s | **0.398** | 62 s | 8.95 GiB |
+| s18 grove follow, 108-110 s | **0.517** | 78 s | 8.89 GiB |
+| s33 drop, 178-180 s | **0.454** | 71 s | 9.03 GiB |
+
+**The whole film:** 13,530 frames at the mean, 0.456 s, is about 6,200 s. **About 1.7 hours,** or
+1.5-2.0 hours depending on the mix of shots, plus about 15 s to load.
+
+**The final is cheaper than the preview configuration at 4K** (0.524 s/frame on s14). The reason is
+`limits: tier` (ADR-191): it keeps the LOD ladder, where the previews' `limits: unlimited` draws every
+far instance at full detail.
+
+The march that F3 removed was what made the first measurement 1.52 s/frame.
+
 ## For the coordinator and the other streams
 
 **Order of merging**
