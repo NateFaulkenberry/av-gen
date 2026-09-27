@@ -101,25 +101,24 @@ def wide_shots(project, scene, field, trace=None):
     """{shot index: far fraction} for every shot of the cut; fixed and keyed rigs from their keys,
     followed and aimed ones only from a cast trace (`avgen_cast_trace --camera`), else 0."""
     shots = scene["cameraDirection"]["shots"]
+    cameras = {c["id"]: c.get("slug", "") for c in scene["cameraDirection"]["cameras"]}
     fractions = {i: 0.0 for i in range(len(shots))}
-    if trace:
-        import json
-        cam = json.loads(open(trace).read())["camera"]
-        per = {}
-        for k in range(0, len(cam["t"]), 60):
-            i = cam["shot"][k]
-            if i >= 0:
-                per.setdefault(i, []).append(far_fraction(field, cam["eye"][k], cam["target"][k], cam["vfov"][k],
-                                                          SHADOW_RANGE))
-        for i, fs in per.items():
-            fractions[i] = sum(fs) / len(fs)
-        return fractions
     by_slug = {}
     for label, t, eye, target, vfov in world.camera_poses(project, scene, per_shot=3):
         by_slug.setdefault(label, []).append(far_fraction(field, eye, target, vfov, SHADOW_RANGE))
-    cameras = {c["id"]: c.get("slug", "") for c in scene["cameraDirection"]["cameras"]}
+    cam = None
+    if trace:
+        import json
+        cam = json.loads(open(trace).read())["camera"]
     for i, s in enumerate(shots):
-        fs = by_slug.get(cameras[s["camera"]])
+        slug = cameras[s["camera"]]
+        fs = list(by_slug.get(slug, []))
+        if cam is not None and not fs:
+            # A traced frame counts for this shot only when it lies in the shot's span AND the trace's
+            # active camera is this shot's camera: a trace of another cut says nothing about this one.
+            for k in range(0, len(cam["t"]), 60):
+                if s["start"] <= cam["t"][k] < s["end"] and cam["camera"][k] == slug:
+                    fs.append(far_fraction(field, cam["eye"][k], cam["target"][k], cam["vfov"][k], SHADOW_RANGE))
         if fs:
             fractions[i] = sum(fs) / len(fs)
     return fractions
