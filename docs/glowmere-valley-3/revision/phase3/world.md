@@ -340,11 +340,35 @@ far darker. It also runs over the sky, which the closed form never fogs (`applyF
 surfaces only). Raising the scattering cannot match the previews without turning the air the moon's
 colour.
 
+## F3: the final keeps the previews' fog (commit `c350391b`)
+
+`offline.py` no longer marches the fog. What the final changes is now only what makes the same
+picture finer:
+- resolution, supersampling and the codec;
+- the limits;
+- the shadows' reach and cascades;
+- the terrain's LOD;
+- the rigs' rate.
+
+The atmosphere stays the previews': the closed form, which is exact and noise-free.
+
+**What gv3-look needs to know** (not applied here, not yet measured end to end). A march can be made
+to carry the closed form's navy fill exactly. Set `scene/volumeEmission` equal to
+`scene/volumeAbsorption`:
+- the march's per-step emission is then density x emission x `fogColor` (`volume.wgsl`);
+- the closed form is `lit * T + fogColor * (1 - T)`;
+- the two are the same integral.
+
+Its noise (`volumeNoise` 0.45) and local-light scattering (`volumeLocalLights` 1) would then come on
+top, and would be seen in the previews first. Stills of that recipe at scattering 0, 0.25 and 0.5 are
+queued (`build/gv3w/jobs2c.txt`). The 4K cost of the final without a march is being re-measured with
+an exclusive GPU (the lock raced from 13:00; see the coordinator's note).
+
 ## Open questions
 - **The alien divergence (W2b):** find the coupling before this merges. If it is the nav grid's
   connectivity, the fix may belong in the engine, not here.
-- **The fog march's look:** it lights the near 220 m with the moon and local lights instead of a
-  flat navy veil. It needs calibration and gv3-look's agreement, because previews never show it.
+- **The fog march (F2, F3):** left out of the final. Whether GV3 wants a marched atmosphere at all is
+  gv3-look's decision, taken in the previews.
 - **The ecology-light options** (`ecologyGlowCell` 14, `ecologyLightRange` 250) re-cluster the glow
   spill in every shot, near ones included. Left out of `offline.py` unless an evaluation supports
   them.
