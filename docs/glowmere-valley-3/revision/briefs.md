@@ -345,3 +345,29 @@ characters, setpieces, and checkpoints (camera).
   - compile the E1–E5 plan with `avgen_cast_trace --plan --save-project` as a generator step;
   - re-validate E4 after the re-homing; it needs two animals within reach.
 - **The gate:** the ADR-910 metrics on the whole-film cast trace (longest still stretch, reversals, pivots, slope under stationary bodies), and the set pieces' measured beats.
+
+## Engine follow-ups found in Phase 3
+
+### navfix (ADRs 932–933, and an ADR-931 amendment): reachable goals, no pacing on urgent reactions
+- **Worktree:** `~/Documents/GitHub/av-gen-navfix`, branch `agent/navfix`, from `integrate/revision` `ec515c8b` (main `040d6644` plus characters, ADR-907–910; main fast-forwards to it when the owner allows). Assets are linked.
+- **Read:** the brief §10–12 (the owner's "never walk → stop → 180° → back"); `stream-reports/characters.md`; ADR-908 and ADR-909; gv3-cast's "Found" 2 in `phase3/cast.md` (in `~/Documents/GitHub/av-gen-gv3-cast`); gv3-world's W2b and W2c in `phase3/world.md` (in `~/Documents/GitHub/av-gen-gv3-world`).
+- **The defect, measured on GV3 by gv3-cast.**
+  - After hearing E5's beam at 170.35 s, ember paced the river bank (walk → stop → 180° → walk back) 8 times in 40 s (176–216 s). The same trap made it dither on that bank at 22–52 s, after roam targets across the water.
+  - `NavigatorPath::route` (`src/entity/action.cpp`) checks only that the goal is navigable, then returns a straight line (`(void)from`). So a goal on another connected piece of walkable ground is `Ready`. On GV3 the river divides the nav grid into 4–5 pieces.
+  - The body walks into the river as far as the wade limit and stalls, so the move gives up. ADR-908 walks it back onto the walkable set. Then the reaction wins again, because an option with urgency is exempt from ADR-909's revisit and turn-back vetoes (the loop block in `src/entity/decision.cpp`).
+  - gv3-world saw the other side of this: the aliens' own destination choices do respect reachability. Joining the banks round the river's head rerouted every alien by up to 100 m.
+  - `NavGrid` already labels regions (`NavGrid::connected`) and has a search that refuses disconnected goals. The action tier does not use either.
+- **Deliverables:**
+  1. **ADR-932: the action tier's routes respect connected regions.** A goal in another region routes to the nearest reachable point in the body's own region, or is refused with a reason when there is none. Justify the choice in the ADR. Everything that calls `route` (moves, errands, reactions, orders) inherits this; list them in the ADR. A reaction to an event across water walks to the bank and watches from there.
+  2. **ADR-933: no pacing on urgent options.** An urgent option (a reaction, a flinch) keeps its exemption for its first attempt. Once its move has failed or given up, the same event cannot send the body back to the same place in a loop. Use ADR-909's revisit and turn-back rules, or an equivalent retry limit. A flinch out of someone's way must still work.
+  3. **ADR-931 amendment: the Director's evaluator hook** (`src/app/directing_evaluate.cpp`) passes the Critic's adapter `--world-preview <build>/tools/avgen_world_preview`, so its evaluations get ground samples. The flag is described in `stream-reports/critic-adapter.md` in the gv3 worktree. Add a test that the argument is passed.
+  4. **Tests, each with a control arm that fails without the change:**
+     - a two-region world (a river or a trench) where a goal across the divide is not `Ready` as a straight line, and routes to the near side;
+     - a reaction across water that produces no walk → stop → 180° → back, measured with ADR-910's reversal metric;
+     - a flinch that still works.
+- **Measure** GV2 multicam and GV3 before and after, with `avgen_cast_trace` and `avgen_character_quality`.
+  - For GV3, use a scratch copy of gv3-cast's generated project, under your own `build/`, never edited in place. Mirror it as gv3-world does: symlink `materials`, `lightrigs`, `entities` and `assets`, and make the song's path absolute.
+  - gv3-cast worked round the defect in iteration 2: E5's reaction is "stop and watch where you stand" (radius 250 m, approach 250 m). Also measure with ember's "go and see" reaction to E5 restored. Report reversals and the longest pacing sequence, before and after.
+- **UI reach:** only behaviour changes. If you add a parameter (a retry limit, say), label it in words under the character's decide or react group.
+- **Suites:** the full CPU suite, via `ctest --test-dir <wt>/build/release -L unit -j 4`. Run the GPU suite only if you touch rendering.
+- **How GV3 should use it:** whether E5's reaction can go back to "go and see", and what else changes for GV3.
