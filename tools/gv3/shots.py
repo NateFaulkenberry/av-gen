@@ -42,7 +42,10 @@ EMBER_CAP = [175.7, 15.2, 149.8]
 EAST_MEADOW = [74.0, 9.0, 13.0]      # the herd's horses, re-homed on the 5.1 ha meadow (characters.md)
 WEST_MEADOW = [-70.0, 8.3, 3.0]      # the two cows, on the flat half of the 3.9 ha meadow
 E1_PLACE = [-20.0, 25.0, -190.0]     # the survey sweeps x -50..10 along z -190, 30 m up (the UFO plan)
-E4_PLACE = [-55.0, 12.0, 40.0]       # the river pair's region centre (radius 30)
+# The river pair's region centre, 14 m up: gv3-cast's (-69, 6), radius 20 (gv3/cast 0ff69eea), where
+# cow-12 and cow-23 graze after the re-homing. The plan's (-55, 40) held one animal, and E4 never
+# beamed. 54.1 frames the whole region at the station's height, so the station may be anywhere in it.
+E4_PLACE = [-69.0, 14.0, 6.0]
 
 COMPOSITIONS = {}
 
@@ -151,12 +154,19 @@ def cap_rim_from_the_north(t0, t1, g):
 @at("15.1")
 def e2_flyby(t0, t1, g):
     # [s07] E2, the flyby: from 112 m north of the elder looking south past it, a shape crosses the
-    # frame over the cap while the music holds its breath -- the promise the drop keeps.
+    # frame over the cap while the music holds its breath -- the promise the drop keeps. Panned 16 deg
+    # east of the first pass's frame (iteration 3): the saucer comes in from the east, slowly at first,
+    # and was 14 deg outside the frame when its crossing began; now it is in from that instant and
+    # crosses for 1.85 s instead of 1.4, and the cap sits on the right third with the sky it comes
+    # out of on the left.
     eye = g(-24, -58, 2.0)
-    r = still(24.0, eye, [-12.0, eye[1] + 110.7 * math.tan(math.radians(14.0)), 52.0])
+    ahead = [-12.0 - eye[0], 110.7 * math.tan(math.radians(14.0)), 52.0 - eye[2]]
+    pan = math.radians(16.0)
+    r = still(24.0, eye, [eye[0] + math.cos(pan) * ahead[0] + math.sin(pan) * ahead[2], eye[1] + ahead[1],
+                          eye[2] - math.sin(pan) * ahead[0] + math.cos(pan) * ahead[2]])
     return r, dict(lead="event", purpose="E2: a shape crosses the sky over the elder",
                    subject="the saucer (flyby, E2), the elder's cap",
-                   camera="24 mm, 112 m north of the elder, 14 deg up", movement="still",
+                   camera="24 mm, 112 m north of the elder, 14 deg up, the cap on the right third", movement="still",
                    music="the pull-back: drums and top out", effects="the flyby", modulation="light drained")
 
 
@@ -385,33 +395,41 @@ def bloom_far_bank(t0, t1, g):
 
 @at("54.1")
 def e4_arrives(t0, t1, g):
-    # E4. The scout comes down over the west meadow and its beam lights (bar 56.3). A live aim at the
-    # scout from over the river south of the elder: its station is wherever its region's animals are
-    # when it arrives, and the elder stands at the right of the frame.
-    r = Rig("", 28.0, aim="scout", aim_offset=(0.0, -6.0, 0.0), smoothing="craft")
-    r.move(t0, t1, g(-24, 120, 3.0), g(-24, 115, 3.0))
+    # E4. The scout comes down over the west meadow and its beam lights (bar 56.3). Locked off on the
+    # region, from over the river south of the elder, with a slow push: the scout flies in at the upper
+    # left and settles upper centre, the elder at the right of the frame. The whole region is in frame
+    # at the station's height, so the station may be wherever its animals are. (Iteration 2 chased the
+    # scout with a live aim: its approach and stop into the station read as 0.20 deg of yaw HF.)
+    r = moving(t0, t1, 28.0, g(-24, 120, 3.0), g(-24, 115, 3.0), E4_PLACE)
     return r, dict(lead="event", purpose="E4: the scout settles over the meadow beyond the elder",
-                   subject="the scout (E4), the elder at the right", camera="28 mm, 3 m, from the south, live aim",
+                   subject="the scout (E4), the elder at the right", camera="28 mm, 3 m, from the south, locked on the region",
                    movement="slow push", music="3 bars; the beam at bar 56.3", effects="the scout's beam (E4)")
 
 
 @at("57.1")
 def e4_pair_lifted(t0, t1, g):
     # E4's lift, on the sub-phrase line: two animals rising together in one column, from 40-50 m off
-    # on the dry ground north-east of the meadow.
-    r = aim_at(50.0, g(-35, -15, 2.5), "scout", (0.0, -12.0, 0.0), "craft")
+    # on the dry ground north-east of the meadow. A 40 mm, so the scout is in the top of the frame and
+    # the pair on the ground at the bottom when it lifts them (iteration 2's 50 mm put the scout just
+    # above the frame).
+    r = aim_at(40.0, g(-35, -15, 2.5), "scout", (0.0, -12.0, 0.0), "hover")
     return r, dict(lead="event", purpose="E4: two animals lifted together", subject="the scout's beam and the pair (E4)",
-                   camera="50 mm, about 45 m off, live aim", movement="still", music="the lift on bar 57",
+                   camera="40 mm, about 45 m off, live aim", movement="still", music="the lift on bar 57",
                    effects="the scout's beam")
 
 
 @at("59.1")
 def e4_aliens_watch(t0, t1, g):
-    # The aliens come to watch: riding behind Ember, who is at the meadow, looking past it at the
-    # column (Vane watches from the elder, beyond).
-    r = follow(28.0, "ember", (-3.0, 2.5, -6.0), (0.0, -10.0, 0.0), aim="scout", smoothing="fixed-target")
-    return r, dict(lead="event", purpose="E4: Ember watches the pair rise", subject="the column (E4), ember in front",
-                   camera="28 mm, riding behind Ember, looking at the scout", movement="follows", music="2 bars")
+    # The aliens watch: over Sage's shoulder at the column. Sage stops on the rise 39 m west of the
+    # station as the pair lifts, turns to face it and stands, so the follow is still and only the
+    # scout's sway reaches the aim. (Iteration 2 rode with Ember, who walks in bursts, and looked 33 m
+    # past her: her stride was 0.24 deg of yaw HF.) If Sage goes to see the beam instead, she walks
+    # away from the lens toward it and stays in frame. Offset searched on the trace: her head and
+    # shoulders low on the right third, the scout and both animals in frame for the whole shot, the
+    # eye 1.7 m over the rising ground behind her.
+    r = follow(20.0, "sage", (-2.23, 3.6, -3.88), (0.0, -12.0, 0.0), aim="scout", smoothing="hover")
+    return r, dict(lead="event", purpose="E4: Sage turns to watch the pair rise", subject="the column (E4), sage in front",
+                   camera="20 mm over Sage's shoulder, looking up at the scout", movement="follows", music="2 bars")
 
 
 @at("61.1")
@@ -561,8 +579,9 @@ def e5_beam_lights(t0, t1, g):
 @at("94.1")
 def e5_up_the_beam(t0, t1, g):
     # [s27] Up the beam from beside the horse, 12 m off the station: at 6 m (iteration 1, the tuned
-    # cast's station) the lens looked almost straight up and the saucer's sway read as yaw.
-    r = aim_at(20.0, g(-8, 83, 1.0), "visitor", (0.0, -3.0, 0.0), "craft")
+    # cast's station) the lens looked almost straight up and the saucer's sway read as yaw. The
+    # hovering kind: at the craft's 0.6 s the sway still read 0.102 deg (iteration 2).
+    r = aim_at(20.0, g(-8, 83, 1.0), "visitor", (0.0, -3.0, 0.0), "hover")
     return r, dict(lead="event", purpose="E5: up the beam from beside the horse", subject="the beam and the saucer",
                    camera="20 mm, 1 m, looking up", movement="still", music="1 bar")
 

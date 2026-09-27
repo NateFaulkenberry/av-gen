@@ -11,8 +11,9 @@ the river's own centreline. Nothing here is evaluated at render time; it is all 
 **How a rig with a subject smooths it** is ADR-911's filtered follow reference, set per kind of
 shot with ADR-913's measured values (`SMOOTHING`): a walker is followed through a 0.3 s
 critically-damped reference with a 1 s constant on its height, led back to pace and measured
-against the ground; a flying craft through 0.6 s, never against the ground; a subject whose rise
-is the shot (the horse in the beam), not at all. Every rig that follows or aims at a node names
+against the ground; a flying craft through 0.6 s, never against the ground; a hovering craft
+through 1 s (its station sway); a subject whose rise is the shot (the horse in the beam), not at
+all. Every rig that follows or aims at a node names
 its kind, so no follow rig is left on the engine's default of none. `followLagSeconds` is not
 used: with the shared reference a lag only re-introduces the nod (ADR-913).
 """
@@ -23,6 +24,12 @@ SMOOTHING = {
     "walker": (0.3, 1.0, 1.0, True),      # a world-offset follow (or a live aim) of a walking character
     "fixed-target": (0.3, 1.2, 1.0, False),  # riding with a walker, looking at a fixed point (s25)
     "craft": (0.6, 1.0, 0.0, False),      # a live aim at a flying craft (s24, s27); never the ground
+    # A live aim at a craft holding its station, or an idle watcher's follow that aims at one: one
+    # filter serves both nodes, so the watcher's eye rides it too. The station's sway is about 3 cm;
+    # at 0.6 s it read as 0.102 deg of yaw HF up E5's beam at 25 m (GV3 cut iteration 2), at 1.0 s
+    # 0.071 (the model of the engine's kernel on the trace), and the aim trails the craft by under a
+    # degree. Not for a craft on the move: the approach into a station trails by 18 deg at 1 s.
+    "hover": (1.0, 1.5, 0.0, False),
     "still": (0.0, 0.0, 0.0, False),      # an idle or static subject: nothing to smooth (s10, s17, s05)
     "lifted": (0.0, 0.0, 0.0, False),     # the subject's rise is the shot (s29)
 }
