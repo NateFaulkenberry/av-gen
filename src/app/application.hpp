@@ -270,6 +270,9 @@ struct AppOptions {
     // ADR-902: `--audit-routes <out.json>` loads --project headless (no window, no GPU), writes the
     // route/track/effect liveness report to the file ("-" = stdout) and exits.
     std::optional<std::filesystem::path> auditRoutes;
+    // ADR-927: `--propose-reactivity <out>`, with --project: the Director's default reactivity
+    // proposal as a document a generator can read, edit and install; headless, no GPU.
+    std::optional<std::filesystem::path> proposeReactivity;
     std::vector<std::string> outputs; // --output <display>[:fullscreen|:WxH]
     std::optional<std::string> syphon; // --syphon <name>
     std::optional<std::string> example; // --example <name>

@@ -186,6 +186,10 @@ std::string usageText() {
            "                      route and effect with a verdict (live / dead / hazard) and the\n"
            "                      reason to <f> as JSON (\"-\" = stdout), and exit. Headless, no GPU;\n"
            "                      --fps overrides the frame rate the event rules sample at (ADR-902)\n"
+           "  --propose-reactivity <f>  with --project: write the Director's default audio-reactivity\n"
+           "                      proposal (routes at three levels with the reason for each, their\n"
+           "                      liveness verdicts and the JSON to install them) to <f> (\"-\" = stdout),\n"
+           "                      and exit. Headless, no GPU; the project file is not changed (ADR-927)\n"
            "  --generate <file>   compose a world from a recipe (see examples/recipes/) at start-up\n"
            "  --direct            cut the camera to the loaded track: folds the audio into\n"
            "                      musical sections and shoots the world's heroes\n"
@@ -503,6 +507,11 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--audit-routes");
             if (!v) return std::unexpected(v.error());
             options.auditRoutes = *v;
+            ++i;
+        } else if (arg == "--propose-reactivity") {
+            auto v = need(i, "--propose-reactivity");
+            if (!v) return std::unexpected(v.error());
+            options.proposeReactivity = *v;
             ++i;
         } else if (arg == "--direct") {
             options.directCamera = true;
