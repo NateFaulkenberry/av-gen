@@ -173,6 +173,35 @@ def _terrain(scene):
     return next(n for n in scene["nodes"] if n.get("kind") == "terrain")
 
 
+# The render stream's values that serve the preview and the final alike (ADR-917-919,
+# stream-reports/render.md "How GV3 should use this"). Post radii are counted in pixels of a
+# 1080-row reference and scaled to the output, so a 960x540 x2 preview (1080 internal rows) is
+# unchanged (0 of 518,400 pixels) and a 4K x2 final now matches it (mean difference 2.20 -> 1.36);
+# the motion blur's reach and samples keep up with it; the fog takes the sky's radiance, the aurora
+# included, so the distant rim reads as air rather than a dark cut-out (s14's far third 67 -> 81),
+# its distance automatic (208-500 m over the density arc). The bloom's 6 levels, the anamorphic
+# stretch 10.386 and the motion-blur tile 20 stay as they are: the audit's 8 levels, stretch x2 and
+# tile 40 were for a resolution-dependent look and would now scale twice. The final-only values
+# (4K, the offline tier) are gv3-world's, in offline.py.
+RENDER_ALIKE = {
+    "post/referenceHeight": 1080.0,
+    "post/motionBlur/maxRadius": 60.0,
+    "post/motionBlur/samples": 32,
+    "scene/fogSky": 1.0,
+    "scene/fogSkyDistance": 0.0,
+}
+# The same, where the scene file keeps them (a value set in the project and not the scene is the one
+# the project states; both are written so neither reverts the other).
+RENDER_ALIKE_SCENE = {("post", "referenceHeight"): 1080.0, ("environment", "fogSky"): 1.0,
+                      ("environment", "fogSkyDistance"): 0.0}
+
+
+def apply_render_alike(project, scene):
+    project["parameters"].update(RENDER_ALIKE)
+    for (block, key), value in RENDER_ALIKE_SCENE.items():
+        scene.setdefault(block, {})[key] = value
+
+
 def apply_water(scene):
     water = _terrain(scene)["terrain"]["water"]
     for key in WATER_DEAD_KEYS:
@@ -196,6 +225,7 @@ def apply_wind(project, scene):
 def apply_base(project, scene):
     params = project["parameters"]
     params.update(BASE)
+    apply_render_alike(project, scene)
     kept = []
     for e in project.get("effects", []):
         if e["id"] in REMOVED_EFFECTS or e.get("type") in REMOVED_EFFECT_TYPES:
