@@ -16,9 +16,14 @@ where its predecessor stopped.
 - **Render is integrating** on a new branch, **`integrate/render`**, in `~/Documents/GitHub/av-gen-signals`: `776b1a87` =
   `ec515c8b` + `agent/render`. The merge was textually clean (the handoff expected conflicts; none). `integrate/revision`
   stays at the tested `ec515c8b`.
-  - Next: build (CMake reconfigured for the new test files), targeted tests, the full CPU suite, then the full GPU
-    suite in a window with no CPU suite. Then fast-forward `integrate/revision` to it, and main after the owner allows.
-  - Render's own full GPU suite (`full-2`, on its final code) is still queued on the lock.
+  - **Built** (12:45, exit 0; a true no-op afterwards; ctest lists 3,788 tests, +7 from render).
+  - Next: the full CPU suite, then the full GPU suite in a window with no CPU suite. Then fast-forward
+    `integrate/revision` to it, and main after the owner allows.
+  - **Held (12:55) on the owner's decision.** Render's own full GPU suite (`full-2`, on its final code, pid 65971) is
+    queued on the lock behind four jobs; a full GPU suite takes about 20 minutes (`full-1`: 1,166 s). A CPU suite run
+    alongside it would void it as evidence (ENGINEERING-RULES, the GPU lock), and the classifier refused both
+    withdrawing `full-2` and starting the integration CPU suite while it waits. The owner chooses: withdraw `full-2`
+    (the integration's GPU suite covers render's code too), or keep it and run the integration CPU suite after it.
 - **The alien float's cause is found. It is data, not the engine.** gv3-cast found that the multicam gives ember and
   vane an entity reaction `audio.bass -> liveliness/bounce` (+0.45 on a 0.32 bounce, 60 ms attack). With the authored
   bounce at 0, the reaction alone still lifted them (p90 0.16-0.17 m, max 0.22-0.23 m). Rook and tide match ADR-895.
