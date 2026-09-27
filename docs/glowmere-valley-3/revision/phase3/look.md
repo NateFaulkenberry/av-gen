@@ -235,6 +235,9 @@ song), and the hue histograms computed so far (`*.hue.json`; `fp-preview` is the
 960×540 preview, from the review folder).
 
 1. Engine: `build/release` -> `/Users/natefaulkenberry/Documents/GitHub/av-gen-engine-2/build/release`.
+   **Trap:** `python3 -m gv3.reactivity snapshot|critic|audit` read the *written* project in
+   `examples/world/`, which the commit rule restores to the committed (first-pass) version. Run
+   the generator first, snapshot, then restore; check the snapshot's route count (65, not 11).
 2. The iteration-2 pairs are in `build/gv3/look/clips/{before,v3}-{A,B,D,E,F}.mov`; C was never
    rendered. v4's clips land as `clips/v4-<tag>.mov` (tags D, A, E, s33, s39, s08); the batch log is
    `clips/v4-batch.log`.
