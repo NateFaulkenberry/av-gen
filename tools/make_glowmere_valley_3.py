@@ -10,8 +10,9 @@ build/gv3/shots.json (the cut, for tools/contact_sheet.py) and, for the film,
 docs/glowmere-valley-3/04-shot-plan.md.
 
 What is authored about Glowmere Valley 3 lives in tools/gv3/: the musical grid (music.py), the
-shots (shots.py), the look and the modulation (look.py), the cast and the abduction (cast.py). This
-file only assembles. Every creative decision is data there, written out as the engine's own
+Director's cut and what GV3 tells the Director (songcut.py), the compositions on its spans
+(shots.py), the look and the modulation (look.py), the cast and the abduction (cast.py). This file
+only assembles. Every creative decision is data there, written out as the engine's own
 content -- a camera collection with locked shots, timeline keys, modulation routes, effect
 instances, staging -- so the project is the whole truth and renders without this script.
 
@@ -34,7 +35,7 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from gv3 import cast, look, music, world  # noqa: E402
+from gv3 import cast, look, music, songcut, world  # noqa: E402
 from gv3.ground import Ground  # noqa: E402
 
 ROOT = HERE.parent
@@ -53,22 +54,24 @@ SOURCE_SHA256 = {
     "glowmere-valley-2-multicam.scene.json": "",
 }
 
-# How the production's segments read in the engine's section vocabulary (src/song/section_type.cpp)
-# and which shot intent the sequencer should show for each. The names are the production's own.
+# How the production's segments read in the engine's section vocabulary (src/song/section_type.cpp),
+# and each one's treatment -- the shot intent the Director cuts it by (songcut.TREATMENT_OF: a
+# built-in, or one of GV3's own, which the project's shot language defines). The names are the
+# production's own.
 SECTION_TYPES = {
-    "cold-open": ("establishing", "atmospheric_establishing"),
-    "riff-groove": ("groove", "groove_coverage"),
-    "first-pullback": ("pause", "held_tension"),
-    "groove-2": ("groove", "slow_environmental_exploration"),
-    "lift": ("build", "increasing_movement"),
-    "arrival": ("peak", "rising_reveal"),
-    "melodic-plateau": ("exploration", "environmental_performance_exploration"),
-    "lead-forward": ("tension", "building_tension"),
-    "suspension": ("suspense", "suspended_locked_off"),
-    "submerged-break": ("breakdown", "held_tension"),
-    "riser": ("riser", "increasing_movement"),
-    "drop": ("drop", "large_scale_dynamic_coverage"),
-    "tail": ("outro", "hard_transition"),
+    "cold-open": "establishing",
+    "riff-groove": "groove",
+    "first-pullback": "pause",
+    "groove-2": "groove",
+    "lift": "build",
+    "arrival": "peak",
+    "melodic-plateau": "exploration",
+    "lead-forward": "tension",
+    "suspension": "suspense",
+    "submerged-break": "breakdown",
+    "riser": "riser",
+    "drop": "drop",
+    "tail": "outro",
 }
 # ...and in the analyser's smaller vocabulary of section *functions* (src/analysis/structure.hpp),
 # where `other` is the honest answer for a groove that has no verses and choruses.
@@ -123,9 +126,6 @@ def strip_director_residue(project, scene):
     seq = project.setdefault("sequence", {})
     seq["shots"] = []
     seq["sectionPerformance"] = []
-    # Song mode would re-cut the camera from sections if anybody pressed Direct; say so in the panel's
-    # own terms by leaving it off Song.
-    project.setdefault("autoDirector", {})["mode"] = "edited"
     # One musical time (ADR-896): the meter's settings are parameters. The source's control.phraseBars
     # and control.sectionPhrases are no longer read; the hand-measured grid is pinned (bar 1 on the
     # first tracked beat, 8-bar phrases), which the analysis also detects.
@@ -142,7 +142,7 @@ def write_sections(project):
     markers, sections, detected = [], [], []
     for name, first, after in music.SEGMENTS:
         start, end = music.segment(name)
-        kind, intent = SECTION_TYPES[name]
+        kind, intent = SECTION_TYPES[name], songcut.TREATMENT_OF[name]
         markers.append({"kind": "section", "name": name.replace("-", " "), "time": round(start, 6)})
         sections.append({"authored": True, "density": 0.0, "edited": ["type", "shot-intent", "start", "end"],
                          "end": round(end, 6), "energy": SEGMENT_ENERGY[name], "group": 0,
@@ -157,6 +157,8 @@ def write_sections(project):
     markers[0]["time"] = 0.0
     seq["markers"] = markers
     seq["sectionTimeline"] = {"duration": FILM_END, "sections": sections}
+    # GV3's own treatments beside the built-ins, so the Sequence panel's treatment picker offers them.
+    seq["shotLanguage"] = songcut.shot_language()
     seq["structure"] = {"duration": FILM_END, "sections": detected, "tempoBpm": music.BPM, "tempoConfidence": 1.0}
 
 
@@ -164,8 +166,13 @@ def write_sections(project):
 def install_cut(project, scene, shots):
     """Every shot's rig into the scene's camera collection, one locked shot each, and the rigs'
     keys onto the project timeline. The cut covers the film end to end, so nothing else -- no event
-    camera, no default -- ever takes the frame."""
-    cameras = [{"id": 1, "name": "Main", "autoDirector": False}]
+    camera, no default -- ever takes the frame.
+
+    The spans are the Director's (songcut.py); the project says so where an artist looks: the
+    Auto-director panel shows the Song mode and shot timing the cut was made with (`autoDirector`),
+    its own camera stays available to it (so Direct re-cuts the same spans on the Main camera), and
+    the set pieces' moments are the song plan's events."""
+    cameras = [{"id": 1, "name": "Main", "autoDirector": True}]
     cut = []
     tracks = []
     shots = sorted(shots, key=lambda s: s.start)
@@ -186,10 +193,23 @@ def install_cut(project, scene, shots):
     scene["cameraDirection"] = {"cameras": cameras, "shots": cut, "default": 2 if len(cameras) > 1 else 1,
                                 "nextId": len(cameras) + 1}
     project["timeline"]["tracks"].extend(tracks)
+    project["autoDirector"] = songcut.director_block(project.get("autoDirector"))
+
+
+ALIEN_BUDGET = 0.20  # the most of the film an alien may lead (brief section 9; the plan: 38% -> 20% or less)
+
+
+def screen_time(shots):
+    """Seconds of the cut by what leads each shot (rig.LEADS)."""
+    out = {}
+    for s in shots:
+        out[s.lead] = out.get(s.lead, 0.0) + s.duration
+    return out
 
 
 def check_cut(shots, end):
-    """Refuse a cut with a hole, an overlap, or a node that does not exist."""
+    """Refuse a cut with a hole, an overlap, an empty shot, a cut off the beat, or aliens leading more
+    of the film than the budget allows."""
     problems = []
     shots = sorted(shots, key=lambda s: s.start)
     if shots and shots[0].start > 1e-6:
@@ -202,6 +222,14 @@ def check_cut(shots, end):
     for s in shots:
         if s.end <= s.start:
             problems.append(f"{s.sid} is empty")
+        if s.start > 0.0:
+            beats = (s.start - music.FIRST_DOWNBEAT) / music.BEAT
+            if abs(beats - round(beats)) > 1e-6:
+                problems.append(f"{s.sid} starts at {s.start:.4f}, off the beat grid")
+    if end is not None and shots:
+        alien = screen_time(shots).get("alien", 0.0) / (shots[-1].end - shots[0].start)
+        if alien > ALIEN_BUDGET + 1e-9:
+            problems.append(f"aliens lead {100 * alien:.1f}% of the film, over the {100 * ALIEN_BUDGET:.0f}% budget")
     return problems
 
 
@@ -209,24 +237,30 @@ def write_shots_json(shots, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(dump({"shots": [
         {"id": s.sid, "start": round(s.start, 4), "end": round(s.end, 4),
-         "label": s.purpose[:60], "segment": s.segment, "subject": s.subject} for s in shots]}))
+         "label": s.purpose[:60], "segment": s.segment, "subject": s.subject, "lead": s.lead,
+         **({"span": s.span.label, "arc": s.span.arc} if s.span else {})} for s in shots]}))
 
 
 def shot_plan(shots):
     """The production record's shot table (04-shot-plan.md), written from the cut itself."""
     lines = ["# 4. Shot plan", "",
-             "Generated by `tools/make_glowmere_valley_3.py` from `tools/gv3/shots.py` -- the table and the "
-             "project are written from the same data, so they cannot disagree. Times are seconds on the "
-             "130 BPM grid (bar.beat in brackets). Status and quality assessment are kept in "
-             "[05-quality.md](05-quality.md) per iteration.", "",
-             "| Shot | Time | Bars | Segment | Purpose | Subject | Camera | Movement | Music | Effects | Modulation |",
-             "|---|---|---|---|---|---|---|---|---|---|---|"]
+             "Generated by `tools/make_glowmere_valley_3.py`: the spans are the engine Director's Song Mode cut "
+             "(`tools/gv3/songcut.py`, `avgen_song_cut`) and each span's composition is `tools/gv3/shots.py` -- "
+             "the table and the project are written from the same data, so they cannot disagree. Times are "
+             "seconds on the 130 BPM grid (bar.beat in brackets); Arc and Why are the Director's. Status and "
+             "quality assessment are kept in [revision/phase3/cut.md](revision/phase3/cut.md) per iteration.", "",
+             "| Shot | Time | Bars | Segment | Arc | Lead | Purpose | Subject | Camera | Movement | Music | Effects | Modulation |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for s in shots:
+        arc = s.span.arc if s.span else ""
         lines.append(f"| {s.sid} | {s.start:.2f}-{s.end:.2f} ({music.label(max(s.start, music.FIRST_DOWNBEAT))}) | "
-                     f"{s.duration / music.BAR:.2f} | {s.segment} | {s.purpose} | {s.subject} | {s.camera} | "
-                     f"{s.movement} | {s.music} | {s.effects} | {s.modulation} |")
+                     f"{s.duration / music.BAR:.2f} | {s.segment} | {arc} | {s.lead} | {s.purpose} | {s.subject} | "
+                     f"{s.camera} | {s.movement} | {s.music} | {s.effects} | {s.modulation} |")
     lines.append("")
-    lines.append(f"{len(shots)} shots; median length {sorted(s.duration for s in shots)[len(shots) // 2]:.2f} s.")
+    total = shots[-1].end - shots[0].start
+    lead = ", ".join(f"{k} {v:.1f} s ({100 * v / total:.0f}%)" for k, v in sorted(screen_time(shots).items()))
+    lines.append(f"{len(shots)} shots; median length {sorted(s.duration for s in shots)[len(shots) // 2]:.2f} s. "
+                 f"Led by: {lead}.")
     lines.append("")
     return "\n".join(lines)
 
@@ -235,6 +269,8 @@ def shot_plan(shots):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--scout", action="store_true", help="a location scout instead of the cut")
+    parser.add_argument("--recut", action="store_true",
+                        help="adopt the Director's cut as it is now and rewrite tools/gv3/song_cut.json")
     args = parser.parse_args()
 
     for path in (SRC_PROJECT, SRC_SCENE):
@@ -262,11 +298,16 @@ def main():
         end = None
     else:
         from gv3 import shots as film
-        shots = film.build(ground)
         end = FILM_END
         arc = look.apply_arc(project)
         motifs = look.apply_motifs(project)
         report.append(f"look: {arc} arc track(s), {motifs} motif route(s)")
+        # The spans are the Director's, cut from this project as it now stands (songcut.py).
+        spans, director, note = songcut.direct(project, scene, recut=args.recut)
+        shots = film.build(ground, spans)
+        st = director["stats"]
+        report.append(f"cut: {note}: {st['shots']} spans, {st['cutsOnDownbeat']} of {st['cuts']} cuts on a "
+                      f"downbeat, lengths {st['min']:.2f}-{st['max']:.2f} s (cv {st['cv']:.2f})")
     problems = check_cut(shots, end)
     if problems:
         for p in problems:
