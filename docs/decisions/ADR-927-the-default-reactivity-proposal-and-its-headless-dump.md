@@ -116,7 +116,8 @@ the notes and changes nothing; the assistant edits it if the request asks for mo
 - **Pixels** (`test_reactivity_gpu.cpp`, the glade at 384x216, each route switched off as the control):
   the elder's gills on a detected kick (and nothing in the kickless break), the fungi's glow 90 ms after a
   kick, their hue in the drop (measured -0.13 of a turn on the changed 8-bit pixels for the -0.08 key),
-  their light wave dimmer in the quiet break than without the section's depth, the elder's spores and its
+  their light wave dimmer in the quiet break than without the section's depth, and a hero part's own light
+  wave likewise, the elder's spores and its
   practical light on the kick, the ecology light, fog and wind in the drop, the water on the hats and in
   the drop, the aurora on the lead, and the lamps on a clap.
 - **Glowmere Valley 3** (a scratch copy of `examples/world/glowmere-valley-3.json`, with the signals
@@ -124,7 +125,8 @@ the notes and changes nothing; the assistant edits it if the request asks for mo
   or ONE_PHASE: micro 15, meso 32, macro 13; the kick 6 routes, the clap 5, the hats 4, the downbeat 4,
   the phrase 4, the breath 5, the lead 5, the bass 4, the section change 12, the section's energy 7, the hue
   4. Installed by plain JSON edits into a copy, `--audit-routes` finds all 60 live. Rendered at 960x540
-  with and without it (s16, s33, s35), it changes 8-28% of each frame's pixels, most on the beats.
+  with and without it (s16, s33, s35; one second each at 30 fps), it changes 8-28% of each frame's pixels
+  (side-by-side clips and sheets in `~/Desktop/av-gen-review/reactivity-adr924-927/`).
 - The proposal is a starting position: GV3's generator installs, edits or drops items, and the evaluator
   judges the behavioural and meaningful tiers the validator cannot.
 - `director.inspect_capabilities`' registry gains `reactive` (ADR-925); the Director tools are ten.
