@@ -130,7 +130,7 @@ bool hasRule(const json& e, const std::string& rule) {
 
 } // namespace
 
-TEST_CASE("--audit-routes reports every route and track with a verdict and a reason", "[liveness][cli][adr902]") {
+TEST_CASE("The route audit (--audit-routes) reports every route and track with a verdict and a reason", "[liveness][cli][adr902]") {
     const auto project = writeProject();
     auto report = app::auditProjectFile(project);
     REQUIRE(report.has_value());
@@ -202,7 +202,7 @@ TEST_CASE("--audit-routes reports every route and track with a verdict and a rea
     CHECK(r["summary"]["findingsByRule"]["node-emits-nothing"] == 1);
 }
 
-TEST_CASE("--audit-routes: a project load logs and warns about its dead items", "[liveness][cli][adr902]") {
+TEST_CASE("The route audit (--audit-routes): a project load logs and warns about its dead items", "[liveness][cli][adr902]") {
     const auto project = writeProject();
     app::Engine engine(app::EngineMode::Offline);
     engine.setLiveControl(false);
@@ -221,7 +221,7 @@ TEST_CASE("--audit-routes: a project load logs and warns about its dead items", 
     CHECK_FALSE(mentions("post/grade/contrast"));
 }
 
-TEST_CASE("--audit-routes writes the file and exits by the documented codes", "[liveness][cli][adr902]") {
+TEST_CASE("The route audit (--audit-routes) writes the file and exits by the documented codes", "[liveness][cli][adr902]") {
     const auto project = writeProject();
     const auto out = projectDir() / "audit.report.json";
     std::filesystem::remove(out);
