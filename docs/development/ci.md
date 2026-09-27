@@ -69,6 +69,10 @@ gh workflow run ci.yml --ref <branch>                          # the full CI
 gh workflow run ci.yml --ref <branch> -f test_filter='[ai]'    # one tag, remotely (labelled FILTERED)
 gh workflow run ci.yml --ref <branch> -f rng_seed=12345        # replay a run's test order
 gh workflow run sanitizers.yml --ref <branch> -f sanitizer=asan   # asan | tsan | both
+
+# Does the sanitizer plan still name real cases, and run every case once? (Every push checks it.)
+python3 tools/ci/catch2_run.py plan-check --binary build/release/tests/avgen_tests \
+    --plan tools/ci/sanitizer-plan.txt --exceptions tools/ci/hosted-runner-exceptions.txt
 ```
 
 `workflow_dispatch` only works for a workflow file that exists on the default branch. Until this
@@ -95,6 +99,8 @@ push ─▶ Build (Release) ─┬─▶ CPU tests (avgen_tests, full)
   - split into 3 Catch2 shards (`--shard-count`) that run in parallel on the runner's 3 cores;
   - every shard uses the same `--rng-seed`, so the shards partition the set. The script checks that
     **ran == listed**, so a shard that dies early cannot turn into a quiet subset.
+  - a last step, `plan-check`, proves `tools/ci/sanitizer-plan.txt` still names real cases and runs
+    each case once (see [The sanitizer partition](#the-sanitizer-partition)). It lists; it runs nothing.
 - **GPU tests:**
   - `avgen_render_tests` in one process (one GPU; see `RESOURCE_LOCK` in `tests/CMakeLists.txt`);
   - then the headless smoke test (`avgen --headless --example Hyperspace --frames 1`), the same
@@ -128,8 +134,11 @@ the commit message.
 - **ASan/UBSan:**
   - `--preset asan`, which is Debug + `-fsanitize=address,undefined` on engine targets and tools,
     built once;
-  - the CPU suite runs in a matrix: everything except `[stage]` in 3 shards on one runner, and
-    the 66 `[stage]` simulation cases in 18 shards over six runners. Nothing is left out.
+  - the CPU suite runs in five jobs laid out by a plan, `tools/ci/sanitizer-plan.txt`: two jobs of
+    named processes for the heavy cases and the cases that share a film, and three jobs of rest
+    shards for every other case. Every default case runs exactly once, except two that no hosted
+    job can finish, which are skipped by name and listed in every summary. See
+    [The sanitizer partition](#the-sanitizer-partition).
   - It gates on sanitizer reports, crashes, timeouts and unexercised cases (`--gate sanitizer`).
     Assertion failures under Debug+ASan are listed, not gated. In run 36087867052 all 11 of them
     were `[performance]` wall-clock ceilings and 10 s job waits that an -O0 instrumented build
@@ -139,17 +148,18 @@ the commit message.
   - Each report appears in the summary as `SANITIZER FAILURE`, with its type, first frame and a
     stack excerpt.
 - **TSan:** `--preset tsan` over the concurrency subset (below). Runs weekly (Sunday) and on dispatch.
-- **Capacity:** a sanitizer run uses up to 5 macOS jobs at once (4 `[stage]` parts plus `main` or
-  TSan). That is the whole free-account macOS concurrency, so push CI queues behind it. That is why
-  it runs at night (07:17 UTC), and why a dispatch during working hours will delay everyone's
-  pushes.
+- **Capacity:** a sanitizer run's five test jobs take the whole free-account macOS concurrency (5
+  jobs) for 4-5 h, so push CI queues behind it; on Sundays TSan is a sixth job and waits for a
+  slot. The three rest jobs finish in about 2.5-4 h and hand their slots back while the film job
+  runs on. That is why it runs at night (07:17 UTC), and why a dispatch during working hours will
+  delay everyone's pushes.
 
 ## What the categories mean
 
 | Category | Where | What runs |
 |---|---|---|
 | FULL | `CI` on every push | build of every target; all default `avgen_tests` cases; all default `avgen_render_tests` cases; the headless binary smoke test |
-| SANITIZER | `Sanitizers` nightly / dispatch | ASan+UBSan over the default CPU set, minus the documented exclusions |
+| SANITIZER | `Sanitizers` nightly / dispatch | ASan+UBSan over the default CPU set, minus the documented exclusions and the two cases `tools/ci/sanitizer-plan.txt` skips |
 | EXTENDED | `Sanitizers` weekly / dispatch | TSan over the concurrency subset |
 | targeted | `CI` dispatch with `test_filter` | one tag on both binaries, labelled `FILTERED` in the summary; never a substitute for FULL |
 
@@ -308,6 +318,7 @@ Why this runner:
 | **Push → verdict, wall clock** | **~25-37 min** | **~9-10 min** (run 36066934636: 9m 06s) |
 | GPU job (informational, main/nightly) | ~15 min (853 s for `avgen_render_tests`) | same |
 | TSan build + 226-case subset | 25 min build + 27 min tests | n/a |
+| ASan/UBSan build + tests (2026-09-26/27) | 38 min build; the old 7 parts ran 12:16-20:51 UTC with 4 timeouts | 5 min build; the plan's 5 jobs, about 4-5 h expected (not yet measured) |
 
 Runs: cold [36060799310](https://github.com/NateFaulkenberry/av-gen/actions/runs/36060799310), warm
 [36066934636](https://github.com/NateFaulkenberry/av-gen/actions/runs/36066934636).
@@ -328,45 +339,94 @@ reference, if it were private (macOS billed at 10× Linux):
 - a warm push run is ~10 macOS job-minutes, or ~100 billed minutes;
 - a cold run is ~40, or ~400 billed.
 
-## Sanitizer exclusions
+## The sanitizer partition
 
-The ASan/UBSan jobs run the same default CPU set as the per-push job, minus the same two
-documented crash exclusions (`tools/ci/hosted-runner-exceptions.txt`). There is no
-sanitizer-specific exclusion.
+The ASan/UBSan run covers the default CPU set, the same set as the per-push job, minus:
 
-**Why it is split, measured on run 36060803359.** A single 3-shard ASan job ran only 847 of 3,233
-cases before its shards stopped (4.8 h):
+- the two documented crash exclusions (`tools/ci/hosted-runner-exceptions.txt`), as on every push;
+- two cases that no hosted job can finish under ASan, skipped by name (below).
 
-- the median case took 4 ms;
-- the 66 `[stage]` cases (abduction, beam and farm simulations) take up to 2 h **each** under
-  Debug+ASan, and were 97% of the measured time;
-- each shard was also stopped early by an ASan report (below), which halts the process.
+Where every case runs is decided by one file, `tools/ci/sanitizer-plan.txt`, read by
+`tools/ci/catch2_run.py run --plan <file> --part <part>`:
 
-**Split run 36087867052** (build 33 min):
+| Job | What runs | Expected (Debug + ASan, hosted runner) |
+|---|---|---|
+| `heavy-1` | `film`: the eleven cases that read `film()` in `test_abduction_sequence.cpp`, in one process; `delete`: deleting animals, the engine's writeback; `pre262`: the pre-ADR-262 scenario, the slowed benchmark run | 4.1-5.0 h. The film: 245-300 min measured. The other two processes: about 3-3.5 h each |
+| `heavy-2` | `fade`: the three cases that read the fade film in `test_abduction_fade.cpp`; `director`: the director's own 30 s, the lab; `abduct`: the UFO abducting several animals, the animal inside the beam | 3.2-3.7 h. Measured: fade 190-216 min, director 154 + 36, abduct 147 + 71 at worst |
+| `rest-a`, `rest-b`, `rest-c` | every other default case (`~[.]`, minus every case the plan names), 9 Catch2 shards, 3 per job | 2.4 h median, 3.8 h at the 95th percentile, per job |
 
-- the four `[stage]` parts ran all 66 cases with **no sanitizer reports**, in 1.3 to 5.0 h per
-  part. The heaviest part was close to the 6 h limit, so it is now 6 parts;
-- the `main` part took 3.9 h and ran 2,426 of 3,166 cases, then stopped on a second ASan report
-  (below). TSan's subset was clean again.
+All five run at once, so the run takes about 4-5 h after the 5-38 min build, against 8.5-10.5 h for
+the seven parts it replaces. Every job has the same 330 min ceiling (`--timeout-min`, inside the
+job's 355 min cap), and the thinnest margin is the film: 300 min at its worst against 330.
 
-**Findings, reported to the owner and not fixed here** (they need product or test changes):
+**How it was measured.** Runs 36241405408 (2026-09-26) and 36321265640 (2026-09-27), both at main
+83a12334, three processes per 3-vCPU runner. Per case, ASan took a median 57x its Release time
+(p90 114x, over 110 cases that take over 1 s in Release). Cases never run under ASan are estimated
+from Release at 57x. The rest figures come from 4,000 random orders cut the way Catch2 cuts them
+into 9 shards, taking each case at the slowest time it was ever measured, which is pessimistic.
+Over the same orders, the slowest of all nine shards is 3.2 h median, 4.3 h at p95 and 4.9 h at p99.
+The same case can differ by up to half between runs (the UFO case: 95 min, then 147), so these
+are ranges, not promises: if a part times out, the TIMEOUT block names its process and the case it
+was running.
 
-- `stack-use-after-scope` in "packing puts every authored number in the lane the shader reads"
-  (`tests/unit/test_wave_effects.cpp:592`). `resolveWaves(std::array{e}, …, out)` stores a pointer
-  into the temporary `std::array` in `out[0].effect`, and `world::packWave(out[0])` on the next line
-  reads it after the temporary has died (`src/world/wave_effect.cpp:661`). The test is at fault as
-  written, and the API makes the mistake easy.
+**Why a plan, and not more shards.** The old split ran `[stage]` in 18 random shards over six
+jobs, and five of the seven parts hit the ceiling. The time was not in the cases themselves:
 
-- `heap-use-after-free` in `Composition::unregisterNodeParameters`
-  (`src/scene/composition.cpp:4818`). A parameter is freed by `ParameterSet::remove` via
-  `unregisterParameters` (4865, called at 4842) while the particle-parameter walk still reads its
-  name. It is reached from `Composition::removeNode` in "Composition nests scene files and flattens
-  them with prefixed parameters" (`tests/unit/test_composition.cpp:868`). Until it is fixed, the
-  nightly ASan main part reports it, and the cases after it in that shard show as never run.
-- UBSan null dereference in `test_body_compensation.cpp:437`, the same missing-asset defect that
-  segfaults in Release (now excluded).
-- Debug-only `assert` in `json.hpp:2174` from the music-video `get_state` case without its audio
-  (now excluded).
+- **Two test files build a film once per process** and share it between their cases (`film()`,
+  90 s of Glowmere Valley 2 at 60 Hz, and the fade file's `static const Film f`). In one process
+  the first reader pays for the film and the others take 0 min (09-26: 280 min, then 0).
+  Random shards spread `film()`'s eleven readers over up to eleven processes, and each paid 4-5 h
+  for the same film. More shards would have made that worse. Now each film is built once.
+- **"main" held two cases that no hosted job can finish**, and no partition can split them:
+  - "the farm animals travel the way they are drawn facing, at the speed their clips say" takes
+    1122 s in Release on the runner, and was killed after 311 min under ASan (36241405408);
+  - "The film's five characters all walk, at more than one seed" takes 512 s in Release (two
+    150 s films), and was killed after 299 min (36321265640).
+
+  They are the plan's two `skip` lines. **ASan does not check them.** Their code (farm locomotion,
+  the multicam's walking) runs under ASan in lighter cases, but those two paths through it do not.
+  They need a sanitizer-sized variant, a shorter film when `__has_feature(address_sanitizer)`,
+  before they can come back; that is their owners' change.
+- **Cases over about an hour** each get a named process, alone or with one more, so two of them
+  can never meet in one random shard.
+
+The plan also fixes a quiet over-selection. `[stage]` also matches a hidden probe, "probe: the
+animal, the beam and the lag" (`[.][beam][probe][stage]`), which no default run includes, and the
+old parts ran it for 94 min. The rest filter is `~[.]`.
+
+**Keeping it honest.** A plan names cases, so a rename could quietly move a four-hour case into a
+rest shard. Every push runs `catch2_run.py plan-check` (the CPU job's last step, listing only, a few
+seconds). It counts, with the binary's own `--list-tests`, that placed + skipped + rest equals the
+default set, and it fails on any plan name that matches no case or more than one:
+
+```
+3786 cases: 22 placed + 2 skipped + 3762 in the rest of ~[.] = 3786     (main 876a11e2)
+```
+
+A name that goes stale on the nightly anyway is a `Sanitizer plan` warning in that job's summary,
+and the renamed case runs in a rest shard. To move a case, edit the plan. A new case needs no
+entry unless it is heavy: new cases land in the rest.
+
+**Earlier history.** Run 36060803359: one 3-shard ASan job ran 847 of 3,233 cases in 4.8 h, 97% of it
+the `[stage]` cases. Run 36087867052 split it into `main` plus four `[stage]` parts, later six.
+
+**Findings.** Runs 36060803359 and 36087867052 found three defects, all fixed on 2026-09-25
+(20de27ac):
+
+- the `stack-use-after-scope` in `test_wave_effects.cpp` (a `ResolvedWave` pointing into a
+  temporary `std::array`);
+- the `heap-use-after-free` in `Composition::unregisterParameters`;
+- the null dereference in `test_body_compensation.cpp`, which now skips without its asset.
+
+The Debug-only `assert` in `json.hpp` from the music-video `get_state` case without its audio is
+still excluded.
+
+Runs 36241405408 and 36321265640 found one more: UBSan's `load of value 240, which is not a valid
+value for type 'bool'` at `atmospherics.cpp:698`, in `packComet`. It is the same mistake as the wave
+test's, in `test_atmospherics.cpp`'s `resolveComet` helper, and ADR-941 fixes it. It is worth
+knowing that ASan could not have caught it. The helper had *returned*, so the read was a
+stack-use-after-return, which ASan reports only with `detect_stack_use_after_return=1` (off here,
+because it costs time). UBSan saw it only because the dead byte happened not to be 0 or 1.
 
 The brief expected the bit-exact golden trace tests to drift by 1 ULP under the -O0 sanitizer
 build. On a fresh clone they cannot run at all: all three stored-baseline comparisons need
@@ -427,20 +487,38 @@ such.
    authoritative remotely. Until then it is local.
 3. **Two test defects** exposed by the runner: `test_body_compensation.cpp:433` (segfault) and
    the `test_ai_tools.cpp:780` abort. Each should SKIP or fail cleanly without its asset, after
-   which its exclusion can go.
+   which its exclusion can go. The first now skips (20de27ac, 2026-09-25), so its exclusion is
+   probably stale; take it out after one run shows the case skipping on the runner.
 4. **Tests that write into `examples/world`** during a run (`test_glowmere_multicam*`,
    `test_motion_matching_default_off`). They are harmless on CI but racy between concurrent
    local agents.
+5. **The two cases the sanitizer plan skips** (the farm locomotion case, the five characters over
+   two seeds) are not checked by ASan at all. They need a sanitizer-sized variant from their
+   owners, a shorter run when `__has_feature(address_sanitizer)`, before they can come back.
+6. **The sanitizer run's margin.** The film in `test_abduction_sequence.cpp` is the floor, at
+   245-300 min of the 330 min ceiling, and no partition can shorten it. Two levers remain, each the
+   owner's call:
+   - a shorter film under sanitizers;
+   - building the `asan` preset at `-O1` instead of Debug's `-O0`. ASan's own documentation
+     recommends `-O1`, and it would likely be several times faster; that has not been measured.
+
+   With margin in hand, `detect_stack_use_after_return=1` would let ASan catch the mistake ADR-941
+   fixed directly; today only UBSan's bool check caught it, and only by luck.
 
 ## Files
 
 - `.github/workflows/ci.yml`, `.github/workflows/sanitizers.yml`
+- `tools/ci/sanitizer-plan.txt`: the ASan/UBSan partition; which process runs each heavy case,
+  the rest filter, and the two skipped cases, each with its measurement.
 - `tools/ci/build.sh`: configure and build a preset, with timings, the ccache report and a
   `meta.json`.
 - `tools/ci/catch2_run.py`:
   - runs a Catch2 binary in shards and reads its XML and exit codes;
   - writes `result.json` and `summary.md`, emits annotations, and fails the step on any failure,
     crash, timeout, sanitizer report or unexercised case;
+  - `run --plan <file> --part <part>` runs one part of the sanitizer plan: its named processes,
+    then its rest shards (`--shards`, `--shard-total`, `--shard-first`);
+  - its `plan-check` subcommand proves a plan runs every case of a binary exactly once;
   - its `report` subcommand builds the run summary.
 
   It can be run locally against any build: `python3 tools/ci/catch2_run.py run --binary

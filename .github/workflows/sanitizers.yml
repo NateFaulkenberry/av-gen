@@ -96,12 +96,12 @@ jobs:
     # tools/ci/sanitizer-plan.txt: named processes for the heavy and fixture-sharing cases, and rest
     # shards for everything else. Every case runs exactly once (`catch2_run.py plan-check`, run by
     # every push), except two the plan skips because no hosted job can finish them.
-    # docs/development/ci.md, "The sanitizer partition", has the measurements. Expected per part:
-    #   heavy-1 : the sequence film (one process), deleting animals, the writeback pair   ~4-5 h
-    #   heavy-2 : the fade film, the director's own film, two abduction scenarios         ~3.5-4 h
-    #   main    : rest ~[stage], minus the plan's cases, 3 shards                        ~2.5-3 h
-    #   stage   : rest [stage]~[.], minus the plan's cases, 3 shards                     ~2-4 h
-    name: ASan/UBSan tests (${{ matrix.part }})
+    # docs/development/ci.md, "The sanitizer partition", has the measurements. Expected per job:
+    #   heavy-1     : the sequence film (one process, the floor), and two pairs of long cases  ~4-5 h
+    #   heavy-2     : the fade film, the director's own 30 s, two abduction scenarios          ~3.2-3.7 h
+    #   rest-a/b/c  : every other default case, 9 Catch2 shards, 3 per job                     ~2.7 h (p95 3.7 h)
+    # Five jobs: one wave of the account's five macOS slots, not two.
+    name: ASan/UBSan tests (${{ matrix.job }})
     needs: asan-build
     runs-on: macos-26
     timeout-minutes: 355
@@ -109,11 +109,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # `shards`: how many rest shards; the plan gives the parts that have them their filter.
-          - { part: heavy-1, shards: 0 }
-          - { part: heavy-2, shards: 0 }
-          - { part: main,    shards: 3 }
-          - { part: stage,   shards: 3 }
+          # `shards` rest shards, global `first` onwards of `total`; the plan gives `rest` its filter.
+          - { job: heavy-1, part: heavy-1, shards: 0, total: 0, first: 0 }
+          - { job: heavy-2, part: heavy-2, shards: 0, total: 0, first: 0 }
+          - { job: rest-a,  part: rest,    shards: 3, total: 9, first: 0 }
+          - { job: rest-b,  part: rest,    shards: 3, total: 9, first: 3 }
+          - { job: rest-c,  part: rest,    shards: 3, total: 9, first: 6 }
     env:
       # Gate: --gate sanitizer. Only a sanitizer report, a crash, a timeout or an unexercised case
       # fails this job. Assertion failures under Debug+ASan are listed, not gated: in run
@@ -137,33 +138,37 @@ jobs:
         env:
           TEST_FILTER: ${{ inputs.test_filter }}
           SHARDS: ${{ matrix.shards }}
+          SHARD_TOTAL: ${{ matrix.total }}
+          SHARD_FIRST: ${{ matrix.first }}
           PART: ${{ matrix.part }}
+          JOB: ${{ matrix.job }}
         run: |
           chmod +x build/asan/tests/avgen_tests
           # One seed for the whole matrix; a rest part's shards must partition the same order.
           seed=$(( GITHUB_RUN_ID % 2147483647 ))
-          common=(--binary build/asan/tests/avgen_tests --name "asan-$PART" --label "ASan/UBSan: $PART"
-                  --out "$RESULTS/asan-$PART" --seed "$seed" --timeout-min 330
+          common=(--binary build/asan/tests/avgen_tests --name "asan-$JOB" --label "ASan/UBSan: $JOB"
+                  --out "$RESULTS/asan-$JOB" --seed "$seed" --timeout-min 330
                   --exceptions tools/ci/hosted-runner-exceptions.txt --gate sanitizer)
           if [ -n "$TEST_FILTER" ]; then
-            if [ "$PART" != main ]; then
-              echo "A test_filter dispatch runs on the 'main' part only."; exit 0
+            if [ "$JOB" != rest-a ]; then
+              echo "A test_filter dispatch runs in the rest-a job only."; exit 0
             fi
             python3 tools/ci/catch2_run.py run "${common[@]}" --shards 3 --filter "$TEST_FILTER" \
                 --expected-label "FILTERED $TEST_FILTER: not the full suite"
             exit $?
           fi
           python3 tools/ci/catch2_run.py run "${common[@]}" --plan tools/ci/sanitizer-plan.txt --part "$PART" \
-              --shards "$SHARDS" --expected-label "part $PART of tools/ci/sanitizer-plan.txt"
+              --shards "$SHARDS" --shard-total "$SHARD_TOTAL" --shard-first "$SHARD_FIRST" \
+              --expected-label "part $PART of tools/ci/sanitizer-plan.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: sanitizer-logs-asan-${{ matrix.part }}
+          name: sanitizer-logs-asan-${{ matrix.job }}
           path: |
-            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.json
-            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.md
-            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.xml
-            ${{ env.RESULTS }}/asan-${{ matrix.part }}/*.log
+            ${{ env.RESULTS }}/asan-${{ matrix.job }}/*.json
+            ${{ env.RESULTS }}/asan-${{ matrix.job }}/*.md
+            ${{ env.RESULTS }}/asan-${{ matrix.job }}/*.xml
+            ${{ env.RESULTS }}/asan-${{ matrix.job }}/*.log
           retention-days: 14
 
   report:
@@ -189,7 +194,7 @@ jobs:
         run: |
           cat > jobs.json <<EOF
           {"ASan/UBSan build": "${{ needs.asan-build.result }}",
-           "ASan/UBSan tests (4 parts, tools/ci/sanitizer-plan.txt)": "${{ needs.asan-tests.result }}",
+           "ASan/UBSan tests (5 jobs, tools/ci/sanitizer-plan.txt)": "${{ needs.asan-tests.result }}",
            "TSan (concurrency subset)": "${{ needs.tsan.result }}"}
           EOF
           python3 tools/ci/catch2_run.py report --results-dir results --job-results jobs.json

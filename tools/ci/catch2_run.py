@@ -145,7 +145,9 @@ def rest_spec(user_filter: str, hosted_excluded: list[str], plan: dict) -> str:
 
 def plan_processes(args, hosted_excluded: list[str]) -> tuple[list[dict], list[dict], list[str]]:
     """One part of a plan, as processes: one per named process, running exactly its cases, then
-    `--shards` rest shards over the part's rest filter. Returns (processes, skipped cases, warnings)."""
+    `--shards` rest shards over the part's rest filter -- global shards `--shard-first` onwards of
+    `--shard-total`, so one part's rest can be spread over several jobs. Returns (processes, skipped
+    cases, warnings)."""
     plan = load_plan(args.plan)
     neg = "".join(f'~"{n}"' for n in hosted_excluded)
     processes, warnings = [], []
@@ -156,7 +158,8 @@ def plan_processes(args, hosted_excluded: list[str]) -> tuple[list[dict], list[d
                          f"{args.shards}; a part runs rest shards exactly when the plan gives it a filter")
     if not groups and not rest_filter:
         raise SystemExit(f"{args.plan}: part '{args.part}' names no process and has no rest filter")
-    for group, names in groups.items():
+    # A part's rest may be spread over several jobs; its named processes run in the first of them only.
+    for group, names in (groups.items() if args.shard_first == 0 else []):
         present = []
         for n in names:
             count = list_case_count(args.binary, [quote_name(n)])
@@ -171,13 +174,15 @@ def plan_processes(args, hosted_excluded: list[str]) -> tuple[list[dict], list[d
             processes.append({"label": group, "args": [spec], "listed": list_case_count(args.binary, [spec])})
     if rest_filter:
         spec = rest_spec(rest_filter, hosted_excluded, plan)
-        for i in range(args.shards):
-            shard = ["--shard-count", str(args.shards), "--shard-index", str(i)] if args.shards > 1 else []
-            processes.append({"label": f"rest {i + 1}/{args.shards}", "args": [spec, *shard],
+        total = args.shard_total or args.shards
+        for i in range(args.shard_first, args.shard_first + args.shards):
+            shard = ["--shard-count", str(total), "--shard-index", str(i)] if total > 1 else []
+            processes.append({"label": f"rest {i + 1}/{total}", "args": [spec, *shard],
                               "listed": list_case_count(args.binary, [spec, *shard])})
     skipped = []
-    if rest_filter:
-        # A skipped case is reported by the part whose rest would otherwise have run it.
+    if rest_filter and args.shard_first == 0:
+        # A skipped case is reported once: by the job running the first shard of the part whose rest
+        # would otherwise have run it.
         for n, reason in plan["skip"].items():
             if list_case_count(args.binary, [",".join(t + quote_name(n) for t in rest_filter.split(","))]):
                 skipped.append({"name": n, "reason": f"sanitizer plan, not run under ASan: {reason}"})
