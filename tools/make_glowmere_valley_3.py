@@ -249,13 +249,14 @@ def shot_plan(shots):
              "the table and the project are written from the same data, so they cannot disagree. Times are "
              "seconds on the 130 BPM grid (bar.beat in brackets); Arc and Why are the Director's. Status and "
              "quality assessment are kept in [revision/phase3/cut.md](revision/phase3/cut.md) per iteration.", "",
-             "| Shot | Time | Bars | Segment | Arc | Lead | Purpose | Subject | Camera | Movement | Music | Effects | Modulation |",
+             "| Shot | Time | Bars | Segment | Purpose | Subject | Camera | Movement | Music | Effects | Modulation | Arc | Lead |",
              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    # The first eleven columns keep the first pass's order: the Critic's adapter reads them by position.
     for s in shots:
         arc = s.span.arc if s.span else ""
         lines.append(f"| {s.sid} | {s.start:.2f}-{s.end:.2f} ({music.label(max(s.start, music.FIRST_DOWNBEAT))}) | "
-                     f"{s.duration / music.BAR:.2f} | {s.segment} | {arc} | {s.lead} | {s.purpose} | {s.subject} | "
-                     f"{s.camera} | {s.movement} | {s.music} | {s.effects} | {s.modulation} |")
+                     f"{s.duration / music.BAR:.2f} | {s.segment} | {s.purpose} | {s.subject} | "
+                     f"{s.camera} | {s.movement} | {s.music} | {s.effects} | {s.modulation} | {arc} | {s.lead} |")
     lines.append("")
     total = shots[-1].end - shots[0].start
     lead = ", ".join(f"{k} {v:.1f} s ({100 * v / total:.0f}%)" for k, v in sorted(screen_time(shots).items()))

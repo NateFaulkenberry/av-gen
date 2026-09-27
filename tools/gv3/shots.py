@@ -732,9 +732,12 @@ def build(ground, spans):
     shots = []
     for i, span in enumerate(spans):
         rig, notes = COMPOSITIONS[span.label](span.start, span.end, g)
-        sid = f"c{i + 1:02d}"
+        # Named s01, s02, ... in cut order, as the engine's evaluator hook and the Critic's adapter name
+        # the scene's shots (directing_evaluate.cpp), so every report agrees on which shot is which. The
+        # first pass's ids named a different cut; the docs name a span by its bar and beat instead.
+        sid = f"s{i + 1:02d}"
         rig.name = f"{sid} {notes.get('purpose', '')}"[:60]
         notes.setdefault("music", "")
-        notes["music"] = f"{notes['music']}; Director: {span.arc}, {span.why}" if span.why else notes["music"]
+        notes["music"] = f"{notes['music']}; Director: {span.why}" if span.why else notes["music"]
         shots.append(Shot(sid, span.start, span.end, rig, segment=span.segment, span=span, **notes))
     return shots
