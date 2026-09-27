@@ -433,3 +433,54 @@ characters, setpieces, and checkpoints (camera).
      - Rebalance so every part finishes within its ceiling with margin: add parts, carve out the new files, or move the heaviest cases. Do not raise the ceiling past the job cap. Record the reasoning and the expected per-part times in `docs/development/ci.md`.
      - You cannot run the workflow yourself. The coordinator pushes, and the CI watcher reports.
 - **Suites:** the full CPU suite before you finish. Check `pgrep -fl avgen_render_tests` first and never run beside a GPU suite. Run the GPU suite only if you touch rendering. Name your logs "cihealth-".
+
+## Phase 3 integration
+
+### gv3-int: the merged film, re-validated, previewed and evaluated
+- **Worktree:** `~/Documents/GitHub/av-gen-gv3-int`, branch `gv3/integrate`, from `gv3/production` `be55dd43`, which has all four Phase 3 streams merged (cast, cut, look, world). `build/release` links to `av-gen-engine-3` (main `876a11e2`). The coordinator will announce engine-4: main with navfix (ADR-932–934), and later behave (ADR-935–936).
+- **Read:**
+  - PROGRESS.md's top sections, including "OPEN ITEMS" and the four hand-back summaries;
+  - this file's "Common to every Phase 3 stream";
+  - the four logs `phase3/{cast,cut,look,world}.md`;
+  - [03-revision-plan.md](03-revision-plan.md) and the owner's spec [00-brief.md](00-brief.md).
+- **Owns every GV3 file:** `tools/gv3/*`, `tools/make_glowmere_valley_3.py`, [04-iterations.md](04-iterations.md) and a new `phase3/integrate.md`. The four stream owners have finished.
+- **Steps:**
+  1. **Generate** the merged film (`python3 tools/make_glowmere_valley_3.py && python3 tools/gv3/ufo.py`) into a scratch copy under `build/`. Never commit regenerated project files unless the coordinator says so; the tracked copies are the first pass's. Read the generator's report, and run `avgen --audit-routes`: 0 unknown parameters, every route live.
+  2. **Re-validate across streams** on the merged project:
+     - a whole-film `avgen_cast_trace --camera` (60 fps, hz 20);
+     - ADR-910 via `avgen_character_quality`: alien stands under 8 s unless watching, reversals, and the animals' slope and turn metrics;
+     - E1–E5's measured beats and watchers (`ufo-beats.json`), including s28 "Vane sees it";
+     - gv3-cut's follow-stability bar (21 of 22 on its last check) and framing (`framing.py`, and the Critic's `framing[].on_screen`) for every shot and every E1–E5 moment;
+     - `world.py --check --trace`: 0 open ends.
+  3. **Fix the cross-stream issues in data,** each with evidence:
+     - s13 at 70 s frames rook behind a fern;
+     - s18 at 110 s loses the E4 beam;
+     - at 29.1, trees hide the elder behind vane;
+     - at 31.1, the spire reads weakly;
+     - E3 now takes bull-21, not bull-10;
+     - the moon reads as a flat grey ellipse in 8 shots;
+     - the horse glow clips at 95.3 and s29. s29's clipping is mostly the saucer beam's core, which rides `audio.rms`;
+     - the river mouth's gorge shows sky in 84 views of s07, s13, s18 and s22–24. Fix it in `world.py`, or accept it with 1080p stills as evidence;
+     - gv3-look's open proposals: a bloom threshold pair on s27, the ecology light's colour, rings that read, the aurora tops' wave amplitude of 0.55, and fan plants at 1080p. Do what the evidence supports.
+  4. **The whole-film preview.**
+     - Render at 960×540 under the lock (about 25 min): `tools/gpu-lock.sh build/release/src/avgen --project <scratch>/glowmere-valley-3.json --render $PWD/build/gv3/int/r1.mov --size 960x540`.
+     - Check the render log for scene-load warnings: a failed scene load renders bare sky and still exits 0.
+     - Regenerate the Critic's inputs (creative-critic INTEGRATION_GUIDE §6). Submit the whole film in preview mode (session `gv3-revision`, track `film`, label `r1`) and compare it with iteration 0 (`job_1a0def77d9084ad74`).
+     - Record the round in 04-iterations.md.
+  5. **Iterate on the findings.** Use targeted clips for each fix, and render the whole film again when the changes add up. Record every round.
+  6. **When the coordinator announces engine-4:**
+     - switch `build/release`;
+     - apply navfix's GV3 recommendation: `cast.py` `REACTIONS["centrepiece"]` `approach` 250 -> 18 ("go and see");
+     - re-trace, repeat step 2, and render again.
+  7. **Final report:** the state, ready for the 4K final. Include the generator command, before/after evidence per brief category, and the open issues.
+- **GPU etiquette:**
+  - Use the lock: the fixed `tools/gpu-lock.sh` in your worktree.
+  - Keep holds short, except the whole-film render.
+  - Never run beside a GPU suite, and check logs for overlap.
+- **Other rules:**
+  - The Critic daemon on 8765 is the coordinator's. It was restarted with the adapter fixes.
+  - Never commit the song or licensed assets.
+  - Never modify `glowmere-valley-2-multicam`.
+  - Never run the windowed app.
+  - Never run `make_abduction_scenario.py`.
+  - Review material goes in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/integrate/`.
