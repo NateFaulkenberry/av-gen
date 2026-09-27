@@ -1,7 +1,49 @@
 # GV3 revision: progress and state
 
-This is the operational state file. Update it whenever the state changes. It was last updated
-2026-09-26 at 14:25, after resuming from the usage limit.
+This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 10:40.
+
+## CURRENT STATE (2026-09-27 10:40): read this before anything else
+This section supersedes the dated notes further down, which are history.
+
+**Where each phase stands:**
+- The evaluator gate passed.
+- The audit is done.
+- **The engine phase is nearly done.** Phase 3, the GV3 scene revision, has started in parallel streams.
+- The owner's standing instruction: use as many agents as helps, and save status often for a handoff.
+
+**Main (the owner's checkout, `~/Documents/GitHub/av-gen`) is `3f720bfa`.** It has 7 of 10 engine streams: signals, routes, emission, song, camera, reactivity and water.
+
+**Integration** (`integrate/revision`, in the worktree `~/Documents/GitHub/av-gen-signals`):
+- `040d6644` = main + **setpieces**. GPU suite passed (533 cases, 532 passed, 1 skipped). **The CPU suite is running** (log `scratchpad/coord-integrate4-cpu-full.log`). If it passes, run `git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision` (owner's checkout clean, on `main`), then merge main into `gv3/production`.
+- **Next: characters.** `agent/characters` `829619b6` is the characters stream plus the follow-teleport fix (ADR-911 amended). Its own suites passed: CPU 3,714 of 3,733 (19 skipped), GPU 531 of 532 (1 skipped). Merge it into `integrate/revision`; conflicts are likely in `staging.cpp` and `composition.cpp`, because setpieces changed staging too. Build, run the full suites, then fast-forward main.
+- **Then render,** when its finisher reports.
+
+**Agents running (IDs are valid only in the session that spawned them):**
+
+| Agent | ID | Where | What |
+|---|---|---|---|
+| render finisher | `abb3faba9bb55470e` | `av-gen-render`, `agent/render` | GPU tests and re-baselines, GV3 evidence, the 4K cost, suites, report |
+| gv3-look | `a975e9345b925a544` | `av-gen-gv3-look`, `gv3/look` | reactivity, the drop, water, wind |
+| gv3-cut | `a2b5481cf60d73226` | `av-gen-gv3-cut`, `gv3/cut` | the Director's cut, pacing, alien screen time, cameras, framing E1–E5 |
+| gv3-world | `a9731881a8bb421a4` | `av-gen-gv3-world`, `gv3/world` | the world edge, the offline 4K configuration |
+| critic-adapter | `a6ebe91c551ba811a` | `~/Documents/GitHub/creative-critic` | set-piece events from the cast trace; regenerating GV3 inputs; ground samples |
+
+**Not yet launched: gv3-cast**, which starts when characters is in main. Worktree `av-gen-gv3-cast`, branch `gv3/cast`, from `gv3/production` after main is merged. Brief: [briefs.md](briefs.md) § Phase 3 "gv3-cast".
+
+**How Phase 3 is organised:**
+- **Briefs:** [briefs.md](briefs.md) § "Phase 3: the GV3 scene revision, in parallel streams". Each stream owns distinct generator files and never commits generated project files.
+- **The foundation commit** on `gv3/production`, `334c4cf6`: the authored energy arc (`SEGMENT_ENERGY`) and the meter pins. Every GV3 branch starts from it.
+- **Shared engine binaries:** the worktree `~/Documents/GitHub/av-gen-engine`, detached at `040d6644`, built once. GV3 worktrees symlink `build/release` to it.
+  - When its build finishes, **create `av-gen-engine/build/release/BUILD-READY`**; the agents wait for it.
+  - For a newer engine (characters, render), build a second worktree (e.g. `av-gen-engine-2`) and tell the agents the new path. Never rebuild under a running render.
+- **Merging Phase 3:** merge each `gv3/<topic>` into `gv3/production`, run `python3 tools/make_glowmere_valley_3.py`, render a full 960×540 preview, and evaluate the whole film against the baseline (iteration 0, `job_1a0def77d9084ad74`). Iterate, then the 4K final with `offline.py`, the revision report, and the Director's self-critique (brief DELIVERABLES and §18).
+
+**Relaunching a stream that died:** a fresh agent gets its brief section plus "your worktree holds partial work: inspect `git log` and `git diff`, and continue". Every stream's notes are in `revision/phase3/<topic>.md` in its worktree.
+
+**Recent rulings:**
+- **The GPU lock.** CPU suites never take it. A GPU suite offered as evidence runs when no CPU suite does, and says so.
+- **Shared folders.** Log names must start with the stream's name.
+- **The multicam file** stays untouched: its stale-key warnings are expected.
 
 ## Start of a session: do this first
 1. **Read this file**, then [00-brief.md](00-brief.md) (the owner's revision spec, verbatim).
