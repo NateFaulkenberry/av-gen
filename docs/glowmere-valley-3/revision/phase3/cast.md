@@ -240,6 +240,8 @@ first 60 s traced; the same measurement, walking 0.1-3.3 m/s):
   rook for the authored bob.
 - **Verified in iteration 3** (below): the excess is gone, and the Critic still flags ember and vane
   on the authored bob. Reported to the coordinator with the numbers and a data option.
+- **Iteration 4** lowers the authored bob itself, as the production's style call (the table in
+  iteration 4): every alien's walk now rises about 0.1 m at most (p90 0.074-0.108 m).
 
 ## Iteration 3: the bass reaction dropped; sage's look 4.5 s
 
@@ -326,6 +328,53 @@ as the production's style call, the authored bounce lowered so no walk rises mor
 (ember and vane 0.32 → 0.17, rook 0.22 → 0.18; sage and tide unchanged). The three float clips
 (idle, e4, e5) are rendered and judged again for a like-for-like before and after.
 
+## Iteration 4: a lower stride bob; vane watches E5
+
+**What changed** (commit `16f5a0d0`; `ufo.py`'s `watches` in `9a6c34f2`):
+- **The stride bob, lowered** (`ALIEN_BOUNCE` in `cast.py`; below);
+- **vane's `centrepiece` weight 6.0** (from 1.5). Its watch of the animals (characters weighted 4.8,
+  the watch's weight raised by `audio.rms` through the riser) outscored a centrepiece worth about
+  weight × 1.04 to it (intensity 0.6 at 100 m, curiosity 1.74).
+
+**Measured** (whole film; `build/gv3/cast/iter4/`). Everything up to E5's beam is iteration 3's
+exactly: the bob is drawn, not simulated (perception and decisions read the simulated position),
+and the centrepiece exists only once E5 is heard. So the ADR-910 figures are iteration 3's, except
+vane's:
+
+| alien | longest still | still | stops (reversals, turns > 90°) | A→B→A | yaw on the spot | stuck |
+|---|---|---|---|---|---|---|
+| vane | 9.0 s [4.2]: **watching E5**, 171.8-180.3 s | 22% [20] | 14 (1, 3) [14 (0, 3)] | 0 | 14% [13] | 1.4 s [1.0] |
+
+Vane's one reversal is a single look in the horses' meadow (202.3-206.5 s at (89, 12)).
+Animals and set pieces unchanged.
+
+**E5's watchers** (`build/gv3/ufo-beats.json`, `watches`: standing, facing the craft within 15°):
+vane 172.15-180.30 s (99 m; it turns to the beam at 171.7-172.2 s, so s28 at 174.0-174.9 s shows
+it seeing it), rook 172.55-178.55 (117 m), ember 171.00-173.45 (89 m) and 177.70-179.30 (76 m),
+sage 176.65-180.10 (114 m, after stepping back); tide (172 m) none. E4: sage 108.30-112.45 s (26 m).
+Sent to gv3-cut.
+
+### The stride bob: a style choice, and reversible
+The owner's direction is grounded characters with the evaluator in the loop, and a 0.18 m rise of
+the whole body at every step of a walk is more than a body's bob at this scale. So the production
+(the coordinator, 2026-09-27) lowered the three springiest aliens' `liveliness/bounce` to a walk peak
+of about 0.1 m. It is one number per alien, in the scene and restated in the project, and it is
+the Parameters panel's `entity/<alien>/liveliness/bounce` (also under "How <alien> moves and
+behaves" in the World panel). **To put the springier walk back, set the old values in
+`ALIEN_BOUNCE` (`tools/gv3/cast.py`) and regenerate;** nothing else depends on them.
+
+| alien | bounce: old → new | formula peak at a 3.07 m/s walk | measured while walking, p90 / max: iteration 3 → 4 |
+|---|---|---|---|
+| ember | 0.32 → **0.17** | 0.184 → 0.098 m | +0.195 / +0.283 → **+0.108 / +0.192 m** |
+| vane | 0.32 → **0.17** | 0.184 → 0.098 m | +0.176 / +0.248 → **+0.098 / +0.155 m** |
+| rook | 0.22 → **0.18** | 0.117 → 0.096 m | +0.123 / +0.238 → **+0.103 / +0.215 m** |
+| sage | 0.18 (unchanged) | 0.096 m | +0.099 / +0.193 m |
+| tide | 0.14 (unchanged) | 0.075 m | +0.074 / +0.158 m |
+
+(The maxima are hurried walks, up to 1.35× the walk speed, and the ground probe's error on slopes.)
+The Critic's rule over the whole film (share of the track over 0.1 m): ember 32% → 11%, vane
+34% → 6%, rook 21% → 10%, sage 7%, tide 1%.
+
 ## Open items that belong to others
 - **The Critic (not GV3):** its float check reads the traced root (`state.position + motion.position`,
   which carries the stride bob), not the drawn feet. The aliens carry ground-driven foot layers with
@@ -353,16 +402,17 @@ as the production's style call, the authored bounce lowered so no walk rises mor
 - **The Critic's adapter**: the trace's `atRetire` is taken after the retired body is dropped back to
   the ground (the horse 23 m up the beam reads 5.3 m); the adapter works round it.
 
-## Status and next steps (checkpoint, 2026-09-27 13:00)
-1. Iteration 3: the bass reaction dropped, sage's look 4.5 s; the whole-film trace and the ADR-910
-   table; the float measured again on that trace (height above the ground while walking, per alien).
-2. Clips through the GPU lock (960×540): `idle` 44-60 s, `ufo-e4` 95-118 s, `grounded` 18.9-26.3 s,
-   `ufo-e5` 166-182 s. The "before" jobs, regenerated with the Critic's new adapter, are in session
-   `gv3-cast` under `build/gv3/cast/critic/before2/`: idle `job_1a0e3a2ef6ddda6d0`, e4
-   `job_1a0e3a2f166a5dbb7`, horse/grounded `job_1a0e3a2f362969799`, e5 `job_1a0e3a2f56977afcb`.
-3. If the Critic still reads the aliens as floating after the drop, tell the coordinator with numbers.
-4. Evidence to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cast/`; the final report with
-   the measured E1-E5 beats.
+## Status and next steps (checkpoint, 2026-09-27 14:00)
+1. Iteration 4's three float clips (idle, e4, e5) wait for the GPU. Then the Critic on them against
+   the `before3` jobs (the first pass's clips, inputs rebuilt with the Critic's adapter at `961e04c`,
+   which stopped mapping the ember-cap mushroom to the alien Ember): idle `job_1a0e3f783c775be73`, e4
+   `job_1a0e3f78a1db376f7`, e5 `job_1a0e3f7907306ee46`. Their findings match `before2`'s.
+2. Evidence to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cast/`, and the final report.
+3. After navfix and gv3-world's river merge, the coordinator re-traces the whole film: re-read the
+   ADR-910 table and `watches` then (the aliens' paths will move; the set pieces will not).
+
+Critic jobs made before `961e04c` (the iteration-3 ones): discount any "ember out of frame" finding
+on a shot that frames the ember-cap; it is not about the alien.
 
 **The iteration-3 clips rendered under GPU overlap from 13:00:24.** Waiting on `tools/gpu-lock.sh`,
 this stream's wrapper read an empty pid file (another wrapper's `mkdir` before its pid write) as a
