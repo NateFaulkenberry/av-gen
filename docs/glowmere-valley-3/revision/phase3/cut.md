@@ -298,6 +298,44 @@ moment plus 0.1 s and 1 s; the adapter also places each moment's event at the cr
     later, then crosses the frame for 1.7 s.
   - By choice: E1's and E3's approaches and departures, and E4's approach.
 
+## Iteration 3: the framings the iteration-2 trace found wanting (`630ca638`)
+
+Each designed on the iteration-2 trace, whose cast iteration 3 does not change (the project differs
+only in `cameras/*`; checked leaf by leaf): the offline filter model for the camera, and the framing
+searches in `build/gv3/cut/tools/search3.py`.
+
+- **A hovering-craft kind** (`rig.SMOOTHING["hover"]`: 1.0 s, 1.5 s vertical, no lead): for a live aim
+  at a craft holding its station, and for an idle watcher's follow that aims at one (one filter serves
+  both nodes). 94.1: 0.102 -> 0.071 deg of yaw HF, the aim trailing the saucer by under a degree.
+  Not for a craft on the move: into its station the scout trails by 18 deg at 1 s.
+- **54.1, E4's arrival: locked off.** A slow linear push on E4's region, `E4_PLACE` = gv3-cast's
+  (-69, 6), 14 m up, through a 28 mm: the scout flies in from the upper left (-0.69, +0.92) and settles
+  upper centre (0.00, +0.31), the elder on the right (+0.78); the region's four compass points at the
+  station's height are all in frame, so the station may be anywhere in it. No subject, no HF.
+- **57.1, E4's lift:** the same eye, 40 mm for 50, on the hover kind: at the lift the scout is in the
+  top of the frame (+0.89; the Critic's adapter projects the raw craft) and the pair on the ground at
+  the bottom (-0.83); both animals are in frame for the whole rise. HF 0.016 pitch, 0.013 yaw.
+- **59.1, the aliens watch: Sage, not Ember.** In the preview world Sage stops on the rise 39 m west
+  of the station at 106.5 s, turns to face it by 108.5 s (her yaw 57.4 deg, the bearing 55.3) and
+  stands through the lift, so the follow is still and only the scout's sway reaches the aim. Over her
+  shoulder through a 20 mm, offset searched on the trace: her head and shoulders low on the right
+  third (x 0.43, y -0.63), the scout and both animals in frame for the whole shot, the eye 1.7 m over
+  the rising ground behind her. HF 0.003 pitch, 0.028 yaw. gv3-cast's `beam` reaction (aliens within
+  80 m go to see E4) would have her walk toward the column instead: away from the lens, in frame.
+  Walking, her follow would carry her stride into the yaw as Ember's did; scaling Ember's modelled
+  0.107 deg on the hover kind (15 m from the aim point) by distance gives about 0.04 at 39 m. An
+  estimate, to measure on gv3-cast's world.
+- **15.1, E2's flyby: panned 16 deg east** of the first pass's frame. The saucer comes in from the
+  east, slowly at first; it was 14 deg outside the frame when its crossing began. Now it is in frame
+  from that instant (x -0.90) and crosses for 1.85 s instead of 1.4, and the cap sits on the right
+  third (+0.36) with the sky it comes out of on the left. The owner's frame, moved: judged on the
+  clip below.
+
+**Predicted from the iteration-2 trace:** every shot with a subject passes the stability bar except
+95.3 (ADR-913's exception), 21 of 22; every planned set-piece moment on screen at its instant,
+including E2's crossing and E4's lift (`build/gv3/cut/it3/cut-onscreen-it3-predicted.txt`). The
+iteration-3 trace is running to measure it.
+
 ## State (2026-09-27, about 12:50)
 
 **Commits on `gv3/cut`:** `a50327ac` (the Director step, the compositions, ADR-913 kinds),
