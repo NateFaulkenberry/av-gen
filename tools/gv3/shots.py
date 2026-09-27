@@ -204,11 +204,13 @@ def the_return(t0, t1, g):
 def first_wave(t0, t1, g):
     # The first wave of light runs out from the elder through the small mushrooms on the downbeat:
     # low over the ground cover north-east of it, so the wave comes toward the lens. (Iteration 1's
-    # vantage was over the pool, and the water filled half the frame.)
-    r = moving(t0, t1, 35.0, g(14, 34, 1.0), g(9, 38, 1.0), [-12.0, 5.0, 52.0])
+    # vantage was over the pool, and the water filled half the frame.) A 4 m truck across the view, not a
+    # push: the merged film's push toward the elder ended inside a fern that filled the last third of the
+    # shot, and so did the same push at 1.8 m and one from further back (gv3-int r1, batch A).
+    r = moving(t0, t1, 35.0, g(14, 34, 1.3), g(16.3, 37.3, 1.3), [-12.0, 5.0, 52.0])
     return r, dict(lead="world", purpose="The first wave runs through the mushrooms toward us",
-                   subject="the small mushrooms, the elder beyond", camera="35 mm, 1 m, north-east of the elder",
-                   movement="push, 6 m", music="2 bars; the wave on the downbeat", effects="bar wave")
+                   subject="the small mushrooms, the elder beyond", camera="35 mm, 1.3 m, north-east of the elder",
+                   movement="lateral truck, 4 m", music="2 bars; the wave on the downbeat", effects="bar wave")
 
 
 @at("21.1")
@@ -230,10 +232,12 @@ def herd_east_meadow(t0, t1, g):
 
 @at("25.1")
 def lantern_close(t0, t1, g):
-    # The lantern's clap flare, close, from its east side, pushing in.
-    r = moving(t0, t1, 35.0, g(-30, -20, 2.5), g(-34, -21.5, 2.3), [-45.0, 10.5, -26.0])
+    # The lantern's clap flare, from its south-east, 17 m, looking up at the underside that answers the
+    # clap (the Critic, r1b: z 4.5 on `lantern-under`). From the east (r1) a big broad-leaved plant stood
+    # across the lantern for most of the bar (gv3-int batch A).
+    r = moving(t0, t1, 35.0, g(-35, -12, 2.5), g(-37, -13, 2.5), [-45.0, 10.5, -26.0])
     return r, dict(lead="hero", purpose="The lantern, close, flaring on the clap", subject="the lantern mushroom",
-                   camera="35 mm, 15 m east of it", movement="push, 4 m", music="1 bar")
+                   camera="35 mm, 17 m south-east of it", movement="lateral drift, 2 m", music="1 bar")
 
 
 @at("26.1")
@@ -636,8 +640,12 @@ def vane_sees_it(t0, t1, g):
 
 @at("95.3")
 def e5_horse_rises(t0, t1, g):
-    # [s29] The horse rises, glowing, side on: the rise is the shot, so the aim is not smoothed.
-    r = aim_at(85.0, g(-14, 75, 8.5), "horse-11", (0.0, 1.0, 0.0), "lifted")
+    # [s29] The horse rises, glowing, side on: the rise is the shot, so the aim's height is not smoothed.
+    # 22 m from the horse, as the first pass framed it: the tuned cast moved E5's station 9.5 m, and from
+    # the first pass's eye the horse rose 13 m from the 85 mm, the beam's glow filled the whole frame and
+    # the horse was a pale ghost in it (gv3-int r1: 12.7% clipped, the Critic's high "clipped highlights").
+    # At 22 m the column is bounded by the night around it again.
+    r = aim_at(85.0, g(-22.5, 75, 8.5), "horse-11", (0.0, 1.0, 0.0), "lifted")
     return r, dict(lead="event", purpose="E5: the horse rises, glowing, side on", subject="horse-11",
                    camera="85 mm, side on, 22 m, live aim", movement="still", music="half a bar")
 
@@ -739,10 +747,12 @@ def herd_rebuilt(t0, t1, g):
 
 @at("106.1")
 def veil_lit(t0, t1, g):
-    # The veil lit, from its north-east, trucking past it.
-    r = moving(t0, t1, 28.0, g(86, 190, 1.4), g(83, 188, 1.4), [77.5, 3.0, 198.7])
-    return r, dict(lead="hero", purpose="The veil lit at the water", subject="the veil mushroom",
-                   camera="28 mm, 1.4 m, 12 m north-east of it", movement="lateral truck, 3.6 m", music="1 bar")
+    # The veil lit, from its south-south-east, trucking past it, the aurora over the hillside behind. From
+    # the north-east (r1) the view ran south past the veil into the river's mouth: a vertical-walled slot of
+    # the aurora's glow at the frame's left (world.py: 14 of 96 columns). Looking north it sees none.
+    r = moving(t0, t1, 28.0, g(81.9, 210.9, 2.5), g(84.5, 209.5, 2.5), [77.5, 3.0, 198.7])
+    return r, dict(lead="hero", purpose="The veil lit", subject="the veil mushroom",
+                   camera="28 mm, 2.5 m, 13 m south-south-east of it", movement="lateral truck, 3 m", music="1 bar")
 
 
 @at("107.1")
