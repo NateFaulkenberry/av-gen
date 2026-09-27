@@ -615,8 +615,8 @@ public:
     // action, sense or field runs for it, and it is not in the crowd other bodies separate against,
     // not a body anyone perceives and not a point anyone can be sent to. It is held where it was
     // taken, hidden. Before this it was only hidden and handed back to its behaviours, so GV3's
-    // abducted cows grazed on, invisible, in the meadow the aliens walk: rook walked on the spot for
-    // 5.25 s beside two of them.
+    // abducted animals grazed on, invisible, in the meadows the aliens walk -- bull-10 136.7 m after
+    // it vanished -- and the aliens chose to go to them seven times in the film.
     //
     // For good: nothing un-retires a body but `EntityWorld::reset`, which is how a seek back before
     // the retire gets the body back. Simulation state like `placements`: copied whole into every

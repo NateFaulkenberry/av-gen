@@ -2,10 +2,10 @@
 //
 // A set piece's `retire` step (`stage::StepKind::Retire`) hid the animal it had taken and handed it
 // back to its own behaviours. The crowd and the sense stage take every body, seen or not, so GV3's
-// abducted cows grazed on invisibly in the meadow the aliens walk: rook played its walk clip on the
-// spot for 5.25 s beside two of them (205.65-210.85 s), and ADR-910's stuck time for rook went from
-// 0.4 s to 6.7 s. Now a retired body is not simulated, not in the crowd, not perceived, not a place to
-// be sent, and is held where it was taken.
+// abducted animals grazed on invisibly in the meadows the aliens walk (bull-10 136.7 m after it
+// vanished), and the aliens chose to go to them seven times -- tide to cow-12, ember to horse-11
+// across the river (gv3-cast's iteration 2, traced with `--decisions`). Now a retired body is not
+// simulated, not in the crowd, not perceived, not a place to be sent, and is held where it was taken.
 //
 // The fixture is a director and two bodies, the director run where the composition runs one -- at
 // the top of every frame, before any body steps (ADR-209) -- and handed to `EntityWorld::seek` as

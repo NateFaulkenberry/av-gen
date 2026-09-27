@@ -1811,8 +1811,9 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (self != nullptr) {
             // ADR-934: and out of the world. Before, the body was put back under its own behaviours
             // and hidden -- and so grazed on unseen, in the crowd other bodies walk round and in
-            // their senses: on GV3 rook walked on the spot for 5.25 s beside two abducted cows. It
-            // is held where it was taken, and nothing is simulated for it again. Its director motion
+            // their senses: on GV3 the four animals the set pieces took walked 39-137 m unseen, and
+            // the aliens chose to go to them seven times. It is held where it was taken, and
+            // nothing is simulated for it again. Its director motion
             // and Director-tier orders are dropped all the same: nothing left holding a claim on it.
             self->clearDirectorMotion();
             self->actions().cancel(entity::Authority::Director, ctx.time);
