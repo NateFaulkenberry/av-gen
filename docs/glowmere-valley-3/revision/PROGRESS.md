@@ -63,6 +63,14 @@ Targeted tests on the three-stream build all pass: routes 57, signals and emissi
 - **The CPU suite through ctest** takes about 50 minutes, against 2 hours run serially. Use it.
 - **Streams branched before this main** (camera, from `e0657a26`; song, from `e0657a26`; reactivity, from `06be0d88`) will need main merged in at integration. Reactivity has been told.
 
+**2026-09-27 00:25, after the second usage limit (it reset at 00:20).**
+- **Song is done** (report in [stream-reports/song.md](stream-reports/song.md); its GV3 cut JSONs are in `audit/data/song/`). It is merged into `integrate/revision` as `819d992a`, and builds.
+- **Camera** was code-complete: UI reach committed (`a32e52ff`), main `e0657a26` merged. Only its full suites and report were left. It is merged into `integrate/revision` too (one index conflict); the build is running.
+- **The coordinator runs the song and camera suites** on the integration build, to save agent tokens. Then main fast-forwards.
+- **Reactivity:** 14 commits including main `808f32e4`, and 3 uncommitted files. Resumed (`a2e7d46e9e7bd31bd`) to settle them, run its suites and report.
+- **Characters:** its finisher had just begun. Resumed (`a0e273bebdc7d7224`).
+- **Left after these:** water, setpieces, render.
+
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
 2. emission finisher + camera finisher.
