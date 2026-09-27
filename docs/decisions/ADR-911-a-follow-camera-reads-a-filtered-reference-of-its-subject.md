@@ -14,6 +14,7 @@ their JSON, and the Cameras panel's rows for them, `scene::followControls` (`src
 (`src/app/engine.cpp`); the Director compiler's `followRig` (`src/directing/compiler.cpp`)
 **Tests:** `tests/unit/test_follow_camera.cpp` (`[adr911]`; the panel's rows are also `[ui]`), below
 **Measured with:** `avgen_cast_trace --camera` and `tools/camera_stability.py` (ADR-913)
+**Amended:** 2026-09-27 -- a subject that is placed restarts the reference (the amendment at the end)
 
 ## Context
 
@@ -208,3 +209,136 @@ from a seek (which reproduces the whole-film trace exactly: ADR-913).
   removed rather than rewired, because the aim-follow's zero point is where the hero stood when the
   keys were baked, not a history the kernel can read. A director shot on a walking hero is the case
   that would want it.
+
+## Amendment, 2026-09-27: a placed subject restarts the reference
+
+**Found by:** the characters stream (ADR-907 to 910). After it, the CPU test "a chase that rises over
+its character and passes it moves behind, over, then ahead, played"
+(`tests/unit/test_directing_performance.cpp`) failed: `chase.up` 1.209 against its bar of 1.0.
+**Implemented by:** `entity::Entity::markPlaced` and `placements` (`src/entity/entity.hpp`, zeroed in
+`EntityWorld::reset`); `world::HistorySample::placement` and `HistoryBank::record`
+(`src/world/effects/history_bank.{hpp,cpp}`); `Composition::placementOf`, `recordHistory`,
+`subjectHead` and `applyPerformers` (`src/scene/composition.cpp`); `SubjectTrail`
+(`src/scene/follow_reference.cpp`); `Staging::advance`'s `moveTo` and `show` (`src/stage/staging.cpp`)
+**Tests:** `[placement][adr911]` in `tests/unit/test_follow_camera.cpp` and
+`tests/unit/test_staging.cpp`, below
+
+**The defect.** The test's plan starts Rook's scripted performance (ADR-758) at 90.00 s, on its mark
+at y 4.29. At 89.98 s he stood where his decider had left him, at y 26.09 on a hillside: 21.8 m
+higher. The performance put him on the mark in one step, which is its job (a performance that starts
+at a cut is a cut to its mark, ADR-759). The compiled chase then filtered his height across the jump:
+it sat 8.6 m above him at 90.5 s, 5.6 m at 91 s and 1.21 m at 92 s. On main the test passed only
+because the old decider happened to leave Rook near his mark's height. The defect was latent in the
+decision above: the reference is a pure function of the subject's history, and nothing told it that
+part of that history belonged to a body somewhere else.
+
+**Decision: a follow rig reads its subject's history back no further than the subject's last
+PLACEMENT,** the last time it was put somewhere its motion did not take it. The systems that place a
+body declare it. This is ADR-912's rule for cuts: whoever knows the picture does not continue says so,
+and the reader starts again.
+
+- **A count on the body.** `Entity::markPlaced()` bumps `Entity::placements()`. Only a change means
+  anything. It is simulation state: copied whole into every ADR-700 checkpoint, zeroed by
+  `EntityWorld::reset`, and counted by a seek's replay on the step a play counts it.
+- **Who declares it:**
+
+  | placement | declared in | on the step |
+  |---|---|---|
+  | a performance on its mark | `Composition::applyPerformers` | the first that finds the body not already performing, when the performance has no entry blend. ADR-820's blend is motion, and a second pass at the same instant (the frame a seek lands on) finds the body performing and counts nothing twice |
+  | a staging move told to put the body there | `Staging::advance`, a `moveTo` with neither a speed nor a duration ("put it there") | where it lands, from somewhere else |
+  | a hidden body shown again (the brief's "retire and re-show") | `Staging::advance`, a `show` of the role's own visibility whose base was hidden | where it is drawn again: nothing it did out of sight is motion anyone saw |
+
+- **HIST records the count with every sample** (`HistorySample::placement`). The count for a node is
+  the placements of the body that drives it plus those of the bodies that drive its parents
+  (`Composition::placementOf`), because a child is put wherever its parent is put. The head carries it
+  too (`subjectHead`).
+- **`SubjectTrail` reads only the samples of the head's placement,** held at the oldest of them as at
+  the head of a film. A subject placed this very frame has no history, and the trail is the head
+  alone. So the eye and the aim, which still read one reference, are on the body in the frame it was
+  put there. The lag reads the same trail: a lagged eye starts from where the body was put.
+
+**No detector.** Nothing guesses a placement from speed. A placement a metre away and a stride a metre
+long are the same two samples. Legitimate motion here has no ceiling: a staging flight at the author's
+speed (GV3's approach is 30 m/s, and a `moveTo` crosses 200 m), an orbit with simulation authority at
+radius times rate, an animal lifted up a beam. A threshold above all of them would miss the placements
+a camera shows most, a mark a few metres off. A threshold below them would snap a camera off a fast
+craft. ADR-912 refused a heuristic for the same reason.
+
+**Checked, and not placements:**
+- The navigation refuge (ADR-162 and 908: `escapeToNavigable`, and `move` walking to
+  `Navigator::refuge`) walks, clamped to a stride. It is motion and is filtered as motion.
+- A performance's hand-back leaves the body where the performance put it. A staging `release` does
+  too, and `lookAt` takes the body over where it stands.
+- A staging `follow` continues the `moveTo` before it, which is ADR-385's contract.
+- A `moveTo` given a speed or a duration eases from where the body is. That includes GV3's 0.05 s
+  flyby entry, which happens out of sight: the `show` after it places the craft.
+- A `retire` hides the body for good. A later `show` places it.
+
+**Not covered (undeclared, so still filtered as motion):**
+- a node's position track stepping on the timeline (ADR-912 finds these jumps for cameras only);
+- a node attached to or detached from a socket (`Equip`, staging `attach`);
+- a hand edit of a node's position;
+- the distance cull's snap back to the authored spot (live mode only, and never a body near the
+  camera).
+
+**Tests,** each with a control that fails without the change:
+- "a trail reads back only as far as its subject's last placement". The trail holds at the
+  placement's oldest sample, and a head placed this frame is read alone. The chase's constants on a
+  walk that is put 20 m up keep the height on the mark (to 0.1 mm) from the frame of the placement.
+  Undeclared (the control), the height is 0.004 m on that frame and still under 19 m more than a
+  second later.
+- "a performance that puts its body on a mark has the follow camera on it from that frame". A body
+  orbiting 25 m up is taken by a performance and put 30.1 m away, followed by the compiled chase.
+  - On the frame of the placement, the eye and the aim are 0 m from where the chase puts them on the
+    subject as it stands.
+  - Over the 3 s after it, the eye rides exactly 0.4 m over the body and the aim 1.4 m (worst
+    vertical error 0 m). They are at most 9.3 cm behind (a walk restarted from rest, bounded by speed
+    times T, 45 cm), and 4.4 cm behind on the two frames after the mark.
+  - Control: the same HIST ring with its placements erased puts the reference 13.4 m over the body at
+    +0.5 s and 5.9 m at +1 s.
+  - Shown failing with the performance's declaration removed: the eye 26.9 m and the aim 29.7 m off
+    on the frame of the placement, 21.0 m worst vertical. Shown failing again, the same way, with the
+    trail's placement check removed.
+- "a follow camera lands on the same pose played and scrubbed across a placement". Landings the frame
+  before the mark, on it, the frame after and half a second after:
+  - The scrub and the play are 0 m apart, bit for bit, at the landing and on every frame to 1.5 s
+    after the mark.
+  - The replay counts the placement once. The landing frame, which runs the performance again at the
+    same instant, does not count it again.
+  - Control: undeclared, the scrubbed ring puts the reference 21.0 m over the body a frame after the
+    mark and 13.4 m half a second after.
+- "a staging placement says so: a move told to put the body there, and a hidden body shown again"
+  (`test_staging.cpp`). The put and the show are each counted on their step. The hide, the 0.05 s
+  entry, a timed flight and a show of what is already drawn are not. A reset zeroes the count.
+- The test that found it: `chase.up` is 0.573 (was 1.209), the rig's 0.4 m plus its clearance over
+  the hillside. `chase.along` is -3.00 (was -2.77), its 3 m. `over` and `ahead` are unchanged to
+  0.1 mm.
+
+**Consequences:**
+- **The camera changes only where a rig that reads history follows or aims at a body that is
+  placed.** A rig reads history when it has a lag or any smoothing. None of the committed scenes has
+  one:
+  - No example project's rig reads history.
+  - GV3's rigs that do are the lagged s13, s18, s19 and s38, plus ADR-913's recommended smoothing on
+    its walkers. They follow walkers that nothing places. GV3 has no performances (its sequence has
+    no actors). Its staging places only the saucer (shown at its flyby and at its arrival) and the
+    saucer's beam, and only rigs with every knob at 0 watch those (s24, s27).
+  - Their cameras are bit-identical by construction: a subject whose count never changes reads the
+    history it read before.
+- **What changes are the Director's compiled chase and follow rigs on a performer.** On the multicam
+  film's plan, the chase is on Rook from the frame he is put on his mark.
+- **If GV3's revision smooths s24 or s27** (the saucer), their aim restarts at the saucer's two shows.
+  The saucer is at rest there (the `moveTo` after each starts from rest), so the restart costs nothing,
+  and the aim no longer glides from where the saucer zipped out of sight.
+- **HIST's sample is 56 bytes** (was 48): one `uint32` and its padding, in every ring and every
+  checkpoint. At GV3's depths that is about 14 KB per ring per checkpoint (was 12).
+- **Nothing new to control.** A restart at a placement is not an artistic choice any more than ADR-912's
+  cut is, so there is no knob: the panel rows above are unchanged.
+- **The other readers of HIST are unchanged, and belong to the same family.** They read across a
+  placement:
+  - `entity.<name>.speed`, `.velocity` and `.acceleration` read one step of about 1300 m/s at a
+    21.8 m placement;
+  - a Trail's ribbon draws a streak from where the body was;
+  - ADR-545's measured velocity, which the pose layers read, has the same one-step spike.
+
+  They are recorded here and not fixed.
