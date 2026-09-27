@@ -101,7 +101,10 @@
     "liftSeconds": 8,
     "fadeDelaySeconds": 6.4,
     "fadeSeconds": 1.6,
-    "gatherRadius": 25
+    "gatherRadius": 25,
+    "stackRadius": 4.0,
+    "stackStagger": 3.0,
+    "beamSize": 1.8
    },
    "framingMetres": 70
   },
