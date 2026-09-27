@@ -314,7 +314,7 @@ craft. ADR-912 refused a heuristic for the same reason.
   height offset is 0.4 m). `chase.along` is -3.00 (was -2.77), the rig's 3 m. `over` moves by 0.1 mm
   and `ahead` not at all.
 - The suites, on `agent/characters` with main 3f720bfa merged: the CPU suite
-  (`ctest -L unit -j 4`) 3733 of 3733 passed, 19 skipped for missing assets or tools, exit 0. The
+  (`ctest -L unit -j 4`) 3714 of 3733 passed and 19 skipped (missing assets or tools), 0 failed, exit 0. The
   GPU suite (`avgen_render_tests` under `tools/gpu-lock.sh`) 531 of 532 cases passed and 1 skipped,
   619,105 assertions, exit 0.
 
