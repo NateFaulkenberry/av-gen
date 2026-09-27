@@ -591,6 +591,23 @@ public:
     [[nodiscard]] const PerformanceEntry& performanceEntry() const { return performanceEntry_; }
     [[nodiscard]] const DirectorGoal& directorGoal() const { return directorGoal_; }
 
+    // ---- placements (ADR-911, amended 2026-09-27) --------------------------------------------
+    //
+    // How many times this body has been PLACED: put somewhere its motion did not take it. The
+    // systems that place a body say so, because only they know -- a performance's first step on its
+    // mark (`scene::Composition::applyPerformers`), a staging move told to put it there, a staging
+    // show of a body that was hidden. To anything that only watches the body, a placement a metre
+    // away and a stride a metre long are the same two numbers.
+    //
+    // Only a change means anything. HIST records the count with every sample of the node this body
+    // drives (`world::HistorySample::placement`), and a follow camera reads its subject's history
+    // back no further than the last change, so it restarts from where the body was put instead of
+    // gliding there from where it was. Simulation state: copied whole into every ADR-700
+    // checkpoint, zeroed by `EntityWorld::reset`, and counted by a seek's replay on the step a play
+    // counts it.
+    void markPlaced() { ++placements_; }
+    [[nodiscard]] std::uint32_t placements() const { return placements_; }
+
     // A named number this entity declared. `setProperty` refuses a name the entity did not
     // declare rather than inventing one, because a property invented at runtime is a property no
     // reaction could have been bound to -- which is this project's recurring failure, in miniature.
@@ -661,6 +678,7 @@ private:
     DirectorMotion director_{};
     PerformanceEntry performanceEntry_{}; // ADR-820
     DirectorGoal directorGoal_{};         // ADR-824
+    std::uint32_t placements_ = 0;        // ADR-911: see `placements`
     LocomotionState locomotion_{};
     BehaviorList behaviors_;
 

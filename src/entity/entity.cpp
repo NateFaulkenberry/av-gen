@@ -1231,6 +1231,7 @@ void EntityWorld::reset() {
         entity->director_ = DirectorMotion{};
         entity->performanceEntry_ = PerformanceEntry{}; // ADR-820: rebuilt by the replay
         entity->directorGoal_ = DirectorGoal{};         // ADR-824: likewise
+        entity->placements_ = 0;                        // ADR-911: recounted by the replay
         entity->locomotion_ = LocomotionState{};
         // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a

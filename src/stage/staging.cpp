@@ -1399,9 +1399,14 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             const auto cap = static_cast<float>(1.0 / duration);
             rate = rate > 0.0f ? std::min(rate, cap) : cap;
         }
-        if (rate <= 0.0f) {
+        const bool put = rate <= 0.0f;
+        if (put) {
             rate = 1.0e9f; // neither was set: put it there
         }
+        // ADR-911 (amended 2026-09-27): and "put it there" is a PLACEMENT, on the step it lands --
+        // declared below, where the body is given its position -- so nothing that watches the body
+        // (a follow camera's filtered reference) reads it as a move from where it was.
+        const bool placing = put && cue.progress < 1.0f && ctx.dt > 0.0 && cue.span > 0.0f;
         cue.progress = std::min(1.0f, cue.progress + static_cast<float>(ctx.dt) * rate);
         const float eased = smoothstep(cue.progress);
         glm::vec3 p = glm::mix(cue.from, goal, eased);
@@ -1525,6 +1530,9 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (gaitSpeed > 0.0f) {
             motion.speed = gaitSpeed;
             motion.hasSpeed = true;
+        }
+        if (placing) {
+            self->markPlaced();
         }
         self->setDirectorMotion(motion);
         return cue.progress >= 1.0f ? StepStatus::Done : StepStatus::Running;
@@ -1653,6 +1661,19 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         const std::string path = parameterPath(run, role, step.target, ctx);
         if (path.empty()) {
             return StepStatus::Failed;
+        }
+        // ADR-911 (amended 2026-09-27): a body shown again after it was hidden is PLACED. It
+        // re-enters the picture where it now is, and nothing it did out of sight -- GV3's saucer
+        // reaching its flyby's entry point in three frames, an animal set down after it was retired
+        // -- is motion anyone saw. The role's own visibility only (a show aimed at another of its
+        // parameters places nothing), and only from hidden: showing what is already drawn places
+        // nothing.
+        if (step.kind == StepKind::Show && self != nullptr && (step.target.empty() || step.target == "visible") &&
+            ctx.params != nullptr) {
+            if (const params::IParameter* shown = ctx.params->find(path);
+                shown != nullptr && shown->baseComponent(0) < 0.5f) {
+                self->markPlaced();
+            }
         }
         writeParameter(run, role, path, step.kind == StepKind::Show ? 1.0f : 0.0f, ctx);
         return StepStatus::Done;
