@@ -143,3 +143,78 @@ Sheets: `build/gv3/int/cand-<shot>.png` (r1's frames above each candidate's).
 flat peach on and off the kick (the gold pixels' luma ×0.98-1.00 at 50 ms against 300 ms after it): they sit at
 the tone curve's shoulder, so the kick's +60-100% has no headroom close up. The Critic's +1% over the film comes
 from the wider framings. The post A/B's 47.1 window shows whether AgX's shoulder gives it back.
+
+### Batches B, C, D and E: judged (candidate sheets `build/gv3/int/cand-<shot>.png`)
+- **29.1** (B): Vane 8-11 m up over the canopy, the elder beyond it; **59.1** (B): a fixed eye up the west bank
+  behind Rook, who goes to see E4, a live aim under the hovering scout. Both applied (`60143694`).
+- **31.1** (D): candidate d's whole arc, low under the spire, its cap against the sky (`9e423bbd`).
+- **77.1** (D, E): turned round to the valley's head, the falls read as a flat textured panel between two
+  rocks (`cand-s44-vD.png`); of four off-axis views with no open end (E, `cand-s44-vE.png`), **w6**: across the
+  valley to the west slope under the aurora from 8 m up the east side, a cow below, a lit mushroom and an
+  alien in the middle distance. Applied (`df64dce6`); 113.1 keeps the look down the valley.
+- **38.1** (C): **c1**, 26 m behind Tide and 10 m up: the column clears the lantern's cap. **73.1**: **hi**, 2.6 m
+  (the leaf gone). **104.1**: **a** at half its swing (-10 deg): the trunk stays left of the spire; **b** was
+  31.1's frame over again (the same trunk, the spire, the moon: `cmp-31.1-104.1b.png`). **107.1**: **a**, the
+  other way round. Applied (`df64dce6`).
+
+### The post pass: kept as r1 (ACES)
+`vP` (AgX, the audit's step 1) desaturated the Glowmere palette and made the wides milky; rejected. `vQ` kept
+ACES and stepped the rest of the recipe in seven windows: the bloom at threshold 0.9 (Q1) puts a standing halo
+on every emissive, the opposite of what the owner asked of the pulses (the peaks, not the rest, should cross
+the bloom's 1.761); the filmic finish (Q2: grain 0.035, vignette 0.35, anamorphic 0.12) is barely visible at
+540p; the look colour and light wrap (Q3) turn the hue 5-17 deg (47.1's gills an orange haze). The post stays
+r1's: ACES, bloom threshold 1.761.
+
+### The air: fogSky 0.5 (`vF`, ten windows, sheets `build/gv3/int/vF/ab-*.png`)
+| | 41.1 mean luma | 71.1 | 117.1 | violet px 41.1 / 117.1 / 113.1 / 66.3 |
+|---|---|---|---|---|
+| F0 fogSky 1.0 (r1) | 0.292 | 0.395 | 0.253 | 17 / 25 / 737 / 170 |
+| F1 0.5 | 0.233 | 0.318 | 0.239 | 83 / 31 / 877 / 209 |
+| F2 1.0 at 600 m | 0.221 | 0.303 | 0.258 | 66 / 33 / 937 / 228 |
+| F3 0 | 0.211 | 0.217 | 0.214 | 158 / 115 / 1134 / 389 |
+
+gv3-world expected 1.0 to soften the ends, and it does: at 0 the end of 109.1's crane shows the river's mouth as
+a slot between two flat blocks (`vF/zoom-109.1-far-end.png`) and 71.1's elder stands in front of a hard cyan
+trapezoid (its light's volume, lost in the haze at 1.0). At 0.5 both stay soft, the wides are navy under the
+aurora again, and the small violet mushrooms come back (41.1: 17 -> 83 pixels). Applied (`4f246a9a`). 81.1 and
+85.1 (the suspension) change little either way.
+
+### The owner's r1 items, first attempt (r2b: calibration clips on engine-4, E5 as r1)
+- **Hero pulses** (`build/gv3/int/tools/pulse.py`: the elder's gills, kick lane, 50 ms against 300 ms after
+  each hit): s01 mean x1.05 (r1) -> x1.11 (r2b), p90 x1.00 -> x1.01; 9.1 x1.04 -> x1.07, p90 x1.01 -> x1.03.
+  Far from +40-60%. Two causes: a route's fall is a time constant, so 260 ms leaves 32% of a hit 300 ms later
+  and 18% when the next kick lands (the gills never come down); and the gills sit at the tone curve's shoulder.
+  The **ladder** (`vL`: every hero's gills and underside stepped through x0.05-3.2 with their routes off,
+  `vL/ladder-sheet.png`) gave each hero's rest and peak: the elder's close-up gills p90 0.47 at x0.1, 0.67 at
+  x0.2, 0.76 at x0.4, then only peach and clipping (15% of them at x0.8). Recalibrated (`45a87733`): each hero
+  rests dim and flares to its brightest short of clipping (the elder 0.10 -> 0.60; the veil, lantern, bloom,
+  umbra, spire and ridge 0.12-0.20 -> 3.2; cairn and scree 0.20 -> 1.6; ember 0.20 -> 1.0), each lane's fall
+  lets the glow come down (kick 100 ms, clap and off-beat 150, once a bar 220), the quietest section at 70%;
+  the elder's light rests at 1.5 and flares x5 on the kick (the spill).
+- **The small mushrooms** (`tools/violet.py`: the violet fungi's pixels at a kick against 300 ms later): 5.1
+  437 -> 551 pixels, luma x1.12; 9.1 426 -> 520, x1.01; the grand wides 13-53 violet pixels in the whole frame.
+  The fog hid them (above), and the hit fell too slowly. Now +3.0 on the kick's 100 ms fall, the shelf fungi
+  +2.4 and beacons +2.2 on 150 ms (`45a87733`). Their size is unchanged: if they still do not read in the
+  wides, the next lever is a look change (size, or the light they cast) for the owner.
+- **The Camera Travel Beam** fires on the 22 cuts that open a four-bar phrase (`r2b/travel-beam-sheet.png`: at
+  each it starts at the lens and sweeps away into the valley in about 1.5 s). It read as a white scan (a
+  near-white edge at intensity 3); its colour now steps through the valley's lights by segment (`4f246a9a`).
+  The load says its kick route is dead ("the sequence has no marker with this trigger's name") while the
+  frames show it firing on every marker: a false alarm in the liveness check, for the engine's list.
+- **E4's two cows** rise apart for most of the lift, but at 107.0 s one body passes through the other
+  (`r2b/e4-zoom-57.1.png`): the engine lays a pair out along +x/-x in the order it takes them and took the
+  western cow first, so each crossed the other's path; and 57.1 looks along that axis. Named in the plan, the
+  east cow first, and 4 m apart in height (`aff43de7`).
+
+### Engine-4 (r2: the merged production, E5's approach 250 -> 18, `690c383b`)
+| Check | r1 (engine-3) | r2 (engine-4) |
+|---|---|---|
+| Watchers of E4 | rook, sage, ember | sage 108.25-114.15 (45 m), ember 109.30-112.50 (14 m); Rook runs at it 106-111 s (facing it within 1-21 deg) and passes 59.1's lens at 108.3 s |
+| Watchers of E5 | rook, ember, **vane 172.30-180.20** | **sage alone**, 170.90-177.15, 135 m off. Vane runs straight at the saucer from 173 s (facing it within 1 deg, 3.9 m/s, 99 -> 68 m); Rook too, from 174 s |
+| 95.1 "Vane sees it" | Vane stands watching | Vane running at it: the close follow bobs (pitch HF 0.109, eye height 2.26 cm: fails the stability bar) |
+| Follow stability | 19/22 | 19/22: 59.1 now passes; 66.3 fails travel (2.08: Sage's path changed); 95.1 fails (above); 95.3 pitch HF 1.31 -> 0.78, yaw HF 0.128 -> 0.040 |
+| ADR-910 | reversals rook 3, ember 4; ember's ABA 5 | rook 1, ember 1 (ABA 1: no pacing); longest stills rook 3.3 s, ember 4.9, vane 4.2, sage 13.4 (watching E5, the only one who does); animals 0 reversals |
+| World | 17 views with an open end; the mouth in 91 views | 20 and 94 (59.1's new eye sees the mouth in 7 views, up to 4 columns; 106.1's is gone) |
+
+The trace logs no "no way across" line with which to count the errands the coordinator expected; what can be
+seen is their effect: the reversals and the pacing are gone, and the aliens who went to watch E5 now go to it.
