@@ -1,56 +1,99 @@
 # GV3 revision: progress and state
 
-This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 11:15.
+This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:00, at a session handoff.
 
-## CURRENT STATE (2026-09-27 11:15): read this before anything else
-This section supersedes the dated notes further down, which are history.
+## CURRENT STATE: SESSION HANDOFF (2026-09-27 12:00). Read this before anything else
+This section supersedes every dated note below it, which are history. The session that wrote it is
+ending. **Its agents end with it: a new session cannot message them.** It relaunches fresh agents
+from each worktree (prompts below).
 
-**Where each phase stands:**
-- The evaluator gate passed.
-- The audit is done.
-- **The engine phase is nearly done.** Phase 3, the GV3 scene revision, is running in parallel streams.
-- The owner's standing instruction: use as many agents as helps, and save status often for a handoff.
+### 1. Verify first
+```
+cd ~/Documents/GitHub
+git -C av-gen log --oneline -1; git -C av-gen status --short | wc -l        # main; the owner's checkout (read-only except merges)
+git -C av-gen-signals log --oneline -1                                      # integrate/revision
+for w in av-gen-gv3 av-gen-render av-gen-gv3-look av-gen-gv3-cut av-gen-gv3-world av-gen-gv3-cast; do
+  echo "== $w $(git -C $w branch --show-current) $(git -C $w log --format='%h %ar %s' -1 | cut -c1-90)"; git -C $w status --short | head -5; done
+ps -eo pid,etime,command | grep -E "[a]vgen_tests|[a]vgen_render_tests|[c]test |[n]inja -|[g]pu-lock|avgen --project|[a]vgen_cast_trace" | cut -c1-120
+~/Documents/GitHub/creative-critic/.venv/bin/critic health
+```
+Leftover processes from the old session may still be running (suites, renders, traces). Let them finish, or stop them if they are orphans. Check that the GPU lock is not held by a dead process.
 
-**Main (the owner's checkout, `~/Documents/GitHub/av-gen`) is `040d6644`.** It has 8 of 10 engine streams: signals, routes, emission, song, camera, reactivity, water and setpieces. The setpieces integration passed CPU 3,747 of 3,747 and GPU 532 of 533 (1 skipped). Main is merged into `gv3/production` (`ecdc3cb4`).
+### 2. Where everything stands
+- **Phases:**
+  - Phase 0 (the evaluator gate): passed.
+  - Phase 1 (the audit): done.
+  - Phase 2 (the engine): 8 of 10 streams in main, 9th integrating, 10th finishing.
+  - Phase 3 (GV3 revision): 4 streams in progress.
+  - Phase 4 (4K final, report, self-critique): not started.
+- **Main is `040d6644`:** signals, routes, emission, song, camera, reactivity, water and setpieces, each integrated and fully tested.
+- **The integration** branch `integrate/revision`, in the worktree `~/Documents/GitHub/av-gen-signals`, is **`ec515c8b` = main + characters,** with the ADR-911 follow-placement fix.
+  - The GPU suite **passed** (533 cases, 532 passed, 1 skipped).
+  - **The CPU suite was running at handoff.** Log: `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/004befa7-093f-41d0-b2da-3d5e53a50a3a/scratchpad/coord-integrate5-cpu-full.log`. It may be gone with the old session's scratchpad; if so, re-run `ctest --test-dir build/release -L unit -j 4` there.
+  - **If it passes:** `git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision` (check that the owner's checkout is clean and on `main`), then merge main into `gv3/production`.
+  - **Expected, harmless:** "Glowmere Valley 2 from several viewpoints" is intermittent, and the event-driven agent test's 180 s wall-clock limit fails under heavy load (it passes alone).
+- **Render** (`agent/render` in `av-gen-render`, the last engine stream): ADR-917–919 are committed, and it was finishing GPU tests, GV3 evidence and suites. When done, merge it into `integrate/revision`, build, run the full suites, and fast-forward main. It merged main `3f720bfa`, so expect conflicts with setpieces and characters.
+- **Two shared engine builds for GV3 worktrees** (each worktree symlinks `build/release` to one):
+  - `~/Documents/GitHub/av-gen-engine` = `040d6644`;
+  - `~/Documents/GitHub/av-gen-engine-2` = `ec515c8b` (with characters). Both are `BUILD-READY`.
+  - For render's post and 4K features, build `av-gen-engine-3` at the next main and tell the streams. Never rebuild one under a running render.
+- **The Critic** `6ed180c`: its adapter reads set pieces and ground samples. The daemon on 8765 was restarted at about 11:40 on that code.
 
-**Integration** (`integrate/revision`, in the worktree `~/Documents/GitHub/av-gen-signals`):
-- `ec515c8b` = main + **characters**, with the follow-placement fix.
-  - Two conflicts were resolved: in `staging.cpp` both kept (the placement check plus `step.component`); in `ui_logic.hpp` both comments kept, with `staging/` on the beginner list.
-  - It builds. Targeted tests pass: `[stage]` 79 cases; follow camera, set pieces and reach 36; the chase test. **The full suites are running** (logs `scratchpad/coord-integrate5-{gpu,cpu}-full.log`).
-- **Next:** run the full suites (GPU when no CPU suite runs, then CPU via ctest), then `git -C ~/Documents/GitHub/av-gen merge --ff-only integrate/revision`, then merge main into `gv3/production`.
-- **Then render,** when its finisher reports.
-
-**Shared engine builds** (GV3 worktrees symlink `build/release` to one of them; never rebuild one under a running render):
-
-| Worktree | Commit | Contents | State | Used by |
-|---|---|---|---|---|
-| `~/Documents/GitHub/av-gen-engine` | `040d6644` | main with setpieces | BUILD-READY | gv3-look, gv3-cut, gv3-world |
-| `~/Documents/GitHub/av-gen-engine-2` | `ec515c8b` | plus characters | **BUILD-READY** (11:11) | gv3-cast; gv3-look, gv3-cut and gv3-world were told to switch at their next iteration boundary |
-
-When the characters integration passes, tell gv3-look, gv3-cut and gv3-world to re-point their symlink at `av-gen-engine-2`, so their renders get characters' behaviour.
-
-**Agents running (IDs valid only in the session that spawned them):**
-
-| Agent | ID | Where | What |
+### 3. The Phase 3 streams (briefs: [briefs.md](briefs.md) § "Phase 3: the GV3 scene revision")
+| Stream | Worktree / branch | Owns | State at handoff |
 |---|---|---|---|
-| render finisher | `abb3faba9bb55470e` | `av-gen-render`, `agent/render` | GPU tests, re-baselines, GV3 evidence, the 4K cost, suites, report |
-| gv3-look | `a975e9345b925a544` | `av-gen-gv3-look`, `gv3/look` | reactivity, the drop, water, wind |
-| gv3-cut | `a2b5481cf60d73226` | `av-gen-gv3-cut`, `gv3/cut` | the Director's cut, pacing, alien screen time, cameras, framing E1–E5 |
-| gv3-world | `a9731881a8bb421a4` | `av-gen-gv3-world`, `gv3/world` | the world edge, the offline 4K configuration |
-| gv3-cast | `a88a2d14952fedf24` | `av-gen-gv3-cast`, `gv3/cast` (from `ecdc3cb4`) | aliens, animals, the scout craft, E1–E5 via set pieces |
-| critic-adapter | `a6ebe91c551ba811a` | `~/Documents/GitHub/creative-critic` | **done** (`6ed180c`); report in [stream-reports/critic-adapter.md](stream-reports/critic-adapter.md). The daemon on 8765 was restarted at about 11:40 on the new code |
+| gv3-look | `av-gen-gv3-look` / `gv3/look` | `look.py`, `directives.py`, `reactivity.py`, the water and wind blocks | reactivity installing and tuning (the riser's roll drives the small fungi); see its `phase3/look.md` |
+| gv3-cut | `av-gen-gv3-cut` / `gv3/cut` | `shots.py`, `rig.py`, `cuts.py`, `framing.py`, `review.py`, `install_cut` and `autoDirector` | the Director's cut with authored spans; E1's wide framed; see `phase3/cut.md` |
+| gv3-world | `av-gen-gv3-world` / `gv3/world` | `world.py`, `offline.py` | the world edge and `offline.py` behind `--final`; see `phase3/world.md` |
+| gv3-cast | `av-gen-gv3-cast` / `gv3/cast` | `cast.py`, `ufo.py` and the plan | the characters settings and the scout applied; E1–E5 via the plan; the alien float to check; see `phase3/cast.md` |
 
-**How Phase 3 is organised:**
-- **Briefs:** [briefs.md](briefs.md) § "Phase 3: the GV3 scene revision, in parallel streams". Each stream owns distinct generator files and never commits generated project files.
-- **The foundation commit** on `gv3/production`, `334c4cf6`: the authored energy arc and the meter pins.
-- **Merging Phase 3:** merge each `gv3/<topic>` into `gv3/production`, run `python3 tools/make_glowmere_valley_3.py`, render a full 960×540 preview, and evaluate the whole film against iteration 0 (`job_1a0def77d9084ad74`). Iterate, then the 4K final with `offline.py`, the revision report, and the Director's self-critique (brief DELIVERABLES and §18).
+- Each stream's own notes, `docs/glowmere-valley-3/revision/phase3/<topic>.md`, hold its iterations and next steps.
+- The streams never commit generated project files. After merging, regenerate with `python3 tools/make_glowmere_valley_3.py`.
 
-**Relaunching a stream that died:** a fresh agent gets its brief section plus "your worktree holds partial work: inspect `git log` and `git diff`, and continue". Every stream's notes are in `revision/phase3/<topic>.md` in its worktree.
+**Relaunch prompt for a Phase 3 stream** (a fresh agent):
+> You are the gv3-<topic> stream of Phase 3 of the Glowmere Valley 3 revision. Read ENGINEERING-RULES.md, then briefs.md § "Phase 3" (the common rules and "gv3-<topic>"), then the stream reports it names. Your worktree `~/Documents/GitHub/av-gen-gv3-<topic>` (branch `gv3/<topic>`) holds your predecessor's work. Read `git log gv3/production..HEAD`, `git status`, and `docs/glowmere-valley-3/revision/phase3/<topic>.md`, which has its iterations and next steps, then continue. The shared engine is `build/release`, a symlink. The Critic daemon on 8765 belongs to the coordinator. Commit early; never commit generated project files; end with the final report your brief describes.
 
-**Recent rulings:**
-- **The GPU lock.** CPU suites never take it. A GPU suite offered as evidence runs when no CPU suite does.
-- **Shared folders.** Log names must start with the stream's name.
-- **The multicam file** stays untouched.
+**Relaunch prompt for render:** the rules, briefs.md § "render (ADRs 917–919)", and "inspect `git log main..HEAD` and `git status` in `~/Documents/GitHub/av-gen-render`, read `docs/development/render-design-notes.md`, finish, run the suites, and report".
+
+### 4. What remains, in order
+1. **Finish the engine:** characters into main (above), then render (merge, suites, fast-forward). Then an engine build at the final main for the GV3 streams.
+2. **Finish the Phase 3 streams**, each with its evaluator evidence.
+3. **Merge Phase 3:** merge each `gv3/<topic>` into `gv3/production` and regenerate the project.
+   - Resolve cross-stream issues. For example, gv3-cut frames E1–E5 at the beat times gv3-cast measures, and the Song Mode events come from gv3-cast's trace.
+4. **The whole film:**
+   - Render a full 960×540 preview: `tools/gpu-lock.sh build/release/src/avgen --project examples/world/glowmere-valley-3.json --render $PWD/build/gv3/r1.mov --size 960x540`, about 25 minutes.
+   - Regenerate the Critic's inputs (INTEGRATION_GUIDE.md §6) and evaluate the whole film in preview mode, against iteration 0 (`job_1a0def77d9084ad74`, session `gv3-revision`, track `film`).
+   - Iterate on the findings. Record each round in [04-iterations.md](04-iterations.md).
+5. **The 4K final:** the generator with `offline.py`'s `--final`, render-post.md's command, about 1.5–2.5 h. Evaluate it at `--delivery 3840x2160`.
+6. **The deliverables** (brief DELIVERABLES and §18): the revision report, before/after evidence per category, and the Director's self-critique. Review material goes in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/`.
+
+### 5. Known open issues
+- **Four aliens float 0.2–0.5 m while walking** (measured on engine `040d6644`); gv3-cast is checking it on engine-2. If it is an engine defect, it needs an engine fix, not data.
+- **E4 must find two animals within reach** after the meadow re-homing (gv3-cast).
+- **E1–E4 were off screen** in the first-pass cut; gv3-cut frames them. Check `framing[].on_screen` in the Critic's report.
+- **The Director's evaluator hook** (ADR-931) calls the adapter without `--world-preview`, so it has no ground data. A small engine follow-up.
+- **`scout` needs a hero record** (radius about 4.9 m) for the Critic.
+- **Engine defects recorded, not fixed:**
+  - the Modulation panel's route and source edits have no undo;
+  - other HIST readers (speed and velocity signals, Trail ribbons, ADR-545 velocity) still read across placements;
+  - decider considerers have no slope limit;
+  - multi-leg `move` errands brake at every waypoint;
+  - `masterGain` pulls Multiply routes toward 0;
+  - the ecology light takes the layer's colour, not the program's.
+- **`glowmere-valley-2-multicam` stays untouched** (the owner's rule). Its stale-key warnings are expected.
+
+### 6. Rulings in force
+- **Engine changes:** they go to main through `integrate/revision`, with full suites before each fast-forward.
+- **The GPU lock:** CPU suites never take it. A GPU suite offered as evidence runs when no CPU suite does.
+- **Logs:** names start with the stream's name.
+- **No compatibility shims** (ADR-441/442).
+- **UI reach:** anything visible is controllable, under viewer-word labels.
+- **Never:**
+  - commit the song or the licensed assets;
+  - run the windowed app for automation;
+  - run `tools/make_abduction_scenario.py`;
+  - modify `glowmere-valley-2-multicam`.
+- **The owner's latest instruction:** "use as many agents as you want to parallelize remaining work, save status updates often".
 
 ## Start of a session: do this first
 1. **Read this file**, then [00-brief.md](00-brief.md) (the owner's revision spec, verbatim).
