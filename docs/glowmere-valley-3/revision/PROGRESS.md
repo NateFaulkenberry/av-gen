@@ -8,22 +8,21 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
-- **Characters: CPU suite PASSED** on `integrate/revision` `ec515c8b`: 3,781 of 3,781, 0 failed, 3,233 s. The GPU
-  suite passed earlier (533 cases, 532 passed, 1 skipped).
-- **Main's fast-forward is waiting on the owner.** The auto-mode classifier refused the coordinator's
-  `merge --ff-only` in the owner's checkout. The owner runs: `git -C ~/Documents/GitHub/av-gen merge --ff-only ec515c8b`,
-  naming the commit and not the branch (see the render integration below). Then merge main into `gv3/production`.
+- **MERGED (12:55): main is `ec515c8b`,** now also with characters (ADR-907–910, the ADR-911 placement amendment).
+  Its suites: CPU 3,781 of 3,781, 0 failed, 3,233 s; GPU 533 cases, 532 passed, 1 skipped. **9 of 11 engine streams
+  are in main.** The owner approved the fast-forward after the classifier refused it. Main was then merged into
+  `gv3/production` (`3a00b180`). The shared build `av-gen-engine-2` is main.
 - **Render is integrating** on a new branch, **`integrate/render`**, in `~/Documents/GitHub/av-gen-signals`: `776b1a87` =
   `ec515c8b` + `agent/render`. The merge was textually clean (the handoff expected conflicts; none). `integrate/revision`
   stays at the tested `ec515c8b`.
   - **Built** (12:45, exit 0; a true no-op afterwards; ctest lists 3,788 tests, +7 from render).
   - Next: the full CPU suite, then the full GPU suite in a window with no CPU suite. Then fast-forward
     `integrate/revision` to it, and main after the owner allows.
-  - **Held (12:55) on the owner's decision.** Render's own full GPU suite (`full-2`, on its final code, pid 65971) is
-    queued on the lock behind four jobs; a full GPU suite takes about 20 minutes (`full-1`: 1,166 s). A CPU suite run
-    alongside it would void it as evidence (ENGINEERING-RULES, the GPU lock), and the classifier refused both
-    withdrawing `full-2` and starting the integration CPU suite while it waits. The owner chooses: withdraw `full-2`
-    (the integration's GPU suite covers render's code too), or keep it and run the integration CPU suite after it.
+  - **Render's own full GPU suite (`full-2`) was withdrawn** from the lock queue at 12:57, with the owner's approval.
+    It had waited 99 minutes; a CPU suite beside it would have voided it as evidence; the integration's GPU suite
+    covers render's code too. A full GPU suite takes about 20 minutes (`full-1`: 1,166 s).
+  - **The full CPU suite is running** on `776b1a87` (from 12:58; log `coord-render-int-cpu-full.log` in the
+    coordinator's scratchpad, `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/08ff7bb5-10b9-4c50-a00a-c45ffb80e000/scratchpad/`).
 - **The alien float's cause is found. It is data, not the engine.** gv3-cast found that the multicam gives ember and
   vane an entity reaction `audio.bass -> liveliness/bounce` (+0.45 on a 0.32 bounce, 60 ms attack). With the authored
   bounce at 0, the reaction alone still lifted them (p90 0.16-0.17 m, max 0.22-0.23 m). Rook and tide match ADR-895.
