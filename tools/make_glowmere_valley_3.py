@@ -3,6 +3,7 @@
 
     python3 tools/make_glowmere_valley_3.py            # the film
     python3 tools/make_glowmere_valley_3.py --scout    # a location scout instead of the cut
+    python3 tools/make_glowmere_valley_3.py --final    # the film, configured for the 4K final render
 
 It reads examples/world/glowmere-valley-2-multicam.{json,scene.json} and never writes to them (the
 brief: the original stays unmodified), and writes examples/world/glowmere-valley-3.{json,scene.json},
@@ -235,6 +236,10 @@ def shot_plan(shots):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--scout", action="store_true", help="a location scout instead of the cut")
+    parser.add_argument("--final", action="store_true",
+                        help="the final render's configuration: 4K at full offline quality (tools/gv3/offline.py)")
+    parser.add_argument("--final-trace", metavar="CAST_JSON",
+                        help="with --final: an avgen_cast_trace --camera JSON, so followed shots are measured too")
     args = parser.parse_args()
 
     for path in (SRC_PROJECT, SRC_SCENE):
@@ -281,6 +286,9 @@ def main():
     render.update({"path": "../../build/gv3/glowmere-valley-3.mov", "start": 0.0, "end": FILM_END if end else shots[-1].end,
                    "fps": 60.0, "width": 1920, "height": 1080, "tier": "offline", "limits": "unlimited",
                    "muxAudio": True, "output": "video", "codec": "h264", "quality": 90})
+    if args.final:
+        from gv3 import offline
+        offline.apply(project, scene, report, trace=args.final_trace)
 
     OUT_SCENE.write_text(dump(scene))
     project["assets"]["scene"]["path"]["path"] = OUT_SCENE.name
