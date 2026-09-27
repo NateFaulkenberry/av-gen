@@ -99,7 +99,7 @@ jobs:
     # docs/development/ci.md, "The sanitizer partition", has the measurements. Expected per job:
     #   heavy-1     : the sequence film (one process, the floor), and two pairs of long cases  ~4-5 h
     #   heavy-2     : the fade film, the director's own 30 s, two abduction scenarios          ~3.2-3.7 h
-    #   rest-a/b/c  : every other default case, 9 Catch2 shards, 3 per job                     ~2.7 h (p95 3.7 h)
+    #   rest-a/b/c  : every other default case, 9 Catch2 shards, 3 per job                     ~2.4 h (p95 3.8 h)
     # Five jobs: one wave of the account's five macOS slots, not two.
     name: ASan/UBSan tests (${{ matrix.job }})
     needs: asan-build
