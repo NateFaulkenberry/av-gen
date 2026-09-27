@@ -149,6 +149,44 @@ struct PathRequest;
 struct PathResult;
 struct NavPathCost;
 
+// **What a walker wants from its next destination, beyond "anywhere navigable" (ADR-907).**
+//
+// The old question -- a uniformly random direction, accepted if the ground there is navigable --
+// is the GV3 audit's first root cause: a body that has just walked east is as likely to be sent
+// straight back west as anywhere else, and one past its home radius was re-drawn around home, which
+// is a return trip by construction. Every field below narrows the answer toward somewhere a creature
+// would plausibly carry on to.
+//
+// Drawn in the walker's own yaw convention (forward = (sin, cos)), not the old draw's (cos, sin), so
+// this is a new stream of answers even with every field at its default. The old
+// `pickDestination(rng, from, lo, hi, out)` is a different question and is unchanged.
+struct DestinationRequest {
+    float minRadius = 0.0f;
+    float maxRadius = 0.0f;
+    // The forward cone: candidates are drawn within `spread` radians either side of `heading`, a
+    // yaw. A `spread` of pi or more is the whole circle.
+    float heading = 0.0f;
+    float spread = 3.14159265f;
+    // The circle the walker turns on while walking, in metres (ADR-908). A candidate `r` metres off
+    // and `u` radians from the heading lies inside it when r < 2 R |sin u|, and a body that keeps
+    // walking cannot reach it without stopping to pivot, so it is not offered. 0 = no such circle.
+    float turnRadius = 0.0f;
+    // The steepest ground, in degrees, the destination and the straight walk to it may cross. 0 =
+    // the navigator's own cliff rule and nothing more.
+    float maxSlopeDegrees = 0.0f;
+    // When no candidate honours `maxSlopeDegrees`, return the gentlest navigable one rather than
+    // nothing: a body standing on a flank walks toward the flat instead of standing on the flank
+    // for ever. Off by default, because a caller that can ask again more widely -- a whole circle
+    // after a cone -- should, before it settles for steep ground.
+    bool gentlestFallback = false;
+    // A leash. With `homeRadius` > 0, a candidate farther than that from `home` is offered only
+    // when it is no farther from home than `from` already is -- so a body inside its territory
+    // stays in it and a body outside it never walks further out.
+    glm::vec2 home{0.0f};
+    float homeRadius = 0.0f;
+    int attempts = 24;
+};
+
 class Navigator {
 public:
     Navigator() = default;
@@ -214,6 +252,15 @@ public:
     // Returns false and leaves `out` untouched when no attempt succeeded.
     [[nodiscard]] bool pickDestination(Rng& rng, glm::vec2 from, float minRadius, float maxRadius,
                                        glm::vec2& out, int attempts = 24) const;
+    // The same, asked with a heading, a turning circle, a slope limit and a leash (ADR-907). Two
+    // draws per attempt, like the old question, whatever the attempt is rejected for.
+    [[nodiscard]] bool pickDestination(Rng& rng, glm::vec2 from, const DestinationRequest& request,
+                                       glm::vec2& out) const;
+    // The steepest ground, in degrees, on the straight walk from `a` to `b`: sampled every `spacing`
+    // metres from `spacing` past `a` to `b` itself -- where the walker is going, not the ground it
+    // already stands on, which it cannot help. The normal is taken a metre either side, about a
+    // body's length, so a pebble's slope is not a hill's.
+    [[nodiscard]] float routeSlopeDegrees(glm::vec2 a, glm::vec2 b, float spacing = 2.0f) const;
 
     // How many cells of margin `gridTrustMetres` asks for on this grid. At least 1.
     [[nodiscard]] int gridTrustCells(const NavGrid& grid) const;

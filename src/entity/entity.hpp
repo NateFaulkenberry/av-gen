@@ -753,6 +753,21 @@ private:
     };
     PerceptionParams perceptionParams_{};
 
+    // ADR-908: how this body turns, as ordinary parameters (`entity/<name>/gait/turnRate`,
+    // `turnRadius`, `pivotRadius`), so an artist finds them in the Parameters panel under the body's
+    // name and a track can keyframe them. Registered for a body that authors a gait -- one that
+    // walks -- and for no other. `gaitLive_` is the authored gait with those three read back in, and
+    // it is what the action tier and the clip rate are handed; `desc_.gait` stays the authored one,
+    // so a save writes what the author wrote and not a modulated moment of it.
+    struct GaitParams {
+        params::Parameter<float>* turnRate = nullptr;
+        params::Parameter<float>* turnRadius = nullptr;
+        params::Parameter<float>* pivotRadius = nullptr;
+    };
+    GaitParams gaitParams_{};
+    GaitSettings gaitLive_{};
+    void refreshGait();
+
     IPoseSink* pose_ = nullptr;
     const ISkeletonQuery* skeleton_ = nullptr;
 

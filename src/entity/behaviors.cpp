@@ -62,6 +62,14 @@ params::ParamDesc<float> floatDesc(std::string path, float def, float lo, float 
     return params::ParamDesc<float>{.path = std::move(path), .defaultValue = def, .hardMin = lo, .hardMax = hi};
 }
 
+// The same, with the words the Parameters panel shows instead of the path's last segment -- what the
+// viewer sees and the unit it is in, so an artist can find the control from the picture (the UI
+// reach rule). ADR-907 to 909's controls use it; the older ones still show their key.
+params::ParamDesc<float> floatDesc(std::string path, float def, float lo, float hi, std::string label) {
+    return params::ParamDesc<float>{
+        .path = std::move(path), .defaultValue = def, .hardMin = lo, .hardMax = hi, .label = std::move(label)};
+}
+
 // Smallest signed angle from `from` to `to`, in radians.
 float angleDelta(float from, float to) {
     float d = std::fmod(to - from + kPi, kTwoPi);
@@ -676,7 +684,13 @@ public:
           maxRangeDefault_(readFloat(s, "maxRange", 30.0f)),
           pauseMinDefault_(readFloat(s, "pauseMin", 1.5f)),
           pauseMaxDefault_(readFloat(s, "pauseMax", 6.0f)),
-          homeDefault_(readFloat(s, "homeRadius", 0.0f)) {}
+          homeDefault_(readFloat(s, "homeRadius", 0.0f)),
+          // ADR-907 and 908. See `update` for what each one changes and why its default is what
+          // it is; every one of them is a registered parameter, so a scene can keyframe it.
+          spreadDefault_(readFloat(s, "headingSpread", 60.0f)),
+          maxSlopeDefault_(readFloat(s, "maxSlope", 0.0f)),
+          radiusDefault_(readFloat(s, "turnRadius", 0.0f)),
+          arrivalDefault_(readFloat(s, "arrival", 2.0f)) {}
 
     [[nodiscard]] std::string_view kind() const override { return "wander"; }
 
@@ -690,9 +704,18 @@ public:
         pauseMin_ = &params.add(floatDesc(prefix + "pauseMin", pauseMinDefault_, 0.0f, 300.0f));
         pauseMax_ = &params.add(floatDesc(prefix + "pauseMax", pauseMaxDefault_, 0.0f, 600.0f));
         home_ = &params.add(floatDesc(prefix + "homeRadius", homeDefault_, 0.0f, 4000.0f));
-        paths_ = {prefix + "speed",     prefix + "runSpeed", prefix + "turnRate", prefix + "arrive",
-                  prefix + "minRange",  prefix + "maxRange", prefix + "pauseMin", prefix + "pauseMax",
-                  prefix + "homeRadius"};
+        spread_ = &params.add(floatDesc(prefix + "headingSpread", spreadDefault_, 0.0f, 180.0f,
+                                        "how far off straight ahead it wanders (deg)"));
+        maxSlope_ = &params.add(floatDesc(prefix + "maxSlope", maxSlopeDefault_, 0.0f, 89.0f,
+                                          "steepest ground it walks on (deg, 0 = any)"));
+        radius_ = &params.add(floatDesc(prefix + "turnRadius", radiusDefault_, 0.0f, 100.0f,
+                                        "turn radius (m, 0 = from speed and turn rate)"));
+        arrival_ = &params.add(floatDesc(prefix + "arrival", arrivalDefault_, 0.0f, 100.0f,
+                                         "slows down over the last (m)"));
+        paths_ = {prefix + "speed",         prefix + "runSpeed", prefix + "turnRate",   prefix + "arrive",
+                  prefix + "minRange",      prefix + "maxRange", prefix + "pauseMin",   prefix + "pauseMax",
+                  prefix + "homeRadius",    prefix + "headingSpread", prefix + "maxSlope",
+                  prefix + "turnRadius",    prefix + "arrival"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
@@ -700,6 +723,7 @@ public:
     void reset(Rng& rng) override {
         hasDestination_ = false;
         pause_ = rng.range(0.0f, 2.0f);
+        pace_ = 0.0f;
         escape_.reset();
     }
 
@@ -710,7 +734,12 @@ public:
         // are untouched, so when the order ends the walk carries on to the same place rather than
         // picking a new one. Speed is deliberately not zeroed here -- whoever is driving has
         // already written it, and overwriting it would make a directed walk stand still.
+        //
+        // ADR-907: and the pace is *taken* from whoever is driving, so a body handed back mid-walk
+        // eases on from the speed it has rather than from a standstill or from a stale pace of its
+        // own.
         if (state.driven) {
+            pace_ = std::max(0.0f, state.speed);
             return;
         }
         // Something with the character's attention has it. Travel is what a character does when
@@ -718,43 +747,40 @@ public:
         // pause timer are kept, and the walk resumes from where it stopped.
         if (state.activity == Activity::Observe || state.activity == Activity::React) {
             state.speed = 0.0f;
+            pace_ = 0.0f;
             return;
         }
-        const float speed = speed_ != nullptr ? speed_->value() : speedDefault_;
-        const float arrive = arrive_ != nullptr ? arrive_->value() : arriveDefault_;
-        const float turnRate = (turn_ != nullptr ? turn_->value() : turnDefault_) / kDegrees;
+        const float speed = param(speed_, speedDefault_);
+        const float arrive = param(arrive_, arriveDefault_);
+        const float turnRate = param(turn_, turnDefault_) / kDegrees;
         const glm::vec3 here = state.position();
         const glm::vec2 flat(here.x, here.z);
+        const GaitSettings gait = ctx.gait != nullptr ? *ctx.gait : GaitSettings{};
+        const auto dt = static_cast<float>(ctx.dt);
+        // ADR-908: the circle this body turns on while it walks. 0 is not "no circle" here, it is
+        // the circle the body's own speed and turn rate already describe -- speed / turnRate, the
+        // tightest turn it could make at full pace -- so a wanderer nobody tuned still walks through
+        // its turns and never stops to pivot out of one. An author who wants a wider, heavier turn
+        // says how wide.
+        const float authoredRadius = param(radius_, radiusDefault_);
+        const TurnSettings turning{turnRate, authoredRadius > 0.0f ? authoredRadius
+                                             : (turnRate > 1e-4f ? speed / turnRate : 0.0f)};
 
         if (pause_ > 0.0f) {
-            pause_ -= static_cast<float>(ctx.dt);
-            state.speed = 0.0f;
-            if (state.activity == Activity::Walk || state.activity == Activity::Run) {
-                state.activity = Activity::Idle;
-            }
+            pause_ -= dt;
             escape_.reset();
+            coast(ctx, state, gait);
             return;
         }
         if (!hasDestination_) {
-            const float lo = minRange_ != nullptr ? minRange_->value() : minRangeDefault_;
-            const float hi = maxRange_ != nullptr ? maxRange_->value() : maxRangeDefault_;
-            // An unleashed wander is a random walk, and a random walk leaves. When a home radius is
-            // set, a character that has strayed past it picks its next destination around *home*
-            // rather than around itself, so it drifts back without ever being pushed: the walk
-            // stays a walk instead of becoming a return trip.
-            const float home = home_ != nullptr ? home_->value() : homeDefault_;
-            const glm::vec2 anchor(state.anchor.x, state.anchor.z);
-            const glm::vec2 from =
-                (home > 0.0f && glm::length(flat - anchor) > home) ? anchor : flat;
-            if (ctx.nav != nullptr && ctx.rng != nullptr &&
-                ctx.nav->pickDestination(*ctx.rng, from, lo, std::min(hi, home > 0.0f ? home : hi),
-                                         destination_)) {
+            if (pick(ctx, state, flat, turning)) {
                 hasDestination_ = true;
             } else if (escapeToNavigable(ctx.nav, escape_, state, speed, turnRate, ctx.dt)) {
                 // Not boxed in: *off the navigable set*, where the rejection sampler can find
                 // nothing in the annulus because the body's own neighbourhood is not walkable.
                 // ADR-162's walk back onto the path, which `explore` has had since then and
                 // `wander` never did -- see the note on the steering branch below.
+                pace_ = state.speed;
                 return;
             } else {
                 // Nowhere to go. Wait a beat and ask again rather than retrying every frame: a
@@ -768,6 +794,7 @@ public:
                 // miniature and repeated: measured over the shipped farm it was 54% of the frames
                 // an animal was "commanded to move".
                 pause_ = 1.0f;
+                pace_ = 0.0f;
                 state.speed = 0.0f;
                 state.activity = Activity::Idle;
                 return;
@@ -777,18 +804,16 @@ public:
         const glm::vec2 toGoal = destination_ - flat;
         const float distance = glm::length(toGoal);
         if (distance <= arrive) {
-            hasDestination_ = false;
-            const float lo = pauseMin_ != nullptr ? pauseMin_->value() : pauseMinDefault_;
-            const float hi = pauseMax_ != nullptr ? pauseMax_->value() : pauseMaxDefault_;
-            pause_ = ctx.rng != nullptr ? ctx.rng->range(std::min(lo, hi), std::max(lo, hi)) : lo;
-            state.speed = 0.0f;
-            state.activity = Activity::Idle;
+            arrived(ctx, state, gait);
             return;
         }
 
         glm::vec2 direction = toGoal / distance;
         if (ctx.nav != nullptr && ctx.nav->valid()) {
-            const glm::vec2 steered = ctx.nav->steer(flat, destination_, std::max(speed * 1.5f, 2.0f));
+            // ADR-908: looking at least a turn and a half ahead, so a body that has to walk round
+            // something has room to do it on its circle rather than finding the trunk inside it.
+            const float lookahead = std::max({speed * 1.5f, 2.0f, turning.radius * 1.5f});
+            const glm::vec2 steered = ctx.nav->steer(flat, destination_, lookahead);
             if (glm::length(steered) > 0.5f) {
                 direction = steered;
             } else if (escapeToNavigable(ctx.nav, escape_, state, speed, turnRate, ctx.dt)) {
@@ -811,49 +836,188 @@ public:
                 //
                 // The destination is kept: it may still be reachable once the body is back on the
                 // path, and re-picking one every frame is rejection sampling nobody asked for.
+                pace_ = state.speed;
                 return;
             } else {
                 // Every way out is blocked. Drop the destination rather than grinding into a
                 // hillside; the next pick will be somewhere else -- and stop claiming to be moving,
-                // for the reason above.
+                // for the reason above. A hard stop, deliberately: easing on into a way that is
+                // blocked is walking into it.
                 hasDestination_ = false;
                 pause_ = 0.5f;
+                pace_ = 0.0f;
                 state.speed = 0.0f;
                 state.activity = Activity::Idle;
                 return;
             }
         }
 
-        // Turn towards the heading before travelling along it, and travel at the fraction of full
-        // speed that the facing error allows -- so a character pivots rather than strafing.
+        // **The turn (ADR-908).** The old rule turned toward the heading at `turnRate` and travelled
+        // at the cosine of what was left, so every turn over 90 degrees -- and a uniformly random
+        // destination is over 90 degrees half the time -- was a dead stop and a pivot on the spot:
+        // measured on GV3's twelve animals, 27 to 44% of all the turning they did was done
+        // standing. Now a moving body turns no faster than its pace allows on its circle and keeps
+        // at least half its pace through the turn; only a body at rest pivots.
         const float wanted = std::atan2(direction.x, direction.y); // direction is XZ in a vec2
-        const float delta = angleDelta(state.yaw, wanted);
-        const float step = turnRate * static_cast<float>(ctx.dt);
-        state.yaw += std::clamp(delta, -step, step);
-        state.turnRate = std::clamp(delta, -step, step) / std::max(static_cast<float>(ctx.dt), 1e-4f);
+        const float error = angleDelta(state.yaw, wanted);
+        // A destination the body cannot reach on its circle -- a steering detour swung it wide, or
+        // it was drawn on the circle's edge -- is reached. It was only ever somewhere to walk
+        // toward, and pivoting to make it exact is the thing ADR-908 exists to stop.
+        if (insideTurn(turning, pace_, distance, error)) {
+            arrived(ctx, state, gait);
+            return;
+        }
 
-        const float alignment = std::max(0.0f, std::cos(angleDelta(state.yaw, wanted)));
-        const float travelSpeed = std::min(speed * alignment, distance / std::max(static_cast<float>(ctx.dt), 1e-4f));
+        // **The pace (ADR-907).** Eased by the body's own gait, the numbers the action tier has
+        // always eased with: up at `accel`, down at `decel`. And slowed into the destination --
+        // never faster than it can still stop from in the distance left, and inside `arrival`
+        // metres in proportion to what is left of them, Reynolds' arrive -- so an animal walks
+        // up to the place it was going to and settles rather than halting in one frame while its
+        // legs, which the speed limiter ramps separately, go on walking for another half second.
+        float desired = speed * turnPace(turning, pace_, error);
+        const float beyond = std::max(0.0f, distance - arrive);
+        desired = std::min(desired, std::sqrt(2.0f * std::max(gait.decel, 0.0f) * beyond));
+        const float arrival = param(arrival_, arrivalDefault_);
+        if (arrival > 0.0f) {
+            desired = std::min(desired, speed * std::clamp(beyond / arrival, 0.2f, 1.0f));
+        }
+        const float before = pace_;
+        pace_ = Gait::approach(pace_, desired, gait.accel, gait.decel, ctx.dt);
+        // Then the turn: no tighter than the circle at the slower of the two paces, or a pivot for
+        // a body that is at rest this step (gait.hpp).
+        const float cap = turnCap(turning, before, pace_) * dt;
+        const float turned = std::clamp(error, -cap, cap);
+        state.yaw += turned;
+        state.turnRate = turned / std::max(dt, 1e-4f);
+        const float travelSpeed = std::min(pace_, distance / std::max(dt, 1e-4f));
         const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
-        const glm::vec2 move = heading * travelSpeed * static_cast<float>(ctx.dt);
+        const glm::vec2 move = heading * travelSpeed * dt;
         state.travel.x += move.x;
         state.travel.z += move.y;
         state.speed = travelSpeed;
-        const float runSpeed = runSpeed_ != nullptr ? runSpeed_->value() : runSpeedDefault_;
+        const float runSpeed = param(runSpeed_, runSpeedDefault_);
         state.activity = travelSpeed > runSpeed * 0.75f ? Activity::Run
                          : travelSpeed > 0.05f          ? Activity::Walk
                                                         : Activity::Turn;
-        // Stay on the ground. The navigator's height query is the same one the terrain mesh was
-        // built from, so a walker never floats above or sinks into the surface it is standing on.
+        groundTo(ctx, state);
+    }
+
+private:
+    [[nodiscard]] static float param(const params::Parameter<float>* p, float fallback) {
+        return p != nullptr ? p->value() : fallback;
+    }
+
+    // Stay on the ground. The navigator's height query is the same one the terrain mesh was built
+    // from, so a walker never floats above or sinks into the surface it is standing on.
+    static void groundTo(const BehaviorContext& ctx, EntityState& state) {
         if (ctx.nav != nullptr && ctx.nav->valid()) {
             const glm::vec3 p = state.position();
             state.travel.y = ctx.nav->groundHeight(glm::vec2(p.x, p.z)) - state.anchor.y;
         }
     }
 
-private:
+    // The destination is reached: pause, and let the pace run down rather than stopping dead.
+    void arrived(const BehaviorContext& ctx, EntityState& state, const GaitSettings& gait) {
+        hasDestination_ = false;
+        const float lo = param(pauseMin_, pauseMinDefault_);
+        const float hi = param(pauseMax_, pauseMaxDefault_);
+        pause_ = ctx.rng != nullptr ? ctx.rng->range(std::min(lo, hi), std::max(lo, hi)) : lo;
+        coast(ctx, state, gait);
+    }
+
+    // **ADR-907: a stop is finished, not imposed.** Whatever pace the body still has when it
+    // arrives runs down at its own `decel` along the way it is facing. The arrival above has
+    // already slowed it to almost nothing, so this is centimetres; what it removes is the frame in
+    // which a walking body became a standing one.
+    void coast(const BehaviorContext& ctx, EntityState& state, const GaitSettings& gait) {
+        if (pace_ <= 0.0f) {
+            state.speed = 0.0f;
+            if (state.activity == Activity::Walk || state.activity == Activity::Run) {
+                state.activity = Activity::Idle;
+            }
+            return;
+        }
+        pace_ = Gait::approach(pace_, 0.0f, gait.accel, gait.decel, ctx.dt);
+        const auto dt = static_cast<float>(ctx.dt);
+        const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
+        state.travel.x += heading.x * pace_ * dt;
+        state.travel.z += heading.y * pace_ * dt;
+        state.speed = pace_;
+        state.activity = pace_ > 0.05f ? Activity::Walk : Activity::Idle;
+        groundTo(ctx, state);
+    }
+
+    // **Where next (ADR-907).** The old draw was a uniformly random direction, re-centred on home
+    // once the body was past its radius -- so half of all destinations lay behind the body and
+    // every one drawn from outside home was a trip straight back to it. Measured over GV3's twelve
+    // animals: 128 of 258 stops were followed by a turn of more than 90 degrees, and each of those
+    // began with a dead stop and a pivot.
+    //
+    // Now the draw is a cone about the way the body is facing, `headingSpread` either side, which
+    // **leans** toward home as the body nears the edge of its territory rather than jumping to it:
+    // the lean starts at half the home radius and is complete at the edge. Cone and lean together
+    // never reach past 90 degrees from the way the body faces, and that number is chosen, not
+    // tuned: a walk-through mover at rest pivots only while its way is more than 90 degrees off
+    // (`turnPace`), so a destination within 90 degrees is walked out to on a curve from the first
+    // step and one beyond it is not. Measured on the regression gate, capping the lean at 135
+    // degrees instead left 7% of a wanderer's turning done standing; at 90 it is 0.2%, and a body
+    // far from home comes back round in two or three legs on a curve rather than in one reversal.
+    // Candidates the body could only reach by a pivot (inside its turning circle), ones that would
+    // take it further out of its territory, and -- with `maxSlope` -- ones whose ground or straight
+    // walk is steeper than the body should be on, are not offered.
+    //
+    // A cone can come up empty where a whole circle would not: a body facing a river bank, the
+    // world's edge, a cliff, a flank steeper than `maxSlope`. Then the whole circle is asked, with
+    // no turning circle -- the walk out of a dead end is allowed to start with a pivot. With a slope
+    // limit and nothing gentle anywhere in reach, the gentlest ground on offer is taken last, so a
+    // body put on a hillside walks down it rather than standing there; only when even that is
+    // empty is the body boxed in.
+    bool pick(const BehaviorContext& ctx, const EntityState& state, glm::vec2 flat, const TurnSettings& turning) {
+        if (ctx.nav == nullptr || ctx.rng == nullptr) {
+            return false;
+        }
+        constexpr float kPiF = 3.14159265358979323846f;
+        DestinationRequest request;
+        request.minRadius = param(minRange_, minRangeDefault_);
+        request.maxRadius = param(maxRange_, maxRangeDefault_);
+        request.spread = std::clamp(param(spread_, spreadDefault_), 0.0f, 180.0f) / kDegrees;
+        request.turnRadius = turning.radius;
+        request.maxSlopeDegrees = param(maxSlope_, maxSlopeDefault_);
+        request.heading = state.yaw;
+        const float home = param(home_, homeDefault_);
+        if (home > 0.0f) {
+            const glm::vec2 anchor(state.anchor.x, state.anchor.z);
+            request.home = anchor;
+            request.homeRadius = home;
+            const glm::vec2 toHome = anchor - flat;
+            const float away = glm::length(toHome);
+            if (away > 1e-3f) {
+                const float weight = std::clamp((away / home - 0.5f) / 0.5f, 0.0f, 1.0f);
+                const float most = std::clamp(0.5f * kPiF - request.spread, 0.0f, 0.5f * kPiF);
+                const float toward = angleDelta(state.yaw, std::atan2(toHome.x, toHome.y));
+                request.heading = state.yaw + std::clamp(weight * toward, -most, most);
+            }
+        }
+        if (ctx.nav->pickDestination(*ctx.rng, flat, request, destination_)) {
+            return true;
+        }
+        request.turnRadius = 0.0f;
+        if (request.spread < kPiF) {
+            request.spread = kPiF;
+            if (ctx.nav->pickDestination(*ctx.rng, flat, request, destination_)) {
+                return true;
+            }
+        }
+        if (request.maxSlopeDegrees <= 0.0f) {
+            return false;
+        }
+        request.gentlestFallback = true;
+        return ctx.nav->pickDestination(*ctx.rng, flat, request, destination_);
+    }
+
     float speedDefault_, runSpeedDefault_, turnDefault_, arriveDefault_;
     float minRangeDefault_, maxRangeDefault_, pauseMinDefault_, pauseMaxDefault_, homeDefault_;
+    float spreadDefault_, maxSlopeDefault_, radiusDefault_, arrivalDefault_;
     params::Parameter<float>* speed_ = nullptr;
     params::Parameter<float>* runSpeed_ = nullptr;
     params::Parameter<float>* turn_ = nullptr;
@@ -863,10 +1027,17 @@ private:
     params::Parameter<float>* pauseMin_ = nullptr;
     params::Parameter<float>* pauseMax_ = nullptr;
     params::Parameter<float>* home_ = nullptr;
+    params::Parameter<float>* spread_ = nullptr;
+    params::Parameter<float>* maxSlope_ = nullptr;
+    params::Parameter<float>* radius_ = nullptr;
+    params::Parameter<float>* arrival_ = nullptr;
     std::vector<std::string> paths_;
     glm::vec2 destination_{0.0f};
     bool hasDestination_ = false;
     float pause_ = 0.0f;
+    // ADR-907: the pace the body is actually walking at, eased by its gait. Checkpointed with the
+    // rest of the behaviour (ADR-700 copies it whole) and reset with it on a seek.
+    float pace_ = 0.0f;
     EscapeMemory escape_;
 };
 

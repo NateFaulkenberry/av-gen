@@ -11,6 +11,8 @@ namespace avgen::entity {
 namespace {
 
 constexpr float kTwoPi = 6.283185307179586f;
+constexpr float kPi = 3.14159265358979323846f;
+constexpr float kDegrees = 180.0f / kPi;
 
 } // namespace
 
@@ -207,6 +209,71 @@ bool Navigator::pickDestination(Rng& rng, glm::vec2 from, float minRadius, float
         }
     }
     return false;
+}
+
+bool Navigator::pickDestination(Rng& rng, glm::vec2 from, const DestinationRequest& request,
+                                glm::vec2& out) const {
+    const float lo = std::max(0.0f, std::min(request.minRadius, request.maxRadius));
+    const float hi = std::max(lo, request.maxRadius);
+    const float spread = std::clamp(request.spread, 0.0f, kPi);
+    const float fromHome = glm::length(from - request.home);
+    // The gentlest navigable candidate that missed only the slope limit, kept in case nothing
+    // honours the limit at all: see `DestinationRequest::maxSlopeDegrees`.
+    glm::vec2 gentlest(0.0f);
+    float gentlestSlope = std::numeric_limits<float>::max();
+    for (int i = 0; i < std::max(request.attempts, 1); ++i) {
+        // Both draws on every attempt, whatever it is rejected for, so the stream this consumes is
+        // a function of the attempt count alone.
+        const float off = spread >= kPi ? rng.range(-kPi, kPi) : rng.range(-spread, spread);
+        const float t = rng.nextFloat();
+        // sqrt of the radius fraction, so points are uniform over the sector rather than bunched at
+        // its inner edge, for the reason the old question gives.
+        const float radius = std::sqrt(lo * lo + t * (hi * hi - lo * lo));
+        const float yaw = request.heading + off;
+        const glm::vec2 candidate = from + glm::vec2(std::sin(yaw), std::cos(yaw)) * radius;
+        if (request.turnRadius > 0.0f && radius < 2.0f * request.turnRadius * std::abs(std::sin(off))) {
+            continue; // inside the circle it turns on: reachable only by a pivot
+        }
+        if (request.homeRadius > 0.0f) {
+            const float away = glm::length(candidate - request.home);
+            if (away > request.homeRadius && away > fromHome) {
+                continue; // further out of its territory than it already is
+            }
+        }
+        if (!sample(candidate).navigable) {
+            continue;
+        }
+        if (request.maxSlopeDegrees > 0.0f) {
+            const float steepest = routeSlopeDegrees(from, candidate);
+            if (steepest > request.maxSlopeDegrees) {
+                if (steepest < gentlestSlope) {
+                    gentlestSlope = steepest;
+                    gentlest = candidate;
+                }
+                continue;
+            }
+        }
+        out = candidate;
+        return true;
+    }
+    if (request.gentlestFallback && gentlestSlope < std::numeric_limits<float>::max()) {
+        out = gentlest;
+        return true;
+    }
+    return false;
+}
+
+float Navigator::routeSlopeDegrees(glm::vec2 a, glm::vec2 b, float spacing) const {
+    const float distance = glm::length(b - a);
+    const float step = std::max(spacing, 0.25f);
+    const int steps = std::max(1, static_cast<int>(std::ceil(distance / step)));
+    float steepest = 0.0f;
+    for (int i = 1; i <= steps; ++i) {
+        const glm::vec2 p = a + (b - a) * (static_cast<float>(i) / static_cast<float>(steps));
+        const float up = std::clamp(groundNormal(p, 1.0f).y, -1.0f, 1.0f);
+        steepest = std::max(steepest, std::acos(up) * kDegrees);
+    }
+    return steepest;
 }
 
 bool Navigator::pathClear(glm::vec2 a, glm::vec2 b, float spacing) const {

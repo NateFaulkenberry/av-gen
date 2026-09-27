@@ -39,6 +39,7 @@ namespace avgen::entity {
 class Entity;
 class EntityWorld;
 class ActionQueue;
+struct GaitSettings;
 
 // What behaviours add to the node the entity drives. Folded onto the node's transform parameters
 // once per frame, after modulation, so a route and a behaviour compose instead of overwriting.
@@ -188,6 +189,11 @@ struct BehaviorContext {
     // it is deliberate: a decision that took effect inside the frame it was made in would run the
     // queue twice in one step, and the second run would see a `dt` it had already spent.
     ActionQueue* actions = nullptr;
+    // This entity's own gait (ADR-907): how fast it may gain and lose speed. What lets a behaviour
+    // that moves the body ease into and out of a stop with the same numbers the action tier has
+    // always eased with, rather than carrying a second copy of them. Null only in a caller that
+    // builds a context by hand, which then gets the gait's defaults.
+    const GaitSettings* gait = nullptr;
 
     // Reads a signal by name, 0 when the bus has no such signal. Behaviours resolve names once and
     // cache the id; this is the slow path for the rare read.
