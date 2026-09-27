@@ -175,6 +175,9 @@ private:
     void drawActorInspector(app::Engine& engine, seq::Actor& actor);
     void drawOverlayInspector(app::Engine& engine, seq::OverlayCue& cue);
     void drawSectionInspector(app::Engine& engine, std::size_t index);
+    // ADR-937: the chosen treatment's dials, under the "shot" picker -- editable for one of the
+    // project's own, shown with "Edit a copy" for a built-in (`ui/treatment_editor_logic.hpp`).
+    void drawTreatmentSettings(app::Engine& engine, std::size_t index);
     void drawSceneSlots(app::Engine& engine);
     // ADR-216's performer rules, as an editable list. See the implementation for why every field
     // is a picker.
@@ -328,6 +331,11 @@ private:
     bool marqueeAdds_ = false;
     std::vector<SelectedItem> marqueeKept_;
     bool dirty_ = false;
+    // ADR-937: the treatment editor's text fields, and the treatment they were filled from, so a
+    // field is refilled when the inspector moves to another treatment rather than every frame.
+    char treatmentName_[128] = {};
+    char treatmentDescription_[256] = {};
+    std::string treatmentEditing_;
     int snapMode_ = 2; // Beats
     // Logic's "catch". When on, the strip follows the playhead during playback -- which the seek
     // rule deliberately does not do, because dragging the view under a pointer mid-edit is worse
