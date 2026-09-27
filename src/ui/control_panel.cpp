@@ -4479,9 +4479,9 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
             "Locked      one shot, one camera, framed exactly as the section asked.\n"
             "Guided      the intent is respected; the camera, the cuts and the framing are\n"
             "            the director's.\n"
-            "Expressive  ...and the director also reads the section's own loudness and\n"
-            "            busyness, so a loud section gets more coverage than a quiet one\n"
-            "            carrying the same intent.");
+            "Expressive  ...and the director also reads how busy the section's music\n"
+            "            measures -- hits per second and brightness, never loudness -- so a\n"
+            "            dense section cuts faster than a sparse one carrying the same intent.");
     }
     int autonomy = static_cast<int>(s.autonomy);
     bool first = true;
@@ -4530,6 +4530,12 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
 
     // The per-section rows. In a scrolling child, because a four-minute track is twenty of them and
     // the panel has eight other controls under this one.
+    // Only while it describes these sections: a cut made before the sections were edited is not.
+    std::vector<std::string> songCut =
+        engine.timeline().isAutomated("camera/position") ? app::lastSongCutSummary() : std::vector<std::string>{};
+    if (songCut.size() != plan->sections.size()) {
+        songCut.clear();
+    }
     const float rowHeight = ImGui::GetTextLineHeightWithSpacing();
     if (ImGui::BeginChild("song-sections", ImVec2(0.0f, std::min(9.0f, static_cast<float>(plan->sections.size()) + 0.5f) * rowHeight),
                           ImGuiChildFlags_Borders)) {
@@ -4565,12 +4571,17 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
                     "which applies to the whole film.");
             }
             ImGui::SameLine();
-            ImGui::Text("%5.1f  %s  --  %s", section.startSeconds,
+            // ADR-921: what the last cut made of this section, beside it -- "6 shots, 1.8-3.7 s,
+            // rising" -- so the pacing a person sees in the film has a row it belongs to.
+            const std::string lastCut = i < songCut.size() ? "  [" + songCut[i] + "]" : std::string();
+            ImGui::Text("%5.1f  %s  --  %s%s", section.startSeconds,
                         section.label.empty() ? "(unnamed)" : section.label.c_str(),
-                        section.intent.id.c_str());
+                        section.intent.id.c_str(), lastCut.c_str());
             if (ImGui::IsItemHovered()) {
                 tooltip("%s\n\nhero %.0f%%  distance %.0f%%  movement %.0f%%\n"
                                   "variation %.0f%%  cut rate %.0f%%  cameras %d\n"
+                                  "push %.0f%%  frame %.0f%% full\n"
+                                  "cuts: %s\n"
                                   "measured: energy %.0f%%, density %.0f%%\n"
                                   "pass %d over this material",
                                   section.intent.id.c_str(),
@@ -4580,6 +4591,9 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
                                   static_cast<double>(section.intent.variation) * 100.0,
                                   static_cast<double>(section.intent.cutRate) * 100.0,
                                   section.intent.cameras,
+                                  static_cast<double>(section.intent.energy) * 100.0,
+                                  static_cast<double>(section.intent.visualDensity) * 100.0,
+                                  app::arcCutNote(section.intent.arc),
                                   static_cast<double>(section.energy) * 100.0,
                                   static_cast<double>(section.density) * 100.0,
                                   section.occurrence + 1);
@@ -4728,6 +4742,10 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                     "Not a shot list played back. Each section carries a shot *intent* -- how\n"
                     "close, how much movement, how much coverage -- and the same intent gives a\n"
                     "different film the second time it comes round.\n\n"
+                    "Cuts land on the song's beats and every section starts on its downbeat. How\n"
+                    "long each shot runs comes from the section's treatment (its cut rate, and\n"
+                    "its arc: a rising treatment cuts faster toward its end, a suspended one\n"
+                    "holds), how busy the music measures, and what the shot is of.\n\n"
                     "Uses every camera you have ticked 'available to the Auto-director'.\n\n"
                     "Needs only an analyzed song -- import audio, tick 'Analyze song structure',\n"
                     "and this has everything it needs. Performer actions are a separate, optional\n"
@@ -4766,26 +4784,30 @@ void ControlPanel::drawAutoDirector(app::Engine& engine) {
                 }
             };
             seconds("shortest shot", s.minShotSeconds, 1.0, 30.0,
-                    "Below this a musical section is folded into its neighbour rather than "
-                    "given a cut of its own: a one-second shot reads as a glitch.");
-            // Disabled in Song Mode rather than hidden: a control that vanishes reads as a missing
-            // feature, and one that is live but read by nothing spends the user's trust -- which is
-            // the rule `AutoDirectorSettings` states about its own three absent knobs. Song Mode has
-            // no "build": it has an authored section carrying a cut rate, and the floor it runs into
-            // is `shortest shot`.
-            ImGui::BeginDisabled(song);
-            seconds("shortest build", s.minBuildShotSeconds, 0.5, 10.0,
-                    "A build is exempt from the minimum, because a build exists to end. This is "
-                    "how short it may get.");
-            ImGui::EndDisabled();
-            if (song && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                tooltip("Song Mode has no builds to exempt: a section's own cut rate sets "
-                                  "its shot length, and 'shortest shot' is the floor it stops at.");
-            }
+                    song ? "The shortest cut a section that does not accelerate may make, and the\n"
+                           "fast end of the pace every section's cut rate is read against. Cuts\n"
+                           "land on the song's beats, so a length is a whole number of beats."
+                         : "Below this a musical section is folded into its neighbour rather than "
+                           "given a cut of its own: a one-second shot reads as a glitch.");
+            // ADR-921: live in every mode again. Song Mode has builds now -- a section whose
+            // treatment accelerates (a rising or bursting arc) is the one kind of section allowed
+            // below `shortest shot`, and this is how short its cuts may get. It used to be disabled
+            // here, with a tooltip saying Song Mode had no builds, which was true until the arc
+            // reached the director.
+            seconds("shortest build", s.minBuildShotSeconds, 0.25, 10.0,
+                    song ? "How short a cut may get in a section whose treatment accelerates -- a\n"
+                           "rising arc (a build, a riser) or a burst (a drop, an impact). Those\n"
+                           "are the only sections that may cut below 'shortest shot'; a riser's\n"
+                           "shots shorten toward the drop down to this, and never below one beat."
+                         : "A build is exempt from the minimum, because a build exists to end. This is "
+                           "how short it may get.");
             seconds("longest shot", s.maxShotSeconds, 4.0, 60.0,
-                    "A passage longer than this becomes several shots inside one section, each "
-                    "cast separately -- so a thirty-second verse is the camera travelling "
-                    "between subjects rather than holding one for a third of the piece.");
+                    song ? "The slow end of the pace: a section cut at rate 0 aims at this length.\n"
+                           "A wide opener that establishes scale may hold up to 80% past it, and a\n"
+                           "suspended section holds for up to twice it."
+                         : "A passage longer than this becomes several shots inside one section, each "
+                           "cast separately -- so a thirty-second verse is the camera travelling "
+                           "between subjects rather than holding one for a third of the piece.");
 
             ImGui::Separator();
             ImGui::TextUnformatted("Pace");

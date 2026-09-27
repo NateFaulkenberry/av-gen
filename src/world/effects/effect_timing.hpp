@@ -123,9 +123,9 @@ struct ShotSpan {
     // The camera has landed: this shot is not travelling and it is about something. Deliberately a
     // geometric fact rather than the director's own `Spotlight::emphasis`, which is how much of the
     // *film* a subject owns and is zero for a whole intro. An effect gated on "the camera is on this
-    // hero" wants the former; `emphasis` below is there for anything that wants the latter.
+    // hero" wants the former. (The span used to carry `emphasis` too, saved and read by nothing;
+    // ADR-922 cut it.)
     bool spotlight = false;
-    float emphasis = 0.0f;   // 0..1, the director's own weighting of this subject
     std::string subject;     // who the shot is about
     glm::vec3 subjectPosition{0.0f};
     float subjectRadius = 1.0f;

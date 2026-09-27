@@ -80,9 +80,9 @@ writes a value the timeline replaces on the next frame — so the mouse appears 
 menu item erases the six tracks the director owns:
 
 ```
+camera/mode                camera/lens/focalLength
 camera/position            camera/lens/aperture
 camera/target              camera/lens/focusDistance
-camera/lens/focalLength    camera/focus/emphasis
 ```
 
 It deliberately does **not** disable the whole timeline: a project may automate other things, and

@@ -44,17 +44,61 @@
 // would break `tests/unit/test_song_director.cpp`'s scramble test rather than merely being poor
 // taste.
 
+#include "analysis/meter.hpp"
 #include "app/cinematic.hpp"
 #include "app/song_plan.hpp"
 #include "core/error.hpp"
 #include "scene/camera_rig.hpp"
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
 
 namespace avgen::app {
+
+// The beat grid a Song Mode cut lands on (ADR-921).
+//
+// **The engine's one musical time, not a second one** (ADR-896): the analysed track's tracked beats
+// and the meter the engine resolves, so a cut on "bar 97" is on the bar `music.downbeat` fires on,
+// the bar the sequencer's ruler draws and the bar the Director Agent's "bar 97 beat 1" names. Empty
+// when there is no analysed track, and then Song Mode cuts in seconds as it always did.
+struct MusicalGrid {
+    std::vector<double> beatTimes; // seconds, ascending: `OfflineBeats::beatTimes`
+    int downbeat = 0;              // `beatTimes[downbeat]` is bar 1 beat 1 (`Meter::downbeat`)
+    int beatsPerBar = 4;
+    int phraseBars = 4;
+
+    [[nodiscard]] bool empty() const { return beatTimes.size() < 2; }
+    // The median spacing of the tracked beats, seconds; 0 when empty.
+    [[nodiscard]] double beatSeconds() const;
+    [[nodiscard]] double barSeconds() const { return beatSeconds() * static_cast<double>(beatsPerBar); }
+    // The musical beat of tracked beat `k`: 0 on bar 1 beat 1, negative in a pickup.
+    [[nodiscard]] std::int64_t musicalBeat(std::size_t k) const {
+        return static_cast<std::int64_t>(k) - downbeat;
+    }
+    // How strong a place tracked beat `k` is to cut: 4 a phrase line, 3 half a phrase in, 2 a bar
+    // line, 1 the bar's middle beat, 0 any other beat.
+    [[nodiscard]] int strength(std::size_t k) const;
+    [[nodiscard]] static const char* strengthName(int strength);
+    // The tracked beat nearest `seconds` within `within` seconds, and the same among bar lines.
+    [[nodiscard]] std::optional<std::size_t> nearestBeat(double seconds, double within) const;
+    [[nodiscard]] std::optional<std::size_t> nearestDownbeat(double seconds, double within) const;
+    // 1-based bar and beat of tracked beat `k`, the way a person counts ("bar 97 beat 1").
+    [[nodiscard]] std::int64_t barNumber(std::size_t k) const;
+    [[nodiscard]] int beatInBar(std::size_t k) const;
+    // Tracked beats inside (a, b), exclusive at both ends, as indices.
+    [[nodiscard]] std::vector<std::size_t> beatsBetween(double a, double b) const;
+
+    friend bool operator==(const MusicalGrid&, const MusicalGrid&) = default;
+};
+
+// The grid of an analysed track under a meter: what `songInputsForEngine` builds from
+// `Engine::meter()` and the track's tracked beats.
+[[nodiscard]] MusicalGrid musicalGridFrom(std::span<const double> beatTimes, const analysis::Meter& meter);
 
 // The director's own timing policy, which Song Mode shares with the other two modes.
 //
@@ -62,11 +106,19 @@ namespace avgen::app {
 // vocabulary it bakes into, rather than in the application layer beside the engine. The
 // application's settings struct produces one of these; nothing else does.
 struct SongDirectorOptions {
-    // The band a shot's length is chosen from. `cutRate == 0` asks for `maxShotSeconds`, `1` for
-    // `minShotSeconds`, and the section's measured energy moves it within the band when the
-    // autonomy allows.
+    // The band a shot's length is chosen from (ADR-921): a cut rate of 0 aims at `maxShotSeconds`,
+    // 1 at `minShotSeconds`, geometrically between -- a step in rate is a ratio of lengths, which is
+    // how pace is heard. `minShotSeconds` is the floor for every section except an accelerating one.
     double minShotSeconds = 5.0;
     double maxShotSeconds = 12.0;
+    // ADR-921: how short a cut may get in a section whose treatment accelerates (a Rising or Burst
+    // arc) -- the only sections allowed below `minShotSeconds`. The Auto-director panel's
+    // "shortest build", which Song Mode used to grey out. Never below one beat of the grid, and
+    // never above `minShotSeconds` (a build may go below the floor, not above it).
+    double minBuildShotSeconds = 2.0;
+    // ADR-921: the beat grid every cut lands on, and every section boundary on its downbeat. Empty:
+    // no analysed track, so cuts fall where the pace puts them in seconds.
+    MusicalGrid grid;
     // Same seed, same heroes, same plan, same world, same film (ADR-249).
     std::uint32_t seed = 1;
     // **A ceiling on freedom, not a setting of it.** The effective autonomy of a section is the
@@ -79,6 +131,29 @@ struct SongDirectorOptions {
     // is for. Here for the same reason `DirectionBrief::focalLength` is: a lens belongs to a camera
     // (ADR-245) and the bake has to commit to one.
     float focalLength = 35.0f;
+};
+
+// Why a shot is as long as it is (ADR-921): every term of the duration rule, as it applied to this
+// shot, and where its cut landed on the grid. What the cut report hands a generator and what the
+// Director panel's tooltip reads, so "why is this shot four seconds" has an answer that is not a
+// debugger.
+struct ShotTiming {
+    double aimSeconds = 0.0; // the length the rule aimed at, before the grid placed the cut
+    float rate = 0.0f;       // the cut rate the aim came from: the arc, density and visual density applied
+    float density = 0.0f;    // the section's level-free density, 0..1 (onset rate and energy composite)
+    float motion = 0.0f;     // how much the subject moves on its own, 0..1
+    float scale = 0.0f;      // how much this shot establishes scale, 0..1 (a section's wide opener)
+    float contrast = 1.0f;   // the hold a section's opener earns for arriving after a busier one
+    // What the shot's end landed on: "phrase", "half-phrase", "bar", "half-bar", "beat", "section"
+    // (a section's own boundary), "end" (the film's), or "free" (no grid).
+    std::string endsOn;
+    std::int64_t startBar = 0; // 1-based musical position of the start; 0 without a grid
+    int startBeat = 0;
+    double beats = 0.0;        // the length in beats; 0 without a grid
+    bool visible = true;       // false when the cut before it falls between two spans of one placed camera
+    std::string why;           // one sentence
+
+    friend bool operator==(const ShotTiming&, const ShotTiming&) = default;
 };
 
 // One span of the film, and every decision that produced it. The unit of the acceptance test: a
@@ -94,13 +169,45 @@ struct SongDecision {
     scene::CameraId camera = scene::kNoCamera;
     std::string cameraName;
     ShotKind kind = ShotKind::Establish;
-    std::string subject;
+    std::string subject;        // who the shot opens on
+    std::string handoff;        // for a transition, who it travels to; "" otherwise
     float startDistance = 0.0f; // in subject radii, as everywhere else in the director
     float endDistance = 0.0f;
+    // ADR-920..922.
+    song::Arc arc = song::Arc::Steady;
+    bool peak = false;          // the section is one of the film's peaks (ADR-922)
+    std::string subjectReason;  // "rotation", "event 'name' at 177.71 s", "the film's hero (peak)"
+    scene::ShotTransition transition = scene::ShotTransition::Cut; // how this span is entered
+    ShotTiming timing;
 
     [[nodiscard]] std::string line() const;
 
     friend bool operator==(const SongDecision&, const SongDecision&) = default;
+};
+
+// One section as the director cut it (ADR-921): where its boundaries landed, what it measured, and
+// what it was given.
+struct SongSectionCut {
+    std::size_t index = 0;
+    std::string label;          // display only
+    std::string intentId;       // display only
+    double authoredStart = 0.0; // the plan's own boundaries...
+    double authoredEnd = 0.0;
+    double startSeconds = 0.0;  // ...and where the director put them: on a downbeat, with a grid
+    double endSeconds = 0.0;
+    song::Arc arc = song::Arc::Steady;
+    float density = 0.0f;       // level-free, 0..1
+    float musicEnergy = 0.0f;   // the section's energy share of the piece, 0..1
+    float push = 0.0f;          // the treatment's energy
+    float rateOpen = 0.0f;      // the cut rate at the section's start and end, arc applied
+    float rateClose = 0.0f;
+    bool peak = false;
+    std::string eventSubject;   // who a peak section was given to, when an event said so
+    std::string eventName;
+    std::size_t firstShot = 0;  // index into `SongDirection::decisions`
+    std::size_t shotCount = 0;
+
+    friend bool operator==(const SongSectionCut&, const SongSectionCut&) = default;
 };
 
 struct SongDirection {
@@ -113,13 +220,24 @@ struct SongDirection {
     std::vector<scene::CameraShot> shots;
     // Every decision, in order. What the panel shows and what the demo's acceptance test reads.
     std::vector<SongDecision> decisions;
+    // ADR-921: every section, as cut.
+    std::vector<SongSectionCut> sections;
     // Things the author should be told and that are not failures: an intent asking for more cameras
     // than the world has, a section too short for the cut rate it asked for.
     std::vector<std::string> warnings;
+    // What it was cut with, for the report: the band, the build floor, the seed, the autonomy, and
+    // the grid (without its beat list, which the report summarises).
+    SongDirectorOptions options;
+    std::string planName;
 
     // How many distinct cameras the film actually uses. The single number that answers "did
     // multi-camera happen", and the one an acceptance test should assert on.
     [[nodiscard]] std::size_t camerasUsed() const;
+
+    // **The cut report** (ADR-923): every shot's span, subject, arc, camera and the reason for its
+    // duration, every section as cut, the grid, and the statistics a reviewer asks first -- shot
+    // lengths per section, how many cuts land on a downbeat. The JSON a generator reads.
+    [[nodiscard]] nlohmann::json report() const;
 };
 
 // The whole of Song Mode.
@@ -135,6 +253,11 @@ struct SongDirection {
 [[nodiscard]] Result<SongDirection> directSong(const SongPlan& plan, const DirectionBrief& brief,
                                                std::span<const scene::CameraRig> eligible,
                                                const SongDirectorOptions& options);
+
+// What an arc does to a section's cuts, in the words the Auto-director panel's section tooltip and
+// the Sequence panel's section inspector show beside a treatment (ADR-921): the visible effect, named
+// for what a viewer sees rather than for the enum.
+[[nodiscard]] const char* arcCutNote(song::Arc arc);
 
 // Which cameras of a collection the Auto-director may use. Exposed because two things need to agree
 // about it -- what the director picks from and what a panel says is available -- and because a
