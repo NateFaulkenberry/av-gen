@@ -20,13 +20,13 @@ The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner
 
 | Stream | ADRs | Branch head | State |
 |---|---|---|---|
-| routes | 900–902 | `dd401647`, **done**; merged into `integrate/revision` | Built. Full CPU suite passed after the pause (3,571 cases, 3,551 passed, 19 skipped, 1 expected failure, exit 0). **Left:** 3 GPU failures unexplained (`test_render_job.cpp:248` readback ring vs sync path, `:318` EXR determinism, `test_glowmere_valley_2_views.cpp:201` camera 72 m off). The camera branch passes all three, so routes is the likely cause; the suspects are in its commit message. Then the report. UI done: route rows edit delay and depth, and show liveness badges. |
+| routes | 900–902 | **merged into main** (`808f32e4`) | Built. Full CPU suite passed after the pause (3,571 cases, 3,551 passed, 19 skipped, 1 expected failure, exit 0). **Left:** 3 GPU failures unexplained (`test_render_job.cpp:248` readback ring vs sync path, `:318` EXR determinism, `test_glowmere_valley_2_views.cpp:201` camera 72 m off). The camera branch passes all three, so routes is the likely cause; the suspects are in its commit message. Then the report. UI done: route rows edit delay and depth, and show liveness badges. |
 | camera | 911–913 | `3d9795f2` (WIP checkpoint), clean | All seven deliverables committed. Full GPU suite 510/509 passed/1 skipped. GV3's follow shots went from 10 of 11 failing the bar to all 11 passing. **Left:** UI reach (plan in the WIP commit: a control table in `scene/camera_rig.hpp`, drawn in `ControlPanel::drawCameras`); the full CPU suite (it stopped at 2,650 of 3,532 cases with one wall-clock failure under load at `test_directing_agent.cpp:379`). GV3 rig values are in ADR-913 and [audit/data/camera-gv3-recommended-rig-changes.json](audit/data/camera-gv3-recommended-rig-changes.json). |
 | water | 914–916 | `ddf44a85` (tears WIP), clean | ADR-914 (bounded advection) and 915 (fades count 1080-row reference pixels) finished and tested. **Left:** re-run `[tears]`, `[water]` and `[water6_2]` GPU tests after the last shader change; UI reach (a `water/tears/` sub-group); ADR-916; full suites. **For GV3:** go back to ripple 0.1 at rippleScale 2.6, with the bass route at 0.03 (ADR-915 makes the final-only values wrong). Stills and scripts are in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/water-work/`. |
 | setpieces | 928–931 | `905c91ac`, clean | `2ea9c7b5` built and tested: templates (abduction with 1–3 animals, survey, flyby), `PlanSetPiece` with validation, staging at timeline seconds, a bus-id bug fixed; 23 cases pass. `905c91ac` (`avgen --plan`, cast_trace `setPieces`) was never compiled. **Left:** build and fix; the UI home (a "UFO set pieces" section in the Director panel); the three-abduction end-to-end proof; the evaluator hook; ADRs; the full suite. The Critic's adapter should read the trace's `setPieces` instead of hard-coding GV3's beats. Notes: `docs/development/setpieces-design-notes.md` in the worktree. |
 | render | 917–919 | `7f36b8e3` (WIP), clean | Built, and the CPU tests pass. `post/referenceHeight` (720) scales every pixel-sized post value; `scene/fogSky`, a sky-radiance fog map; offline floors. **Nothing has run on the GPU.** **Left:** GPU tests and their thresholds, suites, re-baselining small-frame bloom tests, GV3 evidence, the 4K cost, the ADRs' measurements. World edge: report only (a backdrop ring would take 1–2 days). Notes: `docs/development/render-design-notes.md`. |
 | signals | 896–899 | **merged** (`e0657a26`) | Done. |
-| emission | 903–906 | `eca06448`, **done**; merged into `integrate/revision` | Report in [stream-reports/emission.md](stream-reports/emission.md). |
+| emission | 903–906 | **merged into main** (`808f32e4`) | Report in [stream-reports/emission.md](stream-reports/emission.md). |
 | characters | 907–910 | `5dc541db` + **22 uncommitted files** | Died mid-fix (gait state must start as authored for bodies seeked but never stepped). No report. |
 
 **Round 1, launched 14:35:** the signals finisher (agent `a544c532ad5e8e2f3`) and the routes finisher (`a48d9ba7c7b4c3bf2`).
@@ -55,6 +55,13 @@ The session hit its usage limit at about 10:30 and resumed at 14:21. **The owner
 Targeted tests on the three-stream build all pass: routes 57, signals and emission 51, liveness 31, emission GPU plus render-job 27 cases under the lock, multicam 17. **The full GPU and CPU suites are running** on `06be0d88` (logs `scratchpad/integrate-gpu-full.log` and `integrate-cpu-full.log`). If they pass, fast-forward main to `integrate/revision`, then merge main into `gv3/production`.
 
 **Launched: reactivity** (wave 2, agent `a2e7d46e9e7bd31bd`) in `~/Documents/GitHub/av-gen-reactivity`, branch `agent/reactivity`, from `integrate/revision` `06be0d88`. Agents running: camera finisher, song, reactivity.
+
+**MERGED (21:05): main is `808f32e4`,** signals, routes and emission integrated and tested. Main was then merged into `gv3/production` (`a7687bc9`).
+- **Full suites on the integration:** GPU 519 cases, 518 passed, 1 skipped, exit 0. CPU via `ctest -L unit -j 4`: 3,626 tests, all passed except four test-harness issues, fixed in `808f32e4` and re-run:
+  - three route-audit test names began with "--", which ctest hands to Catch2 as an option;
+  - the Rook/Umbra "loads cleanly" test now accepts the two ADR-896 stale-key notices on the owner-frozen multicam file.
+- **The CPU suite through ctest** takes about 50 minutes, against 2 hours run serially. Use it.
+- **Streams branched before this main** (camera, from `e0657a26`; song, from `e0657a26`; reactivity, from `06be0d88`) will need main merged in at integration. Reactivity has been told.
 
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
