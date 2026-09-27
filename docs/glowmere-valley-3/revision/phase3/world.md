@@ -360,9 +360,27 @@ to carry the closed form's navy fill exactly. Set `scene/volumeEmission` equal t
 - the two are the same integral.
 
 Its noise (`volumeNoise` 0.45) and local-light scattering (`volumeLocalLights` 1) would then come on
-top, and would be seen in the previews first. Stills of that recipe at scattering 0, 0.25 and 0.5 are
-queued (`build/gv3w/jobs2c.txt`). The 4K cost of the final without a march is being re-measured with
-an exclusive GPU (the lock raced from 13:00; see the coordinator's note).
+top, and would be seen in the previews first. Measured, on the closed world at 1080p x2:
+
+| Mean luma | no march | recipe, scattering 0 | 0.25 | 0.5 |
+|---|---|---|---|---|
+| s14 whole frame | 52.2 | 52.5 | 54.7 | 56.9 |
+| s14 walls / mid valley / river | 45.3 / 59.5 / 57.7 | 45.1 / 59.6 / 58.0 | 47 / 62.7 / 60.1 | 49 / 65.9 / 62.3 |
+| s14 sky above the V | 37.8 | 44.9 | 46.4 | 47.9 |
+| s14 the aurora's glow in the V | 90.0 | 80.5 | 82.9 | 85.3 |
+| s18 (the grove) whole frame | 48.3 | 47.9 | | 51.0 |
+
+At scattering 0 the recipe matches the previews on the ground to within 0.3 levels (s14, mean
+|difference| 1.67). **It does not match the sky.** The march veils the sky with its 220 m of navy,
+which the closed form never does:
+- the sky above the V rises 7 levels;
+- the aurora's glow in the V falls 9.5.
+
+Each 0.25 of scattering then adds about 2.5 levels of moonlit air. So even the matched march changes
+the aurora, which confirms that it is a decision for gv3-look, taken in the previews.
+
+The 4K cost of the final without a march is being re-measured with an exclusive GPU (the lock raced
+from 13:00; see the coordinator's note).
 
 ## Open questions
 - **The alien divergence (W2b):** find the coupling before this merges. If it is the nav grid's
