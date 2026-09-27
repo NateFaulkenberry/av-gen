@@ -1,4 +1,5 @@
 #include "ui/control_panel.hpp"
+#include "rendering/render_quality.hpp"
 
 #include "ui/param_widget.hpp"
 #include "ui/environment_panel.hpp"
@@ -3407,6 +3408,9 @@ void ControlPanel::drawRender(app::Engine& engine) {
                 "offline  every shadow tap, AO and the shadow mask at full resolution,\n"
                 "         volumetrics per pixel, no LOD or material demotion, no\n"
                 "         temporal shortcut. Slower, and what a deliverable wants.\n"
+                "         It also raises what the scene authored below its floors\n"
+                "         (ADR-919): fog steps, texture filtering and the sky's\n"
+                "         sharpness -- the numbers are under this row.\n"
                 "high     the reference live picture.\n"
                 "realtime what the viewport draws.\n"
                 "preview  fastest; for checking timing on a long sequence.");
@@ -3414,6 +3418,15 @@ void ControlPanel::drawRender(app::Engine& engine) {
         if (s.tier != "offline") {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(0.90f, 0.72f, 0.25f, 1.0f), "(not final quality)");
+        } else {
+            // ADR-919: the offline tier's floors, said where the tier is chosen and in the words of
+            // what they change, read from the tier table so the row cannot disagree with it. They
+            // are adjusted as a set by choosing the tier: a scene that authored more keeps more.
+            const rendering::QualitySettings offline =
+                rendering::QualitySettings::forTier(rendering::QualityTier::Offline);
+            ImGui::TextDisabled("  raises, never lowers: fog at least %u steps a ray, textures filtered at %ux,\n"
+                                "  the sky drawn from %u px a face",
+                                offline.volumeStepFloor, offline.textureAnisotropy, offline.skyCubeFloor);
         }
         // ADR-186: the distance reductions the live path applies. Next to the tier because it is
         // the same kind of decision -- how much work a frame is allowed to skip -- and because the

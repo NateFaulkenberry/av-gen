@@ -806,7 +806,8 @@ public:
     void setHistoryBank(world::HistoryBank* bank) { historyBank_ = bank; }
     [[nodiscard]] world::HistoryBank* historyBank() const { return historyBank_; }
     // One sample per subscribed node at `seconds`: its drawn world transform, the root fold and the
-    // parent chain over the parameter finals -- the flattening's arithmetic and `ReplayPlacement`'s.
+    // parent chain over the parameter finals -- the flattening's arithmetic and `ReplayPlacement`'s --
+    // and which placement of the bodies that move it the sample belongs to (ADR-911, 2026-09-27).
     // `automation` re-applies the play's transform automation, for the replay, which has none.
     void recordHistory(world::HistoryBank& bank, double seconds,
                        const world::HistoryAutomation* automation = nullptr) const;
@@ -1691,6 +1692,8 @@ private:
     // ADR-574: ADR-058's surface/volume coupling. Unreachable until the reason recorded
     // for its omission was tested and turned out to be false about its own code.
     params::Parameter<float>* fogHeightAmount_ = nullptr;
+    params::Parameter<float>* fogSky_ = nullptr; // ADR-918
+    params::Parameter<float>* fogSkyDistance_ = nullptr; // ADR-918: where the fog is all sky colour
     params::Parameter<float>* volumeJitter_ = nullptr; // ADR-461
     // How far the directional shadow cascades reach; 0 = ADR-112's automatic range. See
     // `Environment::shadowRange` for why a scene is allowed an opinion about this one.
@@ -2095,6 +2098,9 @@ private:
     // `nodeWorldTransform` -- so the head of a camera's trail and the history behind it are one
     // quantity.
     [[nodiscard]] world::HistorySample subjectHead(const CompositionNode& node) const;
+    // ADR-911 (amended 2026-09-27): the node's `HistorySample::placement` -- the placements of the
+    // body that drives it and of the bodies that drive its parents (`entity::Entity::placements`).
+    [[nodiscard]] std::uint32_t placementOf(const CompositionNode& node) const;
     // ADR-911: the ring HIST keeps for `node`, or the bank's ring count when it keeps none. Reports
     // the missing ring once when `needed`.
     [[nodiscard]] std::size_t subjectRing(const std::string& node, bool needed) const;

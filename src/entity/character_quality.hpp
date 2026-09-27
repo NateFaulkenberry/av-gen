@@ -25,6 +25,14 @@
 // real behaviour to get stuck on cue. The world door is a thin adapter onto the sample door, so
 // both are the same code past the first line.
 //
+// **ADR-910 adds the patterns a viewer reads as a mechanism rather than a creature**, which the
+// GV3 character audit measured by hand from a cast trace and the owner named in so many words:
+// long stretches standing still, walking to a point and walking straight back, turning on the spot,
+// turns tighter than the body is long, and standing on -- or facing up -- a hillside. They are the
+// regression gate for ADR-907 to 909: each of those decisions claims to move one of these numbers,
+// and a claim about behaviour that no number can contradict is the shape of defect this repository
+// keeps shipping.
+//
 // Deterministic in everything but `wallClockMsPerFrame`, which the caller measures and which the
 // JSON files under a key that says it is machine-dependent: two runs of the same scene give the same
 // motion and behaviour numbers bit for bit (ADR-091), and a regression in one of them is a change in
@@ -38,6 +46,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <optional>
 #include <span>
 #include <string>
@@ -69,6 +78,35 @@ struct CharacterQualityThresholds {
     float movingSpeed = 0.05f;
     // A->B->A inside this many seconds is an oscillation, not two decisions.
     double oscillationWindow = 1.0;
+
+    // ---- ADR-910: the patterns ----------------------------------------------------------------
+    // A body is standing still below this measured horizontal speed, in m/s: the GV3 audit's
+    // "still", so a number from this file and a number from that report mean the same thing.
+    float stillSpeed = 0.10f;
+    // A still stretch at least this long is a stop. Shorter is a hesitation inside a walk -- a body
+    // decelerating through a corner dips under `stillSpeed` for a frame or two -- and counting it
+    // would make every sharp turn a "stop" with a heading in and a heading out.
+    double stopSeconds = 0.25;
+    // A body turning while it goes slower than this (m/s) is turning on the spot: the audit's
+    // "yaw turned below 0.3 m/s".
+    float pivotSpeed = 0.30f;
+    // Walking out of a stop more than this many degrees from the way the body walked into it is a
+    // reversal -- the owner's "walk to a point, turn round, walk back".
+    float reversalDegrees = 150.0f;
+    // The headings into and out of a stop are taken over this much straight-line travel, so the
+    // last metre of an arrival curve or the first of a departure one does not decide them.
+    float headingMetres = 1.5f;
+    // A stop within this many metres of the stop before the last one is an A->B->A revisit.
+    float revisitRadius = 4.0f;
+    // A turn-radius sample needs the body going faster than this (m/s) on both ends of the step and
+    // turning faster than `turnRateMin` (rad/s). Below either, speed over turn rate divides noise.
+    float turnSpeedMin = 0.5f;
+    float turnRateMin = 0.17453293f; // 10 degrees a second
+    // Ground steeper than this (degrees) under a standing body is steep ground, and a body standing
+    // on it facing within `uphillDegrees` of straight uphill is facing into the hill -- the owner's
+    // "horses facing directly into hills", in the audit's own numbers.
+    float steepDegrees = 12.0f;
+    float uphillDegrees = 45.0f;
 };
 
 // One body at one instant: everything the recorder needs and nothing else.
@@ -80,6 +118,11 @@ struct CharacterSample {
     bool grounded = true;
     bool director = false;      // a Director-authority action is running
     GaitSettings gait;          // the body's authored stride speeds, for slip and the pop limit
+    // ADR-910. The facing (forward is (sin yaw, 0, cos yaw), the engine's one convention) and the
+    // surface the body is standing on, when something grounded it this step.
+    float yaw = 0.0f;
+    glm::vec3 groundNormal{0.0f, 1.0f, 0.0f};
+    bool hasGround = false;
 };
 
 struct CharacterMotionMetrics {
@@ -94,6 +137,13 @@ struct CharacterMotionMetrics {
     std::uint32_t slipOutOfBand = 0;
     double slipOutOfBandFraction = 0.0;
     double worstSlip = 1.0;             // the ratio furthest from 1, in log terms
+    // ADR-910: how the body turns.
+    double yawDegrees = 0.0;            // every degree the facing turned, whatever the body did
+    double pivotYawDegrees = 0.0;       // ...of which while slower than `pivotSpeed`: on the spot
+    double pivotYawFraction = 0.0;
+    std::uint32_t turnSamples = 0;      // steps that measured a turn radius
+    double turnRadiusMedian = 0.0;      // metres of speed / turn rate over those steps; 0 with none
+    double turnRadiusP10 = 0.0;         // the tight end: one turn in ten is at least this tight
 };
 
 struct CharacterBehaviourMetrics {
@@ -104,6 +154,23 @@ struct CharacterBehaviourMetrics {
     std::uint32_t oscillations = 0;
     double directorSeconds = 0.0;
     double airborneSeconds = 0.0;
+    // ADR-910: standing, and where the body goes after it has stood.
+    double stillFraction = 0.0;         // of stepped seconds, measured speed under `stillSpeed`
+    double longestStillSeconds = 0.0;
+    std::uint32_t stops = 0;            // still stretches of at least `stopSeconds`
+    std::uint32_t measuredStops = 0;    // ...with a heading in and a heading out to compare
+    std::uint32_t reversals = 0;        // ...walked out of more than `reversalDegrees` from the way in
+    std::uint32_t turnsOver90 = 0;      // ...walked out of more than 90 degrees from it
+    std::uint32_t revisits = 0;         // stops within `revisitRadius` of the stop before the last
+};
+
+// ADR-910: the ground under a body that is standing on it.
+struct CharacterGroundMetrics {
+    double stillSeconds = 0.0;          // standing, on a surface it reported
+    double slopeMeanDegrees = 0.0;      // time-weighted over those seconds
+    double slopeMaxDegrees = 0.0;
+    double steepSeconds = 0.0;          // ...on ground steeper than `steepDegrees`
+    double facingUphillSeconds = 0.0;   // ...and facing within `uphillDegrees` of straight uphill
 };
 
 struct CharacterQuality {
@@ -112,6 +179,7 @@ struct CharacterQuality {
     double seconds = 0.0;
     CharacterMotionMetrics motion;
     CharacterBehaviourMetrics behaviour;
+    CharacterGroundMetrics ground;
 };
 
 struct CharacterQualityReport {
@@ -148,7 +216,30 @@ private:
         Activity changedFrom = Activity::Idle;
         double changedAt = 0.0;
         std::uint64_t idleFrames = 0;
+
+        // ---- ADR-910 ----
+        float lastYaw = 0.0f;
+        bool hasYaw = false;
+        double lastSpeed = 0.0;        // measured, the previous step
+        double stillRun = 0.0;         // seconds of the current still stretch
+        double stillTotal = 0.0;
+        bool inStop = false;           // the current still stretch has reached `stopSeconds`
+        // The most recent stretch of moving positions, just long enough to reach `headingMetres`
+        // back from the newest: the heading into a stop is read off it when the stop begins.
+        std::deque<glm::vec2> trail;
+        glm::vec2 headingIn{0.0f};     // the way the current (or last) stop was walked into
+        bool hasHeadingIn = false;
+        bool pendingOut = false;       // a stop ended and the way out of it is not measured yet
+        glm::vec2 stopExit{0.0f};
+        std::vector<glm::vec2> stopPlaces; // the last two stops' places, for A->B->A
+        std::vector<float> radii;
+        double slopeSecondsWeighted = 0.0;
     };
+
+    // The way out of the last stop, measured from where the body left it to `here`, compared with
+    // the way in. Called once the body has gone `headingMetres`, or earlier -- with what it has --
+    // when it stops again first.
+    void closeStop(Track& t, glm::vec2 here) const;
 
     CharacterQualityThresholds thresholds_;
     std::vector<Track> tracks_;

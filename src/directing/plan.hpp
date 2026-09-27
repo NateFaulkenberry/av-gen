@@ -49,6 +49,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -83,6 +84,7 @@ enum class ContentDomain : std::uint8_t {
     CameraRig, CameraShot, TimelineTrack, EffectInstance,
     ModRoute,  // ADR-924: a route in the project's route list, by its `planItem` ("<planId>/<key>")
     ModSource, // ADR-924: a source in the project's rack, by its signal ("timeline.mushroom-hue")
+    StagingScenario, // ADR-929: a set piece's `stage::ScenarioDesc`, by scenario name
 };
 
 [[nodiscard]] const char* tierName(Tier v);
@@ -205,6 +207,42 @@ struct PlanCue {
     friend bool operator==(const PlanCue&, const PlanCue&) = default;
 };
 
+// ADR-929: a UFO event in the film -- a staging set piece (ADR-928) placed by the plan. It compiles
+// to one `stage::ScenarioDesc`, `setpiece/<key>`, beside the scene's authored scenarios, and to a cue
+// marker per moment ("setpiece/<key>/beam") at the time the compiler places it; a cue in the same
+// plan can start `on` one of those moments.
+//
+// Where it happens is a point, a place near a subject, or a region searched for an animal:
+//   {"point": [x, z]}                      the craft works over that ground
+//   {"near": "lantern", "offset": [dx, dz]} ... over a subject's place, plus an offset
+//   {"region": {"center": [x, z], "radius": r}} or {"region": {"near": alias, "radius": r}}
+//                                          over the nearest animal found there (abduction only)
+struct SetPieceWhere {
+    std::optional<std::pair<float, float>> point; // world x, z
+    std::string near;                             // a subject alias with a place
+    std::pair<float, float> offset{0.0f, 0.0f};   // metres x, z from `near`
+    bool region = false;
+    float radius = 0.0f;                          // region: metres
+    friend bool operator==(const SetPieceWhere&, const SetPieceWhere&) = default;
+};
+
+struct PlanSetPiece {
+    std::string key;                 // unique in the plan; the scenario is setpiece/<key>
+    std::string templateName;        // "abduction" | "survey" | "flyby"
+    std::string craft;               // the staging actor that plays it ("saucer")
+    TimeRef at;                      // when `moment` happens: seconds, a bar, a section, an event
+    std::string moment;              // which moment `at` places; empty = the template's default
+    SetPieceWhere where;
+    std::string tag;                 // what the subject query looks for; empty = "animal"
+    std::vector<std::string> animals; // aliases of named animals, in lift order (abduction)
+    std::vector<std::pair<std::string, float>> set; // template slot overrides, in written order
+    std::optional<std::array<float, 3>> beamColor;  // linear RGB while the beam is lit
+    // Declared, not compiled: the distance the set piece is meant to be seen from. Checked against
+    // the plan's other set pieces for repetition and handed to whoever places the camera.
+    std::optional<float> framingMetres;
+    friend bool operator==(const PlanSetPiece&, const PlanSetPiece&) = default;
+};
+
 // Performance-local slow motion (spec §33): the performance's own keys and clip speeds stretched over
 // the window. Not a scene clock; the rest of the world keeps normal time.
 struct PlanRetime {
@@ -248,6 +286,7 @@ struct Plan {
     // plan's JSON only when present, so a plan without them keeps its bytes.
     std::vector<PlanRoute> routes;
     std::vector<PlanSource> sources;
+    std::vector<PlanSetPiece> setPieces; // ADR-929
     std::vector<ContentRef> produced;
     // ADR-767: what a watched play of the project raised, when this plan places items on events
     // ("when the saucer starts beaming"). Carried in the plan, so its times are the same whenever it

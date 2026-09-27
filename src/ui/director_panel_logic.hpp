@@ -8,12 +8,18 @@
 // which mark an item gets, which buttons are live, and why a live-looking button is not. Asked here
 // so a test can ask it without a window.
 
+#include "core/error.hpp"
 #include "directing/compiler.hpp"
 #include "directing/plan.hpp"
+#include "directing/scene_facts.hpp"
 #include "directing/time_ref.hpp"
 
+#include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace avgen::ui {
@@ -35,7 +41,8 @@ struct PlanItemRow {
 };
 
 // One row per plan item, in plan order (shots, performances, markers, cues, retimes, then ADR-924's
-// sources and routes), plus a row keyed "" for plan-wide findings when there are any.
+// sources and routes, then ADR-929's set pieces), plus a row keyed "" for plan-wide findings when
+// there are any.
 [[nodiscard]] std::vector<PlanItemRow> planItemRows(const directing::Plan& plan, const directing::Validation& validation);
 
 // ADR-924: a project plan's reactivity, as the panel lists it under "Plans in this project": one row
@@ -54,6 +61,71 @@ struct ReactivityRow {
                                                         const std::vector<params::ModRoute>& routes);
 // "59 routes: micro 15, meso 31, macro 13" -- the heading of a plan's reactivity rows.
 [[nodiscard]] std::string reactivityHeading(const directing::Plan& plan);
+
+// ---- UFO set pieces (ADR-929) -------------------------------------------------------------------
+//
+// The Director panel's "UFO set pieces" section: every set piece in the project's plans, said the way
+// somebody describing the picture would say it, with the values its controls edit. A control's edit
+// is a revision of the plan (`editSetPiece`), compiled and applied as ONE undoable edit, exactly as an
+// approved proposal is -- so the plan stays the truth and the Parameters panel's `staging/setpiece/
+// <key>/` sliders stay what they are: fine tuning of the set piece the plan made.
+struct SetPieceRow {
+    std::string plan; // the plan's id
+    std::string planTitle;
+    std::string key;
+    std::string templateName; // abduction | survey | flyby
+    std::string craft;
+    std::string what;  // "abduction: lifts 2 animals"
+    std::string when;  // "beam at 01:02.500 (bar 34)" -- the placed moment and its time
+    std::string where; // "over (62, 22)"; "near lantern"; "the nearest animal within 30 m of (150, 180)"
+    std::string how;   // "comes in from 90 deg, hovers 30 m up, red beam, meant to be seen from about 40 m"
+    // "as made"; "tuned by hand" (a `staging/setpiece/<key>/` slider moved since: a revision keeps
+    // it, so the controls wait); "not in the project" (its scenario was deleted, or never installed).
+    std::string state;
+    bool editable = false;
+    std::string whyNot; // when not editable: what to do about it
+    std::vector<std::string> lines; // what the validator says about it now, errors first
+    // What the controls edit, as the plan holds it.
+    std::vector<std::string> moments; // the template's, in order
+    std::string moment;               // the one its time places
+    std::string timeText;             // the time as the plan wrote it ("bar 57", "12s")
+    std::optional<double> seconds;    // ...as it resolves now; absent when it cannot be placed
+    bool point = false;               // placed on a point (the only place the controls move)
+    float x = 0.0f;
+    float z = 0.0f;
+    bool namedAnimals = false;        // lifts named animals: the count is theirs
+    int animals = 0;                  // abduction
+    float bearing = 0.0f;             // approachBearing (abduction, survey) or pathBearing (flyby)
+    float height = 0.0f;              // hoverHeight (abduction, survey) or altitude (flyby)
+    std::optional<std::array<float, 3>> beamColor;
+    std::optional<float> framingMetres;
+};
+[[nodiscard]] std::vector<SetPieceRow> setPieceRows(const directing::Plan& plan, const directing::SceneFacts& facts);
+
+// One control's change to one set piece. Unset fields are left as they are.
+struct SetPieceEdit {
+    std::optional<std::string> templateName;   // slots, animals, moment and colour the new one cannot
+                                               // take are dropped; a region becomes its centre
+    std::optional<std::string> moment;         // which moment the time places
+    std::optional<double> seconds;             // the placed moment's time, written as seconds
+    std::optional<std::pair<float, float>> point; // a point place, world x, z
+    std::vector<std::pair<std::string, float>> slots; // template slots, each replacing its override
+    std::optional<std::optional<std::array<float, 3>>> beamColor; // a colour, or nullopt to clear it
+    std::optional<float> framingMetres;        // <= 0 clears it
+};
+// The plan with set piece `key` changed; not compiled (compiling makes it the next revision). Fails
+// when the plan has no such set piece or the edit names something the template does not have.
+[[nodiscard]] Result<directing::Plan> editSetPiece(const directing::Plan& plan, std::string_view key,
+                                                   const SetPieceEdit& edit);
+// The revision an edit makes, compiled against `facts` and ready for `app::applyCompilation`; or why
+// it is not applied. Refused when the edited set piece would be blocked -- a revision that blocks an
+// item takes out what its last revision made and builds nothing in its place, so one bad drag would
+// delete the set piece -- and when nothing would change.
+[[nodiscard]] Result<directing::Compilation> compileSetPieceEdit(const directing::Plan& plan, std::string_view key,
+                                                                 const SetPieceEdit& edit,
+                                                                 const directing::SceneFacts& facts);
+// The undo label of an edit: "UFO set piece 'west': time".
+[[nodiscard]] std::string setPieceEditLabel(std::string_view key, const SetPieceEdit& edit);
 
 // The proposed changes, grouped by the item that makes them, in the order the diff lists them.
 // Findings ('!' lines) are the rows' business and are left out.

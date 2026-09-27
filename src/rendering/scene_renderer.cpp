@@ -232,8 +232,9 @@ Result<void> SceneRenderer::init() {
         // by shaders/fields.wgsl (ADR-032; read-only storage, inert when the scene has no grids).
         // 1..10 are the lighting bindings shaders/shadows.wgsl and shaders/lighting.wgsl declare
         // (ADR-033/034), and 11 is the shadow mask shaders/shadows.wgsl reads (ADR-087); a pass
-        // whose shader does not mention them simply never reads them.
-        std::array<wgpu::BindGroupLayoutEntry, 14> entries{};
+        // whose shader does not mention them simply never reads them. ADR-918 adds 16 and 17, the
+        // fog's sky map and its sampler.
+        std::array<wgpu::BindGroupLayoutEntry, 16> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -277,6 +278,13 @@ Result<void> SceneRenderer::init() {
         entries[12].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
         entries[13] = entries[6];
         entries[13].binding = 12; // ADR-715: the terrain's baked height, read by the height layer's readers
+        entries[14].binding = 16; // ADR-918: the sky's radiance by direction, for the surface fog
+        entries[14].visibility = wgpu::ShaderStage::Fragment;
+        entries[14].texture.sampleType = wgpu::TextureSampleType::Float;
+        entries[14].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        entries[15].binding = 17;
+        entries[15].visibility = wgpu::ShaderStage::Fragment;
+        entries[15].sampler.type = wgpu::SamplerBindingType::Filtering;
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "frame-layout";
         desc.entryCount = entries.size();
@@ -588,7 +596,19 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
             return;
         }
         const scene::SkyRuntime sky = scene::resolveSky(scene.environment.sky, scene.lights);
-        const std::uint64_t hash = sky.hash();
+        // ADR-919: the tier's floor under the cube's size. The prefiltered cube's first mip is what
+        // the background pass draws as the visible sky (skybox.wgsl, the procedural-IBL branch), so
+        // it is floored with the source cube; a scene lit by an HDRI draws the map itself (ADR-049)
+        // and needs neither. The sizes are part of the key: a tier change rebuilds the sky.
+        EnvironmentSettings envSettings;
+        const std::uint32_t defaultCube = envSettings.cubeSize;
+        const std::uint32_t defaultPrefiltered = envSettings.prefilteredSize;
+        if (qualitySettings_.skyCubeFloor > 0) {
+            envSettings.cubeSize = std::max(envSettings.cubeSize, qualitySettings_.skyCubeFloor);
+            envSettings.prefilteredSize = std::max(envSettings.prefilteredSize, qualitySettings_.skyCubeFloor);
+        }
+        const std::uint64_t hash = sky.hash() * 1000003ull + static_cast<std::uint64_t>(envSettings.cubeSize) * 8191ull +
+                                   static_cast<std::uint64_t>(envSettings.prefilteredSize);
         if (skyBuilt_ && hash == skyHash_ && ibl_.valid) {
             skyDeferral_.deferring = false;
             return;
@@ -619,7 +639,17 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
             }
         }
         const auto skyStart = std::chrono::steady_clock::now();
-        auto built = environment_->processSky(sky);
+        if ((envSettings.cubeSize != defaultCube || envSettings.prefilteredSize != defaultPrefiltered) &&
+            (envSettings.cubeSize != loggedSkyFloorCube_ || envSettings.prefilteredSize != loggedSkyFloorPrefiltered_)) {
+            // Once per change, as the march's floor is: a sky whose colours or sun move rebuilds on
+            // every frame whose hash moves, and would otherwise say this sixty times a second.
+            log::info("the tier's floor raised the procedural sky's cube from {} to {} px a face and its "
+                      "prefiltered cube -- the visible sky -- from {} to {}",
+                      defaultCube, envSettings.cubeSize, defaultPrefiltered, envSettings.prefilteredSize);
+            loggedSkyFloorCube_ = envSettings.cubeSize;
+            loggedSkyFloorPrefiltered_ = envSettings.prefilteredSize;
+        }
+        auto built = environment_->processSky(sky, envSettings);
         if (!built) {
             log::error("procedural sky: {}", built.error().message);
             setIbl(IblResources{});
@@ -838,6 +868,52 @@ Result<void> SceneRenderer::createLightResources() {
         const wgpu::Extent3D size = {1, 1, 1};
         context_.queue().WriteTexture(&destination, &zero, sizeof(zero), &layout, &size);
     }
+    {
+        // ADR-918: the fog's view of the sky, group 0 binding 16, and the 1x1 bound in its place
+        // wherever the map cannot be read -- the passes that run before it is written each frame,
+        // and its own pass. Both RGBA16F, the HDR target's format, because the map holds radiance.
+        // CopySrc so a test can read the map back and see what the fog was given.
+        auto make = [&](std::uint32_t w, std::uint32_t h, wgpu::TextureUsage usage, const char* label) {
+            wgpu::TextureDescriptor desc{};
+            desc.label = label;
+            desc.usage = usage;
+            desc.dimension = wgpu::TextureDimension::e2D;
+            desc.size = {w, h, 1};
+            desc.format = kHdrFormat;
+            gpu::GpuTexture t;
+            t.texture = device.CreateTexture(&desc);
+            t.view = t.texture.CreateView();
+            t.width = w;
+            t.height = h;
+            t.format = desc.format;
+            return t;
+        };
+        fogSkyMap_ = make(kFogSkyWidth, kFogSkyHeight,
+                          wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding |
+                              wgpu::TextureUsage::CopySrc,
+                          "fog-sky-map");
+        fogSkyPlaceholder_ = make(1, 1, wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst,
+                                  "fog-sky-placeholder");
+        const std::array<std::uint16_t, 4> black = {0, 0, 0, 0x3C00}; // (0, 0, 0, 1) in half floats
+        wgpu::TexelCopyTextureInfo destination{};
+        destination.texture = fogSkyPlaceholder_.texture;
+        wgpu::TexelCopyBufferLayout layout{};
+        layout.bytesPerRow = 8;
+        layout.rowsPerImage = 1;
+        const wgpu::Extent3D size = {1, 1, 1};
+        context_.queue().WriteTexture(&destination, black.data(), sizeof(black), &layout, &size);
+        // Azimuth wraps; elevation does not -- the map's top row is the zenith and its bottom the
+        // horizon, and neither continues past itself.
+        wgpu::SamplerDescriptor sd{};
+        sd.label = "fog-sky-sampler";
+        sd.addressModeU = wgpu::AddressMode::Repeat;
+        sd.addressModeV = wgpu::AddressMode::ClampToEdge;
+        sd.addressModeW = wgpu::AddressMode::ClampToEdge;
+        sd.magFilter = wgpu::FilterMode::Linear;
+        sd.minFilter = wgpu::FilterMode::Linear;
+        sd.mipmapFilter = wgpu::MipmapFilterMode::Nearest;
+        fogSkySampler_ = device.CreateSampler(&sd);
+    }
     lightStaging_.resize(kMaxSceneLights);
     clusterStaging_.assign(kClusterBufferWords, 0u);
     return {};
@@ -847,8 +923,8 @@ void SceneRenderer::rebuildFrameBindGroups() {
     const auto& device = context_.device();
     auto make = [&](const wgpu::Buffer& frameBuffer, const wgpu::TextureView& shadowAtlas,
                     const wgpu::TextureView& aoView, const wgpu::TextureView& depthView,
-                    const wgpu::TextureView& maskView, const char* label) {
-        std::array<wgpu::BindGroupEntry, 14> entries{};
+                    const wgpu::TextureView& maskView, const wgpu::TextureView& fogSkyView, const char* label) {
+        std::array<wgpu::BindGroupEntry, 16> entries{};
         entries[0].binding = 0;
         entries[0].buffer = frameBuffer;
         entries[0].size = sizeof(FrameUniforms);
@@ -882,6 +958,10 @@ void SceneRenderer::rebuildFrameBindGroups() {
         entries[12].size = FieldUniforms::kGridBufferSize;
         entries[13].binding = 12;
         entries[13].textureView = terrainHeightView();
+        entries[14].binding = 16; // ADR-918
+        entries[14].textureView = fogSkyView;
+        entries[15].binding = 17;
+        entries[15].sampler = fogSkySampler_;
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = frameLayout_;
@@ -891,20 +971,24 @@ void SceneRenderer::rebuildFrameBindGroups() {
     };
     const wgpu::TextureView sceneDepth = linearDepth_.valid() ? linearDepth_.view : linearDepthDefault_.view;
     frameBindGroup_ = make(frameUniforms_, shadows_->atlasView(), ao_->output(), sceneDepth,
-                           shadowMask_->output(), "frame-bind-group");
+                           shadowMask_->output(), fogSkyMap_.view, "frame-bind-group");
     // The prepass, the shadow passes, the linear-depth pass and the AO passes all write something
     // the shading pass reads, so their copy binds placeholders in those slots. Ambient occlusion
     // reads the linear depth through its own group instead.
+    // ADR-918: and the fog's sky map, because the map's own pass draws with this group and may not
+    // sample the texture it renders into.
     frameBindGroupAux_ = make(frameUniforms_, shadows_->dummyAtlasView(), ao_->placeholder(),
-                              linearDepthDefault_.view, shadowMask_->placeholder(), "frame-bind-group-aux");
+                              linearDepthDefault_.view, shadowMask_->placeholder(), fogSkyPlaceholder_.view,
+                              "frame-bind-group-aux");
     // ADR-087: the mask pass is the one caller that needs the real atlas and the real linear depth
     // while still being forbidden the mask -- it is computing the shading pass's own shadow terms,
     // through the shading pass's own bindings, into the target it must not sample.
     frameBindGroupMask_ = make(frameUniforms_, shadows_->atlasView(), ao_->placeholder(), sceneDepth,
-                               shadowMask_->placeholder(), "frame-bind-group-mask");
+                               shadowMask_->placeholder(), fogSkyPlaceholder_.view, "frame-bind-group-mask");
     for (std::uint32_t v = 0; v < kMaxShadowViews; ++v) {
         shadowFrameGroups_[v] = make(shadows_->viewUniforms(v), shadows_->dummyAtlasView(), ao_->placeholder(),
-                                     linearDepthDefault_.view, shadowMask_->placeholder(), "shadow-frame-group");
+                                     linearDepthDefault_.view, shadowMask_->placeholder(), fogSkyPlaceholder_.view,
+                                     "shadow-frame-group");
     }
 }
 
@@ -991,6 +1075,8 @@ Result<void> SceneRenderer::createPipelines() {
     if (!sky) return std::unexpected(sky.error());
     auto atmosphere = shaders_.load("atmosphere.wgsl");
     if (!atmosphere) return std::unexpected(atmosphere.error());
+    auto fogSky = shaders_.load("fog_sky.wgsl"); // ADR-918
+    if (!fogSky) return std::unexpected(fogSky.error());
     auto tonemap = shaders_.load("tonemap.wgsl");
     if (!tonemap) return std::unexpected(tonemap.error());
     tonemapModule_ = *tonemap;
@@ -1020,6 +1106,9 @@ Result<void> SceneRenderer::createPipelines() {
     auto atmos = createAtmospherePipeline(*atmosphere);
     if (!atmos) return std::unexpected(atmos.error());
     atmospherePipeline_ = *atmos;
+    auto fs = createFogSkyPipeline(*fogSky);
+    if (!fs) return std::unexpected(fs.error());
+    fogSkyPipeline_ = *fs;
     auto d = createDepthOnlyPipeline(*pbr);
     if (!d) return std::unexpected(d.error());
     depthOnlyPipeline_ = *d;
@@ -1212,6 +1301,31 @@ Result<wgpu::RenderPipeline> SceneRenderer::createAtmospherePipeline(const wgpu:
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
     return finishPipeline(desc, "atmosphere-pipeline");
+}
+
+// ADR-918: the fog's view of the sky. One fullscreen triangle over the small map, no depth, one
+// target: the map. The scene pipeline layout, so the pass binds the groups the sky itself does and
+// reads the sky through the same code (`skyBackgroundAt`, shaders/sky_background.wgsl).
+Result<wgpu::RenderPipeline> SceneRenderer::createFogSkyPipeline(const wgpu::ShaderModule& module) {
+    wgpu::ColorTargetState target{};
+    target.format = kHdrFormat;
+    target.writeMask = wgpu::ColorWriteMask::All;
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = "fs_fog_sky";
+    fragment.targetCount = 1;
+    fragment.targets = &target;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "fog-sky-pipeline";
+    desc.layout = scenePipelineLayout_;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_fog_sky";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    return finishPipeline(desc, "fog-sky-pipeline");
 }
 
 Result<wgpu::RenderPipeline> SceneRenderer::createSkyboxPipeline(const wgpu::ShaderModule& module) {
@@ -1762,6 +1876,15 @@ void SceneRenderer::setQualitySettings(const QualitySettings& settings) {
                        r.error().message);
         }
     }
+    // ADR-919: the tier's texture filtering. The material groups hold the samplers they were made
+    // with, so they are dropped with the samplers; the next frame rebuilds both on first use.
+    const std::uint32_t previousAnisotropy = samplers_->maxAnisotropy();
+    if (samplers_->setMaxAnisotropy(settings.textureAnisotropy)) {
+        materialBindGroups_.clear();
+        log::info("texture filtering at {}x anisotropy ({}; it was {}x)", samplers_->maxAnisotropy(),
+                  samplers_->maxAnisotropy() > 8 ? "the tier's floor raised it" : "the tier's setting",
+                  previousAnisotropy);
+    }
 }
 
 // ---- history, IBL and shader reload -------------------------------------------------------------
@@ -1908,6 +2031,15 @@ Result<void> SceneRenderer::reloadEngineShaders() {
         }
     } else {
         keep("atmosphere.wgsl", std::unexpected(atmosphere.error()));
+    }
+    if (auto fogSky = shaders_.load("fog_sky.wgsl")) {
+        if (auto fp = createFogSkyPipeline(*fogSky)) {
+            fogSkyPipeline_ = *fp;
+        } else {
+            keep("fog_sky.wgsl", std::unexpected(fp.error()));
+        }
+    } else {
+        keep("fog_sky.wgsl", std::unexpected(fogSky.error()));
     }
     if (auto tonemap = shaders_.load("tonemap.wgsl")) {
         tonemapModule_ = *tonemap;
@@ -2901,6 +3033,24 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ADR-717: x is the pooling, 0 -- ADR-715's branch, its frame to the bit -- whenever there is no
     // basin to pool in. The march reads this same lane.
     frame.fogPool = glm::vec4(scene.terrainGround.poolingLane(scene.environment.fogPooling), 0.0f, 0.0f, 0.0f);
+    // ADR-918: the surface fog's colour from the sky. Only when there is air to colour and the
+    // scene asks; otherwise the lane is zero, `applyFog` never reads the map and the map's pass is
+    // skipped, so the frame is the one every scene had before, to the bit. `y` says whether the
+    // sky is actually drawn behind the world -- the map must hold what is there, and with the
+    // skybox off that is the flat background colour, whatever the IBL would have shown.
+    {
+        const float amount = std::clamp(scene.environment.fogSky, 0.0f, 1.0f);
+        drawFogSky_ = amount > 0.0f && frame.fogParams.w > 0.0f && fogSkyPipeline_ != nullptr;
+        const bool skyDrawn =
+            scene::skyBackgroundFor(scene.environment, ibl, skyIbl) != scene::SkyBackground::FlatColour;
+        // z: the distance at which the fog is fully the sky's colour -- the scene's, or three of
+        // the fog's extinction lengths (a level ray 95% fog there).
+        const float extinction = frame.fogParams.w;
+        const float automatic = extinction > 0.0f ? 3.0f / extinction : 0.0f;
+        const float fullAt = scene.environment.fogSkyDistance > 0.0f ? scene.environment.fogSkyDistance : automatic;
+        frame.fogSky = glm::vec4(drawFogSky_ ? amount : 0.0f, skyDrawn ? 1.0f : 0.0f, std::max(fullAt, 1e-3f), 0.0f);
+        stats_.fogSkyMap = drawFogSky_;
+    }
     // Effect Library Wave 2: the Stars effect's field. All zero with no live instance, which the
     // background pass reads as "draw your own fixed field", so the frame is unchanged.
     if (const world::StarField& stars = scene.stars; stars.on) {
@@ -3869,6 +4019,39 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         shadowMask_->encode(encoder, frameBindGroupMask_);
     }
     stage(cpu.depthEncodeMs);
+
+    // ---- the fog's view of the sky (ADR-918) ----
+    //
+    // Before the scene pass, which is where every surface is fogged, and after the frame block is
+    // uploaded, which is what it reads: the sky's radiance by direction -- the background and the
+    // aurora and comets drawn over it -- low-passed into a small map the surface fog samples along
+    // each ray. A pure function of this frame's uniforms, so a seek lands on the frame play did.
+    // Drawn with the aux frame group, whose binding 16 is the placeholder: a pass may not sample the
+    // texture it renders.
+    if (drawFogSky_) {
+        wgpu::RenderPassColorAttachment color{};
+        color.view = fogSkyMap_.view;
+        color.loadOp = wgpu::LoadOp::Clear;
+        color.storeOp = wgpu::StoreOp::Store;
+        color.clearValue = {0.0, 0.0, 0.0, 1.0};
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "fog-sky-pass";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &color;
+        pass.timestampWrites = timeline_->mark("fogsky", gpu::FrameTimeline::PassKind::Render);
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        rp.SetPipeline(fogSkyPipeline_);
+        rp.SetBindGroup(0, frameBindGroupAux_);
+        const std::uint32_t zeroOffset = 0; // the layout requires group 1; the pass ignores it
+        rp.SetBindGroup(1, objectBindGroup_, 1, &zeroOffset);
+        rp.SetBindGroup(2, materialBindGroup(scene::Material{}));
+        rp.SetBindGroup(3, iblBindGroup_);
+        rp.Draw(3);
+        rp.End();
+        ++stats_.drawCalls;
+        ++stats_.state.pipelineBinds;
+        stats_.state.bindGroupBinds += 4;
+    }
 
     // ---- pass 1: scene -> HDR + the auxiliary targets (ADR-035) ----
     {

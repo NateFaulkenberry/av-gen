@@ -18,7 +18,9 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
+#include <string>
 
 namespace avgen::scene {
 
@@ -75,8 +77,8 @@ struct ImageLookIntegration {
     // hot pixel cannot be amplified without limit. Verified against the `--pt-probe` diagnostic's
     // worst measured directional albedo rather than against an assumed ceiling.
     float localContrast = 0.0f;        // 0..1
-    float localContrastRadius = 24.0f; // pixels at 720p, scaled by height / 720 like every other
-                                       // radius in this struct's neighbours
+    float localContrastRadius = 24.0f; // pixels at `PostSettings::referenceHeight`, scaled like
+                                       // every other radius in that struct (ADR-917)
 
     // §68.4 Light wrap. A bright background bleeding around a foreground edge -- the single
     // strongest cue that a subject is *in* a scene rather than in front of it. Reuses the bloom
@@ -100,15 +102,34 @@ struct PostSettings {
     float exposureDeltaSeconds = 1.0f / 60.0f; // the frame's delta time, for the metering rates
     bool exposureReset = false;                // re-seed the meter (scene change, timeline seek)
 
+    // ---- resolution (ADR-917) --------------------------------------------------------------------
+    // The frame height, in the post chain's own pixels, that every pixel-sized value below was
+    // tuned at. The chain runs at the scene target, so a supersampled frame counts its supersampled
+    // height: a 960x540 preview at supersample 2 is a 1080-line chain.
+    //
+    // At any other height every pixel-sized value scales by `height / referenceHeight` -- the
+    // bloom and halation pyramids gain or lose levels at their fine end, the anamorphic streak's
+    // reach, the motion-blur tiles and radius, the defocus radii and the look stage's local-contrast
+    // radius -- so each covers the same fraction of the picture at 540 lines as at 4320. Before
+    // ADR-917 the pyramids, the streak and the tiles were counted in pixels of whatever frame the
+    // chain was handed (ADR-279 measured the bloom), so a preview and a final of one project showed
+    // two different looks.
+    //
+    // 720 is the height the older radii (defocus, motion-blur radius, local contrast) were already
+    // expressed at, so a scene that never sets this keeps their meaning exactly.
+    float referenceHeight = 720.0f;
+
     // ---- bloom (after the lens, before grading) ----------------------------------------------
     bool bloomEnabled = true;
     float bloomIntensity = 0.2f;   // subtler by default than pre-ADR-039 (was 0.35)
     float bloomThreshold = 1.0f;   // exposed luminance where bloom starts
     float bloomKnee = 0.6f;        // soft-knee width as a fraction of the threshold
     float bloomRadius = 1.0f;      // upsample spread (0.5..2)
-    // Pyramid depth. NOT fixed at creation, whatever this comment used to say: `PostProcessor::run`
-    // reads it every frame and builds that many levels (ADR-385). Six is deep enough that the
-    // coarsest level is a handful of texels at 1080p; fewer makes a tighter, harder glow.
+    // Pyramid depth AT `referenceHeight`. NOT fixed at creation, whatever this comment used to say:
+    // `PostProcessor::run` reads it every frame (ADR-385), and since ADR-917 builds this many levels
+    // plus log2(height / referenceHeight) more at the fine end, so the coarsest level -- which is
+    // what sets the glow's reach -- is the same fraction of the frame at any size. Fewer makes a
+    // tighter, harder glow. The halation pyramid follows the same count.
     std::uint32_t bloomLevels = 6;
     // Selective bloom (ADR-039): 0 = luminance only, 1 = the emission target only. Ignored, with
     // no visible change, when the renderer supplies no emission target (ADR-035).
@@ -125,7 +146,8 @@ struct PostSettings {
     // ---- anamorphic: a horizontally stretched bloom tier with optional ghosts, off by default -
     bool anamorphicEnabled = false;
     float anamorphicIntensity = 0.35f;
-    float anamorphicStretch = 8.0f;   // horizontal scale of the streak
+    float anamorphicStretch = 8.0f;   // horizontal scale of the streak: its reach is 8 * stretch
+                                      // quarter-resolution texels at `referenceHeight` (ADR-917)
     float anamorphicGhosts = 0.0f;    // 0 = none; ghost strength mirrored about the centre
     glm::vec3 anamorphicTint{0.35f, 0.55f, 1.0f};
 
@@ -147,7 +169,7 @@ struct PostSettings {
     bool dofEnabled = false;
     float focusDistance = 6.0f;    // metres (the tracked focus when the camera drives it)
     float focusRange = 2.0f;       // sharp zone half-width (only the non-physical fallback)
-    float dofMaxRadius = 8.0f;     // pixels at the output resolution (scaled by height/720)
+    float dofMaxRadius = 8.0f;     // pixels at `referenceHeight` (scaled by height / referenceHeight)
     // ADR-037: when true the blur radius is the lens's circle of confusion in pixels rather than
     // `dofMaxRadius`, which then only clamps it. `lens` is the camera's lens for that frame.
     bool dofPhysical = false;
@@ -166,7 +188,7 @@ struct PostSettings {
     // when the aspect ratio changes rather than shearing with it.
     float tiltShiftBandWidth = 0.2f;  // full width of the fully sharp band
     float tiltShiftFalloff = 0.25f;   // distance past the band's edge to reach maximum defocus
-    float tiltShiftMaxRadius = 8.0f;  // pixels at 720p (scaled by height / 720), as dofMaxRadius
+    float tiltShiftMaxRadius = 8.0f;  // pixels at `referenceHeight`, as dofMaxRadius
 
     // ---- motion blur (ADR-040: tile-based reconstruction over the ADR-035 velocity target) -----
     // The blur length is the pixel's screen motion times `motionBlurAmount` times the shutter
@@ -175,8 +197,12 @@ struct PostSettings {
     // object, instance, deformation and particle motion all blur, because they all write velocity.
     float motionBlurAmount = 0.0f;      // 0 off .. 1 = the physical length
     std::uint32_t motionBlurSamples = 16; // taps along the smear; fewer bands a long streak
-    float motionBlurMaxRadius = 40.0f;  // pixels at 720p (scaled by height / 720)
-    std::uint32_t motionBlurTileSize = 20; // velocity tile edge in pixels; also the reach in tiles
+    float motionBlurMaxRadius = 40.0f;  // pixels at `referenceHeight` (scaled by height / referenceHeight)
+    // Velocity tile edge in pixels at `referenceHeight`, scaled like the radius since ADR-917. The
+    // reconstruction only gathers from the 3x3 tiles around a pixel, so a smear longer than a tile
+    // is cut off at the neighbourhood's edge: scaling the radius without the tile (the chain before
+    // ADR-917) shortened every long smear at high resolution.
+    std::uint32_t motionBlurTileSize = 20;
 
     // ---- output effects ------------------------------------------------------------------------
     // ADR-059: FXAA. This renderer has no MSAA and no TAA, so a scene of alpha-tested foliage
@@ -204,6 +230,7 @@ struct PostSettings {
 };
 
 struct PostParameters {
+    params::Parameter<float>* referenceHeight = nullptr; // ADR-917
     params::Parameter<bool>* bloomEnabled = nullptr;
     params::Parameter<float>* bloomIntensity = nullptr;
     params::Parameter<float>* bloomThreshold = nullptr;
@@ -283,5 +310,47 @@ const char* tonemapOperatorName(TonemapOperator op);
 // inside the renderer also lets a future automated focus pull ask "is this point sharp?" without a
 // device.
 [[nodiscard]] float tiltShiftCoverage(const PostSettings& settings, glm::vec2 uv, float aspect);
+
+// ---- resolution (ADR-917) -------------------------------------------------------------------------
+//
+// How far the post chain's pixel-sized values are scaled for a chain `frameHeight` pixels tall:
+// `frameHeight / referenceHeight`. The chain's own pixels, so a supersampled frame counts its
+// supersampled height. 1 at the reference, where every value means exactly what it says.
+[[nodiscard]] float postPixelScale(const PostSettings& settings, std::uint32_t frameHeight);
+
+// A one-line account of what that scale does to this scene's values, for the log of a render --
+// "every glow, streak and blur is 4.00x its authored pixel size" is the sentence that tells a
+// person why a final and a preview agree, or why they would not have.
+[[nodiscard]] std::string describePostScale(const PostSettings& settings, std::uint32_t frameHeight);
+
+// The energy-conserving pyramid (ADR-039), planned for a frame `octaves` = log2(pixel scale) away
+// from the reference. Shared by the bloom and the halation pyramids, and here rather than in the
+// renderer so the arithmetic is testable without a device.
+//
+// At the reference the authored pyramid gives level k the weight (1 - b) b^k, and the coarsest
+// level what is left, b^(L-1) -- `b` being the upsample blend. A frame that is `octaves` finer has
+// levels that are each that many octaves smaller, so the authored weights move that many levels
+// towards the coarse end: level k's weight lands on level k + octaves, and a fractional shift
+// shares it between the two levels that bracket its size, which keeps both the total (1) and the
+// weighted mean octave exact. The levels finer than the reference's first carry no weight; they
+// exist only as steps of the downsample, and their upsample passes are a plain tent. A frame
+// coarser than the reference folds the weight of the levels it is too small to have into its first.
+//
+// At `octaves` 0 this is exactly the pre-ADR-917 pyramid: the same level count and, to the bit,
+// the same blend on every upsample step.
+inline constexpr std::uint32_t kMaxAuthoredPyramidLevels = 8;
+inline constexpr std::uint32_t kMaxPyramidLevels = 12;
+struct PyramidPlan {
+    std::uint32_t levels = 0;                        // levels to build, finest first
+    std::array<float, kMaxPyramidLevels> weight{};   // each level's share of the result; sums to 1
+    // The upsample blend for each step: level j is `mix(level j, tent(coarser result), blend[j])`,
+    // as fs_upsample computes it. The coarsest level has no step; its entry is 0.
+    std::array<float, kMaxPyramidLevels> blend{};
+};
+// `baseWidth`/`baseHeight` are the pyramid's first level (half the frame for bloom, a quarter for
+// halation): the plan stops, as the chain does, before a level would be narrower than two texels,
+// and folds whatever weight lay beyond into the last level it has.
+[[nodiscard]] PyramidPlan planPyramid(std::uint32_t authoredLevels, float blend, float octaves,
+                                      std::uint32_t baseWidth, std::uint32_t baseHeight);
 
 } // namespace avgen::scene

@@ -33,6 +33,7 @@ world::HistorySample lerpSample(const world::HistorySample& a, const world::Hist
     out.position = glm::mix(a.position, b.position, f);
     out.rotation = glm::slerp(a.rotation, b.rotation, f);
     out.scale = glm::mix(a.scale, b.scale, f);
+    out.placement = b.placement;
     return out;
 }
 
@@ -79,10 +80,16 @@ SubjectTrail::SubjectTrail(const world::HistoryBank* bank, std::size_t ring, dou
     while (count_ > 0 && bank_->sample(ring_, count_ - 1).t >= now_ - 1e-9) {
         --count_;
     }
+    // And only the head's own placement: back from the newest sample to the last change. When the
+    // subject was placed this very frame there is none, and every read is the head.
+    first_ = count_;
+    while (first_ > 0 && bank_->sample(ring_, first_ - 1).placement == head_.placement) {
+        --first_;
+    }
 }
 
 world::HistorySample SubjectTrail::at(double seconds) const {
-    if (count_ == 0 || seconds >= now_) {
+    if (count_ == first_ || seconds >= now_) {
         world::HistorySample s = head_;
         s.t = seconds;
         return s;
@@ -91,7 +98,9 @@ world::HistorySample SubjectTrail::at(double seconds) const {
     if (seconds >= newest.t) {
         return lerpSample(newest, head_, seconds);
     }
-    const world::HistorySample& oldest = bank_->sample(ring_, 0);
+    // Held before the oldest sample of the placement, which is where the subject was first seen.
+    // After it, both samples `sampleAt` interpolates between are of the placement too.
+    const world::HistorySample& oldest = bank_->sample(ring_, first_);
     if (seconds <= oldest.t) {
         world::HistorySample s = oldest;
         s.t = seconds;

@@ -172,6 +172,9 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
             if (watchHook_) {
                 ctx.setWatchHook(watchHook_);
             }
+            if (evaluationHook_) {
+                ctx.setEvaluationHook(evaluationHook_);
+            }
             ctx.setObservation(task.observation());
             ctx.onProgress = [&task, &call](float fraction, const std::string& note) {
                 Activity a;
@@ -221,8 +224,13 @@ ToolResult Orchestrator::invokeOnMainThread(const ToolCall& call, AgentTask& tas
         if (!value) {
             return ToolResult::failure(ToolErrorCode::Internal, value.error().message);
         }
+        // ADR-931: what the answer means for the project (an evaluation is kept), on the main thread.
+        (void)queue_->run([&] { answer->settle(*engine_, *value); }, CancelToken{});
         if (value->contains("observation")) {
             task.setObservation((*value)["observation"]);
+        }
+        if (value->contains("summary") && (*value)["summary"].is_string()) {
+            return ToolResult::ok(*value, (*value)["summary"].get<std::string>());
         }
         const std::size_t count = value->contains("observation") ? (*value)["observation"]["events"].size() : 0;
         return ToolResult::ok(*value, fmt::format("{} event(s) observed", count));

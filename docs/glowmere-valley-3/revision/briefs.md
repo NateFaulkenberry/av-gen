@@ -259,3 +259,128 @@ generator can read.
   - the "everything on the kick" flag;
   - round-trip;
   - one GPU difference image per target kind, proving that a proposed route reaches the pixels.
+
+## Phase 3: the GV3 scene revision, in parallel streams
+
+The plan is [03-revision-plan.md](03-revision-plan.md) and the baseline is
+[04-iterations.md](04-iterations.md) iteration 0. The engine features and their GV3 recipes are
+in [stream-reports/](stream-reports/): signals, routes, emission, song, reactivity, water,
+characters, setpieces, and checkpoints (camera).
+
+### Common to every Phase 3 stream
+- **Worktree:** `~/Documents/GitHub/av-gen-gv3-<topic>`, on branch `gv3/<topic>`, from `gv3/production` `334c4cf6`. That is the first pass plus the Phase 3 foundation: the authored energy arc and the meter pins. Assets are linked.
+- **Engine:** never build the engine in your worktree. Use the shared build:
+  `mkdir -p <wt>/build && ln -s /Users/natefaulkenberry/Documents/GitHub/av-gen-engine/build/release <wt>/build/release`
+  - The shared engine is `040d6644`: main plus setpieces. The coordinator announces a newer build (with characters and render) as a new path.
+  - `tools/gv3/ground.py` and every command below then work unchanged.
+  - Never write into the shared engine worktree.
+- **Generate** with `python3 tools/make_glowmere_valley_3.py` in your worktree.
+  - **Never commit the generated files:** `examples/world/glowmere-valley-3.{json,scene.json}`, `docs/glowmere-valley-3/03-directives.md` and `04-shot-plan.md`. Restore them with `git checkout --` before each commit; the coordinator regenerates after merging.
+  - Commit your generator changes and your notes only.
+- **Render** a clip with an absolute path, through the lock:
+  `tools/gpu-lock.sh build/release/src/avgen --project examples/world/glowmere-valley-3.json --render $PWD/build/gv3/<topic>/<name>.mov --size 960x540 --range a:b`
+  - A range render warms particles for at most 240 frames, and a seek is not a play for particles or the cast. Start ranges early enough for what you judge.
+- **Evaluate** with the Critic daemon on 127.0.0.1:8765. It is the coordinator's: never stop or restart it.
+  `~/Documents/GitHub/creative-critic/.venv/bin/critic submit --inputs <inputs.json> --video <clip> --video-start a --mode preview --session gv3-<topic> --track <category> --label <iteration> --wait --json --strict`
+  - Run it as a background command.
+  - `work/gv3-v2/inputs.json` is the first pass's scene and intent. It is correct for the look and world streams, whose shots do not change.
+  - The critic-adapter stream will document regenerating inputs from a revised project; the cut and cast streams need that.
+- **Before and after (brief §17):** "before" is the same range rendered from `gv3/production` `334c4cf6`. Put stills and sheets in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/<topic>/`, and use the Critic's comparison between the two jobs.
+- **Record every iteration** in `docs/glowmere-valley-3/revision/phase3/<topic>.md` (committed): what changed, what the evaluator measured, what was decided.
+- **Stay inside the files you own** (below). If you need a change elsewhere, say so in your report.
+- **The standing rules:**
+  - never commit the song or the licensed assets;
+  - never modify `glowmere-valley-2-multicam`;
+  - headless only (no windowed app, no `--capture-ui`);
+  - never run `tools/make_abduction_scenario.py`;
+  - use log names prefixed with your topic in any shared folder;
+  - at most `-j 4` for any build;
+  - commit early (the account's usage limit keeps stopping agents).
+
+### gv3-look: audio reactivity, the drop, water, wind
+- **Owns:** `tools/gv3/look.py`, `tools/gv3/directives.py`, and a new `tools/gv3/reactivity.py`. It may edit the scene's water and wind blocks.
+- **Audio reactivity, the highest priority (brief §3–5, §16):**
+  - Make the Director's proposal a generator step: `avgen --project P --propose-reactivity OUT.json`, then install it as `install_reactivity.py` does (`~/Desktop/av-gen-review/reactivity-adr924-927/`).
+  - Follow "How GV3 should install and tune it" in `stream-reports/reactivity.md`, and the mushroom lanes, the bar and drop waves and the hero boosts in `stream-reports/emission.md`.
+  - Keep the elder's heartbeat and the horse's gold. Nothing lockstep, nothing on one source.
+  - Prove each target group on the three tiers: configured (`--audit-routes`), behavioural (the Critic's route-locked "configured and observed"), and meaningful (sheets, judged at 1080p where small things matter).
+- **The drop without the style shift (brief §7, plan §2):** hold the grade within the film's range and express the drop through depth, waves and activity. Check the evaluator's `visual_coherence`, and the hue histograms plateau against drop.
+- **Water:**
+  - the base: ripple 0.1, rippleScale 2.6, bass route 0.03 (`stream-reports/water.md`);
+  - the tears in the scene's valley water block, with the values from that report;
+  - fix `"shoreFade"` to `edgeFade`.
+- **Wind (brief §6):** the scene's wind visibly moves grass and ferns without a storm. Its modulation comes from the reactivity proposal, but check its base values; the tears follow the wind.
+- **Post** (AgX, bloom, grain, depth layers) waits for the render stream. Leave it until the coordinator says the render engine is in.
+
+### gv3-cut: the Director's cut, pacing, cameras
+- **Owns:** `tools/gv3/shots.py`, `rig.py`, `cuts.py`, `framing.py` and `review.py`, plus `install_cut` and the `autoDirector` block in `tools/make_glowmere_valley_3.py`.
+- **Pacing (brief §8):**
+  - Take cut times and arcs from the Director's Song Mode cut: `avgen_song_cut`, with the settings in `stream-reports/song.md`, which the first pass's band prevented. Keep composition authored and evaluator-checked: every span gets an authored rig.
+  - Use the evaluator's novelty measure to trim shots that have said their piece.
+  - There is no global duration.
+- **Aliens not the whole film (brief §9):** alien-led screen time is 38% today; the target is 20% or less. Aliens appear in wides and reacting to events.
+- **Frame the UFO events** E1–E5 (plan §3; times and places in `audit/data/setpieces/gv3-ufo.plan.json`). The gv3-cast stream implements them; you frame them, and feed their moments to Song Mode as plan events, so peaks go to them.
+- **Camera (brief §2):** apply ADR-913's follow values (`stream-reports/checkpoints.md` § Camera) to every follow rig. Check the stability bar with `tools/camera_stability.py` and the Critic's stability.
+- **Keep** the s14/s39 rhyme and the riser's compression into the drop.
+
+### gv3-world: the world edge and the offline configuration
+- **Owns:** `tools/gv3/world.py`, and a new `tools/gv3/offline.py`.
+- **The world edge:** the 640 m valley shows its edge in wides. Close the valley's ends with ridge features in the terrain's `world` block (render-post.md: "closing the valley ends with ridge features"). Check that no wide shows an edge; the render stream's sky-coloured fog helps later.
+- **Offline 4K configuration (brief §13)**, from `audit/reports/render-post.md`, as `offline.py`, applied only for the final render (a flag or a separate output):
+  - shadow cascades 4, shadow range 160 with 300 keyed on the wides;
+  - terrain view distance 1000 with LOD off;
+  - the fog march on (32 steps, `volumeMaxDistance` 220, `horizonDensity` 1);
+  - rigs at every frame (`updateHz` 0);
+  - the render block: 3840×2160, supersample 2, tier offline, limits tier, prores422.
+  
+  Verify the render log lines named in render-post.md on a 2 s range. The render stream's reference-height post radii and floors come later.
+- **Measure the 4K cost** on 2 s ranges; never render the whole film at 4K.
+
+### gv3-cast: the aliens, the animals and the UFO events (starts when characters merges into main)
+- **Owns:** `tools/gv3/cast.py`, and a new `tools/gv3/ufo.py` with the plan file.
+- **Characters (brief §10–12):** apply `stream-reports/characters.md` "How GV3 should use this": the aliens' settings per alien, the animals' slope and turn radii, and the flank animals re-homed onto the meadows.
+- **UFO events (brief §9):**
+  - add the `scout` craft;
+  - remove the hand-written `abduction` scenario and `horse_light()`'s keys;
+  - compile the E1–E5 plan with `avgen_cast_trace --plan --save-project` as a generator step;
+  - re-validate E4 after the re-homing; it needs two animals within reach.
+- **The gate:** the ADR-910 metrics on the whole-film cast trace (longest still stretch, reversals, pivots, slope under stationary bodies), and the set pieces' measured beats.
+
+## Engine follow-ups found in Phase 3
+
+### navfix (ADRs 932–934, and an ADR-931 amendment): reachable goals, no pacing on urgent reactions, retired bodies leave
+- **Worktree:** `~/Documents/GitHub/av-gen-navfix`, branch `agent/navfix`, from `integrate/revision` `ec515c8b` (main `040d6644` plus characters, ADR-907–910; main fast-forwards to it when the owner allows). Assets are linked.
+- **Read:** the brief §10–12 (the owner's "never walk → stop → 180° → back"); `stream-reports/characters.md`; ADR-908 and ADR-909; gv3-cast's "Found" 2 in `phase3/cast.md` (in `~/Documents/GitHub/av-gen-gv3-cast`); gv3-world's W2b and W2c in `phase3/world.md` (in `~/Documents/GitHub/av-gen-gv3-world`).
+- **The defect, measured on GV3 by gv3-cast.**
+  - After hearing E5's beam at 170.35 s, ember paced the river bank (walk → stop → 180° → walk back) 8 times in 40 s (176–216 s). The same trap made it dither on that bank at 22–52 s, after roam targets across the water.
+  - `NavigatorPath::route` (`src/entity/action.cpp`) checks only that the goal is navigable, then returns a straight line (`(void)from`). So a goal on another connected piece of walkable ground is `Ready`. On GV3 the river divides the nav grid into 4–5 pieces.
+  - The body walks into the river as far as the wade limit and stalls, so the move gives up. ADR-908 walks it back onto the walkable set. Then the reaction wins again, because an option with urgency is exempt from ADR-909's revisit and turn-back vetoes (the loop block in `src/entity/decision.cpp`).
+  - gv3-world saw the other side of this: the aliens' own destination choices do respect reachability. Joining the banks round the river's head rerouted every alien by up to 100 m.
+  - `NavGrid` already labels regions (`NavGrid::connected`) and has a search that refuses disconnected goals. The action tier does not use either.
+- **Deliverables:**
+  1. **ADR-932: the action tier's routes respect connected regions.** A goal in another region routes to the nearest reachable point in the body's own region, or is refused with a reason when there is none. Justify the choice in the ADR. Everything that calls `route` (moves, errands, reactions, orders) inherits this; list them in the ADR. A reaction to an event across water walks to the bank and watches from there.
+  2. **ADR-933: no pacing on urgent options.** An urgent option (a reaction, a flinch) keeps its exemption for its first attempt. Once its move has failed or given up, the same event cannot send the body back to the same place in a loop. Use ADR-909's revisit and turn-back rules, or an equivalent retry limit. A flinch out of someone's way must still work.
+  3. **ADR-931 amendment: the Director's evaluator hook** (`src/app/directing_evaluate.cpp`) passes the Critic's adapter `--world-preview <build>/tools/avgen_world_preview`, so its evaluations get ground samples. The flag is described in `stream-reports/critic-adapter.md` in the gv3 worktree. Add a test that the argument is passed.
+  4. **ADR-934: a retired body leaves the world** (added 13:10; found by gv3-cast on iteration 2's whole-film trace).
+     - `StepKind::Retire` (`src/stage/staging.cpp`) hides a set piece's taken animal, then hands it back to its own
+       behaviours. The crowd build and `buildBodyIndex` (`src/entity/entity.cpp`) take every active entity, visible
+       or not. So after E4, cow-12 and cow-23 graze on invisibly in the west meadow until 226 s (cow-12 walking at
+       (−63.9, −1.5) at 206 s). bull-10 (E3) and horse-11 (E5) do the same.
+     - On GV3, rook plays its walk clip in place for 5.25 s (205.65–210.85 s at (−66.2, −5.2)): 0.51 m/s intended,
+       zero travel, flat dry ground, with the invisible cow-23 3.0 m away and cow-12 4.3 m away. ADR-910's stuck time
+       for rook went from 0.4 s to 6.7 s. Nothing in a scene can work round it: only the set piece knows the moment.
+     - The fix: on retire, the body leaves the crowd and perception and stops being simulated. A seek past the
+       retire lands in the same state (ADR-930). Check what else reads a retired body. For example, the cast trace's
+       `atRetire` is taken after the body is dropped back to the ground (the horse, 23 m up the beam, reads 5.3 m).
+       The Critic's adapter works round that; record where the body was taken, if that falls out of the fix.
+  5. **Tests, each with a control arm that fails without the change:**
+     - a two-region world (a river or a trench) where a goal across the divide is not `Ready` as a straight line, and routes to the near side;
+     - a reaction across water that produces no walk → stop → 180° → back, measured with ADR-910's reversal metric;
+     - a flinch that still works;
+     - a retired body that neither blocks nor draws another body, played and scrubbed alike.
+- **Measure** GV2 multicam and GV3 before and after, with `avgen_cast_trace` and `avgen_character_quality`.
+  - For GV3, use a scratch copy of gv3-cast's generated project, under your own `build/`, never edited in place. Mirror it as gv3-world does: symlink `materials`, `lightrigs`, `entities` and `assets`, and make the song's path absolute.
+  - gv3-cast worked round the defect in iteration 2: E5's reaction is "stop and watch where you stand" (radius 250 m, approach 250 m). Also measure with ember's "go and see" reaction to E5 restored. Report reversals and the longest pacing sequence, before and after.
+- **UI reach:** only behaviour changes. If you add a parameter (a retry limit, say), label it in words under the character's decide or react group.
+- **Suites:** the full CPU suite, via `ctest --test-dir <wt>/build/release -L unit -j 4`. Run the GPU suite only if you touch rendering.
+- **How GV3 should use it:** whether E5's reaction can go back to "go and see", and what else changes for GV3.

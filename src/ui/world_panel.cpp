@@ -488,47 +488,53 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
     // scene, any node or any effect: the grouping is read off the paths, which is what makes this
     // the answer to the Tree panel rather than a second Tree panel. A node with no sub-groups shows
     // one flat list, which is what a plain mesh should look like.
-    {
+    //
+    // One section per prefix, drawn by one rule (`ui::inspectorPlace`): the selection's own prefix
+    // under "Properties", and -- for a node a character drives -- the character's under a heading of
+    // its own (below).
+    const auto drawSection = [&](const std::string& sectionPrefix, const std::string& title) {
         std::vector<params::IParameter*> plain;
         std::vector<std::string> groupOrder;
         std::unordered_map<std::string, std::vector<params::IParameter*>> groups;
+        std::unordered_map<const params::IParameter*, std::size_t> cuts;
         for (params::IParameter* param : engine.params().ordered()) {
-            if (!param->flags().exposed || !detail::pathStartsWith(param->path(), prefix)) {
+            if (!param->flags().exposed || !detail::pathStartsWith(param->path(), sectionPrefix)) {
                 continue;
             }
             if (!shows(param->path())) {
                 continue;
             }
-            const std::string rel = param->path().substr(prefix.size());
-            const std::size_t slash = rel.find('/');
-            if (slash == std::string::npos) {
+            const ui::InspectorPlace place = ui::inspectorPlace(param->path(), sectionPrefix);
+            cuts[param] = place.cut;
+            if (place.heading.empty()) {
                 plain.push_back(param);
                 continue;
             }
-            const std::string group = rel.substr(0, slash);
             // ADR-421: the deformer stack has its own editor above, which draws these same
             // parameters labelled by the kind that owns them. Left in the generic list they would
             // appear a second time as `1/amount`, `2/amount`, with nothing saying that slot 1 is a
             // Twist -- two controls on one path, one of which explains itself and one of which does
             // not. Only suppressed for a procedural, because that is the only owner of the prefix.
-            if (group == "deform" && selection.kind == WorldSelection::Kind::Procedural) {
+            if (place.heading == "deform" && selection.kind == WorldSelection::Kind::Procedural) {
                 continue;
             }
-            auto [it, inserted] = groups.try_emplace(group);
+            auto [it, inserted] = groups.try_emplace(place.heading);
             if (inserted) {
-                groupOrder.push_back(group);
+                groupOrder.push_back(place.heading);
             }
             it->second.push_back(param);
         }
-        if (!plain.empty() || !groupOrder.empty()) {
-            ImGui::SeparatorText("Properties");
+        if (plain.empty() && groupOrder.empty()) {
+            return;
         }
-        const auto row = [&](params::IParameter* param, std::size_t cut) {
+        ImGui::SeparatorText(title.c_str());
+        ImGui::PushID(sectionPrefix.c_str());
+        const auto row = [&](params::IParameter* param) {
             ImGui::PushID(param->path().c_str());
             // The path below the heading, its leaf said in words where the parameter was given a
             // label for what the viewer sees (ADR-905: `fungi/light wave`, not
             // `fungi/emissiveFieldAmount`).
-            const std::string rel = ui::inspectorRowLabel(param->path(), cut, param->label());
+            const std::string rel = ui::inspectorRowLabel(param->path(), cuts[param], param->label());
             drawParameterValue(*param, rel.c_str());
             if (ImGui::BeginPopupContextItem("reset")) {
                 if (ImGui::MenuItem("Reset to default")) {
@@ -542,16 +548,32 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
             ImGui::PopID();
         };
         for (params::IParameter* param : plain) {
-            row(param, prefix.size());
+            row(param);
         }
         for (const std::string& group : groupOrder) {
             if (!ImGui::TreeNodeEx(group.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
                 continue;
             }
             for (params::IParameter* param : groups[group]) {
-                row(param, prefix.size() + group.size() + 1);
+                row(param);
             }
             ImGui::TreePop();
+        }
+        ImGui::PopID();
+    };
+    drawSection(prefix, "Properties");
+    // ADR-907: a character's own controls, when the node it drives is the selection. Clicking an
+    // alien or a cow selects its node, whose `nodes/<n>/` prefix is a transform; how it walks, turns,
+    // pauses and chooses where to go -- its behaviours (`wander`, `decide` and each considerer), its
+    // `gait`, its senses -- is registered under `entity/<name>/` and was in another panel only.
+    if (selection.kind == WorldSelection::Kind::Node) {
+        if (const scene::Composition* comp = engine.composition()) {
+            for (const auto& entity : comp->entityWorld().entities()) {
+                if (entity != nullptr && entity->desc().driven() == selection.name) {
+                    drawSection(ui::entityInspectorPrefix(entity->name()),
+                                fmt::format("How {} moves and behaves", entity->name()));
+                }
+            }
         }
     }
 

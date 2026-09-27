@@ -9,6 +9,7 @@
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "rendering/debug_visualizer.hpp"
+#include "scene/post_settings.hpp"
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -226,6 +227,9 @@ Result<void> RenderJob::start() {
     if (auto r = renderer_->resize(settings_.width, settings_.height); !r) {
         return r;
     }
+    // ADR-917: what the post chain does with this deliverable's size, said once. `stats().height`
+    // is the scene target's height after `resize`, which is the chain's -- supersample included.
+    log::info("render: {}", scene::describePostScale(engine_->scene().post, renderer_->stats().height));
     // Quality arms, applied before the pass toggles because an arm sets a policy field and a
     // toggle removes a pass from whatever policy chose.
     if (!settings_.qualityArms.empty()) {

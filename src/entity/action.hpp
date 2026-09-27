@@ -95,6 +95,28 @@ public:
     [[nodiscard]] virtual glm::vec2 steer(glm::vec2 from, glm::vec2 to, float lookahead) const = 0;
     // The surface a walker stands on at `p`.
     [[nodiscard]] virtual float groundHeight(glm::vec2 p) const = 0;
+    // Whether the straight walk from `from` to `to` is clear (ADR-908). `steer` checks the way it
+    // offers; a mover that walks through its turns travels along its *heading*, which is not that
+    // way until the turn is done, and asks this before it does. True by default: a provider with no
+    // world has nothing to walk into.
+    [[nodiscard]] virtual bool clear(glm::vec2 from, glm::vec2 to) const {
+        (void)from;
+        (void)to;
+        return true;
+    }
+    // Whether a walker may stand at `p`. True by default.
+    [[nodiscard]] virtual bool walkable(glm::vec2 p) const {
+        (void)p;
+        return true;
+    }
+    // Somewhere near `from` a walker may stand, when `from` itself is off the walkable set: the
+    // refuge a body that has ended up there walks back to (ADR-240's escape, for the action tier).
+    // False when `from` is walkable or nothing is in reach, and by default.
+    [[nodiscard]] virtual bool refuge(glm::vec2 from, glm::vec2& out) const {
+        (void)from;
+        (void)out;
+        return false;
+    }
 };
 
 // The provider that exists today: `entity::Navigator`, which samples walkability analytically and
@@ -110,6 +132,9 @@ public:
     [[nodiscard]] RouteStatus route(glm::vec2 from, glm::vec2 to, std::vector<glm::vec2>& out) const override;
     [[nodiscard]] glm::vec2 steer(glm::vec2 from, glm::vec2 to, float lookahead) const override;
     [[nodiscard]] float groundHeight(glm::vec2 p) const override;
+    [[nodiscard]] bool clear(glm::vec2 from, glm::vec2 to) const override;
+    [[nodiscard]] bool walkable(glm::vec2 p) const override;
+    [[nodiscard]] bool refuge(glm::vec2 from, glm::vec2& out) const override;
 
 private:
     const Navigator* nav_ = nullptr;

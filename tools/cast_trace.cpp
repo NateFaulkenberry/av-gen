@@ -3,7 +3,7 @@
 //
 //   avgen_cast_trace (--project p.json | --scene s.scene.json)
 //                    [--seconds N] [--start S] [--fps F] [--hz H] [--nodes a,b,...] [--camera]
-//                    [--out file.json]
+//                    [--out file.json] [--plan plan.json] [--save-project out.json]
 //
 //   --project P   load a project through `Engine::loadProject`, the path the application opens
 //   --scene S     load a bare composition through `Engine::loadComposition`
@@ -14,6 +14,21 @@
 //   --nodes LIST  composition nodes to trace besides the entities, by name (a hero, a camera rig)
 //   --camera      also write the camera's pose at EVERY frame (the render's fps, not --hz)
 //   --out FILE    write the JSON there (default stdout)
+//   --plan P      compile a Director Plan into the loaded project first, exactly as `avgen --plan`
+//                 does (ADR-929), so a plan's set pieces can be traced without a GPU
+//   --save-project OUT   write the project with the plan installed, before tracing it
+//
+// Exit codes: 0 traced; 1 could not load, plan or write; 2 traced, but the plan had items that could
+// not be built (listed under "plan" -> "blocked" and "issues").
+//
+// ## Set pieces (ADR-929)
+//
+// Every staging scenario that is a set piece (`setpiece/<id>`) gets an entry under "setPieces": when
+// each of its beats was actually entered (its world events), where the craft was at each, which
+// animals it bound and where each was when the lift began and when it was retired, and -- the
+// invariant ADR-385 exists for -- how fast the craft moved, and how far it drifted from its station,
+// while the beam was rising and the animals were lifted. A plan's nominal times are the request;
+// these are what the film did.
 //
 // Autonomous characters decide where they go, so the only way to know where an alien will be at
 // 2:30 is to run the film to 2:30. This runs the real `app::Engine` in Offline mode -- the same
@@ -59,6 +74,7 @@
 // It traces; it does not judge. Exit status: 0 when the file was written, 1 on a load failure or
 // bad arguments.
 
+#include "app/directing_plan_file.hpp"
 #include "app/engine.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
@@ -68,7 +84,10 @@
 #include "scene/camera_rig.hpp"
 #include "scene/composition.hpp"
 #include "scene/detail_limits.hpp"
+#include "stage/setpiece.hpp"
+#include "stage/staging.hpp"
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <cmath>
@@ -79,6 +98,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -98,13 +118,16 @@ struct Options {
     std::vector<std::string> nodes;
     bool camera = false;
     fs::path out;
+    fs::path plan;
+    fs::path saveProject;
 };
 
 void usage() {
     std::fprintf(stderr,
                  "usage: avgen_cast_trace (--project p.json | --scene s.scene.json)\n"
                  "                        [--seconds N] [--start S] [--fps F] [--hz H] [--nodes a,b,...]\n"
-                 "                        [--camera] [--out file.json]\n");
+                 "                        [--camera] [--out file.json] [--plan plan.json]\n"
+                 "                        [--save-project out.json]\n");
 }
 
 std::vector<std::string> splitList(const char* text) {
@@ -141,6 +164,10 @@ bool parse(int argc, char** argv, Options& o) {
             o.camera = true;
         } else if (std::strcmp(a, "--out") == 0 && hasValue) {
             o.out = argv[++i];
+        } else if (std::strcmp(a, "--plan") == 0 && hasValue) {
+            o.plan = argv[++i];
+        } else if (std::strcmp(a, "--save-project") == 0 && hasValue) {
+            o.saveProject = argv[++i];
         } else {
             std::fprintf(stderr, "unknown or incomplete argument: %s\n", a);
             return false;
@@ -239,6 +266,36 @@ void recordCamera(CameraTrack& track, const app::Engine& engine, const scene::Co
     track.followPoint.push_back(std::move(followPoint));
 }
 
+// What one set piece actually did (ADR-929), assembled from the director's own events frame by frame.
+struct SetPieceTrace {
+    std::string scenario;
+    std::string actor;  // the staging actor
+    std::string craft;  // the entity it drives
+    std::string beam;   // the craft's `beam` part, if it has one
+    std::vector<std::pair<std::string, double>> beats; // beat -> the instant it was entered, in order
+    std::map<std::string, glm::vec3> craftAt;          // beat -> where the craft was then
+    std::optional<double> finished;
+    std::string ended; // "finished" | "cancelled"
+    struct Animal {
+        std::string role;
+        std::string entity;
+        double bound = -1.0;
+        double lifted = -1.0;
+        double retired = -1.0;
+        glm::vec3 atLift{0.0f};
+        glm::vec3 atRetire{0.0f};
+    };
+    std::vector<Animal> animals;
+    std::vector<std::string> failures; // steps that failed, with why
+    // While the beam rises and while the animals are lifted: the craft's fastest frame-to-frame speed
+    // and its farthest horizontal drift from where it stood as that beat began.
+    bool holding = false;
+    glm::vec3 station{0.0f};
+    float holdMaxSpeed = 0.0f;
+    float holdMaxDrift = 0.0f;
+    int holdFrames = 0;
+};
+
 struct Track {
     nlohmann::json t = nlohmann::json::array();
     nlohmann::json position = nlohmann::json::array();
@@ -270,6 +327,34 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "the loaded document is not a composition; there is no cast to trace\n");
         return 1;
     }
+    // ADR-929: the plan first, installed exactly as `avgen --plan` installs it.
+    nlohmann::json planReport;
+    std::size_t blockedItems = 0; // the exit code says so: a generator must hear that it got less than it asked
+    if (!o.plan.empty()) {
+        auto applied = app::applyPlanFile(engine, o.plan);
+        if (!applied) {
+            std::fprintf(stderr, "plan: %s\n", applied.error().message.c_str());
+            return 1;
+        }
+        planReport = applied->toJson();
+        blockedItems = applied->blocked.size();
+        if (!applied->blocked.empty()) {
+            std::fprintf(stderr, "plan: %zu item(s) could not be built; see the report's \"blocked\" and \"issues\"\n",
+                         applied->blocked.size());
+        }
+        if (!o.saveProject.empty()) {
+            if (auto saved = engine.saveProject(o.saveProject); !saved) {
+                std::fprintf(stderr, "save: %s\n", saved.error().message.c_str());
+                return 1;
+            }
+        }
+        // The film is traced from its first frame, as a render of the saved project would play it.
+        engine.seekSeconds(0.0);
+    } else if (!o.saveProject.empty()) {
+        std::fprintf(stderr, "--save-project is for writing the project a --plan compiled into\n");
+        return 1;
+    }
+
     // Through the engine, not the scene: `Engine::update` writes its own limits over the scene's at
     // the top of every frame (ADR-186), which is why `avgen_character_quality` checks it took.
     scene::DetailLimits limits = engine.detailLimits();
@@ -299,6 +384,29 @@ int main(int argc, char** argv) {
         engine.seekSeconds(static_cast<double>(first) * dt);
     }
 
+    // ADR-929: every set piece in the staging, and the entities its craft and beam are.
+    std::vector<SetPieceTrace> pieces;
+    for (const stage::ScenarioDesc& scenario : composition->staging().scenarios) {
+        if (!stage::isSetPieceScenario(scenario.name)) {
+            continue;
+        }
+        SetPieceTrace piece;
+        piece.scenario = scenario.name;
+        piece.actor = scenario.actor;
+        for (const stage::ActorDesc& actor : composition->staging().actors) {
+            if (actor.name == scenario.actor) {
+                piece.craft = actor.driven();
+                for (const stage::ActorPart& part : actor.parts) {
+                    if (part.name == "beam") {
+                        piece.beam = part.entity;
+                    }
+                }
+            }
+        }
+        pieces.push_back(std::move(piece));
+    }
+    std::map<std::string, glm::vec3> lastCraft; // craft entity -> last frame's simulated position
+
     for (std::uint64_t i = first; i < first + frames; ++i) {
         FrameTime time;
         time.renderTime = static_cast<double>(i) * dt;
@@ -313,6 +421,81 @@ int main(int argc, char** argv) {
                                  "the trace would describe the viewport, not the render\n");
             return 1;
         }
+        // ---- set pieces, every frame: the director's events, and the craft while it holds ----
+        const entity::EntityWorld& world = composition->entityWorld();
+        const auto where = [&](const std::string& name) {
+            const entity::Entity* e = world.find(name);
+            return e != nullptr ? e->state().position() : glm::vec3(0.0f);
+        };
+        for (const stage::StageEvent& e : composition->director().events()) {
+            for (SetPieceTrace& piece : pieces) {
+                if (piece.scenario != e.scenario) {
+                    continue;
+                }
+                switch (e.kind) {
+                case stage::StageEventKind::Beat:
+                    piece.beats.emplace_back(e.beat, time.renderTime);
+                    piece.craftAt.emplace(e.beat, where(piece.craft));
+                    if (e.beat == "beam" || e.beat == "lift") {
+                        piece.holding = true;
+                        piece.station = where(piece.craft);
+                    } else {
+                        piece.holding = false;
+                    }
+                    if (e.beat == "lift") {
+                        for (SetPieceTrace::Animal& a : piece.animals) {
+                            a.lifted = time.renderTime;
+                            a.atLift = where(a.entity);
+                        }
+                    }
+                    break;
+                case stage::StageEventKind::Bound:
+                    if (e.role.rfind("target", 0) == 0) {
+                        piece.animals.push_back(SetPieceTrace::Animal{e.role, e.detail, time.renderTime});
+                    }
+                    break;
+                case stage::StageEventKind::Retired:
+                    for (SetPieceTrace::Animal& a : piece.animals) {
+                        if (a.entity == e.detail) {
+                            a.retired = time.renderTime;
+                            a.atRetire = where(a.entity);
+                        }
+                    }
+                    break;
+                case stage::StageEventKind::StepFailed:
+                    piece.failures.push_back(fmt::format("{:.3f}s {} {} {}: {}", time.renderTime, e.beat, e.role, e.step,
+                                                         e.detail));
+                    break;
+                case stage::StageEventKind::Finished:
+                case stage::StageEventKind::Cancelled:
+                    piece.finished = time.renderTime;
+                    piece.ended = e.kind == stage::StageEventKind::Finished ? "finished" : "cancelled";
+                    piece.holding = false;
+                    break;
+                default: break;
+                }
+            }
+        }
+        for (SetPieceTrace& piece : pieces) {
+            if (piece.craft.empty()) {
+                continue;
+            }
+            const glm::vec3 now = where(piece.craft);
+            const auto last = lastCraft.find(piece.craft);
+            if (piece.holding && last != lastCraft.end() && time.deltaTime > 0.0) {
+                const float speed = glm::length(now - last->second) / static_cast<float>(time.deltaTime);
+                piece.holdMaxSpeed = std::max(piece.holdMaxSpeed, speed);
+                piece.holdMaxDrift =
+                    std::max(piece.holdMaxDrift, glm::length(glm::vec2(now.x - piece.station.x, now.z - piece.station.z)));
+                ++piece.holdFrames;
+            }
+        }
+        for (const SetPieceTrace& piece : pieces) {
+            if (!piece.craft.empty()) {
+                lastCraft[piece.craft] = where(piece.craft);
+            }
+        }
+
         if (i % every != 0) {
             continue;
         }
@@ -369,6 +552,59 @@ int main(int argc, char** argv) {
                          {"followPoint", std::move(cameraTrack.followPoint)}};
     }
 
+    // ADR-929: what each set piece did.
+    if (!pieces.empty()) {
+        nlohmann::json list = nlohmann::json::array();
+        for (const SetPieceTrace& piece : pieces) {
+            nlohmann::json beats = nlohmann::json::object();
+            nlohmann::json craftAt = nlohmann::json::object();
+            for (const auto& [beat, t] : piece.beats) {
+                if (!beats.contains(beat)) {
+                    beats[beat] = rounded(t);
+                }
+            }
+            for (const auto& [beat, p] : piece.craftAt) {
+                craftAt[beat] = vec3(p);
+            }
+            nlohmann::json animals = nlohmann::json::array();
+            for (const SetPieceTrace::Animal& a : piece.animals) {
+                nlohmann::json one{{"role", a.role}, {"entity", a.entity}, {"bound", rounded(a.bound)}};
+                if (a.lifted >= 0.0) {
+                    one["lifted"] = rounded(a.lifted);
+                    one["atLift"] = vec3(a.atLift);
+                }
+                if (a.retired >= 0.0) {
+                    one["retired"] = rounded(a.retired);
+                    one["atRetire"] = vec3(a.atRetire);
+                }
+                animals.push_back(std::move(one));
+            }
+            nlohmann::json one{{"id", stage::setPieceIdOf(piece.scenario)},
+                               {"scenario", piece.scenario},
+                               {"actor", piece.actor},
+                               {"craft", piece.craft},
+                               {"beats", std::move(beats)},
+                               {"craftAt", std::move(craftAt)},
+                               {"animals", std::move(animals)},
+                               // The craft while the beam rose and the animals were lifted.
+                               {"holding", {{"frames", piece.holdFrames},
+                                            {"maxSpeed", rounded(piece.holdMaxSpeed)},
+                                            {"maxDrift", rounded(piece.holdMaxDrift)}}}};
+            if (piece.finished) {
+                one["finished"] = rounded(*piece.finished);
+                one["ended"] = piece.ended;
+            }
+            if (!piece.failures.empty()) {
+                one["failures"] = piece.failures;
+            }
+            list.push_back(std::move(one));
+        }
+        doc["setPieces"] = std::move(list);
+    }
+    if (!planReport.is_null()) {
+        doc["plan"] = std::move(planReport);
+    }
+
     const std::string text = doc.dump();
     if (o.out.empty()) {
         std::fwrite(text.data(), 1, text.size(), stdout);
@@ -381,5 +617,7 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    return 0;
+    // 2: the trace was written, but the plan had items that could not be built (its "blocked"), so the
+    // film traced is not the one the plan asked for -- the same refusal `avgen --plan` makes.
+    return blockedItems > 0 ? 2 : 0;
 }

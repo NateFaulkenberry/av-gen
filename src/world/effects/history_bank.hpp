@@ -44,13 +44,19 @@ class IParameter;
 
 namespace avgen::world {
 
-// One step instant. 48 bytes: the design's 40 B of transform plus the instant it was taken at,
-// which is what lets a reader interpolate across a play whose steps are not on the grid.
+// One step instant. 56 bytes: the design's 40 B of transform, the instant it was taken at (which is
+// what lets a reader interpolate across a play whose steps are not on the grid), and its placement.
 struct HistorySample {
     double t = 0.0;
     glm::vec3 position{0.0f};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 scale{1.0f};
+    // ADR-911 (amended 2026-09-27): which placement of the bodies that move this node the sample
+    // belongs to -- `entity::Entity::placements`, summed over the body that drives the node and the
+    // bodies that drive its parents. Its value means nothing; two samples either side of a change do
+    // not continue one another, however close they are. A follow camera reads back only as far as
+    // the last change. Recorded like the transform, by a play and by the seek replay alike.
+    std::uint32_t placement = 0;
 };
 
 struct HistorySubscription {
@@ -101,8 +107,10 @@ public:
 
     // Appends one sample. An instant earlier than the ring's newest starts the ring again (the
     // transport looped or jumped); the same instant replaces the newest (a paused frame redrawn).
+    // `placement` is the node's `HistorySample::placement` at that instant (0 for a node no placed
+    // body moves).
     void record(std::size_t ring, double t, const glm::vec3& position, const glm::quat& rotation,
-                const glm::vec3& scale);
+                const glm::vec3& scale, std::uint32_t placement = 0);
     // Drops every sample and keeps the subscriptions. A seek's first act.
     void clear();
 

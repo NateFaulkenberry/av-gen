@@ -344,6 +344,9 @@ PlanTimes resolvePlanTimes(const Plan& plan, const MusicalContext& musical) {
         place(plan.retimes[i].from, fmt::format("/retimes/{}/from", i));
         place(plan.retimes[i].until, fmt::format("/retimes/{}/until", i));
     }
+    for (std::size_t i = 0; i < plan.setPieces.size(); ++i) { // ADR-929
+        place(plan.setPieces[i].at, fmt::format("/setPieces/{}/at", i));
+    }
     return out;
 }
 

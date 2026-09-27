@@ -44,7 +44,15 @@ namespace {
 // line moved under the cast (ADR-893, 894). No matcher code changed, the scene still carries no key,
 // and the control arm below still shows the key changes the trace. The old value was
 // 0xd53e94d7c2073392.
-constexpr std::uint64_t kPreWiringDigest = 0x6e863d80f8c6146full;
+//
+// Re-pinned a third time, by ADR-907, 908 and 909, for the same reason: the cast moved under the
+// trace. Every wanderer's path changes from its first step (the forward cone, the 12-degree slope
+// limit, the pace eased by its gait, turns walked on a circle); a single-clip animal turning on the
+// spot now plays its cycle, which changes its rig's pose; and the aliens' errands change with the
+// loop memory, the half-tolerance post return and a hurried reaction. No matcher code changed, the
+// scene still carries no key, and the control arm below still shows the key changes the trace. The
+// old value was 0x6e863d80f8c6146f.
+constexpr std::uint64_t kPreWiringDigest = 0x3375850dc3acc580ull;
 
 fs::path glowmere() {
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";
