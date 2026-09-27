@@ -128,14 +128,16 @@ def e1_far_survey(t0, t1, g):
 
 @at("9.1")
 def horse_grazing(t0, t1, g):
-    # [s05] The white horse -- what the valley will lose -- grazing under the elder, from the
-    # north-east: the horse on the lower-left third, the whole of the elder's cap right of centre
-    # (aimed 60% of the way from the horse to the cap). Iteration 2 framed it from the south-east,
-    # the heading of the east-bank travel (26.1) and the orbit (49.1): the Critic found both
-    # "nearly the same framing". Its path here is the same on both casts.
-    r = aim_at(35.0, g(8, 42, 2.5), "horse-11", (-4.89, 6.3, -3.92), "still")
-    return r, dict(lead="animal", purpose="The white horse grazing under the elder",
-                   subject="horse-11 (what the valley will lose)", camera="35 mm, 2.5 m, north-east, fixed eye, live aim",
+    # [s05] The white horse -- what the valley will lose -- grazing under the elder's cap, from the
+    # south-east: through a 55 mm, the horse on the lower third (0.13 of the frame) and the whole cap
+    # above it. Iteration 2's 30 mm from here read as the same framing as the east-bank travel (26.1)
+    # and the orbit (49.1), 35 mm lenses a few metres away (the Critic: eyes within 18 m, views within
+    # 12 deg, fields of view within 8); iteration 4's first try from the north-east put the elder as near
+    # the lens as the horse and hid the horse behind a rock (seen in the clip). Its path is the same on
+    # both casts.
+    r = aim_at(55.0, g(22, 78, 3.0), "horse-11", (0.0, 5.0, 0.0), "still")
+    return r, dict(lead="animal", purpose="The white horse grazing under the elder's cap",
+                   subject="horse-11 (what the valley will lose)", camera="55 mm, 3 m, south-east, fixed eye, live aim",
                    movement="still", music="2 bars")
 
 
