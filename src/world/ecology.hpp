@@ -169,6 +169,20 @@ struct ScatterLayer {
     // so a tree reads as full of fireflies rather than as a lamp shaped like a tree.
     std::string materialProgram;
 
+    // ADR-905: the layer's own emission lane, applied AFTER the material program to everything the
+    // layer emits, so it reaches a program-lit layer as surely as a plain one. `emissionGain`
+    // multiplies it; `hueOffset` turns its displayed hue by that many turns (OKLCH, lightness and
+    // chroma kept). Both are also parameters, `nodes/<terrain>/scatter/<layer>/...`, so a route or a
+    // key can move one layer without touching the material program every other layer shares.
+    // `emissiveField` names a scalar field that multiplies the layer's emission by
+    // 1 + emissiveFieldAmount * field(p) where each fragment stands -- the path a procedural node's
+    // own `emissiveField` takes -- which is how a travelling ring of light crosses a layer.
+    // Per-frame values, deliberately not structural: none of them replants anything.
+    float emissionGain = 1.0f;
+    float hueOffset = 0.0f;
+    std::string emissiveField;
+    float emissiveFieldAmount = 0.0f;
+
     // Clumping. Plants do not occur on a grid; they occur in patches with gaps between them. The
     // cluster field is a coarse noise, and `clustering` is how much of the layer's density it takes
     // away from the gaps and gives to the patches.
@@ -250,6 +264,9 @@ struct GlowCluster {
     float radius = 1.0f;   // spread of the contributing instances, never smaller than one of them
     glm::vec3 color{1.0f}; // the layer's emissive colour, normalised
     float power = 0.0f;    // summed emissive weight: intensity * per-instance area
+    // ADR-905: the index in the terrain's `ecology.layers` of the layer this light stands for, so
+    // the layer's emission lane (its gain and hue) moves the light it casts with the glow it shows.
+    std::uint32_t layer = 0;
 };
 
 // Bins `cloud` into cells of `cellSize` metres and reduces each to one GlowCluster. Returns

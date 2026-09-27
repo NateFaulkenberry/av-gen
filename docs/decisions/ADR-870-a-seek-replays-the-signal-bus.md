@@ -85,7 +85,9 @@ These are not claimed, and the tests compare only what is:
   replay's bus, and a reaction routed from one of them is skipped.
 - **Routes that aren't reactions,** and timeline automation. The project's own routes target
   materials, particles, effects and the wind, and none of them moves a body in this film. Their
-  envelopes are still reset by a seek.
+  envelopes are still reset by a seek. **Closed by ADR-901** (2026-09-26) for every route
+  whose source is a function of time: the replay now advances their chains (without writing their
+  targets) and carries the states in its checkpoints.
 - **A field's spatial gain** (ADR-097). The replay uses the value the field pass last wrote, so a
   scene with music influence fields is not exact yet. The film has none.
 - **Frame rates other than 60 Hz.** Replays and checkpoints step at 60 Hz, so a 30 fps render's

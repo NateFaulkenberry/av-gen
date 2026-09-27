@@ -102,19 +102,36 @@ void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, 
 // scene states (`state.*`) and the entity-derived signals -- the first two are not functions of
 // time, the last is the entity world's own output. The replay's bodies read them as absent, as
 // every replay before this read everything.
+//
+// ADR-901: and the project's own routes ride along. A route's chain is history -- its smoothing,
+// its envelope, and since ADR-900 its delay line -- and a seek used to reset it, so every route with
+// an attack, a decay or a delay landed somewhere a play never was. Each replayed step now also
+// builds the signals those routes read (this bus, plus every pure-in-time source sampled at the
+// step's instant, on a scratch bus laid out like the engine's) and advances their chains without
+// writing their targets; the chain states ride in the checkpoints. A route whose source is not a
+// function of time (control, state, entity, envelope and random sources) is not replayed and is
+// reset by the seek as before. Reactions (ADR-870) are advanced by the composition, which also
+// applies them, and are left alone here.
 class Engine::ReplaySignals final : public entity::ReplaySignalSource {
 public:
-    explicit ReplaySignals(const Engine& engine) : engine_(engine) {
+    explicit ReplaySignals(Engine& engine) : engine_(engine) {
         signals::AudioSignals audio;
         Engine::TimeSignals time;
         declareFrameSignals(zeroBus_, audio, time, zero_.music);
         bus_ = zeroBus_;
     }
 
-    // What this seek's frames read that the pipeline does not carry, fixed for the seek.
+    // What this seek's frames read that the pipeline does not carry, fixed for the seek -- and none
+    // of where the last seek landed. ADR-901: the seek has just reset the routes' chains in the
+    // modulator, so a landing is only good for the seek that made it. `exactAt` must mean that this
+    // seek's replay stands at the target; the first version kept the last landing, and a second seek
+    // to the same instant with no composition to drive the replay skipped it and left every
+    // replayed route reset (a render job seeks twice to its first frame: its warm-up, then for real).
     void begin(bool playing, double duration) {
         playing_ = playing;
         duration_ = duration;
+        lastBuilt_ = -1.0;
+        prepareRoutes();
     }
 
     [[nodiscard]] const signals::SignalBus& bus() const override { return bus_; }
@@ -125,6 +142,9 @@ public:
         started_ = false;
         exact_ = true;
         lastBuilt_ = -1.0;
+        if (replaysRoutes_) {
+            engine_.modulator_.resetChainStates(pick());
+        }
     }
 
     void build(double now, double dt) override {
@@ -142,13 +162,17 @@ public:
         in.position = now; // the offline transport sits at the frame's instant
         in.duration = duration_;
         in.playing = playing_;
-        engine_.advanceClock(state_, bus_, time, fresh, in);
+        const bool pulse = engine_.advanceClock(state_, bus_, time, fresh, in);
         lastBuilt_ = now;
+        if (replaysRoutes_) {
+            advanceRoutes(time, in.bpm, pulse);
+        }
     }
 
     struct Checkpoint final : entity::HostCheckpoint {
         SignalClock clock;
         std::vector<float> values; // the bus: continuous values persist between analysis frames
+        std::vector<params::ProcessorChain::State> routes; // ADR-901: the replayed routes' chains
         std::size_t measured = 0;
         [[nodiscard]] std::size_t bytes() const override { return measured; }
     };
@@ -160,7 +184,14 @@ public:
         for (std::size_t i = 0; i < bus_.size(); ++i) {
             c->values[i] = bus_.value(static_cast<signals::SignalId>(i));
         }
-        c->measured = sizeof(Checkpoint) + c->values.size() * sizeof(float) +
+        std::size_t routeBytes = 0;
+        if (replaysRoutes_) {
+            c->routes = engine_.modulator_.chainStates(pick());
+            for (const auto& s : c->routes) {
+                routeBytes += sizeof(s) + s.history.capacity() * sizeof(params::ProcessorChain::DelaySample);
+            }
+        }
+        c->measured = sizeof(Checkpoint) + c->values.size() * sizeof(float) + routeBytes +
                       (c->clock.latest.magnitude.size() + c->clock.latest.spectrum.size()) * sizeof(float);
         return c;
     }
@@ -171,11 +202,19 @@ public:
         for (std::size_t i = 0; i < c.values.size() && i < bus_.size(); ++i) {
             bus_.set(static_cast<signals::SignalId>(i), c.values[i]);
         }
+        if (replaysRoutes_) {
+            engine_.modulator_.restoreChainStates(pick(), c.routes);
+        }
         started_ = true;
         exact_ = true; // only an exact replay records checkpoints
     }
 
-    [[nodiscard]] std::uint64_t inputKey() const override { return engine_.replaySignalKey(playing_); }
+    // ADR-901: the replayed routes and the sources they sample are inputs too, so an edited route or
+    // score drops the checkpoints its chain states were recorded under.
+    [[nodiscard]] std::uint64_t inputKey() const override {
+        const std::uint64_t key = engine_.replaySignalKey(playing_);
+        return replaysRoutes_ ? key ^ (routesKey_ + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2)) : key;
+    }
 
     // Whether the pipeline now stands where a play from zero stands after its frame at `target`.
     [[nodiscard]] bool exactAt(double target) const {
@@ -205,8 +244,110 @@ public:
 
     [[nodiscard]] const SignalClock& state() const { return state_; }
 
+    // ADR-901: whether this seek replays any of the project's routes (tests and the log ask).
+    [[nodiscard]] bool replaysRoutes() const { return replaysRoutes_; }
+
 private:
-    const Engine& engine_;
+    // Which signals a replayed step can rebuild -- this pipeline's prefix of the engine's bus, and
+    // the outputs of every pure-in-time source -- and so which routes can be replayed. Recomputed
+    // per seek: routes, sources and the bus all change between seeks.
+    void prepareRoutes() {
+        // Sources read their parameters' finals, which a play rebuilds from the bases every frame --
+        // but only once a frame has run: a value a load or an edit has just set is in the base, and the
+        // final still holds the old one. The replay samples the sources, so it (and the landing frame
+        // after it) reads the bases, which is what every played frame after the first reads.
+        for (params::IParameter* p : engine_.params_.ordered()) {
+            if (p->path().starts_with("sources/")) {
+                p->resetFinal();
+            }
+        }
+        const signals::SignalBus& live = engine_.bus_;
+        samplable_.assign(live.size(), 0);
+        for (std::size_t i = 0; i < bus_.size() && i < samplable_.size(); ++i) {
+            samplable_[i] = 1;
+        }
+        std::uint64_t h = 0x7e4c0ffee0dd5eedull;
+        const auto mix = [&h](std::uint64_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+        const auto bits = [](float f) {
+            std::uint32_t u = 0;
+            std::memcpy(&u, &f, sizeof u);
+            return static_cast<std::uint64_t>(u);
+        };
+        for (const auto& source : engine_.sources_.sources()) {
+            if (!source->pureInTime()) {
+                continue;
+            }
+            for (const std::string& name : source->outputs()) {
+                if (const auto id = live.find(name); id && *id < samplable_.size()) {
+                    samplable_[*id] = 1;
+                }
+            }
+            mix(std::hash<std::string>{}(source->kind() + "/" + source->name() + "/" + source->settingsToJson().dump()));
+        }
+        replaysRoutes_ = false;
+        for (const params::ModRoute& r : engine_.modulator_.routes()) {
+            if (!replayed(r)) {
+                continue;
+            }
+            replaysRoutes_ = true;
+            mix(std::hash<std::string>{}(r.source));
+            mix(std::hash<std::string>{}(r.target));
+            mix(static_cast<std::uint64_t>(r.component + 1));
+            mix(static_cast<std::uint64_t>(r.polarity));
+            const params::ProcessorChain& c = r.chain;
+            for (const float f : {c.delayMs, c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel,
+                                  c.attackMs, c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin,
+                                  c.remapInMax, c.remapOutMin, c.remapOutMax}) {
+                mix(bits(f));
+            }
+            mix(static_cast<std::uint64_t>(c.curve) | (static_cast<std::uint64_t>(c.threshold) << 8u) |
+                (static_cast<std::uint64_t>(c.envelope) << 16u) | (c.clampEnabled ? 1ull << 24u : 0u) |
+                (c.remapEnabled ? 1ull << 25u : 0u));
+        }
+        routesKey_ = h;
+        if (replaysRoutes_) {
+            sampling_ = live; // the engine's layout: every id a route or a source holds is valid on it
+        }
+    }
+
+    [[nodiscard]] bool replayed(const params::ModRoute& r) const {
+        return !r.fromEntity && r.enabled && r.targetParam != nullptr && r.sourceId < samplable_.size() &&
+               samplable_[r.sourceId] != 0;
+    }
+
+    [[nodiscard]] std::function<bool(const params::ModRoute&)> pick() const {
+        return [this](const params::ModRoute& r) { return replayed(r); };
+    }
+
+    // One replayed instant for the routes: the pipeline's bus copied onto the engine-shaped scratch
+    // bus, the pure sources sampled at the instant (with the beat clock this step left), and every
+    // replayed chain advanced on it.
+    void advanceRoutes(const FrameTime& time, double bpm, bool pulse) {
+        sampling_.clearEvents();
+        for (std::size_t i = 0; i < bus_.size() && i < sampling_.size(); ++i) {
+            const auto id = static_cast<signals::SignalId>(i);
+            if (bus_.event(id)) {
+                sampling_.setEvent(id, true, bus_.value(id));
+            } else {
+                sampling_.set(id, bus_.value(id));
+            }
+        }
+        signals::SourceContext ctx;
+        ctx.time = time;
+        ctx.audioPosition = time.renderTime;
+        ctx.audioDuration = duration_;
+        ctx.playing = playing_;
+        ctx.beatPhase = static_cast<float>(state_.beatPhase);
+        // Exactly as the play path fills it (ADR-896): the musical position in beats, from this
+        // replay's own beat clock through the engine's meter.
+        ctx.musicalBeats = state_.haveClockBeats ? engine_.meter().beats(state_.clockBeats) : 0.0;
+        ctx.tempoBpm = static_cast<float>(bpm);
+        ctx.beatEvent = pulse;
+        engine_.sources_.sample(sampling_, ctx);
+        engine_.modulator_.advanceChains(sampling_, time.deltaTime, pick());
+    }
+
+    Engine& engine_;
     SignalClock zero_;
     signals::SignalBus zeroBus_;
     SignalClock state_;
@@ -216,6 +357,11 @@ private:
     bool started_ = false;
     bool exact_ = true;
     double lastBuilt_ = -1.0;
+    // ADR-901
+    std::vector<std::uint8_t> samplable_;
+    signals::SignalBus sampling_;
+    bool replaysRoutes_ = false;
+    std::uint64_t routesKey_ = 0;
 };
 
 bool Engine::seekReplaysSignals() const {
@@ -976,9 +1122,20 @@ void Engine::rebind() {
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels must exist on the bus first
     }
-    if (auto r = modulator_.bind(bus_, params_); !r) {
-        log::warn("modulation bind: {}", r.error().message);
-        noteBindingProblem(fmt::format("modulation: {}", r.error().message));
+    // ADR-902: the bind checks every route it resolves against the scene's facts -- unless a project
+    // is half-loaded, when it checks against the bus and parameters alone and the load reports the
+    // rest once the scene is whole (reportRouteLiveness).
+    {
+        scene::LivenessInputs inputs = livenessInputs();
+        inputs.judgeSilence = false; // "no audio yet" is the load's question, not the bind's
+        const scene::SceneLivenessFacts facts(inputs);
+        modulator_.setLivenessFacts(livenessReady_ ? &facts : nullptr);
+        const auto bound = modulator_.bind(bus_, params_);
+        modulator_.setLivenessFacts(nullptr);
+        if (!bound) {
+            log::warn("modulation bind: {}", bound.error().message);
+            noteBindingProblem(fmt::format("modulation: {}", bound.error().message));
+        }
     }
     if (auto r = timeline_.bind(params_); !r) {
         log::warn("{}", r.error().message);
@@ -999,6 +1156,80 @@ void Engine::noteBindingProblem(std::string message) {
         return;
     }
     projectWarnings_.push_back(std::move(message));
+}
+
+// ---- route and parameter liveness (ADR-902) ---------------------------------------------------
+
+scene::LivenessInputs Engine::livenessInputs() const {
+    scene::LivenessInputs in;
+    in.bus = &bus_;
+    in.params = &params_;
+    in.sources = &sources_;
+    in.composition = composition();
+    in.effects = effects_;
+    in.shots = shotSpans_;
+    in.track = track_.get();
+    in.markers = sequence_.markers;
+    in.history = &historyBank_;
+    in.meter = meter();
+    in.durationSeconds = durationSeconds();
+    in.frameRate = render_.fps > 0.0 ? render_.fps : 60.0;
+    // An analysed track, or a live input whose analysis runs as it plays: either moves audio.*.
+    in.hasAudio = (track_ != nullptr && !track_->empty()) || input_ != nullptr;
+    in.hasTempo = in.hasAudio || tempoOverride_.available || embeddedTempo_.available;
+    in.offline = mode_ == EngineMode::Offline;
+    return in;
+}
+
+scene::RouteAudit Engine::auditRoutes() const {
+    return scene::auditProject(livenessInputs(), modulator_, timeline_);
+}
+
+void Engine::reportRouteLiveness() {
+    const scene::RouteAudit audit = auditRoutes();
+    std::size_t dead = 0;
+    std::size_t hazard = 0;
+    const auto report = [&](const char* what, const std::vector<scene::AuditEntry>& entries) {
+        for (const scene::AuditEntry& entry : entries) {
+            for (const params::liveness::Finding& f : entry.findings) {
+                if (f.verdict == params::liveness::Verdict::Live) {
+                    continue;
+                }
+                const bool isDead = f.verdict == params::liveness::Verdict::Dead;
+                (isDead ? dead : hazard) += 1;
+                // The same key the modulator's bind logs under, so a route logged there is not logged
+                // again here.
+                const std::string key =
+                    std::string(what) == "route"
+                        ? fmt::format("{}|{}|{}|{}", f.rule, entry.detail.value("source", std::string()),
+                                      entry.detail.value("target", std::string()), entry.detail.value("component", -1))
+                        : fmt::format("{}|{}|{}", what, f.rule, entry.label);
+                if (modulator_.firstReport(key)) {
+                    log::warn("{} {} ({}) is {}: {} [{}]", what, entry.index, entry.label,
+                              params::liveness::verdictName(f.verdict), f.reason, f.rule);
+                }
+                // Into the warnings a person reads, the dead ones -- except what the binds already put
+                // there (a route or track that did not resolve), what somebody chose (disabled), and
+                // what is about this session rather than the project (no audio loaded yet).
+                static constexpr std::array<std::string_view, 8> kReportedElsewhere{
+                    "disabled",        "unknown-source",         "unknown-depth-source", "unknown-target",
+                    "not-modulatable", "component-out-of-range", "silent-source",        "live-only-source"};
+                if (isDead && std::find(kReportedElsewhere.begin(), kReportedElsewhere.end(), f.rule) ==
+                                  kReportedElsewhere.end()) {
+                    noteBindingProblem(fmt::format("{} {} ({}) does nothing: {} [{}]", what, entry.index,
+                                                   entry.label, f.reason, f.rule));
+                }
+            }
+        }
+    };
+    report("route", audit.routes);
+    report("track", audit.tracks);
+    report("effect", audit.effects);
+    if (dead > 0 || hazard > 0) {
+        log::info("route liveness: {} dead and {} hazardous finding(s) over {} route(s), {} track(s) and {} "
+                  "effect(s) (avgen --audit-routes writes the whole report)",
+                  dead, hazard, audit.routes.size(), audit.tracks.size(), audit.effects.size());
+    }
 }
 
 // ADR-702. The one entry point that changes which effects exist.
@@ -2278,6 +2509,13 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     stage(1);
     const auto dir = std::filesystem::absolute(path).parent_path();
     projectWarnings_.clear();
+    // ADR-902: binds in the middle of the load check routes against the bus and parameters alone;
+    // the scene's facts are read once the scene is whole. Restored on every way out.
+    livenessReady_ = false;
+    struct LivenessReady {
+        bool& ready;
+        ~LivenessReady() { ready = true; }
+    } livenessGuard{livenessReady_};
     // Back to factory before anything of this project's is applied.
     //
     // Opening a project is a *replacement*, not a merge: a parameter the document does not mention
@@ -2913,6 +3151,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
     if (scene::Composition* comp = composition(); comp != nullptr) {
         comp->installEntities();
     }
+    livenessReady_ = true; // the scene is whole: this bind reads its facts
     rebind();
     modulator_.resetState();
     // The sequence goes on last, after every parameter a bake could possibly name exists: the
@@ -2935,6 +3174,9 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) {
             noteBindingProblem(fmt::format("sequence: {}", r.error().message));
         }
     }
+    // ADR-902: every route, track and effect, now that everything a rule reads exists -- the shot
+    // spans, the sequence's markers, the scene's programs and nodes.
+    reportRouteLiveness();
     finishTimings();
     projectPath_ = path;
     // A loaded project is a different piece. The transport stops and parks at its start rather than
@@ -3931,6 +4173,18 @@ void Engine::seekSeconds(double seconds) {
             }
         }
         stats_.analysisFrames = clock_.analysisCursor;
+    } else if (mode_ == EngineMode::Offline) {
+        // ADR-901: offline with no analysed track there is no signal replay to ride (ADR-870's
+        // scope), but a route on a pure-in-time source -- an LFO, a scored timeline -- is still a
+        // function of time: replay the routes on the pipeline alone, from zero, and leave the live
+        // pipeline reset as it always was. Live mode is not replayed: its signals are not.
+        if (!replaySignals_) {
+            replaySignals_ = std::make_unique<ReplaySignals>(*this);
+        }
+        replaySignals_->begin(isPlaying(), durationSeconds());
+        if (replaySignals_->replaysRoutes()) {
+            replaySignals_->runTo(seconds);
+        }
     }
     // A live event belongs to the moment it happened and the moment is gone; the scheduled tier is
     // rebased rather than cleared, so the next frame restores the standing intents at the new
@@ -5460,6 +5714,13 @@ void Engine::update(const FrameTime& time) {
     // flatten below composes into their owners' transforms -- before it, so children, attachments,
     // effects reading the drawn view and `prevModel` all follow them.
     updateEffects(EffectPhase::BeforeScene);
+    // ADR-906: the trigger clock, bound to this frame's transport second before the flatten, which
+    // counts every triggered field's clock from it. Binding it again later in the frame is the same
+    // frame (`TriggerClock::setFrame`), and it binds here even when the project has no effects.
+    triggerClock_.bind(track_.get(), sequence_.markers, &historyBank_, timelineClock_.seconds, meter());
+    if (auto* comp = composition()) {
+        comp->setTriggerClock(&triggerClock_);
+    }
     controller_->update(time);
     // ADR-703: this step's drawn transforms into HIST, after the flattening and before the effects
     // read them -- so a Trail's head and its newest sample are the same instant.

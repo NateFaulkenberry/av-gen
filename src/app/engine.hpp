@@ -35,6 +35,7 @@
 #include "scene/orb_scene.hpp"
 #include "scene/camera.hpp"
 #include "scene/post_settings.hpp"
+#include "scene/route_liveness.hpp"
 #include "world/effects/effect_params.hpp"
 #include "world/effects/effect_stack.hpp"
 #include "world/effects/effect_trigger.hpp"
@@ -210,6 +211,14 @@ public:
     void setLiveControl(bool enabled) { controlHub_.setLiveIo(enabled); }
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
+
+    // ---- route and parameter liveness (ADR-902) ------------------------------------------------
+    // What the liveness rules read about this engine's project -- its bus, parameters, sources,
+    // scene, effects, shot spans, track and render rate -- borrowed, valid until the next edit.
+    [[nodiscard]] scene::LivenessInputs livenessInputs() const;
+    // Every route, timeline track, effect default route and effect with its verdict (the report
+    // `avgen --audit-routes` writes; `scene::routeAuditToJson`).
+    [[nodiscard]] scene::RouteAudit auditRoutes() const;
 
     // ---- unsaved changes (ADR-440) --------------------------------------------------------------
     //
@@ -1166,6 +1175,13 @@ private:
     // read.
     void noteBindingProblem(std::string message);
     std::vector<std::string> projectWarnings_;
+    // ADR-902. At the end of a project load: every dead or hazardous route, track and effect,
+    // logged once (the modulator's log-once set, shared with its bind), and every dead one added to
+    // projectWarnings_ -- a binding that does nothing belongs where a person looks.
+    void reportRouteLiveness();
+    // False while a project is loading: the scene the facts would read is half-built, so a bind in
+    // the middle of a load checks routes against the bus and parameters alone.
+    bool livenessReady_ = true;
     LoadReporter loadReporter_;
     std::vector<std::pair<std::string, double>> loadTimings_;
 
