@@ -131,9 +131,52 @@ bool DirectorPanel::endPreview(app::Engine& engine) {
     return edits->execute(app::EditAction::Undo, engine);
 }
 
+void DirectorPanel::drawProjectPlans(app::Engine& engine) {
+    const auto& plans = engine.directingPlans();
+    if (plans.empty()) {
+        return;
+    }
+    heading("Plans in this project");
+    for (const directing::Plan& p : plans) {
+        ImGui::BulletText("%s  -  revision %d, %zu piece(s) of content", p.title.empty() ? p.id.c_str() : p.title.c_str(),
+                          p.revision, p.produced.size());
+        if (p.routes.empty()) {
+            continue;
+        }
+        // ADR-924: the routes the plan made are ordinary routes in the Modulation panel's Routes tab,
+        // marked "[plan: <key>]", where they are edited; this is why each one is there.
+        ImGui::Indent(ImGui::GetTextLineHeight() + 6.0f);
+        ImGui::PushID(p.id.c_str());
+        if (ImGui::TreeNode("##reactivity", "Reactivity: %s", reactivityHeading(p).c_str())) {
+            std::string level;
+            for (const ReactivityRow& row : reactivityRows(p, engine.modulator().routes())) {
+                if (row.level != level) {
+                    level = row.level;
+                    ImGui::TextDisabled("%s", level.c_str());
+                }
+                ImGui::PushID(row.key.c_str());
+                const bool asMade = row.state == "as made";
+                ImGui::TextWrapped("%s  %s", row.key.c_str(), row.what.c_str());
+                if (ImGui::IsItemHovered() && !row.reason.empty()) {
+                    ImGui::SetTooltip("%s", row.reason.c_str());
+                }
+                if (!asMade) {
+                    ImGui::SameLine();
+                    ImGui::TextColored(kWarn, "(%s)", row.state.c_str());
+                }
+                ImGui::PopID();
+            }
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+        ImGui::Unindent(ImGui::GetTextLineHeight() + 6.0f);
+    }
+}
+
 void DirectorPanel::draw(app::Engine& engine) {
     if (plane == nullptr) {
         ImGui::TextWrapped("The Director needs the AI assistant, which is not available in this session.");
+        drawProjectPlans(engine);
         return;
     }
     const std::shared_ptr<AgentTask> task = directorTask(*plane);
@@ -394,14 +437,7 @@ void DirectorPanel::draw(app::Engine& engine) {
     }
 
     // ---- what the project already carries --------------------------------------------------------
-    const auto& plans = engine.directingPlans();
-    if (!plans.empty()) {
-        heading("Plans in this project");
-        for (const directing::Plan& p : plans) {
-            ImGui::BulletText("%s  -  revision %d, %zu piece(s) of content", p.title.empty() ? p.id.c_str() : p.title.c_str(),
-                              p.revision, p.produced.size());
-        }
-    }
+    drawProjectPlans(engine);
 }
 
 } // namespace avgen::ui

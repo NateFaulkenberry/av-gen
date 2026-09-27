@@ -3,6 +3,7 @@
 // The Modulation panel's route rows, the parts that are decisions rather than drawing (ADR-900,
 // ADR-902). ImGui-free, header-only, so the CPU suite can hold them; control_panel.cpp draws them.
 
+#include "directing/plan.hpp"
 #include "params/liveness.hpp"
 #include "params/modulation.hpp"
 #include "signals/signal_bus.hpp"
@@ -88,6 +89,51 @@ struct RouteBadge {
                                   static_cast<std::uint8_t>((r.chain.clampEnabled ? 1 : 0) | (r.chain.remapEnabled ? 2 : 0))};
     mixBytes(kinds, sizeof kinds);
     return h;
+}
+
+// ADR-924: what a route row says about the Director plan item that made it, beside its header --
+// nothing for a route a person made; "[plan: <key>]" for one a plan made, with the plan, the item's
+// level, what it answers and why in the tooltip, so the person editing the route can see what it was
+// for. A route whose plan is no longer in the project says so rather than pretending to be a person's.
+struct RoutePlanNote {
+    bool show = false;
+    std::string text;
+    std::string tooltip;
+};
+
+[[nodiscard]] inline RoutePlanNote routePlanNote(const params::ModRoute& route, std::span<const directing::Plan> plans) {
+    RoutePlanNote note;
+    if (route.planItem.empty()) {
+        return note;
+    }
+    note.show = true;
+    const auto parts = directing::splitPlanItemId(route.planItem);
+    const std::string key = parts ? parts->second : route.planItem;
+    note.text = fmt::format("[plan: {}]", key);
+    const directing::Plan* plan = nullptr;
+    for (const directing::Plan& p : plans) {
+        if (parts && p.id == parts->first) {
+            plan = &p;
+        }
+    }
+    if (plan == nullptr) {
+        note.tooltip = fmt::format("made by Director plan '{}', which is no longer in this project",
+                                   parts ? parts->first : route.planItem);
+        return note;
+    }
+    for (const directing::PlanRoute& item : plan->routes) {
+        if (item.key == key) {
+            note.tooltip = fmt::format("made by the Director plan \"{}\" (revision {}), item '{}'\n{} level{}{}\n{}",
+                                       plan->title.empty() ? plan->id : plan->title, plan->revision, key,
+                                       directing::reactiveLevelName(item.level),
+                                       item.owner.empty() ? std::string() : ", " + item.owner + " answers",
+                                       item.layer.empty() ? std::string() : " the " + item.layer, item.reason);
+            return note;
+        }
+    }
+    note.tooltip = fmt::format("made by the Director plan \"{}\", whose current revision no longer has item '{}'",
+                               plan->title.empty() ? plan->id : plan->title, key);
+    return note;
 }
 
 // The depth-source combo's entries: "(none)" first -- full depth, the route as it always was -- then

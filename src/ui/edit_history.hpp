@@ -148,6 +148,12 @@ struct AutomationChange {
     bool routesTouched = false;
     std::vector<params::ModRoute> routesBefore;
     std::vector<params::ModRoute> routesAfter;
+    // ADR-924: the modulation sources, as `app::sourcesDocument` writes them (each source's kind, name,
+    // settings and parameter bases). A Director plan's routes can bring sources of their own, and
+    // undoing the plan must take them away with the routes that read them.
+    bool sourcesTouched = false;
+    nlohmann::json sourcesBefore;
+    nlohmann::json sourcesAfter;
 };
 
 // The composition's camera collection and camera track, before and after (ADR-245, ADR-752).
