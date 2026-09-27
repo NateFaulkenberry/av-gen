@@ -18,11 +18,27 @@ where its predecessor stopped.
   - **Built** (12:45, exit 0; a true no-op afterwards; ctest lists 3,788 tests, +7 from render).
   - Next: the full CPU suite, then the full GPU suite in a window with no CPU suite. Then fast-forward
     `integrate/revision` to it, and main after the owner allows.
-  - **Render's own full GPU suite (`full-2`) was withdrawn** from the lock queue at 12:57, with the owner's approval.
+  - **Render's own full GPU suite (`full-2`) was withdrawn** from the lock queue at 12:50, with the owner's approval.
     It had waited 99 minutes; a CPU suite beside it would have voided it as evidence; the integration's GPU suite
     covers render's code too. A full GPU suite takes about 20 minutes (`full-1`: 1,166 s).
-  - **The full CPU suite is running** on `776b1a87` (from 12:58; log `coord-render-int-cpu-full.log` in the
-    coordinator's scratchpad, `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/08ff7bb5-10b9-4c50-a00a-c45ffb80e000/scratchpad/`).
+  - **CPU suite PASSED** on `776b1a87` (12:51-13:47): 3,788 of 3,788, 0 failed, 19 skipped, 3,373 s, exit 0. Log:
+    `coord-render-int-cpu-full.log` in the coordinator's scratchpad
+    (`/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/08ff7bb5-10b9-4c50-a00a-c45ffb80e000/scratchpad/`).
+  - Then, on `integrate/render`:
+    - `f24104be` merges render's docs-only `d2eb2d53`;
+    - `876a11e2` is the **gpu-lock fix** with `tools/gpu-lock-selftest.sh`. The self-test fails 3 of 6 checks on the
+      old script and passes all 6 on the new one; `[hygiene]` passes.
+  - **The GPU suite is queued (13:55),** `build/coord-gpu-full.sh full` in `av-gen-signals`, log
+    `build/coord-gpu-full.log`.
+    - It holds the lock, then waits until no other lock job is running a command (a batch between renders counts)
+      and no GPU binary or CPU suite runs.
+    - It re-queues if an old script's trap takes the lock before it starts.
+    - It logs any overlap during the run.
+    - navfix was told to hold its full CPU suite while it runs.
+  - **When it passes:** fast-forward `integrate/revision` to `integrate/render`, then main (the owner's standing
+    authorisation for engine merges; ask if the classifier refuses). Build `av-gen-engine-3` at that main for the
+    GV3 streams: render's `post/referenceHeight`, `scene/fogSky` and the offline floors. The other worktrees get the
+    lock fix when they take that main.
 - **The alien float's cause is found. It is data, not the engine.** gv3-cast found that the multicam gives ember and
   vane an entity reaction `audio.bass -> liveliness/bounce` (+0.45 on a 0.32 bounce, 60 ms attack). With the authored
   bounce at 0, the reaction alone still lifted them (p90 0.16-0.17 m, max 0.22-0.23 m). Rook and tide match ADR-895.
