@@ -1126,7 +1126,7 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
       "environment": {
         "volumeDensity": 0.05, "fogHeight": 2.0, "fogHeightFalloff": 0.25,
         "fogUpperDensity": 0.18, "fogHeightCurve": 0.65,
-        "volumeLocalLights": 1.7, "fogHeightAmount": 0.6,
+        "volumeLocalLights": 1.7, "fogHeightAmount": 0.6, "fogSky": 0.7,
         "volumeScattering": 1.2, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.4,
         "volumeNoise": 0.6, "volumeNoiseScale": 0.09, "volumeNoiseSpeed": 0.2,
         "volumeEmission": 0.3, "volumeSteps": 48, "volumeMaxDistance": 120.0,
@@ -1185,6 +1185,13 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     // about its own four lines.
     CHECK(s.environment.fogHeightAmount == 0.6f);
     REQUIRE(params.find("scene/fogHeightAmount") != nullptr);
+    // ADR-918: the fog's colour from the sky -- read, registered, and where an artist looks for it
+    // (exposed, and labelled for what it looks like; the Environment panel's "Sky and fog" draws it
+    // as "Fog takes the sky's colour").
+    CHECK(s.environment.fogSky == 0.7f);
+    REQUIRE(params.find("scene/fogSky") != nullptr);
+    CHECK(params.find("scene/fogSky")->flags().exposed);
+    CHECK(std::string(params.find("scene/fogSky")->label()).find("sky behind it") != std::string::npos);
 
     // THE HALF THAT WAS MISSING, and the half a registration test alone does not ask: does moving
     // the parameter reach the ENVIRONMENT the renderer is handed? A parameter that exists, draws a
@@ -1205,11 +1212,13 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     params.find("scene/volumeLocalLights")->setBaseComponent(0, 0.25f);
     params.find("scene/volumeMaxDistance")->setBaseComponent(0, 1234.0f);
     params.find("scene/fogHeightAmount")->setBaseComponent(0, 0.35f);
+    params.find("scene/fogSky")->setBaseComponent(0, 0.45f);
     params.resetFinals();
     (*comp)->update(FrameTime{});
     CHECK((*comp)->scene().environment.volumeLocalLights == 0.25f);
     CHECK((*comp)->scene().environment.volumeMaxDistance == 1234.0f);
     CHECK((*comp)->scene().environment.fogHeightAmount == 0.35f);
+    CHECK((*comp)->scene().environment.fogSky == 0.45f);
     REQUIRE(params.find("scene/volumeDensity") != nullptr);
     REQUIRE(params.find("scene/volumeSteps") != nullptr);
 
@@ -1225,6 +1234,7 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     CHECK(j["environment"]["volumeLocalLights"] == 0.25f);
     CHECK(j["environment"]["volumeMaxDistance"] == 1234.0f);
     CHECK(j["environment"]["fogHeightAmount"] == 0.35f);
+    CHECK(j["environment"]["fogSky"] == 0.45f);
     auto again = scene::Composition::fromJson(j, fx.registry);
     REQUIRE(again.has_value());
     REQUIRE((*again)->grids().size() == 1);
