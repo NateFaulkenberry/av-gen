@@ -17,11 +17,13 @@
 #include "world/effects/history_bank.hpp"
 #include "world/effects/ribbon_frame.hpp"
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -568,4 +570,79 @@ TEST_CASE("a triggered Lightning and Discharge on a moving owner are the same pl
         CHECK(std::memcmp(a.entityFx.lights.lights.data(), b.entityFx.lights.lights.data(),
                           sizeof(world::EffectLight) * a.entityFx.lights.count) == 0);
     }
+}
+
+// ---- a strip's bytes are its value (ADR-940) ---------------------------------------------------------
+
+namespace {
+
+// Leaves `value` in every byte of the stack the next call from the caller's frame will use: whatever
+// that callee does not write, it finds `value` in.
+[[gnu::noinline]] void paintStack(std::uint8_t value) {
+    volatile std::uint8_t below[16 * 1024];
+    for (std::size_t i = 0; i < sizeof(below); ++i) {
+        below[i] = value;
+    }
+}
+
+// One strip, built into storage that last held `value` in every byte (a reused heap block), by a sink
+// whose stack last held `value` too. Those are the two places the play = scrub proof's differing bytes
+// came from: CI's compiler stores a strip's fields straight into the vector and leaves the rest of the
+// heap block as it was; the local one copies the whole strip out of a stack slot it only partly wrote.
+// Everything else is the same both times, and every capacity is reserved, so nothing reallocates.
+world::RibbonFrame stripBuiltOver(std::uint8_t value) {
+    world::RibbonFrame frame;
+    frame.vertices.reserve(256);
+    frame.strips.resize(world::kMaxRibbonStrips);
+    std::memset(static_cast<void*>(frame.strips.data()), value, frame.strips.size() * sizeof(world::RibbonStrip));
+    frame.strips.clear(); // the capacity, and the bytes in it, stay
+    std::vector<world::RibbonPoint> filtered;
+    std::vector<world::RibbonPoint> dense;
+    filtered.reserve(16);
+    dense.reserve(64);
+    std::vector<world::RibbonPoint> points(4);
+    for (std::size_t i = 0; i < points.size(); ++i) {
+        points[i].position = glm::vec3(static_cast<float>(i), 1.0f + 0.5f * static_cast<float>(i % 2), 0.0f);
+        points[i].width = 0.2f;
+        points[i].color = glm::vec3(1.0f, 0.8f, 0.4f);
+        points[i].opacity = 1.0f;
+    }
+    world::RibbonSink sink(frame, filtered, dense);
+    const world::RibbonStyle style;
+    paintStack(value);
+    const world::RibbonFit fit = sink.appendStrip(points, 2, style); // nothing runs between the paint and this
+    REQUIRE(fit == world::RibbonFit::Written);
+    return frame;
+}
+
+std::string hexBytes(const void* data, std::size_t n) {
+    std::string out;
+    for (std::size_t i = 0; i < n; ++i) {
+        out += fmt::format("{:02x}", static_cast<const std::uint8_t*>(data)[i]);
+    }
+    return out;
+}
+
+} // namespace
+
+// ADR-940. The proof above compares two frames' strips byte for byte, so a strip's bytes must be a
+// function of its value. They were not: `RibbonStrip` had three bytes of padding after `blend` that the
+// builder never wrote, so they held whatever the memory held before. On CI the proof failed in 2 of 3
+// runs, each time after a case that left data in the heap block one of its two engines' strips then got.
+// This builds the same strip over clean and over dirty memory: that order dependence, on demand.
+TEST_CASE("a ribbon strip's bytes are its value, whatever the memory it was built in last held",
+          "[bolt][ribbon][determinism]") {
+    const world::RibbonFrame clean = stripBuiltOver(0x00);
+    const world::RibbonFrame dirty = stripBuiltOver(0xF0);
+    REQUIRE(clean.strips.size() == 1);
+    REQUIRE(dirty.strips.size() == 1);
+    // The same strip: every field agrees, and so do the vertices it points at...
+    CHECK(clean.strips[0].firstVertex == dirty.strips[0].firstVertex);
+    CHECK(clean.strips[0].vertexCount == dirty.strips[0].vertexCount);
+    CHECK(clean.strips[0].blend == dirty.strips[0].blend);
+    CHECK(sameVector(clean.vertices, dirty.vertices));
+    // ...so its bytes must agree too, which is the comparison the play = scrub proof makes.
+    INFO("clean strip " << hexBytes(clean.strips.data(), sizeof(world::RibbonStrip)) << ", dirty strip "
+                        << hexBytes(dirty.strips.data(), sizeof(world::RibbonStrip)));
+    CHECK(sameVector(clean.strips, dirty.strips));
 }

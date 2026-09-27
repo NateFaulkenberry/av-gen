@@ -62,6 +62,15 @@ def list_case_count(binary: str, filters: list[str]) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def cannot_list(binary: str) -> str | None:
+    """Why the binary cannot list its cases at all (a missing library, a crash), or None if it can.
+    Without this, a plan check against a binary that does not start blames every name in the plan."""
+    proc = subprocess.run([binary, "--list-tests"], capture_output=True, text=True)
+    if re.search(r"^(\d+) (?:matching )?test cases?", proc.stdout, re.M):
+        return None
+    return f"{binary} did not list its cases (exit {proc.returncode}): {oneline(proc.stderr or proc.stdout)}"
+
+
 def load_exceptions(path: str) -> dict:
     """tools/ci/hosted-runner-exceptions.txt: {'exclude': {name: reason}, 'needs-assets': {...}}."""
     out = {"exclude": {}, "needs-assets": {}}
@@ -89,32 +98,130 @@ def build_spec(user_filter: str, excluded: list[str]) -> list[str]:
     return [",".join(term + neg for term in user_filter.split(","))]
 
 
-def run_shards(args) -> list[dict]:
+def quote_name(name: str) -> str:
+    """One exact case name as a Catch2 spec term. Catch2 splits a spec at a comma even inside quotes,
+    and reads a backslash as an escape, so both are escaped here, and so is a quote: unescaped, "a, b"
+    is two names that match nothing (docs/testing.md 14)."""
+    return '"' + name.replace("\\", "\\\\").replace('"', '\\"').replace(",", "\\,") + '"'
+
+
+def load_plan(path: str) -> dict:
+    """tools/ci/sanitizer-plan.txt: {'parts': {part: {process: [case names]}}, 'skip': {name: reason},
+    'rest': Catch2 filter}.
+
+    A case may be named once. `part | process | name` runs it in that part's process of that name;
+    `skip | reason | name` does not run it; the one `rest | label | filter` line is what rest shards
+    run, minus every case the plan names (see docs/development/ci.md, "The sanitizer partition")."""
+    parts: dict = {}
+    skip: dict = {}
+    rest = ""
+    where: dict = {}
+    for raw in Path(path).read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = [f.strip() for f in line.split("|", 2)]
+        if len(fields) != 3 or not all(fields):
+            raise SystemExit(f"{path}: expected 'part | process | case name' in: {raw}")
+        part, group, name = fields
+        if part == "rest":
+            if rest:
+                raise SystemExit(f"{path}: two rest filters; the rest is one filter, cut into shards")
+            rest = name
+            continue
+        if name in where:
+            raise SystemExit(f"{path}: '{name}' is named twice ({where[name]}, and {part} | {group}); "
+                             "a case runs in one place")
+        where[name] = f"{part} | {group}"
+        if part == "skip":
+            skip[name] = group
+        else:
+            parts.setdefault(part, {}).setdefault(group, []).append(name)
+    return {"parts": parts, "skip": skip, "rest": rest}
+
+
+def plan_names(plan: dict) -> list[str]:
+    """Every case a plan names, placed or skipped: what no rest shard may run."""
+    return [n for groups in plan["parts"].values() for names in groups.values() for n in names] + list(plan["skip"])
+
+
+def rest_spec(user_filter: str, hosted_excluded: list[str], plan: dict) -> str:
+    """A rest shard's selection: the part's OR-ed tag terms, each minus the hosted-runner exclusions
+    and minus every case the plan names anywhere, so a named case runs in its own process only."""
+    neg = "".join(f'~"{n}"' for n in hosted_excluded) + "".join("~" + quote_name(n) for n in plan_names(plan))
+    return ",".join(term + neg for term in (user_filter or "").split(","))
+
+
+def plan_processes(args, hosted_excluded: list[str]) -> tuple[list[dict], list[dict], list[str]]:
+    """One job of a plan, as processes: one per named process of `--part` (if any), running exactly
+    its cases, then `--shards` rest shards -- global shards `--shard-first` onwards of `--shard-total`
+    over the plan's rest filter, so the rest can be spread over several jobs. Returns (processes,
+    skipped cases, warnings)."""
+    plan = load_plan(args.plan)
+    neg = "".join(f'~"{n}"' for n in hosted_excluded)
+    processes, warnings = [], []
+    if args.part and args.part not in plan["parts"]:
+        raise SystemExit(f"{args.plan}: no part '{args.part}'")
+    groups = plan["parts"].get(args.part, {}) if args.part else {}
+    rest_filter = plan["rest"] if args.shards else ""
+    if args.shards and not plan["rest"]:
+        raise SystemExit(f"{args.plan}: --shards {args.shards}, but the plan has no rest filter")
+    if not groups and not rest_filter:
+        raise SystemExit(f"{args.plan}: this job names no part with processes and runs no rest shard")
+    for group, names in groups.items():
+        present = []
+        for n in names:
+            count = list_case_count(args.binary, [quote_name(n)])
+            if count == 1:
+                present.append(n)
+            else:
+                # Renamed or deleted: the case, under its new name, now runs in a rest shard.
+                warnings.append(f"{args.part} | {group}: '{n}' matches {count or 0} cases in this binary; "
+                                "update tools/ci/sanitizer-plan.txt")
+        if present:
+            spec = ",".join(quote_name(n) + neg for n in present)
+            processes.append({"label": group, "args": [spec], "listed": list_case_count(args.binary, [spec])})
+    if rest_filter:
+        spec = rest_spec(rest_filter, hosted_excluded, plan)
+        total = args.shard_total or args.shards
+        for i in range(args.shard_first, args.shard_first + args.shards):
+            shard = ["--shard-count", str(total), "--shard-index", str(i)] if total > 1 else []
+            processes.append({"label": f"rest {i + 1}/{total}", "args": [spec, *shard],
+                              "listed": list_case_count(args.binary, [spec, *shard])})
+    skipped = []
+    if rest_filter and args.shard_first == 0:
+        # A skipped case is reported once: by the job running the rest's first shard, which is where
+        # it would otherwise have run.
+        for n, reason in plan["skip"].items():
+            if list_case_count(args.binary, [",".join(t + quote_name(n) for t in rest_filter.split(","))]):
+                skipped.append({"name": n, "reason": f"sanitizer plan, not run under ASan: {reason}"})
+    return processes, skipped, warnings
+
+
+def run_shards(args, processes: list[dict]) -> list[dict]:
+    """Starts one binary per entry of `processes` ({'label', 'args'}), all at once, and waits."""
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     procs = []
-    total = args.shard_total or args.shards
-    for i in range(args.shards):
-        g = args.shard_first + i   # the global Catch2 shard index
+    for i, spec in enumerate(processes):
         tmp = out / f"tmp-{i}"
         tmp.mkdir(exist_ok=True)
-        cmd = [args.binary, *args.spec,
+        cmd = [args.binary, *spec["args"],
                "--rng-seed", str(args.seed),
                "--reporter", f"console::out={out}/shard-{i}.console.txt::colour-mode=none",
                "--reporter", f"xml::out={out}/shard-{i}.xml",
                "--reporter", f"junit::out={out}/shard-{i}.junit.xml",
                "--durations", "yes"]
-        if total > 1:
-            cmd += ["--shard-count", str(total), "--shard-index", str(g)]
         # Each shard gets its own TMPDIR: tests write fixtures under temp_directory_path(), and two
         # processes of the same binary would otherwise share (and delete) each other's files.
         env = dict(os.environ, TMPDIR=str(tmp) + "/")
         log = open(out / f"shard-{i}.log", "wb")
-        print(f"[catch2_run] shard {i}: {' '.join(cmd)}", flush=True)
+        print(f"[catch2_run] shard {i}{' (' + spec['label'] + ')' if spec.get('label') else ''}: "
+              f"{' '.join(cmd)}", flush=True)
         p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env,
                              cwd=args.cwd or None, start_new_session=True)
-        procs.append({"index": i, "proc": p, "log": log, "start": time.monotonic(),
-                      "timed_out": False, "end": None})
+        procs.append({"index": i, "label": spec.get("label"), "proc": p, "log": log,
+                      "start": time.monotonic(), "timed_out": False, "end": None})
 
     deadline = time.monotonic() + args.timeout_min * 60
     while any(s["proc"].poll() is None for s in procs):
@@ -140,11 +247,16 @@ def run_shards(args) -> list[dict]:
         rc = s["proc"].wait()   # the BINARY's own status, not a wrapper's (docs/testing.md 18)
         s["log"].close()
         end = s["end"] or time.monotonic()
-        results.append({"index": s["index"], "returncode": rc, "timed_out": s["timed_out"],
-                        "seconds": round(end - s["start"], 1)})
-        print(f"[catch2_run] shard {s['index']}: exit {rc}"
+        results.append({"index": s["index"], "label": s["label"], "returncode": rc,
+                        "timed_out": s["timed_out"], "seconds": round(end - s["start"], 1)})
+        print(f"[catch2_run] {shard_name(results[-1])}: exit {rc}"
               f"{' (TIMEOUT)' if s['timed_out'] else ''} after {results[-1]['seconds']} s", flush=True)
     return results
+
+
+def shard_name(st: dict) -> str:
+    """'shard 2', or 'shard 0 (film)' for a process a sanitizer plan named."""
+    return f"shard {st.get('index', st.get('shard'))}" + (f" ({st['label']})" if st.get("label") else "")
 
 
 # ------------------------------------------------------------------------------------------------
@@ -315,18 +427,19 @@ def summarise(name: str, binary: str, listed: int | None, shard_status: list[dic
                 failures.remove(f)
                 counts["failed"] -= 1
             where = where or (killed[0]["name"] if killed else None)
-            timeouts.append({"shard": i, "test": where, "seconds": st["seconds"], "tail": log["tail"]})
+            timeouts.append({"shard": i, "label": st.get("label"), "test": where, "seconds": st["seconds"],
+                             "tail": log["tail"]})
         elif rc < 0 or rc > 255 or (rc != 0 and not x["complete"]):
             fatal = next((p for c in x["cases"] for p in c["problems"]
                           if p["kind"] == "FatalErrorCondition"), None)
-            crashes.append({"shard": i, "returncode": rc,
+            crashes.append({"shard": i, "label": st.get("label"), "returncode": rc,
                             "signal": signal_name(rc) if rc < 0 else None,
                             "test": where or (fatal and next(
                                 (c["name"] for c in x["cases"] if fatal in c["problems"]), None)),
                             "fatal": fatal["message"] if fatal else None,
                             "tail": log["tail"]})
         elif not x["complete"]:
-            crashes.append({"shard": i, "returncode": rc, "signal": None, "test": where,
+            crashes.append({"shard": i, "label": st.get("label"), "returncode": rc, "signal": None, "test": where,
                             "fatal": "the XML report never closed: the run did not finish",
                             "tail": log["tail"]})
         st["catch2_verdict_complete"] = x["complete"]
@@ -450,14 +563,14 @@ def render_binary_md(r: dict, level: int = 2) -> str:
         L.append(f"...and {r['sanitizer_reports_total'] - len(r['sanitizer_reports'])} more sanitizer reports in the logs.")
     for c in r["crashes"]:
         sig = c["signal"] or f"exit {c['returncode']}"
-        L.append(f"{h}# CRASH: {sig} in shard {c['shard']}")
+        L.append(f"{h}# CRASH: {sig} in {shard_name(c)}")
         L.append(f"- executable: `{r['binary']}`")
         L.append(f"- test running when it died: `{c['test'] or 'unknown (no case open)'}`")
         if c["fatal"]:
             L.append(f"- Catch2: {c['fatal']}")
         L.append("<details><summary>last 40 log lines</summary>\n\n```\n" + c["tail"][-4000:] + "\n```\n</details>")
     for t in r["timeouts"]:
-        L.append(f"{h}# TIMEOUT: shard {t['shard']} killed after {fmt_seconds(t['seconds'])}")
+        L.append(f"{h}# TIMEOUT: {shard_name(t)} killed after {fmt_seconds(t['seconds'])}")
         L.append(f"- test running when it was killed: `{t['test'] or 'unknown'}`")
         L.append("- A killed Catch2 prints a `FAILED:` with no `with expansion:` (docs/testing.md entry 4); "
                  "that line is the kill, not a test result.")
@@ -499,9 +612,11 @@ def render_binary_md(r: dict, level: int = 2) -> str:
                  + ", ".join(f"`{n}`" for n in r["needs_assets_stale"]))
         L.append("")
     if r.get("excluded"):
-        L.append("Excluded from this run (tools/ci/hosted-runner-exceptions.txt): "
+        L.append("Excluded from this run (tools/ci/hosted-runner-exceptions.txt, tools/ci/sanitizer-plan.txt): "
                  + "; ".join(f"`{e['name']}` ({md_escape(e['reason'])})" for e in r["excluded"]))
         L.append("")
+    for w in r.get("plan_warnings", []):
+        L.append(f"- **sanitizer plan:** {md_escape(w)}")
     if r["expected_failures"]:
         L.append(f"Expected failures (`[!shouldfail]`/`[!mayfail]`, not failures): "
                  + ", ".join(f"`{n}`" for n in r["expected_failure_names"]))
@@ -533,7 +648,7 @@ def annotate(r: dict) -> None:
         print(f"::error title=CRASH {c['signal'] or c['returncode']} ({r['label']})::"
               f"{r['binary']} died in '{c['test']}'. {oneline(c['fatal'] or '')}")
     for t in r["timeouts"]:
-        print(f"::error title=TIMEOUT ({r['label']})::shard {t['shard']} killed while running '{t['test']}'")
+        print(f"::error title=TIMEOUT ({r['label']})::{shard_name(t)} killed while running '{t['test']}'")
     for s in r["sanitizer_reports"][:10]:
         print(f"::error title=SANITIZER FAILURE {s['sanitizer']} {s['type']}::{oneline(s['where'])}")
     for d in r["disagreements"]:
@@ -576,7 +691,7 @@ def print_console(r: dict, out: Path) -> None:
         print(f"\nCRASH: {r['binary']} {c['signal'] or 'exit ' + str(c['returncode'])} "
               f"while running '{c['test']}'\n--- last log lines (shard {c['shard']}) ---\n{c['tail']}")
     for t in r["timeouts"]:
-        print(f"\nTIMEOUT: shard {t['shard']} killed while running '{t['test']}'")
+        print(f"\nTIMEOUT: {shard_name(t)} killed while running '{t['test']}'")
     for s in r["sanitizer_reports"][:5]:
         print(f"\nSANITIZER FAILURE: {s['sanitizer']} {s['type']} at {s['where']}\n{s['excerpt']}")
     for d in r["disagreements"]:
@@ -586,8 +701,16 @@ def print_console(r: dict, out: Path) -> None:
 
 def cmd_run(args) -> int:
     exceptions = load_exceptions(args.exceptions)
+    if args.plan:
+        why = cannot_list(args.binary)
+        if why:
+            print(f"::error title=Cannot run the sanitizer plan::{why}")
+            return 2
     # Only exclusions that name exactly one case of this binary AND fall inside this selection.
     # A stale one is reported, not silently kept.
+    # A plan part selects by its rest filter; a part of named processes only selects nothing an
+    # exclusion could leave out, so none is listed against it.
+    selection = (load_plan(args.plan)["rest"] if args.shards else "") if args.plan else args.filter
     excluded = []
     for name in exceptions["exclude"]:
         n = list_case_count(args.binary, [f'"{name}"'])
@@ -595,28 +718,47 @@ def cmd_run(args) -> int:
             if n:
                 print(f"::warning title=Ambiguous exclusion::'{name}' matches {n} cases in {args.binary}")
             continue
-        terms = args.filter.split(",") if args.filter else [""]
+        if args.plan and not selection:
+            continue
+        terms = selection.split(",") if selection else [""]
         if list_case_count(args.binary, [",".join(f'{t}"{name}"' for t in terms)]):
             excluded.append(name)
-    args.spec = build_spec(args.filter, excluded)
-    base = list_case_count(args.binary, build_spec(args.filter, []))
-    listed = list_case_count(args.binary, args.spec)
-    print(f"[catch2_run] {args.binary}: {base} cases selected by {args.filter or '(default set)'}, "
-          f"{listed} after {len(excluded)} documented exclusion(s)")
-    if base is not None and listed is not None and base - listed != len(excluded):
-        # The selector could not report a miss (testing.md 14): refuse rather than under-measure.
-        print(f"::error title=Exclusion arithmetic::{base} - {len(excluded)} != {listed}; refusing to run")
-        return 2
-    if args.shard_total and args.shard_total != args.shards:
-        # Part of a wider split across jobs: this job's own cases, as the binary itself lists them.
-        listed = sum(list_case_count(args.binary, args.spec + ["--shard-count", str(args.shard_total),
-                                                             "--shard-index", str(args.shard_first + k)]) or 0
-                     for k in range(args.shards))
-        print(f"[catch2_run] this job runs global shards {args.shard_first}..{args.shard_first + args.shards - 1}"
-              f" of {args.shard_total}: {listed} cases")
-    statuses = run_shards(args)
+    skipped, plan_warnings = [], []
+    if args.plan:
+        # A part of the sanitizer partition: named processes, then rest shards (docs/development/ci.md).
+        processes, skipped, plan_warnings = plan_processes(args, excluded)
+        for w in plan_warnings:
+            print(f"::warning title=Sanitizer plan::{w}")
+        listed = sum(p["listed"] or 0 for p in processes)
+        print(f"[catch2_run] part '{args.part}' of {args.plan}: {listed} cases in {len(processes)} process(es): "
+              + ", ".join(f"{p['label']} {p['listed']}" for p in processes))
+    else:
+        args.spec = build_spec(args.filter, excluded)
+        base = list_case_count(args.binary, build_spec(args.filter, []))
+        listed = list_case_count(args.binary, args.spec)
+        print(f"[catch2_run] {args.binary}: {base} cases selected by {args.filter or '(default set)'}, "
+              f"{listed} after {len(excluded)} documented exclusion(s)")
+        if base is not None and listed is not None and base - listed != len(excluded):
+            # The selector could not report a miss (testing.md 14): refuse rather than under-measure.
+            print(f"::error title=Exclusion arithmetic::{base} - {len(excluded)} != {listed}; refusing to run")
+            return 2
+        if args.shard_total and args.shard_total != args.shards:
+            # Part of a wider split across jobs: this job's own cases, as the binary itself lists them.
+            listed = sum(list_case_count(args.binary, args.spec + ["--shard-count", str(args.shard_total),
+                                                                 "--shard-index", str(args.shard_first + k)]) or 0
+                         for k in range(args.shards))
+            print(f"[catch2_run] this job runs global shards {args.shard_first}..{args.shard_first + args.shards - 1}"
+                  f" of {args.shard_total}: {listed} cases")
+        total = args.shard_total or args.shards
+        processes = [{"label": None,
+                      "args": [*args.spec, *(["--shard-count", str(total), "--shard-index", str(args.shard_first + k)]
+                                             if total > 1 else [])]}
+                     for k in range(args.shards)]
+    statuses = run_shards(args, processes)
     r = summarise(args.name, args.binary, listed, statuses, Path(args.out), args.label, args.seed,
                   args.expected_label, exceptions, excluded)
+    r["excluded"] += skipped
+    r["plan_warnings"] = plan_warnings
     r["report_only"] = args.report_only
     r["gate"] = args.gate
     if args.gate == "sanitizer":
@@ -638,6 +780,48 @@ def cmd_run(args) -> int:
     # Report-only mode: the verdict is recorded (and shown), but the step does not fail. Used only
     # by jobs whose result is documented as not authoritative (see docs/development/ci.md).
     return 0 if args.report_only else 1
+
+
+def cmd_plan_check(args) -> int:
+    """The partition runs every case exactly once, counted by the binary itself: the cases the plan
+    places or skips, plus each rest filter minus them, must add up to the whole default set. A name
+    that matches no case (renamed, deleted) or several is an error, so the plan cannot drift quietly."""
+    plan = load_plan(args.plan)
+    exceptions = load_exceptions(args.exceptions)
+    why = cannot_list(args.binary)
+    if why:
+        print(f"::error title=Sanitizer plan::{why}")
+        return 1
+    hosted = [n for n in exceptions["exclude"] if list_case_count(args.binary, [f'"{n}"']) == 1]
+    total = list_case_count(args.binary, build_spec("", hosted))
+    problems = []
+    placed = skipped = 0
+    for part, groups in plan["parts"].items():
+        for group, names in groups.items():
+            for n in names:
+                count = list_case_count(args.binary, [quote_name(n)]) or 0
+                if count != 1:
+                    problems.append(f"{part} | {group}: '{n}' matches {count} cases")
+                elif n in hosted:
+                    problems.append(f"{part} | {group}: '{n}' is also a hosted-runner exclusion")
+                else:
+                    placed += 1
+    for n in plan["skip"]:
+        count = list_case_count(args.binary, [quote_name(n)]) or 0
+        if count != 1:
+            problems.append(f"skip: '{n}' matches {count} cases")
+        else:
+            skipped += 1
+    rest = {plan["rest"]: list_case_count(args.binary, [rest_spec(plan["rest"], hosted, plan)]) or 0} if plan["rest"] else {}
+    print(f"{total} cases: {placed} placed + {skipped} skipped + "
+          + " + ".join(f"{n} in the rest of {f}" for f, n in rest.items())
+          + f" = {placed + skipped + sum(rest.values())}")
+    if total is None or placed + skipped + sum(rest.values()) != total:
+        problems.append(f"the partition does not add up to the binary's {total} cases: a case runs twice or not "
+                        "at all (are the rest filters complementary?)")
+    for p in problems:
+        print(f"::error title=Sanitizer plan (tools/ci/sanitizer-plan.txt)::{p}")
+    return 1 if problems else 0
 
 
 # ------------------------------------------------------------------------------------------------
@@ -740,11 +924,21 @@ def main() -> int:
     r.add_argument("--gate", choices=["all", "sanitizer"], default="all",
                    help="sanitizer: only sanitizer reports, crashes, timeouts and unexercised cases fail")
     r.add_argument("--exceptions", default="", help="tools/ci/hosted-runner-exceptions.txt")
+    r.add_argument("--plan", default="",
+                   help="tools/ci/sanitizer-plan.txt: run --part's named processes, then --shards rest shards "
+                        "(of --shard-total, from --shard-first) over the plan's rest filter minus every case it names")
+    r.add_argument("--part", default="", help="the plan part whose named processes this job runs (may be empty)")
     r.add_argument("--cwd", default="")
     rp = sub.add_parser("report")
     rp.add_argument("--results-dir", required=True)
     rp.add_argument("--job-results", default="")
+    pc = sub.add_parser("plan-check", help="prove a sanitizer plan runs every case of a binary exactly once")
+    pc.add_argument("--binary", required=True)
+    pc.add_argument("--plan", required=True)
+    pc.add_argument("--exceptions", default="")
     args = ap.parse_args()
+    if args.cmd == "plan-check":
+        return cmd_plan_check(args)
     return cmd_run(args) if args.cmd == "run" else cmd_report(args)
 
 
