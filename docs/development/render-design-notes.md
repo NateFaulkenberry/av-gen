@@ -53,6 +53,8 @@ this file is the handoff.
   536 passed, 5 failed, 1 skipped -- the four tests since re-baselined (ADR-917, ADR-918). Every
   family touched since has passed under the lock: `[terrain][height]` 13, `[weather]` 8,
   `[forensics]` 74, `[bloom]` 4, `[resolution]` 4, `[fogsky]` 4, `[quality][offline]` 3, `[fog]` 43.
-  A full run on the final code was queued behind other agents' holds (`build/render-gpu-full.sh
-  full-2` -> `build/render-gpu-full-2.log`); if that log is absent or incomplete, run it:
-  `AVGEN_AGENT=render tools/gpu-lock.sh build/render-gpu-full.sh full-3`.
+  The full run on the final code that this branch queued (`build/render-gpu-full.sh full-2`)
+  never ran: after 99 minutes in the queue the coordinator withdrew it at 12:50, with the owner's
+  approval, as superseded by the GPU suite on `integrate/render` (`776b1a87`, which merges this
+  branch's `39388364`). That integration suite is the full GPU result for this work; do not queue
+  another one from this worktree.
