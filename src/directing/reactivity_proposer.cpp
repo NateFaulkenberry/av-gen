@@ -437,6 +437,10 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         const ReactiveHero& hero = *heroes[i];
         const float factor = std::max(0.55f, 1.0f - 0.07f * static_cast<float>(i));
         float heroDelay = 0.0f;
+        if (i == 0) {
+            leadHero = hero.name; // every later hero's distance is measured from this one
+            leadPosition = hero.position;
+        }
         Template tp;
         if (i < rotation.size()) {
             tp = rotation[i];
@@ -456,10 +460,6 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         }
         if (tp.layer == "breath") {
             tp = breathTemplate();
-        }
-        if (i == 0) {
-            leadHero = hero.name;
-            leadPosition = hero.position;
         }
         // The hero's glowing parts: those a program lights (where a hero's light comes from, ADR-179),
         // brightest first, three at most; a hero with none answers through its brightest plain part.
@@ -490,11 +490,14 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
                                             hero.name));
             parts.pop_back();
         }
-        const std::string when = i < rotation.size()
-                                     ? fmt::format("{} is the {} owner", hero.name, tp.layer)
-                                     : fmt::format("{} relights {:.0f} ms after the section changes, {:.0f} m from {}",
-                                                   hero.name, heroDelay, heroDelay * options.propagationMetresPerSecond / 1000.0f,
-                                                   leadHero);
+        const std::string when =
+            i < rotation.size()
+                ? fmt::format("{} is the {} owner", hero.name, tp.layer)
+                : (tp.layer == "section"
+                       ? fmt::format("{} relights {:.0f} ms after the section changes, {:.0f} m from {}", hero.name,
+                                     heroDelay, heroDelay * options.propagationMetresPerSecond / 1000.0f, leadHero)
+                       : fmt::format("{} answers the {} again, {:.0f} ms after the hero that owns it", hero.name, tp.layer,
+                                     heroDelay));
         std::size_t j = 0;
         for (const ReactiveTarget* part : parts) {
             if (!b.free(*part)) {
@@ -705,7 +708,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         hue.reason = fmt::format("The glowing layers' colour follows the song's sections and never its audio, gliding "
                                  "over a bar into each: {} (turns of hue).",
                                  arcText);
-        b.plan.sources.push_back(hue);
+        const std::size_t routesBefore = b.plan.routes.size();
         for (std::size_t k = 0; k < hues.size(); ++k) {
             const ReactiveTarget& t = *hues[k];
             if (!b.free(t)) {
@@ -720,6 +723,9 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
                                 "audio.",
                                 shortName(t), scale * 100.0f, 250.0f * static_cast<float>(k)));
             b.plan.routes.back().route.amount = round3(scale);
+        }
+        if (b.plan.routes.size() > routesBefore) {
+            b.plan.sources.push_back(hue); // only a source a route reads
         }
     }
 

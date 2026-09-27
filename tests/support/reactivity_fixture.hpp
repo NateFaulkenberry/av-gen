@@ -68,7 +68,7 @@ inline std::string gladeSceneJson(const std::filesystem::path& scatterAsset, con
     const Hero list[] = {{"elder-cap", "elder-gills", 0.0f, 0.0f, 4.0f},
                          {"lantern-cap", "lantern-gills", -14.0f, -6.0f, 2.0f},
                          {"spire-cap", "spire-gills", 14.0f, -6.0f, 1.6f},
-                         {"moss-cap", "moss-gills", 22.0f, 8.0f, 1.2f}};
+                         {"moss-cap", "moss-gills", 10.0f, 6.0f, 1.2f}};
     for (const Hero& h : list) {
         heroes += ",\n      " + box(h.cap, h.x, h.size * 1.2f, h.z, h.size, cap);
         // The smallest hero's gills take the wave too: a node's light wave (procedural emissiveField).
@@ -100,7 +100,7 @@ inline std::string gladeSceneJson(const std::filesystem::path& scatterAsset, con
         { "name": "elder-cap", "position": [0, 4.8, 0], "radius": 3.0, "height": 6.0, "importance": 0.6 },
         { "name": "lantern-cap", "position": [-14, 2.4, -6], "radius": 1.5, "height": 3.0, "importance": 0.5 },
         { "name": "spire-cap", "position": [14, 1.9, -6], "radius": 1.2, "height": 3.0, "importance": 0.45 },
-        { "name": "moss-cap", "position": [22, 1.4, 8], "radius": 1.0, "height": 2.0, "importance": 0.3 },
+        { "name": "moss-cap", "position": [10, 1.4, 6], "radius": 1.0, "height": 2.0, "importance": 0.3 },
         { "name": "walker", "position": [6, 0, 12], "radius": 0.8, "height": 2.0, "importance": 0.55 } ],
       "effects": [
         { "id": "aurora", "type": "aurora", "name": "Aurora", "owner": { "kind": "world" }, "enabled": true,

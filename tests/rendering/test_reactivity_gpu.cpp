@@ -11,8 +11,8 @@
 // where it must change nothing.
 //
 // Kinds: a hero's glow, a scatter layer's glow, its hue (a rotation of the displayed hue by the
-// section's key, measured), its light wave, particles, a practical light, the ecology light, the fog,
-// the wind, the water, and a world effect (the aurora).
+// section's key, measured), its light wave, a hero part's own light wave, particles, a practical light,
+// the ecology light, the fog, the wind, the water, a world effect (the aurora), and a lamp layer.
 //
 // With AVGEN_REACTIVITY_DUMP=<dir> every arm is written as a PNG for a person to look at.
 
@@ -252,6 +252,18 @@ TEST_CASE("A route the reactivity proposer proposes reaches the pixels, for ever
         const auto bar = std::find_if(bars.begin(), bars.end(), [&](double b) { return b >= breakStart - 1e-3; });
         REQUIRE(bar != bars.end());
         const Arm a = armAt(h, p, "nodes/meadow/scatter/fungi/emissiveFieldAmount", *bar + 0.55, true, "fungi-wave-break");
+        INFO("changed " << a.diff.changed << ", luma " << a.diff.lumaOff() << " -> " << a.diff.lumaOn());
+        CHECK(a.diff.changed > 10);
+        CHECK(a.diff.lumaOn() < a.diff.lumaOff());
+    }
+    SECTION("a hero part's own light wave, as deep as the section: faint in the quiet break") {
+        // The moss's gills name the same ring; it reaches them (11.7 m out, 12 m/s) about a second after
+        // the downbeat. The break's depth holds its 3.0 at 35%: dimmer with the route than without.
+        const auto& bars = testsupport::gladeGroove().truth.downbeats;
+        const double breakStart = sections.sections[2].startSeconds;
+        const auto bar = std::find_if(bars.begin(), bars.end(), [&](double b) { return b >= breakStart - 1e-3; });
+        REQUIRE(bar != bars.end());
+        const Arm a = armAt(h, p, "procedural/moss-gills/emissiveFieldAmount", *bar + 0.97, true, "moss-wave-break");
         INFO("changed " << a.diff.changed << ", luma " << a.diff.lumaOff() << " -> " << a.diff.lumaOn());
         CHECK(a.diff.changed > 10);
         CHECK(a.diff.lumaOn() < a.diff.lumaOff());
