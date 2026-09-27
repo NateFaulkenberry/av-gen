@@ -166,3 +166,7 @@ Rejected:
   - An optional bass accent: `audio.bass -> nodes/valley/water/tears/amount`, add 0.15, attack 120 ms,
     decay 900 ms. At its peak (0.5) it changes 1.3% of s08, inside the seams only.
   - The same settings serve the 960x540 previews and the 1080p and 4K finals.
+  - `avgen --audit-routes` on the scratch copies: GV3's findings are unchanged by these tears (3 dead
+    tracks and 3 hazardous pulse routes, as before). The bass accent is live. A route to
+    `tears/shear` with the tears off is reported `tear-setting-unread`, naming the amount; with them
+    on it is live.
