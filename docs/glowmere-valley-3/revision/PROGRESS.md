@@ -79,11 +79,18 @@ Targeted tests on the three-stream build all pass: routes 57, signals and emissi
   - its GV3 guidance is in [stream-reports/checkpoints.md](stream-reports/checkpoints.md) § Camera and ADR-913.
 - **5 of 10 streams are merged.** Left: reactivity and characters (running), then water, setpieces and render.
 
-**Reactivity is done (03:10)** (report in [stream-reports/reactivity.md](stream-reports/reactivity.md); evidence in `~/Desktop/av-gen-review/reactivity-adr924-927/`, with `install_reactivity.py`). It is merged into `integrate/revision` as `a6598157`, and builds. **Its full suites are running**; when they pass, fast-forward main.
+**Reactivity is done (about 02:10)** (report in [stream-reports/reactivity.md](stream-reports/reactivity.md); evidence in `~/Desktop/av-gen-review/reactivity-adr924-927/`, with `install_reactivity.py`). It is merged into `integrate/revision` as `a6598157`, and builds. **Its full suites are running**; when they pass, fast-forward main.
 - **The GV3 proposal:** 60 routes and 2 sources, all live. The tuned variant is 63 routes with 0 warnings.
 - **The install recipe is in the report.** Remove the shared-material kick and breath routes, use event mode for the pulses, the routes stream's energy arc, and a bar-triggered `bar-wave` field.
 
 **Launching: setpieces finisher.** It merges `integrate/revision` first, where the append conflicts with reactivity are expected. Running: characters (finishing), water (finishing), setpieces.
+
+**MERGED (05:25, after the third usage limit): main is `a6598157`,** now also with reactivity (ADR-924–927). Suites on the integration: GPU 521 cases, 520 passed, 1 skipped; CPU 3,691 of 3,691; exit 0 for both. Main was merged into `gv3/production` (`e166c454`). **6 of 10 streams are merged.**
+- **The limit stopped all three running agents again** (it reset at 05:20). All three were resumed:
+  - **characters** (`3eb53fdd`, 8 commits; its ADR-910 doc is untracked, plus a probe test): suites and report left;
+  - **water** (`f66d65d4`, ADR-916 committed; 22 untracked scratch `zz-water-*` copies not to commit): suites, report and GV3 tear values left;
+  - **setpieces** (`82e1dde7`, `integrate/revision` merged, 32 uncommitted files): the proof, UI, evaluator hook, ADRs and suites left.
+- **Render is untouched** since its WIP checkpoint (`7f36b8e3`). It is the last stream to launch.
 
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
