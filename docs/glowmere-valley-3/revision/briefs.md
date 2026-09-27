@@ -259,3 +259,89 @@ generator can read.
   - the "everything on the kick" flag;
   - round-trip;
   - one GPU difference image per target kind, proving that a proposed route reaches the pixels.
+
+## Phase 3: the GV3 scene revision, in parallel streams
+
+The plan is [03-revision-plan.md](03-revision-plan.md) and the baseline is
+[04-iterations.md](04-iterations.md) iteration 0. The engine features and their GV3 recipes are
+in [stream-reports/](stream-reports/): signals, routes, emission, song, reactivity, water,
+characters, setpieces, and checkpoints (camera).
+
+### Common to every Phase 3 stream
+- **Worktree:** `~/Documents/GitHub/av-gen-gv3-<topic>`, on branch `gv3/<topic>`, from `gv3/production` `334c4cf6`. That is the first pass plus the Phase 3 foundation: the authored energy arc and the meter pins. Assets are linked.
+- **Engine:** never build the engine in your worktree. Use the shared build:
+  `mkdir -p <wt>/build && ln -s /Users/natefaulkenberry/Documents/GitHub/av-gen-engine/build/release <wt>/build/release`
+  - The shared engine is `040d6644`: main plus setpieces. The coordinator announces a newer build (with characters and render) as a new path.
+  - `tools/gv3/ground.py` and every command below then work unchanged.
+  - Never write into the shared engine worktree.
+- **Generate** with `python3 tools/make_glowmere_valley_3.py` in your worktree.
+  - **Never commit the generated files:** `examples/world/glowmere-valley-3.{json,scene.json}`, `docs/glowmere-valley-3/03-directives.md` and `04-shot-plan.md`. Restore them with `git checkout --` before each commit; the coordinator regenerates after merging.
+  - Commit your generator changes and your notes only.
+- **Render** a clip with an absolute path, through the lock:
+  `tools/gpu-lock.sh build/release/src/avgen --project examples/world/glowmere-valley-3.json --render $PWD/build/gv3/<topic>/<name>.mov --size 960x540 --range a:b`
+  - A range render warms particles for at most 240 frames, and a seek is not a play for particles or the cast. Start ranges early enough for what you judge.
+- **Evaluate** with the Critic daemon on 127.0.0.1:8765. It is the coordinator's: never stop or restart it.
+  `~/Documents/GitHub/creative-critic/.venv/bin/critic submit --inputs <inputs.json> --video <clip> --video-start a --mode preview --session gv3-<topic> --track <category> --label <iteration> --wait --json --strict`
+  - Run it as a background command.
+  - `work/gv3-v2/inputs.json` is the first pass's scene and intent. It is correct for the look and world streams, whose shots do not change.
+  - The critic-adapter stream will document regenerating inputs from a revised project; the cut and cast streams need that.
+- **Before and after (brief §17):** "before" is the same range rendered from `gv3/production` `334c4cf6`. Put stills and sheets in `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/<topic>/`, and use the Critic's comparison between the two jobs.
+- **Record every iteration** in `docs/glowmere-valley-3/revision/phase3/<topic>.md` (committed): what changed, what the evaluator measured, what was decided.
+- **Stay inside the files you own** (below). If you need a change elsewhere, say so in your report.
+- **The standing rules:**
+  - never commit the song or the licensed assets;
+  - never modify `glowmere-valley-2-multicam`;
+  - headless only (no windowed app, no `--capture-ui`);
+  - never run `tools/make_abduction_scenario.py`;
+  - use log names prefixed with your topic in any shared folder;
+  - at most `-j 4` for any build;
+  - commit early (the account's usage limit keeps stopping agents).
+
+### gv3-look: audio reactivity, the drop, water, wind
+- **Owns:** `tools/gv3/look.py`, `tools/gv3/directives.py`, and a new `tools/gv3/reactivity.py`. It may edit the scene's water and wind blocks.
+- **Audio reactivity, the highest priority (brief §3–5, §16):**
+  - Make the Director's proposal a generator step: `avgen --project P --propose-reactivity OUT.json`, then install it as `install_reactivity.py` does (`~/Desktop/av-gen-review/reactivity-adr924-927/`).
+  - Follow "How GV3 should install and tune it" in `stream-reports/reactivity.md`, and the mushroom lanes, the bar and drop waves and the hero boosts in `stream-reports/emission.md`.
+  - Keep the elder's heartbeat and the horse's gold. Nothing lockstep, nothing on one source.
+  - Prove each target group on the three tiers: configured (`--audit-routes`), behavioural (the Critic's route-locked "configured and observed"), and meaningful (sheets, judged at 1080p where small things matter).
+- **The drop without the style shift (brief §7, plan §2):** hold the grade within the film's range and express the drop through depth, waves and activity. Check the evaluator's `visual_coherence`, and the hue histograms plateau against drop.
+- **Water:**
+  - the base: ripple 0.1, rippleScale 2.6, bass route 0.03 (`stream-reports/water.md`);
+  - the tears in the scene's valley water block, with the values from that report;
+  - fix `"shoreFade"` to `edgeFade`.
+- **Wind (brief §6):** the scene's wind visibly moves grass and ferns without a storm. Its modulation comes from the reactivity proposal, but check its base values; the tears follow the wind.
+- **Post** (AgX, bloom, grain, depth layers) waits for the render stream. Leave it until the coordinator says the render engine is in.
+
+### gv3-cut: the Director's cut, pacing, cameras
+- **Owns:** `tools/gv3/shots.py`, `rig.py`, `cuts.py`, `framing.py` and `review.py`, plus `install_cut` and the `autoDirector` block in `tools/make_glowmere_valley_3.py`.
+- **Pacing (brief §8):**
+  - Take cut times and arcs from the Director's Song Mode cut: `avgen_song_cut`, with the settings in `stream-reports/song.md`, which the first pass's band prevented. Keep composition authored and evaluator-checked: every span gets an authored rig.
+  - Use the evaluator's novelty measure to trim shots that have said their piece.
+  - There is no global duration.
+- **Aliens not the whole film (brief §9):** alien-led screen time is 38% today; the target is 20% or less. Aliens appear in wides and reacting to events.
+- **Frame the UFO events** E1–E5 (plan §3; times and places in `audit/data/setpieces/gv3-ufo.plan.json`). The gv3-cast stream implements them; you frame them, and feed their moments to Song Mode as plan events, so peaks go to them.
+- **Camera (brief §2):** apply ADR-913's follow values (`stream-reports/checkpoints.md` § Camera) to every follow rig. Check the stability bar with `tools/camera_stability.py` and the Critic's stability.
+- **Keep** the s14/s39 rhyme and the riser's compression into the drop.
+
+### gv3-world: the world edge and the offline configuration
+- **Owns:** `tools/gv3/world.py`, and a new `tools/gv3/offline.py`.
+- **The world edge:** the 640 m valley shows its edge in wides. Close the valley's ends with ridge features in the terrain's `world` block (render-post.md: "closing the valley ends with ridge features"). Check that no wide shows an edge; the render stream's sky-coloured fog helps later.
+- **Offline 4K configuration (brief §13)**, from `audit/reports/render-post.md`, as `offline.py`, applied only for the final render (a flag or a separate output):
+  - shadow cascades 4, shadow range 160 with 300 keyed on the wides;
+  - terrain view distance 1000 with LOD off;
+  - the fog march on (32 steps, `volumeMaxDistance` 220, `horizonDensity` 1);
+  - rigs at every frame (`updateHz` 0);
+  - the render block: 3840×2160, supersample 2, tier offline, limits tier, prores422.
+  
+  Verify the render log lines named in render-post.md on a 2 s range. The render stream's reference-height post radii and floors come later.
+- **Measure the 4K cost** on 2 s ranges; never render the whole film at 4K.
+
+### gv3-cast: the aliens, the animals and the UFO events (starts when characters merges into main)
+- **Owns:** `tools/gv3/cast.py`, and a new `tools/gv3/ufo.py` with the plan file.
+- **Characters (brief §10–12):** apply `stream-reports/characters.md` "How GV3 should use this": the aliens' settings per alien, the animals' slope and turn radii, and the flank animals re-homed onto the meadows.
+- **UFO events (brief §9):**
+  - add the `scout` craft;
+  - remove the hand-written `abduction` scenario and `horse_light()`'s keys;
+  - compile the E1–E5 plan with `avgen_cast_trace --plan --save-project` as a generator step;
+  - re-validate E4 after the re-homing; it needs two animals within reach.
+- **The gate:** the ADR-910 metrics on the whole-film cast trace (longest still stretch, reversals, pivots, slope under stationary bodies), and the set pieces' measured beats.
