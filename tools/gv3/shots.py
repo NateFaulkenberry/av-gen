@@ -411,13 +411,15 @@ def e4_arrives(t0, t1, g):
 
 @at("57.1")
 def e4_pair_lifted(t0, t1, g):
-    # E4's lift, on the sub-phrase line: two animals rising together in one column, from 40-50 m off
-    # on the dry ground north-east of the meadow. A 35 mm aimed 11 m below the scout, so the whole
-    # column is in frame: the scout's top at +0.85 and the pair's feet at -0.82 when it lifts them, on
-    # both casts. (Iteration 2's 50 mm put the scout above the frame; iteration 3's 40 mm cut its top.)
-    r = aim_at(35.0, g(-35, -15, 2.5), "scout", (0.0, -11.0, 0.0), "hover")
+    # E4's lift, on the sub-phrase line: two animals rising together in one column, seen from 4 m over
+    # the river 42 m east of the station, looking west across the water. A 35 mm aimed 10 m below the
+    # scout holds the whole column on both casts: the scout's top at +0.72 (+0.66 on gv3-cast's) and the
+    # pair's feet at -0.86 (-0.73), the pair centred. Over water, so no undergrowth can stand in the
+    # lens: iteration 3's eye on the dry ground north-east of the meadow was inside a plant whose
+    # leaves filled the frame (and its 40 mm cut the scout's top).
+    r = aim_at(35.0, g(-27, 17, 4.0), "scout", (0.0, -10.0, 0.0), "hover")
     return r, dict(lead="event", purpose="E4: two animals lifted together", subject="the scout's beam and the pair (E4)",
-                   camera="35 mm, about 45 m off, live aim", movement="still", music="the lift on bar 57",
+                   camera="35 mm, 4 m over the river 42 m east, live aim", movement="still", music="the lift on bar 57",
                    effects="the scout's beam")
 
 
