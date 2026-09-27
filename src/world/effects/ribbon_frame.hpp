@@ -22,10 +22,12 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace avgen::world {
@@ -60,7 +62,15 @@ struct RibbonStrip {
     std::uint32_t firstVertex = 0;
     std::uint32_t vertexCount = 0; // a triangle strip: 2 per point
     RibbonBlend blend = RibbonBlend::Additive;
+    // ADR-940: the three bytes after `blend`, named and zeroed. As padding they were written by no
+    // one, so a strip's bytes carried whatever its memory held before -- the stack or a reused heap
+    // block, depending on the compiler -- and two identical frames compared unequal byte for byte.
+    std::array<std::uint8_t, 3> reserved{};
 };
+// A strip's bytes are its value: no padding, so equal strips are equal byte for byte (the play = scrub
+// proofs memcmp whole frames). A field that brings padding back must name and zero it, as `reserved` does.
+static_assert(sizeof(RibbonStrip) == 12);
+static_assert(std::has_unique_object_representations_v<RibbonStrip>);
 
 // The frame block (`scene::Scene::ribbons`). Plain data; the renderer reads it.
 struct RibbonFrame {
