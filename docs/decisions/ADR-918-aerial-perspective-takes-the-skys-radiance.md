@@ -93,10 +93,22 @@ sky behind it, while the air near the camera keeps the fog colour it was tuned w
 ## Consequences
 
 - **No existing scene changes.** The default is 0 and no tracked scene or project sets it.
-- **GV3** should set `scene/fogSky` 1.0 in its project. The rim then reads as air against the
-  aurora rather than as a navy cut-out. Because the fog now matches the sky behind the rim, the
-  coordinator can bring the density down (the audit suggests 0.009-0.012 from 0.02) without the rim
-  coming back as a silhouette.
+- **GV3** should set `scene/fogSky` 1.0 and leave `scene/fogSkyDistance` at 0 (automatic: 375 m
+  at its base density, 313-417 m over its density arc of 0.024-0.018). The rim then reads as air
+  against the aurora rather than as a navy cut-out, and the near air keeps its navy. Its density
+  need not come down for the rim's sake; the audit's 0.009-0.012 remains a look choice, not a fix.
+  Measured on a snapshot of GV3 (960x540 x2, offline):
+
+  | Shot | Mean level: fog colour | fog from the sky | the first version (sky's colour everywhere) | near third | far third |
+  |---|---|---|---|---|---|
+  | s06, 24.5 s | 46.9 | 49.2 | 60.2 | 44.6 -> 49.3 (79.3) | 60.8 -> 63.1 |
+  | s14, 78 s | 57.8 | 64.0 | 78.5 | 53.7 -> 58.1 (89.1) | 67.1 -> 81.1 |
+  | s21, 144 s | 36.8 | 38.6 | 49.2 | 47.9 -> 50.7 (79.8) | 53.6 -> 56.3 |
+  | s12, 62 s | 39.7 | 40.6 | | 46.8 -> 47.1 | 50.4 -> 53.7 |
+  | s39, 214.6 s | 58.9 | 63.0 | | 64.6 -> 68.0 | 77.5 -> 86.6 |
+
+  The far third brightens as the valley's ends fade into the sky; the near third barely moves.
+- **Cost on GV3:** two seconds of s14 at 3840x2160 x2, 41.0 s without and 42.1 s with (+2.7%).
 - **The volumetric march is unchanged.** Where it runs (`volumeMaxDistance` > 0), the near air is
   still lit by the march's own in-scatter; `fogSky` colours the closed-form segment beyond it. GV3's
   march is off (`scene/volumeMaxDistance` 0).

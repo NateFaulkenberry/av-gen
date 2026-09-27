@@ -65,7 +65,12 @@ above them.** A floor changes how finely the picture is sampled, never what it i
   - every scene lit and backed by the procedural sky: its visible sky is sharper, and specular
     reflections of it at low roughness are too.
   - Realtime, High and Preview renders, and the editor, are unchanged.
-- **Build cost:** the sky's one-off build is larger at 1024 (one-time, logged by `processSky`).
+- **Build cost:** the sky is built once per render: 44 ms at 1024 px a face against 15-20 ms at
+  256 (GV3, logged by `processSky`).
+- **Measured on GV3** (a snapshot; main `3f720bfa` as the before arm): its 960x540 x2 preview at
+  the offline tier changes in **4,662 of 518,400 pixels (0.9%)**, 85% of them by one code value
+  (the finer sky's gradient crossing rounding boundaries) and 80 by ten or more (textures at grazing
+  angles). Two seconds of s14 at 3840x2160 x2 cost the same, 41.0 s, with the floors and without.
 - **GV3:** its march is off (`scene/volumeMaxDistance` 0), so the step floor only matters if the
   revision turns the march on, which the audit recommends (220 m). Its textures and its sky take the
   other two floors in every offline render, previews included, because its project renders at the

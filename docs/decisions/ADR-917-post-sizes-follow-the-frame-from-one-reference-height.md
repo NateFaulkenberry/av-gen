@@ -130,7 +130,27 @@ Rejected:
     `world/world`, and the ten `world/_diag-water-*` and `world/_pre-defects` diagnostics.
   - A scene tuned at another height keeps its look there by setting its reference to that height.
 - **Nothing moves at a chain height equal to the reference.** Verified on Glowmere Valley 3's
-  preview (see below).
+  preview (below).
+- **Measured on GV3** (a snapshot of its project and scene; main `3f720bfa`, built from the same
+  tree without this branch, is the before arm; stills in the review folder's `render/`):
+  - *The preview is unchanged.* 960x540 at supersample 2, main as-is against this branch with
+    `post/referenceHeight` 1080 and `post/motionBlur/maxRadius` 60, realtime tier (no ADR-919
+    floors): **0 of 518,400 pixels differ** at 16.5 s (s04) and at 173 s (s27), with equal sequence
+    hashes.
+  - *The control is today's chain.* 3840x2160 x2, main as-is against this branch with reference
+    4320 and radius 240 (each frame its own reference): **0 of 8,294,400 pixels differ** (173 s).
+  - *The final now shows the preview's look.* s04 at 16.5 s, offline tier, the 960x540 preview
+    against the 3840x2160 x2 final box-filtered 4x down: mean absolute difference **2.20 -> 1.36**
+    (8-bit), 99th percentile **37.7 -> 21.0**, in the halo band 3.29 -> 1.95; the final's mean level
+    36.59 -> 37.49 against the preview's 37.37. The halos the unscaled final lacked -- the blue pool
+    under the white mushrooms, the pink glow at the left -- are gone from the difference; what
+    remains is edge detail a frame four times larger resolves.
+  - The drop (s33) at 179.5 s, the second frame of a range so motion blur is on: 1.575 -> 1.499;
+    the saucer's anamorphic streak, shorter than the preview's before, matches it after.
+  - s27 at 173 s is identical before and after: nothing on it crosses GV3's bloom threshold of
+    1.761 and a single-frame render carries no motion blur, so no pixel size is used there.
+  - *Cost.* Two seconds of s14 at 3840x2160 x2 (120 frames at 7680x4320): **41.0 s on main, 41.0 s
+    on this branch** (ADR-917 and ADR-919's floors), 342 ms a frame.
 - **GV3** should set `post/referenceHeight` 1080, its previews' chain height, and
   `post/motionBlur/maxRadius` 60 (from 40), which keeps the radius it had at 1080 lines when the
   radius was expressed at 720. Its 960x540 x2 previews are then unchanged, and its 1080p x2 and
