@@ -1,50 +1,43 @@
-# Render stream (GV3 wave 2, ADRs 917-919): status at the pause, 2026-09-26
+# Render stream (GV3 wave 2, ADRs 917-919): status, 2026-09-27
 
-Branch `agent/render`, worktree `av-gen-render`, from main `0b623b88`. Paused on the coordinator's
-instruction (usage limit). Everything below builds; the GPU side has NOT been run yet.
+Branch `agent/render`, worktree `av-gen-render`. Based on `0b623b88`; main `3f720bfa` merged in
+(`ce7afb5e`, at the coordinator's instruction). The ADRs hold the decisions and the measurements;
+this file is the handoff.
 
-## Done (code, compiling, CPU-tested)
-- **ADR-917, post sizes follow the frame.** `post/referenceHeight` (default 720) scales every
-  pixel-sized post value by `chainHeight / referenceHeight`: bloom and halation pyramids
-  (`scene::planPyramid`: weights shifted by log2(scale), fractional shifts shared between bracketing
-  levels, whole-octave shifts bit-exact, finer levels weightless tent passes), anamorphic reach,
-  motion-blur tiles (cap 160), the look stage's low-pass (octave descent instead of truncation).
-  `PostStats` reports `pixelScale`, `anamorphicReach`, `motionBlurTile`, `motionBlurRadius`,
-  `lookOctaves`; the render job logs one line. CPU tests: `tests/unit/test_post_resolution.cpp`
-  (7 cases, 302 assertions, pass).
-- **ADR-918, fog from the sky.** `scene/fogSky` (0..1). A 128x32 RGBA16F map of the sky's radiance
-  (background via the new `shaders/sky_background.wgsl`, shared with `skybox.wgsl`, plus
-  `atmosphereSkyAt`) is rendered by `shaders/fog_sky.wgsl` before the scene pass when fogSky > 0;
-  `applyFog` mixes towards it. Frame group bindings 16/17; aux/mask/shadow groups bind a 1x1
-  placeholder. UI: Environment panel, "Sky and fog", "Fog takes the sky's colour".
-- **ADR-919, offline floors.** `QualitySettings::volumeStepFloor` 32, `textureAnisotropy` 16,
-  `skyCubeFloor` 1024 at offline (others 0/8/0); each logs what it raised. UI: Render section's tier
-  row shows the floors when offline is chosen.
-- **World edge (report only, not built):** size is data (validated to 1e6 m; the ocean world ships
-  40 km); growing GV3's world is a data change plus re-authoring, but `WorldMap::prepare`'s 97x97
-  altitude survey re-ranges `altitude01`, so biomes and scatter in the core valley shift when the map
-  grows. A backdrop ring was estimated at 1-2 days (terrain.cpp ring builder, composition terrain
-  cache, entity after water entities) -- over the brief's "hours" bar.
+## Built
+- **ADR-917, post sizes follow the frame.** `post/referenceHeight` (default 720). Every pixel-sized
+  post value scales by chain height / reference. A frame whole octaves finer than the reference is
+  box-filtered down by them (colour and emission) before the bloom and halation pyramids; the plan
+  (`scene::planPyramid`) shares any fraction of an octave between bracketing levels. The streak's
+  reach and the motion-blur tiles scale; tiles past 40 px are reduced separably (rows, then columns);
+  the look stage's low-pass descends an octave instead of truncating. At the reference nothing moves.
+- **ADR-918, fog from the sky.** `scene/fogSky`: a 128x32 map of the sky's radiance (background,
+  aurora, comets) built each frame the fog asks for it; `applyFog` fades towards it. Environment
+  panel, "Sky and fog", "Fog takes the sky's colour".
+- **ADR-919, offline floors.** March steps 32, anisotropy 16x, procedural sky cubes 1024 px a face;
+  each logged when it raises. Shown under the Render panel's tier row.
+- **World edge: report only.** `WorldMap` size is data (validated to 1e6 m; the ocean world ships
+  40 km), so a bigger GV3 world is a data change plus re-authoring the valley, river and wall paths
+  -- but `WorldMap::prepare`'s 97x97 altitude survey re-ranges `altitude01`, so biomes and scatter in
+  the core valley shift when the map grows, and the nav grid and terrain chunk grid scale with it. A
+  backdrop ring (a terrain ring builder in `terrain.cpp`, the composition terrain cache, an entity
+  drawn after the water entities) is estimated at 1-2 days: over the brief's "hours" bar, so GV3
+  closes its valley ends with ridge features.
 
-## Not done
-- **No GPU run yet.** Queued at the pause (their logs land in `build/`):
-  `build/gpu_targeted.sh` -> `build/gpu-targeted/summary.txt` (new tests + post/sky/fog/motion/hdr
-  families), `build/gv3-eval/base_batch.sh` (GV3 stills with the pre-change binary in
-  `build/base/`). A full CPU suite was running: `build/cpu-suite-1.log`.
-- The new GPU tests' thresholds (0.15 / 0.4 etc. in `test_post_resolution_gpu.cpp`,
-  `test_fog_sky_gpu.cpp`, `test_offline_floors_gpu.cpp`) are guesses to be set from the first run.
-- Expected re-baselines once the GPU suite runs: tests that render small frames with bloom at the
-  default reference now get fewer levels (e.g. `test_image_look_gpu.cpp` "bloom levels" at 192x128
-  asserts 2 levels; pin its `referenceHeight` to 128). `test_post_gpu.cpp`'s 128 px halo check may
-  need the same.
-- `build/gv3-eval/new_batch.sh` (post-change GV3 stills, identity check at the reference, fog stills,
-  4K x2 two-second cost) not yet run; `build/gv3-eval/compare.py` compares a preview with a
-  downsampled final.
-- ADR-917/918/919 are drafts with measurements still to fill ("recorded below"); rows not yet added
-  to `docs/decisions/README.md`.
-- The look-stage fix's control is a throwaway build (octave loop removed) still to do.
+## How it was verified
+- The GPU tests' first run found three code defects (weightless pyramid levels blurred the finer
+  frame's halo; the single-pass tile maximum cost 34 ms at 80 px tiles; the sky floor logged every
+  rebuild) and four test defects (a ridge behind the far plane, a smear too short to see the tiles,
+  a reach measure summing three halos, a sky statistic measuring half-float quantisation). All fixed;
+  thresholds are set from measurement with controls that fail on the old behaviour, including two
+  throwaway builds (the look stage's truncation; the single-pass tile maximum).
+- Four existing GPU tests were re-baselined (ADR-917's and ADR-918's Consequences list them).
 
-## GV3 settings (to confirm once measured)
-- `post/referenceHeight` 1080 and `post/motionBlur/maxRadius` 60: previews unchanged, finals match.
-- `scene/fogSky` 1.0 (then density can come down toward the audit's 0.009-0.012).
-- Final: 3840x2160, supersample 2, tier offline (floors apply).
+## The GV3 evidence
+- `build/gv3-eval/` (not tracked): a snapshot of GV3's project and scene (`snap/`, with the
+  materials, light rig and entity profile it references), variants written by `variant.py`, the
+  batch `render-gv3-batch.sh` (main `3f720bfa` built from `git archive` in
+  `build/main-3f720bfa/` as the before arm) and `analyse.py`. Stills are in
+  `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/render/`.
+- The first batch rendered an empty scene with exit 0: the snapshot lacked `../entities/`,
+  `../materials/` and `../lightrigs/`. Every summary line now records what the render loaded.
