@@ -257,6 +257,8 @@ TEST_CASE("a treatment edited the panel's way survives the project save", "[song
         app::Engine engine(app::EngineMode::Offline);
         REQUIRE(engine.loadFile(stage).has_value());
         REQUIRE(engine.setSequence(piece()).has_value());
+        engine.markProjectSaved();
+        CHECK_FALSE(engine.projectDirty(true));
         if (edit) {
             // What the inspector does: the engine's own sequence, edited in place.
             seq::Sequence& live = engine.sequence();
@@ -267,6 +269,8 @@ TEST_CASE("a treatment edited the panel's way survives the project save", "[song
             t.focus = song::SubjectFocus::Hero;
             t.description = "Edited in the Sequence panel.";
             REQUIRE(ui::editTreatment(live.shotLanguage, t).has_value());
+            // The unsaved-changes check (ADR-440) serialises the project, so closing would ask.
+            CHECK(engine.projectDirty(true));
         }
         REQUIRE(engine.saveProject(file).has_value());
     };

@@ -195,4 +195,7 @@ TEST_CASE("the retry memory's parameter, not the file, decides whether a body pa
     CHECK(paramRemembers.waterTrips == remembered.waterTrips);
     CHECK(paramRemembers.quality.behaviour.longestPacing == remembered.quality.behaviour.longestPacing);
     CHECK(paramRemembers.quality.behaviour.reversals == remembered.quality.behaviour.reversals);
+    WARN("ADR-933 amended, the retry memory as a parameter: file 30: " << summary(remembered) << "; file 0: "
+         << summary(forgotten) << "; file 30, parameter 0: " << summary(paramForgets)
+         << "; file 0, parameter 30: " << summary(paramRemembers));
 }

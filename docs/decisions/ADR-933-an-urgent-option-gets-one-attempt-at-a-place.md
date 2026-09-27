@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 **Date:** 2026-09-27
+**Amended:** 2026-09-27 -- the retry memory (`failSeconds`) is a control under the decide group (the
+amendment at the end)
 **Follows:** ADR-909 (the decider's habits: no walk straight back, no turning round mid-walk), ADR-910
 (the character quality analyzer), Phase D §19 and §59 (a failed plan is left alone for `failSeconds`),
 ADR-932 (routes that respect connected regions)
@@ -134,3 +136,49 @@ trace shows a loop; this shows why.
   GV2-multicam, GV3, the Character Intelligence Lab's decided fixtures and the autonomy demo. A decider
   with no `mind` has no urgent options and is unchanged.
 - **ADR-910's tables change meaning slightly:** `pacing` is new, and `reversals` is unchanged.
+
+## Amendment, 2026-09-27: the retry memory is a control under the decide group
+
+**Found by:** the GV3 revision's uireach brief (gap 4: "`mind.memory.failSeconds` (ADR-933's retry memory)
+is JSON-only").
+**Implemented by:** `Decide::failSeconds_`, registered in `Decide::registerParameters` and read every tick
+at the top of `Decide::update` (`src/entity/behaviors.cpp`)
+**Tests:** `tests/unit/test_retry_memory_control.cpp` (`[adr933]`): "UI reach: the retry memory is a control
+under the character's decide group" and "the retry memory's parameter, not the file, decides whether a
+body paces the bank"
+
+**The gap.** Decision 3 above rests on the mind's `failSeconds`: how long an urgent errand that did not get
+there is remembered, and so whether a body paces a bank (ADR-933's own control arm is `failSeconds` 0). It
+was read once from the scene file (`mind.memory.failSeconds`). Every other habit of the decider -- the
+longest pause, the loop window, radius and penalty (ADR-909) -- is a parameter; this one, which decides a
+behaviour a viewer watches, could not be found or changed in the app.
+
+**Decision.** A decider with a mind registers `entity/<name>/decide/failSeconds`, labelled "won't try again
+where it couldn't get to for (s, 0 = tries at once)", 0 to 600 s, its default the file's value. `Decide`
+reads its final every tick into the mind's memory settings -- the ADR-933 attempts and the object memory's
+failed-plan rule alike -- so a slider, a key, a route or a project parameter moves it as surely as the file
+did. Like every parameter it is a pure function of the playhead, so a replay after a seek reads what the
+play read. A decider with no mind registers nothing: it makes no urgent errands and remembers no failed
+plan, so the slider would move nothing (the registered-but-inert rule).
+
+**Where an artist finds it:** the Parameters panel, group `entity`, heading "<character>/decide", beside
+"longest it stands still" and "won't walk back to where it just was for"; the World panel's Inspector, when
+the character is clicked, under "decide". Both on the Intermediate layer, where the editor opens.
+
+**Consequences.**
+- No behaviour changes: the parameter's default is the file's value, and nothing else reads it.
+- **Tested** on ADR-933's stall fixture (the river ending inside the world), with the file and the
+  parameter saying opposite things (90 s each):
+
+  | `failSeconds` in the file | parameter | walks into the water | reversals | longest pacing |
+  |---|---|---|---|---|
+  | 30 | (the file's) | 1 | 2 | 2 turn-backs in 2.4 s |
+  | 0 | (the file's) | 2 | 5 | 4 over 21.7 s |
+  | 30 | 0 | 2 | 5 | 4 over 21.7 s |
+  | 0 | 30 | 1 | 2 | 2 in 2.4 s |
+
+  The parameter decides, and the file only sets its default. (The first two rows are ADR-933's own
+  "now" and control, reproduced.)
+- The reach test does both panels' arithmetic (`parameterSubGroup`, `inspectorPlace`, `inspectorRowLabel`)
+  and checks that a mindless decider registers no such parameter.
+
