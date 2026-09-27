@@ -256,22 +256,54 @@ it on the baseline trace and on v2a's (both on ec515c8b):
 From s22's camera, at 149 s it is about 15 degrees above the sill's crest, so "comes over the rim"
 still reads.
 
-## W3: renders
+## W3: renders and the scatter
 
-Batch 1, queued behind the gv3-cut stream's full-film render (the lock was held for 25+ minutes):
-1080p x2 stills of v1 at 78.0 (s14), 214.0 (s39), 62.0 (s12), 28.0 (s07), 159.0 (s23) and 199.0
-(s37). Only the baseline's s14 at 78 s was rendered at the checkpoint. It shows the defect plainly:
-the V ends in a flat line of ferns and trees against the aurora
-(`build/gv3w/stills/base-s14-78.0/frame_000000.png`).
+**Stills.** Scratch copies of the project live in `build/gv3w/<variant>/world/`, one per variant:
+- `base`: the 334c4cf6 world;
+- `v1`: the pool-ended river;
+- `v2a`: the committed closure;
+- `v1s`: v1 with the final's shadows only;
+- `v1m*` and `v2ae*`: the march tests.
 
-Batch 2 (`build/gv3w/jobs2.txt`, not yet run):
-- the remaining before/after pairs: s06, s07, s12, s21, s22, s23, s33, s34, s37, s39;
-- the march calibration: v1m025, v1m050 and v1m100 at 78 s, and v1m050 against v1 at 110 s;
-- the shadows-only variant v1s at 78 and 214 s.
+`materials`, `lightrigs`, `entities` and `assets` are symlinks, and the song's path is absolute.
 
-Scratch copies of the project live in `build/gv3w/<variant>/world/`. `materials`, `lightrigs`,
-`entities` and `assets` are symlinks, and the song's path is absolute. The mirror script is the
-scratchpad's `world/mirror.py`.
+At s14 (78 s), the closure plus the final's shadows (`v1s`) against the baseline:
+- the V now ends at a dark saddle, with the aurora above it;
+- the sky and the river measure the same (37.8 and 57.5);
+- the walls are 5 levels darker, where the moon's shadows now reach them;
+- the V's glow drops from 106 to 90, where the saddle replaces the brightest band.
+
+At s39 (214 s) the last wide closes the same way, and rhymes with s14.
+
+The before and after pairs for s06, s07, s12, s14, s21, s22, s23, s33, s34, s37 and s39 are in
+`build/gv3w/jobs2a.txt`. Their sheets go to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/world/`,
+and their Critic jobs to session gv3-world, track world-edge.
+
+**The scatter's glow re-deal, counted** (the render log's "placed N instances", baseline -> closed):
+
+| Layer | Baseline | Closed | | Layer | Baseline | Closed |
+|---|---|---|---|---|---|---|
+| canopy | 551 | 514 | | ferns | 1951 | 1812 |
+| canopy-broad | 349 | 328 | | grass | 55515 | 52845 |
+| twisted | 485 | 469 | | fan-plants | 330 | 308 |
+| twisted-low | 314 | 308 | | flowers | 226 | 221 |
+| pine-upper | 469 | 469 | | fungi | 1131 | 1001 |
+| pine-rim | 327 | 339 | | shelf-fungi | 243 | 230 |
+| deadwood | 254 | 249 | | boulders | 500 | 579 |
+| deadwood-rim | 128 | 131 | | pebbles | 59 | 62 |
+| bushes | 2070 | 1954 | | beacons | 53 | 50 |
+
+The steeper new ends lose meadow and forest plants and gain rock and rim pines. Those losses are 300 m
+or more from any camera.
+
+The consequence in the valley is the index re-deal (W1, point 4). Every layer except `pine-upper`
+changes its count, and nearly all of that change is in the northern rows, which come first. So nearly
+every plant's glow, brightness and hue jitter in the valley is drawn anew. Its position, size and yaw
+are not.
+
+A grove still at 110 s (s18) shows both effects together:
+- the bushes glow differently;
+- Sage stands elsewhere (W2d).
 
 ## F1: the offline configuration (commit `e95db493`)
 
