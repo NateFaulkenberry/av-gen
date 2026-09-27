@@ -38,38 +38,51 @@ SINK = 0.10  # metres a stem's lowest ground-contact point is sunk below the sur
 #   * The terrain material and every biome read altitude as (h - min) / (max - min) over a 97 x 97
 #     survey of the map (WorldMap::prepare). If either extreme moved, every plant's biome weight would
 #     move with it. The minimum is the river bed at (19.8, 316.7), the maximum the north-west rim at
-#     (-310.1, -296.9). `python3 tools/gv3/world.py --check` re-measures both, and no new feature
-#     reaches either.
+#     (-310.1, -296.9). `python3 tools/gv3/world.py --check` re-measures both.
+#   * Water, edge to edge, is what keeps the valley's two banks apart for the navigator (maxSlope 0.55,
+#     ~63 degrees, is walkable, so only water divides the valley): a river that ends inside the world
+#     lets every walker round its head (phase3/world.md, W2c).
+#   * A river's flow speed is the engine's own reading of its whole course, 12 x descent / length
+#     (terrain_water.cpp flowSpeed), and the water's ripples scroll at it in every shot. Editing either
+#     end of the course changes both, so the terrain's `flow.speedOverride` is pinned at the source
+#     course's speed and the film's water moves exactly as it did.
 #
-# North: the banks' level climbs beyond their second point, and a head ridge with a lower shoulder
-# spans the V between the walls. The river keeps its course to the edge -- it has to: its water, edge
-# to edge, is what keeps the two banks apart for the navigator (maxSlope 0.55, ~63 degrees, is
-# walkable, so only water divides the valley). Ending it in a pool inside the world joined the halves
-# (49% of walkable cells unreachable -> 0%), and every alien took a different route from 13 s on,
-# though not one of their heights changed. Its head is bent east instead, so the gorge it cuts
-# through the head turns out of every line of sight up the valley.
-# South: the banks end at their eleventh point (z 244), so beyond it only the corridor flattens
-# (0.55) and a sill across the end stands at 45% of its height; the river keeps its whole course and
-# leaves through a gorge in the sill that turns away from every camera looking south.
+# North: the valley ends at a head. The banks' level climbs beyond their second point, so the
+# flattened floor rises into a saddle about 40 m high between the walls, and the river now begins at
+# the foot of it, at its second point. A narrow stream, `glowmere-falls`, comes down the head from the
+# edge into the river: it carries the water edge to edge, and the notch it cuts at the top of the head
+# is 36 m high, above the horizon of every camera in the film (s37's crane, at 31 m, is the highest).
+# The full river climbing the head instead read as a lit slab from both cranes (s12, s37). A low ridge
+# puts the north-east shoulder's crest inside the world, where the boundary had cut it flat.
+# South: the banks end at their eleventh point (z 244), so beyond it only the corridor flattens (0.55)
+# and the southern rim stands at 45% of its height across the end; a low sill and a ridge on the
+# south-east shoulder close the rest. The river keeps its whole course -- that course is what holds
+# the survey's minimum, to z 329 -- so its mouth is the one place the check still finds sky below the
+# horizon: through the gorge, from the cameras that look down it (phase3/world.md).
 #
 # What this cannot help moving (and the iteration log measures): scatter rows run north to south
 # (ecology.cpp), and a plant's hue jitter, glow and whether it stays dark are keyed on its index in its
 # layer (procedural.cpp materialVariation), so a changed count in the northern rows re-deals those
-# for every plant south of them. Positions, sizes and yaws are keyed on the cell and do not move.
-NORTH_BANKS_HEAD = [[-44.0, 70.0, -352.0], [-52.0, 62.0, -322.0]]  # replaces the banks' first point
-NORTH_RIVER_HEAD = [40.0, 15.0, -350.0]  # replaces the river's first point, (-44, 15, -352)
-NORTH_HEAD = {"name": "north-head", "kind": "ridge",
-              "path": [[-140.0, 0.0, -300.0], [-90.0, 0.0, -306.0], [-40.0, 0.0, -306.0], [10.0, 0.0, -300.0],
-                       [50.0, 0.0, -292.0]],
-              "width": 70.0, "amplitude": 70.0, "falloff": 1.0, "roughness": 1.0, "smoothing": 3}
-NORTH_SHOULDER = {"name": "north-shoulder", "kind": "ridge",
-                  "path": [[60.0, 0.0, -300.0], [100.0, 0.0, -306.0], [130.0, 0.0, -310.0]],
-                  "width": 50.0, "amplitude": 30.0, "falloff": 1.0, "roughness": 1.0, "smoothing": 3}
+# for every plant south of them. Positions, sizes and yaws are keyed on the cell and do not move. And
+# the aliens' explore behaviour draws its destinations from one registry of the whole world's shores
+# and summits, so they take other routes (W2d).
+NORTH_BANKS_HEAD = [[-58.0, 64.0, -352.0], [-58.0, 58.0, -316.0]]  # replaces the banks' first point
+NORTH_FALLS = {"name": "glowmere-falls", "kind": "river",
+               "path": [[-58.0, 48.0, -352.0], [-58.0, 43.5, -322.0], [-58.0, 24.0, -300.0], [-58.0, 12.8, -286.0]],
+               "width": 12.0, "amplitude": 4.0, "falloff": 0.85, "flatten": 0.85, "roughness": 0.1,
+               "water": True, "waterDepth": 0.0, "smoothing": 3}  # ends on the river's new head, level for level
+NORTH_EAST_SHOULDER = {"name": "north-east-shoulder", "kind": "ridge",
+                       "path": [[20.0, 0.0, -298.0], [60.0, 0.0, -300.0], [110.0, 0.0, -298.0]],
+                       "width": 32.0, "amplitude": 16.0, "falloff": 1.0, "roughness": 1.0, "smoothing": 3}
 SOUTH_BANKS_POINTS = 11  # the banks end at (45, -4.6, 244)
 SOUTH_SILL = {"name": "south-sill", "kind": "ridge",
-              "path": [[-110.0, 0.0, 338.0], [-40.0, 0.0, 342.0], [40.0, 0.0, 340.0], [120.0, 0.0, 336.0],
-                       [200.0, 0.0, 328.0]],
-              "width": 60.0, "amplitude": 70.0, "falloff": 1.0, "roughness": 1.0, "smoothing": 3}
+              "path": [[-120.0, 0.0, 334.0], [-60.0, 0.0, 339.0], [0.0, 0.0, 341.0], [60.0, 0.0, 339.0],
+                       [120.0, 0.0, 334.0]],
+              "width": 40.0, "amplitude": 16.0, "falloff": 1.0, "roughness": 1.0, "smoothing": 3}
+SOUTH_EAST_SHOULDER = {"name": "south-east-shoulder", "kind": "ridge",
+                       "path": [[100.0, 0.0, 322.0], [150.0, 0.0, 322.0], [200.0, 0.0, 318.0]],
+                       "width": 30.0, "amplitude": 16.0, "falloff": 1.0, "roughness": 1.0, "smoothing": 3}
+ADDED = (NORTH_FALLS, NORTH_EAST_SHOULDER, SOUTH_SILL, SOUTH_EAST_SHOULDER)
 
 
 def _feature(world, name):
@@ -79,22 +92,63 @@ def _feature(world, name):
     raise RuntimeError(f"the world has no feature '{name}': the valley this closes has changed")
 
 
-def close_ends(world, report):
-    """Close both ends of the valley in the terrain's `world` block. Call before any height is
-    asked of the world (ground.py), so every probe sees the closed valley."""
+def terrain_node(scene):
+    return next(n for n in scene["nodes"] if n.get("kind") == "terrain" and "world" in n)
+
+
+def _chaikin32(path, passes):
+    """world_map.cpp chaikin, in float32 as the engine runs it: quarter points, endpoints kept."""
+    import numpy as np
+    out = [np.array(p, dtype=np.float32) for p in path]
+    q, t, one = np.float32(0.25), np.float32(0.75), np.float32(1.0)
+    for _ in range(passes):
+        if len(out) < 3:
+            break
+        nxt = [out[0]]
+        for a, b in zip(out, out[1:]):
+            nxt += [a * (one - q) + b * q, a * (one - t) + b * t]
+        nxt.append(out[-1])
+        out = nxt
+    return out
+
+
+def flow_speed(river):
+    """The flow speed the engine derives for a river feature (terrain_water.cpp WaterCourse::flowSpeed:
+    12 x descent / length of the smoothed centreline in plan, clamped to [0.05, 1.6] m/s)."""
+    import numpy as np
+    pts = _chaikin32(river["path"], river.get("smoothing", 0) if len(river["path"]) >= 3 else 0)
+    length = np.float32(0.0)
+    for a, b in zip(pts, pts[1:]):
+        length = np.float32(length + np.float32(np.sqrt(np.float32((a[0] - b[0]) ** 2 + (a[2] - b[2]) ** 2))))
+    descent = max(np.float32(pts[0][1] - pts[-1][1]), np.float32(0.0))
+    return float(np.clip(np.float32(np.float32(descent / length) * np.float32(12.0)), 0.05, 1.6))
+
+
+def close_ends(scene, report):
+    """Close both ends of the valley in the terrain's `world` block, and hold the river's flow speed.
+    Call before any height is asked of the world (ground.py), so every probe sees the closed valley."""
+    terrain = terrain_node(scene)
+    world = terrain["world"]
     banks = _feature(world, "river-banks")
     river = _feature(world, "glowmere-run-2")
     # The edits assume the multicam's valley: 13 points from z -352 to +352 on each of the three.
     for f in (banks, river, _feature(world, "valley-corridor")):
         if len(f["path"]) != 13 or f["path"][0][2] != -352.0 or f["path"][-1][2] != 352.0:
             raise RuntimeError(f"feature '{f['name']}' is not the 13-point valley course close_ends was measured on")
-    if any(f["name"] in (NORTH_HEAD["name"], NORTH_SHOULDER["name"], SOUTH_SILL["name"]) for f in world["features"]):
+    if any(f["name"] in {a["name"] for a in ADDED} for f in world["features"]):
         raise RuntimeError("the valley's ends are already closed")
+    if NORTH_FALLS["path"][-1] != river["path"][1]:
+        raise RuntimeError("the falls no longer end on the river's second point")
+    source_speed = flow_speed(river)
     banks["path"] = [list(p) for p in NORTH_BANKS_HEAD] + banks["path"][1:SOUTH_BANKS_POINTS]
-    river["path"][0] = list(NORTH_RIVER_HEAD)
-    world["features"].extend(copy.deepcopy([NORTH_HEAD, NORTH_SHOULDER, SOUTH_SILL]))
-    report.append("valley ends closed: north head ridge and shoulder, the river's head bent east through a gorge; "
-                  "south sill, the banks ending at z 244")
+    river["path"] = river["path"][1:]
+    world["features"].extend(copy.deepcopy(list(ADDED)))
+    flow = terrain["terrain"].setdefault("flow", {})
+    if flow.get("speedOverride", 0.0) == 0.0:
+        flow["speedOverride"] = source_speed
+    report.append(f"valley ends closed: the north head, with the river now starting at its foot and "
+                  f"'glowmere-falls' coming down it; the south's banks ending at z 244, a low sill; "
+                  f"the river's flow held at the source course's {source_speed:.4f} m/s")
 
 
 def mushrooms(scene):
@@ -184,6 +238,7 @@ EDGE_BAND = 6.0      # metres inside the grid's boundary where a skyline counts 
 OPEN_RISE = 0.2      # below this rise per metre, ground cut by the boundary reads as land running on
 OPEN_ELEVATION = 5.0 # ...and below this many degrees above the eye, as the sky meeting the land
 LOW_SKY = 0.5        # degrees: sky seen at or below this is sky where the land should have gone on
+MOUTH_REACH = 32.0   # metres: a ray leaving the terrain this close to where the water does looks out of its mouth
 SURVEY = 97          # WorldMap::prepare's survey, points a side
 
 
@@ -209,6 +264,43 @@ def _probe_heights(world_json, points, cache_dir):
             raise RuntimeError(f"expected {len(chunk)} probes, parsed {len(found)}")
         out.extend(float(h) for h in found)
     return out
+
+
+def _water_mouth(river):
+    """Where a river's smoothed course leaves the drawn terrain at its downstream end, (x, z)."""
+    pts = _chaikin32(river["path"], river.get("smoothing", 0) if len(river["path"]) >= 3 else 0)
+
+    def inside(q):
+        return GRID_LO <= float(q[0]) <= GRID_HI and GRID_LO <= float(q[2]) <= GRID_HI
+    for a, b in zip(reversed(pts[:-1]), reversed(pts[1:])):
+        if inside(a) and not inside(b) or (inside(a) and b is pts[-1]):
+            lo, hi = 0.0, 1.0  # bisect to the boundary along a -> b
+            for _ in range(40):
+                mid = 0.5 * (lo + hi)
+                q = a + (b - a) * mid
+                lo, hi = (mid, hi) if inside(q) else (lo, mid)
+            q = a + (b - a) * lo
+            return float(q[0]), float(q[2])
+    end = pts[-1]
+    return float(end[0]), float(end[2])
+
+
+def _seams(world_json, cache_dir):
+    """(ground cells, water cells) the engine's seam scan finds: a step in either surface."""
+    import json
+    import pathlib
+    import re
+    import subprocess
+    root = pathlib.Path(__file__).resolve().parents[2]
+    tool = root / "build" / "release" / "tools" / "avgen_world_preview"
+    wf = cache_dir / "seams-world.json"
+    wf.write_text(json.dumps({"world": world_json}))
+    text = subprocess.run([str(tool), "--seams", str(wf), str(cache_dir / "seams.png"), "512"],
+                          capture_output=True, text=True).stdout
+    found = dict(re.findall(r"seams: (ground|water) (\d+) cell", text))
+    if set(found) != {"ground", "water"}:
+        raise RuntimeError("avgen_world_preview --seams printed no seam summary")
+    return int(found["ground"]), int(found["water"])
 
 
 class Field:
@@ -265,7 +357,8 @@ class Field:
 
     def open_ends(self, eye, target, vfov_deg, aspect=16 / 9, cols=96):
         """Columns of this view whose skyline is the world's edge on gentle, low ground: the valley
-        running on out of the world. [(column, x, z, height, elevation)]."""
+        running on out of the world. [(column, x, z, height, elevation, exit x, exit z)]: where the
+        skyline is, and where the column's ray leaves the drawn terrain."""
         np = self.np
         fx, fy, fz = (target[k] - eye[k] for k in range(3))
         yaw0 = math.atan2(fz, fx)
@@ -284,10 +377,11 @@ class Field:
             bottom = pitch - half_v * math.cos(math.radians(off))
             top = pitch + half_v * math.cos(math.radians(off))
             x, z = float(eye[0] + math.cos(yaw) * d[k]), float(eye[2] + math.sin(yaw) * d[k])
+            ex, ez = float(eye[0] + math.cos(yaw) * d[-1]), float(eye[2] + math.sin(yaw) * d[-1])
             # Sky at or below the horizon: in a world that went on, land would fill it. The skyline can
             # be anywhere, even below the frame (a gorge's slot seen over the near valley floor).
             if max(float(ang[k]), bottom) <= LOW_SKY and ang[k] < top:
-                found.append((c, x, z, float(h[k]), float(ang[k])))
+                found.append((c, x, z, float(h[k]), float(ang[k]), ex, ez))
                 continue
             if d[k] < d[-1] - EDGE_BAND:
                 continue  # a crest inside the world: the edge is behind it
@@ -296,7 +390,7 @@ class Field:
             back = self.at(eye[0] + math.cos(yaw) * (d[k] - 20.0), eye[2] + math.sin(yaw) * (d[k] - 20.0))
             rise = (h[k] - float(back)) / 20.0
             if rise < OPEN_RISE and ang[k] < OPEN_ELEVATION:
-                found.append((c, x, z, float(h[k]), float(ang[k])))
+                found.append((c, x, z, float(h[k]), float(ang[k]), ex, ez))
         return found
 
     def skyline(self, eye, target, vfov_deg, aspect=16 / 9, cols=64):
@@ -373,27 +467,51 @@ def check(source_world, world, project, scene, trace=None):
     # 3. the river still divides the valley. The navigator walks anything up to ~63 degrees
     # (maxSlope 0.55), so only water keeps the banks apart; a river that ends inside the world lets
     # every walker route around its head, and the aliens' choices change everywhere (phase3/world.md).
-    river = next(f for f in world["features"] if f.get("water") and f["kind"] == "river")
-    ends = (river["path"][0], river["path"][-1])
-    outside = [not (GRID_LO < p[0] < GRID_HI and GRID_LO < p[2] < GRID_HI) for p in ends]
-    ok &= all(outside)
-    lines.append(f"river '{river['name']}' runs edge to edge (the navigator's divide): "
-                 f"{'yes' if all(outside) else 'NO -- an end lies inside the terrain'}")
+    # The water is a chain of river features, each starting where the one before it ends (the falls
+    # run down the head into the river); the chain's two ends must both lie outside the terrain.
+    rivers = [f for f in world["features"] if f.get("water") and f["kind"] == "river"]
+    chain = [min(rivers, key=lambda f: f["path"][0][2])]
+    while True:
+        nxt = [f for f in rivers if f not in chain and f["path"][0] == chain[-1]["path"][-1]]
+        if not nxt:
+            break
+        chain.append(nxt[0])
+    ends = (chain[0]["path"][0], chain[-1]["path"][-1])
+    joined = all(not (GRID_LO < p[0] < GRID_HI and GRID_LO < p[2] < GRID_HI) for p in ends) and len(chain) == len(rivers)
+    ok &= joined
+    lines.append(f"water runs edge to edge (the navigator's divide), {' -> '.join(f['name'] for f in chain)}: "
+                 f"{'yes' if joined else 'NO -- the chain ends inside the terrain'}")
+    # 3b. no step in the ground or the water surface anywhere (the engine's own seam scan)
+    seams = _seams(world, after.cache_dir)
+    ok &= seams == (0, 0)
+    lines.append(f"seams (avgen_world_preview --seams): ground {seams[0]} cell(s), water {seams[1]} cell(s)")
     # 4. no open end in any sampled view
+    # The river's own mouth is told apart from the rest. Its course to z 329 is what holds the survey's
+    # minimum (the river bed at (19.8, 316.7)), so it must leave through the south edge in a gorge,
+    # and a camera looking down its last reach sees out of it (phase3/world.md). Every other open end
+    # fails the check.
     poses = trace_poses(trace) if trace else camera_poses(project, scene)
-    shots = {}
+    mouth = _water_mouth(chain[-1])
+    shots, mouths = {}, {}
     for label, t, eye, target, vfov in poses:
-        n = len(after.open_ends(eye, target, vfov))
-        s = shots.setdefault(label, [0, 0, 0])
-        s[0] += 1
-        s[1] += bool(n)
-        s[2] = max(s[2], n)
+        found = after.open_ends(eye, target, vfov)
+        edge = [f for f in found if math.hypot(f[5] - mouth[0], f[6] - mouth[1]) > MOUTH_REACH]
+        for table, cols in ((shots, len(edge)), (mouths, len(found) - len(edge))):
+            s = table.setdefault(label, [0, 0, 0])
+            s[0] += 1
+            s[1] += bool(cols)
+            s[2] = max(s[2], cols)
     bad = {k: v for k, v in shots.items() if v[1]}
     ok &= not bad
     lines.append(f"views sampled: {len(poses)} in {len(shots)} shots ({'every frame of a trace, sampled' if trace else 'fixed and keyed rigs'}); "
                  f"views with an open end: {sum(v[1] for v in shots.values())}")
     for k, v in sorted(bad.items()):
         lines.append(f"  {k}: an open end in {v[1]} of {v[0]} views (up to {v[2]} of 96 columns)")
+    seen = {k: v for k, v in mouths.items() if v[1]}
+    lines.append(f"views that see out of the river's mouth at ({mouth[0]:.0f}, {mouth[1]:.0f}), the one opening the "
+                 f"survey pins (not counted above): {sum(v[1] for v in seen.values())} in {len(seen)} shots")
+    for k, v in sorted(seen.items()):
+        lines.append(f"  {k}: {v[1]} of {v[0]} views (up to {v[2]} of 96 columns)")
     # 5. how much taller the world stands than before, per shot: a closure should raise the skyline
     # where the valley ran out and nowhere else. Reported, not judged: the look is judged on stills.
     rises = {}
