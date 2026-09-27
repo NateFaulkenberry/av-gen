@@ -137,13 +137,14 @@ def bloom_by_the_river(t0, t1, g):
 
 
 @at("14.1")
-def gills_from_the_east(t0, t1, g):
-    # Under the elder's cap from its east side: the gold that beats with the kick, a bar before the
-    # pull-back takes the drums away.
-    r = still(20.0, g(6, 60, 2.0), [-12.0, 14.0, 50.0])
-    return r, dict(lead="hero", purpose="Under the elder's cap, from the east", subject="the elder's gills",
-                   camera="20 mm, 2 m, east of the stem", movement="still", music="1 bar, into the pull-back",
-                   modulation="heartbeat")
+def cap_rim_from_the_north(t0, t1, g):
+    # The elder's cap from the north, its rim against the stars, the gold beating with the kick a bar
+    # before the pull-back takes the drums away. (From the east, iteration 1, horse-11 grazed in front
+    # of the lens and filled the frame.) A rising move, so the frame changes in its one bar.
+    r = moving(t0, t1, 20.0, g(-10, 36, 1.0), g(-9, 37, 2.2), [-13.0, 17.0, 48.0], [-13.0, 17.5, 48.0])
+    return r, dict(lead="hero", purpose="The elder's cap from the north, its rim against the stars",
+                   subject="the elder's cap and gills", camera="20 mm, 1-2 m, north of the stem",
+                   movement="rising 1.2 m", music="1 bar, into the pull-back", modulation="heartbeat")
 
 
 # ==== 3 first pull-back (bars 15-16): E2 ===============================================================
@@ -173,11 +174,12 @@ def the_return(t0, t1, g):
 @at("19.1")
 def first_wave(t0, t1, g):
     # The first wave of light runs out from the elder through the small mushrooms on the downbeat:
-    # low over the ground cover, so it comes toward the lens.
-    r = moving(t0, t1, 35.0, g(-42, 92, 0.9), g(-40, 89, 0.9), [-12.0, 6.0, 52.0])
+    # low over the ground cover north-east of it, so the wave comes toward the lens. (Iteration 1's
+    # vantage was over the pool, and the water filled half the frame.)
+    r = moving(t0, t1, 35.0, g(14, 34, 1.0), g(9, 38, 1.0), [-12.0, 5.0, 52.0])
     return r, dict(lead="world", purpose="The first wave runs through the mushrooms toward us",
-                   subject="the small mushrooms, the elder beyond", camera="35 mm, 0.9 m, south-west of the elder",
-                   movement="slow push", music="2 bars; the wave on the downbeat", effects="bar wave")
+                   subject="the small mushrooms, the elder beyond", camera="35 mm, 1 m, north-east of the elder",
+                   movement="push, 6 m", music="2 bars; the wave on the downbeat", effects="bar wave")
 
 
 @at("21.1")
@@ -190,25 +192,27 @@ def rook_investigates(t0, t1, g):
 
 @at("23.1")
 def herd_east_meadow(t0, t1, g):
-    # The herd on the east meadow, the elder's gold far beyond it.
-    r = moving(t0, t1, 40.0, g(100, -15, 1.8), g(98, -12, 1.8), [58.0, 9.0, 22.0])
+    # The herd on the east meadow, the elder's gold far beyond it. Four metres up: at 1.8 m a fern
+    # filled the frame (iteration 1).
+    r = moving(t0, t1, 40.0, g(98, -10, 4.0), g(95, -7, 4.0), [60.0, 9.0, 20.0])
     return r, dict(lead="animal", purpose="The herd grazing on the east meadow", subject="the horses, the elder far off",
-                   camera="40 mm, 1.8 m, north-east of the meadow", movement="slow lateral", music="2 bars")
+                   camera="40 mm, 4 m, north-east of the meadow", movement="slow lateral", music="2 bars")
 
 
 @at("25.1")
 def lantern_close(t0, t1, g):
-    # The lantern's clap flare, close, from its east side.
-    r = still(35.0, g(-30, -20, 2.5), [-45.0, 10.5, -26.0])
+    # The lantern's clap flare, close, from its east side, pushing in.
+    r = moving(t0, t1, 35.0, g(-30, -20, 2.5), g(-34, -21.5, 2.3), [-45.0, 10.5, -26.0])
     return r, dict(lead="hero", purpose="The lantern, close, flaring on the clap", subject="the lantern mushroom",
-                   camera="35 mm, 15 m east of it", movement="still", music="1 bar")
+                   camera="35 mm, 15 m east of it", movement="push, 4 m", music="1 bar")
 
 
 @at("26.1")
 def east_bank_travel(t0, t1, g):
     # The one longer travel: down the east bank past the ferns, looking across the river at the
-    # elder, so the whole middle of the valley slides by behind it.
-    r = moving(t0, t1, 35.0, g(24, 98, 2.5), g(22, 76, 2.5), [-12.0, 10.0, 52.0])
+    # elder, so the whole middle of the valley slides by behind it. Eight metres further east than
+    # iteration 1, whose path ran into horse-11 grazing.
+    r = moving(t0, t1, 35.0, g(32, 98, 2.5), g(30, 76, 2.5), [-12.0, 10.0, 52.0])
     return r, dict(lead="world", purpose="A travel down the east bank, the elder across the water",
                    subject="the valley floor, the elder", camera="35 mm, 2.5 m, east bank",
                    movement="lateral dolly, 22 m", music="3 bars")
@@ -216,20 +220,25 @@ def east_bank_travel(t0, t1, g):
 
 @at("29.1")
 def vane_watches(t0, t1, g):
-    # [s11] Vane by the river, watching the elder: riding 10 m behind Vane, looking at the elder's
-    # gold, so the two stay on one line whatever Vane does.
-    r = Rig("", 28.0, follow="vane", follow_offset=(3.8, 2.6, -9.2), target=[-12.0, 12.0, 52.0], clearance=1.2,
-            smoothing="fixed-target")
-    return r, dict(lead="alien", purpose="Vane by the river, watching the elder", subject="vane, the elder beyond",
-                   camera="28 mm, riding 10 m behind Vane", movement="follows", music="2 bars")
+    # [s11] Vane walking in the east of the valley, the elder's gold beyond: riding 7.5 m east of Vane
+    # and aiming 8 m west of it, so the lens looks west past Vane toward the elder. (Iteration 1 rode
+    # behind a Vane standing by the river, as the first pass's cast did; the tuned cast's Vane walks
+    # the east meadow here, and the old offset looked away from it.)
+    # The offset and aim were searched on the tuned cast's trace so Vane holds the right third and
+    # the elder the left third for the whole span (build/gv3/cut, iteration 2).
+    r = follow(28.0, "vane", (9.0, 2.4, 5.0), (-12.0, 1.2, 2.0))
+    return r, dict(lead="alien", purpose="Vane in the east of the valley, the elder beyond", subject="vane, the elder beyond",
+                   camera="28 mm, riding 10 m south-east of Vane, looking west past it", movement="follows",
+                   music="2 bars")
 
 
 @at("31.1")
 def spire_east_bank(t0, t1, g):
-    # A hero the first pass never showed: the spire on the east bank.
-    r = moving(t0, t1, 35.0, g(50, -90, 2.0), g(52, -91, 2.0), [68.0, 14.5, -104.0])
+    # A hero the first pass never showed: the spire on the east bank, trucking past it for parallax
+    # (a 2 m push showed nothing new after its first frame).
+    r = moving(t0, t1, 35.0, g(52, -86, 2.0), g(58, -91, 2.0), [68.0, 14.5, -104.0])
     return r, dict(lead="hero", purpose="The spire on the east bank", subject="the spire mushroom",
-                   camera="35 mm, 2 m, south-west of it", movement="slow push", music="2 bars to the lift")
+                   camera="35 mm, 2 m, south-west of it", movement="lateral truck, 8 m", music="2 bars to the lift")
 
 
 # ==== 5 lift (bars 33-40): E3 ==========================================================================
@@ -272,19 +281,22 @@ def tide_sees_e3(t0, t1, g):
 
 
 @at("39.1")
-def elder_warming(t0, t1, g):
-    # Back in the valley, the elder's gold warming for the arrival.
-    r = moving(t0, t1, 35.0, g(-48, 60, 2.0), g(-46, 59, 2.0), [-12.0, 12.0, 52.0])
-    return r, dict(lead="hero", purpose="The elder from the west, its gold warming", subject="the elder",
-                   camera="35 mm, 2 m, west bank", movement="slow push", music="1 bar")
+def e3_taken(t0, t1, g):
+    # E3's animal fades into the scout and is gone (70.4-71.9 s): a second long lens, from the west
+    # slope, 125 m off.
+    r = aim_at(70.0, g(-125, -150, 3.0), "scout", (0.0, -9.0, 0.0), "craft")
+    return r, dict(lead="event", purpose="E3: the animal fades into the scout", subject="the scout and its beam (E3)",
+                   camera="70 mm from the west slope, live aim", movement="still", music="1 bar",
+                   effects="the scout's beam")
 
 
 @at("40.1")
 def ridge_north_east(t0, t1, g):
-    # The ridge, high in the north-east, the last bar before the valley lights up.
-    r = moving(t0, t1, 35.0, g(110, -170, 3.0), g(112, -171, 3.0), [131.0, 24.0, -189.0])
+    # The ridge, high in the north-east, the last bar before the valley lights up: a push, so the
+    # frame changes in its bar.
+    r = moving(t0, t1, 35.0, g(108, -166, 3.0), g(114, -172, 3.0), [131.0, 24.0, -189.0])
     return r, dict(lead="hero", purpose="The ridge mushroom high in the north-east", subject="the ridge mushroom",
-                   camera="35 mm, 3 m", movement="slow push", music="1 bar into the arrival")
+                   camera="35 mm, 3 m", movement="push, 8 m", music="1 bar into the arrival")
 
 
 # ==== 6 arrival (bars 41-48): the valley lights up ======================================================
@@ -315,18 +327,19 @@ def bloom_spores(t0, t1, g):
 
 @at("46.1")
 def veil_at_the_water(t0, t1, g):
-    r = still(35.0, g(95, 210, 2.0), [78.0, 2.5, 198.5])
+    # The veil at the water's edge, close enough to read (iteration 1: tiny behind the ferns).
+    r = moving(t0, t1, 35.0, g(88, 207, 1.5), g(85, 205, 1.5), [77.5, 3.2, 198.7])
     return r, dict(lead="hero", purpose="The veil at the water's edge", subject="the veil mushroom",
-                   camera="35 mm, 2 m", movement="still", music="1 bar")
+                   camera="35 mm, 1.5 m, 13 m south-east of it", movement="push, 3.6 m", music="1 bar")
 
 
 @at("47.1")
 def gold_gills(t0, t1, g):
-    # [s16] Under the elder: the gold gills. One bar now; the first pass's two showed nothing new
-    # after their first frame.
-    r = still(18.0, g(-15, 59, 1.4), [-12.0, 15.0, 51.0])
+    # [s16] Under the elder: the gold gills, craning up the stem so the frame changes in its one bar
+    # (the first pass's two static bars showed nothing new after their first frame).
+    r = moving(t0, t1, 18.0, g(-15, 59, 1.0), g(-14.5, 58, 2.4), [-12.0, 15.0, 51.0])
     return r, dict(lead="hero", purpose="Under the elder: the gold gills", subject="the elder's gills",
-                   camera="18 mm, from the stem's foot", movement="still", music="1 bar", modulation="heartbeat")
+                   camera="18 mm, from the stem's foot", movement="crane up 1.4 m", music="1 bar", modulation="heartbeat")
 
 
 @at("48.1")
@@ -372,44 +385,42 @@ def bloom_far_bank(t0, t1, g):
 
 @at("54.1")
 def e4_arrives(t0, t1, g):
-    # E4. The scout comes down over the river 47 m west of the elder and its beam lights (bar 56.3):
-    # a middle-distance frame from the south with the elder at its right, so the event is in the
-    # valley, beside the film's heart, not in a sky of its own.
-    # A live aim at the scout: its station is wherever its region's animals are when it arrives (the
-    # plan's region is 30 m round (-55, 40); on the first-pass cast it stopped at (-75, 60)), and a fixed
-    # frame lost it off the left edge.
+    # E4. The scout comes down over the west meadow and its beam lights (bar 56.3). A live aim at the
+    # scout from over the river south of the elder: its station is wherever its region's animals are
+    # when it arrives, and the elder stands at the right of the frame.
     r = Rig("", 28.0, aim="scout", aim_offset=(0.0, -6.0, 0.0), smoothing="craft")
-    r.move(t0, t1, g(-18, 118, 3.0), g(-19, 114, 3.0))
-    return r, dict(lead="event", purpose="E4: the scout settles over the river beside the elder",
+    r.move(t0, t1, g(-24, 120, 3.0), g(-24, 115, 3.0))
+    return r, dict(lead="event", purpose="E4: the scout settles over the meadow beyond the elder",
                    subject="the scout (E4), the elder at the right", camera="28 mm, 3 m, from the south, live aim",
                    movement="slow push", music="3 bars; the beam at bar 56.3", effects="the scout's beam (E4)")
 
 
 @at("57.1")
 def e4_pair_lifted(t0, t1, g):
-    # E4's lift, on the sub-phrase line: two animals rising together in one column, from 55 m.
-    r = aim_at(50.0, g(-25, 85, 2.0), "scout", (0.0, -12.0, 0.0), "craft")
+    # E4's lift, on the sub-phrase line: two animals rising together in one column, from 40-50 m off
+    # on the dry ground north-east of the meadow.
+    r = aim_at(50.0, g(-35, -15, 2.5), "scout", (0.0, -12.0, 0.0), "craft")
     return r, dict(lead="event", purpose="E4: two animals lifted together", subject="the scout's beam and the pair (E4)",
-                   camera="50 mm, 55 m off, live aim", movement="still", music="the lift on bar 57",
+                   camera="50 mm, about 45 m off, live aim", movement="still", music="the lift on bar 57",
                    effects="the scout's beam")
 
 
 @at("59.1")
 def e4_aliens_watch(t0, t1, g):
-    # The aliens walk toward it and watch: riding with Vane, looking past it at the column.
-    r = follow(28.0, "vane", (6.0, 2.4, 3.0), (0.0, -10.0, 0.0), aim="scout", smoothing="fixed-target")
-    return r, dict(lead="event", purpose="E4: Vane watches the pair rise", subject="the column (E4), vane in front",
-                   camera="28 mm, riding beside Vane, looking at the scout", movement="follows", music="2 bars")
+    # The aliens come to watch: riding behind Ember, who is at the meadow, looking past it at the
+    # column (Vane watches from the elder, beyond).
+    r = follow(28.0, "ember", (-3.0, 2.5, -6.0), (0.0, -10.0, 0.0), aim="scout", smoothing="fixed-target")
+    return r, dict(lead="event", purpose="E4: Ember watches the pair rise", subject="the column (E4), ember in front",
+                   camera="28 mm, riding behind Ember, looking at the scout", movement="follows", music="2 bars")
 
 
 @at("61.1")
 def herd_after(t0, t1, g):
-    # The valley goes on: the horses on the east meadow from the south, and in the sky beyond them
-    # the scout climbing away north.
-    r = moving(t0, t1, 35.0, g(95, 45, 2.0), g(94, 42, 2.0), [70.0, 12.0, 10.0])
-    return r, dict(lead="animal", purpose="The herd on the east meadow; the scout leaving beyond",
-                   subject="the horses", camera="35 mm, 2 m, south-east of the meadow", movement="slow lateral",
-                   music="2 bars")
+    # The valley goes on: the horses on the east meadow from its south-east, 3 m up, clear of the
+    # tree that stood in the middle of iteration 1's frame.
+    r = moving(t0, t1, 35.0, g(100, 30, 3.0), g(98, 26, 3.0), [70.0, 11.0, 10.0])
+    return r, dict(lead="animal", purpose="The herd on the east meadow", subject="the horses",
+                   camera="35 mm, 3 m, south-east of the meadow", movement="slow lateral", music="2 bars")
 
 
 @at("63.1")
@@ -422,9 +433,10 @@ def umbra_listening(t0, t1, g):
 
 @at("65.1")
 def elder_spores(t0, t1, g):
-    r = moving(t0, t1, 50.0, g(-36, 70, 2.5), g(-35, 68, 2.5), [-12.0, 12.0, 52.0])
+    # The elder's spores drifting in its gold: a real push now (1 m showed nothing new).
+    r = moving(t0, t1, 50.0, g(-36, 70, 2.5), g(-31, 66, 2.7), [-12.0, 12.0, 52.0])
     return r, dict(lead="hero", purpose="The elder's spores drifting in its gold", subject="the elder",
-                   camera="50 mm, 2.5 m, south-west", movement="slow push", music="a bar and a half")
+                   camera="50 mm, 2.5 m, south-west", movement="push, 6 m", music="a bar and a half")
 
 
 @at("66.3")
@@ -436,10 +448,11 @@ def sage_grove(t0, t1, g):
 
 
 @at("69.1")
-def lantern_pool_side(t0, t1, g):
-    r = moving(t0, t1, 50.0, g(-20, -5, 2.0), g(-22, -4, 2.0), [-45.0, 11.0, -26.0])
-    return r, dict(lead="hero", purpose="The lantern from the river side", subject="the lantern mushroom",
-                   camera="50 mm, 2 m, south-east of it", movement="slow lateral", music="2 bars")
+def lantern_from_the_north(t0, t1, g):
+    # The lantern from its north side, trucking (iteration 1's river-side vantage had a rock in front).
+    r = moving(t0, t1, 35.0, g(-50, -48, 2.5), g(-44, -48, 2.5), [-45.0, 11.0, -26.0])
+    return r, dict(lead="hero", purpose="The lantern from the north", subject="the lantern mushroom",
+                   camera="35 mm, 2.5 m, 22 m north of it", movement="lateral truck, 6 m", music="2 bars")
 
 
 @at("71.1")
@@ -512,22 +525,27 @@ def e5_beyond_the_cap(t0, t1, g):
 # ==== 10 submerged break (bars 89-92) ====================================================================
 @at("89.1")
 def e5_under_the_cap(t0, t1, g):
-    # [s24] From under the elder: the saucer settling over its rim. A slow push now: the first pass's
-    # fixed frame showed nothing new after its first frame.
+    # [s24] From under the elder: the saucer settling over its rim. Pushing 5 m: the first pass's
+    # fixed frame, and iteration 1's 2 m push, showed nothing new after the first frame.
     r = Rig("", 20.0, aim="visitor", aim_offset=(0.0, -4.0, 0.0), smoothing="craft")
-    r.move(t0, t1, g(-18, 45, 1.5), g(-16.6, 46.6, 1.8))
+    r.move(t0, t1, g(-19, 43, 1.5), g(-15.5, 46.5, 1.9))
     return r, dict(lead="event", purpose="From under the elder: the saucer over its rim",
                    subject="the saucer, the elder's gills", camera="20 mm, under the cap, live aim",
-                   movement="slow push", music="the low-pass break on bar 89", modulation="light low, fog up")
+                   movement="push, 5 m", music="the low-pass break on bar 89", modulation="light low, fog up")
 
 
 @at("91.1")
 def ember_watches(t0, t1, g):
-    # [s25] Ember watches from across the water: riding 7 m behind and 4.8 m over Ember (ADR-913), looking
-    # at the saucer, so the two are on one line whatever Ember does.
-    r = follow(28.0, "ember", (-7.0, 4.8, 2.5), (0.0, -6.0, 0.0), aim="visitor", smoothing="fixed-target")
+    # [s25] Ember watches from across the water: riding 7 m behind and 4.8 m over Ember (ADR-913),
+    # looking at the ground under the saucer, as the first pass's frame did, so Ember sits low in the
+    # frame and the saucer high. (Iteration 1 aimed at the craft itself and tilted Ember out of the
+    # bottom of the frame.)
+    # A fixed target on the ground under E5's station (-1, 74 on the tuned cast), through a 24 mm, so Ember's
+    # shoulders sit lower left and the settling saucer upper centre.
+    r = Rig("", 24.0, follow="ember", follow_offset=(-7.0, 4.8, 2.5), target=[-1.0, 4.0, 74.0], clearance=1.2,
+            smoothing="fixed-target")
     return r, dict(lead="alien", purpose="Ember watches from across the water", subject="ember, the saucer beyond",
-                   camera="28 mm over the shoulder, riding with Ember", movement="follows", music="2 bars to the riser")
+                   camera="24 mm over the shoulder, riding with Ember", movement="follows", music="2 bars to the riser")
 
 
 # ==== 11 riser (bars 93-96): E5's lift; the cutting compresses with the roll ================================
@@ -542,8 +560,9 @@ def e5_beam_lights(t0, t1, g):
 
 @at("94.1")
 def e5_up_the_beam(t0, t1, g):
-    # [s27] Up the beam from beside the horse.
-    r = aim_at(20.0, g(-1, 80, 1.0), "visitor", (0.0, -3.0, 0.0), "craft")
+    # [s27] Up the beam from beside the horse, 12 m off the station: at 6 m (iteration 1, the tuned
+    # cast's station) the lens looked almost straight up and the saucer's sway read as yaw.
+    r = aim_at(20.0, g(-8, 83, 1.0), "visitor", (0.0, -3.0, 0.0), "craft")
     return r, dict(lead="event", purpose="E5: up the beam from beside the horse", subject="the beam and the saucer",
                    camera="20 mm, 1 m, looking up", movement="still", music="1 bar")
 
@@ -582,11 +601,12 @@ def e5_horse_under_the_saucer(t0, t1, g):
 
 @at("96.4")
 def e5_horse_fades(t0, t1, g):
-    # [s32] The horse fades into the saucer on the roll's last beat. Aims at the craft, never at the
-    # horse, which is retired on the frame of the drop.
-    r = aim_at(70.0, g(40, 78, 6.0), "visitor", (0.0, -3.5, 0.0), "craft")
+    # [s32] The horse fades into the saucer on the roll's last beat, from the south-west through a
+    # 50 mm (the beat before is 70 mm from the south: two frames that read as one). Aims at the craft,
+    # never at the horse, which is retired on the frame of the drop.
+    r = aim_at(50.0, g(-25, 95, 2.5), "visitor", (0.0, -3.5, 0.0), "craft")
     return r, dict(lead="event", purpose="E5: the horse fades into the saucer", subject="horse-11 vanishing",
-                   camera="70 mm, side on from the east", movement="still", music="the last beat of the roll")
+                   camera="50 mm, from the south-west", movement="still", music="the last beat of the roll")
 
 
 # ==== 12 drop (bars 97-120): the light rebuilt ===========================================================
@@ -618,11 +638,12 @@ def umbra_lit(t0, t1, g):
 
 
 @at("101.1")
-def e5_far_away(t0, t1, g):
-    # The saucer small now over the north rim, climbing toward the aurora.
-    r = aim_at(50.0, g(-20, 40, 3.0), "visitor", (0.0, 0.0, 0.0), "craft")
-    return r, dict(lead="event", purpose="E5: the saucer, small, climbing away north", subject="the saucer",
-                   camera="50 mm, from the elder, live aim", movement="still", music="1 bar")
+def ember_cap_lit(t0, t1, g):
+    # The ember mushroom on the east terrace, lit, pushing in. (Iteration 1 followed the saucer up into
+    # the black sky: a near-black frame in the middle of the drop.)
+    r = moving(t0, t1, 28.0, g(165, 158, 2.0), g(169, 155, 2.0), [175.7, 14.0, 149.8])
+    return r, dict(lead="hero", purpose="The ember mushroom on the east terrace, lit", subject="ember-cap",
+                   camera="28 mm, 2 m, 12 m west of it", movement="push, 5 m", music="1 bar")
 
 
 @at("102.1")
@@ -642,30 +663,33 @@ def ember_looks_up(t0, t1, g):
 
 @at("104.1")
 def spire_lit(t0, t1, g):
-    r = moving(t0, t1, 28.0, g(56, -118, 1.6), g(58, -118, 1.6), [68.0, 14.0, -104.0])
+    # The spire lit, close from the north-west (iteration 1's 17 m left it a speck).
+    r = moving(t0, t1, 28.0, g(62, -112, 1.5), g(64, -109.5, 1.6), [67.7, 14.0, -103.7])
     return r, dict(lead="hero", purpose="The spire lit, from the north-west", subject="the spire mushroom",
-                   camera="28 mm, low", movement="lateral", music="1 bar to the sub-phrase")
+                   camera="28 mm, low, 10 m off", movement="push, 3 m", music="1 bar to the sub-phrase")
 
 
 @at("105.1")
 def herd_rebuilt(t0, t1, g):
-    r = moving(t0, t1, 28.0, g(80, 40, 1.4), g(77, 39, 1.4), [72.0, 9.0, 12.0])
+    # 2.2 m: at 1.4 m a fern leaf covered the first half of iteration 1's bar.
+    r = moving(t0, t1, 28.0, g(80, 40, 2.2), g(76, 39, 2.2), [72.0, 9.0, 12.0])
     return r, dict(lead="animal", purpose="The horses in the rebuilt light", subject="the horses",
-                   camera="28 mm, low, among them", movement="lateral", music="bar 105: the sub-phrase")
+                   camera="28 mm, 2.2 m, among them", movement="lateral, 4 m", music="bar 105: the sub-phrase")
 
 
 @at("106.1")
 def veil_lit(t0, t1, g):
-    r = still(35.0, g(60, 215, 1.5), [78.0, 2.5, 199.0])
+    # The veil lit, from its north-east, trucking past it.
+    r = moving(t0, t1, 28.0, g(86, 190, 1.4), g(83, 188, 1.4), [77.5, 3.0, 198.7])
     return r, dict(lead="hero", purpose="The veil lit at the water", subject="the veil mushroom",
-                   camera="35 mm, 1.5 m, west of it", movement="still", music="1 bar")
+                   camera="28 mm, 1.4 m, 12 m north-east of it", movement="lateral truck, 3.6 m", music="1 bar")
 
 
 @at("107.1")
 def scree_lit(t0, t1, g):
-    r = still(35.0, g(-160, 80, 2.0), [-176.0, 25.0, 96.0])
+    r = moving(t0, t1, 35.0, g(-160, 80, 2.0), g(-163, 85, 2.0), [-176.0, 25.0, 96.0])
     return r, dict(lead="hero", purpose="The scree lit on the west slope", subject="the scree mushroom",
-                   camera="35 mm", movement="still", music="1 bar")
+                   camera="35 mm", movement="push, 6 m", music="1 bar")
 
 
 @at("108.1")
@@ -697,10 +721,11 @@ def vane_where_the_horse_was(t0, t1, g):
 
 @at("113.1")
 def valley_rebuilt_from_the_north(t0, t1, g):
-    # The valley rebuilt, from the north, low: the river winding down to the elder.
-    r = moving(t0, t1, 35.0, g(-35, -130, 3.0), g(-33, -121, 3.2), [-12.0, 10.0, 52.0], interp="easeInOut")
+    # The valley rebuilt, from the north-west, 6 m up: over the foreground plants, clear of the tree
+    # that stood in front of the elder in iteration 1's frame.
+    r = moving(t0, t1, 35.0, g(-30, -130, 6.0), g(-28, -121, 6.2), [-12.0, 10.0, 52.0], interp="easeInOut")
     return r, dict(lead="world", purpose="The valley rebuilt, from the north", subject="the valley, the river, the elder",
-                   camera="35 mm, 3 m, 180 m north of the elder", movement="slow push (9 m)",
+                   camera="35 mm, 6 m, 185 m north of the elder", movement="slow push (9 m)",
                    music="the final phrase, slightly thinner, bar 113")
 
 
@@ -718,10 +743,11 @@ def last_grand_wide(t0, t1, g):
 # ==== 13 tail (bars 121-122) =============================================================================
 @at("121.1")
 def elder_alone(t0, t1, g):
-    # [s40] The elder alone, then black on the last hit.
-    r = still(20.0, g(-17, 60, 1.3), [-12.0, 14.5, 51.0])
+    # [s40] The elder alone, then black on the last hit -- now from the north-east under the cap, so it
+    # does not repeat the arrival's frame at the stem's foot (the Critic's s27/s73 pair).
+    r = moving(t0, t1, 20.0, g(-2, 44, 1.3), g(-3, 45, 1.2), [-12.0, 14.5, 51.0])
     return r, dict(lead="hero", purpose="The elder alone, then black", subject="the elder's gills",
-                   camera="20 mm, below", movement="still", music="kick and clap; black on the last hit at 224.79 s",
+                   camera="20 mm, below, north-east of the stem", movement="drifts in", music="kick and clap; black on the last hit at 224.79 s",
                    modulation="heartbeat alone")
 
 

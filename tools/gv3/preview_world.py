@@ -8,7 +8,7 @@ once gv3-cast's cast.py and UFO plan are merged into gv3/production.
     the horse-light keys removed;
   * the E1-E5 plan compiled into it by the engine (`avgen_cast_trace --plan --save-project`).
 
-    python3 tools/gv3/preview_world.py SRC_PROJECT OUT_DIR [--trace-seconds N]
+    python3 tools/gv3/preview_world.py SRC_PROJECT OUT_DIR [--trace-seconds N] [--plan PLAN.json]
 
 writes OUT_DIR/ufo.json (+ ufo.scene.json), renderable and traceable; `--trace-seconds 1` compiles
 the plan without tracing the film.
@@ -123,6 +123,7 @@ def transform(project, scene):
 def main():
     src, out = pathlib.Path(sys.argv[1]).resolve(), pathlib.Path(sys.argv[2]).resolve()
     seconds = float(sys.argv[sys.argv.index('--trace-seconds') + 1]) if '--trace-seconds' in sys.argv else 226.0
+    plan = pathlib.Path(sys.argv[sys.argv.index('--plan') + 1]).resolve() if '--plan' in sys.argv else PLAN
     out.mkdir(parents=True, exist_ok=True)
     p = json.loads(src.read_text())
     scene_path = pathlib.Path(p['assets']['scene']['path']['path'])
@@ -137,7 +138,7 @@ def main():
     p['assets']['scene']['path'].update(path=str(sp), sha256=hashlib.sha256(sp.read_bytes()).hexdigest(), size=sp.stat().st_size)
     pp = out / 'ufo-src.json'
     pp.write_text(json.dumps(p, indent=1))
-    cmd = [str(TRACE), '--project', str(pp), '--plan', str(PLAN), '--save-project', str(out / 'ufo.json'),
+    cmd = [str(TRACE), '--project', str(pp), '--plan', str(plan), '--save-project', str(out / 'ufo.json'),
            '--seconds', str(seconds), '--hz', '20', '--out', str(out / 'cast-ufo.json')]
     print(' '.join(cmd))
     r = subprocess.run(cmd, capture_output=True, text=True)
