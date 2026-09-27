@@ -26,6 +26,8 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <fmt/format.h>
+
 #include <cmath>
 #include <string>
 #include <vector>
@@ -169,6 +171,11 @@ TEST_CASE("a retired body neither blocks nor draws another body, and stays where
     CHECK(here.framesPerceived > 300);
     CHECK(here.alienClosest < 6.0f);
     CHECK(stayed.world.pointOfInterest("cow", nowhere));
+    WARN(fmt::format("ADR-934: retired -- cow moved {:.4f} m after, in the crowd {} frames, perceived {} frames, alien "
+                     "closest {:.2f} m; no retire -- cow moved {:.2f} m, in the crowd {} frames, perceived {} frames, "
+                     "alien closest {:.2f} m",
+                     gone.cowMovedAfter, gone.framesInCrowd, gone.framesPerceived, gone.alienClosest,
+                     here.cowMovedAfter, here.framesInCrowd, here.framesPerceived, here.alienClosest));
 }
 
 TEST_CASE("a scrub past a retire lands where the play did", "[entity][staging][adr934][seek]") {

@@ -436,4 +436,6 @@ TEST_CASE("a flinch out of someone's way still works", "[decide][adr933][social]
     INFO("control: moved " << pushed << " m");
     CHECK_FALSE(never);
     CHECK(pushed < 1.0f);  // only the crowd's push moved it
+    WARN(fmt::format("ADR-933, a flinch: stepped {:.2f} m (chose to avoid: {}); control moved {:.2f} m", stepped,
+                     avoided, pushed));
 }
