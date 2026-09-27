@@ -380,6 +380,12 @@ TEST_CASE("post/bloom/levels reaches the pyramid from a project (ADR-385)", "[gp
     s.post.bloomEnabled = true;
     s.post.bloomIntensity = 0.8f;
     s.post.bloomThreshold = 0.5f;
+    // ADR-917: `bloomLevels` is the depth AT the reference height, so this asks its question at a
+    // reference equal to its own 128 lines. Against the default 720 a 128-line frame is 2.5 octaves
+    // coarser and the chain folds the levels it is too small for: the first run after ADR-917
+    // reported six=4 two=1 -- the parameter still reaching the pyramid, at a height where two
+    // authored levels are one.
+    s.post.referenceHeight = 128.0f;
 
     s.post.bloomLevels = 6;
     auto six = renderer.renderToImageFloat(s, time, 192, 128);

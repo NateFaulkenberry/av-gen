@@ -44,6 +44,9 @@ class FieldUniforms;
 
 struct VolumeStats {
     std::uint32_t steps = 0;            // raymarch samples per pixel this frame (0 = fog off)
+    // ADR-919: the count before the tier's floor -- the scene's own, times the tier's scale. Equal
+    // to `steps` unless the floor raised it.
+    std::uint32_t authoredSteps = 0;
     std::uint32_t glowSystems = 0;      // emissive particle systems lighting the fog (ADR-040)
     // ADR-578, the brief's §39: "capture GPU ms, CPU ms, memory, resolution, step count, ACTIVE
     // VOLUME COUNT". Every item on that list was reported except this one, and it is the item

@@ -72,6 +72,11 @@ std::size_t litPixels(const gpu::Image8& img, int threshold) {
 // shading and not the simulation.
 scene::Scene cloudScene() {
     scene::Scene s;
+    // ADR-917: the post chain these frames were written against, at their own 128 lines. The bloom
+    // is on by default and incidental here, but a lit-pixel count sees its halo, and against the
+    // default reference of 720 a 128-line frame's glow is planned 2.5 octaves tighter: the wrapping
+    // case's ratio of lit pixels read 3882 to 2908 on the first run after ADR-917.
+    s.post.referenceHeight = 128.0f;
     s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
     s.environment.skyIntensity = 0.0f;
     s.camera.position = {0.0f, 0.0f, 6.0f};

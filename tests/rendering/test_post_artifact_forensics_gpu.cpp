@@ -338,6 +338,13 @@ std::string describe(const char* name, const Field& f) {
 // targets the synthetic arm has no business inventing, and none of them is accused.
 scene::PostSettings glowmerePost() {
     scene::PostSettings s;
+    // ADR-917: the chain these measurements were taken on, at the synthetic frame's own height
+    // (kSynthH, below). Against the default reference of 720 a 288-line frame is scaled to 0.4, so
+    // every streak is 0.4x the texels it was authored at and the lag this file's comb test watches
+    // -- the old defect's period, `stretch` texels -- no longer describes the streak: the first run
+    // after ADR-917 read 0.023-0.042 there against a bar of 0.02, with no isolated peaks and the
+    // elongation intact. Pinned, the chain is scale 1, the chain the recorded numbers describe.
+    s.referenceHeight = 288.0f;
     s.bloomEnabled = true;
     s.bloomIntensity = 0.18f;
     s.bloomThreshold = 1.0f;

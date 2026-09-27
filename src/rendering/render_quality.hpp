@@ -159,6 +159,22 @@ struct QualitySettings {
     // Offline never scales either (§5.9).
     float volumeStepScale = 1.0f;
 
+    // ---- ADR-919: floors under the sample counts a scene authored --------------------------------
+    //
+    // A scale multiplies what the scene asked for and so can only ever be as good as the scene's
+    // own number: offline's `volumeStepScale` of 1 rendered Glowmere Valley 3's final with the 12
+    // march steps its preview was tuned at, its textures at the engine's fixed 8x anisotropy and
+    // its visible sky out of a 128 px cube magnified about 38x at 4K. A floor raises what is below
+    // it and leaves alone what is above, so a scene that authored more keeps more, and it changes
+    // how finely the picture is sampled -- never what it is. Zero means no floor.
+    //
+    // Each floor is logged where it takes effect, from and to, so a render says what it raised.
+    std::uint32_t volumeStepFloor = 0;   // the march takes at least this many steps (when it runs)
+    std::uint32_t textureAnisotropy = 8; // material textures' anisotropic filtering (the old fixed 8x)
+    std::uint32_t skyCubeFloor = 0;      // the procedural sky's cube and its prefiltered specular
+                                         // cube, whose first mip IS the visible sky, are at least
+                                         // this many texels a face (0 = 256 and 128, the defaults)
+
     // ADR-390 §7. Multipliers on the Cosmic Ocean's sample counts: `cosmicOctaveScale` on the
     // nebula octave ceiling, `cosmicSampleScale` on the planet and dust cell neighbourhoods.
     //
@@ -372,6 +388,14 @@ struct QualitySettings {
             q.temporalHistoryScale = 1.0f;
             q.volumeResolutionScale = 1.0f;
             q.volumeStepScale = 1.0f;
+            // ADR-919: and it raises what a scene authored below the offline floors. 32 steps is
+            // where ADR-577 measured the march's animated grain fall from 1% of the medium's
+            // brightness (16 steps) to 1e-4; 16x is the anisotropy WebGPU's samplers allow; 1024
+            // a face spans a texel of the visible sky over about 5 px of a 2160-line frame at a
+            // 40 degree lens, where the default 128 spanned 38.
+            q.volumeStepFloor = 32;
+            q.textureAnisotropy = 16;
+            q.skyCubeFloor = 1024;
             // §5.9 / ADR-146: and it carries no history in the LOD ladder either, so the frame
             // does not depend on which way the camera arrived at it.
             q.lodHysteresisAllowed = false;

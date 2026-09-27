@@ -65,7 +65,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "dayNight",
     "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
     "proceduralSkyBackground",
-    "lightFromEnvironment", "fogColor", "background", "fogHeightAmount", "styledSkyAmbient",
+    "lightFromEnvironment", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
@@ -4655,6 +4655,22 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         fogColor_ = &params.add(fogDesc);
     }
     {
+        // ADR-918: the fog's colour taken from the sky behind it, aurora included. Beside the
+        // colour it replaces, and labelled for what it looks like rather than how it is computed.
+        auto desc = floatDesc(prefix_ + "scene/fogSky", volumeSetting_.fogSky, 0.0f, 1.0f, 0.0f, 1.0f);
+        desc.label = "fogSky (distance fades into the sky behind it, aurora included; 0 = the fog colour)";
+        fogSky_ = &params.add(desc);
+    }
+    {
+        // ADR-918: where the fog has become the sky's colour. Its own row, beside the amount, so the
+        // near air keeping the fog colour is a thing a person can see and move.
+        auto desc = floatDesc(prefix_ + "scene/fogSkyDistance", volumeSetting_.fogSkyDistance, 0.0f, 20000.0f,
+                              0.0f, 1000.0f);
+        desc.label = "fogSkyDistance (metres at which the fog is all sky colour; nearer air keeps the fog "
+                     "colour; 0 = automatic, where the fog is 95% thick)";
+        fogSkyDistance_ = &params.add(desc);
+    }
+    {
         // The painterly hemisphere (ADR-058). These were copied from the scene file rather than
         // registered, on the grounds that nothing animates them. That was true and is no longer
         // sufficient: they are the two values that decide how dark a stylized world is, so a
@@ -5690,6 +5706,8 @@ void Composition::detach() {
     volumeLocalLights_ = nullptr;
     volumeMaxDistance_ = nullptr;
     fogHeightAmount_ = nullptr;
+    fogSky_ = nullptr;
+    fogSkyDistance_ = nullptr;
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     ecologyLight_ = nullptr;
@@ -8556,6 +8574,8 @@ void Composition::applyParameters() {
         // controls and not one of them is on a panel. Those three are lighting rather than fog;
         // ADR-574 records the measurement and leaves them to their owner.
         env.fogHeightAmount = pick(fogHeightAmount_, volumeSetting_.fogHeightAmount);
+        env.fogSky = std::clamp(pick(fogSky_, volumeSetting_.fogSky), 0.0f, 1.0f); // ADR-918
+        env.fogSkyDistance = std::max(pick(fogSkyDistance_, volumeSetting_.fogSkyDistance), 0.0f);
         env.styledSkyAmbient =
             styledSkyAmbient_ != nullptr ? styledSkyAmbient_->value() : volumeSetting_.styledSkyAmbient;
         env.styledGroundAmbient = styledGroundAmbient_ != nullptr ? styledGroundAmbient_->value()
@@ -9564,6 +9584,15 @@ nlohmann::json Composition::toJson() const {
             fogHeightAmount_ != nullptr ? fogHeightAmount_->base() : v.fogHeightAmount;
         if (heightAmount != envDefaults.fogHeightAmount) {
             environment["fogHeightAmount"] = heightAmount;
+        }
+        // ADR-918: the parameter's base, for ADR-574's reason just above.
+        const float fogSky = fogSky_ != nullptr ? fogSky_->base() : v.fogSky;
+        if (fogSky != envDefaults.fogSky) {
+            environment["fogSky"] = fogSky;
+        }
+        const float fogSkyDistance = fogSkyDistance_ != nullptr ? fogSkyDistance_->base() : v.fogSkyDistance;
+        if (fogSkyDistance != envDefaults.fogSkyDistance) {
+            environment["fogSkyDistance"] = fogSkyDistance;
         }
         if (!colourEq3(v.styledSkyAmbient, envDefaults.styledSkyAmbient)) {
             environment["styledSkyAmbient"] = {v.styledSkyAmbient.r, v.styledSkyAmbient.g, v.styledSkyAmbient.b};
@@ -10587,6 +10616,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(value.error());
             }
             comp->volumeSetting_.fogHeightAmount = *value;
+        }
+        {
+            // ADR-918. Absent means 0, the constant fog colour every scene had before.
+            auto value = readFloat(e, "fogSky", comp->volumeSetting_.fogSky);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.fogSky = std::clamp(*value, 0.0f, 1.0f);
+        }
+        {
+            // Absent means 0: automatic, where the fog is thick.
+            auto value = readFloat(e, "fogSkyDistance", comp->volumeSetting_.fogSkyDistance);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.fogSkyDistance = std::max(*value, 0.0f);
         }
         readColour("styledSkyAmbient", comp->volumeSetting_.styledSkyAmbient);
         readColour("styledGroundAmbient", comp->volumeSetting_.styledGroundAmbient);

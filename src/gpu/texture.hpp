@@ -57,10 +57,17 @@ public:
     // Trilinear or nearest with the given wraps.
     const wgpu::Sampler& get(scene::WrapMode wrapU, scene::WrapMode wrapV, bool linear);
     const wgpu::Sampler& get(const scene::TextureRef& ref) { return get(ref.wrapU, ref.wrapV, ref.linearFilter); }
+    // ADR-919: the anisotropic filtering every linear sampler is made with, clamped to 1..16 (the
+    // WebGPU range). A change drops the cached samplers, and returns true so the caller can drop
+    // whatever it built from them -- a bind group holding the old sampler keeps filtering at the
+    // old anisotropy however this is set.
+    bool setMaxAnisotropy(std::uint32_t anisotropy);
+    [[nodiscard]] std::uint32_t maxAnisotropy() const { return maxAnisotropy_; }
 
 private:
     Context& context_;
     std::unordered_map<std::uint32_t, wgpu::Sampler> samplers_;
+    std::uint32_t maxAnisotropy_ = 8;
 };
 
 } // namespace avgen::gpu
