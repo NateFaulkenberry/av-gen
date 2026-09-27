@@ -106,6 +106,10 @@ struct AppOptions {
     // generator consumes the engine through these two and `--save-project`.
     std::optional<std::filesystem::path> plan;
     std::optional<std::filesystem::path> planReport;
+    // `--critic <path>` / `--critic-url <url>` (ADR-931): the Creative Critic the Director's
+    // `director.evaluate` renders a scratch copy for; AVGEN_CRITIC / AVGEN_CRITIC_URL otherwise.
+    std::optional<std::filesystem::path> critic;
+    std::optional<std::string> criticUrl;
     std::optional<std::filesystem::path> saveProject;  // write on exit
     // `--save-scene <file>`: write the composition on exit, the symmetry `--save-project`
     // has always lacked. Needed by Song Mode (ADR-249), whose camera track lives in the

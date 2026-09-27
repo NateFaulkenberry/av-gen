@@ -1,4 +1,5 @@
 #include "app/application.hpp"
+#include "app/directing_evaluate.hpp"
 #include "app/directing_plan_file.hpp"
 #include "pathtrace/denoise.hpp"
 #include "app/trace_sequence.hpp"
@@ -208,6 +209,9 @@ std::string usageText() {
            "                      could not be built\n"
            "  --plan-report <f>   write what --plan did as JSON: findings, blocked items, each set\n"
            "                      piece's scenario and nominal moments\n"
+           "  --critic <path>     the Creative Critic's CLI, for the Director's director.evaluate\n"
+           "                      (default $AVGEN_CRITIC; ADR-931)\n"
+           "  --critic-url <url>  where that Critic listens (default $AVGEN_CRITIC_URL, else the CLI's)\n"
            "  --save-project <f>  write the project on exit\n"
            "  --save-scene <f>    write the scene on exit (the camera collection and its shot\n"
            "                      track live here, not in the project)\n"
@@ -540,6 +544,16 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--cut-report");
             if (!v) return std::unexpected(v.error());
             options.cutReport = *v;
+            ++i;
+        } else if (arg == "--critic") {
+            auto v = need(i, "--critic");
+            if (!v) return std::unexpected(v.error());
+            options.critic = *v;
+            ++i;
+        } else if (arg == "--critic-url") {
+            auto v = need(i, "--critic-url");
+            if (!v) return std::unexpected(v.error());
+            options.criticUrl = *v;
             ++i;
         } else if (arg == "--plan") {
             auto v = need(i, "--plan");
@@ -1415,6 +1429,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->director.plane = ai_.get();
         ai_->setRecordingHook(makeRecordingHook()); // ADR-765: the assistant may ask; the person approves
         ai_->setWatchHook(makeWatchHook());         // ADR-767: what the film does on its own
+        // ADR-931: the quality evaluator in the Director's loop. Installed whether or not a Critic is
+        // configured, so `director.evaluate` answers "no evaluator is configured: --critic ..." rather
+        // than claiming the whole capability is absent.
+        ai_->setEvaluationHook(makeEvaluationHook(evaluatorOptionsFrom(options_.critic, options_.criticUrl)));
         panel_->director.edits = &edits_;
         panel_->director.onRequestStills = [this](const std::string& task, const directing::Compilation& c) {
             pendingStills_.emplace(task, c); // rendered between frames, never inside the UI pass
