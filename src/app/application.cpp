@@ -1,4 +1,6 @@
 #include "app/application.hpp"
+#include "app/directing_evaluate.hpp"
+#include "app/directing_plan_file.hpp"
 #include "pathtrace/denoise.hpp"
 #include "app/trace_sequence.hpp"
 #include "pathtrace/trace_job.hpp"
@@ -16,6 +18,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <fmt/ranges.h>
 
 #include "assets/image.hpp"
 #include "rendering/shader_layer.hpp"
@@ -201,6 +204,14 @@ std::string usageText() {
            "                      this run it is cut instead of the project's own sections\n"
            "  --cut-report <f>    after a mode=song --direct, write the cut as JSON: every shot's span,\n"
            "                      subject, arc and the reason for its duration (ADR-923)\n"
+           "  --plan <file>       compile a Director Plan (shots, cues, set pieces) into the project and\n"
+           "                      install it, before any --director cut; exits non-zero when an item\n"
+           "                      could not be built\n"
+           "  --plan-report <f>   write what --plan did as JSON: findings, blocked items, each set\n"
+           "                      piece's scenario and nominal moments\n"
+           "  --critic <path>     the Creative Critic's CLI, for the Director's director.evaluate\n"
+           "                      (default $AVGEN_CRITIC; ADR-931)\n"
+           "  --critic-url <url>  where that Critic listens (default $AVGEN_CRITIC_URL, else the CLI's)\n"
            "  --save-project <f>  write the project on exit\n"
            "  --save-scene <f>    write the scene on exit (the camera collection and its shot\n"
            "                      track live here, not in the project)\n"
@@ -533,6 +544,26 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             auto v = need(i, "--cut-report");
             if (!v) return std::unexpected(v.error());
             options.cutReport = *v;
+            ++i;
+        } else if (arg == "--critic") {
+            auto v = need(i, "--critic");
+            if (!v) return std::unexpected(v.error());
+            options.critic = *v;
+            ++i;
+        } else if (arg == "--critic-url") {
+            auto v = need(i, "--critic-url");
+            if (!v) return std::unexpected(v.error());
+            options.criticUrl = *v;
+            ++i;
+        } else if (arg == "--plan") {
+            auto v = need(i, "--plan");
+            if (!v) return std::unexpected(v.error());
+            options.plan = *v;
+            ++i;
+        } else if (arg == "--plan-report") {
+            auto v = need(i, "--plan-report");
+            if (!v) return std::unexpected(v.error());
+            options.planReport = *v;
             ++i;
         } else if (arg == "--generate") {
             auto v = need(i, "--generate");
@@ -1398,6 +1429,10 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         panel_->director.plane = ai_.get();
         ai_->setRecordingHook(makeRecordingHook()); // ADR-765: the assistant may ask; the person approves
         ai_->setWatchHook(makeWatchHook());         // ADR-767: what the film does on its own
+        // ADR-931: the quality evaluator in the Director's loop. Installed whether or not a Critic is
+        // configured, so `director.evaluate` answers "no evaluator is configured: --critic ..." rather
+        // than claiming the whole capability is absent.
+        ai_->setEvaluationHook(makeEvaluationHook(evaluatorOptionsFrom(options_.critic, options_.criticUrl)));
         panel_->director.edits = &edits_;
         panel_->director.onRequestStills = [this](const std::string& task, const directing::Compilation& c) {
             pendingStills_.emplace(task, c); // rendered between frames, never inside the UI pass
@@ -1911,6 +1946,42 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         loadAudio(*options.audio);
         if (!engine_->hasAudio() && options.headless) {
             return fail("headless run requires a loadable audio file");
+        }
+    }
+    // ADR-929: a Director Plan from the command line, after the world and the track (a plan names
+    // subjects and places musical times) and before the director, so a Song Mode cut sees the set
+    // pieces the plan placed.
+    if (options.plan) {
+        auto applied = applyPlanFile(*engine_, *options.plan);
+        if (options.planReport) {
+            nlohmann::json doc = applied ? applied->toJson()
+                                         : nlohmann::json{{"error", applied.error().message}};
+            std::ofstream out(*options.planReport);
+            out << doc.dump(2) << '\n';
+            if (!out) {
+                log::error("--plan-report: cannot write {}", options.planReport->string());
+            }
+        }
+        if (!applied) {
+            log::error("--plan: {}", applied.error().message);
+            if (options.headless) {
+                return std::unexpected(applied.error());
+            }
+            if (panel_) panel_->setStatus(applied.error().message);
+        } else {
+            for (const std::string& line : applied->diff) {
+                log::info("plan {}: {}", applied->planId, line);
+            }
+            if (!applied->blocked.empty()) {
+                const std::string message =
+                    fmt::format("--plan: {} item(s) of plan '{}' could not be built: {}", applied->blocked.size(),
+                                applied->planId, fmt::join(applied->blocked, ", "));
+                log::error("{}", message);
+                if (options.headless) {
+                    return fail("{}", message);
+                }
+                if (panel_) panel_->setStatus(message);
+            }
         }
     }
     if (options.directCamera) {

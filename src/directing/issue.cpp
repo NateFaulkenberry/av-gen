@@ -13,7 +13,7 @@ constexpr std::array<std::pair<Severity, const char*>, 3> kSeverities{{
     {Severity::Error, "error"},
 }};
 
-constexpr std::array<std::pair<IssueCode, const char*>, 26> kCodes{{
+constexpr std::array<std::pair<IssueCode, const char*>, 27> kCodes{{
     {IssueCode::SchemaInvalid, "SCHEMA_INVALID"},
     {IssueCode::SchemaUnknownField, "SCHEMA_UNKNOWN_FIELD"},
     {IssueCode::SchemaVersionUnsupported, "SCHEMA_VERSION_UNSUPPORTED"},
@@ -40,10 +40,12 @@ constexpr std::array<std::pair<IssueCode, const char*>, 26> kCodes{{
     {IssueCode::OverSaturated, "OVER_SATURATED"},
     {IssueCode::PhaseRateTrap, "PHASE_RATE_TRAP"},
     {IssueCode::RouteHazard, "ROUTE_HAZARD"},
+    {IssueCode::Repetition, "REPETITION"},
 }};
 // Every code has a row: the table is indexed by nothing, so a code added without one would name
 // itself SCHEMA_INVALID. The last enumerator is checked here, and the round-trip test walks them all.
 static_assert(kCodes.back().first == kLastIssueCode);
+static_assert(kCodes.size() == static_cast<std::size_t>(kLastIssueCode) + 1);
 
 template <typename E, std::size_t N>
 const char* nameIn(const std::array<std::pair<E, const char*>, N>& table, E value) {

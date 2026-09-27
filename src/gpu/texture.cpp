@@ -355,8 +355,18 @@ const wgpu::Sampler& SamplerCache::get(scene::WrapMode wrapU, scene::WrapMode wr
     desc.magFilter = linear ? wgpu::FilterMode::Linear : wgpu::FilterMode::Nearest;
     desc.minFilter = linear ? wgpu::FilterMode::Linear : wgpu::FilterMode::Nearest;
     desc.mipmapFilter = linear ? wgpu::MipmapFilterMode::Linear : wgpu::MipmapFilterMode::Nearest;
-    desc.maxAnisotropy = linear ? 8 : 1;
+    desc.maxAnisotropy = linear ? static_cast<std::uint16_t>(maxAnisotropy_) : 1;
     return samplers_.emplace(key, context_.device().CreateSampler(&desc)).first->second;
+}
+
+bool SamplerCache::setMaxAnisotropy(std::uint32_t anisotropy) {
+    const std::uint32_t clamped = std::clamp<std::uint32_t>(anisotropy, 1u, 16u);
+    if (clamped == maxAnisotropy_) {
+        return false;
+    }
+    maxAnisotropy_ = clamped;
+    samplers_.clear();
+    return true;
 }
 
 } // namespace avgen::gpu

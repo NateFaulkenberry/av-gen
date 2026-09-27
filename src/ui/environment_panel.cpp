@@ -105,6 +105,15 @@ void drawEnvironmentPanel(app::Engine& engine) {
     if (ImGui::CollapsingHeader("Sky and fog", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::PushID("atmos");
         slider(engine, "scene/volumeDensity", "Fog density", "%.3f");
+        // ADR-918: aerial perspective. Named for what it looks like: at 1 the far distance fades
+        // into the sky behind it -- aurora and comets included -- instead of into the fog colour, so
+        // a ridge against a bright horizon reads as air rather than as a dark cut-out.
+        slider(engine, "scene/fogSky", "Fog takes the sky's colour", "%.2f");
+        if (params::IParameter* p = engine.params().find("scene/fogSky"); p != nullptr && p->baseComponent(0) > 0.0f) {
+            ImGui::TextColored(kMuted, "  the far distance fades into the sky behind it, aurora included");
+            // Where it has become the sky: nearer air keeps the fog colour. 0 is automatic.
+            slider(engine, "scene/fogSkyDistance", "  ...all sky colour from", "%.0f m (0 = where the fog is thick)");
+        }
         slider(engine, "scene/fogHeight", "Fog height", "%.1f m");
         slider(engine, "scene/fogHeightFalloff", "Horizon falloff", "%.2f");
         // ADR-568 (the fog brief's §7). Drawn beside the falloff they shape rather than in an

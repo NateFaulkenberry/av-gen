@@ -1,0 +1,764 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "setpiece-lab",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   60.0,
+   240.0
+  ],
+  "target": [
+   0.0,
+   10.0,
+   0.0
+  ],
+  "fov": 50.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "background": [
+   0.012,
+   0.016,
+   0.028
+  ],
+  "intensity": 0.0,
+  "skyIntensity": 0.35,
+  "lightFromEnvironment": true,
+  "fogColor": [
+   0.02,
+   0.03,
+   0.05
+  ],
+  "fogHeight": 40.0,
+  "fogHeightFalloff": 0.05,
+  "volumeDensity": 0.0,
+  "shadowCascades": 2,
+  "sky": {
+   "zenithColor": [
+    0.01,
+    0.016,
+    0.034
+   ],
+   "horizonColor": [
+    0.03,
+    0.052,
+    0.09
+   ],
+   "groundColor": [
+    0.006,
+    0.008,
+    0.012
+   ],
+   "haze": 0.4,
+   "sunColor": [
+    0.36,
+    0.42,
+    0.6
+   ],
+   "sunIntensity": 1.0,
+   "sunSize": 1.2,
+   "sunGlow": 0.2
+  }
+ },
+ "post": {
+  "tonemap": 1,
+  "bloomEnabled": false
+ },
+ "nodes": [
+  {
+   "name": "ground",
+   "kind": "terrain",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "world": {
+    "name": "flat",
+    "seed": 1,
+    "size": [
+     900.0,
+     900.0
+    ],
+    "baseHeight": 0.0,
+    "layers": [],
+    "features": []
+   },
+   "terrain": {
+    "chunkSize": 60.0,
+    "resolution": 16,
+    "lodLevels": 2,
+    "lodDistance": 200.0,
+    "viewDistance": 900.0,
+    "skirtDepth": 1.0,
+    "groundMottle": false,
+    "groundGlow": 0.0
+   },
+   "material": {
+    "baseColor": [
+     0.1,
+     0.11,
+     0.13
+    ],
+    "roughness": 0.92,
+    "metallic": 0.0,
+    "emissiveIntensity": 0.0
+   },
+   "scatter": [],
+   "visible": true
+  },
+  {
+   "name": "visitor",
+   "kind": "procedural",
+   "position": [
+    0.0,
+    120.0,
+    400.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 32,
+     "rings": 16
+    },
+    "sourceTransform": {
+     "scale": [
+      6.0,
+      1.3,
+      6.0
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.05,
+      0.06,
+      0.08
+     ],
+     "roughness": 0.3,
+     "metallic": 0.9,
+     "emissiveColor": [
+      0.1,
+      0.5,
+      1.0
+     ],
+     "emissiveIntensity": 0.4
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "visitor-beam",
+   "kind": "particles",
+   "parent": "visitor",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "particles": {
+    "capacity": 32768,
+    "spawnRate": 0.0,
+    "shape": "disc",
+    "position": [
+     0.0,
+     -2.05,
+     0.0
+    ],
+    "extent": [
+     7.8,
+     7.8,
+     7.8
+    ],
+    "direction": [
+     0.0,
+     -1.0,
+     0.0
+    ],
+    "spread": 0.042,
+    "lifetimeMin": 3.6,
+    "lifetimeMax": 5.0,
+    "speedMin": 8.5,
+    "speedMax": 12.5,
+    "gravity": [
+     0.0,
+     -0.35,
+     0.0
+    ],
+    "drag": 0.05,
+    "turbulence": 0.16,
+    "turbulenceScale": 0.08,
+    "turbulenceSpeed": 0.15,
+    "sizeStart": 0.656,
+    "sizeEnd": 0.074,
+    "blend": "additive",
+    "emissive": 0.45,
+    "colorStart": [
+     0.26,
+     0.78,
+     1.0,
+     0.13
+    ],
+    "colorEnd": [
+     0.1,
+     0.95,
+     0.86,
+     0.0
+    ],
+    "seed": 20260911,
+    "velocityStretch": 4.5,
+    "attractorPosition": [
+     0.0,
+     -2.05,
+     0.0
+    ]
+   },
+   "visible": false,
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "name": "cow-a1",
+   "kind": "procedural",
+   "position": [
+    -120.0,
+    0.0,
+    -60.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "cow-b1",
+   "kind": "procedural",
+   "position": [
+    60.0,
+    0.0,
+    20.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "cow-b2",
+   "kind": "procedural",
+   "position": [
+    64.0,
+    0.0,
+    24.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "cow-c1",
+   "kind": "procedural",
+   "position": [
+    150.0,
+    0.0,
+    180.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "cow-c2",
+   "kind": "procedural",
+   "position": [
+    154.0,
+    0.0,
+    176.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "cow-c3",
+   "kind": "procedural",
+   "position": [
+    146.0,
+    0.0,
+    184.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "cow-s1",
+   "kind": "procedural",
+   "position": [
+    -260.0,
+    0.0,
+    260.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  },
+  {
+   "name": "cow-s2",
+   "kind": "procedural",
+   "position": [
+    260.0,
+    0.0,
+    -260.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 16,
+     "rings": 8
+    },
+    "sourceTransform": {
+     "scale": [
+      1.4,
+      1.1,
+      2.2
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.8,
+      0.78,
+      0.74
+     ],
+     "roughness": 0.7,
+     "metallic": 0.0,
+     "emissiveIntensity": 0.0
+    }
+   },
+   "visible": true
+  }
+ ],
+ "entities": [
+  {
+   "name": "visitor",
+   "node": "visitor",
+   "tags": [
+    "ufo",
+    "vehicle"
+   ],
+   "seed": 11,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "visitor-beam",
+   "node": "visitor-beam",
+   "tags": [
+    "world_effect",
+    "beam"
+   ],
+   "seed": 12,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-a1",
+   "node": "cow-a1",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 100,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-b1",
+   "node": "cow-b1",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 101,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-b2",
+   "node": "cow-b2",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 102,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-c1",
+   "node": "cow-c1",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 103,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-c2",
+   "node": "cow-c2",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 104,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-c3",
+   "node": "cow-c3",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 105,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-s1",
+   "node": "cow-s1",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 106,
+   "cullDistance": 0.0
+  },
+  {
+   "name": "cow-s2",
+   "node": "cow-s2",
+   "tags": [
+    "animal",
+    "farm",
+    "cow"
+   ],
+   "seed": 107,
+   "cullDistance": 0.0
+  }
+ ],
+ "navBodyRadius": 1.2,
+ "staging": {
+  "actors": [
+   {
+    "name": "saucer",
+    "body": "visitor",
+    "parts": [
+     {
+      "name": "beam",
+      "entity": "visitor-beam"
+     }
+    ]
+   }
+  ],
+  "scenarios": []
+ }
+}

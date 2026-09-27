@@ -71,25 +71,35 @@ struct FollowFilter {
 [[nodiscard]] double followKernelWeight(double seconds, std::size_t k);
 
 // The subject's past as a camera evaluated at `now` may read it: HIST's samples strictly before
-// `now`, and then `head`, the subject as it stands this frame.
+// `now` that belong to the head's placement, and then `head`, the subject as it stands this frame.
 //
 // Strictly before, because at the moment a frame's camera is evaluated a play has recorded up to the
 // previous frame and a seek has recorded the landing instant itself; reading the head in both cases
 // is what makes the two the same input. Held at both ends: before the oldest sample the subject is
 // where it was first seen (the head of a film, a body that has not moved), and a query past `now`
 // is the head. With no bank or no ring the trail is the head alone.
+//
+// Of the head's placement (`HistorySample::placement`; amended 2026-09-27), because a body that was
+// put somewhere -- a performance on its mark, a staging placement, a body shown again -- did not
+// move there, and a camera that filtered across the change glided from where it was to where it
+// was put: 21.8 m down a hillside over two seconds, in the defect that found this. The trail stops
+// at the newest sample of another placement, so the oldest sample of this one is where the subject
+// "was first seen", exactly as at the head of a film. ADR-912 drops the renderer's history at a cut
+// by the same rule: whoever knows the picture does not continue says so, and the reader starts
+// again.
 class SubjectTrail {
 public:
     SubjectTrail(const world::HistoryBank* bank, std::size_t ring, double now, const world::HistorySample& head);
 
     [[nodiscard]] world::HistorySample at(double seconds) const;
     // Whether any history backs the head: false means every read is the head.
-    [[nodiscard]] bool hasHistory() const { return count_ > 0; }
+    [[nodiscard]] bool hasHistory() const { return count_ > first_; }
     [[nodiscard]] double now() const { return now_; }
 
 private:
     const world::HistoryBank* bank_ = nullptr;
     std::size_t ring_ = 0;
+    std::size_t first_ = 0; // the ring's oldest sample of the head's placement
     std::size_t count_ = 0; // how many of the ring's samples are strictly before `now`
     double now_ = 0.0;
     world::HistorySample head_;

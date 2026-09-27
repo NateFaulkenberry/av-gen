@@ -67,18 +67,44 @@
 # both ends. Check `pgrep -fl avgen_render_tests` and the lock's `pid` file afterwards.
 #
 # `mkdir` is atomic on every filesystem here, which `[ -e ]` plus `touch` is not.
+#
+# THE PID IS WRITTEN WHOLE, AND A HOLDER RELEASES ONLY ITS OWN LOCK. On 2026-09-27 at 13:00:24
+# a waiter read `pid` in the instant between `echo` creating the file and filling it, took
+# `kill -0 ""` for a dead holder, and reclaimed a live lock. Every holder's trap then removed
+# whatever lock was there, so each job that ended let the next waiter in beside a job still
+# running, for as long as the queue lasted. A 4K cost measurement was taken on a shared GPU
+# before anyone noticed. So the pid now arrives by `mv`, a pid-less lock is reclaimed only once
+# it has been ownerless for longer than any writer takes (the 2026-09-20 wedge above), and the
+# trap removes the lock only while its `pid` is still this process's.
 set -uo pipefail
 
 LOCK="${TMPDIR:-/tmp}/avgen-gpu.lock"
 WAITED=0
 MAX_WAIT="${AVGEN_GPU_LOCK_TIMEOUT:-3600}"
 
+UNOWNED_GRACE=30
+
 while ! mkdir "$LOCK" 2>/dev/null; do
-    if [ -f "$LOCK/pid" ] && ! kill -0 "$(cat "$LOCK/pid" 2>/dev/null)" 2>/dev/null; then
-        # The holder died without releasing. Reclaim rather than wait out the timeout.
-        echo "gpu-lock: stale lock from pid $(cat "$LOCK/pid" 2>/dev/null), reclaiming" >&2
-        rm -rf "$LOCK"
-        continue
+    holder=$(cat "$LOCK/pid" 2>/dev/null)
+    if [ -n "$holder" ]; then
+        if ! kill -0 "$holder" 2>/dev/null; then
+            # The holder died without releasing. Reclaim rather than wait out the timeout -- the
+            # lock that dead pid still owns, not one another waiter has reclaimed since.
+            if [ "$(cat "$LOCK/pid" 2>/dev/null)" = "$holder" ]; then
+                echo "gpu-lock: stale lock from pid $holder, reclaiming" >&2
+                rm -rf "$LOCK"
+            fi
+            continue
+        fi
+    elif [ -d "$LOCK" ]; then
+        # No pid: a winner between its `mkdir` and its first write, or one that died there.
+        # Only time tells them apart.
+        age=$(( $(date +%s) - $(stat -f %m "$LOCK" 2>/dev/null || date +%s) ))
+        if [ "$age" -gt "$UNOWNED_GRACE" ]; then
+            echo "gpu-lock: a lock with no pid for ${age}s, reclaiming" >&2
+            rm -rf "$LOCK"
+            continue
+        fi
     fi
     if [ "$WAITED" -ge "$MAX_WAIT" ]; then
         echo "gpu-lock: timed out after ${MAX_WAIT}s waiting for $LOCK" >&2
@@ -89,8 +115,8 @@ while ! mkdir "$LOCK" 2>/dev/null; do
     WAITED=$((WAITED + 5))
 done
 
-echo $$ > "$LOCK/pid"
+echo $$ > "$LOCK/pid.$$" && mv "$LOCK/pid.$$" "$LOCK/pid"
 echo "${AVGEN_AGENT:-$(basename "$PWD")}" > "$LOCK/holder"
-trap 'rm -rf "$LOCK"' EXIT INT TERM
+trap '[ "$(cat "$LOCK/pid" 2>/dev/null)" = "$$" ] && rm -rf "$LOCK"' EXIT INT TERM
 
 "$@"

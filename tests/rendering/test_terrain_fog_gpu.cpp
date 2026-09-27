@@ -362,7 +362,12 @@ FogPair runApplyFog(gpu::Context& ctx, const rendering::FrameUniforms& frame, co
     }
     ctx.queue().WriteTexture(&dst, texels.data(), texels.size() * sizeof(float), &tl, &extent);
 
-    std::array<wgpu::BindGroupLayoutEntry, 2> e0{};
+    // ADR-918: `applyFog` reads the fog's sky map (group 0, bindings 16 and 17) when the frame's
+    // `fogSky` lane is above zero, so the kernel declares both whatever this frame holds. The lane is
+    // zero here and the map is a 1x1 placeholder that is never read; without the two entries the
+    // pipeline is invalid and every comparison below reads zeros -- which is what the first GPU run
+    // after ADR-918 did.
+    std::array<wgpu::BindGroupLayoutEntry, 4> e0{};
     e0[0].binding = 0;
     e0[0].visibility = wgpu::ShaderStage::Compute;
     e0[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -370,6 +375,19 @@ FogPair runApplyFog(gpu::Context& ctx, const rendering::FrameUniforms& frame, co
     e0[1].visibility = wgpu::ShaderStage::Compute;
     e0[1].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
     e0[1].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+    e0[2].binding = 16;
+    e0[2].visibility = wgpu::ShaderStage::Compute;
+    e0[2].texture.sampleType = wgpu::TextureSampleType::Float;
+    e0[2].texture.viewDimension = wgpu::TextureViewDimension::e2D;
+    e0[3].binding = 17;
+    e0[3].visibility = wgpu::ShaderStage::Compute;
+    e0[3].sampler.type = wgpu::SamplerBindingType::Filtering;
+    wgpu::TextureDescriptor skyDesc{};
+    skyDesc.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+    skyDesc.size = {1, 1, 1};
+    skyDesc.format = wgpu::TextureFormat::RGBA16Float;
+    const wgpu::Texture fogSkyPlaceholder = device.CreateTexture(&skyDesc);
+    const wgpu::Sampler fogSkySampler = device.CreateSampler();
     std::array<wgpu::BindGroupLayoutEntry, 2> e1{};
     e1[0].binding = 5;
     e1[0].visibility = wgpu::ShaderStage::Compute;
@@ -410,12 +428,16 @@ FogPair runApplyFog(gpu::Context& ctx, const rendering::FrameUniforms& frame, co
     odesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
     wgpu::Buffer out = device.CreateBuffer(&odesc);
 
-    std::array<wgpu::BindGroupEntry, 2> b0{};
+    std::array<wgpu::BindGroupEntry, 4> b0{};
     b0[0].binding = 0;
     b0[0].buffer = frameBuf;
     b0[0].size = fdesc.size;
     b0[1].binding = 12;
     b0[1].textureView = texture.CreateView();
+    b0[2].binding = 16;
+    b0[2].textureView = fogSkyPlaceholder.CreateView();
+    b0[3].binding = 17;
+    b0[3].sampler = fogSkySampler;
     std::array<wgpu::BindGroupEntry, 2> b1{};
     b1[0].binding = 5;
     b1[0].buffer = in;

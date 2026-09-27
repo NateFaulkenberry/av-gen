@@ -12,9 +12,9 @@ namespace avgen::app {
 
 // Installs a compilation as ONE command on the editor's history: the content and the plan together,
 // so one undo takes back the content and its provenance at once. A refused install is undone before
-// returning and pushes nothing.
+// returning and pushes nothing. `label` names the undo; empty = "Director: <the plan's title>".
 [[nodiscard]] inline Result<void> applyCompilation(Engine& engine, ui::EditHistory& history,
-                                                   const directing::Compilation& compilation) {
+                                                   const directing::Compilation& compilation, std::string label = {}) {
     EditCapture capture;
     capture.begin(engine);
     if (auto r = installCompilation(engine, compilation); !r) {
@@ -22,8 +22,10 @@ namespace avgen::app {
         (void)ui::applyEdit(engine, partial, false);
         return r;
     }
-    history.push(capture.finish(engine, "Director: " + (compilation.plan.title.empty() ? compilation.plan.id
-                                                                                         : compilation.plan.title)));
+    if (label.empty()) {
+        label = "Director: " + (compilation.plan.title.empty() ? compilation.plan.id : compilation.plan.title);
+    }
+    history.push(capture.finish(engine, std::move(label)));
     return {};
 }
 

@@ -506,76 +506,89 @@ TEST_CASE("a wanderer that steps off the navigable set walks back onto it",
     INFO("directions the steering fan could take: " << steerable << "/16");
     REQUIRE(steerable == 0);
 
-    params::ParameterSet params;
-    signals::SignalBus bus;
-    entity::EntityWorld world;
-    world.setNavigator(nav);
-    registerNode(params, "walker");
+    // The walk, run once per slope rule. `maxSlope` 0 is the escape on its own -- the mechanism this
+    // case pins -- and the bound below is its journey. ADR-907's default slope limit (12 degrees)
+    // changes which destination a wedged body holds while it escapes: on this hilly shore the only
+    // candidates it can accept are the gentlest ones, and once the steering fan finds a way (it
+    // samples from a quarter of a metre ahead, ADR-240) the body walks toward that destination
+    // rather than straight to the nearest refuge. It still walks out, along its facing, which the
+    // second arm holds it to.
+    struct Walk {
+        double freedAt = -1.0;
+        float worstFacingGap = 0.0f;
+        int movingFrames = 0;
+        int againstFacing = 0;
+    };
+    const auto walk = [&](nlohmann::json settings) {
+        params::ParameterSet params;
+        signals::SignalBus bus;
+        entity::EntityWorld world;
+        world.setNavigator(nav);
+        registerNode(params, "walker");
 
-    entity::EntityDesc walker;
-    walker.name = "walker";
-    walker.node = "walker";
-    walker.seed = 11;
-    walker.behaviors.push_back(behaviorDesc("wander", {{"speed", 2.0},
-                                                       {"turnRate", 180.0},
-                                                       {"minRange", 4.0},
-                                                       {"maxRange", 20.0},
-                                                       {"pauseMin", 0.0},
-                                                       {"pauseMax", 0.1},
-                                                       {"homeRadius", 30.0}}));
-    world.setEntities({walker}, 7u);
-    world.setBindings({binding("walker", glm::vec3(wedge.x, map.height(wedge), wedge.y))});
-    world.registerParameters(params);
-    world.bind(params);
+        entity::EntityDesc walker;
+        walker.name = "walker";
+        walker.node = "walker";
+        walker.seed = 11;
+        walker.behaviors.push_back(behaviorDesc("wander", std::move(settings)));
+        world.setEntities({walker}, 7u);
+        world.setBindings({binding("walker", glm::vec3(wedge.x, map.height(wedge), wedge.y))});
+        world.registerParameters(params);
+        world.bind(params);
 
-    const entity::Entity* who = world.entities().front().get();
-    REQUIRE(who != nullptr);
+        const entity::Entity* who = world.entities().front().get();
+        REQUIRE(who != nullptr);
 
-    double freedAt = -1.0;
-    float worstFacingGap = 0.0f;
-    int movingFrames = 0;
-    int againstFacing = 0;
-    glm::vec3 last = who->state().position();
+        Walk out;
+        glm::vec3 last = who->state().position();
+        for (int i = 0; i <= 1800; ++i) { // 30 simulated seconds
+            params.resetFinals();
+            entity::EntityUpdate u;
+            u.time = static_cast<double>(i) / 60.0;
+            u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
+            u.frameIndex = static_cast<std::uint64_t>(i);
+            u.bus = &bus;
+            world.update(u, params);
+
+            const glm::vec3 now = who->state().position();
+            const glm::vec2 step(now.x - last.x, now.z - last.z);
+            last = now;
+            if (out.freedAt < 0.0 && nav.navigable(glm::vec2(now.x, now.z))) {
+                out.freedAt = u.time;
+            }
+            const float len = glm::length(step);
+            if (len < 1e-4f) {
+                continue;
+            }
+            ++out.movingFrames;
+            // Every metre it covers is a metre along the way it is drawn facing.  This is the half of
+            // the defect that survives the stall being fixed: an escape that translated the body
+            // sideways would still free it, and would still look wrong doing it.
+            const float yaw = who->locomotion().yaw;
+            const glm::vec2 facing(std::sin(yaw), std::cos(yaw));
+            const float alignment = glm::dot(facing, step / len);
+            out.worstFacingGap = std::min(out.worstFacingGap, alignment);
+            if (alignment < 0.9f) {
+                ++out.againstFacing;
+            }
+        }
+        return out;
+    };
+    const nlohmann::json settings = {{"speed", 2.0},    {"turnRate", 180.0}, {"minRange", 4.0},
+                                     {"maxRange", 20.0}, {"pauseMin", 0.0},   {"pauseMax", 0.1},
+                                     {"homeRadius", 30.0}};
     constexpr float kWalkerSpeed = 2.0f;
-    constexpr float kWalkerTurn = 180.0f / 57.2957795f; // rad/s, as authored below
-    for (int i = 0; i <= 1800; ++i) { // 30 simulated seconds
-        params.resetFinals();
-        entity::EntityUpdate u;
-        u.time = static_cast<double>(i) / 60.0;
-        u.dt = i == 0 ? 0.0 : 1.0 / 60.0;
-        u.frameIndex = static_cast<std::uint64_t>(i);
-        u.bus = &bus;
-        world.update(u, params);
+    constexpr float kWalkerTurn = 180.0f / 57.2957795f; // rad/s, as authored above
 
-        const glm::vec3 now = who->state().position();
-        const glm::vec2 step(now.x - last.x, now.z - last.z);
-        last = now;
-        if (freedAt < 0.0 && nav.navigable(glm::vec2(now.x, now.z))) {
-            freedAt = u.time;
-        }
-        const float len = glm::length(step);
-        if (len < 1e-4f) {
-            continue;
-        }
-        ++movingFrames;
-        // Every metre it covers is a metre along the way it is drawn facing.  This is the half of
-        // the defect that survives the stall being fixed: an escape that translated the body
-        // sideways would still free it, and would still look wrong doing it.
-        const float yaw = who->locomotion().yaw;
-        const glm::vec2 facing(std::sin(yaw), std::cos(yaw));
-        const float alignment = glm::dot(facing, step / len);
-        worstFacingGap = std::min(worstFacingGap, alignment);
-        if (alignment < 0.9f) {
-            ++againstFacing;
-        }
-    }
-
-    INFO(fmt::format("freed at {:.2f} s; {} moving frames, {} not along the facing, worst "
+    nlohmann::json escapeOnly = settings;
+    escapeOnly["maxSlope"] = 0.0;
+    const Walk w = walk(escapeOnly);
+    INFO(fmt::format("maxSlope 0: freed at {:.2f} s; {} moving frames, {} not along the facing, worst "
                      "alignment {:.3f}",
-                     freedAt, movingFrames, againstFacing, worstFacingGap));
+                     w.freedAt, w.movingFrames, w.againstFacing, w.worstFacingGap));
     // It got out, and quickly: the escape is a walking step per frame toward a refuge at most 24 m
     // away.  Before the fix this body stood at the wedge for the whole twenty seconds.
-    REQUIRE(freedAt >= 0.0);
+    REQUIRE(w.freedAt >= 0.0);
     // The bound is the journey, not a number somebody liked: the opening pause `Wander::reset`
     // rolls (up to two seconds), then a pivot onto the way out at the authored turn rate, then the
     // walk to the refuge at the authored speed.  Anything slower than that is not a walk back onto
@@ -585,10 +598,19 @@ TEST_CASE("a wanderer that steps off the navigable set walks back onto it",
                          3.14159265 / static_cast<double>(kWalkerTurn);
     INFO(fmt::format("refuge {:.1f} m away; an opening pause, a pivot and a walk is {:.2f} s",
                      refugeDistance, bound));
-    CHECK(freedAt <= bound);
+    CHECK(w.freedAt <= bound);
     // And it walked out rather than being slid out.
-    REQUIRE(movingFrames > 60);
-    CHECK(againstFacing == 0);
+    REQUIRE(w.movingFrames > 60);
+    CHECK(w.againstFacing == 0);
+
+    // The default slope limit: out, and walking out along its facing, inside the thirty seconds.
+    const Walk d = walk(settings);
+    WARN(fmt::format("the default maxSlope (12 deg): freed at {:.2f} s against the escape's {:.2f} s; {} "
+                     "moving frames, {} not along the facing",
+                     d.freedAt, w.freedAt, d.movingFrames, d.againstFacing));
+    REQUIRE(d.freedAt >= 0.0);
+    REQUIRE(d.movingFrames > 60);
+    CHECK(d.againstFacing == 0);
 }
 
 // =================================================================================================

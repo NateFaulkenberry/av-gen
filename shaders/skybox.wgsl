@@ -3,47 +3,10 @@
 // sky's prefiltered cube (ADR-036) -- and the flat background colour when there is neither.
 #include "common.wgsl"
 
-@group(3) @binding(0) var iblSampler: sampler;
-@group(3) @binding(1) var irradianceMap: texture_cube<f32>;
-@group(3) @binding(2) var prefilteredMap: texture_cube<f32>;
-@group(3) @binding(3) var brdfLut: texture_2d<f32>;
-@group(3) @binding(4) var skyEquirect: texture_2d<f32>;
-@group(3) @binding(5) var skySampler: sampler; // as iblSampler, but wrapping in longitude
-
-const SKY_PI: f32 = 3.14159265;
-
-// ADR-345: the analytic sky, evaluated here rather than sampled from a cube.
-//
-// This is shaders/environment.wgsl's `skyRadiance` reading the frame block instead of the
-// environment processor's, because the two passes cannot see each other's uniforms. It is
-// deliberately the same maths: the sky the camera sees and the sky the IBL was built from have to
-// be the same sky, and the way that goes wrong is two implementations drifting. The one difference
-// is the trailing intensity multiply, which is left to the caller here -- the background pass
-// already applies `skyExtra.z`, the visible sky's own intensity, and applying both would square it.
-fn skySmoothstepF(e0: f32, e1: f32, x: f32) -> f32 {
-    if (e0 == e1) { return select(1.0, 0.0, x < e0); }
-    let t = saturate((x - e0) / (e1 - e0));
-    return t * t * (3.0 - 2.0 * t);
-}
-
-fn skyRadianceFrame(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
-    let d = normalize(dir);
-    let hazeWidth = max(frame.skyZenithColor.w, 1e-3);
-    let haze = exp(-saturate(d.y) / hazeWidth);
-    let gradient = mix(frame.skyZenithColor.rgb, frame.skyHorizonColor.rgb, haze);
-    let band = skySmoothstepF(-0.03, 0.03, d.y);
-    let base = mix(frame.skyGroundColor.rgb, gradient, band);
-
-    let cosTheta = clamp(dot(d, frame.skySun.xyz), -1.0, 1.0);
-    let theta = acos(cosTheta);
-    let sunRadius = max(frame.skyHorizonColor.w, 1e-3);
-    let radius = max(sunRadius, max(minRadius, 0.0));
-    let energy = (sunRadius / radius) * (sunRadius / radius);
-    let disc = (1.0 - skySmoothstepF(radius * 0.85, radius * 1.15, theta)) * energy;
-    let glow = exp(-theta / max(frame.skyGroundColor.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
-    let sun = frame.skySunRadiance.rgb * (disc + glow) * band;
-    return base + sun;
-}
+// The group-3 bindings, the analytic sky and the equirect parameterisation live in
+// sky_background.wgsl since ADR-918, so the fog's view of the sky reads the sky through this pass's
+// own code rather than a copy of it.
+#include "sky_background.wgsl"
 
 struct SkyOut {
     @builtin(position) clip: vec4<f32>,
@@ -58,14 +21,6 @@ fn vs_sky(@builtin(vertex_index) index: u32) -> SkyOut {
     out.clip = vec4<f32>(p, 1.0, 1.0); // z = far plane
     out.ndc = p;
     return out;
-}
-
-// The parameterisation shaders/environment.wgsl builds the cube with. One definition, so the sky
-// you see and the lighting made from it cannot end up rotated differently.
-fn skyEquirectUv(dir: vec3<f32>) -> vec2<f32> {
-    let phi = atan2(dir.z, dir.x);
-    let theta = acos(clamp(dir.y, -1.0, 1.0));
-    return vec2<f32>(0.5 + phi / (2.0 * SKY_PI), theta / SKY_PI);
 }
 
 // Mip level for an equirect sampled through a view ray, chosen by hand rather than left to the
@@ -141,38 +96,15 @@ fn fs_sky(in: SkyOut) -> SceneOut {
     // sample taken along it below -- depends on the camera's orientation alone. That is what puts
     // the sky at infinity: crossing the 640 m valley does not move it.
     let dir = normalize(far.xyz / far.w - near.xyz / near.w);
-    var color = frame.skyParams.rgb;
-    var isSky = false;
-    // ADR-036: a procedural sky is an IBL source first; it only stands behind the scene when the
-    // scene asks for it (skyExtra.y), so existing looks keep their flat background.
-    if (frame.envParams.w >= 0.5 && frame.skyExtra.y >= 0.5) {
-        let d = envRotate(dir);
-        if (frame.skySunRadiance.w >= 0.5) {
-            // ADR-345: an HDRI is lighting the scene and the scene has asked for the procedural
-            // sky behind it. One pixel of sky is a few ALU here against a cube fetch, and it is
-            // the only way to get a background whose colours move with a day/night cycle while
-            // the lighting comes from a map.
-            color = skyRadianceFrame(d, 0.0);
-        } else if (frame.skyExtra.x >= 0.5) {
-            // The analytic sky has no map behind it; the prefiltered cube is its only form, and
-            // its own `intensity` (params.w) is what has always scaled it.
-            let mip = frame.skyParams.w * frame.envParams.y;
-            color = textureSampleLevel(prefilteredMap, iblSampler, d, mip).rgb * frame.params.w;
-        } else {
-            // ADR-049: read the HDRI itself. A 128 px prefiltered cube face is under 3 texels per
-            // degree; a star is one texel of an 8K map and does not survive being resampled to
-            // that, which is why the visible sky does not share the IBL's cube.
-            let uv = skyEquirectUv(d);
-            let levels = f32(textureNumLevels(skyEquirect) - 1u);
-            let lod = min(max(skyEquirectLod(uv, vec2<f32>(textureDimensions(skyEquirect, 0))),
-                              frame.skyParams.w * levels), levels);
-            color = textureSampleLevel(skyEquirect, skySampler, uv, lod).rgb;
-        }
-        // ADR-049: the visible sky's own intensity. Shading multiplies by params.w instead, so a
-        // dark sky can still cast a useful amount of light and vice versa.
-        color *= frame.skyExtra.z;
-        isSky = true;
-    }
+    // The HDRI's mip for this ray, from the screen derivatives, taken here in uniform control flow
+    // and handed to the shared background (ADR-918). The same numbers the branch that reads the
+    // HDRI used to compute inside itself; the other two branches ignore them.
+    let skyUv = skyEquirectUv(envRotate(dir));
+    let skyLevels = f32(textureNumLevels(skyEquirect) - 1u);
+    let skyLod = min(max(skyEquirectLod(skyUv, vec2<f32>(textureDimensions(skyEquirect, 0))),
+                         frame.skyParams.w * skyLevels), skyLevels);
+    var color = skyBackgroundAt(dir, skyLod, 0.0);
+    let isSky = skyBackgroundIsSky();
     if (frame.lightCounts.z > 0.5 && frame.skyExtra.x > 0.5 && isSky) {
         // Where the *sky* says its sun or moon is, not where the first light in the scene happens
         // to point. Those are the same thing only when the key light is also light zero, and when

@@ -50,7 +50,21 @@ Activity Gait::select(const GaitSettings& settings, Activity proposed, float spe
     // Something else has the character's attention. Pass it through untouched and leave the
     // remembered gait alone, so `Walking -> React -> Walking` is what comes back rather than
     // `Walking -> React -> Idle` (ADR-091).
+    //
+    // **Unless the body has stopped underneath it (ADR-907).** A flinch while walking keeps the
+    // feet going and the walk is what comes back. A two-second hold in a beam, or an observe pose
+    // at the end of an errand, stands the body still -- and a body that is standing is standing,
+    // whatever it is attending to. Remembering a walk through that is how the first frame of the
+    // next walk read "Idle" (the speed ramps up from nothing, below the move band) and changed the
+    // gait, whose `minDwell` then refused the walk for a quarter of a second while the body
+    // accelerated to walking pace: legs idle, ground moving. Before ADR-907 every behaviour
+    // restarted at full speed in one frame, so the stop underneath never showed.
     if (!gaitLocomotor(proposed)) {
+        if (!moving_ && (gait_ == Activity::Walk || gait_ == Activity::Run)) {
+            gait_ = Activity::Idle;
+            dwell_ = 0.0;
+            ++changes_;
+        }
         return proposed;
     }
 
@@ -77,7 +91,7 @@ Activity Gait::select(const GaitSettings& settings, Activity proposed, float spe
     return gait_;
 }
 
-float Gait::playbackRate(const GaitSettings& settings, Activity activity, float speed) {
+float Gait::playbackRate(const GaitSettings& settings, Activity activity, float speed, float turnRate) {
     if (!settings.matchRate) {
         return 1.0f;
     }
@@ -112,9 +126,48 @@ float Gait::playbackRate(const GaitSettings& settings, Activity activity, float 
         if (speed > 0.0f && settings.walkSpeed > 1e-4f) {
             return std::clamp(speed / settings.walkSpeed, settings.rateMin, settings.rateMax);
         }
+        // **A turn on the spot, on an asset with nothing to turn with (ADR-908).**
+        //
+        // `idleRate` below `kVisibleClipRate` is the labelled compensation above: an asset whose
+        // only clip is a locomotion cycle, which freezes it rather than run it on the spot. That is
+        // the right answer for a body standing still and the wrong one for a body *turning*: the
+        // GV3 audit found the farm animals rotating a frozen mid-stride pose about their own axis
+        // on every pivot -- 27 to 44% of all the turning they did -- which reads as a statue on a
+        // turntable. A body turning at w rad/s moves its feet round the pivot at w * `pivotRadius`,
+        // so its cycle plays at that speed over the speed the cycle was authored at, floored where
+        // a cycle becomes visible and capped by the gait's own ceiling. An asset with a real idle
+        // (`idleRate` >= visible) has a turn clip of its own and is left alone.
+        if (activity == Activity::Turn && settings.idleRate < kVisibleClipRate &&
+            settings.walkSpeed > 1e-4f && settings.pivotRadius > 0.0f && turnRate != 0.0f) {
+            const float feet = std::abs(turnRate) * settings.pivotRadius;
+            return std::clamp(feet / settings.walkSpeed, std::max(settings.rateMin, kVisibleClipRate),
+                              std::max(settings.rateMax, kVisibleClipRate));
+        }
         return settings.idleRate;
     }
     return std::clamp(speed / authored, settings.rateMin, settings.rateMax);
+}
+
+float turnPace(const TurnSettings& turning, float pace, float error) {
+    const float facing = std::max(0.0f, std::cos(error));
+    if (turning.radius <= 0.0f || pace <= kTurnRestSpeed) {
+        return facing;
+    }
+    return kTurnKeep + (1.0f - kTurnKeep) * facing;
+}
+
+bool insideTurn(const TurnSettings& turning, float pace, float distance, float error) {
+    if (turning.radius <= 0.0f || pace <= kTurnRestSpeed) {
+        return false;
+    }
+    return distance < 2.0f * turning.radius * std::abs(std::sin(error));
+}
+
+float turnCap(const TurnSettings& turning, float before, float after) {
+    if (turning.radius <= 0.0f || after <= kTurnRestSpeed) {
+        return turning.rate;
+    }
+    return std::min(turning.rate, std::min(before, after) / turning.radius);
 }
 
 float Gait::footSlip(const GaitSettings& settings, Activity activity, float speed) {

@@ -67,6 +67,10 @@ struct VolumeRenderer::Impl {
     bool passThisFrame = false;
     bool activeThisFrame = false;
     bool initialised = false;
+    // ADR-919: the step counts the tier's floor last raised, from and to, so the raise is logged
+    // once when it starts or changes rather than every frame.
+    int loggedFloorFrom = -1;
+    int loggedFloorTo = -1;
 };
 
 VolumeRenderer::VolumeRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
@@ -358,8 +362,19 @@ void VolumeRenderer::update(const scene::Scene& scene, const FrameTime& time, st
     im.rebuildGroups(sceneDepth);
 
     const float stepScale = std::clamp(quality.volumeStepScale, 0.05f, 4.0f);
-    const int steps =
+    const int scaledSteps =
         std::clamp(static_cast<int>(std::lround(static_cast<float>(env.volumeSteps) * stepScale)), 1, 256);
+    // ADR-919: the tier's floor. It raises a count below it and leaves one above it alone, so it
+    // changes how finely the ray is sampled and never what the air is; and it says so, once, when
+    // it takes effect -- a render's log is where "the final used 12 steps" would otherwise hide.
+    const int floorSteps = static_cast<int>(std::min<std::uint32_t>(quality.volumeStepFloor, 256u));
+    const int steps = std::max(scaledSteps, floorSteps);
+    if (steps != scaledSteps && (im.loggedFloorFrom != scaledSteps || im.loggedFloorTo != steps)) {
+        log::info("the tier's floor raised the volumetric march from {} to {} steps a ray", scaledSteps, steps);
+        im.loggedFloorFrom = scaledSteps;
+        im.loggedFloorTo = steps;
+    }
+    stats_.authoredSteps = static_cast<std::uint32_t>(scaledSteps);
     const int densitySlot = (fields != nullptr && !env.volumeDensityField.empty())
                                 ? fields->slotOf(env.volumeDensityField)
                                 : -1;

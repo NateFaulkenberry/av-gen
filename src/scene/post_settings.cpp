@@ -2,11 +2,14 @@
 
 #include "core/log.hpp"
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <string>
 
 namespace avgen::scene {
 
@@ -62,6 +65,17 @@ const char* tonemapOperatorName(TonemapOperator op) {
 
 PostParameters registerPostParameters(params::ParameterSet& params, const PostSettings& s) {
     PostParameters p;
+    {
+        // ADR-917. Two segments, not three, on purpose: it is not a property of any one effect but
+        // of the whole chain, and the Parameters panel draws a group's direct rows first -- so it
+        // sits at the top of `post`, above every section whose sizes it governs. The label says
+        // what it does in the words a person looking at the picture would use.
+        params::ParamDesc<float> d = f("post/referenceHeight", s.referenceHeight, 90.0f, 8640.0f, 360.0f, 2160.0f);
+        d.label = "reference height (the frame height, times supersample, that glow, streak, halo "
+                  "and blur sizes were tuned at; at any other size they scale to cover the same "
+                  "part of the picture)";
+        p.referenceHeight = &params.add(std::move(d));
+    }
     p.bloomEnabled = &params.add(b("post/bloom/enabled", s.bloomEnabled));
     p.bloomIntensity = &params.add(f("post/bloom/intensity", s.bloomIntensity, 0.0f, 10.0f, 0.0f, 1.0f));
     p.bloomThreshold = &params.add(f("post/bloom/threshold", s.bloomThreshold, 0.0f, 20.0f, 0.0f, 4.0f));
@@ -88,7 +102,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         // The leaf, like every other row. Spelling the whole path here made this the one slider in
         // the panel that shouted its own address -- and now that the section is headed "bloom", the
         // prefix was saying a third time what the group and the heading already say.
-        d.label = "levels (pyramid depth; fewer is a tighter, harder glow)";
+        d.label = "levels (pyramid depth at the reference height; fewer is a tighter, harder glow)";
         p.bloomLevels = &params.add(std::move(d));
     }
     p.bloomEmissionWeight =
@@ -160,7 +174,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
         d.hardMax = 40;
         d.softMin = 8;
         d.softMax = 40;
-        d.label = "tileSize (velocity tile edge in pixels; also the reach in tiles)";
+        d.label = "tileSize (velocity tile edge in pixels at the reference height; also the reach in tiles)";
         p.motionBlurTileSize = &params.add(std::move(d));
     }
     p.antialias = &params.add(f("post/output/antialias", s.antialias, 0.0f, 1.0f, 0.0f, 1.0f));
@@ -232,6 +246,7 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         return fail("'post' must be an object");
     }
     const std::pair<const char*, params::Parameter<float>*> floats[] = {
+        {"referenceHeight", p.referenceHeight}, // ADR-917
         {"bloomIntensity", p.bloomIntensity}, {"bloomThreshold", p.bloomThreshold},
         {"bloomKnee", p.bloomKnee},           {"bloomRadius", p.bloomRadius},
         {"bloomEmissionWeight", p.bloomEmissionWeight},
@@ -352,6 +367,9 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     if (p.bloomEnabled == nullptr) {
         return;
     }
+    if (p.referenceHeight != nullptr) {
+        s.referenceHeight = std::max(p.referenceHeight->value(), 1.0f);
+    }
     s.bloomEnabled = p.bloomEnabled->value();
     s.bloomIntensity = p.bloomIntensity->value();
     s.bloomThreshold = p.bloomThreshold->value();
@@ -434,6 +452,87 @@ float tiltShiftCoverage(const PostSettings& s, glm::vec2 uv, float aspect) {
     // Smoothstep rather than a linear ramp: the band's edge is where the eye looks for a seam, and
     // a linear ramp leaves a visible crease there because its slope jumps.
     return t * t * (3.0f - 2.0f * t);
+}
+
+// ---- resolution (ADR-917) -------------------------------------------------------------------------
+
+float postPixelScale(const PostSettings& s, std::uint32_t frameHeight) {
+    return static_cast<float>(std::max(frameHeight, 1u)) / std::max(s.referenceHeight, 1.0f);
+}
+
+std::string describePostScale(const PostSettings& s, std::uint32_t frameHeight) {
+    const float scale = postPixelScale(s, frameHeight);
+    const std::uint32_t levels = std::clamp<std::uint32_t>(s.bloomLevels, 1u, kMaxAuthoredPyramidLevels);
+    const std::uint32_t tile = std::clamp<std::uint32_t>(s.motionBlurTileSize, 4u, 40u);
+    // The renderer boxes the frame down by the whole octaves first (PostProcessor::run), and the
+    // pyramid plan takes what is left.
+    const float octaves = std::log2(scale);
+    const float boxed = std::max(0.0f, std::floor(octaves + 1e-4f));
+    return fmt::format("post chain {} lines at reference height {:.0f}: every glow, streak, halo and blur is "
+                       "{:.2f}x its authored pixel size, so it covers the same part of the picture -- "
+                       "bloom and halation read the frame box-filtered {:.0f} octave(s) down, then {} levels "
+                       "{:+.2f} octaves, anamorphic reach {:.0f} -> {:.0f} quarter-res texels, motion-blur tile "
+                       "{} -> {:.0f} px and radius {:.0f} -> {:.0f} px",
+                       frameHeight, s.referenceHeight, scale, boxed, levels, octaves - boxed,
+                       8.0f * s.anamorphicStretch, 8.0f * s.anamorphicStretch * scale, tile,
+                       static_cast<float>(tile) * scale, s.motionBlurMaxRadius, s.motionBlurMaxRadius * scale);
+}
+
+PyramidPlan planPyramid(std::uint32_t authoredLevels, float blend, float octaves, std::uint32_t baseWidth,
+                        std::uint32_t baseHeight) {
+    PyramidPlan plan;
+    const std::uint32_t authored = std::clamp<std::uint32_t>(authoredLevels, 1u, kMaxAuthoredPyramidLevels);
+    const double b = static_cast<double>(blend);
+    const double m = std::isfinite(octaves) ? static_cast<double>(octaves) : 0.0;
+    const double whole = std::floor(m);
+    const double f = m - whole;
+    const int shift = static_cast<int>(whole);
+
+    // The levels this frame needs to carry the reference's coarsest, before its own size has a say.
+    const int wanted = std::clamp(static_cast<int>(authored) + shift + (f > 0.0 ? 1 : 0), 1,
+                                  static_cast<int>(kMaxPyramidLevels));
+    // The loop PostProcessor::run builds with, run dry: halve from the base size, and stop before a
+    // level would be narrower than two texels.
+    std::uint32_t built = 0;
+    for (std::uint32_t w = baseWidth, h = baseHeight; built < static_cast<std::uint32_t>(wanted) && w >= 2 && h >= 2;
+         w = std::max(1u, w / 2), h = std::max(1u, h / 2)) {
+        ++built;
+    }
+    if (built == 0) {
+        return plan; // a frame too small for one level: the chain builds none either
+    }
+    plan.levels = built;
+
+    // The reference pyramid's weights, moved `octaves` levels towards the coarse end. A level that
+    // would land below the first folds into it (a frame coarser than the reference); one past the
+    // last folds into the last (a frame too small for the whole shift).
+    std::array<double, kMaxPyramidLevels> weight{};
+    auto add = [&](int level, double w) {
+        weight[static_cast<std::size_t>(std::clamp(level, 0, static_cast<int>(built) - 1))] += w;
+    };
+    for (std::uint32_t k = 0; k < authored; ++k) {
+        const double share = (k + 1 < authored) ? (1.0 - b) * std::pow(b, static_cast<double>(k))
+                                                : std::pow(b, static_cast<double>(k));
+        add(static_cast<int>(k) + shift, (1.0 - f) * share);
+        if (f > 0.0) {
+            add(static_cast<int>(k) + shift + 1, f * share);
+        }
+    }
+    // The blends that reproduce those weights through fs_upsample's chain. What is left from level
+    // j down to the coarsest is a suffix sum, accumulated from the coarse end so no step subtracts
+    // two nearly equal numbers: that is what makes a whole-octave shift return the authored blend
+    // to the bit, rather than to within an ulp that would move every frame of every scene.
+    std::array<double, kMaxPyramidLevels + 1> remaining{};
+    for (int j = static_cast<int>(built) - 1; j >= 0; --j) {
+        remaining[static_cast<std::size_t>(j)] = remaining[static_cast<std::size_t>(j) + 1] + weight[static_cast<std::size_t>(j)];
+    }
+    for (std::uint32_t j = 0; j < built; ++j) {
+        plan.weight[j] = static_cast<float>(weight[j]);
+        if (j + 1 < built) {
+            plan.blend[j] = remaining[j] > 0.0 ? static_cast<float>(remaining[j + 1] / remaining[j]) : 1.0f;
+        }
+    }
+    return plan;
 }
 
 } // namespace avgen::scene
