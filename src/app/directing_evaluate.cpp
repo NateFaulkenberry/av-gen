@@ -187,6 +187,7 @@ EvaluatorOptions evaluatorOptionsFrom(const std::optional<fs::path>& critic, con
     o.python = envOr("AVGEN_CRITIC_PYTHON");
     o.avgen = envOr("AVGEN_RENDERER");
     o.castTrace = envOr("AVGEN_CAST_TRACE");
+    o.worldPreview = envOr("AVGEN_WORLD_PREVIEW");
     std::istringstream prefix(envOr("AVGEN_RENDER_PREFIX"));
     for (std::string word; prefix >> word;) {
         o.renderPrefix.push_back(word);
@@ -236,6 +237,15 @@ Result<EvaluatorOptions> resolveEvaluatorOptions(EvaluatorOptions o) {
     }
     if (!executable(o.castTrace)) {
         return fail("avgen_cast_trace is not at {}: build it, or set AVGEN_CAST_TRACE", o.castTrace.string());
+    }
+    // ADR-931, amended: the adapter's ground probe, built beside the tracer. Required like it: without
+    // it an evaluation's grounding check has no ground, and says "not judged" about every body --
+    // a silent pass by another name.
+    if (o.worldPreview.empty()) {
+        o.worldPreview = o.avgen.parent_path().parent_path() / "tools" / "avgen_world_preview";
+    }
+    if (!executable(o.worldPreview)) {
+        return fail("avgen_world_preview is not at {}: build it, or set AVGEN_WORLD_PREVIEW", o.worldPreview.string());
     }
     for (const std::string& word : o.renderPrefix) {
         if (word.find('/') != std::string::npos && !executable(word)) {
@@ -312,6 +322,38 @@ Result<ProcessOutcome> runProcess(const std::vector<std::string>& argv, const fs
 }
 
 // ---- the Critic --------------------------------------------------------------------------------------
+
+bool sceneHasTerrainWorld(const fs::path& scene) {
+    const json doc = json::parse(readFile(scene), nullptr, false);
+    if (doc.is_discarded() || !doc.is_object() || !doc.contains("nodes") || !doc["nodes"].is_array()) {
+        return false;
+    }
+    for (const json& node : doc["nodes"]) {
+        if (node.is_object() && node.value("kind", std::string()) == "terrain" && node.contains("world") &&
+            node["world"].is_object()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<std::string> criticAdapterCommand(const EvaluatorOptions& options, const fs::path& project,
+                                              const fs::path& scene, const fs::path& shots, const fs::path& cast,
+                                              const fs::path& clip, const std::string& range, const fs::path& out,
+                                              bool ground) {
+    std::vector<std::string> argv{options.python.string(), options.adapter.string(), "--project", project.string(),
+                                  "--scene", scene.string(), "--shots", shots.string(), "--cast", cast.string(),
+                                  "--video", clip.string(), "--range", range, "--width", std::to_string(options.width),
+                                  "--height", std::to_string(options.height)};
+    // ADR-931, amended 2026-09-27: the engine's own ground under the cast's paths, probed by the
+    // adapter with the engine's own tool (the Critic's adapter report: without it "grounding" judged
+    // nothing). Only with a terrain, which the adapter requires of the flag.
+    if (ground && !options.worldPreview.empty()) {
+        argv.insert(argv.end(), {"--world-preview", options.worldPreview.string()});
+    }
+    argv.insert(argv.end(), {"--out", out.string()});
+    return argv;
+}
 
 std::vector<std::string> criticSubmitCommand(const EvaluatorOptions& options, const fs::path& inputs, double videoStart,
                                              const std::string& mode, const std::string& track, const std::string& label) {
@@ -478,10 +520,8 @@ Result<directing::EvaluationReport> evaluateFromCopy(const fs::path& copy, const
     // ---- 5. the evaluator's inputs ------------------------------------------------------------------------
     say("writing the evaluator's inputs");
     const fs::path inputsDir = dir / "critic";
-    const std::vector<std::string> adapt{options.python.string(), options.adapter.string(), "--project", project.string(),
-                                         "--scene", scene.string(), "--shots", shots.string(), "--cast", cast.string(),
-                                         "--video", clip.string(), "--range", range, "--width", std::to_string(options.width),
-                                         "--height", std::to_string(options.height), "--out", inputsDir.string()};
+    const std::vector<std::string> adapt =
+        criticAdapterCommand(options, project, scene, shots, cast, clip, range, inputsDir, sceneHasTerrainWorld(scene));
     auto adapted = run(adapt);
     if (!adapted) {
         return std::unexpected(adapted.error());

@@ -294,6 +294,16 @@ public:
     // with exactly the connectivity A* uses, so "different regions" and "A* will not find a route"
     // are the same statement rather than two that can disagree.
     [[nodiscard]] std::uint16_t regionAt(glm::vec2 p) const;
+    // The region `p` belongs to as a walker there would be placed in it: its own cell's, or else the
+    // nearest walkable cell's within `reach` metres; 0 when there is none. The snap `path` makes for
+    // a start (3 cells) and a goal (4 cells), so two points `path` would call `Unreachable` are two
+    // points this puts in different regions (ADR-932).
+    [[nodiscard]] std::uint16_t regionNear(glm::vec2 p, float reach) const;
+    // The centre of the cell of `region` nearest to `p`, by true distance, however far it is: where
+    // a body in that region comes closest to a point it cannot reach (ADR-932). With `dry`, only a
+    // cell with no water over it counts -- the bank, not the shallows a wading walker may stand in.
+    // False when the region is 0 or holds no such cell.
+    [[nodiscard]] bool nearestInRegion(glm::vec2 p, std::uint16_t region, glm::vec2& out, bool dry = false) const;
     // Whether two points are reachable from each other at all. A lookup, not a search.
     [[nodiscard]] bool connected(glm::vec2 a, glm::vec2 b) const;
     // How many cells a region holds. Region 0 is the unwalkable set.

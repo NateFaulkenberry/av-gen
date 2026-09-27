@@ -2643,6 +2643,7 @@ public:
         stillBreaks_ = 0;
         strolls_ = 0;
         departures_.clear();
+        attempts_.clear(); // ADR-933: simulation state, rebuilt by the replay like the departures
         // Phase D. Everything the awareness layer and the trace hold is simulation state, so a seek
         // clears it and the replay rebuilds it (D4).
         attention_.reset();
@@ -2684,8 +2685,8 @@ public:
         dctx.dt = ctx.dt;
         dctx.self = ctx.self;
         dctx.state = &state;
-        dctx.percepts =
-            memory_.merge(self != nullptr ? self->percepts() : std::span<const Percept>(), ctx.time);
+        dctx.percepts = memory_.merge(self != nullptr ? self->percepts() : std::span<const Percept>(), ctx.time,
+                                      ctx.world); // ADR-934: a body since taken is forgotten, not faded
         dctx.visited = visited_;
         dctx.nav = ctx.nav;
         dctx.world = ctx.world;
@@ -2710,6 +2711,28 @@ public:
             sense(ctx, state, self, dctx);
             dctx.mind = &view_;
         }
+        // ---- ADR-933: an urgent errand that did not get there --------------------------------
+        //
+        // Noted the step its walk fails, not when its list drains: the look and the stand that follow
+        // a reaction's walk still run after the walk fails, and a list another choice replaces first
+        // never drains at all -- which is how GV3's ember came to be sent to the same river bank
+        // again and again with nothing remembered of the last time. Kept for the mind's
+        // `failSeconds`, the time "a target that could not be reached is left alone for" -- and an
+        // event's for as long as the body still remembers hearing it, since until then the event
+        // can still send it: a beam heard for ninety seconds must not send the body back to the
+        // same bank every thirty.
+        std::erase_if(attempts_, [&](const Attempt& a) {
+            if (ctx.time - a.time <= static_cast<double>(memorySettings_.failSeconds)) {
+                return false;
+            }
+            return !(subjectKind(a.subject) == SubjectKind::Event && stillHeard(a.subject));
+        });
+        if (aware_ && planActive_) {
+            const ActionQueue::Standing standing = ctx.actions->standing(Authority::Routine);
+            if (standing.serial == planSerial_ && standing.failed) {
+                noteAttempt(ctx.time);
+            }
+        }
         // ---- Phase D §19: how the running plan ended ----------------------------------------
         //
         // A plan that drained is over, and the character chooses again *now* rather than standing
@@ -2720,6 +2743,9 @@ public:
         if (aware_ && planSerial_ != 0 &&
             ctx.actions->drained(Authority::Routine).serial == planSerial_) {
             const ActionQueue::Drained& drained = ctx.actions->drained(Authority::Routine);
+            if (drained.failed) {
+                noteAttempt(ctx.time); // ADR-933, for a list that failed and drained on one step
+            }
             lastOutcome_ = drained.failed ? "failed: " + drained.reason : "completed";
             if (!drained.failed && committed_.kind != 255) {
                 recentKinds_.push_back(committed_.kind);
@@ -2832,6 +2858,7 @@ public:
                 if (!rememberedGoal) {
                     remember(here);
                 }
+                noteAttempt(ctx.time); // ADR-933: giving up on a stalled walk is not getting there
                 ++stalls_;
                 selector_.forget();
                 stallFrom_ = here;
@@ -2894,6 +2921,7 @@ public:
         }
         const std::uint64_t before = selector_.tick();
         const bool startedBefore = selector_.started();
+        dctx.attempts = attempts_; // ADR-933: after every note above, so this tick's count
         const bool changed = selector_.select(dctx, views_);
         const bool ticked = !startedBefore || selector_.tick() != before;
         if (ticked) {
@@ -2921,6 +2949,16 @@ public:
             publishIntent(ctx, state);
             return;
         }
+        // ADR-933: the errand this replaces, when it was an urgent walk that had stopped getting any
+        // nearer, did not get there -- it was given up, whatever set it aside. A reaction stalled at
+        // a river's edge and overruled by a post pulling its body home had failed nowhere the
+        // queue could say, and the next time it won it walked the body straight back.
+        if (aware_ && planActive_) {
+            const ActionQueue::Standing standing = ctx.actions->standing(Authority::Routine);
+            if (standing.serial == planSerial_ && standing.moving && standing.stalledSeconds >= kGivenUpSeconds) {
+                noteAttempt(ctx.time);
+            }
+        }
         // `override` rather than `push`: a new decision *replaces* the routine, and whatever the
         // routine was in the middle of is reported Cancelled rather than dropped in silence. A
         // push would queue the new errand behind the abandoned one, which is the opposite of
@@ -2946,7 +2984,7 @@ public:
             stillFrom_ = here;
             stillSince_ = ctx.time;
         }
-        commit(ctx, winner);
+        commit(ctx, winner, state.position());
         publishIntent(ctx, state);
     }
 
@@ -3153,7 +3191,7 @@ private:
 
     // The committed option, copied out of the selector's list (whose spans die at the next tick),
     // and one line of trace.
-    void commit(const BehaviorContext& ctx, const Option& winner) {
+    void commit(const BehaviorContext& ctx, const Option& winner, const glm::vec3& here) {
         const std::string previous = committed_.name;
         std::string outcome;
         if (planActive_) {
@@ -3172,6 +3210,14 @@ private:
         committed_.kind = winner.kind;
         committed_.subjectName =
             winner.subject != kNoSubject ? describeSubject(*ctx.world, winner.subject) : std::string();
+        // ADR-933: where it is going, for an urgent errand that turns out not to get there.
+        glm::vec2 end(0.0f);
+        float tolerance = 0.0f;
+        bool goes = false;
+        committed_.hasDestination = optionDestination(winner, here, end, tolerance, goes) && goes;
+        committed_.destination = end;
+        committed_.tolerance = tolerance;
+        committed_.attempted = false;
         planSerial_ = winner.actions.empty() ? 0 : ctx.actions->serial(Authority::Routine);
         planActive_ = planSerial_ != 0;
         lastOutcome_.clear();
@@ -3223,6 +3269,33 @@ private:
                     ? lookPoint(*ctx.world, committed_.subject, committed_.target)
                     : committed_.target;
             state.intent.hasTarget = true;
+        }
+    }
+
+    // ADR-933: whether an event is still one this body remembers hearing.
+    bool stillHeard(SubjectId subject) const {
+        const std::uint64_t sequence = subjectIndex(subject);
+        for (const PerceivedEvent& e : objects_.events()) {
+            if (e.sequence == sequence) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // ADR-933: the committed errand, if it is an urgent one that walks somewhere, did not get there.
+    // Once per errand; nothing for an errand that is not urgent (ADR-909's habits already hold those)
+    // or has no subject to key it by.
+    void noteAttempt(double time) {
+        // A mind that leaves nothing it could not reach alone (`failSeconds` 0) keeps no attempts either.
+        if (!aware_ || committed_.attempted || !(committed_.urgency > 0.0f) || committed_.subject == kNoSubject ||
+            !committed_.hasDestination || !(memorySettings_.failSeconds > 0.0f)) {
+            return;
+        }
+        committed_.attempted = true;
+        attempts_.push_back(Attempt{committed_.subject, committed_.destination, committed_.tolerance, time});
+        while (attempts_.size() > kAttempts) {
+            attempts_.erase(attempts_.begin());
         }
     }
 
@@ -3355,6 +3428,14 @@ private:
     static constexpr std::uint64_t kStrollStream = 0x5357u; // the stroll's own draw (Rng::forFrame)
     std::vector<Departure> departures_;
     static constexpr std::size_t kDepartures = 4;
+    // ADR-933: the urgent errands that did not get there, newest last, while the mind's `failSeconds`
+    // remembers them. Members, so an ADR-700 checkpoint carries them.
+    std::vector<Attempt> attempts_;
+    static constexpr std::size_t kAttempts = 8;
+    // An urgent walk that has gone this long without getting nearer its goal when something else is
+    // chosen was given up, not merely interrupted: a second is several strides, and a walk still
+    // getting somewhere resets its count every step it does.
+    static constexpr double kGivenUpSeconds = 1.0;
     std::uint16_t memoryCapacity_ = 8;
     std::size_t visitedCapacity_ = 5;
     params::Parameter<float>* hertz_ = nullptr;
@@ -3393,6 +3474,12 @@ private:
         float score = 0.0f;
         std::uint8_t kind = 255;
         std::string subjectName;
+        // ADR-933: where its walk goes and how near counts as there, and whether its not getting
+        // there has been noted.
+        glm::vec2 destination{0.0f};
+        float tolerance = 0.0f;
+        bool hasDestination = false;
+        bool attempted = false;
     };
     Committed committed_{};
     std::string lastOutcome_;

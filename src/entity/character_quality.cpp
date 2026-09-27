@@ -72,6 +72,12 @@ void CharacterQualityRecorder::record(const EntityWorld& world, double time, dou
     scratch_.reserve(world.entities().size());
     for (const auto& owned : world.entities()) {
         const Entity& e = *owned;
+        // ADR-934: a body a set piece has taken has left the world, and its metrics end where it was
+        // taken. Recorded on, it would stand in the beam for the rest of the film -- and before this
+        // ADR it grazed on, invisible, and every one of its numbers after the abduction was that.
+        if (e.retired()) {
+            continue;
+        }
         CharacterSample s;
         s.name = e.name();
         // `locomotion().position`, not `state().position()`: it is the root the animation layer is
@@ -104,6 +110,23 @@ void CharacterQualityRecorder::closeStop(Track& t, glm::vec2 here) const {
     const double turned = degreesBetween(t.headingIn, out);
     if (turned > 90.0) {
         ++b.turnsOver90;
+        // ADR-933: a stop walked out of back the way it came, after another, is pacing; one walked on
+        // out of breaks the run. Over 90 degrees rather than a reversal's 150: a body that walks
+        // through its turns (ADR-908) and turns right round at a stop leaves it on a curve, and over
+        // the first 1.5 m that measures 116-129 degrees -- GV3's ember, back and forth on a river bank,
+        // turned 121, 172, 116, 173, 129 and 176 degrees at six stops running and made one reversal
+        // run of one.
+        if (t.pacingRun == 0) {
+            t.pacingFrom = t.pendingStopAt;
+        }
+        ++t.pacingRun;
+        if (t.pacingRun > b.longestPacing) {
+            b.longestPacing = t.pacingRun;
+            b.longestPacingFrom = t.pacingFrom;
+            b.longestPacingSeconds = t.pendingStopAt - t.pacingFrom;
+        }
+    } else {
+        t.pacingRun = 0;
     }
     if (turned > static_cast<double>(thresholds_.reversalDegrees)) {
         ++b.reversals;
@@ -259,6 +282,8 @@ void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, 
                 if (t.pendingOut) {
                     closeStop(t, here);
                 }
+                t.stopBegan = time - t.stillRun; // the stop began when the body stood, not when it counted
+
                 // The way in: straight-line travel from the oldest point of the trail to here.
                 t.hasHeadingIn = false;
                 if (!t.trail.empty()) {
@@ -306,6 +331,7 @@ void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, 
                 // Leaving a stop: the way out is measured from where it stood.
                 t.inStop = false;
                 t.pendingOut = true;
+                t.pendingStopAt = t.stopBegan;
                 t.stopExit = t.stopPlaces.empty() ? here : t.stopPlaces.back();
             }
             t.stillRun = 0.0;
@@ -422,7 +448,9 @@ nlohmann::json toJson(const CharacterQualityReport& report) {
             {"stillFraction", b.stillFraction},
             {"longestStillSeconds", b.longestStillSeconds},
             {"stops", {{"count", b.stops}, {"measured", b.measuredStops}, {"reversals", b.reversals},
-                       {"turnsOver90", b.turnsOver90}, {"revisits", b.revisits}}},
+                       {"turnsOver90", b.turnsOver90}, {"revisits", b.revisits},
+                       {"pacing", {{"longest", b.longestPacing}, {"seconds", b.longestPacingSeconds},
+                                   {"from", b.longestPacingFrom}}}}},
         };
         e["ground"] = {
             {"stillSeconds", g.stillSeconds},

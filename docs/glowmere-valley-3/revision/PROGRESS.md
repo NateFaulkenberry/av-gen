@@ -8,6 +8,49 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **MERGED (18:20): main is `983221a9`. ALL 11 ENGINE STREAMS ARE IN MAIN** (navfix: ADR-932-934 and the ADR-931
+  amendment), plus the status index.
+  - navfix integration suites: CPU 3,799 of 3,800 (the wall-clock case passes alone). GPU 544 cases, 543 passed,
+    1 skipped, 617,151 assertions, exit 0; its 49 overlap samples were all cihealth's CPU tests, no GPU.
+  - Pushed (`876a11e2..983221a9`) and merged into `gv3/production` (`4b4c467d`). The CI watcher was resumed for the
+    new push run and the pending runs.
+  - **`av-gen-engine-4` is BUILT** (18:21) at `983221a9`, with `BUILD-READY`. gv3-int was told to switch between
+    GPU jobs, merge `gv3/production`, apply E5's "go and see" (`approach` 250 -> 18) and re-check. Engine-3 stays
+    until gv3-int has switched; then remove it, and point the Critic docs at engine-4.
+  - Still in flight: behave (ADR-935-936), uireach (ADR-937-939), cihealth (ADR-940-941 and the partition).
+    Queued for the next engine round:
+    - two moons, and the moon's controls;
+    - a lift's stack spacing should default from the animals' body size. gv3-int found E4's cows drawn together by
+      the template's stackRadius 1.6 m and stackStagger 1.2 m, and fixes it in `ufo.plan.json`;
+    - the world closure's features have no editor;
+    - `cameraTravel` activation ignores an authored cut, because it needs Song-mode spans. GV3 fires the restored
+      Camera Travel Beam on "cut" markers at phrase-start cuts instead, about every 7 s.
+- **gv3-int's round-2 plan** (18:25), for the owner's items:
+  - **Heroes:** scored lanes (kick, clap, off-beat, downbeat, beat 3) across all ten heroes. Peaks go to x4-6, the
+    depth floor 0.19 -> 0.5, and resting `emissiveBoost` down to 0.4-0.5. A 5 ms attack and a 250-350 ms tail;
+    spill from the practical lights; bloom crossings.
+    - Root cause: the gold gills sit at the tone curve's shoulder, a flat peach with no headroom. The AgX A/B
+      decides the peaks' detail.
+  - **Small mushrooms:** staggered scored routes onto the fungi, shelf-fungi and beacons layers, with ecology-light
+    spill.
+  - **The travel beam:** restored through the generator. `look.REMOVED_EFFECTS` had dropped it.
+  - **E4:** wider stack spacing.
+  - **Re-framings:** 29.1, 59.1, 31.1, 77.1 (turned north to the falls), 38.1, 73.1, 104.1 and 107.1; the post
+    and air A/Bs.
+- **18:10: THE OWNER'S FEEDBACK ON r1** (sent to gv3-int; standing for GV3):
+  - **"Restore the hero pulses in the mushrooms and the camera beam".** Only the elder's kick and the lantern's clap
+    still read. **Rule: tame a pulse, never delete it**; the memory note is `av-gen-gv3-keep-the-pulses`.
+  - **The owner's correction: "the camera beam" is the Camera Travel Beam, not the UFO beam.** That is the world
+    effect "that swept across the world during camera changes": travelBeam, ADR-207/702, from the camera toward
+    the hero the cut hands off to.
+    - GV2 multicam has it (`effects[]` `camera-travel-beam`, with `beat.pulse -> fx/camera-travel-beam/intensity`
+      at 8.0). GV3's first pass carried over only the aurora and the horse's light.
+    - gv3-int restores it through the generator. The UFO beams' audio links stay dropped (`e1bc1c49`).
+  - **"At 1:45 there are two cows stuck together that get abducted together as one"** (E4):
+    - cow-12 and cow-23 stand 3.21 m apart at the beam (102-104 s), so their bodies touch at 1.94x scale;
+    - the lift draws them to 1.34 m (107-109 s).
+    - Data fix: gv3-int beams when they stand apart (10.3 m at 95 s), or picks another pair.
+    - **Engine defect, queued for the next engine round:** a multi-animal lift must keep its animals apart.
 - **18:00: gv3-world is DONE** (final `60143f86`; the log-only tail merged as `6d5791b8`).
   - The closure: 0 open ends in 453 views; the survey, the filmed ground and all 28 camera tracks are unchanged.
   - **The river mouth cannot be closed by terrain** (its course holds the survey minimum), so gv3-int solves 77.1
@@ -678,6 +721,18 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **Pixel-based fades** (water ripples, bloom levels, motion-blur tiles) differ between 540p previews and 1080p/4K finals. Check final-resolution stills before a final render.
 
 ## Owner requirements and creative direction (do not lose)
+- **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the Camera Travel Beam (the light sweep on camera changes) visible.** When a pulse causes a
+  problem, tame it (depth, a peak cap, timing); never delete it. A route the Critic calls inert is to be made
+  visible, not dropped.
+- **(2026-09-27) The heroes' pulses are dramatic, not subtle.** The owner: "the mushroom unders are pulsing to the
+  beat - any way we can make it way more dramatic / noticable". The pulse was +6% to +12% on the gold pixels
+  (amount 1.0 × section depth 0.19-1.0). Target: about +40-60% at the peak, with a spill ring on the ground in the
+  wides, and no flat clipping. Levers: depth, a lower resting glow, a longer tail, spill light, bloom with a peak
+  ceiling, and every hero on its own lane.
+- **(2026-09-27) The tiny glowing mushrooms all over Glowmere pulse to the beat, visibly.** The owner asked
+  directly: "can we make those pulse to the beat". It is valley-wide, staggered per layer so it stays organic, and
+  strong enough to read in the wides. It overrides the brief's "not everything pulses to the beat" caution for
+  this layer.
 - **Audio reactivity is the highest priority.** It must be visible and meaningful, not just configured, and not "everything pulses to the beat". Hierarchical (micro/meso/macro), correlated but not identical.
 - **Hero effects throughout,** with different timing and amplitude per hero. Use the small coloured mushrooms: waves, grouped or staggered responses, colour evolving by section.
 - **Subtle continuous wind.**

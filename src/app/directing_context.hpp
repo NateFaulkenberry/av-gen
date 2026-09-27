@@ -81,6 +81,8 @@ namespace avgen::app {
             switch (comp->entityWorld().pathProvider().route(from, to, route)) {
             case entity::RouteStatus::Ready: return true;
             case entity::RouteStatus::Unreachable: return false;
+            // ADR-932: a walk that ends at the nearest point it can reach does not reach the place.
+            case entity::RouteStatus::Nearest: return false;
             case entity::RouteStatus::Pending: return std::nullopt;
             }
             return std::nullopt;

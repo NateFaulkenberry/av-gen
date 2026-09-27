@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-09-26
+**Amended:** 2026-09-27 -- the adapter is handed the engine's ground probe (the amendment at the end)
 **Follows:** ADR-094 (the AI tool layer), ADR-753/764 (scratch copies), ADR-757 (the approval gate),
 ADR-765/767 (host hooks that answer off the main thread), ADR-770 (Modify and Regenerate), ADR-755
 (plan revisions and `produced`)
@@ -148,3 +149,45 @@ candidate plan, the span 58-66 s, preview mode, `AVGEN_RENDER_PREFIX=tools/gpu-l
   `directingEvaluations`; the person's project held no plan afterwards. The Critic also said "s01: no
   primary subject could be matched": the host names a shot's subject from its rig's aim or follow node,
   and a static rig has neither -- a generator's shot plan (GV3's) names them.
+
+## Amendment, 2026-09-27: the adapter is handed the engine's ground probe
+
+**Found by:** the Critic's adapter update for the GV3 revision's Phase 3 (`stream-reports/critic-adapter.md`
+in the GV3 worktree, "Follow-ups for AV Gen": "The Director's evaluator hook (ADR-931) calls the adapter
+without `--world-preview`, so its evaluations lack ground data").
+**Implemented by:** `criticAdapterCommand`, `sceneHasTerrainWorld` and `EvaluatorOptions::worldPreview`
+(`src/app/directing_evaluate.{hpp,cpp}`); `evaluatorOptionsFrom` reads `AVGEN_WORLD_PREVIEW`
+**Tests:** `[evaluate][adr931]` in `tests/unit/test_directing_evaluate.cpp`: "the Critic's adapter is
+handed the engine's ground probe when the scene has ground", and the stand-in probe in "a missing Critic
+is a clear error, never a silent pass"
+
+**The gap.** The Critic's adapter judges grounding -- whether a body's feet are on the ground -- against
+the engine's own ground height. It gets that by running `avgen_world_preview` itself, under every
+grounded body's path, when it is given `--world-preview <path>`. The hook never gave it, so in every
+evaluation the Director ran the adapter left the ground unknown and the Critic's grounding check had
+nothing to judge against. On GV3 that check, run by hand with the flag, is the one that found four
+aliens floating while they walk.
+
+**Decision.** Step 5 of the pipeline hands the adapter `--world-preview <build>/tools/avgen_world_preview`:
+- **Beside the tracer.** Found as `avgen_cast_trace` is (`tools/` beside `avgen`'s `src/`), or at
+  `AVGEN_WORLD_PREVIEW`, and **required** like the tracer: a build with no probe is refused, in words
+  that say how to supply it ("avgen_world_preview is not at ...: build it, or set AVGEN_WORLD_PREVIEW"),
+  never an evaluation that quietly judged nobody's feet.
+- **Only with a terrain.** The adapter refuses the flag for a scene with no `terrain` node carrying a
+  `world` block ("the scene has no terrain node with a 'world' block; pass --world"), and an evaluation
+  would then fail for nothing. `sceneHasTerrainWorld` applies the adapter's own rule (`world_block`) to
+  the file the adapter reads -- the saved scratch scene -- so the two cannot disagree.
+- The adapter's command line is built by one function, `criticAdapterCommand`, as `critic submit`'s
+  already was, so it can be checked without running anything.
+
+**Consequences.**
+- Every `director.evaluate` of a scene with terrain now gets ground samples, so the Critic's grounding
+  check is judged: GV3 and every Glowmere film, and the set-piece lab the tests use.
+- A scene with no terrain is evaluated exactly as before.
+- **Tested** on the stand-ins: the adapter's recorded command line for the terrained lab carries
+  `--world-preview <the stand-in probe>` (the control: before this amendment it did not); a scene whose
+  terrain has no `world` block is not handed the flag; a build whose probe is missing is refused with its
+  environment variable named. The live test against a private Critic was not re-run: the adapter's
+  `--world-preview` path is covered by the Critic's own test suite (48 passed, its report), and this
+  amendment changes only the flag the engine passes.
+
