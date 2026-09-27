@@ -168,6 +168,52 @@ glm::vec3 standOff(glm::vec3 from, glm::vec3 to, float approach) {
     return glm::vec3(at.x, to.y, at.y);
 }
 
+// ADR-936: where a walk from `here` meant to end at `stand` can end, or false when nowhere near it
+// can. Asked of the world's own path provider, so a considerer offers only what the walk it pushes
+// will be allowed to do: the end must be ground a walker can stand on, and `reaches` -- `route`'s own
+// refusals, without the route -- must not put it across a divide. Where `stand` itself is not
+// standable (inside a hero's footprint, in the scatter round it, under water), the nearest standable
+// point within `tolerance` of it takes its place: rings a metre apart, twelve bearings a ring, and in
+// the first ring that has any, the one nearest the walker, so it stops on its own side of the thing.
+// Arriving within `tolerance` of `stand` is what the walk means by arriving, so that is the same errand.
+bool reachableStand(const DecisionContext& ctx, glm::vec3 here, glm::vec3& stand, float tolerance) {
+    if (ctx.world == nullptr) {
+        return true;
+    }
+    const IPathProvider& path = ctx.world->pathProvider();
+    const glm::vec2 from(here.x, here.z);
+    glm::vec2 at(stand.x, stand.z);
+    if (!path.walkable(at)) {
+        constexpr int kBearings = 12;
+        constexpr float kTurn = 6.28318530717958647692f / static_cast<float>(kBearings);
+        bool found = false;
+        glm::vec2 best(0.0f);
+        for (float r = 1.0f; r <= tolerance + 1e-4f && !found; r += 1.0f) {
+            float nearest = std::numeric_limits<float>::max();
+            for (int k = 0; k < kBearings; ++k) {
+                const float a = kTurn * static_cast<float>(k);
+                const glm::vec2 p = at + glm::vec2(std::sin(a), std::cos(a)) * r;
+                const float d = glm::length(p - from);
+                if (d < nearest && path.walkable(p)) {
+                    nearest = d;
+                    best = p;
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            return false;
+        }
+        at = best;
+    }
+    if (!path.reaches(from, at)) {
+        return false;
+    }
+    stand.x = at.x;
+    stand.z = at.y;
+    return true;
+}
+
 // FNV-1a over a name, for the (seed, tick, option) draws. A string rather than an index, because an
 // option's index in this tick's list moves when the body moves and its name does not.
 std::uint32_t nameHash(std::string_view name) {
@@ -192,7 +238,7 @@ bool optionDestination(const Option& o, glm::vec3 here, glm::vec2& end, float& t
             return false;
         }
         end = glm::vec2(a->target.point.x, a->target.point.z);
-        tolerance = a->tolerance > 0.0f ? a->tolerance : 0.75f;
+        tolerance = a->tolerance > 0.0f ? a->tolerance : kMoveTolerance;
         goes = glm::length(end - glm::vec2(here.x, here.z)) > tolerance + 0.5f;
         return true;
     }
@@ -1112,6 +1158,31 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     if (scratch_.empty()) {
         return;
     }
+    const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
+    // ADR-936: only places the walk can end at are offered. Each candidate's stand-off is asked the
+    // action tier's own questions -- can a walker stand there, and is it on this side of every
+    // divide -- before it is an option, so a roam errand is never chosen only to end at a river bank
+    // (ADR-932's walk to the nearest point) or fail on its first step ("unreachable"): GV3's ember
+    // did the second four times running at 24-33 s, at bloom hero parts and glow patches whose
+    // stand-offs were not ground a body can stand on. The move's own `tolerance`, which is what
+    // arriving means to it, is how far the stand-off may move onto standable ground.
+    const float tolerance = approach_ > 0.0f ? std::max(approach_ * 0.5f, 0.75f) : kMoveTolerance;
+    stands_.clear();
+    {
+        std::size_t kept = 0;
+        for (std::size_t i = 0; i < scratch_.size(); ++i) {
+            glm::vec3 stand = standOff(here, scratch_[i].position, approach_);
+            if (!reachableStand(ctx, here, stand, tolerance)) {
+                continue;
+            }
+            scratch_[kept++] = scratch_[i];
+            stands_.push_back(stand);
+        }
+        scratch_.resize(kept);
+    }
+    if (scratch_.empty()) {
+        return;
+    }
     // Two passes, because the spans handed out in `Option::actions` must survive the whole of this
     // call and a vector that grows moves its storage. The same reason `NavDebug`'s spans are
     // published after the route is built rather than while it is.
@@ -1122,17 +1193,17 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     std::vector<std::pair<std::size_t, std::size_t>> ranges;
     ranges.reserve(scratch_.size());
     const float w = weight();
-    const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
     // ADR-909: this body's walk speed, which a `speedRange` multiplies. Looked up once.
     const SpeedRange range = pace_.live();
     const float walkSpeed = range.set() ? walkSpeedOf(ctx) : 0.0f;
-    for (const GoalCandidate& candidate : scratch_) {
+    for (std::size_t c = 0; c < scratch_.size(); ++c) {
+        const GoalCandidate& candidate = scratch_[c];
         const std::size_t first = actions_.size();
         ActionDesc walk;
         walk.kind = ActionKind::Move;
         walk.name = std::string(candidate.name);
         walk.target.kind = TargetKind::Point;
-        walk.target.point = standOff(here, candidate.position, approach_);
+        walk.target.point = stands_[c];
         if (approach_ > 0.0f) {
             walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
         }

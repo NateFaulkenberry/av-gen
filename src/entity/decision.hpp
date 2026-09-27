@@ -527,6 +527,10 @@ private:
     mutable std::vector<ActionDesc> actions_;
     mutable std::vector<GoalCandidate> scratch_;
     mutable std::vector<std::string> names_;
+    // ADR-936: where each offered candidate's walk ends -- its stand-off, moved onto standable ground
+    // within the walk's tolerance where the stand-off itself is not -- parallel to `scratch_` once the
+    // candidates a walk cannot reach have been taken out of it.
+    mutable std::vector<glm::vec3> stands_;
 };
 
 // Price the *way*, not the place (ADR-336).
