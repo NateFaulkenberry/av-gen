@@ -98,11 +98,16 @@ def pool(t0, t1, g):
 
 
 @at("7.1")
-def lantern_hollow(t0, t1, g):
-    # [s04] The lantern through the ferns; Rook works this side of the valley and may cross it.
-    r = moving(t0, t1, 28.0, g(-70, -41, 1.8), g(-66, -44, 1.8), LANTERN)
-    return r, dict(lead="hero", purpose="The lantern from the hollow, ferns in front", subject="the lantern mushroom",
-                   camera="28 mm, low, through ferns", movement="lateral truck (parallax)", music="2 bars")
+def e1_far_survey(t0, t1, g):
+    # E1. Far up the valley the scout settles and a thin beam lights over a field (bar 8.3), 350 m
+    # beyond the elder; it sweeps east until the riff's phrase end (bar 13) and lifts nothing. From
+    # the east bank, low, through a 50 mm: the elder 5 deg left of centre, the whole sweep 5-15 deg
+    # right of it, never behind the cap (the scout hovers 6.7 deg up, the cap's top is at 6.8).
+    r = moving(t0, t1, 50.0, g(30, 150, 3.0), g(28, 150, 3.0), [-31.8, 14.7, -40.2])
+    return r, dict(lead="event", purpose="E1: the elder, and far beyond it a beam lights over a field",
+                   subject="the elder; the scout's survey (E1), tiny, 350 m beyond",
+                   camera="50 mm from the east bank, 107 m south-east of the elder, low", movement="slow lateral truck",
+                   music="2 bars; the beam lights at bar 8.3", effects="the survey beam (E1)")
 
 
 @at("9.1")
@@ -115,16 +120,12 @@ def horse_grazing(t0, t1, g):
 
 
 @at("11.1")
-def e1_far_survey(t0, t1, g):
-    # E1. Far up the valley a thin beam sweeps a field and lifts nothing, 340 m beyond the elder;
-    # it goes out on the riff's phrase end (bar 13, this shot's cut). A long lens from the river's
-    # south reach, low, so the survey sits to the right of the elder's cap.
-    eye0, eye1 = g(8, 150, 3.0), g(3, 150, 3.0)
-    r = moving(t0, t1, 50.0, eye0, eye1, [-10.0, 13.0, 20.0])
-    return r, dict(lead="event", purpose="E1: the elder, and far beyond it a beam sweeping a field",
-                   subject="the elder; the scout's survey (E1), tiny, 340 m beyond",
-                   camera="50 mm from 100 m south of the elder, low", movement="slow lateral truck",
-                   music="2 bars; the beam goes out on the phrase end, bar 13", effects="the survey beam (E1)")
+def lantern_hollow(t0, t1, g):
+    # [s04] The lantern through the ferns; Rook works this side of the valley and may cross it.
+    r = moving(t0, t1, 28.0, g(-70, -41, 1.8), g(-66, -44, 1.8), LANTERN)
+    return r, dict(lead="hero", purpose="The lantern from the hollow, ferns in front", subject="the lantern mushroom",
+                   camera="28 mm, low, through ferns", movement="lateral truck (parallax)",
+                   music="2 bars to the riff's phrase end")
 
 
 @at("13.1")
@@ -374,9 +375,13 @@ def e4_arrives(t0, t1, g):
     # E4. The scout comes down over the river 47 m west of the elder and its beam lights (bar 56.3):
     # a middle-distance frame from the south with the elder at its right, so the event is in the
     # valley, beside the film's heart, not in a sky of its own.
-    r = moving(t0, t1, 35.0, g(-30, 125, 3.0), g(-29, 121, 3.0), [-33.0, 16.0, 40.0])
+    # A live aim at the scout: its station is wherever its region's animals are when it arrives (the
+    # plan's region is 30 m round (-55, 40); on the first-pass cast it stopped at (-75, 60)), and a fixed
+    # frame lost it off the left edge.
+    r = Rig("", 28.0, aim="scout", aim_offset=(0.0, -6.0, 0.0), smoothing="craft")
+    r.move(t0, t1, g(-18, 118, 3.0), g(-19, 114, 3.0))
     return r, dict(lead="event", purpose="E4: the scout settles over the river beside the elder",
-                   subject="the scout (E4), the elder at the right", camera="35 mm, 3 m, 90 m south",
+                   subject="the scout (E4), the elder at the right", camera="28 mm, 3 m, from the south, live aim",
                    movement="slow push", music="3 bars; the beam at bar 56.3", effects="the scout's beam (E4)")
 
 
