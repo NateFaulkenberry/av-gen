@@ -67,9 +67,12 @@ Individual metrics, never a score: the schema test's ban on aggregate keys cover
   226 s at 60 fps, the render's own step, through the real engine: the analyzer's numbers come from
   `avgen_character_quality`, the speed spread and path grades from `avgen_cast_trace` at 20 Hz through
   the audit's `measure.py`. **Before** is main at `808f32e4` with this ADR's recorder added and
-  nothing else; **after** is this branch; **tuned** is this branch on a scratch copy of GV3 with the
-  settings the stream report recommends (GV3's own files are untouched). Cells read before → after
-  (→ tuned). horse-11 is abducted at 170 s, and the staging owns it from then.
+  nothing else. **After** is this branch at `3eb53fdd` (with `808f32e4` merged; the later restless walk
+  of its own acts only where `maxStillSeconds` is set, which neither film's own scene does).
+  **Tuned** is a scratch copy of GV3 with the settings the stream report recommends (GV3's own files
+  are untouched), on this branch with main `a6598157` merged -- main's camera, song and reactivity
+  work changes nothing under `src/entity/`. Cells read before → after (→ tuned). horse-11 is abducted
+  at 170 s, and the staging owns it from then.
 
 **GV2-multicam: aliens (before → after)**
 
@@ -102,10 +105,10 @@ Individual metrics, never a score: the schema test's ban on aggregate keys cover
 
 | | longest still | still | stops (reversals) | A→B→A revisits | yaw turned on the spot | turn radius (median) | speed p10/med/p90 (trace) |
 |---|---|---|---|---|---|---|---|
-| rook | 26.2 s → 6.1 s → 4.3 s | 26% → 16% → 18% | 15 (0) → 17 (3) → 18 (1) | 1 → 1 → 0 | 34% → 23% → 21% | 0.8 m → 0.8 m → 1.6 m | 0.47/3.07/3.07 → 2.01/3.07/3.07 → 2.41/3.07/3.73 |
-| tide | 12.8 s → 12.8 s → 3.9 s | 38% → 50% → 21% | 22 (1) → 24 (1) → 16 (0) | 4 → 2 → 0 | 24% → 32% → 14% | 0.6 m → 1.2 m → 1.6 m | 0.96/3.06/3.06 → 0.83/3.06/3.06 → 1.63/3.04/3.39 |
-| sage | 67.3 s → 84.7 s → 26.1 s | 45% → 79% → 54% | 23 (16) → 7 (1) → 12 (5) | 12 → 0 → 3 | 47% → 51% → 51% | 0.7 m → 0.6 m → 5.2 m | 1.17/3.06/3.06 → 1.45/3.06/3.06 → 1.83/3.06/3.06 |
-| ember | 9.7 s → 9.1 s → 7.2 s | 31% → 23% → 21% | 25 (8) → 22 (7) → 22 (0) | 5 → 4 → 0 | 22% → 19% → 9% | 0.8 m → 1.0 m → 1.6 m | 1.14/3.07/3.07 → 1.23/3.07/3.07 → 1.62/3.07/3.76 |
+| rook | 26.2 s → 6.1 s → 3.2 s | 26% → 16% → 11% | 15 (0) → 17 (3) → 15 (1) | 1 → 1 → 2 | 34% → 23% → 17% | 0.8 m → 0.8 m → 1.6 m | 0.47/3.07/3.07 → 2.01/3.07/3.07 → 1.87/3.07/3.45 |
+| tide | 12.8 s → 12.8 s → 4.1 s | 38% → 50% → 18% | 22 (1) → 24 (1) → 15 (0) | 4 → 2 → 1 | 24% → 32% → 16% | 0.6 m → 1.2 m → 1.5 m | 0.96/3.06/3.06 → 0.83/3.06/3.06 → 1.74/2.97/3.36 |
+| sage | 67.3 s → 84.7 s → 14.8 s | 45% → 79% → 41% | 23 (16) → 7 (1) → 11 (1) | 12 → 0 → 0 | 47% → 51% → 32% | 0.7 m → 0.6 m → 1.6 m | 1.17/3.06/3.06 → 1.45/3.06/3.06 → 2.09/3.06/3.06 |
+| ember | 9.7 s → 9.1 s → 7.2 s | 31% → 23% → 24% | 25 (8) → 22 (7) → 23 (0) | 5 → 4 → 1 | 22% → 19% → 14% | 0.8 m → 1.0 m → 1.6 m | 1.14/3.07/3.07 → 1.23/3.07/3.07 → 1.51/3.07/3.84 |
 | vane | 22.3 s → 22.5 s → 4.2 s | 37% → 43% → 20% | 15 (1) → 16 (4) → 14 (0) | 0 → 1 → 0 | 30% → 23% → 13% | 0.7 m → 0.7 m → 1.6 m | 1.90/3.07/3.07 → 1.29/3.07/3.07 → 2.47/3.03/3.38 |
 
 **GV3: animals (before → after → tuned)**
@@ -125,7 +128,6 @@ Individual metrics, never a score: the schema test's ban on aggregate keys cover
 | horse-20 | 24 (1, 8) → 23 (0, 2) → 22 (0, 0) | 3 → 1 → 0 | 27% → 17% → 16% | 0.7 m → 0.9 m → 2.2 m | 74 s → 3 s → 0 s | 16 s → 0 s → 0 s | 29% → 3% → 0% |
 | horse-22 | 21 (2, 8) → 20 (0, 4) → 21 (0, 0) | 1 → 1 → 0 | 36% → 29% → 4% | 1.0 m → 1.2 m → 2.2 m | 82 s → 72 s → 0 s | 20 s → 17 s → 0 s | 52% → 28% → 0% |
 
-
 What the tables say, and what they do not:
 
 - **The animals' reversals are gone, in both films, with nothing authored**: GV2-multicam's 28 and
@@ -138,11 +140,14 @@ What the tables say, and what they do not:
   GV3 animals anchored on 17-25 degree flanks cannot be fixed by a destination rule -- a territory
   that is all hillside offers only hillside -- which is why the tuned column re-homes them onto the
   coordinator's two flat meadows, and there they stand on steep ground for 0 s.
-- **The aliens' A->B->A revisits fall** (GV2 8 -> 2, GV3 22 -> 8) with nothing authored. Their
+- **The aliens' A->B->A revisits fall** (GV2 8 -> 2, GV3 22 -> 8, tuned 4) with nothing authored. Their
   longest stands do not fall by themselves: GV2-multicam's file is frozen and cannot opt in to
   `maxStillSeconds`, and there the loop veto turns some walks back into waits (vane 8.5 s -> 27.2 s,
-  ADR-909). With the recommended settings (tuned) four of the five aliens' longest stands are 4-7 s.
-  Sage's 26 s in this column is the case ADR-909 §3a (a restless decider's walk of its own) now
-  covers; the column predates it, and the re-measurement follows.
+  ADR-909). With the recommended settings (tuned) the longest stands are 3.2-7.2 s for four aliens and
+  14.8 s for sage (from 67.3 s). Sage's is the one stand over its 10 s limit, and it spans the
+  abduction beam at 170.3 s, where an urgent reaction -- exempt from the restless rule, as orders are --
+  holds it watching; every other stand of every alien is within its limit. The first tuned run, before
+  ADR-909 §3a (a restless decider's walk of its own) and with sage's graze leash at 19 m, measured sage
+  at 26 s: nothing on offer walked.
 - **Speed now varies** where a scene asks (`speedRange`): the tuned aliens' paces spread over about
   a fifth either side of their walk, and their reactions hurry.
