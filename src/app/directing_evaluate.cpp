@@ -82,6 +82,48 @@ std::string tail(const std::string& text, std::size_t chars = 600) {
 
 std::string seconds(double s) { return fmt::format("{:.4f}", s); }
 
+// The Critic is Python, and Python's `json` writes an undefined measurement as a bare `NaN` (and
+// `Infinity`, `-Infinity`), which strict JSON -- nlohmann's parser -- refuses: the first live report
+// had `"median_offset_ms": NaN` and was read as "not a report" (ADR-931's smoke test). Outside
+// strings, those three tokens become `null`: a measurement that is not a number is one that is not
+// there, which is what every reader of the report already has to handle.
+std::string strictJson(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    bool inString = false;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (inString) {
+            out += c;
+            if (c == '\\' && i + 1 < text.size()) {
+                out += text[++i];
+            } else if (c == '"') {
+                inString = false;
+            }
+            continue;
+        }
+        if (c == '"') {
+            inString = true;
+            out += c;
+            continue;
+        }
+        const auto token = [&](std::string_view t) { return text.compare(i, t.size(), t) == 0; };
+        if (token("-Infinity")) {
+            out += "null";
+            i += 8;
+        } else if (token("Infinity")) {
+            out += "null";
+            i += 7;
+        } else if (token("NaN")) {
+            out += "null";
+            i += 2;
+        } else {
+            out += c;
+        }
+    }
+    return out;
+}
+
 std::string commandLine(const std::vector<std::string>& argv) {
     std::string out;
     for (const std::string& a : argv) {
@@ -309,7 +351,7 @@ Result<directing::EvaluationReport> readCriticOutcome(const ProcessOutcome& outc
     case 3: return fail("the Critic's job was cancelled (exit 3){}", tail(outcome.err));
     default: return fail("the Critic exited {}{}", outcome.exitCode, tail(outcome.err));
     }
-    const json submitted = json::parse(outcome.out, nullptr, false);
+    const json submitted = json::parse(strictJson(outcome.out), nullptr, false);
     if (submitted.is_discarded() || !submitted.is_object()) {
         return fail("the Critic's answer is not the JSON `critic submit --json` prints{}", tail(outcome.out));
     }
@@ -318,7 +360,7 @@ Result<directing::EvaluationReport> readCriticOutcome(const ProcessOutcome& outc
         return fail("the Critic finished job {} without a report on disk (report_json: '{}')",
                     submitted.value("job_id", std::string("?")), reportPath);
     }
-    const json report = json::parse(readFile(reportPath), nullptr, false);
+    const json report = json::parse(strictJson(readFile(reportPath)), nullptr, false);
     if (report.is_discarded() || !report.is_object() || report.value("schema", std::string()) != "critic.report/1") {
         return fail("{} is not a critic.report/1 document", reportPath);
     }
@@ -529,7 +571,8 @@ public:
             return std::unexpected(result_->error());
         }
         json out = (*result_)->toJson();
-        out["summary"] = fmt::format("{}{}", (*result_)->partial ? "PARTIAL: " : "", (*result_)->headline);
+        const std::string& headline = (*result_)->headline;
+        out["summary"] = (*result_)->partial && !headline.starts_with("PARTIAL") ? "PARTIAL: " + headline : headline;
         return out;
     }
     void cancel() override { cancel_ = true; }

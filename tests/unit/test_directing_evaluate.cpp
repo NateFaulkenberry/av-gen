@@ -56,6 +56,17 @@ std::string readText(const fs::path& p) {
     return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
 
+// The report as the Critic writes it: Python's `json` writes an undefined measurement as a bare NaN or
+// Infinity, which strict JSON refuses -- the first live report carried `"median_offset_ms": NaN`.
+std::string asPythonWrites(const json& report) {
+    std::string text = report.dump();
+    const std::string anchor = "\"schema\":\"critic.report/1\"";
+    const std::size_t at = text.find(anchor);
+    REQUIRE(at != std::string::npos);
+    text.insert(at + anchor.size(), ",\"sync\":{\"median_offset_ms\":NaN,\"worst\":Infinity,\"best\":-Infinity}");
+    return text;
+}
+
 // A critic.report/1 with one issue at 13-15 s (inside the west set piece's lift) and one at 90 s
 // (inside nothing the plan made), one strength, and two scored dimensions.
 json criticReport(bool partial) {
@@ -72,7 +83,8 @@ json criticReport(bool partial) {
                                            {"time", {13.0, 15.0}}, {"confidence", 0.8},
                                            {"recommendations", json::array({{{"action", "vary the framing"}}})}},
                                           {{"id", "F002"}, {"key", "stale_hold:s02"}, {"rule", "stale_hold"}, {"severity", "medium"},
-                                           {"kind", "issue"}, {"title", "nothing new after 4 s"}, {"time", {90.0, 94.0}}}})},
+                                           {"kind", "issue"}, {"title", "nothing new after 4 s (NaN in a string stays)"},
+                                           {"time", {90.0, 94.0}}}})},
                 {"strengths", json::array({{{"id", "S001"}, {"key", "clean_exposure:s01"}, {"title", "clean exposure"},
                                             {"time", {12.0, 14.0}}}})}};
 }
@@ -91,7 +103,7 @@ struct StandIns {
         critic = repo / ".venv/bin/critic";
         log = dir / "calls.log";
         const fs::path report = dir / "report.json";
-        std::ofstream(report) << criticReport(exitCode == 5).dump();
+        std::ofstream(report) << asPythonWrites(criticReport(exitCode == 5));
         // Every stand-in appends its argv to the log, one line per call.
         const std::string record = fmt::format("echo \"$(basename \"$0\") $*\" >> '{}'\n", log.string());
         writeScript(critic, record + (exitCode == 4 ? "echo 'critic: evaluator not running at http://127.0.0.1:9' >&2\n"
@@ -207,7 +219,7 @@ TEST_CASE("a child process: its output, its exit code, and cancellation", "[eval
 TEST_CASE("the Critic's answer: a report, a partial report, or a clear error", "[evaluate][adr931]") {
     testsupport::ScratchDir dir("evaluate_answer");
     const fs::path reportPath = dir / "report.json";
-    std::ofstream(reportPath) << criticReport(false).dump();
+    std::ofstream(reportPath) << asPythonWrites(criticReport(false));
     const json submitted{{"job_id", "job_stub"}, {"report_json", reportPath.string()}, {"total_ms", 900}};
     app::ProcessOutcome done;
     done.exitCode = 0;
@@ -223,6 +235,8 @@ TEST_CASE("the Critic's answer: a report, a partial report, or a clear error", "
     CHECK(report->findings[0].start == 13.0);
     CHECK(report->findings[0].recommendations == std::vector<std::string>{"vary the framing"});
     CHECK(report->findings[2].kind == "strength");
+    // The bare NaN and Infinity were read as nothing, and a "NaN" inside a string was left alone.
+    CHECK(report->findings[1].title == "nothing new after 4 s (NaN in a string stays)");
 
     // PARTIAL (exit 5 under --strict): a report, marked so, never mistaken for a full one.
     app::ProcessOutcome partial = done;
