@@ -129,13 +129,14 @@ struct Meadow {
         return params.findAs<float>("nodes/valley/scatter/ferns/sway/" + leaf);
     }
     // One frame as the engine makes one: finals from bases, the composition applies, then a render
-    // with no history carried in from the frame before.
-    gpu::Image8 frame(rendering::SceneRenderer& renderer, double seconds) {
+    // with no history carried in from the frame before. `frameIndex` is the frame's jitter and noise
+    // seed; comparing two SECONDS for motion holds it fixed, so only what time animates can differ.
+    gpu::Image8 frame(rendering::SceneRenderer& renderer, double seconds, std::uint64_t frameIndex = 180) {
         params.resetFinals();
         FrameTime time{};
         time.renderTime = seconds;
         time.deltaTime = 1.0 / 60.0;
-        time.frameIndex = static_cast<std::uint64_t>(seconds * 60.0);
+        time.frameIndex = frameIndex;
         comp->update(time);
         renderer.resetTemporalHistory();
         auto image = renderer.renderToImage(comp->scene(), time, kW, kH);
@@ -192,7 +193,8 @@ TEST_CASE("a scatter layer's sway controls reach the picture", "[gpu][wind][ecol
     }
 
     SECTION("catches the wind at 0: the ferns stand still") {
-        // As authored, two seconds half a second apart differ: the ferns sway.
+        // As authored, two seconds half a second apart differ: the ferns sway. (The same frame index for
+        // both, so the jitter and noise seed is not what differs.)
         const gpu::Image8 a = m.frame(renderer, kAt);
         const gpu::Image8 b = m.frame(renderer, kAt + 0.5);
         const std::size_t swaying = differingPixels(a, b);
