@@ -375,9 +375,11 @@ def _pulses(name, times, width=1.0 / 60.0):
 
 def claps():
     """The clap, as the track plays it: beats 2 and 4 of every bar with the groove (01-music.md
-    section 1.4), the four kick-gap beats included -- the kick drops out there, the clap does not.
-    None in the pull-back (bars 15-16), none in the break (89-92: the top is closed, and beats 2/4 are
-    no brighter than 1/3 above 8 kHz), none under the riser's roll (93-96, which the fungi carry).
+    section 1.4). None in the pull-back (bars 15-16), none in the break (89-92: the top is closed, and
+    beats 2/4 are no brighter than 1/3 above 8 kHz), none under the riser's roll (93-96, which the
+    fungi carry). The clap does play on the four kick-gap beats, but the picture leaves them out: that
+    beat is the valley's held breath, every cap and small mushroom dimming together, the one moment
+    it answers as one (apply_motifs), and a lantern flaring through it would break it.
     Measured on the song: above 8 kHz, beats 2/4 rise 5-19 dB more than 1/3 in every groove section.
     Scored, because the analyser's snare band (audio.onsetMid, 2-6 kHz) is the clap only where the
     groove is bare: it fires 1.0-1.1 times a second in the cold open, the riff, groove 2, the lead and
@@ -386,8 +388,9 @@ def claps():
     in the break and the riser, where there is no clap at all. On that band the lantern flickered at
     3.6 Hz through the film's biggest sections instead of answering the clap."""
     silent = set(range(15, 17)) | set(range(89, 97))
+    held = {round(t, 6) for t in music.KICK_GAPS}
     return [music.beat(b, n) for b in range(1, 123) if b not in silent for n in (2, 4)
-            if music.beat(b, n) <= music.LAST_HIT + 1e-3]
+            if music.beat(b, n) <= music.LAST_HIT + 1e-3 and round(music.beat(b, n), 6) not in held]
 
 
 def roll():
