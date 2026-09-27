@@ -114,9 +114,38 @@ BASE = {
 }
 
 # Effects the film does not use, and why.
-REMOVED_EFFECTS = {
-    "camera-travel-beam": "a repeating violet streak across the sky every 9 s -- effect soup",
+REMOVED_EFFECTS = {}
+
+# The Camera Travel Beam (ADR-207, ADR-702), restored at the owner's request after r1: "the world effect
+# that we used to have, the light pulse that swept across the world during camera changes". The first
+# pass removed it as "a repeating violet streak across the sky every 9 s": GV2 fired it "always", every
+# 9.24 s, whatever the cut did. GV3 fires it on the camera changes themselves. Its own activation for
+# that, `cameraTravel`, reads Song-mode shot spans, which an authored cut does not have (an engine gap,
+# recorded), so it fires on a trigger instead: a cue marker named TRAVEL_BEAM_MARKER at each cut it
+# answers, which the Sequence panel shows and an artist can add, move or delete. It answers the cuts
+# that open a four-bar phrase (every 7.4 s or so), not the dark stretch from the suspension through the
+# riser, not the drop's crash (the drop's own ring and the flash carry it), not the two set-piece lifts
+# it would cross, and not the tail.
+TRAVEL_BEAM_ID = "camera-travel-beam"
+TRAVEL_BEAM_MARKER = "travel beam"
+TRAVEL_BEAM_SILENT = ("suspension", "submerged-break", "riser", "tail")
+TRAVEL_BEAM_SKIP_BARS = (1, 37, 57, 97)   # the cold open's first frame, E3's and E4's lifts, the crash
+TRAVEL_BEAM_TIMING = {"delay": 0.05, "fadeIn": 0.3, "fadeOut": 1.0, "lifetime": 3.2, "repeatSeconds": 0.0}
+# GV2's look, kept, and tuned into GV3's palette: its violet (the fungi's) with a pale lilac edge, rainbow
+# off (GV2's project had it on; the fungi and beacons already carry the colour), a little dimmer than GV2's
+# 1.9 because GV3's night is darker, and GV2's kick in it, gentler (GV2 +8 on every beat pulse).
+TRAVEL_BEAM_PARAMETERS = {
+    "fx/camera-travel-beam/rainbow": False,
+    "fx/camera-travel-beam/intensity": 1.4,
+    "fx/camera-travel-beam/color": [0.58, 0.36, 1.0],
+    "fx/camera-travel-beam/edgeColor": [0.96, 0.84, 1.0],
+    "fx/camera-travel-beam/repeat": 0.0,
+    "fx/camera-travel-beam/lifetime": TRAVEL_BEAM_TIMING["lifetime"],
+    "fx/camera-travel-beam/delay": TRAVEL_BEAM_TIMING["delay"],
+    "fx/camera-travel-beam/fadeIn": TRAVEL_BEAM_TIMING["fadeIn"],
+    "fx/camera-travel-beam/fadeOut": TRAVEL_BEAM_TIMING["fadeOut"],
 }
+TRAVEL_BEAM_KICK = 2.0   # the scored kick on its intensity while it sweeps
 REMOVED_EFFECT_TYPES = {
     "groundPulse": "fired only while the Song-mode shot spans spotlit a hero; the cut is authored now",
 }
@@ -254,6 +283,46 @@ def apply_base(project, scene):
         del params[key]
     apply_water(scene)
     apply_wind(project, scene)
+
+
+def travel_beam_cuts(shots):
+    """The cuts the travel beam answers: those opening a four-bar phrase (bar 5, 9, 13, ...), outside
+    TRAVEL_BEAM_SILENT and TRAVEL_BEAM_SKIP_BARS. [(seconds, shot id, bar)]; the seconds are the cut's
+    on-screen instant (a frame ahead of its beat, make_glowmere_valley_3.CUT_LEAD)."""
+    out = []
+    for i, s in enumerate(sorted(shots, key=lambda s: s.start)):
+        if i == 0 or s.span is None or s.segment in TRAVEL_BEAM_SILENT:
+            continue
+        bar, _, beat = s.span.label.partition(".")
+        if not bar.isdigit() or beat not in ("", "1"):
+            continue
+        b = int(bar)
+        if (b - 1) % 4 or b in TRAVEL_BEAM_SKIP_BARS:
+            continue
+        out.append((s.start - 1.0 / 60.0, s.sid, b))
+    return out
+
+
+def apply_travel_beam(project, shots):
+    """The Camera Travel Beam on the chosen cuts (see TRAVEL_BEAM_*): the effect set to fire on its
+    markers, the markers written, its parameters and its kick. Returns the cuts it answers."""
+    beam = next((e for e in project.get("effects", []) if e.get("id") == TRAVEL_BEAM_ID), None)
+    if beam is None:
+        raise RuntimeError(f"the source has no '{TRAVEL_BEAM_ID}' effect to restore")
+    beam["activation"] = "trigger"
+    beam["trigger"] = {"source": "marker", "name": TRAVEL_BEAM_MARKER}
+    beam["timing"].update(TRAVEL_BEAM_TIMING)
+    beam["parameters"]["appearance"]["rainbow"] = False
+    project["parameters"].update(TRAVEL_BEAM_PARAMETERS)
+    cuts = travel_beam_cuts(shots)
+    seq = project.setdefault("sequence", {})
+    markers = [m for m in seq.get("markers", []) if m.get("name") != TRAVEL_BEAM_MARKER]
+    markers += [{"kind": "cue", "name": TRAVEL_BEAM_MARKER, "time": round(t, 6)} for t, _, _ in cuts]
+    seq["markers"] = sorted(markers, key=lambda m: m["time"])
+    project["routes"] = [r for r in project.get("routes", []) if r.get("target") != "fx/camera-travel-beam/intensity"]
+    project["routes"].append(_route("timeline.kick", "fx/camera-travel-beam/intensity", TRAVEL_BEAM_KICK, "add",
+                                    {"attackMs": 5.0, "decayMs": 240.0}))
+    return cuts
 
 
 # ---- ARC -----------------------------------------------------------------------------------------
@@ -458,6 +527,23 @@ def claps():
             if music.beat(b, n) <= music.LAST_HIT + 1e-3 and round(music.beat(b, n), 6) not in held]
 
 
+def lane(kind):
+    """A drum lane the heroes and the small mushrooms answer (reactivity.HERO_LANES, SCATTER_PULSES),
+    taken from the kicks the track plays, so every lane is silent where the drums are -- the pull-back,
+    the four held beats -- and at half strength in the muffled break: `downbeat` beat 1 of each bar,
+    `beat3` beat 3, `offbeat` the "and" after beats 2 and 4 (the hats' off-beats)."""
+    out = []
+    for t, strength in music.kicks():
+        n = int(round((t - music.FIRST_DOWNBEAT) / music.BEAT)) % 4
+        if kind == "downbeat" and n == 0:
+            out.append((t, strength))
+        elif kind == "beat3" and n == 2:
+            out.append((t, strength))
+        elif kind == "offbeat" and n in (1, 3):
+            out.append((t + 0.5 * music.BEAT, strength))
+    return out
+
+
 def roll():
     """The roll into the drop, as the track plays it (01-music.md section 1.4): 8ths through bars 93-94,
     16ths through 95 and the first three beats of 96, about 32nds on its last beat. The analyser's low
@@ -482,6 +568,11 @@ def apply_motifs(project, scene):
         _pulses("clap", claps()),
         # The riser's roll: the small fungi flicker with it, faster and faster into the drop.
         _pulses("roll", roll()),
+        # The heroes' and the small mushrooms' other drum lanes (reactivity.HERO_LANES): the valley
+        # answers the drums across the frame, each hero on its own hit.
+        _pulses("downbeat", lane("downbeat")),
+        _pulses("beat3", lane("beat3")),
+        _pulses("offbeat", lane("offbeat")),
     ]
     for key in [k for k in params if k.startswith("sources/breath/")]:
         del params[key]  # the first pass's free-running breath: the proposal's is beat-synced
