@@ -45,8 +45,10 @@ half the sections qualify has no hierarchy to honour and no peaks.
 **A peak opens on the subject of its event.** The event is the first in the plan's `events`, in time
 order, that happens from a bar before the section starts to its end, or whose span reaches into it,
 and whose subject is a hero. The peak's opening shot and every shot that starts before the later of
-the event's end and the section's first phrase go to that subject -- held across the section's
-cameras for coverage -- and then the rotation resumes. With no such event, the peak opens on the
+the event's end and the section's first phrase line go to that subject -- held across the section's
+cameras for coverage -- and then the rotation resumes. The hold's end is a bar line of the grid, and
+it stays put: ADR-921's motion pass, which lengthens a moving subject's shots once the cast is known,
+re-lays only the shots after the hold. With no such event, the peak opens on the
 film's hero (the most important). An event whose subject is not a hero is said, not dropped: "star it
 in the World window for the director to give it the peak". A shot held for a peak never travels to its
 subject (a Transition there becomes a Track): the payoff lands on the subject.
@@ -77,8 +79,9 @@ subject must fill some of the frame) reads it.
 - **"Rebuild"** with GV3's treatments: the drop (push 1.0 on the second-loudest music, score 0.95) is
   the only peak -- the riser scores 0.65, the arrival 0.63 -- and opens on the film's hero on bar 97's
   downbeat, holding it for eight bars across three cameras. On the GV3 scene with its staged events as
-  a watch would report them, the drop opens on `visitor` (its departure at bar 99), with a warning that
-  the horse's `abduction/retire` at 177.70 s has a subject that is not a hero.
+  a watch would report them, the drop opens on `visitor` (its departure at bar 99) and holds it to bar 105,
+  the first phrase line, with a warning that the horse's `abduction/retire` at 177.70 s has a
+  subject that is not a hero.
 - **Existing scenes.** A re-directed Song Mode film gives its peaks to event subjects or its hero
   instead of the rotation. `camera/focus/emphasis` was never installed, so no saved camera changes.
   The 14 tracked projects with `cameraShotSpans` carry an `"emphasis"` key on every span (562 spans:

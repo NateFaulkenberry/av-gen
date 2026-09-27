@@ -1290,6 +1290,28 @@ TEST_CASE("A peak section goes to its event's subject, else to the film's hero",
         CHECK(afterPhrase);
     }
 
+    // ...and it stays on its line when the held subject moves on its own: the motion pass lengthens
+    // a walker's shots once the cast is known, and it must not carry the hold past the phrase.
+    {
+        app::DirectionBrief brief = threeHeroBrief();
+        brief.supporting[0].motion = 1.0f; // spire walks; elder and bloom stand
+        app::SongPlan walking = planWith(1.0f);
+        walking.events.push_back(app::SongEvent{"lift", "spire", 32.5, 0.0});
+        auto d = app::directSong(walking, brief, threeCameras(), gridded(grid));
+        REQUIRE(d.has_value());
+        const app::SongSectionCut& chorus = d->sections[1];
+        const double phraseEnd = chorus.startSeconds + 8.0;
+        for (std::size_t i = chorus.firstShot; i < chorus.firstShot + chorus.shotCount; ++i) {
+            const app::SongDecision& s = d->decisions[i];
+            INFO(s.line() << " -- " << s.subjectReason);
+            if (s.startSeconds >= phraseEnd - 1e-6) {
+                CHECK(s.subjectReason == "rotation");
+            } else {
+                CHECK(s.subject == "spire");
+            }
+        }
+    }
+
     // Control: the same chorus with an ordinary push is no peak, and the event does not take it.
     app::SongPlan ordinary = planWith(0.4f);
     ordinary.events = withEvent.events;

@@ -642,10 +642,15 @@ std::optional<Layout> layoutOnGrid(const Positions& pos, double beatSeconds, dou
 // section in proportion to the pace -- a Steady section divides evenly, as Song Mode always did; an
 // accelerating one shortens as its pace climbs. `weights` scales each shot's share (the cast's
 // motion, the opener's scale and contrast); empty is all ones. A count the floor cannot hold is
-// reduced until it can.
+// reduced until it can. [a, b] may be the tail of a section `[sectionA, sectionB]` -- the pace is the
+// section's, read at the section's own progress.
 Layout layoutFree(const SectionPace& pace, double a, double b, double floor, std::size_t count,
-                  const std::vector<double>& weights) {
+                  const std::vector<double>& weights, double sectionA, double sectionB) {
     const double span = b - a;
+    const double sectionSpan = sectionB - sectionA;
+    const auto progressOf = [&](double t) {
+        return sectionSpan > 0.0 ? static_cast<float>((t - sectionA) / sectionSpan) : 0.0f;
+    };
     Layout out;
     std::size_t shots = std::max<std::size_t>(1, count);
     // The cumulative pace, sampled, so shot boundaries sit at equal steps of it.
@@ -655,7 +660,7 @@ Layout layoutFree(const SectionPace& pace, double a, double b, double floor, std
         const double dt = span / kSteps;
         cumulative[static_cast<std::size_t>(i) + 1] =
             cumulative[static_cast<std::size_t>(i)] +
-            dt / pace.lengthAt((static_cast<float>(i) + 0.5f) / static_cast<float>(kSteps));
+            dt / pace.lengthAt(progressOf(a + dt * (static_cast<double>(i) + 0.5)));
     }
     const double total = cumulative.back();
     const auto timeAtPace = [&](double target) {
@@ -703,7 +708,7 @@ Layout layoutFree(const SectionPace& pace, double a, double b, double floor, std
     out.endStrength.assign(shots, -1);
     out.aims.clear();
     for (std::size_t k = 0; k < shots; ++k) {
-        out.aims.push_back(pace.aimFrom(out.cuts[k], a, b));
+        out.aims.push_back(pace.aimFrom(out.cuts[k], sectionA, sectionB));
     }
     return out;
 }
@@ -1374,16 +1379,16 @@ Result<SongDirection> directSong(const SongPlan& plan, const DirectionBrief& bri
                 const auto aimOf = [&](std::size_t, std::size_t i) { return aimAt[i]; };
                 const auto ceilingOf = [&](std::size_t) { return kSuspendedHold * options.maxShotSeconds; };
                 auto l = layoutOnGrid(positions, beatSeconds, options.minShotSeconds, aimOf, ceilingOf, 0, count);
-                layout = l ? *l : layoutFree(pace, a, b, options.minShotSeconds, count, {});
+                layout = l ? *l : layoutFree(pace, a, b, options.minShotSeconds, count, {}, a, b);
             } else {
-                layout = layoutFree(pace, a, b, options.minShotSeconds, count, {});
+                layout = layoutFree(pace, a, b, options.minShotSeconds, count, {}, a, b);
             }
         } else if (gridded) {
             auto l = gridLayout(0, {});
             if (l) {
                 layout = *l;
             } else {
-                layout = layoutFree(pace, a, b, floor, freeCount(), {openerFactor});
+                layout = layoutFree(pace, a, b, floor, freeCount(), {openerFactor}, a, b);
                 out.warnings.push_back(fmt::format(
                     "'{}' could not be laid on the beat grid inside {:.2f} s with a {:.2f} s floor; its "
                     "cuts fall where the pace puts them",
@@ -1397,7 +1402,7 @@ Result<SongDirection> directSong(const SongPlan& plan, const DirectionBrief& bri
                     weights.push_back(variationOf(k) * (k == 0 ? openerFactor : 1.0));
                 }
             }
-            layout = layoutFree(pace, a, b, floor, freeCount(), weights);
+            layout = layoutFree(pace, a, b, floor, freeCount(), weights, a, b);
         }
         std::size_t shotCount = layout.cuts.size() - 1;
         if (mayChoose && !suspended) {
@@ -1598,28 +1603,62 @@ Result<SongDirection> directSong(const SongPlan& plan, const DirectionBrief& bri
         // Now that the subjects are known: a subject that moves on its own holds its shot longer
         // than the cast's average, one that stands still is left sooner. Only where lengths are
         // free to differ -- an accelerating section keeps its arc's shape and a hold is a hold.
+        //
+        // A peak's hold is a prefix of the section whose end the rule placed (the first phrase line,
+        // or the event's end); the pass re-lays only the shots after it, so a moving subject's longer
+        // shots cannot carry the hold past its line.
+        std::size_t held = 0;
+        for (std::size_t k = 0; k < shotCount; ++k) {
+            if (subjectReason[k] != "rotation") {
+                held = k + 1;
+            }
+        }
         std::vector<double> motionFactor(shotCount, 1.0);
-        if (mayChoose && !accelerating && !suspended && shotCount > 1 && !cast.empty()) {
+        if (mayChoose && !accelerating && !suspended && shotCount > held + 1 && !cast.empty()) {
             bool varies = false;
-            for (std::size_t k = 0; k < shotCount; ++k) {
+            for (std::size_t k = held; k < shotCount; ++k) {
                 motionFactor[k] = 1.0 + static_cast<double>(kMotionGain) *
                                             static_cast<double>(cast.at(subjectIndex[k]).motion - meanMotion);
                 varies = varies || std::abs(motionFactor[k] - 1.0) > 1e-3;
             }
+            const std::size_t rest = shotCount - held;
+            const double from = layout.cuts[held];
             if (varies) {
                 if (gridded) {
-                    if (auto l = gridLayout(shotCount, motionFactor)) {
-                        layout = *l;
+                    Positions tail = positionsFor(grid, from, b);
+                    std::vector<double> tailAim;
+                    tailAim.reserve(tail.t.size());
+                    for (const double t : tail.t) {
+                        tailAim.push_back(pace.aimFrom(t, a, b));
+                    }
+                    const auto aimOf = [&](std::size_t k, std::size_t i) {
+                        const std::size_t shot = held + k;
+                        return tailAim[i] * motionFactor[shot] * variationOf(shot) * (shot == 0 ? openerFactor : 1.0);
+                    };
+                    const auto ceilingOf = [&](std::size_t k) {
+                        return held + k == 0 ? openerCeiling : options.maxShotSeconds;
+                    };
+                    if (auto l = layoutOnGrid(tail, beatSeconds, floor, aimOf, ceilingOf, 0, rest)) {
+                        layout.cuts.resize(held + 1);
+                        layout.cuts.insert(layout.cuts.end(), l->cuts.begin() + 1, l->cuts.end());
+                        layout.endStrength.resize(held);
+                        layout.endStrength.insert(layout.endStrength.end(), l->endStrength.begin(), l->endStrength.end());
+                        layout.aims.resize(held);
+                        layout.aims.insert(layout.aims.end(), l->aims.begin(), l->aims.end());
                     }
                 } else {
-                    std::vector<double> weights = motionFactor;
-                    for (std::size_t k = 0; k < weights.size(); ++k) {
-                        weights[k] *= variationOf(k);
+                    std::vector<double> weights;
+                    for (std::size_t k = held; k < shotCount; ++k) {
+                        weights.push_back(motionFactor[k] * variationOf(k) * (k == 0 ? openerFactor : 1.0));
                     }
-                    weights[0] *= openerFactor;
-                    Layout l = layoutFree(pace, a, b, floor, shotCount, weights);
-                    if (l.cuts.size() == layout.cuts.size()) {
-                        layout = l;
+                    Layout l = layoutFree(pace, from, b, floor, rest, weights, a, b);
+                    if (l.cuts.size() == rest + 1) {
+                        layout.cuts.resize(held + 1);
+                        layout.cuts.insert(layout.cuts.end(), l.cuts.begin() + 1, l.cuts.end());
+                        layout.endStrength.resize(held);
+                        layout.endStrength.insert(layout.endStrength.end(), l.endStrength.begin(), l.endStrength.end());
+                        layout.aims.resize(held);
+                        layout.aims.insert(layout.aims.end(), l.aims.begin(), l.aims.end());
                     }
                 }
             }

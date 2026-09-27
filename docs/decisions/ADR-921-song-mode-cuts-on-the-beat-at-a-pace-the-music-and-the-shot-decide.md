@@ -59,7 +59,8 @@ floor    = shortest for Steady, Falling, Suspended
 per shot (Steady, Falling only):
   x 2^(variation * s_k)          s_k in [-1, 1] from the decision hash: the intent's own "how different
                                  successive shots are", now of length as well as framing
-  x 1 + 0.35 * (motion - cast mean)    a subject that moves on its own holds longer
+  x 1 + 0.35 * (motion - cast mean)    a subject that moves on its own holds longer (laid out once the
+                                 cast is known, after any peak's hold, which it does not move)
   x (1 + 0.6 * scale) * contrast       the section's opener only: scale = wide and about the world,
                                  contrast = 1 + (previous density - this density) when that exceeds 0.15, at most 1.5
 ceiling  = longest; the opener's up to longest * min(1.8, scale x contrast); a hold's 2 * longest
