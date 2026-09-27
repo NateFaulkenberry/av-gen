@@ -167,7 +167,7 @@ by 4 x 10^-7 of its range. The expected number of plants that change anywhere in
   characters stream (ec515c8b) and gv3-cast will re-trace the cast anyway, but a distant terrain edit
   should not reroute the aliens.
 
-## W2c: the cause was the river's head, not the ground (commit `7259efad`)
+## W2c: the river's divide (commit `7259efad`), a real defect of v1 but not the cause of W2b
 
 The nav grid's own log line gave it away:
 - **baseline:** "the walkable ground is in 4 disconnected pieces; 9805 of 20214 walkable cells (49%)
@@ -176,13 +176,11 @@ The nav grid's own log line gave it away:
 
 The navigator walks anything up to `maxSlope` 0.55 (about 63 degrees). So **only water divides the
 valley**, and the river, edge to edge, is what kept its two banks apart. Ending the river in a pool
-inside the world opened a walkable way round its head. Nobody walks it, since the aliens' ranges
-barely change, but the aliens' choices depend on what is reachable. So a destination across the
-river that used to be refused now was not, and every alien's route changed.
-
-Two things were ruled out on the way:
-- a shared random stream (every entity has its own `rng_`);
-- a global destination list (`Navigator::pickDestination` samples around the walker).
+inside the world opened a walkable way round its head, and the render log shows the navigator's
+grid no longer trusted: "the grid will NOT answer for this world's terrain -- it disagreed with the
+world after 52 sampled walk(s)". The baseline's grid is trusted, with 951 walks agreed. That was
+worth fixing on its own account. **It was not the cause of W2b**, though: with the divide
+restored, the whole-film trace diverges exactly as before, to the millimetre (W2d).
 
 **The fix.** The river keeps its whole course. Only its first point moves, from (-44, 15, -352) to
 (40, 15, -350). The gorge it cuts through the head then turns 45 degrees east of north, away from every
@@ -195,8 +193,48 @@ line of sight up the valley.
 The nav grid is divided again: "5 disconnected pieces; 9820 of 20153 walkable cells (49%)". The extra
 small piece is at the north end, between the bent gorge and the edge.
 
-`world.py --check` now also asserts that **the river runs edge to edge**. The whole-film trace of this
-version (`cast-v2a.json`) is in W2d.
+`world.py --check` now also asserts that **the river runs edge to edge**. The nav grid is trusted
+again (951 sampled walks agreed, as in the baseline).
+
+## W2d: why the aliens take other routes (the engine's interest registry)
+
+The whole-film trace of v2a (`cast-v2a.json`) diverges from the baseline **identically to v1**: Ember
+97.9393 m, Rook 101.8224 m, first at 13.5 and 17.0 s. So the cause is something v1 and v2a share.
+
+Thirty-second traces reproduce it; the baseline's 30 s trace equals the full one's first 30 s
+exactly. Each variant below is compared with the baseline:
+
+| Variant | Aliens diverge in 30 s | Nav grid |
+|---|---|---|
+| north only (banks' head, river head, head ridge, shoulder) | no (only bull-10/21) | 4 pieces, 9795 of 20210 stranded |
+| south only (banks end at P10, sill) | no | 5 pieces, 9830 of 20157 |
+| north + sill | no (only bull-10/21) | 5 pieces, 9832 of 20163 |
+| **north + south banks' trim** | **yes, as v2a** | 5 pieces, 9821 of 20151 |
+| v2a (all) | yes | 5 pieces, 9820 of 20153 |
+
+**The mechanism** is `Explore`, the aliens' purposeful travel (`behaviors.cpp` `pickGoal`):
+- It takes **a weighted draw over every candidate in the world's interest registry**: heroes, the
+  craft, and the nav grid's shore and vista points (`nav_grid.cpp` `extractInterestPoints`).
+- Shore points are every dry cell beside water, scanned in row order. Vistas are the prominent
+  points, sorted by prominence.
+- A draw is a roll against the running sum of the candidates' weights. Change the list anywhere, even
+  by points too far away to be chosen, and the same roll can land on a different candidate. Its own
+  comment warns that changing the draw "would change every route in Glowmere".
+- North alone and south alone happen not to flip a draw in the first 30 s; together they do. They
+  would flip one later in the film too, and so would almost any edit that moves shore or vista points.
+
+**What this means:**
+- Closing the valley necessarily changes the registry: the head and the sill are prominent, and the
+  south banks' trim changes the walkable shore along the south river.
+- So **the aliens take other routes from 13.5 s on**, though no ground they walk on changed.
+- **Every alien follow shot has to be framed against a trace of the closed world:** s09, s13, s18,
+  s19, s20, s25, s28, s36 and s38.
+- gv3-cast's re-homing and the characters stream's behaviour already re-deal the cast. So the
+  practical rule is an order: trace the cast on a build that includes this branch before gv3-cut
+  settles its follow framings.
+- **An engine defect worth recording:** a world edit anywhere re-routes every character that
+  explores. It is the same class as the scatter's index-keyed glow (W1, point 4).
+- **Not fixed here:** the draw lives in `src/entity/`, outside this stream's files.
 
 ## W3: renders
 
