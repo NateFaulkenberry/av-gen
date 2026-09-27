@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Where each shot's subject sits in frame, from the rigs and the cast trace -- no GPU.
 
-    python3 tools/gv3/framing.py build/gv3/cast-v1.json [--out build/gv3/framing.md]
+    python3 tools/gv3/framing.py build/gv3/cast-v1.json [--out build/gv3/framing.md] [--scene S] [--video V]
+
+(`--scene`: the generated scene to take the world from, for a snapshot outside examples/world.)
 
 For every shot whose subject is a traced body (an alien, an animal, the saucer) or a hero, the eye
 and the aim are rebuilt the way the engine builds them (composition.cpp: a follow rig's eye is its
@@ -139,7 +141,9 @@ def main():
     trace_path = sys.argv[1]
     out = pathlib.Path(sys.argv[sys.argv.index("--out") + 1]) if "--out" in sys.argv else None
     video = pathlib.Path(sys.argv[sys.argv.index("--video") + 1]) if "--video" in sys.argv else None
-    scene = json.loads((HERE.parent.parent / "examples" / "world" / "glowmere-valley-3.scene.json").read_text())
+    scene_path = (pathlib.Path(sys.argv[sys.argv.index("--scene") + 1]) if "--scene" in sys.argv
+                  else HERE.parent.parent / "examples" / "world" / "glowmere-valley-3.scene.json")
+    scene = json.loads(scene_path.read_text())
     world = next(n["world"] for n in scene["nodes"] if "world" in n)
     tr = Trace(trace_path, scene)
     # The cut the project was generated with: the Director's recorded spans and their compositions.
