@@ -1,6 +1,7 @@
 #include "entity/action.hpp"
 
 #include "entity/entity.hpp"
+#include "entity/nav_grid.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -17,6 +18,34 @@ constexpr float kMoveTurnRate = 2.45f;
 // is actually travelling before it walks it (ADR-908). Below it the heading is the way the steering
 // fan checked, to within the fan's own resolution.
 constexpr float kHeadingCheck = 0.1f;
+// ADR-932: what a `move` that went as near as it could says when it gets there. A failure, so the
+// action tier's every reader hears "it did not arrive": staging's step fails, no `onComplete` fires,
+// and a decider remembers the errand as one it could not do.
+constexpr const char* kCannotReach = "unreachable: no way across to it; went as near as it could";
+
+// ADR-932: from a cell centre of the walker's region, straight on toward the goal it cannot reach,
+// every half metre for at most one cell, as far as the ground stays walkable -- and, with `dry`, dry
+// -- so the body walks to the water's edge rather than to the middle of the last dry cell, up to a
+// cell's width short of it, and a walker that may wade still stops on the bank.
+glm::vec2 edgeToward(const Navigator& nav, glm::vec2 from, glm::vec2 to, float reach, bool dry) {
+    const glm::vec2 d = to - from;
+    const float length = glm::length(d);
+    if (length < 1e-3f) {
+        return from;
+    }
+    const glm::vec2 way = d / length;
+    const float limit = std::min(reach, length);
+    glm::vec2 last = from;
+    for (float s = 0.5f; s <= limit + 1e-4f; s += 0.5f) {
+        const glm::vec2 p = from + way * s;
+        const NavSample here = nav.sample(p);
+        if (!here.navigable || (dry && here.waterDepth > 0.0f)) {
+            break;
+        }
+        last = p;
+    }
+    return last;
+}
 
 // Signed shortest angular distance from `from` to `to`, in radians.
 float angleDelta(float from, float to) {
@@ -145,6 +174,7 @@ const char* routeStatusName(RouteStatus status) {
     case RouteStatus::Ready: return "ready";
     case RouteStatus::Pending: return "pending";
     case RouteStatus::Unreachable: return "unreachable";
+    case RouteStatus::Nearest: return "nearest";
     }
     return "?";
 }
@@ -240,7 +270,28 @@ RouteStatus NavigatorPath::route(glm::vec2 from, glm::vec2 to, std::vector<glm::
     if (!nav_->navigable(to)) {
         return RouteStatus::Unreachable;
     }
-    (void)from;
+    // ADR-932: a goal on ground not connected to the walker's is not a straight line into the water.
+    // Placed in regions the way the planner places a start (3 cells) and a goal (4 cells), so this
+    // and `NavGrid::path`'s `Unreachable` are one statement. An end the graph cannot place -- a body
+    // standing far off the walkable set, which ADR-908's refuge walk brings back -- is not a claim
+    // about regions, and keeps the straight line.
+    if (const NavGrid* grid = nav_->grid(); grid != nullptr && grid->valid()) {
+        const float cell = grid->cellSize();
+        const std::uint16_t mine = grid->regionNear(from, cell * 3.0f);
+        const std::uint16_t theirs = grid->regionNear(to, cell * 4.0f);
+        if (mine != 0 && theirs != 0 && mine != theirs) {
+            // The nearest dry ground of its own region -- the bank -- and only when its region has
+            // none, the nearest of it at all: a walker allowed to wade does not end an errand it
+            // cannot finish standing in the river that stopped it.
+            glm::vec2 near(0.0f);
+            bool dry = grid->nearestInRegion(to, mine, near, true);
+            if (!dry && !grid->nearestInRegion(to, mine, near, false)) {
+                return RouteStatus::Unreachable; // a region with no cells: no nearer point exists
+            }
+            out.push_back(edgeToward(*nav_, near, to, cell, dry));
+            return RouteStatus::Nearest;
+        }
+    }
     out.push_back(to);
     return RouteStatus::Ready;
 }
@@ -383,6 +434,18 @@ std::span<const glm::vec2> ActionQueue::route() const {
 std::size_t ActionQueue::routeLeg() const {
     const int top = topLayer();
     return top < 0 ? 0 : layers_[static_cast<std::size_t>(top)].progress.waypoint;
+}
+
+ActionQueue::Standing ActionQueue::standing(Authority authority) const {
+    const Layer& layer = layers_[static_cast<std::size_t>(authority)];
+    Standing out;
+    out.serial = layer.serial;
+    out.failed = layer.anyFailed;
+    out.reason = layer.failReason;
+    const ActionDesc* action = current(authority);
+    out.moving = action != nullptr && action->kind == ActionKind::Move && layer.started;
+    out.stalledSeconds = out.moving ? layer.progress.sinceProgress : 0.0;
+    return out;
 }
 
 double ActionQueue::elapsed() const {
@@ -771,22 +834,35 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                         break; // ask again next tick; a planner is allowed to take its time
                     }
                     layer.progress.routed = true;
+                    layer.progress.shortOf = status == RouteStatus::Nearest && !layer.progress.waypoints.empty();
                 }
                 layer.progress.waypoint = 0;
-                layer.progress.bestDistance = glm::length(goal - here);
+                layer.progress.bestDistance =
+                    glm::length((layer.progress.shortOf ? layer.progress.waypoints.back() : goal) - here);
                 layer.progress.sinceProgress = 0.0;
             }
             // The target may move (it is an entity, not a pin), so the last waypoint always tracks
-            // the goal rather than the place the goal was when the route was asked for.
-            if (!layer.progress.waypoints.empty()) {
+            // the goal rather than the place the goal was when the route was asked for -- unless the
+            // route ends short of the goal (ADR-932), whose end is the nearest point the body can
+            // reach and stays there.
+            if (!layer.progress.waypoints.empty() && !layer.progress.shortOf) {
                 layer.progress.waypoints.back() = goal;
             }
+            const glm::vec2 end = layer.progress.shortOf ? layer.progress.waypoints.back() : goal;
             const float tolerance = action.tolerance > 0.0f ? action.tolerance : 0.75f;
-            const float distance = glm::length(goal - here);
+            const float distance = glm::length(end - here);
             if (distance <= tolerance) {
                 state.speed = 0.0f;
-                done = true;
                 movement = true;
+                if (layer.progress.shortOf) {
+                    // ADR-932: as near as it can get, and not where it was sent. The rest of the list
+                    // still runs -- a reaction's face and look happen from the bank -- and the list is
+                    // remembered as one that failed.
+                    failed = true;
+                    reason = kCannotReach;
+                } else {
+                    done = true;
+                }
                 break;
             }
             const glm::vec2 waypoint =

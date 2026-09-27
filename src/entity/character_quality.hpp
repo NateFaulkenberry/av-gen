@@ -162,6 +162,15 @@ struct CharacterBehaviourMetrics {
     std::uint32_t reversals = 0;        // ...walked out of more than `reversalDegrees` from the way in
     std::uint32_t turnsOver90 = 0;      // ...walked out of more than 90 degrees from it
     std::uint32_t revisits = 0;         // stops within `revisitRadius` of the stop before the last
+    // ADR-933: pacing -- stops walked out of back the way they were walked into (more than 90
+    // degrees; see `closeStop` for why not a reversal's 150), one after another, with no measured
+    // stop between them that the body walked on out of. One is a change of mind; a run of them is the
+    // owner's "walk, stop, turn 180, walk back" as a loop (GV3's ember: six in 28 s on a river bank).
+    // The longest run, how many seconds its first stop to its last spanned, and when it began. A stop
+    // too short to measure neither extends a run nor breaks it.
+    std::uint32_t longestPacing = 0;
+    double longestPacingSeconds = 0.0;
+    double longestPacingFrom = 0.0;
 };
 
 // ADR-910: the ground under a body that is standing on it.
@@ -231,6 +240,12 @@ private:
         bool hasHeadingIn = false;
         bool pendingOut = false;       // a stop ended and the way out of it is not measured yet
         glm::vec2 stopExit{0.0f};
+        // ADR-933: when the current (or last) stop began, when the one whose way out is pending
+        // began, and the run of reversals the measured stops so far end in.
+        double stopBegan = 0.0;
+        double pendingStopAt = 0.0;
+        std::uint32_t pacingRun = 0;
+        double pacingFrom = 0.0;
         std::vector<glm::vec2> stopPlaces; // the last two stops' places, for A->B->A
         std::vector<float> radii;
         double slopeSecondsWeighted = 0.0;

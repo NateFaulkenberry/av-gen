@@ -62,6 +62,12 @@ namespace avgen::entity {
 // knobs on different stages and a character may sense four times a second while deciding twice.
 [[nodiscard]] std::uint64_t decideTick(double time, float hertz, std::uint32_t seed);
 
+// ADR-909, ADR-933: where an option's walk ends, and how close counts as there -- the last `move` to a
+// point in its list, which for an errand of several legs is the far end. False for an option that
+// walks nowhere, or only after a body that moves (a greeting); `goes` says whether the walk leaves
+// the spot the body stands on at all, which a stand-off of a thing already within reach does not.
+[[nodiscard]] bool optionDestination(const Option& o, glm::vec3 here, glm::vec2& end, float& tolerance, bool& goes);
+
 // ---- the pace of an errand (ADR-909) -------------------------------------------------------------
 //
 // The GV3 audit: every alien moved at exactly 3.07 m/s for the whole film, because no considerer
@@ -817,7 +823,12 @@ public:
     // remembered one that is still within `seconds` and was not superseded. Stable in (kind,
     // source) order within each half, so the merge cannot depend on the order the sense stage
     // happened to write.
-    [[nodiscard]] std::span<const Percept> merge(std::span<const Percept> live, double time);
+    //
+    // ADR-934: given the world, a remembered body a set piece has since taken is forgotten at once
+    // rather than faded -- it is not somewhere else now, it is gone, and a memory of it would send a
+    // body to the spot it was lifted from for another `seconds`.
+    [[nodiscard]] std::span<const Percept> merge(std::span<const Percept> live, double time,
+                                                 const EntityWorld* world = nullptr);
 
     void reset();
     [[nodiscard]] std::size_t remembered() const { return remembered_.size(); }
