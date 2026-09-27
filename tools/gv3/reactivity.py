@@ -58,14 +58,18 @@ SCRATCH = ROOT / "build" / "gv3" / "reactivity"
 # transport clock), so each layer names its own.
 ELDER = [-12.0, 0.0, 52.0]  # the rings leave from under the elder's cap
 WAVE_FIELDS = [
+    # A pulse exp(-(2 pi s / wavelength)^2): at 40 m a band about 13 m wide, lighting each mushroom
+    # it crosses for about half a second at 20 m/s. It fades out by 45 m, before the next leaves.
     {"name": "bar-wave", "kind": "field", "position": ELDER, "field": {
         "name": "bar-wave", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
         "wavelength": 40.0, "waveSpeed": 20.0, "waveWidth": 0.0,
         "falloff": {"kind": "smoothstep", "inner": 10.0, "outer": 45.0},
         "trigger": {"source": "beat", "everyN": 4, "offset": 0}}},
+    # The drop's ring: out from the elder on the crash at 40 m/s, 19 m across; it crosses what the
+    # drop's first wide sees (150 m) in under four seconds and fades out 220-340 m away.
     {"name": "drop-wave", "kind": "field", "position": ELDER, "field": {
         "name": "drop-wave", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
-        "wavelength": 60.0, "waveSpeed": 32.0, "waveWidth": 0.0,
+        "wavelength": 60.0, "waveSpeed": 40.0, "waveWidth": 0.0,
         "falloff": {"kind": "smoothstep", "inner": 220.0, "outer": 340.0},
         "trigger": {"source": "marker", "name": "drop"}}},
 ]
@@ -74,6 +78,11 @@ WAVE_FIELDS = [
 # neighbours; the beacons, 1.5 m lamps, are the small lights that still read across a wide, so they
 # carry the drop's ring over the valley.
 WAVE_LAYERS = {"fungi": ("bar-wave", 8.0), "shelf-fungi": ("bar-wave", 5.0), "beacons": ("drop-wave", 3.5)}
+# The heroes take the drop's ring too: each lights as it passes, the elder first, on the crash, and
+# the valley relights outward from it (the plan: "the light rebuilt"). A hero part samples the field
+# at its origin, so the whole part answers at once. Its own glow, on its own layer, carries on.
+HERO_PARTS_ON_DROP_RING = ("-cap", "-under", "-gills")
+HERO_DROP_RING = 1.5
 # The regional hue spread, lowered because ADR-904 made it a real rotation of the colour shown.
 HUE_FIELD = {"fungi": 0.07}
 # Where the bar's rings run: from groove 2, when the track's body arrives, to the suspension; again in
@@ -82,12 +91,25 @@ HUE_FIELD = {"fungi": 0.07}
 BAR_WAVES = {"groove-2", "lift", "arrival", "melodic-plateau", "lead-forward", "drop"}
 
 
+# Which heroes the film features, by how much of the cut they fill (the Critic's visibility over the
+# first pass's final, 1080p: the elder in most shots at 400-800 px; the lantern 240-340 px in s04,
+# s07, s12 and s28; the bloom filling s15; the umbra 480 px in s35; the cairn 80-110 px in s03 and
+# s36; the rest 20-40 px specks in wides). The planner hands the music's layers out most important
+# first -- the kick, the clap, the downbeat, the breath, the phrase, the lead, the bass, then the
+# section change -- and the scene's importances were a plain ramp in the order the heroes were made,
+# which gave the bar's swell to the spire, never more than 40 px, and the lead's slow level to the
+# umbra's one close-up. Ranked by the cut, the heroes with close-ups take the rhythmic layers.
+FEATURED = ["elder-2-cap", "lantern-cap", "bloom-cap", "umbra-cap", "cairn-cap", "spire-cap", "veil-cap",
+            "ridge-cap", "scree-cap", "ember-cap"]
+
+
 def _terrain(scene):
     return next(n for n in scene["nodes"] if n.get("kind") == "terrain")
 
 
-def prepare_scene(scene):
-    """The fields and the mushroom layers' names for them, into the scene."""
+def prepare(project, scene):
+    """What the planner reads, into the scene and the project: the wave fields, the mushroom layers'
+    and the heroes' names for them, and the heroes ranked by the cut."""
     names = {f["name"] for f in WAVE_FIELDS}
     scene["nodes"] = [n for n in scene["nodes"] if n.get("name") not in names] + copy.deepcopy(WAVE_FIELDS)
     for layer in _terrain(scene)["scatter"]:
@@ -96,6 +118,16 @@ def prepare_scene(scene):
             layer["emissiveField"], layer["emissiveFieldAmount"] = WAVE_LAYERS[name]
         if name in HUE_FIELD:
             layer["hueField"] = HUE_FIELD[name]
+    bases = [h[: -len("-cap")] for h in FEATURED]
+    for node in scene["nodes"]:
+        if node.get("kind") == "procedural" and any(node["name"] == b + p for b in bases for p in HERO_PARTS_ON_DROP_RING):
+            node["procedural"]["emissiveField"] = "drop-wave"
+            node["procedural"]["emissiveFieldAmount"] = HERO_DROP_RING
+    rank = {name: round(0.5 - 0.0215 * i, 4) for i, name in enumerate(FEATURED)}
+    for heroes in (scene.get("heroes", []), project.get("heroes", [])):
+        for h in heroes:
+            if h["name"] in rank:
+                h["importance"] = rank[h["name"]]
 
 
 def wave_tracks():
@@ -146,6 +178,14 @@ DROPS = {
     "section.tree-fireflies-density": "the arc keys the fireflies with the sparkle",
     "section.river-motes-density": "the arc keys the river motes with the sparkle",
     "section.water-glow": "the arc keys the water's glow with the valley's light",
+    # The drop's ring fires once, in the drop, where the section's depth is its largest and constant:
+    # a depth route on it would only rescale it (its amount says how strong it is).
+    "section.beacons": "the beacons show the drop's ring, which runs only in the drop",
+}
+# Items dropped by what they move, for the same reason, where the keys are the planner's to number:
+# the heroes' parts show the drop's ring, and the planner gives each part a depth route (30 of them).
+DROP_TARGETS = {
+    "procedural/*/emissiveFieldAmount": "a hero part shows only the drop's ring; its depth is the drop's",
 }
 # Parameters of the planner's sources, merged over its own.
 SOURCE_PARAMETERS = {
@@ -178,11 +218,14 @@ def tune(proposal):
     for key in DROPS:
         if key not in keys:
             notes.append(f"drop '{key}' matched no proposed item")
+    for pattern in DROP_TARGETS:
+        if not any(fnmatch.fnmatch(it["route"]["target"], pattern) for it in plan["routes"]):
+            notes.append(f"drop of '{pattern}' matched no proposed route")
     routes, kept, dropped = [], [], []
     by_key = {r["planItem"].split("/", 1)[1]: r for r in install["routes"]}
     for item in plan["routes"]:
         key = item["key"]
-        if key in DROPS:
+        if key in DROPS or any(fnmatch.fnmatch(item["route"]["target"], p) for p in DROP_TARGETS):
             dropped.append(key)
             continue
         route = by_key[key]

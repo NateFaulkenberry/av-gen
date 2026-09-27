@@ -64,8 +64,15 @@ BASE = {
     "nodes/valley/water/sparkle": 0.06,
     "nodes/valley/water/foam": 0.06,
     "nodes/valley/water/shallowColor": [0.03, 0.1, 0.12],
-    # The aurora keeps its slow response to the bands but no longer pulses on every beat.
+    # The aurora's own response to the spectrum (bass -> curtain height, low-mid -> waves, mid -> folds,
+    # high -> filaments) reads the raw bands every frame, unsmoothed: measured over the arrival's grand
+    # wide (s14, the top fifth of the frame) the sky's brightness jumped by up to 44% from one frame to
+    # the next, in the first pass's render and this one alike -- a flickering sky, the one thing in the
+    # frame that is biggest and should be calmest. It is switched off at its master ("audio response");
+    # the aurora answers the lead instead, slowly (the reactivity proposal's `lead.aurora`, x0.94-1.15
+    # over 0.4-1.6 s), and the arc keys its intensity with the sections. Its own flow still moves it.
     "fx/aurora/audioBeat": 0.0,
+    "fx/aurora/audioSensitivity": 0.0,
 }
 
 # Effects the film does not use, and why.
@@ -396,6 +403,6 @@ def apply_motifs(project, scene):
         _route("audio.bass", "nodes/valley/water/ripple", 0.03, "add", {"attackMs": 90.0, "decayMs": 700.0}),
     ]
     project["routes"] = routes
-    reactivity.prepare_scene(scene)
+    reactivity.prepare(project, scene)
     print("  " + reactivity.apply(project, scene))
     return len(project["routes"])
