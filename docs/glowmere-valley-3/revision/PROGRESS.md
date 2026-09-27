@@ -8,6 +8,24 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **16:35: ALL FOUR PHASE 3 STREAMS ARE MERGED into `gv3/production`.**
+  - **gv3/world** is merged as `be55dd43` (world `588fb792`). The one conflict, the generator's argparse block, was
+    resolved by keeping `--recut`, `--final` and `--final-trace`.
+  - **The closure is redone low:** a head of about 40 m in the north with the river at its foot and a 16 m falls;
+    in the south the rim with a low sill and a crest. The largest skyline rise is 6.6° (was 12°). Re-checked on a
+    whole-film trace of the closed film: 0 open ends. The water's speed is pinned at 0.4116 m/s; a closure had
+    slowed it 5%.
+  - **gv3-world is still measuring the 4K cost** in its own worktree. Merge its final commits when it reports.
+  - **What the closure changed for the other streams:**
+    - E3 takes bull-21, not bull-10;
+    - s13 at 70 s frames rook behind a fern;
+    - s18 at 110 s loses the E4 beam;
+    - s25 is now in frame;
+    - the river mouth's gorge shows sky in 84 views of s07, s13, s18 and s22–24.
+- **LAUNCHED: gv3-int, the Phase 3 integration** (brief in [briefs.md](briefs.md) § "Phase 3 integration"). Worktree
+  `av-gen-gv3-int`, branch `gv3/integrate` from `b74c3429`, on engine-3. It generates, re-validates, fixes the
+  cross-stream issues, renders the whole-film preview r1, evaluates it against iteration 0 and iterates. When navfix
+  is in main, build engine-4 and tell gv3-int; it then applies E5 "go and see".
 - **CI, 16:20: main `876a11e2`'s push run is RED on the bolt flake.** Run 36341601980: CPU 3,544 passed, 1 failed,
   212 skipped, 28 needs-assets, 3,788 in all (the local total). The failure is `test_bolt_path.cpp:565` again, now in
   shard 0 with seed 1790536064: 2 failures in 3 CI runs. The GPU job was still running.
