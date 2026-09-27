@@ -61,6 +61,10 @@ scene::Scene ridgeShot(bool withRidge) {
     s.camera.position = {0.0f, 8.0f, 0.0f};
     s.camera.target = {0.0f, 8.0f, -100.0f};
     s.camera.fovYRadians = glm::radians(40.0f);
+    // The default far plane is 200 m, which clipped the ridge out of every arm of this test's first
+    // run: all three frames were the bare sky, and the difference the test measures was zero.
+    // GV3's own camera reaches past its valley rim.
+    s.camera.farPlane = 2000.0f;
     // No bloom: the ridge is brighter in one arm than the other, and a glow spreading that into the
     // open sky would make "the sky is not fogged" untestable.
     s.post.bloomEnabled = false;
@@ -156,10 +160,15 @@ double bandDifference(const gpu::ImageF& a, const gpu::ImageF& b, double top, do
     return den > 0.0 ? num / den : 0.0;
 }
 
-// The ridge's crest is at about 0.37 of the height and its foot at 0.66; the band just under the
-// crest is where the rim meets the sky, and where the cut-out was.
-constexpr double kRidgeTop = 0.40;
-constexpr double kRidgeBottom = 0.60;
+// The ridge's crest is at 0.367 of the height (5.5 degrees up) and its foot at 0.66. The band just
+// under the crest, and above the horizon, is where the rim meets the sky and where the cut-out was.
+// It stops at 0.45 because the sky's horizon blend starts at 0.459 (1.7 degrees up): below it the
+// frame without the ridge shows the sky's ground colour, while the fog deliberately reads the
+// horizon's radiance there (the air over a valley floor is lit by the sky, not by the ground colour
+// the sky paints beneath its horizon) -- so "the sky behind the ridge" only means the sky above it.
+// The first run of this test used 0.40-0.60 and scored the treatment against that ground colour.
+constexpr double kRidgeTop = 0.39;
+constexpr double kRidgeBottom = 0.45;
 constexpr double kSkyTop = 0.05;
 constexpr double kSkyBottom = 0.30;
 
@@ -179,9 +188,9 @@ TEST_CASE("a far ridge fogged towards the sky dissolves into the sky behind it",
     // How far the ridge's pixels are from the sky that is there when the ridge is not.
     const double controlGap = bandDifference(a.image, skyOnly.image, kRidgeTop, kRidgeBottom);
     const double treatmentGap = bandDifference(b.image, skyOnly.image, kRidgeTop, kRidgeBottom);
-    UNSCOPED_INFO("the ridge against the sky behind it: constant fog colour " << controlGap << ", fog from the sky "
+    WARN("the ridge against the sky behind it: constant fog colour " << controlGap << ", fog from the sky "
                                                                               << treatmentGap);
-    UNSCOPED_INFO("ridge luminance: constant " << bandLuminance(a.image, kRidgeTop, kRidgeBottom) << ", from sky "
+    WARN("ridge luminance: constant " << bandLuminance(a.image, kRidgeTop, kRidgeBottom) << ", from sky "
                                                << bandLuminance(b.image, kRidgeTop, kRidgeBottom) << ", sky behind "
                                                << bandLuminance(skyOnly.image, kRidgeTop, kRidgeBottom));
     // About 5% of the ridge survives 300 m of this air, and the map is a low-pass of the sky, so the
@@ -222,7 +231,7 @@ TEST_CASE("the fog carries the aurora into the air in front of it", "[gpu][fog][
     // ...and does not when the fog is a constant colour -- which is the control, and the reason
     // the rim read as a cut-out: the air in front of the aurora never knew it was there.
     const double withConstant = bandDifference(auroraConstant.image, plainConstant.image, kRidgeTop, kRidgeBottom);
-    UNSCOPED_INFO("the aurora's effect on the fogged ridge: fog from the sky " << withSky << ", constant fog colour "
+    WARN("the aurora's effect on the fogged ridge: fog from the sky " << withSky << ", constant fog colour "
                                                                                 << withConstant);
     CHECK(withSky > 0.05);
     CHECK(withConstant < 0.01);
@@ -230,7 +239,7 @@ TEST_CASE("the fog carries the aurora into the air in front of it", "[gpu][fog][
     // It gets there through the map: the map's horizon rows carry the aurora's light.
     const double mapPlain = bandLuminance(plainFromSky.map, 0.0, 0.25);
     const double mapAurora = bandLuminance(auroraFromSky.map, 0.0, 0.25);
-    UNSCOPED_INFO("the map's horizon rows: plain sky " << mapPlain << ", with the aurora " << mapAurora);
+    WARN("the map's horizon rows: plain sky " << mapPlain << ", with the aurora " << mapAurora);
     CHECK(mapAurora > mapPlain * 1.05);
     CHECK(ctx->errorCount() == 0);
 }

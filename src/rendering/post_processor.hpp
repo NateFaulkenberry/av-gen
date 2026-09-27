@@ -206,13 +206,23 @@ private:
     // Encodes the metering reduction of the pre-exposure image and the readback copy.
     void encodeMetering(wgpu::CommandEncoder& encoder, const PostFrameInputs& in, gpu::TransientPool& pool,
                         const Uniforms& base);
-    // Downsample/upsample pyramid over an already-prefiltered base; returns its finest level.
-    // `blends` is the upsample blend per step, finest first (`scene::planPyramid`, ADR-917).
-    // `tier` names the pyramid for a diagnostic capture ("bloom" / "halation") and is unused
-    // otherwise.
-    wgpu::TextureView buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool, const Uniforms& base,
-                                   std::vector<gpu::TransientTexture>& down, float spread,
-                                   const std::array<float, scene::kMaxPyramidLevels>& blends, const char* tier);
+    // The assembled pyramid: the finest level that carries weight, and its size. Its consumers
+    // sample it by UV through a linear sampler, so it may be coarser than the pyramid's first level.
+    struct PyramidResult {
+        wgpu::TextureView view;
+        std::uint32_t width = 0;
+    };
+    // Downsample/upsample pyramid over an already-prefiltered base (`scene::planPyramid`, ADR-917,
+    // gives each step its blend). The upsample stops at the finest level with any weight: a frame
+    // finer than the reference builds levels below that which exist only as downsample steps, and
+    // upsampling through them would add nothing but blur -- a tent each, at the texel of the level
+    // below, which is exactly what made the glow at 4x the reference softer than its preview's.
+    // At or below the reference level 0 always carries weight (1 - blend >= 0.05), so the chain
+    // there is the pre-ADR-917 chain. `tier` names the pyramid for a diagnostic capture ("bloom" /
+    // "halation") and is unused otherwise.
+    PyramidResult buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool, const Uniforms& base,
+                               std::vector<gpu::TransientTexture>& down, float spread, const scene::PyramidPlan& plan,
+                               const char* tier);
     // Records one intermediate when a capture is armed; a no-op otherwise.
     void captureStage(std::string name, const gpu::TransientTexture& texture);
     // The usage the pyramid and wide textures are allocated with: CopySrc only while capturing.
@@ -245,6 +255,11 @@ private:
     wgpu::RenderPipeline lookAtmos_;
     wgpu::RenderPipeline lookBlur_;
     wgpu::RenderPipeline look_;
+    // ADR-917; appended, never inserted. A 2x2 box for the pyramid levels finer than the
+    // reference's first, and the tile maximum in two passes for tiles past the single pass's 40 px.
+    wgpu::RenderPipeline boxDown_;
+    wgpu::RenderPipeline velocityTileMaxRows_;
+    wgpu::RenderPipeline velocityTileMaxColumns_;
     wgpu::Sampler sampler_;
     wgpu::Buffer uniforms_;
     std::uint32_t slot_ = 0;

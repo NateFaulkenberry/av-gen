@@ -16,6 +16,7 @@
 // it scaled by then. The control must fail the same criterion by a wide margin, or the test could
 // not have caught the defect it was written for.
 
+#include "assets/exr.hpp"
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
@@ -31,9 +32,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <functional>
+#include <iomanip>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 using namespace avgen;
@@ -48,8 +53,9 @@ constexpr std::uint32_t kFactor = 4;
 // Black, no sky, no lights: three self-lit boxes of fixed WORLD size, so each is a fixed fraction of
 // the frame at every resolution. One small and warm (halation reads warm highlights), one small and
 // cool, one larger. All well above the bloom threshold, so the soft knee sees the same thing at
-// both sizes and what is compared is reach, not which pixels crossed a threshold.
-scene::Scene glowShot() {
+// both sizes and what is compared is reach, not which pixels crossed a threshold. `warmOnly` keeps
+// the warm one alone, for measuring one glow's reach without its neighbours' halos in the sum.
+scene::Scene glowShot(bool warmOnly = false) {
     scene::Scene s;
     s.environment.backgroundColor = glm::vec3(0.0f);
     s.environment.showSkybox = false;
@@ -66,8 +72,10 @@ scene::Scene glowShot() {
         e.material.unlit = true;
     };
     emitter("warm", {-2.6f, 0.9f, 0.0f}, 0.16f, {1.0f, 0.45f, 0.15f}, 24.0f);
-    emitter("cool", {2.4f, -0.8f, 0.0f}, 0.14f, {0.3f, 0.6f, 1.0f}, 30.0f);
-    emitter("large", {0.4f, 0.2f, 0.0f}, 0.45f, {0.9f, 0.85f, 1.0f}, 12.0f);
+    if (!warmOnly) {
+        emitter("cool", {2.4f, -0.8f, 0.0f}, 0.14f, {0.3f, 0.6f, 1.0f}, 30.0f);
+        emitter("large", {0.4f, 0.2f, 0.0f}, 0.45f, {0.9f, 0.85f, 1.0f}, 12.0f);
+    }
 
     scene::PostSettings& p = s.post;
     p.bloomEnabled = false;
@@ -152,7 +160,8 @@ double relativeL1(const gpu::ImageF& reference, const gpu::ImageF& other) {
 }
 
 // The radius, in frame heights, that holds `fraction` of a contribution's energy around (u, v): the
-// resolution-free statement of how far an effect reaches (ADR-279's measure).
+// resolution-free statement of how far an effect reaches (ADR-279's measure). Meaningful on a frame
+// with ONE source: every pixel of the frame is in the sum.
 double energyRadius(const gpu::ImageF& image, double u, double v, double fraction) {
     const double cx = u * image.width;
     const double cy = v * image.height;
@@ -182,42 +191,81 @@ double energyRadius(const gpu::ImageF& image, double u, double v, double fractio
     return 0.0;
 }
 
+// Where a frame's light is, as a fraction of its size: the energy-weighted centroid. Taken from the
+// frame without the effect, so the reach is measured about the source itself.
+glm::dvec2 centroid(const gpu::ImageF& image) {
+    glm::dvec2 sum(0.0);
+    double total = 0.0;
+    for (std::uint32_t y = 0; y < image.height; ++y) {
+        for (std::uint32_t x = 0; x < image.width; ++x) {
+            const float* p = image.pixel(x, y);
+            const double e = std::max(0.0, static_cast<double>(p[0]) + static_cast<double>(p[1]) + static_cast<double>(p[2]));
+            sum += e * glm::dvec2((x + 0.5) / image.width, (y + 0.5) / image.height);
+            total += e;
+        }
+    }
+    return total > 0.0 ? sum / total : glm::dvec2(0.5);
+}
+
+// Diagnostics: AVGEN_POST_RESOLUTION_DUMP=<dir> writes each compared contribution as an EXR.
+void dumpIfAsked(const std::string& name, const gpu::ImageF& image) {
+    const char* dir = std::getenv("AVGEN_POST_RESOLUTION_DUMP");
+    if (dir == nullptr || *dir == '\0') {
+        return;
+    }
+    std::filesystem::create_directories(dir);
+    static_cast<void>(assets::writeExr(fs::path(dir) / (name + ".exr"), image.width, image.height, image.rgba, false));
+}
+
 struct Arms {
     double treatment = 0.0;
     double control = 0.0;
-    double treatmentR90 = 0.0; // high / low, around the warm emitter
+    double treatmentR90 = 0.0; // high / low: the warm emitter's 90% energy radius, alone in its frame
     double controlR90 = 0.0;
     rendering::PostStats highStats; // the treatment's high-resolution frame
 };
 
 using Configure = std::function<void(scene::PostSettings&)>;
 
-// One effect's contribution at the two sizes, compared after the box filter: once with a fixed
-// reference (the treatment), once with each frame its own reference (the chain before ADR-917).
-Arms compareEffect(gpu::Context& ctx, gpu::ShaderLibrary& shaders, const Configure& enable) {
+// One effect's contribution -- the frame with it minus the frame without -- at the two sizes,
+// compared after the box filter: once with a fixed reference (the treatment), once with each frame
+// its own reference (the chain before ADR-917). The three-emitter shot gives the relative L1; the
+// warm emitter alone gives the reach, whose sum would otherwise include its neighbours' halos.
+Arms compareEffect(gpu::Context& ctx, gpu::ShaderLibrary& shaders, const Configure& enable, const char* name) {
     Arms out;
+    const std::uint32_t sizes[2][2] = {{kLowW, kLowH}, {kLowW * kFactor, kLowH * kFactor}};
     for (const bool fixedReference : {true, false}) {
         gpu::ImageF contribution[2];
-        const std::uint32_t sizes[2][2] = {{kLowW, kLowH}, {kLowW * kFactor, kLowH * kFactor}};
+        double r90[2] = {0.0, 0.0};
         for (int i = 0; i < 2; ++i) {
-            scene::Scene off = glowShot();
-            off.post.referenceHeight = fixedReference ? static_cast<float>(kLowH) : static_cast<float>(sizes[i][1]);
-            scene::Scene on = off;
-            enable(on.post);
-            const Rendered withEffect = render(ctx, shaders, on, sizes[i][0], sizes[i][1]);
-            const Rendered without = render(ctx, shaders, off, sizes[i][0], sizes[i][1]);
-            contribution[i] = minus(withEffect.image, without.image);
-            if (fixedReference && i == 1) {
-                out.highStats = withEffect.post;
+            const float reference = fixedReference ? static_cast<float>(kLowH) : static_cast<float>(sizes[i][1]);
+            for (const bool warmOnly : {false, true}) {
+                scene::Scene off = glowShot(warmOnly);
+                off.post.referenceHeight = reference;
+                scene::Scene on = off;
+                enable(on.post);
+                const Rendered withEffect = render(ctx, shaders, on, sizes[i][0], sizes[i][1]);
+                const Rendered without = render(ctx, shaders, off, sizes[i][0], sizes[i][1]);
+                gpu::ImageF c = minus(withEffect.image, without.image);
+                if (i == 1) {
+                    c = boxDown(c, kFactor);
+                }
+                if (warmOnly) {
+                    const glm::dvec2 at = centroid(i == 1 ? boxDown(without.image, kFactor) : without.image);
+                    r90[i] = energyRadius(c, at.x, at.y, 0.9);
+                } else {
+                    dumpIfAsked(fmt::format("{}-{}-{}", name, fixedReference ? "treatment" : "control",
+                                            i == 0 ? "low" : "high-down"),
+                                c);
+                    contribution[i] = std::move(c);
+                    if (fixedReference && i == 1) {
+                        out.highStats = withEffect.post;
+                    }
+                }
             }
         }
-        const gpu::ImageF down = boxDown(contribution[1], kFactor);
-        const double err = relativeL1(contribution[0], down);
-        // The warm emitter sits at about (0.30, 0.37) of this frame; a window around it keeps the
-        // other two emitters' halos out of its radius.
-        const double r90Low = energyRadius(contribution[0], 0.30, 0.37, 0.9);
-        const double r90High = energyRadius(down, 0.30, 0.37, 0.9);
-        const double ratio = r90Low > 0.0 ? r90High / r90Low : 0.0;
+        const double err = relativeL1(contribution[0], contribution[1]);
+        const double ratio = r90[0] > 0.0 ? r90[1] / r90[0] : 0.0;
         if (fixedReference) {
             out.treatment = err;
             out.treatmentR90 = ratio;
@@ -236,21 +284,25 @@ TEST_CASE("bloom, halation and the anamorphic streak keep their look across a fo
     auto ctx = testsupport::gpuContextOrSkip();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
 
-    const Arms bloom = compareEffect(*ctx, shaders, [](scene::PostSettings& p) { p.bloomEnabled = true; });
-    const Arms halation = compareEffect(*ctx, shaders, [](scene::PostSettings& p) { p.halationEnabled = true; });
-    const Arms streak = compareEffect(*ctx, shaders, [](scene::PostSettings& p) {
-        p.bloomEnabled = true;
-        p.bloomIntensity = 0.0f; // the streak reads the bloom pyramid, not the bloom's own add
-        p.anamorphicEnabled = true;
-    });
-    UNSCOPED_INFO("relative L1 of the downsampled 1280x720 contribution against the 320x180 one, and the "
-                  "ratio of the warm emitter's 90% energy radius (1 = the same reach)");
-    UNSCOPED_INFO("bloom     treatment " << bloom.treatment << " (r90 x" << bloom.treatmentR90 << ")  control "
-                                         << bloom.control << " (r90 x" << bloom.controlR90 << ")");
-    UNSCOPED_INFO("halation  treatment " << halation.treatment << " (r90 x" << halation.treatmentR90
-                                         << ")  control " << halation.control << " (r90 x" << halation.controlR90 << ")");
-    UNSCOPED_INFO("streak    treatment " << streak.treatment << " (r90 x" << streak.treatmentR90 << ")  control "
-                                         << streak.control << " (r90 x" << streak.controlR90 << ")");
+    const Arms bloom = compareEffect(*ctx, shaders, [](scene::PostSettings& p) { p.bloomEnabled = true; }, "bloom");
+    const Arms halation =
+        compareEffect(*ctx, shaders, [](scene::PostSettings& p) { p.halationEnabled = true; }, "halation");
+    const Arms streak = compareEffect(
+        *ctx, shaders,
+        [](scene::PostSettings& p) {
+            p.bloomEnabled = true;
+            p.bloomIntensity = 0.0f; // the streak reads the bloom pyramid, not the bloom's own add
+            p.anamorphicEnabled = true;
+        },
+        "streak");
+    WARN("relative L1 of the downsampled 1280x720 contribution against the 320x180 one, and the "
+         "ratio of the warm emitter's 90% energy radius (1 = the same reach)");
+    WARN("bloom     treatment " << bloom.treatment << " (r90 x" << bloom.treatmentR90 << ")  control "
+                                << bloom.control << " (r90 x" << bloom.controlR90 << ")");
+    WARN("halation  treatment " << halation.treatment << " (r90 x" << halation.treatmentR90 << ")  control "
+                                << halation.control << " (r90 x" << halation.controlR90 << ")");
+    WARN("streak    treatment " << streak.treatment << " (r90 x" << streak.treatmentR90 << ")  control "
+                                << streak.control << " (r90 x" << streak.controlR90 << ")");
 
     // What reached the chain at four times the reference height: two more pyramid levels, a streak
     // four times as many quarter-resolution texels long. The halation pyramid starts at a quarter of
@@ -273,6 +325,12 @@ TEST_CASE("bloom, halation and the anamorphic streak keep their look across a fo
 // ---- motion blur: the tiles follow the radius ------------------------------------------------------
 
 namespace {
+
+// How far the box moves between the two frames, in metres. At 6 m behind a 50 degree lens a frame
+// is 5.6 m tall, so this is 77 px at 180 lines and 309 at 720; a 180 degree shutter halves that, and
+// the radius clamp (30 px at the 180-line reference) saturates it at both sizes -- a 30 px smear and
+// a 120 px one, the same fraction of the frame.
+constexpr float kTravel = 2.4f;
 
 // One small self-lit box on black, moved between two frames so the second has a real velocity.
 scene::Scene movingBox() {
@@ -302,7 +360,7 @@ Rendered renderMoved(gpu::Context& ctx, gpu::ShaderLibrary& shaders, scene::Scen
     REQUIRE(renderer.init().has_value());
     FrameTime time;
     time.deltaTime = 1.0 / 30.0;
-    s.entities[0].transform.position = {-0.9f, 0.0f, 0.0f};
+    s.entities[0].transform.position = {-kTravel, 0.0f, 0.0f};
     time.frameIndex = 0;
     time.renderTime = 0.0;
     REQUIRE(renderer.renderToImageFloat(s, time, w, h).has_value());
@@ -320,10 +378,12 @@ TEST_CASE("motion blur keeps its smear across a fourfold resolution change", "[g
     auto ctx = testsupport::gpuContextOrSkip();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
 
-    // A long smear: 0.9 m of travel in a frame is a third of this frame's height, and a 180 degree
-    // shutter blurs half of it -- about 30 px at 180 lines and 120 at 720. The authored tile (20 px
-    // at the reference) and radius (30 px at the reference, 180 lines) are chosen so the smear
-    // fits the tiles at the reference, as the defaults do at 720.
+    // A long smear, saturated at the radius clamp at both sizes (kTravel). The reconstruction
+    // (McGuire 2012) gathers along a pixel's 3x3 tile neighbourhood's velocity, so a pixel more
+    // than a tile or two from the moving box never learns it moved: the smear reaches only as far
+    // as the tiles do. At the 180-line reference a 20 px tile holds the 15 px half-smear. At 720
+    // lines the treatment's tiles are 80 px and hold the 60 px half-smear; the control's stay
+    // 20 px -- the chain before ADR-917 -- and cut the smear's outer part off.
     const std::uint32_t sizes[2][2] = {{kLowW, kLowH}, {kLowW * kFactor, kLowH * kFactor}};
     double error[2] = {0.0, 0.0};
     rendering::PostStats highStats;
@@ -354,7 +414,8 @@ TEST_CASE("motion blur keeps its smear across a fourfold resolution change", "[g
         }
         error[fixedReference ? 0 : 1] = relativeL1(contribution[0], boxDown(contribution[1], kFactor));
     }
-    UNSCOPED_INFO("relative L1 of the downsampled smear: treatment " << error[0] << ", control " << error[1]);
+    WARN("relative L1 of the downsampled smear: treatment " << std::setprecision(12) << error[0] << ", control "
+                                                            << error[1]);
     // What reached the chain at 720 lines: the tile and the radius both four times their authored
     // pixels.
     CHECK(highStats.motionBlurTile == 80u);
@@ -375,16 +436,17 @@ TEST_CASE("post/referenceHeight moves the glow's reach at a fixed frame size", "
     double r90[2] = {0.0, 0.0};
     std::uint32_t levels[2] = {0, 0};
     for (int i = 0; i < 2; ++i) {
-        scene::Scene off = glowShot();
+        scene::Scene off = glowShot(true); // one source, so every pixel of the sum is its glow
         off.post.referenceHeight = i == 0 ? 720.0f : 360.0f;
         scene::Scene on = off;
         on.post.bloomEnabled = true;
         const Rendered withBloom = render(*ctx, shaders, on, 1280, 720);
         const Rendered without = render(*ctx, shaders, off, 1280, 720);
-        r90[i] = energyRadius(minus(withBloom.image, without.image), 0.30, 0.37, 0.9);
+        const glm::dvec2 at = centroid(without.image);
+        r90[i] = energyRadius(minus(withBloom.image, without.image), at.x, at.y, 0.9);
         levels[i] = withBloom.post.bloomLevels;
     }
-    UNSCOPED_INFO("r90 at reference 720: " << r90[0] << ", at reference 360: " << r90[1]);
+    WARN("r90 at reference 720: " << r90[0] << ", at reference 360: " << r90[1]);
     CHECK(levels[0] == 6u);
     CHECK(levels[1] == 7u);
     CHECK(r90[1] > 1.4 * r90[0]);
@@ -397,14 +459,20 @@ TEST_CASE("perf: the post chain at 7680x4320, scaled for a 1080-line reference a
           "[.perf][post][resolution]") {
     // Hidden: it prints a measurement rather than asserting one. Run it under the GPU lock:
     //   tools/gpu-lock.sh build/release/tests/avgen_render_tests "perf: the post chain at 7680x4320*"
-    // A 3840x2160 output at supersample 2 is a 7680x4320 chain. Reference 4320 is pixel scale 1 --
-    // the chain before ADR-917 at this size; reference 1080 is a 960x540 x2 preview's, scale 4: two
-    // more pyramid levels, a streak and tiles four times as long, the look stage two octaves down.
-    // GV3's own post settings (render-post.md), with a full-frame moving surface so motion blur
-    // reconstructs everywhere.
+    // A 3840x2160 output at supersample 2 is a 7680x4320 chain, GV3's final. Two arms, both with
+    // GV3's own post settings (render-post.md) and the same 240 px motion-blur radius -- which is
+    // what GV3's 40 px at 720 lines became at 4320 before ADR-917, and what its recommended 60 px at
+    // a 1080-line reference becomes now:
+    //   reference 4320, radius 240: the chain before ADR-917 at this size (pixel scale 1);
+    //   reference 1080, radius 60:  GV3's preview reference, scale 4 -- the pyramid two octaves
+    //                               finer, streak and tiles four times as long, the look stage two
+    //                               octaves down.
+    // A full-frame moving backdrop, so the motion blur reconstructs everywhere.
     auto ctx = testsupport::gpuContextOrSkip();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
-    for (const float reference : {4320.0f, 1080.0f}) {
+    const char* stages[] = {"post/exposure", "post/motionblur", "post/lens", "post/bloom", "post/anamorphic",
+                            "post/composite", "post/look", "post/fxaa"};
+    for (const auto& [reference, radius] : {std::pair{4320.0f, 240.0f}, std::pair{1080.0f, 60.0f}}) {
         rendering::SceneRenderer renderer(*ctx, shaders);
         REQUIRE(renderer.init().has_value());
         rendering::QualitySettings q = renderer.qualitySettings();
@@ -433,15 +501,17 @@ TEST_CASE("perf: the post chain at 7680x4320, scaled for a 1080-line reference a
         p.motionBlurAmount = 0.954f;
         p.motionBlurSamples = 16;
         p.motionBlurTileSize = 20;
-        p.motionBlurMaxRadius = 60.0f;
+        p.motionBlurMaxRadius = radius;
         p.antialias = 0.963f;
-        p.look.colour = 0.12f;      // the audit's recommendation, so the look stage runs
+        p.look.colour = 0.12f; // the audit's recommendation, so the look stage runs
         p.look.lightWrap = 0.15f;
-        p.look.localContrastRadius = 36.0f;
+        p.look.localContrastRadius = 36.0f * reference / 1080.0f; // 36 px at 1080 lines in both arms
         s.camera.lens.shutterAngle = 172.0f;
         std::vector<double> post;
+        std::vector<std::vector<double>> perStage(std::size(stages));
         rendering::PostStats last;
-        for (std::uint64_t frame = 0; frame < 48; ++frame) {
+        std::uint64_t seen = 0;
+        for (std::uint64_t frame = 0; frame < 64; ++frame) {
             s.camera.position.x = 0.02f * static_cast<float>(frame);
             s.camera.target.x = s.camera.position.x + 0.01f * static_cast<float>(frame % 7);
             FrameTime time;
@@ -453,13 +523,28 @@ TEST_CASE("perf: the post chain at 7680x4320, scaled for a 1080-line reference a
             if (frame >= 16 && last.postMs > 0.0) {
                 post.push_back(last.postMs);
             }
+            const gpu::FrameTimeline& timeline = renderer.timeline();
+            if (frame >= 16 && timeline.completedFrames() != seen) {
+                seen = timeline.completedFrames();
+                for (std::size_t k = 0; k < std::size(stages); ++k) {
+                    perStage[k].push_back(timeline.msFor(stages[k]));
+                }
+            }
         }
-        std::sort(post.begin(), post.end());
-        const double median = post.empty() ? -1.0 : post[post.size() / 2];
-        fmt::print("reference {:.0f} (pixel scale {:.2f}): post chain median {:.3f} ms over {} frames; "
-                   "bloom levels {}, streak reach {:.0f}, motion-blur tile {} px, look octaves {}, passes {}\n",
-                   reference, last.pixelScale, median, post.size(), last.bloomLevels, last.anamorphicReach,
-                   last.motionBlurTile, last.lookOctaves, last.passes);
+        auto median = [](std::vector<double> v) {
+            std::sort(v.begin(), v.end());
+            return v.empty() ? -1.0 : v[v.size() / 2];
+        };
+        std::string breakdown;
+        for (std::size_t k = 0; k < std::size(stages); ++k) {
+            breakdown += fmt::format(" {} {:.2f}", stages[k] + 5, median(perStage[k]));
+        }
+        fmt::print("reference {:.0f}, radius {:.0f} (pixel scale {:.2f}): post chain median {:.3f} ms over {} frames; "
+                   "bloom levels {}, streak reach {:.0f}, motion-blur tile {} px and radius {:.0f} px, look octaves "
+                   "{}, passes {}\n  per stage (median ms):{}\n",
+                   reference, radius, last.pixelScale, median(post), post.size(), last.bloomLevels,
+                   last.anamorphicReach, last.motionBlurTile, last.motionBlurRadius, last.lookOctaves, last.passes,
+                   breakdown);
     }
     CHECK(ctx->errorCount() == 0);
 }
@@ -529,7 +614,7 @@ TEST_CASE("the look stage's local mean keeps its radius where its tap budget run
 
     const double treatment = relativeL1(low, boxDown(high, 4));
     const double control = relativeL1(low, boxDown(highNarrow, 4));
-    UNSCOPED_INFO("look contribution, relative L1 against 480x270: 1920x1080 " << treatment
+    WARN("look contribution, relative L1 against 480x270: 1920x1080 " << treatment
                                                                              << ", the same with half the radius "
                                                                              << control);
     CHECK(lowOctaves == 0u);  // 6 texels of sigma at 270 lines: within the budget, nothing changes

@@ -59,10 +59,25 @@ constexpr std::uint32_t kAnamorphicTapBudget = 48;
 // truncating the gaussian, which is what it silently did before (a 3-sigma kernel cut at 0.9 sigma).
 constexpr std::uint32_t kLookBlurTapBudget = 32;
 // ADR-917: the largest velocity tile the scaled tile size may reach. 20 px at the reference is 80
-// at four times the height and 160 at eight; past that a tile-max texel reads more of the velocity
-// target than is worth doing serially, and no deliverable this engine renders is that far from the
-// height it was tuned at.
+// at four times the height and 160 at eight, and no deliverable this engine renders is further from
+// the height it was tuned at; the cap only keeps a nonsense reference from dilating every smear
+// across the frame.
 constexpr std::uint32_t kMaxMotionBlurTile = 160;
+// ADR-917: the largest tile the single-pass tile maximum takes -- the parameter's own hard maximum
+// before tiles scaled, so every chain at or below twice its reference is the pass it always was.
+// Larger tiles are taken separably (rows, then columns).
+constexpr std::uint32_t kSinglePassMotionBlurTile = 40;
+
+// ADR-917: the finest pyramid level that carries weight. Level 0 at or below the reference (it
+// keeps 1 - blend >= 0.05); in a frame finer than the reference, the levels below it are downsample
+// steps only.
+std::uint32_t firstWeightedLevel(const scene::PyramidPlan& plan) {
+    std::uint32_t first = 0;
+    while (first + 1 < plan.levels && plan.weight[first] <= 0.0f) {
+        ++first;
+    }
+    return first;
+}
 
 } // namespace
 
@@ -233,7 +248,7 @@ Result<wgpu::RenderPipeline> PostProcessor::makePipeline(const wgpu::ShaderModul
 }
 
 Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
-    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 17> slots{{
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 18> slots{{
         {"fs_exposure", &exposure_},
         {"fs_meter_prefilter", &meterPrefilter_},
         {"fs_meter_reduce", &meterReduce_},
@@ -255,11 +270,15 @@ Result<void> PostProcessor::createPipelines(const wgpu::ShaderModule& module) {
         {"fs_look_atmos", &lookAtmos_},
         {"fs_look_blur", &lookBlur_},
         {"fs_look", &look_},
+        {"fs_box_down", &boxDown_}, // ADR-917, appended
     }};
-    // The two velocity-tile passes write RG16F, not the HDR format (ADR-040).
-    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 2> tileSlots{{
+    // The velocity-tile passes write RG16F, not the HDR format (ADR-040). ADR-917 appends the two
+    // halves of the tile maximum it takes separably past 40 px.
+    const std::array<std::pair<const char*, wgpu::RenderPipeline*>, 4> tileSlots{{
         {"fs_velocity_tile_max", &velocityTileMax_},
         {"fs_velocity_neighbour_max", &velocityNeighbourMax_},
+        {"fs_velocity_tile_max_rows", &velocityTileMaxRows_},
+        {"fs_velocity_tile_max_columns", &velocityTileMaxColumns_},
     }};
     // Build every pipeline first, so a shader that fails to compile leaves the previous set intact.
     std::array<wgpu::RenderPipeline, slots.size()> built{};
@@ -457,29 +476,34 @@ wgpu::TextureUsage PostProcessor::pyramidUsage() const {
     return capturing_ ? (base | wgpu::TextureUsage::CopySrc) : base;
 }
 
-wgpu::TextureView PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool,
-                                              const Uniforms& base, std::vector<gpu::TransientTexture>& down,
-                                              float spread, const std::array<float, scene::kMaxPyramidLevels>& blends,
-                                              const char* tier) {
+PostProcessor::PyramidResult PostProcessor::buildPyramid(wgpu::CommandEncoder& encoder, gpu::TransientPool& pool,
+                                                         const Uniforms& base, std::vector<gpu::TransientTexture>& down,
+                                                         float spread, const scene::PyramidPlan& plan,
+                                                         const char* tier) {
     if (down.empty()) {
         return {};
     }
-    wgpu::TextureView acc = down.back().view;
-    for (int level = static_cast<int>(down.size()) - 2; level >= 0; --level) {
+    // ADR-917: the finest level with any weight. Every level finer than it is weightless -- it exists
+    // so the downsample can reach the reference's levels -- and an upsample step through it would
+    // be a tent of the result below with nothing of its own added: blur, and nothing else. So the
+    // chain stops there and the consumers magnify that level bilinearly, as they magnify level 0
+    // at the reference.
+    const std::size_t first = std::min<std::size_t>(firstWeightedLevel(plan), down.size() - 1);
+    PyramidResult acc{down.back().view, down.back().width};
+    for (int level = static_cast<int>(down.size()) - 2; level >= static_cast<int>(first); --level) {
         const auto& fine = down[static_cast<std::size_t>(level)];
         const auto& coarse = down[static_cast<std::size_t>(level) + 1];
         auto target = pool.acquire(fine.width, fine.height, kHdrFormat, pyramidUsage(), "bloom-up");
         Uniforms u = base;
         u.texelSize = 1.0f / glm::vec2(static_cast<float>(coarse.width), static_cast<float>(coarse.height));
         // ADR-917: each step's own blend. At the reference height every step carries the authored
-        // one exactly; in a finer frame the steps finer than the reference's first level are 1 --
-        // a plain tent of what is below, adding nothing of their own level.
-        u.params0 = glm::vec4(spread, blends[static_cast<std::size_t>(level)], 0.0f, 0.0f);
+        // one exactly.
+        u.params0 = glm::vec4(spread, plan.blend[static_cast<std::size_t>(level)], 0.0f, 0.0f);
         // No stage of its own: the pyramid is shared by bloom and halation, and the caller has
         // already said which one this is.
-        runPass(encoder, upsample_, target.view, acc, fine.view, nullptr, u);
+        runPass(encoder, upsample_, target.view, acc.view, fine.view, nullptr, u);
         captureStage(std::string(tier) + "/up" + std::to_string(level), target);
-        acc = target.view;
+        acc = {target.view, target.width};
     }
     return acc;
 }
@@ -623,7 +647,23 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         u.params0 = glm::vec4(blurScale, static_cast<float>(tileSize), maxRadius, 0.0f);
         u.params1 = glm::vec4(static_cast<float>(in.width), static_cast<float>(in.height), 0.0f, 0.0f);
         stage_ = "post/motionblur";
-        runPass(encoder, velocityTileMax_, tiles.view, in.velocity, nullptr, nullptr, u);
+        if (tileSize <= kSinglePassMotionBlurTile) {
+            runPass(encoder, velocityTileMax_, tiles.view, in.velocity, nullptr, nullptr, u);
+        } else {
+            // ADR-917: a tile past 40 px is taken in two passes, the longest velocity along each
+            // tile-wide run of a row and then the longest of those down each tile-tall column --
+            // the same maximum, found in O(tile) reads a texel instead of O(tile^2). Measured at
+            // 7680x4320 with 80 px tiles, the single pass took the motion blur from 13.7 ms to
+            // 47.7 ms. The runs are kept at RG16F, the tiles' own format, so the two can differ
+            // from one pass only where two velocities tie to within a half float's precision.
+            auto rows = pool.acquire(tilesX, in.height, kVelocityFormat);
+            Uniforms r = u;
+            r.outputSize = glm::vec2(static_cast<float>(tilesX), static_cast<float>(in.height));
+            r.texelSize = 1.0f / r.outputSize;
+            runPass(encoder, velocityTileMaxRows_, rows.view, in.velocity, nullptr, nullptr, r);
+            runPass(encoder, velocityTileMaxColumns_, tiles.view, rows.view, nullptr, nullptr, u);
+            pool.release(rows);
+        }
         runPass(encoder, velocityNeighbourMax_, neighbours.view, tiles.view, nullptr, nullptr, u);
 
         auto target = pool.acquire(in.width, in.height, kHdrFormat);
@@ -662,6 +702,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
     const float blend = std::clamp(s.bloomRadius * 0.5f, 0.05f, 0.95f);
 
     wgpu::TextureView bloom;
+    std::uint32_t bloomWidth = 0; // the assembled bloom's own width, for the streak's source choice
     std::vector<gpu::TransientTexture> down;
     if (pyramidOn) {
         // ADR-917: the authored depth is the depth at the reference height. A finer frame builds
@@ -670,6 +711,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         std::uint32_t w = std::max(1u, in.width / 2);
         std::uint32_t h = std::max(1u, in.height / 2);
         const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, octaves, w, h);
+        const std::uint32_t first = firstWeightedLevel(plan);
         for (std::uint32_t level = 0; level < plan.levels; ++level) {
             auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "bloom-down");
             Uniforms u = base;
@@ -687,6 +729,12 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
                 textures.emission = in.emission;
                 stage_ = "post/bloom";
                 runPass(encoder, prefilter_, target.view, textures, u);
+            } else if (level <= first) {
+                // ADR-917: into and through the levels finer than the reference's first, a plain
+                // 2x2 box -- the prefilter's own filter -- so the first weighted level is a box of
+                // the frame, as the reference's level 0 is; the 13-tap would soften it by a texel
+                // an octave.
+                runPass(encoder, boxDown_, target.view, down.back().view, nullptr, nullptr, u);
             } else {
                 u.texelSize =
                     1.0f / glm::vec2(static_cast<float>(down.back().width), static_cast<float>(down.back().height));
@@ -698,7 +746,9 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             h = std::max(1u, h / 2);
         }
         stats_.bloomLevels = static_cast<std::uint32_t>(down.size());
-        bloom = buildPyramid(encoder, pool, base, down, s.bloomRadius, plan.blend, "bloom");
+        const PyramidResult assembled = buildPyramid(encoder, pool, base, down, s.bloomRadius, plan, "bloom");
+        bloom = assembled.view;
+        bloomWidth = assembled.width;
     }
 
     // Halation: its own, coarser pyramid over a warm-weighted threshold (ADR-039), planned the same
@@ -709,6 +759,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         std::uint32_t w = std::max(1u, in.width / 4);
         std::uint32_t h = std::max(1u, in.height / 4);
         const scene::PyramidPlan plan = scene::planPyramid(s.bloomLevels, blend, octaves, w, h);
+        const std::uint32_t first = firstWeightedLevel(plan);
         for (std::uint32_t level = 0; level < plan.levels; ++level) {
             auto target = pool.acquire(w, h, kHdrFormat, pyramidUsage(), "halation-down");
             Uniforms u = base;
@@ -717,6 +768,10 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
                 u.params0 = glm::vec4(s.halationThreshold, s.bloomKnee, std::clamp(s.halationWarmth, 0.0f, 1.0f), 0.0f);
                 stage_ = "post/halation";
                 runPass(encoder, halationPrefilter_, target.view, current, nullptr, nullptr, u);
+            } else if (level <= first) {
+                // ADR-917: as bloom's -- the halation prefilter is a 4x4 box, so boxes carry it to
+                // the reference's first level.
+                runPass(encoder, boxDown_, target.view, hdown.back().view, nullptr, nullptr, u);
             } else {
                 u.texelSize =
                     1.0f / glm::vec2(static_cast<float>(hdown.back().width), static_cast<float>(hdown.back().height));
@@ -729,7 +784,7 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
             h = std::max(1u, h / 2);
         }
         stats_.halationLevels = static_cast<std::uint32_t>(hdown.size());
-        halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, plan.blend, "halation");
+        halation = buildPyramid(encoder, pool, base, hdown, s.bloomRadius * s.halationRadius, plan, "halation").view;
     }
 
     // The wide tier: halation tinted and the anamorphic streak, in one texture the composite adds.
@@ -793,7 +848,9 @@ wgpu::TextureView PostProcessor::run(wgpu::CommandEncoder& encoder, const PostFr
         // leaves none.
         const float required = 2.0f * spacing;
         wgpu::TextureView streakSource = bloom;
-        if (!down.empty() && static_cast<float>(w) / static_cast<float>(down.front().width) < required) {
+        // ADR-917: `bloom` is the finest level that carries weight, which in a frame finer than the
+        // reference is coarser than `down.front()`; its own width is what its texel is.
+        if (!down.empty() && static_cast<float>(w) / static_cast<float>(std::max(bloomWidth, 1u)) < required) {
             streakSource = down.back().view; // nothing coarse enough: the coarsest is the best there is
             for (const gpu::TransientTexture& level : down) {
                 if (static_cast<float>(w) / static_cast<float>(level.width) >= required) {

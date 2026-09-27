@@ -189,6 +189,18 @@ fn fs_downsample(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(sum, 1.0);
 }
 
+// ADR-917: a 2x2 box. A frame finer than the post chain's reference height builds pyramid levels
+// finer than the reference's first, and those carry no weight: they are how the chain gets from
+// the frame to the reference's first level. Both prefilters are boxes of the frame (fs_prefilter's
+// four taps a 2x2, fs_halation_prefilter's a 4x4), so boxes are what carry the frame there with the
+// reference's footprint; the 13-tap above would soften it by about a texel every octave. One
+// bilinear tap at this texel's centre, which in a target half the source's size lands on the corner
+// of four source texels and so is exactly their mean.
+@fragment
+fn fs_box_down(in: FsIn) -> @location(0) vec4<f32> {
+    return vec4<f32>(textureSampleLevel(source, linearSampler, in.uv, 0.0).rgb, 1.0);
+}
+
 // Energy-conserving upsample (ADR-039): the coarse level's 9-tap tent (weights summing to 1) is
 // *blended* with this level rather than added to it, so the pyramid's mean equals the prefiltered
 // image's mean whatever the level count. Adding, as the chain did before, multiplied a highlight's
@@ -565,6 +577,56 @@ fn fs_velocity_tile_max(in: FsIn) -> @location(0) vec4<f32> {
                 bestLen = l;
                 best = v;
             }
+        }
+    }
+    if (bestLen > post.params0.z) {
+        best *= post.params0.z / bestLen;
+    }
+    return vec4<f32>(best, 0.0, 0.0);
+}
+
+// ADR-917: the same maximum in two passes, for tiles past 40 px (post_processor.cpp). A tile scales
+// with the frame now, and at 80 px the single pass above spent 6400 serial reads a texel -- 34 ms a
+// frame at 7680x4320. The rows pass takes the longest velocity along each tile-wide run of a row
+// (target: tiles across x the frame's height); the columns pass the longest of those down each
+// tile-tall column, then clamps, exactly as above. Each run's first maximum in x, then the first
+// row with the largest of them, is the single pass's row-major first maximum; the runs are stored
+// at the tiles' own RG16F, so the two differ only where velocities tie within half-float precision.
+// params as fs_velocity_tile_max.
+@fragment
+fn fs_velocity_tile_max_rows(in: FsIn) -> @location(0) vec4<f32> {
+    let tile = max(i32(post.params0.y), 1);
+    let fullSize = vec2<i32>(post.params1.xy);
+    let texel = vec2<i32>(floor(in.clip.xy));
+    let y = min(texel.y, fullSize.y - 1);
+    var best = vec2<f32>(0.0);
+    var bestLen = 0.0;
+    for (var x = 0; x < tile; x = x + 1) {
+        let coord = vec2<i32>(min(texel.x * tile + x, fullSize.x - 1), y);
+        let v = textureLoad(source, coord, 0).xy * post.params1.xy * post.params0.x;
+        let l = length(v);
+        if (l > bestLen) {
+            bestLen = l;
+            best = v;
+        }
+    }
+    return vec4<f32>(best, 0.0, 0.0);
+}
+
+@fragment
+fn fs_velocity_tile_max_columns(in: FsIn) -> @location(0) vec4<f32> {
+    let tile = max(i32(post.params0.y), 1);
+    let runs = vec2<i32>(textureDimensions(source)); // tiles across x the frame's height
+    let texel = vec2<i32>(floor(in.clip.xy));
+    let x = min(texel.x, runs.x - 1);
+    var best = vec2<f32>(0.0);
+    var bestLen = 0.0;
+    for (var y = 0; y < tile; y = y + 1) {
+        let v = textureLoad(source, vec2<i32>(x, min(texel.y * tile + y, runs.y - 1)), 0).xy;
+        let l = length(v);
+        if (l > bestLen) {
+            bestLen = l;
+            best = v;
         }
     }
     if (bestLen > post.params0.z) {

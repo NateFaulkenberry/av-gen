@@ -80,6 +80,19 @@ supersampling counts: a 960x540 preview at supersample 2 is a 1080-line chain.
   `post` group, above every section whose sizes it governs. A scene's own `post` block carries it
   as `referenceHeight`.
 
+Rejected:
+- **One engine-wide reference, as ADR-915 chose for the water.** The water's fades are anti-aliasing
+  thresholds -- where detail becomes finer than a pixel -- so one height suits every project. The
+  post chain's sizes are authored looks, and one of them is an integer: a pyramid depth is exact
+  only at the height it was tuned at. GV3 tuned six levels on a 1080-line chain; against a fixed
+  720 its preview would sit 0.585 octaves off and every level's weight would be shared with its
+  neighbour's, so the approved preview could not be kept. A reference per project cannot be used to
+  make a preview disagree with its final (ADR-915's objection): both scale from the same number.
+  For GV3 the two references coincide at 1080 rows.
+- **Keeping the pixel counts and re-authoring each deliverable** (the audit's 8 levels at 4K x2,
+  stretch x2, tile 40). Each is an approximation of the preview, has to be re-derived for every
+  size, and cannot express a fractional octave.
+
 ## Consequences
 
 - **Every scene with bloom on (the default, so nearly all of them) looks different at any chain

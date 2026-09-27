@@ -958,6 +958,10 @@ private:
     double interactiveEnvBudgetMs_ = 0.0; // 0 = rebuild whenever the hash moves (offline, always)
     scene::RebuildDeferral skyDeferral_;
     std::chrono::steady_clock::time_point lastSkyPollTime_{};
+    // ADR-919: the cube sizes the tier's floor was last reported raising the sky to, so the line is
+    // said when the raise starts or changes -- not on every rebuild of a sky that is animating.
+    std::uint32_t loggedSkyFloorCube_ = 0;
+    std::uint32_t loggedSkyFloorPrefiltered_ = 0;
     bool initialised_ = false;
 
     gpu::RenderTarget hdr_;

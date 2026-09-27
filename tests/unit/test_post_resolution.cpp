@@ -83,6 +83,12 @@ TEST_CASE("at the reference height the pyramid is the authored one, blend for bl
                 CHECK(plan.blend[j] == blend);
             }
             CHECK(totalWeight(plan) == Approx(1.0).margin(1e-6));
+            // The renderer's upsample stops at the finest level with any weight
+            // (PostProcessor::buildPyramid). At the reference -- and at any coarser frame -- that
+            // must be level 0, or the chain would stop early and stop being the authored one. The
+            // blend's clamp to 0.95 is what guarantees it: level 0 keeps 1 - blend >= 0.05.
+            CHECK(plan.weight[0] > 0.0f);
+            CHECK(scene::planPyramid(levels, blend, -1.5f, kBig, kBig).weight[0] > 0.0f);
         }
     }
 }

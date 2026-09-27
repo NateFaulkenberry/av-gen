@@ -154,7 +154,7 @@ TEST_CASE("the offline tier's anisotropy floor reaches the picture", "[gpu][qual
         changed += (eight.rgba[i] != sixteen.rgba[i]) ? 1 : 0;
         repeatChanged += (eight.rgba[i] != eightAgain.rgba[i]) ? 1 : 0;
     }
-    UNSCOPED_INFO("pixels that 16x anisotropy changes against 8x: " << changed << " of " << eight.rgba.size() / 4);
+    WARN("pixels that 16x anisotropy changes against 8x: " << changed << " of " << eight.rgba.size() / 4);
     CHECK(repeatChanged == 0); // the control: the same setting twice is the same picture
     CHECK(changed > 100);      // and the floor's setting is a different one
     CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Offline).textureAnisotropy == 16u);
@@ -194,11 +194,18 @@ scene::Scene skyAtFourK() {
 }
 
 struct Banding {
-    double reconstruction = 0.0; // worst |rendered / analytic - 1| down the column, after the scale
-    double creases = 0.0;        // the worst jump in slope, as a multiple of the column's mean slope
+    double worst = 0.0; // worst |rendered / analytic - 1| down the column, after the common scale
+    double rms = 0.0;   // the same deviation's RMS
 };
 
-// The centre column of the rendered sky, against the analytic sky it was built from.
+// The centre column of the rendered sky, against the analytic sky it was built from. A cube face
+// is sampled bilinearly, so between texel centres the visible sky is a straight line where the
+// analytic one curves: the deviation is a row of arches one texel wide, whose kinks are what an
+// 8-bit gradient shows as bands. The deviation is taken after dividing out the column's median
+// ratio, so the sky's overall intensity and the tone map cancel and only the shape is compared.
+// (An earlier form of this test also took the worst jump in the column's own slope; RGBA16F's
+// 10-bit mantissa makes that statistic mostly quantisation noise at this gradient -- 1.74 and 1.39
+// at the two face sizes -- so it measured the readback, not the sky.)
 Banding measure(const gpu::ImageF& image, const scene::Scene& s) {
     const scene::SkyRuntime sky = scene::resolveSky(s.environment.sky, s.lights);
     const glm::vec3 forward = glm::normalize(s.camera.target - s.camera.position);
@@ -206,7 +213,6 @@ Banding measure(const gpu::ImageF& image, const scene::Scene& s) {
     const glm::vec3 up = glm::cross(right, forward);
     const float t = std::tan(s.camera.fovYRadians * 0.5f);
     const std::uint32_t x = image.width / 2;
-    std::vector<double> rendered;
     std::vector<double> ratio;
     for (std::uint32_t y = 4; y + 4 < image.height; ++y) {
         const float ndcY = 1.0f - 2.0f * (static_cast<float>(y) + 0.5f) / static_cast<float>(image.height);
@@ -217,25 +223,19 @@ Banding measure(const gpu::ImageF& image, const scene::Scene& s) {
                          0.0722 * static_cast<double>(p[2]);
         const double lt = 0.2126 * static_cast<double>(truth.r) + 0.7152 * static_cast<double>(truth.g) +
                           0.0722 * static_cast<double>(truth.b);
-        rendered.push_back(l);
         ratio.push_back(lt > 0.0 ? l / lt : 1.0);
     }
     std::vector<double> sorted = ratio;
     std::nth_element(sorted.begin(), sorted.begin() + static_cast<long>(sorted.size() / 2), sorted.end());
     const double median = sorted[sorted.size() / 2];
     Banding out;
+    double sumSq = 0.0;
     for (const double r : ratio) {
-        out.reconstruction = std::max(out.reconstruction, std::abs(r / median - 1.0));
+        const double d = r / median - 1.0;
+        out.worst = std::max(out.worst, std::abs(d));
+        sumSq += d * d;
     }
-    double meanSlope = 0.0;
-    for (std::size_t i = 1; i < rendered.size(); ++i) {
-        meanSlope += std::abs(rendered[i] - rendered[i - 1]);
-    }
-    meanSlope /= static_cast<double>(rendered.size() - 1);
-    for (std::size_t i = 2; i < rendered.size(); ++i) {
-        const double jump = std::abs((rendered[i] - rendered[i - 1]) - (rendered[i - 1] - rendered[i - 2]));
-        out.creases = std::max(out.creases, meanSlope > 0.0 ? jump / meanSlope : 0.0);
-    }
+    out.rms = std::sqrt(sumSq / static_cast<double>(ratio.size()));
     return out;
 }
 
@@ -274,12 +274,11 @@ TEST_CASE("the offline sky floor takes the banding out of the visible sky at 4K"
     // of straight segments about 76 px long, and the creases between them are what reads as bands.
     const Banding before = measure(realtime, s);
     const Banding after = measure(offline, s);
-    UNSCOPED_INFO("worst deviation from the analytic sky: 128 px faces " << before.reconstruction << ", 1024 px faces "
-                                                                         << after.reconstruction);
-    UNSCOPED_INFO("worst crease (slope jump / mean slope): 128 px faces " << before.creases << ", 1024 px faces "
-                                                                          << after.creases);
-    CHECK(before.reconstruction > 0.01);           // the control can fail: the coarse sky is measurably wrong
-    CHECK(after.reconstruction < before.reconstruction / 4.0);
-    CHECK(after.creases < before.creases / 2.0);
+    WARN("deviation from the analytic sky, worst / RMS: 128 px faces " << before.worst << " / " << before.rms
+                                                                      << ", 1024 px faces " << after.worst << " / "
+                                                                      << after.rms);
+    CHECK(before.worst > 0.05); // the control can fail: the coarse sky is measurably the wrong shape
+    CHECK(after.worst < before.worst / 20.0);
+    CHECK(after.rms < before.rms / 20.0);
     CHECK(ctx->errorCount() == 0);
 }

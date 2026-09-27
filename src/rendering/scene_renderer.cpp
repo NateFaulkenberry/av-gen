@@ -639,10 +639,15 @@ void SceneRenderer::updateEnvironment(const scene::Scene& scene) {
             }
         }
         const auto skyStart = std::chrono::steady_clock::now();
-        if (envSettings.cubeSize != defaultCube || envSettings.prefilteredSize != defaultPrefiltered) {
+        if ((envSettings.cubeSize != defaultCube || envSettings.prefilteredSize != defaultPrefiltered) &&
+            (envSettings.cubeSize != loggedSkyFloorCube_ || envSettings.prefilteredSize != loggedSkyFloorPrefiltered_)) {
+            // Once per change, as the march's floor is: a sky whose colours or sun move rebuilds on
+            // every frame whose hash moves, and would otherwise say this sixty times a second.
             log::info("the tier's floor raised the procedural sky's cube from {} to {} px a face and its "
                       "prefiltered cube -- the visible sky -- from {} to {}",
                       defaultCube, envSettings.cubeSize, defaultPrefiltered, envSettings.prefilteredSize);
+            loggedSkyFloorCube_ = envSettings.cubeSize;
+            loggedSkyFloorPrefiltered_ = envSettings.prefilteredSize;
         }
         auto built = environment_->processSky(sky, envSettings);
         if (!built) {
