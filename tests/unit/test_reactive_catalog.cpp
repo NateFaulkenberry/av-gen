@@ -125,7 +125,7 @@ TEST_CASE("The reactive catalogue lists every kind of target the glade has, each
         CHECK(t.label.find(' ') != std::string::npos);
         CHECK((t.label.find('/') == std::string::npos || t.group == ReactiveGroup::MaterialEmission));
     }
-    // Every group but the water's tears (the water stream's, not on this branch) has an entry here.
+    // Every group but the water's tears (off in the glade: its amount is 0) and node emission has an entry here.
     for (const ReactiveGroup g : allReactiveGroups()) {
         if (g == ReactiveGroup::WaterTears || g == ReactiveGroup::NodeEmission) {
             continue;
@@ -176,16 +176,29 @@ TEST_CASE("The catalogue never offers what cannot reach the picture, nor a chara
 TEST_CASE("The water's tears are catalogued where the water stream registers them, and not while they are off",
           "[directing][reactivity][catalog][adr925]") {
     Glade glade;
-    // The water stream's parameters are not on this branch; the family is read by path, so register one.
-    params::ParamDesc<float> tears{.path = "nodes/meadow/water/tears", .defaultValue = 0.4f, .hardMin = 0.0f, .hardMax = 1.0f};
-    glade.engine.params().add(tears);
+    // ADR-916's controls, registered by the pond's terrain: off by default (amount 0, where the tear code
+    // is compiled out), so none of the routable three is offered, each with that reason.
+    const std::string base = "nodes/meadow/water/tears/";
+    REQUIRE(glade.engine.params().find(base + "amount") != nullptr);
     ReactiveCatalog c = glade.catalog();
-    const ReactiveTarget& t = target(c, "nodes/meadow/water/tears");
-    CHECK(t.group == ReactiveGroup::WaterTears);
-    CHECK(t.kind == ReactiveKind::Motion);
-    CHECK_THAT(t.base, WithinAbs(0.4, 1e-6));
-    glade.engine.params().findAs<float>("nodes/meadow/water/tears")->setBase(0.0f);
+    for (const char* leaf : {"amount", "shear", "coverage"}) {
+        INFO(leaf);
+        CHECK(c.find(base + leaf) == nullptr);
+        CHECK(excluded(c, base + leaf, "compiled out"));
+    }
+    // On: all three in the water-tears group, as motion, labelled for what a viewer sees.
+    glade.engine.params().findAs<float>(base + "amount")->setBase(0.4f);
     c = glade.catalog();
-    CHECK(c.find("nodes/meadow/water/tears") == nullptr);
-    CHECK(excluded(c, "nodes/meadow/water/tears", "compiled out"));
+    const ReactiveTarget& amount = target(c, base + "amount");
+    CHECK(amount.group == ReactiveGroup::WaterTears);
+    CHECK(amount.kind == ReactiveKind::Motion);
+    CHECK_THAT(amount.base, WithinAbs(0.4, 1e-6));
+    CHECK(amount.label == "water tears");
+    CHECK(target(c, base + "shear").label == "tear shear");
+    CHECK(target(c, base + "coverage").label == "tear coverage");
+    // The seven that refuse routes are never offered: a route to one is refused at bind.
+    for (const char* leaf : {"cell", "spacing", "stretch", "followWind", "direction", "drift", "wind"}) {
+        INFO(leaf);
+        CHECK(c.find(base + leaf) == nullptr);
+    }
 }

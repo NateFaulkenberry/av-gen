@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <string>
+#include <string_view>
 
 namespace avgen::rendering {
 
@@ -58,7 +60,11 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
                              s.reflection, s.fresnel,   s.specular,  s.roughness,  s.maxOpacity,
                              s.ripple,    s.rippleScale, s.rippleSpeed, s.chop,     s.foamWidth,
                              s.edgeFade,  s.refraction, s.glowScale, s.glowCoverage, s.glowDepth,
-                             s.swell,     s.emissiveIntensity, flowTime, fastest};
+                             s.swell,     s.emissiveIntensity, flowTime, fastest,
+                             // ADR-916. A NaN shear or cell would take every seam -- and through the
+                             // shared sample point, every ripple -- with it.
+                             s.tears,     s.tearShear,  s.tearCoverage, s.tearCell, s.tearSpacing,
+                             s.tearStretch, s.tearAngle, s.tearDrift,   s.tearWind};
     bool ok = finite3(s.shallowColor) && finite3(s.deepColor) && finite3(s.foamColor) &&
               finite3(s.glowColor) && finite3(s.sparkleColor) && finite3(s.reflectionTint) &&
               finite3(s.emissiveColor);
@@ -90,6 +96,13 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     u.shore = glm::vec4(s.foamWidth, s.edgeFade, s.refraction, 0.0f);
     u.life = glm::vec4(std::max(s.glowScale, 1e-4f), s.glowCoverage, s.glowDepth, s.swell);
     u.params = glm::vec4(flowTime, std::max(fastest, 1e-3f), linearDepthValid ? 1.0f : 0.0f, 0.0f);
+    // ADR-916. Packed as authored even at `tears` 0: the shader's own gate is what keeps a surface with
+    // no tears byte-identical to one without the code, and the identity test holds it to that with
+    // every other tear setting off its default. The cell and spacing are floored only against a
+    // divide; `validate` has already refused anything smaller.
+    u.tears = glm::vec4(s.tears, s.tearShear, s.tearCoverage, std::max(s.tearCell, 1e-3f));
+    u.tearShape = glm::vec4(std::max(s.tearSpacing, 1e-3f), std::max(s.tearStretch, 1e-3f), s.tearDrift, s.tearWind);
+    u.tearFrame = glm::vec4(std::cos(s.tearAngle), std::sin(s.tearAngle), s.tearFollowsWind ? 1.0f : 0.0f, 0.0f);
     return u;
 }
 
@@ -154,11 +167,70 @@ Result<void> WaterRenderer::reload(gpu::ShaderLibrary& shaders) {
     return createPipeline(shaders);
 }
 
+Result<std::string> waterSourceWithoutTears(const std::string& source) {
+    static constexpr std::string_view kBegin = "---- tears (ADR-916) begin ----";
+    static constexpr std::string_view kEnd = "---- tears (ADR-916) end ----";
+    std::string out;
+    out.reserve(source.size());
+    bool inside = false;
+    std::size_t at = 0;
+    while (at < source.size()) {
+        const std::size_t newline = source.find('\n', at);
+        const std::size_t next = newline == std::string::npos ? source.size() : newline + 1;
+        const std::string_view line(source.data() + at, next - at);
+        if (!inside && line.find(kBegin) != std::string_view::npos) {
+            inside = true;
+        } else if (inside) {
+            if (line.find(kEnd) != std::string_view::npos) {
+                inside = false;
+            }
+        } else {
+            out.append(line);
+        }
+        at = next;
+    }
+    if (inside) {
+        return fail("water.wgsl: a '{}' block is never closed", kBegin);
+    }
+    return out;
+}
+
 Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
-    auto module = shaders.load("water.wgsl");
+    // Two pipelines from one file (ADR-916): the tears in, and the tears compiled out. A material
+    // whose `tears` is 0 is drawn with the second, so it runs exactly the shader it ran before tears
+    // existed and its pixels are the same bytes -- which gating the code inside one shader could not
+    // give: with the tear's data flowing through the shared ripple path, the compiler built that path
+    // differently and glints moved. The cost is one more compile at start-up.
+    auto source = shaders.loadSource("water.wgsl");
+    if (!source) {
+        return std::unexpected(source.error());
+    }
+    auto plainSource = waterSourceWithoutTears(*source);
+    if (!plainSource) {
+        return std::unexpected(plainSource.error());
+    }
+    auto module = shaders.compile(*source, "water.wgsl");
     if (!module) {
         return std::unexpected(module.error());
     }
+    auto plainModule = shaders.compile(*plainSource, "water.wgsl (tears compiled out)");
+    if (!plainModule) {
+        return std::unexpected(plainModule.error());
+    }
+    auto torn = buildPipeline(*module, "water");
+    if (!torn) {
+        return std::unexpected(torn.error());
+    }
+    auto plain = buildPipeline(*plainModule, "water-no-tears");
+    if (!plain) {
+        return std::unexpected(plain.error());
+    }
+    pipeline_ = *torn;
+    plainPipeline_ = *plain;
+    return {};
+}
+
+Result<wgpu::RenderPipeline> WaterRenderer::buildPipeline(const wgpu::ShaderModule& module, const char* label) {
     VertexLayoutStorage vertex;
 
     wgpu::BlendState blend{};
@@ -192,7 +264,7 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     targets[3].blend = &additive;
 
     wgpu::FragmentState fragment{};
-    fragment.module = *module;
+    fragment.module = module;
     fragment.entryPoint = "fs_water";
     fragment.targetCount = kSceneTargetCount;
     fragment.targets = targets.data();
@@ -203,9 +275,9 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     depth.depthCompare = wgpu::CompareFunction::Less;
 
     wgpu::RenderPipelineDescriptor desc{};
-    desc.label = "water";
+    desc.label = label;
     desc.layout = pipelineLayout_;
-    desc.vertex.module = *module;
+    desc.vertex.module = module;
     desc.vertex.entryPoint = "vs_water";
     desc.vertex.bufferCount = 1;
     desc.vertex.buffers = &vertex.layout;
@@ -232,10 +304,9 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
         });
     context_->instance().WaitAny(future, UINT64_MAX);
     if (!error.empty()) {
-        return fail("water pipeline: {}", error);
+        return fail("{} pipeline: {}", label, error);
     }
-    pipeline_ = pipeline;
-    return {};
+    return pipeline;
 }
 
 void WaterRenderer::upload(const wgpu::Queue& queue, const std::vector<WaterUniforms>& materials) {
@@ -246,6 +317,7 @@ void WaterRenderer::upload(const wgpu::Queue& queue, const std::vector<WaterUnif
     for (std::uint32_t i = 0; i < uploaded_; ++i) {
         std::memcpy(staging_.data() + static_cast<std::size_t>(i) * kStride, &materials[i],
                     sizeof(WaterUniforms));
+        torn_[i] = materials[i].tears.x > 0.0f; // ADR-916: which pipeline draws this slot
     }
     queue.WriteBuffer(uniforms_, 0, staging_.data(), static_cast<std::size_t>(uploaded_) * kStride);
 }

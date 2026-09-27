@@ -5330,11 +5330,76 @@ void Composition::registerNodeParameters(CompositionNode& node) {
             &params_->add(vec3Desc(base + "water/shallowColor", w.shallowColor, 0.0f, 8.0f, 0.0f, 1.0f));
         node.waterDeepColorParam =
             &params_->add(vec3Desc(base + "water/deepColor", w.deepColor, 0.0f, 8.0f, 0.0f, 1.0f));
+        // ADR-916: the tears, every one of them a control, under their own heading -- the Parameters
+        // panel shows "<terrain>/water/tears", the World panel's Inspector "tears/..." under "water" --
+        // each labelled for what it does to the picture.
+        //
+        // The amount, shear and coverage are routable. Past its first quarter the amount only adds
+        // slope along the seams, so a fast route (audio.bass, say) flashes them and moves nothing
+        // (below it the shear grows in with it); the shear and the coverage move the ripples inside a
+        // seam as they change, so they want slow chains (a second or more). The other seven refuse
+        // routes: WaterSettings says why.
+        {
+            const std::string t = base + "water/tears/";
+            const auto control = [](auto desc, const char* label, bool routable) {
+                desc.label = label;
+                desc.flags.modulatable = routable;
+                return desc;
+            };
+            CompositionNode::WaterTearParameters& p = node.waterTearParams;
+            p.amount = &params_->add(control(floatDesc(t + "amount", w.tears, 0.0f, 20.0f, 0.0f, 2.0f), "amount", true));
+            p.shear = &params_->add(control(floatDesc(t + "shear", w.tearShear, 0.0f, 8.0f, 0.0f, 8.0f), "shear (m)", true));
+            p.coverage = &params_->add(
+                control(floatDesc(t + "coverage", w.tearCoverage, 0.0f, 1.0f, 0.0f, 1.0f), "coverage", true));
+            p.cell = &params_->add(
+                control(floatDesc(t + "cell", w.tearCell, 0.05f, 50.0f, 0.3f, 6.0f), "step size (m)", false));
+            p.spacing = &params_->add(
+                control(floatDesc(t + "spacing", w.tearSpacing, 0.1f, 2000.0f, 2.0f, 120.0f), "spacing (m)", false));
+            p.stretch = &params_->add(
+                control(floatDesc(t + "stretch", w.tearStretch, 0.25f, 20.0f, 0.5f, 8.0f), "stretch", false));
+            p.followWind =
+                &params_->add(control(boolDesc(t + "followWind", w.tearFollowsWind), "follow the wind", false));
+            p.direction = &params_->add(control(floatDesc(t + "direction", w.tearAngle, -6.2832f, 6.2832f, -3.1416f, 3.1416f),
+                                                "direction (radians, if not following the wind)", false));
+            p.drift = &params_->add(
+                control(floatDesc(t + "drift", w.tearDrift, -20.0f, 20.0f, -2.0f, 2.0f), "drift (m per second)", false));
+            p.wind = &params_->add(
+                control(floatDesc(t + "wind", w.tearWind, 0.0f, 1.0f, 0.0f, 1.0f), "wind (gusts tighten the seams)", false));
+        }
     }
     if (node.kind == NodeKind::Scene && node.child) {
         node.child->attach(*params_, *modulator_, base);
     }
 }
+
+namespace {
+
+// Every cached water parameter pointer of a terrain node, in one place, for the two paths that have to
+// drop them all: an unregister and a detach. They were two hand-kept lists of seven, and both missed
+// ADR-350's ten -- `detach` then left ten pointers into a set the composition had left, which the next
+// `updateWaterSurfaces` read.
+void nullWaterParameters(CompositionNode& node) {
+    node.waterGlowParam = nullptr;
+    node.waterSparkleParam = nullptr;
+    node.waterRippleParam = nullptr;
+    node.waterFlowSpeedParam = nullptr;
+    node.waterSwellParam = nullptr;
+    node.waterFoamParam = nullptr;
+    node.waterGlowColorParam = nullptr;
+    node.waterClarityParam = nullptr;
+    node.waterMaxOpacityParam = nullptr;
+    node.waterFresnelParam = nullptr;
+    node.waterReflectionParam = nullptr;
+    node.waterRoughnessParam = nullptr;
+    node.waterRefractionParam = nullptr;
+    node.waterRippleScaleParam = nullptr;
+    node.waterShallowDepthParam = nullptr;
+    node.waterShallowColorParam = nullptr;
+    node.waterDeepColorParam = nullptr;
+    node.waterTearParams = {};
+}
+
+} // namespace
 
 void Composition::unregisterNodeParameters(CompositionNode& node) {
     if (params_ != nullptr) {
@@ -5388,23 +5453,26 @@ void Composition::unregisterNodeParameters(CompositionNode& node) {
         }
         node.scatterParams.clear();
         if (node.kind == NodeKind::Terrain) {
+            // ADR-350's ten were registered and never on this list, so a removed terrain node left
+            // them behind and a node re-added under the same name was handed the dead one's values
+            // (`ParameterSet::add` returns an existing path as it is). test_water_parameters.cpp
+            // sweeps every `water/` path rather than naming these, so the next one is caught too.
             for (const char* suffix :
                  {"terrainLod", "terrainCull", "terrainLodDistance", "terrainViewDistance",
                   "water/glow", "water/sparkle", "water/ripple", "water/flowSpeed", "water/swell",
-                  "water/foam", "water/glowColor"}) {
+                  "water/foam", "water/glowColor", "water/clarity", "water/maxOpacity", "water/fresnel",
+                  "water/reflection", "water/roughness", "water/refraction", "water/rippleScale",
+                  "water/shallowDepth", "water/shallowColor", "water/deepColor", "water/tears/amount",
+                  "water/tears/shear", "water/tears/coverage", "water/tears/cell", "water/tears/spacing",
+                  "water/tears/stretch", "water/tears/followWind", "water/tears/direction",
+                  "water/tears/drift", "water/tears/wind"}) {
                 params_->remove(base + suffix);
             }
             node.terrainLodParam = nullptr;
             node.terrainCullParam = nullptr;
             node.terrainLodDistanceParam = nullptr;
             node.terrainViewDistanceParam = nullptr;
-            node.waterGlowParam = nullptr;
-            node.waterSparkleParam = nullptr;
-            node.waterRippleParam = nullptr;
-            node.waterFlowSpeedParam = nullptr;
-            node.waterSwellParam = nullptr;
-            node.waterFoamParam = nullptr;
-            node.waterGlowColorParam = nullptr;
+            nullWaterParameters(node);
         }
         forEachParticleParam(node.particleParams, [&](auto* p) {
             if (p != nullptr) {
@@ -5507,13 +5575,7 @@ void Composition::detach() {
         node->terrainCullParam = nullptr;
         node->terrainLodDistanceParam = nullptr;
         node->terrainViewDistanceParam = nullptr;
-        node->waterGlowParam = nullptr;
-        node->waterSparkleParam = nullptr;
-        node->waterRippleParam = nullptr;
-        node->waterFlowSpeedParam = nullptr;
-        node->waterSwellParam = nullptr;
-        node->waterFoamParam = nullptr;
-        node->waterGlowColorParam = nullptr;
+        nullWaterParameters(*node);
         node->particleParams = {};
         node->materialPartParams.clear(); // see the note at the end of this function
         node->scatterParams.clear();      // ADR-905, and for the same reason
@@ -8810,6 +8872,19 @@ void Composition::updateWaterSurfaces() {
         if (node.waterShallowDepthParam != nullptr) w.shallow = node.waterShallowDepthParam->value();
         if (node.waterShallowColorParam != nullptr) w.shallowColor = node.waterShallowColorParam->value();
         if (node.waterDeepColorParam != nullptr) w.deepColor = node.waterDeepColorParam->value();
+        // ADR-916: every tear control. The seven a route cannot drive are copied the same way, so an
+        // edit in the panel or a project's saved value reaches the surface like any other.
+        const CompositionNode::WaterTearParameters& tp = node.waterTearParams;
+        if (tp.amount != nullptr) w.tears = tp.amount->value();
+        if (tp.shear != nullptr) w.tearShear = tp.shear->value();
+        if (tp.coverage != nullptr) w.tearCoverage = tp.coverage->value();
+        if (tp.cell != nullptr) w.tearCell = tp.cell->value();
+        if (tp.spacing != nullptr) w.tearSpacing = tp.spacing->value();
+        if (tp.stretch != nullptr) w.tearStretch = tp.stretch->value();
+        if (tp.followWind != nullptr) w.tearFollowsWind = tp.followWind->value();
+        if (tp.direction != nullptr) w.tearAngle = tp.direction->value();
+        if (tp.drift != nullptr) w.tearDrift = tp.drift->value();
+        if (tp.wind != nullptr) w.tearWind = tp.wind->value();
     }
 }
 
@@ -9954,7 +10029,17 @@ nlohmann::json Composition::toJson() const {
                                       {"glowDepth", ts.water.glowDepth},
                                       {"sparkle", ts.water.sparkle},
                                       {"sparkleColor", vecToJson(ts.water.sparkleColor)},
-                                      {"swell", ts.water.swell}}}};
+                                      {"swell", ts.water.swell},
+                                      {"tears", ts.water.tears},
+                                      {"tearShear", ts.water.tearShear},
+                                      {"tearCoverage", ts.water.tearCoverage},
+                                      {"tearCell", ts.water.tearCell},
+                                      {"tearSpacing", ts.water.tearSpacing},
+                                      {"tearStretch", ts.water.tearStretch},
+                                      {"tearDirection", ts.water.tearFollowsWind ? json("wind")
+                                                                                 : json(ts.water.tearAngle)},
+                                      {"tearDrift", ts.water.tearDrift},
+                                      {"tearWind", ts.water.tearWind}}}};
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -11730,12 +11815,33 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                               TerrainFloat{"glowScale", &w.glowScale},
                               TerrainFloat{"glowCoverage", &w.glowCoverage},
                               TerrainFloat{"glowDepth", &w.glowDepth},
-                              TerrainFloat{"sparkle", &w.sparkle}, TerrainFloat{"swell", &w.swell}}) {
+                              TerrainFloat{"sparkle", &w.sparkle}, TerrainFloat{"swell", &w.swell},
+                              TerrainFloat{"tears", &w.tears}, TerrainFloat{"tearShear", &w.tearShear},
+                              TerrainFloat{"tearCoverage", &w.tearCoverage},
+                              TerrainFloat{"tearCell", &w.tearCell},
+                              TerrainFloat{"tearSpacing", &w.tearSpacing},
+                              TerrainFloat{"tearStretch", &w.tearStretch},
+                              TerrainFloat{"tearDrift", &w.tearDrift}, TerrainFloat{"tearWind", &w.tearWind}}) {
                             auto v = readFloat(wj, f.key, *f.target);
                             if (!v) {
                                 return fail("node '{}': water: {}", node.name, v.error().message);
                             }
                             *f.target = *v;
+                        }
+                        // ADR-916: "wind" (the seams run along the scene wind) or an angle in radians
+                        // about +Y, the wind's own convention (0 = +X, pi/2 = +Z).
+                        if (wj.contains("tearDirection")) {
+                            const json& d = wj.at("tearDirection");
+                            if (d.is_string() && d.get<std::string>() == "wind") {
+                                w.tearFollowsWind = true;
+                            } else if (d.is_number()) {
+                                w.tearFollowsWind = false;
+                                w.tearAngle = d.get<float>();
+                            } else {
+                                return fail("node '{}': water 'tearDirection' must be \"wind\" or an angle in "
+                                            "radians",
+                                            node.name);
+                            }
                         }
                         for (const auto& [key, target] : {std::pair{"shallowColor", &w.shallowColor},
                                                           std::pair{"deepColor", &w.deepColor},

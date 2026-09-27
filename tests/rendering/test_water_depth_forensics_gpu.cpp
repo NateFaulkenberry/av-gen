@@ -45,6 +45,7 @@
 #include "scene/scene.hpp"
 #include "world/terrain_query.hpp"
 #include "world/world_map.hpp"
+#include "support/water_shader_variant.hpp"
 
 #include <fmt/format.h>
 
@@ -179,10 +180,13 @@ struct Shore {
         return fs::path(AVGEN_SOURCE_DIR) / "examples" / "qa" / "renderer-qa-water.scene.json";
     }
 
-    static Shore make() {
+    // `shaderDirs` go before the source tree, for a test that compares the live shader with a variant
+    // of it (tests/support/water_shader_variant.hpp).
+    static Shore make(std::vector<fs::path> shaderDirs = {}) {
         Shore s;
         s.ctx = makeContext();
-        s.shaders = std::make_unique<gpu::ShaderLibrary>(*s.ctx, std::vector{fs::path(AVGEN_SHADER_SOURCE_DIR)});
+        shaderDirs.emplace_back(AVGEN_SHADER_SOURCE_DIR);
+        s.shaders = std::make_unique<gpu::ShaderLibrary>(*s.ctx, shaderDirs);
         s.renderer = std::make_unique<rendering::SceneRenderer>(*s.ctx, *s.shaders);
         REQUIRE(s.renderer->init().has_value());
         s.renderer->setPassToggles(quantitativeToggles());
@@ -462,22 +466,46 @@ TEST_CASE("a shoreline pixel reconstructs onto the terrain field the world was g
 //
 // So this renders the same water twice from the same eye, turning the camera so a chosen patch lands
 // first near the centre and then out toward a corner. Turning about the eye leaves every world-space
-// input identical: the same surface point, the same view ray, the same normal, the same fresnel.
-// Only the pixel changes. How much of the bed survives the water is measured with the bed A/B, which
-// is a far larger signal than the water's own colour.
-TEST_CASE("water thickness does not depend on where in the frame the water landed",
-          "[gpu][renderer][forensics][water6_2]") {
-    if (!fs::is_regular_file(Shore::scenePath())) {
-        SKIP("the water QA scene is not present");
-    }
-    Shore shore = Shore::make();
+// input identical: the same surface point, the same view ray, the same fresnel -- and, because the
+// water is held flat and foam-free for the measurement, the same normal. (The ripple layers and the
+// foam's break-up fade against the pixel's own footprint, which does change with where in the frame
+// a point lands; that is level of detail, not depth space, and it is not what this measures.) Only the
+// pixel changes. How much of the bed survives the water is measured with the bed A/B, which is a far
+// larger signal than the water's own colour.
+//
+// Re-baselined for ADR-914, which changed every ripple. The check was `worst ratio < 2.0` over the
+// patch, with the ripples on at t = 2 s, and it held on main at that one second only: 3.07 at 1 s,
+// 1.90 at 2 s, 2.39 at 3 s, 2.56 at 5 s, 4.19 at 8 s, 5.65 at 13 s -- and 3.11 on flat, still water at
+// any second, from one point on a steep stretch of bed that lands on differently-placed pixels in the
+// two views. The worst point measured pixel quantisation and the ripple pattern of the day, not the
+// thickness. What a space mismatch does instead is shift *every* point the same way, so the check is
+// now the mean signed log of the ratio (corner over centre) across the patch: +0.010 here, and +0.125
+// with the `/ cosAxis` correction removed from the shader -- the defect this test exists for -- which
+// is the control arm below.
+namespace {
+
+struct ThicknessAudit {
+    std::size_t compared = 0;
+    double centreOffset = 0.0; // mean off-axis offset, fraction of the half-frame
+    double cornerOffset = 0.0;
+    double meanLogRatio = 0.0; // mean of log(bed through water at the corner / at the centre)
+    double worstRatio = 1.0;
+};
+
+ThicknessAudit auditThickness(Shore& shore) {
     const glm::vec3 eye(40.0f, 26.0f, -86.0f);
     const glm::vec3 centreTarget(12.0f, 0.0f, -112.0f);
+    const auto holdFlat = [&]() {
+        shore.hold(2.0);
+        scene::WaterSettings& w = shore.scene().waters.at(0).settings;
+        w.ripple = 0.0f;
+        w.foam = 0.0f;
+    };
 
     // Where the water is, found from the frame rather than guessed: the surface over the bed under
     // the pixels the water owns when it is in the middle of the frame.
     shore.aim(eye, centreTarget);
-    shore.hold(2.0);
+    holdFlat();
     const gpu::ImageF centred = shore.render();
     const rendering::RendererDiagnosticFrame centreFrame = shore.renderer->diagnosticFrame();
     const std::vector<float> centreDepth = readLinearDepth(*shore.ctx, shore.renderer->linearDepthTexture());
@@ -517,7 +545,7 @@ TEST_CASE("water thickness does not depend on where in the frame the water lande
     const glm::vec3 corneredTarget =
         eye + glm::normalize(glm::normalize(axis) + glm::vec3(-0.34f, 0.16f, 0.26f)) * glm::length(axis);
     shore.aim(eye, corneredTarget);
-    shore.hold(2.0);
+    holdFlat();
     const gpu::ImageF cornered = shore.render();
     const rendering::RendererDiagnosticFrame cornerFrame = shore.renderer->diagnosticFrame();
     const gpu::ImageF corneredLit = shore.renderLitBed();
@@ -531,10 +559,8 @@ TEST_CASE("water thickness does not depend on where in the frame the water lande
         return std::sqrt(dx * dx + dy * dy);
     };
 
-    double worstRatio = 1.0;
-    double centreOffsetSum = 0.0;
-    double cornerOffsetSum = 0.0;
-    std::size_t compared = 0;
+    ThicknessAudit audit;
+    double logSum = 0.0;
     for (const glm::vec3& point : patch) {
         const auto centrePixel = projectToPixel(centreFrame.viewProjection, point);
         const auto cornerPixel = projectToPixel(cornerFrame.viewProjection, point);
@@ -548,23 +574,57 @@ TEST_CASE("water thickness does not depend on where in the frame the water lande
         if (bedThroughCentre < 0.05 && bedThroughCorner < 0.05) {
             continue; // no bed reaches the eye through this point either way; nothing to compare
         }
-        centreOffsetSum += offAxis(*centrePixel);
-        cornerOffsetSum += offAxis(*cornerPixel);
-        worstRatio = std::max(worstRatio, std::max(bedThroughCentre, bedThroughCorner) /
-                                              std::max(std::min(bedThroughCentre, bedThroughCorner), 1e-6));
-        ++compared;
+        audit.centreOffset += offAxis(*centrePixel);
+        audit.cornerOffset += offAxis(*cornerPixel);
+        logSum += std::log(std::max(bedThroughCorner, 1e-6) / std::max(bedThroughCentre, 1e-6));
+        audit.worstRatio = std::max(audit.worstRatio, std::max(bedThroughCentre, bedThroughCorner) /
+                                                          std::max(std::min(bedThroughCentre, bedThroughCorner), 1e-6));
+        ++audit.compared;
     }
-    INFO(compared << " points compared; mean off-axis offset "
-                  << (compared ? centreOffsetSum / static_cast<double>(compared) : 0.0) << " centred against "
-                  << (compared ? cornerOffsetSum / static_cast<double>(compared) : 0.0)
-                  << " cornered; worst bed-through-water ratio " << worstRatio);
-    REQUIRE(compared >= 8);
+    if (audit.compared > 0) {
+        const double n = static_cast<double>(audit.compared);
+        audit.centreOffset /= n;
+        audit.cornerOffset /= n;
+        audit.meanLogRatio = logSum / n;
+    }
+    return audit;
+}
+
+} // namespace
+
+TEST_CASE("water thickness does not depend on where in the frame the water landed",
+          "[gpu][renderer][forensics][water6_2]") {
+    if (!fs::is_regular_file(Shore::scenePath())) {
+        SKIP("the water QA scene is not present");
+    }
+    Shore shore = Shore::make();
+    const ThicknessAudit audit = auditThickness(shore);
+
+    // The control: the same measurement with the shader measuring its thickness along the forward
+    // axis and not along the ray -- `/ cosAxis` removed, which is the space mismatch this test exists
+    // to catch. Derived from the live file (tests/support/water_shader_variant.hpp).
+    const fs::path axisOnly = testsupport::writeWaterShaderVariant(
+        "thickness-along-axis",
+        testsupport::replaceOnce(testsupport::readWaterShaderSource(),
+                                 "var thickness = max(bed - viewDepth, 0.0) / cosAxis;",
+                                 "var thickness = max(bed - viewDepth, 0.0);"));
+    Shore mismatched = Shore::make({axisOnly});
+    const ThicknessAudit control = auditThickness(mismatched);
+
+    INFO(audit.compared << " points compared; mean off-axis offset " << audit.centreOffset << " centred against "
+                        << audit.cornerOffset << " cornered; mean log(corner/centre) " << audit.meanLogRatio
+                        << ", worst ratio " << audit.worstRatio << "; with the thickness along the axis: "
+                        << control.meanLogRatio);
+    REQUIRE(audit.compared >= 8);
     // The samples really did move off-axis, or this is a comparison between two views of the middle
     // of the frame and a mismatch would be invisible in both of them.
-    REQUIRE(cornerOffsetSum / static_cast<double>(compared) >
-            centreOffsetSum / static_cast<double>(compared) + 0.2);
-    CHECK(worstRatio < 2.0);
+    REQUIRE(audit.cornerOffset > audit.centreOffset + 0.2);
+    // THE CONTROL: the mismatch shifts the whole patch. If this failed, the check below could not see
+    // the defect it exists for.
+    CHECK(std::fabs(control.meanLogRatio) > 0.06);
+    CHECK(std::fabs(audit.meanLogRatio) < 0.06);
     CHECK(shore.ctx->errorCount() == 0);
+    CHECK(mismatched.ctx->errorCount() == 0);
 }
 
 // ---- the bed through the water ------------------------------------------------------------------
@@ -1098,6 +1158,16 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
             {"glowCoverage", [&](scene::WaterSettings& w) { w.glowCoverage = nan; }},
             {"glowDepth", [&](scene::WaterSettings& w) { w.glowDepth = nan; }},
             {"swell", [&](scene::WaterSettings& w) { w.swell = nan; }},
+            // ADR-916. A NaN shear or cell reaches every ripple through the shared sample point.
+            {"tears", [&](scene::WaterSettings& w) { w.tears = nan; }},
+            {"tearShear", [&](scene::WaterSettings& w) { w.tearShear = inf; }},
+            {"tearCoverage", [&](scene::WaterSettings& w) { w.tearCoverage = nan; }},
+            {"tearCell", [&](scene::WaterSettings& w) { w.tearCell = nan; }},
+            {"tearSpacing", [&](scene::WaterSettings& w) { w.tearSpacing = nan; }},
+            {"tearStretch", [&](scene::WaterSettings& w) { w.tearStretch = nan; }},
+            {"tearAngle", [&](scene::WaterSettings& w) { w.tearAngle = inf; }},
+            {"tearDrift", [&](scene::WaterSettings& w) { w.tearDrift = nan; }},
+            {"tearWind", [&](scene::WaterSettings& w) { w.tearWind = nan; }},
         };
         for (const Poison& poison : poisons) {
             scene::WaterSettings poisoned = healthy;
@@ -1107,6 +1177,15 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
             CHECK(finiteUniforms(u));
             CHECK(u.surface.w == 0.0f);
         }
+        // The list is hand-kept, so it is counted against the struct: one entry per scalar and per colour
+        // of WaterSettings (`shallow` is poisoned by the section above), and the struct's size says how
+        // many of each there are. A float added to WaterSettings without a poison here changes the size
+        // and fails this, which is how the nine tear fields were found to need one.
+        constexpr std::size_t kScalarFloats = 31; // 22 of the surface's, 9 of ADR-916's tears
+        constexpr std::size_t kColours = 7;
+        CHECK(poisons.size() + 1 == kScalarFloats + kColours);
+        // Two bools (`enabled`, `tearFollowsWind`), each padded out to a float's alignment.
+        CHECK(sizeof(scene::WaterSettings) == sizeof(float) * (kScalarFloats + 3 * kColours) + 2 * alignof(float));
     }
 
     SECTION("the two frame-supplied values are checked too") {

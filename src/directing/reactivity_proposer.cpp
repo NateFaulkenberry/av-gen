@@ -99,8 +99,12 @@ std::string shortName(const ReactiveTarget& t) {
     case ReactiveGroup::EcologyLight: return "ecology-light";
     case ReactiveGroup::Atmosphere: return t.kind == ReactiveKind::Density ? "fog" : "fog-glow";
     case ReactiveGroup::Wind: return t.path.substr(t.path.rfind('/') + 1);
-    case ReactiveGroup::Water:
-    case ReactiveGroup::WaterTears: return "water-" + t.path.substr(t.path.rfind('/') + 1);
+    case ReactiveGroup::Water: return "water-" + t.path.substr(t.path.rfind('/') + 1);
+    case ReactiveGroup::WaterTears: {
+        // nodes/<terrain>/water/tears/<leaf> (ADR-916): the amount is "water-tears", the others after it.
+        const std::string leaf = t.path.substr(t.path.rfind('/') + 1);
+        return leaf == "amount" ? std::string("water-tears") : "water-tear-" + leaf;
+    }
     default: return t.owner;
     }
 }
@@ -824,7 +828,7 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
             break;
         }
         case ReactiveGroup::WaterTears:
-            if (t.path.ends_with("/tears") && sections && b.free(t)) {
+            if (t.path.ends_with("/tears/amount") && sections && b.free(t)) {
                 b.route(t, arc(eLo, eHi, 0.70f, 1.30f, 3000.0f, 5000.0f, ""), 1.0f, 0.0f, ReactiveLevel::Macro, t.owner,
                         "The water's tears catch more of the wind in the loud sections.");
             }
