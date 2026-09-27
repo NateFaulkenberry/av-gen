@@ -26,6 +26,8 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -1002,6 +1004,83 @@ TEST_CASE("a beat with a clock begins on the first frame at or after it, and one
     const double unclocked = run(false);
     CHECK(clocked == Approx(1.0).margin(1e-6));
     CHECK(unclocked < 0.5); // the control: the clock is what held it
+}
+
+TEST_CASE("a step whose duration is a whole number of frames ends on that frame however the instant was computed",
+          "[stage][director][time][adr928]") {
+    // ADR-928. A frame's instant is computed three ways: `i * dt` by a trace, `k / fps` by a render's
+    // clock, `target - m * dt` counted back by a seek's replay. A 3.5 s wait is 210 frames, and 3.5 is
+    // exact as a float, so the step's end sits on a frame boundary and the instants' last bits decide.
+    constexpr double dt = 1.0 / 60.0;
+    constexpr long kFrames = 210;
+    constexpr long kTarget = 9000;
+    const std::function<double(long)> play = [](long f) { return static_cast<double>(f) * dt; };
+    const std::function<double(long)> clock = [](long f) { return static_cast<double>(f) / 60.0; };
+    const std::function<double(long)> replay = [](long f) {
+        return (static_cast<double>(kTarget) / 60.0) - (static_cast<double>(kTarget - f) * dt);
+    };
+    // The control: the raw comparison really does disagree between the three somewhere. Without it,
+    // "the three paths agree" could be three paths that never differed.
+    long witness = -1;
+    for (long k = 1; k + kFrames < kTarget && witness < 0; ++k) {
+        const bool a = play(k + kFrames) - play(k) >= 3.5;
+        const bool b = clock(k + kFrames) - clock(k) >= 3.5;
+        const bool c = replay(k + kFrames) - replay(k) >= 3.5;
+        if (a != b || b != c) {
+            witness = k;
+        }
+    }
+    INFO("the first start frame on which the raw comparison disagrees: " << witness);
+    REQUIRE(witness > 0);
+
+    // The director started on that frame, on each path: the beat after the wait is entered on one frame.
+    const auto enteredOn = [&](const std::function<double(long)>& instant) -> long {
+        stage::StagingDesc d = oneCue({waitStep("hold", 3.5f)});
+        stage::BeatDesc after;
+        after.name = "after";
+        stage::CueDesc c;
+        c.role = "actor";
+        c.steps = {waitStep("rest", 0.1f)};
+        after.cues = {c};
+        d.scenarios[0].beats.push_back(after);
+        Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, std::move(d));
+        REQUIRE(s.staging.start("test", instant(witness)));
+        for (long f = witness; f < witness + kFrames + 30; ++f) {
+            s.params.resetFinals();
+            s.bus.clearEvents();
+            stage::StageContext sc;
+            sc.time = instant(f);
+            sc.dt = dt;
+            sc.world = &s.world;
+            sc.params = &s.params;
+            sc.bus = &s.bus;
+            s.staging.update(sc);
+            for (const stage::StageEvent& e : s.staging.events()) {
+                if (e.kind == stage::StageEventKind::Beat && e.beat == "after") {
+                    return f;
+                }
+            }
+            entity::EntityUpdate u;
+            u.time = sc.time;
+            u.dt = dt;
+            u.frameIndex = static_cast<std::uint64_t>(f);
+            u.bus = &s.bus;
+            u.distanceDetail = false;
+            s.world.update(u, s.params);
+        }
+        return -1;
+    };
+    const long a = enteredOn(play);
+    const long b = enteredOn(clock);
+    const long c = enteredOn(replay);
+    INFO("entered on frame " << a << " (i * dt), " << b << " (k / fps), " << c << " (target - m * dt), started on "
+                             << witness);
+    CHECK(a == b);
+    CHECK(b == c);
+    // And on the frame the duration names: the wait ends 210 frames after it began, and the hand-off to
+    // the next beat is the frame after that.
+    CHECK(a - witness >= kFrames);
+    CHECK(a - witness <= kFrames + 1);
 }
 
 TEST_CASE("a set step writes the component it names and no other", "[stage][director][setpiece]") {

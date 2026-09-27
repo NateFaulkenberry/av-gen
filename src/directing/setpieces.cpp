@@ -443,8 +443,13 @@ void checkSetPiecesTogether(const std::vector<ResolvedSetPiece>& mine, const std
             // Blame the later one of this plan's: it is the one that repeats.
             const Entry& blamed = !y.mine ? x : (!x.mine ? y : (y.piece->timeline->start >= x.piece->timeline->start ? y : x));
             const Entry& other = &blamed == &x ? y : x;
+            // A flyby happens at no place -- its "station" is the middle of a crossing -- so it repeats
+            // only another flyby's line; a crossing over where an abduction later happens is a rhyme,
+            // not the same shot (GV3's flyby passes over the elder its centrepiece lifts beside).
+            const bool flybyX = x.piece->spec->kind == stage::SetPieceKind::Flyby;
+            const bool flybyY = y.piece->spec->kind == stage::SetPieceKind::Flyby;
             const float apart = glm::length(x.piece->timeline->station - y.piece->timeline->station);
-            if (apart < kSamePlaceMetres) {
+            if (flybyX == flybyY && apart < kSamePlaceMetres) {
                 Issue& issue = add(issues, Severity::Warning, IssueCode::Repetition, blamed.piece->key, "",
                                    fmt::format("{} and {} happen {:.0f} m apart, at {} and {}: do not duplicate the same "
                                                "abduction shot -- vary the place",

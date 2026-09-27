@@ -18,6 +18,9 @@
 //                 does (ADR-929), so a plan's set pieces can be traced without a GPU
 //   --save-project OUT   write the project with the plan installed, before tracing it
 //
+// Exit codes: 0 traced; 1 could not load, plan or write; 2 traced, but the plan had items that could
+// not be built (listed under "plan" -> "blocked" and "issues").
+//
 // ## Set pieces (ADR-929)
 //
 // Every staging scenario that is a set piece (`setpiece/<id>`) gets an entry under "setPieces": when
@@ -326,6 +329,7 @@ int main(int argc, char** argv) {
     }
     // ADR-929: the plan first, installed exactly as `avgen --plan` installs it.
     nlohmann::json planReport;
+    std::size_t blockedItems = 0; // the exit code says so: a generator must hear that it got less than it asked
     if (!o.plan.empty()) {
         auto applied = app::applyPlanFile(engine, o.plan);
         if (!applied) {
@@ -333,6 +337,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         planReport = applied->toJson();
+        blockedItems = applied->blocked.size();
         if (!applied->blocked.empty()) {
             std::fprintf(stderr, "plan: %zu item(s) could not be built; see the report's \"blocked\" and \"issues\"\n",
                          applied->blocked.size());
@@ -612,5 +617,7 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    return 0;
+    // 2: the trace was written, but the plan had items that could not be built (its "blocked"), so the
+    // film traced is not the one the plan asked for -- the same refusal `avgen --plan` makes.
+    return blockedItems > 0 ? 2 : 0;
 }

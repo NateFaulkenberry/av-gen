@@ -45,8 +45,9 @@ struct ResolvedSetPiece {
 // The checks across set pieces, appended to `issues`: per craft, in time order, an overlap (with
 // `stage::kCraftHandoverSeconds` between one leaving and the next taking it) or a gap the craft could
 // not cross at its cruise speed is an error on the later one; two within `kSamePlaceMetres` of each
-// other, or two of one template framed within `kSameFramingFraction` of the same distance, are a
-// REPETITION warning. `mine` are this plan's; `others` only ever make a finding against one of `mine`.
+// other (a flyby only against another flyby: it happens at no place), or two of one template framed
+// within `kSameFramingFraction` of the same distance, are a REPETITION warning. `mine` are this plan's;
+// `others` only ever make a finding against one of `mine`.
 inline constexpr float kSamePlaceMetres = 40.0f;
 inline constexpr float kSameFramingFraction = 0.15f;
 void checkSetPiecesTogether(const std::vector<ResolvedSetPiece>& mine, const std::vector<ResolvedSetPiece>& others,

@@ -50,7 +50,12 @@ constexpr std::array<SetPieceSlot, 34> kAbduction{{
     {"fadeDelaySeconds", 3.5f, 0.0f, 30.0f, U::Parameter, "rise before it dissolves", "s"},
     {"fadeSeconds", 1.4f, 0.0f, 30.0f, U::Parameter, "dissolve", "s"},
     {"gatherRadius", 18.0f, 1.0f, 200.0f, U::Parameter, "how far it reaches for an animal", "m"},
-    {"targetClearance", 3.0f, 0.0f, 60.0f, U::Parameter, "canopy allowed over an animal (0: do not ask)", "m"},
+    // Glowmere Valley 2's own abduction's (6.5 m). The canopy asked is the tallest scatter layer that can
+    // grow at a point (`ClearanceField::canopyHeight`), not what stands there: over Glowmere Valley 3's
+    // whole valley floor that is 3.2 m (the meadow layer), 5.4 m in scrub, 7.1-8.0 m in the woods. The
+    // first default, 3 m, refused every animal on open ground; 6.5 m lifts from meadow and scrub and
+    // refuses the woods.
+    {"targetClearance", 6.5f, 0.0f, 60.0f, U::Parameter, "canopy allowed over an animal (0: do not ask)", "m"},
     {"approachBearing", 180.0f, 0.0f, 360.0f, U::Structure, "comes in from (compass)", "deg"},
     {"approachDistance", 220.0f, 0.0f, 1500.0f, U::Structure, "appears this far away", "m"},
     {"departBearing", 0.0f, 0.0f, 360.0f, U::Structure, "leaves toward (compass)", "deg"},

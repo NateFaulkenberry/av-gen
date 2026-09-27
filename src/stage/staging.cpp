@@ -1344,15 +1344,20 @@ void Staging::leaveBeat(Run& run, const StageContext& ctx) {
 
 namespace {
 
-// ADR-928: whether a step that began `elapsed` seconds ago has run its `duration`, with a microsecond
-// of float noise allowed -- the tolerance the beat clock already allows (`startAt`). A frame's instant
-// is computed three ways -- `i * dt` by a trace, `k / fps` by a render's clock, `target - m * dt`
-// counted back by a seek's replay (`EntityWorld::seek`) -- and they differ in the last bits. So a
-// duration that is a whole number of frames (3.5 s is 210, and 3.5 is exact as a float) sat on a
-// frame boundary, and the noise decided which side: the set piece lab's second abduction entered
-// `depart` at 66.083 s in a play and 66.067 s after a seek to 115 s. Now such a step ends on the frame
-// its duration names, on every path. A microsecond cannot end a step a real frame early.
-bool reached(double elapsed, double duration) { return elapsed + 1e-6 >= duration; }
+// ADR-928: whether a step that began `elapsed` seconds ago has run its `duration`, allowing for the
+// noise of how an instant is computed and for nothing else. A frame's instant is computed three ways
+// -- `i * dt` by a trace, `k / fps` by a render's clock, `target - m * dt` counted back by a seek's
+// replay (`EntityWorld::seek`) -- and they differ in the last bits, a few 1e-13 s even twenty minutes
+// in. So a duration that is exactly a whole number of frames (3.5 s is 210, and 3.5 is exact as a
+// float) sat on a frame boundary and the noise decided which side: the set piece lab's second
+// abduction entered `depart` at 66.083 s in a play and 66.067 s after a seek to 115 s.
+//
+// The tolerance is 1e-10 s: a thousand times the noise, and below the rounding of any duration stored
+// as a float that is not exact (0.8f is 0.8 + 1.2e-8, 2.4f is 2.4 + 9.5e-8, 1.4f is 1.4 - 2.4e-8), so
+// those end on exactly the frame they always ended on. The first version allowed a microsecond, which
+// swallowed that rounding and moved every such step a frame earlier -- Glowmere Valley 2's 0.8 s aim
+// among them, which the ADR-623 trace digest caught.
+bool reached(double elapsed, double duration) { return elapsed + 1e-10 >= duration; }
 
 } // namespace
 

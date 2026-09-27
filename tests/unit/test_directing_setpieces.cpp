@@ -303,6 +303,26 @@ TEST_CASE("two set pieces at one place, or framed from one distance, are flagged
     c["framingMetres"] = 220;
     p = planFrom(planWith(json::array({a, c})));
     CHECK(issuesWith(validatePlan(p, facts), IssueCode::Repetition).empty());
+    // A flyby happens at no place: crossing the sky over where an abduction happens is a rhyme, not the
+    // same shot (GV3's flyby passes over the elder its centrepiece lifts beside)...
+    json fly = {{"key", "fly"}, {"template", "flyby"}, {"craft", "saucer"}, {"at", {{"seconds", 8}}},
+                {"place", {{"point", {66, 26}}}}, {"set", {{"pathBearing", 270}}}};
+    a.erase("framingMetres");
+    p = planFrom(planWith(json::array({a, fly})));
+    v = validatePlan(p, facts);
+    INFO(all(v));
+    CHECK(issuesWith(v, IssueCode::Repetition).empty());
+    CHECK_FALSE(v.isBlocked("fly"));
+    // ...but a second flyby on the same line is the same crossing again.
+    json again = fly;
+    again["key"] = "fly-again";
+    again["at"] = {{"seconds", 100}};
+    p = planFrom(planWith(json::array({fly, again})));
+    const Validation twice = validatePlan(p, facts);
+    INFO(all(twice));
+    found = issuesWith(twice, IssueCode::Repetition);
+    REQUIRE(found.size() == 1);
+    CHECK(found[0]->item == "fly-again");
 }
 
 TEST_CASE("a set piece can be placed on the music", "[directing][setpiece][time]") {
