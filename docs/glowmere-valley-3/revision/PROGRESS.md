@@ -44,7 +44,7 @@ Leftover processes from the old session may still be running (suites, renders, t
 |---|---|---|---|
 | gv3-look | `av-gen-gv3-look` / `gv3/look` | `look.py`, `directives.py`, `reactivity.py`, the water and wind blocks | reactivity installing and tuning (the riser's roll drives the small fungi); see its `phase3/look.md` |
 | gv3-cut | `av-gen-gv3-cut` / `gv3/cut` | `shots.py`, `rig.py`, `cuts.py`, `framing.py`, `review.py`, `install_cut`, `autoDirector` and a new `songcut.py` | **checkpoint `c6e3a646`.** The cut's spans come from the Director (`songcut.py` runs `avgen_song_cut`, records `song_cut.json`, `--recut` adopts a new one): 73 spans, CV 0.53, the riser 4-4-2-2-2-1-1 beats, the drop its own 2-bar shot. Every span authored. Aliens lead 13% (the generator refuses more than 20%). 18 of 22 follow rigs pass the stability bar (first pass: 5 of 16). Next: the it1 render, the Critic jobs, novelty trims (`trim.py`), composition fixes, before/after sheets. See `phase3/cut.md` |
-| gv3-world | `av-gen-gv3-world` / `gv3/world` | `world.py`, `offline.py` | the world edge and `offline.py` behind `--final`; see `phase3/world.md` |
+| gv3-world | `av-gen-gv3-world` / `gv3/world` | `world.py`, `offline.py` | **checkpoint `6d25ed53`.** Both valley ends closed with ridges, banks and river-path edits; `world.py --check [--trace]` finds 0 of 452 traced views with an open end (baseline 275, in 21 shots). The ground from z −190 to 170 is unchanged to the mm, and every rig key is byte-identical. `offline.py` (behind `--final`) applies render-post's configuration, with shadows step-keyed to 300 m on the wides. **Not yet run:** before/after stills, the fog-march calibration, the 4K cost ranges. See `phase3/world.md` |
 | gv3-cast | `av-gen-gv3-cast` / `gv3/cast` | `cast.py`, `ufo.py` and `ufo.plan.json` | **checkpoint `0ff69eea` (WIP, iteration 2 being measured).** `cast.py` carries the characters recipe, the re-homing, the scout (hero radius 4.92 m), and removes the hand-written scenario and horse keys. `ufo.py` compiles E1–E5 with `avgen_cast_trace --plan --save-project` and splices in only the plan's products, because a headless save photographs 745 parameters, clamps rippleScale 5.2 to 4.0 and drops 9. Iteration 1: aliens' longest still stretch 3.2–10.3 s; animals 0 reversals, 5 turns over 90°, 5.2 s on steep ground, 0 s facing uphill. Beats: E1 beam 13.900 s; E2 cross 26.650 s; E3 lift 66.967 s; E5 beam 170.350 s, lift 172.783 s, horse gone 177.717 s. E4 moved to (−69, 6) radius 20 on cow-12 and cow-23, re-trace running. See `phase3/cast.md` |
 
 - Each stream's own notes, `docs/glowmere-valley-3/revision/phase3/<topic>.md`, hold its iterations and next steps.
@@ -58,7 +58,7 @@ Leftover processes from the old session may still be running (suites, renders, t
 ### 4. What remains, in order
 1. **Finish the engine:** characters into main (above), then render (merge, suites, fast-forward). Launch the two engine fixes in §5, navigation regions with the loop veto and the stride-bob excess, as focused streams from main. Merge them through `integrate/revision`, then build the engine at the final main for the GV3 streams.
 2. **Finish the Phase 3 streams**, each with its evaluator evidence.
-3. **Merge Phase 3:** merge each `gv3/<topic>` into `gv3/production` and regenerate the project.
+3. **Merge Phase 3:** merge each `gv3/<topic>` into `gv3/production` and regenerate the project. **Then re-validate across streams** (§5): re-trace the whole film, then check the follow rigs' stability, the alien framing and screen time, E1–E5's measured beats, and the ADR-910 metrics. The world closure changes the aliens' paths.
    - Resolve cross-stream issues. For example, gv3-cut frames E1–E5 at the beat times gv3-cast measures, and the Song Mode events come from gv3-cast's trace.
 4. **The whole film:**
    - Render a full 960×540 preview: `tools/gpu-lock.sh build/release/src/avgen --project examples/world/glowmere-valley-3.json --render $PWD/build/gv3/r1.mov --size 960x540`, about 25 minutes.
@@ -74,6 +74,15 @@ Leftover processes from the old session may still be running (suites, renders, t
   - Urgent reactions are exempt from ADR-909's loop veto.
   - It is worked round in GV3's data for now (E5's reaction is "stop and watch where you stand"). The engine needs: routes that respect connected regions (a goal in another region gets the nearest reachable point, or is refused), and the loop veto applying to urgent reactions. Each needs a control arm.
 - **ENGINE DEFECT (the alien float):** the stride bob. rook and tide match ADR-895's formula; ember and vane rise about 2.4× more (walk p90 0.35 m, max 0.45–0.71 m). The cause of the extra factor is not found; gv3-cast ran a bounce-0 control. Fix it in the engine, not in data.
+- **CROSS-STREAM: closing the world reroutes the aliens** (gv3-world found it; the cause is not found).
+  - With the valley's ends closed, ember and rook diverge from about 13–17 s by up to 100 m, and sage, vane and tide later. The alien follow shots' cameras move by up to 77 m, although the ground they walk is unchanged.
+  - Suspects: the navigation grid's connectivity, the water attraction, and the index-keyed scatter glow.
+  - **So the Phase 3 merge must re-validate on the merged project:**
+    - a whole-film cast trace;
+    - gv3-cut's follow-stability bar and alien framing;
+    - E1–E5's beats (E4's cows especially);
+    - the ADR-910 metrics.
+  - If the sensitivity is a defect (a path should not move 100 m because ground 300 m away changed), it is engine work.
 - **A headless save photographs the run** (see the memory note on project vs scene state). On GV3 it wrote 745 parameters, clamped rippleScale 5.2 to 4.0 and dropped 9, so `ufo.py` splices in only the plan's products. Never adopt a headless-saved GV3 project wholesale.
 - **Four aliens float 0.2–0.5 m while walking** (measured on engine `040d6644`); gv3-cast is checking it on engine-2. If it is an engine defect, it needs an engine fix, not data.
 - **E4 cannot play on the tuned cast** (gv3-cut measured it): the re-homed cows graze 35–40 m north of E4's region (−55, 40), radius 30. Move the region to about (−70, 8), or name cow-12 and cow-23 (gv3-cast was told).
