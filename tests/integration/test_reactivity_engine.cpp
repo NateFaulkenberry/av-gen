@@ -28,6 +28,7 @@
 #include "ui/director_panel_logic.hpp"
 #include "ui/edit_history.hpp"
 #include "ui/route_row_logic.hpp"
+#include "ui/ui_logic.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -311,4 +312,56 @@ TEST_CASE("The assistant reaches the proposer: director.propose_reactivity retur
     REQUIRE(checked.success);
     CHECK(checked.value.at("accepted") == true);
     CHECK(checked.value.at("blocked").empty());
+}
+
+TEST_CASE("UI reach: what the proposal installs is where an artist looks, under names for what it moves",
+          "[directing][reactivity][ui][adr924]") {
+    // The owner's rule, checked with the panels' own arithmetic rather than by opening them: a planned
+    // route is an ordinary row of the Modulation panel's Routes tab (it lists `modulator().routes()`)
+    // whose note names its plan item and why; a planned source's parameters are exposed in the
+    // Parameters panel's "sources" group, sectioned by the source's name, which says what it moves; and
+    // the Director panel lists every item, micro to macro, each with its reason.
+    Glade glade;
+    ui::EditHistory history;
+    const Compilation c = glade.proposal();
+    REQUIRE(app::applyCompilation(glade.engine, history, c));
+    const auto& plans = glade.engine.directingPlans();
+    std::size_t noted = 0;
+    for (const params::ModRoute& r : glade.engine.modulator().routes()) {
+        if (r.planItem.empty()) {
+            continue;
+        }
+        const ui::RoutePlanNote note = ui::routePlanNote(r, plans);
+        INFO(r.planItem);
+        CHECK(note.show);
+        CHECK(note.text.starts_with("[plan: "));
+        CHECK(note.tooltip.find("made by the Director plan") != std::string::npos);
+        ++noted;
+    }
+    CHECK(noted == c.plan.routes.size());
+    for (const PlanSource& s : c.plan.sources) {
+        INFO(s.signal());
+        CHECK(std::count(s.name.begin(), s.name.end(), '-') >= 2); // words, not a code: "two-bar-breath"
+        std::size_t params = 0;
+        for (const params::IParameter* p : glade.engine.params().ordered()) {
+            if (p == nullptr || !p->path().starts_with("sources/" + s.name + "/")) {
+                continue;
+            }
+            ++params;
+            CHECK(p->flags().exposed);
+            CHECK(p->group() == "sources");
+            CHECK(ui::parameterSubGroup(p->path(), p->group()) == s.name);
+        }
+        CHECK(params > 0);
+    }
+    const auto rows = ui::reactivityRows(plans.front(), glade.engine.modulator().routes());
+    REQUIRE(rows.size() == c.plan.routes.size());
+    std::string previous = "micro";
+    for (const ui::ReactivityRow& row : rows) {
+        CHECK_FALSE(row.reason.empty());
+        CHECK_FALSE(row.what.empty());
+        const auto rank = [](const std::string& l) { return l == "micro" ? 0 : l == "meso" ? 1 : 2; };
+        CHECK(rank(row.level) >= rank(previous));
+        previous = row.level;
+    }
 }
