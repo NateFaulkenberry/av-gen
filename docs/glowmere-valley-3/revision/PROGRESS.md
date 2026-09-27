@@ -79,6 +79,12 @@ Targeted tests on the three-stream build all pass: routes 57, signals and emissi
   - its GV3 guidance is in [stream-reports/checkpoints.md](stream-reports/checkpoints.md) § Camera and ADR-913.
 - **5 of 10 streams are merged.** Left: reactivity and characters (running), then water, setpieces and render.
 
+**Reactivity is done (03:10)** (report in [stream-reports/reactivity.md](stream-reports/reactivity.md); evidence in `~/Desktop/av-gen-review/reactivity-adr924-927/`, with `install_reactivity.py`). It is merged into `integrate/revision` as `a6598157`, and builds. **Its full suites are running**; when they pass, fast-forward main.
+- **The GV3 proposal:** 60 routes and 2 sources, all live. The tuned variant is 63 routes with 0 warnings.
+- **The install recipe is in the report.** Remove the shared-material kick and breath routes, use event mode for the pulses, the routes stream's energy arc, and a bar-triggered `bar-wave` field.
+
+**Launching: setpieces finisher.** It merges `integrate/revision` first, where the append conflicts with reactivity are expected. Running: characters (finishing), water (finishing), setpieces.
+
 **The schedule under the two-agent limit.** Each round is two fresh agents. A fresh agent gets the rules, its brief section, the table row above, and "inspect `git log main..HEAD` and `git diff`, then finish".
 1. signals finisher + routes finisher.
 2. emission finisher + camera finisher.
