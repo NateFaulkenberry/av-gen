@@ -27,9 +27,10 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
 from gv3 import shots as film  # noqa: E402
+from gv3 import songcut  # noqa: E402
 from gv3.ground import Ground  # noqa: E402
 
-HEIGHTS = {"rook": 3.3, "tide": 3.3, "sage": 3.3, "ember": 3.3, "vane": 3.3, "visitor": 7.1}
+HEIGHTS = {"rook": 3.3, "tide": 3.3, "sage": 3.3, "ember": 3.3, "vane": 3.3, "visitor": 7.1, "scout": 4.3}
 PALE = {"rook", "tide", "sage", "ember", "vane", "horse-11"}   # white bodies: seen = pale pixels there
 SEEN_STEP = 0.5          # seconds between visibility samples
 ASPECT = 16.0 / 9.0
@@ -141,7 +142,8 @@ def main():
     scene = json.loads((HERE.parent.parent / "examples" / "world" / "glowmere-valley-3.scene.json").read_text())
     world = next(n["world"] for n in scene["nodes"] if "world" in n)
     tr = Trace(trace_path, scene)
-    shots = film.build(Ground(world))
+    # The cut the project was generated with: the Director's recorded spans and their compositions.
+    shots = film.build(Ground(world), songcut.spans(json.loads(songcut.RECORD.read_text())))
     lines = ["| Shot | Subject | in frame | seen | height (frac of frame) | where (x, y) | flags |",
              "|---|---|---|---|---|---|---|"]
     for s in shots:
@@ -155,9 +157,10 @@ def main():
         t = s.start + 0.05
         while t < s.end:
             samples += 1
-            node, vis = tr.at(subject, t - rig.lag if rig.follow == subject else t)
+            # The raw node: ADR-911's filtered reference trails a walker by well under the 0.1 s step.
+            node, vis = tr.at(subject, t)
             if rig.follow:
-                base, _ = tr.at(rig.follow, t - rig.lag)
+                base, _ = tr.at(rig.follow, t)
                 off = keyed(rig, "followOffset", t, rig.follow_offset)
                 eye = [base[i] + off[i] for i in range(3)] if base else keyed(rig, "position", t, rig.position)
             else:
