@@ -28,6 +28,8 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <span>
 #include <vector>
 
 using namespace avgen;
@@ -80,12 +82,13 @@ world::EffectContext contextAt(double seconds) {
     return ctx;
 }
 
-// Resolve one effect and hand back the comet slot.
+// Resolve one effect and hand back the comet slot. The slot's `effect` points at `e` itself, so the
+// record is good for as long as the caller's `e` is: resolve the caller's instance, never a copy that
+// dies here (ADR-941 -- a copy in a local array left every record below pointing into a dead frame).
 std::optional<world::ResolvedAtmospheric> resolveComet(const world::EffectInstance& e, double seconds) {
     std::array<world::ResolvedAtmospheric, world::kMaxGpuComets> comets{};
     std::array<world::ResolvedAtmospheric, world::kMaxGpuAuroras> auroras{};
-    const std::array<world::EffectInstance, 1> set{e};
-    const auto counts = world::resolveAtmosphericEffects(set, contextAt(seconds), comets, auroras);
+    const auto counts = world::resolveAtmosphericEffects(std::span(&e, 1), contextAt(seconds), comets, auroras);
     if (counts.comets == 0) {
         return std::nullopt;
     }
@@ -418,6 +421,24 @@ TEST_CASE("packing puts every authored number in the lane the shader reads",
         CHECK_THAT(gh.core.r, WithinAbs(g.core.r * half->envelope, 1e-4f));
         // ...but the geometry is untouched by the fade.
         CHECK_THAT(gh.core.w, WithinAbs(33.0f, 1e-3f));
+    }
+}
+
+// ADR-941. `ResolvedAtmospheric::effect` is a pointer, and `packComet` reads the whole comet through it:
+// the appearance, the sparkle, the rainbow. A record is good only while the instance it points at lives.
+// This file's `resolveComet` used to resolve a COPY held in a local array and return the record after the
+// array had died, so every `packComet(*resolveComet(...))` here read a dead stack frame. In Release the
+// frame usually still held the copy and the checks passed; the nightly ASan/UBSan build found
+// `sparkle.enabled` holding 240 there. The record the helper returns must point at the caller's instance.
+TEST_CASE("a resolved comet's record points at the effect its caller holds", "[world][atmospherics][gpu]") {
+    world::EffectInstance e = plainComet();
+    const auto r = resolveComet(e, 1.0);
+    REQUIRE(r.has_value());
+    REQUIRE(r->effect == &e); // a REQUIRE: past this line a wrong pointer would be read, not compared
+
+    SECTION("so packing reads that effect, edits and all") {
+        e.comet.appearance.headSize = 77.0f;
+        CHECK_THAT(world::packComet(*r).core.w, WithinAbs(77.0, 1e-3));
     }
 }
 
