@@ -150,14 +150,17 @@ ALIEN_BOUNCE = {
 #   beam         go and see: walk to within `approach` of the craft, face it, watch. E4 happens on
 #                the aliens' own bank of the river, in the meadow they roam, and is heard by the ones
 #                near it (80 m: in iteration 1's film, ember, sage and tide).
-#   centrepiece  stop and watch where you stand: E5's beam is heard across the valley (the characters
-#                report's 250 m), and an `approach` that long means every alien that hears it is
-#                already "inside" it (standOff, decision.cpp) -- it faces the beam and watches, and a
-#                cautious one (sage) steps back first. Not "go and see": E5 is on the elder's bank and
-#                four aliens are across the river from it, and the engine's action-tier route
-#                (`NavigatorPath::route`) does not ask whether a goal is on the body's own piece of
-#                walkable ground. Iteration 1 sent ember at a goal across the river: it paced the bank
-#                for 40 s, walk -> stop -> turn 180 -> walk back eight times through the drop.
+#   centrepiece  go and see as well: E5's beam is heard across the valley (the characters report's 250
+#                m), and every alien that hears it walks to within 18 m of the craft, faces it and
+#                watches; a cautious one (sage) steps back first. Until engine-4 this was "stop and
+#                watch where you stand" (an `approach` of 250 m, inside which everyone already stands):
+#                E5 is on the elder's bank, four aliens are across the river from it, and the action
+#                tier's route did not ask whether a goal was on the body's own piece of walkable ground
+#                -- iteration 1 sent ember at a goal across the river and it paced the bank for 40 s,
+#                walk -> stop -> turn 180 -> walk back eight times through the drop. ADR-932 routes a
+#                goal across a divide to the nearest reachable point (the bank) and ADR-933 gives an
+#                urgent option one attempt, so an alien across the water walks to its bank and watches
+#                from there (navfix's measurement on GV3: ember's reversals 3 -> 0 with go-and-see).
 #
 # E1 (the far survey), E2 (the flyby) and E3 (the far lift, 250-330 m from every alien) are seen, not
 # heard: nobody is near enough to walk to them, and walking 300 m to a light is not purposeful.
@@ -166,7 +169,7 @@ REACTIONS = {
     "beam":        ("e4-river-pair", 80.0,
                     {"approach": 18.0, "flee": 10.0, "dwell": 4.0, "fadeSeconds": 12.0, "weight": 1.5}),
     "centrepiece": ("e5-centrepiece", 250.0,
-                    {"approach": 250.0, "flee": 10.0, "dwell": 6.0, "fadeSeconds": 10.0, "weight": 1.5,
+                    {"approach": 18.0, "flee": 10.0, "dwell": 6.0, "fadeSeconds": 10.0, "weight": 1.5,
                      "activity": "observe"}),
 }
 
