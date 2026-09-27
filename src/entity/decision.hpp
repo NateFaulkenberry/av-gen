@@ -76,6 +76,9 @@ struct SpeedRange {
     [[nodiscard]] bool set() const { return hi > 0.0f; }
     // Reads `"speedRange": [lo, hi]`; anything else leaves it unset.
     [[nodiscard]] static SpeedRange fromJson(const nlohmann::json* settings);
+    // The range between two multiples, in either order. Both 0 (or less) is unset; one end at 0 is
+    // the walk speed (1), so "from 0 to 1.5" is a walk to one and a half times a walk.
+    [[nodiscard]] static SpeedRange of(float a, float b);
     // A multiple of the walk speed for the option named `identity` at this decision: in [lo, hi],
     // or 1 when unset.
     [[nodiscard]] float draw(const DecisionContext& ctx, std::string_view identity) const;

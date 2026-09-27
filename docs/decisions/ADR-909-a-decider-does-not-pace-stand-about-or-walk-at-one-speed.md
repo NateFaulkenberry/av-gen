@@ -83,9 +83,11 @@ was told. `DecisionDebug` reports `stillBreaks` and `restless`.
 **5. Pace.** `speedRange: [lo, hi]` on `interest` and `react` gives each option its own pace, in
 multiples of the body's gait walk speed. It is drawn as a hash of (seed, decision tick, option) (D2), so
 the same decision draws the same pace, a scrub draws what the play drew, and one extra option does not
-re-cast the others. `react`'s moves also hurry by their urgency: `urgentSpeed` (default 1.5) multiplies
-the pace at urgency 1 and nothing at urgency 0. The approach's urgency is the event's intensity; the
-flee's is half as much again.
+re-cast the others. An end at 0 is the walk speed (`SpeedRange::of`), so a range of 0 to 1.5 -- one
+end left at its default, as an artist moving one slider leaves it -- is a walk to one and a half times a
+walk, never a crawl; both ends at 0 is unset. `react`'s moves also hurry by their urgency: `urgentSpeed`
+(default 1.5) multiplies the pace at urgency 1 and nothing at urgency 0. The approach's urgency is the
+event's intensity; the flee's is half as much again.
 
 **6. Every knob is a parameter with a plain label**, found in the Parameters panel under `entity` →
 `<name>/decide` (and `<name>/decide/<considerer>` for a considerer's own) and in the World panel
@@ -120,6 +122,15 @@ and watches the walks back appear.
     and home was reached by way of somewhere else.
 - **Standing is bounded where a scene asks.** An idle-weighted decider stood the whole 180 s. With
   `maxStillSeconds` 6, its longest stand was 6.0 s, it broke 15 times and walked 180 m.
+- **The loop veto trades a walk back for a wait, where a scene has not asked for a limit.** A body
+  whose best option is the place it has just left, with nothing else that walks on offer, now waits
+  where it is until the window is over instead of walking straight back. On GV2-multicam, whose file
+  is frozen and cannot opt in, the aliens' A->B->A revisits went from 8 to 2 and their longest stand
+  overall from 97.9 s (sage) to 49.0 s -- but vane's longest stand went from 8.5 s to 27.2 s: an 8 s
+  observe, then the rest of the 20 s window. That is the owner's two hard requirements in conflict
+  in a scene that can set neither knob. `maxStillSeconds` resolves it: a restless body takes the
+  walk back at a tenth of its score only when nothing else that walks is on offer (GV3's tuned run,
+  ADR-910). Making the still clock a default was weighed and not done, for the sentry reason above.
 - **Paces vary per errand and per decision:** four candidates drew four different paces within
   [0.6, 1.4] × walk, the same tick drew the same paces again, and the next tick drew others. A
   reaction to a full-intensity event moves at 1.5× walk (both approach and flee); a faint one (0.4)

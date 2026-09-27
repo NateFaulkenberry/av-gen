@@ -214,11 +214,26 @@ SpeedRange SpeedRange::fromJson(const nlohmann::json* settings) {
     if (!r.is_array() || r.size() != 2 || !r[0].is_number() || !r[1].is_number()) {
         return out;
     }
-    const float a = std::max(0.0f, r[0].get<float>());
-    const float b = std::max(0.0f, r[1].get<float>());
-    out.lo = std::min(a, b);
-    out.hi = std::max(a, b);
-    return out;
+    return SpeedRange::of(r[0].get<float>(), r[1].get<float>());
+}
+
+SpeedRange SpeedRange::of(float a, float b) {
+    a = std::max(0.0f, a);
+    b = std::max(0.0f, b);
+    if (a <= 0.0f && b <= 0.0f) {
+        return SpeedRange{}; // unset: every errand at the walk speed
+    }
+    // An end at 0 is the walk speed, as its label says ("0 = walk"), not a crawl: a range of 0 to
+    // 1.5 is a walk to one and a half times a walk. Read literally it would draw errands from a
+    // standstill up, and one drawn near 0 would crawl while one drawn at exactly 0 walked -- the
+    // move verb reads a zero pace as "the walk speed".
+    if (a <= 0.0f) {
+        a = 1.0f;
+    }
+    if (b <= 0.0f) {
+        b = 1.0f;
+    }
+    return SpeedRange{std::min(a, b), std::max(a, b)};
 }
 
 float SpeedRange::draw(const DecisionContext& ctx, std::string_view identity) const {
@@ -256,9 +271,7 @@ SpeedRange SpeedRangeParams::live() const {
     if (from == nullptr || to == nullptr) {
         return authored;
     }
-    const float a = from->value();
-    const float b = to->value();
-    return SpeedRange{std::min(a, b), std::max(a, b)};
+    return SpeedRange::of(from->value(), to->value());
 }
 
 // ---- the cadence -------------------------------------------------------------------------------

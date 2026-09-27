@@ -3,12 +3,14 @@
 **Status:** Accepted
 **Date:** 2026-09-26
 **Follows:** ADR-096 (gait), ADR-213 and ADR-622 (the farm pack's frozen idle), ADR-620 (authored
-acceleration), ADR-907 (the forward cone this relies on)
+acceleration), ADR-162 and ADR-240 (off the walkable set), ADR-907 (the forward cone this relies on)
 **Implemented by:** `TurnSettings`, `turnPace`, `insideTurn`, `turnCap`; the `GaitSettings` fields `turnRate`,
 `turnRadius` and `pivotRadius`, and their JSON keys; `Gait::playbackRate`'s pivot branch (all in
 `src/entity/gait.{hpp,cpp}` and `src/entity/action.cpp`). `Wander`'s turn (`src/entity/behaviors.cpp`). The action
-tier's `move` and `face` verbs, and `ActionQueue::begin` (`src/entity/action.cpp`).
-**Tests:** `tests/unit/test_walk_through_turns.cpp` (five cases, each with a control arm);
+tier's `move` and `face` verbs, and `ActionQueue::begin` (`src/entity/action.cpp`). The heading check and
+the refuge walk: `IPathProvider::clear` and `refuge` (`src/entity/action.{hpp,cpp}`), `Navigator::refuge`
+(`src/entity/navigation.{hpp,cpp}`).
+**Tests:** `tests/unit/test_walk_through_turns.cpp` (seven cases, each with a control arm);
 `tests/unit/test_character_controls_reach.cpp` (the gait's turn knobs moved as parameters move the body,
 and where each control is found)
 
@@ -71,6 +73,28 @@ at rest, and pivot. Two other small changes, both only where a radius is set:
 - The stuck clock waits while the body is turning back on its circle, which walks away from the goal
   before it walks toward it.
 - The steering fan looks at least one and a half radii ahead.
+
+**A walk-through mover checks the way it is actually walking.** The steering fan checks the direction
+it offers; a body walking through its turn travels along its *heading*, which is not that direction
+until the turn is done. So while the heading is more than about 6 degrees off (`kHeadingCheck`), both
+movers ask whether the heading is clear for as far as the body needs to stop (its stopping distance
+plus half a metre, at least a metre): `Navigator::pathClear` for `wander`, `IPathProvider::clear` for
+the action tier. Where it is not, the turn is not walked -- the body brakes and, at rest, pivots onto
+the checked way. The check is asked only of a body standing on the walkable set (`navigable`,
+`IPathProvider::walkable`): it exists to keep a body from leaving the set, and from off it every line
+fails, so the first cut braked a body at the edge on its way back on -- the wedge case in
+`test_farm_locomotion.cpp` measured 13.20 s against its 13.00 s journey. Found on GV3's tuned run: rook, on a 1.5 m circle at half pace, turned into ground the
+fan had never looked at, and stood off the walkable set from 87.3 s to the end of the film, every errand
+failing "blocked".
+
+**And a `move` that finds every way blocked walks back onto the walkable set first.** From off the set
+the fan finds nothing in any direction, because it samples from the body outward (ADR-162). `wander` has
+walked back since ADR-240; the action tier failed "blocked", and the decider's next errand failed the
+same way from the same spot, for ever. The move now walks to `IPathProvider::refuge` -- the nearest
+navigable point on `Navigator::refuge`'s outward spiral, the search `wander`'s escape used and now
+shares -- and steers on from there; the stuck clock waits while it does. With no refuge in reach it
+fails "blocked", as before. This one is not specific to turning circles: any body put off the walkable
+set -- by a spawn point, a director's move or a crowd push -- could strand itself.
 
 **Wander's radius defaults to its own speed over its own turn rate**: the tightest turn it could make
 at full pace. So a wanderer nobody tuned still walks through its turns and never stops to pivot out of

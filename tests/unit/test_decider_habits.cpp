@@ -578,6 +578,22 @@ TEST_CASE("a speedRange gives each errand its own pace, drawn once per decision"
         CHECK(s == 0.0f);
     }
 
+    // An end at 0 is the walk speed, as the Parameters panel's label says ("0 = walk"): from 0 to
+    // 1.5 is a walk to one and a half times a walk, never a crawl. Read literally it would have drawn
+    // paces from a standstill up.
+    const nlohmann::json halfOpen = {{"source", "omniscient"}, {"weights", {{"landmark", 1.0}}}, {"maxRange", 60.0},
+                                     {"speedRange", {0.0, 1.5}}};
+    for (const std::uint64_t tick : {10u, 11u, 12u}) {
+        for (const float s : paces(halfOpen, tick)) {
+            CHECK(s >= 1.0f * 2.0f);
+            CHECK(s <= 1.5f * 2.0f);
+        }
+    }
+    CHECK(entity::SpeedRange::of(0.0f, 0.0f).set() == false);
+    CHECK(entity::SpeedRange::of(1.5f, 0.0f).lo == 1.0f);
+    CHECK(entity::SpeedRange::of(1.5f, 0.0f).hi == 1.5f);
+    CHECK(entity::SpeedRange::of(0.6f, 1.4f).lo == Approx(0.6f));
+
     // And the body walks at it: a `move` with a pace is travelled at that pace.
     entity::ActionDesc go;
     go.kind = entity::ActionKind::Move;

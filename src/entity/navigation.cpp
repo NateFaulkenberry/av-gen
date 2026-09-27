@@ -266,6 +266,23 @@ bool Navigator::pickDestination(Rng& rng, glm::vec2 from, const DestinationReque
     return false;
 }
 
+bool Navigator::refuge(glm::vec2 from, glm::vec2& out) const {
+    if (navigable(from)) {
+        return false;
+    }
+    for (float radius = 2.0f; radius <= 24.0f; radius += 2.0f) {
+        for (int k = 0; k < 12; ++k) {
+            const float a = static_cast<float>(k) * 0.5235987756f;
+            const glm::vec2 candidate = from + glm::vec2(std::sin(a), std::cos(a)) * radius;
+            if (navigable(candidate)) {
+                out = candidate;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 float Navigator::slopeDegrees(glm::vec2 p) const {
     const float up = std::clamp(groundNormal(p, 1.0f).y, -1.0f, 1.0f);
     return std::acos(up) * kDegrees;

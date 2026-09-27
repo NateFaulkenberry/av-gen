@@ -271,6 +271,11 @@ public:
     [[nodiscard]] float routeSlopeDegrees(glm::vec2 a, glm::vec2 b, float spacing = 2.0f) const;
     // The slope of the ground at `p`, in degrees, with the same metre-wide normal.
     [[nodiscard]] float slopeDegrees(glm::vec2 p) const;
+    // The nearest navigable point to `from` on an outward spiral -- rings every 2 m out to 24 m,
+    // twelve bearings a ring, north first -- when `from` itself is not navigable: where a body that
+    // has ended up off the walkable set walks back to (ADR-240). False when `from` is navigable or
+    // nothing in reach is. `wander`'s escape and the action tier's `move` (ADR-908) both ask it.
+    [[nodiscard]] bool refuge(glm::vec2 from, glm::vec2& out) const;
 
     // How many cells of margin `gridTrustMetres` asks for on this grid. At least 1.
     [[nodiscard]] int gridTrustCells(const NavGrid& grid) const;

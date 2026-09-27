@@ -13,6 +13,10 @@ constexpr float kDegrees = 180.0f / kPi;
 // The `move` verb's turn rate when the body authors none: ~140 deg/s, wander's default (ADR-908
 // made it a default rather than the only answer).
 constexpr float kMoveTurnRate = 2.45f;
+// The heading error, in radians (about 6 degrees), above which a walk-through mover checks the way it
+// is actually travelling before it walks it (ADR-908). Below it the heading is the way the steering
+// fan checked, to within the fan's own resolution.
+constexpr float kHeadingCheck = 0.1f;
 
 // Signed shortest angular distance from `from` to `to`, in radians.
 float angleDelta(float from, float to) {
@@ -252,6 +256,18 @@ glm::vec2 NavigatorPath::steer(glm::vec2 from, glm::vec2 to, float lookahead) co
 
 float NavigatorPath::groundHeight(glm::vec2 p) const {
     return nav_ == nullptr ? 0.0f : nav_->groundHeight(p);
+}
+
+bool NavigatorPath::clear(glm::vec2 from, glm::vec2 to) const {
+    return nav_ == nullptr || !nav_->valid() || nav_->pathClear(from, to);
+}
+
+bool NavigatorPath::walkable(glm::vec2 p) const {
+    return nav_ == nullptr || !nav_->valid() || nav_->navigable(p);
+}
+
+bool NavigatorPath::refuge(glm::vec2 from, glm::vec2& out) const {
+    return nav_ != nullptr && nav_->valid() && nav_->refuge(from, out);
 }
 
 // ---- the queue ---------------------------------------------------------------------------------
@@ -786,14 +802,27 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             const float wantedSpeed = action.speed > 0.0f ? action.speed : gait.walkSpeed;
             glm::vec2 direction = waypoint - here;
             const float toWaypoint = glm::length(direction);
+            bool escaping = false; // walking back onto the walkable set before the errand (below)
             direction = toWaypoint > 1e-5f ? direction / toWaypoint : glm::vec2(0.0f);
             if (path != nullptr) {
                 // ADR-908: at least a turn and a half ahead for a body that turns on a circle, so
                 // it has room to walk round what the fan finds. `max` with 0 is the old lookahead.
                 const float lookahead = std::max(std::max(wantedSpeed * 1.5f, 2.0f), gait.turnRadius * 1.5f);
                 const glm::vec2 steered = path->steer(here, waypoint, lookahead);
+                glm::vec2 refuge(0.0f);
                 if (glm::length(steered) > 0.5f) {
                     direction = steered;
+                } else if (path->refuge(here, refuge) && glm::length(refuge - here) > 1e-3f) {
+                    // ADR-908: every way is blocked because the body is standing *off* the walkable
+                    // set -- the steering fan samples from the body outward, so from there no way
+                    // is ever clear (ADR-162) -- and not because the world is closed. `wander` has
+                    // walked back onto the set since ADR-240; a `move` failed "blocked", and the
+                    // decider's next errand failed the same way from the same spot, for ever.
+                    // Measured on GV3 with walk-through turns: rook turned onto such a spot at
+                    // 87.3 s and stood the other 139 s of the film, every errand "blocked". Now the
+                    // move walks to the nearest refuge first, and steers on from there.
+                    direction = glm::normalize(refuge - here);
+                    escaping = true;
                 } else {
                     failed = true;
                     reason = "blocked";
@@ -830,6 +859,21 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                 const float pace = layer.progress.speed;
                 error = delta;
                 alignment = insideTurn(turning, pace, toWaypoint, error) ? 0.0f : turnPace(turning, pace, error);
+                // The fan checked the way it offers, and a body walking through its turn travels
+                // along its *heading*, which is not that way until the turn is done. Where the heading
+                // is not clear for as far as the body needs to stop, the turn cannot be walked: it
+                // brakes, and at rest pivots onto the checked way (`turnCap`). This is how rook came
+                // to stand off the walkable set above -- a 1.5 m circle, walked at half pace, into
+                // ground the fan never looked at. Asked only of a body standing on the walkable set:
+                // it is there to keep a body from leaving it, and from off it every line fails, so a
+                // body walking back on would brake at the edge instead of stepping over it.
+                if (alignment > 0.0f && path != nullptr && std::abs(error) > kHeadingCheck && path->walkable(here)) {
+                    const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
+                    const float stopping = pace * pace / (2.0f * std::max(gait.decel, 0.1f));
+                    if (!path->clear(here, here + heading * std::max(1.0f, stopping + 0.5f))) {
+                        alignment = 0.0f;
+                    }
+                }
             }
             // Slow into the goal rather than stopping dead on it: v = sqrt(2 a d) is the fastest
             // speed from which the remaining distance is still enough to decelerate in.
@@ -892,8 +936,9 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             if (distance < layer.progress.bestDistance - 0.05f) {
                 layer.progress.bestDistance = distance;
                 layer.progress.sinceProgress = 0.0;
-            } else if (std::abs(error) > 0.5f * kPi) {
-                // ADR-908: walking round a turn is not being stuck. A body turning back on a circle
+            } else if (std::abs(error) > 0.5f * kPi || escaping) {
+                // ADR-908: walking round a turn is not being stuck, and neither is walking back onto
+                // the walkable set, which may lead away from the goal first. A body turning back on a circle
                 // walks away from its goal before it walks toward it -- half a lap of radius R --
                 // and the clock waits until it is facing within 90 degrees of the way. `error` is 0
                 // for the old mover, which never walks away from its goal to turn.

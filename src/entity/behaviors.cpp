@@ -70,6 +70,10 @@ params::ParamDesc<float> floatDesc(std::string path, float def, float lo, float 
         .path = std::move(path), .defaultValue = def, .hardMin = lo, .hardMax = hi, .label = std::move(label)};
 }
 
+// The heading error, in radians (about 6 degrees), above which a walk-through mover checks the way it
+// is actually travelling before it walks it (ADR-908; the action tier's twin is in action.cpp).
+constexpr float kHeadingCheck = 0.1f;
+
 // Smallest signed angle from `from` to `to`, in radians.
 float angleDelta(float from, float to) {
     float d = std::fmod(to - from + kPi, kTwoPi);
@@ -137,17 +141,8 @@ bool escapeToNavigable(const Navigator* navigator, EscapeMemory& memory, EntityS
     // when the body has arrived at it and is somehow still off the set.
     if (!memory.active || !navigator->navigable(memory.refuge) ||
         glm::length(memory.refuge - here) < 0.75f) {
-        memory.active = false;
-        for (float radius = 2.0f; radius <= 24.0f && !memory.active; radius += 2.0f) {
-            for (int k = 0; k < 12 && !memory.active; ++k) {
-                const float a = static_cast<float>(k) * 0.5235987756f;
-                const glm::vec2 candidate = here + glm::vec2(std::sin(a), std::cos(a)) * radius;
-                if (navigator->navigable(candidate)) {
-                    memory.refuge = candidate;
-                    memory.active = true;
-                }
-            }
-        }
+        // The spiral lives on the navigator (ADR-908), where the action tier's `move` asks it too.
+        memory.active = navigator->refuge(here, memory.refuge);
     }
     if (!memory.active) {
         return false;
@@ -890,6 +885,20 @@ public:
         // up to the place it was going to and settles rather than halting in one frame while its
         // legs, which the speed limiter ramps separately, go on walking for another half second.
         float desired = speed * turnPace(turning, pace_, error);
+        // The steering fan checked `direction`; a body walking through its turn travels along its
+        // heading, which is not `direction` until the turn is done. Where the heading is not clear
+        // for as far as the body needs to stop, the turn is not walked: it brakes, and at rest
+        // pivots onto the checked way -- the action tier's rule (action.cpp), which found a GV3 alien
+        // standing off the walkable set after walking a turn into ground nobody had looked at. Only
+        // for a body on the walkable set, for the reason given there: from off it every line fails.
+        if (desired > 0.0f && std::abs(error) > kHeadingCheck && ctx.nav != nullptr && ctx.nav->valid() &&
+            ctx.nav->navigable(flat)) {
+            const glm::vec2 facing(std::sin(state.yaw), std::cos(state.yaw));
+            const float stopping = pace_ * pace_ / (2.0f * std::max(gait.decel, 0.1f));
+            if (!ctx.nav->pathClear(flat, flat + facing * std::max(1.0f, stopping + 0.5f))) {
+                desired = 0.0f;
+            }
+        }
         const float beyond = std::max(0.0f, distance - arrive);
         desired = std::min(desired, std::sqrt(2.0f * std::max(gait.decel, 0.0f) * beyond));
         const float arrival = param(arrival_, arrivalDefault_);

@@ -22,7 +22,12 @@
 #include "entity/character_quality.hpp"
 #include "entity/entity.hpp"
 #include "entity/gait.hpp"
+#include "entity/navigation.hpp"
+#include "spatial/obstacle_field.hpp"
 #include "support/cast_world.hpp"
+#include "world/camera_clearance.hpp"
+#include "world/ecology.hpp"
+#include "world/world_map.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -50,6 +55,57 @@ entity::ActionDesc moveTo(glm::vec2 at) {
     a.target.point = glm::vec3(at.x, 0.0f, at.y);
     return a;
 }
+
+// Flat ground and a set of rock solids: what the two cases below walk among.
+struct SolidBed {
+    world::WorldMap map;
+    world::Ecology ecology;
+    world::ClearanceField field;
+    entity::Navigator nav;
+
+    explicit SolidBed(const std::vector<glm::vec3>& rocks) { // x, z, radius
+        map.size = glm::vec2(400.0f, 400.0f);
+        map.prepare();
+        field.map = &map;
+        field.ecology = &ecology;
+        field.cameraRadius = 0.6f;
+        field.groundClearance = 0.0f;
+        nav = entity::Navigator(&map, field);
+        auto solids = std::make_shared<spatial::ObstacleField>();
+        for (const glm::vec3& r : rocks) {
+            spatial::NavigationObstacle o;
+            o.center = glm::vec2(r.x, r.y);
+            o.radius = r.z;
+            o.base = 0.0f;
+            o.height = 6.0f;
+            o.type = spatial::ObstacleType::Rock;
+            solids->add(o);
+        }
+        solids->build();
+        nav.setObstacles(solids);
+    }
+    SolidBed(const SolidBed&) = delete;
+    SolidBed& operator=(const SolidBed&) = delete;
+};
+
+// The navigator's own routes, steering and ground, with `clear` and `refuge` left at the interface's
+// defaults: what a mover could see before a walk-through turn checked its heading and a `move` could
+// walk back onto the walkable set. The control arms.
+class BlindPath final : public entity::IPathProvider {
+public:
+    explicit BlindPath(const entity::Navigator* nav) : inner_(nav) {}
+    [[nodiscard]] entity::RouteStatus route(glm::vec2 from, glm::vec2 to,
+                                           std::vector<glm::vec2>& out) const override {
+        return inner_.route(from, to, out);
+    }
+    [[nodiscard]] glm::vec2 steer(glm::vec2 from, glm::vec2 to, float lookahead) const override {
+        return inner_.steer(from, to, lookahead);
+    }
+    [[nodiscard]] float groundHeight(glm::vec2 p) const override { return inner_.groundHeight(p); }
+
+private:
+    entity::NavigatorPath inner_;
+};
 
 } // namespace
 
@@ -261,4 +317,107 @@ TEST_CASE("the gait's turn keys survive a save and are absent when nobody wrote 
     CHECK_FALSE(written.contains("pivotRadius"));
 
     CHECK_FALSE(entity::gaitFromJson(nlohmann::json{{"turnRadius", -1.0}}).has_value());
+}
+
+TEST_CASE("a walk-through turn too wide for its corridor brakes and pivots rather than walking into the wall",
+          "[action][adr908][navigation]") {
+    // A corridor of rocks either side of x = 0, 3.1 m of walkable width between the keep-out bands,
+    // and a body turning on a 2.5 m circle -- a 5 m swing -- told to turn back. The steering fan
+    // checks the way it offers (south, down the corridor, clear); the body walks its turn along its
+    // heading, which swings through the wall. GV3's rook did exactly this on its 1.5 m circle and
+    // stood off the walkable set for the rest of the film, every errand "blocked".
+    std::vector<glm::vec3> rocks;
+    for (float z = -30.0f; z <= 60.0f; z += 1.0f) {
+        rocks.emplace_back(-2.6f, z, 0.6f);
+        rocks.emplace_back(2.6f, z, 0.6f);
+    }
+    SolidBed bed(rocks);
+    REQUIRE(bed.nav.navigable({0.0f, 0.0f}));
+    REQUIRE_FALSE(bed.nav.navigable({1.8f, 0.0f})); // the keep-out band: rock plus body radius
+
+    const auto run = [&](bool blind) {
+        CastMember m;
+        m.name = "walker";
+        m.gait.walkSpeed = 1.5f;
+        m.gait.accel = 3.0f;
+        m.gait.decel = 4.0f;
+        m.gait.turnRadius = 2.5f;
+        CastWorld w({m}, &bed.nav);
+        BlindPath blindPath(&w.world.navigator());
+        if (blind) {
+            w.world.setPathProvider(&blindPath);
+        }
+        entity::Entity& e = w.body("walker");
+        e.actions().push(moveTo({0.0f, 40.0f}), entity::Authority::Routine);
+        w.play(5.0);
+        REQUIRE(e.state().speed > 1.4f);
+        e.actions().override({moveTo({0.0f, -10.0f})}, entity::Authority::Routine, w.time());
+        int offSet = 0;
+        float widest = 0.0f;
+        w.play(30.0, [&] {
+            const glm::vec3 p = e.state().position();
+            offSet += bed.nav.navigable({p.x, p.z}) ? 0 : 1;
+            widest = std::max(widest, std::abs(p.x));
+        });
+        const glm::vec3 end = e.state().position();
+        const entity::ActionQueue::Drained& drained = e.actions().drained(entity::Authority::Routine);
+        return std::tuple(offSet, widest, glm::length(glm::vec2(end.x, end.z + 10.0f)), drained.failed,
+                          drained.reason);
+    };
+    const auto [offSet, widest, missBy, failed, reason] = run(false);
+    WARN(fmt::format("corridor, heading checked: {} frames off the walkable set, widest {:.2f} m from the "
+                     "middle, arrived {:.2f} m from the goal{}",
+                     offSet, widest, missBy, failed ? ", failed: " + reason : ""));
+    CHECK(offSet == 0);
+    CHECK_FALSE(failed);
+    CHECK(missBy < 1.0f);
+
+    // The control: the same errand with a provider that cannot see the heading's way (the mover
+    // before this check). It swings into the wall.
+    const auto [blindOff, blindWidest, blindMiss, blindFailed, blindReason] = run(true);
+    WARN(fmt::format("corridor, heading unchecked: {} frames off the walkable set, widest {:.2f} m{}",
+                     blindOff, blindWidest, blindFailed ? ", failed: " + blindReason : ""));
+    CHECK(blindOff > 0);
+}
+
+TEST_CASE("a body standing off the walkable set walks back onto it and on to its errand",
+          "[action][adr908][navigation]") {
+    // Standing inside a rock's keep-out: from here the steering fan finds no clear way in any
+    // direction, because it samples from the body outward (ADR-162). `wander` has walked back
+    // onto the set since ADR-240; a `move` failed "blocked" -- and every errand after it, from the
+    // same spot, for ever.
+    SolidBed bed({glm::vec3(0.0f, 0.0f, 2.0f)});
+    const glm::vec2 start(0.5f, 0.0f);
+    REQUIRE_FALSE(bed.nav.navigable(start));
+
+    const auto run = [&](bool blind) {
+        CastMember m;
+        m.name = "walker";
+        m.at = glm::vec3(start.x, 0.0f, start.y);
+        m.gait.walkSpeed = 1.5f;
+        CastWorld w({m}, &bed.nav);
+        BlindPath blindPath(&w.world.navigator());
+        if (blind) {
+            w.world.setPathProvider(&blindPath);
+        }
+        entity::Entity& e = w.body("walker");
+        e.actions().push(moveTo({0.0f, 20.0f}), entity::Authority::Routine);
+        w.play(25.0);
+        const glm::vec3 end = e.state().position();
+        const entity::ActionQueue::Drained& drained = e.actions().drained(entity::Authority::Routine);
+        return std::tuple(glm::length(glm::vec2(end.x, end.z - 20.0f)), drained.failed, drained.reason);
+    };
+    const auto [missBy, failed, reason] = run(false);
+    WARN(fmt::format("from inside a rock: arrived {:.2f} m from the goal{}", missBy,
+                     failed ? ", failed: " + reason : ""));
+    CHECK_FALSE(failed);
+    CHECK(missBy < 1.0f);
+
+    // The control: no refuge on offer (the provider before this change). Blocked, where it stands.
+    const auto [blindMiss, blindFailed, blindReason] = run(true);
+    WARN(fmt::format("no refuge on offer: {:.2f} m from the goal, {}", blindMiss,
+                     blindFailed ? "failed: " + blindReason : "not failed"));
+    CHECK(blindFailed);
+    CHECK(blindReason == "blocked");
+    CHECK(blindMiss > 19.0f);
 }
