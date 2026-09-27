@@ -348,7 +348,7 @@ characters, setpieces, and checkpoints (camera).
 
 ## Engine follow-ups found in Phase 3
 
-### navfix (ADRs 932–933, and an ADR-931 amendment): reachable goals, no pacing on urgent reactions
+### navfix (ADRs 932–934, and an ADR-931 amendment): reachable goals, no pacing on urgent reactions, retired bodies leave
 - **Worktree:** `~/Documents/GitHub/av-gen-navfix`, branch `agent/navfix`, from `integrate/revision` `ec515c8b` (main `040d6644` plus characters, ADR-907–910; main fast-forwards to it when the owner allows). Assets are linked.
 - **Read:** the brief §10–12 (the owner's "never walk → stop → 180° → back"); `stream-reports/characters.md`; ADR-908 and ADR-909; gv3-cast's "Found" 2 in `phase3/cast.md` (in `~/Documents/GitHub/av-gen-gv3-cast`); gv3-world's W2b and W2c in `phase3/world.md` (in `~/Documents/GitHub/av-gen-gv3-world`).
 - **The defect, measured on GV3 by gv3-cast.**
@@ -361,10 +361,23 @@ characters, setpieces, and checkpoints (camera).
   1. **ADR-932: the action tier's routes respect connected regions.** A goal in another region routes to the nearest reachable point in the body's own region, or is refused with a reason when there is none. Justify the choice in the ADR. Everything that calls `route` (moves, errands, reactions, orders) inherits this; list them in the ADR. A reaction to an event across water walks to the bank and watches from there.
   2. **ADR-933: no pacing on urgent options.** An urgent option (a reaction, a flinch) keeps its exemption for its first attempt. Once its move has failed or given up, the same event cannot send the body back to the same place in a loop. Use ADR-909's revisit and turn-back rules, or an equivalent retry limit. A flinch out of someone's way must still work.
   3. **ADR-931 amendment: the Director's evaluator hook** (`src/app/directing_evaluate.cpp`) passes the Critic's adapter `--world-preview <build>/tools/avgen_world_preview`, so its evaluations get ground samples. The flag is described in `stream-reports/critic-adapter.md` in the gv3 worktree. Add a test that the argument is passed.
-  4. **Tests, each with a control arm that fails without the change:**
+  4. **ADR-934: a retired body leaves the world** (added 13:10; found by gv3-cast on iteration 2's whole-film trace).
+     - `StepKind::Retire` (`src/stage/staging.cpp`) hides a set piece's taken animal, then hands it back to its own
+       behaviours. The crowd build and `buildBodyIndex` (`src/entity/entity.cpp`) take every active entity, visible
+       or not. So after E4, cow-12 and cow-23 graze on invisibly in the west meadow until 226 s (cow-12 walking at
+       (−63.9, −1.5) at 206 s). bull-10 (E3) and horse-11 (E5) do the same.
+     - On GV3, rook plays its walk clip in place for 5.25 s (205.65–210.85 s at (−66.2, −5.2)): 0.51 m/s intended,
+       zero travel, flat dry ground, with the invisible cow-23 3.0 m away and cow-12 4.3 m away. ADR-910's stuck time
+       for rook went from 0.4 s to 6.7 s. Nothing in a scene can work round it: only the set piece knows the moment.
+     - The fix: on retire, the body leaves the crowd and perception and stops being simulated. A seek past the
+       retire lands in the same state (ADR-930). Check what else reads a retired body. For example, the cast trace's
+       `atRetire` is taken after the body is dropped back to the ground (the horse, 23 m up the beam, reads 5.3 m).
+       The Critic's adapter works round that; record where the body was taken, if that falls out of the fix.
+  5. **Tests, each with a control arm that fails without the change:**
      - a two-region world (a river or a trench) where a goal across the divide is not `Ready` as a straight line, and routes to the near side;
      - a reaction across water that produces no walk → stop → 180° → back, measured with ADR-910's reversal metric;
-     - a flinch that still works.
+     - a flinch that still works;
+     - a retired body that neither blocks nor draws another body, played and scrubbed alike.
 - **Measure** GV2 multicam and GV3 before and after, with `avgen_cast_trace` and `avgen_character_quality`.
   - For GV3, use a scratch copy of gv3-cast's generated project, under your own `build/`, never edited in place. Mirror it as gv3-world does: symlink `materials`, `lightrigs`, `entities` and `assets`, and make the song's path absolute.
   - gv3-cast worked round the defect in iteration 2: E5's reaction is "stop and watch where you stand" (radius 250 m, approach 250 m). Also measure with ember's "go and see" reaction to E5 restored. Report reversals and the longest pacing sequence, before and after.
