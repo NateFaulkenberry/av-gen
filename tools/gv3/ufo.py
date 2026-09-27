@@ -31,7 +31,9 @@ This is the generator's last step, run after `make_glowmere_valley_3.py` has wri
  3. **Trace the project that renders.** The spliced project is loaded afresh and the whole film played
     on the CPU at the render's 60 fps, and `build/gv3/ufo-beats.json` records what every set piece
     actually did -- each moment's time, where the craft was, the animals taken, how still the craft
-    held -- for the cut (framing, Song Mode's peaks) and the evaluator. The raw trace is
+    held -- and which aliens stood watching each beam, when (`watches`), for the cut (framing,
+    reaction shots, Song Mode's peaks) and the evaluator. `--trace-file` rebuilds it from a trace
+    already taken of the compiled project. The raw trace is
     `build/gv3/cast-ufo.json`, the cast's whole-film trace for the ADR-910 gate.
 
 It refuses, loudly: a plan item the engine could not build (the trace tool's exit 2), a set piece that
@@ -67,6 +69,16 @@ FPS = 60.0
 HIDDEN_BEATS = ("rest", "transit", "hover")
 # What a set piece must have done for the film to be the one the plan asked for.
 EXPECTED_ANIMALS = {"e3-far-lift": 1, "e4-river-pair": 2, "e5-centrepiece": 1}
+
+# The aliens' answers to the beams they hear (cast.py's REACTIONS), measured for the cut: a reaction
+# shot ("Vane sees it") has to be where an alien actually stands watching. A watch is the body
+# standing (ADR-910's still, under 0.1 m/s) and facing the craft within WATCH_FACING degrees, for at
+# least WATCH_MIN seconds, in the WATCH_AFTER seconds after the beam lights (cast.EVENT_MEMORY).
+ALIENS = ("rook", "tide", "sage", "ember", "vane")
+WATCH_FACING = 15.0
+WATCH_STILL = 0.1
+WATCH_MIN = 0.5
+WATCH_AFTER = 20.0
 
 
 def event_name(key, moment):
@@ -168,7 +180,46 @@ def beats_of(trace_doc, report):
             events.append({"name": event_name(sp["id"], beat), "subject": sp["craft"], "seconds": t})
     events.sort(key=lambda e: e["seconds"])
     return {"source": str(trace_doc.get("source")), "fps": trace_doc.get("fps"), "plan": str(PLAN.name),
-            "setPieces": pieces, "songEvents": events}
+            "setPieces": pieces, "songEvents": events, "watches": watches(trace_doc)}
+
+
+def watches(trace_doc):
+    """Each alien's watches of each beam: {set piece: {alien: [{from, to, seconds, metres}]}}, in
+    film seconds at the trace's rate (20 Hz, so a window is good to 0.05 s). An alien with no entry
+    did not stand facing that beam at all. What the picture shows, not what the alien heard: one
+    that happens to stand facing a far beam it cannot hear (tide and E3, 230 m) counts too."""
+    out = {}
+    for sp in trace_doc.get("setPieces", []):
+        beam = sp.get("beats", {}).get("beam")
+        at = (sp.get("craftAt") or {}).get("beam")
+        if beam is None or at is None:
+            continue
+        per = {}
+        for name in ALIENS:
+            e = trace_doc.get("entities", {}).get(name)
+            if e is None:
+                continue
+            t, p, yaw = e["t"], e["position"], e["yaw"]
+            runs, run = [], None
+            for i in range(1, len(t)):
+                if not beam <= t[i] <= beam + WATCH_AFTER:
+                    continue
+                dx, dz = at[0] - p[i][0], at[2] - p[i][2]
+                off = abs(math.degrees((yaw[i] - math.atan2(dx, dz) + math.pi) % (2.0 * math.pi) - math.pi))
+                speed = math.hypot(p[i][0] - p[i - 1][0], p[i][2] - p[i - 1][2]) / max(t[i] - t[i - 1], 1e-9)
+                if off <= WATCH_FACING and speed < WATCH_STILL:
+                    run = [t[i], t[i], math.hypot(dx, dz)] if run is None else [run[0], t[i], run[2]]
+                elif run is not None:
+                    runs.append(run)
+                    run = None
+            if run is not None:
+                runs.append(run)
+            kept = [{"from": round(a, 3), "to": round(b, 3), "seconds": round(b - a, 3), "metres": round(d, 1)}
+                    for a, b, d in runs if b - a >= WATCH_MIN]
+            if kept:
+                per[name] = kept
+        out[sp["id"]] = per
+    return out
 
 
 def frame(t):
@@ -210,7 +261,9 @@ def check(beats):
     return problems
 
 
-def compile_into(project_path=PROJECT, traced=True):
+def compile_into(project_path=PROJECT, traced=True, trace_file=None):
+    """`trace_file`: take the film's set pieces and watches from that whole-film trace of this
+    project instead of tracing it again (it must be of the project as compiled here)."""
     project_path = pathlib.Path(project_path).resolve()
     if not TOOL.exists():
         raise RuntimeError(f"{TOOL} is not built (the shared engine build: revision/briefs.md, Phase 3)")
@@ -227,7 +280,8 @@ def compile_into(project_path=PROJECT, traced=True):
     if not traced:
         return {"setPieces": [{"id": p["key"], "craft": p["craft"], "nominal": p.get("moments", {})}
                               for p in report.get("setPieces", [])]}
-    beats = beats_of(trace(project_path), report)
+    film = json.loads(pathlib.Path(trace_file).read_text()) if trace_file else trace(project_path)
+    beats = beats_of(film, report)
     BEATS.write_text(json.dumps(beats, indent=1) + "\n")
     problems = check(beats)
     if problems:
@@ -240,9 +294,11 @@ def main():
     ap.add_argument("--project", default=str(PROJECT))
     ap.add_argument("--no-trace", dest="traced", action="store_false",
                     help="compile and install only; skip the whole-film trace (about 15 minutes)")
+    ap.add_argument("--trace-file", default=None,
+                    help="read the film from this whole-film trace of the compiled project instead of tracing")
     args = ap.parse_args()
     try:
-        beats = compile_into(args.project, traced=args.traced)
+        beats = compile_into(args.project, traced=args.traced, trace_file=args.trace_file)
     except RuntimeError as e:
         print(f"ufo: {e}", file=sys.stderr)
         return 1
@@ -254,6 +310,11 @@ def main():
         hold = p.get("holding") or {}
         print(f"  {p['id']:15s} {p['craft']:7s} {text}" + (f"; took {taken}" if taken else "")
               + (f"; held within {hold['maxDrift']:.2f} m" if hold.get("frames") else ""))
+    for key, per in beats.get("watches", {}).items():
+        if per:
+            print(f"  {key} watched by " + "; ".join(
+                f"{name} " + ", ".join(f"{w['from']:.2f}-{w['to']:.2f} ({w['metres']:.0f} m)" for w in ws)
+                for name, ws in per.items()))
     print(f"compiled {PLAN.name} into {pathlib.Path(args.project).name}"
           + (f"; the film's set pieces are in {BEATS.relative_to(ROOT)}" if args.traced else ""))
     return 0

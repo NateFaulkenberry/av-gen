@@ -326,6 +326,25 @@ as the production's style call, the authored bounce lowered so no walk rises mor
 (ember and vane 0.32 → 0.17, rook 0.22 → 0.18; sage and tide unchanged). The three float clips
 (idle, e4, e5) are rendered and judged again for a like-for-like before and after.
 
+## Open items that belong to others
+- **The Critic (not GV3):** its float check reads the traced root (`state.position + motion.position`,
+  which carries the stride bob), not the drawn feet. The aliens carry ground-driven foot layers with
+  `bodyCompensation` (`maxDown` 0.3 model units), which may keep the drawn feet planted while the
+  root rises, so the check may over-report floating. Not investigated (the coordinator's call).
+- **The engine, navfix:** ADR-932 (a route to a goal on another connected piece of walkable ground:
+  ember's river-bank stands and pacing from `roam`), ADR-933 (no pacing on urgent reactions; GV3's
+  E5 reaction is "stop and watch where you stand" until it lands), ADR-934 (a retired body stays in
+  the world: taken animals walk on invisibly, and block and draw the aliens).
+- **The reactivity stream:** the Critic finds no visible response on two alien-side routes it
+  checks: the scout beam's four (copied from the saucer's beam; weak in E4, invisible at E1's
+  320 m) and tide's `audio.lowMid -> liveliness/sway` (before and after). Judge them with the film's
+  other routes.
+- **gv3-cut:** s11 "Vane by the river, watching the elder" (52.2-59.5 s) has lost vane (critical
+  in the Critic's idle clip); the aliens' watches of each beam are in `build/gv3/ufo-beats.json`
+  (`watches`) for the reaction shots (s28 "Vane sees it").
+- **Tooling:** `tools/gpu-lock.sh` took a lock whose pid file was still being written (13:00:24);
+  the coordinator is fixing it.
+
 ## For the other streams
 - **gv3-cut** (framing and Song Mode peaks): `build/gv3/ufo-beats.json` after each generation; the
   measured beats are in iteration 2's table (E4 now plays: beam 102.533, lift 103.883, both cows
