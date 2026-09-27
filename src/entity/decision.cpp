@@ -2047,7 +2047,8 @@ void PerceptMemory::reset() {
     merged_.clear();
 }
 
-std::span<const Percept> PerceptMemory::merge(std::span<const Percept> live, double time) {
+std::span<const Percept> PerceptMemory::merge(std::span<const Percept> live, double time,
+                                              const EntityWorld* world) {
     if (!(settings_.seconds > 0.0f) || settings_.capacity == 0) {
         remembered_.clear();
         return live; // ADR-290's behaviour exactly: a thing that left the range is gone
@@ -2059,8 +2060,13 @@ std::span<const Percept> PerceptMemory::merge(std::span<const Percept> live, dou
             return l.kind == p.kind && l.source == p.source;
         });
     };
+    // ADR-934: a body's percept carries its entity index as `source`.
+    const auto taken = [&](const Percept& p) {
+        return world != nullptr && p.kind == InterestKind::Character && p.source < world->entities().size() &&
+               world->entities()[p.source]->retired();
+    };
     std::erase_if(remembered_, [&](const Percept& p) {
-        return isLive(p) || (time - p.seenAt) > static_cast<double>(settings_.seconds);
+        return isLive(p) || (time - p.seenAt) > static_cast<double>(settings_.seconds) || taken(p);
     });
     for (const Percept& p : remembered_) {
         if (merged_.size() >= static_cast<std::size_t>(settings_.capacity) + live.size()) {

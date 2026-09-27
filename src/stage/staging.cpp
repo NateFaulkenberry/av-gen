@@ -1809,10 +1809,16 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             return StepStatus::Failed;
         }
         if (self != nullptr) {
-            // Put the body back under its own behaviours before hiding it, so nothing is left
-            // holding a director motion that will never be updated again.
+            // ADR-934: and out of the world. Before, the body was put back under its own behaviours
+            // and hidden -- and so grazed on unseen, in the crowd other bodies walk round and in
+            // their senses: on GV3 rook walked on the spot for 5.25 s beside two abducted cows. It
+            // is held where it was taken, and nothing is simulated for it again. Its director motion
+            // and Director-tier orders are dropped all the same: nothing left holding a claim on it.
             self->clearDirectorMotion();
             self->actions().cancel(entity::Authority::Director, ctx.time);
+            if (ctx.world != nullptr) {
+                (void)ctx.world->retire(name);
+            }
             const std::string hidePath = parameterPath(run, role, {}, ctx);
             // And put back every parameter this scenario drove *through this role*, to the value it
             // held before the scenario first touched it, before hiding it (ADR-385).

@@ -2684,8 +2684,8 @@ public:
         dctx.dt = ctx.dt;
         dctx.self = ctx.self;
         dctx.state = &state;
-        dctx.percepts =
-            memory_.merge(self != nullptr ? self->percepts() : std::span<const Percept>(), ctx.time);
+        dctx.percepts = memory_.merge(self != nullptr ? self->percepts() : std::span<const Percept>(), ctx.time,
+                                      ctx.world); // ADR-934: a body since taken is forgotten, not faded
         dctx.visited = visited_;
         dctx.nav = ctx.nav;
         dctx.world = ctx.world;

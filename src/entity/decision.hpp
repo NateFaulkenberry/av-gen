@@ -817,7 +817,12 @@ public:
     // remembered one that is still within `seconds` and was not superseded. Stable in (kind,
     // source) order within each half, so the merge cannot depend on the order the sense stage
     // happened to write.
-    [[nodiscard]] std::span<const Percept> merge(std::span<const Percept> live, double time);
+    //
+    // ADR-934: given the world, a remembered body a set piece has since taken is forgotten at once
+    // rather than faded -- it is not somewhere else now, it is gone, and a memory of it would send a
+    // body to the spot it was lifted from for another `seconds`.
+    [[nodiscard]] std::span<const Percept> merge(std::span<const Percept> live, double time,
+                                                 const EntityWorld* world = nullptr);
 
     void reset();
     [[nodiscard]] std::size_t remembered() const { return remembered_.size(); }

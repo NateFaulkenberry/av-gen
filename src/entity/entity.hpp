@@ -608,6 +608,23 @@ public:
     void markPlaced() { ++placements_; }
     [[nodiscard]] std::uint32_t placements() const { return placements_; }
 
+    // ---- retirement (ADR-934) ------------------------------------------------------------------
+    //
+    // A body a set piece has taken -- abducted, carried off, gone for good (`stage::StepKind::Retire`)
+    // -- leaves the world. From the step it is retired on it is no longer simulated: no behaviour,
+    // action, sense or field runs for it, and it is not in the crowd other bodies separate against,
+    // not a body anyone perceives and not a point anyone can be sent to. It is held where it was
+    // taken, hidden. Before this it was only hidden and handed back to its behaviours, so GV3's
+    // abducted cows grazed on, invisible, in the meadow the aliens walk: rook walked on the spot for
+    // 5.25 s beside two of them.
+    //
+    // For good: nothing un-retires a body but `EntityWorld::reset`, which is how a seek back before
+    // the retire gets the body back. Simulation state like `placements`: copied whole into every
+    // ADR-700 checkpoint, and set again by a seek's replay on the step a play set it, because the
+    // director that retires it is replayed on that step. Retired through the world
+    // (`EntityWorld::retire`), which also takes it out of every other body's senses at once.
+    [[nodiscard]] bool retired() const { return retired_; }
+
     // A named number this entity declared. `setProperty` refuses a name the entity did not
     // declare rather than inventing one, because a property invented at runtime is a property no
     // reaction could have been bound to -- which is this project's recurring failure, in miniature.
@@ -679,6 +696,7 @@ private:
     PerformanceEntry performanceEntry_{}; // ADR-820
     DirectorGoal directorGoal_{};         // ADR-824
     std::uint32_t placements_ = 0;        // ADR-911: see `placements`
+    bool retired_ = false;                // ADR-934: see `retire`
     LocomotionState locomotion_{};
     BehaviorList behaviors_;
 
@@ -968,6 +986,12 @@ public:
     // tiers below were doing (ADR-091). What a timeline "release" and a Director's hand-back call.
     // Anything the tier was in the middle of is reported Cancelled. False for an unknown entity.
     bool release(std::string_view entity, double now);
+    // ADR-934: a body a set piece has taken leaves the world (see `Entity::retired`), from this step
+    // on -- and out of every other body's senses now, not at each one's next sense tick: a working
+    // set is kept between ticks, and one that still held the body would send a character toward the
+    // spot it was lifted from for up to a quarter of a second. What `stage::StepKind::Retire` calls,
+    // on the same step of a play and of a seek's replay. False for an unknown entity.
+    bool retire(std::string_view entity);
     // ADR-824 (§35): gives `entity` a runtime goal (see `DirectorGoal`), replacing any earlier one.
     // An empty subject clears it. False for an unknown entity.
     bool setGoal(std::string_view entity, std::string subject, std::string affordance, double now);

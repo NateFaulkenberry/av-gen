@@ -42,6 +42,11 @@ struct CastMember {
     entity::GaitSettings gait{};
     std::uint32_t seed = 0; // 0 = derived from the name and the scene seed
     float yawDegrees = 0.0f; // placed facing
+    // Senses and words, for a body that notices others (ADR-290) and a body others notice by what it
+    // is (Phase D §25). Off and empty by default, which is every cast written before ADR-934.
+    bool perceives = false;
+    entity::PerceptionSettings perception{};
+    std::vector<std::string> tags;
 };
 
 struct CastWorld {
@@ -77,6 +82,9 @@ struct CastWorld {
             d.cullDistance = 0.0f; // the distance bands must not decide a behaviour test
             d.gait = m.gait;
             d.behaviors = std::move(m.behaviors);
+            d.perceives = m.perceives;
+            d.perception = m.perception;
+            d.tags = m.tags;
             descs.push_back(std::move(d));
             entity::NodeBinding b;
             b.node = m.name;
@@ -101,9 +109,17 @@ struct CastWorld {
 
     [[nodiscard]] double time() const { return static_cast<double>(frame) * kStep; }
 
+    // A director, as the composition runs one: at the top of every frame, before any body steps
+    // (ADR-209). A test that also seeks hands the same function to `EntityWorld::seek`'s `before`
+    // hook, so a scrub replays it on the step a play ran it. Empty: no director.
+    std::function<void(double now)> director;
+
     // One application frame. The recorder sees every frame, the first as a baseline.
     void step() {
         params.resetFinals();
+        if (director) {
+            director(time());
+        }
         entity::EntityUpdate u;
         u.time = time();
         u.dt = frame == 0 ? 0.0 : kStep;

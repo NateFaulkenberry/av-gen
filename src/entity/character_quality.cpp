@@ -72,6 +72,12 @@ void CharacterQualityRecorder::record(const EntityWorld& world, double time, dou
     scratch_.reserve(world.entities().size());
     for (const auto& owned : world.entities()) {
         const Entity& e = *owned;
+        // ADR-934: a body a set piece has taken has left the world, and its metrics end where it was
+        // taken. Recorded on, it would stand in the beam for the rest of the film -- and before this
+        // ADR it grazed on, invisible, and every one of its numbers after the abduction was that.
+        if (e.retired()) {
+            continue;
+        }
         CharacterSample s;
         s.name = e.name();
         // `locomotion().position`, not `state().position()`: it is the root the animation layer is
