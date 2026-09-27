@@ -455,6 +455,67 @@ TEST_CASE("a stop back where the body stood two stops ago is an A->B->A revisit"
     CHECK(only(abc).behaviour.revisits == 0); // the control: the third stop is 20 m from the first
 }
 
+namespace {
+
+// A tour of `points` at 2 m/s, standing two seconds at each (the first included), facing the way it
+// walks: the stops the recorder counts are the stands, and the way into and out of each is the leg.
+Pose tour(const std::vector<glm::vec2>& points, double t) {
+    constexpr double kHold = 2.0;
+    constexpr double kSpeed = 2.0;
+    double clock = 0.0;
+    for (std::size_t leg = 0; leg + 1 < points.size(); ++leg) {
+        if (t < clock + kHold) {
+            return Pose{points[leg], 0.0f};
+        }
+        clock += kHold;
+        const double walk = static_cast<double>(glm::length(points[leg + 1] - points[leg])) / kSpeed;
+        if (t < clock + walk) {
+            return walking(points[leg], points[leg + 1], kSpeed, t - clock);
+        }
+        clock += walk;
+    }
+    return Pose{points.back(), 0.0f};
+}
+
+} // namespace
+
+TEST_CASE("walking back and forth between two places is pacing; a round of places is not",
+          "[motion][quality][adr933]") {
+    // ADR-933. GV3's ember walked to a river bank and back eight times in 40 s: reversals, one after
+    // another. The run is the pattern; one reversal on its own is a change of mind.
+    const glm::vec2 A(0.0f, 0.0f);
+    const glm::vec2 B(10.0f, 0.0f);
+    const glm::vec2 C(0.0f, 10.0f);
+    // A -> B -> A -> B -> A, then on to C. The stops at B (7 s), A (14 s) and B (21 s) are walked out
+    // of the way they were walked into; the one at A at 28 s is walked out of at 90 degrees.
+    const auto pacing = script("pacer", 40.0, [&](double t) { return tour({A, B, A, B, A, C}, t); });
+    const auto& p = only(pacing);
+    CHECK(p.behaviour.reversals == 3);
+    CHECK(p.behaviour.longestPacing == 3);
+    CHECK(p.behaviour.longestPacingFrom == Approx(7.0).margin(0.05));
+    CHECK(p.behaviour.longestPacingSeconds == Approx(14.0).margin(0.05));
+
+    // The control: the same legs round a square. Every stop turns, none reverses, nothing paces.
+    const glm::vec2 D(10.0f, 10.0f);
+    const auto round = script("rounder", 40.0, [&](double t) { return tour({A, B, D, C, A, B}, t); });
+    CHECK(only(round).behaviour.reversals == 0);
+    CHECK(only(round).behaviour.longestPacing == 0);
+    CHECK(only(round).behaviour.longestPacingSeconds == 0.0);
+
+    // A reversal, a turn, a reversal: two changes of mind with a real walk between them, not a run.
+    const auto broken = script("broken", 40.0, [&](double t) { return tour({A, B, A, C, A, B}, t); });
+    CHECK(only(broken).behaviour.reversals == 2);
+    CHECK(only(broken).behaviour.longestPacing == 1);
+
+    // And where a reader of the file will look for it.
+    const nlohmann::json j = entity::toJson(pacing);
+    const auto& stops = j["entities"][0]["behaviour"]["stops"];
+    REQUIRE(stops.contains("pacing"));
+    CHECK(stops["pacing"]["longest"] == 3);
+    CHECK(stops["pacing"]["seconds"].get<double>() == Approx(14.0).margin(0.05));
+    CHECK(stops["pacing"]["from"].get<double>() == Approx(7.0).margin(0.05));
+}
+
 TEST_CASE("turning on the spot is pivot yaw; turning on a circle measures its radius",
           "[motion][quality][adr910]") {
     // A body standing still and turning half a revolution over two seconds.

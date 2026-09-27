@@ -17,6 +17,10 @@
 //   --plan P      compile a Director Plan into the loaded project first, exactly as `avgen --plan`
 //                 does (ADR-929), so a plan's set pieces can be traced without a GPU
 //   --save-project OUT   write the project with the plan installed, before tracing it
+//   --decisions LIST     also write why the deciding characters did what they did: every decision
+//                 (the `avgen_behavior_trace` line) and every action that completed, failed, was
+//                 skipped or was cancelled, with its reason, at the simulation second it happened.
+//                 LIST is `all` or names, comma-separated (ADR-933: how a pacing loop is read)
 //
 // Exit codes: 0 traced; 1 could not load, plan or write; 2 traced, but the plan had items that could
 // not be built (listed under "plan" -> "blocked" and "issues").
@@ -71,6 +75,17 @@
 // `aimPoint` projected through (eye, target, vfov) is where the subject sits in frame, and the eye's
 // travel against `followPoint`'s is how far the camera moves for the distance its subject covers.
 //
+// ---- decisions (`--decisions`, ADR-933) --------------------------------------------------------
+//
+// A position trace shows a body walking to a river bank and back eight times; it cannot say why.
+// With `--decisions`, two more keys, per listed character:
+//
+//   "decisions": { "ember": ["  176.02  ember       beam/approach -> roam [..] ...", ...] }
+//   "actions":   { "ember": [{"t": 176.9, "action": "beam/approach", "result": "failed",
+//                             "reason": "stuck"}, ...] }
+//
+// Decisions are sampled every frame, so none is missed however fast the body changes its mind.
+//
 // It traces; it does not judge. Exit status: 0 when the file was written, 1 on a load failure or
 // bad arguments.
 
@@ -78,6 +93,7 @@
 #include "app/engine.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
+#include "entity/behavior_trace.hpp"
 #include "entity/entity.hpp"
 #include "entity/locomotion.hpp"
 #include "params/parameter_set.hpp"
@@ -90,6 +106,7 @@
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -120,6 +137,8 @@ struct Options {
     fs::path out;
     fs::path plan;
     fs::path saveProject;
+    bool decisions = false;
+    std::vector<std::string> decisionsFor; // empty with `decisions`: every deciding character
 };
 
 void usage() {
@@ -127,7 +146,7 @@ void usage() {
                  "usage: avgen_cast_trace (--project p.json | --scene s.scene.json)\n"
                  "                        [--seconds N] [--start S] [--fps F] [--hz H] [--nodes a,b,...]\n"
                  "                        [--camera] [--out file.json] [--plan plan.json]\n"
-                 "                        [--save-project out.json]\n");
+                 "                        [--save-project out.json] [--decisions all|name,name,...]\n");
 }
 
 std::vector<std::string> splitList(const char* text) {
@@ -168,6 +187,12 @@ bool parse(int argc, char** argv, Options& o) {
             o.plan = argv[++i];
         } else if (std::strcmp(a, "--save-project") == 0 && hasValue) {
             o.saveProject = argv[++i];
+        } else if (std::strcmp(a, "--decisions") == 0 && hasValue) {
+            o.decisions = true;
+            const char* list = argv[++i];
+            if (std::strcmp(list, "all") != 0) {
+                o.decisionsFor = splitList(list);
+            }
         } else {
             std::fprintf(stderr, "unknown or incomplete argument: %s\n", a);
             return false;
@@ -407,6 +432,23 @@ int main(int argc, char** argv) {
     }
     std::map<std::string, glm::vec3> lastCraft; // craft entity -> last frame's simulated position
 
+    // ADR-933: why the deciding characters did what they did, when asked.
+    entity::BehaviorTraceRecorder decisionRecorder;
+    std::map<std::string, nlohmann::json> decisionLines;
+    std::map<std::string, nlohmann::json> actionLines;
+    const auto traced = [&](const std::string& name) {
+        return o.decisionsFor.empty() ||
+               std::find(o.decisionsFor.begin(), o.decisionsFor.end(), name) != o.decisionsFor.end();
+    };
+    if (o.decisions) {
+        for (const std::string& name : o.decisionsFor) {
+            if (composition->entityWorld().find(name) == nullptr) {
+                std::fprintf(stderr, "--decisions: no entity named '%s'\n", name.c_str());
+                return 1;
+            }
+        }
+    }
+
     for (std::uint64_t i = first; i < first + frames; ++i) {
         FrameTime time;
         time.renderTime = static_cast<double>(i) * dt;
@@ -423,6 +465,33 @@ int main(int argc, char** argv) {
         }
         // ---- set pieces, every frame: the director's events, and the craft while it holds ----
         const entity::EntityWorld& world = composition->entityWorld();
+        if (o.decisions) {
+            const std::size_t before = decisionRecorder.lines().size();
+            decisionRecorder.sample(world);
+            for (std::size_t k = before; k < decisionRecorder.lines().size(); ++k) {
+                // The line is "<time>  <entity>  ...": the entity is its second word.
+                const std::string& line = decisionRecorder.lines()[k];
+                std::istringstream words(line);
+                std::string when;
+                std::string who;
+                words >> when >> who;
+                if (traced(who)) {
+                    decisionLines[who].push_back(line);
+                }
+            }
+            for (const entity::ActionEvent& e : world.actionEvents()) {
+                if (!traced(e.entity)) {
+                    continue;
+                }
+                nlohmann::json one{{"t", rounded(e.time)},
+                                   {"action", e.action},
+                                   {"result", entity::actionResultName(e.result)}};
+                if (!e.reason.empty()) {
+                    one["reason"] = e.reason;
+                }
+                actionLines[e.entity].push_back(std::move(one));
+            }
+        }
         const auto where = [&](const std::string& name) {
             const entity::Entity* e = world.find(name);
             return e != nullptr ? e->state().position() : glm::vec3(0.0f);
@@ -603,6 +672,16 @@ int main(int argc, char** argv) {
     }
     if (!planReport.is_null()) {
         doc["plan"] = std::move(planReport);
+    }
+    if (o.decisions) {
+        doc["decisions"] = nlohmann::json::object();
+        doc["actions"] = nlohmann::json::object();
+        for (auto& [name, lines] : decisionLines) {
+            doc["decisions"][name] = std::move(lines);
+        }
+        for (auto& [name, lines] : actionLines) {
+            doc["actions"][name] = std::move(lines);
+        }
     }
 
     const std::string text = doc.dump();

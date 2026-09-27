@@ -107,6 +107,18 @@ void CharacterQualityRecorder::closeStop(Track& t, glm::vec2 here) const {
     }
     if (turned > static_cast<double>(thresholds_.reversalDegrees)) {
         ++b.reversals;
+        // ADR-933: a reversal after a reversal is pacing; anything walked on out of breaks the run.
+        if (t.pacingRun == 0) {
+            t.pacingFrom = t.pendingStopAt;
+        }
+        ++t.pacingRun;
+        if (t.pacingRun > b.longestPacing) {
+            b.longestPacing = t.pacingRun;
+            b.longestPacingFrom = t.pacingFrom;
+            b.longestPacingSeconds = t.pendingStopAt - t.pacingFrom;
+        }
+    } else {
+        t.pacingRun = 0;
     }
 }
 
@@ -259,6 +271,8 @@ void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, 
                 if (t.pendingOut) {
                     closeStop(t, here);
                 }
+                t.stopBegan = time - t.stillRun; // the stop began when the body stood, not when it counted
+
                 // The way in: straight-line travel from the oldest point of the trail to here.
                 t.hasHeadingIn = false;
                 if (!t.trail.empty()) {
@@ -306,6 +320,7 @@ void CharacterQualityRecorder::record(std::span<const CharacterSample> samples, 
                 // Leaving a stop: the way out is measured from where it stood.
                 t.inStop = false;
                 t.pendingOut = true;
+                t.pendingStopAt = t.stopBegan;
                 t.stopExit = t.stopPlaces.empty() ? here : t.stopPlaces.back();
             }
             t.stillRun = 0.0;
@@ -422,7 +437,9 @@ nlohmann::json toJson(const CharacterQualityReport& report) {
             {"stillFraction", b.stillFraction},
             {"longestStillSeconds", b.longestStillSeconds},
             {"stops", {{"count", b.stops}, {"measured", b.measuredStops}, {"reversals", b.reversals},
-                       {"turnsOver90", b.turnsOver90}, {"revisits", b.revisits}}},
+                       {"turnsOver90", b.turnsOver90}, {"revisits", b.revisits},
+                       {"pacing", {{"longest", b.longestPacing}, {"seconds", b.longestPacingSeconds},
+                                   {"from", b.longestPacingFrom}}}}},
         };
         e["ground"] = {
             {"stillSeconds", g.stillSeconds},
