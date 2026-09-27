@@ -1711,6 +1711,14 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
                 tooltipUnformatted(badge.tooltip.c_str());
             }
         }
+        // ADR-924: which Director plan item made this route, and why (the plan's reason on hover).
+        if (const RoutePlanNote note = routePlanNote(route, engine.directingPlans()); note.show) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.55f, 0.78f, 1.0f, 1.0f), "%s", note.text.c_str());
+            if (ImGui::IsItemHovered()) {
+                tooltipUnformatted(note.tooltip.c_str());
+            }
+        }
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60);
         ImGui::Checkbox("##on", &route.enabled);
         ImGui::SameLine();
