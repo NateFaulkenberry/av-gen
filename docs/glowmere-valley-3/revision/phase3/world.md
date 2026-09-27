@@ -5,9 +5,12 @@ Engine: the shared build `040d6644` for the analysis, then `ec515c8b` (main plus
 every trace and render. The world code (`src/world/`) is identical in the two builds except
 `effects/history_bank`, so the terrain measurements hold on both.
 
-Files: `tools/gv3/world.py` (`close_ends`, `Field`, the `--check` CLI), `tools/gv3/offline.py`
-(new), and five lines of `tools/make_glowmere_valley_3.py` (the closure's call, `--final` and
-`--final-trace`).
+Files:
+- `tools/gv3/world.py`: `close_ends`, `Field`, and the `--check` CLI;
+- `tools/gv3/offline.py`: new;
+- about ten lines of `tools/make_glowmere_valley_3.py`, in four places: the usage line, the
+  `--final` and `--final-trace` flags, `world.close_ends` moved ahead of `Ground`, and the call to
+  `offline.apply`.
 
 ## W0: what the edge is, measured
 
@@ -81,8 +84,8 @@ Four constraints decide where each change can go.
    keyed on its *index* in its layer (`procedural.cpp`, `materialVariation`). Its position, scale and
    yaw are keyed on its cell. So any change to how many plants the northern rows accept re-deals the
    glow for every plant south of them: the same plants in the same places, a different lottery for
-   which of them shine. This cannot be avoided by any closure of the north end in the terrain. It is
-   measured in W3 and reported, not hidden.
+   which of them shine. This cannot be avoided by any closure of the north end in the terrain. The
+   per-layer counts are in W3.
 
 ## W2: the closure (commit `25c227dc`)
 
