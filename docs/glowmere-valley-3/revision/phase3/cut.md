@@ -498,8 +498,12 @@ E1-E5 moment the cut shows is on screen on both (`build/gv3/cut/castworld/`).
   (8, rising), 104.1 (20, rising), 107.1 (14). 75.1 cranes up 4.5 m from the ferns, tilting up to the
   aurora. 89.1 swings 30 deg round the elder's stem with its live aim, so the saucer slides out from
   behind the rim.
-- 9.1 from the north-east (the horse lower left, the elder's whole cap right of centre): from the
-  south-east it repeated the east-bank travel (26.1) and the orbit (49.1).
+- 9.1 repeated the east-bank travel (26.1) and the orbit (49.1): the Critic calls two shots the same
+  framing when their eyes are within 4% of the valley's spread of eyes (18 m), their views within 12
+  deg and their fields of view within 8. A first try from the north-east put the elder as near the lens
+  as the horse and hid the horse behind a rock (seen in the clip); the fix is the south-east vantage
+  through a 55 mm (`fc93b071`), the horse on the lower third (0.13 of the frame) under the whole cap,
+  13 deg of field of view from the 35 mm travel and orbit.
 - 113.1 from 12 m up the north-east slope, a 10 m truck, the line of sight to the elder's stem and cap
   clear of the ground from both ends: from the north it repeated 77.1.
 - 57.1 at 28 mm, 91.1 larger (above); 113.1's label no longer says "ridge", which the adapter reads as
@@ -530,10 +534,32 @@ Left as designed: 81.1's saucer small and far, 89.1's saucer behind the rim at t
 "horse partly hidden by the elder" is the cap's bounding box (which reaches the ground), not the stem,
 23 deg clear of the horse from this eye.
 
+### Iteration 4, judged on clips
+
+Nine clips of the changed spans (`render-it4.sh`, one lock hold each, every one exit 0 with GPU
+errors 0), each judged against the same range of the before (`critic-it4.sh`). The before's inputs
+were rebuilt with the adapter as it now is (`44d1111`), and iteration 3's three clips were re-judged
+with it too, so every pair is judged by one adapter. Comparisons: `build/gv3/cut/it4/cut-compare-*.txt`.
+
+- **Staging, cinematography and motion improve or hold in every clip** (cinematography 1.00 in six).
+- **What degrades is mostly not the cut's:** the routes on the scout's beam where it is not lit, and
+  the elder's heartbeat route (musical synchronization, effects: look and cast), Vane floating (cast).
+- **The cut's own findings, left as designed:** "bright areas away from the scout" in 54.1 and 59.1
+  (the beam and the elder's cap around a small craft 45-118 m off); the elder small in 77.1's
+  north-end wide; 89.1's saucer partly behind the rim at the start of the swing that brings it out;
+  the intent's "avoid constant camera movement" beside 65.1 (whose push became an arc, not a new move).
+
+**Seen in the clips** (frames in `build/gv3/cut/it4/`): 47.1's gills wheeling overhead, 53.1, 65.1's
+spores across the cap, 75.1's crane to the aurora over the river, 89.1's swing clearing the saucer,
+91.1's Ember small but seen on the bank with the elder and the settling saucer beyond (iteration 2 hid
+her), and 57.1's whole column from over the river all read as meant. 29.1: Vane walks the lower left
+with the elder's cap above the trees at first; by its end a near tree's canopy fills the right third:
+the scatter is not in any trace, so only a render shows it. Kept, recorded. 9.1's first try: above.
+
 ## State (2026-09-27, about 15:00)
 
 **Commits on `gv3/cut`** since the checkpoint: iteration 2 `dd2306b2`; iteration 3 `630ca638`,
-`6589a152`; iteration 4 `d7c57449`, `e1cac9a6`, `4442ca71`, `d9e4bf35`; and this log.
+`6589a152`; iteration 4 `d7c57449`, `e1cac9a6`, `4442ca71`, `d9e4bf35`, `fc93b071`; and this log.
 
 **The Director's cut in use:** `tools/gv3/song_cut.json`, 73 spans, settings `songcut.SETTINGS`
 (song, expressive, 1.8 / 7.5 / 0.45 s, seed 1), GV3's treatments `songcut.TREATMENTS`. Every span has
