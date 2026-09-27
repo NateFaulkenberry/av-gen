@@ -270,6 +270,19 @@ so v3 and v4 differ only in the film):
   grade still held. v4's drop was darker than the plateau (0.146 against 0.186), its sky 0.82 of the
   first pass's, the spores round the elder thin; the first pass raised these with its grade (light
   2.1, aurora 3.2, sparkle 1.7). To verify on the drop's clip.
+- **The drop's world, measured (v7, engine-2, rendered alone):** the Critic, v4 -> v7 on the same
+  inputs: musical_synchronization 0.62 -> 0.81, effects 0.78 -> 0.90, visual_coherence 0.98 -> 1.00,
+  nothing degraded; the elder's kick routes in the drop are now "configured and observed" (z 3.9-4.3,
+  +2.0-2.6% of its box; v4 z 1.3). The sky in s39 is 0.89 of the first pass's (v5 0.82). The mean
+  luma does not move (0.143 against v4's 0.146: the aurora's calibration in v5 took back what the
+  drop's key added, and the valley's own light is small things in wides), so the gap to the plateau's
+  mean is the shots' content. Hue, plateau -> drop: 2.25 degrees (inside the plateau's 4.5-5.3).
+  Clipped pixels in the drop 0.51% (first pass 0.60%). The spores round the elder cannot be judged
+  on a range render: it warms particles for 4 s, and the first pass's comparison is a whole film.
+- **The horse, measured (v6, rendered alone):** s29's clipping 25.8% -> 23.2% at gain 0.5, the legs
+  tan instead of white. In my branch's framing (the first pass's staging, the camera inside the beam)
+  the clipped disk is mostly the beam's core, whose emission also rides `audio.rms` (+1.5, the
+  saucer beam's own link, kept); gv3-cast's staging frames E5 differently.
 - The Critic, v3n -> v4 on the open (A): musical_synchronization 0.81 -> 0.76, effects 0.90 -> 0.87,
   because its grid no longer finds v3's per-frame sky response (spectrum shape was still 0.75 in
   v3) -- the same disagreement as in iteration 2: the plan gives the aurora the lead, slowly.
