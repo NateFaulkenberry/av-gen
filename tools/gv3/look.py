@@ -356,6 +356,16 @@ def _pulses(name, times, width=1.0 / 60.0):
     return {"kind": "timeline", "name": name, "settings": {"loopLength": 0.0, "mode": "event", "keys": keys}}
 
 
+def roll():
+    """The roll into the drop, as the track plays it (01-music.md section 1.4): 8ths through bars 93-94,
+    16ths through 95 and the first three beats of 96, about 32nds on its last beat. The analyser's low
+    onsets do not hold it (480 of them, the 475 kicks and five more), so it is scored like the kicks."""
+    hits = [music.beat(b, 1 + k / 2) for b in (93, 94) for k in range(8)]
+    hits += [music.beat(95, 1 + k / 4) for k in range(16)] + [music.beat(96, 1 + k / 4) for k in range(12)]
+    hits += [music.beat(96, 4 + k / 8) for k in range(8)]
+    return hits
+
+
 def apply_motifs(project, scene):
     """The authored events, then the Director's proposal on top of them (reactivity.py). Returns the
     number of routes the film carries."""
@@ -366,6 +376,8 @@ def apply_motifs(project, scene):
         _pulses("gap", music.KICK_GAPS),
         # Every kick the track plays, as scored (music.kicks): the elder's heartbeat.
         _pulses("kick", music.kicks(), width=1.5 / 60.0),
+        # The riser's roll: the small fungi flicker with it, faster and faster into the drop.
+        _pulses("roll", roll()),
     ]
     for key in [k for k in params if k.startswith("sources/breath/")]:
         del params[key]  # the first pass's free-running breath: the proposal's is beat-synced

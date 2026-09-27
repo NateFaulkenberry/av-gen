@@ -85,6 +85,13 @@ HERO_PARTS_ON_DROP_RING = ("-cap", "-under", "-gills")
 HERO_DROP_RING = 1.5
 # The regional hue spread, lowered because ADR-904 made it a real rotation of the colour shown.
 HUE_FIELD = {"fungi": 0.07}
+# The colour of the light a layer casts on what is around it (the ecology light) is its authored
+# `emissiveColor`, which the program's own colour replaces on the mushroom itself: the fungi show the
+# tissue program's teal and cast the source's purple (the emission stream's finding). Not changed yet:
+# the cast light's colour is normalised and its power is not, so teal (luminance 0.77 at unit peak)
+# would light the valley floor about 3.8 times brighter than the purple (0.20) -- a variant to judge on
+# frames, not a default.
+LAYER_COLOUR = {}
 # Where the bar's rings run: from groove 2, when the track's body arrives, to the suspension; again in
 # the drop. Silent while the valley holds its breath (the pull-back), while the saucer drains the light
 # (suspension, break), through the riser (the roll drives the fungi instead) and in the tail.
@@ -118,6 +125,8 @@ def prepare(project, scene):
             layer["emissiveField"], layer["emissiveFieldAmount"] = WAVE_LAYERS[name]
         if name in HUE_FIELD:
             layer["hueField"] = HUE_FIELD[name]
+        if name in LAYER_COLOUR:
+            layer["emissiveColor"] = LAYER_COLOUR[name]
     bases = [h[: -len("-cap")] for h in FEATURED]
     for node in scene["nodes"]:
         if node.get("kind") == "procedural" and any(node["name"] == b + p for b in bases for p in HERO_PARTS_ON_DROP_RING):
@@ -187,6 +196,20 @@ DROPS = {
 DROP_TARGETS = {
     "procedural/*/emissiveFieldAmount": "a hero part shows only the drop's ring; its depth is the drop's",
 }
+# Routes the production adds after the planner's, for what it does not know about. They go in after
+# the proposal because the planner leaves alone any target a person already routes, and each of these
+# shares a target with one of its routes.
+ADDS = [
+    # The roll into the drop drives the small fungi (the plan's map, micro): 8ths, 16ths, then about
+    # 32nds, each hit a short flare over the kick's slower echo, so the flicker quickens with the roll.
+    # Short enough (70 ms) that 16ths still read as separate flashes; the 32nds fuse into a glow as the
+    # riser crests. The fungi are specks spread over the frame, not a large area, and +0.35 is under
+    # the kick's echo at full depth: a flicker of the valley floor, not a strobe.
+    ({"source": "timeline.roll", "target": "nodes/valley/scatter/fungi/emissionGain", "component": -1,
+      "amount": 0.35, "op": "add", "polarity": "unipolar", "enabled": True,
+      "chain": {"attackMs": 5.0, "decayMs": 70.0}},
+     "the riser's scored roll on the small fungi: their flicker quickens with it"),
+]
 # Parameters of the planner's sources, merged over its own.
 SOURCE_PARAMETERS = {
     # beat-synced: position = beats / 8 + phase, a sine 0.5 - 0.5 cos(2 pi position) peaking at 0.5;
@@ -242,14 +265,15 @@ def tune(proposal):
     plan["produced"] = [p for p in plan["produced"] if p.get("item") not in dropped]
     parameters = dict(install["parameters"])
     parameters.update(SOURCE_PARAMETERS)
-    return {"routes": routes, "sources": install["sources"], "parameters": parameters, "plan": plan,
-            "dropped": dropped, "notes": notes}
+    added = [copy.deepcopy(route) for route, _ in ADDS]
+    return {"routes": routes, "added": added, "sources": install["sources"], "parameters": parameters,
+            "plan": plan, "dropped": dropped, "notes": notes}
 
 
 def install(project, tuned):
     """ADR-927's install, as plain JSON edits: a re-install replaces the previous one."""
     project["routes"] = [r for r in project.get("routes", [])
-                         if not r.get("planItem", "").startswith("reactivity/")] + tuned["routes"]
+                         if not r.get("planItem", "").startswith("reactivity/")] + tuned["routes"] + tuned["added"]
     names = {(s["kind"], s["name"]) for s in tuned["sources"]}
     project["sources"] = [s for s in project.get("sources", []) if (s["kind"], s["name"]) not in names] + \
         tuned["sources"]
@@ -333,7 +357,7 @@ def apply(project, scene):
         levels[item["level"]] = levels.get(item["level"], 0) + 1
     return (f"reactivity: {len(tuned['routes'])} of {s['routes']} proposed routes installed "
             f"(micro {levels.get('micro', 0)}, meso {levels.get('meso', 0)}, macro {levels.get('macro', 0)}; "
-            f"{len(tuned['dropped'])} dropped), {len(tuned['sources'])} sources; audit: "
+            f"{len(tuned['dropped'])} dropped), {len(tuned['added'])} added, {len(tuned['sources'])} sources; audit: "
             f"{report['summary']['routes']['live']}/{report['summary']['routes']['total']} routes and "
             f"{report['summary']['tracks']['live']}/{report['summary']['tracks']['total']} tracks live")
 
