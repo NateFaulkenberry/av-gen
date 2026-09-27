@@ -5,8 +5,9 @@
 // properties the owner's brief and the silent-no-op rule ask for:
 //   * at tears 0 the surface is byte-identical to the shader without the tear code at all, whatever
 //     the other tear settings say (the no-op the rest of the world relies on);
-//   * the seams exist, are thin, carry parallel stripes, and turn when their direction does;
-//   * every tear setting reaches the picture, and a routable one reaches it through its parameter;
+//   * the seams exist, are thin, carry stripes along them, and turn when their direction does;
+//   * outside its seams the water is the water with no tears (the brief's "not uniformly busy");
+//   * every tear setting reaches the picture, and each reaches it through its control's parameter;
 //   * the wind reaches them;
 //   * a seek lands on the frame a play reached;
 //   * a preview and a final at twice its resolution fade them the same.
@@ -121,11 +122,13 @@ struct Synthetic {
     std::unique_ptr<rendering::SceneRenderer> renderer;
     std::uint32_t size = 384;
 
-    static Synthetic make(std::uint32_t size = 384) {
+    // `dirs` are searched before the live shader tree, so a variant of water.wgsl written there wins.
+    static Synthetic make(std::uint32_t size = 384, std::vector<fs::path> dirs = {}) {
         Synthetic s;
         s.size = size;
         s.ctx = makeWaterContext();
-        s.shaders = std::make_unique<gpu::ShaderLibrary>(*s.ctx, std::vector{fs::path(AVGEN_SHADER_SOURCE_DIR)});
+        dirs.emplace_back(AVGEN_SHADER_SOURCE_DIR);
+        s.shaders = std::make_unique<gpu::ShaderLibrary>(*s.ctx, dirs);
         s.renderer = std::make_unique<rendering::SceneRenderer>(*s.ctx, *s.shaders);
         REQUIRE(s.renderer->init().has_value());
         s.renderer->setPassToggles(waterQuantitativeToggles());
@@ -547,18 +550,12 @@ TEST_CASE("tears are thin seams of parallel stripes that turn with their directi
     const std::vector<float> plain = luminance(bench.render(untorn));
     const double aligned = stripeAlignment(a.lum, a.band, n, n);
     const double unrelated = stripeAlignment(plain, a.band, n, n);
-    const double cohBand5 = meanOver(coherence(a.lum, n, n, 2), a.band, true);
-    const double cohPlain5 = meanOver(coherence(plain, n, n, 2), a.band, true);
-    const double cohOut5 = meanOver(coherence(a.lum, n, n, 2), a.band, false);
-    const double cohBand9 = meanOver(coherence(a.lum, n, n, 4), a.band, true);
-    const double cohPlain9 = meanOver(coherence(plain, n, n, 4), a.band, true);
-    const double cohOut9 = meanOver(coherence(a.lum, n, n, 4), a.band, false);
+    const double cohBand = meanOver(coherence(a.lum, n, n, 2), a.band, true);
+    const double cohPlain = meanOver(coherence(plain, n, n, 2), a.band, true);
     INFO(fmt::format("seams cover {:.1f}% of the water in {} components ({} px in parts of 60+), "
-                     "size-weighted length over width {:.1f}; stripes' alignment with their band {:.2f}, the same "
-                     "pixels untorn {:.2f}; coherence 5x5: bands {:.2f}, same pixels untorn {:.2f}, outside {:.2f}; "
-                     "9x9: bands {:.2f}, untorn {:.2f}, outside {:.2f}",
-                     share * 100.0, a.parts.size(), bigPixels, meanAspect, aligned, unrelated, cohBand5, cohPlain5,
-                     cohOut5, cohBand9, cohPlain9, cohOut9));
+                     "size-weighted length over width {:.1f}; stripes' alignment with their band {:.2f} (the same "
+                     "pixels untorn {:.2f}); 5x5 coherence in the bands {:.2f} (untorn {:.2f})",
+                     share * 100.0, a.parts.size(), bigPixels, meanAspect, aligned, unrelated, cohBand, cohPlain));
     // Present, and not the whole surface: the brief's "do not make the entire water uniformly busy".
     CHECK(share > 0.02);
     CHECK(share < 0.25);
@@ -566,10 +563,15 @@ TEST_CASE("tears are thin seams of parallel stripes that turn with their directi
     REQUIRE(bigPixels > 0);
     CHECK(meanAspect > 6.0);
     // Stripes that run along the band: the image's dominant gradient inside the bands lines up with the
-    // band's own, where the same pixels untorn have much less to do with it.
+    // band's own (it points across the band), where the same pixels untorn have little to do with it
+    // (0.60 against 0.15 when this was written).
     CHECK(aligned > unrelated + 0.2);
-    // PROVISIONAL (being measured): coherent stripes, against the same pixels untorn.
-    CHECK(cohBand9 > cohPlain9);
+    // The audit also proposed "the structure tensor is coherent (above 0.6)" in the bands. That is not a
+    // property of these seams and is not asserted: the compressed ripples are thin streaks with ends and
+    // junctions, less coherent in a 5x5 window than the smooth ripples they came from (0.58 against 0.67
+    // when this was written, 0.45 against 0.54 in 9x9) while strongly aligned with the band. Gradient
+    // energy across the band over along it said little more (x1.77 against x1.24 untorn): in HDR
+    // luminance it is carried by the moon's glints, which are isotropic.
 
     // THE CONTROL, and the alignment claim: turned 60 degrees, the seams' axis turns with them.
     const Seams b = seamsAt(0.35f + static_cast<float>(std::numbers::pi / 3.0));
@@ -578,6 +580,86 @@ TEST_CASE("tears are thin seams of parallel stripes that turn with their directi
     CHECK(turned > 48.0);
     CHECK(turned < 72.0);
     CHECK(bench.ctx->errorCount() == 0);
+}
+
+// ---- nowhere past the seams ---------------------------------------------------------------------------
+//
+// The brief: "do not make the entire water surface uniformly busy". A seam moves the ripples only inside
+// its band: the shift goes out and comes back across the band (a tent in S), so it is exactly zero on
+// both sides, and outside every band the surface is the surface with no tears. Measured as the share of
+// the water outside the bands (dilated three pixels past their soft edges) that differs from the untorn
+// render by more than 1% of its mean. THE CONTROL is the same shader with the tent replaced by a
+// one-sided step -- the shift left in place past the band -- under which the water on the far side of
+// every seam moves too. (A step relaxed back to zero over the surrounding metres was the design before
+// the tent; value noise sits near zero, so its relaxation reached most of the surface.)
+TEST_CASE("outside its seams the water is the water with no tears", "[gpu][renderer][water][tears]") {
+    const scene::WaterSettings strong = tearSettings();
+    scene::WaterSettings faint = strong;
+    faint.tears = 0.3f;
+    scene::WaterSettings untorn = strong;
+    untorn.tears = 0.0f;
+
+    Synthetic live = Synthetic::make(256);
+    const std::uint32_t n = live.size;
+    const std::vector<float> plain = luminance(live.render(untorn));
+    const std::vector<float> torn = luminance(live.render(strong));
+    const std::vector<char> seams = differs(torn, luminance(live.render(faint)), 1e-4f);
+    std::vector<char> near(seams.size(), 0);
+    for (int y = 0; y < static_cast<int>(n); ++y) {
+        for (int x = 0; x < static_cast<int>(n); ++x) {
+            if (seams[static_cast<std::size_t>(y) * n + static_cast<std::size_t>(x)] == 0) {
+                continue;
+            }
+            for (int dy = -3; dy <= 3; ++dy) {
+                for (int dx = -3; dx <= 3; ++dx) {
+                    const int u = x + dx, v = y + dy;
+                    if (u >= 0 && v >= 0 && u < static_cast<int>(n) && v < static_cast<int>(n)) {
+                        near[static_cast<std::size_t>(v) * n + static_cast<std::size_t>(u)] = 1;
+                    }
+                }
+            }
+        }
+    }
+    double meanPlain = 0.0;
+    std::size_t outside = 0;
+    for (std::size_t i = 0; i < plain.size(); ++i) {
+        if (near[i] == 0) {
+            meanPlain += plain[i];
+            ++outside;
+        }
+    }
+    REQUIRE(outside > plain.size() / 2);
+    meanPlain /= static_cast<double>(outside);
+    // The share of the water outside the seams that differs from the untorn render by more than
+    // `fraction` of its mean luminance.
+    const auto changedOutside = [&](const std::vector<float>& lum, double fraction) {
+        std::size_t changed = 0;
+        for (std::size_t i = 0; i < lum.size(); ++i) {
+            if (near[i] == 0 && std::fabs(lum[i] - plain[i]) > fraction * meanPlain) {
+                ++changed;
+            }
+        }
+        return static_cast<double>(changed) / static_cast<double>(outside);
+    };
+
+    const fs::path stepDir = writeWaterShaderVariant(
+        "tears-one-sided", replaceOnce(readWaterShaderSource(), "(1.0 - abs(2.0 * s - 1.0))", "s"));
+    Synthetic stepped = Synthetic::make(256, {stepDir});
+    const std::vector<float> step = luminance(stepped.render(strong));
+    INFO(fmt::format("outside the seams ({:.1f}% of the view), the share of the water that differs from the untorn "
+                     "render by more than 0.01% / 0.1% / 1% of its mean: {:.2f}% / {:.2f}% / {:.2f}%; with a one-sided "
+                     "step {:.1f}% / {:.1f}% / {:.1f}%",
+                     100.0 * static_cast<double>(outside) / static_cast<double>(plain.size()),
+                     100.0 * changedOutside(torn, 1e-4), 100.0 * changedOutside(torn, 1e-3),
+                     100.0 * changedOutside(torn, 1e-2), 100.0 * changedOutside(step, 1e-4),
+                     100.0 * changedOutside(step, 1e-3), 100.0 * changedOutside(step, 1e-2)));
+    // A shift of the ripples moves the reflection only slightly where it is of a smooth stretch of sky,
+    // so the check counts any change above a thousandth of the mean: everything a shift touches, and
+    // none of what a single pixel's rounding does.
+    CHECK(changedOutside(torn, 1e-3) < 0.01);
+    CHECK(changedOutside(step, 1e-3) > 0.10); // THE CONTROL
+    CHECK(live.ctx->errorCount() == 0);
+    CHECK(stepped.ctx->errorCount() == 0);
 }
 
 // ---- every setting reaches the picture, and none of them does at 0 ---------------------------------
@@ -866,8 +948,18 @@ TEST_CASE("tears fade the same at a preview's resolution and at twice it", "[gpu
     // calibration cannot see that, since near the lens the stripes are far above the limit.
     const auto agrees = [](double ratio) { return ratio > 1.0 / 1.3 && ratio < 1.3; };
     CHECK(agrees(now.farRelative));
-    // THE CONTROL: the shader counting its own pixels fails the same check.
+    // THE CONTROL: the shader counting its own pixels fails the same check (x0.55 when this was written:
+    // on the low side, where before ADR-916's fold it failed on the high side, x5.1).
     CHECK_FALSE(agrees(own.farRelative));
+    // And the band itself: its slope fades out at the same distance in both frames, so the far half holds
+    // about as many band pixels at 2160 rows as at 1080 (6145 and 5310 when this was written); counting
+    // its own pixels a final keeps bands a preview has faded (12007).
+    const double bandsNow = static_cast<double>(now.farBandHigh) / static_cast<double>(std::max<std::size_t>(now.farBandLow, 1));
+    const double bandsOwn = static_cast<double>(own.farBandHigh) / static_cast<double>(std::max<std::size_t>(own.farBandLow, 1));
+    INFO(fmt::format("far band pixels at 2160 over 1080 rows: x{:.2f}; counting its own pixels x{:.2f}", bandsNow, bandsOwn));
+    REQUIRE(now.farBandLow > 1000);
+    CHECK(agrees(bandsNow));
+    CHECK(bandsOwn > 1.5); // THE CONTROL
 }
 
 // ---- the permutation's source ------------------------------------------------------------------------
