@@ -38,7 +38,7 @@ When the characters integration passes, tell gv3-look, gv3-cut and gv3-world to 
 | gv3-cut | `a2b5481cf60d73226` | `av-gen-gv3-cut`, `gv3/cut` | the Director's cut, pacing, alien screen time, cameras, framing E1–E5 |
 | gv3-world | `a9731881a8bb421a4` | `av-gen-gv3-world`, `gv3/world` | the world edge, the offline 4K configuration |
 | gv3-cast | `a88a2d14952fedf24` | `av-gen-gv3-cast`, `gv3/cast` (from `ecdc3cb4`) | aliens, animals, the scout craft, E1–E5 via set pieces |
-| critic-adapter | `a6ebe91c551ba811a` | `~/Documents/GitHub/creative-critic` | set-piece events from the cast trace; regenerating GV3 inputs; ground samples |
+| critic-adapter | `a6ebe91c551ba811a` | `~/Documents/GitHub/creative-critic` | **done** (`6ed180c`); report in [stream-reports/critic-adapter.md](stream-reports/critic-adapter.md). The daemon on 8765 was restarted at about 11:40 on the new code |
 
 **How Phase 3 is organised:**
 - **Briefs:** [briefs.md](briefs.md) § "Phase 3: the GV3 scene revision, in parallel streams". Each stream owns distinct generator files and never commits generated project files.
