@@ -111,9 +111,9 @@ Set pieces, measured: E1 beam 13.900, sweep 15.033, depart 22.633 (bar 13); E2 c
 4. **Sage's `interest` behaviour stops its feet** (it runs after the decider), 55% of the time in
    3-6 s spells, which chain past `maxStillSeconds`; sage's four longest stands (9-10 s) are these.
 
-## Iteration 2: E4 on the meadow pair; the aliens kept on their own bank (in progress)
+## Iteration 2: E4 on the meadow pair; the aliens kept on their own bank
 
-**What changed** (this commit):
+**What changed** (commit `0ff69eea`):
 - **E4** placed on the western meadow's two cows: region centre (-69, 6), radius 20 (the plan
   compiles with no finding; nominal: approach 93.871, beam 102.504, lift 103.871 (bar 57),
   depart 111.904).
@@ -126,11 +126,72 @@ Set pieces, measured: E1 beam 13.900, sweep 15.033, depart 22.633 (bar 13); E2 c
 - **The scout has a hero record** (the saucer's, scaled 0.6: radius 4.92 m, height 4.26 m,
   importance halved), so the Critic's adapter no longer assumes the saucer's 8.2 m.
 
-**Running at this checkpoint:** the iteration-2 whole-film trace (`python3 tools/gv3/ufo.py`, about
-26 min under this load; log `build/gv3/cast/iter2/ufo-run.log`) and `avgen_character_quality`
-(`build/gv3/cast/iter2/quality.json`).
+**Measured** (whole film, 226 s at 60 fps: `python3 tools/gv3/ufo.py`, 21 min 55 s, log
+`build/gv3/cast/iter2/ufo-run.log`; `avgen_character_quality`, `build/gv3/cast/iter2/quality.json`;
+the scene and project that ran are beside them). Iteration 1's figures in brackets:
 
-## The aliens float while walking (the coordinator's finding 1): investigation so far
+| alien | longest still | still | stops (reversals, turns > 90°) | A→B→A | yaw on the spot | turn radius | stuck |
+|---|---|---|---|---|---|---|---|
+| rook | **7.7 s** [3.2] | 21% [11] | 19 (0, 2) [15 (1, 7)] | 0 [2] | 21% [17] | 1.6 m | **6.7 s** [0.4] |
+| tide | **8.4 s** [4.1] | 25% [18] | 18 (1, 5) [15 (0, 3)] | 0 [1] | 20% [16] | 1.6 m | **7.0 s** [1.9] |
+| sage | 8.2 s [10.3] | 35% [35] | 14 (1, 5) [12 (1, 4)] | 0 [0] | 28% [26] | 1.6 m | 0.6 s [1.0] |
+| ember | 7.2 s [7.2] | 27% [25] | 24 (1, 5) [29 (3, 11)] | 0 [4] | 16% [26] | 1.6 m | 3.3 s [2.6] |
+| vane | 4.2 s [4.2] | 20% [20] | 14 (0, 3) [14 (0, 3)] | 0 [0] | 13% [13] | 1.6 m | 1.0 s [1.0] |
+
+("Stuck" is ADR-910's: meaning to move faster than 0.3 m/s while moving slower than 0.05.)
+
+Animals: 273 stops, **0 reversals, 6 turns over 90°** (bull-1 1, bull-10 2, bull-21 2, cow-23 1),
+**5.2 s standing on ground over 12°** (bull-1 3.7 s, bull-21 1.5 s, unchanged), **0 s facing uphill**.
+
+**All five set pieces played** (measured; each craft held within 0.35-0.42 m while beaming):
+
+| | craft | approach | beam | sweep / lift | depart | taken |
+|---|---|---|---|---|---|---|
+| E1 survey | scout | 6.233 | 13.900 | sweep 15.033 | 22.633 | — |
+| E2 flyby | saucer | cross 26.650 | — | — | 29.883 | — |
+| E3 far lift | scout | 55.967 | 65.617 | 66.967 | 71.900 | bull-10 71.883 |
+| **E4 river pair** | scout | 93.883 | **102.533** | **103.883** | 111.933 | **cow-23, cow-12 111.917** |
+| E5 centrepiece | saucer | 148.317 | 170.350 | 172.783 | 177.733 | horse-11 177.717 |
+
+E4 lands one or two frames after the plan's nominal moments (lift 103.883 against 103.871).
+
+**The aliens' reactions** (facing within 5° of the craft, standing):
+- **E4:** ember (17-22 m away) turned and watched 4.0 s (105.2-109.2 s); sage (31 m) stepped back to
+  40 m and watched 4.1 s. Rook and tide (49-57 m) and vane (78-90 m) carried on.
+- **E5:** ember watched 5.0 s (171.7-176.7 s), sage stepped back 8 m and watched 3.5 s, rook 2.9 s,
+  tide 0.8 s (it had stood since 164.3 s for a roam look, so its `maxStillSeconds` of 8 walked it off
+  at 172.7 s, before the watch's pose began), vane not at all (100 m away, facing off).
+- **Ember no longer paces the bank through the drop:** stops turning 120° or more, 176-216 s: seven
+  in iteration 1, none in iteration 2 (one at 192.5 s).
+
+**Found:**
+1. **A taken animal is only hidden: it keeps walking, invisible, and still blocks and is seen.**
+   Rook "walked" in place for 5.25 s (205.65-210.85 s at (-66.2, -5.2)): the walk clip at 0.51 m/s,
+   no travel, on flat dry meadow, with the invisible cow-23 3.0 m away and cow-12 4.3 m away. After
+   E4 both cows graze on in the meadow the aliens roam until the film ends (cow-12 at (-63.9, -1.5)
+   at 206 s, walking). The engine's `retire` step hides the body and hands it back to its own
+   behaviours (`stage/staging.cpp`, `StepKind::Retire`); the crowd the bodies separate against and
+   the perception index are built from every active entity, visible or not (`entity/entity.cpp`,
+   the crowd build and `buildBodyIndex`). So a taken animal stays an obstacle and something to walk
+   up to and look at. An engine defect, **reported to the coordinator**; nothing in the scene can
+   remove a body at a moment only the set piece knows.
+2. **Tide "walked" in place for 4.4 s** (211.80-216.25 s at (-36.1, -31.1), 0.37 m/s, no travel),
+   on flat dry ground with no other body within 6 m. The move's own stuck clock (4 s without
+   progress) ended it. Cause not found.
+3. **Ember still stands on the river bank early in the film:** 4.9 s at 22.7 s and 7.2 s at 31.0 s,
+   at (-54.6, 81.2), on a 26° bank at the water's edge. It stops dead from 2.97 m/s in one sample
+   (a roam target across the river): iteration 1's finding 2, now from `roam` rather than a reaction.
+   The navfix engine stream (ADR-932, 933) owns it.
+4. **Sage's stands end at its cap:** its `graze` looks last 6 s (`dwell` 6) and it decides at
+   0.6 Hz, so five stands run 7.2-8.2 s, each ended by `maxStillSeconds` 8.
+5. **Rook's and tide's longest stills are regressions from iteration 1** (3.2 → 7.7 s, 4.1 → 8.4 s),
+   but each is one of the episodes above (1, and tide's E5 watch cut short), not a pattern of long
+   stands: rook's next longest is 4.2 s and tide's 4.5 s.
+
+**Decided (iteration 3):** drop ember's and vane's bass reaction on the bounce (below); shorten
+sage's `graze` look from 6 to 4.5 s; report finding 1. Findings 2 and 3 wait for the engine.
+
+## The aliens float while walking (the coordinator's finding 1)
 
 On iteration 1's trace, the drawn root's height above the engine's own ground (`WorldMap::height`,
 probed through `tools/gv3/ground.py`), on dry ground, by speed:
@@ -146,27 +207,55 @@ probed through `tools/gv3/ground.py`), on dry ground, by speed:
   `0.5 (1 - cos 2φ) · bounce · min(speed / stride, 2)`, a rise from ground contact, written into the
   traced position as `state.position + motion.position`).
 - **Rook and tide match that formula** (peaks 0.117 and 0.075 m at a walk). **Ember and vane rise
-  about 2.4× what it gives** (0.18 m): something else doubles their bob. Not yet found.
-- A control is running on scratch copies (`build/gv3/cast/float/bob0` with every alien's bounce 0,
-  `bobref` unchanged; 60 s each) to prove the bob is the whole cause. Nothing is worked round in
-  data.
+  about 2.4× what it gives** (0.18 m): something else doubles their bob.
+
+**The control arms** (scratch copies of iteration 1's data in `build/gv3/cast/float/`, the film's
+first 60 s traced; the same measurement, walking 0.1-3.3 m/s):
+
+| arm | ember mean / p90 / max | vane | rook | tide | sage |
+|---|---|---|---|---|---|
+| `bobref`: as iteration 1 | +0.139 / +0.311 / +0.396 | +0.160 / +0.329 / +0.406 | +0.050 / +0.109 / +0.133 | +0.032 / +0.071 / +0.096 | +0.045 / +0.093 / +0.142 |
+| `bob0`: every alien's `bounce` 0 | **+0.071 / +0.161 / +0.228** | **+0.083 / +0.172 / +0.223** | +0.003 / +0.009 / +0.036 | +0.003 / +0.009 / +0.055 | +0.005 / +0.036 / +0.051 |
+
+(`bob0band`, the same with the run band written exactly, measured identically.)
+
+- **The bob is the whole cause for rook, tide and sage:** with no bounce they sit on the ground to
+  within the ground probe's error.
+- **Ember and vane still rise 0.22 m with no bounce at all.** The extra is an entity reaction both
+  carry from the multicam: `audio.bass -> liveliness/bounce`, depth 0.45, a 60 ms attack. It adds up
+  to 0.45 to a bounce of 0.32 on every bass note, so their bob peaks at up to 2.4× what was authored.
+- **Decided:** drop that reaction (`ALIEN_REACTIONS_DROPPED` in `cast.py`), keep the authored bounce.
+  Iteration 3's trace checks it. The aliens still answer the music, through what they do rather
+  than a lift off the ground: ember and vane keep `audio.rms` on their interest's weight and
+  `music.drop` on how often they decide, rook keeps `audio.rms` on its roam, sage `music.drop` on its
+  graze, and tide `audio.lowMid` on its sway (the brief's §3 asks for more reactivity, and its
+  research list for none of the "everything pulses to the beat" kind).
+- **What remains after the drop is ADR-895's authored bob**, whose peak at a 3.07 m/s walk is
+  0.184 m for ember and vane, 0.117 m for rook, 0.075 m for tide and about 0.085 m for sage. The
+  Critic's grounding rule (`critic/analyzers/entities.py`, `synthesis.py`) is the root's height over
+  the ground: "floats" when more than 10% of an on-screen body's track is over 0.1 m, "medium" when
+  the worst is over 0.2 m. It reads the root, not the feet, so it may still flag ember, vane and
+  rook for the authored bob.
 
 ## For the other streams
 - **gv3-cut** (framing and Song Mode peaks): `build/gv3/ufo-beats.json` after each generation; the
-  measured beats above (iteration 1), E4's to follow from iteration 2. The re-homed animals: three
-  horses in the eastern meadow round (74, 13), two cows in the western one round (-69, 6).
+  measured beats are in iteration 2's table (E4 now plays: beam 102.533, lift 103.883, both cows
+  taken at 111.917). The re-homed animals: three horses in the eastern meadow round (74, 13), two
+  cows in the western one round (-69, 6). E4's pair graze 4-11 m apart there until the lift.
 - **The Critic's adapter**: the trace's `atRetire` is taken after the retired body is dropped back to
   the ground (the horse 23 m up the beam reads 5.3 m); the adapter works round it.
 
-## Status and next steps (checkpoint, 2026-09-27 12:00)
-1. Read iteration 2's trace: E4's beam and two lifts at bar 57, ember and the others no longer
-   pacing, the ADR-910 table; iterate on anything over the bar (no alien still > 8 s unless
-   watching, no reversals).
-2. Finish the float investigation (the control arm) and report it with evidence.
-3. Clips through the GPU lock (960×540): `idle` 44-60 s, `ufo-e4` 95-118 s, `grounded` 18.9-26.3 s,
-   `ufo-e5` 166-182 s; the "before" clips are cut from the first pass's final and already judged
-   (session `gv3-cast`: `job_1a0e37a89cff758a4`, `job_1a0e37abc8f5686b2`, `job_1a0e37b083f46e32d`,
-   `job_1a0e37b26c7aa44a7`); regenerate their inputs with the Critic's new adapter first
-   (INTEGRATION_GUIDE §6), then compare.
+## Status and next steps (checkpoint, 2026-09-27 13:00)
+1. Iteration 3: the bass reaction dropped, sage's look 4.5 s; the whole-film trace and the ADR-910
+   table; the float measured again on that trace (height above the ground while walking, per alien).
+2. Clips through the GPU lock (960×540): `idle` 44-60 s, `ufo-e4` 95-118 s, `grounded` 18.9-26.3 s,
+   `ufo-e5` 166-182 s. The "before" jobs, regenerated with the Critic's new adapter, are in session
+   `gv3-cast` under `build/gv3/cast/critic/before2/`: idle `job_1a0e3a2ef6ddda6d0`, e4
+   `job_1a0e3a2f166a5dbb7`, horse/grounded `job_1a0e3a2f362969799`, e5 `job_1a0e3a2f56977afcb`.
+3. If the Critic still reads the aliens as floating after the drop, tell the coordinator with numbers.
 4. Evidence to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cast/`; the final report with
    the measured E1-E5 beats.
+
+The helper scripts (`cast_report.py`, `clips.sh`, `float.py`, `stops.py`, `where.py`, and this
+session's `mstills.py`, `stuck.py`, `episode.py`, `reacts.py`, `pathmap.py`) are in
+`build/gv3/cast/tools/` (not committed: `build/` is the stream's scratch).
