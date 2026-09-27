@@ -8,6 +8,17 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **MERGED (18:20): main is `983221a9`. ALL 11 ENGINE STREAMS ARE IN MAIN** (navfix: ADR-932-934 and the ADR-931
+  amendment), plus the status index.
+  - navfix integration suites: CPU 3,799 of 3,800 (the wall-clock case passes alone). GPU 544 cases, 543 passed,
+    1 skipped, 617,151 assertions, exit 0; its 49 overlap samples were all cihealth's CPU tests, no GPU.
+  - Pushed (`876a11e2..983221a9`) and merged into `gv3/production` (`4b4c467d`). The CI watcher was resumed for the
+    new push run and the pending runs.
+  - **Building `av-gen-engine-4`** at `983221a9`. When it is ready, gv3-int switches to it and applies E5's "go and
+    see".
+  - Still in flight: behave (ADR-935-936), uireach (ADR-937-939), cihealth (ADR-940-941 and the partition).
+    Queued for the next engine round: two moons and the moon's controls; a multi-animal lift keeps its animals
+    apart; the world closure's features have no editor.
 - **18:10: THE OWNER'S FEEDBACK ON r1** (sent to gv3-int; standing for GV3):
   - **"Restore the hero pulses in the mushrooms and the camera beam".** Only the elder's kick and the lantern's clap
     still read. **Rule: tame a pulse, never delete it**; the memory note is `av-gen-gv3-keep-the-pulses`.
