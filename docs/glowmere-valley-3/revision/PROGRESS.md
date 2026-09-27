@@ -16,9 +16,17 @@ where its predecessor stopped.
       makes false failures, not false passes, so the pass stands, with the overlap on record.
   - Main was pushed to GitHub (`ec515c8b..876a11e2`) and merged into `gv3/production` (`37c1b65d`).
     `integrate/revision` = `876a11e2`.
-  - **Building `av-gen-engine-3`** at `876a11e2` (detached; log `coord-engine3-build.log` in the coordinator's
-    scratchpad). When it is ready, the GV3 streams move `build/release` to it between jobs. It carries render's
-    `post/referenceHeight`, `scene/fogSky`, `scene/fogSkyDistance` and the offline floors.
+  - **`av-gen-engine-3` is BUILT** (15:00) at `876a11e2` (detached; exit 0).
+  - At 15:00 gv3-look, gv3-cut and gv3-world were told to:
+    - switch `build/release` to engine-3 between jobs;
+    - merge `gv3/production` `37c1b65d` (the lock fix and the cast) when no `gpu-lock.sh` of theirs is running,
+      then re-baseline.
+  - **Render's GV3 values are split by owner:**
+    - **gv3-look's `look.BASE`** takes the five values common to preview and final: `post/referenceHeight` 1080,
+      `post/motionBlur/maxRadius` 60, `post/motionBlur/samples` 32, `scene/fogSky` 1.0, `scene/fogSkyDistance` 0.
+      Bloom levels 6, stretch 10.386 and tile 20 stay as they are.
+    - **gv3-world's `offline.py`** keeps only final-only values, and drops the render-post.md items render made
+      unnecessary.
 - **MERGED (12:55): main is `ec515c8b`,** now also with characters (ADR-907–910, the ADR-911 placement amendment).
   Its suites: CPU 3,781 of 3,781, 0 failed, 3,233 s; GPU 533 cases, 532 passed, 1 skipped. **9 of 11 engine streams
   are in main.** The owner approved the fast-forward after the classifier refused it. Main was then merged into
