@@ -471,6 +471,12 @@ walkable cells (48%) cannot be reached from the largest". The source: 951 walks,
 
 s28, "Vane sees it" (174.02-174.94), still has Vane watching.
 
+**The crafts over the new ground** (the closed trace, the ground from the closed world's heights):
+- the scout's lowest pass over edited ground is 26.1 m, at 73.4 s, leaving E3's lift site (the ground
+  there moved 0.8 m);
+- the saucer's is 99.4 m, at 148.35 s, over the south sill on E5's approach;
+- anywhere, their lowest are unchanged ground: 21.9 m (the scout at E4) and 23.3 m (the saucer at E5).
+
 **The cast diverges as W2d said it would.**
 
 | Body | Max | Mean | First divergence |
@@ -685,6 +691,50 @@ The final as it now stands (`c350391b`, no march), 3840x2160 x2, ProRes 422.
 far instance at full detail.
 
 The march that F3 removed was what made the first measurement 1.52 s/frame.
+
+## F6: the final on engine-3 (the coordinator's split of render's values, and the re-measure)
+
+**What `offline.py` applies, against render's split.** Render's report (`stream-reports/render.md`):
+- five values that are the same in the preview and the final now belong to gv3-look's `look.BASE`:
+  `post/referenceHeight` 1080, motion blur `maxRadius` 60 and `samples` 32, `scene/fogSky` 1.0,
+  `scene/fogSkyDistance` 0;
+- these render-post.md recommendations are unnecessary: bloom levels 8, stretch x2, tile 40, a
+  resolution-dependent look, `volumeSteps` 32 at offline, a fixed 8x anisotropy, and gaps 6, 7 and
+  3's radii.
+
+`offline.py` applies **none of them**, so nothing is dropped. The march (`volumeSteps` 32) left it in
+F3, and the rest were never in it. It keeps only what is final-only:
+- the render block (3840x2160 x2, the offline tier, `limits: tier`, ProRes 422);
+- the shadows' reach and cascades;
+- the terrain's LOD and view distance;
+- the rigs' rate.
+
+**The final as generated now** (`--final --final-trace cast-e3final.json`, the closed film): "final:
+3840x2160 x2, tier offline, limits tier, prores422; shadows 160 m (300 m on 18 wides: s02, s04, s05,
+s06, s08, s09, s11, s13, s14, s17, s18, s19, s23, s25, s29, s30, s38, s39), terrain LOD 0 to 1000 m,
+the fog as previewed, 17 rigs posed every frame". gv3-look's five values are not in `gv3/production`
+`37c1b65d` yet, so the measured project (`build/gv3w/e3final4k/`) has them applied by hand, to measure
+the final that will be rendered.
+
+**The cost on engine-3: not measured yet.** Between 15:58 and 17:40 the GPU never went quiet for 90
+s: navfix's suite and gv3-int's renders held it, and a 1080p job of mine timed out after an hour in
+the lock's queue. The ranges are ready and keep trying on their own:
+- `build/gv3w/k4wait3h.sh build/gv3w/k4z-jobs.txt`, started 17:41, gives up at 20:41;
+- it waits outside the lock for 90 s with no avgen, avgen_render_tests, avgen_tests or ctest running
+  (by executable name), takes the lock for one range, re-checks, and marks any overlap SHARED;
+- results in `build/gv3w/k4wait3h.out`, and each range's log (with `AVGEN_SHADOW_STATS=1` and
+  `time -l`) in `build/gv3w/k4/e3final4k-<start>-<end>.mov.log`.
+
+To read them: s/frame is the log's "render complete: N frames in Ts" over N; the film is 13,530
+frames. The log lines to look for are the coordinator's: "post chain 4320 lines at reference height
+1080 ... box-filtered 2 octave(s) down", "texture filtering at 16x", "sky's cube from 256 to 1024",
+and "project 'glowmere-valley-3.json' loaded" with no scene-load failure. Until then the figures are
+render's: about 0.34 s a frame, 77-80 minutes for the film. F5's 0.40-0.52 s a frame were
+engine `ec515c8b` and the first closure.
+
+**gv3-look's `scene/fogSky` 1.0 changes how the ends look.** Distance fades into the sky behind it,
+aurora included, so the head, the sill and the mouth's slot will read softer than in W5's stills,
+which were taken without it. The pairs to look at again with `look.BASE` in: s14, s22, s23 and s37.
 
 ## For the coordinator and the other streams
 
