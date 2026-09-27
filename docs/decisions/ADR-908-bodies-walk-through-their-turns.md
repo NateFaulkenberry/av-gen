@@ -8,7 +8,9 @@ acceleration), ADR-907 (the forward cone this relies on)
 `turnRadius` and `pivotRadius`, and their JSON keys; `Gait::playbackRate`'s pivot branch (all in
 `src/entity/gait.{hpp,cpp}` and `src/entity/action.cpp`). `Wander`'s turn (`src/entity/behaviors.cpp`). The action
 tier's `move` and `face` verbs, and `ActionQueue::begin` (`src/entity/action.cpp`).
-**Tests:** `tests/unit/test_walk_through_turns.cpp` (five cases, each with a control arm)
+**Tests:** `tests/unit/test_walk_through_turns.cpp` (five cases, each with a control arm);
+`tests/unit/test_character_controls_reach.cpp` (the gait's turn knobs moved as parameters move the body,
+and where each control is found)
 
 ## Context
 
@@ -80,6 +82,16 @@ the speed the feet move round the pivot: `|turnRate| * pivotRadius / walkSpeed`.
 cycle becomes visible and capped at the gait's ceiling. `pivotRadius` defaults to 1 m, about half a
 farm animal at the Glowmere cast scale. An asset with a real idle has its own turn clip and is left
 alone.
+
+**The turn knobs are parameters**, for a body that authors a gait: `entity/<name>/gait/turnRate`
+("turn rate on errands (degrees a second, 0 = the default 140)"), `gait/turnRadius` ("turn radius on
+errands (m, 0 = turns on the spot)") and `gait/pivotRadius` ("turning on the spot, its feet circle at
+(m)"). `Entity::refreshGait` reads them back at the top of every step on both paths into `gaitLive_`,
+which is what the action tier and the clip rate are handed; `desc_.gait` stays the authored one, so a
+save writes what the author wrote. `gaitLive_` starts as the authored gait in the constructor, because a
+seek can publish a clip rate for a body it never stepped. Wander's `turnRadius` and `turnRate` are its
+own parameters. All of them are found in the Parameters panel (`entity` → `<name>/gait`,
+`<name>/wander`) and in the Inspector's character section (ADR-907 §8).
 
 **On defaults.**
 - **`wander` walks through its turns by default,** for ADR-907's reason: the pattern is built in and

@@ -9,7 +9,8 @@ commitment boost, variety), ADR-907 and ADR-908
 `Option::directed` (`src/entity/character_ai.hpp`). `Decide`'s still clock and departure memory (`src/entity/behaviors.cpp`).
 `HoldPostConsiderer`'s `duration` and its half-tolerance return. `SpeedRange` on `interest` and `react`, and
 `react`'s `urgentSpeed` (`src/entity/decision.{hpp,cpp}`).
-**Tests:** `tests/unit/test_decider_habits.cpp` (eight cases, each with a control arm)
+**Tests:** `tests/unit/test_decider_habits.cpp` (ten cases, each with a control arm);
+`tests/unit/test_character_controls_reach.cpp` (where each control is found)
 
 ## Context
 
@@ -81,6 +82,16 @@ the same decision draws the same pace, a scrub draws what the play drew, and one
 re-cast the others. `react`'s moves also hurry by their urgency: `urgentSpeed` (default 1.5) multiplies
 the pace at urgency 1 and nothing at urgency 0. The approach's urgency is the event's intensity; the
 flee's is half as much again.
+
+**6. Every knob is a parameter with a plain label**, found in the Parameters panel under `entity` →
+`<name>/decide` (and `<name>/decide/<considerer>` for a considerer's own) and in the World panel
+Inspector's character section when the body is clicked (ADR-907 §8): "longest it stands still (s, 0 =
+no limit)", "won't walk back to where it just was for (s)", "counts as back where it was within (m)",
+"a walk straight back is worth (x its score, 0 = never)", "stays at its post for (s, 0 = until
+something better)", "slowest pace" and "fastest pace" (x walk speed), "hurries at full alarm (x its
+pace)". `loopRadius` and `loopPenalty` were first read once from the file; ADR-225 calls that a
+decoration, so they are registered like the rest, and a test moves `loopPenalty` through its parameter
+and watches the walks back appear.
 
 **On defaults.**
 - **The loop memory and its veto are on**, because walking straight back to where it just left is

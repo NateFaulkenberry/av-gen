@@ -34,6 +34,25 @@ Layers, the inspector, scene states, direction, macros and debug draw. It also c
 The world-editing half of this panel is being rewritten and is not documented yet. See
 [The world editor](help://gaps/world-editor).
 
+### How a character moves
+
+Click an alien or an animal and **World → Inspector** shows, below its **Properties**, a section
+named for it (**How rook moves and behaves**, for rook): everything that decides how that character
+walks, turns, pauses and chooses where to go, headed by what owns it.
+
+- **wander** (animals): walking speed, turn rate and **turn radius** (it walks through its turns on a
+  circle this wide), **how far off straight ahead it wanders**, **steepest ground it walks on** (12
+  degrees unless changed; 0 for any), shortest and longest walk, **longest pause between walks**,
+  how near home it stays, and where it **slows down** before stopping.
+- **gait**: the **turn rate** and **turn radius on errands** for a character sent somewhere, and how
+  wide its feet circle when it turns on the spot.
+- **decide** (the aliens): the **longest it stands still**, how long it **won't walk back to where it
+  just was**, and under each of its considerers the **slowest and fastest pace** of its walks, how
+  long it **stays at its post**, and how much it **hurries** toward or away from an event.
+
+The same controls are in the **Parameters** panel under **entity**, one heading per character and
+behaviour, on the Intermediate and Advanced authoring layers.
+
 ### Effects
 
 There is no separate effects panel. An effect is attached to something — the World, an object (a

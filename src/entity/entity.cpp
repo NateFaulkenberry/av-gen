@@ -853,12 +853,12 @@ void EntityWorld::registerParameters(params::ParameterSet& params, const std::st
                     .path = base + name, .defaultValue = value, .hardMin = 0.0f, .hardMax = hi, .label = label});
             };
             const GaitSettings& gait = entity->desc_.gait;
-            entity->gaitParams_.turnRate =
-                add("turnRate", gait.turnRate, 720.0f, "turn rate on errands (deg/s, 0 = the default 140)");
+            entity->gaitParams_.turnRate = add("turnRate", gait.turnRate, 720.0f,
+                                               "turn rate on errands (degrees a second, 0 = the default 140)");
             entity->gaitParams_.turnRadius =
                 add("turnRadius", gait.turnRadius, 20.0f, "turn radius on errands (m, 0 = turns on the spot)");
             entity->gaitParams_.pivotRadius =
-                add("pivotRadius", gait.pivotRadius, 10.0f, "steps round a turn on the spot at (m)");
+                add("pivotRadius", gait.pivotRadius, 10.0f, "turning on the spot, its feet circle at (m)");
         }
         // Declared state, as ordinary parameters. This is the whole of what makes "the headphones
         // are on" readable by anything else: a reaction targets "state/headphones", a track
@@ -1128,12 +1128,10 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
     bindFields();
 }
 
-// Phase B. One step of the provider memory, from the state the body is already in.
-//
-// **Deliberately reads `state_` rather than taking arguments.** The request is a view of what the
-// body is doing and wants, and both halves already live on the entity (ADR-545); building it from
-// parameters would give a caller a way to advance the memory with something other than the truth,
-// and a seek would then replay a different request from the one a play used.
+// ADR-908: the authored gait with the three turn knobs read back from their parameters, so a track,
+// a route or a slider moves them. Called at bind and at the top of every step on both paths; the
+// constructor starts `gaitLive_` as the authored gait, because `publishSeek` can read it for a body
+// a seek never stepped.
 void Entity::refreshGait() {
     gaitLive_ = desc_.gait;
     if (gaitParams_.turnRate != nullptr) {
@@ -1143,6 +1141,12 @@ void Entity::refreshGait() {
     }
 }
 
+// Phase B. One step of the provider memory, from the state the body is already in.
+//
+// **Deliberately reads `state_` rather than taking arguments.** The request is a view of what the
+// body is doing and wants, and both halves already live on the entity (ADR-545); building it from
+// parameters would give a caller a way to advance the memory with something other than the truth,
+// and a seek would then replay a different request from the one a play used.
 void Entity::publishLookSchedule() {
     if (state_.hasLookTarget != locomotion_.hasLookTarget) {
         locomotion_.lookTargetBefore = locomotion_.hasLookTarget;

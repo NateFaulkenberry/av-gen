@@ -51,10 +51,16 @@ inline bool pathStartsWith(const std::string& s, std::string_view prefix) {
 // -- decides when every downbeat, phrase and bar-synced pulse in the picture lands. Off every list it
 // showed only on Advanced, and the editor opens on Intermediate: a third instance of ADR-375, caught
 // before it shipped.
+// `entity/` is on the intermediate list, beside `nodes/`, for the same reason (ADR-907 to 909): how a
+// character walks, turns, pauses and chooses where to go -- its behaviours, its gait, its decider --
+// is what a viewer watches it do, and every one of those knobs lives under `entity/<name>/`. Off
+// every list they showed only on Advanced: a fourth instance of ADR-375, found when the walk-through
+// turns, the slope limit and the longest pause were given plain labels nobody on the default layer
+// could see.
 inline constexpr std::string_view kBeginnerPrefixes[] = {"macros/", "scene/", "env/",    "post/",     "camera/",
                                                          "root/",   "music/", "shader/", "temporal/"};
 inline constexpr std::string_view kIntermediatePrefixes[] = {
-    "procedural/", "field/", "spline/", "sdf/", "material/", "particles/"};
+    "procedural/", "field/", "spline/", "sdf/", "material/", "particles/", "entity/"};
 } // namespace detail
 
 // True when `path` (a parameter path) belongs to the layer.
@@ -184,6 +190,41 @@ inline constexpr std::string_view kIntermediatePrefixes[] = {
     const std::size_t slash = rel.rfind('/');
     return slash == std::string_view::npos ? std::string(label)
                                            : std::string(rel.substr(0, slash + 1)) + std::string(label);
+}
+
+// Where the World panel Inspector puts a parameter below a selection's prefix: under the heading of
+// its first path segment below the prefix ("" for a direct member, drawn as a plain row), with its
+// row label starting at `cut` (`inspectorRowLabel`). One rule for every section the Inspector draws
+// -- the selected object's own properties and, for a character, how it moves and behaves (below) --
+// so a test can do the panel's arithmetic instead of trusting it.
+//
+//   ("nodes/oak/wind/lag",                "nodes/oak/")   -> {"wind", 15}    row "lag"
+//   ("entity/rook/decide/graze/paceFrom", "entity/rook/") -> {"decide", 19}  row "graze/paceFrom"
+//   ("nodes/oak/position",                "nodes/oak/")   -> {"", 10}        row "position"
+struct InspectorPlace {
+    std::string heading;
+    std::size_t cut = 0;
+};
+[[nodiscard]] inline InspectorPlace inspectorPlace(std::string_view path, std::string_view prefix) {
+    InspectorPlace out;
+    out.cut = std::min(prefix.size(), path.size());
+    const std::string_view rel = path.substr(out.cut);
+    const std::size_t slash = rel.find('/');
+    if (slash != std::string_view::npos) {
+        out.heading = std::string(rel.substr(0, slash));
+        out.cut += slash + 1;
+    }
+    return out;
+}
+
+// The prefix of everything an entity registers -- its behaviours, its gait, its decider, its senses
+// and its declared state (`EntityWorld::registerParameters`) -- which the World panel Inspector lists
+// in a section of its own when the node that entity drives is selected (ADR-907). A character is
+// selected by clicking it, a click selects its node, and the node's own `nodes/<n>/` prefix holds
+// only a transform: before this section, how the thing an artist had just clicked walks, turns and
+// chooses where to go was in another panel, on a layer the editor does not open on.
+[[nodiscard]] inline std::string entityInspectorPrefix(std::string_view entityName) {
+    return "entity/" + std::string(entityName) + "/";
 }
 
 // Slider bounds for a route amount. They must NOT depend on the current amount: a range derived

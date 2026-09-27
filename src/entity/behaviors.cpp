@@ -2446,8 +2446,8 @@ public:
           // authored intention.
           maxStillDefault_(readFloat(s, "maxStillSeconds", 0.0f)),
           loopDefault_(readFloat(s, "loopSeconds", 20.0f)),
-          loopRadius_(std::max(0.0f, readFloat(s, "loopRadius", 4.0f))),
-          loopPenalty_(std::clamp(readFloat(s, "loopPenalty", 0.0f), 0.0f, 1.0f)) {
+          loopRadiusDefault_(std::max(0.0f, readFloat(s, "loopRadius", 4.0f))),
+          loopPenaltyDefault_(std::clamp(readFloat(s, "loopPenalty", 0.0f), 0.0f, 1.0f)) {
         if (s != nullptr && s->is_object() && s->contains("considerers") &&
             (*s)["considerers"].is_array()) {
             for (const auto& entry : (*s)["considerers"]) {
@@ -2560,9 +2560,16 @@ public:
                                           "longest it stands still (s, 0 = no limit)"));
         loop_ = &params.add(floatDesc(prefix + "loopSeconds", loopDefault_, 0.0f, 600.0f,
                                       "won't walk back to where it just was for (s)"));
+        // And what "back where it just was" means, and how firmly it is refused: parameters rather
+        // than numbers read once from the file (ADR-225), so the loop rule is as reachable as its
+        // window.
+        loopRadius_ = &params.add(floatDesc(prefix + "loopRadius", loopRadiusDefault_, 0.0f, 100.0f,
+                                            "counts as back where it was within (m)"));
+        loopPenalty_ = &params.add(floatDesc(prefix + "loopPenalty", loopPenaltyDefault_, 0.0f, 1.0f,
+                                             "a walk straight back is worth (x its score, 0 = never)"));
         paths_ = {prefix + "hertz",         prefix + "dwellTicks",      prefix + "margin",
                   prefix + "memorySeconds", prefix + "stallSeconds",    prefix + "maxStillSeconds",
-                  prefix + "loopSeconds"};
+                  prefix + "loopSeconds",   prefix + "loopRadius",      prefix + "loopPenalty"};
         // Every considerer's knobs, under its own name. ADR-225: a weight an author wrote in a
         // scene file and the engine then read once from the JSON would be a decoration, not a
         // setting -- it could not be keyframed, modulated, saved or driven by a signal, which is
@@ -2653,8 +2660,10 @@ public:
         });
         dctx.departures = departures_;
         dctx.loopSeconds = static_cast<double>(loopSeconds);
-        dctx.loopRadius = loopRadius_;
-        dctx.loopPenalty = loopPenalty_;
+        dctx.loopRadius =
+            std::max(0.0f, loopRadius_ != nullptr ? loopRadius_->value() : loopRadiusDefault_);
+        dctx.loopPenalty =
+            std::clamp(loopPenalty_ != nullptr ? loopPenalty_->value() : loopPenaltyDefault_, 0.0f, 1.0f);
 
         // ---- Phase D: the awareness layer, between the senses and the choice ------------------
         if (aware_) {
@@ -3216,10 +3225,12 @@ private:
     // ---- ADR-909 ----
     float maxStillDefault_ = 0.0f;
     float loopDefault_ = 20.0f;
-    float loopRadius_ = 4.0f;
-    float loopPenalty_ = 0.0f;
+    float loopRadiusDefault_ = 4.0f;
+    float loopPenaltyDefault_ = 0.0f;
     params::Parameter<float>* maxStill_ = nullptr;
     params::Parameter<float>* loop_ = nullptr;
+    params::Parameter<float>* loopRadius_ = nullptr;
+    params::Parameter<float>* loopPenalty_ = nullptr;
     glm::vec3 stillFrom_{0.0f};
     double stillSince_ = 0.0;
     bool stillStarted_ = false;
