@@ -33,8 +33,28 @@ where its predecessor stopped.
 - **Launched: navfix** (ADRs 932-933, plus an ADR-931 amendment) in `~/Documents/GitHub/av-gen-navfix`, branch
   `agent/navfix`, from `ec515c8b`. Brief: [briefs.md](briefs.md) § "Engine follow-ups found in Phase 3". It covers
   routes that respect connected regions, no pacing on urgent reactions, and the evaluator hook passing `--world-preview`.
-- **gv3-cast iteration 2 played all five events,** E4 included (cow-23 and cow-12 at 111.917 s). Its ADR-910 metrics
-  are on disk; the relaunched agent reads and records them.
+- **gv3-cast iteration 2 played all five events,** E4 included (cow-23 and cow-12 at 111.917 s). Ember's drop-time
+  pacing is gone (the data workaround). Iteration 3's trace verifies the float fix.
+- **NEW ENGINE DEFECT (13:10), assigned to navfix as ADR-934: a retired body stays in the world.** A set piece's
+  taken animals keep walking invisibly, and they still block the aliens and draw their attention. `StepKind::Retire`
+  only hides the body; the crowd and body index take every active entity. On GV3, rook walked in place for 5.25 s
+  (205.65–210.85 s) beside the invisible cows, and its stuck time went from 0.4 s to 6.7 s. There is no data
+  workaround. **After navfix merges, re-trace the whole film** for ADR-910.
+- **GitHub CI (the owner's offer, 13:10: "offload some testing there, put an agent on watching the CI/CD pipeline").**
+  - **Pushed at 13:15:** `main` `ec515c8b` (`origin/main` was `83a12334`, 113 commits behind) and `integrate/render`
+    `776b1a87`. The outgoing commits were checked first: source, docs and JSON only. There were no binaries, audio
+    or licensed assets. The `_diag-water` JSONs were already on origin, and the song tests carry only its SHA-256 and
+    beat grid.
+  - **What CI does** (`.github/workflows/ci.yml`, `docs/development/ci.md`): every push builds and runs the full CPU
+    suite in 3 shards, which gates. The GPU job is informational, on main, nightly and dispatch only, because the
+    hosted VM's GPU cannot compile the renderer's pipelines. The licensed assets and the song are never on CI, so
+    tests that need them SKIP there. So CI takes CPU suites off this machine; GPU suites and asset-dependent tests
+    stay local.
+  - **The watcher agent is held.** The classifier refused the coordinator's read-only `gh run list` ("Out-of-Place
+    Publication"), so it waits on the owner's decision. The nightly CI on the old main failed today (run
+    36318924797), and so did yesterday's Sanitizers run; nobody has triaged them yet.
+  - **Not pushed:** the `gv3/*` branches. Pushing them would publish the owner's brief and the production docs, and CI
+    adds nothing there (their engine code is main's). Also not pushed: `agent/navfix`, which has no commits yet.
 - **The GPU queue is long:** gv3-world's batch holds it; render's `full-2`, gv3-look's pair, gv3-world's stills and
   gv3-cut's 25-minute it2 film all wait.
 
