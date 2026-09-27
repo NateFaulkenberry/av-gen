@@ -130,4 +130,96 @@ generator refuses one that does not: walkers 0.3 / 1.0 / 1 with the ground, ridi
 toward a fixed point or a craft 0.3 / 1.2 / 1, a flying craft 0.6 / 1.0 / 0, a lifted horse and a
 static subject none. `followLagSeconds` is gone from GV3.
 
-Measured: pending (render and trace queued).
+### Iteration 1, measured (engine `ec515c8b`: main plus characters)
+
+The render and trace are of a **preview world**: the generator's project with gv3-cast's expected
+changes applied to a scratch copy (`tools/gv3/preview_world.py`, evidence only: the characters
+stream's tuned cast, the scout craft, the E1-E5 plan compiled in). Files in `build/gv3/cut/it1/`.
+
+**Camera stability** (`tools/camera_stability.py` on `avgen_cast_trace --camera`; the bar: pitch and
+yaw HF <= 0.1 deg, eye height HF <= 2 cm, subject off-centre <= 20%):
+
+| | shots with a subject | pass | fail |
+|---|---|---|---|
+| before: the first pass's rigs, same engine (`build/gv3/cut/baseline2/stability-baseline.json`) | 16 | 5 | 11: s03, s09, s13, s19, s20, s25, s28, s29, s36, s38 on the nod or the bob (pitch HF up to 2.41 deg, eye height HF up to 13.4 cm) |
+| after: iteration 1 (`build/gv3/cut/it1/stability-it1.json`) | 22 | 18 | 4, below |
+
+Every walker follow passes (Rook, Sage, Vane three times, Tide, Ember: eye height HF 0.30-1.46 cm,
+pitch HF <= 0.027 deg). The four failures:
+- **59.1 (E4, Vane watching):** yaw HF 12.6 deg -- the rig aims at the scout, and E4 never played
+  (below), so the aim swung to the hidden craft.
+- **94.1 (up the beam):** yaw HF 0.137 deg, the hovering saucer's sway through a 20 mm at 26 m.
+- **101.1 (the saucer, far, climbing away):** pitch HF 0.110 deg.
+- **95.3 (the horse rises):** pitch HF 1.31 deg over 0.92 s. ADR-913's own exception: the rise is the
+  shot, and the metric cannot tell a deliberate tilt from wobble in under a second (the first pass's
+  s29 measures 2.41 deg on this engine).
+
+**The set pieces, as they played** (`setPieces` in `build/gv3/cut/it1/cast-it1.json`):
+- E1: beam 13.90 s, sweep 15.03-22.63 s over x -50..10 at z -190, 30 m up. Played.
+- E2: cross 26.65 s. Played.
+- E3: beam 65.62 s, lift 66.97 s, bull-10 taken at (-78.5, -265.8), retired 71.88 s. Played.
+- **E4 did not play.** On the tuned cast the re-homed cows graze 35-40 m north of the plan's region
+  centre (-55, 40), outside its 30 m radius, and only cow-19 is inside it. The scout took its transit
+  at 93.8 s, entered its approach only at 110.5 s, found one animal and left at 117.5 s without
+  beaming. **gv3-cast owns the fix** (the region to about (-70, 8), where cow-12 and cow-23 graze, or
+  two animals named). gv3-cut's E4 shots aim live at the scout, so they follow the station wherever it
+  moves, but they cannot be judged until E4 plays.
+- E5: beam 170.35 s, lift 172.78 s, the horse retired 177.72 s. The station moved 9.5 m west with the
+  tuned cast, to (-0.6, 28.0, 73.9); the riser's live aims follow it.
+
+**On screen at each set-piece moment** (my projection of the rigs through the measured craft
+positions, `build/gv3/cut/tools/onscreen.py`; the Critic's `framing[].on_screen` to confirm): E1's
+beam and sweep in 7.1 (after the fix below), its approach in the cold open; E2 during its crossing in
+15.1; E3's beam in 35.1 and its lift in 37.1; E5's approach in 81.1, beam in 93.1, lift in 94.1 and
+departure in 97.1. Off screen: E1's and E3's departures, E3's approach (by choice).
+
+**Fixed after iteration 1's render started** (`27e18605`, not in the it1 render): E1's wide moved to
+the span its beam lights in (7.1), from the east bank, because from the first vantage the scout
+hovered straight behind the elder's cap; the lantern moved to 11.1. E4's establishing shot aims live at
+the scout (on the first-pass cast its station was 20 m west of the region centre, off the fixed frame).
+
+## State at the session handoff (2026-09-27, about 12:00)
+
+**Commits on `gv3/cut`:** `a50327ac` (the Director step, the compositions, ADR-913 kinds),
+`2b7fd781` (this log), `e5c7a050` (shot ids s01.. as the Critic's adapter names them), `27e18605`
+(E1 and E4 framing), and the checkpoint commit with `tools/gv3/trim.py` and `preview_world.py`.
+
+**The Director's cut in use:** `tools/gv3/song_cut.json`, 73 spans, settings `songcut.SETTINGS`
+(song, expressive, 1.8 / 7.5 / 0.45 s, seed 1), GV3's treatments `songcut.TREATMENTS`. Every span has
+an authored composition in `tools/gv3/shots.py`; `python3 tools/make_glowmere_valley_3.py` reports
+"re-run and identical to song_cut.json". No trims yet (`songcut.TRIMS` is empty).
+
+**In flight when the session ended** (both from `build/gv3/cut/render-it1.sh`, under the GPU lock):
+- `build/gv3/cut/it1/cut-it1.mov`, the iteration-1 preview, 960x540, full film (log `it1/cut-render-it1.log`);
+- then `build/gv3/cut/baseline2/cut-baseline.mov`, the first pass's cut on the same engine (the "before").
+
+**No evaluator job of the new cut yet.**
+
+**Open questions:**
+- E4's place (gv3-cast): see above.
+- The arrival's grand wide is 2 bars, not the plan's 4 (the Director's opener rule).
+- GV3's treatments are named and selectable in the Sequence panel, but a custom treatment's dials have
+  no editor in the app; they are tuned in `songcut.TREATMENTS`. A UI gap to report, not to fix here.
+
+**Next steps, in order:**
+1. When `cut-it1.mov` exists, regenerate the Critic's inputs with the adapter (INTEGRATION_GUIDE §6),
+   from the preview project and its trace:
+   `~/Documents/GitHub/creative-critic/.venv/bin/python ~/Documents/GitHub/creative-critic/adapters/avgen/avgen_adapter.py --project build/gv3/cut/it1/ufo.json --cast build/gv3/cut/it1/cast-it1.json --lightrig examples/lightrigs/glowmere-valley.rig.json --world-preview build/release/tools/avgen_world_preview --climax drop --video build/gv3/cut/it1/cut-it1.mov --width 960 --height 540 --out build/gv3/cut/it1/critic`
+   (no `--shot-plan` for it1: the render predates the s-ids; from iteration 2 on, regenerate and pass
+   `docs/glowmere-valley-3/04-shot-plan.md` and `03-directives.md`). Submit `critic submit --inputs
+   build/gv3/cut/it1/critic/inputs.json --mode preview --session gv3-cut --track film --label it1
+   --wait --json` in the background; also `--mode fast`.
+2. Read `measurements.events.types.*.framing[].on_screen` for every E1-E5 moment, and
+   `measurements.novelty`: `python3 tools/gv3/trim.py <report.json>` proposes `songcut.TRIMS`.
+3. Look at every shot: `python3 tools/gv3/review.py build/gv3/cut/it1/cut-it1.mov build/gv3/cut/it1/shots-it1.json build/gv3/cut/it1/review`
+   and `tools/gv3/cuts.py` the same way; re-author compositions that do not read (the new hero
+   vantages -- ridge 40.1, ember-cap 48.3, scree, veil, spire, cairn -- are unscouted).
+4. The "before": the baseline render through the adapter (project `build/gv3/cut/baseline/gv3-baseline.json`,
+   trace `build/gv3/cut/baseline2/cast-baseline.json`), label `baseline-ec515c8b`, then
+   `critic compare <before> <after>`.
+5. Stability: the craft kind's smoothing for hovering and departing crafts (94.1, 101.1): try a longer
+   `followSmoothSeconds` for those two, re-trace their windows with `--start`.
+6. Iteration 2: clips of the changed spans through the lock (7.1 for E1; E4's spans once gv3-cast
+   places it), each submitted with `--video-start`.
+7. Before/after stills and sheets to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`.
+8. The final report (briefs.md: common rules, and gv3-cut).
