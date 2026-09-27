@@ -8,6 +8,21 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **18:00: gv3-world is DONE** (final `60143f86`; the log-only tail merged as `6d5791b8`).
+  - The closure: 0 open ends in 453 views; the survey, the filmed ground and all 28 camera tracks are unchanged.
+  - **The river mouth cannot be closed by terrain** (its course holds the survey minimum), so gv3-int solves 77.1
+    and 106.1 in framing.
+  - **The 4K cost on engine-3 is still unmeasured.** A runner (`av-gen-gv3-world/build/gv3w/k4wait3h.sh`) waits
+    outside the lock for quiet until 20:41; results go to `build/gv3w/k4wait3h.out`. Until then, use render's
+    0.34 s/frame (77-80 min for the film).
+  - **UI reach gap:** the closure's head, falls, sill and shoulders, and `flow.speedOverride`, can be changed only in
+    the scene file. Add it to the engine's UI-reach list.
+  - **The final:** `python3 tools/make_glowmere_valley_3.py --final --final-trace <cast trace> && python3 tools/gv3/ufo.py`
+    (300 m shadows on 18 shots).
+- **The r1 preview is in the owner's review folder** (`revision/integrate/r1-preview-960x540.mov` and
+  `README-r1-preview.md`). It is a work in progress: new versus the first pass, the known issues, and two calls for
+  the owner's eye: the air (teal haze against navy night) and the river mouth. The review candidate r2 (round 2
+  plus navfix) is expected about 20:00-21:00.
 - **17:45: gv3-int round 1 is done.** The merged film is generated and audited (93/93 routes, 0 unknown parameters),
   traced, rendered whole (13,530 frames, 0 GPU errors) and judged (`job_1a0e49f4c67b66a3b`, and
   `job_1a0e4a50eaa6cabba` with the routes mapped).
