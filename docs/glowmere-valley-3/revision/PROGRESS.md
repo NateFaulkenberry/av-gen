@@ -57,8 +57,12 @@ where its predecessor stopped.
     camera guard, the scout alias and engine-3. It was idle when restarted; the new pid is 31482.
   - **The status index is committed**, verbatim, as `docs/development/STATUS-2026-09-25.md` on `integrate/revision`
     (`983221a9`). It reaches main with navfix. Its worktree and `docs/status-2026-09-25` branch are removed.
-  - **navfix's integration:** `90158678` + `983221a9` is built and settled (a true no-op). **The full CPU suite is
-    running** (log `coord-navfix-int-cpu-full.log`). Then the GPU suite in a quiet window, then main.
+  - **navfix's integration:** `90158678` + `983221a9` is built and settled (a true no-op).
+    - **CPU suite (15:37-16:38): 3,799 of 3,800.** The 1 failure is the 180 s wall-clock limit on "event-driven: the
+      assistant watches the film" (`test_directing_agent.cpp:392`), under a load average of about 100. Re-run
+      alone, it passes: 14 assertions, 142 s, exit 0.
+    - **The GPU suite is queued** (`build/coord-gpu-full2.sh navfix`, log `build/coord-gpu-navfix.log`). Then main,
+      engine-4, and the announcement to gv3-int.
   - **Launched from `983221a9`:**
     - **behave** (ADR-935–936): rook's walk on the spot, and unreachable roam targets;
     - **uireach** (ADR-937–939, and an ADR-933 amendment): editable treatments, per-species wind sway, a real aurora
