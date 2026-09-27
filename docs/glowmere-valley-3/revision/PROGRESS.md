@@ -8,6 +8,17 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **18:10: THE OWNER'S FEEDBACK ON r1** (sent to gv3-int; standing for GV3):
+  - **"Restore the hero pulses in the mushrooms and the camera beam".** "Camera beam" is read as the UFO tractor
+    beam; confirm with the owner if in doubt. Only the elder's kick and the lantern's clap still read. The saucer
+    beam's audio links were dropped (gv3-int `e1bc1c49`, for the horse's washout), and so were the scout beam's
+    reactions (gv3-look `REACTION_DROPS`, "inert"). **Rule: tame a pulse, never delete it**; the memory note is
+    `av-gen-gv3-keep-the-pulses`.
+  - **"At 1:45 there are two cows stuck together that get abducted together as one"** (E4):
+    - cow-12 and cow-23 stand 3.21 m apart at the beam (102-104 s), so their bodies touch at 1.94x scale;
+    - the lift draws them to 1.34 m (107-109 s).
+    - Data fix: gv3-int beams when they stand apart (10.3 m at 95 s), or picks another pair.
+    - **Engine defect, queued for the next engine round:** a multi-animal lift must keep its animals apart.
 - **18:00: gv3-world is DONE** (final `60143f86`; the log-only tail merged as `6d5791b8`).
   - The closure: 0 open ends in 453 views; the survey, the filmed ground and all 28 camera tracks are unchanged.
   - **The river mouth cannot be closed by terrain** (its course holds the survey minimum), so gv3-int solves 77.1
@@ -678,6 +689,9 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **Pixel-based fades** (water ripples, bloom levels, motion-blur tiles) differ between 540p previews and 1080p/4K finals. Check final-resolution stills before a final render.
 
 ## Owner requirements and creative direction (do not lose)
+- **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the UFO beams' pulse visible.** When a pulse causes a
+  problem, tame it (depth, a peak cap, timing); never delete it. A route the Critic calls inert is to be made
+  visible, not dropped.
 - **Audio reactivity is the highest priority.** It must be visible and meaningful, not just configured, and not "everything pulses to the beat". Hierarchical (micro/meso/macro), correlated but not identical.
 - **Hero effects throughout,** with different timing and amplitude per hero. Use the small coloured mushrooms: waves, grouped or staggered responses, colour evolving by section.
 - **Subtle continuous wind.**
