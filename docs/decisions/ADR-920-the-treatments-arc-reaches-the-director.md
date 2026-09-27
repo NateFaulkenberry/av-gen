@@ -8,7 +8,8 @@
 measured profile in the plan)
 **Implemented by:** `ShotIntentProfile::arc` / `energy` / `visualDensity`, `SongPlanSection::intentAt`
 and `intentAtProgress`, `SongEvent` and `SongPlan::events` (`src/app/song_plan.hpp/.cpp`);
-`songPlanFromCues`, `songPlanFromMeasurements`
+`songPlanFromCues`, `songPlanFromMeasurements`; the Sequence panel's section inspector, through
+`song::SectionCue::intentAt` (`src/ui/sequence_panel.cpp`)
 **Tests:** `tests/unit/test_song_director.cpp` -- "The treatment's arc reaches the director through
 the song model's own arc", "The new intent dials and the events round-trip, and a bad arc is
 refused"; every existing `[song]` case, including the label scramble
@@ -48,7 +49,8 @@ arc applied, by handing the four dials an arc moves to `song::ShotIntent::atProg
 them back. It is `SectionCue::intentAt`'s twin -- the director is handed a plan, not cues (the seam
 ADR-249 draws), so it cannot call the cue's method, and a second copy of the arc arithmetic would
 come to disagree with the first. A test holds the two equal at five points of a section for every
-arc.
+arc. `SectionCue::intentAt` itself gets its caller where a person chooses the treatment: the
+Sequence panel's section inspector shows the cut rate the arc gives at the section's start and end.
 
 **Events.** `SongPlan::events` -- `{name, subject, seconds, end}`, the shape of a watched play's
 observation (ADR-767) -- is what ADR-922's peaks read. Written only when present, so a plan with
@@ -64,5 +66,7 @@ none is byte-identical to one written before.
   Locked, where an arc changes nothing (a Locked section is one shot).
 - The Auto-director panel's section tooltip shows the arc, the push and the frame; the Sequence
   panel's section inspector says what the chosen treatment's arc does to the cutting (ADR-921).
-- `song::SectionCue::intentAt` still has no production caller: its twin does its job. Recorded
-  rather than papered over with a call that exists only to be a caller.
+- `song::SectionCue::intentAt` has a production caller: the Sequence panel's section inspector reads
+  the cut rate at a section's start and end through it ("cut rate 19% at its start, 55% at its end")
+  for any treatment that is not Steady -- the same arithmetic the director applies, where the
+  treatment is chosen.

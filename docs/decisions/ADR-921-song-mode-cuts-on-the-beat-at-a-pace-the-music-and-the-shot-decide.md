@@ -107,8 +107,9 @@ node whose hero reactions hover, rotate or pulse its scale 0.3; anything else 0.
   ("6 shots, 1.8-3.7 s, rising", "1 shot, 14.8 s, suspended", "peak on elder"); the tooltip adds the
   arc, the push and the visual density.
 - **Sequence panel -> a section -> "shot"**: under the treatment, "cuts: rising -- shots shorten
-  toward the section's end, below 'shortest shot' if they must" (and the other four), so an
-  accelerating riser or a held suspension traces back to the control that made it.
+  toward the section's end, below 'shortest shot' if they must" (and the other four), and for an arc
+  that travels, "cut rate 19% at its start, 55% at its end" -- so an accelerating riser or a held
+  suspension traces back to the control that made it.
 
 ## Consequences
 

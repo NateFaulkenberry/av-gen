@@ -4395,9 +4395,9 @@ void ControlPanel::drawSongDirector(app::Engine& engine, app::AutoDirectorSettin
             "Locked      one shot, one camera, framed exactly as the section asked.\n"
             "Guided      the intent is respected; the camera, the cuts and the framing are\n"
             "            the director's.\n"
-            "Expressive  ...and the director also reads the section's own loudness and\n"
-            "            busyness, so a loud section gets more coverage than a quiet one\n"
-            "            carrying the same intent.");
+            "Expressive  ...and the director also reads how busy the section's music\n"
+            "            measures -- hits per second and brightness, never loudness -- so a\n"
+            "            dense section cuts faster than a sparse one carrying the same intent.");
     }
     int autonomy = static_cast<int>(s.autonomy);
     bool first = true;

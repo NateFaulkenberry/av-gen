@@ -20,6 +20,7 @@
 #include "seq/section_performance.hpp"
 #include "seq/song_structure.hpp"
 #include "song/from_analysis.hpp"
+#include "song/section_cue.hpp"
 
 #include <glm/trigonometric.hpp> // degrees/radians for the drift control
 
@@ -2784,6 +2785,18 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
                     "Auto-director panel's 'shortest shot', 'shortest build' and 'longest shot'\n"
                     "set the range; the treatment's cut rate and the music's density set where\n"
                     "in it this section sits. Every cut lands on a beat.");
+        }
+        // ...and how far the arc carries the cut rate across this section, read through the cue --
+        // the treatment with its arc applied at a second, the same arithmetic the director's
+        // `SongPlanSection::intentAt` uses (ADR-920).
+        if (treatment.arc != song::Arc::Steady) {
+            const std::vector<song::SectionCue> cues = song::cueSheet(piece.sectionTimeline, piece.shotLanguage);
+            if (index < cues.size()) {
+                const song::SectionCue& cue = cues[index];
+                ImGui::TextDisabled("cut rate %.0f%% at its start, %.0f%% at its end",
+                                    static_cast<double>(cue.intentAt(cue.startSeconds).cutFrequency) * 100.0,
+                                    static_cast<double>(cue.intentAt(cue.endSeconds).cutFrequency) * 100.0);
+            }
         }
     }
 
