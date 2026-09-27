@@ -132,12 +132,20 @@ WIND = {
 }
 # Per-species response (VegetationMotion): how far a plant's tip travels at unit wind, as a fraction
 # of its height. Grass, ferns and flowers carry the wind in the frame; the trees get a mass that lets
-# them sway at about 0.2 Hz instead of resonating at 0.07 Hz, which read as a lean. Mushrooms, bushes
-# and fan plants keep the source's stiffness: a fungus that sways is wrong.
+# them sway at about 0.2 Hz instead of resonating at 0.07 Hz, which read as a lean. Mushrooms and
+# bushes keep the source's stiffness: a fungus that sways is wrong.
+# The fan plants -- the big broad-leaved plants in the foreground of s04, s17, s34 and s36, the most
+# visible vegetation in the film -- were effectively rigid: by wind.cpp's oscillator (static bend
+# tip x sensitivity / stiffness, 0.4 of each gust at their 0.225 Hz resonance) a 2 m plant swung
+# 0.9 cm in a gust and 0.6 cm in flutter, and the static s34 showed them still (iteration 2). Now
+# about 4.6 cm and 2.8 cm at the same slow 0.225 Hz (stiffness and mass scaled together): a third of
+# the ferns' 13 cm, the heavy leaves moving less and slower than the fronds around them.
 MOTION = {
     "grass": {"tipAmplitude": 0.22},
     "ferns": {"tipAmplitude": 0.20},
     "flowers": {"tipAmplitude": 0.18},
+    "fan-plants": {"tipAmplitude": 0.20, "windSensitivity": 0.9, "stiffness": 2.4, "mass": 1.2,
+                   "gustResponse": 1.2},
     "canopy": {"mass": 6.0}, "canopy-broad": {"mass": 6.0}, "twisted": {"mass": 6.0},
     "twisted-low": {"mass": 6.0}, "pine-upper": {"mass": 9.0}, "pine-rim": {"mass": 9.0},
 }
