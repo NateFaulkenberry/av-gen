@@ -149,6 +149,11 @@ std::size_t GridPerception::perceive(const EntityWorld& world, std::size_t self,
             if (body == self || body >= index_.bodyPositions.size()) {
                 continue; // a character does not perceive itself
             }
+            // ADR-934: nor a body a set piece has taken. It stays in the index -- a grid point's
+            // index is an entity index -- and is simply never offered: gone, not hidden.
+            if (body < world.entities().size() && world.entities()[body]->retired()) {
+                continue;
+            }
             add(InterestKind::Character, body, index_.bodyPositions[body],
                 body < world.entities().size() ? world.entities()[body]->tagMask() : 0);
         }

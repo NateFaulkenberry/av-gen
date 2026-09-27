@@ -14,7 +14,10 @@
 //   3. render  `avgen --project copy --render clip.mov --range a:b --size WxH`, behind a configurable
 //              prefix (`tools/gpu-lock.sh` on a machine where agents share the GPU)
 //   4. trace   `avgen_cast_trace --project copy --start a --seconds b-a --hz 20`, where the bodies were
-//   5. adapt   the Critic's `adapters/avgen/avgen_adapter.py`: scene, shots, cast and clip -> inputs.json
+//   5. adapt   the Critic's `adapters/avgen/avgen_adapter.py`: scene, shots, cast and clip -> inputs.json,
+//              with `--world-preview <build>/tools/avgen_world_preview` when the scene has a terrain
+//              (ADR-931, amended 2026-09-27): the adapter probes the engine's own ground under every
+//              body's path, so the Critic's grounding check has ground to judge against
 //   6. judge   `critic submit --inputs ... --video-start a --wait --json --strict --no-autostart`
 //   7. report  the Critic's `critic.report/1` into an `EvaluationReport`, each finding attributed to
 //              the plan items whose film-time spans it overlaps
@@ -46,6 +49,9 @@ struct EvaluatorOptions {
     std::filesystem::path python;  // runs the adapter; empty = the Critic's own `.venv/bin/python`
     std::filesystem::path avgen;   // renders the clip; empty = this executable
     std::filesystem::path castTrace; // empty = `tools/avgen_cast_trace` beside `avgen`'s build
+    // ADR-931, amended: the adapter's ground probe. Empty = `tools/avgen_world_preview` beside
+    // `avgen`'s build.
+    std::filesystem::path worldPreview;
     std::vector<std::string> renderPrefix; // e.g. {"<repo>/tools/gpu-lock.sh"}: the GPU is shared
     unsigned width = 960;          // the clip's size: the previews' 960x540 unless asked otherwise
     unsigned height = 540;
@@ -57,8 +63,9 @@ struct EvaluatorOptions {
 
 // The options a session gets from its command line and environment: `--critic` / AVGEN_CRITIC,
 // `--critic-url` / AVGEN_CRITIC_URL, AVGEN_CRITIC_ADAPTER, AVGEN_CRITIC_PYTHON, AVGEN_RENDERER,
-// AVGEN_CAST_TRACE, AVGEN_RENDER_PREFIX (split on spaces), AVGEN_EVALUATE_SIZE ("960x540"). Paths the
-// Critic's layout implies are filled from it (`<repo>/.venv/bin/critic` -> the adapter and python).
+// AVGEN_CAST_TRACE, AVGEN_WORLD_PREVIEW, AVGEN_RENDER_PREFIX (split on spaces), AVGEN_EVALUATE_SIZE
+// ("960x540"). Paths the Critic's layout implies are filled from it (`<repo>/.venv/bin/critic` -> the
+// adapter and python).
 [[nodiscard]] EvaluatorOptions evaluatorOptionsFrom(const std::optional<std::filesystem::path>& critic,
                                                     const std::optional<std::string>& criticUrl);
 // The options with every empty path derived -- the adapter and python from the Critic's repository,
@@ -81,6 +88,17 @@ struct ProcessOutcome {
                                                 const std::filesystem::path& workDir,
                                                 const std::atomic<bool>* cancel = nullptr,
                                                 double timeoutSeconds = 1800.0);
+
+// The Critic's AV Gen adapter's command line for one evaluation: step 5. With `ground`, it is handed
+// `--world-preview` so it probes the engine's ground under the cast's paths (ADR-931, amended); the
+// adapter refuses that flag for a scene with no terrain, so `ground` is `sceneHasTerrainWorld`.
+[[nodiscard]] std::vector<std::string> criticAdapterCommand(
+    const EvaluatorOptions& options, const std::filesystem::path& project, const std::filesystem::path& scene,
+    const std::filesystem::path& shots, const std::filesystem::path& cast, const std::filesystem::path& clip,
+    const std::string& range, const std::filesystem::path& out, bool ground);
+// Whether a saved scene has what the adapter's `--world-preview` probes: a `terrain` node with a
+// `world` block -- the adapter's own rule (`world_block`), read off the same file it reads.
+[[nodiscard]] bool sceneHasTerrainWorld(const std::filesystem::path& scene);
 
 // `critic submit`'s command line for one evaluation.
 [[nodiscard]] std::vector<std::string> criticSubmitCommand(const EvaluatorOptions& options,

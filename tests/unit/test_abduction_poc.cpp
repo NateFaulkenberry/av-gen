@@ -202,6 +202,12 @@ struct Run {
                     continue;
                 }
                 const glm::vec3 now = e.state().position();
+                // ADR-934: an animal the director has taken and retired has left the world -- held
+                // where it was taken, simulated no more -- so it is not wandering either. Before, it
+                // was handed back to its behaviours and wandered on, invisible, and this counted it.
+                if (e.retired()) {
+                    continue;
+                }
                 if (e.directorMotion().active) {
                     // Being abducted. Not wandering, so not part of the wander metric -- but it is
                     // where the lift is measured, and where "the animal reaches the beam/UFO"

@@ -586,6 +586,12 @@ const NodeBinding* EntityWorld::binding(const std::string& node) const {
 
 bool EntityWorld::pointOfInterest(std::string_view name, glm::vec3& out) const {
     if (const Entity* e = find(name)) {
+        // ADR-934: a body a set piece has taken is nowhere anyone can be sent. A walk to it, a face
+        // toward it and a post on it fail "no such target" rather than lead to the spot it was
+        // lifted from.
+        if (e->retired_) {
+            return false;
+        }
         out = e->state_.position() + e->motion_.position;
         return true;
     }
@@ -1232,6 +1238,7 @@ void EntityWorld::reset() {
         entity->performanceEntry_ = PerformanceEntry{}; // ADR-820: rebuilt by the replay
         entity->directorGoal_ = DirectorGoal{};         // ADR-824: likewise
         entity->placements_ = 0;                        // ADR-911: recounted by the replay
+        entity->retired_ = false;                       // ADR-934: retired again by the replay
         entity->locomotion_ = LocomotionState{};
         // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
@@ -1866,7 +1873,9 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
         crowdOwner_.clear();
         for (std::size_t e = 0; e < entities_.size(); ++e) {
             const Entity& entity = *entities_[e];
-            if (!entity.active_ || entity.state_.radius <= 0.0f) {
+            // ADR-934: a retired body is not a body anyone walks round -- read here, not off
+            // `active_`, because the director retires it at the top of the very step this builds for.
+            if (!entity.active_ || entity.retired_ || entity.state_.radius <= 0.0f) {
                 continue;
             }
             const glm::vec3 at = entity.state_.position();
@@ -1897,6 +1906,13 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
             continue; // its answer at `target` cannot depend on this step
         }
         Entity& entity = *entities_[entityIndex];
+        // ADR-934: retired on this step or an earlier one by the replayed director, exactly as a play
+        // retires it, and from then on not simulated: held where it was taken. The host's `after`
+        // writes its node offsets, as `update` does for it.
+        if (entity.retired_) {
+            entity.active_ = false;
+            continue;
+        }
         // ADR-620's "the speed this body had last step", taken where `update` takes it -- before
         // the action tier writes this step's. Taken after the queue (as it was), the limiter's
         // "previous" was the action's new speed and a replayed body started every walk without
@@ -2203,6 +2219,44 @@ bool EntityWorld::release(std::string_view entity, double now) {
     return true;
 }
 
+bool EntityWorld::retire(std::string_view entity) {
+    std::size_t index = entities_.size();
+    for (std::size_t i = 0; i < entities_.size(); ++i) {
+        if (entities_[i]->name() == entity) {
+            index = i;
+            break;
+        }
+    }
+    if (index == entities_.size()) {
+        return false;
+    }
+    Entity& taken = *entities_[index];
+    taken.retired_ = true;
+    // Held, not carried: nothing moves it again, so it says it is not moving. The speed a beam
+    // carried it up at would otherwise stand in its state for the rest of the film, a body "walking"
+    // on the spot to anything that reads it.
+    taken.state_.speed = 0.0f;
+    taken.state_.turnRate = 0.0f;
+    taken.locomotion_.speed = 0.0f;
+    taken.locomotion_.turnRate = 0.0f;
+    // Out of every working set now. A body's percept of another carries that body's entity index as
+    // its `source` (`GridPerception`), and the set is compacted in place, so its order -- salience,
+    // then scan index -- is the order the next sense tick would have produced without the body.
+    for (auto& owned : entities_) {
+        Entity& e = *owned;
+        std::size_t kept = 0;
+        for (std::size_t k = 0; k < e.perceptCount_; ++k) {
+            const Percept& p = e.percepts_[k];
+            if (p.kind == InterestKind::Character && p.source == index) {
+                continue;
+            }
+            e.percepts_[kept++] = p;
+        }
+        e.perceptCount_ = kept;
+    }
+    return true;
+}
+
 bool EntityWorld::setGoal(std::string_view entity, DirectorGoal goal) {
     Entity* found = find(entity);
     if (found == nullptr) {
@@ -2378,7 +2432,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
     crowdOwner_.clear();
     for (std::size_t i = 0; i < entities_.size(); ++i) {
         const Entity& entity = *entities_[i];
-        if (!entity.active_ || entity.state_.radius <= 0.0f) {
+        // ADR-934: a retired body is not a body anyone walks round -- read here, not off `active_`,
+        // because the director retires it at the top of the very update this builds for.
+        if (!entity.active_ || entity.retired_ || entity.state_.radius <= 0.0f) {
             continue;
         }
         const glm::vec3 at = entity.state_.position();
@@ -2440,6 +2496,17 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
     for (std::size_t entityIndex = 0; entityIndex < entities_.size(); ++entityIndex) {
         auto& entityPtr = entities_[entityIndex];
         Entity& entity = *entityPtr;
+        // ADR-934: a body a set piece has taken has left the world. Nothing runs for it -- no action,
+        // behaviour, sense, gait or pose -- and it is out of the crowd (above) and out of every other
+        // body's senses (`GridPerception`). Its node is still written, from the state it was taken
+        // in, because finals are rebuilt from bases every frame: skipping the write would put the
+        // hidden node back on the spot the author placed it, where a camera aimed at it would jump.
+        if (entity.retired_) {
+            ++counts_.skipped;
+            entity.active_ = false;
+            applyNodeOffsets(entity);
+            continue;
+        }
         const glm::vec3 here = entity.state_.position();
         const float distance = glm::length(here - ctx.viewPosition);
         // The one update level of detail may never skip. Everything below reasons about an entity
@@ -3232,7 +3299,8 @@ void EntityWorld::updateFields(const FieldUpdate& ctx, params::ParameterSet& par
         Entity& e = *entities_[i];
         const bool anyFilter = std::any_of(e.governedBy_.begin(), e.governedBy_.end(),
                                            [](std::uint8_t g) { return g != 0; });
-        if (!anyFilter) {
+        // ADR-934: a retired body enters and leaves no field; it keeps the influence it was taken with.
+        if (!anyFilter || e.retired_) {
             continue;
         }
         ++fieldCounts_.governed;
