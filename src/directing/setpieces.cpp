@@ -469,6 +469,58 @@ void checkSetPiecesTogether(const std::vector<ResolvedSetPiece>& mine, const std
     }
 }
 
+nlohmann::json setPieceCatalog(const SceneFacts& facts) {
+    nlohmann::json templates = nlohmann::json::array();
+    for (const std::string& name : stage::setPieceKindNames()) {
+        const auto kind = stage::setPieceKindFromName(name);
+        nlohmann::json slots = nlohmann::json::array();
+        for (const stage::SetPieceSlot& slot : stage::setPieceSlots(*kind)) {
+            slots.push_back({{"name", slot.name},
+                             {"default", slot.value},
+                             {"min", slot.min},
+                             {"max", slot.max},
+                             {"unit", slot.unit},
+                             {"label", slot.label},
+                             {"kind", slot.use == stage::SlotUse::Parameter ? "knob" : "structure"}});
+        }
+        templates.push_back({{"name", name},
+                             {"moments", stage::setPieceMoments(*kind)},
+                             {"defaultMoment", stage::defaultSetPieceMoment(*kind)},
+                             {"regionPlace", *kind == stage::SetPieceKind::Abduction},
+                             {"slots", std::move(slots)}});
+    }
+    nlohmann::json crafts = nlohmann::json::array();
+    for (const stage::ActorDesc& actor : facts.staged.staging.actors) {
+        const bool beam = std::any_of(actor.parts.begin(), actor.parts.end(),
+                                      [](const stage::ActorPart& p) { return p.name == "beam"; });
+        std::vector<std::string> busy;
+        for (const stage::ScenarioDesc& s : facts.staged.staging.scenarios) {
+            if (s.actor == actor.name && !stage::isSetPieceScenario(s.name)) {
+                busy.push_back(s.name + (s.autoStart ? " (from the start: set pieces on it are refused)" : ""));
+            }
+        }
+        nlohmann::json craft{{"name", actor.name}, {"entity", actor.driven()}, {"beam", beam},
+                             {"templates", beam ? stage::setPieceKindNames() : std::vector<std::string>{"flyby"}}};
+        if (!busy.empty()) {
+            craft["authoredScenarios"] = busy;
+        }
+        crafts.push_back(std::move(craft));
+    }
+    return {{"templates", std::move(templates)},
+            {"crafts", std::move(crafts)},
+            {"rules",
+             {fmt::format("one craft plays its set pieces one after another: {:.1f} s at least between one letting it "
+                          "go and the next taking it, and no faster than the later one's cruiseSpeed in between",
+                          stage::kCraftHandoverSeconds),
+              "the time places one moment (\"moment\", default the beam, or a flyby's crossing); the others follow "
+              "at the template's durations and are reported by avgen --plan-report",
+              fmt::format("vary them: two within {:.0f} m of each other, or two of one template framed within {:.0f}% "
+                          "of the same distance, are flagged REPETITION",
+                          kSamePlaceMetres, kSameFramingFraction * 100.0f),
+              "every moment is a world event and a bus event, setpiece/<key>/<moment>: a cue can start on it "
+              "(\"on\") and a route can key on it"}}};
+}
+
 std::optional<std::size_t> setPieceOfEvent(const Plan& plan, std::string_view event) {
     if (!event.starts_with("setpiece/")) {
         return std::nullopt;

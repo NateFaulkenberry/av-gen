@@ -514,7 +514,8 @@ void Staging::registerParameters(params::ParameterSet& params, const std::string
                 .path = path,
                 .defaultValue = std::clamp(p.value, lo, hi),
                 .hardMin = lo,
-                .hardMax = hi}));
+                .hardMax = hi,
+                .label = p.label}));
             registered_.push_back(path);
         }
     }
@@ -1341,6 +1342,20 @@ void Staging::leaveBeat(Run& run, const StageContext& ctx) {
     run.beat = 0;
 }
 
+namespace {
+
+// ADR-928: whether a step that began `elapsed` seconds ago has run its `duration`, with a microsecond
+// of float noise allowed -- the tolerance the beat clock already allows (`startAt`). A frame's instant
+// is computed three ways -- `i * dt` by a trace, `k / fps` by a render's clock, `target - m * dt`
+// counted back by a seek's replay (`EntityWorld::seek`) -- and they differ in the last bits. So a
+// duration that is a whole number of frames (3.5 s is 210, and 3.5 is exact as a float) sat on a
+// frame boundary, and the noise decided which side: the set piece lab's second abduction entered
+// `depart` at 66.083 s in a play and 66.067 s after a seek to 115 s. Now such a step ends on the frame
+// its duration names, on every path. A microsecond cannot end a step a real frame early.
+bool reached(double elapsed, double duration) { return elapsed + 1e-6 >= duration; }
+
+} // namespace
+
 Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
                                      const StepDesc& step, const StageContext& ctx) {
     const std::string_view role = step.role.empty() ? std::string_view(desc.role)
@@ -1351,7 +1366,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
 
     switch (step.kind) {
     case StepKind::Wait:
-        return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+        return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
 
     case StepKind::MoveTo: {
         if (self == nullptr) {
@@ -1609,7 +1624,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             motion.hasSpeed = true;
         }
         self->setDirectorMotion(motion);
-        return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+        return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
     }
 
     case StepKind::LookAt: {
@@ -1641,7 +1656,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         self->setDirectorMotion(motion);
         const bool aimed = std::abs(delta) < 0.05f;
         if (duration > 0.0) {
-            return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+            return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
         }
         return aimed ? StepStatus::Done : StepStatus::Running;
     }
@@ -1664,7 +1679,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
         if (duration <= 0.0) {
             return StepStatus::Done;
         }
-        return elapsed >= duration ? StepStatus::Done : StepStatus::Running;
+        return reached(elapsed, duration) ? StepStatus::Done : StepStatus::Running;
     }
 
     case StepKind::Show:
@@ -1715,7 +1730,7 @@ Staging::StepStatus Staging::advance(Run& run, CueRun& cue, const CueDesc& desc,
             return StepStatus::Running;
         }
         if (self->actions().pending(entity::Authority::Director) > 0) {
-            if (duration > 0.0 && elapsed >= duration) {
+            if (duration > 0.0 && reached(elapsed, duration)) {
                 self->actions().cancel(entity::Authority::Director, ctx.time);
                 return StepStatus::Done;
             }

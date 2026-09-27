@@ -298,17 +298,20 @@ std::vector<ScenarioParam> parametersOf(const Plan& p, const std::vector<BeatDes
     std::vector<ScenarioParam> out;
     for (const SetPieceSlot& slot : setPieceSlots(spec.kind)) {
         if (slot.use == SlotUse::Parameter) {
-            out.push_back(ScenarioParam{slot.name, setPieceValue(spec, slot.name), slot.min, slot.max});
+            out.push_back(ScenarioParam{slot.name, setPieceValue(spec, slot.name), slot.min, slot.max,
+                                        setPieceSlotLabel(slot)});
         }
     }
     // The clocks are timeline seconds. The range is the widest a film could need; the validator is
     // what refuses a set piece that falls outside its song.
-    out.push_back(ScenarioParam{"transitAt", static_cast<float>(p.transitAt), 0.0f, 100000.0f});
-    out.push_back(ScenarioParam{p.moment + "At", static_cast<float>(spec.atSeconds), 0.0f, 100000.0f});
+    out.push_back(ScenarioParam{"transitAt", static_cast<float>(p.transitAt), 0.0f, 100000.0f,
+                                "craft taken for its hidden move, at (s)"});
+    out.push_back(ScenarioParam{p.moment + "At", static_cast<float>(spec.atSeconds), 0.0f, 100000.0f,
+                                fmt::format("{} at (s)", p.moment)});
     if (spec.beamColor) {
-        out.push_back(ScenarioParam{"beamRed", spec.beamColor->r, 0.0f, 64.0f});
-        out.push_back(ScenarioParam{"beamGreen", spec.beamColor->g, 0.0f, 64.0f});
-        out.push_back(ScenarioParam{"beamBlue", spec.beamColor->b, 0.0f, 64.0f});
+        out.push_back(ScenarioParam{"beamRed", spec.beamColor->r, 0.0f, 64.0f, "beam colour: red"});
+        out.push_back(ScenarioParam{"beamGreen", spec.beamColor->g, 0.0f, 64.0f, "beam colour: green"});
+        out.push_back(ScenarioParam{"beamBlue", spec.beamColor->b, 0.0f, 64.0f, "beam colour: blue"});
     }
     const std::vector<std::string> read = referencedParams(beats);
     std::erase_if(out, [&](const ScenarioParam& q) { return std::find(read.begin(), read.end(), q.name) == read.end(); });
@@ -600,6 +603,11 @@ const SetPieceSlot* findSetPieceSlot(SetPieceKind kind, std::string_view name) {
         }
     }
     return nullptr;
+}
+
+std::string setPieceSlotLabel(const SetPieceSlot& slot) {
+    const std::string_view unit = slot.unit != nullptr ? std::string_view(slot.unit) : std::string_view();
+    return unit.empty() ? std::string(slot.label) : fmt::format("{} ({})", slot.label, unit);
 }
 
 std::vector<std::string> setPieceSlotNames(SetPieceKind kind) {

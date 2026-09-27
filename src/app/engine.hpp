@@ -1157,8 +1157,10 @@ private:
     // piece's "setpiece/<id>/beam" among them -- fired on the frame after the beat was entered, from
     // the entity world's event record (which a seek replays), so a route can key on a set piece.
     std::vector<std::pair<std::string, signals::SignalId>> stagingSignals_;
+    double stagingStep_ = 1.0 / 60.0; // the last step taken; a seek resets it to the replay's grid
     void declareStagingSignals();
     void publishStagingSignals(const FrameTime& time);
+    [[nodiscard]] std::vector<signals::SignalId> stagingEventsBefore(double renderTime, double step) const;
     signals::SignalId cameraSpeedSignal_ = signals::kInvalidSignal;
     void refreshHistorySubscriptions();
     void publishEntitySignals();

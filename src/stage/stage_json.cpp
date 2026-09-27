@@ -496,6 +496,7 @@ Result<ScenarioDesc> scenarioFromJson(const nlohmann::json& j) {
             if (item.contains("value")) p.value = item.at("value").get<float>();
             if (item.contains("min")) p.min = item.at("min").get<float>();
             if (item.contains("max")) p.max = item.at("max").get<float>();
+            p.label = readString(item, "label");
             if (p.min == 0.0f && p.max == 0.0f) {
                 // A parameter with no declared range gets one wide enough not to clamp what the
                 // author wrote. A hard range of [0, 0] would silently zero every value.
@@ -529,8 +530,11 @@ nlohmann::json scenarioToJson(const ScenarioDesc& s) {
     if (!s.params.empty()) {
         nlohmann::json params = nlohmann::json::array();
         for (const ScenarioParam& p : s.params) {
-            params.push_back(nlohmann::json{
-                {"name", p.name}, {"value", p.value}, {"min", p.min}, {"max", p.max}});
+            nlohmann::json one{{"name", p.name}, {"value", p.value}, {"min", p.min}, {"max", p.max}};
+            if (!p.label.empty()) {
+                one["label"] = p.label; // written only when set: an authored scenario keeps its bytes
+            }
+            params.push_back(std::move(one));
         }
         j["params"] = std::move(params);
     }

@@ -5,6 +5,7 @@
 
 #include "seq/layer_sink.hpp"
 #include "seq/section_actions.hpp"
+#include "stage/setpiece.hpp"
 
 #include "core/phase_profiler.hpp"
 #include "core/interaction_latency.hpp"
@@ -273,6 +274,14 @@ private:
             std::memcpy(&u, &f, sizeof u);
             return static_cast<std::uint64_t>(u);
         };
+        // ADR-930: a staging beat's event is rebuilt at every replayed step from the entity world's
+        // record, which the entity replay has written up to that step (`stagingEventsBefore`), so a
+        // route on a set piece's beam is replayed like one on an onset.
+        for (const auto& [name, id] : engine_.stagingSignals_) {
+            if (id < samplable_.size()) {
+                samplable_[id] = 1;
+            }
+        }
         for (const auto& source : engine_.sources_.sources()) {
             if (!source->pureInTime()) {
                 continue;
@@ -344,6 +353,12 @@ private:
         ctx.tempoBpm = static_cast<float>(bpm);
         ctx.beatEvent = pulse;
         engine_.sources_.sample(sampling_, ctx);
+        // ADR-930: the beats the step before this one entered. With the entity replay driving this
+        // (an analysed track) the record holds exactly the steps up to that one; replayed alone after
+        // it (`runTo`, no track) it holds the whole replay, and the window picks the same step out.
+        for (const signals::SignalId id : engine_.stagingEventsBefore(time.renderTime, time.deltaTime)) {
+            sampling_.setEvent(id, true, 1.0f);
+        }
         engine_.modulator_.advanceChains(sampling_, time.deltaTime, pick());
     }
 
@@ -1053,7 +1068,9 @@ Result<void> Engine::setStaging(stage::StagingDesc staging) {
 }
 
 // ADR-930: every beat of every scenario is a bus event, "<scenario>/<beat>". Declared here, before
-// `rebind` resolves the routes, so a route whose source is a set piece's beam binds on load.
+// `rebind` resolves the routes, so a route whose source is a set piece's beam binds on load. Each is
+// labelled in the words the Modulation panel's source picker shows beside it (the owner's rule: a
+// source is found by what it is), so "setpiece/field/beam" reads "UFO set piece 'field': beam".
 void Engine::declareStagingSignals() {
     stagingSignals_.clear();
     const scene::Composition* comp = composition();
@@ -1061,40 +1078,64 @@ void Engine::declareStagingSignals() {
         return;
     }
     for (const stage::ScenarioDesc& scenario : comp->staging().scenarios) {
+        const std::string id = stage::setPieceIdOf(scenario.name);
         for (const stage::BeatDesc& beat : scenario.beats) {
             std::string name = scenario.name + "/" + beat.name;
-            const signals::SignalId id = bus_.declare(name, 0.0f, 1.0f, true);
-            stagingSignals_.emplace_back(std::move(name), id);
+            const signals::SignalId signal = bus_.declare(name, 0.0f, 1.0f, true);
+            bus_.setLabel(signal, id.empty() ? fmt::format("scenario '{}': {}", scenario.name, beat.name)
+                                             : fmt::format("UFO set piece '{}': {}", id, beat.name));
+            stagingSignals_.emplace_back(std::move(name), signal);
         }
     }
 }
 
-// Fired on the frame after the beat was entered -- the same one frame every entity-derived signal
-// lags by (ADR-703) -- and read off the entity world's record of world events, not off the director.
-// That record is what a seek's replay rebuilds (`Composition::seekWithDirector` raises the beats as it
-// steps), so the frame after a seek carries exactly the events a play carries there.
-void Engine::publishStagingSignals(const FrameTime& time) {
-    if (stagingSignals_.empty() || !(time.deltaTime > 0.0)) {
-        return;
-    }
+// The staging beats one step raised, as bus ids: every world event named "<scenario>/<beat>" stamped
+// at the instant `step` before `renderTime`. The window is [renderTime - step, renderTime) with a
+// microsecond of float noise either side (instants are computed as `i / fps`): a beat entered by the
+// step at `renderTime` itself is raised after the routes of that frame have run, so it belongs to the
+// next frame -- the one frame every entity-derived signal lags by (ADR-703).
+//
+// It reads the entity world's record of world events, never the director: that record is what a
+// seek's replay rebuilds and checkpoints (`Composition::seekWithDirector` raises the beats as it
+// steps; `EntityWorld::checkpoint` carries them), so the same question asked after a seek gets the
+// answer a play got. The record keeps a minute and 128 events (`EntityWorld::kEventWindowSeconds`,
+// `kEventCapacity`); a step's own beats are always the newest in it.
+std::vector<signals::SignalId> Engine::stagingEventsBefore(double renderTime, double step) const {
+    std::vector<signals::SignalId> out;
     const scene::Composition* comp = composition();
-    if (comp == nullptr) {
-        return;
+    if (stagingSignals_.empty() || comp == nullptr || !(step > 0.0)) {
+        return out;
     }
     const entity::EntityWorld& world = comp->entityWorld();
-    const double previous = time.renderTime - time.deltaTime;
+    const double previous = renderTime - step;
     for (const entity::WorldEvent& e : world.worldEvents()) {
-        // Raised by the previous step: its instant is this frame's minus its delta. The microsecond is
-        // float noise on an instant computed as `i / fps`.
-        if (e.time < previous - 1e-6 || e.time > time.renderTime - 1e-6) {
+        if (e.time < previous - 1e-6 || e.time > renderTime - 1e-6) {
             continue;
         }
         const std::string_view name = world.eventName(e.type);
         for (const auto& [signal, id] : stagingSignals_) {
-            if (signal == name) {
-                bus_.setEvent(id, true, 1.0f);
+            if (signal == name && std::find(out.begin(), out.end(), id) == out.end()) {
+                out.push_back(id);
             }
         }
+    }
+    return out;
+}
+
+// Fired on the frame after the beat was entered. A frame with no delta -- the frame a seek lands on,
+// or a paused frame drawn again -- is the same instant as the step before it and carries what that
+// step's frame carried: the window is the last step the engine took (the replay's 1/60 s grid after a
+// seek, ADR-700), not nothing. Before this a seek that landed on the frame after a beam lit showed no
+// beam event where the play showed one, so a route on it disagreed on exactly the landing frame.
+// Carrying it again at dt = 0 moves no chain that has already consumed it: a one-pole and a ramp do not
+// advance, a hold restarts at the same instant, and a delay line merges a second sample at the same
+// instant into the first (`ProcessorChain::delay`).
+void Engine::publishStagingSignals(const FrameTime& time) {
+    if (time.deltaTime > 0.0) {
+        stagingStep_ = time.deltaTime;
+    }
+    for (const signals::SignalId id : stagingEventsBefore(time.renderTime, stagingStep_)) {
+        bus_.setEvent(id, true, 1.0f);
     }
 }
 
@@ -4232,6 +4273,9 @@ void Engine::seekSeconds(double seconds) {
     }
     cueState_ = {};   // cues re-sync from the new position on the next frame
     cueApplied_ = false;
+    // ADR-930: the frame a seek lands on carries the staging beats of the replay's last step, which is
+    // on the replay's 60 Hz grid (ADR-700), whatever step the frames before the jump took.
+    stagingStep_ = 1.0 / 60.0;
     // ADR-398. `PostSettings::exposureReset` has documented itself as "(scene change, timeline
     // seek)" since it was written, and until this line only the scene change ever set it:
     // `resetCameraState` had exactly one caller, the composition install. So a scrub reset the

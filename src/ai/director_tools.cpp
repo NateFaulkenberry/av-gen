@@ -6,6 +6,7 @@
 #include "directing/compiler.hpp"
 #include "directing/plan.hpp"
 #include "directing/resolver.hpp"
+#include "directing/setpieces.hpp"
 #include "directing/validator.hpp"
 
 #include <fmt/format.h>
@@ -236,7 +237,9 @@ void registerDirectorTools(ToolRegistry& registry) {
             const directing::SceneFacts facts = app::sceneFactsFor(ctx.engine());
             const std::string subject = args.value("subject", std::string{});
             if (subject.empty()) {
-                return ToolResult::ok(facts.capabilities.toJson(), "the whole registry");
+                json out = facts.capabilities.toJson();
+                out["setPieces"] = directing::setPieceCatalog(facts); // ADR-929: what a plan's setPieces may ask for
+                return ToolResult::ok(out, "the whole registry");
             }
             const directing::CharacterCard* card = facts.capabilities.character(subject);
             if (card == nullptr) {

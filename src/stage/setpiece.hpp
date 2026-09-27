@@ -95,6 +95,9 @@ struct SetPieceSlot {
 
 [[nodiscard]] std::span<const SetPieceSlot> setPieceSlots(SetPieceKind kind);
 [[nodiscard]] const SetPieceSlot* findSetPieceSlot(SetPieceKind kind, std::string_view name);
+// What the Parameters panel shows for a slot's scenario parameter: its label and its unit, "hover
+// height above the ground (m)" (ADR-928's UI reach).
+[[nodiscard]] std::string setPieceSlotLabel(const SetPieceSlot& slot);
 // Every slot name of a template, for an error's suggestions and for a schema.
 [[nodiscard]] std::vector<std::string> setPieceSlotNames(SetPieceKind kind);
 

@@ -405,6 +405,9 @@ struct ScenarioParam {
     float value = 0.0f;
     float min = 0.0f;
     float max = 1.0f;
+    // What the Parameters panel calls it (ADR-928), when `name` is a word only the scenario's author
+    // would read: "hover height above the ground (m)" rather than "hoverHeight". Empty = the name.
+    std::string label;
 };
 
 struct ScenarioDesc {

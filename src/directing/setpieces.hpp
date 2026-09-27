@@ -52,6 +52,12 @@ inline constexpr float kSameFramingFraction = 0.15f;
 void checkSetPiecesTogether(const std::vector<ResolvedSetPiece>& mine, const std::vector<ResolvedSetPiece>& others,
                             const SceneFacts& facts, std::vector<Issue>& issues);
 
+// What `director.inspect_capabilities` lists under "setPieces" (the plan schema promises it): every
+// template with its moments and every slot -- name, default, range, unit, what a viewer would call it,
+// and whether it is a knob the Parameters panel shows or folded into the beats -- and every staging
+// actor that could fly one, with whether it has the beam an abduction and a survey need.
+[[nodiscard]] nlohmann::json setPieceCatalog(const SceneFacts& facts);
+
 // "setpiece/<key>/<moment>" when that names a moment of one of `plan`'s set pieces: the set piece's
 // index; nothing otherwise.
 [[nodiscard]] std::optional<std::size_t> setPieceOfEvent(const Plan& plan, std::string_view event);
