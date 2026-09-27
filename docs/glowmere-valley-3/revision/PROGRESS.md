@@ -8,6 +8,28 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **20:00: gv3-int round 2** (44 commits; now on engine-4 with E5 "go and see", `690c383b`).
+  - **The owner's items, first attempt:**
+    - **Hero pulses** barely moved (x1.05 -> x1.11). Two causes: each route's fall never lets the glow come down
+      between kicks, and the gold sits at the tone curve's shoulder. **Recalibrated** from a per-hero ladder
+      (`45a87733`): each hero rests dim and flares to its brightest short of clipping (the elder 0.10 -> 0.60,
+      most heroes 0.12-0.20 -> 3.2); falls of 100-220 ms; the elder's light flares x5 (spill). Re-measure due.
+    - **Small mushrooms:** +3.0 on the kick (100 ms fall), shelf fungi +2.4, beacons +2.2. The fog had hidden them.
+      If they still don't read in the wides, size or cast light is a look question for the owner.
+    - **Camera Travel Beam:** fires on the 22 cuts that open a four-bar phrase, sweeping from the lens into the
+      valley in about 1.5 s. It read as a white scan, so its colour now steps through the valley's lights by
+      segment. The load's "dead kick route" warning is a false alarm (an engine list item).
+    - **E4:** the cows now rise apart except at 107.0 s, where the engine lays a pair along +/-x in take order.
+      Fixed by naming the east cow first, with 4 m of height offset (`aff43de7`).
+  - **The air:** `scene/fogSky` 1.0 -> 0.5 (`4f246a9a`); the aurora and the violet mushrooms come back (41.1: 17 ->
+    83 px). **The post:** kept on ACES; AgX lifted every emissive's rest, the opposite of the pulse ask.
+  - **Re-framed:** 19.1, 25.1, 29.1, 31.1, 38.1, 59.1, 73.1, 77.1 and 106.1.
+  - **Engine-4 r2:** rook and ember each have 1 reversal (no pacing); the animals have 0; follow stability is 19/22.
+    With approach 18, vane and rook RUN at the saucer and only sage watches E5, so 95.1 fails the stability bar.
+    Suggested: approach 60-70 m (hurry, then stop at a vantage and watch).
+  - World: 20 open-end views and the mouth in 94 (59.1's new eye sees the mouth in 7 views).
+- **uireach** was waiting for a fully quiet window for its own full GPU suite. It was told to run its targeted GPU
+  families under the lock; the integration runs the full suite once for behave, uireach and cihealth.
 - **19:40: cihealth is DONE** (final `423e231d`) and **merged into `integrate/revision`** (`bea0ef33`). The suites
   will run once with behave and uireach.
   - **ADR-940: the bolt flake was three padding bytes in `RibbonStrip`.** Nothing wrote them; CI's compiler (Xcode
