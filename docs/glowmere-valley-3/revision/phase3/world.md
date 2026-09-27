@@ -89,8 +89,10 @@ Four constraints decide where each change can go.
 **North** (`world.py` `NORTH_*`):
 - **Banks:** the banks' first point is replaced by two, at levels 70 and 62. The band therefore
   climbs north of the river's source instead of running flat to the edge.
-- **River:** the river starts at its second point, (-58, 12.8, -286), in a pool at the foot of the
-  climb.
+- **River:** in `25c227dc` the river started at its second point, (-58, 12.8, -286), in a pool at
+  the foot of the climb. That joined the valley's halves for the navigator (W2b, W2c). Since
+  `7259efad` it keeps its whole course, with its first point moved to (40, 15, -350), so its gorge
+  through the head turns east out of sight.
 - **Head ridge:** `north-head`, width 70, amplitude 70, spans the V from x -140 to 50 along
   z -292..-306.
 - **Shoulder:** `north-shoulder`, width 50, amplitude 30, covers the east shoulder the head ridge
@@ -130,7 +132,7 @@ by 4 x 10^-7 of its range. The expected number of plants that change anywhere in
 - Slope p99 rose from 0.27 to 0.49 (the new head and sill). Biome shares moved: scree 13 -> 17%,
   forest 32 -> 30%, rim 11 -> 10%.
 
-## W2b: the cast and the camera (OPEN PROBLEM, found at the checkpoint)
+## W2b: the cast and the camera (found at the checkpoint; the cause and the fix are in W2c)
 
 `avgen_cast_trace --camera` over the whole film, on engine `ec515c8b`, baseline against closed
 (`build/gv3/world/cast-base.json` against `cast-v1.json`; the script is in the stream's scratchpad,
@@ -164,6 +166,37 @@ by 4 x 10^-7 of its range. The expected number of plants that change anywhere in
 - **Why it matters.** The first pass framed these follow shots against the baseline trace. The
   characters stream (ec515c8b) and gv3-cast will re-trace the cast anyway, but a distant terrain edit
   should not reroute the aliens.
+
+## W2c: the cause was the river's head, not the ground (commit `7259efad`)
+
+The nav grid's own log line gave it away:
+- **baseline:** "the walkable ground is in 4 disconnected pieces; 9805 of 20214 walkable cells (49%)
+  cannot be reached from the largest";
+- **v1:** "8 of 20179 walkable cells (0%) cannot be reached".
+
+The navigator walks anything up to `maxSlope` 0.55 (about 63 degrees). So **only water divides the
+valley**, and the river, edge to edge, is what kept its two banks apart. Ending the river in a pool
+inside the world opened a walkable way round its head. Nobody walks it, since the aliens' ranges
+barely change, but the aliens' choices depend on what is reachable. So a destination across the
+river that used to be refused now was not, and every alien's route changed.
+
+Two things were ruled out on the way:
+- a shared random stream (every entity has its own `rng_`);
+- a global destination list (`Navigator::pickDestination` samples around the walker).
+
+**The fix.** The river keeps its whole course. Only its first point moves, from (-44, 15, -352) to
+(40, 15, -350). The gorge it cuts through the head then turns 45 degrees east of north, away from every
+line of sight up the valley.
+- With the first point left where it was, the straight gorge showed the edge in s12 and s37 (10
+  views).
+- With it at (10, -352), one view of s37 still did.
+- At (40, -350), none.
+
+The nav grid is divided again: "5 disconnected pieces; 9820 of 20153 walkable cells (49%)". The extra
+small piece is at the north end, between the bent gorge and the edge.
+
+`world.py --check` now also asserts that **the river runs edge to edge**. The whole-film trace of this
+version (`cast-v2a.json`) is in W2d.
 
 ## W3: renders
 
