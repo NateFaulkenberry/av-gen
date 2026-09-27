@@ -641,7 +641,6 @@ std::vector<world::ShotSpan> Sequence::shotSpans() const {
         // leaves it at zero for a whole intro, so gating on it made "the camera has landed on a
         // hero" false for the first third of a piece the camera spent landing on three of them.
         span.spotlight = !span.travel && !s.subject.name.empty();
-        span.emphasis = s.spotlight.active ? s.spotlight.emphasis : 0.0f;
         span.subject = s.subject.name;
         span.subjectPosition = s.subject.position;
         span.subjectRadius = s.subject.radius;
@@ -719,7 +718,6 @@ json Sequence::toTimelineTracks(int samplesPerShot) const {
     json focalKeys = json::array();
     json apertureKeys = json::array();
     json focusKeys = json::array();
-    json emphasisKeys = json::array();
 
     for (std::size_t si = 0; si < shots.size(); ++si) {
         const auto& s = shots[si];
@@ -769,15 +767,6 @@ json Sequence::toTimelineTracks(int samplesPerShot) const {
         apertureKeys.push_back(json{{"time", s.startSeconds},
                                     {"value", s.composition.aperture},
                                     {"interp", "linear"}});
-        // Emphasis is a state, not a curve. Two keys hold it flat to the last millisecond of the
-        // shot so the change happens *at* the cut; one key per shot would ramp the hero's
-        // importance across the whole of the shot before it.
-        const float emphasis = s.spotlight.active ? s.spotlight.emphasis : 0.0f;
-        emphasisKeys.push_back(
-            json{{"time", s.startSeconds}, {"value", emphasis}, {"interp", "linear"}});
-        emphasisKeys.push_back(json{{"time", std::max(s.endSeconds() - 1e-3, s.startSeconds)},
-                                    {"value", emphasis},
-                                    {"interp", "linear"}});
     }
 
     json tracks = json::array();
@@ -801,10 +790,10 @@ json Sequence::toTimelineTracks(int samplesPerShot) const {
                           {"timeBase", "seconds"},
                           {"mode", "replace"},
                           {"keys", std::move(focusKeys)}});
-    tracks.push_back(json{{"target", "camera/focus/emphasis"},
-                          {"timeBase", "seconds"},
-                          {"mode", "replace"},
-                          {"keys", std::move(emphasisKeys)}});
+    // There used to be a sixth, `camera/focus/emphasis`: the spotlight's emphasis as a stepped track,
+    // for "the systems that will frame, expose and rim-light the subject". No build ever registered
+    // the parameter, so `installSequence` left it out of every install with a log line, and nothing
+    // else read it. ADR-922 cut it (ADR-442: no shim for a thing with no reader).
     // Free mode, as part of the bake.
     //
     // A composition ignores `camera/position` and `camera/target` entirely unless `camera/mode` is 1
@@ -817,7 +806,7 @@ json Sequence::toTimelineTracks(int samplesPerShot) const {
     // A step key at zero, because a mode is a state and not a curve. In the bake rather than in the
     // installer, so a directed camera saved into a project still works when it is reopened; last in
     // the array rather than first, because the timeline writes every track before anything reads a
-    // parameter, so the order carries no meaning and the existing five have index-shaped tests.
+    // parameter, so the order carries no meaning and the other five have index-shaped tests.
     tracks.push_back(json{{"target", "camera/mode"},
                           {"timeBase", "seconds"},
                           {"mode", "replace"},

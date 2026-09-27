@@ -57,6 +57,11 @@ enum class TrackMode : std::uint8_t { Replace, Add, Multiply };
 
 using KeyValue = std::array<float, 4>;
 
+// The ramp a baked cut spends between the outgoing shot's last pose and the incoming shot's first
+// (`seq::Sequence`'s bake): two keys this far apart, because a track keeps one key per instant.
+// Shared with `Track::jumpsWithin` (ADR-912), which is how a render finds those cuts again.
+inline constexpr double kCutRampSeconds = 1e-3;
+
 struct Key {
     double time = 0.0;          // seconds or beats, per the track's time base
     KeyValue value{};           // components (entries past the keyed count are ignored)
@@ -97,6 +102,15 @@ struct Track {
     [[nodiscard]] double localTime(double time) const;
     [[nodiscard]] double firstKeyTime() const;
     [[nodiscard]] double lastKeyTime() const;
+    // ADR-912: whether the value JUMPS somewhere in (t0, t1] -- the track's own statement that the
+    // picture it drives does not continue, rather than a guess from how far it moved. A jump is a
+    // Step key whose value differs from the next key's, landing at that next key; or a segment no
+    // longer than `rampSeconds` that moves at least twenty times as fast as either neighbour (or
+    // at all, with no moving neighbour): the millisecond ramp a baked sequence writes between two
+    // shots, and the zero-length one two keys at one instant make. Dense keys on a fast move are
+    // not jumps: their neighbours move as fast as they do. Seconds tracks only; a looped or
+    // beat-based track answers false.
+    [[nodiscard]] bool jumpsWithin(double t0, double t1, double rampSeconds) const;
 };
 
 struct Cue {

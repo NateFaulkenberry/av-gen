@@ -239,6 +239,35 @@ or ride something that moves. `eventScenario` names a staging scenario; while it
 of `eventBeats`, or at all when that list is empty) the camera claims the frame, widened by
 `eventLead` and `eventTail`. A `locked` shot is the author's veto: an event does not take it.
 
+A follow or aim rig reads a filtered **reference** of its node rather than the node itself (ADR-911):
+the node's own transform history (HIST) through a causal, critically damped kernel, the same
+reference for the eye (at `t - followLagSeconds`, plus `followOffset`) and the aim (at `t`, plus
+`aimOffset`). It is a pure function of the history, so a scrub and a render of a range land on the
+frame a play from zero draws. Every key is optional, written only when set, and absent means the raw
+node -- every rig written before ADR-911.
+
+| Key | Cameras panel row | Meaning |
+|---|---|---|
+| `followSmoothSeconds` | follow smoothing (s) | the kernel's mean delay for X and Z, seconds |
+| `followVerticalSmoothSeconds` | height smoothing (s) | the same for the height: what takes out a walker's stride bob |
+| `followLead` | keep up with the subject (0-1) | 0..1: adds `lead x T x velocity` of the smoothed horizontal path; 1 cancels a steady walk's delay. Horizontal only |
+| `followGround` | follow the ground | the subject walks on the terrain: its height is smoothed relative to the ground, so a descent is followed without the vertical constant's lag. Not for things that fly |
+| `followLagSeconds` | follow lag (s) | the eye stands where the subject was this long ago; the aim does not lag |
+| `followLocal` | stay behind as it turns | `followOffset` is in the subject's frame, turned by its heading, rather than in world axes |
+| `followHeadingSmoothSeconds` | turn smoothing (s) | with `followLocal`: the kernel's mean delay for the yaw the offset turns by (the yaw alone, not the sway or slope tilt) |
+| `followClearance` | ground clearance (m) | metres above the surface the eye is kept, by a 0.25 m softplus rather than a hard floor |
+
+The smoothing keys filter whichever of `followNode` and `aimNode` the rig reads, so an aim-only rig
+gets look-at damping from them too. A rig reading more than 16 s of history (lag plus four of its
+longest constant) is refused at load.
+
+Each key is also a row in the **Cameras** panel (View menu > Cameras): select the camera, and its section shows them
+under the lens slider, headed "following its subject" (`scene::followControls`). The panel's ranges
+(0-3 s for every time, 0-1 for the lead, 0-10 m for the clearance) always stay inside HIST's 16 s; a
+row that would do nothing on that camera -- a lead with no smoothing, turn smoothing without
+`followLocal`, the ground or the clearance in a scene with no terrain -- is greyed, with the reason
+in its tooltip.
+
 Resolution at any instant, highest first: a locked shot, then an event (highest `priority`, then
 lowest id), then the last shot containing the time, then `default`. `Engine::activeCamera()` reports
 which and why; the pose itself is `Scene::camera`, as it always was. The exception is a project

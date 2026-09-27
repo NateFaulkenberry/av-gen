@@ -83,6 +83,12 @@ Result<void> ShotIntentProfile::validate() const {
     if (auto ok = check("cutRate", cutRate); !ok) {
         return ok;
     }
+    if (auto ok = check("energy", energy); !ok) {
+        return ok;
+    }
+    if (auto ok = check("visualDensity", visualDensity); !ok) {
+        return ok;
+    }
     // An upper bound as well as a lower one, because a request for four hundred cameras is not an
     // ambitious intent, it is a typo, and honouring it silently would produce a shot per frame.
     if (cameras < 1 || cameras > 16) {
@@ -98,7 +104,10 @@ nlohmann::json ShotIntentProfile::toJson() const {
                           {"movement", movement},
                           {"variation", variation},
                           {"cutRate", cutRate},
-                          {"cameras", cameras}};
+                          {"cameras", cameras},
+                          {"arc", song::arcName(arc)},
+                          {"energy", energy},
+                          {"visualDensity", visualDensity}};
 }
 
 Result<ShotIntentProfile> ShotIntentProfile::fromJson(const nlohmann::json& doc) {
@@ -107,11 +116,13 @@ Result<ShotIntentProfile> ShotIntentProfile::fromJson(const nlohmann::json& doc)
     }
     ShotIntentProfile out;
     out.id = doc.value("id", std::string());
-    const std::array<std::pair<const char*, float*>, 5> axes{{{"hero", &out.heroEmphasis},
+    const std::array<std::pair<const char*, float*>, 7> axes{{{"hero", &out.heroEmphasis},
                                                               {"distance", &out.distance},
                                                               {"movement", &out.movement},
                                                               {"variation", &out.variation},
-                                                              {"cutRate", &out.cutRate}}};
+                                                              {"cutRate", &out.cutRate},
+                                                              {"energy", &out.energy},
+                                                              {"visualDensity", &out.visualDensity}}};
     for (const auto& [key, field] : axes) {
         auto v = axis(doc, key, *field);
         if (!v) {
@@ -120,9 +131,54 @@ Result<ShotIntentProfile> ShotIntentProfile::fromJson(const nlohmann::json& doc)
         *field = *v;
     }
     out.cameras = doc.value("cameras", out.cameras);
+    // Refused rather than read as Steady: an arc nobody has heard of is a file from a build that
+    // meant something else by the key, and cutting it as Steady would be a silently different film.
+    if (const auto arc = doc.find("arc"); arc != doc.end()) {
+        if (!arc->is_string()) {
+            return fail("song plan: 'arc' must be a string");
+        }
+        const auto parsed = song::arcFromName(arc->get<std::string>());
+        if (!parsed) {
+            return fail("song plan: '{}' is not an arc; expected steady, rising, falling, suspended "
+                        "or burst",
+                        arc->get<std::string>());
+        }
+        out.arc = *parsed;
+    }
     if (auto ok = out.validate(); !ok) {
         return std::unexpected(ok.error());
     }
+    return out;
+}
+
+// ---- SongPlanSection -----------------------------------------------------------------------------
+
+float SongPlanSection::progressAt(double seconds) const {
+    const double span = durationSeconds();
+    if (!(span > 0.0)) {
+        return 0.0f;
+    }
+    return static_cast<float>(std::clamp((seconds - startSeconds) / span, 0.0, 1.0));
+}
+
+ShotIntentProfile SongPlanSection::intentAtProgress(float progress) const {
+    ShotIntentProfile out = intent;
+    if (intent.arc == song::Arc::Steady) {
+        return out;
+    }
+    // Through the song model's own arc, not a copy of it: the four dials an arc moves go in, the
+    // same four come out. The rest of a `ShotIntent` (focus, framing, cameras) does not travel.
+    song::ShotIntent carrier;
+    carrier.arc = intent.arc;
+    carrier.movement = intent.movement;
+    carrier.energy = intent.energy;
+    carrier.variation = intent.variation;
+    carrier.cutFrequency = intent.cutRate;
+    const song::ShotIntent at = carrier.atProgress(progress);
+    out.movement = at.movement;
+    out.energy = at.energy;
+    out.variation = at.variation;
+    out.cutRate = at.cutFrequency;
     return out;
 }
 
@@ -163,6 +219,16 @@ Result<void> SongPlan::validate() const {
         }
         previousEnd = s.endSeconds;
     }
+    for (const SongEvent& e : events) {
+        if (!std::isfinite(e.seconds) || e.seconds < 0.0) {
+            return fail("song plan event '{}' is at {} s; an event happens at a time in the film",
+                        e.name, e.seconds);
+        }
+        if (!std::isfinite(e.endSeconds) || (e.endSeconds != 0.0 && e.endSeconds < e.seconds)) {
+            return fail("song plan event '{}' ends at {} s, before it starts at {} s", e.name,
+                        e.endSeconds, e.seconds);
+        }
+    }
     return {};
 }
 
@@ -191,6 +257,22 @@ nlohmann::json SongPlan::toJson() const {
         list.push_back(std::move(j));
     }
     out["sections"] = std::move(list);
+    // ADR-922. Written only when there are some, so a plan that has none is byte-identical to one
+    // written before events existed.
+    if (!events.empty()) {
+        nlohmann::json eventList = nlohmann::json::array();
+        for (const SongEvent& e : events) {
+            nlohmann::json j{{"name", e.name}, {"seconds", e.seconds}};
+            if (!e.subject.empty()) {
+                j["subject"] = e.subject;
+            }
+            if (e.span()) {
+                j["end"] = e.endSeconds;
+            }
+            eventList.push_back(std::move(j));
+        }
+        out["events"] = std::move(eventList);
+    }
     return out;
 }
 
@@ -246,6 +328,26 @@ Result<SongPlan> SongPlan::fromJson(const nlohmann::json& doc) {
         }
         s.occurrence = j.value("occurrence", s.occurrence);
         out.sections.push_back(std::move(s));
+    }
+    // The shape `director.watch_events` returns its observation in, so a watched play can be pasted
+    // into a plan as it stands.
+    if (const auto events = doc.find("events"); events != doc.end()) {
+        if (!events->is_array()) {
+            return fail("song plan: 'events' must be an array");
+        }
+        for (const auto& j : *events) {
+            if (!j.is_object() || !j.contains("seconds") || !j["seconds"].is_number()) {
+                return fail("song plan: every event needs a number 'seconds'");
+            }
+            SongEvent e;
+            e.name = j.value("name", std::string());
+            e.subject = j.value("subject", std::string());
+            e.seconds = j["seconds"].get<double>();
+            e.endSeconds = j.value("end", 0.0);
+            out.events.push_back(std::move(e));
+        }
+        std::stable_sort(out.events.begin(), out.events.end(),
+                         [](const SongEvent& a, const SongEvent& b) { return a.seconds < b.seconds; });
     }
     if (auto ok = out.validate(); !ok) {
         return std::unexpected(ok.error());
@@ -315,6 +417,11 @@ SongPlan songPlanFromMeasurements(const analysis::SongStructure& structure, cons
         intent.variation = std::clamp(0.15f + 0.70f * d, 0.0f, 1.0f);
         intent.cutRate = std::clamp(0.10f + 0.45f * e + 0.40f * d, 0.0f, 1.0f);
         intent.cameras = e > 0.75f ? 3 : (e > 0.45f ? 2 : 1);
+        // ADR-920. Nothing measured says how a passage should travel, so it holds steady; its push
+        // is how loud it measured and its frame as full as it is busy.
+        intent.arc = song::Arc::Steady;
+        intent.energy = e;
+        intent.visualDensity = d;
         out.intent = std::move(intent);
 
         plan.sections.push_back(std::move(out));
@@ -395,6 +502,14 @@ Result<SongPlan> songPlanFromCues(std::span<const song::SectionCue> cues) {
         profile.movement = intent.movement;
         profile.variation = intent.variation;
         profile.cutRate = intent.cutFrequency;
+        // ADR-920: the three this adapter used to drop. The arc is what makes a Rising treatment's
+        // cutting accelerate and a Suspended one hold; the push is how the director finds the
+        // film's peaks; the visual density moves shot length. Carried as the song model states
+        // them -- `SongPlanSection::intentAt` applies the arc through the song model's own
+        // `ShotIntent::atProgress`, the function `SectionCue::intentAt` wraps.
+        profile.arc = intent.arc;
+        profile.energy = intent.energy;
+        profile.visualDensity = intent.visualDensity;
 
         // `CameraCount` is a range and the profile asks for one number. The FEWEST is the request,
         // not the most: `cameras` is already documented as a request a world may not be able to

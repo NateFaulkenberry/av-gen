@@ -13,12 +13,14 @@
 #include "analysis/structure.hpp"
 #include "core/log.hpp"
 #include "app/edit_system.hpp"
+#include "app/song_director.hpp"
 #include "scene/composition.hpp"
 #include "seq/layer_sink.hpp"
 #include "seq/lyrics.hpp"
 #include "seq/section_performance.hpp"
 #include "seq/song_structure.hpp"
 #include "song/from_analysis.hpp"
+#include "song/section_cue.hpp"
 
 #include <glm/trigonometric.hpp> // degrees/radians for the drift control
 
@@ -2773,6 +2775,28 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
         if (ImGui::IsItemHovered()) {
             tooltip("What this section should look like. 'default' follows the type, so "
                               "changing the type changes the treatment too.");
+        }
+        // ADR-921: what the treatment does to the cutting, said where the treatment is chosen -- the
+        // one place an accelerating riser or a held suspension can be traced to from the picture.
+        const song::ShotIntent& treatment = piece.shotLanguage.intentFor(section);
+        ImGui::TextDisabled("cuts: %s", app::arcCutNote(treatment.arc));
+        if (ImGui::IsItemHovered()) {
+            tooltip("How Song Mode paces this section's shots, from its treatment's arc. The\n"
+                    "Auto-director panel's 'shortest shot', 'shortest build' and 'longest shot'\n"
+                    "set the range; the treatment's cut rate and the music's density set where\n"
+                    "in it this section sits. Every cut lands on a beat.");
+        }
+        // ...and how far the arc carries the cut rate across this section, read through the cue --
+        // the treatment with its arc applied at a second, the same arithmetic the director's
+        // `SongPlanSection::intentAt` uses (ADR-920).
+        if (treatment.arc != song::Arc::Steady) {
+            const std::vector<song::SectionCue> cues = song::cueSheet(piece.sectionTimeline, piece.shotLanguage);
+            if (index < cues.size()) {
+                const song::SectionCue& cue = cues[index];
+                ImGui::TextDisabled("cut rate %.0f%% at its start, %.0f%% at its end",
+                                    static_cast<double>(cue.intentAt(cue.startSeconds).cutFrequency) * 100.0,
+                                    static_cast<double>(cue.intentAt(cue.endSeconds).cutFrequency) * 100.0);
+            }
         }
     }
 

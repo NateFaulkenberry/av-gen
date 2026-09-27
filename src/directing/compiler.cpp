@@ -253,7 +253,20 @@ scene::CameraRig followRig(const std::string& name, const std::string& node, Cam
     const float distance = beat.distanceMetres.value_or(move == CameraMove::Chase ? 4.0f : 6.0f);
     rig.followOffset = glm::vec3(0.0f, height, -distance);
     rig.aimOffset = glm::vec3(0.0f, lowAngle ? 1.4f : 1.2f, 0.0f);
-    rig.followLagSeconds = move == CameraMove::Chase ? 0.25 : 0.0;
+    // ADR-911: the filtered subject reference rather than a lagged node. On GV3's walkers in the
+    // camera audit's four windows, the rig this replaced -- the raw node, its drawn rotation, 0.25 s
+    // of lag on the eye alone -- turned its view at 143-145 degrees a second at the 95th percentile,
+    // moved its eye at 10 m/s and nodded 0.4-1.3 degrees (HF RMS). These settings, measured in the
+    // engine on the same shots (ADR-913), turn at 48-97 degrees a second and nod at most 0.24
+    // degrees with the subject within 20% of centre; modelled, the eye moves at 3.1-5.3 m/s. A chase
+    // still trails: the heading's 1.2 s swings it round behind a turn, where the lag it replaces
+    // delayed the eye against its own aim.
+    rig.followLagSeconds = 0.0;
+    rig.followSmoothSeconds = 0.3;
+    rig.followVerticalSmoothSeconds = 0.8;
+    rig.followLead = 1.0f;
+    rig.followGround = true; // characters walk; a rig on something that flies is authored, not compiled
+    rig.followHeadingSmoothSeconds = 1.2;
     rig.followClearance = 0.2f;
     rig.focalLength = lowAngle ? 24.0f : 35.0f;
     return rig;

@@ -96,6 +96,9 @@ struct AppOptions {
     // does not carry one. The same reason `--director` exists: a mode that can only be reached
     // through a GUI is a mode nobody can measure, reproduce or regression-test.
     std::optional<std::filesystem::path> songPlan;
+    // `--cut-report <file>`: after a Song Mode `--direct`, write the cut as JSON (ADR-923) -- every
+    // shot's span, subject, arc and the reason for its duration -- for a generator to read.
+    std::optional<std::filesystem::path> cutReport;
     std::optional<std::filesystem::path> saveProject;  // write on exit
     // `--save-scene <file>`: write the composition on exit, the symmetry `--save-project`
     // has always lacked. Needed by Song Mode (ADR-249), whose camera track lives in the

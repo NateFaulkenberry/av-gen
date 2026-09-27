@@ -2,6 +2,8 @@
 
 #include "app/engine.hpp"
 #include "app/music_runtime.hpp"
+#include "directing/plan.hpp"
+#include "entity/entity.hpp"
 #include "scene/composition.hpp"
 #include "world/camera_clearance.hpp"
 #include "core/log.hpp"
@@ -11,6 +13,9 @@
 
 #include <algorithm>
 #include <array>
+#include <set>
+#include <string>
+#include <tuple>
 
 namespace avgen::app {
 namespace {
@@ -23,10 +28,12 @@ namespace {
 // previous direction's focal length and aperture in place alongside the new one -- two tracks
 // writing the same parameter, which is not a blend but whichever the timeline applies last. A test
 // that walks the installed tracks and checks each is on this list caught it immediately, which is
-// the argument for the list existing at all rather than being implied.
-constexpr std::array<std::string_view, 7> kCameraTargets{
+// the argument for the list existing at all rather than being implied. (A seventh,
+// `camera/focus/emphasis`, was baked and never registered, so every install dropped it; ADR-922
+// cut it from the bake and from here.)
+constexpr std::array<std::string_view, 6> kCameraTargets{
     // The mode belongs to the director for as long as the director owns the camera: it is what
-    // makes the other six readable at all. Handing the camera back removes this with them, so the
+    // makes the other five readable at all. Handing the camera back removes this with them, so the
     // scene returns to whichever way of placing the camera it was authored with.
     "camera/mode",
     "camera/position",
@@ -34,7 +41,6 @@ constexpr std::array<std::string_view, 7> kCameraTargets{
     "camera/lens/focalLength",
     "camera/lens/aperture",
     "camera/lens/focusDistance",
-    "camera/focus/emphasis",
 };
 
 bool isCameraTarget(std::string_view target) {
@@ -639,16 +645,25 @@ Result<SongPlan> songPlanForEngine(const Engine& engine) {
     // treatment, both of which the timeline carries and `cueSheet` resolves -- so the deliberate
     // authoring a plan used to hold is held by the thing being edited instead.
     const seq::Sequence& piece = engine.sequence();
+    // ADR-922: whichever the sections come from, the film's events come with them.
+    const auto withEvents = [&](SongPlan plan) {
+        plan.events = songEventsForEngine(engine);
+        return plan;
+    };
     if (!piece.sectionTimeline.sections.empty()) {
         const std::vector<song::SectionCue> cues =
             song::cueSheet(piece.sectionTimeline, piece.shotLanguage, engine.track());
         if (!cues.empty()) {
-            return songPlanFromCues(cues);
+            auto plan = songPlanFromCues(cues);
+            if (!plan) {
+                return plan;
+            }
+            return withEvents(std::move(*plan));
         }
     }
     // Then a plan somebody authored, for a project that has one and no film to derive from.
     if (!engine.songPlan().empty()) {
-        return engine.songPlan();
+        return withEvents(engine.songPlan());
     }
     // Otherwise, the analyzed structure read for its *measurements* -- never for its labels. Kept as
     // the fallback for a project that has a detection and no film, and as the thing that makes the
@@ -658,24 +673,173 @@ Result<SongPlan> songPlanForEngine(const Engine& engine) {
         return fail("Song Mode needs a song structure: analyze the track in the Sequence panel, or "
                     "author a song plan, before directing to it");
     }
-    return songPlanFromMeasurements(structure, engine.track());
+    return withEvents(songPlanFromMeasurements(structure, engine.track()));
+}
+
+std::vector<SongEvent> songEventsForEngine(const Engine& engine) {
+    // Two sources, and neither is parsed: an event is a name, a subject and a time. The saved plan's
+    // own events are what somebody wrote down (a generator's `"events"`); a watched play's are what
+    // the film does on its own -- a scenario's world events, and, once set pieces are planned, their
+    // `setpiece/<id>/...` events -- recorded on the directing plan that asked (ADR-767).
+    std::vector<SongEvent> out = engine.songPlan().events;
+    for (const directing::Plan& plan : engine.directingPlans()) {
+        if (!plan.observation) {
+            continue;
+        }
+        for (const directing::ObservedEvent& e : plan.observation->first) {
+            out.push_back(SongEvent{e.name, e.subject, e.seconds, e.endSeconds});
+        }
+    }
+    std::stable_sort(out.begin(), out.end(), [](const SongEvent& a, const SongEvent& b) {
+        return std::tie(a.seconds, a.name, a.subject) < std::tie(b.seconds, b.name, b.subject);
+    });
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+}
+
+namespace {
+
+// The last Song Mode cut, as the panel's rows read it.
+std::vector<std::string> gLastSongCut;
+
+std::vector<std::string> summariseSongCut(const SongDirection& direction) {
+    std::vector<std::string> out;
+    out.reserve(direction.sections.size());
+    for (const SongSectionCut& c : direction.sections) {
+        double shortest = 0.0;
+        double longest = 0.0;
+        for (std::size_t i = c.firstShot; i < c.firstShot + c.shotCount && i < direction.decisions.size(); ++i) {
+            const double length = direction.decisions[i].endSeconds - direction.decisions[i].startSeconds;
+            shortest = i == c.firstShot ? length : std::min(shortest, length);
+            longest = std::max(longest, length);
+        }
+        std::string line = c.shotCount == 1
+                               ? fmt::format("1 shot, {:.1f} s", longest)
+                               : fmt::format("{} shots, {:.1f}-{:.1f} s", c.shotCount, shortest, longest);
+        if (c.arc != song::Arc::Steady) {
+            line += fmt::format(", {}", song::arcName(c.arc));
+        }
+        if (c.peak) {
+            line += c.eventSubject.empty() ? ", peak" : fmt::format(", peak on {}", c.eventSubject);
+        }
+        out.push_back(std::move(line));
+    }
+    return out;
+}
+
+bool travels(std::string_view behaviour) {
+    return behaviour == "wander" || behaviour == "explore" || behaviour == "orbit" || behaviour == "decide" ||
+           behaviour == "motionScript";
+}
+
+bool movesInPlace(std::string_view behaviour) {
+    return behaviour == "hover" || behaviour == "drift" || behaviour == "bank" || behaviour == "spin" ||
+           behaviour == "liveliness" || behaviour == "lookAt" || behaviour == "interest";
+}
+
+} // namespace
+
+std::vector<std::string> lastSongCutSummary() { return gLastSongCut; }
+
+float heroMotion(const Engine& engine, const world::HeroPoint& hero) {
+    const scene::Composition* composition = engine.composition();
+    if (composition == nullptr) {
+        return 0.0f;
+    }
+    // The node the hero names, driven by an entity or not. A hero is one object (ADR-107), and an
+    // entity drives the node its `node` names (its own name by default).
+    const entity::Entity* body = nullptr;
+    for (const auto& e : composition->entityWorld().entities()) {
+        if (e && (e->name() == hero.name || e->desc().node == hero.name)) {
+            body = e.get();
+            break;
+        }
+    }
+    if (body != nullptr) {
+        // A body a scenario flies travels, whatever its own behaviours are.
+        for (const stage::ActorDesc& actor : composition->staging().actors) {
+            if (actor.driven() == body->name()) {
+                return 1.0f;
+            }
+        }
+        float motion = 0.0f;
+        for (const entity::BehaviorDesc& b : body->desc().behaviors) {
+            if (travels(b.kind)) {
+                return 1.0f;
+            }
+            if (movesInPlace(b.kind)) {
+                motion = 0.5f;
+            }
+        }
+        const auto moves = [](const std::vector<entity::ActionDesc>& actions) {
+            return std::any_of(actions.begin(), actions.end(),
+                               [](const entity::ActionDesc& a) { return a.kind == entity::ActionKind::Move; });
+        };
+        if (moves(body->desc().actions)) {
+            return 1.0f;
+        }
+        for (const entity::ScheduleEntry& entry : body->desc().schedule.entries) {
+            if (moves(entry.actions)) {
+                return 1.0f;
+            }
+        }
+        return motion;
+    }
+    // A plain node moves only if its hero reactions move it: a hover, a spin or a pulse of scale.
+    if (const world::HeroReactionProfile* profile = world::findHeroReactionProfile(hero.reactionProfile)) {
+        for (const world::HeroReaction& r : profile->reactions) {
+            if (r.behaviour == world::HeroBehaviour::Hover || r.behaviour == world::HeroBehaviour::Rotation ||
+                r.behaviour == world::HeroBehaviour::ScalePulse) {
+                return 0.3f;
+            }
+        }
+    }
+    return 0.0f;
+}
+
+SongInputs songInputsForEngine(const Engine& engine) {
+    SongInputs inputs;
+    if (const analysis::AnalysisTrack* track = engine.track(); track != nullptr) {
+        inputs.grid = musicalGridFrom(track->beats().beatTimes, engine.meter());
+    }
+    if (const scene::Composition* composition = engine.composition()) {
+        for (const world::HeroPoint& hero : composition->heroes()) {
+            inputs.motion.emplace_back(hero.name, heroMotion(engine, hero));
+        }
+    }
+    return inputs;
 }
 
 Result<SongDirection> directSongFromPlan(std::span<const world::HeroPoint> heroes,
                                          const SongPlan& plan,
                                          const scene::CameraDirection& cameras,
-                                         const AutoDirectorSettings& settings) {
+                                         const AutoDirectorSettings& settings,
+                                         const SongInputs& inputs) {
     auto brief = briefFromHeroes(heroes);
     if (!brief) {
         return std::unexpected(brief.error());
     }
     settings.applyTo(*brief);
+    // ADR-921: how much each subject moves on its own, which the duration rule reads.
+    const auto motionOf = [&](FocalTarget& target) {
+        for (const auto& [name, motion] : inputs.motion) {
+            if (name == target.name) {
+                target.motion = std::clamp(motion, 0.0f, 1.0f);
+            }
+        }
+    };
+    motionOf(brief->hero);
+    for (FocalTarget& target : brief->supporting) {
+        motionOf(target);
+    }
     const std::vector<scene::CameraRig> eligible = eligibleCameras(cameras);
     SongDirectorOptions options;
     options.minShotSeconds = settings.minShotSeconds;
     options.maxShotSeconds = settings.maxShotSeconds;
+    options.minBuildShotSeconds = settings.minBuildShotSeconds;
     options.seed = settings.seed;
     options.autonomy = settings.autonomy;
+    options.grid = inputs.grid;
     // The lens the framing bake commits to, from the hero's own proportions -- the same choice
     // `briefFromHeroes` makes, carried through so Song Mode and the other two modes frame a tall
     // thin subject the same way.
@@ -771,29 +935,43 @@ Result<std::size_t> installSongDirection(Engine& engine, const SongDirection& di
 }
 
 Result<std::size_t> directEngine(Engine& engine, std::span<const world::HeroPoint> heroes,
-                                 const AutoDirectorSettings& settings) {
+                                 const AutoDirectorSettings& settings, const SongPlan* explicitPlan,
+                                 SongDirection* directionOut) {
     if (auto ok = settings.validate(); !ok) {
         return std::unexpected(ok.error());
     }
     // Song Mode does not fold audio: the fold has already happened and somebody has edited the
     // result. So it needs no analyzed track and works on a project whose audio is not loaded, which
-    // is what makes an offline render of a Song Mode cut possible from the project alone.
+    // is what makes an offline render of a Song Mode cut possible from the project alone. With a
+    // track, the cut lands on its beat grid (ADR-921).
     if (settings.mode == DirectorMode::Song) {
-        auto plan = songPlanForEngine(engine);
+        Result<SongPlan> plan = explicitPlan != nullptr ? Result<SongPlan>(*explicitPlan) : songPlanForEngine(engine);
         if (!plan) {
             return std::unexpected(plan.error());
+        }
+        if (explicitPlan != nullptr && plan->events.empty()) {
+            // A plan handed in for this run still hears what the film does on its own.
+            plan->events = songEventsForEngine(engine);
         }
         const scene::Composition* composition = engine.composition();
         if (composition == nullptr) {
             return fail("Song Mode needs a scene to direct");
         }
-        auto direction = directSongFromPlan(heroes, *plan, composition->cameraDirection(), settings);
+        const SongInputs inputs = songInputsForEngine(engine);
+        auto direction = directSongFromPlan(heroes, *plan, composition->cameraDirection(), settings, inputs);
         if (!direction) {
             return std::unexpected(direction.error());
         }
-        log::info("song director: {:.0f}s of authored song in {} section(s)",
-                  plan->durationSeconds(), plan->sections.size());
-        return installSongDirection(engine, *direction, settings);
+        log::info("song director: {:.0f}s of authored song in {} section(s){}", plan->durationSeconds(),
+                  plan->sections.size(),
+                  inputs.grid.empty() ? std::string(", no beat grid (no analysed track)")
+                                      : fmt::format(", cut on {} tracked beats", inputs.grid.beatTimes.size()));
+        gLastSongCut = summariseSongCut(*direction);
+        auto installed = installSongDirection(engine, *direction, settings);
+        if (installed && directionOut != nullptr) {
+            *directionOut = std::move(*direction);
+        }
+        return installed;
     }
     const analysis::AnalysisTrack* track = engine.track();
     if (track == nullptr) {
@@ -951,9 +1129,10 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
     std::vector<std::string> unknown;
     for (const auto& entry : cleared) {
         // A track for a parameter this build does not have is a track that binds to nothing and is
-        // skipped in silence by the timeline. Better to leave it out and name it once: the bake
-        // emits camera/focus/emphasis for hero spotlighting, which nothing registers yet, and an
-        // unbound track sitting in a saved project is a puzzle for whoever opens it next.
+        // skipped in silence by the timeline. Better to leave it out and name it once: an unbound
+        // track sitting in a saved project is a puzzle for whoever opens it next. Nothing the bake
+        // emits takes this branch any more (ADR-922 cut `camera/focus/emphasis`, which always did);
+        // `tests/unit/test_song_director.cpp` holds that every baked track is installed.
         const std::string target = entry.value("target", std::string());
         if (!target.empty() && engine.params().find(target) == nullptr) {
             unknown.push_back(target);
@@ -1097,5 +1276,82 @@ Result<std::size_t> installSequence(Engine& engine, const Sequence& sequence,
               sequence.shots.size(), added, removed);
     return added;
 }
+
+// `--director mode=continuous,maxShot=6.8,maxSpeed=0.4`. Unknown keys are refused rather than
+// ignored: a typo in a measurement's arguments that silently measures the default is worse than no
+// flag at all, and this flag exists to make measurements reproducible.
+Result<void> applyDirectorArgs(AutoDirectorSettings& s, std::string_view spec) {
+    std::size_t at = 0;
+    while (at <= spec.size()) {
+        const std::size_t comma = spec.find(',', at);
+        std::string_view item = spec.substr(at, comma == std::string_view::npos ? comma : comma - at);
+        at = comma == std::string_view::npos ? spec.size() + 1 : comma + 1;
+        if (item.empty()) {
+            continue;
+        }
+        const std::size_t eq = item.find('=');
+        if (eq == std::string_view::npos) {
+            return fail("--director: '{}' is not key=value", item);
+        }
+        const std::string key(item.substr(0, eq));
+        const std::string value(item.substr(eq + 1));
+        const auto number = [&](double& out) -> Result<void> {
+            try {
+                std::size_t used = 0;
+                out = std::stod(value, &used);
+                if (used != value.size()) {
+                    return fail("--director: '{}' is not a number for '{}'", value, key);
+                }
+            } catch (const std::exception&) {
+                return fail("--director: '{}' is not a number for '{}'", value, key);
+            }
+            return {};
+        };
+        double v = 0.0;
+        if (key == "mode") {
+            // Through the same table the panel and the project file use, so one setting has one
+            // spelling however it arrives.
+            const auto parsed = directorModeFromName(value);
+            if (!parsed) {
+                return fail("--director: mode must be 'continuous', 'edited' or 'song', got '{}'",
+                            value);
+            }
+            s.mode = *parsed;
+            continue;
+        }
+        if (key == "autonomy") {
+            const auto parsed = autonomyFromName(value);
+            if (!parsed) {
+                return fail("--director: autonomy must be 'locked', 'guided' or 'expressive', got "
+                            "'{}'",
+                            value);
+            }
+            s.autonomy = *parsed;
+            continue;
+        }
+        if (auto ok = number(v); !ok) {
+            return std::unexpected(ok.error());
+        }
+        if (key == "minShot") {
+            s.minShotSeconds = v;
+        } else if (key == "minBuildShot") {
+            s.minBuildShotSeconds = v;
+        } else if (key == "maxShot") {
+            s.maxShotSeconds = v;
+        } else if (key == "maxSpeed") {
+            s.maxCameraSpeed = static_cast<float>(v);
+        } else if (key == "maxSwing") {
+            s.maxViewRate = static_cast<float>(v);
+        } else if (key == "dwell") {
+            s.dwellShots = static_cast<int>(v);
+        } else if (key == "seed") {
+            s.seed = static_cast<std::uint32_t>(std::max(0.0, v));
+        } else {
+            return fail("--director: unknown setting '{}'", key);
+        }
+    }
+    return s.validate();
+}
+
 
 } // namespace avgen::app
