@@ -28,6 +28,16 @@ where its predecessor stopped.
   bounce at 0, the reaction alone still lifted them (p90 0.16-0.17 m, max 0.22-0.23 m). Rook and tide match ADR-895.
   GV3 drops the reaction (`ALIEN_REACTIONS_DROPPED` in `cast.py`); gv3-cast verifies it on a trace. **No stride-bob
   engine stream.**
+  - **Verified in iteration 3 (13:40):** ember's walk went from 0.172 / 0.374 / 0.560 m to 0.091 / 0.195 / 0.283 m
+    (mean / p90 / max root height above the ground), and vane's from 0.172 / 0.347 / 0.477 m to
+    0.087 / 0.176 / 0.248 m. They now match ADR-895's formula. The Critic still flags them (its "floats" check fires
+    at >0.1 m for >10% of an on-screen track), because the authored bounce of 0.32 lifts the body over 0.1 m for about
+    45% of each stride.
+  - **The coordinator's call (reversible style choice; the owner may reverse it):** lower the bounce so a walk peaks
+    at 0.1 m or less. ember and vane go 0.32 -> 0.17 and rook 0.22 -> 0.18 in iteration 4; sage (0.18) and tide
+    (0.14) already pass.
+  - **Open, for the Critic:** its float check reads the traced root. The foot layers' `bodyCompensation` (maxDown 0.3
+    model units) may keep the drawn feet planted, so the check may over-report.
 - **The world closure's alien reroute is explained and fixed in data** (gv3-world W2c, `7259efad`): ending the river
   in a pool joined its banks for the navigator. The river now runs edge to edge, with its head bent 45° east.
 - **Launched: navfix** (ADRs 932-933, plus an ADR-931 amendment) in `~/Documents/GitHub/av-gen-navfix`, branch
