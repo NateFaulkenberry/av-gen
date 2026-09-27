@@ -135,7 +135,7 @@ def markdown():
         a, b = music.segment(d["segment"])
         L = d["look"]
         lines.append(f"| {d['segment']} | {a:.2f}-{b:.2f} | {d['name']} | {d['intent']} | {d['camera']} | "
-                     f"{L['ev']:+.1f} | {L['sat']:.2f} | {L['fog']:.2f} | {L['light']:.2f} | {L['aurora']:.1f} | "
+                     f"{L['ev']:+.2f} | {L['sat']:.2f} | {L['fog']:.2f} | {L['light']:.2f} | {L['aurora']:.1f} | "
                      f"{L['sparkle']:.2f} |")
     lines.append("")
     return "\n".join(lines)

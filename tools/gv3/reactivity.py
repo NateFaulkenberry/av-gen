@@ -60,15 +60,15 @@ ELDER = [-12.0, 0.0, 52.0]  # the rings leave from under the elder's cap
 WAVE_FIELDS = [
     # A pulse exp(-(2 pi s / wavelength)^2): at 40 m a band about 13 m wide, lighting each mushroom
     # it crosses for about half a second at 20 m/s. It fades out by 45 m, before the next leaves.
-    {"name": "bar-wave", "kind": "field", "position": ELDER, "field": {
-        "name": "bar-wave", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
+    {"name": "elder-rings", "kind": "field", "position": ELDER, "field": {
+        "name": "elder-rings", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
         "wavelength": 40.0, "waveSpeed": 20.0, "waveWidth": 0.0,
         "falloff": {"kind": "smoothstep", "inner": 10.0, "outer": 45.0},
         "trigger": {"source": "beat", "everyN": 4, "offset": 0}}},
     # The drop's ring: out from the elder on the crash at 40 m/s, 19 m across; it crosses what the
     # drop's first wide sees (150 m) in under four seconds and fades out 220-340 m away.
-    {"name": "drop-wave", "kind": "field", "position": ELDER, "field": {
-        "name": "drop-wave", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
+    {"name": "drop-ring", "kind": "field", "position": ELDER, "field": {
+        "name": "drop-ring", "kind": "wave", "waveGeometry": "radial", "waveShape": "pulse",
         "wavelength": 60.0, "waveSpeed": 40.0, "waveWidth": 0.0,
         "falloff": {"kind": "smoothstep", "inner": 220.0, "outer": 340.0},
         "trigger": {"source": "marker", "name": "drop"}}},
@@ -77,7 +77,7 @@ WAVE_FIELDS = [
 # 8 clear; fungi 6-10, shelf fungi 4-6, beacons 3-4). The fungi and shelf fungi are the elder's
 # neighbours; the beacons, 1.5 m lamps, are the small lights that still read across a wide, so they
 # carry the drop's ring over the valley.
-WAVE_LAYERS = {"fungi": ("bar-wave", 8.0), "shelf-fungi": ("bar-wave", 5.0), "beacons": ("drop-wave", 3.5)}
+WAVE_LAYERS = {"fungi": ("elder-rings", 8.0), "shelf-fungi": ("elder-rings", 5.0), "beacons": ("drop-ring", 3.5)}
 # The heroes take the drop's ring too: each lights as it passes, the elder first, on the crash, and
 # the valley relights outward from it (the plan: "the light rebuilt"). A hero part samples the field
 # at its origin, so the whole part answers at once. Its own glow, on its own layer, carries on.
@@ -130,7 +130,7 @@ def prepare(project, scene):
     bases = [h[: -len("-cap")] for h in FEATURED]
     for node in scene["nodes"]:
         if node.get("kind") == "procedural" and any(node["name"] == b + p for b in bases for p in HERO_PARTS_ON_DROP_RING):
-            node["procedural"]["emissiveField"] = "drop-wave"
+            node["procedural"]["emissiveField"] = "drop-ring"
             node["procedural"]["emissiveFieldAmount"] = HERO_DROP_RING
     rank = {name: round(0.5 - 0.0215 * i, 4) for i, name in enumerate(FEATURED)}
     for heroes in (scene.get("heroes", []), project.get("heroes", [])):
@@ -150,7 +150,7 @@ def wave_tracks():
         if v != prev:
             keys += [(start - 0.001, prev, "linear"), (start, v, "linear")]
     keys.append((music.TAIL_END, steps[-1][1], "linear"))
-    return [track("field/bar-wave/strength", keys)]
+    return [track("field/elder-rings/strength", keys)]
 
 
 # ---- EDIT --------------------------------------------------------------------------------------------
@@ -341,7 +341,7 @@ def apply(project, scene):
     tuned = tune(proposal)
     install(project, tuned)
     project["timeline"]["tracks"] = [t for t in project["timeline"]["tracks"]
-                                     if not t["target"].startswith("field/bar-wave/")] + wave_tracks()
+                                     if not t["target"].startswith("field/elder-rings/")] + wave_tracks()
     report = audit(project, scene)
     (SCRATCH / "tuned.json").write_text(json.dumps({k: v for k, v in tuned.items() if k != "plan"}, indent=1))
     bad = [r for r in report["routes"] + report["tracks"] if r["verdict"] != "live"]
