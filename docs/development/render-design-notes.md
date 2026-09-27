@@ -41,3 +41,18 @@ this file is the handoff.
   `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/render/`.
 - The first batch rendered an empty scene with exit 0: the snapshot lacked `../entities/`,
   `../materials/` and `../lightrigs/`. Every summary line now records what the render loaded.
+
+## Suite state at the handoff (2026-09-27)
+- **CPU:** `ctest --test-dir build/release -L unit -j 4` at `63dbe0a0` (every later commit is
+  documentation): 3706 cases, 3686 passed, 1 failed, 19 skipped; exit 8, 3822 s. The failure is
+  `test_directing_agent.cpp:381`, a 180 s wall-clock limit on the scripted assistant watching 30 s
+  of the multicam film: it timed out at 185 s under the suite's load and passed alone in 123 s
+  (`build/render-cpu-rerun-directing.log`). Other agents' suites record the same case failing at
+  185.4 and 185.7 s and passing in 109-144 s.
+- **GPU:** the first full run on this branch (`60746ee5`, `build/render-gpu-full-1.log`): 542 cases,
+  536 passed, 5 failed, 1 skipped -- the four tests since re-baselined (ADR-917, ADR-918). Every
+  family touched since has passed under the lock: `[terrain][height]` 13, `[weather]` 8,
+  `[forensics]` 74, `[bloom]` 4, `[resolution]` 4, `[fogsky]` 4, `[quality][offline]` 3, `[fog]` 43.
+  A full run on the final code was queued behind other agents' holds (`build/render-gpu-full.sh
+  full-2` -> `build/render-gpu-full-2.log`); if that log is absent or incomplete, run it:
+  `AVGEN_AGENT=render tools/gpu-lock.sh build/render-gpu-full.sh full-3`.
