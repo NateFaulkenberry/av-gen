@@ -376,10 +376,13 @@ label `it3b`; complete), 80 issues (2 critical, 3 high, 16 medium).
 - **The two criticals are the adapter's, not the cut's:** "ember is out of frame for 100% of the shot"
   in 48.3 and 101.1 (and in iteration 1's job, s29 = 48.3). Both shots frame the ember-cap mushroom
   ("the ember-cap mushroom"), which is centred and lit in the frames (`it1/cut-it1.mov` at 88.6 s).
-  `avgen_adapter.py`'s `SUBJECT_ALIASES` has no alias for `ember-cap`: `\bember\b` maps the text to
-  the alien Ember, and `\bcap\b` to the elder's cap. The fix, for the critic-adapter stream: an
-  `(r"ember[- ]cap|ember mushroom", "ember-cap")` alias ahead of `\bember\b`, and `\bcap\b` not
-  matching after a hyphen. The labels stay what they are.
+  `avgen_adapter.py`'s `SUBJECT_ALIASES` had no alias for `ember-cap`, so `\bember\b` mapped the text
+  to the alien Ember. **Fixed by the coordinator in creative-critic `961e04c`** ("a mushroom named like
+  an alien is the mushroom"). With the fixed adapter, the iteration-3 inputs name `ember-cap` in s29
+  and s61 and nothing else changes, and the before's inputs are identical, so the before jobs stand
+  and still compare like for like. Resubmitted: job `job_1a0e3f09cc6ad3a9b` (label `it3c`; complete),
+  **78 issues (0 critical, 3 high, 16 medium)**, composition 0.70 -> 0.83. Iteration 1's F002 (s29)
+  was the same false positive. The labels stay what they are.
 - **54.1:** the one finding on iteration 3's changes that was the cut's (the elder's cap across the
   frame's edge), fixed as above; the job before the fix, `job_1a0e3e7b8b77dc917`, had it.
 - **Left as designed:** "1 element outweighs the visitor" in 81.1 (the suspension's locked-off wide:
