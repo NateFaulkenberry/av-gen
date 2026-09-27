@@ -259,9 +259,13 @@ def vane_watches(t0, t1, g):
     # horse-20 walked past the lens and filled half the frame: the herd grazes within 5-8 m of her
     # path. Searched on both casts, gv3-cut's preview world and gv3-cast's, where her path is the
     # same: no animal nearer the lens than 6.7 m or in front of her, the eye 5.8 m over the ground.)
-    r = follow(35.0, "vane", (7.07, 6.0, -8.43), (-12.0, 1.2, 2.0))
+    # On the merged film that vantage looked through the meadow's canopy trees, which hid the elder and by
+    # the shot's end filled a third of the frame (the scatter is in no trace). Now 14 m east-south-east of
+    # her and 8 m up, over the canopy's line to the elder: its cap whole in the upper left, Vane walking the
+    # lower right (gv3-int batch B, four vantages rendered; the higher ones left her small).
+    r = follow(35.0, "vane", (12.12, 8.0, 7.0), (-12.0, 1.2, 2.0))
     return r, dict(lead="alien", purpose="Vane crosses the east meadow, the elder beyond", subject="vane, the elder beyond",
-                   camera="35 mm, riding 11 m north-east of Vane and 6 m up, looking south-west past it",
+                   camera="35 mm, riding 14 m east-south-east of Vane and 8 m up, looking west-north-west past it",
                    movement="follows", music="2 bars")
 
 
@@ -461,9 +465,15 @@ def e4_aliens_watch(t0, t1, g):
     # away from the lens toward it and stays in frame. Offset searched on the trace: her head and
     # shoulders low on the right third, the scout and both animals in frame for the whole shot, the
     # eye 1.7 m over the rising ground behind her.
-    r = follow(20.0, "sage", (-2.23, 3.6, -3.88), (0.0, -12.0, 0.0), aim="scout", smoothing="hover")
-    return r, dict(lead="event", purpose="E4: Sage turns to watch the pair rise", subject="the column (E4), sage in front",
-                   camera="20 mm over Sage's shoulder, looking up at the scout", movement="follows", music="2 bars")
+    # In the closed world (gv3-world's valley ends) Sage walks away from the column through the whole
+    # span and was out of this frame for all of it; the alien that goes to see E4 is Rook, walking down
+    # the west bank straight at it (facing it within a degree, 40 -> 27 m). A fixed eye up the bank behind
+    # him, a live aim under the hovering scout: he passes the lens and walks down toward the column as
+    # the pair rises (searched on the merged trace, gv3-int batch B; the bank behind him is too steep
+    # for an eye that rides with him).
+    r = aim_at(20.0, [-103.1, 12.9, -19.2], "scout", (0.0, -19.0, 0.0), "hover")
+    return r, dict(lead="event", purpose="E4: Rook goes to see the pair rise", subject="the column (E4), rook walking to it",
+                   camera="20 mm up the west bank behind Rook, looking at the scout", movement="still", music="2 bars")
 
 
 @at("61.1")
