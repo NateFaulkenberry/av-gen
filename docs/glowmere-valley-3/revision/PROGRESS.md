@@ -8,6 +8,17 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **MERGED (14:50): main is `876a11e2`,** now also with **render** (ADR-917–919) and the **gpu-lock fix**. **10 of 11
+  engine streams are in main**; navfix (ADR-932–934) is the last.
+  - The render integration's suites: CPU 3,788 of 3,788, 0 failed (at `776b1a87`; later commits are docs and
+    tools). GPU 544 cases, 543 passed, 1 skipped, 617,268 assertions, exit 0, 1,073 s.
+    - The GPU run overlapped a CPU test run (`avgen_tests`, 14:27-14:35) and one short `avgen` sample. Contention
+      makes false failures, not false passes, so the pass stands, with the overlap on record.
+  - Main was pushed to GitHub (`ec515c8b..876a11e2`) and merged into `gv3/production` (`37c1b65d`).
+    `integrate/revision` = `876a11e2`.
+  - **Building `av-gen-engine-3`** at `876a11e2` (detached; log `coord-engine3-build.log` in the coordinator's
+    scratchpad). When it is ready, the GV3 streams move `build/release` to it between jobs. It carries render's
+    `post/referenceHeight`, `scene/fogSky`, `scene/fogSkyDistance` and the offline floors.
 - **MERGED (12:55): main is `ec515c8b`,** now also with characters (ADR-907–910, the ADR-911 placement amendment).
   Its suites: CPU 3,781 of 3,781, 0 failed, 3,233 s; GPU 533 cases, 532 passed, 1 skipped. **9 of 11 engine streams
   are in main.** The owner approved the fast-forward after the classifier refused it. Main was then merged into
