@@ -225,6 +225,15 @@ struct EffectChange {
     std::vector<params::ModRoute> routesAfter;
 };
 
+// The scene's staging description, before and after (ADR-929): the scenarios a plan's set pieces
+// compile into. Whole, on `LightChange`'s argument -- a handful of plain documents -- and both sides
+// the description AS INSTALLED (`Composition::staging()`), because `Engine::setStaging` registers
+// the scenario parameters from it and a slider moved since is a `ParamChange` of its own.
+struct StagingChange {
+    stage::StagingDesc before;
+    stage::StagingDesc after;
+};
+
 // One reversible change. Move-only, because it owns nodes.
 struct EditCommand {
     // What the user did, in their words, for the status bar and the history list: "Place 12 x fern",
@@ -250,6 +259,8 @@ struct EditCommand {
     std::unique_ptr<LightChange> lights;
     // The effect list either side (ADR-702), or null for the edits that are most of them.
     std::unique_ptr<EffectChange> effects;
+    // The staging description either side (ADR-929), or null.
+    std::unique_ptr<StagingChange> staging;
     // The selection either side, so undoing a delete gives you back what you had selected rather
     // than leaving you staring at a scene with nothing chosen and no idea what came back.
     std::vector<std::string> selectionBefore;
@@ -265,7 +276,7 @@ struct EditCommand {
     [[nodiscard]] bool empty() const {
         return params.empty() && parents.empty() && heroes.empty() && added.empty() &&
                removed.empty() && timeline == nullptr && lights == nullptr && effects == nullptr &&
-               automation == nullptr && cameras == nullptr && plans == nullptr;
+               automation == nullptr && cameras == nullptr && plans == nullptr && staging == nullptr;
     }
     // How many things the user would say this touched, for the label and for tests.
     [[nodiscard]] std::size_t touched() const;
@@ -292,6 +303,8 @@ struct EditApply {
     std::size_t automationInstalled = 0;
     // 1 when this command installed a camera collection, 0 otherwise (ADR-752).
     std::size_t cameraDirectionsInstalled = 0;
+    // 1 when this command installed a staging description, 0 otherwise (ADR-929).
+    std::size_t stagingsInstalled = 0;
     std::vector<std::string> problems;
     [[nodiscard]] bool ok() const { return problems.empty(); }
 };

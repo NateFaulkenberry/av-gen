@@ -7,6 +7,7 @@
 
 #include "app/directing_record.hpp"
 #include "directing/compiler.hpp"
+#include "ui/director_panel_logic.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -14,6 +15,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace avgen::app {
 class EditSystem;
@@ -89,6 +91,10 @@ private:
     // micro to macro, each with its reason and whether the route it made is still as made. Drawn with
     // or without the assistant: the plans are the project's, not the assistant's.
     void drawProjectPlans(app::Engine& engine);
+    // ADR-929: "UFO set pieces" -- every set piece in the project's plans, in the words of the picture,
+    // with a control for its template, placed moment, time, place and variation. Each edit is a
+    // revision of its plan, applied as one undo. Drawn with or without the assistant.
+    void drawSetPieces(app::Engine& engine);
     // The proposal's dry run, recompiled only when the proposal or the project changed.
     void refresh(app::Engine& engine, const std::shared_ptr<avgen::ai::AgentTask>& task);
     bool endPreview(app::Engine& engine);
@@ -109,6 +115,12 @@ private:
     std::string recordingTask_;
     bool cancelledRecording_ = false;
     std::string cachedDiff_; // the proposal's diff as last compiled: a revised proposal recompiles
+    // ADR-929: the set piece rows, rebuilt when the history moves (their values are the controls'
+    // buffers while a drag is in progress).
+    std::vector<SetPieceRow> setPieceRows_;
+    std::uint64_t setPieceState_ = ~std::uint64_t{0};
+    std::size_t setPiecePlans_ = 0;
+    std::string setPieceStatus_; // what the last edit did, or why it was not applied
 };
 
 } // namespace avgen::ui

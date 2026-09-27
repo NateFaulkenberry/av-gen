@@ -58,8 +58,10 @@ enum class IssueCode : std::uint8_t {
     OverSaturated,            // one entity answers too many things, or its routes push it past its safe range
     PhaseRateTrap,            // a route moves a rate whose phase is time x rate: the pattern jumps
     RouteHazard,              // reaches the picture, in a way that is almost certainly not what was meant
+    // ---- quality ----
+    Repetition,               // ADR-929: two items would read as the same moment (a set piece at the same place)
 };
-inline constexpr IssueCode kLastIssueCode = IssueCode::RouteHazard;
+inline constexpr IssueCode kLastIssueCode = IssueCode::Repetition;
 [[nodiscard]] const char* issueCodeName(IssueCode code);
 [[nodiscard]] std::optional<IssueCode> issueCodeFromName(std::string_view name);
 

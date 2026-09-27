@@ -1,0 +1,20 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Set piece lab"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "setpiece-lab.scene.json"
+  }
+ },
+ "render": {
+  "width": 960,
+  "height": 540,
+  "fps": 60,
+  "output": "sequence",
+  "path": "renders/setpiece-lab"
+ }
+}

@@ -13,7 +13,9 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <optional>
 #include <string>
+#include <utility>
 
 namespace avgen::ui {
 namespace {
@@ -173,10 +175,195 @@ void DirectorPanel::drawProjectPlans(app::Engine& engine) {
     }
 }
 
+void DirectorPanel::drawSetPieces(app::Engine& engine) {
+    const auto& plans = engine.directingPlans();
+    const bool any = std::any_of(plans.begin(), plans.end(), [](const directing::Plan& p) { return !p.setPieces.empty(); });
+    if (!any) {
+        setPieceRows_.clear();
+        return;
+    }
+    const std::uint64_t state = edits != nullptr ? edits->history().stateId() : 0;
+    if (state != setPieceState_ || plans.size() != setPiecePlans_) {
+        setPieceRows_.clear();
+        const directing::SceneFacts facts = app::sceneFactsFor(engine);
+        for (const directing::Plan& p : plans) {
+            for (SetPieceRow& row : setPieceRows(p, facts)) {
+                setPieceRows_.push_back(std::move(row));
+            }
+        }
+        setPieceState_ = state;
+        setPiecePlans_ = plans.size();
+    }
+    heading("UFO set pieces");
+    ImGui::TextWrapped("Each change here is a new revision of its plan, applied as one undo. The Parameters panel's "
+                       "staging > setpiece/<name> sliders fine-tune what the plan made.");
+    std::optional<std::pair<std::size_t, SetPieceEdit>> pending;
+    for (std::size_t i = 0; i < setPieceRows_.size(); ++i) {
+        SetPieceRow& row = setPieceRows_[i];
+        ImGui::PushID(static_cast<int>(i));
+        const bool errors = !row.lines.empty() && !row.seconds;
+        markIcon(row.state != "as made" ? ItemMark::Warning
+                 : errors                ? ItemMark::Blocked
+                 : !row.lines.empty()    ? ItemMark::Warning
+                                         : ItemMark::Ok);
+        const bool open = ImGui::TreeNode("##setpiece", "%s  -  %s", row.key.c_str(), row.when.c_str());
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s\n%s\n%s\nplan: %s", row.what.c_str(), row.where.c_str(), row.how.c_str(),
+                              row.planTitle.c_str());
+        }
+        if (open) {
+            ImGui::TextWrapped("%s", row.what.c_str());
+            ImGui::TextWrapped("where: %s", row.where.c_str());
+            ImGui::TextWrapped("%s", row.how.c_str());
+            if (row.state != "as made") {
+                ImGui::PushStyleColor(ImGuiCol_Text, kWarn);
+                ImGui::TextWrapped("%s: %s", row.state.c_str(), row.whyNot.c_str());
+                ImGui::PopStyleColor();
+            }
+            for (const std::string& line : row.lines) {
+                ImGui::PushStyleColor(ImGuiCol_Text, kWarn);
+                ImGui::TextWrapped("! %s", line.c_str());
+                ImGui::PopStyleColor();
+            }
+            ImGui::BeginDisabled(!row.editable || edits == nullptr);
+            SetPieceEdit edit;
+            bool changed = false;
+            // What kind of event: the template.
+            static constexpr const char* kTemplates[] = {"abduction", "survey", "flyby"};
+            if (ImGui::BeginCombo("event", row.templateName.c_str())) {
+                for (const char* t : kTemplates) {
+                    if (ImGui::Selectable(t, row.templateName == t) && row.templateName != t) {
+                        edit.templateName = t;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            // When: the moment the time places, and the time.
+            if (ImGui::BeginCombo("placed moment", row.moment.c_str())) {
+                for (const std::string& m : row.moments) {
+                    if (ImGui::Selectable(m.c_str(), row.moment == m) && row.moment != m) {
+                        edit.moment = m;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            double seconds = row.seconds.value_or(0.0);
+            if (ImGui::InputDouble("at (s)", &seconds, 0.1, 1.0, "%.3f")) {
+                row.seconds = seconds;
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                edit.seconds = row.seconds.value_or(0.0);
+                changed = true;
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                ImGui::SetTooltip("the plan wrote %s; an edit here writes seconds", row.timeText.c_str());
+            }
+            // Where.
+            if (row.point) {
+                float xz[2] = {row.x, row.z};
+                if (ImGui::DragFloat2("over x, z (m)", xz, 0.5f)) {
+                    row.x = xz[0];
+                    row.z = xz[1];
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    edit.point = std::make_pair(row.x, row.z);
+                    changed = true;
+                }
+            } else {
+                ImGui::TextDisabled("placed %s: change that in the plan", row.where.c_str());
+            }
+            // Variation.
+            const bool flyby = row.templateName == "flyby";
+            if (row.templateName == "abduction") {
+                if (row.namedAnimals) {
+                    ImGui::TextDisabled("lifts the animals the plan names (%d)", row.animals);
+                } else {
+                    ImGui::SliderInt("animals lifted", &row.animals, 1, 3);
+                    if (ImGui::IsItemDeactivatedAfterEdit()) {
+                        edit.slots.emplace_back("animals", static_cast<float>(row.animals));
+                        changed = true;
+                    }
+                }
+            }
+            ImGui::SliderFloat(flyby ? "flies toward (deg, 0 = north)" : "comes in from (deg, 0 = north)", &row.bearing,
+                               0.0f, 360.0f, "%.0f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                edit.slots.emplace_back(flyby ? "pathBearing" : "approachBearing", row.bearing);
+                changed = true;
+            }
+            ImGui::SliderFloat(flyby ? "height above the ground (m)" : "hover height above the ground (m)", &row.height,
+                               flyby ? 5.0f : 4.0f, flyby ? 1000.0f : 120.0f, "%.1f");
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                edit.slots.emplace_back(flyby ? "altitude" : "hoverHeight", row.height);
+                changed = true;
+            }
+            if (!flyby) {
+                bool coloured = row.beamColor.has_value();
+                if (ImGui::Checkbox("coloured beam", &coloured)) {
+                    edit.beamColor = coloured ? std::optional<std::array<float, 3>>(std::array<float, 3>{1.0f, 0.3f, 0.2f})
+                                              : std::optional<std::array<float, 3>>();
+                    changed = true;
+                }
+                if (row.beamColor) {
+                    ImGui::SameLine();
+                    float rgb[3] = {(*row.beamColor)[0], (*row.beamColor)[1], (*row.beamColor)[2]};
+                    if (ImGui::ColorEdit3("beam colour", rgb, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR)) {
+                        row.beamColor = std::array<float, 3>{rgb[0], rgb[1], rgb[2]};
+                    }
+                    if (ImGui::IsItemDeactivatedAfterEdit()) {
+                        edit.beamColor = row.beamColor;
+                        changed = true;
+                    }
+                }
+            }
+            float framing = row.framingMetres.value_or(0.0f);
+            if (ImGui::SliderFloat("meant to be seen from (m, 0 = not said)", &framing, 0.0f, 1000.0f, "%.0f")) {
+                row.framingMetres = framing > 0.0f ? std::optional<float>(framing) : std::nullopt;
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                edit.framingMetres = framing;
+                changed = true;
+            }
+            ImGui::EndDisabled();
+            if (!row.editable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && !row.whyNot.empty()) {
+                ImGui::SetTooltip("%s", row.whyNot.c_str());
+            }
+            if (changed) {
+                pending = std::make_pair(i, std::move(edit));
+            }
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    // Applied after the loop: an apply moves the history, which rebuilds the rows being drawn.
+    if (pending && edits != nullptr) {
+        const SetPieceRow& row = setPieceRows_[pending->first];
+        const auto plan = std::find_if(plans.begin(), plans.end(), [&](const directing::Plan& p) { return p.id == row.plan; });
+        if (plan == plans.end()) {
+            setPieceStatus_ = "the set piece's plan is no longer in the project";
+        } else if (auto compiled = compileSetPieceEdit(*plan, row.key, pending->second, app::sceneFactsFor(engine));
+                   !compiled) {
+            setPieceStatus_ = fmt::format("{}: {}", setPieceEditLabel(row.key, pending->second), compiled.error().message);
+        } else {
+            const std::string label = setPieceEditLabel(row.key, pending->second);
+            setPieceStatus_ = app::applyCompilation(engine, edits->history(), *compiled, label)
+                                  ? label + " (revision " + std::to_string(compiled->plan.revision) + ", one undo)"
+                                  : label + ": could not be installed";
+        }
+        setPieceState_ = ~std::uint64_t{0};
+    }
+    if (!setPieceStatus_.empty()) {
+        ImGui::TextDisabled("%s", setPieceStatus_.c_str());
+    }
+}
+
 void DirectorPanel::draw(app::Engine& engine) {
     if (plane == nullptr) {
         ImGui::TextWrapped("The Director needs the AI assistant, which is not available in this session.");
         drawProjectPlans(engine);
+        drawSetPieces(engine);
         return;
     }
     const std::shared_ptr<AgentTask> task = directorTask(*plane);
@@ -438,6 +625,7 @@ void DirectorPanel::draw(app::Engine& engine) {
 
     // ---- what the project already carries --------------------------------------------------------
     drawProjectPlans(engine);
+    drawSetPieces(engine);
 }
 
 } // namespace avgen::ui

@@ -118,6 +118,8 @@ public:
     void setRecordingHook(RecordingHook hook);
     // ADR-767: the host's watcher, for `director.watch_events`.
     void setWatchHook(WatchHook hook);
+    // ADR-931: the host's evaluator, for `director.evaluate`. Unset: the tool says it is unavailable.
+    void setEvaluationHook(EvaluationHook hook);
     // Where projects live, for the project life-cycle tools.
     void setProjectsRoot(std::filesystem::path root);
     // Directories the assistant may read content from.
