@@ -146,6 +146,22 @@ TRAVEL_BEAM_PARAMETERS = {
     "fx/camera-travel-beam/fadeOut": TRAVEL_BEAM_TIMING["fadeOut"],
 }
 TRAVEL_BEAM_KICK = 2.0   # the scored kick on its intensity while it sweeps
+# Its colour through the song (the owner: "tune its colour to the GV3 palette and the section arc"), keyed
+# on the timeline at each segment's first cut, so the Timeline panel shows it and the Effects panel's
+# colour is the value it starts from. Each is one of the valley's own lights, the edge a paler tint of
+# it: at r2b the edge was near-white at intensity 3 and the band read as a white scan across the frame.
+# The silent segments keep the last colour (the beam does not fire in them).
+TRAVEL_BEAM_EDGE_INTENSITY = 2.0
+TRAVEL_BEAM_ARC = {
+    #  segment            colour                edge
+    "cold-open": ((0.58, 0.36, 1.00), (0.80, 0.66, 1.00)),        # the small mushrooms' violet
+    "groove-2": ((0.42, 0.40, 1.00), (0.68, 0.70, 1.00)),         # indigo, the night deepening
+    "lift": ((0.07, 0.78, 1.00), (0.55, 0.92, 1.00)),             # the beacons' cyan, E3's column
+    "arrival": ((0.08, 0.95, 0.70), (0.62, 1.00, 0.86)),          # the aurora's teal: the valley lit
+    "melodic-plateau": ((1.00, 0.60, 0.22), (1.00, 0.84, 0.58)),  # the elder's gold
+    "lead-forward": ((0.20, 1.00, 0.55), (0.70, 1.00, 0.82)),     # the aurora carries the lead
+    "drop": ((1.00, 0.62, 0.30), (1.00, 0.86, 0.66)),             # the valley rebuilt, gold
+}
 REMOVED_EFFECT_TYPES = {
     "groundPulse": "fired only while the Song-mode shot spans spotlit a hero; the cut is authored now",
 }
@@ -221,16 +237,25 @@ def _terrain(scene):
 # stretch 10.386 and the motion-blur tile 20 stay as they are: the audit's 8 levels, stretch x2 and
 # tile 40 were for a resolution-dependent look and would now scale twice. The final-only values
 # (4K, the offline tier) are gv3-world's, in offline.py.
+#
+# The air at half (gv3-int round 2, the fog A/B `vF`: ten windows stepped through fogSky 1.0 / 0.5 /
+# 1.0 at 600 m / 0). At 1.0 the wides were a bright teal haze from the middle distance on (41.1's mean
+# luma 0.292; the Critic's "bright areas away from the subject dominate") and the small violet mushrooms
+# all but vanished into it (41.1: 17 violet pixels in the frame, 83 at 0.5, 158 at 0). At 0 the first
+# pass's navy came back, and with it the river's mouth as a slot at the end of 109.1's crane and the
+# elder's light as a hard trapezoid behind it in 71.1. At 0.5 the distance still fades into the aurora,
+# the ends stay soft and the valley's own lights read again.
+FOG_SKY = 0.5
 RENDER_ALIKE = {
     "post/referenceHeight": 1080.0,
     "post/motionBlur/maxRadius": 60.0,
     "post/motionBlur/samples": 32,
-    "scene/fogSky": 1.0,
+    "scene/fogSky": FOG_SKY,
     "scene/fogSkyDistance": 0.0,
 }
 # The same, where the scene file keeps them (a value set in the project and not the scene is the one
 # the project states; both are written so neither reverts the other).
-RENDER_ALIKE_SCENE = {("post", "referenceHeight"): 1080.0, ("environment", "fogSky"): 1.0,
+RENDER_ALIKE_SCENE = {("post", "referenceHeight"): 1080.0, ("environment", "fogSky"): FOG_SKY,
                       ("environment", "fogSkyDistance"): 0.0}
 
 
@@ -322,7 +347,28 @@ def apply_travel_beam(project, shots):
     project["routes"] = [r for r in project.get("routes", []) if r.get("target") != "fx/camera-travel-beam/intensity"]
     project["routes"].append(_route("timeline.kick", "fx/camera-travel-beam/intensity", TRAVEL_BEAM_KICK, "add",
                                     {"attackMs": 5.0, "decayMs": 240.0}))
+    apply_travel_beam_arc(project, shots)
     return cuts
+
+
+def apply_travel_beam_arc(project, shots):
+    """The beam's colour and edge colour stepped at each TRAVEL_BEAM_ARC segment's first cut."""
+    starts = {}
+    for s in shots:
+        starts[s.segment] = min(starts.get(s.segment, s.start), s.start)
+    arc = sorted((starts[seg], colours) for seg, colours in TRAVEL_BEAM_ARC.items() if seg in starts)
+    first = arc[0][1]
+    project["parameters"]["fx/camera-travel-beam/color"] = list(first[0])
+    project["parameters"]["fx/camera-travel-beam/edgeColor"] = list(first[1])
+    project["parameters"]["fx/camera-travel-beam/edgeIntensity"] = TRAVEL_BEAM_EDGE_INTENSITY
+    targets = ("fx/camera-travel-beam/color", "fx/camera-travel-beam/edgeColor")
+    tracks = project["timeline"]["tracks"]
+    tracks[:] = [t for t in tracks if t.get("target") not in targets]
+    for k, target in enumerate(targets):
+        keys = [{"time": 0.0, "value": list(first[k]), "interp": "step"}]
+        keys += [{"time": round(t - 1.0 / 60.0, 6), "value": list(c[k]), "interp": "step"} for t, c in arc[1:]]
+        tracks.append({"target": target, "component": -1, "timeBase": "seconds", "mode": "replace",
+                       "loopLength": 0.0, "enabled": True, "keys": keys})
 
 
 # ---- ARC -----------------------------------------------------------------------------------------
