@@ -311,14 +311,22 @@ so v3 and v4 differ only in the film):
    the beacons only where they are large in frame, or make it the ecology light's (the light the
    layers cast follows their `emissionGain`, not their `emissiveField`, so the ring lights the
    mushrooms but not the ground around them).
-3. The tears with the wind back at 0.62 rad: verify the s08 glint seam at 1080p (queued, v5).
+3. (Answered: the s08 seam is back with the wind at 0.62 rad, v5.)
 4. The slow level routes on the specks (spire on the lead, veil on the bass level) read as
-   "configured but no measurable response" everywhere; keep (background life) or drop.
-5. The wind's most visible plants, the fan plants, keep the source's stiffness (tip 0.08). A
-   candidate: tip 0.14 and sensitivity 0.8, judged on a static 1080p shot with fan plants in front
-   (s34).
+   "configured but no measurable response" everywhere; kept as background life, since an
+   event-locked check cannot see a slow level, but they show only in close-ups.
+5. The fan plants now sway about 4.6 cm (computed from wind.cpp's oscillator); not visible at 540p
+   in s34. Judge on a static 1080p shot with fan plants in front. The species' sway settings are not
+   parameters (see the report's defects), so an artist cannot adjust them in the app.
 6. Not done: the ecology light's colour (the fungi cast the source's purple while showing teal; teal
    would light the floor about 3.8x brighter at the same power -- a variant to judge, not a default).
+7. The bloom threshold (1.761, the render stream's note): s27's saucer underside does not glow. The
+   plan's audit suggested 0.9 with knee 0.7; it changes every glowing thing in the film, so it needs
+   a before/after on s27 and a lit wide before it is applied.
+8. The drop's spores and fireflies (sparkle 2.0) need a whole-film or early-starting render to
+   judge: range renders warm particles for only 4 s.
+9. The curtain tops of the aurora form a regular row (a flat top varies only by the wave noise);
+   a larger wave amplitude (0.38 -> ~0.55) would vary them as the first pass's spectrum did.
 
 ## Resuming (the exact next steps)
 
