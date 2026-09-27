@@ -95,6 +95,13 @@ BASE = {
     "fx/aurora/curtainHeight": 2300.0,
     "fx/aurora/turbulence": 0.68,
     "fx/aurora/waveAmplitude": 0.38,
+    # The horse's gold as the saucer lifts it (E5). Its Glow's cues -- self-glow 3 and rim 5 on a white
+    # horse, raised on the lift -- are the first pass's, and the peak blows the horse out: 25.7% of s29's
+    # pixels clipped (31.9% at worst; the evaluator's high "clipped highlights" at 175.76 s), the horse
+    # pale white with its gold only on the legs. The Glow's brightness multiplies everything it adds
+    # and no cue keys it, so halving it halves the peak and keeps the lift -- when it rises, how long it
+    # holds, its colour.
+    "fx/horse-light/gain": 0.5,
 }
 
 # Effects the film does not use, and why.

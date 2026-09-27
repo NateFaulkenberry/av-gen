@@ -110,6 +110,40 @@ FEATURED = ["elder-2-cap", "lantern-cap", "bloom-cap", "umbra-cap", "cairn-cap",
             "ridge-cap", "scree-cap", "ember-cap"]
 
 
+# The scene's own audio links (an entity's `reactions`), judged with the film's routes. gv3-cast's
+# report handed two of them to this step: the evaluator's route-locked checks find no response on
+# either (session gv3-cast, iterations 3-4). Each drop says why; `None` drops every reaction.
+REACTION_DROPS = {
+    # The scout's beam is a copy of the saucer beam's entity, its four audio links included (bass ->
+    # particle rate, level -> emission, onset -> size, low-mid -> speed). The scout is only ever seen
+    # far off -- E1 at 320 m, E3 up the valley, E4 at middle distance and partly behind sage -- where a
+    # beam flickering with the music reads as noise (the evaluator: z 2.2 in E4, nothing in E1). The
+    # saucer's own beam carries the reactive beam, close, in E5; the scout's reads as an event by its
+    # shape and its motion. As copies they also put two beams on the same four sources.
+    "scout-beam": (None, "a far craft's beam reads by its shape; the saucer's beam carries the music in E5"),
+    # An idle alien swaying with the low-mid reads as dancing, which the aliens' behaviour (brief
+    # section 10) does not ask for, and no framing the cut gives tide shows it (the evaluator, before
+    # and after gv3-cast). The aliens keep their other musical links, on what they decide rather than
+    # how they move.
+    "tide": ("liveliness/sway", "an idle alien swaying on the low-mid reads as dancing, and no shot shows it"),
+}
+
+
+def drop_reactions(scene, notes):
+    """REACTION_DROPS applied to the scene's entities; an entity or reaction that is not there is
+    reported (the scout arrives with gv3-cast's recipe)."""
+    by_name = {e.get("name"): e for e in scene.get("entities", [])}
+    for name, (target, why) in REACTION_DROPS.items():
+        e = by_name.get(name)
+        if e is None:
+            notes.append(f"reaction drop: no entity '{name}' in this scene ({why})")
+            continue
+        keep = [r for r in e.get("reactions", []) if target is not None and r.get("target") != target]
+        if len(keep) == len(e.get("reactions", [])):
+            notes.append(f"reaction drop: '{name}' has no reaction on {target or 'anything'} ({why})")
+        e["reactions"] = keep
+
+
 def _terrain(scene):
     return next(n for n in scene["nodes"] if n.get("kind") == "terrain")
 
@@ -137,6 +171,10 @@ def prepare(project, scene):
         for h in heroes:
             if h["name"] in rank:
                 h["importance"] = rank[h["name"]]
+    notes = []
+    drop_reactions(scene, notes)
+    for n in notes:
+        print("reactivity:", n)
 
 
 def wave_tracks():
