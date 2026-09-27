@@ -191,6 +191,10 @@ struct Builder {
     }
 };
 
+bool used_contains(const Builder& b, const std::string& path) {
+    return b.used.contains(path);
+}
+
 double beatSeconds(const MusicalContext& music) {
     if (music.tempoBpm > 0.0) {
         return 60.0 / music.tempoBpm;
@@ -461,7 +465,15 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
             return a->emission != c->emission ? a->emission > c->emission : a->path < c->path;
         });
         const bool anyLit = !parts.empty() && parts.front()->programLit;
-        std::erase_if(parts, [&](const ReactiveTarget* t) { return anyLit && !t->programLit; });
+        std::erase_if(parts, [&](const ReactiveTarget* t) {
+            if (anyLit && !t->programLit) {
+                out.notes.push_back(fmt::format("{} is left alone: {}'s light is its program-lit parts', and this part "
+                                                "is a plain emissive accent",
+                                                t->path, hero.name));
+                return true;
+            }
+            return false;
+        });
         for (std::size_t p = anyLit ? 3 : 1; parts.size() > p;) {
             out.notes.push_back(fmt::format("{} is left alone: {} answers through its brighter parts", parts.back()->path,
                                             hero.name));
@@ -809,6 +821,9 @@ ReactivityProposal proposeReactivity(const ReactiveCatalog& catalog, const Music
         if (t.group == ReactiveGroup::Light && t.global) {
             out.notes.push_back(fmt::format("the {} ({}) is left alone: moving the key or the ambient changes the whole "
                                             "frame's look, the style shift the owner ruled out",
+                                            t.label, t.path));
+        } else if (t.group == ReactiveGroup::Light && t.hero.empty() && !used_contains(b, t.path)) {
+            out.notes.push_back(fmt::format("the {} ({}) stands beside no hero, so no hero's layer is given to it",
                                             t.label, t.path));
         } else if (t.group == ReactiveGroup::MaterialEmission) {
             out.notes.push_back(fmt::format("{} is left alone: a route on it moves every surface drawn with it ({}) in "

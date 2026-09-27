@@ -596,6 +596,27 @@ std::optional<Candidate> classify(std::string_view path, const params::IParamete
                     c.position = l.position;
                 }
             }
+            // Before the composition's first frame its rig is not expanded into the scene yet: expand it
+            // here around the subject the composition sizes its rig to (its framed focal point, else the
+            // whole scene), as `Composition::update` does.
+            if (!c.position && rig != nullptr) {
+                glm::vec3 centre = comp->boundsCenter();
+                float radius = comp->boundsRadius();
+                const scene::CompositionData& data = comp->composition();
+                const scene::FocalPoint* focus = data.cameraTarget.empty()
+                                                     ? (data.focalPoints.empty() ? nullptr : &data.focalPoints.front())
+                                                     : data.find(data.cameraTarget);
+                if (focus != nullptr) {
+                    centre = focus->position;
+                    radius = std::max(focus->radius, 1e-3f);
+                }
+                for (const scene::PunctualLight& l :
+                     rig->expand(centre, radius, comp->scene().camera.position, glm::vec3(0.0f, 1.0f, 0.0f))) {
+                    if (l.name == seg[2]) {
+                        c.position = l.position;
+                    }
+                }
+            }
         }
         c.global = !practical;
         c.level = practical ? ReactiveLevel::Meso : ReactiveLevel::Macro;
@@ -637,7 +658,7 @@ std::optional<Candidate> classify(std::string_view path, const params::IParamete
         c.kind = ReactiveKind::Motion;
         c.level = ReactiveLevel::Macro;
         c.owner = "world";
-        c.label = path == "scene/windSpeed" ? "wind strength" : (path == "scene/wind/gustAmount" ? "gusts" : "turbulence");
+        c.label = path == "scene/windSpeed" ? "wind strength" : (path == "scene/wind/gustAmount" ? "wind gusts" : "wind turbulence");
         c.lo = path == "scene/windSpeed" ? 0.6f : 0.7f;
         c.hi = path == "scene/windSpeed" ? 1.4f : (path == "scene/wind/gustAmount" ? 1.8f : 2.0f);
         if (base <= 0.0f) {
@@ -924,6 +945,17 @@ ReactiveCatalog buildReactiveCatalog(const ReactiveInputs& in) {
         t.programLit = c->programLit;
         t.scripted = (!c->heroNode.empty() && index.scripted.contains(c->heroNode)) || index.scripted.contains(c->owner);
         t.hero = c->heroNode.empty() ? std::string() : index.hero(c->heroNode);
+        // A practical light has no node to inherit a hero from: it answers for the hero it stands beside.
+        if (t.hero.empty() && t.group == ReactiveGroup::Light && !t.global && t.position) {
+            float best = 0.0f;
+            for (const ReactiveHero& h : index.heroes) {
+                const float d = glm::length(glm::vec2(t.position->x - h.position.x, t.position->z - h.position.z));
+                if (d <= std::max(h.radius * 2.0f, h.radius + 3.0f) && (t.hero.empty() || d < best)) {
+                    t.hero = h.name;
+                    best = d;
+                }
+            }
+        }
         if (t.group == ReactiveGroup::NodeEmission && !t.hero.empty()) {
             t.group = ReactiveGroup::HeroEmission;
         }
