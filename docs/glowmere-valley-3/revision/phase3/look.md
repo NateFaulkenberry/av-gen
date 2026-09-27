@@ -236,6 +236,18 @@ so v3 and v4 differ only in the film):
   (water.wgsl lays the seams on a lattice in the frame of the wind's steady direction, so turning
   the wind to 1.45 rad rotated every seam away from where the water stream put it). The rest of the
   wind's retune stays. To verify on s08 at 1080p.
+- `48846e52`: the aurora calibrated on frames. v4's fixed values overshot where the arc is unchanged:
+  s04's sky (top 30%, the riff, intensity 1.3 in both) was 0.0556 against the first pass's 0.0317
+  (x1.75; v3 0.0278), while the drop matched (s33 x0.94 at 2.4 against 3.2). The Critic's s04
+  "jitter" rose 0.023 -> 0.141 with it: its camera-shake estimate is optical flow, and the moving
+  streaks in the sky pull it. So filaments 2.3 -> 1.3 (the auto-gained high band averages well under
+  the 0.5 I assumed outside the drop), curtain 2600 -> 2300 m (a flat top stands taller than the
+  first pass's quieter bearings), and the glints 0.5 -> 0.3: they are the one sky term "audio
+  response" does not switch off, following the high band frame by frame (+5.1% on the off-beats in
+  s04, +12.2% in the first pass). To verify on s04 (and s34, s39).
+- The Critic, v3n -> v4 on the open (A): musical_synchronization 0.81 -> 0.76, effects 0.90 -> 0.87,
+  because its grid no longer finds v3's per-frame sky response (spectrum shape was still 0.75 in
+  v3) -- the same disagreement as in iteration 2: the plan gives the aurora the lead, slowly.
 
 **Open questions:**
 1. The elder's rings do not read in the shots that show the elder from afar (s39 at 1080p). They
