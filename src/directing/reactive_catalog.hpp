@@ -72,7 +72,7 @@ enum class ReactiveGroup : std::uint8_t {
     Atmosphere,       // scene/volumeDensity, volumeScattering: the air
     Wind,             // scene/windSpeed, scene/wind/gustAmount, scene/wind/turbulence
     Water,            // nodes/<terrain>/water/glow|sparkle|ripple|swell|foam
-    WaterTears,       // nodes/<terrain>/water/tears|tearShear|tearCoverage (the water stream's)
+    WaterTears,       // nodes/<terrain>/water/tears/amount|shear|coverage (ADR-916), while the amount is above 0
 };
 [[nodiscard]] const char* reactiveGroupName(ReactiveGroup group);
 [[nodiscard]] std::optional<ReactiveGroup> reactiveGroupFromName(std::string_view name);

@@ -66,6 +66,61 @@ bool colourIsBlack(const glm::vec3& c) {
     return c.x <= 0.0f && c.y <= 0.0f && c.z <= 0.0f;
 }
 
+// ADR-916. Whether the water whose tear controls sit under `prefix` (".../water/tears/") draws tears
+// at some moment of the project. A water whose amount is 0 is drawn by the pipeline with the tear code
+// compiled out, so every other tear setting of it is read only while something lifts the amount: an
+// enabled route with a nonzero amount, or an enabled track with a key above 0. Unknown when the
+// routes and tracks are not to hand (a bare facts object), so the rules built on this can decline to
+// guess in either direction.
+enum class TearsShow : std::uint8_t { Yes, Never, Unknown };
+
+TearsShow tearsShow(const LivenessInputs& in, const std::string& prefix) {
+    const std::string amount = prefix + "amount";
+    if (in.params != nullptr) {
+        if (const params::IParameter* p = in.params->find(amount); p != nullptr && p->baseComponent(0) > 0.0f) {
+            return TearsShow::Yes;
+        }
+    }
+    if (in.modulator == nullptr || in.timeline == nullptr) {
+        return TearsShow::Unknown;
+    }
+    for (const params::ModRoute& route : in.modulator->routes()) {
+        if (route.enabled && route.target == amount && route.amount != 0.0f) {
+            return TearsShow::Yes;
+        }
+    }
+    for (const params::Track& track : in.timeline->tracks()) {
+        if (track.enabled && track.target == amount &&
+            std::any_of(track.keys.begin(), track.keys.end(), [](const params::Key& k) { return k.value[0] > 0.0f; })) {
+            return TearsShow::Yes;
+        }
+    }
+    return TearsShow::Never;
+}
+
+// ADR-916: a water whose tears show, follow the wind and drift -- the one case in which the wind's
+// direction is a drifting lattice's direction, and so a phase rate.
+bool driftingTearsFollowTheWind(const LivenessInputs& in) {
+    if (in.params == nullptr) {
+        return false;
+    }
+    constexpr std::string_view kLeaf = "followWind";
+    constexpr std::string_view kTail = "/water/tears/followWind";
+    for (const params::IParameter* p : in.params->ordered()) {
+        const std::string& name = p->path();
+        if (name.size() <= kTail.size() || name.compare(name.size() - kTail.size(), kTail.size(), kTail) != 0 ||
+            p->baseComponent(0) < 0.5f) {
+            continue;
+        }
+        const std::string prefix = name.substr(0, name.size() - kLeaf.size());
+        const params::IParameter* drift = in.params->find(prefix + "drift");
+        if (drift != nullptr && drift->baseComponent(0) != 0.0f && tearsShow(in, prefix) == TearsShow::Yes) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 // ---- the phase-rate table --------------------------------------------------------------------------
@@ -97,8 +152,19 @@ constexpr PhaseRateEntry kPhaseRates[] = {
     {"nodes/*/energy/pulseSpeed", "", "common.wgsl: tree energy pulse at t * pulseSpeed"},
     {"nodes/*/energy/propagation", "", "common.wgsl: fract(h - t * propagation)"},
     {"nodes/*/energy/shimmerSpeed", "", "common.wgsl: shimmer at t * shimmerSpeed"},
-    {"nodes/*/water/flowSpeed", "", "water.wgsl: flowTime (= renderTime) * flowSpeed"},
+    // ADR-914 bounded the water's advection, so a change jumps its fields by at most 8 s of travel rather
+    // than by the whole elapsed time -- still a jump.
+    {"nodes/*/water/flowSpeed", "", "water.wgsl flowPhases (ADR-914): each field travels (phase x period) * flowSpeed, up to kFlowPeriod = 8 s of it"},
     {"nodes/*/water/rippleScale", "", "water.wgsl: ripple lattice scale of a flow-advected coordinate", "flowSpeed"},
+    // ADR-916: the tears' seam lattice drifts rigidly at t * drift, and its step size, spacing, stretch
+    // and direction scale or turn that drifting coordinate. None of these is modulatable -- a route to
+    // one is refused -- so what meets these rows is a timeline track that keys one.
+    {"nodes/*/water/tears/drift", "", "water.wgsl tearAt: lattice = (dot(p, along) - drift * t, dot(p, across)) / cell"},
+    {"nodes/*/water/tears/cell", "", "water.wgsl tearAt: lattice cell of a drifting coordinate", "drift"},
+    {"nodes/*/water/tears/spacing", "", "water.wgsl tearAt: seam spacing of a drifting coordinate", "drift"},
+    {"nodes/*/water/tears/stretch", "", "water.wgsl tearAt: seam stretch of a drifting coordinate", "drift"},
+    {"nodes/*/water/tears/direction", "", "water.wgsl tearAt: direction of a drifting coordinate", "drift"},
+    {"scene/windDirection", "", "water.wgsl tearAt (ADR-916): seams that follow the wind drift along it by drift * t", {}, false, true},
     // particles
     {"particles/*/pulseRate", "", "particles.wgsl pulseGain: phase = renderTime * pulseRate"},
     {"particles/*/pauseRate", "", "particles.wgsl: fract(t * pauseRate + ...)"},
@@ -363,6 +429,29 @@ std::optional<Finding> SceneLivenessFacts::deadTarget(std::string_view path, int
                                 fmt::format("effect '{}' never fires: {}", e.id, why->reason));
                 }
                 return std::nullopt;
+            }
+        }
+        return std::nullopt;
+    }
+    // nodes/<terrain>/water/tears/<setting> (ADR-916): read only while the water draws tears at all, and
+    // the fixed direction only while the seams do not follow the wind. The amount itself is what turns
+    // them on, so it is never unread.
+    if (seg.size() >= 5 && seg[seg.size() - 5] == "nodes" && seg[seg.size() - 3] == "water" &&
+        seg[seg.size() - 2] == "tears" && seg.back() != "amount") {
+        const std::string prefix(path.substr(0, path.size() - seg.back().size()));
+        if (tearsShow(in_, prefix) == TearsShow::Never) {
+            return make("tear-setting-unread", Verdict::Dead,
+                        fmt::format("'{}amount' is 0 and no route or track lifts it, so the water is drawn with "
+                                    "the tear code compiled out and its '{}' is never read (ADR-916)",
+                                    prefix, seg.back()));
+        }
+        if (seg.back() == "direction" && in_.params != nullptr) {
+            if (const params::IParameter* follow = in_.params->find(prefix + "followWind");
+                follow != nullptr && follow->baseComponent(0) >= 0.5f) {
+                return make("tear-setting-unread", Verdict::Dead,
+                            fmt::format("the seams follow the scene wind ('{}followWind' is on), so their fixed "
+                                        "direction is never read (ADR-916)",
+                                        prefix));
             }
         }
         return std::nullopt;
@@ -655,6 +744,9 @@ std::optional<Finding> SceneLivenessFacts::phaseRate(std::string_view path) cons
                 continue;
             }
         }
+        if (entry.windTears && !driftingTearsFollowTheWind(in_)) {
+            continue;
+        }
         if (entry.windBodies) {
             // Only a scene whose meshes carry a wind body (ADR-360) has the flutter this goes through.
             bool bodies = false;
@@ -838,7 +930,12 @@ std::string auditReason(const AuditEntry& entry) {
 
 RouteAudit auditProject(const LivenessInputs& inputs, const params::Modulator& modulator,
                         const params::Timeline& timeline) {
-    const SceneLivenessFacts facts(inputs);
+    // The facts see the very routes and tracks being audited: a rule may ask what else drives a
+    // parameter its target depends on (ADR-916: what lifts a water's tear amount).
+    LivenessInputs in = inputs;
+    in.modulator = in.modulator != nullptr ? in.modulator : &modulator;
+    in.timeline = in.timeline != nullptr ? in.timeline : &timeline;
+    const SceneLivenessFacts facts(in);
     const auto& registry = params::liveness::Registry::standard();
     RouteAudit audit;
 

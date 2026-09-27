@@ -172,6 +172,7 @@ struct Candidate {
 
 struct SceneIndex {
     const scene::Composition* comp = nullptr;
+    const params::ParameterSet* params = nullptr; // for a target whose reach depends on another parameter
     std::map<std::string, const scene::CompositionNode*, std::less<>> nodes;
     std::map<std::string, std::string, std::less<>> heroOf; // node -> hero
     std::vector<ReactiveHero> heroes;
@@ -667,27 +668,33 @@ std::optional<Candidate> classify(std::string_view path, const params::IParamete
         return c;
     }
 
-    // ---- nodes/<terrain>/water/<leaf> ------------------------------------------------------------------
-    if (seg.size() == 4 && seg[0] == "nodes" && seg[2] == "water") {
+    // ---- nodes/<terrain>/water/<leaf>, and the tears' nodes/<terrain>/water/tears/<leaf> (ADR-916) -------
+    const bool tears = seg.size() == 5 && seg[0] == "nodes" && seg[2] == "water" && seg[3] == "tears";
+    if ((seg.size() == 4 && seg[0] == "nodes" && seg[2] == "water") || tears) {
         const scene::CompositionNode* terrain = index.node(seg[1]);
         if (terrain == nullptr || terrain->kind != scene::NodeKind::Terrain) {
             return std::nullopt;
         }
-        static constexpr std::array<std::pair<std::string_view, ReactiveKind>, 8> kLeaves{{
+        // The tears' routable three; the other seven refuse routes and never reach this (ADR-916).
+        static constexpr std::array<std::pair<std::string_view, ReactiveKind>, 5> kLeaves{{
             {"glow", ReactiveKind::Luminance}, {"sparkle", ReactiveKind::Luminance}, {"ripple", ReactiveKind::Motion},
-            {"swell", ReactiveKind::Motion}, {"foam", ReactiveKind::Luminance}, {"tears", ReactiveKind::Motion},
-            {"tearShear", ReactiveKind::Motion}, {"tearCoverage", ReactiveKind::Motion},
+            {"swell", ReactiveKind::Motion}, {"foam", ReactiveKind::Luminance},
         }};
-        const auto leaf = std::find_if(kLeaves.begin(), kLeaves.end(), [&](const auto& l) { return l.first == seg[3]; });
-        if (leaf == kLeaves.end()) {
+        static constexpr std::array<std::pair<std::string_view, ReactiveKind>, 3> kTearLeaves{{
+            {"amount", ReactiveKind::Motion}, {"shear", ReactiveKind::Motion}, {"coverage", ReactiveKind::Motion},
+        }};
+        const std::span<const std::pair<std::string_view, ReactiveKind>> leaves =
+            tears ? std::span<const std::pair<std::string_view, ReactiveKind>>(kTearLeaves)
+                  : std::span<const std::pair<std::string_view, ReactiveKind>>(kLeaves);
+        const auto leaf = std::find_if(leaves.begin(), leaves.end(), [&](const auto& l) { return l.first == seg.back(); });
+        if (leaf == leaves.end()) {
             return std::nullopt;
         }
-        const bool tears = seg[3].substr(0, 4) == "tear";
         c.group = tears ? ReactiveGroup::WaterTears : ReactiveGroup::Water;
         c.kind = leaf->second;
         c.level = ReactiveLevel::Meso;
         c.owner = fmt::format("{}/water", seg[1]);
-        c.label = tears ? (seg[3] == "tears" ? "water tears" : (seg[3] == "tearShear" ? "tear shear" : "tear coverage"))
+        c.label = tears ? (seg.back() == "amount" ? "water tears" : (seg.back() == "shear" ? "tear shear" : "tear coverage"))
                         : fmt::format("water {}", seg[3]);
         const bool holdsWater = std::any_of(terrain->worldMap.features.begin(), terrain->worldMap.features.end(),
                                             [](const world::Feature& f) { return f.water; });
@@ -695,9 +702,18 @@ std::optional<Candidate> classify(std::string_view path, const params::IParamete
             c.excluded = fmt::format("terrain '{}' holds no water", seg[1]);
             return c;
         }
-        if (tears && base <= 0.0f) {
-            c.excluded = "the water's tears are off (at 0 the tear code is compiled out), so no route can open them";
-            return c;
+        // All three are read only while the tears' amount is above 0: at 0 the surface is drawn by the
+        // pipeline with the tear code compiled out, so no route to any of them can be seen (and a multiply
+        // of an amount of 0 is 0).
+        if (tears) {
+            const std::string amountPath = fmt::format("nodes/{}/water/tears/amount", seg[1]);
+            const params::IParameter* amount = index.params != nullptr ? index.params->find(amountPath) : nullptr;
+            if (amount == nullptr || amount->baseComponent(0) <= 0.0f) {
+                c.excluded = fmt::format("the water's tears are off ('{}' is 0, and at 0 the tear code is compiled "
+                                         "out), so no route can open them",
+                                         amountPath);
+                return c;
+            }
         }
         if (base > 0.0f) {
             c.op = ModOp::Multiply;
@@ -847,7 +863,8 @@ ReactiveCatalog buildReactiveCatalog(const ReactiveInputs& in) {
     if (in.params == nullptr) {
         return out;
     }
-    const SceneIndex index = indexScene(in.composition);
+    SceneIndex index = indexScene(in.composition);
+    index.params = in.params;
     out.heroes = index.heroes;
 
     bool anyLayerEmits = false;

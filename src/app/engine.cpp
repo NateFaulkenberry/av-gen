@@ -1178,6 +1178,9 @@ scene::LivenessInputs Engine::livenessInputs() const {
     in.hasAudio = (track_ != nullptr && !track_->empty()) || input_ != nullptr;
     in.hasTempo = in.hasAudio || tempoOverride_.available || embeddedTempo_.available;
     in.offline = mode_ == EngineMode::Offline;
+    // ADR-916: the tear rule asks whether anything lifts a water's tear amount.
+    in.modulator = &modulator_;
+    in.timeline = &timeline_;
     return in;
 }
 
