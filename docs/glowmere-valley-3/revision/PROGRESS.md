@@ -695,6 +695,11 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the Camera Travel Beam (the light sweep on camera changes) visible.** When a pulse causes a
   problem, tame it (depth, a peak cap, timing); never delete it. A route the Critic calls inert is to be made
   visible, not dropped.
+- **(2026-09-27) The heroes' pulses are dramatic, not subtle.** The owner: "the mushroom unders are pulsing to the
+  beat - any way we can make it way more dramatic / noticable". The pulse was +6% to +12% on the gold pixels
+  (amount 1.0 × section depth 0.19-1.0). Target: about +40-60% at the peak, with a spill ring on the ground in the
+  wides, and no flat clipping. Levers: depth, a lower resting glow, a longer tail, spill light, bloom with a peak
+  ceiling, and every hero on its own lane.
 - **(2026-09-27) The tiny glowing mushrooms all over Glowmere pulse to the beat, visibly.** The owner asked
   directly: "can we make those pulse to the beat". It is valley-wide, staggered per layer so it stays organic, and
   strong enough to read in the wides. It overrides the brief's "not everything pulses to the beat" caution for
