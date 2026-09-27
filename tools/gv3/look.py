@@ -75,18 +75,24 @@ BASE = {
     # Iteration 2 switched off only the first ("audio response" 0). Measured in the drop, that left
     # the kick in the sky (+12% to +16% on the beat, v3) and took away the curtain's brightness and
     # height with it: the sky's mean over the drop fell by 25-57% and the aurora all but vanished
-    # (v3-D against before-D, the same engine). So the second goes too, and the average the first
-    # pass's audio terms gave is put back as fixed values: the spectrum held a top at about 0.8 of
-    # the curtain and the bass lifted it about 1.25x, so a flat top (spectrum shape 0) stands as tall;
-    # the high band tripled the filaments' base 0.4 on average (0.4 + 1.6 x 0.7 x ~0.5), so the
-    # filaments go 0.95 -> 2.3; the mid band's folds and the low-mid's waves likewise (turbulence
-    # 0.45 -> 0.68, wave amplitude 0.30 -> 0.38). The aurora answers the lead instead, slowly (the
-    # proposal's `lead.aurora`, x0.94-1.15 over 0.4-1.6 s), the arc keys it with the sections, and its
-    # own flow keeps it moving.
+    # (v3-D against before-D, the same engine). So the second goes too (spectrum shape 0), and the
+    # first pass's average look is put back as fixed values, calibrated on frames: at first (v4) the
+    # filaments 0.95 -> 2.3 on the guess that the high band tripled their base on average, which left
+    # the riff's sky 1.75x the first pass's (s04, the top 30%, the same intensity key) while the drop
+    # matched; the auto-gained high band is lower than that outside the drop. Now filaments 1.3; the
+    # curtain a little lower (2600 -> 2300 m), because a flat top stands taller than the first pass's
+    # quieter bearings did; the folds and waves at the first pass's averages (turbulence 0.45 -> 0.68,
+    # wave amplitude 0.30 -> 0.38). The glints (sparkle) are the one term the "audio response" does not
+    # switch off -- they follow the high band frame by frame, +5% on the off-beats in s04 -- so they
+    # are halved (0.5 -> 0.3). The aurora answers the lead instead, slowly (the proposal's
+    # `lead.aurora`, x0.94-1.15 over 0.4-1.6 s), the arc keys it with the sections, and its own flow
+    # keeps it moving.
     "fx/aurora/audioBeat": 0.0,
     "fx/aurora/audioSensitivity": 0.0,
     "fx/aurora/spectrumShape": 0.0,
-    "fx/aurora/filaments": 2.3,
+    "fx/aurora/filaments": 1.3,
+    "fx/aurora/sparkle": 0.3,
+    "fx/aurora/curtainHeight": 2300.0,
     "fx/aurora/turbulence": 0.68,
     "fx/aurora/waveAmplitude": 0.38,
 }
