@@ -96,9 +96,14 @@ DIRECTIVES = [
     # first pass stepped the whole grade here -- exposure +0.5, saturation 1.3, temperature +0.12 --
     # and the valley became another picture. Now the grade holds at the plateau's (ev +0.15, sat 1.10,
     # temp +0.05, all inside the range the film has already shown by the arrival), and the drop is
-    # carried by what the world does: its own light brighter than ever (1.6), the air a little clearer,
+    # carried by what the world does: its own light brighter than ever, the air a little clearer,
     # more spores and fireflies, every route answering at the section's full depth, the bar's waves
     # of light reaching the whole valley, the wind up and the water torn by it.
+    # The world's side was first set below the first pass's too (light 1.6, aurora 2.4, sparkle 1.5
+    # against 2.1, 3.2, 1.7), and the drop came out darker than the plateau it follows (mean luma 0.146
+    # against 0.186, gv3-look iteration 3), its sky 0.82 of the first pass's, the spores round the elder
+    # thin. The grade stays held; the valley's own light (2.0, 1.5x the plateau's), its sky (2.8) and
+    # its spores and fireflies (2.0) carry the drop.
     {"segment": "drop", "name": "Rebuilt",
      "intent": "The horse is gone and the valley's light comes back rebuilt: the same night and the same "
                "colours, but every hero answering at full strength, rings of light running out from the "
@@ -106,7 +111,7 @@ DIRECTIVES = [
                "and so does the picture.",
      "camera": "Downbeat cut on the crash, then big, wide, lateral moves and a crane; bar cuts for the "
                "first phrase, then long wides. The saucer climbs away over the north rim.",
-     "look": {"ev": 0.15, "sat": 1.10, "fog": 0.85, "light": 1.6, "aurora": 2.4, "sparkle": 1.5, "temp": 0.05},
+     "look": {"ev": 0.15, "sat": 1.10, "fog": 0.85, "light": 2.0, "aurora": 2.8, "sparkle": 2.0, "temp": 0.05},
      "motifs": ["heartbeat (full depth)", "every hero on its layer at full depth",
                 "the bar's rings across the whole valley, and the drop's own ring", "flash on the crash"]},
     {"segment": "tail", "name": "Afterglow",
