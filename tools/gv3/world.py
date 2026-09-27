@@ -41,17 +41,23 @@ SINK = 0.10  # metres a stem's lowest ground-contact point is sunk below the sur
 #     (-310.1, -296.9). `python3 tools/gv3/world.py --check` re-measures both, and no new feature
 #     reaches either.
 #
-# North: the banks' level climbs beyond their second point, the river rises at that point in a pool,
-# and a head ridge with a lower shoulder spans the V between the walls. South: the banks end at their
-# eleventh point (z 244), so beyond it only the corridor flattens (0.55) and a sill across the end
-# stands at 45% of its height; the river keeps its whole course and leaves through a gorge in the
-# sill that turns away from every camera looking south.
+# North: the banks' level climbs beyond their second point, and a head ridge with a lower shoulder
+# spans the V between the walls. The river keeps its course to the edge -- it has to: its water, edge
+# to edge, is what keeps the two banks apart for the navigator (maxSlope 0.55, ~63 degrees, is
+# walkable, so only water divides the valley). Ending it in a pool inside the world joined the halves
+# (49% of walkable cells unreachable -> 0%), and every alien took a different route from 13 s on,
+# though not one of their heights changed. Its head is bent east instead, so the gorge it cuts
+# through the head turns out of every line of sight up the valley.
+# South: the banks end at their eleventh point (z 244), so beyond it only the corridor flattens
+# (0.55) and a sill across the end stands at 45% of its height; the river keeps its whole course and
+# leaves through a gorge in the sill that turns away from every camera looking south.
 #
 # What this cannot help moving (and the iteration log measures): scatter rows run north to south
 # (ecology.cpp), and a plant's hue jitter, glow and whether it stays dark are keyed on its index in its
 # layer (procedural.cpp materialVariation), so a changed count in the northern rows re-deals those
 # for every plant south of them. Positions, sizes and yaws are keyed on the cell and do not move.
 NORTH_BANKS_HEAD = [[-44.0, 70.0, -352.0], [-52.0, 62.0, -322.0]]  # replaces the banks' first point
+NORTH_RIVER_HEAD = [40.0, 15.0, -350.0]  # replaces the river's first point, (-44, 15, -352)
 NORTH_HEAD = {"name": "north-head", "kind": "ridge",
               "path": [[-140.0, 0.0, -300.0], [-90.0, 0.0, -306.0], [-40.0, 0.0, -306.0], [10.0, 0.0, -300.0],
                        [50.0, 0.0, -292.0]],
@@ -85,9 +91,9 @@ def close_ends(world, report):
     if any(f["name"] in (NORTH_HEAD["name"], NORTH_SHOULDER["name"], SOUTH_SILL["name"]) for f in world["features"]):
         raise RuntimeError("the valley's ends are already closed")
     banks["path"] = [list(p) for p in NORTH_BANKS_HEAD] + banks["path"][1:SOUTH_BANKS_POINTS]
-    river["path"] = river["path"][1:]
+    river["path"][0] = list(NORTH_RIVER_HEAD)
     world["features"].extend(copy.deepcopy([NORTH_HEAD, NORTH_SHOULDER, SOUTH_SILL]))
-    report.append("valley ends closed: north head ridge and shoulder, the river rising in a pool at (-58, -286); "
+    report.append("valley ends closed: north head ridge and shoulder, the river's head bent east through a gorge; "
                   "south sill, the banks ending at z 244")
 
 
@@ -344,7 +350,16 @@ def check(source_world, world, project, scene, trace=None):
     worst = float(np.abs(after.h[band] - before.h[band]).max())
     ok &= worst == 0.0
     lines.append(f"ground from z -190 to 170: largest change {worst:.3f} m")
-    # 3. no open end in any sampled view
+    # 3. the river still divides the valley. The navigator walks anything up to ~63 degrees
+    # (maxSlope 0.55), so only water keeps the banks apart; a river that ends inside the world lets
+    # every walker route around its head, and the aliens' choices change everywhere (phase3/world.md).
+    river = next(f for f in world["features"] if f.get("water") and f["kind"] == "river")
+    ends = (river["path"][0], river["path"][-1])
+    outside = [not (GRID_LO < p[0] < GRID_HI and GRID_LO < p[2] < GRID_HI) for p in ends]
+    ok &= all(outside)
+    lines.append(f"river '{river['name']}' runs edge to edge (the navigator's divide): "
+                 f"{'yes' if all(outside) else 'NO -- an end lies inside the terrain'}")
+    # 4. no open end in any sampled view
     poses = trace_poses(trace) if trace else camera_poses(project, scene)
     shots = {}
     for label, t, eye, target, vfov in poses:
