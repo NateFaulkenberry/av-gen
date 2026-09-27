@@ -410,3 +410,26 @@ characters, setpieces, and checkpoints (camera).
   4. **`mind.memory.failSeconds`** (ADR-933's retry memory) is JSON-only. Expose it with a words label under the character's decide group. Record it as an ADR-933 amendment, not a new ADR.
 - **Verification:** never run the windowed app. Prove reach with CPU tests on the registry and the panels' grouping code (ADR-387's `ui::parameterSubGroup`). Prove each control reaches the output: a GPU difference image for the aurora and the sway, a round-trip test for the treatments.
 - **Suites:** the full CPU suite, and the GPU suite if you touch rendering or shaders, under the lock in a quiet window.
+
+### cihealth (ADRs 940–941, and the sanitizer partition): make main's CI tell the truth
+- **Worktree:** `~/Documents/GitHub/av-gen-cihealth`, branch `agent/cihealth`, from `integrate/revision` `983221a9`. Assets are linked.
+- **Why now:** main's CI is red for a reason unrelated to any change. The owner asked for CI to be watched for errors, and a gate that fails on a known flake teaches everyone to ignore it. The CI watcher's findings are in the coordinator's scratchpad, `ci-watch-notes.md`, with the test-result artifacts under `ci-artifacts/`: `/private/tmp/claude-501/-Users-natefaulkenberry-Documents-GitHub-av-gen/08ff7bb5-10b9-4c50-a00a-c45ffb80e000/scratchpad/`.
+- **Deliverables:**
+  1. **ADR-940: the triggered-bolt play/scrub failure depends on test order.**
+     - The test is "a triggered Lightning and Discharge on a moving owner are the same played and scrubbed" (`tests/unit/test_bolt_path.cpp:565`, `CHECK(sameVector(a.ribbons.strips, b.ribbons.strips))`, all three frames 331, 337 and 407).
+     - It failed on CI in 2 of 3 runs:
+       - nightly 36318924797: seed 1790512056, shard 2;
+       - main `876a11e2`'s push 36341601980: seed 1790536064, shard 0.
+     - It passes alone, even with the failing seed. So another test leaves global state behind: a static cache, a shared RNG, a registry, a pool.
+     - Reproduce it with the shard's own case list in the CI order (`tools/ci/catch2_run.py` shows how shards are cut, and `--rng-seed` replays an order). Bisect the preceding cases to find the polluter, and fix the state leak at its source, not in the test. If the leak can reach the app (seek ≠ play), say so. Add a control arm: the polluter followed by the bolt test fails before the fix and passes after.
+     - Use the built binary at `~/Documents/GitHub/av-gen-engine-3/build/release/tests/avgen_tests` (main `876a11e2`) to investigate, and never rebuild engine-3. Build your own worktree only for the fix.
+  2. **ADR-941: UBSan finds an invalid `bool` in `packComet`.**
+     - The report is "load of value 240, which is not a valid value for type 'bool'" at `src/world/atmospherics.cpp:698:39`, `c.sparkle.enabled` (`c = r.effect->comet`). It recurs byte for byte on two Sanitizers runs, in the "main" part, while `glowmere-valley-2-multicam.json` is evaluated. That scene has no comet.
+     - `Sparkle::enabled` has a default initialiser, so something constructs or reuses the effect payload without initialising it. Find it and fix it.
+     - A local sanitizer build is expensive. First try to prove the path by reading the code and with a targeted test. If you do build with sanitizers, use `-j 4` and do it only when the coordinator's integration suites are not running.
+  3. **The sanitizer partition.**
+     - `sanitizers.yml`'s parts are killed at the script's own `--timeout-min 330`: stage-0, stage-1 (2 shards), stage-2, stage-5 (new) and "main" (new) on run 36321265640.
+     - New `[stage]` tests (`test_setpiece_templates.cpp` 339 lines, `test_staging.cpp` 284 lines, `test_abduction_poc.cpp` changed) landed with no rebalancing.
+     - Rebalance so every part finishes within its ceiling with margin: add parts, carve out the new files, or move the heaviest cases. Do not raise the ceiling past the job cap. Record the reasoning and the expected per-part times in `docs/development/ci.md`.
+     - You cannot run the workflow yourself. The coordinator pushes, and the CI watcher reports.
+- **Suites:** the full CPU suite before you finish. Check `pgrep -fl avgen_render_tests` first and never run beside a GPU suite. Run the GPU suite only if you touch rendering. Name your logs "cihealth-".
