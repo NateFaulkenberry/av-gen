@@ -197,7 +197,7 @@ namespace {
 nlohmann::json spansJson(std::span<const world::ShotSpan> spans) {
     nlohmann::json out = nlohmann::json::array();
     for (const world::ShotSpan& s : spans) {
-        out.push_back({s.start, s.end, s.travel, s.spotlight, s.emphasis, s.subject,
+        out.push_back({s.start, s.end, s.travel, s.spotlight, s.subject,
                        {s.subjectPosition.x, s.subjectPosition.y, s.subjectPosition.z},
                        s.subjectRadius, s.handoff,
                        {s.handoffPosition.x, s.handoffPosition.y, s.handoffPosition.z}});

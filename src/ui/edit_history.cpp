@@ -2,6 +2,7 @@
 #include "ui/edit_history.hpp"
 
 #include "app/engine.hpp"
+#include "app/source_document.hpp"
 #include "core/log.hpp"
 
 #include <algorithm>
@@ -232,6 +233,13 @@ EditApply applyEdit(app::Engine& engine, EditCommand& command, bool forward) {
         const AutomationChange& change = *command.automation;
         engine.timeline() = forward ? change.after : change.before;
         engine.timeline().unbind();
+        // ADR-924: the sources before the routes that read them; the rebind this function ends with
+        // binds both.
+        if (change.sourcesTouched) {
+            if (auto r = app::setSourcesDocument(engine, forward ? change.sourcesAfter : change.sourcesBefore); !r) {
+                out.problems.push_back(r.error().message);
+            }
+        }
         if (change.routesTouched) {
             engine.modulator().routes() = forward ? change.routesAfter : change.routesBefore;
         }

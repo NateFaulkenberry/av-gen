@@ -98,15 +98,18 @@ distance, never the timing — a cut here lands on the music.
   the cameras marked available          ──┘                    └──▶ camera shot track (which camera)
 ```
 
-**A shot intent is six numbers and a name, and the director never reads the name.**
+**A shot intent is a handful of numbers, an arc and a name, and the director never reads the name.**
 
 ```
-hero       0 the environment   .. 1 the subject
-distance   0 intimate          .. 1 the widest this world offers
-movement   0 locked off        .. 1 constantly travelling
-variation  0 one setup held    .. 1 keep finding new ones
-cutRate    0 the longest hold  .. 1 the shortest
-cameras    how many viewpoints the section wants used
+hero           0 the environment   .. 1 the subject
+distance       0 intimate          .. 1 the widest this world offers
+movement       0 locked off        .. 1 constantly travelling
+variation      0 one setup held    .. 1 keep finding new ones (framing and length)
+cutRate        0 the longest hold  .. 1 the shortest
+cameras        how many viewpoints the section wants used
+arc            steady | rising | falling | suspended | burst: how the dials travel (ADR-920)
+energy         0 .. 1, how hard the treatment pushes: how the director finds the peaks (ADR-922)
+visualDensity  0 one thing in frame .. 1 a full frame: fuller asks for shorter shots
 ```
 
 The name — "Hero Performance", "Ocean Ambience", "Atmospheric Establishing" — is carried for log
@@ -124,11 +127,25 @@ identical, which is a guarantee a `switch` on a label cannot survive.
   something; the Auto-director's own camera frames whatever the shot is of; a placed viewpoint is a
   shot of a world). The intent's `cameras` asks for a number of them; the world may not have that
   many, and then the director says so rather than inventing one.
-- **How many cuts, and where.** `cutRate` places the shot length in the band between
-  `minShotSeconds` and `maxShotSeconds`, and the section's own measured energy and density move it
-  within that band when the autonomy allows.
+- **How many cuts, and where** (ADR-921). With an analysed track every cut lands on a tracked beat
+  and every section boundary on its downbeat -- the engine's one musical time (ADR-896), so "bar 97"
+  is the bar `music.downbeat` fires on. The length a shot aims at is the rule written down in
+  ADR-921: `cutRate` with its arc applied (`SongPlanSection::intentAt`, the song model's own
+  `ShotIntent::atProgress`), moved by the section's level-free density (onsets per second and the
+  energy composite, at Expressive) and by `visualDensity`, placed geometrically between
+  `minShotSeconds` and `maxShotSeconds`. A **rising** section opens at that pace and closes up to
+  sixteen times faster, a **burst** the mirror -- the only two allowed below `minShotSeconds`, down to
+  *shortest build* and never below a beat; a **suspended** section holds, up to twice the longest
+  shot. A subject that moves on its own holds its shot longer; a section's wide opener that
+  establishes scale, or arrives after a busier section, holds longer too. The cuts themselves are
+  chosen by a small dynamic programme over the grid's beats that trades the aimed length against
+  landing on a phrase line, a bar, a half-bar or a beat. Without a track the same pace divides each
+  section in seconds.
 - **What each shot is of.** The same weighted cast rotation the other two modes use, leaned towards
-  or away from the film's subject by `hero`.
+  or away from the film's subject by `hero` -- except in the film's **peaks** (the heaviest treatment
+  on the loudest music, ADR-922), which open on the subject of their event (a watched play's world
+  event, a set piece's event, or the plan's own `events`) or else the film's hero, and hold it
+  through the event and the first phrase.
 - **The move, and the framing.** `hero`, `distance` and `movement` together choose the shot kind;
   `distance` places the camera in the band between 2.6 and 14 subject radii; `movement` sets how far
   it travels and how far round it sweeps.
@@ -168,11 +185,11 @@ timeline half has always followed, for the identical reason: two cuts on one tra
 
 ## What all three modes do
 
-**Drive seven things and replace only those.** `camera/mode`, `camera/position`, `camera/target`,
-`camera/lens/focalLength`, `camera/lens/aperture`, `camera/lens/focusDistance` (and
-`camera/focus/emphasis` when a shot registers it). The mode is part of it because a composition
-ignores `camera/position` and `camera/target` unless it is in free mode. Any existing track on those
-is replaced; every other track in the project is left alone.
+**Drive six things and replace only those.** `camera/mode`, `camera/position`, `camera/target`,
+`camera/lens/focalLength`, `camera/lens/aperture`, `camera/lens/focusDistance`. The mode is part of
+it because a composition ignores `camera/position` and `camera/target` unless it is in free mode. Any
+existing track on those is replaced; every other track in the project is left alone. (A seventh,
+`camera/focus/emphasis`, was baked and never registered, so every install dropped it; ADR-922 cut it.)
 
 **One hero, one object.** A hero is the scene object of the same name (ADR-107) — so every hero has
 a row in World ▸ Objects, and every star is one click away from the thing it describes.
@@ -292,10 +309,14 @@ freedom turns that derived plan into the project's own, saved with it.
 On the command line:
 
 ```
---director mode=song,autonomy=guided,minShot=1.6,maxShot=5,seed=1
---song-plan <file>        a song plan, for a project that does not carry one
+--director mode=song,autonomy=guided,minShot=1.6,maxShot=5,minBuildShot=0.5,seed=1
+--song-plan <file>        a song plan, cut for this run instead of the project's own sections (ADR-923)
+--cut-report <file>       the cut as JSON: every shot's span, subject, arc and the reason for its length
 --save-scene <file>       the camera shot track lives in the scene, not the project
 ```
+
+`avgen_song_cut --project P [--song-plan PLAN] [--director k=v,...] [--out CUT.json]` makes the same
+cut and report on the CPU -- no window, no GPU, no GPU lock -- for a generator iterating on a plan.
 
 `examples/world/glowmere-valley-2-song.json` is the worked example; `tools/make_song_demo.py` builds
 it from the three-camera demo and prints the two commands that direct and render it.

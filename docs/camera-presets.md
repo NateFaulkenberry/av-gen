@@ -184,9 +184,12 @@ and cannot be followed:
 | a **staging scenario** | no | no |
 
 For the cases in the lower half, the tool is an authored camera rig — `scene::CameraRig::followNode`
-with `followLocal`, `followLagSeconds` and `followClearance` — which is evaluated per frame and
-resolves through `nodeWorldTransform`, so it sees modulation and behaviours alike. It buys generality
-and gives up the free determinism; the sequencer's behaviours make the opposite trade.
+with `followLocal`, `followLagSeconds`, `followClearance` and the smoothing of ADR-911 — which is
+evaluated per frame from the node's transform history (HIST), so it sees behaviours and the staging
+alike. HIST is rebuilt by the seek replay, so the rig is seek-exact wherever HIST is: everywhere
+except a node moved by a modulation route the replay does not re-apply (ADR-703's stated limit).
+It buys generality at the price of that one limit; the sequencer's behaviours make the opposite
+trade.
 
 ---
 

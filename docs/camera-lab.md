@@ -359,6 +359,32 @@ render.
 
 ---
 
+## 6a. Stability: is the camera steady, measured without a render (ADR-911, ADR-913)
+
+A follow camera that wobbles is a camera problem a still cannot show, and a render is the slowest
+way to see one. `avgen_cast_trace --camera` runs the real engine offline at the render's fps and
+writes the frame's camera at every frame -- eye, target, vertical field of view, the shot on screen
+and the active rig's raw aim and follow points (the JSON is documented in `tools/cast_trace.cpp`).
+`tools/camera_stability.py TRACE.json` turns that into, per shot:
+
+| metric | what it catches | pass bar |
+|---|---|---|
+| pitch / yaw HF | the view nodding or rocking: RMS of the angle minus its 0.3 s Gaussian low-pass | <= 0.1 deg |
+| eye vertical HF | the camera itself bobbing | <= 2 cm |
+| subject off-centre max | the aim point's distance from centre, % of frame | <= 20 % |
+| eye / subject travel | a camera frozen while its subject walks (< 1), or taking every step twice (> 1) | about 1 |
+
+`--start S` seeks first, as a render of a range does, so a scrub can be compared with a play frame
+by frame. The knobs these numbers tune are the follow rig's subject reference (ADR-911:
+`followSmoothSeconds`, `followVerticalSmoothSeconds`, `followLead`, `followGround`,
+`followHeadingSmoothSeconds`, the soft `followClearance`); ADR-913 records GV3's before and after and
+the values recommended per kind of shot. Every one of them is adjustable in the app: the **Cameras**
+panel (View menu > Cameras), the camera's own section, the rows headed "following its subject" under its lens slider --
+"follow smoothing", "height smoothing", "keep up with the subject", "follow the ground", "follow
+lag", "stay behind as it turns", "turn smoothing", "ground clearance".
+
+---
+
 ## 7. Unsupported
 
 **Occlusion of a hero by scenery that is neither terrain, a hero, nor the statistical canopy.** There

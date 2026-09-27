@@ -292,6 +292,10 @@ json routeToJson(const ModRoute& route) {
         j["depthMin"] = static_cast<double>(route.depthMin);
         j["depthMax"] = static_cast<double>(route.depthMax);
     }
+    // ADR-924, the same rule: only a route a Director plan made says which item made it.
+    if (!route.planItem.empty()) {
+        j["planItem"] = route.planItem;
+    }
     return j;
 }
 
@@ -320,6 +324,12 @@ Result<ModRoute> routeFromJson(const json& j) {
             return fail("route {} -> {}: 'depthSource' must be a string", route.source, route.target);
         }
         route.depthSource = it->get<std::string>();
+    }
+    if (const auto it = j.find("planItem"); it != j.end()) {
+        if (!it->is_string()) {
+            return fail("route {} -> {}: 'planItem' must be a string", route.source, route.target);
+        }
+        route.planItem = it->get<std::string>();
     }
     for (const auto& r : results) {
         if (!r) {

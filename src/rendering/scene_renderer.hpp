@@ -191,6 +191,10 @@ struct RenderStats {
     std::uint32_t waves = 0; // ADR-207/702: surface-wave records in the frame block this frame
     std::uint32_t comets = 0;       // ADR-230: comets live in the frame block this frame
     std::uint32_t auroras = 0;      // ADR-230: auroras live in the frame block this frame
+    // ADR-912: the cuts this renderer has dropped its motion history for, over its life -- one per
+    // change of `Scene::camera.cutSerial`. Cumulative, not per frame, so a log or a test can read it
+    // after the fact.
+    std::uint32_t cameraCuts = 0;
 };
 
 constexpr std::uint32_t kMaxLights = 8; // the uniform fallback path (ADR-033); clustered has no such limit
@@ -474,8 +478,10 @@ public:
     [[nodiscard]] Result<void> init();
     // (Re)creates the HDR target. Idempotent for equal sizes.
     [[nodiscard]] Result<void> resize(std::uint32_t width, std::uint32_t height);
-    // Invalidates camera/model/AO temporal state after an in-place scene reload or camera cut.
+    // Invalidates camera/model/AO temporal state after an in-place scene reload.
     // The next frame is treated as a new temporal sequence rather than as motion from the old one.
+    // (A camera cut needs no call: the scene says so through `Scene::camera.cutSerial`, and
+    // `render` takes the screen reset below for it, ADR-912.)
     // This is the *seek* reset: it also restarts the particle pools, because a seek moves the
     // world's clock and the pools are the world's state at that clock.
     void resetTemporalHistory();
@@ -900,6 +906,8 @@ private:
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};
     bool havePrevViewProj_ = false;
+    // ADR-912: the `Scene::camera.cutSerial` the last frame was drawn with; a different one is a cut.
+    std::uint32_t lastCutSerial_ = 0;
     double previousRenderTime_ = -std::numeric_limits<double>::infinity();
     // ADR-360: the previous frame's render time, captured before `previousRenderTime_` is
     // overwritten, so the wind's contribution to the velocity target is a real difference.

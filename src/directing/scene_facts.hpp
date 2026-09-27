@@ -10,6 +10,8 @@
 #include "directing/plan.hpp"
 #include "directing/resolver.hpp"
 #include "directing/time_ref.hpp"
+#include "params/liveness.hpp"
+#include "params/modulation.hpp"
 #include "scene/camera_rig.hpp"
 #include "seq/sequence.hpp"
 #include "world/effects/effect_instance.hpp"
@@ -17,6 +19,7 @@
 #include <glm/glm.hpp>
 
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -41,6 +44,11 @@ struct Staging {
     seq::Sequence sequence;
     scene::CameraDirection cameras;
     std::vector<world::EffectInstance> effects; // captured: every slider's base in the instance
+    // ADR-924: the project's authored routes (not the ones a graph, an entity or a world macro
+    // installs; runtime fields unused), and its modulation sources, each as the rack writes it
+    // (kind, name, settings) plus "parameters": the base of every parameter it registers, by leaf.
+    std::vector<params::ModRoute> routes;
+    nlohmann::json sources = nlohmann::json::array();
 };
 
 // A character's authored mark: where the scene file put it (its node's BASE position), never where
@@ -77,6 +85,10 @@ struct SceneFacts {
     // ramp from or return to (the bake says so, and it held the value from t = 0).
     std::vector<std::pair<std::string, std::vector<float>>> parameterBases;
     [[nodiscard]] const std::vector<float>* base(std::string_view path) const;
+    // ADR-902/926: the scene's liveness facts (`scene::SceneLivenessFacts`), which the validator puts
+    // every route through. Borrows the engine's state, so it is valid only while the engine it came
+    // from is unchanged -- a SceneFacts is built per question. Null: the routes' liveness is not judged.
+    std::shared_ptr<const params::liveness::Facts> liveness;
 
     [[nodiscard]] const Place* place(std::string_view id) const;
     [[nodiscard]] const CharacterMark* character(std::string_view id) const;

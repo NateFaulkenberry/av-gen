@@ -40,6 +40,7 @@
 #include "core/error.hpp"
 
 #include "song/section_cue.hpp"
+#include "song/shot_intent.hpp"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -108,6 +109,22 @@ struct ShotIntentProfile {
     // inventing a camera.
     int cameras = 1;
 
+    // ---- ADR-920: the three dials `songPlanFromCues` used to drop ------------------------------
+    //
+    // How the dials travel across the section: a Rising treatment arrives at its stated values at
+    // the section's end, a Burst lands them on its first frame and settles, Suspended pins movement
+    // and cutting down (`song::Arc`). A *shape*, not a musical label -- the director never learns
+    // that risers exist, it learns that this section's cutting accelerates. Applied through
+    // `SongPlanSection::intentAt`, which is `song::ShotIntent::atProgress`: one implementation.
+    song::Arc arc = song::Arc::Steady;
+    // How hard the treatment pushes overall, 0..1 (`song::ShotIntent::energy`). The author's word on
+    // how big a moment this is -- distinct from the section's own `energy`, which is the music's.
+    // The director reads it to find the film's peaks (ADR-922).
+    float energy = 0.5f;
+    // How much should be in frame, 0..1 (`song::ShotIntent::visualDensity`): a full frame asks for
+    // shorter shots, one thing in frame for longer (ADR-921's duration rule).
+    float visualDensity = 0.5f;
+
     // Refuses a profile that cannot mean anything: an axis outside 0..1, a camera count below 1 or
     // absurdly high, an empty id. Refused rather than clamped, for ADR-225's reason: the only route
     // to one is a hand edit or a file from a build that meant something else by the key.
@@ -163,8 +180,39 @@ struct SongPlanSection {
     int occurrence = 0;
 
     [[nodiscard]] double durationSeconds() const { return endSeconds - startSeconds; }
+    // How far through the section `seconds` is, clamped to 0..1; 0 for a zero-length section.
+    [[nodiscard]] float progressAt(double seconds) const;
+    // **The treatment with its arc applied** `progress` of the way through the section (ADR-920):
+    // movement, energy, variation and cut rate travel as `arc` says, and everything else is what the
+    // section states. The director's twin of `song::SectionCue::intentAt`, computed by the same
+    // `song::ShotIntent::atProgress`, because the director is handed a plan rather than cues (the
+    // seam, ADR-249) and two implementations of an arc would come to disagree. Steady returns the
+    // profile unchanged.
+    [[nodiscard]] ShotIntentProfile intentAtProgress(float progress) const;
+    [[nodiscard]] ShotIntentProfile intentAt(double seconds) const {
+        return intentAtProgress(progressAt(seconds));
+    }
 
     friend bool operator==(const SongPlanSection&, const SongPlanSection&) = default;
+};
+
+// Something that happens in the film, and to whom (ADR-922): "the saucer starts beaming at 170.3 s",
+// "the horse is lifted from 172.1 to 177.7 s". What Song Mode gives a peak section to, instead of
+// whoever's turn it is in the rotation.
+//
+// **The same shape as a watched play's observation** (`directing::ObservedEvent`, ADR-767:
+// `{"name", "subject", "seconds", "end"}`), because that is where the engine learns what happens: a
+// scenario's world events, a set piece's `setpiece/<id>/...` events once set pieces are planned, an
+// event camera's span. Song Mode reads them by name and subject only and never parses the name, so
+// an event kind nobody has invented yet is read the same way as the ones that exist.
+struct SongEvent {
+    std::string name;
+    std::string subject;      // the entity or node the event is about; "" when it is about nobody
+    double seconds = 0.0;
+    double endSeconds = 0.0;  // > seconds for a span; otherwise the event is an instant
+
+    [[nodiscard]] bool span() const { return endSeconds > seconds; }
+    friend bool operator==(const SongEvent&, const SongEvent&) = default;
 };
 
 // The whole song, as the director sees it. Ordered and non-overlapping; gaps are allowed, because a
@@ -172,6 +220,9 @@ struct SongPlanSection {
 struct SongPlan {
     std::string name;
     std::vector<SongPlanSection> sections;
+    // ADR-922: what happens in the film, in time order -- written by whoever made the plan (a
+    // generator's `"events"`), or gathered by the engine from a watched play (`songPlanForEngine`).
+    std::vector<SongEvent> events;
 
     [[nodiscard]] bool empty() const { return sections.empty(); }
     [[nodiscard]] double durationSeconds() const;
@@ -218,9 +269,11 @@ struct SongPlan {
 // knows nothing about section types, and this projects one onto the other.
 //
 // `ShotIntent` carries more than a director can act on -- a description, a name, a built-in flag, a
-// framing RANGE, a camera range, an arc. `ShotIntentProfile` is five axes and a count. The mapping
-// is a projection and loses information on purpose; what it must not lose is the *ordering* of the
-// axes, because that is what the director actually consumes.
+// framing RANGE, a camera range. `ShotIntentProfile` is five axes, a count, and (ADR-920) the arc,
+// the treatment's push and its visual density, which the adapter used to drop: an arc that never
+// reached the director was a Rising treatment that cut like a Steady one. The mapping is a
+// projection and loses information on purpose; what it must not lose is the *ordering* of the axes,
+// because that is what the director actually consumes.
 [[nodiscard]] Result<SongPlan> songPlanFromCues(std::span<const song::SectionCue> cues);
 
 // A plan derived from an analyzed structure **without reading a single label**.
