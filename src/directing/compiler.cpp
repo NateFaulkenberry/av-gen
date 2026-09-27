@@ -1,5 +1,6 @@
 #include "directing/compiler.hpp"
 #include "directing/performance.hpp"
+#include "directing/reactivity.hpp"
 
 #include "app/cinematic.hpp"
 #include "seq/events.hpp"
@@ -109,6 +110,8 @@ bool remove(const ContentRef& ref, Staging& staged) {
         return rig != cameras.cameras.end() && cameras.removeCamera(rig->id);
     }
     case ContentDomain::EffectInstance: return world::removeEffect(staged.effects, ref.id);
+    case ContentDomain::ModRoute:
+    case ContentDomain::ModSource: return removeReactivityContent(ref, staged); // ADR-924
     case ContentDomain::SequenceTrack:
     case ContentDomain::TimelineTrack: return false; // not produced yet
     }
@@ -172,6 +175,8 @@ std::optional<nlohmann::json> contentOf(const ContentRef& ref, const Staging& st
             }
         }
         break;
+    case ContentDomain::ModRoute:
+    case ContentDomain::ModSource: return reactivityContent(ref, staged); // ADR-924
     case ContentDomain::SequenceTrack:
     case ContentDomain::TimelineTrack: break;
     }
@@ -803,6 +808,13 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                          pc.rampSeconds > 0.0 ? fmt::format(", ramp {:.2f}s", pc.rampSeconds) : std::string(),
                          hold > 0.0 ? fmt::format(", back after {:.2f}s", hold) : std::string()));
     }
+
+    // ---- routes and the sources they need (ADR-924) ----------------------------------------------------
+    compileReactivity(plan, v, out.staged,
+                      ReactivityCompileSink{record, [&](char sign, const std::string& item, std::string text) {
+                                                line(sign, item, std::move(text));
+                                            },
+                                            [&](const std::string& item) { return removedLine(item); }});
 
     // Rigs a previous revision made that this one no longer uses.
     for (const auto& [item, slug] : reusableRigs) {

@@ -282,7 +282,9 @@ TEST_CASE("the Director tools declare themselves honestly", "[directing][agent][
         CHECK_FALSE(tool->definition.annotations.mutatesProject);
         ++count;
     }
-    CHECK(count == 9); // ADR-765 added director.record_plan, ADR-767 director.watch_events
+    // ADR-765 added director.record_plan, ADR-767 director.watch_events, ADR-927
+    // director.propose_reactivity (which only looks: it returns a plan to propose).
+    CHECK(count == 10);
     const ai::Tool* watch = registry.find("director.watch_events");
     REQUIRE(watch != nullptr);
     CHECK_FALSE(watch->definition.annotations.requiresApproval); // it only looks

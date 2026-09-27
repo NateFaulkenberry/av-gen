@@ -42,6 +42,11 @@ struct ModRoute {
     std::string depthSource;
     float depthMin = 0.0f;
     float depthMax = 1.0f;
+    // ADR-924: the Director plan item that made this route, "<planId>/<itemKey>"; empty for a route a
+    // person or a subsystem made. Saved with the route (and only when set), so the Modulation panel can
+    // say which plan item made it and why, and the plan's next revision can find it again -- its
+    // `produced` entry names exactly this. It changes nothing the route does.
+    std::string planItem;
 
     // Runtime (not serialised)
     bool fromGraph = false;        // installed by a procedural graph evaluation (ADR-028)

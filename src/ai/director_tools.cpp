@@ -1,4 +1,5 @@
 #include "ai/director_tools.hpp"
+#include "directing/reactivity_proposer.hpp"
 
 #include "app/directing_context.hpp"
 #include "app/engine.hpp"
@@ -243,6 +244,25 @@ void registerDirectorTools(ToolRegistry& registry) {
                                            "director.inspect_subject resolves a name to an id");
             }
             return ToolResult::ok(card->toJson(), fmt::format("{}'s capabilities", subject));
+        });
+
+    add(registry, "director.propose_reactivity", "The default audio-reactivity plan",
+        "The Director's default audio-reactivity plan for this scene (ADR-927), from the reactive catalogue "
+        "(director.inspect_capabilities, \"reactive\"): routes at three levels -- hats and claps on small "
+        "things, the kick and the bar on the heroes (each hero its own layer, timing and amplitude), the "
+        "section on the world's light, fog, wind and colour -- with staggered delays and depth that follows "
+        "the section. Returns the plan (its \"routes\" and \"sources\"), the music's layers, a summary and "
+        "what was left alone and why. Changes nothing: edit the plan if the request asks for something else, "
+        "then director.propose_plan it for the person's approval.",
+        schema::object({{"id", schema::string("The plan's id; default \"reactivity\". Reuse an existing id to revise it")}}),
+        inspect(), [](const json& args, ToolContext& ctx) -> ToolResult {
+            const directing::SceneFacts facts = app::sceneFactsFor(ctx.engine());
+            directing::ReactivityOptions options;
+            options.planId = args.value("id", options.planId);
+            const directing::ReactivityProposal p =
+                directing::proposeReactivity(facts.capabilities.reactive(), facts.music, options);
+            return ToolResult::ok(json{{"plan", p.plan.toJson()}, {"summary", p.summaryJson()}},
+                                  fmt::format("{} route(s), {} source(s)", p.plan.routes.size(), p.plan.sources.size()));
         });
 
     add(registry, "director.resolve_time", "Resolve a musical time",

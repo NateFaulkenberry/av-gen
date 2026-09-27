@@ -11,7 +11,7 @@ namespace avgen::params::liveness {
 namespace {
 
 // THE table. Ids are stable: an evaluator ingests them and a validator refuses by them.
-constexpr std::array<RuleInfo, 24> kRules{{
+constexpr std::array<RuleInfo, 26> kRules{{
     {"disabled", "route|track", "dead", "The route or track is switched off (or the whole timeline is)."},
     {"unknown-source", "route", "dead", "The source is not a signal on the bus, so the route never binds."},
     {"unknown-depth-source", "route", "dead", "The depth source is not a signal on the bus, so the route never binds."},
@@ -56,6 +56,12 @@ constexpr std::array<RuleInfo, 24> kRules{{
     {"node-emits-nothing", "route|track", "dead",
      "nodes/<n>/emissiveBoost on a node none of whose surfaces emits anything. The boost is a post-program "
      "multiplier on every kind of node, so it is live on any node that emits."},
+    {"layer-emits-nothing", "route|track", "dead",
+     "nodes/<terrain>/scatter/<layer>/emissionGain|hueOffset|emissiveFieldAmount on a scatter layer that emits "
+     "nothing (no emissive colour, no program that writes emission): the lane multiplies zero (ADR-926)."},
+    {"no-field-named", "route|track", "dead",
+     "A light-wave depth (a scatter layer's or a procedural node's emissiveFieldAmount) whose owner names no field, "
+     "or a field the scene does not have: it multiplies nothing (ADR-926)."},
     {"effect-never-fires", "route|track|effect", "dead",
      "The effect's activation cannot open in this project (hero focus or camera travel with no matching shot "
      "span, a trigger with no events, a window outside the piece, an owner the scene does not have), so it "
