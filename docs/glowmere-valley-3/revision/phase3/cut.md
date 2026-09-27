@@ -518,6 +518,14 @@ E1-E5 moment the cut shows is on screen on both (`build/gv3/cut/castworld/`).
 | visual hierarchy | 0.912 | 0.918 |
 | pacing | 0.984 | 1.000 |
 
+**Measured on its trace** (`build/gv3/cut/it4/cast-it4.json`; the cast bit-identical to iteration 3's,
+the set pieces' beats too): **21 of 22 shots with a subject pass the stability bar**, the one failure
+95.3's rise (ADR-913's exception). The re-framed ones: 9.1 0.031 / 0.056 deg pitch / yaw HF, 29.1
+0.000 / 0.000 (eye height HF 0.88 cm), 57.1 0.016 / 0.016, 91.1 0.018 / 0.020, 111.1 0.000 / 0.000
+(1.40 cm). Every set-piece moment the cut shows is on screen at its instant
+(`build/gv3/cut/it4/cut-onscreen-it4.txt`: 26 samples on, the off ones the approaches and departures
+left out by choice).
+
 Left as designed: 81.1's saucer small and far, 89.1's saucer behind the rim at the swing's start; 9.1's
 "horse partly hidden by the elder" is the cap's bounding box (which reaches the ground), not the stem,
 23 deg clear of the horse from this eye.
