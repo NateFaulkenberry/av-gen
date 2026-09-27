@@ -2423,7 +2423,16 @@ public:
           visitedCapacity_(static_cast<std::size_t>(
               std::clamp(readFloat(s, "visitedCapacity", 5.0f), 0.0f, 64.0f))),
           stallSecondsDefault_(readFloat(s, "stallSeconds", 0.0f)),
-          stallDistance_(std::max(0.01f, readFloat(s, "stallDistance", 1.5f))) {
+          stallDistance_(std::max(0.01f, readFloat(s, "stallDistance", 1.5f))),
+          // ADR-909. `maxStillSeconds` is off unless a scene asks: standing is a legitimate thing
+          // for a character to have been authored to do -- a sentry, a beat in a shot -- and only
+          // the scene knows which of its characters may. The loop memory is on, and a loop is not
+          // on offer (`loopPenalty` 0): walking straight back to where it just left is nobody's
+          // authored intention.
+          maxStillDefault_(readFloat(s, "maxStillSeconds", 0.0f)),
+          loopDefault_(readFloat(s, "loopSeconds", 20.0f)),
+          loopRadius_(std::max(0.0f, readFloat(s, "loopRadius", 4.0f))),
+          loopPenalty_(std::clamp(readFloat(s, "loopPenalty", 0.0f), 0.0f, 1.0f)) {
         if (s != nullptr && s->is_object() && s->contains("considerers") &&
             (*s)["considerers"].is_array()) {
             for (const auto& entry : (*s)["considerers"]) {
@@ -2530,8 +2539,15 @@ public:
         // is the first thing anybody watching will want to turn.
         stallSeconds_ =
             &params.add(floatDesc(prefix + "stallSeconds", stallSecondsDefault_, 0.0f, 600.0f));
-        paths_ = {prefix + "hertz", prefix + "dwellTicks", prefix + "margin",
-                  prefix + "memorySeconds", prefix + "stallSeconds"};
+        // ADR-909, drivable for the same reason: "how long may it stand" and "how long before it
+        // may walk back where it came from" are knobs a shot turns.
+        maxStill_ = &params.add(floatDesc(prefix + "maxStillSeconds", maxStillDefault_, 0.0f, 600.0f,
+                                          "longest it stands still (s, 0 = no limit)"));
+        loop_ = &params.add(floatDesc(prefix + "loopSeconds", loopDefault_, 0.0f, 600.0f,
+                                      "won't walk back to where it just was for (s)"));
+        paths_ = {prefix + "hertz",         prefix + "dwellTicks",      prefix + "margin",
+                  prefix + "memorySeconds", prefix + "stallSeconds",    prefix + "maxStillSeconds",
+                  prefix + "loopSeconds"};
         // Every considerer's knobs, under its own name. ADR-225: a weight an author wrote in a
         // scene file and the engine then read once from the JSON would be a decoration, not a
         // setting -- it could not be keyframed, modulated, saved or driven by a signal, which is
@@ -2557,6 +2573,14 @@ public:
         queue_ = nullptr;
         lastMargin_ = 0.0f;
         stalls_ = 0;
+        // ADR-909. Simulation state like the stall clock above it: cleared on a seek, rebuilt by
+        // the replay, copied whole into a checkpoint.
+        stillFrom_ = glm::vec3(0.0f);
+        stillSince_ = 0.0;
+        stillStarted_ = false;
+        restless_ = false;
+        stillBreaks_ = 0;
+        departures_.clear();
         // Phase D. Everything the awareness layer and the trace hold is simulation state, so a seek
         // clears it and the replay rebuilds it (D4).
         attention_.reset();
@@ -2605,6 +2629,17 @@ public:
         dctx.world = ctx.world;
         dctx.bus = ctx.bus;
         dctx.seed = self != nullptr ? self->seed() : 0;
+        // ADR-909: which decision this is, and the loop memory. The departures older than the
+        // window are dropped here rather than kept, so the list stays a handful long.
+        dctx.tick = decideTick(ctx.time, settings.hertz, dctx.seed);
+        const float loopSeconds = loop_ != nullptr ? loop_->value() : loopDefault_;
+        std::erase_if(departures_, [&](const Departure& d) {
+            return ctx.time - d.time > static_cast<double>(loopSeconds);
+        });
+        dctx.departures = departures_;
+        dctx.loopSeconds = static_cast<double>(loopSeconds);
+        dctx.loopRadius = loopRadius_;
+        dctx.loopPenalty = loopPenalty_;
 
         // ---- Phase D: the awareness layer, between the senses and the choice ------------------
         if (aware_) {
@@ -2741,6 +2776,44 @@ public:
             }
         }
 
+        // **ADR-909: the still clock.** The stall breaker above watches only plans that are trying
+        // to move, and it has to: a body that chose to stand is not stuck. Which left nothing at
+        // all watching how long a body stands -- the GV3 audit measured `sage` on its ring for
+        // 67.3 s to the end of the film, because `idle` and a post with no duration never end and
+        // nothing else ever beat them. `maxStillSeconds` is that limit: a body that has not moved
+        // `stallDistance` in that long has its committed option set aside for as long again, and
+        // until it chooses something that walks it is `restless` -- what does not go anywhere is
+        // not on offer (the selector, decision.cpp). An order is not standing about: a body a shot
+        // or a one-off action is holding still is doing what it was told, and restarts the clock.
+        const float maxStill = maxStill_ != nullptr ? maxStill_->value() : maxStillDefault_;
+        if (maxStill > 0.0f) {
+            const glm::vec3 here = state.position();
+            const bool ordered = ctx.actions->running() && ctx.actions->authority() != Authority::Routine;
+            if (!stillStarted_ || ordered ||
+                glm::length(glm::vec2(here.x - stillFrom_.x, here.z - stillFrom_.z)) >= stallDistance_) {
+                stillFrom_ = here;
+                stillSince_ = ctx.time;
+                stillStarted_ = true;
+            } else if (ctx.time - stillSince_ >= static_cast<double>(maxStill)) {
+                if (!selector_.current().empty()) {
+                    selector_.exclude(selector_.current(), selector_.currentSubject(),
+                                      ctx.time + static_cast<double>(maxStill));
+                }
+                // Forgetting clears the commitment, which is also what releases Phase D's hold on a
+                // running plan (the hold keeps only a plan whose name is still committed) -- so a
+                // long look at the end of an errand is cut here too, and the test says so.
+                selector_.forget();
+                restless_ = true;
+                ++stillBreaks_;
+                stillFrom_ = here;
+                stillSince_ = ctx.time;
+            }
+        } else {
+            restless_ = false;
+            stillStarted_ = false;
+        }
+        dctx.restless = restless_;
+
         // Phase D §20: hold a running plan while its subject is still known (see `Selector::hold`).
         if (aware_ && planActive_ && subjectKnown(dctx, committed_.subject)) {
             selector_.hold(committed_.score);
@@ -2784,6 +2857,18 @@ public:
         if (!aware_) {
             remember(state.position()); // an aware decider remembers on arrival (above)
         }
+        // ADR-909: an errand that walks somewhere sets out from here -- the place a walk straight
+        // back would be a loop to -- and ends the restlessness, because the body is going.
+        if (walksAway(winner, state.position())) {
+            const glm::vec3 here = state.position();
+            departures_.push_back(Departure{glm::vec2(here.x, here.z), ctx.time});
+            while (departures_.size() > kDepartures) {
+                departures_.erase(departures_.begin());
+            }
+            restless_ = false;
+            stillFrom_ = here;
+            stillSince_ = ctx.time;
+        }
         commit(ctx, winner);
         publishIntent(ctx, state);
     }
@@ -2800,6 +2885,8 @@ public:
         out.marginRejections = counts.marginRejections;
         out.remembered = memory_.remembered();
         out.stalls = stalls_;
+        out.stillBreaks = stillBreaks_;
+        out.restless = restless_;
         out.intent = committed_.intent;
         out.subject = committed_.subjectName;
         out.factors = factorsText_;
@@ -3084,6 +3171,25 @@ private:
         }
     }
 
+    // ADR-909: whether an option's actions walk the body anywhere -- a `move` to a point further off
+    // than it counts as arrived, or one that follows another body. A stand-off of something already
+    // within reach walks nowhere and is a stand, not a departure.
+    static bool walksAway(const Option& o, const glm::vec3& here) {
+        for (const ActionDesc& a : o.actions) {
+            if (a.kind != ActionKind::Move) {
+                continue;
+            }
+            if (a.target.kind != TargetKind::Point) {
+                return true;
+            }
+            const float tolerance = a.tolerance > 0.0f ? a.tolerance : 0.75f;
+            if (glm::length(glm::vec2(a.target.point.x - here.x, a.target.point.z - here.z)) > tolerance + 0.5f) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     float hertzDefault_, dwellDefault_, marginDefault_, memorySecondsDefault_;
     float stallSecondsDefault_ = 0.0f;
     float stallDistance_ = 1.5f;
@@ -3092,6 +3198,20 @@ private:
     double stallSince_ = 0.0;
     bool stallStarted_ = false;
     std::size_t stalls_ = 0;
+    // ---- ADR-909 ----
+    float maxStillDefault_ = 0.0f;
+    float loopDefault_ = 20.0f;
+    float loopRadius_ = 4.0f;
+    float loopPenalty_ = 0.0f;
+    params::Parameter<float>* maxStill_ = nullptr;
+    params::Parameter<float>* loop_ = nullptr;
+    glm::vec3 stillFrom_{0.0f};
+    double stillSince_ = 0.0;
+    bool stillStarted_ = false;
+    bool restless_ = false;
+    std::size_t stillBreaks_ = 0;
+    std::vector<Departure> departures_;
+    static constexpr std::size_t kDepartures = 4;
     std::uint16_t memoryCapacity_ = 8;
     std::size_t visitedCapacity_ = 5;
     params::Parameter<float>* hertz_ = nullptr;

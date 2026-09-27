@@ -296,6 +296,10 @@ struct DecisionDebug {
     // that does not opt in, and zero on one that does and never stalls -- which is the
     // distinction that makes the number worth printing rather than a decoration.
     std::size_t stalls = 0;
+    // Times it had stood `maxStillSeconds` and was sent on its way (ADR-909), and whether it is
+    // still looking for somewhere to go.
+    std::size_t stillBreaks = 0;
+    bool restless = false;
 
     // ---- Phase D §40/§41: the rest of "why is this character doing that" -----------------------
     IntentType intent = IntentType::Custom;   // the committed option's intent
