@@ -342,7 +342,7 @@ def check(source_world, world, project, scene, trace=None):
     for label, a, b in (("minimum", min(h0), min(h1)), ("maximum", max(h0), max(h1))):
         same = a == b
         ok &= same
-        lines.append(f"survey {label}: {a:.3f} -> {b:.3f} {'(unchanged)' if same else '(MOVED)'}")
+        lines.append(f"survey {label}: {a:.3f} -> {b:.3f} {'(unchanged to the mm, the probe'"'"'s precision)' if same else '(MOVED)'}")
     # 2. the filmed valley: nothing between the two ends' edits moves, to the millimetre
     np = before.np
     zs = GRID_LO + np.arange(before.h.shape[0]) * GRID_STEP
