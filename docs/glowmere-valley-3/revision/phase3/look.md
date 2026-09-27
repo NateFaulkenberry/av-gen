@@ -187,6 +187,17 @@ claps for the lantern; the elder at the plan's +60% to +100%; the drop at the pl
 **Renders** (queued at 13:05, one lock acquisition, `build/gv3/look/multi.sh`): D, A, and a 7 s slice
 of E (93-100) at 960×540 for the Critic and the hue check; at 1920×1080, s33 (the drop's ring),
 two bars of s39 (bars 115-116: the elder's rings in the last wide) and s08 (33.2-34.4: the tears).
+They render `v4.json`, the snapshot of `8dc975a2`.
+
+**After the snapshot** (not in the v4 renders):
+- `fd8cbc5a`: the scored claps leave out the four kick-gap beats (219 claps): the clap plays there,
+  but that beat is the valley's held breath, and the lantern flaring through it would break the one
+  moment the valley answers as one. No v4 range contains a gap beat.
+- `272a93e0`: the fan plants sway (computed, not yet seen). They are the big broad-leaved plants in
+  the foreground of s04, s17, s34 and s36, and they kept the source's stiffness: by wind.cpp's
+  oscillator a 2 m plant swung 0.9 cm in a gust. Now tip 0.20, sensitivity 0.9, stiffness 2.4 and
+  mass 1.2 (the same 0.225 Hz resonance), gust response 1.2: about 4.6 cm of gust swing and 2.8 cm of
+  flutter, a third of the ferns' 13 cm. To verify on the static s34.
 
 **Open questions:**
 1. Do the elder's rings read (fungi within 45 m of the elder, every bar from groove 2)? Judge on the
