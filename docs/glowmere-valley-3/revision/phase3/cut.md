@@ -578,6 +578,16 @@ arrival and the break for a camera GV3 does not have, and would move again with 
 For the song stream: an option to leave the subject term out, or to read the subjects from the
 authored rigs, would make an authored production's cut depend only on the music and its plan.
 
+**Re-checked after the merge** (the generator, then `ufo.py`, on engine-3; whole-film trace
+`build/gv3/cut/merged/cast-merged.json`): all five set pieces play at the moments the cut was framed for
+(E4 now in gv3-cast's own region, taking cow-23 and cow-12; the stand-in is retired), and every moment
+the cut shows is on screen (26 samples on; off only the approaches and departures left out by
+choice). Every traced subject is in frame for the whole of its shot (`framing-merged.md`). The follow
+bar: 20 of 22 at first -- 91.1's live aim at a walking Ember gave 0.105 deg of yaw HF on the final cast
+(0.020 on the preview's) -- so a `watch` kind (0.6 s, 1.2 s, half the lead) for a fixed eye watching a
+walker (`e185371e`): 0.080, measured on a trace window whose cast matches the whole-film play exactly.
+**21 of 22 pass on the merged project**, the one failure 95.3's rise (ADR-913's exception).
+
 ## Review material
 
 `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`:
@@ -594,27 +604,33 @@ elder she was meant to be seen against) and **31.1** (the spire, centred by proj
 mushroom among many on a busy lit hillside). Both need render-and-look iterations: the scatter is in no
 trace.
 
-## State (2026-09-27, about 15:00)
+## State (2026-09-27, about 15:30): the stream's work is done
 
-**Commits on `gv3/cut`** since the checkpoint: iteration 2 `dd2306b2`; iteration 3 `630ca638`,
-`6589a152`; iteration 4 `d7c57449`, `e1cac9a6`, `4442ca71`, `d9e4bf35`, `fc93b071`; and this log.
+**Branch `gv3/cut`**, merged with `gv3/production` `274fe408` (`54db99c8`); last commit this log. The
+shared build is engine-3 (`876a11e2`).
 
-**The Director's cut in use:** `tools/gv3/song_cut.json`, 73 spans, settings `songcut.SETTINGS`
-(song, expressive, 1.8 / 7.5 / 0.45 s, seed 1), GV3's treatments `songcut.TREATMENTS`. Every span has
-an authored composition in `tools/gv3/shots.py`; `python3 tools/make_glowmere_valley_3.py` reports
-"re-run and identical to song_cut.json". No trims (`songcut.TRIMS` is empty; see iteration 2).
+**The cut:** `tools/gv3/song_cut.json`, the Director's Song Mode cut, 73 spans (settings
+`songcut.SETTINGS`, GV3's treatments `songcut.TREATMENTS`, the set pieces' moments as plan events);
+every span an authored composition in `tools/gv3/shots.py`. Aliens lead 13.1% (the generator refuses
+more than 20%). Follow rigs: 21 of 22 pass the stability bar on the merged project. No trims
+(`songcut.TRIMS` is empty: the shots the novelty measure found holding were static from their first
+frame, and got moves instead).
 
-**Open questions:**
-- E4's place (gv3-cast): the stand-in is 3 m from gv3-cast's region; its trace plays E4 with the
-  same moments.
+**Evaluator jobs** (session `gv3-cut`): the before `job_1a0e3b6d031dcf565`; it1
+`job_1a0e399224ec50121`; it2 `job_1a0e3f6314a75aa5f` (whole film, 0 critical, composition 0.637 ->
+0.763 against the before); the clip tracks `clip-<range>` (the before and each iteration per range);
+scene-only jobs on track `scene`, the last `job_1a0e4352f9bf3c090`.
+
+**Open, for others:**
+- The song stream: Song Mode's span lengths depend on the subject its own Auto-director camera would
+  follow, so a cast change moves an authored production's cut (above). An option to leave that term out.
+- The critic-adapter: its camera model is the raw node (no ADR-911 filter); `followNode`/`aimNode` rigs
+  could read the trace's own camera track instead. Fixed during this stream by the coordinator: the
+  ember-cap alias, the camera sample-time rounding, the scout's alias.
+- gv3-look: the moon's disc reads as a flat grey ellipse where it is in frame (8 shots, e.g. E2); the
+  clipped highlights on the horse's glow (95.3) and 47.1.
+- The app: a custom treatment's dials have no editor (they are tuned in `songcut.TREATMENTS`).
 - The arrival's grand wide is 2 bars, not the plan's 4 (the Director's opener rule).
-- GV3's treatments are named and selectable in the Sequence panel, but a custom treatment's dials have
-  no editor in the app; they are tuned in `songcut.TREATMENTS`. A UI gap to report, not to fix here.
-- The adapter: "scout" has no subject alias (54.1's hierarchy finding).
-
-**Next steps, in order:**
-1. Iteration 4's changed spans as clips (`render-it4.sh`: nine ranges, one lock hold each), judged
-   against the before's same ranges (`critic-it4.sh`, befores and afters from one adapter), and its
-   trace (`cast-it4.json`) for the follow rigs' stability.
-2. Before/after stills and sheets to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`.
-3. The final report (briefs.md: common rules, and gv3-cut).
+- 29.1 and 31.1 want render-and-look iterations (trees hide the elder; the spire reads weakly).
+- A whole-film render of the final cut, then `trim.py` on its Critic job, for trims of shots that
+  change and then hold.
