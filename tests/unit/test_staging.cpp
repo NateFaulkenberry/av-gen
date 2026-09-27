@@ -425,6 +425,67 @@ TEST_CASE("show, hide and set write the parameters an author can see", "[stage][
     CHECK(rate->baseComponent(0) == Approx(10.0f));
 }
 
+TEST_CASE("a staging placement says so: a move told to put the body there, and a hidden body shown again",
+          "[stage][director][placement][adr911]") {
+    // ADR-911 (amended 2026-09-27). A follow camera reads its subject's past back only as far as the
+    // body's last placement (`entity::Entity::placements`), so a placement staging makes and does not
+    // declare is a camera gliding from where the body was to where it was put. Two steps place: a
+    // moveTo with neither a speed nor a duration ("put it there"), and a show of a body that was
+    // hidden. The controls are the steps beside them that do not: a hide, a moveTo given time -- the
+    // three-frame entry GV3's flyby makes out of sight is one, and the show after it is what places
+    // the craft -- and a show of what is already drawn.
+    stage::StepDesc hide = step(stage::StepKind::Hide, "off");
+    stage::StepDesc put = step(stage::StepKind::MoveTo, "put");
+    put.point = glm::vec3(30.0f, 20.0f, -10.0f); // neither a speed nor a duration
+    stage::StepDesc enter = step(stage::StepKind::MoveTo, "enter");
+    enter.point = glm::vec3(60.0f, 20.0f, -10.0f);
+    enter.duration = lit(0.05f);
+    stage::StepDesc show = step(stage::StepKind::Show, "on");
+    stage::StepDesc fly = step(stage::StepKind::MoveTo, "fly");
+    fly.point = glm::vec3(0.0f, 20.0f, -10.0f);
+    fly.duration = lit(1.0f);
+    stage::StepDesc again = step(stage::StepKind::Show, "again");
+    Stage s({animal("hero", {})}, {{"hero", glm::vec3(0.0f)}}, oneCue({hide, put, enter, show, fly, again}));
+    const entity::Entity* hero = s.world.find("hero");
+    REQUIRE(hero != nullptr);
+    const params::IParameter* visible = s.params.find("nodes/hero/visible");
+    REQUIRE(visible != nullptr);
+    REQUIRE(hero->placements() == 0);
+    s.staging.start("test", s.time);
+
+    struct Change {
+        glm::vec3 position{0.0f};
+        float visible = 0.0f;
+        glm::vec3 stepBefore{0.0f}; // where the body was the step before
+    };
+    std::vector<Change> changes;
+    std::uint32_t last = 0;
+    glm::vec3 previous = s.where("hero");
+    for (int i = 0; i < 150; ++i) {
+        s.tick(1.0 / 60.0);
+        if (hero->placements() != last) {
+            changes.push_back({s.where("hero"), visible->baseComponent(0), previous});
+            last = hero->placements();
+        }
+        previous = s.where("hero");
+    }
+    CHECK(s.done() == std::vector<std::string>{"only/off", "only/put", "only/enter", "only/on", "only/fly", "only/again"});
+    REQUIRE(changes.size() == 2);
+    // The put: counted on the step the body landed on its point, from the origin, still hidden.
+    CHECK(glm::length(changes[0].position - put.point) < 1e-4f);
+    CHECK(glm::length(changes[0].stepBefore) < 1e-4f);
+    CHECK(changes[0].visible == Approx(0.0f));
+    // The show: counted on the step it was drawn again, where the three-frame entry left it.
+    CHECK(glm::length(changes[1].position - enter.point) < 1e-3f);
+    CHECK(changes[1].visible == Approx(1.0f));
+    // And nothing else counted: the hide, the entry, the flight and the second show left it alone.
+    CHECK(hero->placements() == 2);
+    CHECK(glm::length(s.where("hero") - fly.point) < 0.01f);
+    // A seek resets the director and the bodies together, and the count goes with them.
+    s.world.reset();
+    CHECK(hero->placements() == 0);
+}
+
 // ADR-241. The Inspector's promise is "everything that writes this parameter", and a scenario writes
 // parameters no other layer can see -- a beam's visibility, a spawn rate, any absolute path a `set`
 // step names. ADR-211 recorded the hole and declined to fill it; this is the query that fills it.

@@ -243,8 +243,11 @@ A follow or aim rig reads a filtered **reference** of its node rather than the n
 the node's own transform history (HIST) through a causal, critically damped kernel, the same
 reference for the eye (at `t - followLagSeconds`, plus `followOffset`) and the aim (at `t`, plus
 `aimOffset`). It is a pure function of the history, so a scrub and a render of a range land on the
-frame a play from zero draws. Every key is optional, written only when set, and absent means the raw
-node -- every rig written before ADR-911.
+frame a play from zero draws. The history is read back no further than the subject's last
+**placement** -- a performance putting its body on its mark, a staging `moveTo` with neither a speed
+nor a duration, a staging `show` of a body that was hidden -- so the camera starts again from where
+the body was put rather than gliding there (ADR-911, amended 2026-09-27). Every key is optional,
+written only when set, and absent means the raw node -- every rig written before ADR-911.
 
 | Key | Cameras panel row | Meaning |
 |---|---|---|

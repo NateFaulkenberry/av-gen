@@ -27,6 +27,9 @@ HistorySample lerpSample(const HistorySample& a, const HistorySample& b, double 
     out.position = glm::mix(a.position, b.position, f);
     out.rotation = glm::slerp(a.rotation, b.rotation, f);
     out.scale = glm::mix(a.scale, b.scale, f);
+    // An instant after `a` is the later sample's. Nothing that must not straddle a placement reads
+    // between two samples either side of one (`scene::SubjectTrail` stops at the change).
+    out.placement = b.placement;
     return out;
 }
 
@@ -113,7 +116,7 @@ void HistoryBank::trim(Ring& r) {
 }
 
 void HistoryBank::record(std::size_t ring, double t, const glm::vec3& position, const glm::quat& rotation,
-                         const glm::vec3& scale) {
+                         const glm::vec3& scale, std::uint32_t placement) {
     if (ring >= rings_.size()) {
         return;
     }
@@ -126,6 +129,7 @@ void HistoryBank::record(std::size_t ring, double t, const glm::vec3& position, 
     s.position = position;
     s.rotation = rotation;
     s.scale = scale;
+    s.placement = placement;
     if (r.count > 0) {
         const double newest = at(r, r.count - 1).t;
         if (t < newest - 1e-9) {

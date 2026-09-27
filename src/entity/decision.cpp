@@ -75,6 +75,12 @@ params::ParamDesc<float> floatDesc(std::string path, float def, float lo, float 
     return params::ParamDesc<float>{std::move(path), def, lo, hi};
 }
 
+// With the words the Parameters panel shows, for the UI reach rule (see behaviors.cpp's twin).
+params::ParamDesc<float> floatDesc(std::string path, float def, float lo, float hi, std::string label) {
+    return params::ParamDesc<float>{
+        .path = std::move(path), .defaultValue = def, .hardMin = lo, .hardMax = hi, .label = std::move(label)};
+}
+
 // The five `InterestKind`s as the names a scene file writes. One list, so a kind cannot be spelled
 // one way in a weight table and another in a filter (ADR-225's rule applied to a name).
 constexpr std::string_view kKindNames[5] = {"landmark", "character", "glow", "water", "vista"};
@@ -145,6 +151,10 @@ std::uint32_t hash32(std::uint32_t x) {
 // last one. One constant rather than a knob per considerer until an author needs it to differ.
 constexpr float kArrival = 2.5f;
 
+// ADR-909: what a walk back to where the body just was is worth to a body that has stood
+// `maxStillSeconds` -- enough to beat standing, never enough to beat anything else that walks.
+constexpr float kRestlessLoop = 0.1f;
+
 glm::vec3 standOff(glm::vec3 from, glm::vec3 to, float approach) {
     if (!(approach > 0.0f)) {
         return to;
@@ -158,7 +168,111 @@ glm::vec3 standOff(glm::vec3 from, glm::vec3 to, float approach) {
     return glm::vec3(at.x, to.y, at.y);
 }
 
+// FNV-1a over a name, for the (seed, tick, option) draws. A string rather than an index, because an
+// option's index in this tick's list moves when the body moves and its name does not.
+std::uint32_t nameHash(std::string_view name) {
+    std::uint32_t h = 2166136261u;
+    for (const char c : name) {
+        h ^= static_cast<std::uint8_t>(c);
+        h *= 16777619u;
+    }
+    return h;
+}
+
+// ADR-909: where an option's walk ends, and how close counts as there -- the last `move` to a point
+// in its list, which for an errand of several legs is the far end. False for an option that walks
+// nowhere, or only after a body that moves (a greeting); `goes` says whether the walk leaves the
+// spot the body stands on at all, which a stand-off of a thing already within reach does not.
+bool destinationOf(const Option& o, glm::vec3 here, glm::vec2& end, float& tolerance, bool& goes) {
+    goes = false;
+    for (auto a = o.actions.rbegin(); a != o.actions.rend(); ++a) {
+        if (a->kind != ActionKind::Move) {
+            continue;
+        }
+        if (a->target.kind != TargetKind::Point) {
+            goes = true; // it follows a body somewhere: it moves, to nowhere this can name
+            return false;
+        }
+        end = glm::vec2(a->target.point.x, a->target.point.z);
+        tolerance = a->tolerance > 0.0f ? a->tolerance : 0.75f;
+        goes = glm::length(end - glm::vec2(here.x, here.z)) > tolerance + 0.5f;
+        return true;
+    }
+    return false;
+}
+
 } // namespace
+
+// ---- the pace of an errand (ADR-909) -------------------------------------------------------------
+
+SpeedRange SpeedRange::fromJson(const nlohmann::json* settings) {
+    SpeedRange out;
+    if (settings == nullptr || !settings->is_object() || !settings->contains("speedRange")) {
+        return out;
+    }
+    const nlohmann::json& r = (*settings)["speedRange"];
+    if (!r.is_array() || r.size() != 2 || !r[0].is_number() || !r[1].is_number()) {
+        return out;
+    }
+    return SpeedRange::of(r[0].get<float>(), r[1].get<float>());
+}
+
+SpeedRange SpeedRange::of(float a, float b) {
+    a = std::max(0.0f, a);
+    b = std::max(0.0f, b);
+    if (a <= 0.0f && b <= 0.0f) {
+        return SpeedRange{}; // unset: every errand at the walk speed
+    }
+    // An end at 0 is the walk speed, as its label says ("0 = walk"), not a crawl: a range of 0 to
+    // 1.5 is a walk to one and a half times a walk. Read literally it would draw errands from a
+    // standstill up, and one drawn near 0 would crawl while one drawn at exactly 0 walked -- the
+    // move verb reads a zero pace as "the walk speed".
+    if (a <= 0.0f) {
+        a = 1.0f;
+    }
+    if (b <= 0.0f) {
+        b = 1.0f;
+    }
+    return SpeedRange{std::min(a, b), std::max(a, b)};
+}
+
+float SpeedRange::draw(const DecisionContext& ctx, std::string_view identity) const {
+    if (!set()) {
+        return 1.0f;
+    }
+    const std::uint32_t tick = static_cast<std::uint32_t>(ctx.tick ^ (ctx.tick >> 32));
+    const std::uint32_t h = hash32(ctx.seed ^ hash32(tick * 0x9E3779B1U + 0x6a09e667U) ^ nameHash(identity));
+    const float u = static_cast<float>(h) / 4294967296.0f;
+    return lo + (hi - lo) * u;
+}
+
+float walkSpeedOf(const DecisionContext& ctx) {
+    if (ctx.world == nullptr || ctx.self >= ctx.world->entities().size()) {
+        return 0.0f;
+    }
+    return ctx.world->entities()[ctx.self]->desc().gait.walkSpeed;
+}
+
+void SpeedRangeParams::registerParameters(params::ParameterSet& params, const std::string& prefix) {
+    fromPath = prefix + "paceFrom";
+    toPath = prefix + "paceTo";
+    from = &params.add(floatDesc(fromPath, authored.lo, 0.0f, 4.0f, "slowest pace (x walk speed, 0 = walk)"));
+    to = &params.add(floatDesc(toPath, authored.hi, 0.0f, 4.0f, "fastest pace (x walk speed, 0 = walk)"));
+}
+
+void SpeedRangeParams::collectParameterPaths(std::vector<std::string>& out) const {
+    if (!fromPath.empty()) {
+        out.push_back(fromPath);
+        out.push_back(toPath);
+    }
+}
+
+SpeedRange SpeedRangeParams::live() const {
+    if (from == nullptr || to == nullptr) {
+        return authored;
+    }
+    return SpeedRange::of(from->value(), to->value());
+}
 
 // ---- the cadence -------------------------------------------------------------------------------
 
@@ -235,6 +349,86 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
             }
         }
     }
+    // ADR-909: the habits a decider refuses by default, applied here so that every considerer --
+    // including one an author writes -- is held to them alike.
+    //
+    //   * **A->B->A.** A walk ending where the body set out from less than `loopSeconds` ago
+    //     scores `loopPenalty` of itself -- 0 by default, not on offer. The GV3 audit's `sage` did
+    //     exactly this every 15 s for two minutes: out to a glow patch, back to the ring of its post,
+    //     out again. A soft discount was tried first and did not hold: Phase D's variety term
+    //     discounts the errand in hand along with its kind, so a held errand could score a tenth of
+    //     what it was chosen at, and a post discounted to a tenth still cut its dwell short and took
+    //     the body home -- one A->B->A inside the window in 240 s on the ADR-909 fixture, and the
+    //     brief asks for none. A guard whose post is the only thing on offer lingers where it went
+    //     until the window is over, and then goes back. An author who wants the soft rule sets
+    //     `loopPenalty`.
+    //   * **Turning back mid-walk.** While the body is walking an errand, an option that would
+    //     turn it round -- a destination more than 120 degrees behind the way it is going -- is not
+    //     on offer: a creature finishes the walk it started (or fails it -- a `move` that cannot
+    //     progress gives up on its own) before it walks back. Without this, a post whose pull rises
+    //     with distance and an errand whose pull rises with nearness cross halfway, and the body
+    //     paces between the crossing points: measured on the ADR-909 fixture, 4.5 m to 11.6 m and
+    //     back every nine seconds for the whole run, even with Phase D's commitment boost. A soft
+    //     discount was tried first and was not enough: Phase D's variety term discounts the errand
+    //     in hand along with its kind, so a body sent out on a third landmark errand walked a few
+    //     metres and was pulled home past a 0.1 discount -- four quick loops in 240 s. The errand in
+    //     hand is exempt, it being the way the body is going, and so is a body at rest, which the
+    //     departure rule speaks for.
+    //   * **Standing too long.** When the body is `restless` -- it has stood `maxStillSeconds` --
+    //     an option that takes it nowhere is not on offer, so what wins walks.
+    //
+    // None of them touches an order (`directed`) or an option with urgency -- a reaction, a flinch
+    // out of someone's way -- which are not habits.
+    const bool looping = ctx.loopSeconds > 0.0;
+    const bool walking = looping && ctx.state != nullptr && ctx.state->speed > 0.3f && !current_.empty();
+    if (ctx.restless || (looping && (walking || !ctx.departures.empty()))) {
+        const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
+        const glm::vec2 flatHere(here.x, here.z);
+        const glm::vec2 heading = ctx.state != nullptr
+                                      ? glm::vec2(std::sin(ctx.state->yaw), std::cos(ctx.state->yaw))
+                                      : glm::vec2(0.0f, 1.0f);
+        for (Option& o : options_) {
+            if (o.score <= 0.0f || o.directed || o.urgency > 0.0f) {
+                continue;
+            }
+            glm::vec2 end(0.0f);
+            float tolerance = 0.0f;
+            bool goes = false;
+            const bool named = destinationOf(o, here, end, tolerance, goes);
+            if (ctx.restless && !goes) {
+                o.score = 0.0f;
+                o.addFactor("restless", 0.0f);
+                continue;
+            }
+            if (!named || !goes || !looping) {
+                continue;
+            }
+            bool loop = false;
+            for (const Departure& d : ctx.departures) {
+                // A departure the body is still standing on is not somewhere it could go back to.
+                if (ctx.time - d.time <= ctx.loopSeconds && glm::length(d.place - flatHere) >= ctx.loopRadius &&
+                    glm::length(end - d.place) < ctx.loopRadius + tolerance) {
+                    loop = true;
+                    o.addFactor("revisit", ctx.loopPenalty);
+                    break;
+                }
+            }
+            if (walking && !(o.name == current_ && o.subject == currentSubject_)) {
+                const glm::vec2 way = end - flatHere;
+                if (glm::dot(way, heading) < -0.5f * glm::length(way)) {
+                    o.score = 0.0f;
+                    o.addFactor("turn back", 0.0f);
+                    continue;
+                }
+            }
+            if (loop) {
+                // A body that has stood as long as its scene allows would rather walk back than go
+                // on standing: restless, a loop is a tenth of itself rather than not on offer, so it
+                // wins only when nothing else on offer walks anywhere.
+                o.score *= ctx.restless ? std::max(ctx.loopPenalty, kRestlessLoop) : ctx.loopPenalty;
+            }
+        }
+    }
 
     // The best applicable option. `<= 0` is "not applicable now" (character_ai.hpp §3), and a tie
     // is broken on the order the considerers appended -- which is the scene file's order, and so is
@@ -254,8 +448,21 @@ bool Selector::select(const DecisionContext& ctx, std::span<const IConsiderer* c
     if (best == kNone) {
         ++counts_.empty;
         chosen_ = kNone;
-        current_.clear();
-        currentSubject_ = 0;
+        // Phase D §20 again: a plan in progress keeps its slot unless something beats it, and
+        // nothing on offer beats nothing. ADR-909 made this reachable -- an errand whose own option
+        // drops out of the list as the body nears it (inside the considerer's `minRange`), with
+        // every other option behind the body and so not on offer -- and clearing the commitment
+        // then lifted the turn-back rule on the next tick and turned the body round 4 m short of
+        // where it was going. A plan is in progress while it is held (Phase D's awareness) *or*
+        // while the body is still walking it: the second is the same errand for a decider with no
+        // `mind`, and without it such a body turned round 6.5 m short of its errand the moment a
+        // walk home came back on offer (the loop-firmness case in test_decider_habits.cpp). A body
+        // that has stopped with nothing on offer is committed to nothing, as before.
+        const bool walkingOn = ctx.state != nullptr && ctx.state->speed > 0.3f && !current_.empty();
+        if (!hold_ && !walkingOn) {
+            current_.clear();
+            currentSubject_ = 0;
+        }
         return false;
     }
 
@@ -492,6 +699,7 @@ HoldPostConsiderer::HoldPostConsiderer(const nlohmann::json* settings)
     : post_(readString(settings, "post", "")),
       activity_(readString(settings, "activity", "")),
       tolerance_(readFloat(settings, "tolerance", 1.5f)),
+      durationDefault_(std::max(0.0f, readFloat(settings, "duration", 0.0f))),
       pullDefault_(readFloat(settings, "pull", 0.08f)) {
     weightDefault_ = readFloat(settings, "weight", 1.0f);
     if (settings != nullptr && settings->is_object() && settings->contains("facing") &&
@@ -505,12 +713,18 @@ void HoldPostConsiderer::registerParameters(params::ParameterSet& params, const 
     registerWeight(params, prefix, weightDefault_);
     pullPath_ = prefix + "pull";
     pull_ = &params.add(floatDesc(pullPath_, pullDefault_, 0.0f, 10.0f));
+    durationPath_ = prefix + "duration";
+    duration_ = &params.add(floatDesc(durationPath_, durationDefault_, 0.0f, 600.0f,
+                                      "stays at its post for (s, 0 = until something better)"));
 }
 
 void HoldPostConsiderer::collectParameterPaths(std::vector<std::string>& out) const {
     collectWeightPath(out);
     if (!pullPath_.empty()) {
         out.push_back(pullPath_);
+    }
+    if (!durationPath_.empty()) {
+        out.push_back(durationPath_);
     }
 }
 
@@ -552,7 +766,12 @@ void HoldPostConsiderer::consider(const DecisionContext& ctx, std::vector<Option
         walk.name = name_;
         walk.target.kind = TargetKind::Point;
         walk.target.point = post;
-        walk.tolerance = tolerance_;
+        // ADR-909: back to *half* the tolerance, not to its edge. Walking only as far as the ring
+        // left the body standing exactly `tolerance` from its post -- the GV3 audit found 12 of
+        // `sage`'s 21 stops at 9.0 m from a 9 m post -- where one step outward is "away from the
+        // post" again and the next errand out is a hop over the line. Half way in, it is at its
+        // post.
+        walk.tolerance = tolerance_ * 0.5f;
         actions_.push_back(std::move(walk));
     }
     if (hasFacing_) {
@@ -566,12 +785,17 @@ void HoldPostConsiderer::consider(const DecisionContext& ctx, std::vector<Option
         face.target.point = post + glm::vec3(std::sin(faceYaw_), 0.0f, std::cos(faceYaw_));
         actions_.push_back(std::move(face));
     }
-    if (!activity_.empty()) {
+    const double duration =
+        static_cast<double>(std::max(0.0f, duration_ != nullptr ? duration_->value() : durationDefault_));
+    if (!activity_.empty() || duration > 0.0) {
+        // ADR-909: for `duration` seconds when one is given, so the errand of returning to the post
+        // ends and the decider chooses again; with none it stands until something else wins, which
+        // is a sentry.
         ActionDesc pose;
-        pose.kind = ActionKind::Pose;
+        pose.kind = activity_.empty() ? ActionKind::Wait : ActionKind::Pose;
         pose.name = name_;
         pose.activity = activity_; // an activity, never a clip (R4)
-        pose.duration = 0.0;
+        pose.duration = duration;
         actions_.push_back(std::move(pose));
     }
     out.push_back(Option{name_, score, std::span<const ActionDesc>(actions_), Authority::Routine});
@@ -825,14 +1049,17 @@ InterestConsiderer::InterestConsiderer(const nlohmann::json* settings)
     source_ = readString(settings, "source", "perceived") == "omniscient" ? Source::Omniscient
                                                                          : Source::Perceived;
     variety_ = std::clamp(readFloat(settings, "variety", 0.6f), 0.0f, 1.0f);
+    pace_.authored = SpeedRange::fromJson(settings);
 }
 
 void InterestConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
     registerWeight(params, prefix, weightDefault_);
+    pace_.registerParameters(params, prefix);
 }
 
 void InterestConsiderer::collectParameterPaths(std::vector<std::string>& out) const {
     collectWeightPath(out);
+    pace_.collectParameterPaths(out);
 }
 
 std::size_t InterestConsiderer::candidates(const DecisionContext& ctx, const GoalTaste& taste,
@@ -863,6 +1090,9 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
     ranges.reserve(scratch_.size());
     const float w = weight();
     const glm::vec3 here = ctx.state != nullptr ? ctx.state->position() : glm::vec3(0.0f);
+    // ADR-909: this body's walk speed, which a `speedRange` multiplies. Looked up once.
+    const SpeedRange range = pace_.live();
+    const float walkSpeed = range.set() ? walkSpeedOf(ctx) : 0.0f;
     for (const GoalCandidate& candidate : scratch_) {
         const std::size_t first = actions_.size();
         ActionDesc walk;
@@ -872,6 +1102,14 @@ void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option
         walk.target.point = standOff(here, candidate.position, approach_);
         if (approach_ > 0.0f) {
             walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
+        }
+        if (walkSpeed > 0.0f) {
+            // Keyed on the place rather than the name, which a derived point is only given below:
+            // the same place at the same decision is the same pace, whoever lists it first.
+            const std::string key = std::string(candidate.name) + "@" +
+                                    std::to_string(static_cast<int>(std::lround(candidate.position.x))) + "," +
+                                    std::to_string(static_cast<int>(std::lround(candidate.position.z)));
+            walk.speed = walkSpeed * range.draw(ctx, key);
         }
         actions_.push_back(std::move(walk));
         if (dwell_ > 0.0) {
@@ -1317,16 +1555,26 @@ ReactConsiderer::ReactConsiderer(const nlohmann::json* settings)
       fleeActivity_(readString(settings, "fleeActivity", "react")),
       fadeSeconds_(std::max(0.1f, readFloat(settings, "fadeSeconds", 8.0f))),
       curiosityPull_(readFloat(settings, "curiosityPull", 2.0f)),
-      cautionPull_(readFloat(settings, "cautionPull", 2.0f)) {
+      cautionPull_(readFloat(settings, "cautionPull", 2.0f)),
+      urgentSpeedDefault_(std::max(0.1f, readFloat(settings, "urgentSpeed", 1.5f))) {
     weightDefault_ = readFloat(settings, "weight", 1.0f);
+    pace_.authored = SpeedRange::fromJson(settings);
 }
 
 void ReactConsiderer::registerParameters(params::ParameterSet& params, const std::string& prefix) {
     registerWeight(params, prefix, weightDefault_);
+    pace_.registerParameters(params, prefix);
+    urgentSpeedPath_ = prefix + "urgentSpeed";
+    urgentSpeed_ = &params.add(floatDesc(urgentSpeedPath_, urgentSpeedDefault_, 0.1f, 4.0f,
+                                         "hurries at full alarm (x its pace)"));
 }
 
 void ReactConsiderer::collectParameterPaths(std::vector<std::string>& out) const {
     collectWeightPath(out);
+    pace_.collectParameterPaths(out);
+    if (!urgentSpeedPath_.empty()) {
+        out.push_back(urgentSpeedPath_);
+    }
 }
 
 void ReactConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {
@@ -1372,6 +1620,20 @@ void ReactConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& 
         ctx.mind->personality != nullptr ? *ctx.mind->personality : neutralPersonality();
     const glm::vec3 here = ctx.state->position();
     const SubjectId subject = eventSubject(chosen->sequence);
+    // ADR-909: how fast each response goes. The option's own draw from `speedRange` (1 without
+    // one), times what the urgency adds: `urgentSpeed` at full urgency, nothing at none. 0 when
+    // neither asks for anything -- the walk speed, exactly as before.
+    const float approachUrgency = std::clamp(chosen->intensity, 0.0f, 1.0f);
+    const float fleeUrgency = std::clamp(chosen->intensity * 1.5f, 0.0f, 1.0f);
+    const SpeedRange range = pace_.live();
+    const float urgentSpeed = urgentSpeed_ != nullptr ? urgentSpeed_->value() : urgentSpeedDefault_;
+    const auto pace = [&](std::string_view identity, float urgency) {
+        if (!range.set() && urgentSpeed == 1.0f) {
+            return 0.0f;
+        }
+        const float walkSpeed = walkSpeedOf(ctx);
+        return walkSpeed * range.draw(ctx, identity) * (1.0f + (urgentSpeed - 1.0f) * urgency);
+    };
 
     // ---- approach: go and see ----
     approachActions_.clear();
@@ -1383,6 +1645,7 @@ void ReactConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& 
         walk.target.point = standOff(here, chosen->position, approach_);
         walk.tolerance = std::max(approach_ * 0.5f, 0.75f);
         walk.arrival = kArrival;
+        walk.speed = pace(approachName_, approachUrgency);
         approachActions_.push_back(walk);
         ActionDesc face;
         face.kind = ActionKind::Face;
@@ -1428,6 +1691,7 @@ void ReactConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& 
         run.target.kind = TargetKind::Point;
         run.target.point = awayFrom(here, chosen->position, flee_, ctx.state->yaw);
         run.tolerance = 1.5f;
+        run.speed = pace(fleeName_, fleeUrgency);
         fleeActions_.push_back(run);
         ActionDesc face;
         face.kind = ActionKind::Face;
@@ -1740,6 +2004,7 @@ void GoalConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& o
     o.target = at;
     o.hasTarget = true;
     o.stoppingDistance = approach;
+    o.directed = true; // ADR-909: an order, not a habit -- never discounted as a loop or a stand
     o.addFactor("goal", weight());
 }
 

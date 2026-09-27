@@ -151,6 +151,7 @@ Entity::Entity(EntityDesc desc, std::uint32_t sceneSeed)
     if (!desc_.actions.empty()) {
         actions_.push(desc_.actions, Authority::Routine);
     }
+    gaitLive_ = desc_.gait; // ADR-908: the authored gait until the parameters are read
 }
 
 const std::string& Entity::clipFor(std::string_view activity) const {
@@ -839,6 +840,26 @@ void EntityWorld::registerParameters(params::ParameterSet& params, const std::st
                     .hardMax = 1.0f});
             }
         }
+        // ADR-908: how the body turns, as ordinary parameters with the words an artist would use,
+        // for a body that authors a gait (one that walks) and for no other -- a prop with a turn
+        // radius would be a knob that draws and does nothing. Read back every step by
+        // `Entity::refreshGait`.
+        entity->gaitParams_ = Entity::GaitParams{};
+        if (!(entity->desc_.gait == GaitSettings{})) {
+            const std::string base = prefix + entity->name() + "/gait/";
+            const auto add = [&](const std::string& name, float value, float hi, const char* label) {
+                registered_.push_back(base + name);
+                return &params.add(params::ParamDesc<float>{
+                    .path = base + name, .defaultValue = value, .hardMin = 0.0f, .hardMax = hi, .label = label});
+            };
+            const GaitSettings& gait = entity->desc_.gait;
+            entity->gaitParams_.turnRate = add("turnRate", gait.turnRate, 720.0f,
+                                               "turn rate on errands (degrees a second, 0 = the default 140)");
+            entity->gaitParams_.turnRadius =
+                add("turnRadius", gait.turnRadius, 20.0f, "turn radius on errands (m, 0 = turns on the spot)");
+            entity->gaitParams_.pivotRadius =
+                add("pivotRadius", gait.pivotRadius, 10.0f, "turning on the spot, its feet circle at (m)");
+        }
         // Declared state, as ordinary parameters. This is the whole of what makes "the headphones
         // are on" readable by anything else: a reaction targets "state/headphones", a track
         // keyframes it, a preset saves it, and none of them has to know an action wrote it.
@@ -877,6 +898,7 @@ void EntityWorld::unregisterParameters(params::ParameterSet& params) {
         // is the live reading of it, which `perceiveOne` falls back off when the pointers are null.
         entity->perceptionParams_ = Entity::PerceptionParams{};
         entity->personalityParams_.fill(nullptr);
+        entity->gaitParams_ = Entity::GaitParams{}; // ADR-908
     }
 }
 
@@ -1086,11 +1108,37 @@ void EntityWorld::bind(params::ParameterSet& params, const std::string& prefix) 
                 entity->percepts_.assign(kPerceptCapacityMax, Percept{});
             }
         }
+        // ADR-908: the turn knobs, all three or none, for the reason the senses' are.
+        entity->gaitParams_ = Entity::GaitParams{};
+        if (!(entity->desc_.gait == GaitSettings{})) {
+            const std::string base = prefix + entity->name() + "/gait/";
+            Entity::GaitParams gp;
+            gp.turnRate = params.findAs<float>(base + "turnRate");
+            gp.turnRadius = params.findAs<float>(base + "turnRadius");
+            gp.pivotRadius = params.findAs<float>(base + "pivotRadius");
+            if (gp.turnRate != nullptr && gp.turnRadius != nullptr && gp.pivotRadius != nullptr) {
+                entity->gaitParams_ = gp;
+            }
+        }
+        entity->refreshGait();
     }
     navPath_.setNavigator(&nav_);
     // After the anchors, because a field's source may be an entity and an entity's position is its
     // anchor until something moves it.
     bindFields();
+}
+
+// ADR-908: the authored gait with the three turn knobs read back from their parameters, so a track,
+// a route or a slider moves them. Called at bind and at the top of every step on both paths; the
+// constructor starts `gaitLive_` as the authored gait, because `publishSeek` can read it for a body
+// a seek never stepped.
+void Entity::refreshGait() {
+    gaitLive_ = desc_.gait;
+    if (gaitParams_.turnRate != nullptr) {
+        gaitLive_.turnRate = std::max(0.0f, gaitParams_.turnRate->value());
+        gaitLive_.turnRadius = std::max(0.0f, gaitParams_.turnRadius->value());
+        gaitLive_.pivotRadius = std::max(0.0f, gaitParams_.pivotRadius->value());
+    }
 }
 
 // Phase B. One step of the provider memory, from the state the body is already in.
@@ -1183,6 +1231,7 @@ void EntityWorld::reset() {
         entity->director_ = DirectorMotion{};
         entity->performanceEntry_ = PerformanceEntry{}; // ADR-820: rebuilt by the replay
         entity->directorGoal_ = DirectorGoal{};         // ADR-824: likewise
+        entity->placements_ = 0;                        // ADR-911: recounted by the replay
         entity->locomotion_ = LocomotionState{};
         // ADR-337 / ADR-267 D4: the previous root-motion sample is recoverable by replaying the
         // steps, so a reset must forget it. Keeping it would make the first step of a seek a
@@ -1879,6 +1928,7 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
         entity.state_.intent.clear();
         entity.active_ = true;
         entity.everUpdated_ = true;
+        entity.refreshGait(); // ADR-908: the turn knobs, read back on both paths
 
         // ---- the Director tier (ADR-210), replayed since ADR-671 ----
         // Inactive on every step of a replay whose caller does not replay the director (its
@@ -1905,7 +1955,7 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
             ac.self = &entity;
             ac.world = this;
             ac.path = &pathProvider();
-            ac.gait = &entity.desc_.gait;
+            ac.gait = &entity.gaitLive_;
             ac.events = &seekEvents_;
             // **The result was discarded here, with a literal `(void)`.** `update` captures it
             // and publishes `locomotion_.action`, which is what picks the clip -- an action's
@@ -1946,6 +1996,8 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
         // one layer up. A decision taken during a replay pushes onto the queue the replay is
         // already integrating, so the replayed second contains the errand the played one did.
         bc.actions = &entity.actions_;
+        // ADR-907: on both paths, for the reason the next comment gives about the limiter.
+        bc.gait = &entity.gaitLive_;
         // ADR-620, and it is applied on BOTH paths for the reason testing.md #38 gives: a
         // limit honoured by `update` and not by `seek` is a body that accelerates differently
         // when scrubbed than when played, which is exactly the class ADR-360 exists to stop.
@@ -1994,8 +2046,8 @@ void EntityWorld::publishSeek(double target, double dt, bool replayedNothing) {
         if (replayedNothing) {
             entity.locomotion_.activity = entity.state_.activity;
         }
-        entity.locomotion_.playbackRate =
-            Gait::playbackRate(entity.desc_.gait, entity.locomotion_.activity, entity.state_.speed);
+        entity.locomotion_.playbackRate = Gait::playbackRate(
+            entity.gaitLive_, entity.locomotion_.activity, entity.state_.speed, entity.state_.turnRate);
         if (performing(entity)) {
             entity.locomotion_.playbackRate *= entity.director_.timeScale; // ADR-823, as `update` does
         }
@@ -2454,6 +2506,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // whoever decided it. Cleared on both paths with the other per-step fields, so a step in
         // which nobody published one falls back to the polar pair rather than latching the last.
         entity.state_.intent.clear();
+        entity.refreshGait(); // ADR-908: the turn knobs, read back on both paths
 
         // ---- the Director tier, above everything (ADR-210) ----
         // A director says where a body *is*. Written as `travel` rather than as an offset so that
@@ -2480,7 +2533,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             ac.self = &entity;
             ac.world = this;
             ac.path = &pathProvider();
-            ac.gait = &entity.desc_.gait;
+            ac.gait = &entity.gaitLive_;
             ac.events = &actionEvents_;
             const std::size_t eventsBefore = actionEvents_.size();
             intent = entity.actions_.update(ac, entity.state_);
@@ -2586,6 +2639,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         // behaviour and must stay that way -- a behaviour that could reach another body's queue
         // would be a second writer of somebody else's intentions.
         bc.actions = &entity.actions_;
+        bc.gait = &entity.gaitLive_; // ADR-907, and on the replay path too
         for (auto& behavior : entity.behaviors_) {
             behavior->update(bc, entity.state_, entity.motion_);
         }
@@ -2663,7 +2717,9 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             entity.gait_.select(entity.desc_.gait, entity.state_.activity, entity.state_.speed,
                                 entity.state_.turnRate, dt);
         entity.locomotion_.activity = gait;
-        entity.locomotion_.playbackRate = Gait::playbackRate(entity.desc_.gait, gait, entity.state_.speed);
+        // ADR-908: the turn rate too, so a body turning on the spot with no idle clip plays its cycle.
+        entity.locomotion_.playbackRate =
+            Gait::playbackRate(entity.gaitLive_, gait, entity.state_.speed, entity.state_.turnRate);
         if (performing(entity)) {
             entity.locomotion_.playbackRate *= entity.director_.timeScale; // ADR-823: slowed, not swapped
         }
