@@ -471,6 +471,12 @@ walkable cells (48%) cannot be reached from the largest". The source: 951 walks,
 
 s28, "Vane sees it" (174.02-174.94), still has Vane watching.
 
+**The crafts over the new ground** (the closed trace, the ground from the closed world's heights):
+- the scout's lowest pass over edited ground is 26.1 m, at 73.4 s, leaving E3's lift site (the ground
+  there moved 0.8 m);
+- the saucer's is 99.4 m, at 148.35 s, over the south sill on E5's approach;
+- anywhere, their lowest are unchanged ground: 21.9 m (the scout at E4) and 23.3 m (the saucer at E5).
+
 **The cast diverges as W2d said it would.**
 
 | Body | Max | Mean | First divergence |
