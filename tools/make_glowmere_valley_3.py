@@ -250,8 +250,9 @@ def main():
 
     strip_director_residue(project, scene)
     write_sections(project)
-    ground = Ground(world_block(scene))
     report = []
+    world.close_ends(world_block(scene), report)  # before any height is asked of the world
+    ground = Ground(world_block(scene))
     world.apply(project, scene, ground, report)
     cast.apply(project, scene)
     look.apply_base(project)
