@@ -8,6 +8,23 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **17:45: gv3-int round 1 is done.** The merged film is generated and audited (93/93 routes, 0 unknown parameters),
+  traced, rendered whole (13,530 frames, 0 GPU errors) and judged (`job_1a0e49f4c67b66a3b`, and
+  `job_1a0e4a50eaa6cabba` with the routes mapped).
+  - All five set pieces play; E3 takes bull-21 and is framed fine. 19 of 22 follow rigs pass.
+  - `world.py` fails on the cut's new cameras: 77.1 sees the south edge and the river mouth dead centre.
+  - 59.1's sage walks out of frame; it is re-framed on rook.
+  - 95.3's horse washed out in the beam, whose `audio.rms` link tripled it in the riser. The link is dropped.
+  - **Two moons (an engine defect, queued for the next engine round):** `skybox.wgsl` draws the crisp moon at the
+    un-rotated sun direction while the procedural sky is sampled through `env/rotation`. GV3 inherited -0.568 from
+    GV2, so the film had two moons 32.5 degrees apart in 11 shots; GV2 multicam has it too. The disc's colour and
+    radius are hard-coded, so it is visible and not controllable. GV3's workaround: `env/rotation` 0 (`e1bc1c49`).
+  - **The Critic adapter maps a hero's own node routes now** (creative-critic `cf63d64`; suite 53 passed). A
+    whole-film job had judged only 11 of 75 routes, never the elder's kick.
+  - **GPU policy change:** navfix's GPU suite held the lock for an hour waiting for the uireach, cihealth and behave
+    CPU runs, so gv3-int's clips were blocked. The runner is now `build/coord-gpu-full4.sh navfix2`: it waits only
+    for other GPU work and logs CPU overlap. Rationale: CPU contention makes GPU suites fail spuriously, not pass
+    spuriously, so a pass stands with its overlap on record, and a failure is re-run in a quiet window.
 - **16:35: ALL FOUR PHASE 3 STREAMS ARE MERGED into `gv3/production`.**
   - **gv3/world** is merged as `be55dd43` (world `588fb792`). The one conflict, the generator's argparse block, was
     resolved by keeping `--recut`, `--final` and `--final-trace`.
