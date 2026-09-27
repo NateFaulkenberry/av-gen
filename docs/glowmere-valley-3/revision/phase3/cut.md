@@ -391,41 +391,128 @@ label `it3b`; complete), 80 issues (2 critical, 3 high, 16 medium).
   watching the elder, which is the frame). The low "abrupt camera acceleration" findings fall on the
   cut instants, where a linear move's keys begin and end.
 
-## State (2026-09-27, about 12:50)
+## Iteration 2, judged on the whole film
 
-**Commits on `gv3/cut`:** `a50327ac` (the Director step, the compositions, ADR-913 kinds),
-`2b7fd781` (this log), `e5c7a050` (shot ids s01.. as the Critic's adapter names them), `27e18605`
-(E1 and E4 framing), `c6e3a646` (checkpoint: `tools/gv3/trim.py`, `preview_world.py`), `dd2306b2`
-(iteration 2's compositions), `f192d918` and later (this log).
+The iteration-2 render (`build/gv3/cut/it2/cut-it2.mov`, 960x540, 13,530 frames, exit 0, GPU errors
+0, the scene loaded) through the adapter with the same flags as it1 and the before. Job
+`job_1a0e3f6314a75aa5f` (track `film`, label `it2`; complete): **131 issues, 0 critical** (it1: 2),
+4 high, 50 medium, 77 low. Comparisons in `build/gv3/cut/it2/cut-compare-*.txt`.
+
+| Dimension | before (first pass, same engine) | it1 | it2 |
+|---|---|---|---|
+| composition | 0.637 | 0.647 | **0.763** |
+| character staging | 0.868 | 0.918 | **0.934** |
+| visual hierarchy | 0.746 | 0.708 | **0.773** |
+| pacing | 0.969 | 0.979 | 0.984 |
+| musical synchronization | 0.934 | 0.963 | 0.939 |
+| cinematography | 0.742 | 0.698 | 0.680 |
+| lighting | 0.787 | 0.756 | 0.802 |
+| technical quality | 0.768 | 0.748 | 0.787 |
+| temporal coherence | 0.909 | 0.876 | 0.924 |
+
+**Cinematography, what drives it** (the dimension's own drivers): 38 of 73 shots include a push-in
+(`movement_monoculture`); four repeated framings (41.1/117.1 is the rhyme kept on purpose; 9.1/26.1,
+9.1/49.1 and 77.1/113.1 are not); path jitter in 59.1 (fixed in iteration 3) and 109.1; and 39 low
+"abrupt camera acceleration" findings. Of those 39, **7 were real** -- each keyed move started on the
+beat while its shot starts a frame earlier (`CUT_LEAD`), so it held still for one frame and set off
+at full speed -- and **32 were the adapter's**: it wrote camera sample times to 4 decimals while shot
+bounds carry 6, and the analyzer differentiated across a few microseconds. Fixed on both sides: moves
+are keyed over the shot's on-screen span (`shots.build(lead=CUT_LEAD)`, iteration 4), and the adapter
+writes 6 decimals (creative-critic `111a283`, the coordinator). On the scene alone, the 7 fixed
+lifted cinematography 0.722 -> 0.755 (`job_1a0e3feaec6c9dfec`).
+
+**Novelty:** 34.2 s held after the shots' last new information (it1 44.3, the before 24.5); 8 shots
+static from the first frame (before 4). Six account for 17 s: 89.1, 91.1 (Ember hidden, so nothing
+changes), 31.1, 65.1, 47.1 and 107.1. `trim.py` proposes 65.1 -2 beats and 89.1 -4, both static from
+their first frame, where a trim gives only a shorter still: not applied; they want moves that change
+the picture.
+
+**Seen on the sheets** (`build/gv3/cut/it2/review/`, and `framing.py --video` on the render):
+- 29.1: horse-20 walked past the lens and filled the left half of the frame (the herd grazes 5-8 m
+  from Vane's path); the Critic: "vane is likely partly hidden by horse-20" and "outweighs vane".
+- 91.1: Ember in frame by projection, seen in none of the 6 checked frames: the bottom-left corner,
+  behind the ferns.
+- 111.1: the lens went through a large plant for two thirds of the shot (Vane seen in 2 of 6).
+- Flags only for clipping (the look's): 95.3's glowing horse 15.4%, 47.1 6.7%.
+
+Not the cut's, recorded: clipped highlights (look), aliens floating (gv3-cast), five routes with no
+visible response (look and gv3-cast), shimmer (render).
+
+## Iteration 3, judged on clips
+
+The three spans iteration 3 changed, rendered from the iteration-3 world (`render-it3.sh`, one lock
+hold each: E2 24.4-30.1, E4 98.2-115.0, the riser 170.2-176.9; all exit 0, GPU errors 0), each judged
+against the same range of the before on its own track (`clip-e2`, `clip-e4`, `clip-e5riser`):
+
+| Clip | before -> it3 (critical/high/medium) | improved | degraded |
+|---|---|---|---|
+| E2 | 0/0/1 -> 0/0/3 | visual hierarchy 0.95 -> 1.00 | musical sync, effects, technical: the new beam's route, clipping and shimmer |
+| E4 | 0/0/4 -> 0/0/12 | cinematography 0.975 -> 1.000, staging 0.97 -> 1.00, environment 0.94 -> 1.00 | musical sync, effects (the scout-beam routes); composition and hierarchy, below |
+| riser | 1/2/11 -> 0/1/10 | composition 0.67 -> 0.82, hierarchy 0.80 -> 0.92, lighting 0.72 -> 0.81, motion 0.91 -> 0.96 | nothing measurable |
+
+Every event in the clips is on screen at its instant (E2's crossing, E4's beam, lift, pair taken and
+departure, E5's beam and lift). The before's clips have no set pieces, so the route checks on the
+beams exist only in the after. **E4's hierarchy finding** ("bright areas away from the elder dominate"
+in 54.1) is the adapter again: "scout" has no subject alias, so it takes the elder, named in the
+label, for the subject and the scout's beam for a distraction.
+
+**Seen in the clips:**
+- **57.1's eye stood in a plant**: at 105.5 s its leaves fill the left and centre of the frame, the
+  beam and a cow behind them (iteration 2's eye, kept in iteration 3).
+- **E2's pan brings the moon into the corner**: at the crossing's first instant the saucer lies on the
+  moon's bearing, so every frame that holds it then holds the moon too. The moon (the light rig's disc,
+  azimuth 64, elevation 22) is in frame in 8 shots of the cut, e.g. small and bright in 59.1; in E2 it
+  reads as a flat grey ellipse. A look matter, recorded; the pan stays (a 12-degree pan leaves the moon
+  out and the saucer in 0.28 s late).
+
+## Iteration 4: the alien shots on both casts, the column, the keys (`d7c57449` to `4442ca71`)
+
+**Both casts.** gv3-cast's iteration-4 trace (`av-gen-gv3-cast/build/gv3/cast/iter4/trace.json`,
+9a6c34f2) is its world as it will merge (until navfix and gv3-world's river): the set pieces' moments
+are identical to the preview world's to the hundredth; the aliens differ. Every framing of iteration 4
+is searched on both at once (`build/gv3/cut/tools/search4.py`): it must hold whichever merges. Every
+E1-E5 moment the cut shows is on screen on both (`build/gv3/cut/castworld/`).
+
+- **Keys on the on-screen span** (`shots.build(lead)`): all 42 keyed moves start and end on their
+  shot's first and last frame.
+- **29.1:** Vane crosses the east meadow; the lens rides 11 m north-east of her and 6 m up, looking
+  south-west past her to the elder's cap on the horizon. Nearest animal 6.7 m from the lens, none in
+  front of her, on both casts (her path is the same on both).
+- **91.1:** a fixed eye 22 m up the west bank behind Ember, 4 m up, a live aim at her led 15% toward the
+  saucer: both in frame for the whole shot on both casts, where she walks different ways 26 m apart
+  (on gv3-cast's, iteration 2's rig lost her entirely). She is small (0.11-0.13 of the frame): a figure
+  on the bank under the saucer's light.
+- **111.1:** Tide, not Vane, walks the north end toward the lit spire: a chase 5 m behind her, 3.4 m
+  up, 24 mm, on her own path 76% of the shot. Her path is the same on both casts; Vane's is not, and on
+  neither did Vane walk toward the horse's place.
+- **57.1:** from 4 m over the river 42 m east of the station (no undergrowth over water), 35 mm aimed
+  10 m below the scout: the scout's top at +0.72 and the pair's feet at -0.86 (+0.66 and -0.73 on
+  gv3-cast's) at the lift.
+- The aliens lead 13.1% still: Vane 3 shots, Tide 3, Ember 2, Rook 1, Sage 1.
+
+## State (2026-09-27, about 14:30)
+
+**Commits on `gv3/cut`** since the checkpoint: iteration 2 `dd2306b2`; iteration 3 `630ca638`,
+`6589a152`; iteration 4 `d7c57449`, `e1cac9a6`, `4442ca71`; and this log.
 
 **The Director's cut in use:** `tools/gv3/song_cut.json`, 73 spans, settings `songcut.SETTINGS`
 (song, expressive, 1.8 / 7.5 / 0.45 s, seed 1), GV3's treatments `songcut.TREATMENTS`. Every span has
 an authored composition in `tools/gv3/shots.py`; `python3 tools/make_glowmere_valley_3.py` reports
-"re-run and identical to song_cut.json". No trims yet (`songcut.TRIMS` is empty).
-
-**The GPU.** The baseline render finished at 12:26 and released the lock. Iteration 2's whole-film
-render (`build/gv3/cut/render-it2.sh`, project `build/gv3/cut/it2/ufo.json`, 960x540, about 25 min)
-waits behind it; the coordinator asked for it to stay queued (it is the Critic job's evidence) and
-for no further long holds. From here on this stream renders clips only.
+"re-run and identical to song_cut.json". No trims (`songcut.TRIMS` is empty; see iteration 2).
 
 **Open questions:**
-- E4's place (gv3-cast): the stand-in is 3 m from gv3-cast's iteration 2. gv3-cast's `beam` reaction
-  sends aliens within 80 m of E4 to go and see it, which the preview world does not have: 59.1's
-  watcher has to hold up whether they stand or walk.
+- E4's place (gv3-cast): the stand-in is 3 m from gv3-cast's region; its trace plays E4 with the
+  same moments.
 - The arrival's grand wide is 2 bars, not the plan's 4 (the Director's opener rule).
 - GV3's treatments are named and selectable in the Sequence panel, but a custom treatment's dials have
   no editor in the app; they are tuned in `songcut.TREATMENTS`. A UI gap to report, not to fix here.
+- The adapter: "scout" has no subject alias (54.1's hierarchy finding).
 
 **Next steps, in order:**
-1. Iteration 3, CPU (no render needed to design): 94.1 on a hovering-craft smoothing kind; 59.1
-   re-composed so the eye does not ride a walker while looking 30 m away; 54.1 locked off on E4's
-   region instead of chasing the approach; 57.1 with the scout in frame at the lift; E2's frame
-   entering the crossing at its first instant, if the pan keeps the owner's composition. Search each
-   framing on the trace; re-trace; measure with `camera_stability.py` and `onscreen.py`.
-2. When `cut-it2.mov` lands: the adapter with `--shot-plan build/gv3/cut/it2/04-shot-plan.md
-   --directives build/gv3/cut/it2/03-directives.md`, then `critic submit ... --session gv3-cut --track
-   film --label it2 --wait --json --strict` (the track compares it with it1), and `critic compare`
-   against the before. `trim.py` on its report proposes `songcut.TRIMS`.
-3. Iteration 3's changed spans as short clips through the lock, each submitted with `--video-start`.
-4. Before/after stills and sheets to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`.
-5. The final report (briefs.md: common rules, and gv3-cut).
+1. Iteration 4, CPU: the repeated framings (113.1 against 77.1, 26.1 and 49.1 against 9.1), and moves
+   that change the picture for the static-held heroes (89.1, 65.1, 47.1, 107.1, 31.1), with fewer
+   push-ins.
+2. Iteration 4's changed spans as clips through the lock (one hold each), judged against the before on
+   the clip tracks, with inputs regenerated by the fixed adapter.
+3. Before/after stills and sheets to `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/cut/`.
+4. The final report (briefs.md: common rules, and gv3-cut).
