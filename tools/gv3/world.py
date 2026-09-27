@@ -52,8 +52,12 @@ SINK = 0.10  # metres a stem's lowest ground-contact point is sunk below the sur
 # the foot of it, at its second point. A narrow stream, `glowmere-falls`, comes down the head from the
 # edge into the river: it carries the water edge to edge, and the notch it cuts at the top of the head
 # is 36 m high, above the horizon of every camera in the film (s37's crane, at 31 m, is the highest).
-# The full river climbing the head instead read as a lit slab from both cranes (s12, s37). A low ridge
-# puts the north-east shoulder's crest inside the world, where the boundary had cut it flat.
+# The full river climbing the head instead read as a lit slab from both cranes (s12, s37). The falls
+# are 16 m wide because at 12 their water narrowed to 8 m on the steepest pitch, and there the nav
+# grid's sampled walks disagreed with the world: the grid is then not trusted, and every walkability
+# query in the film stays analytic. Their amplitude is 4 m because where the falls meet the river the
+# two surfaces blend by weight, and a shallower bed let the blend fall below it (a dry gap). A low
+# ridge puts the north-east shoulder's crest inside the world, where the boundary had cut it flat.
 # South: the banks end at their eleventh point (z 244), so beyond it only the corridor flattens (0.55)
 # and the southern rim stands at 45% of its height across the end; a low sill and a ridge on the
 # south-east shoulder close the rest. The river keeps its whole course -- that course is what holds
@@ -69,7 +73,7 @@ SINK = 0.10  # metres a stem's lowest ground-contact point is sunk below the sur
 NORTH_BANKS_HEAD = [[-58.0, 64.0, -352.0], [-58.0, 58.0, -316.0]]  # replaces the banks' first point
 NORTH_FALLS = {"name": "glowmere-falls", "kind": "river",
                "path": [[-58.0, 48.0, -352.0], [-58.0, 43.5, -322.0], [-58.0, 24.0, -300.0], [-58.0, 12.8, -286.0]],
-               "width": 12.0, "amplitude": 4.0, "falloff": 0.85, "flatten": 0.85, "roughness": 0.1,
+               "width": 16.0, "amplitude": 4.0, "falloff": 0.85, "flatten": 0.85, "roughness": 0.1,
                "water": True, "waterDepth": 0.0, "smoothing": 3}  # ends on the river's new head, level for level
 NORTH_EAST_SHOULDER = {"name": "north-east-shoulder", "kind": "ridge",
                        "path": [[20.0, 0.0, -298.0], [60.0, 0.0, -300.0], [110.0, 0.0, -298.0]],
