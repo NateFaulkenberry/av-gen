@@ -245,6 +245,14 @@ so v3 and v4 differ only in the film):
   first pass's quieter bearings), and the glints 0.5 -> 0.3: they are the one sky term "audio
   response" does not switch off, following the high band frame by frame (+5.1% on the off-beats in
   s04, +12.2% in the first pass). To verify on s04 (and s34, s39).
+- **v5 checks** (14:18-14:20, rendered alone; evidence in `.../look/iteration4-v5/`):
+  - **The tears: verified.** With the wind back at 0.62 rad, s08 at 1080p (33.7 s) has the water
+    stream's seam again: a diagonal band of bright packed streaks near the lens by the boat and a
+    dark slick line running up from it; with the wind at 1.45 rad (v4) there is none.
+  - **The fan plants: not shown at 540p.** s34's temporal-change map is dominated by the saucer, the
+    sky and particles in both; the lower frame changed less in v5 (2.15 against 2.65 x1e-3), but the
+    two renders start at different times (particles and animals differ) and the wind now runs closer
+    to the line of sight. A 4.6 cm swing is about a pixel there. Kept as computed.
 - The Critic, v3n -> v4 on the open (A): musical_synchronization 0.81 -> 0.76, effects 0.90 -> 0.87,
   because its grid no longer finds v3's per-frame sky response (spectrum shape was still 0.75 in
   v3) -- the same disagreement as in iteration 2: the plan gives the aurora the lead, slowly.
