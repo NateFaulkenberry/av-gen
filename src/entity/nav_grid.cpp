@@ -940,6 +940,57 @@ bool NavGrid::connected(glm::vec2 a, glm::vec2 b) const {
     return ra != 0 && ra == regionAt(b);
 }
 
+std::uint16_t NavGrid::regionNear(glm::vec2 p, float reach) const {
+    if (const std::uint16_t here = regionAt(p); here != 0) {
+        return here;
+    }
+    glm::vec2 snapped(0.0f);
+    return nearestWalkable(p, reach, snapped) ? regionAt(snapped) : 0;
+}
+
+bool NavGrid::nearestInRegion(glm::vec2 p, std::uint16_t region, glm::vec2& out, bool dry) const {
+    if (!valid() || region == 0 || regionSize(region) == 0 || regions_.empty()) {
+        return false;
+    }
+    const glm::ivec2 start = cellOf(p);
+    // Rings outward from `p`'s cell, keeping the nearest cell centre by true distance, and stopping
+    // only when no cell of a further ring can be nearer than the best found: a ring `r` cells out
+    // holds no centre closer than (r - 1/2) cells, wherever in its own cell `p` stands. Stopping at
+    // the first ring that held one -- `nearestWalkable`'s rule -- can miss a nearer cell of the next
+    // ring by up to a third of the distance, and this answer is where a body is sent to stand.
+    // The ring that reaches the grid's farthest corner from `start`, which may lie outside it.
+    const int span = std::max({std::abs(start.x), std::abs(start.x - (stats_.width - 1)), std::abs(start.y),
+                               std::abs(start.y - (stats_.height - 1))});
+    const float cell = stats_.cellSize;
+    float bestSq = std::numeric_limits<float>::max();
+    bool found = false;
+    for (int r = 0; r <= span; ++r) {
+        const float nearest = (static_cast<float>(r) - 0.5f) * cell;
+        if (found && nearest > 0.0f && nearest * nearest > bestSq) {
+            break;
+        }
+        for (int dy = -r; dy <= r; ++dy) {
+            // The ring's two edge rows whole, and only its two end cells in every row between.
+            const int step = (dy == -r || dy == r) ? 1 : 2 * r;
+            for (int dx = -r; dx <= r; dx += step) {
+                const glm::ivec2 c = start + glm::ivec2(dx, dy);
+                if (!inside(c) || regions_[index(c)] != region ||
+                    (dry && (cells_[index(c)].flags & NavWater) != 0)) {
+                    continue;
+                }
+                const glm::vec2 centre = centerOf(c);
+                const float d = glm::dot(centre - p, centre - p);
+                if (d < bestSq) {
+                    bestSq = d;
+                    out = centre;
+                    found = true;
+                }
+            }
+        }
+    }
+    return found;
+}
+
 std::size_t NavGrid::regionSize(std::uint16_t region) const {
     return region < regionSizes_.size() ? regionSizes_[region] : 0;
 }

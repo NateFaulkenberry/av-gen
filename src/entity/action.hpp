@@ -80,6 +80,10 @@ enum class RouteStatus : std::uint8_t {
     Ready,       // `out` holds the route
     Pending,     // a planner is working on it; ask again next update
     Unreachable, // there is no route, and the caller should give up rather than walk at a wall
+    // ADR-932: the goal is on ground not connected to where the walker stands -- across a river
+    // that runs edge to edge, on an island -- and `out` holds a route to the nearest point it CAN
+    // reach instead. A caller walks there and says it did not arrive: the goal was not reached.
+    Nearest,
 };
 [[nodiscard]] const char* routeStatusName(RouteStatus status);
 
@@ -120,11 +124,20 @@ public:
 };
 
 // The provider that exists today: `entity::Navigator`, which samples walkability analytically and
-// steers locally but has **no graph and no search** (docs/cinematic-world-gap-analysis.md §5/§6).
-// Its route is the straight line -- one waypoint -- and the only destination it refuses is one a
+// steers locally. Its route is the straight line -- one waypoint -- and it refuses a destination a
 // walker could not stand on. So a character gets around a tree (that is `steer`) and does not get
 // around a lake (that would need a search). Written down here so the limitation is a seam somebody
 // chose rather than a surprise somebody hit.
+//
+// **ADR-932: it does not route across a divide.** With a navigation graph (`Navigator::grid`), a goal
+// in a different connected region from the walker's -- the far bank of a river that runs edge to
+// edge -- is answered `Nearest`: one waypoint, the nearest point of the walker's own region to the
+// goal, found on the graph and carried out to the edge of the walkable ground. Before, it was
+// `Ready` with the straight line, and the walker waded in to its limit, stalled, gave up and was
+// sent again (GV3's ember, eight times in 40 s). Two points the planner (`NavGrid::path`) would
+// call `Unreachable` are two points this calls `Nearest`: the same snaps, the same regions. Within
+// one region the answer is the straight line, as it always was; so is every answer in a world with
+// no graph, or where the graph cannot place one of the two ends.
 class NavigatorPath final : public IPathProvider {
 public:
     explicit NavigatorPath(const Navigator* nav = nullptr) : nav_(nav) {}
@@ -397,6 +410,10 @@ public:
 private:
     struct Progress {
         bool routed = false;
+        // ADR-932: the route ends at the nearest point the body can reach, short of a goal on ground
+        // it cannot (`RouteStatus::Nearest`). Its last waypoint then stays where it is rather than
+        // tracking the goal, and arriving there ends the move as a failure that says why.
+        bool shortOf = false;
         std::vector<glm::vec2> waypoints;
         std::size_t waypoint = 0;
         float speed = 0.0f;        // the accel/decel model's current speed
