@@ -259,16 +259,29 @@ struct AuroraAppearance {
 // §4.2. These are **depths on an existing signal**, not an analyzer: each one scales how much the
 // band already in the frame block moves its feature. The mapping the brief proposes is the default
 // and every number is a parameter, which is the whole of "make them adjustable".
+//
+// ADR-939: `sensitivity` ("Audio response") is the master over EVERY term here -- the five band
+// depths, the glints' depth and the spectrum's shape. Each term is multiplied by it as a distance
+// from silence, so at 0 the aurora is exactly the aurora with no music playing, and at 1 every term
+// is what its own depth says. It used to scale the five band depths only: turned to 0, the spectrum
+// still set every curtain's top and the glints still followed the high band, so Glowmere Valley 3's
+// sky kept the kick with its "master" off. Routes onto the aurora's parameters (the Effects card's
+// "Beat response", the Modulation panel) are not in it: they are the project's, named where they are.
 struct AuroraAudio {
     float bass = 0.85f;      // base movement and overall height
     float lowMid = 0.55f;    // curtain width and wave amplitude
     float mid = 0.45f;       // internal folds, shape complexity
     float high = 0.70f;      // fine filaments and edge motion
     float beat = 0.35f;      // the pulse on each beat
-    float sensitivity = 1.0f;// one multiplier over all of them
+    // ADR-939: how much the high band brightens the glints (`AuroraAppearance::sparkle`). It was a
+    // constant in the shader, so the glints followed the music with no control saying so; 1 is that
+    // constant, which keeps every aurora that never set it exactly as it was.
+    float glints = 1.0f;
+    float sensitivity = 1.0f;// "Audio response": the master over all of the above and the spectrum
     // How much of the curtain's height comes from the *spectrum* rather than from a flat base.
     // 0 is an aurora that ignores the music's shape entirely and still answers its level through
-    // the routes above; 1 is a full visualiser.
+    // the routes above; 1 is a full visualiser. With no music, or `sensitivity` 0, the spectrum is
+    // flat at its middle, and the tops stand at the height that gives.
     float spectrumShape = 0.75f;
     [[nodiscard]] Result<void> validate() const;
 };
@@ -587,8 +600,12 @@ struct AuroraGpu {
     glm::vec4 band1{0.0f};   // bins 4..7
     glm::vec4 band2{0.0f};   // bins 8..11
     glm::vec4 band3{0.0f};   // bins 12..15
+    // ADR-939: x = the glints' high-band depth, already sensitised (`AuroraAudio::glints` x
+    // `sensitivity`); yzw = 0. Last, so no lane above moved. The bins above arrive sensitised too:
+    // each one's distance from the neutral 0.5 is scaled by the sensitivity.
+    glm::vec4 audio3{0.0f};
 };
-static_assert(sizeof(AuroraGpu) == 224);
+static_assert(sizeof(AuroraGpu) == 240);
 
 // The ground illumination every live effect contributes, summed. One block rather than one per
 // effect because §6 asks for *cinematic* light rather than correct light, and a sum of coloured

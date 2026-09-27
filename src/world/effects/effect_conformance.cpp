@@ -69,7 +69,10 @@ constexpr std::string_view kProbeName = "conformance probe";
     // **That is why the tripwire can finally relax.** It still pins the size, because a frame that
     // grows a member OUTSIDE the slots is still a question worth being asked. It no longer guards a
     // hand-maintained list, because there is no longer a hand-maintained list to guard.
-    static_assert(sizeof(AtmosphericFrame) == 2564,
+    //
+    // 2564 -> 2596 for ADR-939: `AuroraGpu` gained one vec4 (the glints' high-band depth), two
+    // auroras' worth. Asked and answered yes: `auroras` is compared whole below, lane for lane.
+    static_assert(sizeof(AtmosphericFrame) == 2596,
                   "AtmosphericFrame changed size: check that frameDiffers still reads all of it");
     if (a.cometCount != b.cometCount || a.auroraCount != b.auroraCount ||
         a.cometSteps != b.cometSteps || a.mediumCount != b.mediumCount ||
