@@ -18,6 +18,15 @@ where its predecessor stopped.
   - **Ruling (precedent #1712: fix before merge; keep the bar):** an interest errand to a character tracks the body
     (a live target, stopping within `approach`); steering round standing bodies if it is cheap; controls at both
     seeds; a full suite; GV3 and GV2 re-measured with the closest approach between characters.
+  - **19:25: ADR-944 works.** Seed 0 goes 0.26 -> 2.12 m; the shifted seed's 0.73 m walk-through is gone (a 1.13 m
+    graze by two walkers crossing remains).
+    - Steering round standing bodies is not the fix: 6 of 9 approaches under 1.2 m across the films are two
+      walkers crossing.
+    - **Accepted:** seed 0 keeps 1.2 m; both seeds get ADR-944's bar (no errand nearer than the two radii, no
+      pair under 1.0 m).
+    - **Mutual avoidance is queued for the next engine round.** Closest approaches: GV3 0.76 -> 1.09 m, GV3
+      iteration 2 0.89 -> 0.58 m, GV2 0.57 m.
+    - gv3-int checks which close approaches (< 1.4 m) in GV3 are on screen.
 - **CI, 19:00: main `983221a9`'s push run.** CPU: 3,556 passed, 1 failed, 212 skipped, 28 needs-assets, 3,800 in
   all, matching the local count. The one failure is the bolt test again (shard 1, seed 1790548209): 3 failures in 4
   runs. The local wall-clock case passed on CI. The GPU job is informational and was still running.
