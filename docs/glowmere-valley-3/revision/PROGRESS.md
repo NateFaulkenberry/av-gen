@@ -8,6 +8,16 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **19:05: behave's suite has one failure; the coordinator ruled "fix it here".** The failing test is "The
+  multicam's five deciders move, and they do not walk through each other" (`test_glowmere_multicam.cpp:636`).
+  behave's full CPU suite: 3,809 tests, 3,789 passed, 19 skipped, 1 failed.
+  - ADR-936's correct choice changes moved seed 0 onto a pre-existing gap: vane walks through a standing ember
+    (0.263 m; the bar is 1.2 m). The base engine already reaches 0.73 m on the shifted seed.
+  - The cause: an `interest` errand walks to a fixed point 7 m short of where its subject stood. Nothing steers
+    round a standing body, and the crowd push lets a 3 m/s walker overlap about 1 m.
+  - **Ruling (precedent #1712: fix before merge; keep the bar):** an interest errand to a character tracks the body
+    (a live target, stopping within `approach`); steering round standing bodies if it is cheap; controls at both
+    seeds; a full suite; GV3 and GV2 re-measured with the closest approach between characters.
 - **CI, 19:00: main `983221a9`'s push run.** CPU: 3,556 passed, 1 failed, 212 skipped, 28 needs-assets, 3,800 in
   all, matching the local count. The one failure is the bolt test again (shard 1, seed 1790548209): 3 failures in 4
   runs. The local wall-clock case passed on CI. The GPU job is informational and was still running.
