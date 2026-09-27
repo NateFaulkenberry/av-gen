@@ -92,13 +92,23 @@ DIRECTIVES = [
      "camera": "Cuts compress: 2 bars, 1 bar, half bars, beats. Low angles up the beam; the aliens' faces.",
      "look": {"ev": -0.3, "sat": 0.9, "fog": 1.2, "light": 0.6, "aurora": 1.2, "sparkle": 0.4, "temp": -0.1},
      "motifs": ["the beam", "roll accelerates the cutting"]},
+    # The drop is a new state of the same world, not a new style (the owner, brief section 7). The
+    # first pass stepped the whole grade here -- exposure +0.5, saturation 1.3, temperature +0.12 --
+    # and the valley became another picture. Now the grade holds at the plateau's (ev +0.15, sat 1.10,
+    # temp +0.05, all inside the range the film has already shown by the arrival), and the drop is
+    # carried by what the world does: its own light brighter than ever (1.6), the air a little clearer,
+    # more spores and fireflies, every route answering at the section's full depth, the bar's waves
+    # of light reaching the whole valley, the wind up and the water torn by it.
     {"segment": "drop", "name": "Rebuilt",
-     "intent": "The horse is gone and the valley's light comes back rebuilt -- every hero lit, the aurora "
-               "full, colour at its widest. The music gets wider, not busier, and so does the picture.",
+     "intent": "The horse is gone and the valley's light comes back rebuilt: the same night and the same "
+               "colours, but every hero answering at full strength, rings of light running out from the "
+               "elder across the whole valley on every bar, the wind up. The music gets wider, not busier, "
+               "and so does the picture.",
      "camera": "Downbeat cut on the crash, then big, wide, lateral moves and a crane; bar cuts for the "
                "first phrase, then long wides. The saucer climbs away over the north rim.",
-     "look": {"ev": 0.5, "sat": 1.3, "fog": 0.75, "light": 2.1, "aurora": 3.2, "sparkle": 1.7, "temp": 0.12},
-     "motifs": ["heartbeat (full)", "breath", "sparkle", "flash on the crash"]},
+     "look": {"ev": 0.15, "sat": 1.10, "fog": 0.85, "light": 1.6, "aurora": 2.4, "sparkle": 1.5, "temp": 0.05},
+     "motifs": ["heartbeat (full depth)", "every hero on its layer at full depth",
+                "the bar's rings across the whole valley, and the drop's own ring", "flash on the crash"]},
     {"segment": "tail", "name": "Afterglow",
      "intent": "Kick and clap alone: one image holds while the valley settles -- then black on the last hit.",
      "camera": "One held shot. Cut to black at 224.79 s.",

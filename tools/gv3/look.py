@@ -2,17 +2,19 @@
 
 Three layers, deliberately kept apart because they answer different questions:
 
-  BASE       what the valley looks like -- the lens, the grade, the water, the haze. Static
-             parameters. This is where the diorama problem is fought (docs/glowmere-valley-3/
-             03-art-direction.md): no depth of field on a wide, haze that grows with distance, a
-             lens that does not bend the world into a fishbowl.
+  BASE       what the valley looks like -- the lens, the grade, the water, the haze, the air. Static
+             parameters, plus the scene's water and wind blocks. This is where the diorama problem is
+             fought (docs/glowmere-valley-3/02-art-direction.md): no depth of field on a wide, haze that
+             grows with distance, a lens that does not bend the world into a fishbowl.
   ARC        how the look travels with the music, segment by segment: exposure, saturation, fog,
              the valley's own light, the aurora. Timeline keys on the true grid, written from the
-             directive table below -- a slow envelope, never a beat.
-  MOTIFS     what reacts to what, with a hierarchy: a few small things on the beat, the valley's
-             breathing on the two-bar bass glide, the sparkle on the top of the mix, and one flash
-             on the drop. Routes from phase-locked LFOs and from the audio. Terrain, trees, the
-             river's flow and the camera never react.
+             directive table (directives.py) -- a slow envelope, never a beat. The grade stays inside
+             the range the film establishes before the drop (the owner: no post-riser style shift).
+  MOTIFS     what reacts to what. A few events stay authored here -- the crash's flash, the valley's
+             held breath on the four kick gaps, the river's surface on the bass -- and everything
+             else is the Director's reactivity proposal, edited and installed by reactivity.py: each
+             hero on its own layer of the music, the small mushrooms on the hats and the kick, waves
+             of light from the elder on the bar, the wind and the colour on the sections.
 """
 
 from . import music
@@ -49,13 +51,13 @@ BASE = {
     # as a cobbled road. Faint, fine ripples leave a calm surface carrying the sky, with detail only
     # near the lens, where the shader's footprint fade lets the fine layers resolve (water.wgsl).
     # Chosen from three variants on four stills (06-iterations, iteration 2) as 0.1 at 2.6 cycles/m.
-    # That fade is in pixels, and the final renders at twice the previews' internal resolution
-    # (1080p at 2x supersampling), where those ripples resolved across the whole far river again. So
-    # the frequency is doubled for the final and the amplitude halved: the slope, which is what the
-    # eye reads, stays; the distance at which the ripples dissolve into a mirror is the preview's.
+    # The first pass's final then doubled the frequency and halved the amplitude (F37), because the
+    # shader faded ripples by the frame's own pixels; since ADR-915 it counts 1080-row reference
+    # pixels, so one setting serves the previews and the finals (they agree within 3-4%), and the
+    # final-only values would now smooth the river 2.4x in both (the water stream's measurement).
     "nodes/valley/water/glow": 0.12,
-    "nodes/valley/water/rippleScale": 5.2,
-    "nodes/valley/water/ripple": 0.05,
+    "nodes/valley/water/rippleScale": 2.6,
+    "nodes/valley/water/ripple": 0.1,
     "nodes/valley/water/reflection": 1.0,
     "nodes/valley/water/fresnel": 0.14,
     "nodes/valley/water/roughness": 0.2,
@@ -75,7 +77,74 @@ REMOVED_EFFECT_TYPES = {
 }
 
 
-def apply_base(project):
+# The valley's water block (the terrain's `water`, ADR-099), beyond what the project's parameters set.
+WATER = {
+    # Deliberate tears (ADR-916, the owner's reference image): thin stepped seams in which the ripples
+    # are packed into dense parallel stripes, on a rigid lattice that runs along the wind, drifts
+    # slowly, and tightens where a gust crosses it -- so the seams move with the grass on the bank.
+    # The water stream's values for GV3. The step is 3.2 m, not the reference's 1.2 m, because GV3's
+    # cameras are tens of metres from the water and at 1.2 m the stripes fade to slick lines. Coverage
+    # keeps most of the seam network out: the surface between seams is untouched.
+    "tears": 0.35, "tearShear": 6.4, "tearCoverage": 0.8, "tearCell": 3.2, "tearSpacing": 20.0,
+    "tearStretch": 4.0, "tearDirection": "wind", "tearDrift": 0.15, "tearWind": 0.6,
+    # The shoreline fade. The source wrote it as "shoreFade", which nothing reads, so the banks used
+    # the default 0.8 m; 1.6 m is what was meant: the surface thins out over the last 1.6 m of depth.
+    "edgeFade": 1.6,
+}
+WATER_DEAD_KEYS = ("shoreFade",)
+
+# The air (ADR-055). The source's wind reached every plant, but as a 7-20 cm static lean with gusts
+# every 9.5 s and a centimetre of flutter: shape, not motion (the audit's replica of wind.cpp). The
+# brief asks for subtle, continuous motion with a direction, gusts and variation, and no storm.
+WIND = {
+    # Down the valley, the way the river runs (the corridor runs along +Z, north to south): a night
+    # valley drains its cold air downhill. 0 blows toward +X, pi/2 toward +Z.
+    "direction": 1.45,
+    # A front every 3.25 s (26 m apart at 8 m/s): quicker than the old 9.5 s, and not the two-bar
+    # breath's 3.69 s, so the breath that lifts the gusts (the proposal's gust route) drifts across
+    # the fronts instead of pinning strong gusts to fixed lines on the ground.
+    "gustScale": 26.0, "gustSpeed": 8.0,
+    "gustAmount": 0.9, "gustSharpness": 2.0,   # distinct fronts with a calm between them
+    "turbulence": 0.45,                        # eddies turn the local direction; flutter scales with it
+}
+# Per-species response (VegetationMotion): how far a plant's tip travels at unit wind, as a fraction
+# of its height. Grass, ferns and flowers carry the wind in the frame; the trees get a mass that lets
+# them sway at about 0.2 Hz instead of resonating at 0.07 Hz, which read as a lean. Mushrooms, bushes
+# and fan plants keep the source's stiffness: a fungus that sways is wrong.
+MOTION = {
+    "grass": {"tipAmplitude": 0.22},
+    "ferns": {"tipAmplitude": 0.20},
+    "flowers": {"tipAmplitude": 0.18},
+    "canopy": {"mass": 6.0}, "canopy-broad": {"mass": 6.0}, "twisted": {"mass": 6.0},
+    "twisted-low": {"mass": 6.0}, "pine-upper": {"mass": 9.0}, "pine-rim": {"mass": 9.0},
+}
+
+
+def _terrain(scene):
+    return next(n for n in scene["nodes"] if n.get("kind") == "terrain")
+
+
+def apply_water(scene):
+    water = _terrain(scene)["terrain"]["water"]
+    for key in WATER_DEAD_KEYS:
+        water.pop(key, None)
+    water.update(WATER)
+
+
+def apply_wind(project, scene):
+    """The scene's wind block and the project's restatement of it, which overrides the scene
+    (ADR-264): set in one and not the other, a value silently reverts."""
+    scene["wind"].update(WIND)
+    params = project["parameters"]
+    for key, value in WIND.items():
+        path = "scene/windDirection" if key == "direction" else f"scene/wind/{key}"
+        params[path] = value
+    for layer in _terrain(scene)["scatter"]:
+        if layer.get("name") in MOTION:
+            layer["motion"].update(MOTION[layer["name"]])
+
+
+def apply_base(project, scene):
     params = project["parameters"]
     params.update(BASE)
     kept = []
@@ -90,6 +159,13 @@ def apply_base(project):
     # and seven more were event routes whose attack swallowed the one-frame event and did nothing.
     project["routes"] = []
     project["sources"] = [s for s in project.get("sources", []) if s.get("kind") == "control"]
+    # Parameters the engine no longer has (it says so at load): the programs' intensities that
+    # multiply nothing (ADR-905: the fireflies' glow is a layer's, the painted ground emits nowhere),
+    # and an op the tissue program lost.
+    for key in [k for k in params if k in DEAD_PARAMETERS or k.startswith(DEAD_PREFIXES)]:
+        del params[key]
+    apply_water(scene)
+    apply_wind(project, scene)
 
 
 # ---- ARC -----------------------------------------------------------------------------------------
@@ -115,9 +191,31 @@ ENTRY = {
 BLACK = -20.0  # exposure compensation that is black for all practical purposes
 
 
+# Parameters the engine does not have, which the source project carries and the load reports.
+DEAD_PARAMETERS = {
+    "material/glowmereFirefliesCrown/emissionIntensity",   # its glow is its layer's (ADR-905)
+    "material/glowmereFirefliesScaled/emissionIntensity",  # likewise
+    "material/paintedGround2/emissionIntensity",           # the painted ground writes no emission
+}
+DEAD_PREFIXES = ("material/glowmereTissue/op/9/input/",)   # an op the tissue program no longer has
+# Glows that live in a program's layer, at the material files' own intensity. The first pass keyed the
+# fireflies' programs' base intensity instead, which multiplies nothing: the crowns never followed
+# the valley's light (the route audit's three dead arcs).
+LAYER_LIGHTS = {
+    "material/glowmereFirefliesCrown/layer/1/fireflies/emissionIntensity": 16.0,
+    "material/glowmereFirefliesScaled/layer/1/fireflies/emissionIntensity": 16.0,
+}
+# The light the glowing plants and fungi cast on what is around them (the scene's `ecologyLight`, a
+# parameter since ADR-905): it follows the glow it comes from, so the ground dims with the mushrooms.
+ECOLOGY_LIGHT = 1.4
+
+
 def _light_targets(params):
-    """The valley's own light: every bioluminescent material, the water's glow, the heroes' spores."""
+    """The valley's own light: every bioluminescent material, the crowns' fireflies, the light the
+    glowing layers cast, the water's glow, the heroes' spores."""
     out = {k: params[k] for k in params if k.startswith("material/") and k.endswith("/emissionIntensity")}
+    out.update(LAYER_LIGHTS)
+    out["scene/ecologyLight"] = ECOLOGY_LIGHT
     out["nodes/valley/water/glow"] = params["nodes/valley/water/glow"]
     for k in params:
         if k.startswith("particles/") and k.endswith("-spores/emissive"):
@@ -220,21 +318,14 @@ def apply_arc(project):
 
 
 # ---- MOTIFS ------------------------------------------------------------------------------------------
-# One visual owner per musical layer, kept for the whole film (research principle 12), and a
-# hierarchy of how strongly each reacts (principle 13): a few small things on the beat, the valley's
-# breathing on the two-bar bass glide, the sparkle on the top of the mix, one flash on the crash.
+# The film's reactivity is the Director's proposal (reactivity.py): one owner per musical layer, each
+# hero on its own, the small mushrooms on the fast layers, the world on the sections. What stays
+# authored here is what the score itself writes and a detector would place wrong: the crash, the four
+# kick gaps, and the kicks the elder's heartbeat keeps (the proposal's elder routes are pointed at them).
 #
-# The clocks are free-running LFOs locked to the measured grid rather than the engine's beat clock,
-# whose bars start on beat 4 of this track (its first tracked beat is counted 1, not 0). An LFO's
-# position is frac(t * rate + phase), so the phase that puts cycle zero on the first downbeat is
-# frac(-0.480 * rate). Every visual accent is led by LEAD_SECONDS: viewers forgive a picture a
-# little late far more than one late by a frame, and animators hit early for the same reason
-# (research principle 17).
+# Every visual accent is led by LEAD_SECONDS: viewers forgive a picture a little late far more than
+# one late by a frame, and animators hit early for the same reason (research principle 17).
 LEAD_SECONDS = 0.02
-
-
-def _lfo_phase(rate, offset_cycles=0.0):
-    return (-(music.FIRST_DOWNBEAT - LEAD_SECONDS) * rate + offset_cycles) % 1.0
 
 
 def _route(source, target, amount, op="add", chain=None, polarity="unipolar"):
@@ -243,34 +334,35 @@ def _route(source, target, amount, op="add", chain=None, polarity="unipolar"):
 
 
 def _pulses(name, times, width=1.0 / 60.0):
-    """A timeline source that is 1 for one frame at each time and 0 elsewhere -- an event the
-    film's own score writes, where the analyser's would land wherever its detector decided. A time
-    may be a (seconds, value) pair for a pulse of another height."""
+    """A scored timeline source: a hit at each time, an event the film's own score writes where the
+    analyser's would land wherever its detector decided. A time may be a (seconds, value) pair for a
+    hit of another strength. Event mode (ADR-900): each key above zero fires once on the frame whose
+    interval holds it, so no hit falls between frames at any frame rate (the value pulses of the first
+    pass missed 109 of the 475 kicks at 30 fps). The keys are still written as step pulses, which read
+    the same in either mode."""
     keys = [{"time": 0.0, "value": 0.0, "interp": "step"}]
     for item in sorted(times):
         t, value = item if isinstance(item, tuple) else (item, 1.0)
         t = t - LEAD_SECONDS
         keys.append({"time": round(t, 6), "value": value, "interp": "step"})
         keys.append({"time": round(t + width, 6), "value": 0.0, "interp": "step"})
-    return {"kind": "timeline", "name": name, "settings": {"loopLength": 0.0, "keys": keys}}
+    return {"kind": "timeline", "name": name, "settings": {"loopLength": 0.0, "mode": "event", "keys": keys}}
 
 
-def apply_motifs(project):
+def apply_motifs(project, scene):
+    """The authored events, then the Director's proposal on top of them (reactivity.py). Returns the
+    number of routes the film carries."""
+    from . import reactivity
     params = project["parameters"]
-    beat_rate = music.BPM / 60.0
-    breath_rate = beat_rate / 8.0  # two bars
     sources = [
-        {"kind": "lfo", "name": "breath", "settings": {"shape": "sine"}},
         _pulses("crash", [music.bar(97)]),
         _pulses("gap", music.KICK_GAPS),
-        # A frame and a half wide, so every kick lands on at least one frame at 60 fps however its
-        # time rounds.
+        # Every kick the track plays, as scored (music.kicks): the elder's heartbeat.
         _pulses("kick", music.kicks(), width=1.5 / 60.0),
     ]
+    for key in [k for k in params if k.startswith("sources/breath/")]:
+        del params[key]  # the first pass's free-running breath: the proposal's is beat-synced
     params.update({
-        # The sine peaks at half a cycle; the glide is on beat 4 of the second bar, 7/8 of the way round.
-        "sources/breath/rate": breath_rate, "sources/breath/phase": _lfo_phase(breath_rate, 0.5 - 0.875),
-        "sources/breath/beatSync": False,
         # The drop's one camera shake: the impact of the crash felt in the frame, 6 cm and a third of a
         # degree, gone in 0.9 s. The only shake in the film (the research: a shake on every beat is
         # the thing the camera vocabulary refused). Its origin is a parameter, not a timer, so a seek
@@ -281,52 +373,29 @@ def apply_motifs(project):
     project["sources"] = [s for s in project.get("sources", []) if s.get("kind") == "control"] + sources
 
     routes = [
-        # The heartbeat: the elder's gold flares on every kick the track plays and falls away within a
-        # beat -- none in the pull-back or on a gap beat, half in the muffled break. The only thing in
-        # the valley that moves with the kick. It multiplies the warm tissue's program emission, which
-        # is the elder's alone (its gills and the underside around them) and the only handle on it:
-        # a program that writes emission owns it (ADR-179), and a node's emissiveBoost never reaches
-        # a procedural node (F23). Its size follows the valley's light, because the arc scales the
-        # same emission: nearly gone in the break, full at the drop.
-        _route("timeline.kick", "material/glowmere2TissueWarm/emissionIntensity", 1.0, "multiply",
-               {"attackMs": 0.0, "decayMs": 110.0, "remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0,
-                "remapOutMin": 1.0, "remapOutMax": 1.6}),
-        # The breath: every cap's glow swells a tenth on the two-bar bass glide -- slow, felt more than seen.
-        _route("lfo.breath", "material/glowmere2Cap/emissionIntensity", 1.0, "multiply",
-               {"remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 0.9, "remapOutMax": 1.12}),
-        _route("lfo.breath", "material/glowmere2TissueCool/emissionIntensity", 1.0, "multiply",
-               {"remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 0.92, "remapOutMax": 1.1}),
-        _route("lfo.breath", "material/glowmere2TissueWarm/emissionIntensity", 1.0, "multiply",
-               {"remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 0.92, "remapOutMax": 1.1}),
-        # The sparkle follows the top of the mix -- multiplied onto the arc's level, so where the arc
-        # has taken the shimmer away the hats cannot bring it back.
-        _route("audio.treble", "particles/spores/emissive", 1.0, "multiply",
-               {"attackMs": 20.0, "decayMs": 180.0, "remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0,
-                "remapOutMin": 0.7, "remapOutMax": 1.35}),
-        _route("audio.treble", "particles/tree-fireflies/emissive", 1.0, "multiply",
-               {"attackMs": 30.0, "decayMs": 260.0, "remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0,
-                "remapOutMin": 0.75, "remapOutMax": 1.3}),
-        # The crash: one flash of light on the drop's downbeat. v2: it was held 90 ms and fell at 2.2 a
-        # second, so the first second of the drop read as an overexposed shot rather than a flash; now
-        # it is gone in about a third of a second.
+        # The crash: one flash of light on the drop's downbeat, gone in about a third of a second (v2:
+        # held 90 ms and falling at 2.2 a second, the drop's first second read as an overexposed shot).
+        # An event, not a style: the grade itself holds through the drop (directives.py).
         _route("timeline.crash", "camera/exposure/compensation", 2.0, "add",
                {"envelope": "peakhold", "envelopeHoldMs": 60.0, "envelopeFallPerSecond": 6.0}),
         _route("timeline.crash", "post/bloom/intensity", 2.5, "add",
                {"envelope": "peakhold", "envelopeHoldMs": 80.0, "envelopeFallPerSecond": 3.5}),
         # The kick gaps: on beat 4 of bars 24, 40, 56 and 72 the kick drops out and the valley holds
-        # its breath -- its glow dips for that beat and comes back on the next downbeat.
+        # its breath -- every cap and every small mushroom dips for that beat together, the one moment
+        # the whole valley answers as one, four times in the film.
         _route("timeline.gap", "material/glowmere2Cap/emissionIntensity", 1.0, "multiply",
                # peak-hold the pulse itself, then invert it with the remap, which runs last in the
                # chain: gain and offset run first, and a peak-hold of an inverted pulse holds its 1.0.
                {"envelope": "peakhold", "envelopeHoldMs": 330.0, "envelopeFallPerSecond": 8.0,
                 "remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 1.0, "remapOutMax": 0.45}),
         _route("timeline.gap", "material/glowmereTissue/emissionIntensity", 1.0, "multiply",
-               # peak-hold the pulse itself, then invert it with the remap, which runs last in the
-               # chain: gain and offset run first, and a peak-hold of an inverted pulse holds its 1.0.
                {"envelope": "peakhold", "envelopeHoldMs": 330.0, "envelopeFallPerSecond": 8.0,
                 "remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "remapOutMin": 1.0, "remapOutMax": 0.45}),
-        # The river answers the bass, barely: a rougher surface on the pump, never a pulse.
-        _route("audio.bass", "nodes/valley/water/ripple", 0.015, "add", {"attackMs": 90.0, "decayMs": 700.0}),
+        # The river answers the bass, barely: a rougher surface on the pump, never a pulse. 0.03 on
+        # ripples of 0.1 (ADR-915; the final-only 0.015 went with the final-only ripple).
+        _route("audio.bass", "nodes/valley/water/ripple", 0.03, "add", {"attackMs": 90.0, "decayMs": 700.0}),
     ]
     project["routes"] = routes
-    return len(routes)
+    reactivity.prepare_scene(scene)
+    print("  " + reactivity.apply(project, scene))
+    return len(project["routes"])
