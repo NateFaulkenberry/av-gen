@@ -99,7 +99,13 @@ where its predecessor stopped.
     and read 1e4-8e5. The adapter now writes 6 decimals, which works now: regenerate inputs. `camera_stats` also
     ignores samples within 1 ms of each other, which needs a **daemon restart**. The classifier refused that restart
     (other streams' jobs), so it waits for the owner; it is not needed while inputs are regenerated.
-  - The Critic suite: 50 passed. Every stream was told to regenerate its inputs.
+  - **`44d1111`: "scout" named nothing,** so the scout and its beam counted as stray bright areas in every E1, E3 and
+    E4 shot (s33: hierarchy 1.00 -> 0.90). The alias is added. Also, any beam or traced node now drops its authored
+    position (the set piece's hidden rest), which was done for the visitor's beam only.
+  - The Critic suite: 51 passed. Every stream was told to regenerate its inputs.
+  - **gv3-cut's numbers:** it2's whole film has 0 criticals (it1 had 2), and composition went 0.637 -> 0.763
+    against the same-engine before. The it3 clips beat their befores on every cut dimension (the riser +0.15
+    composition). Iteration 4 (`9b2a5b03`) re-frames 29.1, 91.1, 111.1 and 57.1 on both casts.
 - **GPU LOCK RACE (13:00:24, found by gv3-cast). Two GPU jobs have been running at a time since.**
   - `tools/gpu-lock.sh` wrote its pid with `echo $$ > pid`. A waiter that read the file in the instant between its
     creation and the write saw it empty; `kill -0 ""` fails, so it reclaimed a live lock. Every holder's EXIT trap
