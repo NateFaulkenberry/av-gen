@@ -86,7 +86,25 @@ Either way:
 
 ## The minimal asset set
 
-(Filled in by the audit below; see "Test asset audit" in `docs/qa-pass/ci.md`.)
+`tools/ci/test-assets.list`, **measured**: every file under `assets/` that the test binaries actually
+opened on 2026-09-28, traced with a `DYLD_INSERT_LIBRARIES` open()/fopen() interposer over the whole
+GPU suite (549 cases) and over the 280 CPU cases a hosted runner skips or fails for want of an asset.
+
+| Tier | Needed by | Files | Size |
+|---|---|---:|---:|
+| 1 | `avgen_render_tests`: 5 aliens, 3 farm animals, 55 Quaternius meshes and textures | 63 | 65 MB |
+| 2 | the Glowmere-tier `avgen_tests` cases: the rest of the aliens and farm, 55 more Quaternius, 55 Kenney city pieces, 15 nature, 1 HDRI | 133 | 44 MB |
+| 2 | the Tree of Life island meshes (the tree-island cases only; optional) | 6 | 152 MB |
+
+So the private repository is about **110 MB** without the island and 260 MB with it, against 1.4 GB in
+`assets/`. It leaves out:
+- `assets/audio/*.wav`: CI regenerates them;
+- the songs (`~/Desktop/Rebuild.mp3`, `~/Desktop/MP3/bass.mp3`): the owner's decision;
+- the motion packs 17 cases need (retargeted 100STYLE, the augmented scout pack and its database):
+  they are not on the owner's machine either, so **no machine runs those 17 cases today**.
+
+With every tier present locally, the 280 asset-bound CPU cases give 263 passed, 17 skipped (the
+packs above), 0 failed, and the GPU suite 548 passed, 1 skipped, 0 failed.
 
 ## Owner's steps
 
