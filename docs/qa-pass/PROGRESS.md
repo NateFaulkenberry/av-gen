@@ -70,7 +70,10 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   running on it. qa/ci is still with the CI monitor.
 - **Owner, 2026-09-28: skip the ADR-440 check during playback.** An agent is fixing it in `../av-gen-qa-dirty`
   (branch `qa/dirty-check`, from `4360244c`, taking ADR-952). Merge it into qa/coord once both suites pass.
-- **Next:** once qa/coord's suites pass, launch the art pass from qa/coord's head. The final merge into main
+- **qa/coord `581c018c`: both suites pass after the merges.** `avgen_tests` exits 0 (3,846 cases: 3,826 passed,
+  19 skipped, 1 failed as expected). `avgen_render_tests` exits 0 (549 cases: 548 passed, 1 skipped).
+- **The GV3 art pass has launched:** worktree `../av-gen-art`, branch `gv3/art-pass`, from `581c018c`.
+- **Superseded:** once qa/coord's suites pass, launch the art pass from qa/coord's head. The final merge into main
   waits for qa/ci.
 - **Superseded, kept for the record:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
