@@ -540,12 +540,17 @@ such.
 
 ## Open decisions and follow-ups
 
-1. **The private test assets and the GPU runner (owner's decision).** Designed and implemented,
-   switched off: [gpu-ci-private-assets.md](gpu-ci-private-assets.md) has the design, the security
-   reasoning and the exact steps. Until then the asset-bound cases are local-only, and a GPU verdict
-   comes from `tools/ci/run-suite.sh gpu` on a real Mac.
-2. **The song**, and **the farm GLBs still in public history** (`4bdc42ff`): both in that document's
-   "Decisions" section.
+1. **The private test assets and the GPU runner: PARKED, owner's decision (2026-09-28).** Designed and
+   implemented, switched off: [gpu-ci-private-assets.md](gpu-ci-private-assets.md) has the design, the
+   security reasoning and the exact steps. Owner's steps 1-3 are done (the PRIVATE repository
+   `NateFaulkenberry/av-gen-test-assets` exists and `tools/ci/test-assets.lock` pins `61ff6dd`); steps
+   4-6 (deploy key/secret, the `AVGEN_TEST_ASSETS`/`AVGEN_GPU_RUNNER` variables, the self-hosted runner)
+   are pending and parked, so the asset jobs stay skipped. Decided: the runner will live on the private
+   repository. Until then the asset-bound cases are local-only, and a GPU verdict comes from
+   `tools/ci/run-suite.sh gpu` on a real Mac.
+2. **The song: decided**, `Rebuild.mp3` may go into the private repository (the owner's own song); adding
+   it to the list and the fetch script is future work, not done. **The farm GLBs still in public
+   history** (`4bdc42ff`): still open, in that document's "Decisions" section.
 3. **Tests that write into `examples/world`** during a run (`test_glowmere_multicam*`,
    `test_motion_matching_default_off`). They are harmless on CI but racy between concurrent
    local agents.

@@ -4,4 +4,4 @@
 # `commit none` means it has not been published yet: an asset job then fails with a clear error and
 # nothing else changes. After publishing (or updating) the repository, put its HEAD sha here.
 repository NateFaulkenberry/av-gen-test-assets
-commit none
+commit 61ff6dddac36d3876f327453580938dd5b693cd7

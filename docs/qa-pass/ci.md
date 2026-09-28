@@ -165,8 +165,13 @@ Survey by a read-only agent, then each finding verified by a failing test before
   `tools/ci/private-repo-gpu-workflow.yml`), or require approval for fork PR workflows.
 - Scripts tested offline end to end (build repo from a list, link into a fresh clone, git sees nothing;
   error paths: missing secret, unpublished lock, tracked path in list).
-- Owner decisions: the song in the private repo or not; runner placement; farm GLBs still in public
-  git history (`4bdc42ff`), removal needs a history rewrite.
+- Owner decisions (2026-09-28): the owner ran steps 1-2; the PRIVATE repo
+  `NateFaulkenberry/av-gen-test-assets` is at `61ff6dd` (202 files, 248 MB, from f20739dd), now pinned in
+  `tools/ci/test-assets.lock` (step 3). The runner will live on the private repo. `Rebuild.mp3` MAY go
+  into the private repo, but is not yet in the list or the fetch script (future work). Everything else
+  is PARKED, owner's decision: steps 4-6 pending, no deploy key/secret, `AVGEN_TEST_ASSETS` and
+  `AVGEN_GPU_RUNNER` unset, no self-hosted runner. Do not set them or dispatch against the private repo.
+- Still open: farm GLBs in public git history (`4bdc42ff`), removal needs a history rewrite.
 
 ## Log
 - 2026-09-28: triage; fixes; workflow restructure; private-asset tooling; asset trace and list;

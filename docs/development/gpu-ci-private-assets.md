@@ -1,9 +1,15 @@
 # GPU CI and the private test assets
 
 How CI gets the assets this public repository cannot hold, and how a real Apple GPU runs the GPU
-suite. Written 2026-09-28 (QA pass, W2). **Nothing here has been switched on:** creating the private
-repository, the secret and the runner are the owner's decisions, and the steps below are for the owner
-to run. Until then every job described here is skipped, and the run summary says why.
+suite. Written 2026-09-28 (QA pass, W2).
+
+> **Status (2026-09-28): PARKED, owner's decision.** Owner's steps 1-3 are done: the private repository
+> `NateFaulkenberry/av-gen-test-assets` exists (PRIVATE), and `tools/ci/test-assets.lock` pins its commit
+> `61ff6dd` ("Test assets: 202 files, 248 MB (from av-gen f20739dd)"). Steps 4-6 are pending and parked:
+> no deploy key or secret has been created, the `AVGEN_TEST_ASSETS` and `AVGEN_GPU_RUNNER` variables
+> stay unset, and there is no self-hosted runner for now. So every job described here is still skipped,
+> and the run summary says why. Nothing has been dispatched against the private repository. The
+> decisions taken are under "Decisions for the owner" below.
 
 ## The constraints
 
@@ -117,8 +123,8 @@ Each step can be done alone; nothing runs until step 6.
    It copies `tools/ci/test-assets.list` out of `assets/` (following the worktree symlinks), refuses any
    path this repository tracks and any file over 100 MB (GitHub's limit), writes `SHA256SUMS`, a
    README that says the repository is private and not for distribution, and the runner workflow, and
-   commits. It prints the commit sha. It deliberately **does not include `Rebuild.mp3`**: whether the
-   song may go into a private repository is the owner's call (see "Decisions" below).
+   commits. It prints the commit sha. It does **not yet include `Rebuild.mp3`**: the owner has decided
+   the song may go into the private repository, but wiring it in is future work (see "Decisions" below).
 2. **Create it on GitHub, private, and push:**
    ```sh
    gh repo create NateFaulkenberry/av-gen-test-assets --private --source ~/Documents/GitHub/av-gen-test-assets --remote origin --push
@@ -174,11 +180,20 @@ the same av-gen commit as the change that needs it.
 
 ## Decisions for the owner
 
-- **The song.** 41 CPU cases skip on CI without `Rebuild.mp3` (the multicam project's audio). A
-  private repository is not distribution, but this pass does not decide that for a copyrighted file.
-  To include it, add it to the list and teach the fetch script to link it where the projects look
-  (`~/Desktop/Rebuild.mp3`, or `AVGEN_REBUILD_AUDIO`).
-- **Where the runner lives**: the private repository (recommended) or av-gen (needs 5b).
+Decided 2026-09-28:
+
+- **The song: DECIDED, it may go into the private repository** (it is the owner's own song). 41 CPU
+  cases skip on CI without `Rebuild.mp3` (the multicam project's audio). **Not done yet (future work):**
+  it is not in `tools/ci/test-assets.list` and the fetch script does not link it. To include it, add it
+  to the list, re-run step 1, and teach the fetch script to link it where the projects look
+  (`~/Desktop/Rebuild.mp3`, or `AVGEN_REBUILD_AUDIO`). It must never go into this public repository,
+  a CI cache or an artifact.
+- **Where the runner lives: DECIDED, the private repository** (so step 5b is not needed). The runner
+  itself is parked: none is registered for now.
+- **Steps 4-6: PARKED** by the owner (see the status note at the top).
+
+Still open:
+
 - **The farm models in git history.** `4a138886` removed them from the tree, but the nine GLBs remain
   in this public repository's history (added in `4bdc42ff`). Removing them from history means
   rewriting it (`git filter-repo`) and force-pushing, which breaks every clone and worktree. That is
