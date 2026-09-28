@@ -8,6 +8,20 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **21:00: gv3-int rounds 3-4; round 5, the final candidate, is generating** (a whole-film render and a Critic job,
+  about 60 min).
+  - **E5 at approach 100 m works** (`779875d5`): vane stops facing the saucer and watches 172.55-180.05; 95.1 passes
+    the stability bar (pitch HF 0.109 -> 0.002).
+  - **57.1 re-framed from the south** (`61e9dbf0`), so E4's cows rise either side of the beam. The elder's practical
+    light hangs 7 m lower, at the stem: x4 on the kick on a ring of ferns.
+  - **The Critic on r3** (`job_1a0e55294f206d8e8`):
+    - the elder's kick z 16-17 (was 7-9); the bloom, lantern and scree now observed;
+    - novelty 92.6 -> 39.9 s held; technical quality +7.7;
+    - motion -6.7: the travel-beam sweeps and big pulses are read as camera wobble. The engine's paths are unchanged.
+  - **The owner's "more light on the ground" cannot be done in data.** The ecology-light budget (about 200) is
+    filled nearest-first whatever the power, and pools reach 4x a 9 m cell; the ground-glow route is the
+    `groundGlow` defect. **Launched: the ecolight engine stream** (ADR-945-946, `av-gen-ecolight` from
+    `983221a9`): choose lights by screen contribution and fix `groundGlow`.
 - **20:00: gv3-int round 2** (44 commits; now on engine-4 with E5 "go and see", `690c383b`).
   - **The owner's items, first attempt:**
     - **Hero pulses** barely moved (x1.05 -> x1.11). Two causes: each route's fall never lets the glow come down
