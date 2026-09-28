@@ -9,8 +9,14 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 where its predecessor stopped.
 
 - **22:00: uireach is DONE** (`7f20403a`) and **merged** (`9f6f0674`; ADR index rows 933-944 in order).
-  **`integrate/revision` = main + cihealth + behave + uireach.** It is built (3,831 tests). **The CPU and GPU suites
-  are running side by side**; a GPU pass under CPU load stands. Then main, then engine-5.
+  **`integrate/revision` = main + cihealth + behave + uireach.** It is built (3,831 tests). **Suites (22:45):**
+  - GPU: 547 cases, 546 passed, 1 skipped, exit 0; overlap was CPU only.
+  - CPU: 3,830 of 3,831. The one failure is an integration interaction: uireach's "the retry memory's parameter,
+    not the file, decides whether a body paces the bank" (`test_retry_memory_control.cpp:185`,
+    `forgotten.waterTrips >= 2`, got 1). behave's ADR-936 now keeps the body out of the water without the memory,
+    so the control arm lost its effect.
+  - uireach is resumed to fix the test on its branch, with integrate/revision merged in. Then re-merge, re-run the
+    CPU suite, main, and engine-5.
   - uireach: treatments editable in the Sequence panel (ADR-937); 9 sway parameters per scatter layer (ADR-938);
     Audio response is the aurora's real master, with "High -> glints" (ADR-939); `failSeconds` is a control.
   - **For GV3:** the glints now hold steady. Set `fx/aurora/sparkle` to about 0.85 to keep the old average; confirm
