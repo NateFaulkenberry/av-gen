@@ -16,6 +16,14 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - **Limit:** 3 concurrent agents.
 - The same plan is in memory note `av-gen-restart-handoff-2026-09-28`.
 
+## Resumed after the restart (2026-09-28)
+- The Blender MCP was confirmed connected: `get_objects_summary` returned Blender's default scene.
+- **Three agents launched (3 of 3 slots):**
+  - The `astronaut-prototype` agent, in `../av-gen-astro` (branch `proto/astronaut-musicians` from main `77ea4247`, with the ignored assets symlinked per file).
+  - A resumed W1 agent, in `../av-gen-qa-perf`, working from perf.md's "Resume here".
+  - The CI monitor, in `../av-gen-qa-ci`. At launch, qa/ci was at `f20739dd`. On run 36434165586, TSan, UBSan, the ASan build, heavy-2 and heavy-3 had passed; heavy-1, rest-a and rest-b were still running. Run 36434180499 was still running.
+- **Next:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
+
 ## Current Status
 2026-09-28:
 - Phase 0 is complete: the inventory and the plan are in `PLAN.md`.
