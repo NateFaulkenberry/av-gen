@@ -10,13 +10,27 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - Each starts with measurement or triage only. No changes are made before its baseline is recorded.
 
 ## Completed
+- 2026-09-28, **W3 cleanup** (`qa/clean` `b8edd995`, merged into qa/coord `3b3d323c`):
+  - **GV3 r7b installed** as `examples/world/glowmere-valley-3{,.scene}.json`, with the song path relative. It
+    loads with 0 errors: 105/105 routes, 130/130 tracks, 18/18 effects, 73 shots. Main's generator reproduces it
+    (`make_glowmere_valley_3.py && gv3/ufo.py --no-trace`): the scene byte-identical, the project differing only in
+    the audio path.
+  - **Removed:** nine `_diag-water-*` arms and `_pre-defects` (5.8 MB), with nothing referencing them.
+    `check_project_integrity` went from 20 problems to 9 (the 9 left are `treeisland/_vx2-*`, whose generator no
+    longer runs).
+  - **Three engine defects fixed, with tests:** the silent orb fallback now shows a status-bar error;
+    `--export-bundle` carries a top-level light rig; the batch flags imply `--headless`.
+  - **The GV3 state audit** is in `gv3-state-audit.md`: no broken references; 12 effect values stored twice with
+    the parameter winning (the aurora's audio sensitivity is 0 as rendered); hidden beam pools, hero pulses and
+    ground pools passed to W1 to measure.
 - 2026-09-28, Phase 0: the inventory; worktrees `av-gen-qa-{coord,perf,ci,clean}` branched from `77ea4247`, with
   assets linked; the plan.
 
 ## In Progress
 - W1: the GV3 performance baseline and the shot sweep.
 - W2: triage of the red CPU run (`4a138886`) and the failing nightly sanitizer stages.
-- W3: integration of GV3 r7b from the Desktop into `examples/world/`.
+- W3 is DONE and merged into qa/coord (`3b3d323c`). Its full serial CPU suite was still running at hand-back, and
+  its exit code is the check before main.
 
 ## Queued after this pass: GV3 targeted art pass
 - **Brief:** `docs/glowmere-valley-3/art-pass/00-brief.md`, the owner's words, 2026-09-28.
@@ -39,7 +53,20 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   `ci.yml`. An authoritative GPU job needs real Apple GPU hardware.
 
 ## Performance Baselines
-(pending W1)
+Interim from W1, measured while the other agents were loading the machine, so these are ratios and not
+baselines. Headless, 640x360, the 73 shots of GV3 r7b:
+
+| | base | ADR-950 fix | sightline off |
+|---|---:|---:|---:|
+| median frame | 57.7 ms | 41.7 ms | 21.0 ms |
+| shots under 10 FPS | 20 | 13 | 0 |
+| worst shot (66) | 389 ms | 252 ms | 26.8 ms |
+
+- **The cost is on the CPU, in `heroSightline` (ADR-834).** Each in-shot character is marched to every frame, and
+  the frame cost against characters x distance gives r = 0.975. With the sightline off, the GPU frame is at most
+  17.2 ms in any shot.
+- **ADR-950:** the ground query asks for 2 values instead of a full sample. The output is bit-identical and 3.6x
+  cheaper per sightline.
 
 ## Bugs Found
 Known from the GV3 wrap-up, and not yet triaged:
@@ -60,7 +87,15 @@ Known from the GV3 wrap-up, and not yet triaged:
 | Nightly/extended | `ci.yml` nightly exists |
 
 ## Remaining Problems
-(to be filled in)
+- **Committed renders:** `examples/treeisland/renders` has 28 PNGs (51 MB) committed despite its `.gitignore` rule.
+  They are listed and not removed.
+- **Dead data:** unknown-parameter entries (`material/*/op/9/*`, `emissionIntensity`) and `lod.lodCount` are in
+  every Glowmere scene. Removing them needs a GPU frame-hash proof.
+- **Foot slip (for the art pass):** the test log warns "travelling at 0.02 m/s against a walk clip authored for
+  3.24 m/s ... rate matching is on and saturated". This fits the owner's report of pre-footstep sliding.
 
 ## Decisions Required From Human
-(none yet)
+- **Old worktrees:** 15 of the 17 GV3-era worktrees have their HEAD already in main. `av-gen-gv3` and
+  `av-gen-gv3-world` each hold 1-2 commits of notes only. Removing a worktree also deletes its `build/`, and
+  `av-gen-gv3-int/build/gv3/int/` holds every review snapshot from r1 to r7b and the cast trace. Should they be
+  removed, and should that snapshot directory be kept?
