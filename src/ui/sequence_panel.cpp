@@ -4,6 +4,7 @@
 #include "ui/shortcuts.hpp"
 #include "ui/style.hpp"
 #include "ui/theme.hpp"
+#include "ui/treatment_editor_logic.hpp"
 #include "ui/ui_logic.hpp"
 
 #include <chrono>
@@ -2799,6 +2800,8 @@ void SequencePanel::drawSectionInspector(app::Engine& engine, std::size_t index)
             }
         }
     }
+    // ADR-937: and what the treatment is, dial by dial -- editable when it is the project's own.
+    drawTreatmentSettings(engine, index);
 
     // ADR-899: the number `section.energy` publishes while the playhead is in this section -- what a
     // route keyed to it reads -- and what the audio under the span measures (level-free), so a
@@ -3124,6 +3127,198 @@ void SequencePanel::drawPerformerRules(app::Engine& engine) {
         ImGui::TextDisabled("%zu rule(s) -- tick \"Generate performer actions\" when you import",
                             piece.sectionPerformance.entries.size());
     }
+}
+
+// ---- the treatment's dials (ADR-937) -----------------------------------------------------------
+//
+// Under the "shot" picker, for the treatment the section resolves to. The project's own treatments are
+// edited in place: an edit replaces the definition in the project's shot language, so every section
+// using it follows, the project's save writes it, and each gesture is one undo step (the whole
+// sequence, shot language included, is what `beginEdit` photographs). A built-in is code: its dials are
+// shown greyed, and "Edit a copy" makes a custom one for this section. Song Mode re-cuts when a gesture
+// ends -- not on every frame of a drag, as `onSectionsEdited` asks.
+void SequencePanel::drawTreatmentSettings(app::Engine& engine, std::size_t index) {
+    seq::Sequence& piece = engine.sequence();
+    if (index >= piece.sectionTimeline.sections.size()) {
+        return;
+    }
+    const song::ShotIntent shown = piece.shotLanguage.intentFor(piece.sectionTimeline.sections[index]);
+    const bool editable = ui::treatmentEditable(piece.shotLanguage, shown.id);
+    const bool open = ImGui::TreeNode("treatment-settings", "treatment settings: %s", shown.name.c_str());
+    if (ImGui::IsItemHovered()) {
+        tooltip(editable ? "This project's own treatment. Its dials set how Song Mode cuts every section\n"
+                           "that uses it; edits are saved with the project."
+                         : "A built-in treatment: its dials are shown here. 'Edit a copy' makes one of\n"
+                           "the project's own for this section, which you can then change.");
+    }
+    if (!open) {
+        return;
+    }
+    if (editable) {
+        const std::size_t users = ui::treatmentUsers(piece.sectionTimeline, piece.shotLanguage, shown.id);
+        ImGui::TextDisabled("this project's own; an edit reaches the %zu section%s using it", users,
+                            users == 1 ? "" : "s");
+    } else {
+        ImGui::TextDisabled("built in: shown, not edited");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Edit a copy")) {
+            beginEdit(engine);
+            const auto copied = ui::copyTreatmentForSection(piece.shotLanguage, piece.sectionTimeline, index);
+            if (copied) {
+                commitEdit(engine, "Edit a copy of " + shown.name);
+                touch();
+                sectionsEdited();
+            } else {
+                abandonEdit();
+                status_ = copied.error().message;
+            }
+            ImGui::TreePop();
+            return; // the section's treatment changed under this frame's `shown`
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Makes a copy of '%s' that belongs to this project, gives it to this section,\n"
+                    "and opens its dials for editing. Other sections keep the built-in.",
+                    shown.name.c_str());
+        }
+    }
+
+    song::ShotIntent draft = shown;
+    // One gesture, one undo step: the first change photographs the sequence, the edit lands at once
+    // (so the cut notes above follow a drag), and the gesture's end records it and re-cuts.
+    const auto settle = [&](bool changed, bool continuous) {
+        if (changed && editable) {
+            if (!pendingEdit_) {
+                beginEdit(engine);
+            }
+            if (auto ok = ui::editTreatment(piece.shotLanguage, draft); !ok) {
+                status_ = ok.error().message;
+            }
+            touch();
+        }
+        const bool finished = continuous ? ImGui::IsItemDeactivatedAfterEdit() : changed;
+        if (finished && pendingEdit_) {
+            commitEdit(engine, "Treatment " + draft.name);
+            sectionsEdited();
+        }
+    };
+    ImGui::BeginDisabled(!editable);
+    if (treatmentEditing_ != shown.id) {
+        treatmentEditing_ = shown.id;
+        std::snprintf(treatmentName_, sizeof(treatmentName_), "%s", shown.name.c_str());
+        std::snprintf(treatmentDescription_, sizeof(treatmentDescription_), "%s", shown.description.c_str());
+    }
+    ImGui::SetNextItemWidth(200);
+    const bool renamed = ImGui::InputText("treatment name", treatmentName_, sizeof(treatmentName_));
+    if (renamed) {
+        draft.name = treatmentName_;
+    }
+    settle(renamed && !draft.name.empty(), true);
+    ImGui::SetNextItemWidth(200);
+    const bool described =
+        ImGui::InputText("description", treatmentDescription_, sizeof(treatmentDescription_));
+    if (described) {
+        draft.description = treatmentDescription_;
+    }
+    settle(described, true);
+
+    for (const ui::TreatmentDial& dial : ui::treatmentDials()) {
+        ImGui::PushID(dial.key);
+        ImGui::SetNextItemWidth(200);
+        switch (dial.kind) {
+        case ui::TreatmentDialKind::Amount: {
+            settle(ImGui::SliderFloat(dial.label, &(draft.*dial.amount), 0.0f, 1.0f, "%.2f"), true);
+            break;
+        }
+        case ui::TreatmentDialKind::Focus: {
+            const std::span<const song::SubjectFocus> all = song::allSubjectFocuses();
+            bool changed = false;
+            if (ImGui::BeginCombo(dial.label, ui::focusLabel(draft.focus))) {
+                for (const song::SubjectFocus f : all) {
+                    if (ImGui::Selectable(ui::focusLabel(f), f == draft.focus) && f != draft.focus) {
+                        draft.focus = f;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            settle(changed, false);
+            break;
+        }
+        case ui::TreatmentDialKind::Framing: {
+            // Two pickers, each offering only the sizes that keep tightest <= widest, so the pair can
+            // never be made into one the treatment would refuse.
+            bool changed = false;
+            if (ImGui::BeginCombo("tightest shot", ui::framingLabel(draft.framing.tightest))) {
+                for (const song::Framing f : song::allFramings()) {
+                    if (f <= draft.framing.widest &&
+                        ImGui::Selectable(ui::framingLabel(f), f == draft.framing.tightest) &&
+                        f != draft.framing.tightest) {
+                        draft.framing.tightest = f;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::IsItemHovered()) {
+                tooltip("%s", dial.tip);
+            }
+            ImGui::SetNextItemWidth(200);
+            if (ImGui::BeginCombo("widest shot", ui::framingLabel(draft.framing.widest))) {
+                for (const song::Framing f : song::allFramings()) {
+                    if (f >= draft.framing.tightest &&
+                        ImGui::Selectable(ui::framingLabel(f), f == draft.framing.widest) &&
+                        f != draft.framing.widest) {
+                        draft.framing.widest = f;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            settle(changed, false);
+            break;
+        }
+        case ui::TreatmentDialKind::Cameras: {
+            int fewest = draft.cameras.fewest;
+            int most = draft.cameras.most;
+            const bool a = ImGui::SliderInt("fewest cameras", &fewest, 1, 8);
+            if (a) {
+                draft.cameras.fewest = fewest;
+                draft.cameras.most = most > 0 ? std::max(most, fewest) : most;
+            }
+            settle(a, true);
+            if (ImGui::IsItemHovered()) {
+                tooltip("%s", dial.tip);
+            }
+            ImGui::SetNextItemWidth(200);
+            const bool b = ImGui::SliderInt("most cameras", &most, 0, 8, most <= 0 ? "all there are" : "%d");
+            if (b) {
+                draft.cameras.most = most > 0 ? std::max(most, draft.cameras.fewest) : 0;
+            }
+            settle(b, true);
+            break;
+        }
+        case ui::TreatmentDialKind::Arc: {
+            bool changed = false;
+            if (ImGui::BeginCombo(dial.label, ui::arcLabel(draft.arc))) {
+                for (const song::Arc arc : song::allArcs()) {
+                    if (ImGui::Selectable(ui::arcLabel(arc), arc == draft.arc) && arc != draft.arc) {
+                        draft.arc = arc;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            settle(changed, false);
+            break;
+        }
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("%s", dial.tip);
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndDisabled();
+    ImGui::TreePop();
 }
 
 void SequencePanel::drawSceneSlots(app::Engine& engine) {

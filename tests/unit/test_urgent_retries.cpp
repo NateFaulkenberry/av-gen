@@ -16,7 +16,8 @@
 //             elsewhere is held to the turn-back rule; a first attempt at another subject -- a flinch
 //             -- is not  |  with nothing remembered, every one of them keeps its exemption
 //   stall     a reaction that stalls in the water on ground the river does not divide (ADR-932 does
-//             not apply): the body turns back once and does not pace  |  `failSeconds` 0, the memory
+//             not apply; the straight line ADR-936 replaced makes the stall): the body turns back
+//             once and does not pace  |  `failSeconds` 0, the memory
 //             off: it paces, walk, stop, turn round, walk back, again and again
 //   across    GV3's case, a reaction to a beam across a river that runs edge to edge: the body walks
 //             to the bank and watches; no reversal, no pacing  |  the old straight-line route with
@@ -315,17 +316,20 @@ TEST_CASE("an urgent option keeps its exemption for its first attempt, and not f
 }
 
 TEST_CASE("a reaction that stalls in the water does not send the body back to it", "[decide][adr933]") {
-    // The river ends inside this world, so its banks are one region and ADR-932 leaves the straight
-    // line alone: the reaction walks the body into the water to its wade limit, where it stalls.
+    // The river ends inside this world, so its banks are one region and ADR-932 leaves them alone.
+    // The stall this case is about -- a reaction walks the body into the water to its wade limit,
+    // where it stalls -- is the straight line's, which every same-region walk took until ADR-936 sent
+    // it round the channel's head. So both arms walk the straight line: what is under test is what the
+    // memory does after a stall, and the stall is the fixture.
     const world::WorldMap map = riverWorld(40.0f);
     world::Ecology ecology;
     const entity::Navigator nav = wader(map, ecology);
     REQUIRE(nav.grid() != nullptr);
     REQUIRE(nav.grid()->connected(glm::vec2(0.0f), glm::vec2(46.0f, 0.0f)));
 
-    const Watched now = watchBeam(nav, 30.0, false, 90.0);
+    const Watched now = watchBeam(nav, 30.0, true, 90.0);
     INFO("now: " << summary(now));
-    const Watched before = watchBeam(nav, 0.0, false, 90.0);
+    const Watched before = watchBeam(nav, 0.0, true, 90.0);
     INFO("control (failSeconds 0): " << summary(before));
     // The fixture does what the defect needs: the reaction took the body into the water.
     CHECK(now.deepest > 0.3f);

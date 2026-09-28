@@ -359,7 +359,7 @@ struct FrameUniforms {
 // the same field in the same place, which is the whole reason it is written as a sum rather than a
 // number.
 static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 144 * world::kMaxGpuWaves +
-                                       16 + 160 * world::kMaxGpuComets + 224 * world::kMaxGpuAuroras + 48 +
+                                       16 + 160 * world::kMaxGpuComets + 240 * world::kMaxGpuAuroras + 48 +
                                        64 + // ADR-345: four vec4s of analytic sky
                                        32 + // ADR-379: two vec4s of vortex glow
                                        16 + // ADR-568: one vec4 of height-fog shape
@@ -386,7 +386,9 @@ static_assert(offsetof(FrameUniforms, waves) == 1168);
 static_assert(offsetof(FrameUniforms, atmosCount) == 2320);
 static_assert(offsetof(FrameUniforms, comets) == 2336);
 static_assert(offsetof(FrameUniforms, auroras) == 3296);
-static_assert(offsetof(FrameUniforms, skyGround) == 3744);
+// ADR-939: 3744 + 2 x 16. The aurora block grew one vec4 (its glints' depth), so everything after
+// `auroras` moved by one vec4 per aurora; the WGSL mirror moved with it (test_renderer_layout_guards).
+static_assert(offsetof(FrameUniforms, skyGround) == 3776);
 
 struct ObjectUniforms {
     glm::mat4 model;

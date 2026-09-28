@@ -61,6 +61,7 @@ struct AtmosAurora {
     band1: vec4<f32>,   // bins 4..7
     band2: vec4<f32>,   // bins 8..11
     band3: vec4<f32>,   // bins 12..15
+    audio3: vec4<f32>,  // ADR-939: x = the glints' high-band depth, already sensitised; yzw = 0
 };
 
 struct FrameUniforms {

@@ -524,13 +524,39 @@ struct CompositionNode {
     // `ecology.layers`, in order. The gain and hue are applied after the material program to every
     // part of the layer (the object emission lane); the field amount is the layer's `emissiveField`
     // depth, which acts after the program too.
+    //
+    // ADR-938: and how the layer sways in the wind -- its species response (`ScatterLayer::motion`,
+    // ADR-055) -- under `.../scatter/<layer>/sway/<leaf>`, one per `scatterSwayControls()` row, in
+    // that order. Per frame, like the emission lane: none of them replants anything.
     struct ScatterLayerParameters {
         params::Parameter<float>* emissionGain = nullptr;
         params::Parameter<float>* hueOffset = nullptr;
         params::Parameter<float>* emissiveFieldAmount = nullptr;
+        std::array<params::Parameter<float>*, 9> sway{};
     };
     std::vector<ScatterLayerParameters> scatterParams;
 };
+
+// ADR-938: one of a scatter layer's sway controls. A member of the species' wind response
+// (`wind::VegetationMotion`), registered as `nodes/<terrain>/scatter/<layer>/sway/<leaf>` -- the leaf is
+// the member's key in the scene file's `motion` block, the label what an artist sees it do. The Parameters
+// panel heads them "<terrain>/scatter/<layer>/sway"; the Inspector of the terrain (a click on a plant
+// selects it) lists them under "scatter" as "<layer>/sway/<label>".
+struct ScatterSwayControl {
+    const char* leaf = "";
+    const char* label = "";
+    float wind::VegetationMotion::*member = nullptr;
+    float hardMin = 0.0f;
+    float hardMax = 1.0f;
+    float softMin = 0.0f;
+    float softMax = 1.0f;
+    // False for the two that set the rate the plant rings at (`sqrt(stiffness / mass)`): the flutter's
+    // phase is that rate times the whole elapsed time, so a route moving either every frame would jump
+    // the flutter by t x the change (the phase-rate hazard, ADR-902). A slider or a key still moves them.
+    bool routable = true;
+};
+// The nine, in the order `ScatterLayerParameters::sway` holds them.
+[[nodiscard]] std::span<const ScatterSwayControl> scatterSwayControls();
 
 // ADR-833 (Phase D §25): the node's authored `tags` plus what it demonstrably is (a generated
 // procedural's generator name). Deduplicated, in that order.

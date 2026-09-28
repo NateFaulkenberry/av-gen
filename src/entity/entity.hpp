@@ -1462,6 +1462,12 @@ private:
     [[nodiscard]] static bool performing(const Entity& entity);
     static void directorAfter(Entity& entity);
     static void rescaleIntent(EntityState& state);
+    // ADR-935: where a body is drawn, across the ground -- its simulation place plus the visual
+    // offsets its behaviours added (a craft's hover and drift) -- and the rule it feeds: a body the
+    // step did not move publishes no speed, unless a director named one. Shared by `update` and
+    // `seek`, taken at the same two points on both, so a scrub and a play agree about every step.
+    [[nodiscard]] static glm::vec2 drawnAcross(const Entity& entity);
+    static void restIfStill(Entity& entity, glm::vec2 drawnBefore, double dt);
     // Rebuilds `bodyGrid_` and `bodyPoints_` from where every entity's simulation stands now, and
     // runs one sense tick for `entityIndex` when its cadence says it is due. Shared by `update` and
     // `seek` so a scrubbed character's working set is built by the same code as a played one's.

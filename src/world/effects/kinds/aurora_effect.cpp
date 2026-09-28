@@ -8,6 +8,10 @@
 // stepped radii, and the hit's azimuth and height index a curtain whose top is driven by the audio
 // spectrum. §4.2's per-band depths below are **depths on a signal that already exists**, not a
 // second analyzer -- each scales how much a band already in the frame block moves its feature.
+//
+// ADR-939: "Audio response" is the master of every one of those depths, of the glints' and of the
+// spectrum's shape -- at 0 the aurora is the aurora with no music playing -- and its tooltip says so,
+// and says what it is not the master of: the routes onto these parameters, which are the project's.
 
 #include "world/effects/effect_registry.hpp"
 
@@ -46,14 +50,26 @@ constexpr EffectField kFields[] = {
                SETF(e.aurora.shape.curtainCount)).json("shape/curtainCount").fmt("%.0f").main().clampTo(1.0f, 5.0f),
     floatField("flowSpeed", "Flow", -2.0f, 2.0f, -0.4f, 0.4f, GET(e.aurora.shape.flowSpeed),
                SETF(e.aurora.shape.flowSpeed)).json("shape/flowSpeed").main(),
+    // ADR-939: the master. It multiplies every audio term the aurora has of its own -- the band
+    // depths under Advanced > "Audio response", the glints' and the spectrum's shape -- as a distance
+    // from silence, so 0 is the aurora exactly as it is with no music. Routes are not in it.
     floatField("audioSensitivity", "Audio response", 0.0f, 6.0f, 0.0f, 3.0f,
                GET(e.aurora.audio.sensitivity), SETF(e.aurora.audio.sensitivity))
-        .json("audio/sensitivity").main(),
+        .json("audio/sensitivity").main()
+        .tooltip("How much the aurora follows the music by itself, frame by frame: the spectrum\n"
+                 "shaping the curtain tops, the bass lifting them, the waves, folds, filaments and\n"
+                 "glints, and the pulse on each beat (their depths are under Advanced > Audio response).\n"
+                 "0 is a steady aurora, exactly as it looks with no music playing.\n"
+                 "Routes onto the aurora -- Beat response below, and any in the Modulation panel --\n"
+                 "are separate, and keep moving it."),
     // How much of the curtain's height comes from the *spectrum* rather than from a flat base. 0
     // ignores the music's shape and still answers its level through the routes; 1 is a visualiser.
     floatField("spectrumShape", "Spectrum shape", 0.0f, 1.0f, 0.0f, 1.0f,
                GET(e.aurora.audio.spectrumShape), SETF(e.aurora.audio.spectrumShape))
-        .json("audio/spectrumShape").main(),
+        .json("audio/spectrumShape").main()
+        .tooltip("How much each curtain's top follows the music's spectrum at its bearing: 0 a level\n"
+                 "row of tops, 1 a visualiser. Scaled by Audio response; with no music, or Audio\n"
+                 "response at 0, the spectrum is flat and the tops stand level, a little lower at 1."),
     boolField("rainbow", "Colour cycle", GET(e.aurora.rainbow.enabled), SETB(e.aurora.rainbow.enabled))
         .json("rainbow/enabled").main(),
 
@@ -88,8 +104,11 @@ constexpr EffectField kFields[] = {
         .json("appearance/edgeBrightness"),
     floatField("filaments", "Filaments", 0.0f, 10.0f, 0.0f, 3.0f, GET(e.aurora.appearance.filaments),
                SETF(e.aurora.appearance.filaments)).json("appearance/filaments"),
-    floatField("sparkle", "Sparkle", 0.0f, 10.0f, 0.0f, 3.0f, GET(e.aurora.appearance.sparkle),
-               SETF(e.aurora.appearance.sparkle)).json("appearance/sparkle"),
+    // ADR-939: "Glints", the word for what the viewer sees (the leaf and the file keep "sparkle").
+    floatField("sparkle", "Glints", 0.0f, 10.0f, 0.0f, 3.0f, GET(e.aurora.appearance.sparkle),
+               SETF(e.aurora.appearance.sparkle)).json("appearance/sparkle")
+        .tooltip("Glinting points in the curtains, at this amount with no music. The high band\n"
+                 "brightens them by High -> glints x Audio response (Advanced > Audio response)."),
     floatField("horizonGlow", "Horizon glow", 0.0f, 6.0f, 0.0f, 2.0f,
                GET(e.aurora.appearance.horizonGlow), SETF(e.aurora.appearance.horizonGlow))
         .json("appearance/horizonGlow"),
@@ -104,6 +123,11 @@ constexpr EffectField kFields[] = {
                SETF(e.aurora.audio.mid)).json("audio/mid"),
     floatField("audioHigh", "High -> filaments", 0.0f, 6.0f, 0.0f, 2.0f, GET(e.aurora.audio.high),
                SETF(e.aurora.audio.high)).json("audio/high"),
+    // ADR-939: the glints' share of the high band, which was a constant nothing could reach.
+    floatField("audioGlints", "High -> glints", 0.0f, 6.0f, 0.0f, 2.0f, GET(e.aurora.audio.glints),
+               SETF(e.aurora.audio.glints)).json("audio/glints")
+        .tooltip("How much the high band brightens the glints (Glints, under Appearance).\n"
+                 "1 is the aurora's original response; 0 holds them at their own amount."),
     floatField("audioBeat", "Beat -> pulse", 0.0f, 6.0f, 0.0f, 2.0f, GET(e.aurora.audio.beat),
                SETF(e.aurora.audio.beat)).json("audio/beat"),
 

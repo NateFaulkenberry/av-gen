@@ -389,6 +389,11 @@ fn atmosphereAuroraAt(ro: vec3<f32>, rd: vec3<f32>) -> AtmosResult {
     // The bands already in the frame block (ADR-030), which is the whole of "do not create a second
     // audio-analysis system": bass, mid and treble from `audio`, low-mid from `audioBands`, the
     // beat's pulse from `beat`.
+    //
+    // ADR-939: every one of them is read below only through a depth the CPU has already multiplied
+    // by the aurora's "Audio response" (`a.audio`, `a.audio2.x`, `a.audio3.x`), and the spectrum bins
+    // arrive scaled toward their neutral 0.5 by it. So at 0 nothing here moves with the music -- the
+    // frame is the frame with no music playing -- and a new audio term must take the same path.
     let bass = frame.audio.y;
     let lowMid = frame.audioBands.x;
     let midBand = frame.audio.z;
@@ -496,7 +501,11 @@ fn atmosphereAuroraAt(ro: vec3<f32>, rd: vec3<f32>) -> AtmosResult {
             var glint = 0.0;
             if (a.detail.y > 0.0) {
                 let g = atmosNoise2(rayCoord * 6.0 + vec2<f32>(a.flow.y * 1.7, h * 9.0));
-                glint = pow(max(g, 0.0), 12.0) * a.detail.y * (0.3 + 2.0 * high) * 6.0;
+                // ADR-939: the high band's share goes through its sensitised depth ("High ->
+                // glints" x "Audio response"). It was `2.0 * high`, which no control reached, so the
+                // glints followed the music with the aurora's audio response off. The 0.3 is the
+                // glints' own level, which is what they hold at silence -- and at "Audio response" 0.
+                glint = pow(max(g, 0.0), 12.0) * a.detail.y * (0.3 + 2.0 * a.audio3.x * high) * 6.0;
             }
 
             // Further shells are dimmer and hazier, which is what reads as depth.

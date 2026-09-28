@@ -226,7 +226,7 @@ Result<void> AuroraAppearance::validate() const {
 }
 
 Result<void> AuroraAudio::validate() const {
-    for (const float v : {bass, lowMid, mid, high, beat, sensitivity, spectrumShape}) {
+    for (const float v : {bass, lowMid, mid, high, beat, glints, sensitivity, spectrumShape}) {
         if (!finite(v) || v < 0.0f) { return fail("an aurora audio response must be finite and not negative"); }
     }
     return {};
@@ -744,12 +744,20 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
                          au.rainbow.scale,
                          static_cast<float>(r.elapsed) * au.rainbow.speed + au.rainbow.hueOffset);
     g.anchor = glm::vec4(r.anchor, std::clamp(au.rainbow.saturation, 0.0f, 1.0f));
+    // ADR-939: the glints' high-band depth, under the same master as the five above.
+    g.audio3 = glm::vec4(std::max(ad.glints, 0.0f) * sens, 0.0f, 0.0f, 0.0f);
 
     // The spectrum, or a flat 0.5 when there is no music. 0.5 is the value the shader's height
     // mapping treats as neutral, so silence gives an ordinary curtain rather than a collapsed one.
+    //
+    // ADR-939: each bin's distance from that neutral is scaled by the sensitivity, as every other
+    // audio term is, so "Audio response" 0 flattens the spectrum to what silence gives and the curtain
+    // tops stop following the music. `std::lerp` is exact at 0 and at 1: a sensitivity of 1 passes
+    // every bin through bit for bit, which is what keeps every aurora that never turned it unchanged.
     std::array<float, kAuroraBands> bands{};
     for (std::size_t i = 0; i < kAuroraBands; ++i) {
-        bands[i] = i < spectrum.size() ? std::clamp(spectrum[i], 0.0f, 1.0f) : 0.5f;
+        const float bin = i < spectrum.size() ? std::clamp(spectrum[i], 0.0f, 1.0f) : 0.5f;
+        bands[i] = std::clamp(std::lerp(0.5f, bin, sens), 0.0f, 1.0f);
     }
     g.band0 = glm::vec4(bands[0], bands[1], bands[2], bands[3]);
     g.band1 = glm::vec4(bands[4], bands[5], bands[6], bands[7]);

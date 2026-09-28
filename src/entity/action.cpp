@@ -22,6 +22,42 @@ constexpr float kHeadingCheck = 0.1f;
 // action tier's every reader hears "it did not arrive": staging's step fails, no `onComplete` fires,
 // and a decider remembers the errand as one it could not do.
 constexpr const char* kCannotReach = "unreachable: no way across to it; went as near as it could";
+// ADR-936: how near a corner of a route round the water a walker comes before it takes the next leg,
+// at least: half the navigation grid's four-metre cell, which is how far a corner the planner chose
+// can be from the water it chose it to avoid. A body that turns on a circle takes two of its circles.
+constexpr float kLegReach = 2.0f;
+
+// ADR-936: what is left of a route from `from` -- to the waypoint being walked to, and every leg
+// after it. Generic in the progress record, which is the queue's own.
+template <typename Progress>
+float routeLeft(const Progress& progress, glm::vec2 from) {
+    float left = 0.0f;
+    glm::vec2 at = from;
+    for (std::size_t i = progress.waypoint; i < progress.waypoints.size(); ++i) {
+        left += glm::length(progress.waypoints[i] - at);
+        at = progress.waypoints[i];
+    }
+    return left;
+}
+
+// ADR-944: how far short of its tolerance a walk holds behind a goal that is moving off. The move's
+// braking asks for no more speed than stops the body at `tolerance` from the goal (v = sqrt(2 a d)),
+// so behind a goal receding at v it settles v^2 / 2a short of it -- plus the step the goal takes
+// before the arrival test reads it -- and a walk after a body that is walking on, however slowly,
+// never arrives. `moved` is how far the goal went since the last step. The recession counts only up
+// to the walker's own pace, the fastest it could follow. A goal that is still, or coming nearer,
+// leaves no gap: every walk to a place, and to a body standing, arrives exactly as before.
+float trailingGap(glm::vec2 moved, glm::vec2 toGoal, float distance, float pace, float decel, double dt) {
+    if (dt <= 0.0 || distance <= 1e-4f) {
+        return 0.0f;
+    }
+    const float step = static_cast<float>(dt);
+    const float receding = std::min(glm::dot(moved, toGoal / distance) / step, pace);
+    if (receding <= 0.0f) {
+        return 0.0f;
+    }
+    return receding * receding / (2.0f * std::max(decel, 0.1f)) + receding * step;
+}
 
 // ADR-932: from a cell centre of the walker's region, straight on toward the goal it cannot reach,
 // every half metre for at most one cell, as far as the ground stays walkable -- and, with `dry`, dry
@@ -270,19 +306,13 @@ RouteStatus NavigatorPath::route(glm::vec2 from, glm::vec2 to, std::vector<glm::
     if (!nav_->navigable(to)) {
         return RouteStatus::Unreachable;
     }
-    // ADR-932: a goal on ground not connected to the walker's is not a straight line into the water.
-    // Placed in regions the way the planner places a start (3 cells) and a goal (4 cells), so this
-    // and `NavGrid::path`'s `Unreachable` are one statement. An end the graph cannot place -- a body
-    // standing far off the walkable set, which ADR-908's refuge walk brings back -- is not a claim
-    // about regions, and keeps the straight line.
     if (const NavGrid* grid = nav_->grid(); grid != nullptr && grid->valid()) {
-        const float cell = grid->cellSize();
-        const std::uint16_t mine = grid->regionNear(from, cell * 3.0f);
-        const std::uint16_t theirs = grid->regionNear(to, cell * 4.0f);
-        if (mine != 0 && theirs != 0 && mine != theirs) {
-            // The nearest dry ground of its own region -- the bank -- and only when its region has
-            // none, the nearest of it at all: a walker allowed to wade does not end an errand it
-            // cannot finish standing in the river that stopped it.
+        std::uint16_t mine = 0;
+        if (acrossDivide(from, to, &mine)) {
+            // ADR-932. The nearest dry ground of its own region -- the bank -- and only when its
+            // region has none, the nearest of it at all: a walker allowed to wade does not end an
+            // errand it cannot finish standing in the river that stopped it.
+            const float cell = grid->cellSize();
             glm::vec2 near(0.0f);
             bool dry = grid->nearestInRegion(to, mine, near, true);
             if (!dry && !grid->nearestInRegion(to, mine, near, false)) {
@@ -291,9 +321,75 @@ RouteStatus NavigatorPath::route(glm::vec2 from, glm::vec2 to, std::vector<glm::
             out.push_back(edgeToward(*nav_, near, to, cell, dry));
             return RouteStatus::Nearest;
         }
+        // ADR-936: one region, and water it cannot wade across the straight line. The planner's
+        // route round, when it has one that bends; its default price on wading, so a ford the planner
+        // would take is taken and a channel it would walk round is walked round. Anything else --
+        // no route inside the search budget, an end it cannot place, a route that is the straight
+        // line after all -- keeps the straight line, which is what every walk did before.
+        if (crossesDeepWater(from, to)) {
+            PathRequest request;
+            request.from = from;
+            request.to = to;
+            const PathResult round = nav_->requestPath(request);
+            if (round.status == PathStatus::Ok && round.waypoints.size() > 1) {
+                out = round.waypoints;
+                out.back() = to; // the planner snaps its end to a cell; `to` is standable (above)
+                return RouteStatus::Ready;
+            }
+        }
     }
     out.push_back(to);
     return RouteStatus::Ready;
+}
+
+bool NavigatorPath::acrossDivide(glm::vec2 from, glm::vec2 to, std::uint16_t* mine) const {
+    // ADR-932: a goal on ground not connected to the walker's is not a straight line into the water.
+    // Placed in regions the way the planner places a start (3 cells) and a goal (4 cells), so this
+    // and `NavGrid::path`'s `Unreachable` are one statement. An end the graph cannot place -- a body
+    // standing far off the walkable set, which ADR-908's refuge walk brings back -- is not a claim
+    // about regions, and keeps the straight line.
+    const NavGrid* grid = nav_ != nullptr ? nav_->grid() : nullptr;
+    if (grid == nullptr || !grid->valid()) {
+        return false;
+    }
+    const float cell = grid->cellSize();
+    const std::uint16_t here = grid->regionNear(from, cell * 3.0f);
+    const std::uint16_t there = grid->regionNear(to, cell * 4.0f);
+    if (mine != nullptr) {
+        *mine = here;
+    }
+    return here != 0 && there != 0 && here != there;
+}
+
+bool NavigatorPath::reaches(glm::vec2 from, glm::vec2 to) const {
+    // ADR-936: `route`'s own two refusals, without the route -- so a place a considerer offers is a
+    // place the walk it pushes can end at, by the same test the walk will make.
+    if (nav_ == nullptr || !nav_->valid()) {
+        return true;
+    }
+    return nav_->navigable(to) && !acrossDivide(from, to);
+}
+
+bool NavigatorPath::crossesDeepWater(glm::vec2 from, glm::vec2 to) const {
+    if (nav_ == nullptr || !nav_->valid()) {
+        return false;
+    }
+    // Every metre of the line, both ends included, against the world's own rule for this walker:
+    // `Submerged` is water deeper than its wade band (or, for a walker that does not wade, water at
+    // all). Its depth is read as well because the terrain's rules fire slope first, and a steep
+    // bank under the water is still water to a body walking into it. A metre, because the grid's
+    // four-metre cells can hold a channel between two dry centres, and a body is about a metre wide.
+    const float wade = nav_->settings().wadeDepth;
+    const float length = glm::length(to - from);
+    const int steps = std::max(1, static_cast<int>(std::ceil(length)));
+    for (int i = 0; i <= steps; ++i) {
+        const glm::vec2 p = from + (to - from) * (static_cast<float>(i) / static_cast<float>(steps));
+        const NavSample s = nav_->sample(p);
+        if (s.reject == NavReject::Submerged || (wade > 0.0f && s.waterDepth > wade)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 glm::vec2 NavigatorPath::steer(glm::vec2 from, glm::vec2 to, float lookahead) const {
@@ -817,6 +913,7 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             const glm::vec2 goal = flat(point);
             const glm::vec2 here = flat(state.position());
             const IPathProvider* path = ctx.path;
+            const float tolerance = action.tolerance > 0.0f ? action.tolerance : kMoveTolerance;
             if (!layer.progress.routed) {
                 if (path == nullptr) {
                     layer.progress.waypoints.assign(1, goal);
@@ -835,23 +932,45 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                     }
                     layer.progress.routed = true;
                     layer.progress.shortOf = status == RouteStatus::Nearest && !layer.progress.waypoints.empty();
+                    // ADR-936: a route round the water to a goal the body already stands within its
+                    // tolerance of is not walked. Arriving within `tolerance` is what the move means,
+                    // and the straight line had it arrive on this step, as it still does.
+                    if (layer.progress.waypoints.size() > 1 && glm::length(goal - here) <= tolerance) {
+                        layer.progress.waypoints.assign(1, goal);
+                    }
                 }
                 layer.progress.waypoint = 0;
                 layer.progress.bestDistance =
-                    glm::length((layer.progress.shortOf ? layer.progress.waypoints.back() : goal) - here);
+                    layer.progress.waypoints.size() > 1
+                        ? routeLeft(layer.progress, here)
+                        : glm::length((layer.progress.shortOf ? layer.progress.waypoints.back() : goal) - here);
                 layer.progress.sinceProgress = 0.0;
             }
             // The target may move (it is an entity, not a pin), so the last waypoint always tracks
             // the goal rather than the place the goal was when the route was asked for -- unless the
             // route ends short of the goal (ADR-932), whose end is the nearest point the body can
             // reach and stays there.
+            const glm::vec2 goalWas =
+                layer.progress.waypoints.empty() || layer.progress.shortOf ? goal : layer.progress.waypoints.back();
             if (!layer.progress.waypoints.empty() && !layer.progress.shortOf) {
                 layer.progress.waypoints.back() = goal;
             }
             const glm::vec2 end = layer.progress.shortOf ? layer.progress.waypoints.back() : goal;
-            const float tolerance = action.tolerance > 0.0f ? action.tolerance : 0.75f;
             const float distance = glm::length(end - here);
-            if (distance <= tolerance) {
+            const GaitSettings gait = ctx.gait != nullptr ? *ctx.gait : GaitSettings{};
+            const float wantedSpeed = action.speed > 0.0f ? action.speed : gait.walkSpeed;
+            // ADR-936: on a route round (several waypoints), the walk is over on its last leg only --
+            // a goal across the water can be nearer than the tolerance while the walk round has most
+            // of its way to go -- and what is left of it is the route's length, not the straight
+            // line's: the braking into the goal and the stuck clock both read `remaining`. On a route
+            // of one waypoint, which is every route before ADR-936, `remaining` is `distance`.
+            const bool lastLeg = layer.progress.waypoint + 1 >= layer.progress.waypoints.size();
+            const float remaining = lastLeg ? distance : routeLeft(layer.progress, here);
+            // ADR-944: arrived is within the tolerance of where the goal is now, and behind a goal
+            // moving off, within the gap the braking below holds behind it (`trailingGap`).
+            const float trailing =
+                trailingGap(goal - goalWas, end - here, distance, wantedSpeed, gait.decel, ctx.dt);
+            if (lastLeg && distance <= tolerance + trailing) {
                 state.speed = 0.0f;
                 movement = true;
                 if (layer.progress.shortOf) {
@@ -869,13 +988,16 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                 layer.progress.waypoint < layer.progress.waypoints.size()
                     ? layer.progress.waypoints[layer.progress.waypoint]
                     : goal;
-            if (glm::length(waypoint - here) <= tolerance &&
+            // ADR-936: a corner on the way is passed within a leg's reach -- two turning circles, so
+            // a body that walks through its turns (ADR-908) swings onto the next leg rather than
+            // orbiting the corner -- and not within the goal's `tolerance`, which for a post is 15 m
+            // and would cut the corner back into the water the route went round.
+            const float legReach = std::max(kLegReach, (ctx.gait != nullptr ? ctx.gait->turnRadius : 0.0f) * 2.0f);
+            if (glm::length(waypoint - here) <= legReach &&
                 layer.progress.waypoint + 1 < layer.progress.waypoints.size()) {
                 ++layer.progress.waypoint;
             }
 
-            const GaitSettings gait = ctx.gait != nullptr ? *ctx.gait : GaitSettings{};
-            const float wantedSpeed = action.speed > 0.0f ? action.speed : gait.walkSpeed;
             glm::vec2 direction = waypoint - here;
             const float toWaypoint = glm::length(direction);
             bool escaping = false; // walking back onto the walkable set before the errand (below)
@@ -953,7 +1075,7 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             }
             // Slow into the goal rather than stopping dead on it: v = sqrt(2 a d) is the fastest
             // speed from which the remaining distance is still enough to decelerate in.
-            const float arrival = std::sqrt(std::max(0.0f, 2.0f * gait.decel * std::max(0.0f, distance - tolerance)));
+            const float arrival = std::sqrt(std::max(0.0f, 2.0f * gait.decel * std::max(0.0f, remaining - tolerance)));
             float desired = std::min({wantedSpeed * alignment, arrival, wantedSpeed});
             // Phase D §14 "arrive": a slowing radius, when the action asks for one. The line above
             // is the fastest speed from which the body can still stop -- a braking limit, reached
@@ -962,8 +1084,8 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             // approaching something it means to look at visibly slows into it. Floored at a fifth
             // of the pace so the last centimetres are covered rather than approached forever.
             if (action.arrival > 0.0f) {
-                const float remaining = std::max(0.0f, distance - tolerance);
-                desired = std::min(desired, wantedSpeed * std::clamp(remaining / action.arrival, 0.2f, 1.0f));
+                const float left = std::max(0.0f, remaining - tolerance);
+                desired = std::min(desired, wantedSpeed * std::clamp(left / action.arrival, 0.2f, 1.0f));
             }
             const float paceBefore = layer.progress.speed;
             layer.progress.speed =
@@ -978,7 +1100,7 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
                 error = angleDelta(state.yaw, wantedYaw);
             }
             const float travel =
-                std::min(layer.progress.speed, distance / std::max(static_cast<float>(ctx.dt), 1e-4f));
+                std::min(layer.progress.speed, remaining / std::max(static_cast<float>(ctx.dt), 1e-4f));
             const glm::vec2 heading(std::sin(state.yaw), std::cos(state.yaw));
             state.travel.x += heading.x * travel * static_cast<float>(ctx.dt);
             state.travel.z += heading.y * travel * static_cast<float>(ctx.dt);
@@ -1009,8 +1131,10 @@ ActionOutput ActionQueue::update(const ActionContext& ctx, EntityState& state) {
             // *progress*: a character that has not got closer to its goal for `kStuckSeconds`
             // gives up with a reason, which is the difference between a bug report and a mystery.
             constexpr double kStuckSeconds = 4.0;
-            if (distance < layer.progress.bestDistance - 0.05f) {
-                layer.progress.bestDistance = distance;
+            // ADR-936: along the route -- a walk round the water heads away from the goal for a while
+            // and is getting somewhere all the time. `remaining` is `distance` on a one-waypoint route.
+            if (remaining < layer.progress.bestDistance - 0.05f) {
+                layer.progress.bestDistance = remaining;
                 layer.progress.sinceProgress = 0.0;
             } else if (std::abs(error) > 0.5f * kPi || escaping) {
                 // ADR-908: walking round a turn is not being stuck, and neither is walking back onto

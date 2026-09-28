@@ -121,13 +121,20 @@ public:
         (void)out;
         return false;
     }
+    // ADR-936: whether a walk from `from` could end at `to` at all -- the two things `route` settles
+    // before it answers (a walker can stand at `to`; `to` is not across a divide), asked without
+    // building the route, so a considerer can ask it of every place it would offer. By default,
+    // whether `to` is walkable: a provider with no graph knows of no divide.
+    [[nodiscard]] virtual bool reaches(glm::vec2 from, glm::vec2 to) const {
+        (void)from;
+        return walkable(to);
+    }
 };
 
 // The provider that exists today: `entity::Navigator`, which samples walkability analytically and
 // steers locally. Its route is the straight line -- one waypoint -- and it refuses a destination a
-// walker could not stand on. So a character gets around a tree (that is `steer`) and does not get
-// around a lake (that would need a search). Written down here so the limitation is a seam somebody
-// chose rather than a surprise somebody hit.
+// walker could not stand on. So a character gets around a tree (that is `steer`); the one thing it
+// searches for is a way round water (ADR-936, below).
 //
 // **ADR-932: it does not route across a divide.** With a navigation graph (`Navigator::grid`), a goal
 // in a different connected region from the walker's -- the far bank of a river that runs edge to
@@ -135,9 +142,16 @@ public:
 // goal, found on the graph and carried out to the edge of the walkable ground. Before, it was
 // `Ready` with the straight line, and the walker waded in to its limit, stalled, gave up and was
 // sent again (GV3's ember, eight times in 40 s). Two points the planner (`NavGrid::path`) would
-// call `Unreachable` are two points this calls `Nearest`: the same snaps, the same regions. Within
-// one region the answer is the straight line, as it always was; so is every answer in a world with
-// no graph, or where the graph cannot place one of the two ends.
+// call `Unreachable` are two points this calls `Nearest`: the same snaps, the same regions. A world
+// with no graph, or one whose graph cannot place one of the two ends, gets the straight line.
+//
+// **ADR-936: within one region, it goes round water it cannot wade.** A straight line across water
+// deeper than the walker's wade band -- a river's channel whose banks join round its head, a pond --
+// is not a route: the walker waded in to its limit and dithered there, and the move's stuck clock
+// read each creep deeper as progress (8.7 s in the water before it gave up, in ADR-933's fixture).
+// Such a goal is answered with the planner's route round (`Navigator::requestPath`): several
+// waypoints, `Ready`. A dry straight line is the straight line, exactly as before, and so is every
+// answer the planner cannot better.
 class NavigatorPath final : public IPathProvider {
 public:
     explicit NavigatorPath(const Navigator* nav = nullptr) : nav_(nav) {}
@@ -148,8 +162,16 @@ public:
     [[nodiscard]] bool clear(glm::vec2 from, glm::vec2 to) const override;
     [[nodiscard]] bool walkable(glm::vec2 p) const override;
     [[nodiscard]] bool refuge(glm::vec2 from, glm::vec2& out) const override;
+    [[nodiscard]] bool reaches(glm::vec2 from, glm::vec2 to) const override;
+    // ADR-936: whether the straight walk from `from` to `to` crosses water deeper than this world's
+    // walker wades -- the world's own answer, sampled every metre, not the grid's four-metre one.
+    [[nodiscard]] bool crossesDeepWater(glm::vec2 from, glm::vec2 to) const;
 
 private:
+    // ADR-932: the two ends' regions, placed the way the planner places a start and a goal, when
+    // both can be placed and they differ.
+    [[nodiscard]] bool acrossDivide(glm::vec2 from, glm::vec2 to, std::uint16_t* mine = nullptr) const;
+
     const Navigator* nav_ = nullptr;
 };
 
@@ -173,6 +195,10 @@ struct ActionTarget {
     glm::vec3 point{0.0f};
     [[nodiscard]] bool empty() const { return kind == TargetKind::None; }
 };
+
+// How near a `move` with no `tolerance` of its own must come to count as there, in metres. One
+// number, read by the verb and by anything that must agree with it about arriving (ADR-936).
+inline constexpr float kMoveTolerance = 0.75f;
 
 // ---- state, conditions and effects --------------------------------------------------------------
 
