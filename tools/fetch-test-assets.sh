@@ -69,6 +69,7 @@ esac
 
 # ---- authentication: one-shot, never written to the clone's config --------------------------------
 git_auth=()
+no_secret=""
 url="https://github.com/$repo.git"
 keyfile=""
 cleanup() { [[ -n "$keyfile" ]] && rm -f "$keyfile"; return 0; }
@@ -85,7 +86,8 @@ elif [[ -n "${AVGEN_TEST_ASSETS_SSH_KEY:-}" ]]; then
     url="git@github.com:$repo.git"
     export GIT_SSH_COMMAND="ssh -i $keyfile -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 elif [[ "$in_ci" == true ]]; then
-    err "neither the AVGEN_TEST_ASSETS_TOKEN nor the AVGEN_TEST_ASSETS_SSH_KEY secret is set for this repository, so $repo cannot be read (docs/development/gpu-ci-private-assets.md, step 4)"
+    # Fatal only if this run has to reach the network (an existing clone that has the commit does not).
+    no_secret="neither the AVGEN_TEST_ASSETS_TOKEN nor the AVGEN_TEST_ASSETS_SSH_KEY secret is set for this repository, so $repo cannot be read (docs/development/gpu-ci-private-assets.md, step 4)"
 else
     # Locally: whatever the developer's git already uses for github.com. ssh if an agent has a key.
     if ssh-add -l >/dev/null 2>&1; then url="git@github.com:$repo.git"; fi
@@ -93,11 +95,13 @@ fi
 
 # ---- clone or update, then pin -------------------------------------------------------------------
 if [[ -d "$dir/.git" ]]; then
-    git -C "$dir" remote set-url origin "$url"
     if ! git -C "$dir" cat-file -e "$ref^{commit}" 2>/dev/null; then
+        [[ -n "$no_secret" ]] && err "$no_secret"
+        git -C "$dir" remote set-url origin "$url"
         git ${git_auth[@]+"${git_auth[@]}"} -C "$dir" fetch --quiet origin || err "cannot fetch $repo into $dir (no access, or the repository does not exist)"
     fi
 else
+    [[ -n "$no_secret" ]] && err "$no_secret"
     mkdir -p "$(dirname "$dir")"
     git ${git_auth[@]+"${git_auth[@]}"} clone --quiet --no-checkout "$url" "$dir" ||
         err "cannot clone $repo (no access, or the repository does not exist). Locally: check 'gh auth status' or your ssh key; in CI: check the secret's scope"
@@ -137,6 +141,7 @@ if [[ ${#refused[@]} -gt 0 ]]; then
     err "${#refused[@]} file(s) in $repo land on paths this repository does NOT ignore; refusing to link any of them. Add them to .gitignore first (a public repository must never be able to stage them)."
 fi
 verb=linked; [[ "$check_only" == true ]] && verb="would link"
+ref=$(git -C "$dir" rev-parse HEAD)
 echo "fetch-test-assets: $repo@${ref:0:12} -> $dir; $verb $linked file(s), $present already present"
 if [[ -n "${GITHUB_ENV:-}" ]]; then
     echo "AVGEN_TEST_ASSETS_REV=$ref" >> "$GITHUB_ENV"

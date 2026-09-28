@@ -33,10 +33,27 @@ Local testing is still the right tool for:
 | Local (your Mac) | Remote (GitHub Actions) |
 |---|---|
 | targeted tag runs while iterating | the full regression suite, both binaries |
-| debugging a failure, lldb, Instruments | the ASan/UBSan suite (nightly, or on dispatch) |
-| interactive renderer checks, screenshots | TSan over the concurrency subset (weekly, or on dispatch) |
+| debugging a failure, lldb, Instruments | ASan, UBSan and TSan (nightly, or on dispatch) |
+| interactive renderer checks, screenshots | the CPU suite with the private test assets (nightly, once enabled) |
 | tests that need `assets/` (see Coverage gaps) | repeat verification after every push |
 | `[.perf]` probes and GPU timing | pre-merge verification of a branch |
+
+**Run what CI runs.** Every suite goes through one script, `tools/ci/run-suite.sh`, and the
+workflows call it with the same arguments a developer would:
+
+```sh
+tools/ci/run-suite.sh cpu --build              # the push gate: build Release, run avgen_tests as CI does
+tools/ci/run-suite.sh ubsan --build            # the nightly UBSan job
+tools/ci/run-suite.sh tsan --build             # the nightly TSan job
+tools/ci/run-suite.sh asan:rest-a --build      # one of the five nightly ASan jobs
+tools/ci/run-suite.sh gpu                      # the authoritative GPU suite (under tools/gpu-lock.sh)
+tools/ci/run-suite.sh cpu --filter '[ai]'      # any suite, one tag (labelled FILTERED)
+```
+
+Results land in `ci-results/<suite>/` (gitignored): `summary.md`, `result.json`, shard logs and
+XML, exactly what the CI artifacts hold. It generates the two repository scores
+(`tools/ci/generate-audio.sh`) if they are missing. Locally the full CPU suite counts as GPU work
+(`tools/gpu-lock.sh` says why): run it when nothing else is using the GPU.
 
 ## Commands
 
@@ -68,7 +85,7 @@ gh run rerun <run-id> --failed
 gh workflow run ci.yml --ref <branch>                          # the full CI
 gh workflow run ci.yml --ref <branch> -f test_filter='[ai]'    # one tag, remotely (labelled FILTERED)
 gh workflow run ci.yml --ref <branch> -f rng_seed=12345        # replay a run's test order
-gh workflow run sanitizers.yml --ref <branch> -f sanitizer=asan   # asan | tsan | both
+gh workflow run sanitizers.yml --ref <branch> -f sanitizer=all    # all | asan | ubsan | tsan
 
 # Does the sanitizer plan still name real cases, and run every case once? (Every push checks it.)
 python3 tools/ci/catch2_run.py plan-check --binary build/release/tests/avgen_tests \
@@ -83,10 +100,17 @@ lands on `main`, dispatch is unavailable and CI starts on push only.
 ### `CI` (`.github/workflows/ci.yml`): on every push, fork PRs, and dispatch
 
 ```
-push ─▶ Build (Release) ─┬─▶ CPU tests (avgen_tests, full)
-                         ├─▶ GPU tests (avgen_render_tests)
-                         └─▶ Report  (writes the "# AV Gen CI" summary)
+push ─▶ Build (Release) ─┬─▶ CPU tests (avgen_tests, full)                         GATES
+                         ├─▶ GPU tests (hosted, informational)                      main / nightly / dispatch
+                         ├─▶ CPU tests with private assets (Glowmere tier)          nightly / dispatch, once enabled
+                         └─▶ Report  (writes the "# AV Gen CI" summary; prunes caches on main)
+      GPU tests (self-hosted Apple GPU, authoritative)                              once a runner exists
 ```
+
+The setup every build shares (the Xcode check, the CPM and ccache caches, `tools/ci/build.sh`) is one
+composite action, `.github/actions/cmake-preset`, used by both workflows. The two asset-bearing jobs
+are described in [gpu-ci-private-assets.md](gpu-ci-private-assets.md); until the owner enables them
+they are skipped, and the Jobs table says so.
 
 - **Build (Release):**
   - runs `cmake --preset release` then `cmake --build --preset release`, building every target:
@@ -101,7 +125,11 @@ push ─▶ Build (Release) ─┬─▶ CPU tests (avgen_tests, full)
     **ran == listed**, so a shard that dies early cannot turn into a quiet subset.
   - a last step, `plan-check`, proves `tools/ci/sanitizer-plan.txt` still names real cases and runs
     each case once (see [The sanitizer partition](#the-sanitizer-partition)). It lists; it runs nothing.
-- **GPU tests:**
+- **CPU tests with private assets** (`cpu-assets`): the same binary, with the private test assets
+  linked by `tools/fetch-test-assets.sh` and no hosted-runner exceptions, so a case that needs an
+  asset must pass. Nightly and dispatch, never `pull_request`, and only when
+  `vars.AVGEN_TEST_ASSETS == 'true'`.
+- **GPU tests (hosted):**
   - `avgen_render_tests` in one process (one GPU; see `RESOURCE_LOCK` in `tests/CMakeLists.txt`);
   - then the headless smoke test (`avgen --headless --example Hyperspace --frames 1`), the same
     command ctest registers as `gpu.the-binary-renders-a-frame-headless`.
@@ -159,8 +187,8 @@ the commit message.
 | Category | Where | What runs |
 |---|---|---|
 | FULL | `CI` on every push | build of every target; all default `avgen_tests` cases; all default `avgen_render_tests` cases; the headless binary smoke test |
-| SANITIZER | `Sanitizers` nightly / dispatch | ASan+UBSan over the default CPU set, minus the documented exclusions and the two cases `tools/ci/sanitizer-plan.txt` skips |
-| EXTENDED | `Sanitizers` weekly / dispatch | TSan over the concurrency subset |
+| SANITIZER | `Sanitizers` nightly / dispatch | ASan (with UBSan's checks) over the default CPU set, minus the two cases `tools/ci/sanitizer-plan.txt` skips; UBSan alone over the whole default set; TSan over the concurrency set |
+| ASSETS | `CI` nightly / dispatch, once enabled | the CPU suite with the private test assets; the GPU suite on a self-hosted Apple GPU |
 | targeted | `CI` dispatch with `test_filter` | one tag on both binaries, labelled `FILTERED` in the summary; never a substitute for FULL |
 
 There is no separate "fast" category. The suite has no fast/slow tag split to build one from, and
@@ -212,7 +240,11 @@ The missing packs:
 - `assets/kenney/city`, `assets/imported/concert`, `assets/treeisle`
 - `~/Desktop/*.mp3`
 
-Tracked on the runner: `assets/farm`, `assets/imported/{alien,ufo}.gltf`, and the manifests. The
+Tracked on the runner: `assets/imported/{alien,ufo}.gltf` and the manifests. `assets/farm/*.glb` was
+tracked until `4a138886` (2026-09-28), when the owner confirmed the pack is purchased; the Glowmere
+Valley 2 cases that need the animals now skip through `testsupport::skipUnlessFarmAssetsPresent()`.
+`assets/audio/*.wav` is generated on every CI run by `tools/ci/generate-audio.sh` (the scripts are the
+repository's own and deterministic; each file is checked against its manifest sha256). The
 suite behaves in four ways without the packs (census 2026-09-24):
 
 | Behaviour | Cases (run 36066934636) | What the summary shows |
@@ -228,12 +260,9 @@ needs, taken from observed CI failures. A needs-assets case that starts passing 
 stale entry. A new failure that is not on the list fails the job, as it should: add it to the
 list only with a run URL showing the asset is the cause.
 
-Two of these are **test defects the runner exposed**, left for the owner:
-
-- `test_body_compensation.cpp:433` calls `nodes().front()` on an empty composition when
-  `alien-scout.glb` is absent, and segfaults instead of failing or skipping.
-- "sequence.get_state reports the music video, not the timeline" (`test_ai_tools.cpp:780`) fails
-  in Release without `night-shift.wav`, and aborts (SIGABRT) in the Debug sanitizer builds.
+The two **test defects the runner exposed** are both fixed, and neither case is excluded any more:
+`test_body_compensation.cpp` skips without `alien-scout.glb` (20de27ac), and the two night-shift
+`sequence.get_state` cases skip without `night-shift.wav` (2026-09-28), which CI now generates anyway.
 
 The pass-without-asserting group has 55 cases, all guarded on `assets/aliens/*.glb`:
 
@@ -266,8 +295,9 @@ This is the VM's paravirtualized Metal (MTLGPUFamilyMac2 only), not the change u
 - It runs on `main`, nightly and on dispatch, and its results are still uploaded and summarised.
 - A branch push shows it as "not run: branch push" in the Jobs table.
 
-**Every GPU verdict still has to come from a real Mac: run `avgen_render_tests` locally.** The
-fix is a self-hosted Apple Silicon runner (see follow-ups).
+**Every GPU verdict still has to come from a real Mac.** Until the self-hosted runner exists, run
+`tools/ci/run-suite.sh gpu` locally. [gpu-ci-private-assets.md](gpu-ci-private-assets.md) is the
+design and the owner's setup steps.
 
 **Hidden tests.** `[.perf]` and the other hidden tags are not run (see above).
 
@@ -278,9 +308,13 @@ fix is a self-hosted Apple Silicon runner (see follow-ups).
 | CPM sources (`.cache/cpm`) | OS, arch, hash of `cmake/Dependencies.cmake`, `cmake/CPM.cmake`, `cmake/patches/**` | **none** | Every dependency is pinned by tag, commit or SHA-256. There is no fallback because CPM's own cache key covers a patch's path but not its content, so an older cache after a patch change could carry stale patched sources. |
 | ccache (`~/ccache`, 2 GB cap) | OS, arch, Xcode version, preset, commit | previous commit's cache for the same OS/arch/Xcode/preset | ccache keys each object on the compiler binary, the flags and the preprocessed input, so an old cache yields misses, never stale objects. |
 
-Branch caches can read `main`'s caches, but not each other's (GitHub's scoping rule). An agent
-branch's first run therefore starts from `main`'s ccache. A job that fails saves no cache
-(actions/cache saves only on success). Each build step prints the ccache hit rate, and the
+**Saved from `main` only, and pruned.** Every job restores (`actions/cache/restore`), but only a
+run on `main` saves (`actions/cache/save`); branch runs read `main`'s caches, which GitHub's scoping
+allows, and save none of their own. Each workflow's report job on `main` then runs
+`tools/ci/prune-caches.sh`, which keeps only the newest entry per key prefix. Before this
+(2026-09-28) every push on every branch saved a 150-550 MB ccache under its own commit key: 24
+entries, 10.7 GB against the repository's 10 GB quota, and GitHub was evicting the least recently
+used, which was `main`'s TSan cache. A job that fails saves no cache. Each build step prints the ccache hit rate, and the
 summary shows whether each cache was restored.
 
 The build directory itself is not cached. Every run configures fresh, which also sidesteps the
@@ -477,7 +511,12 @@ such.
 
 ## Security
 
-- `permissions: contents: read` on every workflow, and no secrets are used or needed.
+- `permissions: contents: read` on every workflow. The report jobs add `actions: write`, used on
+  `main` only, to prune caches.
+- One secret, used only by the asset jobs and only on trusted events (never `pull_request`):
+  `AVGEN_TEST_ASSETS_SSH_KEY` (a read-only deploy key) or `AVGEN_TEST_ASSETS_TOKEN`. See
+  [gpu-ci-private-assets.md](gpu-ci-private-assets.md), including why a self-hosted runner belongs on
+  the private repository.
 - Checkout uses `persist-credentials: false`.
 - Third-party actions are pinned to full commit SHAs, with the version in a comment.
 - `workflow_dispatch` inputs reach scripts only through `env:`, never interpolated into a script.

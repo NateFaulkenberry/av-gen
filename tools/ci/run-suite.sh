@@ -85,6 +85,10 @@ fi
 binary() { [[ -x "$bin/$1" ]] || { echo "run-suite: no $bin/$1 (build it, or pass --build / --bin)" >&2; exit 2; }; echo "$bin/$1"; }
 out="${out:-ci-results/${suite/:/-}}"
 
+# The CPU suites play the repository's generated scores; make them where they are missing (a no-op
+# when they are present, e.g. linked into a worktree).
+case "$suite" in gpu|gpu-hosted) ;; *) tools/ci/generate-audio.sh ;; esac
+
 args=(--out "$out" --seed "$seed")
 filtered=()
 [[ -n "$filter" ]] && filtered=(--filter "$filter" --expected-label "FILTERED $filter: not the full suite")

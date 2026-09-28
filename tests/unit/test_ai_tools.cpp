@@ -786,6 +786,12 @@ TEST_CASE("sequence.get_state reports the music video, not the timeline", "[ai][
     if (!std::filesystem::exists(project)) {
         SKIP("night-shift.json is not present in this checkout");
     }
+    // The song is generated, not committed. Without it the project loads with no audio, the case
+    // fails in Release and aborts on a json.hpp assert in the Debug sanitizer builds, which took a
+    // whole shard down (TSan run 36060803359). tools/ci/run-suite.sh generates it on CI.
+    if (!std::filesystem::exists(std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "night-shift.wav")) {
+        SKIP("assets/audio/night-shift.wav is generated, not committed: run tools/ci/generate-audio.sh");
+    }
     Fixture f;
     const auto loaded = f.engine.loadProject(project);
     INFO((loaded ? std::string() : loaded.error().message));
@@ -841,6 +847,12 @@ TEST_CASE("sequence.get_state hands back beats only where they were asked for", 
         std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "city" / "night-shift.json";
     if (!std::filesystem::exists(project)) {
         SKIP("night-shift.json is not present in this checkout");
+    }
+    // The song is generated, not committed. Without it the project loads with no audio, the case
+    // fails in Release and aborts on a json.hpp assert in the Debug sanitizer builds, which took a
+    // whole shard down (TSan run 36060803359). tools/ci/run-suite.sh generates it on CI.
+    if (!std::filesystem::exists(std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "audio" / "night-shift.wav")) {
+        SKIP("assets/audio/night-shift.wav is generated, not committed: run tools/ci/generate-audio.sh");
     }
     Fixture f;
     REQUIRE(f.engine.loadProject(project).has_value());
