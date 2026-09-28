@@ -27,8 +27,12 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   - The aurora should react to the audio with a similar low-energy bass pulse. This is added to the art-pass brief
     as an addendum, because it is a look change. It is not a revert of the per-frame response, which made the sky
     jump on the kick.
-  - The owner asked for detailed steps to set up the private asset repository for GPU CI. They were given in chat;
-    the source is `docs/development/gpu-ci-private-assets.md` on qa/ci.
+  - **GPU CI:** PARKED by the owner (no self-hosted runner for now).
+    - Steps 1-3 are done: `NateFaulkenberry/av-gen-test-assets` is private on GitHub at `61ff6dd` (202 files,
+      248 MB), and the CI monitor was asked to pin that sha in `tools/ci/test-assets.lock`.
+    - Steps 4-6 are pending: the deploy key and secret, the variables, and the runner.
+    - Decided: the runner will live on the private repository. `Rebuild.mp3` may go into it (the owner's own
+      song); it is not wired in yet.
 - **Next:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
 ## Current Status
