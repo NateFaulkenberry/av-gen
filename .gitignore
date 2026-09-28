@@ -163,3 +163,9 @@ __pycache__/
 /examples/treeisland/_fogshadow-*.json
 /examples/treeisland/_fogshadowshot-*.json
 /examples/treeisland/_fogtemporal-*.json
+
+# Vortex 2.0 comparison arms (tools/make_vortex2_arms.py), same rule as the fog arms above. The nine
+# committed ones went stale against the deliverable (check_project_integrity's last 9 problems) and
+# were removed in the QA pass (2026-09-28); the generator itself no longer runs against today's
+# deliverable ("no vortex object to set 'innerVoid'"), so regenerating them needs it updated first.
+/examples/treeisland/_vx2-*.json
