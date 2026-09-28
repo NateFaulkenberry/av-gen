@@ -91,7 +91,10 @@ BASE = {
     "fx/aurora/audioSensitivity": 0.0,
     "fx/aurora/spectrumShape": 0.0,
     "fx/aurora/filaments": 1.3,
-    "fx/aurora/sparkle": 0.3,
+    # engine-6 (ADR-938/939) holds the glints steady instead of flickering with the high band, so their
+    # average brightness fell; 0.85 keeps the old average. The effect's own block is set to the same
+    # value (AURORA_SPARKLE, apply_base), so the Effects panel and the Parameters panel agree.
+    "fx/aurora/sparkle": 0.85,
     "fx/aurora/curtainHeight": 2300.0,
     "fx/aurora/turbulence": 0.68,
     "fx/aurora/waveAmplitude": 0.38,
@@ -263,6 +266,12 @@ def apply_render_alike(project, scene):
     project["parameters"].update(RENDER_ALIKE)
     for (block, key), value in RENDER_ALIKE_SCENE.items():
         scene.setdefault(block, {})[key] = value
+    for key, param, value in GLOW_POOLS:
+        scene.setdefault("environment", {})[key] = value
+        project["parameters"][param] = value
+    for e in project.get("effects", []):
+        if e.get("id") == "aurora":
+            e["parameters"]["appearance"]["sparkle"] = BASE["fx/aurora/sparkle"]
 
 
 def apply_water(scene):
@@ -410,7 +419,15 @@ LAYER_LIGHTS = {
 }
 # The light the glowing plants and fungi cast on what is around them (the scene's `ecologyLight`, a
 # parameter since ADR-905): it follows the glow it comes from, so the ground dims with the mushrooms.
-ECOLOGY_LIGHT = 1.4
+# x3 on engine-6 (ADR-945): the lights are chosen by what they add to the frame and each lights a pool
+# on the ground, which only the violet fungi cast (GLOW_POOLS' faintest), so every pool pulses with the
+# fungi's kick; the arc keys it section by section from this.
+ECOLOGY_LIGHT = 4.2
+# ADR-945's glow pools, in the scene's environment and restated as the project's parameters:
+# (environment key, parameter, value). The farthest pool 300 m (the wides look 100-300 m).
+GLOW_POOLS = [("ecologyLightRange", "scene/glow-pools/distance", 300.0),
+              ("ecologyPoolFaintest", "scene/glow-pools/faintest", 6.5),
+              ("ecologyPoolReach", "scene/glow-pools/reach", 6.0)]
 
 
 def _light_targets(params):

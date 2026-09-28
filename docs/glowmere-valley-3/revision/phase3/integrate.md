@@ -246,3 +246,22 @@ lighting 0.822 -> 0.845; issues 0/8/50/45. The elder's kick z 28-29, the lantern
 the spire 5-6 (observed now), the veil's spores 4.4; the umbra, cairn, ridge, scree and ember weak (z 2-3.7).
 Novelty 29.3 s held, 2 shots static from the first frame. Trace: follow stability 21 of 22 (95.3's ADR-913
 exception); E1-E5 play, E4 takes cow-12 and cow-23, E5's watchers vane, ember, rook, sage.
+
+## Round 6: engine-6 (main ad5623d2: behave, uireach, ecolight), the candidate for the owner's review
+`build/release` -> av-gen-engine-6; gv3/production (879cd647 + c26f3fd4) merged. Generated from `7419a6c1`:
+audit 90/90 routes, 130/130 tracks, 0 unknown parameters. Render 00:43-01:07 (r6b), GPU errors 0.
+- **Glow pools** (ADR-945, `7004044f`): range 300 m, only the violet fungi cast (faintest 6.5), reach 6 m (11 m
+  washed the foreground evenly, `vR`), ecology light x3 (1.4 -> 4.2 through the arc), kick.fungi +3.0 kept. The
+  ground in the wides at each kick against 300 ms later: 41.1 x1.10, 113.1 x1.17, 117.1 x1.08 (r5 1.05-1.07,
+  41.1's with the travel beam in it); violet pixels 41.1 439 -> 1166, 113.1 1825 -> 2665, 117.1 710 -> 1147.
+- **Aurora glints** 0.3 -> 0.85, the effect block set to the same: the sky's mean identical to r5 in 41.1,
+  75.1 and 117.1, its top 0.5% within 1%, frame-to-frame change 8-11% lower (steady glints).
+- **Behave:** E4 watched by sage (40 m) and vane; Rook no longer goes to it and was out of 59.1 for the
+  whole shot (the Critic's critical finding on r6) -> 59.1 over Sage's shoulder (`7419a6c1`, vM1). E5 watched
+  by vane 172.20-178.40, ember, sage; 95.1 stands. Stability 19/22: 80.1 (travel 1.28) and 103.1 (eye height
+  2.11 cm) newly fail marginally, 95.3 the known exception. ADR-910: longest stills 2.7-8.9 s, no pacing.
+  Closest approach (behave-closest.py) 1.16 m, horse-2 and vane at 186.4 s, off screen. World: 13 views with
+  an open end, the mouth in 70 views of 8 shots (r5: 20 / 94 of 12).
+- **Critic** r6b `job_1a0e668cdca4609c3` against r5: musical sync 0.885 -> 0.943, effects 0.945 -> 0.975,
+  pacing 1.000; technical quality 0.923 -> 0.825 and lighting 0.845 -> 0.789 (clipping in pooled shots, up to
+  1.6% of pixels; bright secondary masses), cinematography -4.0. Elder's kick z 39, lantern 14, bloom 9.6.

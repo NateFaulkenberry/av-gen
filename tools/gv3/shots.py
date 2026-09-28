@@ -483,9 +483,16 @@ def e4_aliens_watch(t0, t1, g):
     # him, a live aim under the hovering scout: he passes the lens and walks down toward the column as
     # the pair rises (searched on the merged trace, gv3-int batch B; the bank behind him is too steep
     # for an eye that rides with him).
-    r = aim_at(20.0, [-103.1, 12.9, -19.2], "scout", (0.0, -19.0, 0.0), "hover")
-    return r, dict(lead="event", purpose="E4: Rook goes to see the pair rise", subject="the column (E4), rook walking to it",
-                   camera="20 mm up the west bank behind Rook, looking at the scout", movement="still", music="2 bars")
+    # engine-6 (behave, ADR-935/936/944): Rook no longer goes to E4 (he roams the far west slope, 80-93 m
+    # off, and was out of this frame for the whole shot: the Critic's one critical finding on r6). Sage
+    # does what the first version of this shot was written for: she hurries up and stands on the rise
+    # 40 m west of the station from 108 s, facing it within 3 deg. A fixed eye 6 m behind her and 2.5 m to
+    # her left, 3 m up, a live aim under the hovering scout: she stands at the left third, the column
+    # and the rising pair in the middle (gv3-int r6, candidate vM1).
+    r = aim_at(35.0, g(-114.45, 19.6, 3.0), "scout", (0.0, -12.0, 0.0), "hover")
+    return r, dict(lead="event", purpose="E4: Sage watches the pair rise", subject="the column (E4), sage watching it",
+                   camera="35 mm, 6 m behind Sage, live aim", movement="still", music="2 bars",
+                   effects="the scout's beam")
 
 
 @at("61.1")
