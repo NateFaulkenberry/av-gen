@@ -28,6 +28,7 @@
 #include "scene/tree_generated.hpp"
 #include "signals/signal_bus.hpp"
 #include "stage/staging.hpp"
+#include "support/project_assets.hpp"
 #include "support/ramp.hpp"
 #include "world/terrain_query.hpp"
 
@@ -55,9 +56,7 @@ fs::path sceneFile() {
     return fs::path(AVGEN_SOURCE_DIR) / "examples" / "world" / "glowmere-valley-2.scene.json";
 }
 
-bool farmAssetsPresent() {
-    return fs::is_regular_file(fs::path(AVGEN_SOURCE_DIR) / "assets" / "farm" / "cow.glb");
-}
+using testsupport::farmAssetsPresent;
 
 bool isAnimal(const entity::Entity& e) {
     const auto& tags = e.desc().tags;

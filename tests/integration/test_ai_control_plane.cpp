@@ -319,17 +319,25 @@ TEST_CASE("Cancellation stops execution and rolls back deterministically", "[int
 
     auto task = s.plane.submit("take this as far as you can");
     REQUIRE(task != nullptr);
-    // Let the first turn land, then cancel.
+    // Let the first turn land, then cancel. ONE main-thread item per pump (a zero budget): the default
+    // budget drains the queue until it is empty, and on a loaded runner the worker woken by each call's
+    // completion enqueued the next call before the drain re-checked the queue -- so a single pump ran
+    // all nine scripted turns, the script ran out, and the task had FAILED before this loop could
+    // cancel it (run 36422061644: Failed, not Cancelled, in 0.196 s). Serviced one item at a time,
+    // the loop sees the count within a call or two of the first, and cancels while most of the script
+    // is still unread.
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{10};
     while (task->toolCallsSoFar() == 0 && !task->finished() &&
            std::chrono::steady_clock::now() < deadline) {
-        s.plane.pump();
+        s.plane.pump(0.0);
         std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
+    REQUIRE_FALSE(task->finished()); // cancelling a task that has already ended proves nothing
     task->requestCancel();
     REQUIRE(s.runToCompletion(task));
 
     CHECK(task->state() == ai::TaskState::Cancelled);
+    CHECK(task->toolCallsSoFar() < 9); // the script's later turns never ran
     CHECK(task->outcome().cancelled);
     CHECK(task->outcome().rolledBack);
     CHECK_THAT(static_cast<double>(s.engine.params().find("orb/scale")->baseComponent(0)),

@@ -22,6 +22,7 @@
 #include "app/engine.hpp"
 #include "scene/composition.hpp"
 #include "ui/edit_history.hpp"
+#include "support/project_assets.hpp"
 #include "ui/world_edit.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -45,6 +46,8 @@ TEST_CASE("deleting animals while the scene runs does not crash", "[editor][dele
     if (!std::filesystem::exists(glowmereProject())) {
         SKIP("Glowmere Valley 2 is not present");
     }
+    // The animals ARE the farm GLBs: without them there is no animal node to delete.
+    testsupport::skipUnlessFarmAssetsPresent();
     app::Engine engine(app::EngineMode::Offline);
     auto loaded = engine.loadProject(glowmereProject());
     INFO((loaded ? std::string() : loaded.error().message));

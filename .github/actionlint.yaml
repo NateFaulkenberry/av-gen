@@ -1,0 +1,5 @@
+# actionlint configuration (https://github.com/rhysd/actionlint): the custom label of the self-hosted
+# Apple-GPU runner that ci.yml's `gpu` job targets (docs/development/gpu-ci-private-assets.md).
+self-hosted-runner:
+  labels:
+    - avgen-gpu

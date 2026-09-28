@@ -19,6 +19,7 @@
 #include "signals/signal_bus.hpp"
 #include "scene/composition.hpp"
 #include "stage/staging.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -490,6 +491,10 @@ std::vector<Cycle> cyclesOf(const std::vector<Sample>& run) {
 }
 
 const std::vector<Sample>& film() {
+    // The film is the multicam project with its farm animals. Without their GLBs the animals are
+    // nodes with no mesh, the director lifts almost nothing (2 cycles, not 5, on the hosted runner
+    // after 4a138886), and every reader below would be judging a different film.
+    testsupport::skipUnlessFarmAssetsPresent();
     static const std::vector<Sample> run = playFilm(90.0, 60.0);
     return run;
 }
@@ -504,7 +509,8 @@ const std::vector<Cycle>& cycles() {
 TEST_CASE("the film runs five complete abduction cycles", "[stage][abduction][sequence]") {
     // The premise every other case here rests on. Without it a suite that found no teleport would
     // be a suite that found no abduction (ADR-182).
-    REQUIRE(cycles().size() >= 4);
+    const std::vector<Cycle>& all = cycles(); // not inside REQUIRE: its SKIP would read as a throw
+    REQUIRE(all.size() >= 4);
     for (const Cycle& c : cycles()) {
         INFO(fmt::format("cycle at {:.3f}", c.beamStart));
         CHECK(c.beamShown > 0.0);
@@ -546,6 +552,7 @@ TEST_CASE("the beam never deploys under a moving craft", "[stage][abduction][seq
 
 // Test 2 -- the craft is stationary for the whole beam interval.
 TEST_CASE("the craft holds station from beam to beam-complete", "[stage][abduction][sequence]") {
+    testsupport::skipUnlessFarmAssetsPresent(); // before the REQUIRE: a SKIP inside one reads as a throw
     REQUIRE(!cycles().empty());
     for (const Cycle& c : cycles()) {
         INFO(fmt::format("cycle {:.3f}..{:.3f}: xz span {:.3f} m, y span {:.3f} m, worst step "
@@ -558,6 +565,7 @@ TEST_CASE("the craft holds station from beam to beam-complete", "[stage][abducti
 
 // Test 3 -- the beam is finished before the craft departs.
 TEST_CASE("the craft does not depart under a live beam", "[stage][abduction][sequence]") {
+    testsupport::skipUnlessFarmAssetsPresent(); // before the REQUIRE: a SKIP inside one reads as a throw
     REQUIRE(!cycles().empty());
     for (const Cycle& c : cycles()) {
         REQUIRE(c.craftMoved > 0.0);
@@ -1008,6 +1016,7 @@ TEST_CASE("the fade reaches the flattened scene and is given back", "[stage][abd
 // the reading is populated, agrees with the beat the director is actually in, and carries the two
 // numbers the brief singled out -- world position and velocity -- for the craft.
 TEST_CASE("the director publishes the state an overlay needs", "[stage][abduction][sequence]") {
+    testsupport::skipUnlessFarmAssetsPresent(); // the abduction beats need an animal to abduct
     app::Engine engine(app::EngineMode::Offline);
     auto loaded = engine.loadProject(filmProject());
     REQUIRE(loaded.has_value());

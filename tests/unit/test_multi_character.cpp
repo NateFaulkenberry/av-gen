@@ -22,6 +22,7 @@
 #include "scene/composition.hpp"
 #include "signals/signal_bus.hpp"
 #include "scene/scene.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -94,6 +95,10 @@ TEST_CASE("the shipping scene carries one copy of the alien per alien", "[multi]
     if (!fs::exists(glowmere())) {
         SKIP("the Glowmere scene is not present");
     }
+    // The scene's rigs are its aliens and its farm animals, both gitignored. The hosted runner never
+    // had the aliens, so this case measured the farm's duplicate rigs there; with neither there is
+    // no rig to measure.
+    testsupport::skipUnlessFarmAssetsPresent();
     assets::AssetRegistry registry(glowmere().parent_path());
     auto loaded = scene::Composition::loadFile(glowmere(), registry);
     if (!loaded.has_value()) {

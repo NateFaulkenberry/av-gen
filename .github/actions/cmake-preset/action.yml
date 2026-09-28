@@ -1,0 +1,79 @@
+# Configure and build one CMake preset on a GitHub-hosted macOS runner: the setup every build job in
+# ci.yml and sanitizers.yml used to repeat (docs/development/ci.md, "Caching").
+#
+#   - uses: ./.github/actions/cmake-preset
+#     with: { preset: asan, out: /Users/runner/ci-results/build-asan }
+#
+# Caches are RESTORED on every event and SAVED only from main. A branch reads main's caches (GitHub's
+# scoping lets it) and saves none of its own: per-branch, per-commit ccache entries were what filled
+# the repository's 10 GB cache quota on 2026-09-28 (24 entries, 10.7 GB) and evicted the sanitizer
+# caches main depends on. tools/ci/prune-caches.sh, run by each workflow's report job on main, keeps
+# only the newest entry per key prefix.
+#
+# Never cache anything under assets/: the purchased packs must not be placed in an Actions cache.
+# Neither path below can contain them (CPM sources, and ccache's object store outside the checkout).
+name: Build a preset
+description: Toolchain check, CPM and ccache restore, tools/ci/build.sh, cache save on main
+inputs:
+  preset:
+    description: CMake preset (release, asan, ubsan, tsan)
+    required: true
+  out:
+    description: Where build.sh writes configure.log, build.log and meta.json
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Toolchain
+      shell: bash
+      run: |
+        if [ ! -d "$DEVELOPER_DIR" ]; then
+          echo "::error title=Pinned Xcode missing::$DEVELOPER_DIR is not on this runner image. Available: $(ls /Applications | grep Xcode | tr '\n' ' '). Update XCODE_VERSION/DEVELOPER_DIR in .github/workflows/*.yml."
+          exit 1
+        fi
+        brew install ccache >/dev/null
+        sw_vers; uname -m; xcodebuild -version; clang --version | head -1; cmake --version | head -1
+        echo "ninja $(ninja --version)"; ccache --version | head -1
+
+    # Dependency SOURCES (CPM). Keyed on everything that decides what CPM fetches, with NO
+    # restore-keys fallback: cmake/Dependencies.cmake says CPM's cache key covers a patch's path
+    # but not its content, so restoring an older cache after a patch change could build stale
+    # patched sources. A miss costs one download (a few minutes); a stale hit costs correctness.
+    - name: Restore dependency cache (CPM)
+      id: cpm
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .cache/cpm
+        key: cpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/CPM.cmake', 'cmake/patches/**') }}
+
+    # Compiler cache. ccache is content-addressed (compiler, flags, preprocessed input), so an
+    # older cache can only produce misses, never a stale object: restore-keys are safe here.
+    - name: Restore compiler cache (ccache)
+      id: ccache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ inputs.preset }}-${{ github.sha }}
+        restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ inputs.preset }}-
+
+    - name: Configure and build (preset ${{ inputs.preset }})
+      shell: bash
+      env:
+        CPM_CACHE_STATE: ${{ steps.cpm.outputs.cache-hit == 'true' && 'hit' || 'miss (cold download)' }}
+        PRESET: ${{ inputs.preset }}
+        OUT: ${{ inputs.out }}
+      run: tools/ci/build.sh "$PRESET" "$OUT"
+
+    - name: Save dependency cache (main only)
+      if: github.ref == 'refs/heads/main' && steps.cpm.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .cache/cpm
+        key: ${{ steps.cpm.outputs.cache-primary-key }}
+
+    - name: Save compiler cache (main only)
+      if: github.ref == 'refs/heads/main'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ${{ steps.ccache.outputs.cache-primary-key }}

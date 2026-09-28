@@ -61,6 +61,7 @@
 #include "world/terrain_query.hpp"
 #include "signals/signal_bus.hpp"
 #include "stage/staging.hpp"
+#include "support/project_assets.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -111,9 +112,7 @@ fs::path labProject() {
     return {};
 }
 
-bool farmAssetsPresent() {
-    return fs::is_regular_file(fs::path(AVGEN_SOURCE_DIR) / "assets" / "farm" / "cow.glb");
-}
+using testsupport::farmAssetsPresent;
 
 float flatDistance(glm::vec3 a, glm::vec3 b) {
     return glm::length(glm::vec2(a.x - b.x, a.z - b.z));

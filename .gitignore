@@ -1,6 +1,8 @@
 .DS_Store
 build/
 build-*/
+# tools/ci/run-suite.sh's default results directory (result.json, shard logs), when run locally.
+/ci-results/
 .cache/
 # ...and `.cache` itself, without the slash. A trailing slash matches a *directory* only, so an
 # agent worktree whose `.cache` is a symlink to the main checkout's cache was not ignored, was

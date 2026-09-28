@@ -1,0 +1,7 @@
+# The private test-asset repository, and the exact commit of it that CI and tools/fetch-test-assets.sh
+# check out. docs/development/gpu-ci-private-assets.md says how it is made and updated.
+#
+# `commit none` means it has not been published yet: an asset job then fails with a clear error and
+# nothing else changes. After publishing (or updating) the repository, put its HEAD sha here.
+repository NateFaulkenberry/av-gen-test-assets
+commit none
