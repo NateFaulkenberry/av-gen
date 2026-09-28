@@ -371,7 +371,11 @@ table) so that the Effects panel and what renders agree.
   - the drummer's corrections (the right leg turned out 40°, the left wrist raised 8 cm);
   - `NECK_STIFFNESS = 0.5`.
 - **Still open:** the missing kick and hi-hat pedals are a prototype gap. Add them only if they are cheap and they
-  read in shot. The CGTrader licences are unconfirmed, which doesn't block local work.
+  read in shot. The licences, as the owner confirmed them on 2026-09-28:
+  - the astronaut, the keyboard and the stand: CC0;
+  - the drum kit: a personal royalty-free licence, not for redistribution;
+  - the Mixamo clips: not redistributable as files.
+  So all the generated GLBs stay uncommitted, and renders are fine.
 - **GV3's cast scale** (1.94x) must be applied to the musicians and their props together, as one transform per
   group.
 

@@ -41,7 +41,11 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   - Report: `~/Desktop/av-gen-review/21-astronaut-musicians/REPORT.md`.
   - Owner decisions pending: the texture, the keyboard, the drummer's corrections, and the CGTrader licences.
 - **Owner, 2026-09-28: the astronaut decisions.** Accepted as they are: the flat white suit and dark visor, the
-  keyboard at 2x, the drummer's corrections, and a neck stiffness of 0.5. The CGTrader licences are still open.
+  keyboard at 2x, the drummer's corrections, and a neck stiffness of 0.5. The licences, as the owner confirmed them on 2026-09-28:
+  - the astronaut: CC0 1.0 Universal;
+  - the keyboard and the stand: CC0;
+  - the drum kit: a personal royalty-free licence, not for redistribution. It may appear in renders, but the files
+    are never committed.
 - **Owner, 2026-09-28: the Astronaut Musicians + UFO Abduction addendum** is appended to the art-pass brief. It asks
   for:
   - the two musicians in GV3 near the river as hero entities, with a rainbow bioluminescent audio pulse and optional
