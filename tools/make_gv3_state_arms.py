@@ -127,8 +127,20 @@ def eco_gv2(p, s):
               or t.startswith(('scene/glowPools', 'scene/glow-pools')))
 
 
+@arm
+def no_ecolight(p, s):
+    """The ecology lights (ADR-053/945 glow pools) off: environment ecologyLight 0, its automation and routes removed."""
+    s['environment']['ecologyLight'] = 0.0
+    drop_refs(p, lambda t: t == 'scene/ecologyLight')
+    if 'scene/ecologyLight' in p.get('parameters', {}):
+        p['parameters']['scene/ecologyLight'] = 0.0
+
+
+PREFIX = '_qa-b-'
+
+
 def write(src, name, p, s):
-    base = os.path.join(os.path.dirname(src), f'_qa-b-{name}')
+    base = os.path.join(os.path.dirname(src), f'{PREFIX}{name}')
     scene_text = json.dumps(s, indent=1)
     with open(base + '.scene.json', 'w') as f:
         f.write(scene_text)
@@ -145,11 +157,14 @@ def main():
     ap.add_argument('project')
     ap.add_argument('--clean', action='store_true')
     ap.add_argument('--only', help='comma-separated arm names')
+    ap.add_argument('--prefix', default='_qa-b-', help='file prefix of the written arms (default _qa-b-)')
     a = ap.parse_args()
+    global PREFIX
+    PREFIX = a.prefix
     d = os.path.dirname(a.project)
     if a.clean:
         for f in os.listdir(d):
-            if f.startswith('_qa-b-'):
+            if f.startswith(PREFIX):
                 os.remove(os.path.join(d, f))
         return 0
     p0 = json.load(open(a.project))
