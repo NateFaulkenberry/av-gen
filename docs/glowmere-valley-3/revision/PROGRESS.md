@@ -8,6 +8,14 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **MERGED (00:05): main is `ad5623d2`, with every engine fix, ecolight included.** Integration suites: CPU 3,835 of
+  3,835; GPU 548 cases, 547 passed, 1 skipped. Pushed; merged into `gv3/production` (`879cd647`).
+  **`av-gen-engine-6` is the final engine** (BUILD-READY).
+  - **gv3-int is resumed to make r6, the final candidate:**
+    - engine-6, with ecolight's GV3 settings and the aurora glints at about 0.85;
+    - a re-trace, the cross-stream checks and the Critic against r5;
+    - the r6 preview and README in the review folder.
+    The 4K final waits for the owner's OK on r6.
 - **23:00: ecolight is DONE** (`9080e2f4`, ADR-945; ADR-946 was not needed) and **merged** (`ad5623d2`); its full
   suites are running.
   - Ecology lights are chosen by contribution and each lights a ground pool. New controls sit under scene/glow-pools
