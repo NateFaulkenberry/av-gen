@@ -81,6 +81,10 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 - **Superseded:** once qa/coord's suites pass, launch the art pass from qa/coord's head. The final merge into main waits for qa/ci.
 - **Superseded, kept for the record:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
+## The final report
+`FINAL-REPORT.md` (`d7f624ed`) answers the brief's 11 questions. Where this file's interim numbers differ from it,
+the report and `perf-summary.md` (the clean retake) win.
+
 ## Current Status
 2026-09-28:
 - Phase 0 is complete: the inventory and the plan are in `PLAN.md`.
@@ -155,7 +159,8 @@ in-frame character. Each call is 9 rays, sampling the terrain every 2 m. The onl
   - it runs even while the editor is paused (75 ms per frame on a paused wide), which is the "navigation is
     slow" complaint.
 
-**Worst wide (s66), 1280x720 headless, 3 repeats:**
+**Worst wide (s66), 1280x720 headless, 3 repeats.** These are INTERIM numbers, measured under contention. The clean
+retake supersedes them: 376.2 -> 235.4 -> 32.2 ms. See `perf-summary.md` and `FINAL-REPORT.md`.
 
 | build | frame | FPS |
 |---|---:|---:|
@@ -208,10 +213,12 @@ GV2 multicam wide, 720p:
 1. **ADR-834's per-frame sightline** (+20 ms of engine update; draws and triangles identical). FIXED by ADR-950 and
    ADR-951.
 2. **Each sightline got about 1.7x more expensive after ADR-834** (another +17 ms). Suspect: ADR-893's terrain
-   changes. It is neutralised by 951, which removes the calls, but it is NOT bisected. Bisect worktrees:
-   `0b623b88`, `22ce5c3d`, `ad5623d2`; script `build/qa-runs/hypC2.sh`.
+   changes. It is neutralised by 951, which removes the calls. **Resolved later:** it was bisected to `0fd83284`
+   (ADR-893/894), where each sightline became 1.79x as expensive. The bisect worktrees are removed.
 3. **The GPU scene pass is +2.5-3 ms (+18%)** while clustered lights went from 206 to 88-115. Suspect: ADR-945's
-   ecology lights. It may be an accepted look change. Open.
+   ecology lights. It may be an accepted look change. **Resolved later**, on the clean retake: +1.9 ms (+11%).
+   ADR-945's glow pools are 1.3 ms, an accepted look change. Creep across `0b623b88..22ce5c3d` is about 1.1 ms,
+   each part under 0.5 ms and not narrowed further.
 
 ## CI Status
 W2 checkpointed 2026-09-28 at `qa/ci` `bfa795b4`, pushed, not merged. Details and the monitor's resume point:
@@ -225,7 +232,7 @@ W2 checkpointed 2026-09-28 at `qa/ci` `bfa795b4`, pushed, not merged. Details an
 | `cpu-assets` (nightly, private assets) | written, gated off |
 | ASan (nightly, 5 jobs, 11 rest shards) | heavy-2 and heavy-3 PASS; heavy-1 and rest-a/b still running (36434165586) |
 | UBSan (now its own job, `halt_on_error=1`) | running (36434165586); risk of hitting the 330 min limit, in which case split it |
-| TSan (now nightly, concurrency set) | PASS: 243 cases, 0 reports, 40 min. The whole-suite probe 36434180499 will probably time out |
+| TSan (now nightly, concurrency set) | PASS: 243 cases, 0 reports, 40 min of tests in an 82 min job. The whole-suite probe 36434180499 will probably time out |
 
 **What changed:**
 - one composite build action;
