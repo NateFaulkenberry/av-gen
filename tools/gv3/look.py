@@ -572,6 +572,100 @@ def _route(source, target, amount, op="add", chain=None, polarity="unipolar"):
             "polarity": polarity, "enabled": True, "chain": chain or {}}
 
 
+# The aurora answers the bass (the owner, 2026-09-28: "the aurora should react to the audio, with a similar
+# low-energy bass pulse"). Not the aurora's own per-frame response, which stays off (BASE: it read the analyser
+# raw, every frame, and made the sky jump up to 44% between two frames on a kick): two smoothed routes in the
+# style of the river's `audio.bass -> ripple`, onto what a viewer reads as the curtains breathing -- their
+# brightness (a multiply beside the lead's `lead.aurora`, 1.0 at silence and AURORA_BASS_GAIN at a full bass)
+# and a small lift of their tops. The attack is ten frames long, so no frame carries more than a sliver of a
+# kick; the fall is slower than a bar's beat, so the swell rides the bass line rather than flickering on it.
+AURORA_BASS_GAIN = 1.16    # the curtains' brightness at a full bass, over their lead-driven level
+AURORA_BASS_LIFT = 140.0   # metres the curtain tops rise at a full bass, on 2300
+AURORA_BASS_BRIGHT = {"attackMs": 160.0, "decayMs": 1100.0, "clampEnabled": True, "clampMin": 0.0,
+                      "clampMax": 1.0, "remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0,
+                      "remapOutMin": 1.0, "remapOutMax": AURORA_BASS_GAIN}
+AURORA_BASS_LIFTING = {"attackMs": 240.0, "decayMs": 1500.0, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}
+
+
+def aurora_bass_routes():
+    return [_route("audio.bass", "fx/aurora/intensity", 1.0, "multiply", dict(AURORA_BASS_BRIGHT)),
+            _route("audio.bass", "fx/aurora/curtainHeight", AURORA_BASS_LIFT, "add", dict(AURORA_BASS_LIFTING))]
+
+
+# An effect keeps its values twice: its block (the `parameters` the Effects panel builds it from) and its flat
+# `fx/<id>/<field>` parameters, which are applied after the block and so are what renders. The QA pass's state
+# audit found twelve that disagreed (docs/qa-pass/gv3-state-audit.md, item 1) -- the aurora's audio response 1.0
+# in the block and 0 in what renders, its curtain height 2600 against 2300, among them -- and the owner asked
+# for the aurora's to agree. They are resolved for every effect the same way: the block is written from the
+# flat value that renders, last, after every look decision. The field -> block path tables are the registry's
+# own (`aurora_effect.cpp`, `wave_rows.hpp`); a stored-value type (glow, space warp, ...) keeps the field's own
+# name as its block key.
+_WAVE_BLOCK = {
+    "color": "appearance/color", "intensity": "appearance/intensity", "edgeColor": "appearance/edgeColor",
+    "edgeIntensity": "appearance/edgeIntensity", "width": "appearance/width", "rainbow": "appearance/rainbow",
+    "sparkle": "sparkle/enabled", "rainbowSpeed": "appearance/rainbowSpeed",
+    "rainbowScale": "appearance/rainbowScale", "rainbowSaturation": "appearance/rainbowSaturation",
+    "rainbowBrightness": "appearance/rainbowBrightness", "sparkleDensity": "sparkle/density",
+    "sparkleSize": "sparkle/size", "sparkleIntensity": "sparkle/intensity", "sparkleSpeed": "sparkle/speed",
+    "speed": "propagation/speed", "range": "propagation/range", "frontWidth": "propagation/frontWidth",
+    "trailLength": "propagation/trailLength", "falloff": "propagation/falloff",
+    "startOffset": "propagation/startOffset", "verticalExtent": "propagation/verticalExtent",
+    "ringCount": "propagation/ringCount", "beamRadius": "propagation/beamRadius",
+}
+_AURORA_BLOCK = {
+    "lowColor": "appearance/lowColor", "midColor": "appearance/midColor", "topColor": "appearance/topColor",
+    "intensity": "appearance/intensity", "curtainHeight": "shape/curtainHeight", "curtains": "shape/curtainCount",
+    "flowSpeed": "shape/flowSpeed", "audioSensitivity": "audio/sensitivity", "spectrumShape": "audio/spectrumShape",
+    "rainbow": "rainbow/enabled", "radius": "shape/radius", "layerSpacing": "shape/layerSpacing",
+    "baseHeight": "shape/baseHeight", "waveAmplitude": "shape/waveAmplitude", "waveScale": "shape/waveScale",
+    "turbulence": "shape/turbulence", "complexity": "shape/complexity", "driftSpeed": "shape/driftSpeed",
+    "verticalSpeed": "shape/verticalSpeed", "emission": "appearance/emission", "opacity": "appearance/opacity",
+    "edgeBrightness": "appearance/edgeBrightness", "filaments": "appearance/filaments",
+    "sparkle": "appearance/sparkle", "horizonGlow": "appearance/horizonGlow", "audioBass": "audio/bass",
+    "audioLowMid": "audio/lowMid", "audioMid": "audio/mid", "audioHigh": "audio/high",
+    "audioGlints": "audio/glints", "audioBeat": "audio/beat", "rainbowSpeed": "rainbow/speed",
+    "rainbowScale": "rainbow/scale", "rainbowHue": "rainbow/hueOffset", "rainbowSaturation": "rainbow/saturation",
+    "rainbowBrightness": "rainbow/brightness",
+}
+BLOCK_PATHS = {"aurora": _AURORA_BLOCK, "travelBeam": _WAVE_BLOCK, "groundPulse": _WAVE_BLOCK}
+
+
+def _differs(a, b):
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) != len(b) or any(_differs(x, y) for x, y in zip(a, b))
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a != b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) > 1e-5 * max(1.0, abs(b))
+    return a != b
+
+
+def sync_effect_blocks(project):
+    """Write every effect block value that has a flat `fx/` parameter from that parameter (see above).
+    Returns [(effect id, block path, was, now)] for what changed."""
+    params = project["parameters"]
+    changed = []
+    for e in project.get("effects", []):
+        block = e.get("parameters")
+        if not isinstance(block, dict):
+            continue
+        table = BLOCK_PATHS.get(e.get("type"))
+        items = table.items() if table else [(k, k) for k, v in block.items() if not isinstance(v, dict)]
+        for name, path in items:
+            key = f"fx/{e['id']}/{name}"
+            if key not in params:
+                continue
+            node, parts = block, path.split("/")
+            for part in parts[:-1]:
+                node = node.get(part) if isinstance(node, dict) else None
+            if not isinstance(node, dict) or parts[-1] not in node:
+                continue
+            if _differs(node[parts[-1]], params[key]):
+                changed.append((e["id"], path, node[parts[-1]], params[key]))
+                node[parts[-1]] = params[key]
+    return changed
+
+
 def _pulses(name, times, width=1.0 / 60.0):
     """A scored timeline source: a hit at each time, an event the film's own score writes where the
     analyser's would land wherever its detector decided. A time may be a (seconds, value) pair for a
@@ -693,6 +787,10 @@ def apply_motifs(project, scene):
     project["routes"] = routes
     reactivity.prepare(project, scene)
     print("  " + reactivity.apply(project, scene))
+    # After the proposal, not before it: the proposer leaves alone a target something already routes, so a
+    # bass route authored first would cost the aurora the lead's slow response (`lead.aurora`), which the
+    # owner asked to keep. Both now ride the aurora's brightness, the lead slowly and the bass as a swell.
+    project["routes"] += aurora_bass_routes()
     return len(project["routes"])
 
 

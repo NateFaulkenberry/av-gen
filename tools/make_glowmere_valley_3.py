@@ -333,6 +333,11 @@ def main():
         report.append(f"travel beam: fires on {len(beam_cuts)} cuts, "
                       + ", ".join(f"{sid} (bar {b}, {t:.2f} s)" for t, sid, b in beam_cuts))
 
+    # Last of the look: every effect's block agrees with the flat values that render (look.sync_effect_blocks).
+    synced = look.sync_effect_blocks(project)
+    report.append(f"effect blocks agree with what renders: {len(synced)} value(s) rewritten"
+                  + (": " + ", ".join(f"{i} {p} {w} -> {n}" for i, p, w, n in synced) if synced else ""))
+
     render = project.setdefault("render", {})
     # The render path resolves against the project's folder. Into build/, which git ignores: the film
     # carries the song, which must never be committed, and examples/world/ is not ignored.

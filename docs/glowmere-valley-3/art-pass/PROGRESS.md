@@ -6,7 +6,9 @@ in `docs/decisions/README.md`). Don't push, don't merge: the coordinator merges.
 
 ## Resume here
 
-- **Status (2026-09-28, start):** reading and planning. Nothing changed in GV3 yet.
+- **Status (2026-09-28, evening):** milestone 1 committed (`cdbcf63f`: items 1-3, ADRs 980-982, the two probes).
+  The aurora addendum is in `look.py` (data only, committed after milestone 1); its sky measurement waits for the
+  render batch (step 6). Next: the UFO warp (step 3 of the plan below).
 - **Build:** `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
   -DCPM_SOURCE_CACHE=/Users/natefaulkenberry/Documents/GitHub/av-gen/.cache/cpm`, then `cmake --build build/release`.
   Assets are linked (`../av-gen/tools/link-worktree-assets.sh ../av-gen-art`, 1,803 links).
@@ -151,10 +153,26 @@ of the head get their jitter re-dealt. Positions, sizes and yaws do not move.
   ~0.24 m). Global foot-IK behaviour; out of an art pass's scope. Check a walking alien in the verification stills.
 - Tests `[adr982]` in `test_entity_action.cpp` (3 cases); `[gait]` 24 cases pass.
 
+## Aurora addendum: done in data (`look.py`), measurement pending
+
+- Two smoothed routes, appended AFTER the reactivity proposal (`apply_motifs`; the proposer skips a target something
+  already routes, so authored first they cost the aurora the lead's `lead.aurora` -- checked: the proposal is 60 of
+  97 again and the route diff against r7b is exactly the two new routes):
+  `audio.bass -> fx/aurora/intensity` multiply, remapped 0..1 -> x1.00..x1.16, attack 160 ms, decay 1100 ms; and
+  `audio.bass -> fx/aurora/curtainHeight` add, 0..140 m on 2300 m, attack 240 ms, decay 1500 ms. The shader's own
+  per-frame audio response and spectrum shape stay 0 (look.py BASE, the 44% flicker).
+- Block/parameter duplicates: `look.sync_effect_blocks` (called last in `make_glowmere_valley_3.py`) writes every
+  effect block value that has a flat `fx/<id>/<field>` parameter from that parameter, with the registry's own
+  field -> block path tables (aurora, travel beam, ground pulse; a stored-value type keeps the field's name). 12
+  values rewritten (the aurora's `shape/curtainHeight` 2600 -> 2300, `audio/sensitivity` 1.0 -> 0.0, ...), 0 left.
+- **To measure (render batch):** the top fifth's mean luma frame to frame at 60 fps over s14 (the arrival's grand
+  wide, the 76.634 s beat) and the drop (s33, s36), r7b against this pass; state max and p99 of the consecutive-frame
+  change and the swell's size over a bar.
+
 ## Plan (the rest, in order)
 
-1. Commit milestone 1 (water, pulses, gait, the two probes, ADRs 980-982).
-2. Aurora bass pulse + resolve the aurora's duplicate block values (`look.py`; data only).
+1. ~~Commit milestone 1 (water, pulses, gait, the two probes, ADRs 980-982).~~ Done, `cdbcf63f`.
+2. ~~Aurora bass pulse + resolve the aurora's duplicate block values (`look.py`; data only).~~ Done; measure in 6.
 3. UFO warp: Space Warp ("UFO Warp" style) + a wake on `visitor` and `scout`, speed-routed; a hidden owner warps
    nothing (engine: `NodeView` visibility, ADR-983); suppressed during every beam/lift (timeline keys from the plan's
    moments).
