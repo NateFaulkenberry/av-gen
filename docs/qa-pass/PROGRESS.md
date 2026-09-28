@@ -40,6 +40,15 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
     7.66 cm to 0 and the pianist from 8.90 cm to 0.
   - Report: `~/Desktop/av-gen-review/21-astronaut-musicians/REPORT.md`.
   - Owner decisions pending: the texture, the keyboard, the drummer's corrections, and the CGTrader licences.
+- **Owner, 2026-09-28: the astronaut decisions.** Accepted as they are: the flat white suit and dark visor, the
+  keyboard at 2x, the drummer's corrections, and a neck stiffness of 0.5. The CGTrader licences are still open.
+- **Owner, 2026-09-28: the Astronaut Musicians + UFO Abduction addendum** is appended to the art-pass brief. It asks
+  for:
+  - the two musicians in GV3 near the river as hero entities, with a rainbow bioluminescent audio pulse and optional
+    stage lighting;
+  - the UFO abducting the drummer instead of the animal.
+  - **The launch gate changes:** `proto/astronaut-musicians` must be merged into main (or into the art-pass branch)
+    before the art pass starts.
 - **Next:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
 ## Current Status

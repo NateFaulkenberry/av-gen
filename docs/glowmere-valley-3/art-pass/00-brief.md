@@ -350,3 +350,529 @@ curtain's brightness and/or lift that you can read over the bass, never a frame-
 existing slow `lead.aurora` response. Measure the frame-to-frame change of the sky over the arrival wide and the
 drop, as `look.py` did, and state the numbers. Resolve the aurora's duplicate block and parameter values (the audit's
 table) so that the Effects panel and what renders agree.
+
+
+---
+
+## Addendum (owner, 2026-09-28): Astronaut Musicians + UFO Abduction
+
+*Coordinator's note, not the owner's words:*
+- **The validated source of truth** is branch `proto/astronaut-musicians` (`7f1dc21d`, worktree `../av-gen-astro`).
+  It has the build script `tools/make_astronaut_musicians.py` (with the rigid-helmet fix and `NECK_STIFFNESS = 0.5`),
+  the standalone example `examples/musicians/`, `assets/musicians/ATTRIBUTION.md`, and
+  `docs/prototypes/astronaut-musicians/PROGRESS.md`. It must be merged into main before this pass starts, or into
+  this pass's branch.
+- **The assets** (`~/Desktop/musician_assets/`, and everything generated from them) have unknown or unconfirmed
+  licences, so they are never committed. Regenerate them with the Blender command in PROGRESS.md.
+- **The prototype's report** is `~/Desktop/av-gen-review/21-astronaut-musicians/REPORT.md`.
+- **Owner decisions, 2026-09-28** (all accepted as they are):
+  - the flat white suit and dark visor, with no texture;
+  - the keyboard at about twice real width;
+  - the drummer's corrections (the right leg turned out 40°, the left wrist raised 8 cm);
+  - `NECK_STIFFNESS = 0.5`.
+- **Still open:** the missing kick and hi-hat pedals are a prototype gap. Add them only if they are cheap and they
+  read in shot. The CGTrader licences are unconfirmed, which doesn't block local work.
+- **GV3's cast scale** (1.94x) must be applied to the musicians and their props together, as one transform per
+  group.
+
+The owner's words follow, verbatim.
+
+# GV3 Art Pass Addendum — Astronaut Musicians + UFO Abduction
+
+This is an **addendum to the existing Glowmere Valley 3 art-pass specification**.
+
+The GV3 art pass has not yet begun.
+
+The standalone astronaut-musician prototype has now been completed successfully. The two astronauts have been rigged and the supplied Mixamo animations are working convincingly with the instruments.
+
+We are now ready to bring that validated work into GV3.
+
+---
+
+# 1. Import the Astronaut Musicians
+
+Import the validated astronaut musician assets from the standalone prototype into GV3.
+
+There should be two performers:
+
+### Musician 1 — Keyboard
+
+* Low-poly astronaut
+* Keyboard
+* Folding keyboard stand
+* Mixamo piano-playing animation
+
+### Musician 2 — Drummer
+
+* Low-poly astronaut
+* Low-poly drum kit
+* Mixamo drum-playing animation
+
+**Reuse the exact rigging/animation solution that was validated in the prototype.**
+
+Do not redo the character rigging unless there is a genuine GV3 integration issue.
+
+Do not create a new character system as part of this task.
+
+---
+
+# 2. Placement — Central River Area
+
+Place the two musicians somewhere **roughly in the middle of Glowmere Valley near the river**.
+
+The location should feel intentional and visually interesting, rather than simply being the nearest empty patch of terrain.
+
+Desired composition:
+
+```text
+                 River
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+          Keyboard Astronaut
+                  ↘
+                    ↘
+                      ↘
+
+                       ↙
+                     ↙
+                   ↙
+          Drummer Astronaut
+                 
+             [some space]
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+The exact arrangement is flexible.
+
+The important characteristics are:
+
+* Both musicians should be reasonably close to the river.
+* They should have **clear separation from one another**.
+* They should be **facing each other**, as though they are performing together.
+* There should be enough space between them that each character reads clearly.
+* Their instruments should remain visually distinct.
+* The composition should work from the existing GV3 cameras where possible.
+
+They should feel like a deliberate musical performance happening inside Glowmere rather than two unrelated NPCs dropped into the environment.
+
+---
+
+# 3. Vegetation / Environment Integration
+
+Be especially careful with the existing Glowmere vegetation.
+
+Do not simply place the musicians and accept whatever intersections occur.
+
+Inspect the final placement for:
+
+* mushrooms growing through the drum kit
+* plants growing through the keyboard
+* vegetation intersecting astronaut bodies
+* branches/leaves intersecting instruments
+* terrain clipping through chairs/instruments
+* props floating above or sinking into the ground
+* awkward vegetation directly underneath the performers
+
+Prefer **small local adjustments to placement and/or vegetation** rather than substantially clearing the environment.
+
+The musicians should feel embedded in the existing Glowmere environment.
+
+Do not sterilize the surrounding area just to make placement easy.
+
+---
+
+# 4. Make Both Musicians Heroes
+
+Both astronauts should be treated as **hero entities** in GV3.
+
+Use the existing GV3 hero/entity infrastructure.
+
+Do not invent a parallel system.
+
+Make sure both musicians can participate in the existing hero-effect architecture.
+
+---
+
+# 5. New Hero Effect — Rainbow Bioluminescent Pulse
+
+Create a new hero treatment for the astronauts.
+
+The initial concept:
+
+> **Outward-radiating rainbow bioluminescent energy that pulses to the music.**
+
+The effect should make the astronauts feel like unusual Glowmere entities rather than ordinary astronauts imported into the scene.
+
+### Desired visual behavior
+
+The effect should:
+
+* originate around each astronaut
+* radiate outward
+* have a bioluminescent quality
+* contain a shifting/rainbow spectral color range
+* pulse rhythmically with the music
+* respond clearly enough to be visible in the render
+* remain aesthetically compatible with the existing Glowmere palette
+* avoid looking like a generic RGB game effect
+
+Think:
+
+**bioluminescent aura / energy field**
+
+rather than:
+
+**rainbow outline / neon cartoon glow.**
+
+The effect should feel organic and atmospheric.
+
+---
+
+# 6. Audio Reactivity
+
+Tie the hero effect into the existing GV3 audio-reactive system.
+
+The pulse should respond to the actual music rather than simply running on an arbitrary timer.
+
+Prefer existing audio analysis/signal-bus infrastructure.
+
+The effect should have some relationship to the beat:
+
+* subtle baseline activity
+* stronger pulse on beats/transients
+* potentially stronger intensity during larger musical moments
+
+Do not make it so aggressive that the astronauts become giant flashing objects that dominate the entire scene.
+
+The goal is **musical life**, not visual noise.
+
+---
+
+# 7. Make the Two Astronauts Feel Like a Pair
+
+Although they are separate hero entities, they should visually read as part of the same performance.
+
+Consider subtle synchronization:
+
+* shared pulse timing
+* synchronized aura expansion
+* slight variation in color phase/intensity between the two
+* complementary rather than identical effect behavior
+
+Do not make them perfectly identical clones in behavior if a small amount of variation would improve the shot.
+
+---
+
+# 8. Optional Stage Lighting
+
+Investigate whether the musicians benefit from a subtle stage-like lighting treatment.
+
+One possible approach:
+
+* a soft localized light over the performers
+* potentially a subtle spotlight/cone
+* enough illumination to separate them from the environment
+* preserve the astronauts' own bioluminescent effects
+
+### This is OPTIONAL.
+
+Do not force additional lighting into the scene if it compromises the existing Glowmere look.
+
+The existing scene relies heavily on glowing materials, modulation, atmospheric lighting and bioluminescent effects.
+
+Too much conventional illumination could flatten the scene and reduce the visual impact of those effects.
+
+Therefore:
+
+> **Only add a stage/spotlight treatment if it genuinely improves the composition.**
+
+If implemented, keep it restrained.
+
+Prefer a subtle theatrical pool of light over a bright obvious spotlight.
+
+Evaluate both versions if practical.
+
+---
+
+# 9. UFO Abduction — Replace Existing Animal
+
+GV3 already contains a UFO-abduction shot during the riser.
+
+Currently the UFO abducts an animal.
+
+Replace that subject with the **drummer astronaut**.
+
+The intended sequence is:
+
+1. Drummer is playing normally behind the drum kit.
+2. UFO enters / appears according to the existing shot.
+3. UFO begins abducting the drummer.
+4. Drummer rises from behind the drum kit.
+5. Drummer is lifted upward toward the UFO.
+6. Drummer exits the camera framing / is abducted.
+7. Once the shot no longer sees the drummer, restore him to his normal position behind the drum kit.
+8. Resume the normal drum-playing animation.
+
+The scene does **not** need to make literal narrative sense.
+
+This is a music-video gag.
+
+The drummer can simply disappear from the performance, get abducted, and then magically be back behind the drum kit afterward.
+
+Do not spend time implementing narrative continuity.
+
+---
+
+# 10. Drummer Abduction Motion
+
+The existing UFO abduction should provide the basic upward motion.
+
+However, add additional character motion if feasible.
+
+The ideal visual result is that the drummer's body becomes increasingly uncontrolled as he is pulled upward.
+
+Potential behavior:
+
+* legs dangling
+* torso rotating slightly
+* arms flailing
+* drumsticks moving erratically
+* hands leaving their normal playing positions
+* slight rotation of the character while ascending
+
+The motion should communicate:
+
+> "Holy shit, I'm being abducted."
+
+rather than:
+
+> "Character translation Y += 0.1."
+
+---
+
+# 11. Bonus: Procedural Flailing
+
+If the existing character animation system makes this practical, layer a simple procedural secondary motion on top of the abduction animation.
+
+For example:
+
+```text
+normal drum animation
+        ↓
+UFO abduction begins
+        ↓
+reduce / override normal playing animation
+        ↓
+add arm + leg + torso secondary motion
+        ↓
+character rises toward UFO
+        ↓
+character leaves camera
+```
+
+The flailing does NOT need to be physically accurate.
+
+It just needs to read clearly in the shot.
+
+Possible implementation approaches include:
+
+* animation blending
+* additive animation
+* procedural bone offsets
+* simple keyed transforms
+* temporary animation override
+
+Use the simplest approach that produces a convincing result.
+
+Do not build a generalized procedural ragdoll system for this shot.
+
+---
+
+# 12. Restoration After Abduction
+
+Once the drummer is no longer visible:
+
+* restore the drummer to the original performance transform
+* restore the normal drum-playing animation
+* ensure the drum kit remains in its original position
+* ensure no permanent transform state from the abduction leaks into subsequent shots
+
+The drummer should be visually identical to his pre-abduction state when he returns.
+
+This should be deterministic and shot-specific.
+
+---
+
+# 13. Existing UFO Shot Preservation
+
+Do not unnecessarily redesign the UFO itself.
+
+Preserve the existing UFO aesthetic, animation and timing where possible.
+
+The primary change is:
+
+**animal subject → drummer astronaut**
+
+with additional character-specific abduction motion.
+
+If the existing UFO animation already provides a strong beam/pull effect, reuse it.
+
+---
+
+# 14. Camera / Composition Review
+
+After implementing the musicians, review the existing GV3 cameras that see this area.
+
+The musicians should read clearly when visible.
+
+If necessary, make **small composition adjustments** to existing shots so that:
+
+* both musicians aren't obscured
+* instruments remain readable
+* the rainbow bioluminescence is visible
+* the river/environment still contributes to the shot
+* the performers don't accidentally become background clutter
+
+Do not redesign the entire sequence.
+
+Do not add unnecessary camera shots.
+
+---
+
+# 15. Performance Considerations
+
+GV3 is already approaching a performance bottleneck.
+
+This is especially important.
+
+Keep the musicians extremely lightweight.
+
+Reuse:
+
+* existing character meshes
+* existing animation infrastructure
+* existing materials where possible
+* existing effect systems where possible
+
+Avoid:
+
+* expensive transparent particle volumes
+* large numbers of dynamic lights
+* high-resolution shadow maps
+* unnecessary post-processing
+* duplicated high-poly assets
+* expensive per-frame CPU processing
+
+The rainbow aura should be implemented using the **cheapest existing effect mechanism that can produce the desired visual quality**.
+
+If the optional stage lighting introduces a significant GPU cost, omit it.
+
+---
+
+# 16. Art Direction
+
+The musicians should ultimately feel like they belong in Glowmere.
+
+Do not make them look like realistic NASA astronauts suddenly dropped into a fantasy scene.
+
+The low-poly astronaut aesthetic is intentional.
+
+Use the surrounding Glowmere environment, emissive materials, hero effects and lighting to integrate them into the world.
+
+The contrast between:
+
+**simple low-poly astronauts**
+
+and
+
+**rich bioluminescent environment**
+
+is desirable.
+
+Lean into that contrast.
+
+---
+
+# 17. Validation Pass
+
+Before considering the implementation complete, render and inspect:
+
+### Normal performance
+
+* keyboard astronaut playing
+* drummer playing
+* both facing each other
+* instruments clearly visible
+* no vegetation/instrument clipping
+* hero effects visible
+* audio-reactive pulse working
+
+### UFO sequence
+
+* drummer playing normally
+* UFO arrival
+* drummer lifting from kit
+* convincing flailing
+* drummer leaving frame
+* restoration after shot
+* normal drum animation resumes
+
+### Lighting
+
+Evaluate the scene both:
+
+1. without additional stage lighting
+2. with the optional subtle stage lighting
+
+Use whichever produces the stronger Glowmere result while preserving the existing bioluminescent aesthetic.
+
+
+---
+
+# 18. Scope Boundary
+
+This task is an **art-pass implementation**, not the beginning of a generalized character system.
+
+Do not use this work to introduce:
+
+* Character Synthesis
+* generalized animation authoring
+* generalized procedural animation
+* generalized ragdoll physics
+* character-generation UI
+* new character schemas
+* generalized musician entities
+
+However, document any reusable infrastructure discovered during implementation.
+
+If the implementation exposes a genuinely useful missing capability in AV Gen's character/animation architecture, record it as a potential future Character Synthesis requirement rather than expanding the current scope.
+
+---
+
+# Definition of Done
+
+The addendum is complete when:
+
+* [ ] Two astronauts are integrated into GV3.
+* [ ] Keyboard astronaut plays the keyboard correctly.
+* [ ] Drummer plays the drum kit correctly.
+* [ ] Both are positioned near the river in the central valley.
+* [ ] They face one another with deliberate spacing.
+* [ ] Vegetation does not visibly clip through the instruments.
+* [ ] Both are registered as hero entities.
+* [ ] Both have the new rainbow bioluminescent hero effect.
+* [ ] The effect pulses with the music.
+* [ ] Optional stage lighting has been evaluated and only retained if beneficial.
+* [ ] Existing UFO animal-abduction shot has been converted to abduct the drummer.
+* [ ] Drummer rises from behind the drum kit.
+* [ ] Drummer performs convincing secondary/flailing motion if feasible.
+* [ ] Drummer exits the shot.
+* [ ] Drummer is restored to his original performance position afterward.
+* [ ] Normal drum animation resumes.
+* [ ] Existing GV3 shots continue to function.
+* [ ] Performance impact has been evaluated.
+* [ ] Final renders have been visually inspected.
+* [ ] No unrelated GV3 systems have been modified unnecessarily.
+
+This should be implemented as part of the upcoming GV3 art pass, with the existing standalone musician prototype treated as the validated source of truth for the character assets and animation setup.
