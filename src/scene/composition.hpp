@@ -1560,6 +1560,10 @@ private:
     float ecologyLightGain_ = 0.0f;      // 0 disables; scenes opt in (ADR-053)
     float ecologyLightRange_ = 120.0f;   // metres from the camera a glowing patch still lights
     float ecologyGlowCell_ = 9.0f;       // metres per aggregation cell
+    // ADR-945: the radius of the pool each patch lights on the ground, and the faintest layer glow
+    // (`scene::layerGlowStrength`) that casts one. The file's values; the parameters below are live.
+    float ecologyPoolReach_ = 6.0f;
+    float ecologyPoolFaintest_ = 0.1f;
     // Authored camera/environment settings (used when unattached and as parameter defaults).
     std::optional<float> cameraDistanceSetting_; // empty = fitted to the bounds
     std::optional<float> cameraHeightSetting_;
@@ -1701,6 +1705,10 @@ private:
     params::Parameter<float>* keyLight_ = nullptr;   // multiplier on the default key light
     // ADR-905: `scene/ecologyLight`, the final behind `ecologyLightGain_` (the file's value).
     params::Parameter<float>* ecologyLight_ = nullptr;
+    // ADR-945: `scene/glow-pools/{reach,faintest,distance}` behind the three settings above.
+    params::Parameter<float>* ecologyPoolReachParam_ = nullptr;
+    params::Parameter<float>* ecologyPoolFaintestParam_ = nullptr;
+    params::Parameter<float>* ecologyPoolDistanceParam_ = nullptr;
     bool addedKeyLight_ = false;
     mutable std::uint64_t frameCounter_ = 0;
     params::Parameter<glm::vec3>* fogColor_ = nullptr;

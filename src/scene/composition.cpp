@@ -1,5 +1,6 @@
 #include "scene/composition.hpp"
 
+#include "scene/ecology_lights.hpp"
 #include "scene/follow_reference.hpp"
 
 #include "params/timeline.hpp"
@@ -63,7 +64,8 @@ constexpr std::string_view kSceneKeys[] = {
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
-    "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "skybox",
+    "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "ecologyPoolReach",
+    "ecologyPoolFaintest", "skybox",
     "proceduralSkyBackground",
     "lightFromEnvironment", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
@@ -4499,6 +4501,27 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         d.label = "light cast by glowing plants and fungi"; // what it looks like: pools on the ground
         ecologyLight_ = &params.add(std::move(d));
     }
+    // ADR-945: the pools themselves, named for what they look like. Their Parameters-panel section
+    // is "glow-pools" under "scene", beside the brightness above; the World panel shows them in the
+    // Environment inspector with every other `scene/` parameter.
+    {
+        params::ParamDesc<float> d =
+            floatDesc(prefix_ + "scene/glow-pools/reach", ecologyPoolReach_, 0.25f, 80.0f, 1.0f, 30.0f);
+        d.label = "how far each glow pool spreads on the ground (m)";
+        ecologyPoolReachParam_ = &params.add(std::move(d));
+    }
+    {
+        params::ParamDesc<float> d =
+            floatDesc(prefix_ + "scene/glow-pools/faintest", ecologyPoolFaintest_, 0.0f, 20.0f, 0.0f, 1.0f);
+        d.label = "faintest glow that casts a pool (dimmer plants cast none)";
+        ecologyPoolFaintestParam_ = &params.add(std::move(d));
+    }
+    {
+        params::ParamDesc<float> d =
+            floatDesc(prefix_ + "scene/glow-pools/distance", ecologyLightRange_, 1.0f, 2000.0f, 20.0f, 600.0f);
+        d.label = "farthest glow pool from the camera (m)";
+        ecologyPoolDistanceParam_ = &params.add(std::move(d));
+    }
     // ADR-055/ADR-360. `WindParams::active()` is `enabled && speed > 0`, and until ADR-360 only
     // `speed` was reachable -- the comment that used to sit here said "speed 0 is a genuine no-op:
     // active() is false", reading the gate as speed alone, which is how a field nobody could switch
@@ -5711,6 +5734,9 @@ void Composition::detach() {
     volumeJitter_ = nullptr;
     keyLight_ = nullptr;
     ecologyLight_ = nullptr;
+    ecologyPoolReachParam_ = nullptr;
+    ecologyPoolFaintestParam_ = nullptr;
+    ecologyPoolDistanceParam_ = nullptr;
     gridIntensity_ = nullptr;
     rootScale_ = nullptr;
     rootRotationSpeed_ = nullptr;
@@ -8796,9 +8822,10 @@ void Composition::applyDayNight() {
 // than snapped. The aspect comes from the lens's sensor, which is the authored intent; the render
 // target's aspect is not known here and would make the framing depend on the output size.
 // ADR-053: the light a glowing ecology casts. The scatter layers are reduced at build time to
-// soft emitters, one per occupied cell of a coarse grid, and this picks the ones near the camera
-// and makes them real lights. The count is bounded by the light budget rather than by how much is
-// growing, so a meadow of ten thousand glowing ferns costs the same as a hundred.
+// soft emitters, one per occupied cell of a coarse grid, and this picks the ones that put the most
+// light into the picture (ADR-945) and makes them real lights, each a pool on the ground round its
+// patch. The count is bounded by the light budget rather than by how much is growing, so a meadow
+// of ten thousand glowing ferns costs the same as a hundred.
 void Composition::updateEcologyLights() {
     ecologyLightCount_ = 0;
     if (!ecologyLightsEnabled_) {
@@ -8818,76 +8845,104 @@ void Composition::updateEcologyLights() {
         return;
     }
 
-    struct Candidate {
+    // ADR-945: the patches that put the most light into this picture, not the nearest ones. Every
+    // input is this frame's -- the camera, the clusters, the parameters -- so a seek lands on the
+    // lights play would have (ADR-089); nothing here remembers the last frame.
+    const float reach = ecologyPoolReachParam_ != nullptr ? ecologyPoolReachParam_->value() : ecologyPoolReach_;
+    const float faintest =
+        ecologyPoolFaintestParam_ != nullptr ? ecologyPoolFaintestParam_->value() : ecologyPoolFaintest_;
+    EcologyLightView view;
+    view.eye = scene_.camera.position;
+    view.farthest = ecologyPoolDistanceParam_ != nullptr ? ecologyPoolDistanceParam_->value() : ecologyLightRange_;
+    {
+        const float aspect = static_cast<float>(viewportWidth_) / static_cast<float>(std::max(viewportHeight_, 1u));
+        view.planes = world::frustumPlanes(scene_.camera.projection(std::max(aspect, 1e-3f)) * scene_.camera.view());
+    }
+
+    struct Source {
         const world::GlowCluster* cluster;
-        float distanceSq;
-        glm::vec3 position;
         const CompositionNode* node;
+        GlowPool pool;
+        float layerGain;
+        float layerHue;
     };
-    std::vector<Candidate> candidates;
-    const glm::vec3 eye = scene_.camera.position;
+    std::vector<Source> sources;
+    std::vector<EcologyLightCandidate> candidates;
     for (std::size_t i = 0; i < nodes_.size() && i < ranges_.size(); ++i) {
         const CompositionNode& node = *nodes_[i];
         if (node.kind != NodeKind::Terrain || node.glow.empty()) {
             continue;
         }
         const glm::mat4 m = nodeTransform(node).matrix();
+        const float boostBase = node.emissiveParam != nullptr ? node.emissiveParam->base() : node.emissiveBoost;
+        // Per layer, once: whether it glows enough to cast a pool, and the gain and hue its light
+        // takes. The threshold and the ranking read the gain's BASE -- what the artist set -- so a
+        // route pulsing the fungi on the kick brightens their pools without reshuffling which
+        // patches have lights on every beat; the light's intensity reads the final (ADR-905).
+        struct LayerLight {
+            bool casts = false;
+            float baseGain = 1.0f;
+            float gain = 1.0f;
+            float hue = 0.0f;
+            float lift = 0.0f;
+        };
+        std::vector<LayerLight> layers(node.ecology.layers.size());
+        for (std::size_t l = 0; l < layers.size(); ++l) {
+            const world::ScatterLayer& layer = node.ecology.layers[l];
+            const CompositionNode::ScatterLayerParameters* p =
+                l < node.scatterParams.size() ? &node.scatterParams[l] : nullptr;
+            LayerLight& out = layers[l];
+            out.baseGain = p != nullptr && p->emissionGain != nullptr ? p->emissionGain->base() : layer.emissionGain;
+            out.gain = p != nullptr && p->emissionGain != nullptr ? p->emissionGain->value() : layer.emissionGain;
+            out.hue = p != nullptr && p->hueOffset != nullptr ? p->hueOffset->value() : layer.hueOffset;
+            out.lift = layer.height * 0.5f; // `aggregateGlow`'s default lift, the one the build uses
+            out.casts = out.gain > 0.0f && layerGlowStrength(layer, out.baseGain) >= faintest;
+        }
         for (const world::GlowCluster& g : node.glow) {
-            const glm::vec3 world = glm::vec3(m * glm::vec4(g.position, 1.0f));
-            const float d2 = glm::dot(world - eye, world - eye);
-            if (d2 > ecologyLightRange_ * ecologyLightRange_) {
+            if (g.layer >= layers.size() || !layers[g.layer].casts) {
                 continue;
             }
-            candidates.push_back({&g, d2, world, &node});
+            const LayerLight& layer = layers[g.layer];
+            world::GlowCluster placed = g;
+            placed.position = glm::vec3(m * glm::vec4(g.position, 1.0f));
+            const GlowPool pool = glowPool(placed, layer.lift, reach);
+            candidates.push_back({pool.position, pool.range, g.power * boostBase * std::max(layer.baseGain, 0.0f)});
+            sources.push_back({&g, &node, pool, layer.gain, layer.hue});
         }
     }
-    if (candidates.empty()) {
-        return;
-    }
-    // Nearest first: a patch behind the camera still lights the air and the ground it sits on, but
-    // when the budget runs out the ones the frame is actually looking at are the ones to keep.
-    if (candidates.size() > budget) {
-        std::nth_element(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(budget),
-                         candidates.end(),
-                         [](const Candidate& a, const Candidate& b) { return a.distanceSq < b.distanceSq; });
-        candidates.resize(budget);
-    }
+    const std::vector<EcologyLightChoice> chosen = chooseEcologyLights(candidates, view, budget);
 
-    for (std::size_t i = 0; i < candidates.size(); ++i) {
-        const world::GlowCluster& g = *candidates[i].cluster;
-        const CompositionNode& owner = *candidates[i].node;
-        // ADR-905: the light a layer casts follows the glow it shows -- the terrain's boost and the
-        // layer's own gain and hue, the same finals its surfaces take after their program.
-        float layerGain = 1.0f;
-        float layerHue = 0.0f;
-        if (g.layer < owner.ecology.layers.size()) {
-            const world::ScatterLayer& layer = owner.ecology.layers[g.layer];
-            const CompositionNode::ScatterLayerParameters* p =
-                g.layer < owner.scatterParams.size() ? &owner.scatterParams[g.layer] : nullptr;
-            layerGain = p != nullptr && p->emissionGain != nullptr ? p->emissionGain->value() : layer.emissionGain;
-            layerHue = p != nullptr && p->hueOffset != nullptr ? p->hueOffset->value() : layer.hueOffset;
-        }
+    // Highest contribution first: the clustered pass keeps the first 32 lights of a froxel in buffer
+    // order, so where a distant froxel is crowded the pools it keeps are the ones that matter most.
+    std::size_t made = 0;
+    for (const EcologyLightChoice& choice : chosen) {
+        const Source& src = sources[choice.index];
+        const world::GlowCluster& g = *src.cluster;
         PunctualLight light;
-        light.name = fmt::format("{}{}", kEcologyLightPrefix, i);
+        light.name = fmt::format("{}{}", kEcologyLightPrefix, made);
         // A point light, not a Sphere: a sphere emitter goes through the LTC area-light
         // integration, and at a couple of hundred of them that dominated the frame. What a patch
-        // of glow needs is a soft falloff, which the radius already gives.
+        // of glow needs is a soft pool, which its height over the ground gives (`glowPool`).
         light.type = PunctualLight::Type::Point;
         light.role = PunctualLight::Role::Practical;
-        light.position = candidates[i].position;
-        light.color = layerHue != 0.0f ? color::hueShift(g.color, layerHue) : g.color;
-        // The aggregate's power is a sum of emissive weights, not photometric candela. The scale
-        // is the one free constant here: it sets how far a patch of glowing ecology throws light,
-        // and it is authored per scene rather than guessed once.
-        light.intensity = g.power * gain * nodeEmissiveBoost(owner) * std::max(layerGain, 0.0f);
+        light.position = src.pool.position;
+        // ADR-905: the light a layer casts follows the glow it shows -- the terrain's boost and the
+        // layer's own gain and hue, the same finals its surfaces take after their program.
+        light.color = src.layerHue != 0.0f ? color::hueShift(g.color, src.layerHue) : g.color;
+        // The aggregate's power is a sum of emissive weights, not photometric candela; `gain` is the
+        // scene's scale for it. Where the light stands does not change it: a wider pool is the same
+        // light spread further. `weight` fades a light in at the budget's cut and out at the
+        // distance limit, so a pool crossing either as the camera moves does not pop.
+        light.intensity = g.power * gain * nodeEmissiveBoost(*src.node) * std::max(src.layerGain, 0.0f) * choice.weight;
         light.radius = std::max(g.radius, 0.25f);
-        light.range = g.radius * 4.0f;
+        light.range = src.pool.range;
         light.castsShadow = false;   // hundreds of these; none of them can afford a shadow map
         light.contactShadow = false;
         light.volumetricStrength = 0.0f; // the volumetrics see these through the glow field, not here
         scene_.lights.push_back(std::move(light));
+        ++made;
     }
-    ecologyLightCount_ = candidates.size();
+    ecologyLightCount_ = made;
 }
 
 void Composition::setViewport(std::uint32_t width, std::uint32_t height) {
@@ -9495,8 +9550,13 @@ nlohmann::json Composition::toJson() const {
     if (const float ecologyLight = ecologyLight_ != nullptr ? ecologyLight_->base() : ecologyLightGain_;
         ecologyLight > 0.0f) {
         environment["ecologyLight"] = ecologyLight;
-        environment["ecologyLightRange"] = ecologyLightRange_;
+        environment["ecologyLightRange"] =
+            ecologyPoolDistanceParam_ != nullptr ? ecologyPoolDistanceParam_->base() : ecologyLightRange_;
         environment["ecologyGlowCell"] = ecologyGlowCell_;
+        environment["ecologyPoolReach"] =
+            ecologyPoolReachParam_ != nullptr ? ecologyPoolReachParam_->base() : ecologyPoolReach_;
+        environment["ecologyPoolFaintest"] =
+            ecologyPoolFaintestParam_ != nullptr ? ecologyPoolFaintestParam_->base() : ecologyPoolFaintest_;
     }
     if (lightFromEnvironmentSetting_) {
         environment["lightFromEnvironment"] = true;
@@ -10572,7 +10632,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
               // of lights changes what every other scene costs, so it is opt-in.
               std::pair<const char*, float*>{"ecologyLight", &comp->ecologyLightGain_},
               std::pair<const char*, float*>{"ecologyLightRange", &comp->ecologyLightRange_},
-              std::pair<const char*, float*>{"ecologyGlowCell", &comp->ecologyGlowCell_}}) {
+              std::pair<const char*, float*>{"ecologyGlowCell", &comp->ecologyGlowCell_},
+              // ADR-945: the pool each glowing patch lights, and the faintest glow that casts one.
+              std::pair<const char*, float*>{"ecologyPoolReach", &comp->ecologyPoolReach_},
+              std::pair<const char*, float*>{"ecologyPoolFaintest", &comp->ecologyPoolFaintest_}}) {
             auto value = readFloat(e, key.first, *key.second);
             if (!value) {
                 return std::unexpected(value.error());
