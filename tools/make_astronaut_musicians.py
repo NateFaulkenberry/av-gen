@@ -186,6 +186,94 @@ def fix_astronaut_materials(mesh):
     return len(faces)
 
 
+# The helmet. The supplied skin was made with automatic weights, and they bleed: every one of the
+# helmet shell's 349 vertices is weighted to six bones -- about 37 % head, 24 % neck_01, 11-12 % to
+# EACH upper arm and 8 % to each clavicle -- so any arm or shoulder movement drags the shell and it
+# dents (measured over every frame: up to 7.7 cm off rigid on the drummer, 8.9 cm on the pianist).
+# The fix is a hard shell (100 % head) plus a collar that hands the rotation from the head to the
+# chest over three rings -- and a stiffer neck in the retarget (NECK_STIFFNESS), because the helmet
+# sits directly on the shoulders: there is no neck, so any angle between head and chest has to be
+# taken up by the band of suit under the rim (about 0.19 m x the angle).
+HELMET_CUT_Z = 1.58          # the helmet separates from the shoulders above this height (rest pose)
+HELMET_BLEND_RINGS = 3       # rings below the rim that blend from head to chest
+COLLAR_R_IN, COLLAR_R_OUT = 0.19, 0.26   # rings 2+ fade out between these distances from the neck axis
+NECK_STIFFNESS = 0.5         # fraction of the clips' neck/head rotation away from the chest that is kept
+
+
+def helmet_vertices(mesh, cut_z=HELMET_CUT_Z):
+    """The helmet shell: the part of the mesh connected to the crown and lying above cut_z."""
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    bm.verts.ensure_lookup_table()
+    crown = max(bm.verts, key=lambda v: v.co.z)
+    seen, stack = {crown.index}, [crown]
+    while stack:
+        v = stack.pop()
+        for e in v.link_edges:
+            o = e.other_vert(v)
+            if o.index not in seen and o.co.z >= cut_z:
+                seen.add(o.index)
+                stack.append(o)
+    bm.free()
+    return sorted(seen)
+
+
+def collar_rings(mesh, helmet, n):
+    """The n rings of vertices below the helmet, by edge distance from it."""
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    bm.verts.ensure_lookup_table()
+    known, frontier, rings = set(helmet), set(helmet), []
+    for _ in range(n):
+        nxt = {e.other_vert(bm.verts[i]).index for i in frontier for e in bm.verts[i].link_edges} - known
+        known |= nxt
+        rings.append(sorted(nxt))
+        frontier = nxt
+    bm.free()
+    return rings
+
+
+def fix_helmet_weights(mesh, rig, rings=HELMET_BLEND_RINGS, r_in=COLLAR_R_IN, r_out=COLLAR_R_OUT):
+    """Weight the helmet 100 % to `head`, and blend the collar from head to chest.
+
+    Ring d (1 = just under the rim) moves a fraction beta = 1 - d/(rings+1) of the way to
+    {head: beta, neck_01: 1 - beta}, keeping the rest of its own weights (arms included, so it still
+    meets the shoulders without a seam). Ring 1 lies wholly inside the neck opening and blends fully;
+    rings 2+ reach onto the shoulders, so their blend fades out between r_in and r_out from the neck
+    axis -- taking the shoulders off the arms is what made an earlier version stretch them into flat
+    wings."""
+    helmet = helmet_vertices(mesh)
+    ring_sets = collar_rings(mesh, helmet, rings)
+    axis = rig.data.bones["neck_01"].head_local
+    names = {g.index: g.name for g in mesh.vertex_groups}
+    groups = {g.name: g for g in mesh.vertex_groups}
+    new = {}
+    for d, ring in enumerate(ring_sets, start=1):
+        beta = 1.0 - d / (rings + 1.0)
+        for i in ring:
+            co = mesh.data.vertices[i].co
+            r = math.hypot(co.x - axis.x, co.y - axis.y)
+            fade = 1.0 if (d == 1 or r <= r_in) else max(0.0, min(1.0, (r_out - r) / (r_out - r_in)))
+            f = beta * fade
+            if f <= 0.0:
+                continue
+            own = {names[g.group]: g.weight for g in mesh.data.vertices[i].groups if g.weight > 0}
+            total = sum(own.values())
+            own = {k: v / total for k, v in own.items()}
+            top = {"head": beta, "neck_01": 1.0 - beta}
+            new[i] = {k: (1 - f) * own.get(k, 0.0) + f * top.get(k, 0.0) for k in set(own) | set(top)}
+    touched = helmet + sorted(new)
+    for g in mesh.vertex_groups:
+        g.remove(touched)
+    groups["head"].add(helmet, 1.0, "REPLACE")
+    for i, w in sorted(new.items()):
+        for k, v in sorted(w.items()):
+            if v > 1e-4:
+                groups[k].add([i], v, "REPLACE")
+    mesh.data.update()
+    return {"helmet_vertices": len(helmet), "collar_vertices_reweighted": len(new)}
+
+
 # --------------------------------------------------------------------------------------------------
 # 2. Mixamo clips
 # --------------------------------------------------------------------------------------------------
@@ -212,7 +300,7 @@ def _hip_height(obj, bone_name, sole_z):
 
 
 def retarget(src, dst, action_name, frame_range=None, hip_scale=None, hand_height_ik=False,
-             hand_offsets=None, lift=0.0, leg_turnout=None, hand_shift=None):
+             hand_offsets=None, lift=0.0, leg_turnout=None, hand_shift=None, neck_stiffness=1.0):
     """Bake `src`'s current action onto `dst` as a new action called `action_name`.
 
     For every mapped bone and frame, the source bone's world rotation relative to its own rest is
@@ -237,6 +325,10 @@ def retarget(src, dst, action_name, frame_range=None, hip_scale=None, hand_heigh
     constant offset on the whole leg (thigh, calf, foot, ball rotate together, so the foot stays on
     the floor and every pedal tap is kept). The drum clip needs it: its snare strokes land where the
     suit's 0.28 m-wide right knee is, so the knee has to make room.
+    `neck_stiffness` keeps that fraction of the neck's and head's rotation away from the chest (same
+    axis, same timing, smaller angle). The astronaut's head is a rigid helmet sitting on a collar, and
+    the clips nod and turn the head up to 46-49 deg against the chest -- which a real neck does and a
+    helmet on a suit collar cannot.
     Returns (action, hip_scale, ik_stats).
     """
     sc = bpy.context.scene
@@ -282,6 +374,14 @@ def retarget(src, dst, action_name, frame_range=None, hip_scale=None, hand_heigh
             turn = Quaternion(Vector((0.0, 0.0, 1.0)), math.radians(deg if side == "l" else -deg))
             for b in (f"thigh_{side}", f"calf_{side}", f"foot_{side}", f"ball_{side}"):
                 tgt[b] = turn @ tgt[b]
+        if neck_stiffness != 1.0:
+            chest = tgt["spine_03"] @ rest_dst_arm["spine_03"].inverted()
+            for b in ("neck_01", "head"):
+                follow = chest @ rest_dst_arm[b]            # where the bone would be, locked to the chest
+                rel = tgt[b] @ follow.inverted()
+                if rel.w < 0.0:
+                    rel.negate()
+                tgt[b] = Quaternion().slerp(rel, neck_stiffness) @ follow
         targets.append(tgt)
         hips_w = sw @ src.pose.bones["mixamorig:Hips"].head
         pelvis_pos.append(dw_inv @ (pelvis_rest_w + (hips_w - hips_rest_w) * hip_scale) + Vector((0.0, 0.0, lift)))
@@ -437,7 +537,7 @@ def ground_lift(mesh, frames):
     return max(0.0, -low)
 
 
-def calibrate_hands(src, dst, mesh, action_name, skip=(), lift=0.0):
+def calibrate_hands(src, dst, mesh, action_name, skip=(), lift=0.0, **kw):
     """Retarget with the hand-height IK twice: once to measure where each hand's fingertips play,
     once with per-hand offsets that put both hands' median fingertip height on one plane.
 
@@ -446,7 +546,7 @@ def calibrate_hands(src, dst, mesh, action_name, skip=(), lift=0.0):
     fingertips ~3.7 cm above its left. Returns (action, key_plane_z, stats) with z relative to
     `dst`'s own origin.
     """
-    act, hip_scale, _ = retarget(src, dst, action_name, hand_height_ik=True, lift=lift)
+    act, hip_scale, _ = retarget(src, dst, action_name, hand_height_ik=True, lift=lift, **kw)
     f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])
     frames = range(f0, f1 + 1, 2)
     base = dst.matrix_world.translation.z
@@ -454,7 +554,7 @@ def calibrate_hands(src, dst, mesh, action_name, skip=(), lift=0.0):
     med = {s: sorted(v)[len(v) // 2] - base for s, v in h.items()}
     plane = 0.5 * (med["l"] + med["r"])
     offs = {s: plane - med[s] for s in med}
-    act, hip_scale, ik = retarget(src, dst, action_name, hand_height_ik=True, hand_offsets=offs, lift=lift)
+    act, hip_scale, ik = retarget(src, dst, action_name, hand_height_ik=True, hand_offsets=offs, lift=lift, **kw)
     h = fingertip_heights(mesh, frames, skip)
     after = {s: sorted(v)[len(v) // 2] - base for s, v in h.items()}
     return act, plane, {"before_median": med, "offsets": offs, "after_median": after, "ik": ik,
@@ -1004,6 +1104,67 @@ def seat_contact(mesh, frames, inside):
     return lows[len(lows) // 2], lows[0], lows[-1]
 
 
+def helmet_audit(mesh, rig, frames):
+    """How far the helmet is from rigid, how hard the suit around it strains, whether it cuts the body.
+
+    - rigid residual: per frame, the helmet's deformed vertices against the best rigid fit of its rest
+      shape (Kabsch); the max over the helmet, then over frames. 0 means the shell never dents.
+    - suit strain: per edge of the upper torso around the helmet (rest z 1.36 .. 1.62, |x| < 0.36:
+      collar and shoulders), the worst |length/rest - 1| over the clip; the median, p90, p99 and max
+      over edges. A strain count, not a verdict -- the worst edges are short ones under the rim.
+    - overlap frames: frames in which a helmet triangle crosses a body triangle (the collar rings,
+      which join the two, excluded).
+    - head vs chest: the angle between the head bone and where a chest-locked head would be."""
+    import numpy as np
+    from mathutils.bvhtree import BVHTree
+    sc = bpy.context.scene
+    helmet = helmet_vertices(mesh)
+    hs = set(helmet)
+    rings = collar_rings(mesh, helmet, HELMET_BLEND_RINGS)
+    near = hs.union(*[set(r) for r in rings])
+    polys = [tuple(p.vertices) for p in mesh.data.polygons]
+    hf = [p for p in polys if all(i in hs for i in p)]
+    bf = [p for p in polys if not any(i in near for i in p)]
+    rest = np.array([v.co[:] for v in mesh.data.vertices])
+    region = {v.index for v in mesh.data.vertices
+              if v.index not in hs and 1.36 <= v.co.z < 1.62 and abs(v.co.x) < 0.36}
+    E = np.array(sorted({tuple(sorted((a, b))) for p in polys for a, b in zip(p, p[1:] + p[:1])
+                         if a in region or b in region}))
+    L0 = np.linalg.norm(rest[E[:, 0]] - rest[E[:, 1]], axis=1)
+    Q = rest[helmet]
+    A = Q - Q.mean(0)
+    rs = rig.data.bones["spine_03"].matrix_local.to_quaternion()
+    rh = rig.data.bones["head"].matrix_local.to_quaternion()
+    worst_edge = np.zeros(len(E))
+    resid, angle, overlap = [], [], 0
+    for f in frames:
+        sc.frame_set(f)
+        ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        P = np.array([v.co[:] for v in ev.data.vertices])
+        B = P[helmet] - P[helmet].mean(0)
+        U, _S, Vt = np.linalg.svd(A.T @ B)
+        d = np.sign(np.linalg.det(Vt.T @ U.T))
+        R = Vt.T @ np.diag([1.0, 1.0, d]) @ U.T
+        resid.append(float(np.linalg.norm(A @ R.T - B, axis=1).max()))
+        worst_edge = np.maximum(worst_edge, np.abs(np.linalg.norm(P[E[:, 0]] - P[E[:, 1]], axis=1) / L0 - 1))
+        pts = [tuple(x) for x in P]
+        if BVHTree.FromPolygons(pts, hf).overlap(BVHTree.FromPolygons(pts, bf)):
+            overlap += 1
+        ps = rig.pose.bones["spine_03"].matrix.to_quaternion()
+        ph = rig.pose.bones["head"].matrix.to_quaternion()
+        angle.append(math.degrees((ph @ (ps @ rs.inverted() @ rh).inverted()).angle))
+    r, a = np.array(resid), np.array(angle)
+    return {"helmet_rigid_residual_cm": {"max": round(float(r.max()) * 100, 2), "p50": round(float(np.median(r)) * 100, 2),
+                                         "frames_over_1cm": int((r > 0.01).sum())},
+            "suit_edge_strain_pct": {"p50": round(float(np.median(worst_edge)) * 100, 1),
+                                     "p90": round(float(np.percentile(worst_edge, 90)) * 100, 1),
+                                     "p99": round(float(np.percentile(worst_edge, 99)) * 100, 1),
+                                     "max": round(float(worst_edge.max()) * 100, 1)},
+            "helmet_body_overlap_frames": overlap,
+            "head_vs_chest_deg": {"max": round(float(a.max()), 1), "p50": round(float(np.median(a)), 1)},
+            "frames": len(r)}
+
+
 # --------------------------------------------------------------------------------------------------
 # 5. The pipeline
 # --------------------------------------------------------------------------------------------------
@@ -1065,14 +1226,21 @@ def _duplicate_performer(rig, mesh, prefix, coll):
     return r, m
 
 
-def build(src_dir):
-    """Everything, from the source files, in performer-local coordinates. Returns a report dict."""
+def build(src_dir, helmet_fix=True):
+    """Everything, from the source files, in performer-local coordinates. Returns a report dict.
+
+    helmet_fix=False reproduces the rig as supplied (auto-weighted helmet, full neck rotation), for
+    before/after measurements."""
     bpy.ops.wm.read_homefile(use_empty=True)
     sc = bpy.context.scene
     sc.render.fps, sc.render.fps_base = 30, 1.0
     report = {}
     rig, mesh = load_astronaut(src_dir)
     report["visor_faces"] = fix_astronaut_materials(mesh)
+    if helmet_fix:
+        report["helmet_weights"] = fix_helmet_weights(mesh, rig)
+    neck = NECK_STIFFNESS if helmet_fix else 1.0
+    report["neck_stiffness"] = neck
     piano_src, _ = import_mixamo(src_dir, PIANO_FBX, "piano")
     drums_src, _ = import_mixamo(src_dir, DRUMS_FBX, "drums")
     keys = bpy.data.collections["astronaut"]
@@ -1083,8 +1251,9 @@ def build(src_dir):
     drig, dmesh = _duplicate_performer(rig, mesh, "drums", drums)
 
     # --- pianist: ground, then hold both hands on one key plane
-    _act, lift_p, _ = grounded_retarget(piano_src, rig, mesh, "Piano")
-    _act, plane, cal = calibrate_hands(piano_src, rig, mesh, "Piano", skip=PIANO_SKIP, lift=lift_p)
+    _act, lift_p, _ = grounded_retarget(piano_src, rig, mesh, "Piano", neck_stiffness=neck)
+    _act, plane, cal = calibrate_hands(piano_src, rig, mesh, "Piano", skip=PIANO_SKIP, lift=lift_p,
+                                       neck_stiffness=neck)
     key_top = plane - KEY_BELOW_FINGERTIPS
     kb = load_keyboard(src_dir, keys)
     xs = [v.co.x for v in kb.data.vertices]
@@ -1107,7 +1276,8 @@ def build(src_dir):
 
     # --- drummer: ground, turn the right leg out, raise the left hand; sticks; kit from the strikes
     _act_d, lift_d, ik_d = grounded_retarget(drums_src, drig, dmesh, "Drums", leg_turnout=DRUM_TURNOUT,
-                                            hand_height_ik=("l",), hand_offsets={"l": DRUM_LEFT_RAISE})
+                                            hand_height_ik=("l",), hand_offsets={"l": DRUM_LEFT_RAISE},
+                                            neck_stiffness=neck)
     gl = solve_grip(drig, "l", *GRIP_L)
     gr = solve_grip(drig, "r", *GRIP_R)
     sticks = make_drumsticks(drig, drums, {"l": gl[:2], "r": gr[:2]}, frame=GRIP_L[0][0],
@@ -1143,6 +1313,8 @@ def build(src_dir):
         "drummer_body_vs_kit": audit_intersections(dmesh, list(kit.values()), range(1, 143)),
         "sticks_vs_kit": audit_intersections(sticks, list(kit.values()), range(1, 143)),
     }
+    report["helmet"] = {"pianist": helmet_audit(mesh, rig, range(1, 501)),
+                        "drummer": helmet_audit(dmesh, drig, range(1, 143))}
     return report
 
 
@@ -1246,12 +1418,14 @@ def main(argv):
     ap.add_argument("--out", required=True, help="folder for the four GLBs (e.g. assets/musicians)")
     ap.add_argument("--blend", required=True, help="where to write the validation .blend")
     ap.add_argument("--report", help="where to write the measurements as JSON")
+    ap.add_argument("--no-helmet-fix", action="store_true",
+                    help="build the rig as supplied (auto-weighted helmet, full neck rotation) for comparison")
     args = ap.parse_args(argv)
     src = os.path.expanduser(args.src)
     out = os.path.abspath(args.out)
     blend = os.path.abspath(args.blend)
     build_blend = os.path.splitext(blend)[0] + "_build.blend"
-    report = build(src)
+    report = build(src, helmet_fix=not args.no_helmet_fix)
     bpy.ops.wm.save_as_mainfile(filepath=build_blend)
     report["glb_bytes"] = {}
     for name in EXPORT_SETS:
