@@ -459,11 +459,9 @@ def e4_pair_lifted(t0, t1, g):
     # scout has no hero record and the Critic takes the saucer's larger bounds. Over water, so no undergrowth can stand in the
     # lens: iteration 3's eye on the dry ground north-east of the meadow was inside a plant whose
     # leaves filled the frame (and its 40 mm cut the scout's top).
-    # From the south now, 44 m off: the engine spreads a lifted pair along east-west, so the old eye
-    # east of the station saw the two cows one behind the other, touching (the owner's "stuck together";
-    # gv3-int r3 at 1080p). From the south they rise side by side, either side of the beam (batch vK1).
+    # From the south, 44 m off (gv3-int vK1). Since r7 E4 lifts one cow (the owner: one animal at a time).
     r = aim_at(28.0, g(-70, 52, 4.0), "scout", (0.0, -10.0, 0.0), "hover")
-    return r, dict(lead="event", purpose="E4: two animals lifted together", subject="the scout's beam and the pair (E4)",
+    return r, dict(lead="event", purpose="E4: a cow lifted into the column", subject="the scout's beam and the cow (E4)",
                    camera="28 mm, 4 m up, 44 m south of the station, live aim", movement="still", music="the lift on bar 57",
                    effects="the scout's beam")
 
@@ -488,9 +486,9 @@ def e4_aliens_watch(t0, t1, g):
     # does what the first version of this shot was written for: she hurries up and stands on the rise
     # 40 m west of the station from 108 s, facing it within 3 deg. A fixed eye 6 m behind her and 2.5 m to
     # her left, 3 m up, a live aim under the hovering scout: she stands at the left third, the column
-    # and the rising pair in the middle (gv3-int r6, candidate vM1).
+    # and the rising cow in the middle (gv3-int r6, candidate vM1).
     r = aim_at(35.0, g(-114.45, 19.6, 3.0), "scout", (0.0, -12.0, 0.0), "hover")
-    return r, dict(lead="event", purpose="E4: Sage watches the pair rise", subject="the column (E4), sage watching it",
+    return r, dict(lead="event", purpose="E4: Sage watches the cow rise", subject="the column (E4), sage watching it",
                    camera="35 mm, 6 m behind Sage, live aim", movement="still", music="2 bars",
                    effects="the scout's beam")
 

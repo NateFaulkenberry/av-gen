@@ -13,13 +13,10 @@ music, building to the riser's centrepiece. The five are a Director plan in the 
                  leaves on bar 13, the riff's phrase end
   E2  flyby      the saucer crosses the sky in the first pull-back (bar 15 + 0.3 s)
   E3  abduction  the scout lifts one animal far up the valley, at the top of the lift's crane (bar 37)
-  E4  abduction  the scout lifts two animals together in the meadow west of the river (bar 57): the
-                 two cows it finds there, named (`east-cow` cow-12 first, `west-cow` cow-23), because
-                 the engine lays a pair out along +x/-x in the order it takes them, and taking the
-                 western cow first sent each across the other's path mid-lift -- one body through the
-                 other at 107.0 s, the owner's "two cows stuck together, abducted as one" (gv3-int
-                 r2b) -- and 4 m apart in height, since 57.1 looks along that axis and sees them one
-                 above the other
+  E4  abduction  the scout lifts one cow in the meadow west of the river (bar 57), named (`e4-cow`,
+                 cow-12). The owner: only one animal is ever abducted at a time; the pair E4 used to lift
+                 read at 1:45 as "two cows being abducted at once", so the second cow is re-homed away
+                 (cast.REHOMED) and no other animal stands within 15 m of any beam
   E5  abduction  the centrepiece: the saucer takes the elder's own horse -- the beam on bar 93, the
                  horse gone on the drop, its gold glow riding the lift (two cues on E5's lift)
 
@@ -74,7 +71,7 @@ FPS = 60.0
 # `transit` is its hidden move to where it appears, `hover` the hold before the beam.
 HIDDEN_BEATS = ("rest", "transit", "hover")
 # What a set piece must have done for the film to be the one the plan asked for.
-EXPECTED_ANIMALS = {"e3-far-lift": 1, "e4-river-pair": 2, "e5-centrepiece": 1}
+EXPECTED_ANIMALS = {"e3-far-lift": 1, "e4-river-pair": 1, "e5-centrepiece": 1}
 
 # The aliens' answers to the beams they hear (cast.py's REACTIONS), measured for the cut: a reaction
 # shot ("Vane sees it") has to be where an alien actually stands watching. A watch is the body
