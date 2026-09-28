@@ -24,6 +24,7 @@
 // means touching the engine, the window and the panel, and a gate that could do any of that could
 // not be tested without all three.
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 
@@ -139,6 +140,87 @@ private:
     State state_ = State::Idle;
     CloseIntent intent_ = CloseIntent::Quit;
     std::filesystem::path path_;
+};
+
+// When the periodic dirty sample runs, and what it may attribute to the user (ADR-440, ADR-952).
+//
+// ADR-440's sample is a full project serialisation -- about 36 ms on Glowmere Valley 3 -- taken on
+// the UI thread every `max(250 ms, 10 x its last cost)`. While the transport plays, that is two
+// dropped frames about 2.6 times a second of the film the owner is watching. ADR-952 (the owner's
+// decision of 2026-09-28): **the periodic sample does not run while the transport is playing.**
+//
+// Why that is sound rather than a stale "clean":
+//
+// - The sample's only job on an untouched window is to move the baseline over the engine's own
+//   drift. Absorbing ten windows of drift in ten samples and absorbing them in one sample at the end
+//   are the same result, because on an untouched window every difference is the engine's.
+// - Touches are still *recorded* while playing -- a widget active, an edit history that is dirty --
+//   so the window does not forget one. It is only the serialisation that waits.
+// - Every close measures on demand (`Application::requestClose`) with `touched()` as it stands, so
+//   a close mid-playback gets a fresh answer: an edit made during playback is reported, an untouched
+//   playback is absorbed. Nothing that discards a project reads the cached answer.
+// - The first idle frame after playback stops samples at once, whatever the throttle says, so the
+//   title's unsaved marker is brought up to date as soon as the film stops.
+//
+// Header-only and free of ImGui, the Engine and the clock, so the schedule is unit-tested
+// (tests/unit/test_unsaved_changes.cpp) rather than described. The host passes time in
+// milliseconds on any monotonic clock.
+class DirtySampleSchedule {
+public:
+    // The throttle floor, and the multiple of the last measured cost, from ADR-440.
+    static constexpr double kFloorMs = 250.0;
+    static constexpr double kCostMultiple = 10.0;
+
+    // Called once per frame, before the panels draw. Records a touch when a widget is active or the
+    // edit history has unsaved commands, and answers whether the host should sample now (passing
+    // `touched()`, then calling `sampled`).
+    //
+    // Never while a widget is active (a 36 ms stall must not land in a drag) and never while the
+    // transport is playing (ADR-952). The first eligible frame after playback stops is due at once.
+    [[nodiscard]] bool due(double nowMs, bool playing, bool widgetActive, bool editsDirty) {
+        if (widgetActive || editsDirty) {
+            touched_ = true;
+        }
+        if (playing) {
+            playedSinceSample_ = true;
+            return false;
+        }
+        if (widgetActive) {
+            return false;
+        }
+        if (playedSinceSample_) {
+            return true;
+        }
+        return nowMs - lastSampleMs_ >= std::max(kFloorMs, lastCostMs_ * kCostMultiple);
+    }
+
+    // The host has just sampled, at `nowMs`, and it cost `costMs`. The attribution window restarts.
+    void sampled(double nowMs, double costMs) {
+        lastCostMs_ = costMs;
+        restart(nowMs);
+    }
+
+    // The baseline moved without a periodic sample -- a close measured on demand, a load, a save --
+    // so the window this attributes over starts again here. The click that asked for the load or
+    // save is not an edit to what came after it.
+    void restart(double nowMs) {
+        touched_ = false;
+        playedSinceSample_ = false;
+        lastSampleMs_ = nowMs;
+    }
+
+    // Something reached the project without going through a widget (the stress driver).
+    void touch() { touched_ = true; }
+
+    // "Did anything touch the application since the last sample?" -- what the engine is told.
+    [[nodiscard]] bool touched() const { return touched_; }
+    [[nodiscard]] double lastCostMs() const { return lastCostMs_; }
+
+private:
+    bool touched_ = false;
+    bool playedSinceSample_ = false;
+    double lastSampleMs_ = 0.0;
+    double lastCostMs_ = 0.0;
 };
 
 // What the modal says. `inline`, and in the header rather than beside the drawing, so the wording

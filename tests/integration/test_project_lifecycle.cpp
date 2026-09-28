@@ -28,6 +28,7 @@
 #include "support/temp_dir.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <string>
@@ -246,5 +247,77 @@ TEST_CASE("the engine's own writeback does not dirty an untouched project",
     // sample. This is the monotonicity that keeps the absorption from becoming a work-loser.
     play(120);
     CHECK(engine.projectDirtyCached());
+#endif
+}
+
+TEST_CASE("a close during playback, with no periodic sample, still answers correctly",
+          "[project][lifecycle][unsaved][adr952]") {
+    // ADR-952: the periodic sample does not run while the transport plays, so a close in the middle
+    // of a film measures once, on demand, over the whole playback. Both directions must hold from
+    // that one measurement: the engine's own writes during a long untouched playback are absorbed
+    // (no spurious prompt), and an edit made mid-playback is reported (no lost work).
+    //
+    // Measured while writing ADR-952: 600 frames of this project, and 300 frames of Glowmere Valley
+    // 3 from 0 s, 85.8 s and 194.7 s, now drift by **zero** paths -- the 20 paths ADR-440 measured
+    // on 2026-09-20 no longer move. So the engine's writeback is stood in for by the thing it is: a
+    // parameter base written with nothing touching the application. The same write, reported as a
+    // touch, is the edit section's control (ADR-182).
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    if (!fs::exists(projectA())) {
+        SKIP("Glowmere Valley 2 Multi-Camera is not present");
+    }
+    double t = 0.0;
+    const double dt = 1.0 / 30.0;
+    // Playback as ADR-952 has it: frames advance, and nothing samples.
+    const auto play = [&](app::Engine& engine, int frames) {
+        for (int i = 0; i < frames; ++i) {
+            FrameTime ft{};
+            ft.renderTime = t;
+            ft.deltaTime = dt;
+            t += dt;
+            engine.update(ft);
+        }
+    };
+
+    SECTION("an untouched playback is absorbed in one on-demand sample") {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(projectA()).has_value());
+        engine.setViewport(1920, 1080);
+        const nlohmann::json opened = engine.projectDocument(engine.projectPath());
+        play(engine, 300);
+        // The engine writing its own state mid-playback, as ADR-386's writeback does.
+        params::IParameter* p = engine.params().find("camera/fov");
+        REQUIRE(p != nullptr);
+        p->setBaseComponent(0, p->baseComponent(0) + 5.0f);
+        play(engine, 300);
+        // The document did move, so "absorbed" below is not "there was nothing to absorb".
+        REQUIRE(engine.projectDocument(engine.projectPath()) != opened);
+        // The close, as `Application::requestClose` asks it after an untouched playback.
+        CHECK_FALSE(engine.projectDirty(/*touchedSinceLastSample=*/false));
+    }
+
+    SECTION("an edit made mid-playback is reported by the close") {
+        app::Engine engine(app::EngineMode::Offline);
+        REQUIRE(engine.loadProject(projectA()).has_value());
+        engine.setViewport(1920, 1080);
+        play(engine, 300);
+        params::IParameter* p = engine.params().find("camera/fov");
+        REQUIRE(p != nullptr);
+        const float fov = p->baseComponent(0);
+        p->setBaseComponent(0, fov + 5.0f);
+        REQUIRE(p->baseComponent(0) != fov); // the edit actually took (ADR-387)
+        play(engine, 300);
+        // Nothing sampled in 20 s, and the cached answer is the stale one the title would show...
+        CHECK_FALSE(engine.projectDirtyCached());
+        // ...which is why a close never reads it: measured on demand, with the touch the schedule
+        // kept, the edit is there.
+        CHECK(engine.projectDirty(/*touchedSinceLastSample=*/true));
+        // And the stop sample that follows keeps it (monotone).
+        play(engine, 60);
+        engine.sampleProjectDirty(false);
+        CHECK(engine.projectDirtyCached());
+    }
 #endif
 }

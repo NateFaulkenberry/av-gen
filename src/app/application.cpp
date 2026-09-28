@@ -2216,6 +2216,15 @@ bool Application::opensADifferentProject(const std::filesystem::path& path) {
     return doc.value("format", std::string()) != scene::Composition::kFormatName;
 }
 
+namespace {
+// The dirty schedule's clock (ADR-952): milliseconds on the steady clock.
+double dirtyClockMs() {
+    return std::chrono::duration<double, std::milli>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+} // namespace
+
 bool Application::requestClose(ui::CloseIntent intent, std::function<void()> action,
                                const std::filesystem::path& path) {
     if (closeGate_.busy()) {
@@ -2233,9 +2242,13 @@ bool Application::requestClose(ui::CloseIntent intent, std::function<void()> act
     // timeline -- so a clean history falls through to the comparison rather than short-circuiting
     // it. (It also gives `EditSystem::dirty()` its first production reader; before ADR-440 it had
     // neither a reader nor a writer.)
-    const bool dirty = edits_.dirty() || engine_->projectDirty(touchedSinceDirtySample_);
-    touchedSinceDirtySample_ = false;
-    lastDirtySample_ = std::chrono::steady_clock::now();
+    //
+    // Also measured here *during playback*, where the periodic sample does not run (ADR-952): the
+    // touch window then spans the whole of the playback so far, so an edit made while the film
+    // played is reported and an untouched playback is absorbed. The cached answer is never what a
+    // close reads.
+    const bool dirty = edits_.dirty() || engine_->projectDirty(dirtySchedule_.touched());
+    dirtySchedule_.restart(dirtyClockMs());
     if (closeGate_.requestClose(intent, dirty, path)) {
         action();
         return true;
@@ -2329,35 +2342,33 @@ void Application::refreshWindowTitle() {
 // Sampled no more often than ten times the cost of the last sample -- so the 675 KB project is
 // checked about every 310 ms and a small one four times a second -- and never while a widget is
 // active, so a 31 ms serialisation cannot land in the middle of a drag.
+//
+// And never while the transport is playing (ADR-952, the owner's decision of 2026-09-28): on
+// Glowmere Valley 3 each sample is ~36 ms, two dropped frames of the film about 2.6 times a second.
+// The first idle frame after playback stops samples at once, so the title's marker catches up as
+// soon as the film does; until then it shows the answer from before playback. Every close measures
+// on demand, so no discard ever reads that frozen answer.
 void Application::sampleProjectDirtyIfIdle() {
-    const bool widgetActive = ImGui::IsAnyItemActive();
-    if (widgetActive || edits_.dirty()) {
-        touchedSinceDirtySample_ = true;
-    }
-    if (widgetActive) {
-        return;
-    }
-    const auto now = std::chrono::steady_clock::now();
-    const double waited = std::chrono::duration<double, std::milli>(now - lastDirtySample_).count();
-    if (waited < std::max(250.0, lastDirtySampleMs_ * 10.0)) {
+    const double now = dirtyClockMs();
+    // ADR-952: not while the transport plays. Touches are still recorded by `due`, so the window a
+    // later sample (or a close, measured on demand) attributes over forgets none of them.
+    if (!dirtySchedule_.due(now, engine_->isPlaying(), ImGui::IsAnyItemActive(), edits_.dirty())) {
         return;
     }
     const bool wasDirty = engine_->projectDirtyCached();
-    const auto started = std::chrono::steady_clock::now();
+    const bool touched = dirtySchedule_.touched();
     if (std::getenv("AVGEN_DIRTY_TRACE") != nullptr) {
-        log::info("DIRTYTRACE sample touched={} dirty={}", touchedSinceDirtySample_, wasDirty);
+        log::info("DIRTYTRACE sample touched={} dirty={}", touched, wasDirty);
     }
-    engine_->sampleProjectDirty(touchedSinceDirtySample_);
-    lastDirtySampleMs_ =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
-    touchedSinceDirtySample_ = false;
-    lastDirtySample_ = now;
+    engine_->sampleProjectDirty(touched);
+    const double cost = dirtyClockMs() - now;
+    dirtySchedule_.sampled(now, cost);
     if (engine_->projectDirtyCached() != wasDirty) {
         refreshWindowTitle();
         // Said once per transition, because "the title grew a dot" is the kind of claim that is
         // true of the code and false of the running application (ADR-387), and this is the only
         // place the answer changes on its own.
-        log::info("project has unsaved changes (sampled in {:.1f} ms)", lastDirtySampleMs_);
+        log::info("project has unsaved changes (sampled in {:.1f} ms)", cost);
     }
 }
 
@@ -2380,8 +2391,7 @@ void Application::performOpen(const std::filesystem::path& path) {
     auto r = openAny(path);
     // Whatever happens below, the attribution window starts again here: a load resets the engine's
     // baseline, and the click that asked for the load is not an edit to what just arrived.
-    touchedSinceDirtySample_ = false;
-    lastDirtySample_ = std::chrono::steady_clock::now();
+    dirtySchedule_.restart(dirtyClockMs());
     if (!r) {
         log::error("open '{}': {}", path.string(), r.error().message);
         if (panel_) {
@@ -2730,8 +2740,7 @@ void Application::saveProjectAsCopyTo(const std::filesystem::path& path) {
     }
     edits_.markSaved();
     rememberProject(written);
-    touchedSinceDirtySample_ = false;
-    lastDirtySample_ = std::chrono::steady_clock::now();
+    dirtySchedule_.restart(dirtyClockMs());
     refreshWindowTitle();
 }
 
@@ -2755,8 +2764,7 @@ void Application::saveProjectTo(const std::filesystem::path& path) {
     rememberProject(path);
     // The baseline has just moved, so the window this attributes over starts here. Without this,
     // the click that asked for the save would be attributed to whatever the engine wrote next.
-    touchedSinceDirtySample_ = false;
-    lastDirtySample_ = std::chrono::steady_clock::now();
+    dirtySchedule_.restart(dirtyClockMs());
 }
 
 void Application::rememberProject(const std::filesystem::path& path) {
@@ -4372,7 +4380,7 @@ int Application::runLive() {
             // The stress driver stands in for a user and reaches the engine directly, so it has to
             // say so: without this its edits are indistinguishable from the engine's own writeback
             // and are absorbed. Found by running it and watching nothing happen (ADR-387).
-            touchedSinceDirtySample_ = true;
+            dirtySchedule_.touch();
         }
         if (!engineShaderWatcher_.poll().empty()) {
             if (auto r = renderer_->reloadEngineShaders(); !r) {
