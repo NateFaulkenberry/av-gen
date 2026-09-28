@@ -2,6 +2,52 @@
 
 This is the operational state file. Update it whenever the state changes. It was last updated 2026-09-27 12:45.
 
+## SESSION WRAP-UP (2026-09-28, about 04:30). READ THIS FIRST
+The owner stopped for the night: **"I'd like to review the project file before kicking off any more renders"**,
+then **"merge everything into main too once complete"**. Nothing renders until the owner says so.
+
+**Where everything is:**
+- **The project for the owner's review:**
+  `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/integrate/project-for-review/`. It holds
+  `glowmere-valley-3.json` and `.scene.json` (r7b on engine-6), a README (what changed since r6, where the hero pulses
+  and E1-E5 live, the render commands), `hero-pulse-shots.txt` and `hero-pulse-before-after.png`.
+- **The last whole-film preview the owner has:** r6 (`revision/integrate/r6-preview-960x540.mov`). A stray r7
+  render predates the one-animal change; it is superseded and not in the folder.
+- **Since r6** (gv3-int `5d9e7bb1`, `9a527c0c`; merged into `gv3/production` `b6230265`):
+  - **the 15 Hero Pulses restored from GV2 multicam** (the ten caps and five aliens, NOT the UFOs), GV2's look,
+    fired by "hero pulse <hero>" cue markers on the downbeats: 140 rings;
+  - **one animal per abduction:** E4 lifts cow-12 alone; cow-23 and bull-10 are re-homed. The nearest other animal
+    to any beam is now 50-145 m.
+- **Engine:** main = `ad5623d2` (every engine stream up to ADR-945). herofocus (ADR-947: heroFocus and
+  cameraTravel read an authored cut, plus a per-shot "focuses on" control) is done (`d5b32ace`). Its GPU test is
+  written but was not run.
+- **Integration in progress at wrap-up:** `integrate/revision` `79a74db3` = main + herofocus + **gv3/production (the
+  whole GV3 revision: generator, docs, project), per the owner's "merge everything into main"**. It is built; the
+  full CPU and GPU suites are running (logs `coord-int6-cpu.log` in the coordinator's scratchpad,
+  `av-gen-signals/build/coord-gpu-int6.log`). **If both pass: fast-forward main to `79a74db3`. DO NOT PUSH:**
+  main would then carry the owner's brief and the production docs to the public repo, and the owner decides that.
+
+**Open decisions for the owner:**
+1. **Review the project file**, then say go for r7 (a 960x540 preview) and/or the 4K final. The commands are in the
+   project README. **Take a fresh cast trace first:** `make_glowmere_valley_3.py --final --final-trace <new trace> &&
+   ufo.py`.
+2. **Switch GV3 to native heroFocus** (ADR-947) instead of the markers. herofocus's report gives the steps: GV2's 15
+   `groundPulse` effects with heroFocus, and `"subject"` on each shot. Its probe found that only 6 of 15 pulses fire
+   on aim/follow subjects alone, so the "focuses on" field must be set per shot.
+3. **Push main or not.** It includes the GV3 revision's docs.
+4. **An asset-licence contradiction** (found at wrap-up; nothing changed tonight). Commit `4bdc42ff` (2026-09-15)
+   records the owner's statement that the farm and alien packs are CC0, and tracks the nine farm GLBs, which have
+   been on public GitHub since. The memory note `av-gen-ci-assets-decision` (2026-09-25) says both packs are
+   commercially licensed and must never be committed. If they are commercial, the farm GLBs must be removed from
+   the repo and its history.
+5. **Check the cut's shot count:** herofocus's scratch copy of gv3-int's working project (about 02:50) had a 40-shot
+   cut, where the recorded cut has 73 shots. Confirm the review project's shot count before rendering.
+
+**Open engine items:** mutual avoidance (walkers crossing); two moons and the moon's controls; a lift's stack
+spacing from body size; the world closure's features have no editor; the travel beam's false "dead" warning;
+`groundGlow` under authored ground programs; effect parameters show code names; possible edge shimmer on static
+ferns; `interest.approach` is JSON-only; `kCutTravelSeconds` is a constant.
+
 ## SINCE THE HANDOFF (2026-09-27, from 12:20). Read this first, then the handoff below
 The coordinator restarted after the old account's session limit (the owner switched accounts). Same process, so
 two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-cut** was resumed from its transcript.
