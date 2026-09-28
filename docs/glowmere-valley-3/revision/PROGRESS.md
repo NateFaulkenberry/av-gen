@@ -8,6 +8,17 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **01:30: THE OWNER: THE HERO PULSE IS STILL MISSING** ("the hero pulse that used to swell out from the mushroom and
+  across the ground - please check glowmere-valley-2-multicam ... I've requested it be added to GV3 several times").
+  - **Root cause:** GV2 multicam has 16 "Hero Pulse" effects (type `groundPulse`, one per hero: ten caps, five
+    aliens, the visitor; `heroFocus` activation; `beat.pulse` x8). GV3's `look.py` deletes them:
+    `REMOVED_EFFECT_TYPES = {"groundPulse": ...}`, because `heroFocus` needs Song-mode shot spans. The revision had
+    read "hero pulse" as the mushrooms' own emission.
+  - **gv3-int** restores all 16 through the generator, triggered by cue markers per hero while that hero is the
+    subject, with GV2's look. It renders **r7** for the owner.
+  - **Launched: herofocus** (ADR-947, `av-gen-herofocus` from `ad5623d2`): `heroFocus` and `cameraTravel` read the
+    authored cut's shots and subjects, so GV3 can drop its marker workarounds.
+  - **The 4K final waits for r7.**
 - **01:15: r6 (the final candidate) is in the review folder** (`r6-preview-960x540.mov`, `README-r6-preview.md`,
   sheets in `r6/`). `gv3/integrate` `292cc758` is merged into `gv3/production`.
   - Settings: ground pools (range 300, faintest 6.5, reach 6, ecology light x3); aurora glints 0.85 (the duplicate
@@ -874,6 +885,9 @@ All seven had been stopped once by an account usage limit and resumed with SendM
 - **(2026-09-27, on r1) Keep the hero mushrooms' pulses and the Camera Travel Beam (the light sweep on camera changes) visible.** When a pulse causes a
   problem, tame it (depth, a peak cap, timing); never delete it. A route the Critic calls inert is to be made
   visible, not dropped.
+- **(2026-09-28) THE HERO PULSE = GV2 multicam's `groundPulse` "Hero Pulse" effects:** a ring that swells out from
+  each hero across the ground, on the beat. Never delete them. The owner asked for them several times before the
+  revision understood.
 - **(2026-09-27) The heroes' pulses are dramatic, not subtle.** The owner: "the mushroom unders are pulsing to the
   beat - any way we can make it way more dramatic / noticable". The pulse was +6% to +12% on the gold pixels
   (amount 1.0 × section depth 0.19-1.0). Target: about +40-60% at the peak, with a spill ring on the ground in the
