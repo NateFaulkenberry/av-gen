@@ -128,7 +128,10 @@ An entity-target walk is still routed once, when it starts.
     to it" 4 -> 0); GV3 go and see 18 -> 9 ("unreachable" 12 -> 1, tide's reaction to E5, which is
     `react`'s; "no way across" 4 -> 0); GV2-multicam 17 -> 0. What is left on GV3 is three to four
     greetings that chase an alien walking away and give up "stuck", and ember's "blocked" in one
-    pocket of shallows (below).
+    pocket of shallows (below). With ADR-944 on top (the branch's head, `1670f07d`): GV3 as generated
+    17 -> 2, go and see 18 -> 2, iteration 2 21 -> 7, GV2-multicam 17 -> 3; the only one "unreachable"
+    is rook's reaction to the beam on GV2-multicam, which is `react`'s (below), and the rest are walks
+    after a body walking away that give up "stuck" and one "blocked" in the pocket.
   - **No route round water was needed on GV3:** a diagnostic replay of the film as generated, to
     180 s, planned none. Its river divides the valley (ADR-932's `Nearest`), and none of its
     same-region straight lines crosses water deeper than 0.85 m. The route round matters where banks

@@ -110,6 +110,10 @@ rule's.
   | GV3, gv3-cast's iteration 2 | 15.6 -> 0.0 s | 10.9 -> 1.3 s | 12.8 -> 0.0 s | 17.3 -> 7.8 s |
   | GV2-multicam | 8.7 -> 0.1 s | 20.2 -> 2.6 s | 6.6 -> 0.8 s | 27.1 -> 8.2 s |
 
+  With ADR-944 on top (this branch's head, `1670f07d`), the after-columns read: GV3 as generated
+  0.0 / 2.0 / 0.0 / 8.3 s, go and see 0.0 / 2.0 / 0.0 / 8.4 s, iteration 2 0.0 / 1.3 / 0.0 / 8.1 s,
+  GV2-multicam 0.1 / 2.6 / 0.8 / 6.9 s.
+
   - **Rook's case, as the brief put it:** iteration 2 (a copy of the project navfix measured) replays it
     on the engine before this ADR exactly: 195.45-201.90 s at (-65.6, -5.6), 0.473 m/s published
     after "range -> range", the walk shown, ADR-910 stuck 8.5 s. After: rook's stuck time is 0.0 s and
