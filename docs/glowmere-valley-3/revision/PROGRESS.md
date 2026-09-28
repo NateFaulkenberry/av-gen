@@ -8,6 +8,14 @@ two of the four Phase 3 agents survived: **gv3-world** kept running, and **gv3-c
 **gv3-look** and **gv3-cast** had no transcript in the new session and were **relaunched fresh**, each told exactly
 where its predecessor stopped.
 
+- **23:00: ecolight is DONE** (`9080e2f4`, ADR-945; ADR-946 was not needed) and **merged** (`ad5623d2`); its full
+  suites are running.
+  - Ecology lights are chosen by contribution and each lights a ground pool. New controls sit under scene/glow-pools
+    (reach, faintest, distance).
+  - GV3's wides: the ground at a kick +0-3% -> +11-35%.
+  - **GV3 settings for the final:** `environment.ecologyLightRange` 300; `ecologyPoolFaintest` 6.5 (fungi only);
+    `ecologyPoolReach` 6 (or 10-12 for softer pools); the `scene/ecologyLight` arc keys x3; keep `kick.fungi` +3.0.
+  - Every Glowmere scene's look changes: pools instead of specks, and faint plants cast none.
 - **MERGED (22:30): main is `22ce5c3d`**, now with cihealth (ADR-940-941, the sanitizer partition), behave
   (ADR-935-936, 944) and uireach (ADR-937-939, the ADR-933 amendment).
   - Suites: GPU 546/547 (1 skipped). CPU 3,830/3,831: uireach's retry-memory test lost its control arm to behave's
