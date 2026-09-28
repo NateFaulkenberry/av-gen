@@ -3,7 +3,11 @@
 Four GLBs built by `tools/make_astronaut_musicians.py` from source files the owner supplied in
 `~/Desktop/musician_assets/` on 2026-09-28. **Neither the sources nor the GLBs are in this repository.**
 
-> **Licences: partly unestablished. NOT for distribution until the owner clears them.**
+> **Licences (confirmed by the owner, 2026-09-28): the GLBs are NOT for distribution.**
+> - The drum kit is under a personal royalty-free licence that forbids redistribution.
+> - The Mixamo clips baked into both astronaut GLBs may not be redistributed as files.
+> - Only `keyboard_set.glb` is built entirely from CC0 sources (plus the bench, made here). Even so, the policy stays
+>   uniform: none of the GLBs is committed.
 > - The repository is public.
 > - Do not commit, cache or upload the GLBs, the validation .blend, or anything else derived from the sources.
 > - The GLBs are ignored by `/assets/musicians/*.glb` in `.gitignore`.
@@ -26,8 +30,8 @@ two FBX files).
 - **Files:** `Untitled.blend` and `Untitled.fbx` (FBX binary, written by Blender 5.2.0).
 - **Origin:** itch.io, <https://mrlentereng.itch.io/rigged-low-poly-astronaut>, by MrLentereng. The page also
   credits "Original creator: ThunderWare Games".
-- **Licence:** the page states **CC0 1.0 Universal**, commercial use allowed and attribution not required. This
-  is the uploader's claim; given the "original creator" credit, the owner may want to confirm it.
+- **Licence:** **CC0 1.0 Universal**, confirmed by the owner on 2026-09-28. Commercial use is allowed and
+  attribution is not required.
 - **Mesh:** one skinned mesh of 2,019 vertices, 2,018 faces and 4,038 triangles.
 - **Skeleton:** 53 bones with Unreal-mannequin naming, resting in a T-pose facing -Y.
 - **Weights:** up to 10 per vertex. The export keeps the strongest 4 and renormalises them, because AV Gen reads
@@ -69,7 +73,7 @@ two FBX files).
 - **Files:** `BasicKeyboard.obj`, `.mtl` and `.fbx`, plus `BasicKeyboard_IMG.png`. The PNG is a 1000x1000 preview
   render, not a texture.
 - **Origin:** CGTrader. The download does not record which model page it came from.
-- **Licence:** not established.
+- **Licence:** CC0, confirmed by the owner on 2026-09-28.
 - **Mesh:** 310 vertices and 484 triangles, 20 white keys, three materials (all 0.64 grey), no UVs, no textures.
 - **Conversion:**
   - The OBJ is used.
@@ -83,7 +87,7 @@ two FBX files).
 - **Files:** `OBJ/Folding_Stand.obj` and `.mtl` (exported by LightWave), plus `LWO/Folding_Stand.lwo`. The LWO
   file is not used.
 - **Origin:** CGTrader.
-- **Licence:** not established.
+- **Licence:** CC0, confirmed by the owner on 2026-09-28.
 - **Mesh:** 23,363 vertices and 46,368 triangles in 38 loose parts; four materials (Rubber, Painted_Metal,
   Plastic, Chrome); no UVs.
 - **Conversion:**
@@ -96,7 +100,7 @@ two FBX files).
 
 - **Files:** `drums.blend`, `.obj`, `.mtl` and `.fbx`.
 - **Origin:** CGTrader.
-- **Licence:** not established.
+- **Licence:** a personal royalty-free licence, **not for redistribution** (the owner, 2026-09-28). Renders using it are fine; the model files, and any GLB built from them, are never committed, cached or uploaded.
 - **Content:** seven mesh objects with 3,112 triangles in total: kick, two rack toms, snare, hi-hat, ride, floor
   tom and throne. There are six flat-colour materials and no textures. The file also holds a camera and two
   lights, which are not used. There are no pedals.
