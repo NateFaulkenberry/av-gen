@@ -41,7 +41,15 @@ two FBX files).
   - The astronaut is stood on z = 0 and its object transforms are baked into the data.
   - The material is replaced by a flat off-white suit plus a dark visor, assigned to the visor's own UV island
     (30 faces).
-  - The skeleton and the mesh are otherwise unchanged.
+  - **The helmet is re-weighted.** The supplied weights are automatic and bleed onto the shell: each of its 349
+    vertices is about 37 % head, 24 % neck_01, 11-12 % each upper arm and 8 % each clavicle. So the helmet
+    dented whenever the arms moved.
+    - The shell is now 100 % head.
+    - Three rings of suit under the rim (56 vertices) blend from head to chest.
+    - The clips keep half of their neck and head rotation away from the chest, because the helmet sits directly
+      on the shoulders.
+    - `--no-helmet-fix` rebuilds the rig as supplied, for comparison.
+  - The skeleton and the mesh geometry are otherwise unchanged.
 
 ### Piano Playing / Playing Drums
 

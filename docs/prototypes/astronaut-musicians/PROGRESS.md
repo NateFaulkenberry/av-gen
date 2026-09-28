@@ -11,7 +11,9 @@ Branch `proto/astronaut-musicians`, worktree `../av-gen-astro`, started from mai
   - the Blender pipeline, its validation, and the four GLBs;
   - the AV Gen demo, `examples/musicians/astronaut-musicians.{json,scene.json}`, registered in `examples/index.json`
     as "Astronaut Musicians - Prototype";
-  - the renders and videos in the review folder.
+  - the renders and videos in the review folder;
+  - **the helmet fix** (owner feedback, 2026-09-28: the helmets crumpled). See "The helmet" below; the build
+    applies it by default.
 - **Where the report is:** the compatibility report and the recommendation went to the coordinator in the agent's
   handback. The facts behind them are below. `assets/musicians/ATTRIBUTION.md` is the asset report.
 - **After a merge, the owner's checkout has no GLBs.** Run the command below in that checkout.
@@ -21,11 +23,12 @@ Branch `proto/astronaut-musicians`, worktree `../av-gen-astro`, started from mai
   /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup \
       --python tools/make_astronaut_musicians.py -- \
       --src ~/Desktop/musician_assets --out assets/musicians \
-      --blend ~/Desktop/av-gen-review/21-astronaut-musicians/blender/astronaut_musicians_validation.blend \
+      --blend ~/Desktop/av-gen-review/21-astronaut-musicians/blender/astronaut_musicians_validation_rigid_helmet.blend \
       --report /tmp/astronaut-report.json
   ```
 
-  The run takes about 8 s. It writes these files:
+  The run takes about 15 s. Add `--no-helmet-fix` to rebuild the rig exactly as supplied, for comparison.
+  It writes these files:
   - `assets/musicians/astronaut_keys.glb`
   - `assets/musicians/keyboard_set.glb`
   - `assets/musicians/astronaut_drums.glb`
@@ -181,6 +184,63 @@ session and call the steps one at a time, which is how it was validated.
 - `renders/16`: the naive retarget failing.
 - `renders/17`: the Blender validation scene.
 - `blender/`: the validation .blend and `build_report.json`.
+
+## The helmet (owner feedback, 2026-09-28)
+
+**What the owner saw:** the helmets crumple as the head turns and tilts, mostly on the drummer.
+
+**The cause, measured.** It is the supplied rig's automatic weights, not the clips and not the export.
+- Every one of the helmet shell's 349 vertices (the part above z = 1.58 m, connected to the crown) has six
+  influences: about 37 % `head`, 24 % `neck_01`, 11-12 % on EACH upper arm, and about 8 % on each clavicle.
+- The collar under it is mostly clavicles and upper arms, with stray `thigh_r`.
+- So any arm or shoulder movement drags the shell. The drum clip's arms move asymmetrically all the time (the
+  right arm crosses over to the hi-hat), which is why the drummer shows it most.
+- My own linear-blend reproduction matches Blender to 3.4e-7 m, and the 4-influence glTF truncation measures the
+  same. The export is not the cause.
+- The clips also move the head a long way against the chest: up to 48.7° (drums) and 49.6° (piano), with a
+  median of 24°. On the drummer that is a nod of -24° to +46°; on the pianist, turns of up to 47°.
+
+**The fix** (`fix_helmet_weights`, plus `NECK_STIFFNESS` in the retarget):
+- The helmet is 100 % `head`.
+- There is no neck: the helmet's rim joins the shoulders and upper chest directly. So three rings under the rim
+  blend from head to chest:
+  - Ring d moves a fraction 1 - d/4 of the way to {head, neck_01} (0.75, 0.5 and 0.25).
+  - Ring 1 blends in full; rings 2 and 3 fade out between 0.19 m and 0.26 m from the neck axis.
+  - Each ring keeps the rest of its own weights, arms included.
+- The retarget keeps 0.5 of the neck's and head's rotation away from the chest (same axis and timing). Arms,
+  contacts and prop placements do not depend on the neck, and did not move.
+
+**Numbers, over every frame of both clips** (`helmet_audit`, in the build report):
+
+| | drummer before → after | pianist before → after |
+|---|---|---|
+| helmet max deviation from rigid | 7.66 → **0.00 cm** | 8.90 → **0.00 cm** |
+| frames over 1 cm | 142/142 → 0 | 500/500 → 0 |
+| head vs chest, max | 48.7° → 24.3° | 49.6° → 24.8° |
+| helmet-body overlaps | 0 → 0 | 0 → 0 |
+| suit edge strain p50 / p90 | 19.0 / 42.0 → 19.6 / 45.3 % | 13.1 / 36.4 → 13.1 / 36.6 % |
+| suit edge strain p99 / max | 70 / 93 → 89 / 205 % | 70 / 91 → 108 / 206 % |
+
+The p99 and max rise comes from 6 edges (drummer) and 9 edges (pianist) out of 759. They are short (1.8-4.3 cm),
+at the sides of the helmet just under the rim. Rendered close up at their worst frames (drummer 41 and 81,
+pianist 103 and 303), they show no tear or spike, while the before renders show the bent ear pods and the warped
+shell.
+
+**What was tried and rejected:**
+- Two rings: the collar tore at about 300 % strain.
+- Five or seven rings with the arm weights stripped: the shoulders stretched into flat wings.
+- A radial fade that also weakened ring 1: the rim band took 280-360 %.
+- Neck stiffness 0.35 against 0.5: they look alike; 0.5 keeps more of the performance.
+- A helmet cut free of the collar as a separate rigid part: not tried. It would open a visible hole at the neck
+  whenever the helmet tilts.
+
+**Unrelated, found on the way:** the drummer's 40° right-leg turnout strains a few 0.5 cm edges at the crotch by
+up to 477 %. They are hidden between the thighs, behind the snare and throne, at the worst frame (108).
+
+**Files** (in `~/Desktop/av-gen-review/21-astronaut-musicians/blender/`):
+- `astronaut_musicians_validation_rigid_helmet.blend` and `build_report_rigid_helmet.json`: the current build.
+- `*_before_helmet_fix.*`: the build the owner reviewed.
+- `helmet_investigation.blend` and `helmet_fix_check.blend`: the investigation's work files.
 
 ## Licences and the repository
 
