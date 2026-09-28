@@ -53,7 +53,24 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
   - the UFO abducting the drummer instead of the animal.
   - **The launch gate changes:** `proto/astronaut-musicians` must be merged into main (or into the art-pass branch)
     before the art pass starts.
-- **Next:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
+- **W1 is DONE:** `qa/perf` `25510c39`. The coordinator then recorded ADR-951 as accepted by the owner
+  (`ad3c5b9f`). Owner summary: `docs/qa-pass/perf-summary.md`.
+  - **A (complexity): not the cause of the collapse, but what remains.** Wides run at 31-33 FPS at 720p and are
+    GPU-bound; the scene pass is about 9.4 ms plus 10 ms per megapixel. No single feature owns the cost.
+  - **B (stale state): no.**
+  - **C (engine regression): yes, and it is the cause.** ADR-834 took the engine update from 3.2 to 21.7 ms, and
+    ADR-893/894 took it on to 38.8 ms. ADR-950/951 bring it back to 3.3 ms. On s66 the frame went from 376.2 to
+    32.2 ms.
+  - **GPU:** +1.9 ms, of which ADR-945's glow pools are 1.3 ms (the look the owner chose) and creep across
+    `0b623b88..22ce5c3d` is 1.1 ms.
+  - **Editor:** the `ui.build` spike of about 35 ms is ADR-440's unsaved-changes check, which serialises the
+    whole project about every 380 ms. The owner needs to decide what to do about it.
+  - **Suites on qa/perf:** `avgen_tests` exits 0; `avgen_render_tests` exits 0 (548 passed, 1 skipped).
+- **qa/perf and `proto/astronaut-musicians` are merged into qa/coord** (`77a6db26`, `0a941dfe`), and both suites are
+  running on it. qa/ci is still with the CI monitor.
+- **Next:** once qa/coord's suites pass, launch the art pass from qa/coord's head. The final merge into main
+  waits for qa/ci.
+- **Superseded, kept for the record:** when W1 finishes and qa/perf is merged, launch `gv3-art-pass` in the freed slot.
 
 ## Current Status
 2026-09-28:
