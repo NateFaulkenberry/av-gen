@@ -8,11 +8,9 @@ Six variants exported from a single modular source file.
 its description claims, a raw Unreal/Epic mannequin skeleton). Supplied by the project owner; the
 file is not in this repository.
 
-> **Licence: CC0 1.0 Universal (public domain dedication)** —
-> <https://creativecommons.org/publicdomain/zero/1.0/>. Recorded 2026-09-15 on the project owner's
-> statement that this pack shares its author, and its licence, with the repository's other asset
-> packs. The source `.blend` still carries no licence text of its own; this line is the owner's
-> assertion of the terms, written down so the next person does not have to ask again.
+> **Licence: purchased, commercially licensed. NOT for distribution.** Confirmed by the project owner on
+> 2026-09-28. An entry of 2026-09-15 recorded this pack as CC0 1.0; that was a mistake. Do not commit,
+> cache or upload the meshes: this repository is public.
 
 ## What ships, and what does not
 
