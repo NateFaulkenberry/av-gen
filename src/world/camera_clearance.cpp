@@ -219,9 +219,15 @@ namespace {
 
 // Where the ground is, for a sightline. The same `max(height, waterSurface)` `minimumHeight` uses:
 // a camera cannot see a hero through a lake any more than it can sit in one.
+//
+// The two fields it needs, asked for directly. This used to be `map.sample(p, 0.5f)`, which also
+// derives a normal (four more height evaluations), slope, altitude and moisture (a closest-point
+// search over every water path) and then threw all of it away. `WorldMap::sample` computes its
+// `height` and `waterSurface` with exactly these two calls, so the answer is bit-identical. It
+// matters because `heroSightline` samples this at every step of nine rays, and since ADR-834 it
+// runs for every in-shot character on every frame (QA pass: docs/qa-pass/perf.md, ADR-950).
 float surfaceAt(const WorldMap& map, glm::vec2 p) {
-    const Sample s = map.sample(p, 0.5f);
-    return std::max(s.height, s.waterSurface);
+    return std::max(map.height(p), map.waterSurface(p));
 }
 
 // The radius that divides a disc into two equal areas, r/sqrt(2). See the header: it is what makes

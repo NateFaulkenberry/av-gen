@@ -216,6 +216,9 @@ std::string usageText() {
            "  --save-scene <f>    write the scene on exit (the camera collection and its shot\n"
            "                      track live here, not in the project)\n"
            "  --play              start playback immediately\n"
+           "  --start-at <s>      live editor: put the playhead at second s before the first\n"
+           "                      frame, so a --profile-cpu or --ui-ab run measures that shot\n"
+           "                      (a diagnostic; headless runs use --range)\n"
            "  --frames <n>        exit after n frames\n"
            "  --stress <seed>     apply random slider-like actions every frame (seek, params, routes, volume)\n"
            "  --ai-prompt <text>  run one AI task at start-up against the configured provider\n"
@@ -339,6 +342,15 @@ Result<AppOptions> parseArgs(int argc, char** argv) {
             options.showHelp = true;
         } else if (arg == "--play") {
             options.autoplay = true;
+        } else if (arg == "--start-at") {
+            auto v = need(i, "--start-at");
+            if (!v) return std::unexpected(v.error());
+            try {
+                options.startAt = std::stod(*v);
+            } catch (...) {
+                return fail("--start-at wants seconds, got '{}'", *v);
+            }
+            ++i;
         } else if (arg == "--headless") {
             options.headless = true;
         } else if (arg == "--audio") {
@@ -2050,6 +2062,11 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         if (auto located = shaders_->locate(name)) {
             engineShaderWatcher_.watch(*located);
         }
+    }
+    // Diagnostic (QA pass W1): the live editor opened on a given second, so the interactive frame
+    // can be profiled on the shot in question rather than only on whatever the film opens with.
+    if (options.startAt && !options.headless) {
+        engine_->seekSeconds(*options.startAt);
     }
     if (options.autoplay && engine_->hasAudio()) {
         if (auto r = engine_->play(); !r) {
@@ -6138,11 +6155,11 @@ int Application::runHeadless() {
                     const probe2::Frame& pr = probe2::frame();
                     log::info("             cpu(update): control={:.2f} signals={:.2f} modulation={:.2f} "
                               "controller={:.2f} other={:.2f} | meshUp={:.2f}ms/{}pass/{}buf "
-                              "texUp={:.2f}ms/{} env={:.2f} analysisCatchup={:.2f}",
+                              "texUp={:.2f}ms/{} env={:.2f} analysisCatchup={:.2f} sightlines={}/{:.0f}m",
                               pr.updControlMs, pr.updSignalsMs, pr.updModulationMs, pr.updControllerMs,
                               pr.updOtherMs, pr.meshUploadMs, pr.meshUploadPasses, pr.meshesUploaded,
                               pr.textureUploadMs, pr.texturesUploaded, pr.environmentMs,
-                              pr.analysisCatchupMs);
+                              pr.analysisCatchupMs, pr.sightlines, pr.sightlineMetres);
                 }
                 // The workload each measured phase was actually given. Without these an A/B that edits
                 // a scene cannot prove its two arms differ, and "no effect" reads exactly like a run

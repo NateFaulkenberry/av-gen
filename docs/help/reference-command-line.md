@@ -50,6 +50,7 @@ features: subsystem.cli
 | `--osc-port <n>` | override the project's OSC port |
 | `--list-audio-devices`, `--list-midi` | enumerate and exit |
 | `--play` | start playing immediately |
+| `--start-at <s>` | live editor: put the playhead at second *s* before the first frame (a diagnostic, for profiling one shot) |
 | `--direct` | cut the camera to the loaded track |
 
 ## Output and sharing

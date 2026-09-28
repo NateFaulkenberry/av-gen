@@ -10,6 +10,7 @@
 #include "core/json_keys.hpp"
 #include "core/log.hpp"
 #include "core/phase_profiler.hpp"
+#include "core/phase2_probe.hpp" // diagnostic: the sightline counters (QA pass W1)
 #include "assets/asset_library.hpp"
 #include "assets/mesh_lod.hpp"
 #include "entity/gait.hpp"
@@ -2228,13 +2229,23 @@ void Composition::publishCinematicSignals(signals::SignalBus& bus) {
                 const float fraction = std::clamp(slot.height / (2.0f * depth * std::max(tanHalf, 1e-4f)), 0.0f, 1.0f);
                 const float centrality = 1.0f - std::clamp(glm::length(ndc) / 1.41421356f, 0.0f, 1.0f);
                 out.screenImportance = std::clamp(fraction * (0.5f + (0.5f * centrality)), 0.0f, 1.0f);
-                if (field.map != nullptr) {
+                // Diagnostic only (QA pass W1, docs/qa-pass/perf.md): `AVGEN_DIAG_NO_SIGHTLINE=1`
+                // publishes visibility 1 without marching, so the sightline's share of a frame can
+                // be measured in the same build. Unset -- always, outside a measurement -- nothing
+                // changes. Read once, like `AVGEN_HEIGHT_CACHE`.
+                static const bool skipSightline = [] {
+                    const char* v = std::getenv("AVGEN_DIAG_NO_SIGHTLINE");
+                    return v != nullptr && v[0] == '1';
+                }();
+                if (field.map != nullptr && !skipSightline) {
                     world::SubjectCapsule subject;
                     subject.position = base;
                     subject.height = slot.height;
                     subject.radius = std::max(slot.height * 0.2f, 0.2f);
                     subject.name = nodeName;
                     out.visibility = world::heroSightline(field, camera.position, subject, 2.0f).visible;
+                    ++probe2::frame().sightlines;                                  // diagnostic
+                    probe2::frame().sightlineMetres += glm::length(base - camera.position); // diagnostic
                 } else {
                     out.visibility = 1.0f;
                 }
