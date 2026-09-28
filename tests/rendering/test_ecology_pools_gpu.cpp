@@ -11,8 +11,9 @@
 //                 spread, as many as the engine made.
 //
 // At the ground under every chosen light 100-250 m out the chosen frame is brighter than the dark
-// one, and the control's is not. Then `scene/glow-pools/reach` on pixels: a wider reach lights more
-// of the ground. With AVGEN_ECOLOGY_DUMP=<dir> every arm is written as a PNG.
+// one, and the control's is not. Then `scene/glow-pools/reach` on pixels (a wider reach lights more
+// of the ground) and `faintest` (above every layer's glow, the frame is the dark one).
+// With AVGEN_ECOLOGY_DUMP=<dir> every arm is written as a PNG.
 
 #include "assets/asset_registry.hpp"
 #include "assets/image.hpp"
@@ -282,18 +283,22 @@ TEST_CASE("Glow pools 100-250 m out: the chosen lights make them, the nearest-fi
         CHECK(a > 200);
     }
 
-    SECTION("scene/glow-pools/faintest: at zero the faint grass casts pools too") {
+    SECTION("scene/glow-pools/faintest: above the fungi's glow (6.0) no layer casts a pool") {
+        // The grass's inclusion at 0 is the CPU test's; here, the threshold on pixels. The fungi
+        // glow at 6.0 x peak 1.0, so 7 leaves nothing to cast light: the frame is the dark one.
         scene->param("scene/ecologyLight").setBase(gain);
-        scene->param("scene/glow-pools/faintest").setBase(0.0f);
+        scene->param("scene/glow-pools/faintest").setBase(7.0f);
         scene->frame();
-        const gpu::Image8 all = h.render(scene->comp->scene());
-        dump(all, "pools-faintest-0");
-        std::size_t grass = 0;
-        for (const scene::PunctualLight& l : scene->comp->scene().lights) {
-            grass += isEcology(l) && l.color.y > l.color.z ? 1 : 0;
-        }
-        INFO(grass << " grass lights; pixels differing from the default choice: " << brighter(all, chosen) + brighter(chosen, all));
-        CHECK(grass > 0);
-        CHECK(brighter(all, chosen) + brighter(chosen, all) > 200);
+        const gpu::Image8 none = h.render(scene->comp->scene());
+        dump(none, "pools-faintest-7");
+        const std::size_t lights = static_cast<std::size_t>(std::count_if(
+            scene->comp->scene().lights.begin(), scene->comp->scene().lights.end(), isEcology));
+        const std::size_t fromDark = brighter(none, dark) + brighter(dark, none);
+        const std::size_t fromChosen = brighter(chosen, none);
+        INFO(lights << " lights at faintest 7; pixels differing from dark " << fromDark << ", chosen brighter in "
+                    << fromChosen);
+        CHECK(lights == 0);
+        CHECK(fromDark == 0);
+        CHECK(fromChosen > 2000);
     }
 }
