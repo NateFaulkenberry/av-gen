@@ -32,8 +32,8 @@ The plan is in `PLAN.md`, and the brief in `00-brief.md`. Each workstream's deta
 ## In Progress
 - W1: the GV3 performance baseline and the shot sweep.
 - W2: triage of the red CPU run (`4a138886`) and the failing nightly sanitizer stages.
-- W3 is DONE and merged into qa/coord (`3b3d323c`). Its full serial CPU suite was still running at hand-back, and
-  its exit code is the check before main.
+- W3 is DONE and merged into qa/coord (`3b3d323c`). Its full serial CPU suite on `qa/clean` passed: 3,843 cases,
+  3,823 passed, 19 skipped, and 1 failed as expected (the `[!shouldfail]` slope lean); 9,124,064 assertions passed.
 
 ## Queued after this pass: GV3 targeted art pass
 - **Brief:** `docs/glowmere-valley-3/art-pass/00-brief.md`, the owner's words, 2026-09-28.
