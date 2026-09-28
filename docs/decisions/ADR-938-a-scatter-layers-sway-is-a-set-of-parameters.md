@@ -88,11 +88,14 @@ gains rows for them, for a timeline track that keys one. A slider or a key still
   - the save: the bases reach the scene the composition writes, untouched members stay authored, and none
     of the nine moves a layer's structural hash;
   - on the GPU, through the composition as the engine renders it (517 ferns of the library's `Fern_1` on
-    a flat meadow in a breeze, 480x300, no skybox): "sway at the tip" 0.08 -> 0.40 moves **101,683 of
-    144,000 pixels**; the same edit with the wind off moves **none** (the control that the difference is
-    the sway, not a replant or a re-light); setting it back to 0.08 gives the authored frame back byte for
-    byte; and with "catches the wind" at 0 two seconds half a second apart must be identical, where the
-    authored ferns move between them. The first run of that last arm compared
-    frames 180 and 210 and found the renderer's per-frame jitter, not the ferns; the two seconds now share
-    one frame index, so only animated time differs.
+    a flat meadow in a breeze, 480x300, no skybox, the camera still), all at one second: "sway at the tip"
+    0.08 -> 0.40 moves **101,683 of 144,000 pixels**; the same edit with the wind off moves **none** (the
+    control that the difference is the sway, not a replant or a re-light); setting it back to 0.08 gives
+    the authored frame back byte for byte; and with "catches the wind" at 0 the ferns render **exactly**
+    the frame the scene renders with the wind switched off, where the authored ferns differ from it by
+    98,821 pixels (the control that the wind does bend them).
+  - That last arm first compared two seconds half a second apart, and found 61,506 pixels moving along the
+    ferns' fine edges with no wind at all -- the same count with the frame index held and the camera's
+    default orbit pinned. Something in the frame is keyed on the render second itself (the stream's
+    report lists it); the arm now asks its question at one second.
   - Evidence: `~/Desktop/av-gen-review/18-glowmere-valley-3/revision/uireach-work/sway/`.

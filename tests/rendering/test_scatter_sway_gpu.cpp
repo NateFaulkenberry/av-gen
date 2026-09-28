@@ -5,7 +5,7 @@
 // composition exactly as the engine renders one, changes when "sway at the tip" is raised -- and does
 // not change when the same edit is made with the wind off, which is the control that the difference is
 // the sway and not a replant, a re-light or a history effect. "catches the wind" at 0 is the other end:
-// the ferns stand still between two seconds that differ with the layer as authored.
+// at the same second, the ferns render exactly as they do with the wind switched off.
 
 #include "assets/asset_registry.hpp"
 #include "assets/image.hpp"
@@ -195,19 +195,26 @@ TEST_CASE("a scatter layer's sway controls reach the picture", "[gpu][wind][ecol
         CHECK(differingPixels(still, stillLoosened) == 0);
     }
 
-    SECTION("catches the wind at 0: the ferns stand still") {
-        // As authored, two seconds half a second apart differ: the ferns sway. (The same frame index for
-        // both, so the jitter and noise seed is not what differs.)
-        const gpu::Image8 a = m.frame(renderer, kAt);
-        const gpu::Image8 b = m.frame(renderer, kAt + 0.5);
-        const std::size_t swaying = differingPixels(a, b);
-        dump("authored-3.0-vs-3.5", a, b);
-        INFO("pixels the authored ferns moved in half a second: " << swaying);
-        CHECK(swaying > 0);
+    SECTION("catches the wind at 0: the ferns stand as they do with no wind at all") {
+        // One second, three frames: the ferns as authored, the same scene with the wind switched off,
+        // and the wind back on with the ferns catching none of it. The last must be the no-wind frame
+        // exactly -- nothing of the sway left -- and the first must not be (the control: the wind does
+        // bend them). One second, because two different seconds differ along the ferns' fine edges
+        // even with no wind (61,506 pixels, the same with the frame index and the camera pinned):
+        // something in the frame is keyed on the second itself, which is not what this arm asks.
+        const gpu::Image8 authored = m.frame(renderer, kAt);
+        auto* windOn = m.params.findAs<bool>("scene/wind/enabled");
+        REQUIRE(windOn != nullptr);
+        windOn->setBase(false);
+        const gpu::Image8 noWind = m.frame(renderer, kAt);
+        windOn->setBase(true);
         m.sway("windSensitivity")->setBase(0.0f);
-        const gpu::Image8 c = m.frame(renderer, kAt);
-        const gpu::Image8 d = m.frame(renderer, kAt + 0.5);
-        CHECK(differingPixels(c, d) == 0);
+        const gpu::Image8 still = m.frame(renderer, kAt);
+        const std::size_t bent = differingPixels(authored, noWind);
+        dump("authored-vs-no-wind", authored, noWind);
+        INFO("pixels the wind bends the authored ferns by: " << bent);
+        CHECK(bent > kW * kH / 200);
+        CHECK(differingPixels(still, noWind) == 0);
     }
     CHECK(ctx->errorCount() == 0);
 }
