@@ -84,8 +84,10 @@ def load_astronaut(src_dir, collection_name="astronaut"):
         data_to.objects = [n for n in data_from.objects if n in ("Human.rig", "Cube")]
     for o in data_to.objects:
         coll.objects.link(o)
-    rig = bpy.data.objects["Human.rig"]
-    mesh = bpy.data.objects["Cube"]
+    # The appended objects themselves, not a lookup by name: a second append into the same file
+    # arrives as "Human.rig.001", and a name lookup would return the first copy.
+    rig = next(o for o in data_to.objects if o.type == "ARMATURE")
+    mesh = next(o for o in data_to.objects if o.type == "MESH")
     rig.name, mesh.name = "astronaut_rig", "astronaut_mesh"
     rig.data.name, mesh.data.name = "astronaut_rig", "astronaut_mesh"
     bpy.context.view_layer.update()
@@ -951,7 +953,7 @@ def _poly_region(mesh_obj):
     out = []
     for p in mesh_obj.data.polygons:
         names = [best[i] for i in p.vertices]
-        out.append(max(set(names), key=names.count))
+        out.append(max(sorted(set(names)), key=names.count))   # sorted: ties break the same way every run
     return out
 
 
@@ -979,7 +981,7 @@ def audit_intersections(char_mesh, props, frames):
             r["frames_hit"] += 1
             if len(pairs) > r["worst_count"]:
                 r["worst_count"], r["worst_frame"] = len(pairs), f
-            for bone in {region[a] for a, _b in pairs}:
+            for bone in sorted({region[a] for a, _b in pairs}):
                 r["regions"][bone] = r["regions"].get(bone, 0) + 1
     return report
 
@@ -1260,7 +1262,7 @@ def main(argv):
     for leftover in (build_blend + "1", blend + "1"):
         if os.path.exists(leftover):
             os.remove(leftover)
-    text = json.dumps(report, indent=1, default=str)
+    text = json.dumps(report, indent=1, default=str, sort_keys=True)
     if args.report:
         with open(args.report, "w") as fh:
             fh.write(text)

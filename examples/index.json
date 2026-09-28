@@ -38,6 +38,12 @@
     },
     {
       "category": "Lab",
+      "description": "Prototype: two copies of one rigged low-poly astronaut, one playing a keyboard on an X-stand and one a five-piece drum kit, each driven by a Mixamo clip retargeted onto the astronaut's own skeleton and played through the glTF skin path. The meshes are built outside the repository by tools/make_astronaut_musicians.py; without them the scene shows only its floor.",
+      "name": "Astronaut Musicians - Prototype",
+      "project": "musicians/astronaut-musicians.json"
+    },
+    {
+      "category": "Lab",
       "description": "Every primitive, distribution, variation control, deformer and stack, with audio routes and a performance readout.",
       "name": "Procedural Geometry Lab",
       "project": "lab/lab.json"

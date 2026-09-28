@@ -5,15 +5,16 @@ Branch `proto/astronaut-musicians`, worktree `../av-gen-astro`, started from mai
 
 ## Resume here
 
+- **Status: complete. Stopped at the brief's stop condition** (the standalone demo works and has been visually
+  validated). The owner decides whether the astronauts go into GV3. Nothing here touches GV3.
 - **Done:**
-  - The Blender pipeline and its validation.
-  - All four GLBs, built and structurally checked.
-  - The AV Gen demo files: `examples/musicians/astronaut-musicians.{json,scene.json}`.
-- **In progress:** rendering the demo in AV Gen (stills and a video) and confirming that the engine plays both clips.
-- **Still to do:**
-  - the report (`REPORT.md`);
-  - the review folder `~/Desktop/av-gen-review/21-astronaut-musicians/`;
-  - registering the demo in `examples/index.json`.
+  - the Blender pipeline, its validation, and the four GLBs;
+  - the AV Gen demo, `examples/musicians/astronaut-musicians.{json,scene.json}`, registered in `examples/index.json`
+    as "Astronaut Musicians - Prototype";
+  - the renders and videos in the review folder.
+- **Where the report is:** the compatibility report and the recommendation went to the coordinator in the agent's
+  handback. The facts behind them are below. `assets/musicians/ATTRIBUTION.md` is the asset report.
+- **After a merge, the owner's checkout has no GLBs.** Run the command below in that checkout.
 - **To regenerate the assets** (they are not in git, and never may be; see "Licences" below):
 
   ```
@@ -103,7 +104,7 @@ session and call the steps one at a time, which is how it was validated.
   - It is **not** Mixamo-compatible:
     - Assigning the Mixamo action binds zero channels.
     - A name-mapped copy of local rotations mangles the body, because the bone rolls differ. The evidence is
-      `renders/01-*`.
+      `renders/16-naive-retarget-fails-f120.png`.
   - The world-space delta retarget works. After it, each limb segment keeps a constant 0.8-2.6° offset from the
     source; that is the difference between the two rest poses.
 - **Loops:** both clips' last frame equals their first (0° on every bone). They loop cleanly at 499/30 s
@@ -138,6 +139,49 @@ session and call the steps one at a time, which is how it was validated.
   - The right stick's off-beats stop 7-19 cm short of the hi-hat. That is the source clip: it air-taps the
     off-beats.
 
+## How it was verified
+
+- **Pianist contact on the final build:**
+
+  | | fingertips into the keys: worst | frames deeper than 2 cm |
+  |---|---|---|
+  | left fingers | 1.7 cm | 0 of 250 |
+  | right fingers | 2.6 cm (frame 11, the flourish) | 8 |
+
+  The left palm heel goes deeper than 2 cm in 13 frames, at the keyboard's front edge.
+- **Pianist, other props:** the stand has no contact. The bench is at most a 1.3 cm sink with a median gap of
+  0.9 cm.
+- **Drummer:** the body touches no drum except the throne cushion (thigh edge). The sticks touch the hi-hat in
+  8 frames and the snare in 3, at impact only.
+- **AV Gen `build/release/src/avgen`** (built in this worktree, run under `tools/gpu-lock.sh`) loads both GLBs as
+  one rig each: 54 joints (the 53 bones plus the armature node) and one clip, with 0 warnings.
+  - Stills and three `--render` videos: binary exit 0, and no warn or error lines in the log.
+  - An AV Gen frame and a Blender frame at the same instant, from the same camera, match pose for pose.
+  - Both loops are seamless in the rendered videos.
+- **`avgen_tests`** (built in this worktree), all passing with binary exit 0:
+  - "Every example in the index exists and loads"
+  - "The scene parser's key list matches what it reads"
+  - "no project overrides its scene's volumetric noise back to zero"
+
+  The index case also passes with the GLBs moved away (each node is skipped with a warning).
+- **`tools/check_project_integrity.py`:** 20 problems, all pre-existing stale fingerprints under `examples/world`.
+  None names this demo.
+- **The pipeline is deterministic.** Two runs give byte-identical GLBs and a byte-identical `build_report.json`
+  (the set-order tie-breaks in the audit are sorted).
+
+## Review files (`~/Desktop/av-gen-review/21-astronaut-musicians/`)
+
+- `00-brief.md`: the brief.
+- `01`-`03`: AV Gen videos: both performers (16.7 s), the keyboard astronaut close (16.7 s), the drummer close
+  (9.4 s).
+- `renders/04`-`11`: AV Gen stills and a sheet of representative frames.
+- `renders/12`: AV Gen against Blender at the same instant.
+- `renders/13`, `14`: the loop seams.
+- `renders/15`: the astronaut as supplied (magenta: missing texture) against as adjusted.
+- `renders/16`: the naive retarget failing.
+- `renders/17`: the Blender validation scene.
+- `blender/`: the validation .blend and `build_report.json`.
+
 ## Licences and the repository
 
 The repository is public. Never commit, cache or upload the source files, the GLBs or the .blend.
@@ -148,3 +192,5 @@ commit.
 ## Commits
 
 1. `1efbbc2b`: the brief.
+2. `cff51cb0`: the pipeline, the demo, ATTRIBUTION.md and these notes.
+3. The next commit: the index entry, the reproducibility fixes to the tool, and these notes updated.
