@@ -127,7 +127,8 @@ bool resetEffectParameters(world::EffectInstance& effect);
 // ---- activation ----------------------------------------------------------------------------------
 
 [[nodiscard]] std::span<const char* const> activationLabels(); // indexed by `world::Activation`
-// CameraTravel and HeroFocus gate on the director's cut; a scene with no cut never fires them.
+// CameraTravel and HeroFocus gate on the cut -- the director's schedule, or the authored camera track
+// (ADR-947); a scene with neither never fires them.
 [[nodiscard]] bool activationNeedsCut(world::Activation activation);
 
 // ---- beat response -------------------------------------------------------------------------------

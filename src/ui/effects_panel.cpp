@@ -213,11 +213,14 @@ void EffectsSection::draw(app::Engine& engine, const world::EffectOwner& owner, 
         }
     }
     // A cut is what a camera-gated effect activates against; a scene with none never fires one.
-    if (engine.shotSpans().empty() &&
+    // ADR-947: the cut is the director's schedule or, without one, the authored camera track.
+    if (engine.effectShots().empty() &&
         std::any_of(stack.begin(), stack.end(), [&](std::size_t i) { return activationNeedsCut(list[i].activation); })) {
-        ImGui::TextColored(kWarning, "No directed camera: effects gated on the cut cannot fire.");
+        ImGui::TextColored(kWarning, "No cut with a subject: effects gated on the cut cannot fire.");
         if (ImGui::IsItemHovered()) {
-            tooltip("Camera > Enable Auto-director, or set the activation to Always or a window.");
+            tooltip("Camera > Enable Auto-director, or cut to cameras that aim at or follow a subject\n"
+                    "(or set a shot's 'Focuses on' on the camera track), or set the activation to\n"
+                    "Always or a window.");
         }
     }
 

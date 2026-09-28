@@ -75,12 +75,13 @@ EffectSchema buildSchema() {
     s.key = "groundPulse";
     s.enumName = "GroundPulse";
     s.displayName = "Ground Pulse";
-    s.description = "A ring spreading through the ground from where its owner stands; fires when the director's cut holds that owner.";
+    s.description = "A ring spreading through the ground from where its owner stands; fires when the cut holds that owner.";
     s.performance = PerformanceClass::VeryLow;
     s.primaryCost = CostFragment;
     s.addLabel = "Ground Pulse";
     s.addTip = "A ring spreading through the ground from where its owner stands.\n"
-               "On an entity: fires when the director's cut holds that entity.";
+               "On an entity: fires while the cut holds that entity -- the Auto-director's, or a camera-track\n"
+               "shot that aims at, follows or 'focuses on' it (Cameras panel).";
     s.targets = targetBit(EffectTarget::Entity) | targetBit(EffectTarget::World);
     s.styles = kStyles;
     s.routes = kRoutes;

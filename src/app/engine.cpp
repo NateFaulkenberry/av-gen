@@ -1,5 +1,7 @@
 #include "app/engine.hpp"
 
+#include "scene/authored_cut.hpp"
+
 #include "organism/mushroom.hpp"
 #include "scene/tree_generated.hpp"
 
@@ -1302,7 +1304,7 @@ scene::LivenessInputs Engine::livenessInputs() const {
     in.sources = &sources_;
     in.composition = composition();
     in.effects = effects_;
-    in.shots = shotSpans_;
+    in.shots = effectShots(); // ADR-947
     in.track = track_.get();
     in.markers = sequence_.markers;
     in.history = &historyBank_;
@@ -5534,6 +5536,55 @@ void Engine::publishFields() {
 // of the instances it owns. Stages are not forced through one implementation: the surface waves
 // are a per-fragment term in the lit pass, the sky is a far-plane draw, the media are marched --
 // and all three coexist because each writes its own block of the frame and its own slots in it.
+// ADR-947. The director's schedule wins whenever there is one, so Song mode and every baked cut
+// gate exactly as before; otherwise the authored camera track is read as the schedule.
+std::span<const world::ShotSpan> Engine::effectShots() const {
+    if (!shotSpans_.empty()) {
+        return shotSpans_;
+    }
+    const scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return {};
+    }
+    AuthoredCutCache& cache = authoredCut_;
+    const bool continuous = comp->continuousTake();
+    if (!cache.valid || cache.generation != sceneGeneration_ || cache.continuousTake != continuous ||
+        !(cache.direction == comp->cameraDirection())) {
+        cache.valid = true;
+        cache.generation = sceneGeneration_;
+        cache.continuousTake = continuous;
+        cache.direction = comp->cameraDirection();
+        cache.spans.clear();
+        if (!continuous) {
+            // Where a subject stands, from the document rather than the live frame, so the spans are
+            // the same whenever they are derived: a hero's authored point, else a root node's
+            // authored position. Only a `FocusHero` endpoint whose subject is not a hero reads it
+            // (wave_effect.cpp `resolveEndpoint`, `resolveTravelTarget`); an entity-owned pulse
+            // spreads from its owner's live position whatever this says.
+            const std::vector<world::HeroPoint> heroes = comp->authoredHeroes();
+            const auto locate = [&](std::string_view name, glm::vec3& at, float& radius) {
+                for (const world::HeroPoint& h : heroes) {
+                    if (h.name == name) {
+                        at = h.position;
+                        radius = h.radius;
+                        return true;
+                    }
+                }
+                if (const scene::CompositionNode* node = comp->findNode(std::string(name));
+                    node != nullptr && node->parent.empty()) {
+                    at = node->transform.position;
+                    return true;
+                }
+                return false;
+            };
+            cache.spans = scene::authoredShotSpans(cache.direction, locate);
+        }
+    }
+    return cache.spans;
+}
+
+bool Engine::effectShotsFromAuthoredCut() const { return shotSpans_.empty() && !effectShots().empty(); }
+
 world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene) const {
     const scene::Scene& live = controller_->scene();
     world::EffectContext ctx;
@@ -5543,7 +5594,7 @@ world::EffectContext Engine::effectContext(const world::EffectSceneQuery* scene)
     const glm::vec3 aim = live.camera.target - live.camera.position;
     ctx.cameraForward = glm::length(aim) > 1e-5f ? glm::normalize(aim) : glm::vec3(0.0f, 0.0f, -1.0f);
     ctx.cameraVelocity = cameraVelocityOnTimeline();
-    ctx.shots = shotSpans_;
+    ctx.shots = effectShots(); // ADR-947: the director's schedule, else the authored cut
     ctx.scene = scene;
     if (const auto* comp = composition()) {
         ctx.heroes = comp->heroes();

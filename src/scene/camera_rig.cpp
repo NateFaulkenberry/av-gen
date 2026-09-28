@@ -440,6 +440,9 @@ json CameraShot::toJson() const {
     if (!label.empty()) {
         s["label"] = label;
     }
+    if (!subject.empty()) {
+        s["subject"] = subject; // ADR-947
+    }
     // Written only when it is not the default, so an untouched project is byte-identical.
     if (origin == Origin::Directed) {
         s["origin"] = "directed";
@@ -465,6 +468,7 @@ Result<CameraShot> CameraShot::fromJson(const json& sh) {
     shot.blendSeconds = sh.value("blend", 0.0);
     shot.locked = sh.value("locked", false);
     shot.label = sh.value("label", std::string());
+    shot.subject = sh.value("subject", std::string()); // ADR-947
     if (const auto o = sh.find("origin"); o != sh.end() && o->is_string()) {
         const std::string origin = o->get<std::string>();
         if (origin == "directed") {
