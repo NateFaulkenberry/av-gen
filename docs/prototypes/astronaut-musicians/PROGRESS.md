@@ -174,16 +174,25 @@ session and call the steps one at a time, which is how it was validated.
 
 ## Review files (`~/Desktop/av-gen-review/21-astronaut-musicians/`)
 
+Everything in the top level shows the fixed helmet.
+
 - `00-brief.md`: the brief.
 - `01`-`03`: AV Gen videos: both performers (16.7 s), the keyboard astronaut close (16.7 s), the drummer close
   (9.4 s).
-- `renders/04`-`11`: AV Gen stills and a sheet of representative frames.
-- `renders/12`: AV Gen against Blender at the same instant.
-- `renders/13`, `14`: the loop seams.
-- `renders/15`: the astronaut as supplied (magenta: missing texture) against as adjusted.
-- `renders/16`: the naive retarget failing.
-- `renders/17`: the Blender validation scene.
-- `blender/`: the validation .blend and `build_report.json`.
+- `04`, `05`: **the helmet fix**, as before/after side-by-side AV Gen clips of the drummer (9.4 s) and the pianist
+  (16.7 s), from one fixed close-up camera.
+- `renders/06`: AV Gen before/after at the six worst frames (drummer 41, 82, 130; pianist 104, 280, 303).
+- `renders/07`: the seam under the helmet at the suit's worst-strain frames, before and after (Blender close-ups).
+- `renders/08`-`15`: AV Gen stills and a sheet of representative frames.
+- `renders/16`: AV Gen against Blender at the same instant.
+- `renders/17`, `18`: the loop seams.
+- `renders/19`: the astronaut as supplied (magenta: missing texture) against as adjusted.
+- `renders/20`: the naive retarget failing.
+- `renders/21`: the Blender validation scene.
+- `renders/22`: the same demo under `stylized: true`. The flat material colours survive it.
+- `blender/`: the validation .blend and `build_report_rigid_helmet.json`, the pre-fix pair (`*_before_helmet_fix`),
+  and the helmet investigation's work files.
+- `superseded-before-helmet-fix/`: the review media the owner saw first, kept for comparison.
 
 ## The helmet (owner feedback, 2026-09-28)
 
